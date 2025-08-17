@@ -32,11 +32,6 @@ Documents must be consistent.
 Update related documents for every prompt.
 Example: feature changes must update FEATURES.md.
 
-## Processing Prompts
-For every prompt:
-- Add record to `CHANGELOG.md`: date, time, prompt, changes summary.
-- Remove completed tasks from `PLAN.md`.
-
 ## Testing Requirements
 **CRITICAL**: For any code changes to Ploy:
 - Use VPS testing environment in `iac/dev/`
