@@ -1,0 +1,241 @@
+---
+- name: Setup FreeBSD VM for Ploy Testing
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Install QEMU/KVM for FreeBSD VM
+      apt:
+        name:
+          - qemu-kvm
+          - libvirt-daemon-system
+          - libvirt-clients
+          - bridge-utils
+          - virtinst
+          - virt-manager
+          - cloud-image-utils
+        state: present
+
+    - name: Start and enable libvirt
+      systemd:
+        name: libvirtd
+        state: started
+        enabled: true
+
+    - name: Add users to libvirt group
+      user:
+        name: "{{ item }}"
+        groups: libvirt
+        append: true
+      loop:
+        - root
+        - ploy
+
+    - name: Create VM storage directory
+      file:
+        path: /var/lib/libvirt/images
+        state: directory
+        mode: '0755'
+
+    - name: Download FreeBSD cloud image
+      get_url:
+        url: "https://download.freebsd.org/ftp/releases/VM-IMAGES/14.0-RELEASE/amd64/Latest/FreeBSD-14.0-RELEASE-amd64.qcow2.xz"
+        dest: /tmp/freebsd-14.0.qcow2.xz
+        timeout: 1800
+
+    - name: Extract FreeBSD image
+      command: xz -d /tmp/freebsd-14.0.qcow2.xz
+      creates: /tmp/freebsd-14.0.qcow2
+
+    - name: Copy FreeBSD image to VM storage
+      copy:
+        src: /tmp/freebsd-14.0.qcow2
+        dest: /var/lib/libvirt/images/freebsd-dev.qcow2
+        remote_src: true
+
+    - name: Resize FreeBSD disk
+      command: qemu-img resize /var/lib/libvirt/images/freebsd-dev.qcow2 {{ freebsd_vm.disk_size }}
+
+    - name: Create cloud-init user-data
+      template:
+        src: ../templates/freebsd-user-data.yml.j2
+        dest: /tmp/freebsd-user-data.yml
+
+    - name: Create cloud-init meta-data
+      template:
+        src: ../templates/freebsd-meta-data.yml.j2
+        dest: /tmp/freebsd-meta-data.yml
+
+    - name: Create cloud-init ISO
+      command: >
+        cloud-localds /var/lib/libvirt/images/freebsd-dev-cloud-init.iso
+        /tmp/freebsd-user-data.yml /tmp/freebsd-meta-data.yml
+      creates: /var/lib/libvirt/images/freebsd-dev-cloud-init.iso
+
+    - name: Create FreeBSD VM
+      command: >
+        virt-install
+        --name freebsd-dev
+        --ram {{ freebsd_vm.memory }}
+        --vcpus {{ freebsd_vm.cpus }}
+        --disk path=/var/lib/libvirt/images/freebsd-dev.qcow2,format=qcow2
+        --disk path=/var/lib/libvirt/images/freebsd-dev-cloud-init.iso,device=cdrom
+        --network bridge=virbr0
+        --os-variant freebsd13.0
+        --import
+        --noautoconsole
+      creates: /etc/libvirt/qemu/freebsd-dev.xml
+
+    - name: Wait for FreeBSD VM to be accessible
+      wait_for:
+        host: "{{ freebsd_vm.ip }}"
+        port: 22
+        delay: 60
+        timeout: 300
+
+- name: Configure FreeBSD VM
+  hosts: freebsd_vms
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Update FreeBSD package repository
+      pkgng:
+        name: pkg
+        state: latest
+
+    - name: Install essential packages
+      pkgng:
+        name:
+          - python3
+          - py39-pip
+          - bash
+          - curl
+          - wget
+          - git
+          - go
+          - node18
+          - npm
+          - openjdk17
+          - docker
+        state: present
+
+    - name: Enable Docker service
+      service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Install bhyve tools
+      pkgng:
+        name:
+          - bhyve-firmware
+          - grub2-bhyve
+        state: present
+
+    - name: Enable bhyve kernel module
+      lineinfile:
+        path: /boot/loader.conf
+        line: 'vmm_load="YES"'
+        create: true
+
+    - name: Load bhyve kernel module
+      kld:
+        name: vmm
+        state: present
+
+    - name: Create jails configuration directory
+      file:
+        path: /usr/local/etc/jail.conf.d
+        state: directory
+
+    - name: Enable jail service
+      service:
+        name: jail
+        enabled: true
+
+    - name: Install Nomad
+      block:
+        - name: Download Nomad for FreeBSD
+          get_url:
+            url: "https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_freebsd_amd64.zip"
+            dest: /tmp/nomad.zip
+
+        - name: Extract Nomad
+          unarchive:
+            src: /tmp/nomad.zip
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Make Nomad executable
+          file:
+            path: /usr/local/bin/nomad
+            mode: '0755'
+
+    - name: Install Consul
+      block:
+        - name: Download Consul for FreeBSD
+          get_url:
+            url: "https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{ consul_version }}_freebsd_amd64.zip"
+            dest: /tmp/consul.zip
+
+        - name: Extract Consul
+          unarchive:
+            src: /tmp/consul.zip
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Make Consul executable
+          file:
+            path: /usr/local/bin/consul
+            mode: '0755'
+
+    - name: Create Nomad configuration
+      template:
+        src: ../templates/nomad-freebsd.hcl.j2
+        dest: /usr/local/etc/nomad.hcl
+
+    - name: Create Consul configuration
+      template:
+        src: ../templates/consul-freebsd.hcl.j2
+        dest: /usr/local/etc/consul.hcl
+
+    - name: Create rc.d scripts for Nomad and Consul
+      template:
+        src: "../templates/{{ item }}.j2"
+        dest: "/usr/local/etc/rc.d/{{ item }}"
+        mode: '0755'
+      loop:
+        - nomad
+        - consul
+
+    - name: Enable Nomad and Consul services
+      service:
+        name: "{{ item }}"
+        enabled: true
+      loop:
+        - nomad
+        - consul
+
+    - name: Install Unikraft build dependencies
+      pkgng:
+        name:
+          - gmake
+          - gcc
+          - flex
+          - bison
+          - gawk
+          - unzip
+          - wget
+          - socat
+        state: present
+
+    - name: Clone Ploy repository on FreeBSD
+      git:
+        repo: https://github.com/ploy/ploy.git
+        dest: /home/freebsd/ploy
+        force: true
+      become_user: freebsd

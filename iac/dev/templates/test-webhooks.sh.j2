@@ -1,0 +1,50 @@
+#!/bin/bash
+# Test webhook functionality (mock server)
+
+set -e
+
+echo "Testing Webhook System..."
+
+# Create a simple webhook receiver
+cat > /tmp/webhook-receiver.py << 'EOF'
+#!/usr/bin/env python3
+import json
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime
+
+class WebhookHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        content_length = int(self.headers['Content-Length'])
+        body = self.rfile.read(content_length)
+        
+        print(f"[{datetime.now()}] Received webhook:")
+        try:
+            data = json.loads(body.decode('utf-8'))
+            print(json.dumps(data, indent=2))
+        except:
+            print(body.decode('utf-8'))
+        
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'OK')
+
+if __name__ == '__main__':
+    server = HTTPServer(('localhost', 9999), WebhookHandler)
+    print("Webhook receiver listening on http://localhost:9999")
+    server.serve_forever()
+EOF
+
+# Start webhook receiver in background
+python3 /tmp/webhook-receiver.py &
+WEBHOOK_PID=$!
+
+sleep 2
+
+# Test webhook delivery
+echo "Testing webhook delivery:"
+http POST localhost:9999 event=test.webhook app=test-app timestamp="$(date -Iseconds)"
+
+echo "Webhook test completed!"
+
+# Cleanup
+kill $WEBHOOK_PID 2>/dev/null || true

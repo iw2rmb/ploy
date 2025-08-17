@@ -1,0 +1,21 @@
+[Unit]
+Description="HashiCorp Nomad - A cluster manager and scheduler"
+Documentation=https://www.nomadproject.io/
+Requires=network-online.target
+After=network-online.target
+Wants=consul.service
+ConditionFileNotEmpty=/etc/nomad.d/nomad.hcl
+
+[Service]
+Type=notify
+User=hashicorp
+Group=hashicorp
+ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d/nomad.hcl
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+LimitNOFILE=65536
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

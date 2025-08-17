@@ -1,0 +1,32 @@
+#!/bin/bash
+# Test build pipeline scenarios
+
+set -e
+
+echo "Testing Build Pipeline..."
+
+# Start Ploy controller in background
+cd /home/ploy/ploy
+./ploy-controller &
+CONTROLLER_PID=$!
+
+sleep 5
+
+# Test simple Go app build
+echo "Testing Go app build via CLI:"
+cd /home/ploy/test-apps/go-hellosvc
+tar czf - . | http POST localhost:{{ ploy.controller_port }}/v1/apps/go-hellosvc/builds Content-Type:application/x-tar
+
+# Test API directly
+echo "Testing build API directly:"
+echo '{"test": "payload"}' | http POST localhost:{{ ploy.controller_port }}/v1/apps/test-app/builds sha==test-123 lane==A
+
+# Test lane picker via API
+echo "Testing lane picker:"
+cd /home/ploy/test-apps/node-apisvc
+tar czf - . | http POST localhost:{{ ploy.controller_port }}/v1/apps/node-test/builds
+
+echo "Build pipeline tests completed!"
+
+# Cleanup
+kill $CONTROLLER_PID 2>/dev/null || true

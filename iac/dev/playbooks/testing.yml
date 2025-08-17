@@ -1,0 +1,167 @@
+---
+- name: Setup Testing Tools and Environment
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Install testing dependencies
+      apt:
+        name:
+          - httpie
+          - jq
+          - tmux
+          - vim
+          - htop
+          - iotop
+          - netstat-nat
+          - tcpdump
+          - strace
+          - lsof
+          - tree
+        state: present
+
+    - name: Install Kontain runtime for Docker
+      block:
+        - name: Download Kontain
+          get_url:
+            url: "https://github.com/kontainapp/km/releases/latest/download/kontain.tar.gz"
+            dest: /tmp/kontain.tar.gz
+          ignore_errors: true
+
+        - name: Extract Kontain
+          unarchive:
+            src: /tmp/kontain.tar.gz
+            dest: /usr/local
+            remote_src: true
+          ignore_errors: true
+
+        - name: Configure Docker for Kontain runtime
+          template:
+            src: ../templates/docker-daemon.json.j2
+            dest: /etc/docker/daemon.json
+          notify: restart docker
+
+    - name: Setup Ploy testing environment
+      block:
+        - name: Build Ploy controller
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o ploy-controller ./controller
+          become_user: ploy
+
+        - name: Build Ploy CLI
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o ploy ./cmd/ploy
+          become_user: ploy
+
+        - name: Build lane picker
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o lane-pick ./tools/lane-pick
+          become_user: ploy
+
+        - name: Create Ploy configuration
+          template:
+            src: ../templates/ploy-storage-config.yaml.j2
+            dest: /home/ploy/ploy/configs/storage-config.yaml
+            owner: ploy
+            group: ploy
+
+        - name: Create test scripts directory
+          file:
+            path: /home/ploy/test-scripts
+            state: directory
+            owner: ploy
+            group: ploy
+
+        - name: Create lane detection test script
+          template:
+            src: ../templates/test-lane-detection.sh.j2
+            dest: /home/ploy/test-scripts/test-lane-detection.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create build pipeline test script
+          template:
+            src: ../templates/test-build-pipeline.sh.j2
+            dest: /home/ploy/test-scripts/test-build-pipeline.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create API test script
+          template:
+            src: ../templates/test-api.sh.j2
+            dest: /home/ploy/test-scripts/test-api.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create webhook test script
+          template:
+            src: ../templates/test-webhooks.sh.j2
+            dest: /home/ploy/test-scripts/test-webhooks.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+    - name: Setup test data
+      block:
+        - name: Create test apps directory
+          file:
+            path: /home/ploy/test-apps
+            state: directory
+            owner: ploy
+            group: ploy
+
+        - name: Copy sample apps for testing
+          copy:
+            src: /home/ploy/ploy/apps/
+            dest: /home/ploy/test-apps/
+            remote_src: true
+            owner: ploy
+            group: ploy
+
+    - name: Install monitoring tools
+      block:
+        - name: Install Prometheus Node Exporter
+          get_url:
+            url: "https://github.com/prometheus/node_exporter/releases/latest/download/node_exporter-1.7.0.linux-amd64.tar.gz"
+            dest: /tmp/node_exporter.tar.gz
+
+        - name: Extract Node Exporter
+          unarchive:
+            src: /tmp/node_exporter.tar.gz
+            dest: /tmp
+            remote_src: true
+
+        - name: Install Node Exporter
+          copy:
+            src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+            dest: /usr/local/bin/node_exporter
+            remote_src: true
+            mode: '0755'
+
+        - name: Create Node Exporter systemd service
+          template:
+            src: ../templates/node-exporter.service.j2
+            dest: /etc/systemd/system/node-exporter.service
+
+        - name: Start and enable Node Exporter
+          systemd:
+            name: node-exporter
+            state: started
+            enabled: true
+            daemon_reload: true
+
+    - name: Create environment setup script
+      template:
+        src: ../templates/setup-env.sh.j2
+        dest: /home/ploy/setup-env.sh
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+  handlers:
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted

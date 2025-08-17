@@ -1,0 +1,40 @@
+#!/bin/bash
+# Test lane detection scenarios
+
+set -e
+
+echo "Testing Lane Detection..."
+
+cd /home/ploy/test-apps
+
+# Test Go app detection
+echo "Testing Go app (should be Lane A):"
+cd go-hellosvc
+/home/ploy/ploy/lane-pick --path .
+cd ..
+
+# Test Node app detection  
+echo "Testing Node app (should be Lane B):"
+cd node-apisvc
+/home/ploy/ploy/lane-pick --path .
+cd ..
+
+# Test Java app detection
+echo "Testing Java app (should be Lane C or E):"
+cd java-ordersvc
+/home/ploy/ploy/lane-pick --path .
+cd ..
+
+# Test Python app detection
+echo "Testing Python app (should be Lane B):"
+cd python-apisvc
+/home/ploy/ploy/lane-pick --path .
+cd ..
+
+# Test Scala app detection
+echo "Testing Scala app (should be Lane C or E):"
+cd scala-catalogsvc
+/home/ploy/ploy/lane-pick --path .
+cd ..
+
+echo "Lane detection tests completed!"

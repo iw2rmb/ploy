@@ -1,0 +1,47 @@
+datacenter = "dc1"
+data_dir = "/opt/hashicorp/nomad"
+log_level = "INFO"
+
+server {
+  enabled = true
+  bootstrap_expect = 1
+}
+
+client {
+  enabled = true
+  servers = ["127.0.0.1"]
+  
+  # Enable raw_exec driver for testing
+  options {
+    "driver.raw_exec.enable" = "1"
+  }
+}
+
+consul {
+  address = "127.0.0.1:8500"
+}
+
+vault {
+  enabled = true
+  address = "http://127.0.0.1:8200"
+}
+
+plugin "docker" {
+  config {
+    enabled = true
+    allow_privileged = true
+    
+    # Allow Kontain runtime
+    allow_runtimes = ["runc", "io.kontain"]
+  }
+}
+
+ui {
+  enabled = true
+}
+
+ports {
+  http = 4646
+  rpc = 4647
+  serf = 4648
+}

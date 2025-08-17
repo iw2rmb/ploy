@@ -1,0 +1,34 @@
+#cloud-config
+users:
+  - name: freebsd
+    groups: wheel
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7... # Replace with your SSH public key
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - python3
+  - py39-pip
+  - bash
+  - curl
+
+runcmd:
+  - echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
+  - service sshd restart
+  - pw usermod root -h 0 <<< 'ploydev'
+
+network:
+  version: 2
+  ethernets:
+    {{ freebsd_vm.network_interface }}:
+      dhcp4: false
+      addresses:
+        - {{ freebsd_vm.ip }}/24
+      gateway4: {{ freebsd_vm.gateway }}
+      nameservers:
+        addresses:
+          - 8.8.8.8
+          - 1.1.1.1
