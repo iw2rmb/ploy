@@ -31,7 +31,6 @@ __pycache__/
 # Java caches
 .gradle/
 .m2/
-build/
 
 # Artifacts
 *.img
