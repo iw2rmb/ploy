@@ -37,10 +37,21 @@ For every prompt:
 - Add record to `CHANGELOG.md`: date, time, prompt, changes summary.
 - Remove completed tasks from `PLAN.md`.
 
-## Self-Healing Loop Features
-For self-healing loop changes:
-- Update configs/webhooks-config.yaml
-- Update PLAN.md, FEATURES.md, REST.md, CLI.md
+## Testing Requirements
+**CRITICAL**: For any code changes to Ploy:
+- Use VPS testing environment in `iac/dev/`
+- SSH to VPS and run relevant test scenarios from TESTS.md
+- Test on both Linux host and FreeBSD VM as appropriate
+- Verify changes work in full stack (controller + CLI + Nomad)
+- Required test categories based on change type:
+  - Lane detection changes: Run lane-detection tests
+  - API changes: Run API and build-pipeline tests  
+  - CLI changes: Run CLI and integration tests
+  - FreeBSD features: Test on FreeBSD VM (jails, bhyve)
+  - Self-healing features: Run webhook tests
+
+Setup: `cd iac/dev && ansible-playbook site.yml -e target_host=VPS_IP`
+Test: `ssh root@VPS_IP && su - ploy && ./test-scripts/test-*.sh`
 
 ## Development Commands
 

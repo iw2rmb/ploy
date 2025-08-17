@@ -1,0 +1,37 @@
+#!/bin/bash
+# Test API endpoints
+
+set -e
+
+echo "Testing Ploy API..."
+
+BASE_URL="http://localhost:{{ ploy.controller_port }}/v1"
+
+# Start controller
+cd /home/ploy/ploy
+./ploy-controller &
+CONTROLLER_PID=$!
+
+sleep 5
+
+echo "Testing core endpoints:"
+
+# Test status endpoint
+echo "GET /v1/status/test-app"
+http GET $BASE_URL/status/test-app
+
+# Test apps list
+echo "GET /v1/apps"
+http GET $BASE_URL/apps
+
+# Test webhook endpoints (planned)
+echo "Testing webhook endpoints (should return 404 for now):"
+http POST $BASE_URL/apps/test-app/webhooks url=http://example.com/webhook events:='["build.completed"]' || echo "Expected 404"
+
+echo "Testing diff push endpoint (should return 404 for now):"
+echo "diff content" | http POST $BASE_URL/apps/test-app/diff verify==true || echo "Expected 404"
+
+echo "API tests completed!"
+
+# Cleanup
+kill $CONTROLLER_PID 2>/dev/null || true

@@ -1,0 +1,6 @@
+---
+# Complete Ploy development environment setup
+- import_playbook: playbooks/main.yml
+- import_playbook: playbooks/hashicorp.yml  
+- import_playbook: playbooks/freebsd.yml
+- import_playbook: playbooks/testing.yml
