@@ -1,0 +1,15 @@
+spec_version: '0.6'
+name: posix-node
+unikraft:
+  version: stable
+targets:
+  - architecture: x86_64
+    platform: qemu
+libraries:
+  - name: musl     # POSIX libc for lane B
+  - name: lwip
+application:
+  sources: ./
+  arguments: []
+options:
+  http_port: 8080

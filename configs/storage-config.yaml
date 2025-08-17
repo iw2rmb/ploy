@@ -1,0 +1,12 @@
+storage:
+  provider: s3
+  endpoint: http://minio.ploy.local:9000
+  bucket: ploy-artifacts
+  region: us-east-1
+  access_key: PLOYACCESSKEY
+  secret_key: PLOYSECRETKEY
+  path_style: true
+buckets:
+  artifacts: ploy-artifacts
+  logs: ploy-logs
+  cache: ploy-cache

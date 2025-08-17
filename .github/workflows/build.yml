@@ -1,0 +1,30 @@
+name: Build
+on: { push: { branches: [ main ] } }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - name: Install syft/grype/cosign
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          COSIGN_VERSION=v2.2.4
+          curl -sSfL https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64 -o /usr/local/bin/cosign
+          chmod +x /usr/local/bin/cosign
+      - name: Build controller
+        run: go build -o bin/ploy-controller ./controller
+      - name: SBOM & Sign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          syft dir:. -o json > repo.sbom.json
+          grype repo.sbom.json --fail-on high
+          cosign sign-blob --yes repo.sbom.json --output-signature repo.sbom.json.sig
+      - uses: actions/upload-artifact@v4
+        with: { name: sbom, path: repo.sbom.json }

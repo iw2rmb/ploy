@@ -1,0 +1,45 @@
+# Go and build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.a
+bin/
+dist/
+build/
+vendor/
+go.work
+*.lock
+*.coverprofile
+*.prof
+*.pprof
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node/Python caches
+node_modules/
+__pycache__/
+.venv/
+
+# Java caches
+.gradle/
+.m2/
+build/
+
+# Artifacts
+*.img
+*.qcow2
+*.iso
+*.tar
+*.tar.gz
+
+# Git
+.git/
