@@ -41,3 +41,23 @@
 26. Nomad server failover does not disrupt deployments.
 27. Ingress node failover preserves domains & certs.
 28. Network partition between FreeBSD and Linux pools recovers cleanly.
+
+## Self-Healing Loop Integration
+29. `POST /v1/apps/:app/diff?verify=true` creates verification branch and deploys to isolated namespace.
+30. `ploy push --verify --diff patch.diff` pushes diff, returns verification URL for testing.
+31. Verification deployments auto-cleanup after TTL expiration.
+32. `POST /v1/apps/:app/webhooks` configures webhook for build/deploy events.
+33. Webhook delivers structured JSON payload on build.completed event.
+34. Webhook retry logic with exponential backoff on delivery failure.
+35. LLM agent receives webhook, analyzes failure, pushes fix via verification branch.
+36. Verification branch testing passes, manual merge triggers production deployment.
+
+## Enhanced Lane Detection  
+37. Java project with Jib plugin → Lane E (not Lane C).
+38. Python project with C-extensions (.c files, ext_modules) → Lane C (not Lane B).
+39. Scala project with sbt-jib plugin → Lane E (not Lane C).
+
+## Storage & Artifacts
+40. Build artifacts (image, SBOM, signature) uploaded to S3/MinIO storage.
+41. Storage retrieval for rollback operations.
+42. Storage cleanup for expired verification builds.

@@ -15,8 +15,21 @@ ploy push -a <app> [-lane A|B|C|D|E|F] [-main com.example.Main] [-sha <sha>]
 ```
 Streams a tar of the working tree (respects `.gitignore`) to the controller, which lane-picks and builds & deploys.
 
+```
+ploy push -a <app> --verify --diff <diff-file> [--cleanup-after <duration>]
+```
+**Self-Healing Loop Support** (planned): Pushes a diff/patch file to create a verification branch for isolated testing. Returns verification URL for testing before merging.
+
 ### `ploy open`
 ```
 ploy open <app>
 ```
 Opens the app domain from `manifests/<app>.yaml` or falls back to `<app>.ployd.app`.
+
+### `ploy webhooks` (planned)
+```
+ploy webhooks add <app> <url> [--events build.completed,deploy.failed] [--secret <secret>]
+ploy webhooks list <app>
+ploy webhooks remove <app> <webhook-id>
+```
+**Self-Healing Loop Support**: Configure webhooks for external LLM agents to monitor build/deploy events and implement automated responses.

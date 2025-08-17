@@ -39,13 +39,32 @@ func detect(root string) Result {
 	if exists(filepath.Join(root, "go.mod")) { lang = "go"; lane = "A"; reasons = append(reasons, "go.mod detected") }
 	if exists(filepath.Join(root, "Cargo.toml")) { lang = "rust"; lane = "A"; reasons = append(reasons, "Cargo.toml detected") }
 	if exists(filepath.Join(root, "package.json")) { lang = "node"; lane = "B"; reasons = append(reasons, "package.json detected") }
-	if exists(filepath.Join(root, "pyproject.toml")) || exists(filepath.Join(root, "requirements.txt")) { lang = "python"; lane = "B"; reasons = append(reasons, "python detected") }
+	if exists(filepath.Join(root, "pyproject.toml")) || exists(filepath.Join(root, "requirements.txt")) { 
+		lang = "python"; lane = "B"; reasons = append(reasons, "python detected")
+		// Check for C extensions
+		if hasAny(root, ".c") || hasAny(root, ".cc") || grep(root, "ext_modules") {
+			lane = "C"; reasons = append(reasons, "Python C-extensions detected")
+		}
+	}
 	if hasAny(root, ".csproj") { lang = ".net"; lane = "C"; reasons = append(reasons, ".csproj detected") }
 	if exists(filepath.Join(root, "pom.xml")) || hasAny(root, "build.gradle") || hasAny(root, "build.gradle.kts") {
 		if lang == "unknown" { lang = "java" }
-		lane = "C"; reasons = append(reasons, "Java/Scala build tool detected")
+		// Check for Jib plugin to determine Lane E vs C
+		if grep(root, "com.google.cloud.tools.jib") || grep(root, "jib {") {
+			lane = "E"; reasons = append(reasons, "Java/Scala with Jib plugin detected")
+		} else {
+			lane = "C"; reasons = append(reasons, "Java/Scala build tool detected")
+		}
 	}
-	if hasAny(root, "build.sbt") { lang = "scala"; lane = "C"; reasons = append(reasons, "build.sbt detected") }
+	if hasAny(root, "build.sbt") { 
+		lang = "scala"
+		// Check for Jib plugin in SBT projects
+		if grep(root, "sbt-jib") {
+			lane = "E"; reasons = append(reasons, "Scala with Jib plugin detected")
+		} else {
+			lane = "C"; reasons = append(reasons, "build.sbt detected")
+		}
+	}
 
 	// Heuristics for POSIX-heavy
 	if grep(root, "fork(") || grep(root, "/proc") { lane = "C"; reasons = append(reasons, "POSIX-heavy features detected") }

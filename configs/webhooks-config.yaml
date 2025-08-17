@@ -1,0 +1,68 @@
+# Webhook Configuration Template for Ploy
+# This configuration defines webhook settings for self-healing loop integration
+
+webhooks:
+  # Global webhook settings
+  retry_attempts: 3
+  retry_backoff: exponential  # linear or exponential
+  timeout: 30s
+  
+  # Security settings
+  require_authentication: true
+  allowed_ips: []  # Empty means allow all
+  
+  # Rate limiting
+  rate_limit:
+    requests_per_minute: 60
+    burst: 10
+
+# Per-app webhook examples
+apps:
+  # Example app configuration
+  example-app:
+    webhooks:
+      - id: "llm-agent-1"
+        url: "https://llm-agent.example.com/webhook"
+        events:
+          - "build.started"
+          - "build.completed" 
+          - "build.failed"
+          - "deploy.started"
+          - "deploy.completed"
+          - "deploy.failed"
+        auth:
+          type: "bearer"  # bearer, hmac, or none
+          secret: "${WEBHOOK_SECRET_1}"
+        active: true
+        
+      - id: "monitoring-system"
+        url: "https://monitor.example.com/ploy-events"
+        events:
+          - "build.failed"
+          - "deploy.failed"
+        auth:
+          type: "hmac"
+          secret: "${WEBHOOK_SECRET_2}"
+          algorithm: "sha256"
+        active: true
+
+# Event payload structure (documentation)
+# {
+#   "event": "build.completed",
+#   "app": "example-app",
+#   "sha": "abc123def456",
+#   "branch": "main",
+#   "verification_branch": "verify-20240817-abc123",  # if applicable
+#   "timestamp": "2024-08-17T10:30:00Z",
+#   "duration": "45s",
+#   "lane": "C",
+#   "status": "success",  # success, failed, started
+#   "logs": "Build logs here...",
+#   "metadata": {
+#     "image_path": "/path/to/image",
+#     "image_size": "125MB",
+#     "sbom_generated": true,
+#     "signature_generated": true,
+#     "nomad_job_id": "example-app-lane-c"
+#   }
+# }

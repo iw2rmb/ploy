@@ -1,17 +1,46 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) when working in this repository.
+
+Must be followed for every prompt execution.
 
 ## Project Overview
 
-Ploy is a deployment platform that builds and runs applications using different "lanes" (A-F) optimized for performance and footprint:
+Ploy deploys applications via optimized "lanes" (A-F) for performance and footprint:
 - **Lane A/B**: Unikraft-based unikernels (1-40MB, microsecond boot)
 - **Lane C**: OSv/Hermit VMs for JVM/.NET (50-200MB)
 - **Lane D**: FreeBSD jails for native apps
 - **Lane E**: OCI containers with VM isolation via Kontain/Firecracker
 - **Lane F**: Full VMs for stateful workloads
 
-The system automatically picks the optimal lane based on project structure unless overridden.
+Auto-selects optimal lane from project structure unless overridden.
+
+## Documentation
+- `docs/` contains:
+  - PLAN.md — LLM instructions for repo iteration.
+  - CONCEPT.md — architecture and purpose.
+  - FOLDERS.md — folder structure.
+  - CLI.md — CLI reference.
+  - REST.md — REST API routes.
+  - STORAGE.md — storage abstraction (MinIO).
+  - INFRASTRUCTURE.md — bare-metal setup.
+  - SCENARIOS.md — test scenarios.
+  - FEATURES.md — feature list.
+  - TESTS.md — test scenarios to implement.
+
+Documents must be consistent.
+Update related documents for every prompt.
+Example: feature changes must update FEATURES.md.
+
+## Processing Prompts
+For every prompt:
+- Add record to `CHANGELOG.md`: date, time, prompt, changes summary.
+- Remove completed tasks from `PLAN.md`.
+
+## Self-Healing Loop Features
+For self-healing loop changes:
+- Update configs/webhooks-config.yaml
+- Update PLAN.md, FEATURES.md, REST.md, CLI.md
 
 ## Development Commands
 
@@ -58,7 +87,7 @@ go run ./tools/lane-pick --path /path/to/project
 ## Architecture
 
 ### Core Components
-- **controller/**: REST API server that handles builds and deployments
+- **controller/**: REST API for builds and deployments
   - `main.go`: Fiber HTTP server with build endpoints
   - `builders/`: Lane-specific image builders (unikraft.go, java_osv.go, etc.)
   - `nomad/`: HashiCorp Nomad integration for job scheduling
@@ -69,14 +98,14 @@ go run ./tools/lane-pick --path /path/to/project
   - `main.go`: Command router and TUI
   - `scaffold.go`: App templating for new projects
 
-- **tools/lane-pick/**: Automated lane selection based on project analysis
+- **tools/lane-pick/**: Automated lane selection
 
-- **internal/storage/**: Object storage abstraction for artifacts
+- **internal/storage/**: Object storage abstraction
 
 ### Key Workflows
-1. **Deploy Flow**: CLI streams tar → Controller lane-picks → Builds image → Submits to Nomad
-2. **Preview Flow**: Git SHA-based URLs trigger on-demand builds via Host header routing
-3. **Lane Selection**: Automatic based on file patterns, dependencies, and project structure
+1. **Deploy**: CLI tar → Controller lane-pick → Build → Nomad
+2. **Preview**: SHA URLs trigger builds via Host routing
+3. **Lane Selection**: Auto-detect from file patterns, dependencies
 
 ### Configuration
 - Controller reads storage config from `configs/storage-config.yaml`
@@ -84,4 +113,4 @@ go run ./tools/lane-pick --path /path/to/project
 - App manifests in `manifests/` define domain routing
 
 ### Sample Apps
-The `apps/` directory contains reference implementations for different languages and lanes.
+`apps/` contains reference implementations per language/lane.
