@@ -39,6 +39,20 @@
 87. CLI help messages display correct usage for all new commands.
 88. Error handling for invalid arguments and missing parameters.
 
+## API Endpoints Implementation (Aug 2025)
+89. `POST /v1/apps/:app/domains` accepts domain JSON and returns registration status.
+90. `GET /v1/apps/:app/domains` returns list of domains for app in JSON format.
+91. `DELETE /v1/apps/:app/domains/:domain` removes domain and returns confirmation.
+92. `POST /v1/certs/issue` accepts domain JSON and initiates certificate issuance.
+93. `GET /v1/certs` returns list of all managed certificates with metadata.
+94. `POST /v1/apps/:app/debug` creates debug instance with SSH configuration.
+95. `POST /v1/apps/:app/debug?lane=A` creates debug instance in specified lane.
+96. `POST /v1/apps/:app/rollback` accepts SHA and performs application rollback.
+97. All endpoints return proper HTTP status codes and JSON responses.
+98. Error handling returns 400 for invalid JSON and missing required fields.
+99. Existing endpoints (`/apps`, `/status/:app`) remain functional after changes.
+100. Controller compiles without errors and starts successfully.
+
 ## Policies & Supply Chain
 20. Reject deploy without signature/SBOM.
 21. Reject SSH in prod unless break-glass flag present.

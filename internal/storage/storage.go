@@ -3,6 +3,7 @@ package storage
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -65,7 +66,7 @@ func New(cfg Config) (*Client, error) {
 
 func first(vals ...string) string { for _, v := range vals { if v != "" { return v } } ; return "" }
 
-func (c *Client) PutObject(bucket, key string, body aws.ReadSeekCloser, contentType string) (*s3.PutObjectOutput, error) {
+func (c *Client) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*s3.PutObjectOutput, error) {
 	in := &s3.PutObjectInput{ Bucket: aws.String(bucket), Key: aws.String(key), Body: body, ContentType: aws.String(contentType) }
 	if c.SSE != "" { in.ServerSideEncryption = aws.String(c.SSE) }
 	return c.S3.PutObject(in)

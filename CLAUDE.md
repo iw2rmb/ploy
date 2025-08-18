@@ -121,3 +121,20 @@ go run ./tools/lane-pick --path /path/to/project
 
 ### Sample Apps
 `apps/` contains reference implementations per language/lane.
+
+## Mandatory Update Protocol
+
+**CRITICAL**: For EVERY codebase modification, execute ALL steps below in exact order:
+
+1. **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
+2. **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
+3. **TESTS.md Scenarios**: Add comprehensive test scenarios (numbered sequentially) if current functionality lacks coverage
+4. **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
+5. **STACK.md Dependencies**: Update technology stack documentation when adding/changing frameworks or tools
+6. **Test Implementation**: Create executable test scripts for any new scenarios defined in step 3
+7. **VPS Validation**: Deploy and run ALL relevant tests on development VPS environment - must pass completely
+8. **Git Operations**: 
+   - IF all tests pass: Commit and push all changes with descriptive commit message
+   - IF any tests fail: Stash changes immediately and report test failures
+
+**NO EXCEPTIONS**: Every code change must complete this full protocol. Incomplete updates violate project standards and compromise system integrity.

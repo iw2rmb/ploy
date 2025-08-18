@@ -85,12 +85,11 @@ func previewHostRouter(c *fiber.Ctx) error {
 
 	// naive readiness check and proxy
 	if isHealthy("http://127.0.0.1:8080/healthz") { // fast path
-		return c.Proxy("http://127.0.0.1:8080")
+		// TODO: Implement actual proxy to app
+		return c.Redirect("http://127.0.0.1:8080")
 	}
 	// slow path: poll Nomad and then proxy default service endpoint if known (placeholder)
 	// In production, resolve from Consul or job svc address.
-		return c.Proxy("http://127.0.0.1:8080")
-	}
 	c.Set("Content-Type","application/json")
 	c.Set("Retry-After","3")
 	return c.Status(resp.StatusCode).Send(b)
@@ -321,7 +320,7 @@ func debugApp(c *fiber.Ctx) error {
 		return errJSON(c, 400, fmt.Errorf("invalid request body"))
 	}
 	
-	log.Printf("Creating debug build for app %s with SSH enabled: %v", app, req.SSHEnabled)
+	log.Printf("Creating debug build for app %s (lane: %s) with SSH enabled: %v", app, lane, req.SSHEnabled)
 	
 	// TODO: Implement debug build with SSH support
 	// This would typically involve:

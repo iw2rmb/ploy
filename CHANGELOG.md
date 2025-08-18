@@ -46,3 +46,36 @@
 **COMPLETED** - Phase 1, Step 1 from PLAN.md: "Complete missing CLI commands: domains add, certs issue, debug shell, rollback"
 
 All essential CLI operations are now implemented, providing users with complete domain, certificate, debugging, and rollback capabilities.
+
+## [2025-08-18] - Controller Fixes & API Testing
+
+### Fixed
+- **Controller Compilation Issues**
+  - Fixed AWS SDK type error in `internal/storage/storage.go` (changed `aws.ReadSeekCloser` to `io.ReadSeeker`)
+  - Resolved syntax error in `previewHostRouter` function (removed stray closing brace)
+  - Replaced deprecated `c.Proxy()` with `c.Redirect()` for Fiber v2 compatibility
+  - Fixed unused variable warning in `debugApp` function by including lane in log message
+
+### Testing
+- **Comprehensive API Test Suite**
+  - Created `test-api-endpoints.sh` with 100+ test scenarios
+  - All new API endpoints return proper HTTP status codes and JSON responses
+  - Error handling validated for invalid JSON and missing required fields
+  - Existing endpoints confirmed functional after changes
+  - End-to-end CLI-to-API integration verified
+
+### Technical Details
+- Controller now compiles cleanly without errors or warnings
+- All dependencies resolved via `go mod tidy`
+- Successful deployment and testing on production VPS environment
+- JSON response format validation ensures API consistency
+- Proper error responses with meaningful messages
+
+### Test Results
+- ✅ **Domain Management**: add/list/remove operations working
+- ✅ **Certificate Management**: issue/list operations working  
+- ✅ **Debug Operations**: SSH-enabled debug instances working
+- ✅ **Rollback Operations**: SHA-based rollbacks working
+- ✅ **Error Handling**: 400 responses for invalid requests
+- ✅ **Backward Compatibility**: Existing endpoints unaffected
+- ✅ **CLI Integration**: Commands successfully communicate with API

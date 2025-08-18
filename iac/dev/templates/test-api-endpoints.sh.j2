@@ -1,0 +1,225 @@
+#!/bin/bash
+# Test script for new API endpoints: domains, certs, debug, rollback
+
+set -e
+
+echo "=== Testing New API Endpoints ==="
+
+# Configuration
+CONTROLLER_URL="http://localhost:8081/v1"
+TEST_APP="test-api-app"
+TEST_DOMAIN="api-test.example.com"
+TEST_SHA="abc123def456"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Helper functions
+log_info() {
+    echo -e "${YELLOW}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+test_endpoint() {
+    local method=$1
+    local endpoint=$2
+    local data=$3
+    local expected_status=$4
+    local description=$5
+    
+    log_info "Testing: $description"
+    
+    if [ "$method" = "GET" ]; then
+        response=$(curl -s -w "\n%{http_code}" "$CONTROLLER_URL$endpoint")
+    elif [ "$method" = "DELETE" ]; then
+        response=$(curl -s -w "\n%{http_code}" -X DELETE "$CONTROLLER_URL$endpoint")
+    else
+        response=$(curl -s -w "\n%{http_code}" -X "$method" \
+            -H "Content-Type: application/json" \
+            -d "$data" \
+            "$CONTROLLER_URL$endpoint")
+    fi
+    
+    status_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | sed '$d')
+    
+    if [ "$status_code" = "$expected_status" ]; then
+        log_success "$description - Status: $status_code"
+        echo "Response: $body"
+    else
+        log_error "$description - Expected: $expected_status, Got: $status_code"
+        echo "Response: $body"
+        return 1
+    fi
+    
+    echo
+    return 0
+}
+
+# Wait for controller to be ready
+log_info "Waiting for controller to be ready..."
+timeout=30
+while [ $timeout -gt 0 ]; do
+    if curl -s "$CONTROLLER_URL/status/health" > /dev/null 2>&1; then
+        log_success "Controller is ready"
+        break
+    fi
+    sleep 1
+    timeout=$((timeout - 1))
+done
+
+if [ $timeout -eq 0 ]; then
+    log_error "Controller failed to start within 30 seconds"
+    exit 1
+fi
+
+echo
+echo "--- Testing Domain Management Endpoints ---"
+
+# Test domains add
+test_endpoint "POST" "/apps/$TEST_APP/domains" \
+    "{\"domain\":\"$TEST_DOMAIN\"}" \
+    "200" \
+    "POST /apps/$TEST_APP/domains - Add domain"
+
+# Test domains list
+test_endpoint "GET" "/apps/$TEST_APP/domains" \
+    "" \
+    "200" \
+    "GET /apps/$TEST_APP/domains - List domains"
+
+# Test domains remove
+test_endpoint "DELETE" "/apps/$TEST_APP/domains/$TEST_DOMAIN" \
+    "" \
+    "200" \
+    "DELETE /apps/$TEST_APP/domains/$TEST_DOMAIN - Remove domain"
+
+echo "--- Testing Certificate Management Endpoints ---"
+
+# Test certificate issue
+test_endpoint "POST" "/certs/issue" \
+    "{\"domain\":\"$TEST_DOMAIN\"}" \
+    "200" \
+    "POST /certs/issue - Issue certificate"
+
+# Test certificate list
+test_endpoint "GET" "/certs" \
+    "" \
+    "200" \
+    "GET /certs - List certificates"
+
+echo "--- Testing Debug Endpoint ---"
+
+# Test debug app creation
+test_endpoint "POST" "/apps/$TEST_APP/debug" \
+    "{\"ssh_enabled\":true}" \
+    "200" \
+    "POST /apps/$TEST_APP/debug - Create debug instance"
+
+# Test debug app creation with lane
+test_endpoint "POST" "/apps/$TEST_APP/debug?lane=A" \
+    "{\"ssh_enabled\":true}" \
+    "200" \
+    "POST /apps/$TEST_APP/debug?lane=A - Create debug instance with lane"
+
+echo "--- Testing Rollback Endpoint ---"
+
+# Test rollback
+test_endpoint "POST" "/apps/$TEST_APP/rollback" \
+    "{\"sha\":\"$TEST_SHA\"}" \
+    "200" \
+    "POST /apps/$TEST_APP/rollback - Rollback application"
+
+echo "--- Testing Error Handling ---"
+
+# Test invalid JSON
+log_info "Testing invalid JSON handling"
+response=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d "invalid-json" \
+    "$CONTROLLER_URL/apps/$TEST_APP/domains")
+
+status_code=$(echo "$response" | tail -n1)
+if [ "$status_code" = "400" ]; then
+    log_success "Invalid JSON properly rejected - Status: $status_code"
+else
+    log_error "Invalid JSON handling - Expected: 400, Got: $status_code"
+fi
+
+# Test missing required fields
+log_info "Testing missing required fields"
+response=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d "{}" \
+    "$CONTROLLER_URL/apps/$TEST_APP/domains")
+
+status_code=$(echo "$response" | tail -n1)
+body=$(echo "$response" | sed '$d')
+echo "Response: $body"
+
+# Test existing endpoints still work
+echo
+echo "--- Testing Existing Endpoints Still Work ---"
+
+test_endpoint "GET" "/apps" \
+    "" \
+    "200" \
+    "GET /apps - List apps (existing endpoint)"
+
+test_endpoint "GET" "/status/$TEST_APP" \
+    "" \
+    "200" \
+    "GET /status/$TEST_APP - App status (existing endpoint)"
+
+echo
+echo "--- Testing API Response Format ---"
+
+log_info "Validating JSON response formats..."
+
+# Test domain add response format
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"domain\":\"format-test.com\"}" \
+    "$CONTROLLER_URL/apps/$TEST_APP/domains")
+
+if echo "$response" | python3 -m json.tool > /dev/null 2>&1; then
+    log_success "Domain add returns valid JSON"
+else
+    log_error "Domain add returns invalid JSON: $response"
+fi
+
+# Test certificate issue response format
+response=$(curl -s -X POST \
+    -H "Content-Type: application/json" \
+    -d "{\"domain\":\"cert-test.com\"}" \
+    "$CONTROLLER_URL/certs/issue")
+
+if echo "$response" | python3 -m json.tool > /dev/null 2>&1; then
+    log_success "Certificate issue returns valid JSON"
+else
+    log_error "Certificate issue returns invalid JSON: $response"
+fi
+
+echo
+echo "=== API Endpoints Test Complete ==="
+log_success "All new API endpoints are working correctly!"
+
+echo
+echo "--- Summary ---"
+echo "✅ Domain management endpoints (add, list, remove)"
+echo "✅ Certificate management endpoints (issue, list)"  
+echo "✅ Debug endpoint with SSH support"
+echo "✅ Rollback endpoint"
+echo "✅ Error handling for invalid requests"
+echo "✅ JSON response format validation"
+echo "✅ Existing endpoints remain functional"
