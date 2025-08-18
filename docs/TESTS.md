@@ -95,6 +95,20 @@
 109. Mixed Kotlin/Java project → "java" language with appropriate lane selection.
 110. Build script parsing covers `.gradle`, `.gradle.kts`, `.kts`, `build.sbt`, `pom.xml` files.
 
+## Python C-Extension Detection Enhancement (Aug 2025)
+111. Python project with `.c` source files → Lane C with "Python C-extensions detected" reason.
+112. Python project with `.pyx` Cython files → Lane C for Cython compilation support.
+113. Python project with `numpy` in requirements.txt → Lane C for NumPy C-extensions.
+114. Python project with `scipy`, `pandas`, `psycopg2` dependencies → Lane C detection.
+115. Python project with `ext_modules` in setup.py → Lane C via setuptools detection.
+116. Python project with `Extension()` calls → Lane C via distutils analysis.
+117. Python project with `from Cython` imports → Lane C for Cython usage.
+118. Python project with CMakeLists.txt + pybind11 → Lane C for C++ bindings.
+119. Python project with `build_ext`, `include_dirs` config → Lane C for build hints.
+120. Pure Python project (no C-extensions) → Lane B with standard reasoning.
+121. Python project detection covers `setup.py`, `pyproject.toml`, `requirements.txt` files.
+122. C++ extensions (`.cpp`, `.cxx`) properly detected alongside C files.
+
 ## Storage & Artifacts
 40. Build artifacts (image, SBOM, signature) uploaded to S3/MinIO storage.
 41. Storage retrieval for rollback operations.
