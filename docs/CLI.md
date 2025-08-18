@@ -26,6 +26,17 @@ ploy open <app>
 ```
 Opens the app domain from `manifests/<app>.yaml` or falls back to `<app>.ployd.app`.
 
+### `ploy env` (planned)
+```
+ploy env set <app> <key> <value>
+ploy env set <app> <key> <value> --secret
+ploy env get <app> <key>
+ploy env list <app>
+ploy env delete <app> <key>
+ploy env import <app> <file.env>
+```
+**Environment Variables**: Manage per-app environment variables available during build and deployment. Use `--secret` flag for sensitive values that will be encrypted.
+
 ### `ploy webhooks` (planned)
 ```
 ploy webhooks add <app> <url> [--events build.completed,deploy.failed] [--secret <secret>]

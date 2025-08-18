@@ -1,155 +1,126 @@
-# Ploy features
+# Ploy Features
 
 ## 🎯 Core Purpose
-	- Deliver maximum performance & smallest footprint PaaS by leveraging unikernels, OSv, Unikraft, jails, Kontain, and VMs.
-	- Provide a Heroku-like developer experience (ploy push, ploy apps new, ploy open) while running apps in the most efficient lane possible.
+Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like developer experience.
 
 ⸻
 
 ## 🛠 Build Lanes (A–F)
 
-Each source tree is auto-classified into a lane:
-- Lane A – Unikraft Minimal (Go, C apps)
-  - Ultra-small unikernel images via KraftKit.
-  - Deterministic <app>-<sha>.img.
-  - SBOM + signature generated during build.
-- Lane B – Unikraft POSIX (Node, POSIX apps)
-  - Musl libc + POSIX layer.
-  - Supports POSIX syscalls for Node/Python-like apps.
-  - SSH support with Dropbear (planned) for debug variants.
-- Lane C – OSv Java
-  - Jib (Gradle/Maven) → Tar → Capstan → OSv image.
-  - Deterministic <app>-<sha>.qcow2.
-  - Supports Java & Scala apps with custom MainClass.
-- Lane D – FreeBSD Jails
-  - Packs rootfs into <app>-<sha>-jail.tar.
-  - Lightweight FreeBSD isolation, ideal for legacy POSIX apps.
-- Lane E – OCI + Kontain
-  - Docker/Jib build to harbor.local/ploy/<app>:<sha>.
-  - Runs under Docker runtime io.kontain for better performance & isolation.
-- Lane F – VM (Packer)
-  - Builds VM images (<app>-<sha>.img) for workloads requiring full OS.
-  - Provides maximum compatibility fallback.
+Auto-classified lanes:
+- **Lane A** – Unikraft Minimal (Go, C)
+  - KraftKit unikernel images
+  - `<app>-<sha>.img` deterministic naming
+  - SBOM + signature generation
+- **Lane B** – Unikraft POSIX (Node, Python)
+  - Musl libc POSIX layer
+  - Dropbear SSH for debug (planned)
+- **Lane C** – OSv Java/Scala
+  - Jib → Capstan → `<app>-<sha>.qcow2`
+  - Custom MainClass support
+- **Lane D** – FreeBSD Jails
+  - `<app>-<sha>-jail.tar` rootfs
+  - Lightweight isolation for legacy apps
+- **Lane E** – OCI + Kontain
+  - `harbor.local/ploy/<app>:<sha>` images
+  - `io.kontain` runtime for VM isolation
+- **Lane F** – Full VMs
+  - `<app>-<sha>.img` via Packer
+  - Maximum compatibility fallback
 
 ⸻
 
 ## ⚙️ Builders
-- Scripts per lane in build/:
-  - build/osv/java/…, build/kraft/…, build/oci/…, build/jail/…, build/packer/….
-- SBOM (Syft) + Signatures (Cosign) automatically produced when tools are installed.
-- Deterministic image naming (<app>-<sha>).
-- Can run standalone or invoked via controller.
+- Per-lane scripts in `build/` directory
+- Auto SBOM (Syft) + signatures (Cosign)
+- Deterministic `<app>-<sha>` naming
+- Standalone or controller invocation
 
 ⸻
 
 ## 📦 Supply Chain Security
-- SBOMs: Generated during builds and in CI with Syft.
-- Vulnerability scans: With Grype (CI).
-- Signing: With Cosign (key-based or keyless OIDC).
-- Storage upload: SBOM/signatures uploaded to object storage after generation (planned).
-- OPA Policy Enforcement:
-  - Requires signature + SBOM before deploy.
-  - Blocks SSH in prod unless break-glass flag is set.
-  - Image size caps per lane (planned).
-  - Enhanced lane detection (Jib plugin detection, Python C-extensions).
+- SBOM generation (Syft), vulnerability scans (Grype), signing (Cosign)
+- Storage upload to object storage (planned)
+- OPA policy enforcement:
+  - Requires signature + SBOM
+  - SSH blocked in prod without break-glass
+  - Image size caps per lane (planned)
+  - Enhanced lane detection (Jib, C-extensions)
 
 ⸻
 
-## 🚀 Deployment (Nomad-based)
-- Nomad templates per lane in platform/nomad/templates/.
-- Each job includes:
-  - Health checks.
-  - Vault integration (vault { policies = ["default"] }).
-  - Canary rollout strategy (update { canary=1, auto_promote, auto_revert }).
-  - Consul service registrations.
-- controller/nomad/ handles rendering and submission.
-- controller/nomad/client.go polls allocations for health readiness.
+## 🚀 Deployment
+- Nomad templates per lane in `platform/nomad/`
+- Jobs include health checks, Vault integration, canary rollouts, Consul registration
+- Controller handles rendering, submission, health polling
 
 ⸻
 
 ## 🌐 Routing & Preview
-- Preview routes:
-https://<sha>.<app>.ployd.app → triggers build pipeline and proxies when ready.
-- TTL cleanup for preview allocations (planned) to prevent resource accumulation.
-- Domain management:
-  - Per-app manifests/<app>.yaml defines custom domains.
-  - ploy open resolves and opens correct domain.
-- TLS:
-  - Certbot integration planned (auto-issue).
-  - Bring-your-own cert supported.
+- Preview: `https://<sha>.<app>.ployd.app` triggers builds
+- TTL cleanup for previews (planned)
+- Domains: `manifests/<app>.yaml` configuration
+- TLS: Certbot integration (planned), BYOC supported
 
 ⸻
 
-## 👩‍💻 Developer Experience
-- CLI (ploy) in Go + Bubble Tea TUI.
-  - ploy apps new --lang <go|node> --name <app> → scaffolds app with /healthz.
-  - ploy push → tars repo (respects .gitignore), streams to controller, triggers lane build.
-  - ploy push --verify --diff <file> → pushes diff to verification branch for isolated testing (planned).
-  - ploy open <app> → opens deployed app in browser.
-  - ploy domains add <app> <domain> → updates Consul and ingress (planned).
-  - ploy certs issue <domain> → obtains cert via ACME HTTP-01 (planned).
-  - ploy debug shell <app> → builds debug variant with SSH and prints command (planned).
-  - ploy rollback <app> <sha> → restores previous release (planned).
-- Heroku-like workflow: push → build → deploy → open.
-- Self-healing loop support for external LLM agents via diff push and webhooks.
+## 👩‍💻 CLI (Go + Bubble Tea)
+- `ploy apps new` – scaffold with /healthz
+- `ploy push` – tar + stream to controller
+- `ploy push --verify --diff` – verification branch testing (planned)
+- `ploy open` – browser launch
+- `ploy env` – manage app environment variables (planned)
+- `ploy domains/certs/debug/rollback` – operations (planned)
+- Workflow: push → build → deploy → open
+- Self-healing loop support for LLM agents
 
 ⸻
 
-## 🗄 Storage Layer
-	- Abstracted S3 client with MinIO as default.
-	- Config: configs/storage-config.yaml.
-	- Controller uploads artifacts (image, sbom, signature) → artifacts/<app>/<sha>/.
-	- Easy migration to other S3 backends (Ceph, AWS S3, etc).
+## 🗄 Storage
+- S3-compatible (MinIO default)
+- Config: `configs/storage-config.yaml`
+- Uploads: `artifacts/<app>/<sha>/`
+- Backends: MinIO, Ceph, AWS S3
 
 ⸻
 
-## 🔬 Example Apps
-- Go: apps/go-helloweb/
-- Node: apps/node-helloweb/
-- Python: apps/python-fastapi/
-- .NET: apps/dotnet-webapi/
-- Scala: apps/scala-akka/
-- Java: apps/java-ordersvc/
-
-All include /healthz endpoint on port 8080.
+## 🔬 Sample Apps
+`apps/` directory with Go, Node, Python, .NET, Scala, Java examples.
+All include `/healthz` on port 8080.
 
 ⸻
 
-## 🧪 CI/CD Integration
-- GitHub Actions:
-  - Build controller, SBOM, scan, sign (keyless).
-- GitLab CI:
-  - Validate (lane pick), build, supply-chain checks, deploy.
-- Output artifacts (repo.sbom.json, signatures) uploaded for traceability.
+## 🧪 CI/CD
+- GitHub Actions: build, SBOM, scan, keyless sign
+- GitLab CI: validate, build, supply-chain, deploy
+- Artifact upload for traceability
 
 ⸻
 
-## 🤖 Self-Healing Loop Integration
-- **Diff Push with Verification** (planned):
-  - `POST /v1/apps/:app/diff?verify=true` API endpoint.
-  - Creates temporary git branches (`verify-<timestamp>-<hash>`) for safe testing.
-  - Isolated verification deployments in separate Nomad namespace.
-  - Automatic cleanup of verification branches and deployments.
-  - CLI: `ploy push --verify --diff <file>` for LLM agent integration.
+## 🤖 Self-Healing Loop (planned)
+- **Diff Push**: `POST /v1/apps/:app/diff?verify=true`
+  - Temporary branches (`verify-<timestamp>-<hash>`)
+  - Isolated verification namespace
+  - Auto-cleanup
+- **Webhooks**: `POST /v1/apps/:app/webhooks`
+  - Real-time events (`build.*`, `deploy.*`)
+  - JSON payloads with metadata
+  - Retry + auth (Bearer/HMAC)
+- **LLM Integration**: Monitor via webhooks, fix via verification branches
 
-- **Webhook System** (planned):
-  - Per-app webhook configuration via `POST /v1/apps/:app/webhooks`.
-  - Real-time build/deploy event streaming (`build.started`, `build.completed`, `build.failed`, etc.).
-  - Structured JSON payloads with timestamps, log levels, and metadata.
-  - Webhook retry logic with exponential backoff.
-  - Authentication support (Bearer tokens, HMAC signatures).
-
-- **LLM Agent Integration**:
-  - External agents can monitor deployments via webhooks.
-  - Push fixes safely via verification branches.
-  - Implement automated self-healing loops with proper isolation.
+## 🌍 Environment Variables (planned)
+- **Management**: `POST/GET/PUT/DELETE /v1/apps/:app/env`
+- **Build-time**: Available during image creation
+- **Runtime**: Injected into deployment environment
+- **Security**: Sensitive values encrypted at rest
+- **CLI**: `ploy env set/get/list/delete` commands
 
 ⸻
 
-## 🔮 Extensibility / Next Steps
-- Advanced readiness: switch preview to Consul/Nomad service health resolution.
-- Richer lane recipes (Unikraft with Node/Python per-app configurations).
-- Keyless OIDC flow integration for Cosign.
-- Automated end-to-end tests with Nomad cluster in CI.
-- Observability pipeline (Loki/Prometheus/Grafana).
-- Traffic shifting (blue/green, weighted canary).
+## 🔮 Next Steps
+- Advanced readiness via Consul/Nomad health
+- Per-app Unikraft recipes
+- Keyless OIDC Cosign integration
+- E2E testing with Nomad cluster
+- Observability (Loki/Prometheus/Grafana)
+- Traffic shifting (blue/green, canary)

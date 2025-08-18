@@ -19,7 +19,7 @@ Auto-selects optimal lane from project structure unless overridden.
 - `docs/` contains:
   - PLAN.md — LLM instructions for repo iteration.
   - CONCEPT.md — architecture and purpose.
-  - FOLDERS.md — folder structure.
+  - FOLDERS.md — folders structure.
   - CLI.md — CLI reference.
   - REST.md — REST API routes.
   - STORAGE.md — storage abstraction (MinIO).
