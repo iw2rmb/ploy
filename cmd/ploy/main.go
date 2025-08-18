@@ -25,6 +25,10 @@ func main(){
 		case "apps": appsCmd(os.Args[2:])
 		case "push": pushCmd(os.Args[2:])
 		case "open": openCmd(os.Args[2:])
+		case "domains": domainsCmd(os.Args[2:])
+		case "certs": certsCmd(os.Args[2:])
+		case "debug": debugCmd(os.Args[2:])
+		case "rollback": rollbackCmd(os.Args[2:])
 		default: usage()
 		}
 		return
@@ -43,7 +47,14 @@ func usage(){
 Usage:
   ploy apps new --lang <go|node> --name <app>
   ploy push -a <app> [-lane A|B|C|D|E|F] [-main com.example.Main] [-sha <sha>]
-  ploy open <app>`)
+  ploy open <app>
+  ploy domains add <app> <domain>
+  ploy domains list <app>
+  ploy domains remove <app> <domain>
+  ploy certs issue <domain>
+  ploy certs list
+  ploy debug shell <app> [--lane <A-F>]
+  ploy rollback <app> <sha>`)
 }
 
 func appsCmd(args []string){
@@ -152,4 +163,164 @@ func tarDir(dir string, w io.Writer, ign ignore) error {
 		f, _ := os.Open(path); defer f.Close()
 		_, err = io.Copy(tw, f); return err
 	})
+}
+
+func domainsCmd(args []string) {
+	if len(args) < 1 {
+		fmt.Println("usage: ploy domains <add|list|remove> <app> [domain]")
+		return
+	}
+
+	action := args[0]
+	switch action {
+	case "add":
+		if len(args) < 3 {
+			fmt.Println("usage: ploy domains add <app> <domain>")
+			return
+		}
+		app, domain := args[1], args[2]
+		url := fmt.Sprintf("%s/apps/%s/domains", controllerURL, app)
+		payload := fmt.Sprintf(`{"domain":"%s"}`, domain)
+		resp, err := http.Post(url, "application/json", strings.NewReader(payload))
+		if err != nil {
+			fmt.Println("domains add error:", err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			fmt.Printf("Domain %s added to app %s\n", domain, app)
+		} else {
+			fmt.Printf("Failed to add domain: HTTP %d\n", resp.StatusCode)
+		}
+
+	case "list":
+		if len(args) < 2 {
+			fmt.Println("usage: ploy domains list <app>")
+			return
+		}
+		app := args[1]
+		url := fmt.Sprintf("%s/apps/%s/domains", controllerURL, app)
+		resp, err := http.Get(url)
+		if err != nil {
+			fmt.Println("domains list error:", err)
+			return
+		}
+		defer resp.Body.Close()
+		io.Copy(os.Stdout, resp.Body)
+
+	case "remove":
+		if len(args) < 3 {
+			fmt.Println("usage: ploy domains remove <app> <domain>")
+			return
+		}
+		app, domain := args[1], args[2]
+		url := fmt.Sprintf("%s/apps/%s/domains/%s", controllerURL, app, domain)
+		req, _ := http.NewRequest("DELETE", url, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			fmt.Println("domains remove error:", err)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == 200 {
+			fmt.Printf("Domain %s removed from app %s\n", domain, app)
+		} else {
+			fmt.Printf("Failed to remove domain: HTTP %d\n", resp.StatusCode)
+		}
+
+	default:
+		fmt.Println("usage: ploy domains <add|list|remove> <app> [domain]")
+	}
+}
+
+func certsCmd(args []string) {
+	if len(args) < 1 {
+		fmt.Println("usage: ploy certs <issue|list>")
+		return
+	}
+
+	action := args[0]
+	switch action {
+	case "issue":
+		if len(args) < 2 {
+			fmt.Println("usage: ploy certs issue <domain>")
+			return
+		}
+		domain := args[1]
+		url := fmt.Sprintf("%s/certs/issue", controllerURL)
+		payload := fmt.Sprintf(`{"domain":"%s"}`, domain)
+		resp, err := http.Post(url, "application/json", strings.NewReader(payload))
+		if err != nil {
+			fmt.Println("certs issue error:", err)
+			return
+		}
+		defer resp.Body.Close()
+		io.Copy(os.Stdout, resp.Body)
+
+	case "list":
+		url := fmt.Sprintf("%s/certs", controllerURL)
+		resp, err := http.Get(url)
+		if err != nil {
+			fmt.Println("certs list error:", err)
+			return
+		}
+		defer resp.Body.Close()
+		io.Copy(os.Stdout, resp.Body)
+
+	default:
+		fmt.Println("usage: ploy certs <issue|list>")
+	}
+}
+
+func debugCmd(args []string) {
+	if len(args) < 1 {
+		fmt.Println("usage: ploy debug shell <app> [--lane <A-F>]")
+		return
+	}
+
+	if args[0] != "shell" {
+		fmt.Println("usage: ploy debug shell <app> [--lane <A-F>]")
+		return
+	}
+
+	if len(args) < 2 {
+		fmt.Println("usage: ploy debug shell <app> [--lane <A-F>]")
+		return
+	}
+
+	fs := flag.NewFlagSet("debug shell", flag.ExitOnError)
+	lane := fs.String("lane", "", "lane override for debug build")
+	fs.Parse(args[2:])
+
+	app := args[1]
+	url := fmt.Sprintf("%s/apps/%s/debug", controllerURL, app)
+	if *lane != "" {
+		url += "?lane=" + *lane
+	}
+
+	resp, err := http.Post(url, "application/json", strings.NewReader(`{"ssh_enabled":true}`))
+	if err != nil {
+		fmt.Println("debug shell error:", err)
+		return
+	}
+	defer resp.Body.Close()
+	io.Copy(os.Stdout, resp.Body)
+}
+
+func rollbackCmd(args []string) {
+	if len(args) < 2 {
+		fmt.Println("usage: ploy rollback <app> <sha>")
+		return
+	}
+
+	app, sha := args[0], args[1]
+	url := fmt.Sprintf("%s/apps/%s/rollback", controllerURL, app)
+	payload := fmt.Sprintf(`{"sha":"%s"}`, sha)
+	resp, err := http.Post(url, "application/json", strings.NewReader(payload))
+	if err != nil {
+		fmt.Println("rollback error:", err)
+		return
+	}
+	defer resp.Body.Close()
+	io.Copy(os.Stdout, resp.Body)
 }

@@ -27,6 +27,18 @@
 18. `ploy debug shell app` builds debug variant with SSH and prints command.
 19. `ploy rollback app sha` restores previous release.
 
+## CLI Commands Implementation (Aug 2025)
+79. `ploy domains add <app> <domain>` registers domain in controller and returns success.
+80. `ploy domains list <app>` displays all domains associated with the app.
+81. `ploy domains remove <app> <domain>` removes domain registration from app.
+82. `ploy certs issue <domain>` initiates certificate issuance process via ACME.
+83. `ploy certs list` shows all managed certificates with expiration dates.
+84. `ploy debug shell <app>` creates debug instance with SSH access enabled.
+85. `ploy debug shell <app> --lane B` creates debug instance in specific lane.
+86. `ploy rollback <app> <sha>` restores app to previous SHA version.
+87. CLI help messages display correct usage for all new commands.
+88. Error handling for invalid arguments and missing parameters.
+
 ## Policies & Supply Chain
 20. Reject deploy without signature/SBOM.
 21. Reject SSH in prod unless break-glass flag present.

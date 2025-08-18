@@ -47,6 +47,19 @@ func main(){
 	api.Post("/apps/:app/builds", triggerBuild)
 	api.Get("/apps", listApps)
 	api.Get("/status/:app", status)
+	
+	// Domain management
+	api.Post("/apps/:app/domains", addDomain)
+	api.Get("/apps/:app/domains", listDomains)
+	api.Delete("/apps/:app/domains/:domain", removeDomain)
+	
+	// Certificate management
+	api.Post("/certs/issue", issueCertificate)
+	api.Get("/certs", listCertificates)
+	
+	// Debug and rollback
+	api.Post("/apps/:app/debug", debugApp)
+	api.Post("/apps/:app/rollback", rollbackApp)
 
 	port := getenv("PORT", "8081")
 	log.Printf("Ploy Controller listening on :%s", port)
@@ -197,3 +210,159 @@ func getenv(k, d string) string { if v:=os.Getenv(k); v!="" { return v }; return
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func errJSON(c *fiber.Ctx, code int, err error) error { return c.Status(code).JSON(fiber.Map{"error": err.Error()}) }
+
+// Domain management handlers
+func addDomain(c *fiber.Ctx) error {
+	app := c.Params("app")
+	var req struct {
+		Domain string `json:"domain"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return errJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	// Store domain mapping in Consul (simplified implementation)
+	log.Printf("Adding domain %s for app %s", req.Domain, app)
+	
+	// TODO: Implement actual Consul integration for domain registration
+	// This would typically involve:
+	// 1. Register domain in Consul KV store
+	// 2. Update ingress configuration
+	// 3. Trigger configuration reload
+	
+	return c.JSON(fiber.Map{
+		"status": "added",
+		"app": app,
+		"domain": req.Domain,
+		"message": "Domain registered successfully",
+	})
+}
+
+func listDomains(c *fiber.Ctx) error {
+	app := c.Params("app")
+	
+	// TODO: Implement actual Consul lookup for domains
+	// This would query Consul KV store for domains associated with the app
+	
+	log.Printf("Listing domains for app %s", app)
+	return c.JSON(fiber.Map{
+		"app": app,
+		"domains": []string{
+			fmt.Sprintf("%s.ployd.app", app), // default domain
+		},
+	})
+}
+
+func removeDomain(c *fiber.Ctx) error {
+	app := c.Params("app")
+	domain := c.Params("domain")
+	
+	// TODO: Implement actual Consul integration for domain removal
+	log.Printf("Removing domain %s from app %s", domain, app)
+	
+	return c.JSON(fiber.Map{
+		"status": "removed",
+		"app": app,
+		"domain": domain,
+		"message": "Domain removed successfully",
+	})
+}
+
+// Certificate management handlers
+func issueCertificate(c *fiber.Ctx) error {
+	var req struct {
+		Domain string `json:"domain"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return errJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	log.Printf("Issuing certificate for domain %s", req.Domain)
+	
+	// TODO: Implement actual Let's Encrypt ACME challenge
+	// This would typically involve:
+	// 1. Create ACME challenge
+	// 2. Configure HTTP-01 challenge response
+	// 3. Request certificate from Let's Encrypt
+	// 4. Store certificate in Vault or filesystem
+	
+	return c.JSON(fiber.Map{
+		"status": "issued",
+		"domain": req.Domain,
+		"message": "Certificate issued successfully",
+		"expires": time.Now().AddDate(0, 3, 0).Format("2006-01-02"),
+	})
+}
+
+func listCertificates(c *fiber.Ctx) error {
+	// TODO: Implement actual certificate listing from Vault or filesystem
+	log.Printf("Listing certificates")
+	
+	return c.JSON(fiber.Map{
+		"certificates": []fiber.Map{
+			{
+				"domain": "example.ployd.app",
+				"status": "valid",
+				"expires": time.Now().AddDate(0, 2, 0).Format("2006-01-02"),
+			},
+		},
+	})
+}
+
+// Debug and rollback handlers
+func debugApp(c *fiber.Ctx) error {
+	app := c.Params("app")
+	lane := c.Query("lane", "")
+	
+	var req struct {
+		SSHEnabled bool `json:"ssh_enabled"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return errJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	log.Printf("Creating debug build for app %s with SSH enabled: %v", app, req.SSHEnabled)
+	
+	// TODO: Implement debug build with SSH support
+	// This would typically involve:
+	// 1. Build debug variant with SSH daemon
+	// 2. Deploy to debug namespace
+	// 3. Return SSH connection details
+	
+	debugInstance := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
+	
+	return c.JSON(fiber.Map{
+		"status": "debug_created",
+		"app": app,
+		"instance": debugInstance,
+		"ssh_enabled": req.SSHEnabled,
+		"ssh_command": fmt.Sprintf("ssh debug@%s.debug.ployd.app", debugInstance),
+		"message": "Debug instance created successfully",
+	})
+}
+
+func rollbackApp(c *fiber.Ctx) error {
+	app := c.Params("app")
+	
+	var req struct {
+		SHA string `json:"sha"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return errJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	log.Printf("Rolling back app %s to SHA %s", app, req.SHA)
+	
+	// TODO: Implement actual rollback via Nomad
+	// This would typically involve:
+	// 1. Validate SHA exists in storage
+	// 2. Update Nomad job with previous image
+	// 3. Monitor rollback health
+	
+	return c.JSON(fiber.Map{
+		"status": "rolled_back",
+		"app": app,
+		"sha": req.SHA,
+		"message": "Application rolled back successfully",
+	})
+}

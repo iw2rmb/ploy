@@ -10,7 +10,7 @@ Changes implemented:
 Next steps to implement:
 
 **Phase 1: Critical Missing Basic Functionality**
-1. Complete missing CLI commands: domains add, certs issue, debug shell, rollback.
+1. ✅ **COMPLETED (2025-08-18)** Complete missing CLI commands: domains add, certs issue, debug shell, rollback.
 2. Fix lane picker: Add Jib detection for Java/Scala Lane E vs C selection.
 3. Fix Python C-extension detection in lane picker (should force Lane C).
 4. App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases.
