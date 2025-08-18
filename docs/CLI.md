@@ -26,6 +26,33 @@ ploy open <app>
 ```
 Opens the app domain from `manifests/<app>.yaml` or falls back to `<app>.ployd.app`.
 
+### `ploy domains` (implemented)
+```
+ploy domains add <app> <domain>
+ploy domains list <app>  
+ploy domains remove <app> <domain>
+```
+**Domain Management**: Register custom domains for applications, list associated domains, and remove domain mappings.
+
+### `ploy certs` (implemented)
+```
+ploy certs issue <domain>
+ploy certs list
+```
+**Certificate Management**: Issue TLS certificates via ACME protocol and list all managed certificates with expiration dates.
+
+### `ploy debug` (implemented)
+```
+ploy debug shell <app> [--lane <A-F>]
+```
+**Debug Operations**: Create debug instances with SSH access enabled. Optionally specify lane for debug build.
+
+### `ploy rollback` (implemented)
+```
+ploy rollback <app> <sha>
+```
+**Rollback Operations**: Rollback application to a previous SHA version for quick recovery.
+
 ### `ploy env` (planned)
 ```
 ploy env set <app> <key> <value>
