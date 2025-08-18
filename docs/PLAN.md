@@ -8,24 +8,26 @@ Changes implemented:
 - **Storage**: S3 abstraction (MinIO) + automatic artifact uploads.
 
 Next steps to implement:
-1. Replace naive readiness with Nomad API polling of alloc health, then proxy.
-2. Integrate cosign keyless OIDC flow and key management.
-3. Generate SBOM/signature in builders too (not only CI); upload both to storage.
-4. Fill Unikraft per-app recipes and POSIX shim for lane B.
-5. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
 
-Critical gaps identified (Aug 2025 analysis):
-6. Fix lane picker: Add Jib detection for Java/Scala Lane E vs C selection.
-7. Implement Unikraft Lane B SSH support: Dropbear library, ssh.enabled flag, key injection.
-8. Complete missing CLI commands: domains add, certs issue, debug shell, rollback.
-9. Add TTL cleanup for preview allocations to prevent resource accumulation.
-10. Implement image size caps per lane in OPA policies.
-11. Fix Python C-extension detection in lane picker (should force Lane C).
-12. Upload SBOM/signatures to storage after generation in builders.
+**Phase 1: Critical Missing Basic Functionality**
+1. Complete missing CLI commands: domains add, certs issue, debug shell, rollback.
+2. Fix lane picker: Add Jib detection for Java/Scala Lane E vs C selection.
+3. Fix Python C-extension detection in lane picker (should force Lane C).
+4. App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases.
+5. Replace naive readiness with Nomad API polling of alloc health, then proxy.
 
-Self-healing loop features (Aug 2025 addition):
+**Phase 2: Security & Supply Chain Hardening**
+6. Integrate cosign keyless OIDC flow and key management.
+7. Generate SBOM/signature in builders too (not only CI); upload both to storage.
+8. Upload SBOM/signatures to storage after generation in builders.
+9. Implement image size caps per lane in OPA policies.
+
+**Phase 3: Platform Enhancement Features**
+10. Implement Unikraft Lane B SSH support: Dropbear library, ssh.enabled flag, key injection.
+11. Add TTL cleanup for preview allocations to prevent resource accumulation.
+12. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
+
+**Phase 4: Advanced Self-Healing & Automation**
 13. Diff push with verification: `POST /v1/apps/:app/diff?verify=true` API and `ploy push --verify --diff` CLI to push diffs that create temporary git branches for isolated testing.
 14. Webhook system: `POST /v1/apps/:app/webhooks` API to configure per-app webhooks for build/deploy events, enabling external LLM agents to monitor and react to deployment status.
-
-Environment variables feature (Aug 2025 addition):
-15. App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases.
+15. Fill Unikraft per-app recipes and POSIX shim for lane B.
