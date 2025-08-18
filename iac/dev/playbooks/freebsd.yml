@@ -47,7 +47,8 @@
 
     - name: Extract FreeBSD image
       command: xz -d /tmp/freebsd-14.0.qcow2.xz
-      creates: /tmp/freebsd-14.0.qcow2
+      args:
+        creates: /tmp/freebsd-14.0.qcow2
 
     - name: Copy FreeBSD image to VM storage
       copy:
@@ -72,7 +73,8 @@
       command: >
         cloud-localds /var/lib/libvirt/images/freebsd-dev-cloud-init.iso
         /tmp/freebsd-user-data.yml /tmp/freebsd-meta-data.yml
-      creates: /var/lib/libvirt/images/freebsd-dev-cloud-init.iso
+      args:
+        creates: /var/lib/libvirt/images/freebsd-dev-cloud-init.iso
 
     - name: Create FreeBSD VM
       command: >
@@ -86,7 +88,8 @@
         --os-variant freebsd13.0
         --import
         --noautoconsole
-      creates: /etc/libvirt/qemu/freebsd-dev.xml
+      args:
+        creates: /etc/libvirt/qemu/freebsd-dev.xml
 
     - name: Wait for FreeBSD VM to be accessible
       wait_for:
