@@ -47,22 +47,39 @@ func detect(root string) Result {
 		}
 	}
 	if hasAny(root, ".csproj") { lang = ".net"; lane = "C"; reasons = append(reasons, ".csproj detected") }
-	if exists(filepath.Join(root, "pom.xml")) || hasAny(root, "build.gradle") || hasAny(root, "build.gradle.kts") {
-		if lang == "unknown" { lang = "java" }
-		// Check for Jib plugin to determine Lane E vs C
-		if grep(root, "com.google.cloud.tools.jib") || grep(root, "jib {") {
-			lane = "E"; reasons = append(reasons, "Java/Scala with Jib plugin detected")
-		} else {
-			lane = "C"; reasons = append(reasons, "Java/Scala build tool detected")
-		}
-	}
+	// Check Scala first (more specific than Java)
 	if hasAny(root, "build.sbt") { 
 		lang = "scala"
-		// Check for Jib plugin in SBT projects
-		if grep(root, "sbt-jib") {
-			lane = "E"; reasons = append(reasons, "Scala with Jib plugin detected")
+		// Enhanced Jib detection for SBT projects
+		if hasJibPlugin(root) {
+			lane = "E"; reasons = append(reasons, "Scala with Jib plugin detected - optimal for containerless builds")
 		} else {
-			lane = "C"; reasons = append(reasons, "build.sbt detected")
+			lane = "C"; reasons = append(reasons, "Scala build.sbt detected - using OSv for JVM optimization")
+		}
+	} else if exists(filepath.Join(root, "pom.xml")) || hasAny(root, "build.gradle") || hasAny(root, "build.gradle.kts") {
+		// Check if it's a Scala project with Gradle/Maven
+		if grep(root, "scala-library") || grep(root, "org.jetbrains.kotlin.jvm") || hasAny(root, ".scala") {
+			if grep(root, "scala-library") || hasAny(root, ".scala") {
+				lang = "scala"
+			} else {
+				lang = "java" // Kotlin projects treated as Java
+			}
+		} else {
+			lang = "java"
+		}
+		// Enhanced Jib detection for multiple configurations
+		if hasJibPlugin(root) {
+			if lang == "scala" {
+				lane = "E"; reasons = append(reasons, "Scala with Jib plugin detected - optimal for containerless builds")
+			} else {
+				lane = "E"; reasons = append(reasons, "Java with Jib plugin detected - optimal for containerless builds")
+			}
+		} else {
+			if lang == "scala" {
+				lane = "C"; reasons = append(reasons, "Scala build tool detected - using OSv for JVM optimization")
+			} else {
+				lane = "C"; reasons = append(reasons, "Java build tool detected - using OSv for JVM optimization")
+			}
 		}
 	}
 
@@ -87,7 +104,13 @@ func grep(root, needle string) bool {
 	match := false
 	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err==nil && !d.IsDir() {
-			if strings.HasSuffix(p, ".c") || strings.HasSuffix(p, ".cc") || strings.HasSuffix(p, ".go") || strings.HasSuffix(p, ".rs") || strings.HasSuffix(p, ".js") || strings.HasSuffix(p, ".ts") || strings.HasSuffix(p, ".py") {
+			// Search in source code files and build scripts
+			if strings.HasSuffix(p, ".c") || strings.HasSuffix(p, ".cc") || 
+			   strings.HasSuffix(p, ".go") || strings.HasSuffix(p, ".rs") || 
+			   strings.HasSuffix(p, ".js") || strings.HasSuffix(p, ".ts") || 
+			   strings.HasSuffix(p, ".py") || strings.HasSuffix(p, ".gradle") || 
+			   strings.HasSuffix(p, ".gradle.kts") || strings.HasSuffix(p, ".kts") || 
+			   strings.HasSuffix(p, "build.sbt") || strings.HasSuffix(p, "pom.xml") {
 				b, _ := os.ReadFile(p)
 				if strings.Contains(string(b), needle) { match = true }
 			}
@@ -95,4 +118,33 @@ func grep(root, needle string) bool {
 		return nil
 	})
 	return match
+}
+
+// hasJibPlugin detects Jib plugin in various build systems
+func hasJibPlugin(root string) bool {
+	// Check for Gradle Jib plugin
+	if grep(root, "com.google.cloud.tools.jib") {
+		return true
+	}
+	// Check for Jib configuration block
+	if grep(root, "jib {") {
+		return true
+	}
+	// Check for Jib tasks (Gradle)
+	if grep(root, "jibBuildTar") || grep(root, "jibDockerBuild") {
+		return true
+	}
+	// Check for SBT Jib plugin
+	if grep(root, "sbt-jib") {
+		return true
+	}
+	// Check for Maven Jib plugin
+	if grep(root, "<groupId>com.google.cloud.tools</groupId>") && grep(root, "<artifactId>jib-maven-plugin</artifactId>") {
+		return true
+	}
+	// Check for Maven Jib plugin (abbreviated)
+	if grep(root, "jib-maven-plugin") {
+		return true
+	}
+	return false
 }

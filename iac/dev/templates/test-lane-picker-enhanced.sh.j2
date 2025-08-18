@@ -1,0 +1,317 @@
+#!/bin/bash
+# Test script for enhanced lane picker with Jib detection
+
+set -e
+
+echo "=== Enhanced Lane Picker Testing ==="
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Helper functions
+log_info() {
+    echo -e "${YELLOW}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+test_lane_detection() {
+    local test_name="$1"
+    local app_path="$2"
+    local expected_lane="$3"
+    local expected_language="$4"
+    local reason_contains="$5"
+    
+    log_info "Testing: $test_name"
+    
+    result=$(cd /home/ploy/ploy && ./lane-pick --path "$app_path" 2>/dev/null)
+    
+    if [ $? -ne 0 ]; then
+        log_error "$test_name - Lane picker execution failed"
+        return 1
+    fi
+    
+    lane=$(echo "$result" | jq -r '.lane')
+    language=$(echo "$result" | jq -r '.language')
+    reasons=$(echo "$result" | jq -r '.reasons | join(" ")')
+    
+    success=true
+    
+    if [ "$lane" != "$expected_lane" ]; then
+        log_error "$test_name - Expected lane: $expected_lane, Got: $lane"
+        success=false
+    fi
+    
+    if [ "$language" != "$expected_language" ]; then
+        log_error "$test_name - Expected language: $expected_language, Got: $language"
+        success=false
+    fi
+    
+    if [ -n "$reason_contains" ] && [[ ! "$reasons" == *"$reason_contains"* ]]; then
+        log_error "$test_name - Expected reason to contain: '$reason_contains', Got: '$reasons'"
+        success=false
+    fi
+    
+    if [ "$success" = true ]; then
+        log_success "$test_name - Lane: $lane, Language: $language"
+        echo "  Reasons: $reasons"
+    else
+        echo "  Full result: $result"
+    fi
+    
+    echo
+    return $([ "$success" = true ] && echo 0 || echo 1)
+}
+
+# Build lane picker if not exists
+cd /home/ploy/ploy
+if [ ! -f "./lane-pick" ]; then
+    log_info "Building lane picker..."
+    go build -o lane-pick ./tools/lane-pick
+fi
+
+# Test 1: Java with Jib (should be Lane E)
+test_lane_detection \
+    "Java project with Jib plugin" \
+    "/home/ploy/ploy/apps/java-ordersvc" \
+    "E" \
+    "java" \
+    "Jib plugin detected"
+
+# Test 2: Scala with Jib (should be Lane E)
+test_lane_detection \
+    "Scala project with Jib plugin" \
+    "/home/ploy/ploy/apps/scala-catalogsvc" \
+    "E" \
+    "scala" \
+    "Jib plugin detected"
+
+# Create test projects for additional scenarios
+TEST_DIR="/tmp/ploy-lane-tests"
+rm -rf "$TEST_DIR"
+mkdir -p "$TEST_DIR"
+
+# Test 3: Java without Jib (should be Lane C)
+log_info "Creating Java project without Jib..."
+mkdir -p "$TEST_DIR/java-no-jib"
+cat > "$TEST_DIR/java-no-jib/build.gradle.kts" << 'EOF'
+plugins {
+    application
+    java
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("com.google.guava:guava:31.1-jre")
+}
+
+application {
+    mainClass.set("com.example.App")
+}
+EOF
+
+test_lane_detection \
+    "Java project without Jib" \
+    "$TEST_DIR/java-no-jib" \
+    "C" \
+    "java" \
+    "OSv for JVM optimization"
+
+# Test 4: Maven Java with Jib
+log_info "Creating Maven Java project with Jib..."
+mkdir -p "$TEST_DIR/maven-jib"
+cat > "$TEST_DIR/maven-jib/pom.xml" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>maven-jib-example</artifactId>
+    <version>1.0.0</version>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>3.4.0</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+EOF
+
+test_lane_detection \
+    "Maven Java project with Jib" \
+    "$TEST_DIR/maven-jib" \
+    "E" \
+    "java" \
+    "Jib plugin detected"
+
+# Test 5: SBT Scala with Jib
+log_info "Creating SBT Scala project with Jib..."
+mkdir -p "$TEST_DIR/sbt-jib/project"
+cat > "$TEST_DIR/sbt-jib/build.sbt" << 'EOF'
+name := "sbt-jib-example"
+version := "1.0.0"
+scalaVersion := "2.13.10"
+
+enablePlugins(JavaAppPackaging)
+EOF
+
+cat > "$TEST_DIR/sbt-jib/project/plugins.sbt" << 'EOF'
+addSbtPlugin("com.github.sbt" % "sbt-jib" % "0.3.0")
+EOF
+
+test_lane_detection \
+    "SBT Scala project with sbt-jib" \
+    "$TEST_DIR/sbt-jib" \
+    "E" \
+    "scala" \
+    "Jib plugin detected"
+
+# Test 6: Gradle Scala project (mixed with Java)
+log_info "Creating Gradle Scala project with Jib..."
+mkdir -p "$TEST_DIR/gradle-scala-jib/src/main/scala"
+cat > "$TEST_DIR/gradle-scala-jib/build.gradle.kts" << 'EOF'
+plugins {
+    application
+    scala
+    id("com.google.cloud.tools.jib") version "3.4.0"
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("org.scala-lang:scala-library:2.13.10")
+}
+
+jib {
+    from {
+        image = "openjdk:11-jre-slim"
+    }
+}
+EOF
+
+cat > "$TEST_DIR/gradle-scala-jib/src/main/scala/Main.scala" << 'EOF'
+object Main extends App {
+  println("Hello Scala!")
+}
+EOF
+
+test_lane_detection \
+    "Gradle Scala project with Jib" \
+    "$TEST_DIR/gradle-scala-jib" \
+    "E" \
+    "scala" \
+    "Jib plugin detected"
+
+# Test 7: Test jibBuildTar task detection
+log_info "Creating Java project with jibBuildTar reference..."
+mkdir -p "$TEST_DIR/java-jib-task"
+cat > "$TEST_DIR/java-jib-task/build.gradle.kts" << 'EOF'
+plugins {
+    application
+    java
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.register("packageForDocker") {
+    dependsOn("jibBuildTar")
+    doLast {
+        println("Docker package ready")
+    }
+}
+EOF
+
+test_lane_detection \
+    "Java project with jibBuildTar task" \
+    "$TEST_DIR/java-jib-task" \
+    "E" \
+    "java" \
+    "Jib plugin detected"
+
+# Test 8: Test jib {} configuration block detection
+log_info "Creating Java project with jib configuration..."
+mkdir -p "$TEST_DIR/java-jib-config"
+cat > "$TEST_DIR/java-jib-config/build.gradle.kts" << 'EOF'
+plugins {
+    application
+    java
+}
+
+repositories {
+    mavenCentral()
+}
+
+jib {
+    to {
+        image = "myregistry/myapp:latest"
+    }
+    container {
+        ports = listOf("8080")
+    }
+}
+EOF
+
+test_lane_detection \
+    "Java project with jib configuration" \
+    "$TEST_DIR/java-jib-config" \
+    "E" \
+    "java" \
+    "Jib plugin detected"
+
+# Test 9: Verify existing Go/Node/Python still work
+test_lane_detection \
+    "Go project (baseline test)" \
+    "/home/ploy/ploy/apps/go-hellosvc" \
+    "A" \
+    "go" \
+    "go.mod detected"
+
+test_lane_detection \
+    "Node project (baseline test)" \
+    "/home/ploy/ploy/apps/node-apisvc" \
+    "B" \
+    "node" \
+    "package.json detected"
+
+test_lane_detection \
+    "Python project (baseline test)" \
+    "/home/ploy/ploy/apps/python-apisvc" \
+    "B" \
+    "python" \
+    "python detected"
+
+# Cleanup
+rm -rf "$TEST_DIR"
+
+echo
+echo "=== Enhanced Lane Picker Test Summary ==="
+log_success "All Jib detection scenarios tested successfully!"
+echo
+echo "✅ Java with Jib → Lane E (containerless builds)"
+echo "✅ Scala with Jib → Lane E (containerless builds)"  
+echo "✅ Java without Jib → Lane C (OSv optimization)"
+echo "✅ Maven Jib plugin detection working"
+echo "✅ SBT Jib plugin detection working"
+echo "✅ Gradle Jib configurations detected"
+echo "✅ Jib task references detected"
+echo "✅ Language identification improved"
+echo "✅ Existing lane detection unaffected"
