@@ -115,3 +115,42 @@ All essential CLI operations are now implemented, providing users with complete 
 - Extended `grep()` function to include build configuration files
 - Improved conditional logic for language and lane selection
 - Clear reasoning messages for debugging and user understanding
+
+## [2025-08-18] - Python C-Extension Detection Enhancement
+
+### Added
+- **Comprehensive Python C-Extension Detection**
+  - Enhanced `hasPythonCExtensions()` function with multi-layered detection
+  - C/C++/Cython source file detection (`.c`, `.cc`, `.cpp`, `.cxx`, `.pyx`, `.pxd`)
+  - Setuptools/distutils configuration analysis (`ext_modules`, `Extension()`)
+  - Cython usage detection (`from Cython`, `cythonize`, `.pyx` files)
+  - Popular C-extension library detection (numpy, scipy, pandas, psycopg2, lxml, pillow, cryptography, cffi)
+  - Build configuration hints (`build_ext`, `include_dirs`, `library_dirs`)
+  - CMake integration detection for Python bindings (pybind11)
+
+### Improved
+- **Lane Selection Logic**
+  - Python projects with C-extensions → Lane C (full POSIX environment)
+  - Python projects without C-extensions → Lane B (Unikraft POSIX layer)
+  - Enhanced reasoning: "Python C-extensions detected - requires full POSIX environment"
+
+- **File Search Capabilities**
+  - Extended `grep()` function to search Python build files (`setup.py`, `pyproject.toml`, `requirements.txt`)
+  - Added C++ file extensions (`.cpp`, `.cxx`) and Cython files (`.pyx`) to search scope
+  - Added CMake file support (`CMakeLists.txt`) for Python binding projects
+
+### Fixed
+- **Detection Accuracy**: Previous implementation only checked basic `.c` files and `ext_modules`
+- **False Negatives**: Projects with complex C-extension setups now properly detected
+- **Library Dependencies**: Popular libraries requiring C-extensions automatically force Lane C
+
+### Testing
+- ✅ **Comprehensive C-Extension Detection**: Covers multiple detection methods
+- ✅ **Popular Libraries**: numpy, scipy, pandas, cryptography properly detected
+- ✅ **Build Systems**: setuptools, distutils, CMake configurations covered
+- ✅ **Cython Support**: .pyx files and cythonize usage detection
+
+### Status
+**COMPLETED** - Phase 1, Step 3 from PLAN.md: "Fix Python C-extension detection in lane picker (should force Lane C)"
+
+Python projects requiring C-extensions now reliably route to Lane C for full POSIX compatibility, while pure Python projects remain on optimal Lane B.

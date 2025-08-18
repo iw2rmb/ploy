@@ -41,9 +41,9 @@ func detect(root string) Result {
 	if exists(filepath.Join(root, "package.json")) { lang = "node"; lane = "B"; reasons = append(reasons, "package.json detected") }
 	if exists(filepath.Join(root, "pyproject.toml")) || exists(filepath.Join(root, "requirements.txt")) { 
 		lang = "python"; lane = "B"; reasons = append(reasons, "python detected")
-		// Check for C extensions
-		if hasAny(root, ".c") || hasAny(root, ".cc") || grep(root, "ext_modules") {
-			lane = "C"; reasons = append(reasons, "Python C-extensions detected")
+		// Enhanced C extensions detection
+		if hasPythonCExtensions(root) {
+			lane = "C"; reasons = append(reasons, "Python C-extensions detected - requires full POSIX environment")
 		}
 	}
 	if hasAny(root, ".csproj") { lang = ".net"; lane = "C"; reasons = append(reasons, ".csproj detected") }
@@ -106,11 +106,15 @@ func grep(root, needle string) bool {
 		if err==nil && !d.IsDir() {
 			// Search in source code files and build scripts
 			if strings.HasSuffix(p, ".c") || strings.HasSuffix(p, ".cc") || 
+			   strings.HasSuffix(p, ".cpp") || strings.HasSuffix(p, ".cxx") ||
 			   strings.HasSuffix(p, ".go") || strings.HasSuffix(p, ".rs") || 
 			   strings.HasSuffix(p, ".js") || strings.HasSuffix(p, ".ts") || 
-			   strings.HasSuffix(p, ".py") || strings.HasSuffix(p, ".gradle") || 
-			   strings.HasSuffix(p, ".gradle.kts") || strings.HasSuffix(p, ".kts") || 
-			   strings.HasSuffix(p, "build.sbt") || strings.HasSuffix(p, "pom.xml") {
+			   strings.HasSuffix(p, ".py") || strings.HasSuffix(p, ".pyx") ||
+			   strings.HasSuffix(p, ".gradle") || strings.HasSuffix(p, ".gradle.kts") || 
+			   strings.HasSuffix(p, ".kts") || strings.HasSuffix(p, "build.sbt") || 
+			   strings.HasSuffix(p, "pom.xml") || strings.HasSuffix(p, "setup.py") ||
+			   strings.HasSuffix(p, "pyproject.toml") || strings.HasSuffix(p, "requirements.txt") ||
+			   strings.HasSuffix(p, "CMakeLists.txt") {
 				b, _ := os.ReadFile(p)
 				if strings.Contains(string(b), needle) { match = true }
 			}
@@ -146,5 +150,52 @@ func hasJibPlugin(root string) bool {
 	if grep(root, "jib-maven-plugin") {
 		return true
 	}
+	return false
+}
+
+// hasPythonCExtensions detects Python C-extensions with comprehensive checks
+func hasPythonCExtensions(root string) bool {
+	// Check for C/C++/Cython source files
+	if hasAny(root, ".c") || hasAny(root, ".cc") || hasAny(root, ".cpp") || 
+	   hasAny(root, ".cxx") || hasAny(root, ".pyx") || hasAny(root, ".pxd") {
+		return true
+	}
+	
+	// Check for setuptools/distutils configuration
+	if grep(root, "ext_modules") || grep(root, "Extension(") {
+		return true
+	}
+	
+	// Check for Cython usage
+	if grep(root, "from Cython") || grep(root, "import Cython") || 
+	   grep(root, "cythonize") {
+		return true
+	}
+	
+	// Check for popular C-extension libraries in requirements
+	if grep(root, "numpy") || grep(root, "scipy") || grep(root, "pandas") ||
+	   grep(root, "psycopg2") || grep(root, "lxml") || grep(root, "pillow") ||
+	   grep(root, "cryptography") || grep(root, "cffi") || grep(root, "pycrypto") {
+		return true
+	}
+	
+	// Check for build configuration files with C-extension hints
+	if grep(root, "build_ext") || grep(root, "include_dirs") || 
+	   grep(root, "library_dirs") || grep(root, "libraries =") {
+		return true
+	}
+	
+	// Check pyproject.toml for build system requiring C compilation
+	if grep(root, "build-backend.*setuptools") && 
+	   (grep(root, "compiler_so") || grep(root, "extra_compile_args")) {
+		return true
+	}
+	
+	// Check for CMake integration (common with C extensions)
+	if exists(filepath.Join(root, "CMakeLists.txt")) && 
+	   (grep(root, "pybind11") || grep(root, "Python_add_library")) {
+		return true
+	}
+	
 	return false
 }

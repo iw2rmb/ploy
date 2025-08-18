@@ -49,7 +49,11 @@ Auto-classified lanes:
   - **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
   - **Build System Support**: Gradle, Maven, SBT with comprehensive plugin detection
   - **Language Accuracy**: Proper Scala vs Java identification in mixed projects
-  - **C-Extension Detection**: Python projects with native extensions → Lane C
+  - **Python C-Extension Detection**: Multi-layered detection for C-extensions → Lane C
+    - Source file detection: `.c`, `.cc`, `.cpp`, `.cxx`, `.pyx`, `.pxd` files
+    - Library dependencies: numpy, scipy, pandas, psycopg2, lxml, pillow, cryptography
+    - Build configuration: `ext_modules`, `Extension()`, `build_ext`, CMake integration
+    - Cython support: Import detection and `.pyx` file analysis
 
 ⸻
 
