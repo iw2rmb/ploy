@@ -26,3 +26,6 @@ Critical gaps identified (Aug 2025 analysis):
 Self-healing loop features (Aug 2025 addition):
 13. Diff push with verification: `POST /v1/apps/:app/diff?verify=true` API and `ploy push --verify --diff` CLI to push diffs that create temporary git branches for isolated testing.
 14. Webhook system: `POST /v1/apps/:app/webhooks` API to configure per-app webhooks for build/deploy events, enabling external LLM agents to monitor and react to deployment status.
+
+Environment variables feature (Aug 2025 addition):
+15. App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases.

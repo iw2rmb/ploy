@@ -5,6 +5,16 @@
 - `GET /v1/apps` — list apps (stub).
 - `GET /v1/status/:app` — controller status.
 
+## Environment Variables Endpoints (Planned)
+- `POST /v1/apps/:app/env` — set environment variable.
+  - Body: `{"key": "API_KEY", "value": "secret123", "secret": true}`
+- `GET /v1/apps/:app/env` — list all environment variables.
+  - Returns: `{"env": [{"key": "NODE_ENV", "value": "production", "secret": false}]}`
+- `GET /v1/apps/:app/env/:key` — get specific environment variable.
+- `PUT /v1/apps/:app/env/:key` — update environment variable.
+  - Body: `{"value": "new_value", "secret": false}`
+- `DELETE /v1/apps/:app/env/:key` — delete environment variable.
+
 ## Self-Healing Loop Endpoints (Planned)
 - `POST /v1/apps/:app/diff?verify=true&branch=<name>` — push diff to verification branch.
   - Body: patch/diff content

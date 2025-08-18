@@ -61,3 +61,17 @@
 40. Build artifacts (image, SBOM, signature) uploaded to S3/MinIO storage.
 41. Storage retrieval for rollback operations.
 42. Storage cleanup for expired verification builds.
+
+## Environment Variables Management
+43. `POST /v1/apps/:app/env` sets environment variable for app.
+44. `GET /v1/apps/:app/env` lists all environment variables for app.
+45. `PUT /v1/apps/:app/env/:key` updates existing environment variable.
+46. `DELETE /v1/apps/:app/env/:key` removes environment variable.
+47. `ploy env set app KEY VALUE` via CLI sets environment variable.
+48. `ploy env set app SECRET_KEY value --secret` encrypts sensitive environment variable.
+49. `ploy env list app` displays all environment variables (secrets masked).
+50. Environment variables available during build phase (all lanes).
+51. Environment variables injected into deployment runtime environment.
+52. Secret environment variables encrypted at rest in storage.
+53. Environment variable changes trigger new deployment with updated values.
+54. `ploy env import app .env` imports environment variables from file.
