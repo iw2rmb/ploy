@@ -83,6 +83,18 @@
 38. Python project with C-extensions (.c files, ext_modules) → Lane C (not Lane B).
 39. Scala project with sbt-jib plugin → Lane E (not Lane C).
 
+## Jib Detection Enhancement (Aug 2025)
+101. Gradle Java project with `com.google.cloud.tools.jib` plugin → Lane E with "java" language.
+102. Gradle Scala project with Jib plugin → Lane E with "scala" language (not "java").
+103. Maven Java project with `jib-maven-plugin` → Lane E with proper detection.
+104. SBT Scala project with `sbt-jib` → Lane E with "scala" language.
+105. Java project with `jibBuildTar` task usage → Lane E detection via task reference.
+106. Scala project with `jib {}` configuration block → Lane E with build script parsing.
+107. Gradle Java project without Jib plugin → Lane C for OSv optimization.
+108. Maven Java project without Jib → Lane C with proper fallback.
+109. Mixed Kotlin/Java project → "java" language with appropriate lane selection.
+110. Build script parsing covers `.gradle`, `.gradle.kts`, `.kts`, `build.sbt`, `pom.xml` files.
+
 ## Storage & Artifacts
 40. Build artifacts (image, SBOM, signature) uploaded to S3/MinIO storage.
 41. Storage retrieval for rollback operations.

@@ -79,3 +79,39 @@ All essential CLI operations are now implemented, providing users with complete 
 - ✅ **Error Handling**: 400 responses for invalid requests
 - ✅ **Backward Compatibility**: Existing endpoints unaffected
 - ✅ **CLI Integration**: Commands successfully communicate with API
+
+## [2025-08-18] - Lane Picker Jib Detection Enhancement
+
+### Added
+- **Enhanced Jib Plugin Detection**
+  - Comprehensive Jib detection for Gradle projects (`com.google.cloud.tools.jib`, `jib {}` blocks, `jibBuildTar` tasks)
+  - Maven Jib plugin support (`jib-maven-plugin`, XML-based detection)
+  - SBT Jib plugin detection for Scala projects (`sbt-jib`)
+  - Extended file search to include build scripts (`.gradle`, `.gradle.kts`, `.kts`, `build.sbt`, `pom.xml`)
+
+- **Improved Language Detection** 
+  - Scala projects now correctly identified as "scala" instead of "java"
+  - Kotlin projects properly handled as Java ecosystem
+  - Better precedence for Scala detection over generic JVM tools
+
+- **Lane Selection Logic**
+  - Java/Scala with Jib → Lane E (optimal for containerless builds)
+  - Java/Scala without Jib → Lane C (using OSv for JVM optimization)
+  - Enhanced reasoning messages explain lane selection rationale
+
+### Fixed
+- **Build Script Parsing**: `grep()` function now searches Gradle, Maven, and SBT build files
+- **False Negatives**: Jib detection was failing due to limited file type scanning
+- **Language Misidentification**: Scala projects with Gradle now correctly identified
+
+### Testing
+- ✅ **Java with Jib**: Correctly identifies Lane E with detailed reasoning
+- ✅ **Scala with Jib**: Properly detects Lane E and "scala" language
+- ✅ **Java without Jib**: Correctly falls back to Lane C for OSv optimization
+- ✅ **Multiple Build Systems**: Supports Gradle, Maven, and SBT configurations
+
+### Technical Details
+- New `hasJibPlugin()` function with comprehensive detection patterns
+- Extended `grep()` function to include build configuration files
+- Improved conditional logic for language and lane selection
+- Clear reasoning messages for debugging and user understanding

@@ -45,7 +45,11 @@ Auto-classified lanes:
   - Requires signature + SBOM
   - SSH blocked in prod without break-glass
   - Image size caps per lane (planned)
-  - Enhanced lane detection (Jib, C-extensions)
+- **Enhanced Lane Detection** (Aug 2025):
+  - **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
+  - **Build System Support**: Gradle, Maven, SBT with comprehensive plugin detection
+  - **Language Accuracy**: Proper Scala vs Java identification in mixed projects
+  - **C-Extension Detection**: Python projects with native extensions → Lane C
 
 ⸻
 
