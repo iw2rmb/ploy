@@ -46,8 +46,10 @@ Example: feature changes must update FEATURES.md.
   - FreeBSD features: Test on FreeBSD VM (jails, bhyve)
   - Self-healing features: Run webhook tests
 
-Setup: `cd iac/dev && ansible-playbook site.yml -e target_host=VPS_IP`
-Test: `ssh root@VPS_IP && su - ploy && ./test-scripts/test-*.sh`
+Setup: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
+Test: `ssh root@$TARGET_HOST && su - ploy && ./test-scripts/test-*.sh`
+
+**IMPORTANT**: Always use `$TARGET_HOST` environment variable instead of hardcoded IP addresses when accessing the development VPS. This ensures consistent environment management and avoids IP address exposure in commands.
 
 ## Development Commands
 
