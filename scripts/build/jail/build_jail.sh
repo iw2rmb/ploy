@@ -19,5 +19,16 @@ echo "$OUT"
 # SBOM/signature (optional)
 
 if command -v syft >/dev/null 2>&1; then syft scan "$OUT" -o json > "$OUT.sbom.json" || true; fi
-if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$OUT.sig" "$OUT" || true; fi
+
+# Enhanced keyless OIDC artifact signing
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../common/signing.sh" ]]; then
+  source "$SCRIPT_DIR/../common/signing.sh"
+  sign_ploy_artifact "$OUT" "artifact" || true
+else
+  # Fallback to basic signing
+  if command -v cosign >/dev/null 2>&1; then 
+    cosign sign-blob --yes --output-signature "$OUT.sig" "$OUT" || true
+  fi
+fi
 

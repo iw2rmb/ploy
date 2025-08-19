@@ -94,22 +94,83 @@ func signWithKey(target string, targetType SignTargetType, privKey string) error
 	return nil
 }
 
-// signKeyless performs keyless OIDC signing
+// signKeyless performs enhanced keyless OIDC signing with improved configuration
 func signKeyless(target string, targetType SignTargetType) error {
 	var cmd *exec.Cmd
 	
 	switch targetType {
 	case ArtifactFile:
 		sigPath := target + ".sig"
-		cmd = exec.Command("cosign", "sign-blob", "--output-signature", sigPath, target)
+		certPath := target + ".crt"
+		
+		// Enhanced cosign command with better OIDC support
+		args := []string{
+			"sign-blob",
+			"--yes", // Skip confirmation prompts for automation
+			"--output-signature", sigPath,
+			"--output-certificate", certPath,
+		}
+		
+		// Add OIDC provider configuration if specified
+		if provider := os.Getenv("COSIGN_OIDC_PROVIDER"); provider != "" {
+			args = append(args, "--oidc-provider", provider)
+		}
+		
+		if clientID := os.Getenv("COSIGN_OIDC_CLIENT_ID"); clientID != "" {
+			args = append(args, "--oidc-client-id", clientID)
+		}
+		
+		// Control transparency log upload (default: true for production)
+		tlogUpload := os.Getenv("COSIGN_TLOG_UPLOAD")
+		if tlogUpload == "" {
+			tlogUpload = "true" // Default to uploading to transparency log
+		}
+		args = append(args, "--tlog-upload="+tlogUpload)
+		
+		args = append(args, target)
+		cmd = exec.Command("cosign", args...)
+		
 	case DockerImage:
-		cmd = exec.Command("cosign", "sign", target)
+		// Enhanced container signing with OIDC configuration
+		args := []string{
+			"sign",
+			"--yes", // Skip confirmation prompts for automation
+		}
+		
+		// Add OIDC provider configuration if specified
+		if provider := os.Getenv("COSIGN_OIDC_PROVIDER"); provider != "" {
+			args = append(args, "--oidc-provider", provider)
+		}
+		
+		if clientID := os.Getenv("COSIGN_OIDC_CLIENT_ID"); clientID != "" {
+			args = append(args, "--oidc-client-id", clientID)
+		}
+		
+		// Control transparency log upload
+		tlogUpload := os.Getenv("COSIGN_TLOG_UPLOAD")
+		if tlogUpload == "" {
+			tlogUpload = "true"
+		}
+		args = append(args, "--tlog-upload="+tlogUpload)
+		
+		args = append(args, target)
+		cmd = exec.Command("cosign", args...)
 	}
 	
-	cmd.Env = append(os.Environ(), "COSIGN_EXPERIMENTAL=1")
+	// Set enhanced environment for keyless signing
+	cmd.Env = append(os.Environ(), 
+		"COSIGN_EXPERIMENTAL=1",
+		"COSIGN_YES=true", // Additional confirmation skip
+	)
+	
+	// Set timeout for OIDC operations (5 minutes)
+	if timeout := os.Getenv("COSIGN_TIMEOUT"); timeout == "" {
+		cmd.Env = append(cmd.Env, "COSIGN_TIMEOUT=300s")
+	}
+	
 	b, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("cosign keyless sign failed: %v: %s", err, string(b))
+		return fmt.Errorf("cosign keyless OIDC sign failed: %v: %s", err, string(b))
 	}
 	return nil
 }
