@@ -254,6 +254,7 @@
         - /opt/hashicorp/nomad/logs
         - /opt/hashicorp/nomad/alloc
         - /opt/hashicorp/nomad/client
+        - /opt/hashicorp/nomad/plugins
 
     - name: Create Ploy host volume directories for Nomad
       file:

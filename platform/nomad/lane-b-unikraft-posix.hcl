@@ -3,7 +3,14 @@ job "{{APP_NAME}}-lane-b" {
   type = "service"
   group "app" {
     count = 2
-    network { port "http" { to = 8080 } ssh = 2222 }
+    network { 
+      port "http" { 
+        to = 8080 
+      }
+      port "ssh" {
+        static = 2222
+      }
+    }
     task "unikernel" {
       driver = "qemu"
       config {
