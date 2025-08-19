@@ -145,6 +145,11 @@
               - pkg-config
             state: present
 
+        - name: Remove old KraftKit version
+          file:
+            path: /usr/local/bin/kraft
+            state: absent
+
         - name: Download KraftKit
           get_url:
             url: "https://github.com/unikraft/kraftkit/releases/download/v{{ build_tools.kraft.version }}/kraft_{{ build_tools.kraft.version }}_linux_amd64.tar.gz"
@@ -155,6 +160,20 @@
             src: /tmp/kraft.tar.gz
             dest: /usr/local/bin
             remote_src: true
+
+        - name: Make KraftKit executable
+          file:
+            path: /usr/local/bin/kraft
+            mode: '0755'
+
+        - name: Verify KraftKit installation
+          command: /usr/local/bin/kraft version
+          register: kraft_version
+          changed_when: false
+
+        - name: Display KraftKit version
+          debug:
+            msg: "KraftKit installed successfully: {{ kraft_version.stdout_lines[0] if kraft_version.stdout_lines else 'Version info not available' }}"
 
         - name: Download Cosign
           get_url:
