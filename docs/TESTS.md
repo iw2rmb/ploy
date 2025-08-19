@@ -235,3 +235,15 @@
 226. Signature files are automatically uploaded to MinIO storage alongside artifacts.
 227. Build handler properly handles signing failures with informative error messages.
 228. Verification logic correctly identifies signed vs unsigned artifacts for policy enforcement.
+
+## Signature File Generation for All Artifacts (Aug 2025)
+229. Lane A Unikraft builds generate .sig signature files for all .img artifacts.
+230. Lane B Unikraft builds generate .sig signature files for all .img artifacts.
+231. Lane C OSv builds generate .sig signature files for all .qcow2 artifacts.
+232. Lane D FreeBSD jail builds generate .sig signature files for all .tar.gz artifacts.
+233. Lane E OCI builds generate signatures for all Docker images in registry.
+234. Lane F VM builds generate .sig signature files for all .img artifacts.
+235. Debug build variants generate signature files alongside main build artifacts.
+236. All build scripts include SBOM generation (.sbom.json) for supply chain tracking.
+237. Signature generation gracefully handles missing cosign tool in development environments.
+238. Build scripts verify signature file existence before creating new signatures to avoid duplicates.
