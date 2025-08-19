@@ -97,6 +97,14 @@ Auto-classified lanes:
   - **Detailed Error Reporting**: Comprehensive failure analysis with specific reasons for verification failures
   - **Audit Trail Logging**: Complete verification history with timestamps and validation results for compliance
   - **Retry Logic Integration**: Handles temporary storage issues with intelligent retry mechanisms
+- **Lane-Specific Image Size Caps** ✅ (Aug 2025):
+  - **Optimized Size Limits**: Lane A (50MB), Lane B (100MB), Lane C (500MB), Lane D (200MB), Lane E (1GB), Lane F (5GB)
+  - **Multi-Format Size Measurement**: File-based artifacts via filesystem and Docker images via CLI commands
+  - **Pre-Deployment Enforcement**: Size caps validated before Nomad deployment to prevent resource waste
+  - **Break-Glass Override**: Emergency deployment capability for size cap violations in production environments
+  - **Comprehensive Error Reporting**: Detailed size violation messages with actual vs limit comparisons
+  - **Performance Optimization**: Size limits aligned with lane performance characteristics and boot requirements
+  - **Storage Efficiency**: Prevents oversized deployments while maintaining functionality requirements
 - **Enhanced Lane Detection** (Aug 2025):
   - **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
   - **Build System Support**: Gradle, Maven, SBT with comprehensive plugin detection

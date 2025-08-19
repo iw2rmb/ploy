@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2025-08-19] - Lane-Specific Image Size Caps Implementation (Phase 4 Step 3)
+
+### Added
+- **Comprehensive Image Size Measurement System**
+  - File-based artifact size measurement using filesystem operations for accurate sizing
+  - Docker container image size measurement using Docker CLI commands for container analysis
+  - Support for parsing Docker size formats (MB, GB, KB, B) with automatic unit conversion
+  - Detailed size information reporting with both compressed and uncompressed measurements
+
+### Enhanced
+- **Lane-Specific Size Limits with OPA Policy Enforcement**
+  - Lane A (Unikernel minimal): 50MB limit optimized for microsecond boot performance
+  - Lane B (Unikernel POSIX): 100MB limit for enhanced runtime compatibility
+  - Lane C (OSv/JVM): 500MB limit accommodating Java runtime requirements
+  - Lane D (FreeBSD jail): 200MB limit for efficient containerization
+  - Lane E (OCI container): 1GB limit for standard container deployment
+  - Lane F (Full VM): 5GB limit balancing functionality and storage efficiency
+
+### Security & Policy Features
+- **Break-Glass Override Mechanism**: Emergency deployment capability for size cap violations in production
+- **Comprehensive Error Reporting**: Detailed size violation messages with actual vs limit comparisons
+- **Audit Trail Logging**: Complete size measurement and enforcement history for compliance tracking
+- **Pre-Deployment Enforcement**: Size caps validated before Nomad deployment to prevent resource waste
+
+### Testing
+- Added comprehensive test scenarios (Tests 266-280) for image size caps per lane
+- Created unit test script for validating size measurement and enforcement logic
+- Created integration test script for end-to-end size cap enforcement workflows
+- Verified size cap enforcement works correctly on both local and VPS environments
+- Confirmed proper integration with existing OPA policy enforcement framework
+
 ## [2025-08-19] - Comprehensive Artifact Integrity Verification (Phase 4 Step 2)
 
 ### Added
