@@ -119,7 +119,7 @@ if ! command -v kraft &> /dev/null; then
   # Generate comprehensive SBOM and signature for debug image  
   if command -v syft >/dev/null 2>&1; then 
     echo "Generating comprehensive SBOM for fallback debug image $IMAGE_PATH..."
-    syft packages "$IMAGE_PATH" -o spdx-json --catalogers all --select-catalogers +license --file "$IMAGE_PATH.sbom.json" || true
+    syft scan "$IMAGE_PATH" -o spdx-json --file "$IMAGE_PATH.sbom.json" || true
   fi
   if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$IMAGE_PATH.sig" "$IMAGE_PATH" || true; fi
   
@@ -134,7 +134,7 @@ else
     # Generate comprehensive SBOM and signature for debug image
     if command -v syft >/dev/null 2>&1; then 
       echo "Generating comprehensive SBOM for debug image $NEW_PATH..."
-      syft packages "$NEW_PATH" -o spdx-json --catalogers all --select-catalogers +license --file "$NEW_PATH.sbom.json" || true
+      syft scan "$NEW_PATH" -o spdx-json --file "$NEW_PATH.sbom.json" || true
     fi
     if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$NEW_PATH.sig" "$NEW_PATH" || true; fi
     

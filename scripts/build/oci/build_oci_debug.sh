@@ -124,7 +124,7 @@ docker build -f Dockerfile.debug -t "$TAG" . \
   fi)
 
 # Generate SBOM and signature for debug image
-if command -v syft >/dev/null 2>&1; then syft packages "$TAG" -o json > "/tmp/$APP-$TAG.sbom.json" || true; fi
+if command -v syft >/dev/null 2>&1; then syft scan "$TAG" -o json > "/tmp/$APP-$TAG.sbom.json" || true; fi
 if command -v cosign >/dev/null 2>&1; then cosign sign --yes "$TAG" || true; fi
 
 echo "Built debug image: $TAG"

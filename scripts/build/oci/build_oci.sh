@@ -26,19 +26,16 @@ fi
 if command -v syft >/dev/null 2>&1; then 
   echo "Generating comprehensive container SBOM for $TAG..."
   SBOM_FILE="/tmp/$APP-$(echo $TAG | tr '/:' '-').sbom.json"
-  syft packages "$TAG" \
+  syft scan "$TAG" \
     -o spdx-json \
-    --catalogers all \
-    --select-catalogers +secrets,+license \
     --file "$SBOM_FILE" || true
   echo "Container SBOM saved to $SBOM_FILE"
   
   # Also generate source code SBOM for the build context
   if [ -d "$SRC" ]; then
     echo "Generating source dependencies SBOM..."
-    syft packages "$SRC" \
+    syft scan "$SRC" \
       -o spdx-json \
-      --catalogers all \
       --file "$SRC/.sbom.json" || true
   fi
 else
