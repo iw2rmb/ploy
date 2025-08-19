@@ -167,13 +167,22 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		signed = true
 	}
 
+	// Enhanced OPA policy enforcement with comprehensive context
+	env := c.Query("env", "dev")
+	breakGlass := c.Query("break_glass", "false") == "true"
+	debug := c.Query("debug", "false") == "true"
+	
 	if err := opa.Enforce(opa.ArtifactInput{
-		Signed:     signed,
+		Signed:      signed,
 		SBOMPresent: sbom,
-		Env:        c.Query("env", "dev"),
-		SSHEnabled: false,
+		Env:         env,
+		SSHEnabled:  debug, // SSH is enabled for debug builds
+		BreakGlass:  breakGlass,
+		App:         appName,
+		Lane:        lane,
+		Debug:       debug,
 	}); err != nil {
-		return utils.ErrJSON(c, 403, fmt.Errorf("policy denied: %w", err))
+		return utils.ErrJSON(c, 403, fmt.Errorf("OPA policy enforcement failed: %w", err))
 	}
 
 	jobFile, err := nomad.RenderTemplate(lane, nomad.RenderData{

@@ -59,6 +59,22 @@
 21. Reject SSH in prod unless break-glass flag present.
 22. Enforce image size caps per lane.
 
+## OPA Policy Enforcement Implementation (Aug 2025)
+265. OPA policy validation blocks deployment when artifact signature is missing.
+266. OPA policy validation blocks deployment when SBOM file is missing.
+267. OPA policy allows deployment when both signature and SBOM are present.
+268. Production environment with SSH enabled requires break-glass approval flag.
+269. Development environment allows SSH-enabled deployments without break-glass.
+270. Policy enforcement triggers before Nomad job submission in build pipeline.
+271. Policy violation returns clear error message to user about missing requirements.
+272. Policy validation works across all deployment lanes (A, B, C, D, E, F).
+273. Build process properly sets signed=true when artifacts are successfully signed.
+274. Build process properly sets sbom=true when SBOM files are generated.
+275. OPA policy enforcement integrates with existing build handler workflow.
+276. Policy validation preserves existing functionality for valid deployments.
+277. Controller logs policy enforcement decisions for audit and debugging.
+278. Policy enforcement can be bypassed in development environments when configured.
+
 ## Observability
 23. Prometheus scrapes app/host; Grafana dashboards render.
 24. Logs from unikernel serial captured to Loki.
