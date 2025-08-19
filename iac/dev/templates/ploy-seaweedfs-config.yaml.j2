@@ -1,29 +1,29 @@
 # Ploy Storage Configuration for SeaweedFS
-# This configuration enables SeaweedFS as the primary storage backend
-# with collection-based organization for different artifact types
+# Simplified configuration with SeaweedFS as the only storage backend
 
-provider: seaweedfs
-endpoint: http://localhost:{{ seaweedfs.filer_port }}
-bucket: {{ seaweedfs.collections.artifacts.name }}
-region: dc1
+# SeaweedFS master server address
+master: "localhost:{{ seaweedfs.master_port }}"
 
-# SeaweedFS-specific configuration
-seaweedfs:
-  master: "localhost:{{ seaweedfs.master_port }}"
-  filer: "localhost:{{ seaweedfs.filer_port }}"
-  collection: "{{ seaweedfs.collections.artifacts.name }}"
-  replication: "{{ seaweedfs.collections.artifacts.replication }}"
-  timeout: 30
+# SeaweedFS filer server address  
+filer: "localhost:{{ seaweedfs.filer_port }}"
 
-# Collection organization
-buckets:
+# Collection name for storing artifacts
+collection: "{{ seaweedfs.collections.artifacts.name }}"
+
+# Replication strategy
+replication: "{{ seaweedfs.collections.artifacts.replication }}"
+
+# Request timeout in seconds
+timeout: 30
+
+# Data center identifier
+datacenter: "dc1"
+
+# Rack identifier
+rack: "rack1"
+
+# Collection organization for different artifact types
+collections:
   artifacts: "{{ seaweedfs.collections.artifacts.name }}"
-  logs: "{{ seaweedfs.collections.debug.name }}"
-  cache: "{{ seaweedfs.collections.debug.name }}"
-
-# Optional: Hybrid mode configuration (commented out by default)
-# hybrid:
-#   enabled: false
-#   primary_provider: "seaweedfs"
-#   dual_write: false
-#   fallback_read: false
+  metadata: "{{ seaweedfs.collections.metadata.name }}"
+  debug: "{{ seaweedfs.collections.debug.name }}"
