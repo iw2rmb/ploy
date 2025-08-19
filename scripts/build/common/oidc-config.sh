@@ -14,7 +14,7 @@ setup_default_oidc() {
 
 # GitHub Actions OIDC configuration
 setup_github_oidc() {
-    if [[ "$GITHUB_ACTIONS" == "true" ]]; then
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
         echo "🔧 Configuring GitHub Actions OIDC..."
         export COSIGN_OIDC_PROVIDER="github-actions"
         export COSIGN_OIDC_CLIENT_ID="sigstore"
@@ -36,7 +36,7 @@ setup_github_oidc() {
 
 # GitLab CI OIDC configuration  
 setup_gitlab_oidc() {
-    if [[ "$GITLAB_CI" == "true" ]]; then
+    if [[ "${GITLAB_CI:-}" == "true" ]]; then
         echo "🔧 Configuring GitLab CI OIDC..."
         export COSIGN_OIDC_PROVIDER="gitlab"
         export COSIGN_OIDC_CLIENT_ID="sigstore"
@@ -58,7 +58,7 @@ setup_gitlab_oidc() {
 
 # Buildkite OIDC configuration
 setup_buildkite_oidc() {
-    if [[ "$BUILDKITE" == "true" ]]; then
+    if [[ "${BUILDKITE:-}" == "true" ]]; then
         echo "🔧 Configuring Buildkite OIDC..."
         export COSIGN_OIDC_PROVIDER="buildkite-agent"
         export COSIGN_OIDC_CLIENT_ID="sigstore"

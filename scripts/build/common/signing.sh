@@ -25,11 +25,11 @@ configure_oidc_environment() {
 # Detect signing mode based on environment
 detect_signing_mode() {
     # Check for CI/CD environments that support OIDC
-    if [[ "$GITHUB_ACTIONS" == "true" ]] || \
-       [[ "$GITLAB_CI" == "true" ]] || \
-       [[ "$BUILDKITE" == "true" ]] || \
-       [[ "$PLOY_ENV" == "production" ]] || \
-       [[ "$PLOY_ENV" == "staging" ]]; then
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]] || \
+       [[ "${GITLAB_CI:-}" == "true" ]] || \
+       [[ "${BUILDKITE:-}" == "true" ]] || \
+       [[ "${PLOY_ENV:-}" == "production" ]] || \
+       [[ "${PLOY_ENV:-}" == "staging" ]]; then
         echo "keyless-oidc"
     elif command -v cosign >/dev/null 2>&1; then
         echo "keyless-oidc"
