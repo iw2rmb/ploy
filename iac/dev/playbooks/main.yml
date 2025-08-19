@@ -1,4 +1,19 @@
 ---
+# Ploy Development Environment Setup Playbook
+# 
+# This playbook sets up a complete development environment including:
+# - Development tools (Go, Node.js, Java, Python)
+# - Build tools (KraftKit, Cosign, Syft, Grype)
+# - Container runtime (Docker)
+# - Object storage (MinIO)
+# - Proper PATH configuration to avoid conflicts
+# - GitHub credentials setup for the ploy user
+#
+# Key improvements:
+# - Fixed PATH configuration to prevent multiple conflicting declarations
+# - Cosign installation with verification
+# - Cleanup of conflicting environment variables
+#
 - name: Setup Ploy Development Environment
   hosts: linux_hosts
   become: true
@@ -78,10 +93,11 @@
             dest: /usr/local
             remote_src: true
 
-        - name: Add Go to PATH
+        - name: Configure system PATH with Go
           lineinfile:
             path: /etc/environment
-            line: 'PATH="/usr/local/go/bin:$PATH"'
+            regexp: '^PATH='
+            line: 'PATH="/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"'
             create: true
 
         - name: Create Go workspace
@@ -145,6 +161,15 @@
             url: "https://github.com/sigstore/cosign/releases/download/v{{ build_tools.cosign.version }}/cosign-linux-amd64"
             dest: /usr/local/bin/cosign
             mode: '0755'
+
+        - name: Verify Cosign installation
+          command: /usr/local/bin/cosign version
+          register: cosign_version
+          changed_when: false
+
+        - name: Display Cosign version
+          debug:
+            msg: "Cosign installed successfully: {{ cosign_version.stdout_lines[0] if cosign_version.stdout_lines else 'Version info not available' }}"
 
         - name: Download Syft
           get_url:
@@ -222,6 +247,20 @@
         shell: /bin/bash
         create_home: true
 
+    - name: Clean up conflicting environment variables from /etc/environment
+      lineinfile:
+        path: /etc/environment
+        regexp: '^GITHUB_PLOY_DEV_(USERNAME|PAT)='
+        state: absent
+
+    - name: Clean up conflicting PATH entries from user profile
+      lineinfile:
+        path: /home/ploy/.profile
+        regexp: '^export PATH="/usr/bin:/bin:\$PATH"'
+        state: absent
+        owner: ploy
+        group: ploy
+
     - name: Set GitHub environment variables for ploy user
       blockinfile:
         path: /home/ploy/.bashrc
@@ -235,17 +274,6 @@
           export GITHUB_PLOY_DEV_PAT="{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - GitHub env vars"
 
-    - name: Set PATH for ploy user
-      blockinfile:
-        path: /home/ploy/.bashrc
-        create: true
-        owner: ploy
-        group: ploy
-        mode: '0644'
-        block: |
-          # Ensure basic system directories are in PATH
-          export PATH="/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - PATH setup"
 
     - name: Clone Ploy repository
       git:

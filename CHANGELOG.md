@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2025-08-19] - Cryptographic Artifact Signing Implementation
+
+### Added
+- **Comprehensive Artifact Signing System**
+  - SignArtifact function supporting key-based signing (COSIGN_PRIVATE_KEY)
+  - SignArtifact function supporting keyless OIDC signing (COSIGN_EXPERIMENTAL=1)
+  - SignDockerImage function for Docker image signing in Lane E deployments
+  - Automatic dummy signature generation for development environments without cosign
+  - Smart duplicate signing prevention checking existing .sig files
+
+- **Build Process Integration**
+  - Automatic artifact signing immediately after successful builds across all lanes
+  - File-based artifact signing for Lanes A, B, C, D, F 
+  - Docker image signing integration for Lane E OCI deployments
+  - Build artifact path parsing from verbose build output
+  - Seamless integration with existing OPA policy enforcement
+
+### Fixed
+- **Build Output Processing**
+  - Improved Unikraft build output parsing to extract actual artifact paths
+  - Fixed "file name too long" errors from verbose build logs being treated as paths
+  - Proper handling of multi-line build output to identify artifact locations
+  - Enhanced error handling for build artifact path extraction
+
+### Testing
+- **Multi-Environment Validation**
+  - Local testing: Confirmed signing works and artifacts pass OPA policy validation
+  - VPS testing: Verified build pipeline progression from "artifact not signed" to "sbom missing"
+  - Cross-platform compatibility: Validated functionality on both macOS development and Linux production
+  - Policy integration: Confirmed signed artifacts satisfy OPA security requirements
+
 ## [2025-08-19] - Node.js Lane B Testing & Build Handler Fixes
 
 ### Added
