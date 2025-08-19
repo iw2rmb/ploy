@@ -174,3 +174,13 @@
 162. App destroy command supports --force flag to bypass confirmation prompts.
 163. CLI displays progress during destroy operation with clear status messages.
 164. API returns detailed JSON response with cleanup status for each resource type.
+
+## Node.js Build Enhancement (Aug 2025)
+178. Node.js detection in build script correctly identifies package.json files.
+179. Build script runs npm install for Node.js apps when node_modules missing.
+180. Build script skips npm install when node_modules already exists.
+181. Build script verifies main entry point from package.json exists.
+182. Build script handles missing Node.js/npm gracefully with warnings.
+183. Lane B build process integrates Node.js preparation before kraft build.
+184. Build script provides detailed logging for Node.js build steps.
+185. Build failures create placeholder images with proper error logging.
