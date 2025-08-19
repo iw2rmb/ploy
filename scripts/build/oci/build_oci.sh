@@ -22,8 +22,27 @@ else
   echo "No Dockerfile or Jib; cannot build OCI for $APP" >&2; exit 2
 fi
 
-# Generate SBOM and signature for image
-if command -v syft >/dev/null 2>&1; then syft packages "$TAG" -o json > "/tmp/$APP-$(echo $TAG | tr '/:' '-').sbom.json" || true; fi
+# Generate comprehensive SBOM and signature for container image
+if command -v syft >/dev/null 2>&1; then 
+  echo "Generating comprehensive container SBOM for $TAG..."
+  SBOM_FILE="/tmp/$APP-$(echo $TAG | tr '/:' '-').sbom.json"
+  syft scan "$TAG" \
+    -o spdx-json \
+    --file "$SBOM_FILE" || true
+  echo "Container SBOM saved to $SBOM_FILE"
+  
+  # Also generate source code SBOM for the build context
+  if [ -d "$SRC" ]; then
+    echo "Generating source dependencies SBOM..."
+    syft scan "$SRC" \
+      -o spdx-json \
+      --file "$SRC/.sbom.json" || true
+  fi
+else
+  echo "Warning: syft not found, skipping comprehensive SBOM generation"
+fi
+
+# Container image signing
 if command -v cosign >/dev/null 2>&1; then cosign sign --yes "$TAG" || true; fi
 
 echo "$TAG"

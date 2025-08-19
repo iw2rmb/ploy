@@ -1,5 +1,62 @@
 # CHANGELOG
 
+## [2025-08-19] - Production-Ready SBOM Generation (Phase 3 Step 3)
+
+### Added
+- **Comprehensive SBOM Generation**
+  - Updated all build scripts to use modern `syft scan` command instead of deprecated `syft packages`
+  - Fixed SBOM generation compatibility with syft 0.100.0+ versions
+  - Enhanced SBOM generation across all deployment lanes (A, B, C, D, E, F)
+  - Verified SBOM generation works for Unikraft, FreeBSD jails, OCI containers, and VM images
+  - SBOM files generated in both SPDX-JSON and JSON formats with comprehensive metadata
+
+- **Supply Chain Security Testing**
+  - Validated SBOM generation on VPS environment with real artifacts
+  - Confirmed cosign integration for artifact signing alongside SBOM generation
+  - Tested multi-lane SBOM support ensuring coverage across all build paths
+
+### Fixed
+- **SBOM Generation Script Updates**
+  - Removed deprecated `--catalogers all` and `--select-catalogers` flags from syft commands
+  - Fixed unbound variable issues in APP_DIR handling for source directory SBOM generation
+  - Updated syft command syntax to be compatible with current syft versions
+  - Ensured graceful fallback when syft tool is not available
+
+### Testing
+- ✅ VPS environment setup with syft 0.100.0 verified
+- ✅ Unikraft build SBOM generation (Lane A/B) tested with SPDX-JSON format
+- ✅ FreeBSD jail SBOM generation (Lane D) tested with JSON format  
+- ✅ VM/Packer SBOM generation (Lane F) tested with JSON format
+- ✅ Cosign artifact signing integration verified across all lanes
+- ✅ SBOM files contain proper metadata, checksums, and supply chain information
+
+## [2025-08-19] - Comprehensive Signature File Generation
+
+### Added
+- **Universal Signature Generation**
+  - Enhanced all build scripts to automatically generate .sig signature files for all built artifacts
+  - Added signature generation to previously missing debug build scripts (jail, OCI)
+  - Consistent SBOM generation (.sbom.json) across all build scripts for supply chain tracking
+  - Added graceful fallback handling when cosign tool is not available in development environments
+
+- **Build Script Enhancements**
+  - scripts/build/jail/build_jail_debug.sh: Added signature and SBOM generation for .tar.gz jail files
+  - scripts/build/oci/build_oci.sh: Added signature and SBOM generation for OCI container images
+  - scripts/build/oci/build_oci_debug.sh: Added signature and SBOM generation for debug container images
+  - Enhanced existing debug scripts with consistent signature generation patterns
+
+### Fixed
+- **Build Script Consistency**
+  - Standardized signature generation approach across all lanes (A-F) and debug variants
+  - Proper file path handling for signature files in different build contexts
+  - Consistent cosign and syft tool availability checks across all scripts
+
+### Testing
+- **Comprehensive Test Coverage**
+  - Added 10 new test scenarios (TESTS.md #229-238) for signature file generation across all lanes
+  - VPS testing confirmed all modified scripts have valid syntax and execute correctly
+  - Local testing validated build script modifications don't break existing functionality
+
 ## [2025-08-19] - Cryptographic Artifact Signing Implementation
 
 ### Added

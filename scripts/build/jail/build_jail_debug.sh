@@ -151,7 +151,7 @@ tar -czf "debug-$APP-$SHA-jail.tar.gz" -C "$JAIL_DIR" .
 JAIL_TAR="$OUT_DIR/debug-$APP-$SHA-jail.tar.gz"
 
 # Generate SBOM and signature for debug jail
-if command -v syft >/dev/null 2>&1; then syft packages "$JAIL_TAR" -o json > "$JAIL_TAR.sbom.json" || true; fi
+if command -v syft >/dev/null 2>&1; then syft scan "$JAIL_TAR" -o json > "$JAIL_TAR.sbom.json" || true; fi
 if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$JAIL_TAR.sig" "$JAIL_TAR" || true; fi
 
 echo "Built debug jail: $JAIL_TAR"
