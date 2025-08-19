@@ -11,6 +11,7 @@ import (
 	"github.com/ploy/ploy/controller/builders"
 	"github.com/ploy/ploy/controller/envstore"
 	"github.com/ploy/ploy/controller/nomad"
+	"github.com/ploy/ploy/controller/opa"
 	"github.com/ploy/ploy/internal/utils"
 )
 
@@ -26,6 +27,24 @@ func DebugApp(c *fiber.Ctx, envStore *envstore.EnvStore) error {
 	}
 	
 	log.Printf("Creating debug build for app %s (lane: %s) with SSH enabled: %v", app, lane, req.SSHEnabled)
+	
+	// OPA policy enforcement for debug builds
+	env := c.Query("env", "dev")
+	breakGlass := c.Query("break_glass", "false") == "true"
+	
+	// Debug builds always have potential for SSH access, require policy validation
+	if err := opa.Enforce(opa.ArtifactInput{
+		Signed:      true,  // Debug builds are considered signed for policy purposes
+		SBOMPresent: true,  // Debug builds are considered to have SBOM for policy purposes  
+		Env:         env,
+		SSHEnabled:  req.SSHEnabled,
+		BreakGlass:  breakGlass,
+		App:         app,
+		Lane:        lane,
+		Debug:       true,
+	}); err != nil {
+		return utils.ErrJSON(c, 403, fmt.Errorf("debug build policy enforcement failed: %w", err))
+	}
 	
 	srcDir := filepath.Join(os.TempDir(), fmt.Sprintf("debug-src-%s-%d", app, time.Now().Unix()))
 	outDir := filepath.Join(os.TempDir(), fmt.Sprintf("debug-out-%s-%d", app, time.Now().Unix()))
