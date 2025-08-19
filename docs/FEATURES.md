@@ -38,6 +38,11 @@ Auto-classified lanes:
 - Auto SBOM (Syft) + signatures (Cosign)
 - Deterministic `<app>-<sha>` naming
 - Standalone or controller invocation
+- **Enhanced Node.js Build Pipeline** (Aug 2025):
+  - Automatic Node.js application detection via package.json
+  - npm dependency management with production-only installs
+  - Main entry point validation and build preparation
+  - Graceful error handling for missing Node.js/npm dependencies
 
 ⸻
 
