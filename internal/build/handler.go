@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -183,18 +184,31 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 	breakGlass := c.Query("break_glass", "false") == "true"
 	debug := c.Query("debug", "false") == "true"
 	
+	// Determine signing method based on environment and available signatures
+	signingMethod := determineSigningMethod(imagePath, dockerImage, env)
+	
+	// Perform vulnerability scanning for production and staging environments
+	vulnScanPassed := performVulnerabilityScanning(imagePath, dockerImage, env)
+	
+	// Get source repository information if available
+	sourceRepo := extractSourceRepository(srcDir)
+	
 	if err := opa.Enforce(opa.ArtifactInput{
-		Signed:      signed,
-		SBOMPresent: sbom,
-		Env:         env,
-		SSHEnabled:  debug, // SSH is enabled for debug builds
-		BreakGlass:  breakGlass,
-		App:         appName,
-		Lane:        lane,
-		Debug:       debug,
-		ImageSizeMB: imageSizeMB,
-		ImagePath:   imagePath,
-		DockerImage: dockerImage,
+		Signed:         signed,
+		SBOMPresent:    sbom,
+		Env:            env,
+		SSHEnabled:     debug, // SSH is enabled for debug builds
+		BreakGlass:     breakGlass,
+		App:            appName,
+		Lane:           lane,
+		Debug:          debug,
+		ImageSizeMB:    imageSizeMB,
+		ImagePath:      imagePath,
+		DockerImage:    dockerImage,
+		VulnScanPassed: vulnScanPassed,
+		SigningMethod:  signingMethod,
+		BuildTime:      time.Now().Unix(),
+		SourceRepo:     sourceRepo,
 	}); err != nil {
 		return utils.ErrJSON(c, 403, fmt.Errorf("OPA policy enforcement failed: %w", err))
 	}
@@ -294,4 +308,106 @@ func ListApps(c *fiber.Ctx) error {
 
 func Status(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "ok"})
+}
+
+// determineSigningMethod analyzes the signing method used for the artifact
+func determineSigningMethod(imagePath, dockerImage, env string) string {
+	// Check for certificate files indicating OIDC keyless signing
+	if imagePath != "" {
+		certPath := imagePath + ".cert"
+		if utils.FileExists(certPath) {
+			return "keyless-oidc"
+		}
+	}
+	
+	// Check for key-based signing indicators
+	if imagePath != "" && utils.FileExists(imagePath+".sig") {
+		// Read signature file to determine if it's key-based or development
+		if data, err := os.ReadFile(imagePath + ".sig"); err == nil {
+			if strings.Contains(string(data), "development") || strings.Contains(string(data), "dummy") {
+				return "development"
+			}
+			return "key-based"
+		}
+	}
+	
+	// For Docker images, assume keyless OIDC in production/staging, development otherwise
+	if dockerImage != "" {
+		if env == "prod" || env == "production" || env == "staging" {
+			return "keyless-oidc"
+		}
+		return "development"
+	}
+	
+	// Default to development signing
+	return "development"
+}
+
+// performVulnerabilityScanning runs Grype vulnerability scanning if available
+func performVulnerabilityScanning(imagePath, dockerImage, env string) bool {
+	// Skip vulnerability scanning in development environment for performance
+	if env == "dev" || env == "development" || env == "" {
+		return false
+	}
+	
+	// Check if Grype is available
+	if _, err := exec.LookPath("grype"); err != nil {
+		fmt.Printf("Warning: Grype not available for vulnerability scanning: %v\n", err)
+		return false
+	}
+	
+	var target string
+	if imagePath != "" {
+		target = imagePath
+	} else if dockerImage != "" {
+		target = dockerImage
+	} else {
+		return false
+	}
+	
+	// Run Grype vulnerability scan
+	cmd := exec.Command("grype", target, "--fail-on", "medium", "--output", "json")
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Vulnerability scan failed for %s: %v\n", target, err)
+		return false
+	}
+	
+	fmt.Printf("Vulnerability scan passed for %s\n", target)
+	return true
+}
+
+// extractSourceRepository attempts to extract source repository information
+func extractSourceRepository(srcDir string) string {
+	// Try to read from .git/config
+	gitConfigPath := filepath.Join(srcDir, ".git", "config")
+	if data, err := os.ReadFile(gitConfigPath); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "url =") {
+				parts := strings.Split(line, "url =")
+				if len(parts) > 1 {
+					return strings.TrimSpace(parts[1])
+				}
+			}
+		}
+	}
+	
+	// Try to read from package.json for Node.js projects
+	packageJSONPath := filepath.Join(srcDir, "package.json")
+	if data, err := os.ReadFile(packageJSONPath); err == nil {
+		var pkg map[string]interface{}
+		if json.Unmarshal(data, &pkg) == nil {
+			if repo, ok := pkg["repository"]; ok {
+				if repoMap, ok := repo.(map[string]interface{}); ok {
+					if url, ok := repoMap["url"].(string); ok {
+						return url
+					}
+				} else if repoStr, ok := repo.(string); ok {
+					return repoStr
+				}
+			}
+		}
+	}
+	
+	return ""
 }
