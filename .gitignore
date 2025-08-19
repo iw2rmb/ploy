@@ -9,7 +9,7 @@
 bin/
 dist/
 vendor/
-build/
+/build
 go.work
 *.lock
 *.coverprofile
