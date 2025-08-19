@@ -1,0 +1,51 @@
+spec_version: '0.6'
+name: posix-node
+unikraft:
+  version: stable
+  kconfig:
+    # Enable ELF loader for Node.js runtime
+    CONFIG_LIBPOSIX_ENVIRON: 'y'
+    CONFIG_LIBPOSIX_SOCKET: 'y'
+    CONFIG_LIBPOSIX_PROCESS: 'y'
+    CONFIG_LIBPOSIX_USER: 'y'
+    CONFIG_LIBPOSIX_TIME: 'y'
+    CONFIG_LIBPOSIX_SYSINFO: 'y'
+    CONFIG_LIBUKDEBUG_PRINTD: 'y'
+    CONFIG_LIBUKDEBUG_PRINTK_INFO: 'y'
+    CONFIG_LIBUKDEBUG_PRINTK_WARN: 'y'
+    CONFIG_LIBUKSCHED_SEMAPHORES: 'y'
+    CONFIG_LIBUKSWRAND: 'y'
+    CONFIG_LIBUKSWRAND_DEVFS: 'y'
+    CONFIG_LIBUKMMAP: 'y'
+    CONFIG_LIBUKMMAP_VMEM: 'y'
+    CONFIG_LIBVFSCORE_PIPE: 'y'
+    CONFIG_LIBVFSCORE_EVENTPOLL: 'y'
+    CONFIG_LIBDEVFS_DEV_NULL: 'y'
+    CONFIG_LIBDEVFS_DEV_ZERO: 'y'
+    CONFIG_LIBDEVFS_DEV_RANDOM: 'y'
+targets:
+  - architecture: x86_64
+    platform: qemu
+libraries:
+  - name: musl     # POSIX libc for lane B - required for Node.js
+    kconfig:
+      CONFIG_LIBMUSL_COMPLEX: 'y'
+      CONFIG_LIBMUSL_CRYPT: 'y'
+      CONFIG_LIBMUSL_LOCALE: 'y'
+      CONFIG_LIBMUSL_NETWORK: 'y'
+      CONFIG_LIBMUSL_REGEX: 'y'
+  - name: lwip     # Lightweight IP stack for networking
+    kconfig:
+      CONFIG_LWIP_UKNETDEV: 'y'
+      CONFIG_LWIP_TCP: 'y'
+      CONFIG_LWIP_UDP: 'y'
+      CONFIG_LWIP_IPV4: 'y'
+      CONFIG_LWIP_DHCP: 'y'
+      CONFIG_LWIP_AUTOIFACE: 'y'
+      CONFIG_LWIP_THREADS: 'y'
+  - name: libelf   # ELF loading support for Node.js binary
+application:
+  sources: ./
+  arguments: []
+options:
+  http_port: 8080
