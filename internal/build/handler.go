@@ -208,7 +208,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		if _, err := os.Stat(sourceSBOMPath); err == nil {
 			if f, err := os.Open(sourceSBOMPath); err == nil {
 				defer f.Close()
-				if _, err := storeClient.PutObject(storeClient.Artifacts, keyPrefix+"source.sbom.json", f, "application/json"); err != nil {
+				if _, err := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"source.sbom.json", f, "application/json"); err != nil {
 					fmt.Printf("Warning: Failed to upload source SBOM: %v\n", err)
 				}
 			}
@@ -220,7 +220,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 			if _, err := os.Stat(containerSBOMPath); err == nil {
 				if f, err := os.Open(containerSBOMPath); err == nil {
 					defer f.Close()
-					if _, err := storeClient.PutObject(storeClient.Artifacts, keyPrefix+"container.sbom.json", f, "application/json"); err != nil {
+					if _, err := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"container.sbom.json", f, "application/json"); err != nil {
 						fmt.Printf("Warning: Failed to upload container SBOM: %v\n", err)
 					}
 				}
@@ -237,7 +237,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 			"signed":      fmt.Sprintf("%t", signed),
 		}
 		mb, _ := json.Marshal(meta)
-		if _, err := storeClient.PutObject(storeClient.Artifacts, keyPrefix+"meta.json", bytes.NewReader(mb), "application/json"); err != nil {
+		if _, err := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"meta.json", bytes.NewReader(mb), "application/json"); err != nil {
 			fmt.Printf("Warning: Failed to upload metadata: %v\n", err)
 		}
 	}

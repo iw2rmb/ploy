@@ -36,14 +36,7 @@ testing_tools:
 # Ploy specific configuration
 ploy:
   controller_port: 8081
-  storage_backend: "minio"
-  
-# MinIO configuration
-minio:
-  port: 9000
-  console_port: 9001
-  access_key: "ploy-dev"
-  secret_key: "ploy-dev-secret-key"
+  storage_backend: "seaweedfs"
 
 # Build tools for different lanes
 build_tools:

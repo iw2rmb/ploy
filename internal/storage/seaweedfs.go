@@ -13,6 +13,17 @@ import (
 	"time"
 )
 
+// SeaweedFSConfig represents SeaweedFS-specific configuration
+type SeaweedFSConfig struct {
+	Master      string `yaml:"master"`      // master server address (e.g., "localhost:9333")
+	Filer       string `yaml:"filer"`       // filer server address (e.g., "localhost:8888")
+	Collection  string `yaml:"collection"`  // collection name for artifacts
+	Replication string `yaml:"replication"` // replication strategy (e.g., "001")
+	Timeout     int    `yaml:"timeout"`     // timeout in seconds
+	DataCenter  string `yaml:"datacenter"`  // data center identifier
+	Rack        string `yaml:"rack"`        // rack identifier
+}
+
 // SeaweedFSClient implements StorageProvider for SeaweedFS
 type SeaweedFSClient struct {
 	masterURL   string
@@ -27,32 +38,32 @@ type SeaweedFSClient struct {
 var _ StorageProvider = (*SeaweedFSClient)(nil)
 
 // NewSeaweedFSClient creates a new SeaweedFS storage client
-func NewSeaweedFSClient(cfg Config) (*SeaweedFSClient, error) {
-	if cfg.SeaweedFS.Master == "" {
+func NewSeaweedFSClient(cfg SeaweedFSConfig) (*SeaweedFSClient, error) {
+	if cfg.Master == "" {
 		return nil, fmt.Errorf("seaweedfs master address is required")
 	}
-	if cfg.SeaweedFS.Filer == "" {
+	if cfg.Filer == "" {
 		return nil, fmt.Errorf("seaweedfs filer address is required")
 	}
 
-	timeout := time.Duration(cfg.SeaweedFS.Timeout) * time.Second
+	timeout := time.Duration(cfg.Timeout) * time.Second
 	if timeout == 0 {
 		timeout = 30 * time.Second
 	}
 
-	collection := cfg.SeaweedFS.Collection
+	collection := cfg.Collection
 	if collection == "" {
 		collection = "ploy-artifacts"
 	}
 
-	replication := cfg.SeaweedFS.Replication
+	replication := cfg.Replication
 	if replication == "" {
 		replication = "001" // default replication
 	}
 
 	client := &SeaweedFSClient{
-		masterURL:   ensureHTTPScheme(cfg.SeaweedFS.Master),
-		filerURL:    ensureHTTPScheme(cfg.SeaweedFS.Filer),
+		masterURL:   ensureHTTPScheme(cfg.Master),
+		filerURL:    ensureHTTPScheme(cfg.Filer),
 		collection:  collection,
 		replication: replication,
 		timeout:     timeout,
