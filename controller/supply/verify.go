@@ -28,93 +28,118 @@ func VerifySignature(artifact, sigPath string) error {
 	return nil
 }
 
-// SignArtifact signs a build artifact using cosign, supporting both key-based and keyless OIDC signing.
-// The signature is written to artifact + ".sig"
+// SignTargetType represents the type of target being signed
+type SignTargetType string
+
+const (
+	ArtifactFile SignTargetType = "file"
+	DockerImage  SignTargetType = "image"
+)
+
+// SignTarget signs either a file artifact or Docker image using cosign.
+// Supports key-based, keyless OIDC, and development dummy signing modes.
 // Env:
 //  COSIGN_PRIVATE_KEY: path to private key (if provided, use key mode)
 //  COSIGN_PASSWORD: password for private key (if key mode)
 //  COSIGN_EXPERIMENTAL: set to "1" for keyless OIDC signing
-func SignArtifact(artifact string) error {
-	if _, err := os.Stat(artifact); err != nil {
-		return fmt.Errorf("artifact not found: %w", err)
+func SignTarget(target string, targetType SignTargetType) error {
+	// Validate inputs based on target type
+	switch targetType {
+	case ArtifactFile:
+		if _, err := os.Stat(target); err != nil {
+			return fmt.Errorf("artifact not found: %w", err)
+		}
+	case DockerImage:
+		if target == "" {
+			return fmt.Errorf("image tag cannot be empty")
+		}
+	default:
+		return fmt.Errorf("unsupported target type: %s", targetType)
 	}
 
-	sigPath := artifact + ".sig"
-	
 	// Key-based signing
 	if privKey := os.Getenv("COSIGN_PRIVATE_KEY"); privKey != "" {
-		cmd := exec.Command("cosign", "sign-blob", "--key", privKey, "--output-signature", sigPath, artifact)
-		if password := os.Getenv("COSIGN_PASSWORD"); password != "" {
-			cmd.Env = append(os.Environ(), fmt.Sprintf("COSIGN_PASSWORD=%s", password))
-		}
-		b, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("cosign sign-blob failed: %v: %s", err, string(b))
-		}
-		return nil
+		return signWithKey(target, targetType, privKey)
 	}
 	
 	// Keyless OIDC signing
 	if os.Getenv("COSIGN_EXPERIMENTAL") == "1" {
-		cmd := exec.Command("cosign", "sign-blob", "--output-signature", sigPath, artifact)
-		cmd.Env = append(os.Environ(), "COSIGN_EXPERIMENTAL=1")
-		b, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("cosign keyless sign failed: %v: %s", err, string(b))
-		}
-		return nil
+		return signKeyless(target, targetType)
 	}
 	
-	// Generate a dummy signature file for development/testing
-	// This allows the build to proceed in environments without proper cosign setup
-	if err := os.WriteFile(sigPath, []byte("dummy-signature-for-development"), 0644); err != nil {
-		return fmt.Errorf("failed to create dummy signature: %w", err)
+	// Development dummy signature fallback
+	return createDummySignature(target, targetType)
+}
+
+// signWithKey performs key-based signing
+func signWithKey(target string, targetType SignTargetType, privKey string) error {
+	var cmd *exec.Cmd
+	
+	switch targetType {
+	case ArtifactFile:
+		sigPath := target + ".sig"
+		cmd = exec.Command("cosign", "sign-blob", "--key", privKey, "--output-signature", sigPath, target)
+	case DockerImage:
+		cmd = exec.Command("cosign", "sign", "--key", privKey, target)
 	}
 	
+	if password := os.Getenv("COSIGN_PASSWORD"); password != "" {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("COSIGN_PASSWORD=%s", password))
+	}
+	
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cosign key-based sign failed: %v: %s", err, string(b))
+	}
 	return nil
 }
 
-// SignDockerImage signs a Docker image using cosign, supporting both key-based and keyless OIDC signing.
-// The signature is stored in the registry alongside the image.
-// Env:
-//  COSIGN_PRIVATE_KEY: path to private key (if provided, use key mode)
-//  COSIGN_PASSWORD: password for private key (if key mode)
-//  COSIGN_EXPERIMENTAL: set to "1" for keyless OIDC signing
-func SignDockerImage(imageTag string) error {
-	if imageTag == "" {
-		return fmt.Errorf("image tag cannot be empty")
+// signKeyless performs keyless OIDC signing
+func signKeyless(target string, targetType SignTargetType) error {
+	var cmd *exec.Cmd
+	
+	switch targetType {
+	case ArtifactFile:
+		sigPath := target + ".sig"
+		cmd = exec.Command("cosign", "sign-blob", "--output-signature", sigPath, target)
+	case DockerImage:
+		cmd = exec.Command("cosign", "sign", target)
 	}
 	
-	// Key-based signing
-	if privKey := os.Getenv("COSIGN_PRIVATE_KEY"); privKey != "" {
-		cmd := exec.Command("cosign", "sign", "--key", privKey, imageTag)
-		if password := os.Getenv("COSIGN_PASSWORD"); password != "" {
-			cmd.Env = append(os.Environ(), fmt.Sprintf("COSIGN_PASSWORD=%s", password))
-		}
-		b, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("cosign sign failed: %v: %s", err, string(b))
-		}
-		return nil
+	cmd.Env = append(os.Environ(), "COSIGN_EXPERIMENTAL=1")
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cosign keyless sign failed: %v: %s", err, string(b))
 	}
-	
-	// Keyless OIDC signing
-	if os.Getenv("COSIGN_EXPERIMENTAL") == "1" {
-		cmd := exec.Command("cosign", "sign", imageTag)
-		cmd.Env = append(os.Environ(), "COSIGN_EXPERIMENTAL=1")
-		b, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("cosign keyless sign failed: %v: %s", err, string(b))
-		}
-		return nil
-	}
-	
-	// For development/testing, we'll create a dummy signature file for Docker images
-	// In a real environment, this would be handled by the registry or cosign would be properly configured
-	dummySigPath := filepath.Join(os.TempDir(), "docker-"+filepath.Base(imageTag)+".sig")
-	if err := os.WriteFile(dummySigPath, []byte("dummy-docker-signature-for-development"), 0644); err != nil {
-		return fmt.Errorf("failed to create dummy docker signature: %w", err)
-	}
-	
 	return nil
+}
+
+// createDummySignature creates development/testing dummy signatures
+func createDummySignature(target string, targetType SignTargetType) error {
+	var sigPath string
+	var content string
+	
+	switch targetType {
+	case ArtifactFile:
+		sigPath = target + ".sig"
+		content = "dummy-signature-for-development"
+	case DockerImage:
+		sigPath = filepath.Join(os.TempDir(), "docker-"+filepath.Base(target)+".sig")
+		content = "dummy-docker-signature-for-development"
+	}
+	
+	if err := os.WriteFile(sigPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to create dummy signature: %w", err)
+	}
+	return nil
+}
+
+// SignArtifact signs a build artifact file using the generic signing function.
+func SignArtifact(artifact string) error {
+	return SignTarget(artifact, ArtifactFile)
+}
+
+// SignDockerImage signs a Docker image using the generic signing function.
+func SignDockerImage(imageTag string) error {
+	return SignTarget(imageTag, DockerImage)
 }
