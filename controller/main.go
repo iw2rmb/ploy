@@ -93,13 +93,16 @@ func previewHostRouter(c *fiber.Ctx) error {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 
-	// naive readiness check and proxy
-	if isHealthy("http://127.0.0.1:8080/healthz") { // fast path
-		// TODO: Implement actual proxy to app
-		return c.Redirect("http://127.0.0.1:8080")
+	// Check Nomad allocation health and proxy to app
+	jobName := fmt.Sprintf("%s-%s", app, sha)
+	if nomad.IsJobHealthy(jobName) {
+		endpoint, err := nomad.GetJobEndpoint(jobName)
+		if err == nil {
+			return c.Redirect(endpoint)
+		}
 	}
-	// slow path: poll Nomad and then proxy default service endpoint if known (placeholder)
-	// In production, resolve from Consul or job svc address.
+	
+	// Fallback: return build response with retry header
 	c.Set("Content-Type","application/json")
 	c.Set("Retry-After","3")
 	return c.Status(resp.StatusCode).Send(b)
