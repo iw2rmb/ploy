@@ -28,8 +28,8 @@ Next steps to implement:
 **Phase 3: Supply Chain Security Implementation**
 1. ✅ **COMPLETED (2025-08-19)** Implement cryptographic signing of build artifacts during build process.
 2. ✅ **COMPLETED (2025-08-19)** Generate signature files (`.sig`) for all built artifacts.
-3. Implement SBOM (Software Bill of Materials) generation during builds.
-4. Create SBOM files (`.sbom.json`) with actual dependency information.
+3. ✅ **COMPLETED (2025-08-19)** Implement SBOM (Software Bill of Materials) generation during builds.
+4. ✅ **COMPLETED (2025-08-19)** Create SBOM files (`.sbom.json`) with actual dependency information.
 5. Integrate cosign keyless OIDC flow and key management.
 6. Ensure artifacts and signatures are properly uploaded to MinIO storage.
 
