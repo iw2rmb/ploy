@@ -8,7 +8,7 @@ import (
 
 func BuildOCI(app, srcDir, tag string, envVars map[string]string) (string, error) {
 	args := []string{"--app", app, "--src", srcDir, "--tag", tag}
-	cmd := exec.Command("./build/oci/build_oci.sh", args...)
+	cmd := exec.Command("./scripts/build/oci/build_oci.sh", args...)
 	
 	// Add environment variables to the build process
 	env := os.Environ()
