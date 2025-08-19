@@ -36,30 +36,206 @@ prepare_nodejs_build() {
     return 1
   fi
   
-  # Install dependencies if package.json exists and node_modules doesn't
-  if [[ -f "$app_dir/package.json" ]] && [[ ! -d "$app_dir/node_modules" ]]; then
-    echo "Installing Node.js dependencies with npm..."
-    pushd "$app_dir" >/dev/null
-    npm install --production --silent || {
-      echo "Warning: npm install failed, continuing with build..."
-      popd >/dev/null
-      return 1
-    }
-    popd >/dev/null
-    echo "Node.js dependencies installed successfully"
-  elif [[ -d "$app_dir/node_modules" ]]; then
-    echo "Node.js dependencies already installed"
-  fi
+  pushd "$app_dir" >/dev/null
+  
+  # Enhanced dependency management
+  manage_nodejs_dependencies "$app_dir"
+  
+  # Package bundling and optimization
+  bundle_nodejs_application "$app_dir"
   
   # Verify main entry point exists
+  verify_nodejs_entrypoint "$app_dir"
+  
+  popd >/dev/null
+  return 0
+}
+
+manage_nodejs_dependencies() {
+  local app_dir="$1"
+  echo "Managing Node.js dependencies..."
+  
+  # Check for package-lock.json and handle accordingly
+  if [[ -f "package-lock.json" ]]; then
+    echo "Found package-lock.json, using npm ci for faster, reproducible builds"
+    if [[ -d "node_modules" ]]; then
+      echo "Removing existing node_modules for clean install"
+      rm -rf node_modules
+    fi
+    npm ci --production --silent || {
+      echo "Warning: npm ci failed, falling back to npm install..."
+      npm install --production --silent || {
+        echo "Warning: npm install also failed, continuing with build..."
+        return 1
+      }
+    }
+  elif [[ -f "package.json" ]] && [[ ! -d "node_modules" ]]; then
+    echo "Installing Node.js dependencies with npm install..."
+    npm install --production --silent || {
+      echo "Warning: npm install failed, continuing with build..."
+      return 1
+    }
+  elif [[ -d "node_modules" ]]; then
+    echo "Node.js dependencies already installed"
+    # Verify dependencies are up to date
+    echo "Verifying dependency integrity..."
+    npm ls --production --silent >/dev/null 2>&1 || {
+      echo "Warning: Dependency issues detected, reinstalling..."
+      rm -rf node_modules
+      npm install --production --silent || {
+        echo "Warning: npm install failed after cleanup, continuing..."
+        return 1
+      }
+    }
+  fi
+  
+  # Cache dependency information for build optimization
+  if [[ -f "package.json" ]]; then
+    local dep_count
+    dep_count=$(node -p "Object.keys(require('./package.json').dependencies || {}).length" 2>/dev/null || echo "0")
+    echo "Node.js dependencies installed: $dep_count packages"
+    
+    # Generate dependency manifest for Unikraft optimization
+    generate_dependency_manifest
+  fi
+  
+  echo "Node.js dependency management completed"
+}
+
+bundle_nodejs_application() {
+  local app_dir="$1"
+  echo "Optimizing Node.js application bundle..."
+  
+  # Create optimized application structure
+  local bundle_dir=".unikraft-bundle"
+  
+  if [[ -d "$bundle_dir" ]]; then
+    rm -rf "$bundle_dir"
+  fi
+  mkdir -p "$bundle_dir"
+  
+  # Copy essential application files
+  echo "Bundling application files..."
+  
+  # Copy main application files (exclude development artifacts)
+  find . -name "*.js" -not -path "./node_modules/*" -not -path "./.unikraft*" -not -path "./test/*" -not -path "./tests/*" | \
+    xargs -I {} cp {} "$bundle_dir/" 2>/dev/null || true
+  
+  # Copy package.json and lock files
+  [[ -f "package.json" ]] && cp "package.json" "$bundle_dir/"
+  [[ -f "package-lock.json" ]] && cp "package-lock.json" "$bundle_dir/"
+  
+  # Copy only production node_modules
+  if [[ -d "node_modules" ]]; then
+    echo "Bundling production dependencies..."
+    cp -r "node_modules" "$bundle_dir/"
+    
+    # Remove development-only packages from bundle
+    if command -v npm >/dev/null 2>&1; then
+      pushd "$bundle_dir" >/dev/null
+      # Remove dev dependencies that might have been installed
+      npm prune --production --silent 2>/dev/null || true
+      popd >/dev/null
+    fi
+  fi
+  
+  # Copy additional runtime files (if they exist)
+  for file in ".env.production" "config.json" "public" "views" "static"; do
+    [[ -e "$file" ]] && cp -r "$file" "$bundle_dir/" 2>/dev/null || true
+  done
+  
+  # Create startup script for Unikraft
+  create_unikraft_startup_script "$bundle_dir"
+  
+  echo "Application bundle created in $bundle_dir"
+}
+
+generate_dependency_manifest() {
+  echo "Generating dependency manifest for Unikraft optimization..."
+  
+  if [[ -f "package.json" ]] && command -v node >/dev/null 2>&1; then
+    # Extract key dependency information
+    node -e "
+      const pkg = require('./package.json');
+      const manifest = {
+        name: pkg.name || 'nodejs-app',
+        version: pkg.version || '1.0.0',
+        main: pkg.main || 'index.js',
+        scripts: pkg.scripts || {},
+        dependencies: Object.keys(pkg.dependencies || {}),
+        engines: pkg.engines || {},
+        unikraft: {
+          optimized: true,
+          bundle_created: new Date().toISOString(),
+          production_only: true
+        }
+      };
+      require('fs').writeFileSync('.unikraft-manifest.json', JSON.stringify(manifest, null, 2));
+      console.log('Dependency manifest generated');
+    " 2>/dev/null || echo "Warning: Could not generate dependency manifest"
+  fi
+}
+
+create_unikraft_startup_script() {
+  local bundle_dir="$1"
   local main_file
-  if [[ -f "$app_dir/package.json" ]]; then
-    main_file=$(node -p "try { require('$app_dir/package.json').main || 'index.js' } catch(e) { 'index.js' }" 2>/dev/null || echo "index.js")
-    if [[ ! -f "$app_dir/$main_file" ]]; then
+  
+  # Determine main entry point
+  if [[ -f "package.json" ]]; then
+    main_file=$(node -p "try { require('./package.json').main || 'index.js' } catch(e) { 'index.js' }" 2>/dev/null || echo "index.js")
+  else
+    main_file="index.js"
+  fi
+  
+  # Create optimized startup script
+  cat > "$bundle_dir/start.js" << EOF
+#!/usr/bin/env node
+// Unikraft optimized startup script
+// Generated by Ploy build system
+
+// Set production environment
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
+// Optimize memory usage for unikernel
+if (global.gc) {
+  global.gc();
+}
+
+// Load main application
+try {
+  require('./$main_file');
+} catch (error) {
+  console.error('Failed to start application:', error);
+  process.exit(1);
+}
+EOF
+  
+  chmod +x "$bundle_dir/start.js"
+  echo "Startup script created: start.js"
+}
+
+verify_nodejs_entrypoint() {
+  local app_dir="$1"
+  local main_file
+  
+  if [[ -f "package.json" ]]; then
+    main_file=$(node -p "try { require('./package.json').main || 'index.js' } catch(e) { 'index.js' }" 2>/dev/null || echo "index.js")
+    
+    if [[ ! -f "$main_file" ]]; then
       echo "Warning: Main file '$main_file' not found, build may fail"
       return 1
     fi
+    
     echo "Verified main entry point: $main_file"
+    
+    # Validate main file syntax
+    echo "Validating JavaScript syntax..."
+    node -c "$main_file" 2>/dev/null || {
+      echo "Warning: Syntax errors detected in $main_file"
+      return 1
+    }
+    
+    echo "JavaScript syntax validation passed"
   fi
   
   return 0
