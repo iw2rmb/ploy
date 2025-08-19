@@ -35,7 +35,7 @@ Next steps to implement:
 
 **Phase 4: Policy Enforcement & Validation**
 1. ✅ Implement OPA policies requiring signature/SBOM for deployments. (2025-08-19)
-2. Add artifact integrity verification after storage upload.
+2. ✅ Add artifact integrity verification after storage upload. (2025-08-19)
 3. Implement image size caps per lane in OPA policies.
 4. Enhance policy enforcement for production vs development environments.
 

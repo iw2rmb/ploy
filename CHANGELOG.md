@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [2025-08-19] - Comprehensive Artifact Integrity Verification (Phase 4 Step 2)
+
+### Added
+- **Comprehensive Artifact Integrity Verification System**
+  - SHA-256 checksum verification for all uploaded artifacts to detect data corruption
+  - File size verification to prevent truncated uploads and ensure complete transfers
+  - SBOM content validation ensuring proper JSON schema compliance and required metadata
+  - Complete bundle verification confirming all expected files (artifact, SBOM, signature, certificate) are present
+  - Detailed error reporting with specific failure reasons for failed verification steps
+  - Audit logging providing complete trail for all integrity checks and validation results
+
+### Enhanced
+- **Storage Interface and Implementation**
+  - Added UploadArtifactBundleWithVerification method to storage provider interface
+  - Enhanced SeaweedFS client with comprehensive integrity verification capabilities
+  - Integrated retry logic with up to 3 attempts for temporary storage issues
+  - Build handler now uses integrity verification for all artifact uploads including source and container SBOMs
+
+### Testing
+- Added comprehensive test scenarios (Tests 251-265) for artifact integrity verification
+- Created unit test script for validating implementation structure and integration
+- Created integration test script for end-to-end verification workflows
+- Verified integrity verification works correctly on both local and VPS environments
+- Confirmed proper error handling and reporting for various failure scenarios
+
 ## [2025-08-19] - Enhanced OPA Policy Enforcement (Phase 4 Step 1)
 
 ### Added
