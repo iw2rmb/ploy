@@ -294,3 +294,20 @@
 263. Retry logic handles temporary storage issues and reattempts verification up to 3 times.
 264. Debug builds include integrity verification for SSH keys and configuration files.
 265. Verification logs provide audit trail for all integrity checks and validation results.
+
+## Image Size Caps per Lane Implementation (Aug 2025)
+266. OPA policies enforce lane-specific image size limits to prevent oversized deployments.
+267. Lane A unikernel images are capped at 50MB to maintain microsecond boot performance.
+268. Lane B POSIX unikernel images are capped at 100MB for enhanced runtime compatibility.
+269. Lane C OSv/JVM images are capped at 500MB to accommodate Java runtime requirements.
+270. Lane D FreeBSD jail images are capped at 200MB for efficient containerization.
+271. Lane E OCI container images are capped at 1GB for standard container deployment limits.
+272. Lane F full VM images are capped at 5GB to balance functionality and storage efficiency.
+273. File-based artifact size measurement uses filesystem stat operations for accuracy.
+274. Docker image size measurement uses docker CLI commands for container size analysis.
+275. Size cap enforcement occurs before Nomad deployment to prevent resource waste.
+276. Policy violations provide clear error messages indicating actual vs allowed size limits.
+277. Size calculations include compressed and uncompressed measurements for comprehensive analysis.
+278. Debug builds follow same size restrictions as production builds for consistency.
+279. Break-glass approval can override size caps for emergency deployments in production.
+280. Size measurement logging provides audit trail for capacity planning and optimization.

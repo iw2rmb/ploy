@@ -167,7 +167,18 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		signed = true
 	}
 
-	// Enhanced OPA policy enforcement with comprehensive context
+	// Measure image size for policy enforcement
+	var imageSizeMB float64
+	sizeInfo, err := utils.GetImageSize(imagePath, dockerImage, lane)
+	if err != nil {
+		fmt.Printf("Warning: Failed to measure image size: %v\n", err)
+		imageSizeMB = 0 // Continue without size info
+	} else {
+		imageSizeMB = sizeInfo.SizeMB
+		fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
+	}
+
+	// Enhanced OPA policy enforcement with comprehensive context including size
 	env := c.Query("env", "dev")
 	breakGlass := c.Query("break_glass", "false") == "true"
 	debug := c.Query("debug", "false") == "true"
@@ -181,6 +192,9 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		App:         appName,
 		Lane:        lane,
 		Debug:       debug,
+		ImageSizeMB: imageSizeMB,
+		ImagePath:   imagePath,
+		DockerImage: dockerImage,
 	}); err != nil {
 		return utils.ErrJSON(c, 403, fmt.Errorf("OPA policy enforcement failed: %w", err))
 	}
