@@ -1,4 +1,4 @@
-package clidebug
+package debug
 
 import (
 	"flag"

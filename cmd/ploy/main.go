@@ -6,43 +6,43 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	cliapps "github.com/ploy/ploy/internal/cli-apps"
-	clicerts "github.com/ploy/ploy/internal/cli-certs"
-	clidebug "github.com/ploy/ploy/internal/cli-debug"
-	clideploy "github.com/ploy/ploy/internal/cli-deploy"
-	clidomains "github.com/ploy/ploy/internal/cli-domains"
-	clienv "github.com/ploy/ploy/internal/cli-env"
-	cliui "github.com/ploy/ploy/internal/cli-ui"
-	cliutils "github.com/ploy/ploy/internal/cli-utils"
+	"github.com/ploy/ploy/internal/cli/apps"
+	"github.com/ploy/ploy/internal/cli/certs"
+	"github.com/ploy/ploy/internal/cli/debug"
+	"github.com/ploy/ploy/internal/cli/deploy"
+	"github.com/ploy/ploy/internal/cli/domains"
+	"github.com/ploy/ploy/internal/cli/env"
+	"github.com/ploy/ploy/internal/cli/ui"
+	"github.com/ploy/ploy/internal/cli/utils"
 )
 
-var controllerURL = cliutils.Getenv("PLOY_CONTROLLER", "http://localhost:8081/v1")
+var controllerURL = utils.Getenv("PLOY_CONTROLLER", "http://localhost:8081/v1")
 
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "apps":
-			cliapps.AppsCmd(os.Args[2:], controllerURL)
+			apps.AppsCmd(os.Args[2:], controllerURL)
 		case "push":
-			clideploy.PushCmd(os.Args[2:], controllerURL)
+			deploy.PushCmd(os.Args[2:], controllerURL)
 		case "open":
-			clideploy.OpenCmd(os.Args[2:])
+			deploy.OpenCmd(os.Args[2:])
 		case "env":
-			clienv.EnvCmd(os.Args[2:], controllerURL)
+			env.EnvCmd(os.Args[2:], controllerURL)
 		case "domains":
-			clidomains.DomainsCmd(os.Args[2:], controllerURL)
+			domains.DomainsCmd(os.Args[2:], controllerURL)
 		case "certs":
-			clicerts.CertsCmd(os.Args[2:], controllerURL)
+			certs.CertsCmd(os.Args[2:], controllerURL)
 		case "debug":
-			clidebug.DebugCmd(os.Args[2:], controllerURL)
+			debug.DebugCmd(os.Args[2:], controllerURL)
 		case "rollback":
-			clidebug.RollbackCmd(os.Args[2:], controllerURL)
+			debug.RollbackCmd(os.Args[2:], controllerURL)
 		default:
-			cliui.Usage()
+			ui.Usage()
 		}
 		return
 	}
-	p := tea.NewProgram(cliui.Model{})
+	p := tea.NewProgram(ui.Model{})
 	if err := p.Start(); err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)

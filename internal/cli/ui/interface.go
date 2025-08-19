@@ -1,4 +1,4 @@
-package cliui
+package ui
 
 import (
 	"fmt"
