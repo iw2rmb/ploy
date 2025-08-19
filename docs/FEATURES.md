@@ -80,7 +80,7 @@ Auto-classified lanes:
   - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
   - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
 - Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration ✅
-- Storage upload to object storage (planned)
+- ✅ **Comprehensive storage upload** to MinIO/S3 with artifact bundles (Aug 2025)
 - OPA policy enforcement:
   - Requires signature + SBOM ✅
   - SSH blocked in prod without break-glass
@@ -146,10 +146,16 @@ Auto-classified lanes:
 ⸻
 
 ## 🗄 Storage
-- S3-compatible (MinIO default)
+- **Comprehensive Artifact Storage** (Aug 2025):
+  - Enhanced MinIO integration with artifact bundle upload system
+  - Automated upload of complete deployment packages (artifact + SBOM + signature + certificate)
+  - Upload retry logic with ETag verification for reliable storage operations
+  - Enhanced metadata tracking with timestamps and artifact status information
+- S3-compatible backends: MinIO (default), Ceph, AWS S3
 - Config: `configs/storage-config.yaml`
-- Uploads: `artifacts/<app>/<sha>/`
-- Backends: MinIO, Ceph, AWS S3
+- Organization: `artifacts/<app>/<sha>/` with artifact bundles
+- **Upload Verification**: Built-in methods to confirm successful storage operations
+- **Multi-File Support**: Source SBOMs, container SBOMs, and build artifacts
 
 ⸻
 

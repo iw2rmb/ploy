@@ -31,7 +31,7 @@ Next steps to implement:
 3. ✅ **COMPLETED (2025-08-19)** Implement SBOM (Software Bill of Materials) generation during builds.
 4. ✅ **COMPLETED (2025-08-19)** Create SBOM files (`.sbom.json`) with actual dependency information.
 5. ✅ **COMPLETED (2025-08-19)** Integrate cosign keyless OIDC flow and key management.
-6. Ensure artifacts and signatures are properly uploaded to MinIO storage.
+6. ✅ **COMPLETED (2025-08-19)** Ensure artifacts and signatures are properly uploaded to MinIO storage.
 
 **Phase 4: Policy Enforcement & Validation**
 1. Implement OPA policies requiring signature/SBOM for deployments.

@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [2025-08-19] - Comprehensive MinIO Storage Integration (Phase 3 Step 6)
+
+### Added
+- **Enhanced MinIO Storage Capabilities**
+  - Comprehensive artifact bundle upload system for complete deployment packages
+  - Automated upload of artifacts, SBOMs, signatures, and OIDC certificates
+  - Retry logic with ETag verification for reliable storage operations
+  - Enhanced metadata tracking with timestamps and artifact status information
+
+- **Advanced Upload Management**
+  - Intelligent file detection and upload for all artifact types (.img, .sbom.json, .sig, .crt)
+  - Support for source code SBOMs alongside build artifact SBOMs
+  - Container image SBOM handling for Lane E deployments
+  - Upload verification methods to confirm successful storage operations
+
+- **Build Handler Enhancement**
+  - Replaced individual file uploads with comprehensive bundle upload mechanism
+  - Improved error handling and graceful failure recovery for storage operations
+  - Enhanced logging and debugging information for storage operations
+  - Better integration between build process and storage system
+
+### Fixed
+- **SBOM Generation Modernization**
+  - Updated syft commands from deprecated `packages` to modern `scan` syntax
+  - Removed deprecated `--catalogers` and `--select-catalogers` flags
+  - Improved compatibility with current syft versions and automatic cataloger selection
+  - Fixed SBOM generation failures that were preventing artifact uploads
+
+### Testing
+- ✅ VPS MinIO storage integration validated with complete artifact bundles
+- ✅ Artifact upload retry logic and ETag verification tested successfully
+- ✅ SBOM generation with modern syft syntax verified and working
+- ✅ Upload verification and storage confirmation methods validated
+- ✅ Multi-file bundle upload (artifact + SBOM + signature + certificate) tested
+- ✅ Enhanced metadata upload and storage organization confirmed
+
 ## [2025-08-19] - Enhanced Keyless OIDC Integration (Phase 3 Step 5)
 
 ### Added
