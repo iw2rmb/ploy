@@ -37,7 +37,7 @@
 - **Open Policy Agent (OPA)** — Policy enforcement for deployment security
 
 ## Storage & Networking
-- **MinIO** — S3-compatible object storage for artifacts and SBOMs
+- **SeaweedFS** — Distributed object storage optimized for small files (artifacts, SBOMs, signatures)
 - **Traefik/Envoy** — Ingress controllers and load balancing
 - **Let's Encrypt** — Automated TLS certificate provisioning
 - **Consul Connect** — Service mesh networking and mTLS
