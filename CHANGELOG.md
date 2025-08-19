@@ -1,5 +1,53 @@
 # CHANGELOG
 
+## [2025-08-19] - Lane B Node.js Unikraft Enhancement
+
+### Added
+- **Enhanced Node.js Runtime Support for Lane B (Unikraft POSIX)**
+  - Comprehensive Unikraft kconfig settings for Node.js/V8 runtime environment
+  - Added libelf library for ELF loading support enabling Node.js binary execution
+  - Extended musl libc configuration with complex math, cryptography, locale, and networking modules
+  - Enhanced lwip networking stack with TCP/UDP, DHCP, auto-interface, and threading support
+  - POSIX environment configuration (process, user, time, sysinfo) for Node.js compatibility
+
+- **Node.js-Specific Kernel Configuration**
+  - `CONFIG_LIBPOSIX_ENVIRON` for environment variable access
+  - `CONFIG_LIBPOSIX_SOCKET` for networking system calls
+  - `CONFIG_LIBPOSIX_PROCESS` for process management
+  - `CONFIG_LIBUKDEBUG_*` for comprehensive debugging support
+  - `CONFIG_LIBUKSCHED_SEMAPHORES` for concurrency primitives
+  - `CONFIG_LIBUKMMAP_VMEM` for virtual memory management
+  - `CONFIG_LIBVFSCORE_PIPE` and `CONFIG_LIBVFSCORE_EVENTPOLL` for I/O operations
+
+### Enhanced
+- **Lane B kraft.yaml Template (`lanes/B-unikraft-posix/kraft.yaml`)**
+  - Added comprehensive library-specific kconfig settings
+  - Enhanced musl libc with all Node.js required modules
+  - Configured lwip with optimal settings for Node.js networking
+  - Added detailed comments explaining library purposes and configurations
+
+### Fixed
+- Lane B now properly supports Node.js applications with complete runtime requirements
+- kraft.yaml generation for Node.js apps includes all necessary Unikraft libraries and configurations
+
+### Testing
+- ✅ **Lane Detection**: Node.js apps correctly detected and assigned to Lane B
+- ✅ **kraft.yaml Generation**: Enhanced template produces proper Node.js-compatible configuration
+- ✅ **VPS Testing**: All components compile and function correctly on production environment
+- ✅ **Library Verification**: libelf, musl, and lwip libraries properly configured with Node.js settings
+- Added test scenario 177: "Unikraft B Node.js: kraft.yaml includes musl, lwip, libelf with Node.js-specific kconfig"
+
+### Technical Details
+- **Complete POSIX Environment**: Enables Node.js system calls for file operations, networking, and process management
+- **ELF Loading Support**: libelf library enables loading of Node.js binary within Unikraft environment
+- **Optimized Networking**: lwip configured for maximum compatibility with Node.js HTTP servers and networking
+- **Virtual Memory Support**: Enhanced memory management for V8 JavaScript engine requirements
+
+### Status
+**COMPLETED** - Phase 2, Step 1 from PLAN.md: "Enhance `lanes/B-unikraft-posix/kraft.yaml` with Node.js runtime libraries and configuration"
+
+Lane B now provides production-ready Node.js runtime support with comprehensive Unikraft configuration, enabling developers to deploy Node.js applications as optimized unikernels with microsecond boot times and minimal memory footprint.
+
 ## [2025-08-19] - App Destroy Command Implementation
 
 ### Added
