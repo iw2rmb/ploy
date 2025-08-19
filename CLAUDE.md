@@ -129,27 +129,27 @@ go run ./tools/lane-pick --path /path/to/project
 **CRITICAL**: For EVERY codebase modification, execute ALL steps below in exact order:
 
 1. **Branch Creation**: Create new feature branch with 2-3 word name describing changes
-2. **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
-3. **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
-4. **TESTS.md Scenarios**: Add comprehensive test scenarios (numbered sequentially) if current functionality lacks coverage
-5. **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
-6. **STACK.md Dependencies**: Update technology stack documentation when adding/changing frameworks or tools
-7. **Test Implementation**: Create executable test scripts for any new scenarios defined in step 6
-8. **Local Testing**: Run relevant tests locally if applicable
-9. **Push Branch**: Push feature branch to GitHub before VPS testing
-10. **VPS Setup**: On VPS, authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT
-11. **VPS Pull**: Pull feature branch on VPS
-12. **VPS Testing**: Run ALL relevant tests on VPS environment
-13. **Error Handling**: IF tests fail:
+2. **TESTS.md Scenarios**: Add comprehensive test scenarios (numbered sequentially) if current functionality lacks coverage
+3. **Test Implementation**: Create executable test scripts for any new scenarios defined in step 6
+4. **Local Testing**: Run relevant tests locally if applicable
+5. **Push Branch**: Push feature branch to GitHub before VPS testing
+6. **VPS Setup**: On VPS, authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT
+7. **VPS Pull**: Pull feature branch on VPS
+8. **VPS Testing**: Run ALL relevant tests on VPS environment
+9. **Error Handling**: IF tests fail:
     - Fix errors locally
     - Test locally if applicable
     - Push fixes to feature branch
     - Pull changes on VPS
     - Re-run VPS tests
-14. **Success Actions**: IF all tests pass:
+10. **Success Actions**: IF all tests pass:
     - Merge feature branch to main locally
     - Delete feature branch locally
     - Pull main branch on VPS
     - Start Ploy controller on VPS
+    - **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
+    - **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
+    - **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
+    - **STACK.md Dependencies**: Update technology stack documentation when adding/changing frameworks or tools
 
 **NO EXCEPTIONS**: Every code change must complete this full protocol. Incomplete updates violate project standards and compromise system integrity.
