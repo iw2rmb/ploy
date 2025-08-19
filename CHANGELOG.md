@@ -1,5 +1,65 @@
 # CHANGELOG
 
+## [2025-08-19] - Advanced Node.js Dependency Handling & Package Bundling
+
+### Added
+- **Comprehensive Dependency Management System**
+  - Enhanced `npm ci` support for faster, reproducible builds when package-lock.json exists
+  - Intelligent fallback from `npm ci` to `npm install` when CI builds fail
+  - Dependency integrity verification with automatic corrupted node_modules detection and cleanup
+  - Production dependency pruning to remove development packages from final bundles
+
+- **Advanced Package Bundling Infrastructure**
+  - `.unikraft-bundle/` directory creation with optimized application structure
+  - Selective file copying excluding development artifacts (test/, tests/, development configs)
+  - Production-only node_modules bundling with automatic dev dependency removal
+  - Runtime configuration file support (.env.production, config.json, public/, views/, static/)
+
+- **Build Optimization and Metadata Generation**
+  - `.unikraft-manifest.json` generation with dependency metadata and optimization flags
+  - Dependency count reporting for build insights and performance monitoring
+  - Memory-optimized startup script (start.js) with garbage collection integration
+  - JavaScript syntax validation for main entry points before build execution
+
+- **Production-Ready Startup Script Generation**
+  - Unikraft-optimized startup script with NODE_ENV=production configuration
+  - Memory management optimizations for unikernel environments
+  - Error handling and graceful application startup with proper exit codes
+  - Automatic main entry point detection and validation
+
+### Enhanced
+- **Build Script (`build/kraft/build_unikraft.sh`)**
+  - Modular function architecture with specialized dependency, bundling, and verification functions
+  - Enhanced error handling with detailed logging and fallback mechanisms
+  - Production build optimizations for minimal footprint and maximum performance
+  - Comprehensive file structure analysis and optimization for Unikraft deployment
+
+### Fixed
+- Build process now creates production-optimized bundles for Node.js applications
+- Dependency management handles package-lock.json correctly for reproducible builds
+- Corrupted node_modules directories automatically detected and rebuilt
+- Missing development artifacts no longer break production builds
+
+### Testing
+- ✅ **Enhanced Dependency Management**: npm ci and npm install with integrity verification
+- ✅ **Package Bundling**: Optimized bundle creation with production-only dependencies
+- ✅ **Manifest Generation**: Dependency metadata and optimization tracking
+- ✅ **Startup Script Creation**: Memory-optimized unikernel startup with error handling
+- ✅ **VPS Testing**: All functionality verified on production VPS environment
+- ✅ **Error Handling**: Graceful degradation when Node.js/npm unavailable
+- Added 12 test scenarios (186-197) covering all enhanced dependency handling features
+
+### Technical Details
+- **Reproducible Builds**: package-lock.json detection enables npm ci for consistent dependency installation
+- **Bundle Optimization**: Selective file copying reduces final image size while maintaining functionality
+- **Memory Management**: Startup script includes garbage collection optimization for constrained unikernel environments
+- **Dependency Insights**: Manifest generation provides build-time dependency analysis and optimization metadata
+
+### Status
+**COMPLETED** - Phase 2, Step 3 from PLAN.md: "Add Node.js dependency handling (npm install, package bundling) to build process"
+
+The build system now provides enterprise-grade Node.js dependency management and package bundling, enabling production-ready deployments with optimized footprint, reproducible builds, and comprehensive error handling for Unikraft Lane B pipeline.
+
 ## [2025-08-19] - Node.js Build Process Enhancement
 
 ### Added
