@@ -204,6 +204,22 @@ func (c *SeaweedFSClient) UploadArtifactBundle(keyPrefix, artifactPath string) e
 	return nil
 }
 
+func (c *SeaweedFSClient) UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (*BundleIntegrityResult, error) {
+	// First upload the bundle using existing method
+	if err := c.UploadArtifactBundle(keyPrefix, artifactPath); err != nil {
+		return nil, fmt.Errorf("failed to upload artifact bundle: %w", err)
+	}
+
+	// Then perform integrity verification
+	verifier := NewIntegrityVerifier(c)
+	result, err := verifier.VerifyArtifactBundle(keyPrefix, artifactPath)
+	if err != nil {
+		return result, fmt.Errorf("integrity verification failed: %w", err)
+	}
+
+	return result, nil
+}
+
 func (c *SeaweedFSClient) VerifyUpload(key string) error {
 	// Use HEAD request to check if file exists
 	url := fmt.Sprintf("%s/%s", c.filerURL, key)

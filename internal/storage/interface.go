@@ -37,6 +37,9 @@ type StorageProvider interface {
 	// UploadArtifactBundle uploads an artifact and all its related files (SBOM, signature, certificate)
 	UploadArtifactBundle(keyPrefix, artifactPath string) error
 	
+	// UploadArtifactBundleWithVerification uploads and verifies integrity of artifact bundle
+	UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (*BundleIntegrityResult, error)
+	
 	// VerifyUpload checks if an object exists in storage
 	VerifyUpload(key string) error
 	

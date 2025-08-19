@@ -204,26 +204,38 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 	if storeClient != nil {
 		keyPrefix := appName + "/" + sha + "/"
 		
-		// Upload artifact bundle (main artifact + SBOM + signature + certificate)
+		// Upload artifact bundle with comprehensive integrity verification
 		if imagePath != "" {
-			if err := storeClient.UploadArtifactBundle(keyPrefix, imagePath); err != nil {
-				fmt.Printf("Warning: Failed to upload artifact bundle for %s: %v\n", imagePath, err)
-				// Continue with build even if upload fails
+			if result, err := storeClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
+				return utils.ErrJSON(c, 500, fmt.Errorf("artifact bundle upload with verification failed: %w", err))
+			} else {
+				fmt.Printf("Artifact bundle integrity verification: %s\n", result.GetVerificationSummary())
+				if !result.Verified {
+					return utils.ErrJSON(c, 500, fmt.Errorf("artifact integrity verification failed: %s", strings.Join(result.Errors, "; ")))
+				}
 			}
 		}
 		
-		// Upload source code SBOM if it exists
+		// Upload source code SBOM with integrity verification if it exists
 		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
 		if _, err := os.Stat(sourceSBOMPath); err == nil {
 			if f, err := os.Open(sourceSBOMPath); err == nil {
 				defer f.Close()
 				if _, err := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"source.sbom.json", f, "application/json"); err != nil {
 					fmt.Printf("Warning: Failed to upload source SBOM: %v\n", err)
+				} else {
+					// Verify source SBOM upload integrity
+					verifier := storage.NewIntegrityVerifier(storeClient)
+					if info, err := verifier.VerifyUploadedFile(sourceSBOMPath, keyPrefix+"source.sbom.json"); err != nil {
+						fmt.Printf("Warning: Source SBOM integrity verification failed: %v\n", err)
+					} else {
+						fmt.Printf("Source SBOM integrity verified: %s (size: %d bytes)\n", info.StorageKey, info.UploadedSize)
+					}
 				}
 			}
 		}
 		
-		// Upload container SBOM for Lane E if it exists in /tmp
+		// Upload container SBOM for Lane E with integrity verification if it exists in /tmp
 		if dockerImage != "" {
 			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
 			if _, err := os.Stat(containerSBOMPath); err == nil {
@@ -231,6 +243,14 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 					defer f.Close()
 					if _, err := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"container.sbom.json", f, "application/json"); err != nil {
 						fmt.Printf("Warning: Failed to upload container SBOM: %v\n", err)
+					} else {
+						// Verify container SBOM upload integrity  
+						verifier := storage.NewIntegrityVerifier(storeClient)
+						if info, err := verifier.VerifyUploadedFile(containerSBOMPath, keyPrefix+"container.sbom.json"); err != nil {
+							fmt.Printf("Warning: Container SBOM integrity verification failed: %v\n", err)
+						} else {
+							fmt.Printf("Container SBOM integrity verified: %s (size: %d bytes)\n", info.StorageKey, info.UploadedSize)
+						}
 					}
 				}
 			}
