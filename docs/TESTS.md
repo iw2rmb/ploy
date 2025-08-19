@@ -12,6 +12,7 @@
 ## Build Pipelines
 8. Unikraft A: build tiny image, export health endpoint, boot in QEMU.
 9. Unikraft B: enable Dropbear when ssh.enabled=true and inject keys.
+177. Unikraft B Node.js: kraft.yaml includes musl, lwip, libelf with Node.js-specific kconfig.
 10. OSv Java packer: consume Jib tar → produce image placeholder.
 11. OCI Kontain: run Java/Scala image under docker runtime=io.kontain.
 
