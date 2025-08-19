@@ -163,9 +163,9 @@ go run ./tools/lane-pick --path /path/to/project
     - **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
     - **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
     - **STACK.md Dependencies**: Update technology stack documentation when adding/changing frameworks or tools
-    - Commit all updates to feature branch locally
-    - Merge feature branch to main locally
-    - Delete feature branch locally
+    - Commit all updates to feature branch
+    - Merge feature branch to main
+    - Delete feature branch
     - Pull main branch on VPS
 
 **NO EXCEPTIONS**: Every code change must complete this full protocol. Incomplete updates violate project standards and compromise system integrity.
