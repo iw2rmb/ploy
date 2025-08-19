@@ -56,10 +56,16 @@ Auto-classified lanes:
 ⸻
 
 ## 📦 Supply Chain Security
+- **Cryptographic Artifact Signing** ✅ (Aug 2025):
+  - **Multi-Mode Signing**: Key-based, keyless OIDC, and development dummy signatures
+  - **Universal Lane Support**: File-based artifacts (A,B,C,D,F) and Docker images (E)
+  - **Automatic Integration**: Seamless signing immediately after successful builds
+  - **Smart Prevention**: Avoids duplicate signing by checking existing signatures
+  - **Cosign Compatible**: Full support for cosign key management and OIDC flows
 - SBOM generation (Syft), vulnerability scans (Grype), signing (Cosign)
 - Storage upload to object storage (planned)
 - OPA policy enforcement:
-  - Requires signature + SBOM
+  - Requires signature + SBOM ✅
   - SSH blocked in prod without break-glass
   - Image size caps per lane (planned)
 - **Enhanced Lane Detection** (Aug 2025):
