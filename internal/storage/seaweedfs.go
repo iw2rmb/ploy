@@ -7,10 +7,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -29,7 +27,7 @@ type SeaweedFSClient struct {
 var _ StorageProvider = (*SeaweedFSClient)(nil)
 
 // NewSeaweedFSClient creates a new SeaweedFS storage client
-func NewSeaweedFSClient(cfg Config) (*Client, error) {
+func NewSeaweedFSClient(cfg Config) (*SeaweedFSClient, error) {
 	if cfg.SeaweedFS.Master == "" {
 		return nil, fmt.Errorf("seaweedfs master address is required")
 	}
@@ -63,8 +61,7 @@ func NewSeaweedFSClient(cfg Config) (*Client, error) {
 		},
 	}
 
-	// Return as legacy Client type for compatibility
-	return (*Client)(client), nil
+	return client, nil
 }
 
 func ensureHTTPScheme(addr string) string {
