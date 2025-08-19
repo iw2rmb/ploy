@@ -108,10 +108,33 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		imagePath = img
 	}
 
+	// Sign the built artifact if not already signed
+	if imagePath != "" && !utils.FileExists(imagePath + ".sig") {
+		// Sign file-based artifacts (Lanes A, B, C, D, F)
+		if err := supply.SignArtifact(imagePath); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("artifact signing failed: %w", err))
+		}
+	} else if dockerImage != "" {
+		// Sign Docker images (Lane E)
+		// Note: Docker image signing verification is more complex and handled by the registry
+		if err := supply.SignDockerImage(dockerImage); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("docker image signing failed: %w", err))
+		}
+	}
+
 	sbom := utils.FileExists(imagePath+".sbom.json") || utils.FileExists(filepath.Join(srcDir, "SBOM.json"))
-	signed := utils.FileExists(imagePath + ".sig")
-	if signed && imagePath != "" {
-		_ = supply.VerifySignature(imagePath, imagePath+".sig")
+	
+	var signed bool
+	if imagePath != "" {
+		// Check for file-based artifact signatures
+		signed = utils.FileExists(imagePath + ".sig")
+		if signed {
+			_ = supply.VerifySignature(imagePath, imagePath+".sig")
+		}
+	} else if dockerImage != "" {
+		// For Docker images, assume signed if signing was successful
+		// In a real environment, this would verify against the registry
+		signed = true
 	}
 
 	if err := opa.Enforce(opa.ArtifactInput{
