@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2025-08-19] - Enhanced OPA Policy Enforcement (Phase 4 Step 1)
+
+### Added
+- **Comprehensive OPA Policy Enforcement**
+  - Enhanced OPA policy enforcement requiring signature and SBOM for all deployments
+  - Production environment SSH restrictions with break-glass approval mechanism
+  - Detailed audit logging for all policy decisions with comprehensive context
+  - Policy enforcement integration in both main build and debug build pipelines
+  - Development environment policy bypass capability for testing scenarios
+
+### Fixed
+- **Nomad Template Syntax Issues**
+  - Fixed HCL syntax errors in lane-a-unikraft.hcl template
+  - Corrected restart, network, service, resources, and logs block formatting
+  - Resolved parsing errors that prevented deployments from completing
+
+### Testing
+- Added comprehensive test scenarios (Tests 265-278) for OPA policy enforcement
+- Created test implementation script for validating all policy requirements
+- Verified policy enforcement works correctly on both local and VPS environments
+- Confirmed OPA policies block deployments without proper signatures/SBOMs
+- Validated production SSH restrictions and break-glass approval workflows
+
 ## [2025-08-19] - Comprehensive MinIO Storage Integration (Phase 3 Step 6)
 
 ### Added
