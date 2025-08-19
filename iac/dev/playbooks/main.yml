@@ -235,6 +235,18 @@
           export GITHUB_PLOY_DEV_PAT="{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - GitHub env vars"
 
+    - name: Set PATH for ploy user
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Ensure basic system directories are in PATH
+          export PATH="/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - PATH setup"
+
     - name: Clone Ploy repository
       git:
         repo: https://github.com/ploy/ploy.git

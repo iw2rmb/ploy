@@ -4,10 +4,15 @@
 echo "Setting up Ploy development environment..."
 
 # Set environment variables
-export PATH="/usr/local/go/bin:$PATH"
+# Ensure basic system directories are in PATH
+export PATH="/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 export PLOY_CONTROLLER="http://localhost:{{ ploy.controller_port }}/v1"
 export GOOS=linux
 export GOARCH=amd64
+
+# GitHub environment variables for Ploy development
+export GITHUB_PLOY_DEV_USERNAME="{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
+export GITHUB_PLOY_DEV_PAT="{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
 
 # Create necessary directories
 mkdir -p ~/ploy-testing
