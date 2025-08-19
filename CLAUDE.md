@@ -60,37 +60,76 @@ Test: `ssh root@$TARGET_HOST && su - ploy && ./test-scripts/test-*.sh`
 
 ### Controller (Backend API)
 ```bash
-# Start the controller server
+# Build and start the controller from build/ folder
+go build -o build/controller ./controller
+./build/controller
+
+# Or run directly (development)
 go run ./controller
 
 # Start with custom config
-PLOY_STORAGE_CONFIG=path/to/config.yaml go run ./controller
+PLOY_STORAGE_CONFIG=path/to/config.yaml ./build/controller
 
 # Start on different port
-PORT=8082 go run ./controller
+PORT=8082 ./build/controller
 ```
 
 ### CLI Tool
 ```bash
-# Build the CLI
-go build -o ploy ./cmd/ploy
+# Build the CLI to build/ folder (default binary location)
+go build -o build/ploy ./cmd/ploy
 
-# Scaffold new app
-./ploy apps new --lang go --name myapp
-./ploy apps new --lang node --name myapp
+# Run CLI from build folder
+./build/ploy apps new --lang go --name myapp
+./build/ploy apps new --lang node --name myapp
 
 # Deploy app (auto lane-pick)
-./ploy push -a myapp
+./build/ploy push -a myapp
 
 # Deploy with specific lane
-./ploy push -a myapp -lane B
+./build/ploy push -a myapp -lane B
 
 # Deploy Java app with custom main class
-./ploy push -a myapp -lane C -main com.example.CustomMain
+./build/ploy push -a myapp -lane C -main com.example.CustomMain
 
 # Open deployed app
-./ploy open myapp
+./build/ploy open myapp
 ```
+
+## Folder Structure
+
+**STRICT FOLDER ORGANIZATION:**
+
+### `build/` - Binary Build Output
+- **Purpose**: Default folder for compiled binaries (controller, CLI)
+- **Usage**: All binary builds must output to this folder
+- **Git**: Ignored in .gitignore
+- **Commands**:
+  ```bash
+  # Build controller binary
+  go build -o build/controller ./controller
+  
+  # Build CLI binary
+  go build -o build/ploy ./cmd/ploy
+  
+  # Run binaries from build folder
+  ./build/controller
+  ./build/ploy --help
+  ```
+
+### `scripts/` - Shell Scripts and Build Scripts
+- **Purpose**: Container for all shell scripts and build automation
+- **Git**: Tracked and committed
+
+### `scripts/build/` - Lane-Specific Build Scripts
+- **Purpose**: Build scripts for different deployment lanes
+- **Structure**:
+  - `scripts/build/kraft/` - Unikraft build scripts (Lanes A, B)
+  - `scripts/build/osv/` - OSv build scripts (Lane C)
+  - `scripts/build/jail/` - FreeBSD jail scripts (Lane D)
+  - `scripts/build/oci/` - OCI container scripts (Lane E)
+  - `scripts/build/packer/` - VM build scripts (Lane F)
+- **Git**: All build scripts are tracked and committed
 
 ### Lane Picker Tool
 ```bash

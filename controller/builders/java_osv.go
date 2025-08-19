@@ -30,7 +30,7 @@ func BuildOSVJava(req JavaOSVRequest) (string, error) {
 	}
 	out := filepath.Join(req.OutDir, fmt.Sprintf("%s-%s.qcow2", req.App, short(req.GitSHA)))
 	args := []string{ "--tar", jibTar, "--main", req.MainClass, "--app", req.App, "--sha", req.GitSHA, "--out", out }
-	cmd := exec.Command("./build/osv/java/build_osv_java_with_capstan.sh", args...)
+	cmd := exec.Command("./scripts/build/osv/java/build_osv_java_with_capstan.sh", args...)
 	cmd.Stdout = os.Stdout; cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil { return "", err }
 	return out, nil

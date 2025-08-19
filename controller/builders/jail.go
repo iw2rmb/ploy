@@ -8,7 +8,7 @@ import (
 
 func BuildJail(app, srcDir, sha, outDir string, envVars map[string]string) (string, error) {
 	args := []string{"--app", app, "--src", srcDir, "--sha", sha, "--out-dir", outDir}
-	cmd := exec.Command("./build/jail/build_jail.sh", args...)
+	cmd := exec.Command("./scripts/build/jail/build_jail.sh", args...)
 	
 	// Add environment variables to the build process
 	env := os.Environ()
