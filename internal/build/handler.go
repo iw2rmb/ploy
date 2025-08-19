@@ -194,23 +194,52 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 
 	if storeClient != nil {
 		keyPrefix := appName + "/" + sha + "/"
+		
+		// Upload artifact bundle (main artifact + SBOM + signature + certificate)
 		if imagePath != "" {
-			if f, err := os.Open(imagePath); err == nil {
-				defer f.Close()
-				storeClient.PutObject(storeClient.Artifacts, keyPrefix+filepath.Base(imagePath), f, "application/octet-stream")
-			}
-			if f, err := os.Open(imagePath + ".sbom.json"); err == nil {
-				defer f.Close()
-				storeClient.PutObject(storeClient.Artifacts, keyPrefix+filepath.Base(imagePath+".sbom.json"), f, "application/json")
-			}
-			if f, err := os.Open(imagePath + ".sig"); err == nil {
-				defer f.Close()
-				storeClient.PutObject(storeClient.Artifacts, keyPrefix+filepath.Base(imagePath+".sig"), f, "application/octet-stream")
+			if err := storeClient.UploadArtifactBundle(keyPrefix, imagePath); err != nil {
+				fmt.Printf("Warning: Failed to upload artifact bundle for %s: %v\n", imagePath, err)
+				// Continue with build even if upload fails
 			}
 		}
-		meta := map[string]string{"lane": lane, "image": imagePath, "dockerImage": dockerImage}
+		
+		// Upload source code SBOM if it exists
+		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
+		if _, err := os.Stat(sourceSBOMPath); err == nil {
+			if f, err := os.Open(sourceSBOMPath); err == nil {
+				defer f.Close()
+				if _, err := storeClient.PutObject(storeClient.Artifacts, keyPrefix+"source.sbom.json", f, "application/json"); err != nil {
+					fmt.Printf("Warning: Failed to upload source SBOM: %v\n", err)
+				}
+			}
+		}
+		
+		// Upload container SBOM for Lane E if it exists in /tmp
+		if dockerImage != "" {
+			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
+			if _, err := os.Stat(containerSBOMPath); err == nil {
+				if f, err := os.Open(containerSBOMPath); err == nil {
+					defer f.Close()
+					if _, err := storeClient.PutObject(storeClient.Artifacts, keyPrefix+"container.sbom.json", f, "application/json"); err != nil {
+						fmt.Printf("Warning: Failed to upload container SBOM: %v\n", err)
+					}
+				}
+			}
+		}
+		
+		// Upload metadata
+		meta := map[string]string{
+			"lane":        lane,
+			"image":       imagePath,
+			"dockerImage": dockerImage,
+			"timestamp":   time.Now().UTC().Format(time.RFC3339),
+			"sbom":        fmt.Sprintf("%t", sbom),
+			"signed":      fmt.Sprintf("%t", signed),
+		}
 		mb, _ := json.Marshal(meta)
-		storeClient.PutObject(storeClient.Artifacts, keyPrefix+"meta.json", bytes.NewReader(mb), "application/json")
+		if _, err := storeClient.PutObject(storeClient.Artifacts, keyPrefix+"meta.json", bytes.NewReader(mb), "application/json"); err != nil {
+			fmt.Printf("Warning: Failed to upload metadata: %v\n", err)
+		}
 	}
 
 	return c.JSON(fiber.Map{"status": "deployed", "lane": lane, "image": imagePath, "dockerImage": dockerImage})
