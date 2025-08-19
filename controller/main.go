@@ -342,22 +342,73 @@ func debugApp(c *fiber.Ctx) error {
 	
 	log.Printf("Creating debug build for app %s (lane: %s) with SSH enabled: %v", app, lane, req.SSHEnabled)
 	
-	// TODO: Implement debug build with SSH support
-	// This would typically involve:
-	// 1. Build debug variant with SSH daemon
-	// 2. Deploy to debug namespace
-	// 3. Return SSH connection details
+	// Get latest source for app (this is simplified - in production you'd retrieve from storage)
+	srcDir := filepath.Join(os.TempDir(), fmt.Sprintf("debug-src-%s-%d", app, time.Now().Unix()))
+	outDir := filepath.Join(os.TempDir(), fmt.Sprintf("debug-out-%s-%d", app, time.Now().Unix()))
+	sha := fmt.Sprintf("debug-%d", time.Now().Unix())
 	
-	debugInstance := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
+	// Create directories
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to create source directory: %v", err))
+	}
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to create output directory: %v", err))
+	}
 	
-	return c.JSON(fiber.Map{
-		"status": "debug_created",
-		"app": app,
-		"instance": debugInstance,
+	// Get environment variables for the app
+	envVarsData, err := envStore.GetAll(app)
+	if err != nil {
+		log.Printf("Failed to get environment variables for %s: %v", app, err)
+		envVarsData = make(map[string]string) // Continue with empty env vars
+	}
+	envVars := make(map[string]string)
+	for k, v := range envVarsData {
+		envVars[k] = v
+	}
+	
+	// Build debug instance
+	debugResult, err := builders.BuildDebugInstance(app, lane, srcDir, sha, outDir, envVars, req.SSHEnabled)
+	if err != nil {
+		return errJSON(c, 500, fmt.Errorf("debug build failed: %v", err))
+	}
+	
+	// Deploy to debug namespace using Nomad
+	debugInstanceName := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
+	renderData := nomad.RenderData{
+		App:         debugInstanceName,
+		ImagePath:   debugResult.ImagePath,
+		DockerImage: debugResult.DockerImage,
+		EnvVars:     envVars,
+		IsDebug:     true,
+	}
+	
+	templatePath, err := nomad.RenderTemplate(lane, renderData)
+	if err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))
+	}
+	
+	// Submit debug job to Nomad
+	if err := nomad.Submit(templatePath); err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
+	}
+	
+	// Clean up template file
+	os.Remove(templatePath)
+	
+	response := fiber.Map{
+		"status":      "debug_created",
+		"app":         app,
+		"instance":    debugInstanceName,
 		"ssh_enabled": req.SSHEnabled,
-		"ssh_command": fmt.Sprintf("ssh debug@%s.debug.ployd.app", debugInstance),
-		"message": "Debug instance created successfully",
-	})
+		"message":     "Debug instance created successfully",
+	}
+	
+	if req.SSHEnabled {
+		response["ssh_command"] = debugResult.SSHCommand
+		response["ssh_public_key"] = debugResult.SSHPublicKey
+	}
+	
+	return c.JSON(response)
 }
 
 func rollbackApp(c *fiber.Ctx) error {

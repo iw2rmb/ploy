@@ -19,5 +19,5 @@ func BuildJail(app, srcDir, sha, outDir string, envVars map[string]string) (stri
 	
 	b, err := cmd.CombinedOutput()
 	if err != nil { return "", fmt.Errorf("jail build failed: %v: %s", err, string(b)) }
-	return string(bytesTrimSpace(b)), nil
+	return bytesTrimSpace(b), nil
 }
