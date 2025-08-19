@@ -1,0 +1,34 @@
+[Unit]
+Description=SeaweedFS Filer Server
+Documentation=https://github.com/seaweedfs/seaweedfs
+After=network.target seaweedfs-master.service seaweedfs-volume.service
+Requires=seaweedfs-master.service
+
+[Service]
+Type=simple
+User=seaweedfs
+Group=seaweedfs
+ExecStart=/usr/local/bin/weed filer \
+  -port={{ seaweedfs.filer_port }} \
+  -ip.bind=0.0.0.0 \
+  -master=localhost:{{ seaweedfs.master_port }} \
+  -dataCenter=dc1 \
+  -defaultReplicaPlacement=001 \
+  -dirListLimit=1000 \
+  -defaultStoreDir=/var/lib/seaweedfs/filer
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=seaweedfs-filer
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/seaweedfs/filer
+ReadOnlyPaths=/etc/seaweedfs
+
+[Install]
+WantedBy=multi-user.target

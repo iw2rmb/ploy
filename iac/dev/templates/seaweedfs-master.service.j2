@@ -1,0 +1,31 @@
+[Unit]
+Description=SeaweedFS Master Server
+Documentation=https://github.com/seaweedfs/seaweedfs
+After=network.target
+
+[Service]
+Type=simple
+User=seaweedfs
+Group=seaweedfs
+ExecStart=/usr/local/bin/weed master \
+  -port={{ seaweedfs.master_port }} \
+  -mdir=/var/lib/seaweedfs/master \
+  -defaultReplication=001 \
+  -volumeSizeLimitMB=30000 \
+  -garbageThreshold=0.3
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=seaweedfs-master
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/seaweedfs/master
+ReadOnlyPaths=/etc/seaweedfs
+
+[Install]
+WantedBy=multi-user.target
