@@ -1,5 +1,71 @@
 # CHANGELOG
 
+## [2025-08-18] - Environment Variables Implementation
+
+### Added
+- **Environment Variables API Endpoints**
+  - `POST /v1/apps/:app/env` - Set multiple environment variables at once
+  - `GET /v1/apps/:app/env` - List all environment variables for app
+  - `PUT /v1/apps/:app/env/:key` - Update single environment variable
+  - `DELETE /v1/apps/:app/env/:key` - Remove environment variable
+
+- **Environment Variables CLI Commands**
+  - `ploy env list <app>` - Display all environment variables
+  - `ploy env set <app> <key> <value>` - Set environment variable
+  - `ploy env get <app> <key>` - Get specific environment variable
+  - `ploy env delete <app> <key>` - Delete environment variable
+
+- **Storage Layer**
+  - File-based persistence in configurable directory (default: `/tmp/ploy-env-store`)
+  - JSON format storage with proper escaping for special characters
+  - Thread-safe operations with read-write mutex
+  - Persistent storage across controller restarts
+
+### Integration
+- **Build Phase Integration**
+  - Environment variables passed to all build processes (Gradle, Maven, npm, etc.)
+  - Support for all lanes (A-F) with proper environment variable injection
+  - Variables available during compilation for Unikraft, OSv, OCI, and VM builds
+
+- **Deploy Phase Integration**  
+  - Nomad job templates updated with environment variable placeholders
+  - `{{ENV_VARS}}` template rendering generates proper HCL `env {}` blocks
+  - Runtime environment variables injected into all deployment targets
+  - Updated all lane templates (A-F) to support environment variable rendering
+
+### Testing
+- **Comprehensive Test Suite**
+  - Created `test-env-vars.sh` for API endpoint testing (scenarios 123-145)
+  - Created `test-env-cli.sh` for CLI command testing (scenarios 127-130)
+  - Added 23 new test scenarios to TESTS.md covering all functionality
+  - API validation: JSON format, error handling, CRUD operations
+  - CLI validation: User-friendly output, error messages, integration
+
+### Technical Details
+- **Backend Implementation**
+  - New `envstore` package with thread-safe file-based storage
+  - RESTful API handlers with proper JSON request/response handling
+  - Environment variable inheritance in all builder functions
+  - Template rendering system for Nomad job environment injection
+
+- **Frontend Implementation**
+  - Extended CLI router with `env` command category
+  - JSON parsing for API responses with user-friendly formatting
+  - Comprehensive error handling and usage messages
+  - Integration with existing controller URL configuration
+
+### Documentation
+- **Updated Documentation**
+  - FEATURES.md: Environment variables section updated to "implemented" status
+  - REST.md: Full API specification with request/response examples
+  - CLI.md: Complete command reference with usage examples
+  - TESTS.md: 23 new test scenarios (123-145) for comprehensive coverage
+
+### Status
+**COMPLETED** - Phase 1, Step 4 from PLAN.md: "App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases"
+
+Environment variables are now fully integrated across the entire Ploy stack, providing developers with complete configuration management for both build-time and runtime environments across all deployment lanes.
+
 ## [2025-08-18] - CLI Commands Implementation
 
 ### Added

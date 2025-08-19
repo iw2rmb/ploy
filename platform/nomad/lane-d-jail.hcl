@@ -1,4 +1,4 @@
-job "lane-d-jail" {
+job "{{APP_NAME}}-lane-d" {
   datacenters = ["dc1"]
   type = "service"
   group "edge" {
@@ -17,7 +17,8 @@ job "lane-d-jail" {
 {{ file "../../apps/nginx-edge/nginx.conf" }}
 EOF
       }
-      service { name = "lane-d-jail" port = "http" }
+{{ENV_VARS}}
+      service { name = "{{APP_NAME}}-lane-d-jail" port = "http" }
       resources { cpu = 200 memory = 128 }
     }
   }

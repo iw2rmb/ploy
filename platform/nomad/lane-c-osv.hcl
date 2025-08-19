@@ -1,4 +1,4 @@
-job "lane-c-osv" {
+job "{{APP_NAME}}-lane-c" {
   datacenters = ["dc1"]
   type = "service"
   group "app" {
@@ -7,11 +7,12 @@ job "lane-c-osv" {
     task "osv" {
       driver = "qemu"
       config {
-        image_path = "local/${NOMAD_TASK_DIR}/java-osv.qcow2"
+        image_path = "{{IMAGE_PATH}}"
         args = ["-nographic"]
       }
+{{ENV_VARS}}
       service {
-        name = "lane-c-osv"
+        name = "{{APP_NAME}}-lane-c-osv"
         port = "http"
         check { type="http" path="/healthz" interval="5s" timeout="1s" }
       }

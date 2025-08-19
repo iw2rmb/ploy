@@ -15,6 +15,7 @@ type JavaOSVRequest struct {
 	JibTar    string // optional
 	GitSHA    string
 	OutDir    string
+	EnvVars   map[string]string // environment variables
 }
 
 func BuildOSVJava(req JavaOSVRequest) (string, error) {
@@ -24,7 +25,7 @@ func BuildOSVJava(req JavaOSVRequest) (string, error) {
 	jibTar := req.JibTar
 	if jibTar == "" {
 		var err error
-		jibTar, err = runJibBuildTar(req.SrcDir)
+		jibTar, err = runJibBuildTar(req.SrcDir, req.EnvVars)
 		if err != nil { return "", err }
 	}
 	out := filepath.Join(req.OutDir, fmt.Sprintf("%s-%s.qcow2", req.App, short(req.GitSHA)))
@@ -35,12 +36,17 @@ func BuildOSVJava(req JavaOSVRequest) (string, error) {
 	return out, nil
 }
 
-func runJibBuildTar(src string) (string, error) {
+func runJibBuildTar(src string, envVars map[string]string) (string, error) {
+	env := os.Environ()
+	for k, v := range envVars {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	
 	if exists(filepath.Join(src,"gradlew")) && (exists(filepath.Join(src,"build.gradle")) || exists(filepath.Join(src,"build.gradle.kts"))) {
-		cmd := exec.Command("./gradlew","jibBuildTar"); cmd.Dir = src; cmd.Stdout=os.Stdout; cmd.Stderr=os.Stderr; if err:=cmd.Run(); err==nil { p:=filepath.Join(src,"build","jib-image.tar"); if exists(p){return p,nil} }
+		cmd := exec.Command("./gradlew","jibBuildTar"); cmd.Dir = src; cmd.Env = env; cmd.Stdout=os.Stdout; cmd.Stderr=os.Stderr; if err:=cmd.Run(); err==nil { p:=filepath.Join(src,"build","jib-image.tar"); if exists(p){return p,nil} }
 	}
 	if exists(filepath.Join(src,"mvnw")) && exists(filepath.Join(src,"pom.xml")) {
-		cmd := exec.Command("./mvnw","-B","com.google.cloud.tools:jib-maven-plugin:buildTar"); cmd.Dir = src; cmd.Stdout=os.Stdout; cmd.Stderr=os.Stderr; if err:=cmd.Run(); err==nil { p:=filepath.Join(src,"target","jib-image.tar"); if exists(p){return p,nil} }
+		cmd := exec.Command("./mvnw","-B","com.google.cloud.tools:jib-maven-plugin:buildTar"); cmd.Dir = src; cmd.Env = env; cmd.Stdout=os.Stdout; cmd.Stderr=os.Stderr; if err:=cmd.Run(); err==nil { p:=filepath.Join(src,"target","jib-image.tar"); if exists(p){return p,nil} }
 	}
 	return "", errors.New("failed to produce Jib tar")
 }

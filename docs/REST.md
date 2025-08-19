@@ -30,15 +30,23 @@
   - Body: `{"sha": "abc123def456"}`
   - Returns: `{"status": "rolled_back", "app": "myapp", "sha": "abc123def456", "message": "Application rolled back successfully"}`
 
-## Environment Variables Endpoints (Planned)
-- `POST /v1/apps/:app/env` — set environment variable.
-  - Body: `{"key": "API_KEY", "value": "secret123", "secret": true}`
+## Environment Variables Endpoints (Implemented)
+- `POST /v1/apps/:app/env` — set multiple environment variables.
+  - Body: `{"NODE_ENV": "production", "DATABASE_URL": "postgres://localhost", "DEBUG": "true"}`
+  - Returns: `{"status": "updated", "app": "myapp", "count": 3, "message": "Environment variables updated successfully"}`
 - `GET /v1/apps/:app/env` — list all environment variables.
-  - Returns: `{"env": [{"key": "NODE_ENV", "value": "production", "secret": false}]}`
-- `GET /v1/apps/:app/env/:key` — get specific environment variable.
-- `PUT /v1/apps/:app/env/:key` — update environment variable.
-  - Body: `{"value": "new_value", "secret": false}`
+  - Returns: `{"app": "myapp", "env": {"NODE_ENV": "production", "DATABASE_URL": "postgres://localhost"}}`
+- `PUT /v1/apps/:app/env/:key` — update single environment variable.
+  - Body: `{"value": "new_value"}`
+  - Returns: `{"status": "updated", "app": "myapp", "key": "NODE_ENV", "message": "Environment variable updated successfully"}`
 - `DELETE /v1/apps/:app/env/:key` — delete environment variable.
+  - Returns: `{"status": "deleted", "app": "myapp", "key": "NODE_ENV", "message": "Environment variable deleted successfully"}`
+
+**Features:**
+- Environment variables available during build phase (all lanes)
+- Environment variables injected into Nomad job templates for runtime
+- File-based storage with JSON persistence
+- Full CRUD operations with proper error handling
 
 ## Self-Healing Loop Endpoints (Planned)
 - `POST /v1/apps/:app/diff?verify=true&branch=<name>` — push diff to verification branch.

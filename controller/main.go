@@ -23,6 +23,7 @@ import (
 	"github.com/ploy/ploy/controller/opa"
 	"github.com/ploy/ploy/controller/supply"
 	"github.com/ploy/ploy/controller/config"
+	"github.com/ploy/ploy/controller/envstore"
 	"github.com/ploy/ploy/internal/storage"
 )
 
@@ -33,6 +34,7 @@ type lanePickResult struct {
 }
 
 var storeClient *storage.Client
+var envStore *envstore.EnvStore
 
 func main(){
 	app := fiber.New()
@@ -42,6 +44,8 @@ func main(){
 	if rootCfg, err := config.Load(cfgPath); err == nil {
 		if c, err := storage.New(rootCfg.Storage); err == nil { storeClient = c }
 	}
+	
+	envStore = envstore.New(getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", triggerBuild)
@@ -56,6 +60,12 @@ func main(){
 	// Certificate management
 	api.Post("/certs/issue", issueCertificate)
 	api.Get("/certs", listCertificates)
+	
+	// Environment variables management
+	api.Post("/apps/:app/env", setEnvVars)
+	api.Get("/apps/:app/env", getEnvVars)
+	api.Put("/apps/:app/env/:key", setEnvVar)
+	api.Delete("/apps/:app/env/:key", deleteEnvVar)
 	
 	// Debug and rollback
 	api.Post("/apps/:app/debug", debugApp)
@@ -110,30 +120,37 @@ func triggerBuild(c *fiber.Ctx) error {
 	// Extract tar
 	srcDir := filepath.Join(tmpDir, "src"); os.MkdirAll(srcDir, 0755); _ = untar(tarPath, srcDir)
 
+	// Get environment variables for this app
+	appEnvVars, err := envStore.GetAll(appName)
+	if err != nil {
+		log.Printf("Warning: failed to retrieve environment variables for app %s: %v", appName, err)
+		appEnvVars = make(map[string]string)
+	}
+
 	if lane == "" { if res, err := runLanePick(srcDir); err == nil { lane = res.Lane } else { lane = "C" } }
 
 	var imagePath, dockerImage string
 	switch strings.ToUpper(lane) {
 	case "A","B":
-		img, err := builders.BuildUnikraft(appName, lane, srcDir, sha, tmpDir); if err != nil { return errJSON(c, 500, err) }
+		img, err := builders.BuildUnikraft(appName, lane, srcDir, sha, tmpDir, appEnvVars); if err != nil { return errJSON(c, 500, err) }
 		imagePath = img
 	case "C":
-		img, err := builders.BuildOSVJava(builders.JavaOSVRequest{ App: appName, MainClass: mainClass, SrcDir: srcDir, GitSHA: sha, OutDir: tmpDir })
+		img, err := builders.BuildOSVJava(builders.JavaOSVRequest{ App: appName, MainClass: mainClass, SrcDir: srcDir, GitSHA: sha, OutDir: tmpDir, EnvVars: appEnvVars })
 		if err != nil { return errJSON(c, 500, err) }
 		imagePath = img
 	case "D":
-		img, err := builders.BuildJail(appName, srcDir, sha, tmpDir); if err != nil { return errJSON(c, 500, err) }
+		img, err := builders.BuildJail(appName, srcDir, sha, tmpDir, appEnvVars); if err != nil { return errJSON(c, 500, err) }
 		imagePath = img
 	case "E":
 		tag := fmt.Sprintf("harbor.local/ploy/%s:%s", appName, sha)
-		img, err := builders.BuildOCI(appName, srcDir, tag); if err != nil { return errJSON(c, 500, err) }
+		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars); if err != nil { return errJSON(c, 500, err) }
 		dockerImage = img
 	case "F":
-		img, err := builders.BuildVM(appName, sha, tmpDir); if err != nil { return errJSON(c, 500, err) }
+		img, err := builders.BuildVM(appName, sha, tmpDir, appEnvVars); if err != nil { return errJSON(c, 500, err) }
 		imagePath = img
 	default:
 		lane = "C"
-		img, err := builders.BuildOSVJava(builders.JavaOSVRequest{ App: appName, MainClass: mainClass, SrcDir: srcDir, GitSHA: sha, OutDir: tmpDir })
+		img, err := builders.BuildOSVJava(builders.JavaOSVRequest{ App: appName, MainClass: mainClass, SrcDir: srcDir, GitSHA: sha, OutDir: tmpDir, EnvVars: appEnvVars })
 		if err != nil { return errJSON(c, 500, err) }
 		imagePath = img
 	}
@@ -148,7 +165,7 @@ func triggerBuild(c *fiber.Ctx) error {
 		return errJSON(c, 403, fmt.Errorf("policy denied: %w", err))
 	}
 
-	jobFile, err := nomad.RenderTemplate(lane, nomad.RenderData{ App: appName, ImagePath: imagePath, DockerImage: dockerImage })
+	jobFile, err := nomad.RenderTemplate(lane, nomad.RenderData{ App: appName, ImagePath: imagePath, DockerImage: dockerImage, EnvVars: appEnvVars })
 	if err != nil { return errJSON(c, 500, err) }
 	if err := nomad.Submit(jobFile); err != nil { return errJSON(c, 500, err) }
 	// wait for job healthy (basic)
@@ -363,5 +380,87 @@ func rollbackApp(c *fiber.Ctx) error {
 		"app": app,
 		"sha": req.SHA,
 		"message": "Application rolled back successfully",
+	})
+}
+
+// Environment variables handlers
+func setEnvVars(c *fiber.Ctx) error {
+	app := c.Params("app")
+	
+	var req map[string]string
+	if err := c.BodyParser(&req); err != nil {
+		return errJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	log.Printf("Setting environment variables for app %s", app)
+	
+	if err := envStore.SetAll(app, req); err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to store environment variables: %w", err))
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "updated",
+		"app": app,
+		"count": len(req),
+		"message": "Environment variables updated successfully",
+	})
+}
+
+func getEnvVars(c *fiber.Ctx) error {
+	app := c.Params("app")
+	
+	log.Printf("Getting environment variables for app %s", app)
+	
+	envVars, err := envStore.GetAll(app)
+	if err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to retrieve environment variables: %w", err))
+	}
+	
+	return c.JSON(fiber.Map{
+		"app": app,
+		"env": envVars,
+	})
+}
+
+func setEnvVar(c *fiber.Ctx) error {
+	app := c.Params("app")
+	key := c.Params("key")
+	
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return errJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	log.Printf("Setting environment variable %s for app %s", key, app)
+	
+	if err := envStore.Set(app, key, req.Value); err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to store environment variable: %w", err))
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "updated",
+		"app": app,
+		"key": key,
+		"message": "Environment variable updated successfully",
+	})
+}
+
+func deleteEnvVar(c *fiber.Ctx) error {
+	app := c.Params("app")
+	key := c.Params("key")
+	
+	log.Printf("Deleting environment variable %s for app %s", key, app)
+	
+	if err := envStore.Delete(app, key); err != nil {
+		return errJSON(c, 500, fmt.Errorf("failed to delete environment variable: %w", err))
+	}
+	
+	return c.JSON(fiber.Map{
+		"status": "deleted",
+		"app": app,
+		"key": key,
+		"message": "Environment variable deleted successfully",
 	})
 }

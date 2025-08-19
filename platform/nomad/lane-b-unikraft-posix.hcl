@@ -1,4 +1,4 @@
-job "lane-b-unikraft-posix" {
+job "{{APP_NAME}}-lane-b" {
   datacenters = ["dc1"]
   type = "service"
   group "app" {
@@ -7,7 +7,7 @@ job "lane-b-unikraft-posix" {
     task "unikernel" {
       driver = "qemu"
       config {
-        image_path = "local/${NOMAD_TASK_DIR}/app-b.img"
+        image_path = "{{IMAGE_PATH}}"
         args = ["-nographic"]
       }
       template {
@@ -16,16 +16,13 @@ job "lane-b-unikraft-posix" {
         change_mode = "restart"
       }
       service {
-        name = "lane-b-unikraft-posix"
+        name = "{{APP_NAME}}-lane-b-unikraft-posix"
         port = "http"
         check { type="http" path="/healthz" interval="5s" timeout="1s" }
       }
       resources { cpu = 600 memory = 192 }
       logs { max_files = 5 max_file_size = 10 }
-      env {
-        DROPBEAR_SSH = "false" # set true in debug
-        AUTHORIZED_KEYS = ""
-      }
+{{ENV_VARS}}
     }
   }
 }

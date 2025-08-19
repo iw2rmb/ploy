@@ -1,4 +1,4 @@
-job "lane-e-oci-kontain" {
+job "{{APP_NAME}}-lane-e" {
   datacenters = ["dc1"]
   type = "service"
   group "app" {
@@ -7,11 +7,12 @@ job "lane-e-oci-kontain" {
     task "oci" {
       driver = "docker"
       config {
-        image = "harbor.local/ploy/java-ordersvc:latest"
+        image = "{{DOCKER_IMAGE}}"
         runtime = "io.kontain"
         ports = ["http"]
       }
-      service { name = "lane-e-oci-kontain" port = "http" }
+{{ENV_VARS}}
+      service { name = "{{APP_NAME}}-lane-e-oci-kontain" port = "http" }
       resources { cpu = 500 memory = 256 }
     }
   }
