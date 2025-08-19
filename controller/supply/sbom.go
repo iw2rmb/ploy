@@ -46,30 +46,16 @@ func NewSBOMGenerator() *SBOMGenerator {
 func (s *SBOMGenerator) GenerateForFile(artifactPath string, options SBOMGenerationOptions) error {
 	outputPath := artifactPath + ".sbom.json"
 	
-	// Build syft command with enhanced options
+	// Build syft command with modern syntax
 	args := []string{
-		"packages",
+		"scan",
 		artifactPath,
 		"-o", options.OutputFormat,
 		"--file", outputPath,
 	}
 	
-	// Add cataloger-specific options based on artifact type
-	if strings.HasSuffix(artifactPath, ".img") {
-		// Unikernel images - treat as filesystem scan
-		args = append(args, "--catalogers", "all")
-	} else if strings.HasSuffix(artifactPath, ".qcow2") {
-		// QCOW2 VM images - filesystem analysis
-		args = append(args, "--catalogers", "all")
-	} else if strings.HasSuffix(artifactPath, ".tar.gz") {
-		// Archive files (jails) - extract and analyze
-		args = append(args, "--catalogers", "all")
-	}
-	
-	// Add metadata enhancement
-	if options.IncludeLicenses {
-		args = append(args, "--select-catalogers", "+license")
-	}
+	// Note: Modern syft uses automatic cataloger selection
+	// Legacy --catalogers and --select-catalogers flags are deprecated
 	
 	cmd := exec.Command(s.SyftPath, args...)
 	output, err := cmd.CombinedOutput()
@@ -88,16 +74,13 @@ func (s *SBOMGenerator) GenerateForContainer(imageTag string, options SBOMGenera
 	outputPath := filepath.Join("/tmp", fmt.Sprintf("%s.sbom.json", sanitizedTag))
 	
 	args := []string{
-		"packages",
+		"scan",
 		imageTag,
 		"-o", options.OutputFormat,
 		"--file", outputPath,
-		"--catalogers", "all", // Full analysis for containers
 	}
 	
-	if options.IncludeSecrets {
-		args = append(args, "--select-catalogers", "+secrets")
-	}
+	// Note: Modern syft automatically selects appropriate catalogers
 	
 	cmd := exec.Command(s.SyftPath, args...)
 	output, err := cmd.CombinedOutput()
@@ -113,26 +96,14 @@ func (s *SBOMGenerator) GenerateForSourceCode(sourcePath string, options SBOMGen
 	outputPath := filepath.Join(sourcePath, ".sbom.json")
 	
 	args := []string{
-		"packages",
+		"scan",
 		sourcePath,
 		"-o", options.OutputFormat,
 		"--file", outputPath,
 	}
 	
-	// Language-specific cataloger selection
-	args = append(args, "--select-catalogers")
-	switch {
-	case s.hasFile(sourcePath, "package.json"):
-		args = append(args, "javascript,npm")
-	case s.hasFile(sourcePath, "go.mod"):
-		args = append(args, "go-module,go-build")
-	case s.hasFile(sourcePath, "pom.xml") || s.hasFile(sourcePath, "build.gradle"):
-		args = append(args, "java,java-gradle,java-pom")
-	case s.hasFile(sourcePath, "requirements.txt") || s.hasFile(sourcePath, "pyproject.toml"):
-		args = append(args, "python,python-pip,python-poetry")
-	default:
-		args = append(args, "all")
-	}
+	// Modern syft automatically detects and uses appropriate catalogers
+	// based on the source code language and build files
 	
 	cmd := exec.Command(s.SyftPath, args...)
 	output, err := cmd.CombinedOutput()
