@@ -17,6 +17,6 @@ echo "$OUT"
 
 # SBOM/signature (optional)
 
-if command -v syft >/dev/null 2>&1; then syft packages "$OUT" -o json > "$OUT.sbom.json" || true; fi
+if command -v syft >/dev/null 2>&1; then syft scan "$OUT" -o json > "$OUT.sbom.json" || true; fi
 if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$OUT.sig" "$OUT" || true; fi
 

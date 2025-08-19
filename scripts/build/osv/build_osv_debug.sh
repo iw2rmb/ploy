@@ -120,7 +120,7 @@ if ! command -v capstan &> /dev/null; then
   echo "Created debug image: $IMAGE_PATH"
   
   # Generate SBOM and signature for debug image
-  if command -v syft >/dev/null 2>&1; then syft packages "$IMAGE_PATH" -o json > "$IMAGE_PATH.sbom.json" || true; fi
+  if command -v syft >/dev/null 2>&1; then syft scan "$IMAGE_PATH" -o json > "$IMAGE_PATH.sbom.json" || true; fi
   if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$IMAGE_PATH.sig" "$IMAGE_PATH" || true; fi
   
   echo "$IMAGE_PATH"
@@ -134,7 +134,7 @@ else
     cp "$IMAGE_PATH" "$NEW_PATH"
     
     # Generate SBOM and signature for debug image
-    if command -v syft >/dev/null 2>&1; then syft packages "$NEW_PATH" -o json > "$NEW_PATH.sbom.json" || true; fi
+    if command -v syft >/dev/null 2>&1; then syft scan "$NEW_PATH" -o json > "$NEW_PATH.sbom.json" || true; fi
     if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$NEW_PATH.sig" "$NEW_PATH" || true; fi
     
     echo "$NEW_PATH"

@@ -283,19 +283,16 @@ echo "$OUT"
 if command -v syft >/dev/null 2>&1; then
   echo "Generating comprehensive SBOM for $OUT..."
   # Generate SPDX-JSON format SBOM with full cataloger analysis
-  syft packages "$OUT" \
+  syft scan "$OUT" \
     -o spdx-json \
-    --catalogers all \
-    --select-catalogers +license \
     --file "$OUT.sbom.json" || true
   
   # Also generate source code dependencies SBOM if in a source directory
-  if [ -n "$APP_DIR" ] && [ -d "$APP_DIR" ]; then
+  if [ -n "${APP_DIR:-}" ] && [ -d "${APP_DIR:-}" ]; then
     echo "Generating source dependencies SBOM..."
-    syft packages "$APP_DIR" \
+    syft scan "${APP_DIR}" \
       -o spdx-json \
-      --catalogers all \
-      --file "$APP_DIR/.sbom.json" || true
+      --file "${APP_DIR}/.sbom.json" || true
   fi
 else
   echo "Warning: syft not found, skipping comprehensive SBOM generation"
