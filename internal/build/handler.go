@@ -108,6 +108,36 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		imagePath = img
 	}
 
+	// Generate comprehensive SBOM for the built artifact
+	if imagePath != "" {
+		// Generate SBOM for file-based artifacts (Lanes A, B, C, D, F)
+		if !utils.FileExists(imagePath + ".sbom.json") {
+			if err := supply.GenerateSBOM(imagePath, lane, appName, sha); err != nil {
+				// Log error but don't fail the build - SBOM generation is best effort
+				fmt.Printf("Warning: SBOM generation failed for %s: %v\n", imagePath, err)
+			}
+		}
+	} else if dockerImage != "" {
+		// Generate SBOM for container images (Lane E)
+		if err := supply.GenerateSBOM(dockerImage, lane, appName, sha); err != nil {
+			// Log error but don't fail the build - SBOM generation is best effort
+			fmt.Printf("Warning: SBOM generation failed for container %s: %v\n", dockerImage, err)
+		}
+	}
+	
+	// Also generate source code SBOM for dependency analysis
+	if !utils.FileExists(filepath.Join(srcDir, ".sbom.json")) {
+		generator := supply.NewSBOMGenerator()
+		options := supply.DefaultSBOMOptions()
+		options.Lane = lane
+		options.AppName = appName
+		options.SHA = sha
+		if err := generator.GenerateForSourceCode(srcDir, options); err != nil {
+			// Log error but don't fail the build
+			fmt.Printf("Warning: Source code SBOM generation failed: %v\n", err)
+		}
+	}
+
 	// Sign the built artifact if not already signed
 	if imagePath != "" && !utils.FileExists(imagePath + ".sig") {
 		// Sign file-based artifacts (Lanes A, B, C, D, F)

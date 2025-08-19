@@ -247,3 +247,17 @@
 236. All build scripts include SBOM generation (.sbom.json) for supply chain tracking.
 237. Signature generation gracefully handles missing cosign tool in development environments.
 238. Build scripts verify signature file existence before creating new signatures to avoid duplicates.
+
+## Comprehensive SBOM Generation Implementation (Aug 2025)
+239. Controller supply/sbom.go module provides centralized SBOM generation functionality.
+240. SBOM generation supports SPDX-JSON format with comprehensive metadata and cataloger analysis.
+241. Build handler automatically generates SBOMs for all artifacts before signing process.
+242. Source code SBOM generation analyzes dependencies in project source directories.
+243. Container image SBOM generation includes secrets detection and license analysis.
+244. File-based artifact SBOM generation works across all lanes (A, B, C, D, F).
+245. SBOM enhancement adds Ploy-specific metadata including lane, app name, and SHA.
+246. Language-specific cataloger selection optimizes SBOM accuracy for different project types.
+247. Build scripts use enhanced syft commands with full cataloger analysis and license detection.
+248. SBOM generation gracefully handles missing syft tool without failing builds.
+249. Generated SBOMs include timestamps, tool versions, and supply chain metadata.
+250. Build scripts generate both artifact SBOMs and source dependency SBOMs for complete coverage.

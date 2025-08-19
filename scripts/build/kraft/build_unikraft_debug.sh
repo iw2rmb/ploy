@@ -116,8 +116,11 @@ if ! command -v kraft &> /dev/null; then
   
   echo "Created debug image: $IMAGE_PATH"
   
-  # Generate SBOM and signature for debug image
-  if command -v syft >/dev/null 2>&1; then syft packages "$IMAGE_PATH" -o json > "$IMAGE_PATH.sbom.json" || true; fi
+  # Generate comprehensive SBOM and signature for debug image  
+  if command -v syft >/dev/null 2>&1; then 
+    echo "Generating comprehensive SBOM for fallback debug image $IMAGE_PATH..."
+    syft packages "$IMAGE_PATH" -o spdx-json --catalogers all --select-catalogers +license --file "$IMAGE_PATH.sbom.json" || true
+  fi
   if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$IMAGE_PATH.sig" "$IMAGE_PATH" || true; fi
   
   echo "$IMAGE_PATH"
@@ -128,8 +131,11 @@ else
     NEW_PATH="$OUT_DIR/debug-$APP-$SHA.img"
     mv "$IMAGE_PATH" "$NEW_PATH"
     
-    # Generate SBOM and signature for debug image
-    if command -v syft >/dev/null 2>&1; then syft packages "$NEW_PATH" -o json > "$NEW_PATH.sbom.json" || true; fi
+    # Generate comprehensive SBOM and signature for debug image
+    if command -v syft >/dev/null 2>&1; then 
+      echo "Generating comprehensive SBOM for debug image $NEW_PATH..."
+      syft packages "$NEW_PATH" -o spdx-json --catalogers all --select-catalogers +license --file "$NEW_PATH.sbom.json" || true
+    fi
     if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$NEW_PATH.sig" "$NEW_PATH" || true; fi
     
     echo "$NEW_PATH"

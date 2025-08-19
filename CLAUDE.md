@@ -182,29 +182,42 @@ go run ./tools/lane-pick --path /path/to/project
 **CRITICAL**: For EVERY codebase modification, execute ALL steps below in exact order:
 
 1. **Branch Creation**: Create new feature branch with 2-3 word name describing changes
-2. **TESTS.md Scenarios**: Add comprehensive test scenarios (numbered sequentially) if current functionality lacks coverage
-3. **Test Implementation**: Create executable test scripts for any new scenarios defined in step 6
-4. **Local Testing**: Run relevant tests locally if applicable
-    - Run local tests
-    - Push feature branch to GitHub before VPS testing
-5. **VPS Testing**: Run ALL relevant tests on VPS environment
-    - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT
-    - Pull feature branch
-    - Run ALL relevant tests on VPS environment
-6. **Error Handling**: IF tests fail:
-    - Fix errors locally
-    - Test locally if applicable
-    - Push fixes to feature branch
-    - Pull changes on VPS
-    - Re-run VPS tests
-7. **Success Actions**: IF all tests pass:
-    - **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
-    - **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
-    - **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
-    - **STACK.md Dependencies**: Update technology stack documentation when adding/changing frameworks or tools
-    - Commit all updates to feature branch
-    - Merge feature branch to main
-    - Delete feature branch
-    - Pull main branch on VPS
 
-**NO EXCEPTIONS**: Every code change must complete this full protocol. Incomplete updates violate project standards and compromise system integrity.
+2. **Infrastructure Preparation**: Update Ansible playbooks and install required components BEFORE testing
+    - **Ansible Playbook Updates**: Modify `iac/dev/playbooks/main.yml` to install any new tools, dependencies, or configurations required by the changes
+    - **Local Component Installation**: Install necessary tools and dependencies on local development environment using appropriate package managers (brew, npm, pip, etc.)
+    - **VPS Component Installation**: Run Ansible playbook to provision VPS with updated components: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
+    - **Verification**: Confirm all required tools are available and properly configured on both local and VPS environments before proceeding
+
+3. **Test Scenarios**: Add comprehensive test scenarios to TESTS.md (numbered sequentially) if current functionality lacks coverage
+
+4. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
+
+5. **Local Testing**: Execute relevant tests in local environment if applicable
+    - Run local validation tests to verify changes work correctly
+    - Ensure all syntax checks and basic functionality tests pass
+    - Push feature branch to GitHub before VPS testing
+
+6. **VPS Testing**: Execute ALL relevant tests on VPS environment
+    - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
+    - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
+    - Run comprehensive tests on VPS environment to validate changes work in production setup
+
+7. **Error Resolution**: IF any tests fail:
+    - Fix identified errors in local environment
+    - Re-run local tests to verify fixes
+    - Push corrections to feature branch
+    - Pull updated changes on VPS
+    - Re-execute VPS tests until all pass
+
+8. **Documentation and Completion**: IF all tests pass successfully:
+    - **PLAN.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in PLAN.md
+    - **CHANGELOG.md Entry**: Add dated summary entry following established format with Added/Fixed/Testing sections describing changes
+    - **FEATURES.md Synchronization**: Add new feature entries or modify existing ones to accurately reflect current system capabilities
+    - **STACK.md Dependencies**: Update technology stack documentation when adding or modifying frameworks, tools, or dependencies
+    - Commit all documentation updates to feature branch
+    - Merge feature branch to main branch
+    - Delete feature branch locally
+    - Pull updated main branch on VPS
+
+**NO EXCEPTIONS**: Every code change must complete this comprehensive protocol. Incomplete updates violate project standards and compromise system integrity. The infrastructure preparation step is particularly critical for ensuring all environments have consistent tooling and dependencies.

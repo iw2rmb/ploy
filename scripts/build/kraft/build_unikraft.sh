@@ -279,8 +279,28 @@ fi
 popd >/dev/null
 echo "$OUT"
 
-# SBOM/signature (optional)
+# Enhanced SBOM generation with comprehensive metadata
+if command -v syft >/dev/null 2>&1; then
+  echo "Generating comprehensive SBOM for $OUT..."
+  # Generate SPDX-JSON format SBOM with full cataloger analysis
+  syft packages "$OUT" \
+    -o spdx-json \
+    --catalogers all \
+    --select-catalogers +license \
+    --file "$OUT.sbom.json" || true
+  
+  # Also generate source code dependencies SBOM if in a source directory
+  if [ -n "$APP_DIR" ] && [ -d "$APP_DIR" ]; then
+    echo "Generating source dependencies SBOM..."
+    syft packages "$APP_DIR" \
+      -o spdx-json \
+      --catalogers all \
+      --file "$APP_DIR/.sbom.json" || true
+  fi
+else
+  echo "Warning: syft not found, skipping comprehensive SBOM generation"
+fi
 
-if command -v syft >/dev/null 2>&1; then syft packages "$OUT" -o json > "$OUT.sbom.json" || true; fi
+# Artifact signing (optional)
 if command -v cosign >/dev/null 2>&1; then cosign sign-blob --yes --output-signature "$OUT.sig" "$OUT" || true; fi
 
