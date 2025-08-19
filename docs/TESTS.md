@@ -184,3 +184,17 @@
 183. Lane B build process integrates Node.js preparation before kraft build.
 184. Build script provides detailed logging for Node.js build steps.
 185. Build failures create placeholder images with proper error logging.
+
+## Enhanced Node.js Dependency Handling (Aug 2025)
+186. Enhanced dependency management uses npm ci when package-lock.json exists.
+187. Build process falls back to npm install when npm ci fails.
+188. Dependency integrity verification detects and fixes corrupted node_modules.
+189. Production dependency pruning removes development packages from bundles.
+190. Dependency manifest generation creates .unikraft-manifest.json with metadata.
+191. Application bundling creates optimized .unikraft-bundle directory structure.
+192. Bundle includes only essential files (excludes test/, development artifacts).
+193. Startup script generation creates production-optimized start.js entrypoint.
+194. JavaScript syntax validation verifies main entry point before build.
+195. Bundle includes production runtime files (.env.production, config.json).
+196. Memory optimization features included in startup script for unikernels.
+197. Dependency count reporting provides build insights and optimization data.
