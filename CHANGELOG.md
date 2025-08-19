@@ -1,5 +1,58 @@
 # CHANGELOG
 
+## [2025-08-19] - Node.js Build Process Enhancement
+
+### Added
+- **Comprehensive Node.js Detection and Build Pipeline**
+  - `has_nodejs()` function for detecting package.json files in application directories
+  - `prepare_nodejs_build()` function with complete Node.js build preparation
+  - Automatic npm dependency installation with `npm install --production`
+  - Main entry point validation from package.json configuration
+  - Node.js and npm availability verification with graceful degradation
+
+- **Enhanced Build Process Integration**
+  - Lane B specific Node.js handling integrated into Unikraft build pipeline
+  - Pre-build Node.js preparation executed before kraft build process
+  - Comprehensive error handling for missing dependencies and build failures
+  - Detailed logging for all Node.js build steps and decisions
+
+- **Robust Error Handling and Logging**
+  - Graceful handling of missing Node.js/npm with warning messages
+  - Build failure recovery with placeholder image creation
+  - Comprehensive build logs with kraft output capture
+  - Multiple build artifact paths support for different kraft versions
+
+### Enhanced
+- **Build Script (`build/kraft/build_unikraft.sh`)**
+  - Integrated Node.js detection logic for Lane B applications
+  - Pre-build dependency management for Node.js applications
+  - Enhanced kraft build execution with detailed error reporting
+  - Support for both local development and production VPS environments
+
+### Fixed
+- Build process now properly handles Node.js applications before Unikraft compilation
+- Missing dependencies no longer cause silent build failures
+- Build script provides meaningful feedback for all error conditions
+
+### Testing
+- ✅ **Node.js Detection**: Correctly identifies package.json files and Node.js applications
+- ✅ **Dependency Management**: npm install executed when node_modules missing, skipped when present
+- ✅ **Error Handling**: Graceful degradation when Node.js/npm unavailable
+- ✅ **VPS Testing**: All functionality verified on production VPS environment
+- ✅ **Build Integration**: Lane B builds properly execute Node.js preparation steps
+- Added 8 test scenarios (178-185) covering all Node.js build functionality
+
+### Technical Details
+- **Conditional Execution**: Node.js preparation only runs for Lane B applications with package.json
+- **Production Optimization**: npm install uses --production flag for minimal dependency footprint  
+- **Entry Point Validation**: Verifies main file from package.json exists before build
+- **Build Recovery**: Creates placeholder images on kraft build failures to maintain pipeline flow
+
+### Status
+**COMPLETED** - Phase 2, Step 2 from PLAN.md: "Extend `build/kraft/build_unikraft.sh` with Node.js detection and build steps"
+
+The build system now provides complete Node.js application support with dependency management, validation, and robust error handling, enabling reliable deployment of Node.js applications through the Unikraft Lane B pipeline.
+
 ## [2025-08-19] - Lane B Node.js Unikraft Enhancement
 
 ### Added
