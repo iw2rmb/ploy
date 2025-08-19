@@ -135,7 +135,6 @@ go run ./tools/lane-pick --path /path/to/project
     - Run local tests
     - Push feature branch to GitHub before VPS testing
 5. **VPS Testing**: Run ALL relevant tests on VPS environment
-    - Stop Ploy controller
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT
     - Pull feature branch
     - Run ALL relevant tests on VPS environment
@@ -143,9 +142,7 @@ go run ./tools/lane-pick --path /path/to/project
     - Fix errors locally
     - Test locally if applicable
     - Push fixes to feature branch
-    - Stop Ploy controller
     - Pull changes on VPS
-    - Start Ploy controller
     - Re-run VPS tests
 7. **Success Actions**: IF all tests pass:
     - **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
@@ -155,8 +152,6 @@ go run ./tools/lane-pick --path /path/to/project
     - Commit all updates to feature branch locally
     - Merge feature branch to main locally
     - Delete feature branch locally
-    - Stop Ploy controller on VPS
     - Pull main branch on VPS
-    - Start Ploy controller on VPS
 
 **NO EXCEPTIONS**: Every code change must complete this full protocol. Incomplete updates violate project standards and compromise system integrity.
