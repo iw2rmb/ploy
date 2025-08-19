@@ -23,7 +23,7 @@ Next steps to implement:
 2. ✅ **COMPLETED (2025-08-19)** Extend `build/kraft/build_unikraft.sh` with Node.js detection and build steps.
 3. ✅ **COMPLETED (2025-08-19)** Add Node.js dependency handling (npm install, package bundling) to build process.
 4. ✅ **COMPLETED (2025-08-19)** Create Node.js-specific Unikraft configuration within existing template system.
-5. Test `ploy push` with `apps/node-hello` example using enhanced Lane B detection.
+5. ✅ **COMPLETED (2025-08-19)** Test `ploy push` with `apps/node-hello` example using enhanced Lane B detection.
 
 **Phase 3: Supply Chain Security Implementation**
 1. Implement cryptographic signing of build artifacts during build process.

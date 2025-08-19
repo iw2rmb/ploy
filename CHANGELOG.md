@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2025-08-19] - Node.js Lane B Testing & Build Handler Fixes
+
+### Added
+- **Node.js Lane B Testing Validation**
+  - Successfully tested `ploy push` with apps/node-hello using automatic Lane B detection
+  - Verified lane detection correctly identifies Node.js applications via package.json
+  - Confirmed build pipeline progression through tar processing and lane validation
+  - Added comprehensive test scenarios (210-216) in TESTS.md for Node.js Lane B testing
+
+### Fixed
+- **Build Handler Request Body Processing**
+  - Fixed critical nil pointer dereference in build handler request body stream processing
+  - Replaced unreliable RequestBodyStream() with robust c.Body() method for Fiber framework
+  - Added proper error handling for request body read failures
+  - Eliminated server crashes during push command execution
+
+### Testing
+- **VPS Integration Testing**
+  - Verified fix eliminates EOF errors in push command on production VPS environment
+  - Confirmed Lane B detection working correctly with "Detected Node.js application" messaging
+  - Build pipeline now progresses to Unikraft build stage instead of crashing at request processing
+  - OPA policy validation triggers appropriately for unsigned artifacts
+
 ## [2025-08-19] - Node.js-Specific Unikraft Configuration System
 
 ### Added
