@@ -81,9 +81,13 @@ Auto-classified lanes:
   - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
 - Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration ✅
 - ✅ **Comprehensive storage upload** to SeaweedFS with artifact bundles (Aug 2025)
-- OPA policy enforcement:
-  - Requires signature + SBOM ✅
-  - SSH blocked in prod without break-glass
+- **Enhanced OPA Policy Enforcement** ✅ (Aug 2025):
+  - **Signature & SBOM Requirements**: All deployments must have cryptographic signatures and SBOMs
+  - **Production SSH Restrictions**: SSH access blocked in production without break-glass approval
+  - **Comprehensive Audit Logging**: Detailed logging for all policy decisions with context
+  - **Environment-Aware Policies**: Different enforcement levels for dev vs production environments
+  - **Debug Build Integration**: Policy enforcement for SSH-enabled debug deployments
+  - **Break-Glass Approval**: Emergency override mechanism for critical production access
   - Image size caps per lane (planned)
 - **Enhanced Lane Detection** (Aug 2025):
   - **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
