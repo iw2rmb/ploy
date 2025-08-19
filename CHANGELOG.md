@@ -1,5 +1,65 @@
 # CHANGELOG
 
+## [2025-08-19] - SSH Debug Support Implementation
+
+### Added
+- **Debug Build System with SSH Support**
+  - `BuildDebugInstance` function with automatic SSH key pair generation
+  - Debug-specific build scripts for all lanes (Unikraft, OCI, OSv, jail)
+  - SSH daemon configuration and public key injection into debug builds
+  - Private key storage and SSH command generation for user access
+
+- **Debug-Specific Nomad Templates**
+  - `debug-unikraft.hcl` for Unikraft-based debug instances (lanes A, B, C)
+  - `debug-oci.hcl` for OCI container debug instances (lanes E, F)
+  - `debug-jail.hcl` for FreeBSD jail debug instances (lane D)
+  - Debug namespace isolation with auto-cleanup after 2 hours
+  - SSH port exposure (22) alongside application port (8080)
+
+- **Enhanced Debug API Endpoint**
+  - Complete implementation of `POST /v1/apps/:app/debug` with SSH support
+  - SSH key pair generation using RSA 2048-bit keys
+  - Integration with environment variables and lane-specific builders
+  - Nomad job deployment to debug namespace with proper health checks
+
+### Technical Details
+- **SSH Key Management**
+  - Automatic RSA key pair generation for each debug session
+  - Private key file creation with secure permissions (0600)
+  - Public key injection into debug builds via environment variables
+  - SSH command generation with proper key file paths
+
+- **Build System Integration**
+  - Debug build scripts for all lanes with SSH daemon installation
+  - Environment variable injection for SSH configuration
+  - Debug-specific Dockerfile and configuration generation
+  - Integration with existing builder pattern and error handling
+
+- **Nomad Template Enhancements**
+  - Enhanced `RenderData` struct with `IsDebug` flag
+  - `debugTemplateForLane` function for debug template selection
+  - Debug namespace deployment with proper service discovery
+  - Auto-cleanup configuration for debug instances
+
+### Fixed
+- **Builder Function Consistency**
+  - Unified `bytesTrimSpace` utility function across all builders
+  - Fixed function signature conflicts between builder modules
+  - Proper error handling and output trimming for all build processes
+
+### Testing
+- ✅ **Debug Endpoint**: API responds correctly with SSH enabled/disabled
+- ✅ **Lane Support**: All lanes (A-F) properly route to debug builders
+- ✅ **SSH Generation**: Key pairs generated successfully with proper formatting
+- ✅ **Build Integration**: Debug build scripts execute with proper parameters
+- ✅ **VPS Deployment**: Full stack testing on production VPS environment
+- ✅ **Regression Testing**: Existing environment variable functionality unchanged
+
+### Status
+**COMPLETED** - SSH debug build support fully implemented with complete build, deployment, and SSH access capabilities across all Ploy lanes.
+
+The debug system now provides developers with fully-featured debugging environments including SSH access, debugging tools, and proper isolation via Nomad's debug namespace.
+
 ## [2025-08-19] - Nomad Readiness Polling Implementation
 
 ### Added
