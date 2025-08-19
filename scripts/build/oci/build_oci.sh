@@ -42,7 +42,26 @@ else
   echo "Warning: syft not found, skipping comprehensive SBOM generation"
 fi
 
-# Container image signing
-if command -v cosign >/dev/null 2>&1; then cosign sign --yes "$TAG" || true; fi
+# Enhanced keyless OIDC container signing
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../common/signing.sh" ]]; then
+  source "$SCRIPT_DIR/../common/signing.sh"
+  
+  echo "🔐 Enhanced Container Signing Configuration:"
+  print_signing_config
+  
+  echo "🖊️  Signing container with keyless OIDC..."
+  if sign_ploy_artifact "$TAG" "container"; then
+    echo "✅ Container signed successfully: $TAG"
+  else
+    echo "⚠️  Container signing failed, but continuing build"
+  fi
+else
+  # Fallback to basic signing if common functions not available
+  echo "⚠️  Common signing functions not found, using basic signing"
+  if command -v cosign >/dev/null 2>&1; then 
+    cosign sign --yes "$TAG" || true
+  fi
+fi
 
 echo "$TAG"
