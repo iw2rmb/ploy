@@ -60,7 +60,7 @@ build_tools:
 
 # SeaweedFS configuration
 seaweedfs:
-  version: "3.70"
+  version: "3.96"
   master_port: 9333
   volume_port: 8080
   filer_port: 8888

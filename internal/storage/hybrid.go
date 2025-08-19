@@ -16,13 +16,12 @@ type HybridClient struct {
 var _ StorageProvider = (*HybridClient)(nil)
 
 // NewHybridClient creates a new hybrid storage client
-func NewHybridClient(cfg Config) (*Client, error) {
+func NewHybridClient(cfg Config) (*HybridClient, error) {
 	if !cfg.Hybrid.Enabled {
 		return nil, fmt.Errorf("hybrid storage is not enabled")
 	}
 
 	var primary, secondary StorageProvider
-	var err error
 
 	// Create primary provider
 	switch cfg.Hybrid.PrimaryProvider {
@@ -33,7 +32,7 @@ func NewHybridClient(cfg Config) (*Client, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create primary SeaweedFS client: %w", err)
 		}
-		primary = (*SeaweedFSClient)(client)
+		primary = client
 	case "minio":
 		primaryCfg := cfg
 		primaryCfg.Provider = "minio"
@@ -64,7 +63,7 @@ func NewHybridClient(cfg Config) (*Client, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to create secondary SeaweedFS client: %w", err)
 			}
-			secondary = (*SeaweedFSClient)(client)
+			secondary = client
 		}
 	}
 
@@ -74,8 +73,7 @@ func NewHybridClient(cfg Config) (*Client, error) {
 		config:    cfg.Hybrid,
 	}
 
-	// Return as legacy Client type for compatibility
-	return (*Client)(hybrid), nil
+	return hybrid, nil
 }
 
 // StorageProvider interface implementation for HybridClient

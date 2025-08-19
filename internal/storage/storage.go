@@ -65,21 +65,84 @@ type MinIOClient struct {
 // Ensure MinIOClient implements StorageProvider
 var _ StorageProvider = (*MinIOClient)(nil)
 
-// Legacy Client type for backward compatibility
-type Client = MinIOClient
-
-func New(cfg Config) (*Client, error) {
-	switch cfg.Provider {
-	case "seaweedfs":
-		return NewSeaweedFSClient(cfg)
-	case "hybrid":
-		return NewHybridClient(cfg)
-	default: // "minio", "s3", or empty (default to MinIO)
-		return NewMinIOClient(cfg)
-	}
+// UnifiedClient wraps any StorageProvider to provide a unified interface
+type UnifiedClient struct {
+	provider StorageProvider
+	// MinIO-specific fields for backward compatibility
+	S3        *s3.S3
+	Artifacts string
+	Logs      string
+	Cache     string
+	SSE       string
 }
 
-func NewMinIOClient(cfg Config) (*Client, error) {
+// Ensure UnifiedClient implements StorageProvider
+var _ StorageProvider = (*UnifiedClient)(nil)
+
+// Delegate all StorageProvider methods to the wrapped provider
+func (u *UnifiedClient) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*PutObjectResult, error) {
+	return u.provider.PutObject(bucket, key, body, contentType)
+}
+
+func (u *UnifiedClient) UploadArtifactBundle(keyPrefix, artifactPath string) error {
+	return u.provider.UploadArtifactBundle(keyPrefix, artifactPath)
+}
+
+func (u *UnifiedClient) VerifyUpload(key string) error {
+	return u.provider.VerifyUpload(key)
+}
+
+func (u *UnifiedClient) GetObject(bucket, key string) (io.ReadCloser, error) {
+	return u.provider.GetObject(bucket, key)
+}
+
+func (u *UnifiedClient) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
+	return u.provider.ListObjects(bucket, prefix)
+}
+
+func (u *UnifiedClient) GetProviderType() string {
+	return u.provider.GetProviderType()
+}
+
+func (u *UnifiedClient) GetArtifactsBucket() string {
+	return u.provider.GetArtifactsBucket()
+}
+
+// Legacy Client type for backward compatibility
+type Client = UnifiedClient
+
+func New(cfg Config) (*Client, error) {
+	var provider StorageProvider
+	var err error
+
+	switch cfg.Provider {
+	case "seaweedfs":
+		provider, err = NewSeaweedFSClient(cfg)
+	case "hybrid":
+		provider, err = NewHybridClient(cfg)
+	default: // "minio", "s3", or empty (default to MinIO)
+		provider, err = NewMinIOClient(cfg)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	client := &Client{provider: provider}
+
+	// If the provider is MinIOClient, populate compatibility fields
+	if minioClient, ok := provider.(*MinIOClient); ok {
+		client.S3 = minioClient.S3
+		client.Artifacts = minioClient.Artifacts
+		client.Logs = minioClient.Logs
+		client.Cache = minioClient.Cache
+		client.SSE = minioClient.SSE
+	}
+
+	return client, nil
+}
+
+func NewMinIOClient(cfg Config) (*MinIOClient, error) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	if cfg.TLSInsecure {
 		if tr.TLSClientConfig == nil { tr.TLSClientConfig = &tls.Config{} }
@@ -96,7 +159,7 @@ func NewMinIOClient(cfg Config) (*Client, error) {
 	})
 	if err != nil { return nil, fmt.Errorf("create aws session: %w", err) }
 
-	c := &Client{
+	c := &MinIOClient{
 		S3:        s3.New(sess),
 		Artifacts: first(cfg.Buckets.Artifacts, cfg.Bucket),
 		Logs:      cfg.Buckets.Logs,

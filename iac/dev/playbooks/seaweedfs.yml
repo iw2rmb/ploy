@@ -86,21 +86,7 @@
         group: root
         mode: '0644'
 
-    - name: Create SeaweedFS master configuration
-      template:
-        src: ../templates/seaweedfs-master.toml.j2
-        dest: /etc/seaweedfs/master.toml
-        owner: seaweedfs
-        group: seaweedfs
-        mode: '0644'
-
-    - name: Create SeaweedFS filer configuration
-      template:
-        src: ../templates/seaweedfs-filer.toml.j2
-        dest: /etc/seaweedfs/filer.toml
-        owner: seaweedfs
-        group: seaweedfs
-        mode: '0644'
+    # SeaweedFS will run with command-line arguments, no config files needed
 
     - name: Start and enable SeaweedFS master
       systemd:
