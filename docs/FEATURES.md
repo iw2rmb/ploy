@@ -82,13 +82,18 @@ Auto-classified lanes:
 - Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration ✅
 - ✅ **Comprehensive storage upload** to SeaweedFS with artifact bundles (Aug 2025)
 - **Enhanced OPA Policy Enforcement** ✅ (Aug 2025):
+  - **Environment-Specific Policy Framework**: Production, staging, and development environments with tailored security policies
   - **Signature & SBOM Requirements**: All deployments must have cryptographic signatures and SBOMs
-  - **Production SSH Restrictions**: SSH access blocked in production without break-glass approval
-  - **Comprehensive Audit Logging**: Detailed logging for all policy decisions with context
-  - **Environment-Aware Policies**: Different enforcement levels for dev vs production environments
-  - **Debug Build Integration**: Policy enforcement for SSH-enabled debug deployments
-  - **Break-Glass Approval**: Emergency override mechanism for critical production access
-  - Image size caps per lane (planned)
+  - **Production Security Restrictions**: Strict enforcement of key-based/OIDC signing, vulnerability scanning, SSH/debug build controls
+  - **Staging Security Balance**: Core security requirements with warning-based degradation for development efficiency
+  - **Development Flexibility**: Warning-only enforcement with all signing methods accepted for rapid iteration
+  - **Vulnerability Scanning Integration**: Grype-based security analysis for production and staging deployments
+  - **Signing Method Detection**: Automatic analysis of signature types (keyless-oidc, key-based, development)
+  - **Source Repository Validation**: Trusted repository patterns for supply chain security
+  - **Artifact Age Limits**: Maximum 30-day freshness requirements for production deployments
+  - **Environment Normalization**: Intelligent handling of environment name variations
+  - **Comprehensive Audit Logging**: Detailed logging for all policy decisions with environment context
+  - **Break-Glass Approval**: Emergency override mechanism for critical production access with full audit trail
 - **Comprehensive Artifact Integrity Verification** ✅ (Aug 2025):
   - **SHA-256 Checksum Verification**: All uploaded artifacts verified with cryptographic checksums to detect corruption
   - **File Size Validation**: Prevents truncated uploads and ensures complete file transfers to storage
