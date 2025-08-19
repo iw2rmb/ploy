@@ -143,13 +143,14 @@ go run ./tools/lane-pick --path /path/to/project
     - Pull changes on VPS
     - Re-run VPS tests
 10. **Success Actions**: IF all tests pass:
-    - Merge feature branch to main locally
-    - Delete feature branch locally
-    - Pull main branch on VPS
-    - Start Ploy controller on VPS
     - **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
     - **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
     - **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
     - **STACK.md Dependencies**: Update technology stack documentation when adding/changing frameworks or tools
+    - Commit all updates to feature branch locally
+    - Merge feature branch to main locally
+    - Delete feature branch locally
+    - Pull main branch on VPS
+    - Start Ploy controller on VPS
 
 **NO EXCEPTIONS**: Every code change must complete this full protocol. Incomplete updates violate project standards and compromise system integrity.

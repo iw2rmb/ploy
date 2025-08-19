@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## [2025-08-19] - Nomad Readiness Polling Implementation
+
+### Added
+- **Enhanced Nomad Health Monitoring**
+  - Replaced naive readiness checks with proper Nomad API polling
+  - `NomadClient` struct with allocation health monitoring capabilities
+  - Configurable polling intervals and retry logic for allocation status checks
+  - Health validation based on Nomad allocation state and task health
+
+- **Improved Preview System Reliability**
+  - Proper allocation status polling before proxying requests
+  - Retry logic for allocations in pending/starting states
+  - Error handling for failed or dead allocations with meaningful user feedback
+  - Dynamic endpoint discovery based on allocation IP and port mapping
+
+### Fixed
+- **Preview Host Router**
+  - Enhanced `previewHostRouter` to use Nomad client for allocation monitoring
+  - Proper error responses when allocations are unhealthy or unreachable
+  - Replaced simple HTTP checks with comprehensive Nomad API integration
+  - Improved user experience with detailed error messages during deployment
+
+### Technical Details
+- **Nomad Integration**
+  - New `controller/nomad/client.go` with allocation health checking functions
+  - `GetAllocationByName()` function for retrieving allocation details by job name
+  - `IsAllocationHealthy()` function for comprehensive health validation
+  - Integration with existing preview system through enhanced router logic
+
+- **Configuration**
+  - Nomad client configured with standard environment variables
+  - Default polling intervals optimized for responsive preview experience
+  - Error handling patterns consistent with existing controller architecture
+
+### Testing
+- ✅ **Environment Variables API**: All tests pass on VPS with new implementation
+- ✅ **Environment Variables CLI**: All commands working correctly with controller
+- ✅ **Nomad Integration**: Health checking functions validated
+- ✅ **Preview System**: Enhanced routing working with allocation monitoring
+
+### Status
+**COMPLETED** - Phase 1, Step 5 from PLAN.md: "Replace naive readiness with Nomad API polling of alloc health, then proxy"
+
+The preview system now properly validates deployment health through Nomad API before routing traffic, ensuring users only access fully healthy deployments and receive meaningful feedback during the deployment process.
+
 ## [2025-08-18] - Environment Variables Implementation
 
 ### Added

@@ -65,7 +65,11 @@ Auto-classified lanes:
 ⸻
 
 ## 🌐 Routing & Preview
-- Preview: `https://<sha>.<app>.ployd.app` triggers builds
+- **Preview System**: `https://<sha>.<app>.ployd.app` triggers builds
+  - **Nomad Health Monitoring**: Proper allocation health polling before routing ✅
+  - **Smart Readiness**: Replaces naive HTTP checks with Nomad API integration ✅
+  - **Error Handling**: Meaningful feedback for failed/pending deployments ✅
+  - **Dynamic Discovery**: Endpoint detection based on allocation IP/port mapping ✅
 - TTL cleanup for previews (planned)
 - Domains: `manifests/<app>.yaml` configuration
 - TLS: Certbot integration (planned), BYOC supported
@@ -127,7 +131,6 @@ All include `/healthz` on port 8080.
 ⸻
 
 ## 🔮 Next Steps
-- Advanced readiness via Consul/Nomad health
 - Per-app Unikraft recipes
 - Keyless OIDC Cosign integration
 - E2E testing with Nomad cluster
