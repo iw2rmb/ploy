@@ -132,17 +132,22 @@ go run ./tools/lane-pick --path /path/to/project
 2. **TESTS.md Scenarios**: Add comprehensive test scenarios (numbered sequentially) if current functionality lacks coverage
 3. **Test Implementation**: Create executable test scripts for any new scenarios defined in step 6
 4. **Local Testing**: Run relevant tests locally if applicable
-5. **Push Branch**: Push feature branch to GitHub before VPS testing
-6. **VPS Setup**: On VPS, authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT
-7. **VPS Pull**: Pull feature branch on VPS
-8. **VPS Testing**: Run ALL relevant tests on VPS environment
-9. **Error Handling**: IF tests fail:
+    - Run local tests
+    - Push feature branch to GitHub before VPS testing
+5. **VPS Testing**: Run ALL relevant tests on VPS environment
+    - Stop Ploy controller
+    - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT
+    - Pull feature branch
+    - Run ALL relevant tests on VPS environment
+6. **Error Handling**: IF tests fail:
     - Fix errors locally
     - Test locally if applicable
     - Push fixes to feature branch
+    - Stop Ploy controller
     - Pull changes on VPS
+    - Start Ploy controller
     - Re-run VPS tests
-10. **Success Actions**: IF all tests pass:
+7. **Success Actions**: IF all tests pass:
     - **PLAN.md Completion**: Mark corresponding step as completed with ✅ and date if step exists in PLAN.md
     - **CHANGELOG.md Update**: Add dated summary entry following established format with Added/Fixed/Testing sections
     - **FEATURES.md Sync**: Add new feature entries or modify existing ones to reflect current capabilities accurately
@@ -150,6 +155,7 @@ go run ./tools/lane-pick --path /path/to/project
     - Commit all updates to feature branch locally
     - Merge feature branch to main locally
     - Delete feature branch locally
+    - Stop Ploy controller on VPS
     - Pull main branch on VPS
     - Start Ploy controller on VPS
 
