@@ -32,10 +32,24 @@
 
     - name: Download and install Nomad
       block:
+        - name: Check if Nomad is already installed
+          stat:
+            path: /usr/local/bin/nomad
+          register: nomad_binary
+
+        - name: Get current Nomad version (if installed)
+          command: /usr/local/bin/nomad version
+          register: current_nomad_version
+          changed_when: false
+          ignore_errors: true
+          when: nomad_binary.stat.exists
+
         - name: Download Nomad
           get_url:
             url: "https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_linux_amd64.zip"
             dest: /tmp/nomad.zip
+            timeout: 120
+          when: not nomad_binary.stat.exists or nomad_version not in (current_nomad_version.stdout | default(''))
 
         - name: Extract Nomad
           unarchive:
@@ -44,12 +58,23 @@
             remote_src: true
             owner: hashicorp
             group: hashicorp
+            mode: '0755'
+          when: not nomad_binary.stat.exists or nomad_version not in (current_nomad_version.stdout | default(''))
 
         - name: Create Nomad symlink
           file:
             src: /opt/hashicorp/bin/nomad
             dest: /usr/local/bin/nomad
             state: link
+
+        - name: Verify Nomad installation
+          command: /usr/local/bin/nomad version
+          register: nomad_install_version
+          changed_when: false
+
+        - name: Display Nomad version
+          debug:
+            msg: "Nomad installed successfully: {{ nomad_install_version.stdout_lines[0] if nomad_install_version.stdout_lines else 'Version info not available' }}"
 
     - name: Download and install Consul
       block:
@@ -161,6 +186,40 @@
       wait_for:
         port: 4646
         delay: 10
+        timeout: 60
+
+    - name: Verify Nomad server status
+      uri:
+        url: "http://localhost:4646/v1/status/leader"
+        method: GET
+        status_code: 200
+      register: nomad_leader_check
+      retries: 6
+      delay: 10
+      until: nomad_leader_check.status == 200
+
+    - name: Display Nomad leader status
+      debug:
+        msg: "Nomad cluster leader: {{ nomad_leader_check.json | default('Leader election in progress') }}"
+
+    - name: Verify Nomad node status
+      uri:
+        url: "http://localhost:4646/v1/nodes"
+        method: GET
+        status_code: 200
+      register: nomad_nodes_check
+      retries: 3
+      delay: 5
+
+    - name: Display Nomad node count
+      debug:
+        msg: "Nomad nodes registered: {{ nomad_nodes_check.json | length if nomad_nodes_check.json is defined else 0 }}"
+
+    - name: Add ploy user to hashicorp group for Nomad access
+      user:
+        name: ploy
+        groups: hashicorp
+        append: true
 
     - name: Initialize Vault (if not already initialized)
       uri:
@@ -183,14 +242,40 @@
         mode: '0600'
       when: vault_init.status == 200
 
-    - name: Create Nomad job directory
+    - name: Create Nomad job and data directories
       file:
-        path: /opt/hashicorp/nomad/jobs
+        path: "{{ item }}"
         state: directory
         owner: hashicorp
         group: hashicorp
+        mode: '0755'
+      loop:
+        - /opt/hashicorp/nomad/jobs
+        - /opt/hashicorp/nomad/logs
+        - /opt/hashicorp/nomad/alloc
+        - /opt/hashicorp/nomad/client
 
-    - name: Copy Ploy Nomad job templates
+    - name: Create Ploy host volume directories for Nomad
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "/opt/ploy", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/artifacts", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/logs", owner: "ploy", group: "ploy", mode: "0755" }
+
+    - name: Create Nomad log file with proper permissions
+      file:
+        path: /var/log/nomad.log
+        state: touch
+        owner: hashicorp
+        group: hashicorp
+        mode: '0644'
+
+    - name: Copy Ploy Nomad job templates (if they exist)
       copy:
         src: "{{ item }}"
         dest: /opt/hashicorp/nomad/jobs/
@@ -198,3 +283,23 @@
         group: hashicorp
       with_fileglob:
         - "../../platform/nomad/*.hcl"
+      ignore_errors: true
+
+    - name: Create Nomad environment file for systemd
+      copy:
+        content: |
+          # Nomad environment variables
+          NOMAD_ADDR=http://localhost:4646
+          NOMAD_LOG_LEVEL=INFO
+        dest: /etc/nomad.d/nomad.env
+        owner: hashicorp
+        group: hashicorp
+        mode: '0644'
+
+    - name: Set up Nomad CLI access for ploy user
+      lineinfile:
+        path: /home/ploy/.bashrc
+        line: "export NOMAD_ADDR=http://localhost:4646"
+        create: true
+        owner: ploy
+        group: ploy
