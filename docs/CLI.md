@@ -53,16 +53,36 @@ ploy rollback <app> <sha>
 ```
 **Rollback Operations**: Rollback application to a previous SHA version for quick recovery.
 
-### `ploy env` (planned)
+### `ploy env` (implemented)
 ```
 ploy env set <app> <key> <value>
-ploy env set <app> <key> <value> --secret
 ploy env get <app> <key>
 ploy env list <app>
 ploy env delete <app> <key>
-ploy env import <app> <file.env>
 ```
-**Environment Variables**: Manage per-app environment variables available during build and deployment. Use `--secret` flag for sensitive values that will be encrypted.
+**Environment Variables**: Manage per-app environment variables available during build and deployment phases.
+
+**Examples:**
+```bash
+# Set environment variables
+ploy env set myapp NODE_ENV production
+ploy env set myapp DATABASE_URL "postgres://localhost:5432/myapp"
+
+# List all environment variables
+ploy env list myapp
+
+# Get specific variable
+ploy env get myapp NODE_ENV
+
+# Delete variable
+ploy env delete myapp DEBUG
+```
+
+**Features:**
+- Variables available during build process (Gradle, Maven, npm, etc.)
+- Variables injected into runtime environment via Nomad templates
+- Persistent storage across controller restarts
+- Full CRUD operations with user-friendly output
 
 ### `ploy webhooks` (planned)
 ```

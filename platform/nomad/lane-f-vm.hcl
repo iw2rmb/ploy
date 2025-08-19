@@ -1,4 +1,4 @@
-job "lane-f-vm" {
+job "{{APP_NAME}}-lane-f" {
   datacenters = ["dc1"]
   type = "service"
   group "db" {
@@ -7,9 +7,10 @@ job "lane-f-vm" {
     task "vm" {
       driver = "qemu"
       config {
-        image_path = "local/${NOMAD_TASK_DIR}/postgres.img"
+        image_path = "{{IMAGE_PATH}}"
         args = ["-nographic"]
       }
+{{ENV_VARS}}
       resources { cpu = 2000 memory = 4096 }
     }
   }

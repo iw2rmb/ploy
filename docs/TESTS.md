@@ -127,3 +127,28 @@
 52. Secret environment variables encrypted at rest in storage.
 53. Environment variable changes trigger new deployment with updated values.
 54. `ploy env import app .env` imports environment variables from file.
+
+## Environment Variables Implementation (Aug 2025)
+123. `POST /v1/apps/:app/env` with JSON map sets multiple environment variables at once.
+124. `GET /v1/apps/:app/env` returns empty object `{}` for app with no environment variables.
+125. `PUT /v1/apps/:app/env/:key` accepts JSON `{"value":"..."}` and updates single variable.
+126. `DELETE /v1/apps/:app/env/:key` returns 200 status for successful deletion.
+127. `ploy env list app` shows "Environment variables for app X: (none)" when empty.
+128. `ploy env get app KEY` displays `KEY=VALUE` format or "not found" message.
+129. `ploy env set app KEY VALUE` displays "Environment variable KEY set for app".
+130. `ploy env delete app KEY` displays "Environment variable KEY deleted from app".
+131. Environment variables persist across controller restarts via file storage.
+132. Build phase: Environment variables passed to Gradle/Maven/npm build processes.
+133. Build phase: Lane A/B Unikraft builds receive environment variables during compilation.
+134. Build phase: Lane C OSv Java builds can access environment variables in Jib process.
+135. Build phase: Lane D FreeBSD jail builds include environment variables in build context.
+136. Build phase: Lane E OCI builds receive environment variables during Docker build.
+137. Build phase: Lane F VM builds access environment variables during Packer execution.
+138. Deploy phase: Nomad job templates render environment variables in `env {}` blocks.
+139. Deploy phase: Lane C QEMU tasks receive environment variables in runtime.
+140. Deploy phase: Lane E Docker containers receive environment variables via `env` configuration.
+141. Error handling: API returns 400 for malformed JSON in environment variable requests.
+142. Error handling: API returns 500 for storage failures during environment variable operations.
+143. Multiple environment variables: Setting multiple variables preserves existing ones.
+144. Environment variable storage: Files stored in configurable path (default /tmp/ploy-env-store).
+145. Environment variable format: Stored as JSON with proper escaping for special characters.

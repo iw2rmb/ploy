@@ -116,12 +116,13 @@ All include `/healthz` on port 8080.
   - Retry + auth (Bearer/HMAC)
 - **LLM Integration**: Monitor via webhooks, fix via verification branches
 
-## 🌍 Environment Variables (planned)
-- **Management**: `POST/GET/PUT/DELETE /v1/apps/:app/env`
-- **Build-time**: Available during image creation
-- **Runtime**: Injected into deployment environment
-- **Security**: Sensitive values encrypted at rest
-- **CLI**: `ploy env set/get/list/delete` commands
+## 🌍 Environment Variables
+- **Management**: `POST/GET/PUT/DELETE /v1/apps/:app/env` ✅
+- **Build-time**: Available during image creation ✅
+- **Runtime**: Injected into deployment environment ✅
+- **Storage**: File-based persistence with JSON format
+- **CLI**: `ploy env set/get/list/delete` commands ✅
+- **Integration**: All lanes support environment variables in build and deploy phases
 
 ⸻
 
