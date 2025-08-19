@@ -182,6 +182,15 @@
             dest: /usr/local/bin
             remote_src: true
 
+        - name: Verify Syft installation
+          command: /usr/local/bin/syft version
+          register: syft_version
+          changed_when: false
+
+        - name: Display Syft version
+          debug:
+            msg: "Syft installed successfully: {{ syft_version.stdout_lines[1] if syft_version.stdout_lines|length > 1 else 'Version info not available' }}"
+
         - name: Download Grype
           get_url:
             url: "https://github.com/anchore/grype/releases/download/v{{ build_tools.grype.version }}/grype_{{ build_tools.grype.version }}_linux_amd64.tar.gz"
@@ -192,6 +201,15 @@
             src: /tmp/grype.tar.gz
             dest: /usr/local/bin
             remote_src: true
+
+        - name: Verify Grype installation
+          command: /usr/local/bin/grype version
+          register: grype_version
+          changed_when: false
+
+        - name: Display Grype version
+          debug:
+            msg: "Grype installed successfully: {{ grype_version.stdout_lines[0] if grype_version.stdout_lines else 'Version info not available' }}"
 
     - name: Setup MinIO
       block:
