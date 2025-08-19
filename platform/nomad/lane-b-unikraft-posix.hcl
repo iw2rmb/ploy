@@ -25,10 +25,21 @@ job "{{APP_NAME}}-lane-b" {
       service {
         name = "{{APP_NAME}}-lane-b-unikraft-posix"
         port = "http"
-        check { type="http" path="/healthz" interval="5s" timeout="1s" }
+        check { 
+          type = "http" 
+          path = "/healthz" 
+          interval = "5s" 
+          timeout = "1s" 
+        }
       }
-      resources { cpu = 600 memory = 192 }
-      logs { max_files = 5 max_file_size = 10 }
+      resources { 
+        cpu = 600 
+        memory = 192 
+      }
+      logs { 
+        max_files = 5 
+        max_file_size = 10 
+      }
 {{ENV_VARS}}
     }
   }
