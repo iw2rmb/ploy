@@ -81,8 +81,14 @@ Auto-classified lanes:
 - `ploy push` – tar + stream to controller
 - `ploy push --verify --diff` – verification branch testing (planned)
 - `ploy open` – browser launch
-- `ploy env` – manage app environment variables (planned)
-- `ploy domains/certs/debug/rollback` – operations (planned)
+- `ploy env` – manage app environment variables ✅
+- `ploy domains/certs/rollback` – operations ✅
+- **`ploy debug shell` – SSH-enabled debug instances** ✅
+  - **Debug Build System**: Lane-specific debug builds with SSH daemon
+  - **SSH Key Management**: Automatic RSA key pair generation per session
+  - **Debug Isolation**: Nomad debug namespace with 2-hour auto-cleanup
+  - **All Lane Support**: Unikraft, OCI, OSv, and jail debug environments
+  - **Development Tools**: Pre-installed debuggers, profilers, and network tools
 - Workflow: push → build → deploy → open
 - Self-healing loop support for LLM agents
 

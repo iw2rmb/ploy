@@ -15,15 +15,15 @@ Next steps to implement:
 3. ✅ **COMPLETED (2025-08-18)** Fix Python C-extension detection in lane picker (should force Lane C).
 4. ✅ **COMPLETED (2025-08-18)** App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases.
 5. ✅ **COMPLETED (2025-08-19)** Replace naive readiness with Nomad API polling of alloc health, then proxy.
+6. ✅ **COMPLETED (2025-08-19)** Implement debug build with SSH support: Complete implementation of `POST /v1/apps/:app/debug` with SSH key generation, debug builds for all lanes, and Nomad debug namespace deployment.
 
 **Phase 2: Security & Supply Chain Hardening**
-6. Integrate cosign keyless OIDC flow and key management.
-7. Generate SBOM/signature in builders too (not only CI); upload both to storage.
-8. Upload SBOM/signatures to storage after generation in builders.
-9. Implement image size caps per lane in OPA policies.
+7. Integrate cosign keyless OIDC flow and key management.
+8. Generate SBOM/signature in builders too (not only CI); upload both to storage.
+9. Upload SBOM/signatures to storage after generation in builders.
+10. Implement image size caps per lane in OPA policies.
 
 **Phase 3: Platform Enhancement Features**
-10. Implement Unikraft Lane B SSH support: Dropbear library, ssh.enabled flag, key injection.
 11. Add TTL cleanup for preview allocations to prevent resource accumulation.
 12. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
 
