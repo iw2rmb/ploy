@@ -198,3 +198,17 @@
 195. Bundle includes production runtime files (.env.production, config.json).
 196. Memory optimization features included in startup script for unikernels.
 197. Dependency count reporting provides build insights and optimization data.
+
+## Node.js-Specific Unikraft Configuration (Aug 2025)
+198. Node.js applications automatically use B-unikraft-nodejs template instead of generic POSIX.
+199. Non-Node.js applications continue to use standard B-unikraft-posix template.
+200. kraft.yaml generation extracts app name from package.json for Node.js projects.
+201. kraft.yaml generation identifies main entry point from package.json metadata.
+202. Node.js template includes enhanced kernel configuration for V8 runtime support.
+203. Node.js template includes optimized networking configuration for HTTP servers.
+204. Node.js template includes comprehensive threading support for event loop and workers.
+205. Node.js template includes enhanced memory management for V8 garbage collection.
+206. Node.js template includes signal handling and timer support for Node.js processes.
+207. Node.js template includes enhanced device file support (/dev/urandom, etc.).
+208. Node.js configuration includes production runtime optimizations and heap size settings.
+209. Template selection correctly differentiates between Node.js and other applications.

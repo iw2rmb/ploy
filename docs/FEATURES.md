@@ -13,6 +13,12 @@ Auto-classified lanes:
   - `<app>-<sha>.img` deterministic naming
   - SBOM + signature generation
 - **Lane B** – Unikraft POSIX (Node, Python)
+  - **Intelligent Node.js Configuration System** (Aug 2025):
+    - Specialized B-unikraft-nodejs template for Node.js applications
+    - Enhanced V8 runtime support with optimized kernel configuration
+    - Threading and memory management for event loop and worker threads
+    - Advanced networking with IPv4/IPv6 and HTTP server optimizations
+    - Automatic application metadata extraction from package.json
   - Enhanced Node.js runtime support with libelf, musl, lwip libraries
   - Comprehensive V8/Node.js kconfig for POSIX environment, networking, I/O
   - Musl libc with crypto, locale, networking, and complex math support

@@ -1,5 +1,72 @@
 # CHANGELOG
 
+## [2025-08-19] - Node.js-Specific Unikraft Configuration System
+
+### Added
+- **Specialized Node.js Unikraft Template (lanes/B-unikraft-nodejs/kraft.yaml)**
+  - Enhanced kernel configuration specifically optimized for Node.js V8 runtime
+  - Comprehensive threading support for Node.js event loop and worker threads
+  - Advanced memory management configuration for V8 garbage collection
+  - Signal handling and timer support optimized for Node.js processes
+  - Enhanced device file support including /dev/urandom for crypto operations
+
+- **Intelligent Template Selection System**
+  - Automatic detection of Node.js applications via package.json presence
+  - Dynamic template selection: Node.js apps use B-unikraft-nodejs, others use B-unikraft-posix
+  - Backward compatibility maintained for all existing non-Node.js applications
+  - Enhanced gen_kraft_yaml.sh with application-aware configuration generation
+
+- **Node.js Application Metadata Integration**
+  - Automatic extraction of application name from package.json
+  - Main entry point detection and validation from package.json metadata
+  - Application-specific configuration customization based on Node.js project structure
+  - Production runtime optimizations including heap size and environment settings
+
+- **Comprehensive Node.js Runtime Optimizations**
+  - Enhanced networking configuration for HTTP servers with keepalive and socket options
+  - IPv4/IPv6 dual-stack support for modern Node.js networking requirements
+  - pthread-embedded support for Node.js worker_threads and cluster modules
+  - Optimized random number generation for Node.js crypto and security operations
+
+### Enhanced
+- **Template System Architecture**
+  - Modular template selection based on application type and lane requirements
+  - Intelligent fallback mechanisms for missing templates or configuration errors
+  - Application-aware customization with Node.js-specific metadata extraction
+  - Enhanced error handling and template validation for robust configuration generation
+
+- **kraft.yaml Generation Pipeline**
+  - detect_nodejs() function for reliable Node.js application identification
+  - select_template() function with lane and application type awareness
+  - configure_nodejs_template() function for Node.js-specific customizations
+  - Improved sed pattern matching to prevent accidental configuration corruption
+
+### Fixed
+- Template system now properly differentiates between Node.js and other Lane B applications
+- kraft.yaml generation correctly preserves library names and configuration structure
+- Node.js applications receive optimized kernel and runtime configurations
+- Non-Node.js applications continue to use appropriate POSIX configurations without disruption
+
+### Testing
+- ✅ **Template Selection**: Node.js apps use specialized template, others use standard template
+- ✅ **Metadata Extraction**: App name and main entry point correctly extracted from package.json
+- ✅ **Configuration Generation**: Node.js-specific kernel and runtime optimizations applied
+- ✅ **VPS Testing**: All functionality verified on production VPS environment
+- ✅ **Backward Compatibility**: Non-Node.js applications continue to work correctly
+- ✅ **Error Handling**: Graceful fallback when Node.js runtime unavailable
+- Added 12 test scenarios (198-209) covering all Node.js-specific configuration features
+
+### Technical Details
+- **V8 Runtime Support**: Comprehensive kernel configuration for V8 JavaScript engine requirements
+- **Event Loop Optimization**: Threading and scheduler configuration optimized for Node.js event-driven architecture
+- **Memory Management**: Enhanced memory mapping and allocation for V8 garbage collection
+- **Network Performance**: Optimized lwip configuration for Node.js HTTP server performance
+
+### Status
+**COMPLETED** - Phase 2, Step 4 from PLAN.md: "Create Node.js-specific Unikraft configuration within existing template system"
+
+The template system now provides intelligent, application-aware configuration generation with specialized Node.js optimizations while maintaining full backward compatibility for all existing applications across all lanes.
+
 ## [2025-08-19] - Advanced Node.js Dependency Handling & Package Bundling
 
 ### Added
