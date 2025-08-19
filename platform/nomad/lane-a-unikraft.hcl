@@ -9,7 +9,11 @@ job "{{APP_NAME}}-lane-a" {
       delay = "5s" 
       mode = "fail" 
     }
-    network { port "http" { to = 8080 } }
+    network { 
+      port "http" { 
+        to = 8080 
+      } 
+    }
     task "unikernel" {
       driver = "qemu"
       config {
@@ -20,10 +24,21 @@ job "{{APP_NAME}}-lane-a" {
       service {
         name = "{{APP_NAME}}-lane-a-unikraft"
         port = "http"
-        check { type="http" path="/healthz" interval="5s" timeout="1s" }
+        check { 
+          type = "http" 
+          path = "/healthz" 
+          interval = "5s" 
+          timeout = "1s" 
+        }
       }
-      resources { cpu = 500 memory = 128 }
-      logs { max_files = 5 max_file_size = 10 }
+      resources { 
+        cpu = 500 
+        memory = 128 
+      }
+      logs { 
+        max_files = 5 
+        max_file_size = 10 
+      }
     }
   }
 }
