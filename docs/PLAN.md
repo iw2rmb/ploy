@@ -19,16 +19,16 @@ Next steps to implement:
 7. ✅ **COMPLETED (2025-08-19)** Implement app destroy command: `ploy apps destroy --name <app>` CLI command and `DELETE /v1/apps/:app` API endpoint to completely remove all app resources including services, storage, environment variables, domains, certificates, and debug instances.
 
 **Phase 2: Security & Supply Chain Hardening**
-8. Integrate cosign keyless OIDC flow and key management.
-9. Generate SBOM/signature in builders too (not only CI); upload both to storage.
-10. Upload SBOM/signatures to storage after generation in builders.
-11. Implement image size caps per lane in OPA policies.
+1. Integrate cosign keyless OIDC flow and key management.
+2. Generate SBOM/signature in builders too (not only CI); upload both to storage.
+3. Upload SBOM/signatures to storage after generation in builders.
+4. Implement image size caps per lane in OPA policies.
 
 **Phase 3: Platform Enhancement Features**
-12. Add TTL cleanup for preview allocations to prevent resource accumulation.
-13. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
+1. Add TTL cleanup for preview allocations to prevent resource accumulation.
+2. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
 
 **Phase 4: Advanced Self-Healing & Automation**
-14. Diff push with verification: `POST /v1/apps/:app/diff?verify=true` API and `ploy push --verify --diff` CLI to push diffs that create temporary git branches for isolated testing.
-15. Webhook system: `POST /v1/apps/:app/webhooks` API to configure per-app webhooks for build/deploy events, enabling external LLM agents to monitor and react to deployment status.
-16. Fill Unikraft per-app recipes and POSIX shim for lane B.
+1. Diff push with verification: `POST /v1/apps/:app/diff?verify=true` API and `ploy push --verify --diff` CLI to push diffs that create temporary git branches for isolated testing.
+2. Webhook system: `POST /v1/apps/:app/webhooks` API to configure per-app webhooks for build/deploy events, enabling external LLM agents to monitor and react to deployment status.
+3. Fill Unikraft per-app recipes and POSIX shim for lane B.
