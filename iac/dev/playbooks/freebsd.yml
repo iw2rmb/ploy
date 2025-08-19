@@ -146,9 +146,8 @@
         create: true
 
     - name: Load bhyve kernel module
-      kld:
-        name: vmm
-        state: present
+      command: kldload vmm
+      ignore_errors: true
 
     - name: Create jails configuration directory
       file:

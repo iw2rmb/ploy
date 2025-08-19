@@ -222,6 +222,19 @@
         shell: /bin/bash
         create_home: true
 
+    - name: Set GitHub environment variables for ploy user
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # GitHub environment variables for Ploy development
+          export GITHUB_PLOY_DEV_USERNAME="{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
+          export GITHUB_PLOY_DEV_PAT="{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - GitHub env vars"
+
     - name: Clone Ploy repository
       git:
         repo: https://github.com/ploy/ploy.git
