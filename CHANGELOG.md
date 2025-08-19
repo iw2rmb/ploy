@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [2025-08-19] - Enhanced Keyless OIDC Integration (Phase 3 Step 5)
+
+### Added
+- **Advanced Keyless OIDC Signing System**
+  - Comprehensive signing module with intelligent provider detection
+  - Auto-configuration for GitHub Actions, GitLab CI, Buildkite, and Google Cloud OIDC
+  - Enhanced cosign integration with improved timeout and error handling
+  - Certificate generation and transparency log control for production use
+  - Common signing functions for consistent behavior across all deployment lanes
+
+- **Multi-Environment OIDC Support**
+  - Interactive device flow for development environments
+  - Non-interactive CI/CD pipeline integration with automatic provider detection
+  - Fallback modes for environments without OIDC support
+  - Environment-specific configuration management
+
+- **Enhanced Build Script Integration**
+  - Updated all build scripts to use enhanced keyless OIDC signing
+  - Standardized signing configuration across Unikraft, OCI, jail, and VM builds
+  - Improved error handling and graceful fallbacks for signing failures
+  - Comprehensive logging and debugging information for OIDC operations
+
+### Fixed
+- **OIDC Configuration Robustness**
+  - Fixed unbound variable issues in shell scripts for non-CI environments
+  - Improved parameter expansion syntax for better shell compatibility
+  - Enhanced error handling for network timeouts and connectivity issues
+  - Graceful degradation when transparency log upload fails
+
+### Testing
+- ✅ VPS environment OIDC integration validated with Google account authentication
+- ✅ Device flow authentication tested and working correctly
+- ✅ Keyless signing with ephemeral certificate generation verified
+- ✅ Multi-lane OIDC support tested across Unikraft, jail, and container builds
+- ✅ Transparency log integration tested (with graceful timeout handling)
+- ✅ Development and production environment modes validated
+
 ## [2025-08-19] - Production-Ready SBOM Generation (Phase 3 Step 3)
 
 ### Added
