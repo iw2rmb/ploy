@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,7 +31,9 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 	tarPath := filepath.Join(tmpDir, "src.tar")
 	f, _ := os.Create(tarPath)
 	defer f.Close()
-	io.Copy(f, c.Context().RequestBodyStream())
+	if _, err := f.Write(c.Body()); err != nil {
+		return c.Status(400).SendString("Failed to read request body: " + err.Error())
+	}
 
 	srcDir := filepath.Join(tmpDir, "src")
 	os.MkdirAll(srcDir, 0755)

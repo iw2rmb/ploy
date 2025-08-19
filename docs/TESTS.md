@@ -212,3 +212,12 @@
 207. Node.js template includes enhanced device file support (/dev/urandom, etc.).
 208. Node.js configuration includes production runtime optimizations and heap size settings.
 209. Template selection correctly differentiates between Node.js and other applications.
+
+## Node.js Lane B Testing (Aug 2025)
+210. `ploy push` with apps/node-hello successfully detects Lane B automatically.
+211. Lane detection processes package.json and identifies "node" language correctly.
+212. Build pipeline progresses through tar processing and lane picker validation.
+213. Controller handles Node.js application tar upload without errors.
+214. OPA policy validation triggers correctly for unsigned artifacts.
+215. Forced Lane C with Node.js app fails appropriately with Jib error.
+216. Controller logs show proper Lane B detection and processing flow.
