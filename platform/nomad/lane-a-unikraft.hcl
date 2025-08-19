@@ -3,7 +3,12 @@ job "{{APP_NAME}}-lane-a" {
   type = "service"
   group "app" {
     count = 2
-    restart { attempts = 3; interval = "30s"; delay = "5s"; mode = "fail" }
+    restart { 
+      attempts = 3 
+      interval = "30s" 
+      delay = "5s" 
+      mode = "fail" 
+    }
     network { port "http" { to = 8080 } }
     task "unikernel" {
       driver = "qemu"
