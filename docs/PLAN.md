@@ -16,7 +16,7 @@ Next steps to implement:
 4. ✅ **COMPLETED (2025-08-18)** App environment variables: `POST/GET/PUT/DELETE /v1/apps/:app/env` API and `ploy env` CLI commands to manage per-app environment variables that are available during build and deploy phases.
 5. ✅ **COMPLETED (2025-08-19)** Replace naive readiness with Nomad API polling of alloc health, then proxy.
 6. ✅ **COMPLETED (2025-08-19)** Implement debug build with SSH support: Complete implementation of `POST /v1/apps/:app/debug` with SSH key generation, debug builds for all lanes, and Nomad debug namespace deployment.
-7. Implement app destroy command: `ploy apps destroy --name <app>` CLI command and `DELETE /v1/apps/:app` API endpoint to completely remove all app resources including services, storage, environment variables, domains, certificates, and debug instances.
+7. ✅ **COMPLETED (2025-08-19)** Implement app destroy command: `ploy apps destroy --name <app>` CLI command and `DELETE /v1/apps/:app` API endpoint to completely remove all app resources including services, storage, environment variables, domains, certificates, and debug instances.
 
 **Phase 2: Security & Supply Chain Hardening**
 8. Integrate cosign keyless OIDC flow and key management.
