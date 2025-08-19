@@ -62,6 +62,12 @@ Auto-classified lanes:
   - **Automatic Integration**: Seamless signing immediately after successful builds
   - **Smart Prevention**: Avoids duplicate signing by checking existing signatures
   - **Cosign Compatible**: Full support for cosign key management and OIDC flows
+- **Comprehensive Signature File Generation** ✅ (Aug 2025):
+  - **Universal .sig Files**: All build scripts generate signature files for every artifact
+  - **Debug Variant Support**: Debug builds include signature generation alongside main builds  
+  - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
+  - **Consistent SBOM Generation**: .sbom.json files created with supply chain metadata
+  - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
 - SBOM generation (Syft), vulnerability scans (Grype), signing (Cosign)
 - Storage upload to object storage (planned)
 - OPA policy enforcement:
