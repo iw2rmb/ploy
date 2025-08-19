@@ -152,3 +152,24 @@
 143. Multiple environment variables: Setting multiple variables preserves existing ones.
 144. Environment variable storage: Files stored in configurable path (default /tmp/ploy-env-store).
 145. Environment variable format: Stored as JSON with proper escaping for special characters.
+
+## App Destroy Command Implementation (Aug 2025)
+146. `ploy apps destroy --name <app>` stops all running services for the specified app.
+147. App destroy removes all Nomad jobs (main, preview, debug) associated with the app.
+148. App destroy deletes all environment variables stored for the app.
+149. App destroy removes all domain registrations associated with the app.
+150. App destroy revokes and deletes all certificates associated with the app.
+151. App destroy cleans up all storage artifacts (images, tars, SBOMs) for the app.
+152. App destroy removes container images from registry (harbor.local/ploy/<app>:*).
+153. App destroy deletes source code copies and build artifacts from temporary directories.
+154. `DELETE /v1/apps/:app` API endpoint performs complete app resource cleanup.
+155. App destroy command requires confirmation prompt before proceeding with destruction.
+156. App destroy fails gracefully if app does not exist with clear error message.
+157. App destroy logs all cleanup operations for audit trail and debugging.
+158. App destroy verifies Nomad job deletion completion before proceeding to storage cleanup.
+159. App destroy handles partial failures by continuing cleanup and reporting issues.
+160. App destroy removes debug instances and SSH keys associated with the app.
+161. App destroy operation is atomic where possible to prevent incomplete cleanup.
+162. App destroy command supports --force flag to bypass confirmation prompts.
+163. CLI displays progress during destroy operation with clear status messages.
+164. API returns detailed JSON response with cleanup status for each resource type.
