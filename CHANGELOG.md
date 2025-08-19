@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [2025-08-19] - Enhanced Environment-Specific Policy Enforcement (Phase 4 Step 4)
+
+### Added
+- **Environment-Aware Policy Enforcement System**
+  - Production environment policies with strict security requirements
+  - Staging environment policies with moderate security and warnings
+  - Development environment policies with relaxed enforcement and warnings-only
+  - Environment normalization handling variations (prod/production/live → production)
+
+### Enhanced
+- **Sophisticated OPA Policy Framework**
+  - Vulnerability scanning integration using Grype for production and staging deployments
+  - Signing method detection analyzing certificates and signature files (keyless-oidc, key-based, development)
+  - Source repository validation against trusted organization patterns
+  - Artifact age validation enforcing maximum 30-day freshness for production
+  - Break-glass approval mechanism for emergency policy overrides
+
+### Security Features
+- **Production Environment Restrictions**
+  - Mandatory cryptographic signing with key-based or OIDC methods (no development signatures)
+  - Required vulnerability scanning with blocking on medium+ severity issues
+  - SSH access and debug builds blocked without break-glass approval
+  - Trusted source repository validation for supply chain security
+- **Staging Environment Policies**
+  - Core security requirements enforced with warning-based degradation
+  - Development signatures allowed but logged for security awareness
+  - SSH and debug builds permitted with comprehensive audit logging
+- **Development Environment Flexibility**
+  - Warning-only enforcement for rapid development workflows
+  - All signing methods accepted including development signatures
+  - Vulnerability scanning bypassed for build performance optimization
+
+### Testing
+- Added comprehensive test scenarios (Tests 281-300) for environment-specific policy enforcement
+- Created enhanced policy enforcement test script with environment variation testing
+- Verified production, staging, and development policy differentiation on VPS
+- Validated vulnerability scanning integration, signing method detection, and break-glass mechanisms
+
 ## [2025-08-19] - Lane-Specific Image Size Caps Implementation (Phase 4 Step 3)
 
 ### Added
