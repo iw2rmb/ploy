@@ -19,7 +19,7 @@ Next steps to implement:
 7. ✅ **COMPLETED (2025-08-19)** Implement app destroy command: `ploy apps destroy --name <app>` CLI command and `DELETE /v1/apps/:app` API endpoint to completely remove all app resources including services, storage, environment variables, domains, certificates, and debug instances.
 
 **Phase 2: Lane B (Node.js Unikraft) Enhancement**
-1. Enhance `lanes/B-unikraft-posix/kraft.yaml` with Node.js runtime libraries and configuration.
+1. ✅ **COMPLETED (2025-08-19)** Enhance `lanes/B-unikraft-posix/kraft.yaml` with Node.js runtime libraries and configuration.
 2. Extend `build/kraft/build_unikraft.sh` with Node.js detection and build steps.
 3. Add Node.js dependency handling (npm install, package bundling) to build process.
 4. Create Node.js-specific Unikraft configuration within existing template system.

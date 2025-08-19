@@ -13,7 +13,10 @@ Auto-classified lanes:
   - `<app>-<sha>.img` deterministic naming
   - SBOM + signature generation
 - **Lane B** – Unikraft POSIX (Node, Python)
-  - Musl libc POSIX layer
+  - Enhanced Node.js runtime support with libelf, musl, lwip libraries
+  - Comprehensive V8/Node.js kconfig for POSIX environment, networking, I/O
+  - Musl libc with crypto, locale, networking, and complex math support
+  - Optimized lwip networking stack with TCP/UDP, DHCP, threading
   - Dropbear SSH for debug (planned)
 - **Lane C** – OSv Java/Scala
   - Jib → Capstan → `<app>-<sha>.qcow2`
