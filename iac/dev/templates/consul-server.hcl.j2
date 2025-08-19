@@ -5,8 +5,10 @@ node_name = "consul-server"
 server = true
 bootstrap_expect = 1
 
-bind_addr = "0.0.0.0"
+# Bind to the primary network interface (auto-detected or specify manually)
+bind_addr = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
 client_addr = "0.0.0.0"
+advertise_addr = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
 
 ports {
   grpc = 8502
@@ -24,3 +26,10 @@ acl = {
   enabled = false
   default_policy = "allow"
 }
+
+# Performance and retry configurations
+performance {
+  raft_multiplier = 1
+}
+
+retry_join = ["{{ ansible_default_ipv4.address | default('127.0.0.1') }}"]
