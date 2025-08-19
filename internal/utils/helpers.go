@@ -1,0 +1,100 @@
+package utils
+
+import (
+	"archive/tar"
+	"compress/gzip"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+type LanePickResult struct {
+	Lane     string   `json:"lane"`
+	Language string   `json:"language"`
+	Reasons  []string `json:"reasons"`
+}
+
+func Getenv(k, d string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return d
+}
+
+func FileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+func ErrJSON(c *fiber.Ctx, code int, err error) error {
+	return c.Status(code).JSON(fiber.Map{"error": err.Error()})
+}
+
+func IsHealthy(url string) bool {
+	client := &http.Client{Timeout: 1 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == 200
+}
+
+func Untar(tarPath, dst string) error {
+	f, err := os.Open(tarPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	
+	var r io.Reader = f
+	if strings.HasSuffix(tarPath, ".gz") {
+		gzr, _ := gzip.NewReader(f)
+		defer gzr.Close()
+		r = gzr
+	}
+	
+	tr := tar.NewReader(r)
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		
+		p := filepath.Join(dst, h.Name)
+		if h.FileInfo().IsDir() {
+			os.MkdirAll(p, 0755)
+			continue
+		}
+		
+		os.MkdirAll(filepath.Dir(p), 0755)
+		out, _ := os.Create(p)
+		io.Copy(out, tr)
+		out.Close()
+	}
+	return nil
+}
+
+func RunLanePick(path string) (LanePickResult, error) {
+	cmd := exec.Command("go", "run", "./tools/lane-pick", "--path", path)
+	b, err := cmd.Output()
+	if err != nil {
+		return LanePickResult{}, err
+	}
+	
+	var res LanePickResult
+	if err := json.Unmarshal(b, &res); err != nil {
+		return LanePickResult{}, err
+	}
+	return res, nil
+}

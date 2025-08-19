@@ -21,7 +21,7 @@
 14. TTL cleanup for preview allocations.
 
 ## CLI
-15. `ploy push` from Git repo: lane-pick, build, sign, deploy dev.
+15. `ploy push` from Git repo: lane-pick, build, sign, deploy.
 16. `ploy domains add app domain` updates Consul and ingress.
 17. `ploy certs issue domain` obtains cert via ACME HTTP-01.
 18. `ploy debug shell app` builds debug variant with SSH and prints command.
