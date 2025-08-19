@@ -311,3 +311,25 @@
 278. Debug builds follow same size restrictions as production builds for consistency.
 279. Break-glass approval can override size caps for emergency deployments in production.
 280. Size measurement logging provides audit trail for capacity planning and optimization.
+
+## Enhanced Environment-Specific Policy Enforcement (Aug 2025)
+281. Production environment deployments require strict cryptographic signing (no development signatures).
+282. Production environment deployments require vulnerability scanning to pass before deployment.
+283. Production environment blocks SSH access without break-glass approval for security.
+284. Production environment blocks debug builds without break-glass approval for security.
+285. Production environment enforces artifact age limits (maximum 30 days old).
+286. Production environment validates source repository trust against organization policies.
+287. Staging environment allows development signatures but logs security warnings.
+288. Staging environment recommends vulnerability scanning but does not block on failure.
+289. Staging environment allows SSH and debug builds with audit logging.
+290. Development environment allows relaxed policies with warning-only enforcement.
+291. Development environment bypasses vulnerability scanning for build performance.
+292. Development environment accepts all signing methods including development signatures.
+293. Environment classification normalizes variations (prod/production/live → production).
+294. Policy enforcement determines signing method from certificate and signature analysis.
+295. Vulnerability scanning integration uses Grype for security analysis when available.
+296. Source repository extraction analyzes .git/config and package.json for origin information.
+297. Enhanced OPA input includes vulnerability scan results and signing method metadata.
+298. Policy violation messages indicate specific environment requirements and violations.
+299. Audit logging captures all policy decisions with environment context for compliance.
+300. Break-glass approval mechanism allows emergency overrides with comprehensive logging.

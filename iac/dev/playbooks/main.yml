@@ -114,21 +114,11 @@
         state: present
 
     - name: Install Node.js and npm
-      block:
-        - name: Add NodeSource GPG key
-          apt_key:
-            url: https://deb.nodesource.com/gpgkey/nodesource.gpg.key
-            state: present
-
-        - name: Add NodeSource repository
-          apt_repository:
-            repo: "deb https://deb.nodesource.com/node_18.x {{ ansible_distribution_release }} main"
-            state: present
-
-        - name: Install Node.js
-          apt:
-            name: nodejs
-            state: present
+      apt:
+        name:
+          - nodejs
+          - npm
+        state: present
 
     - name: Install Java 17
       apt:
@@ -270,7 +260,7 @@
 
     - name: Clone Ploy repository
       git:
-        repo: https://github.com/ploy/ploy.git
+        repo: https://github.com/iw2rmb/ploy.git
         dest: /home/ploy/ploy
         force: true
       become_user: ploy
