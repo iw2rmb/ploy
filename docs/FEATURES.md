@@ -68,12 +68,18 @@ Auto-classified lanes:
   - **Cross-Lane Coverage**: SBOM generation verified across Unikraft (A/B), jails (D), containers (E), VMs (F)
   - **Source & Artifact Analysis**: Generates SBOMs for both source dependencies and built artifacts
   - **Supply Chain Metadata**: Includes checksums, timestamps, tool versions, and artifact relationships
+- **Enhanced Keyless OIDC Integration** ✅ (Aug 2025):
+  - **Multi-Provider OIDC Support**: Auto-detection for GitHub Actions, GitLab CI, Buildkite, Google Cloud
+  - **Device Flow Authentication**: Interactive and non-interactive signing modes with automatic detection
+  - **Certificate Management**: Ephemeral certificate generation from Fulcio with transparency log integration
+  - **Environment Adaptability**: Production keyless OIDC, development fallbacks, CI/CD pipeline optimization
+  - **Enhanced Error Handling**: Graceful timeout handling, network resilience, comprehensive logging
 - **Comprehensive Signature File Generation** ✅ (Aug 2025):
   - **Universal .sig Files**: All build scripts generate signature files for every artifact
   - **Debug Variant Support**: Debug builds include signature generation alongside main builds  
   - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
   - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
-- Vulnerability scans (Grype), keyless signing (Cosign) with OIDC integration ✅
+- Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration ✅
 - Storage upload to object storage (planned)
 - OPA policy enforcement:
   - Requires signature + SBOM ✅
