@@ -20,12 +20,12 @@ setup_github_oidc() {
         export COSIGN_OIDC_CLIENT_ID="sigstore"
         
         # GitHub Actions provides these automatically
-        if [[ -n "$GITHUB_TOKEN" ]]; then
+        if [[ -n "${GITHUB_TOKEN:-}" ]]; then
             export COSIGN_OIDC_TOKEN="$GITHUB_TOKEN"
         fi
         
         # Set identity for verification
-        if [[ -n "$GITHUB_REPOSITORY" ]]; then
+        if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
             export COSIGN_VERIFY_IDENTITY_REGEXP="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/.*"
         fi
         
@@ -42,12 +42,12 @@ setup_gitlab_oidc() {
         export COSIGN_OIDC_CLIENT_ID="sigstore"
         
         # GitLab provides CI_JOB_JWT_V2 for OIDC
-        if [[ -n "$CI_JOB_JWT_V2" ]]; then
+        if [[ -n "${CI_JOB_JWT_V2:-}" ]]; then
             export COSIGN_OIDC_TOKEN="$CI_JOB_JWT_V2"
         fi
         
         # Set identity for verification
-        if [[ -n "$CI_PROJECT_URL" ]]; then
+        if [[ -n "${CI_PROJECT_URL:-}" ]]; then
             export COSIGN_VERIFY_IDENTITY_REGEXP="${CI_PROJECT_URL}/.gitlab-ci.yml.*"
         fi
         
@@ -64,7 +64,7 @@ setup_buildkite_oidc() {
         export COSIGN_OIDC_CLIENT_ID="sigstore"
         
         # Set identity for verification  
-        if [[ -n "$BUILDKITE_ORGANIZATION_SLUG" && -n "$BUILDKITE_PIPELINE_SLUG" ]]; then
+        if [[ -n "${BUILDKITE_ORGANIZATION_SLUG:-}" && -n "${BUILDKITE_PIPELINE_SLUG:-}" ]]; then
             export COSIGN_VERIFY_IDENTITY_REGEXP="https://buildkite.com/${BUILDKITE_ORGANIZATION_SLUG}/${BUILDKITE_PIPELINE_SLUG}.*"
         fi
         
@@ -75,7 +75,7 @@ setup_buildkite_oidc() {
 
 # Google Cloud OIDC configuration
 setup_google_oidc() {
-    if [[ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]] || [[ -n "$GCLOUD_PROJECT" ]]; then
+    if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]] || [[ -n "${GCLOUD_PROJECT:-}" ]]; then
         echo "🔧 Configuring Google Cloud OIDC..."
         export COSIGN_OIDC_PROVIDER="google"
         export COSIGN_OIDC_CLIENT_ID="sigstore"
@@ -94,7 +94,7 @@ setup_interactive_oidc() {
     export COSIGN_OIDC_CLIENT_ID=${COSIGN_OIDC_CLIENT_ID:-"sigstore"}
     
     # Enable device flow for non-interactive environments
-    if [[ ! -t 0 ]] || [[ -n "$CI" ]]; then
+    if [[ ! -t 0 ]] || [[ -n "${CI:-}" ]]; then
         echo "🔄 Non-interactive environment detected, using device flow"
         export COSIGN_FULCIO_AUTH_FLOW="device"
     fi
@@ -137,7 +137,7 @@ print_oidc_config() {
     echo "   COSIGN_TLOG_UPLOAD: ${COSIGN_TLOG_UPLOAD:-not set}"
     echo "   COSIGN_TIMEOUT: ${COSIGN_TIMEOUT:-not set}"
     
-    if [[ -n "$COSIGN_VERIFY_IDENTITY_REGEXP" ]]; then
+    if [[ -n "${COSIGN_VERIFY_IDENTITY_REGEXP:-}" ]]; then
         echo "   Identity verification pattern: ${COSIGN_VERIFY_IDENTITY_REGEXP}"
     fi
 }
