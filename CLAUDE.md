@@ -2,7 +2,7 @@
 
 Guidance for Claude Code (claude.ai/code) when working in this repository.
 
-Must be followed for every prompt execution.
+This file must be followed for every prompt execution.
 
 ## Project Overview
 
@@ -28,6 +28,7 @@ Auto-selects optimal lane from project structure unless overridden.
   - SCENARIOS.md — test scenarios.
   - FEATURES.md — feature list.
   - TESTS.md — test scenarios to implement.
+- `CHANGELOG.md` — dated change log with Added/Fixed/Testing sections.
 
 Documents must be consistent.
 Update related documents for every prompt.
@@ -49,7 +50,11 @@ Example: feature changes must update FEATURES.md.
 Setup: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
 Test: `ssh root@$TARGET_HOST && su - ploy && ./test-scripts/test-*.sh`
 
-**IMPORTANT**: Always use `$TARGET_HOST` environment variable instead of hardcoded IP addresses when accessing the development VPS. This ensures consistent environment management and avoids IP address exposure in commands.
+**VPS Access Protocol**: 
+- Always connect to VPS as root user: `ssh root@$TARGET_HOST`
+- Switch to ploy user for all operations: `su - ploy -c 'command'` or `su - ploy` then execute commands
+- The ploy user owns the repository and has proper permissions for testing and execution
+- Always use `$TARGET_HOST` environment variable instead of hardcoded IP addresses
 
 ## Development Commands
 
