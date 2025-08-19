@@ -277,3 +277,20 @@
 248. SBOM generation gracefully handles missing syft tool without failing builds.
 249. Generated SBOMs include timestamps, tool versions, and supply chain metadata.
 250. Build scripts generate both artifact SBOMs and source dependency SBOMs for complete coverage.
+
+## Artifact Integrity Verification Implementation (Aug 2025)
+251. Storage client performs checksum verification after uploading artifacts to SeaweedFS.
+252. Build handler verifies uploaded file sizes match local file sizes for all artifacts.
+253. Integrity verification validates uploaded signatures match their corresponding artifacts.
+254. SBOM validation ensures uploaded SBOMs are properly formatted JSON and complete.
+255. Bundle verification confirms all expected files (artifact, SBOM, signature, certificate) are present in storage.
+256. Checksum verification uses SHA-256 hashes to detect data corruption during upload.
+257. Size verification prevents truncated uploads and ensures complete file transfers.
+258. Signature verification validates cosign signatures against uploaded artifacts using public keys.
+259. SBOM validation checks JSON schema compliance and required metadata fields.
+260. Complete bundle verification ensures artifact bundles contain all required security artifacts.
+261. Integrity verification provides detailed error reporting for failed validation steps.
+262. Build process fails gracefully when integrity verification detects corrupted uploads.
+263. Retry logic handles temporary storage issues and reattempts verification up to 3 times.
+264. Debug builds include integrity verification for SSH keys and configuration files.
+265. Verification logs provide audit trail for all integrity checks and validation results.
