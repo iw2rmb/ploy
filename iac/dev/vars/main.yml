@@ -57,3 +57,22 @@ build_tools:
     version: "0.100.0"
   grype:
     version: "0.74.0"
+
+# SeaweedFS configuration
+seaweedfs:
+  version: "3.70"
+  master_port: 9333
+  volume_port: 8080
+  filer_port: 8888
+  
+  # Collection configuration for different artifact types
+  collections:
+    artifacts:
+      name: "ploy-artifacts"
+      replication: "001"  # Single copy for large build artifacts
+    metadata:
+      name: "ploy-metadata"
+      replication: "010"  # Replicated for small critical files (SBOMs, sigs, certs)
+    debug:
+      name: "ploy-debug"
+      replication: "000"  # No replication for ephemeral debug artifacts
