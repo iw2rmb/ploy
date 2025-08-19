@@ -62,13 +62,18 @@ Auto-classified lanes:
   - **Automatic Integration**: Seamless signing immediately after successful builds
   - **Smart Prevention**: Avoids duplicate signing by checking existing signatures
   - **Cosign Compatible**: Full support for cosign key management and OIDC flows
+- **Production-Ready SBOM Generation** ✅ (Aug 2025):
+  - **Comprehensive SBOM Support**: All build scripts generate SBOM files using modern syft scan command
+  - **Multi-Format Output**: SPDX-JSON for Unikraft lanes, JSON for other lanes with full metadata
+  - **Cross-Lane Coverage**: SBOM generation verified across Unikraft (A/B), jails (D), containers (E), VMs (F)
+  - **Source & Artifact Analysis**: Generates SBOMs for both source dependencies and built artifacts
+  - **Supply Chain Metadata**: Includes checksums, timestamps, tool versions, and artifact relationships
 - **Comprehensive Signature File Generation** ✅ (Aug 2025):
   - **Universal .sig Files**: All build scripts generate signature files for every artifact
   - **Debug Variant Support**: Debug builds include signature generation alongside main builds  
   - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
-  - **Consistent SBOM Generation**: .sbom.json files created with supply chain metadata
   - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
-- SBOM generation (Syft), vulnerability scans (Grype), signing (Cosign)
+- Vulnerability scans (Grype), keyless signing (Cosign) with OIDC integration ✅
 - Storage upload to object storage (planned)
 - OPA policy enforcement:
   - Requires signature + SBOM ✅

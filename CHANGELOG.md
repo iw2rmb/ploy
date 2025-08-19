@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2025-08-19] - Production-Ready SBOM Generation (Phase 3 Step 3)
+
+### Added
+- **Comprehensive SBOM Generation**
+  - Updated all build scripts to use modern `syft scan` command instead of deprecated `syft packages`
+  - Fixed SBOM generation compatibility with syft 0.100.0+ versions
+  - Enhanced SBOM generation across all deployment lanes (A, B, C, D, E, F)
+  - Verified SBOM generation works for Unikraft, FreeBSD jails, OCI containers, and VM images
+  - SBOM files generated in both SPDX-JSON and JSON formats with comprehensive metadata
+
+- **Supply Chain Security Testing**
+  - Validated SBOM generation on VPS environment with real artifacts
+  - Confirmed cosign integration for artifact signing alongside SBOM generation
+  - Tested multi-lane SBOM support ensuring coverage across all build paths
+
+### Fixed
+- **SBOM Generation Script Updates**
+  - Removed deprecated `--catalogers all` and `--select-catalogers` flags from syft commands
+  - Fixed unbound variable issues in APP_DIR handling for source directory SBOM generation
+  - Updated syft command syntax to be compatible with current syft versions
+  - Ensured graceful fallback when syft tool is not available
+
+### Testing
+- ✅ VPS environment setup with syft 0.100.0 verified
+- ✅ Unikraft build SBOM generation (Lane A/B) tested with SPDX-JSON format
+- ✅ FreeBSD jail SBOM generation (Lane D) tested with JSON format  
+- ✅ VM/Packer SBOM generation (Lane F) tested with JSON format
+- ✅ Cosign artifact signing integration verified across all lanes
+- ✅ SBOM files contain proper metadata, checksums, and supply chain information
+
 ## [2025-08-19] - Comprehensive Signature File Generation
 
 ### Added
