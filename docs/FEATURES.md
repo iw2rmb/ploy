@@ -78,6 +78,12 @@ Auto-classified lanes:
 
 ## 👩‍💻 CLI (Go + Bubble Tea)
 - `ploy apps new` – scaffold with /healthz
+- **`ploy apps destroy` – comprehensive app destruction** ✅
+  - **Safety First**: Interactive confirmation with detailed resource warnings
+  - **Complete Cleanup**: Nomad jobs, environment variables, containers, temp files
+  - **Force Mode**: `--force` flag for automated workflows and CI/CD
+  - **Status Reporting**: Detailed operation results with per-resource status
+  - **Error Resilience**: Continues cleanup even if individual operations fail
 - `ploy push` – tar + stream to controller
 - `ploy push --verify --diff` – verification branch testing (planned)
 - `ploy open` – browser launch
@@ -89,7 +95,7 @@ Auto-classified lanes:
   - **Debug Isolation**: Nomad debug namespace with 2-hour auto-cleanup
   - **All Lane Support**: Unikraft, OCI, OSv, and jail debug environments
   - **Development Tools**: Pre-installed debuggers, profilers, and network tools
-- Workflow: push → build → deploy → open
+- Workflow: push → build → deploy → open → destroy
 - Self-healing loop support for LLM agents
 
 ⸻

@@ -1,5 +1,66 @@
 # CHANGELOG
 
+## [2025-08-19] - App Destroy Command Implementation
+
+### Added
+- **Comprehensive App Destruction System**
+  - `DELETE /v1/apps/:app` API endpoint for complete app resource cleanup
+  - `ploy apps destroy --name <app>` CLI command with confirmation prompt
+  - `--force` flag to bypass confirmation for automated workflows
+  - Structured operation status reporting with detailed cleanup progress
+
+- **Multi-Resource Cleanup Framework**
+  - **Nomad Jobs**: Stop and purge all related jobs (main, preview, debug instances)
+  - **Environment Variables**: Complete removal of all app-specific environment variables
+  - **Container Images**: Docker image cleanup from registry (harbor.local/ploy/<app>:*)
+  - **Temporary Files**: Cleanup of build artifacts, SSH keys, and debug session files
+  - **Framework for Future**: Domains, certificates, and storage artifact cleanup
+
+- **Enhanced CLI User Experience**
+  - Interactive confirmation prompt with detailed warning about resources to be destroyed
+  - Progress indicators during destruction operations
+  - Color-coded status messages with emoji indicators
+  - Detailed operation results with per-resource status reporting
+  - Error handling with graceful degradation for missing dependencies
+
+### Technical Details
+- **Atomic Operations**: Each cleanup operation is isolated to prevent cascade failures
+- **Error Resilience**: Continues cleanup even if individual operations fail
+- **Audit Trail**: Comprehensive logging of all destruction operations
+- **Status Reporting**: JSON response with operations performed and any errors encountered
+
+### Testing
+- ✅ **CLI Commands**: Interactive confirmation and --force flag functionality
+- ✅ **API Endpoints**: Complete resource cleanup with detailed status responses
+- ✅ **Error Handling**: Graceful handling of non-existent apps and missing dependencies
+- ✅ **Environment Cleanup**: Verification of environment variable removal
+- ✅ **Container Cleanup**: Docker image removal with proper error handling
+- ✅ **VPS Integration**: Full functionality tested on production VPS environment
+- ✅ **Regression Testing**: Existing functionality unchanged
+
+### Security & Safety
+- **Confirmation Required**: Interactive prompt prevents accidental destruction
+- **Force Flag Control**: Explicit --force required for automated destruction
+- **Detailed Warnings**: Clear listing of all resources that will be destroyed
+- **Operation Logging**: Complete audit trail for security and debugging
+
+### API Usage
+```bash
+# Interactive destroy with confirmation
+ploy apps destroy --name my-app
+
+# Automated destroy for CI/CD
+ploy apps destroy --name my-app --force
+
+# API endpoint
+curl -X DELETE http://localhost:8081/v1/apps/my-app
+```
+
+### Status
+**COMPLETED** - Phase 1, Step 7 from PLAN.md: Complete app destruction capability with comprehensive resource cleanup, user safety features, and detailed operation reporting.
+
+The destroy system provides developers and operators with safe, comprehensive app removal capabilities while maintaining detailed audit trails and preventing accidental data loss.
+
 ## [2025-08-19] - SSH Debug Support Implementation
 
 ### Added
