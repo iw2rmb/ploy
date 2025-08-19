@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [2025-08-19] - Comprehensive Signature File Generation
+
+### Added
+- **Universal Signature Generation**
+  - Enhanced all build scripts to automatically generate .sig signature files for all built artifacts
+  - Added signature generation to previously missing debug build scripts (jail, OCI)
+  - Consistent SBOM generation (.sbom.json) across all build scripts for supply chain tracking
+  - Added graceful fallback handling when cosign tool is not available in development environments
+
+- **Build Script Enhancements**
+  - scripts/build/jail/build_jail_debug.sh: Added signature and SBOM generation for .tar.gz jail files
+  - scripts/build/oci/build_oci.sh: Added signature and SBOM generation for OCI container images
+  - scripts/build/oci/build_oci_debug.sh: Added signature and SBOM generation for debug container images
+  - Enhanced existing debug scripts with consistent signature generation patterns
+
+### Fixed
+- **Build Script Consistency**
+  - Standardized signature generation approach across all lanes (A-F) and debug variants
+  - Proper file path handling for signature files in different build contexts
+  - Consistent cosign and syft tool availability checks across all scripts
+
+### Testing
+- **Comprehensive Test Coverage**
+  - Added 10 new test scenarios (TESTS.md #229-238) for signature file generation across all lanes
+  - VPS testing confirmed all modified scripts have valid syntax and execute correctly
+  - Local testing validated build script modifications don't break existing functionality
+
 ## [2025-08-19] - Cryptographic Artifact Signing Implementation
 
 ### Added
