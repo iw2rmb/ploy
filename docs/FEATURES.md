@@ -89,6 +89,14 @@ Auto-classified lanes:
   - **Debug Build Integration**: Policy enforcement for SSH-enabled debug deployments
   - **Break-Glass Approval**: Emergency override mechanism for critical production access
   - Image size caps per lane (planned)
+- **Comprehensive Artifact Integrity Verification** ✅ (Aug 2025):
+  - **SHA-256 Checksum Verification**: All uploaded artifacts verified with cryptographic checksums to detect corruption
+  - **File Size Validation**: Prevents truncated uploads and ensures complete file transfers to storage
+  - **SBOM Content Validation**: Validates SPDX-JSON schema compliance and required metadata fields
+  - **Bundle Completeness Verification**: Confirms all expected files (artifact, SBOM, signature, certificate) are present
+  - **Detailed Error Reporting**: Comprehensive failure analysis with specific reasons for verification failures
+  - **Audit Trail Logging**: Complete verification history with timestamps and validation results for compliance
+  - **Retry Logic Integration**: Handles temporary storage issues with intelligent retry mechanisms
 - **Enhanced Lane Detection** (Aug 2025):
   - **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
   - **Build System Support**: Gradle, Maven, SBT with comprehensive plugin detection
