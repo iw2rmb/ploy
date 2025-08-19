@@ -1,0 +1,182 @@
+---
+# SeaweedFS Installation and Configuration Playbook
+# 
+# This playbook installs SeaweedFS cluster components:
+# - Master server for cluster coordination
+# - Volume servers for data storage
+# - Filer server for file system interface
+# - Collection-based organization for different artifact types
+#
+- name: Install and Configure SeaweedFS
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+
+  tasks:
+    - name: Create SeaweedFS user
+      user:
+        name: seaweedfs
+        system: true
+        shell: /bin/false
+        home: /var/lib/seaweedfs
+        create_home: true
+
+    - name: Create SeaweedFS directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: seaweedfs
+        group: seaweedfs
+        mode: '0755'
+      loop:
+        - /var/lib/seaweedfs
+        - /var/lib/seaweedfs/master
+        - /var/lib/seaweedfs/volume1
+        - /var/lib/seaweedfs/volume2
+        - /var/lib/seaweedfs/filer
+        - /etc/seaweedfs
+        - /var/log/seaweedfs
+
+    - name: Download SeaweedFS
+      get_url:
+        url: "https://github.com/seaweedfs/seaweedfs/releases/download/{{ seaweedfs.version }}/linux_amd64.tar.gz"
+        dest: /tmp/seaweedfs.tar.gz
+        mode: '0644'
+
+    - name: Extract SeaweedFS
+      unarchive:
+        src: /tmp/seaweedfs.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Verify SeaweedFS installation
+      command: /usr/local/bin/weed version
+      register: weed_version
+      changed_when: false
+
+    - name: Display SeaweedFS version
+      debug:
+        msg: "SeaweedFS installed successfully: {{ weed_version.stdout_lines[0] if weed_version.stdout_lines else 'Version info not available' }}"
+
+    - name: Create SeaweedFS master service
+      template:
+        src: ../templates/seaweedfs-master.service.j2
+        dest: /etc/systemd/system/seaweedfs-master.service
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Create SeaweedFS volume service
+      template:
+        src: ../templates/seaweedfs-volume.service.j2
+        dest: /etc/systemd/system/seaweedfs-volume.service
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Create SeaweedFS filer service
+      template:
+        src: ../templates/seaweedfs-filer.service.j2
+        dest: /etc/systemd/system/seaweedfs-filer.service
+        owner: root
+        group: root
+        mode: '0644'
+
+    # SeaweedFS will run with command-line arguments, no config files needed
+
+    - name: Start and enable SeaweedFS master
+      systemd:
+        name: seaweedfs-master
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for master to be ready
+      wait_for:
+        port: "{{ seaweedfs.master_port }}"
+        delay: 2
+        timeout: 30
+
+    - name: Start and enable SeaweedFS volume server
+      systemd:
+        name: seaweedfs-volume
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for volume server to be ready
+      wait_for:
+        port: "{{ seaweedfs.volume_port }}"
+        delay: 2
+        timeout: 30
+
+    - name: Start and enable SeaweedFS filer
+      systemd:
+        name: seaweedfs-filer
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for filer to be ready
+      wait_for:
+        port: "{{ seaweedfs.filer_port }}"
+        delay: 2
+        timeout: 30
+
+    - name: Create artifact collections
+      uri:
+        url: "http://localhost:{{ seaweedfs.master_port }}/col/{{ item.name }}?replication={{ item.replication }}"
+        method: PUT
+        status_code: [200, 201, 409]  # 409 = already exists
+      loop:
+        - name: "{{ seaweedfs.collections.artifacts.name }}"
+          replication: "{{ seaweedfs.collections.artifacts.replication }}"
+        - name: "{{ seaweedfs.collections.metadata.name }}"
+          replication: "{{ seaweedfs.collections.metadata.replication }}"
+        - name: "{{ seaweedfs.collections.debug.name }}"
+          replication: "{{ seaweedfs.collections.debug.replication }}"
+      register: collection_creation
+      failed_when: false
+
+    - name: Display collection creation results
+      debug:
+        msg: "Collection {{ item.item.name }}: {{ 'Created' if item.status in [200, 201] else 'Already exists' if item.status == 409 else 'Failed' }}"
+      loop: "{{ collection_creation.results }}"
+
+    - name: Create ploy storage configuration for SeaweedFS
+      template:
+        src: ../templates/ploy-seaweedfs-config.yaml.j2
+        dest: /home/ploy/ploy/configs/seaweedfs-config.yaml
+        owner: ploy
+        group: ploy
+        mode: '0644'
+      when: "'ploy' in ansible_facts.user_list or true"
+
+    - name: Set up firewall for SeaweedFS
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - "{{ seaweedfs.master_port }}"
+        - "{{ seaweedfs.volume_port }}"
+        - "{{ seaweedfs.filer_port }}"
+
+    - name: Display SeaweedFS cluster status
+      uri:
+        url: "http://localhost:{{ seaweedfs.master_port }}/cluster/status"
+        method: GET
+      register: cluster_status
+      failed_when: false
+
+    - name: Show cluster status
+      debug:
+        msg: "SeaweedFS cluster status: {{ cluster_status.json if cluster_status.json is defined else 'Unable to fetch status' }}"
+
+    - name: Cleanup installation files
+      file:
+        path: /tmp/seaweedfs.tar.gz
+        state: absent
