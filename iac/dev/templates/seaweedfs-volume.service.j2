@@ -1,0 +1,32 @@
+[Unit]
+Description=SeaweedFS Volume Server
+Documentation=https://github.com/seaweedfs/seaweedfs
+After=network.target seaweedfs-master.service
+Requires=seaweedfs-master.service
+
+[Service]
+Type=simple
+User=seaweedfs
+Group=seaweedfs
+ExecStart=/usr/local/bin/weed volume \
+  -port={{ seaweedfs.volume_port }} \
+  -dir=/var/lib/seaweedfs/volume1,/var/lib/seaweedfs/volume2 \
+  -mserver=localhost:{{ seaweedfs.master_port }} \
+  -dataCenter=dc1 \
+  -rack=rack1 \
+  -maxVolumes=8
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=seaweedfs-volume
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/seaweedfs/volume1 /var/lib/seaweedfs/volume2
+
+[Install]
+WantedBy=multi-user.target
