@@ -97,19 +97,28 @@ go run ./tools/lane-pick --path /path/to/project
 
 ### Core Components
 - **controller/**: REST API for builds and deployments
-  - `main.go`: Fiber HTTP server with build endpoints
+  - `main.go`: Fiber HTTP server with clean routing and module delegation
   - `builders/`: Lane-specific image builders (unikraft.go, java_osv.go, etc.)
   - `nomad/`: HashiCorp Nomad integration for job scheduling
   - `opa/`: Open Policy Agent for security verification
   - `supply/`: Supply chain security (SBOM, signatures)
 
 - **cmd/ploy/**: CLI client
-  - `main.go`: Command router and TUI
-  - `scaffold.go`: App templating for new projects
+  - `main.go`: Clean command router with modular handlers
+
+- **internal/**: Shared modules for controller and CLI
+  - `storage/`: Object storage abstraction
+  - `cli/`: CLI-specific modules (apps, deploy, env, domains, certs, debug, ui, utils)
+  - `preview/`: Preview host routing
+  - `build/`: Build management
+  - `domain/`: Domain management
+  - `cert/`: Certificate management
+  - `env/`: Environment variables
+  - `debug/`: Debug operations
+  - `lifecycle/`: App lifecycle management
+  - `utils/`: Shared utilities
 
 - **tools/lane-pick/**: Automated lane selection
-
-- **internal/storage/**: Object storage abstraction
 
 ### Key Workflows
 1. **Deploy**: CLI tar → Controller lane-pick → Build → Nomad

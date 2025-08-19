@@ -1,4 +1,4 @@
-package cliapps
+package apps
 
 import (
 	"bufio"
@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	cliutils "github.com/ploy/ploy/internal/cli-utils"
+	"github.com/ploy/ploy/internal/cli/utils"
 )
 
 func AppsCmd(args []string, controllerURL string) {
 	if len(args) > 0 && args[0] == "new" {
 		fs := flag.NewFlagSet("apps new", flag.ExitOnError)
 		lang := fs.String("lang", "go", "language")
-		name := fs.String("name", filepath.Base(cliutils.MustGetwd()), "name")
+		name := fs.String("name", filepath.Base(utils.MustGetwd()), "name")
 		fs.Parse(args[1:])
 		if err := scaffold(*lang, *name); err != nil {
 			fmt.Println("scaffold error:", err)

@@ -1,4 +1,4 @@
-package clideploy
+package deploy
 
 import (
 	"flag"
@@ -9,33 +9,33 @@ import (
 	"path/filepath"
 	"time"
 
-	cliutils "github.com/ploy/ploy/internal/cli-utils"
+	utils "github.com/ploy/ploy/internal/cli/utils"
 )
 
 func PushCmd(args []string, controllerURL string) {
 	fs := flag.NewFlagSet("push", flag.ExitOnError)
-	app := fs.String("a", filepath.Base(cliutils.MustGetwd()), "app name")
+	app := fs.String("a", filepath.Base(utils.MustGetwd()), "app name")
 	lane := fs.String("lane", "", "lane override (A..F)")
 	main := fs.String("main", "com.ploy.ordersvc.Main", "Java main class for lane C")
 	sha := fs.String("sha", "", "git sha to annotate")
 	fs.Parse(args)
 
 	if *sha == "" {
-		if v := cliutils.GitSHA(); v != "" {
+		if v := utils.GitSHA(); v != "" {
 			*sha = v
 		} else {
 			*sha = time.Now().Format("20060102-150405")
 		}
 	}
 
-	ign, _ := cliutils.ReadGitignore(".")
+	ign, _ := utils.ReadGitignore(".")
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close()
-		_ = cliutils.TarDir(".", pw, ign)
+		_ = utils.TarDir(".", pw, ign)
 	}()
 
-	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s&main=%s", controllerURL, *app, *sha, cliutils.URLQueryEsc(*main))
+	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s&main=%s", controllerURL, *app, *sha, utils.URLQueryEsc(*main))
 	if *lane != "" {
 		url += "&lane=" + *lane
 	}
@@ -56,7 +56,7 @@ func OpenCmd(args []string) {
 		return
 	}
 	app := args[0]
-	domain := cliutils.DefaultDomainFor(app)
+	domain := utils.DefaultDomainFor(app)
 	fmt.Println("Opening:", domain)
-	cliutils.OpenURL("https://" + domain)
+	utils.OpenURL("https://" + domain)
 }

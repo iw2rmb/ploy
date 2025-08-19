@@ -1,4 +1,4 @@
-package clienv
+package env
 
 import (
 	"encoding/json"

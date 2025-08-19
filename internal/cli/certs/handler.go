@@ -1,4 +1,4 @@
-package clicerts
+package certs
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package clidomains
+package domains
 
 import (
 	"fmt"
