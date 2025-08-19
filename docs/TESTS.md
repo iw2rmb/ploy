@@ -212,3 +212,38 @@
 207. Node.js template includes enhanced device file support (/dev/urandom, etc.).
 208. Node.js configuration includes production runtime optimizations and heap size settings.
 209. Template selection correctly differentiates between Node.js and other applications.
+
+## Node.js Lane B Testing (Aug 2025)
+210. `ploy push` with apps/node-hello successfully detects Lane B automatically.
+211. Lane detection processes package.json and identifies "node" language correctly.
+212. Build pipeline progresses through tar processing and lane picker validation.
+213. Controller handles Node.js application tar upload without errors.
+214. OPA policy validation triggers correctly for unsigned artifacts.
+215. Forced Lane C with Node.js app fails appropriately with Jib error.
+216. Controller logs show proper Lane B detection and processing flow.
+
+## Artifact Signing Implementation (Aug 2025)
+217. Build process automatically signs file-based artifacts (Lanes A, B, C, D, F) after successful build.
+218. Build process automatically signs Docker images (Lane E) using cosign.
+219. SignArtifact function supports key-based signing with COSIGN_PRIVATE_KEY environment variable.
+220. SignArtifact function supports keyless OIDC signing with COSIGN_EXPERIMENTAL=1.
+221. SignArtifact function creates dummy signatures for development environments without cosign.
+222. SignDockerImage function supports key-based Docker image signing with private key.
+223. SignDockerImage function supports keyless OIDC Docker image signing.
+224. Artifact signature files (.sig) are automatically created alongside build artifacts.
+225. Signed artifacts pass OPA policy validation that previously blocked unsigned artifacts.
+226. Signature files are automatically uploaded to MinIO storage alongside artifacts.
+227. Build handler properly handles signing failures with informative error messages.
+228. Verification logic correctly identifies signed vs unsigned artifacts for policy enforcement.
+
+## Signature File Generation for All Artifacts (Aug 2025)
+229. Lane A Unikraft builds generate .sig signature files for all .img artifacts.
+230. Lane B Unikraft builds generate .sig signature files for all .img artifacts.
+231. Lane C OSv builds generate .sig signature files for all .qcow2 artifacts.
+232. Lane D FreeBSD jail builds generate .sig signature files for all .tar.gz artifacts.
+233. Lane E OCI builds generate signatures for all Docker images in registry.
+234. Lane F VM builds generate .sig signature files for all .img artifacts.
+235. Debug build variants generate signature files alongside main build artifacts.
+236. All build scripts include SBOM generation (.sbom.json) for supply chain tracking.
+237. Signature generation gracefully handles missing cosign tool in development environments.
+238. Build scripts verify signature file existence before creating new signatures to avoid duplicates.

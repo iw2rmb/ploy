@@ -8,7 +8,7 @@ import (
 
 func BuildVM(app, sha, outDir string, envVars map[string]string) (string, error) {
 	args := []string{"--app", app, "--sha", sha, "--out-dir", outDir}
-	cmd := exec.Command("./build/packer/build_vm.sh", args...)
+	cmd := exec.Command("./scripts/build/packer/build_vm.sh", args...)
 	
 	// Add environment variables to the build process
 	env := os.Environ()
