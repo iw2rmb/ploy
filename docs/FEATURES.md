@@ -273,6 +273,12 @@ Auto-classified lanes:
   - Operation-level timeout configuration with configurable maximum operation times
   - Graceful fallback to basic storage client when enhanced features unavailable
   - Backward compatibility with existing storage operations and interfaces
+- ✅ **External Storage Configuration** (Aug 2025):
+  - Per-request storage client initialization for stateless operation and improved reliability
+  - External YAML configuration support with fallback to embedded config
+  - Configuration validation and hot reload capabilities without service restart
+  - API endpoints for configuration management: `/storage/config`, `/storage/config/validate`, `/storage/config/reload`
+  - Environment-specific configuration templates with Ansible provisioning to `/etc/ploy/storage/`
 - ✅ **Scalable Architecture**: No single point of failure, HTTP-based simple API
 - ✅ Config: `configs/storage-config.yaml` with simplified SeaweedFS-only configuration
 - ✅ Organization: Collections with proper replication strategies per artifact type

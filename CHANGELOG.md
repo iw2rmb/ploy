@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## [2025-08-20] - External Storage Configuration (Phase no-SPOF-1 Step 2)
+
+### Added
+- **External Storage Configuration Management**
+  - `controller/config` package with external YAML configuration support
+  - Configuration path priority: `PLOY_STORAGE_CONFIG` env var → `/etc/ploy/storage/config.yaml` → embedded `configs/storage-config.yaml`
+  - Per-request storage client initialization replacing singleton pattern for stateless operation
+  - Configuration validation with comprehensive error reporting and type checking
+
+- **Storage Configuration API Endpoints**
+  - `GET /v1/storage/config` - Retrieve current storage configuration
+  - `POST /v1/storage/config/validate` - Validate configuration without applying changes
+  - `POST /v1/storage/config/reload` - Hot reload configuration from external files
+  - Real-time configuration change detection with file modification timestamp tracking
+
+- **Enhanced Storage Client Architecture**
+  - Per-request storage client creation for improved reliability and configuration flexibility
+  - Automatic configuration refresh on each request ensuring latest settings are applied
+  - Improved error handling for storage client initialization failures
+  - Consistent error responses with detailed failure information for API clients
+
+- **Ansible Infrastructure Provisioning**
+  - External storage configuration deployment to `/etc/ploy/storage/config.yaml` on VPS
+  - SeaweedFS configuration templating with environment-specific values
+  - Storage client configuration with retry policies, health checks, and operation timeouts
+  - Proper file ownership and permissions for security compliance
+
+### Fixed
+- Replaced singleton storage client pattern eliminating shared state and potential race conditions
+- Updated all storage-dependent endpoints to use per-request client initialization
+- Enhanced storage health and metrics endpoints with proper error handling
+- Configuration validation preventing invalid settings from causing runtime failures
+
+### Testing
+- **Local Environment Validation**
+  - Configuration loading and validation tested with embedded `configs/storage-config.yaml`
+  - Per-request storage client initialization verified with multiple concurrent requests
+  - Configuration management endpoints tested for validation and reload functionality
+  - Storage health checks confirmed working with SeaweedFS connectivity validation
+
+- **VPS Environment Integration Testing**
+  - External configuration successfully loaded from `/etc/ploy/storage/config.yaml`
+  - Configuration management API endpoints validated on production VPS environment
+  - Per-request storage client creation verified with SeaweedFS backend
+  - Configuration reload tested with live file modifications and timestamp detection
+  - Storage health and metrics endpoints confirmed working with external configuration
+
 ## [2025-08-20] - Consul KV-based Environment Storage (Phase no-SPOF-1 Step 1)
 
 ### Added
