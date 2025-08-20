@@ -123,7 +123,8 @@ fi
 
 # Deploy with monitoring (should use enhanced monitoring)
 echo "Deploying app with health monitoring..."
-if curl -X POST "$PLOY_CONTROLLER/build/$TEST_APP?lane=E" \
+if curl -X POST "$PLOY_CONTROLLER/apps/$TEST_APP/builds?lane=E" \
+    -H "Content-Type: application/octet-stream" \
     --data-binary @"$TEST_DIR/app.tar.gz" 2>&1 | tee deploy.log | grep -q "deployed"; then
     echo "✓ Deployment completed with monitoring"
 else
@@ -147,7 +148,8 @@ tar -czf ../policy.tar.gz .
 cd - > /dev/null
 
 echo "Testing non-retryable error (policy)..."
-if curl -X POST "$PLOY_CONTROLLER/build/test-policy-fail?lane=C&env=prod" \
+if curl -X POST "$PLOY_CONTROLLER/apps/test-policy-fail/builds?lane=C&env=prod" \
+    -H "Content-Type: application/octet-stream" \
     --data-binary @"$TEST_DIR/policy.tar.gz" 2>&1 | grep -q "policy"; then
     echo "✓ Policy errors correctly identified as non-retryable"
 else
@@ -182,7 +184,8 @@ cd - > /dev/null
 
 echo "Testing deployment with failing app (should abort after threshold)..."
 START_TIME=$(date +%s)
-if curl -X POST "$PLOY_CONTROLLER/build/test-fail-threshold?lane=E" \
+if curl -X POST "$PLOY_CONTROLLER/apps/test-fail-threshold/builds?lane=E" \
+    -H "Content-Type: application/octet-stream" \
     --data-binary @"$TEST_DIR/fail.tar.gz" 2>&1 | tee fail.log | grep -q "failed"; then
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
