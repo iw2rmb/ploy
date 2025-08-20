@@ -1,5 +1,80 @@
 # CHANGELOG
 
+## [2025-08-20] - Comprehensive Git Integration and Repository Validation (Phase 5 Step 2)
+
+### Added
+- **Complete Git Repository Analysis System**
+  - `internal/git/repository.go` with comprehensive repository metadata extraction and validation
+  - `internal/git/validator.go` with environment-specific validation configurations (development, staging, production)
+  - `internal/git/utils.go` with enhanced Git utilities and multi-source URL extraction
+  - Repository URL extraction from git config, package.json, Cargo.toml, pom.xml, and go.mod files
+  - URL normalization converting SSH format to HTTPS with .git suffix removal
+
+### Enhanced
+- **Security-Focused Repository Validation**
+  - Secrets detection scanning for AWS keys, private keys, API keys, passwords, and tokens
+  - Sensitive file detection identifying .env files, private keys, and certificate files
+  - GPG commit signature validation for enhanced security compliance
+  - Repository health scoring system (0-100) based on security and validation issues
+  - Comprehensive validation results with errors, warnings, security issues, and suggestions
+
+### Integration
+- **Build Handler Git Integration**
+  - Enhanced `extractSourceRepository` function using new Git utilities for improved URL extraction
+  - Build process Git repository validation with environment-specific rules
+  - Repository health scoring and validation result logging during build pipeline
+  - Improved source repository detection across multiple project types and languages
+
+### Environment-Specific Validation
+- **Production Environment**
+  - Requires clean repository with no uncommitted changes or untracked files
+  - Enforces GPG-signed commits for security compliance
+  - Restricts to trusted domains (github.com, gitlab.com) with configurable domain lists
+  - Limits allowed branches to main/master/production for release control
+  - Enforces strict repository size limits (100MB) for resource management
+- **Staging Environment** 
+  - Requires clean repository but allows unsigned commits with warnings
+  - Permits broader branch selection including develop/staging branches
+  - Uses default size limits with warning-based enforcement
+- **Development Environment**
+  - Allows dirty repositories and untracked files with warning notifications
+  - Accepts any branch with informational messages
+  - Uses relaxed validation rules for rapid development workflows
+
+### Advanced Repository Analysis
+- **Comprehensive Statistics Generation**
+  - Repository metadata: commit count, contributor analysis, branch and tag counts
+  - Language statistics with file type analysis and size calculations by language
+  - First commit and last activity timestamps for project lifecycle analysis
+  - Repository size calculation excluding .git directory for accurate measurements
+
+### Testing
+- **Comprehensive Test Coverage (Tests 321-370)**
+  - Git repository detection and validation across different project structures
+  - Multi-source URL extraction testing (git config, package manifests, build files)
+  - Security scanning validation for secrets and sensitive file detection
+  - Environment-specific validation testing for production, staging, and development
+  - Repository statistics and health scoring validation
+  - Created `test-git-integration.sh` and `test-git-validation-unit.sh` for complete coverage
+  - All unit tests pass successfully on both local and VPS environments
+
+### Technical Implementation
+- **Repository Creation and Analysis**
+  - `NewRepository()` function with comprehensive repository information loading
+  - Multi-source repository URL extraction with intelligent fallback mechanisms
+  - Git status detection differentiating between uncommitted changes and untracked files
+  - Branch and commit analysis with GPG signature validation
+- **Validation Framework**
+  - Configurable validation levels: None, Warning, Strict with appropriate error handling
+  - Environment-aware validation configuration with temporary config management
+  - Repository health scoring with point deductions for various issue categories
+  - Detailed validation summaries with human-readable format and actionable suggestions
+
+### Status
+**COMPLETED** - Phase 5 Step 2 from PLAN.md: "Improve Git integration with proper repository validation"
+
+The Git integration system now provides enterprise-grade repository analysis, security scanning, and environment-specific validation, enabling comprehensive source code validation during the build process while maintaining development workflow flexibility.
+
 ## [2025-08-20] - Enhanced Nomad Job Health Monitoring (Phase 5 Step 1)
 
 ### Added
