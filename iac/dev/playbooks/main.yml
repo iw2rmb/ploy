@@ -70,28 +70,58 @@
         enabled: true
 
     - name: Install Docker Compose
-      get_url:
-        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
+      block:
+        - name: Check if Docker Compose is already installed
+          stat:
+            path: /usr/local/bin/docker-compose
+          register: docker_compose_binary
+
+        - name: Get current Docker Compose version (if installed)
+          command: /usr/local/bin/docker-compose version --short
+          register: current_docker_compose_version
+          changed_when: false
+          ignore_errors: true
+          when: docker_compose_binary.stat.exists
+
+        - name: Download Docker Compose
+          get_url:
+            url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+            dest: /usr/local/bin/docker-compose
+            mode: '0755'
+          when: not docker_compose_binary.stat.exists or docker_compose_version not in (current_docker_compose_version.stdout | default(''))
 
     - name: Install Go
       block:
+        - name: Check if Go is already installed
+          stat:
+            path: /usr/local/go/bin/go
+          register: go_binary
+
+        - name: Get current Go version (if installed)
+          command: /usr/local/go/bin/go version
+          register: current_go_version
+          changed_when: false
+          ignore_errors: true
+          when: go_binary.stat.exists
+
         - name: Download Go
           get_url:
             url: "https://golang.org/dl/go{{ go_version }}.linux-{{ go_arch }}.tar.gz"
             dest: /tmp/go.tar.gz
+          when: not go_binary.stat.exists or go_version not in (current_go_version.stdout | default(''))
 
         - name: Remove existing Go installation
           file:
             path: /usr/local/go
             state: absent
+          when: not go_binary.stat.exists or go_version not in (current_go_version.stdout | default(''))
 
         - name: Extract Go
           unarchive:
             src: /tmp/go.tar.gz
             dest: /usr/local
             remote_src: true
+          when: not go_binary.stat.exists or go_version not in (current_go_version.stdout | default(''))
 
         - name: Configure system PATH with Go
           lineinfile:
@@ -114,16 +144,39 @@
         state: present
 
     - name: Install Node.js and npm
-      apt:
-        name:
-          - nodejs
-          - npm
-        state: present
+      block:
+        - name: Check if Node.js is already installed
+          command: node --version
+          register: current_node_version
+          changed_when: false
+          ignore_errors: true
 
-    - name: Install Java 17
-      apt:
-        name: openjdk-17-jdk
-        state: present
+        - name: Install NodeSource repository for specific Node.js version
+          shell: |
+            curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | sudo -E bash -
+          when: current_node_version.failed or nodejs_version not in (current_node_version.stdout | default(''))
+
+        - name: Install Node.js and npm
+          apt:
+            name:
+              - nodejs
+            state: present
+            update_cache: true
+          when: current_node_version.failed or nodejs_version not in (current_node_version.stdout | default(''))
+
+    - name: Install Java {{ java_version }}
+      block:
+        - name: Check if Java is already installed
+          command: java -version
+          register: current_java_version
+          changed_when: false
+          ignore_errors: true
+
+        - name: Install Java {{ java_version }}
+          apt:
+            name: openjdk-{{ java_version }}-jdk
+            state: present
+          when: current_java_version.failed or java_version not in (current_java_version.stderr | default(''))
 
     - name: Install build tools
       block:
@@ -165,11 +218,24 @@
           debug:
             msg: "KraftKit installed successfully: {{ kraft_version.stdout_lines[0] if kraft_version.stdout_lines else 'Version info not available' }}"
 
+        - name: Check if Cosign is already installed
+          stat:
+            path: /usr/local/bin/cosign
+          register: cosign_binary
+
+        - name: Get current Cosign version (if installed)
+          command: /usr/local/bin/cosign version
+          register: current_cosign_version
+          changed_when: false
+          ignore_errors: true
+          when: cosign_binary.stat.exists
+
         - name: Download Cosign
           get_url:
             url: "https://github.com/sigstore/cosign/releases/download/v{{ build_tools.cosign.version }}/cosign-linux-amd64"
             dest: /usr/local/bin/cosign
             mode: '0755'
+          when: not cosign_binary.stat.exists or build_tools.cosign.version not in (current_cosign_version.stdout | default(''))
 
         - name: Verify Cosign installation
           command: /usr/local/bin/cosign version
@@ -180,16 +246,30 @@
           debug:
             msg: "Cosign installed successfully: {{ cosign_version.stdout_lines[0] if cosign_version.stdout_lines else 'Version info not available' }}"
 
+        - name: Check if Syft is already installed
+          stat:
+            path: /usr/local/bin/syft
+          register: syft_binary
+
+        - name: Get current Syft version (if installed)
+          command: /usr/local/bin/syft version
+          register: current_syft_version
+          changed_when: false
+          ignore_errors: true
+          when: syft_binary.stat.exists
+
         - name: Download Syft
           get_url:
             url: "https://github.com/anchore/syft/releases/download/v{{ build_tools.syft.version }}/syft_{{ build_tools.syft.version }}_linux_amd64.tar.gz"
             dest: /tmp/syft.tar.gz
+          when: not syft_binary.stat.exists or build_tools.syft.version not in (current_syft_version.stdout | default(''))
 
         - name: Extract Syft
           unarchive:
             src: /tmp/syft.tar.gz
             dest: /usr/local/bin
             remote_src: true
+          when: not syft_binary.stat.exists or build_tools.syft.version not in (current_syft_version.stdout | default(''))
 
         - name: Verify Syft installation
           command: /usr/local/bin/syft version
@@ -200,16 +280,30 @@
           debug:
             msg: "Syft installed successfully: {{ syft_version.stdout_lines[1] if syft_version.stdout_lines|length > 1 else 'Version info not available' }}"
 
+        - name: Check if Grype is already installed
+          stat:
+            path: /usr/local/bin/grype
+          register: grype_binary
+
+        - name: Get current Grype version (if installed)
+          command: /usr/local/bin/grype version
+          register: current_grype_version
+          changed_when: false
+          ignore_errors: true
+          when: grype_binary.stat.exists
+
         - name: Download Grype
           get_url:
             url: "https://github.com/anchore/grype/releases/download/v{{ build_tools.grype.version }}/grype_{{ build_tools.grype.version }}_linux_amd64.tar.gz"
             dest: /tmp/grype.tar.gz
+          when: not grype_binary.stat.exists or build_tools.grype.version not in (current_grype_version.stdout | default(''))
 
         - name: Extract Grype
           unarchive:
             src: /tmp/grype.tar.gz
             dest: /usr/local/bin
             remote_src: true
+          when: not grype_binary.stat.exists or build_tools.grype.version not in (current_grype_version.stdout | default(''))
 
         - name: Verify Grype installation
           command: /usr/local/bin/grype version
@@ -276,3 +370,6 @@
         - "4646"  # Nomad
         - "8500"  # Consul
         - "8200"  # Vault
+        - "80"    # HTTP (Traefik)
+        - "443"   # HTTPS (Traefik)
+        - "8080"  # Traefik dashboard
