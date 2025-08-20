@@ -8,17 +8,17 @@ import (
 	"time"
 )
 
-// EnhancedStorageClient provides comprehensive error handling, retry logic, and monitoring
-type EnhancedStorageClient struct {
+// StorageClient provides comprehensive error handling, retry logic, and monitoring
+type StorageClient struct {
 	client      StorageProvider
 	retryClient *RetryableStorageClient
 	metrics     *StorageMetrics
 	healthChecker *HealthChecker
-	config      *EnhancedClientConfig
+	config      *ClientConfig
 }
 
-// EnhancedClientConfig configures the enhanced storage client
-type EnhancedClientConfig struct {
+// ClientConfig configures the storage client
+type ClientConfig struct {
 	RetryConfig      *RetryConfig      `json:"retry_config"`
 	HealthCheckConfig *HealthCheckConfig `json:"health_check_config"`
 	EnableMetrics    bool              `json:"enable_metrics"`
@@ -26,9 +26,9 @@ type EnhancedClientConfig struct {
 	MaxOperationTime time.Duration     `json:"max_operation_time"`
 }
 
-// DefaultEnhancedClientConfig returns sensible defaults for enhanced client
-func DefaultEnhancedClientConfig() *EnhancedClientConfig {
-	return &EnhancedClientConfig{
+// DefaultClientConfig returns sensible defaults for storage client
+func DefaultClientConfig() *ClientConfig {
+	return &ClientConfig{
 		RetryConfig:       DefaultRetryConfig(),
 		HealthCheckConfig: DefaultHealthCheckConfig(),
 		EnableMetrics:     true,
@@ -37,13 +37,13 @@ func DefaultEnhancedClientConfig() *EnhancedClientConfig {
 	}
 }
 
-// NewEnhancedStorageClient creates a new enhanced storage client with comprehensive error handling
-func NewEnhancedStorageClient(client StorageProvider, config *EnhancedClientConfig) *EnhancedStorageClient {
+// NewStorageClient creates a new storage client with comprehensive error handling
+func NewStorageClient(client StorageProvider, config *ClientConfig) *StorageClient {
 	if config == nil {
-		config = DefaultEnhancedClientConfig()
+		config = DefaultClientConfig()
 	}
 	
-	enhanced := &EnhancedStorageClient{
+	enhanced := &StorageClient{
 		client: client,
 		config: config,
 	}
@@ -65,7 +65,7 @@ func NewEnhancedStorageClient(client StorageProvider, config *EnhancedClientConf
 }
 
 // PutObject uploads an object with comprehensive error handling
-func (e *EnhancedStorageClient) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*PutObjectResult, error) {
+func (e *StorageClient) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*PutObjectResult, error) {
 	start := time.Now()
 	
 	// Create context with timeout
@@ -95,7 +95,7 @@ func (e *EnhancedStorageClient) PutObject(bucket, key string, body io.ReadSeeker
 	}
 	
 	err := RetryWithBackoff(ctx, operation, e.config.RetryConfig, 
-		fmt.Sprintf("enhanced_put_object(%s/%s)", bucket, key))
+		fmt.Sprintf("put_object(%s/%s)", bucket, key))
 	
 	// Record metrics
 	if e.metrics != nil {
@@ -111,14 +111,14 @@ func (e *EnhancedStorageClient) PutObject(bucket, key string, body io.ReadSeeker
 	}
 	
 	if err != nil {
-		return nil, fmt.Errorf("enhanced storage put operation failed: %w", err)
+		return nil, fmt.Errorf("storage put operation failed: %w", err)
 	}
 	
 	return result, nil
 }
 
 // GetObject retrieves an object with comprehensive error handling
-func (e *EnhancedStorageClient) GetObject(bucket, key string) (io.ReadCloser, error) {
+func (e *StorageClient) GetObject(bucket, key string) (io.ReadCloser, error) {
 	start := time.Now()
 	
 	// Create context with timeout
@@ -137,7 +137,7 @@ func (e *EnhancedStorageClient) GetObject(bucket, key string) (io.ReadCloser, er
 	}
 	
 	err := RetryWithBackoff(ctx, operation, e.config.RetryConfig, 
-		fmt.Sprintf("enhanced_get_object(%s/%s)", bucket, key))
+		fmt.Sprintf("get_object(%s/%s)", bucket, key))
 	
 	// Wrap result with metrics tracking if successful
 	if err == nil && result != nil {
@@ -162,14 +162,14 @@ func (e *EnhancedStorageClient) GetObject(bucket, key string) (io.ReadCloser, er
 	}
 	
 	if err != nil {
-		return nil, fmt.Errorf("enhanced storage get operation failed: %w", err)
+		return nil, fmt.Errorf("storage get operation failed: %w", err)
 	}
 	
 	return result, nil
 }
 
 // UploadArtifactBundle uploads an artifact bundle with comprehensive error handling
-func (e *EnhancedStorageClient) UploadArtifactBundle(keyPrefix, artifactPath string) error {
+func (e *StorageClient) UploadArtifactBundle(keyPrefix, artifactPath string) error {
 	start := time.Now()
 	
 	// Create context with timeout
@@ -185,7 +185,7 @@ func (e *EnhancedStorageClient) UploadArtifactBundle(keyPrefix, artifactPath str
 	}
 	
 	err := RetryWithBackoff(ctx, operation, e.config.RetryConfig, 
-		fmt.Sprintf("enhanced_upload_artifact_bundle(%s)", keyPrefix))
+		fmt.Sprintf("upload_artifact_bundle(%s)", keyPrefix))
 	
 	// Record metrics
 	if e.metrics != nil {
@@ -201,14 +201,14 @@ func (e *EnhancedStorageClient) UploadArtifactBundle(keyPrefix, artifactPath str
 	}
 	
 	if err != nil {
-		return fmt.Errorf("enhanced artifact bundle upload failed: %w", err)
+		return fmt.Errorf("artifact bundle upload failed: %w", err)
 	}
 	
 	return nil
 }
 
 // UploadArtifactBundleWithVerification uploads and verifies with comprehensive error handling
-func (e *EnhancedStorageClient) UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (*BundleIntegrityResult, error) {
+func (e *StorageClient) UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (*BundleIntegrityResult, error) {
 	start := time.Now()
 	
 	// Create context with timeout (verification may take longer)
@@ -226,7 +226,7 @@ func (e *EnhancedStorageClient) UploadArtifactBundleWithVerification(keyPrefix, 
 	}
 	
 	err := RetryWithBackoff(ctx, operation, e.config.RetryConfig, 
-		fmt.Sprintf("enhanced_upload_artifact_bundle_with_verification(%s)", keyPrefix))
+		fmt.Sprintf("upload_artifact_bundle_with_verification(%s)", keyPrefix))
 	
 	// Record metrics for both upload and verification
 	if e.metrics != nil {
@@ -243,14 +243,14 @@ func (e *EnhancedStorageClient) UploadArtifactBundleWithVerification(keyPrefix, 
 	}
 	
 	if err != nil {
-		return nil, fmt.Errorf("enhanced artifact bundle upload with verification failed: %w", err)
+		return nil, fmt.Errorf("artifact bundle upload with verification failed: %w", err)
 	}
 	
 	return result, nil
 }
 
 // VerifyUpload verifies an upload with comprehensive error handling
-func (e *EnhancedStorageClient) VerifyUpload(key string) error {
+func (e *StorageClient) VerifyUpload(key string) error {
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), e.config.MaxOperationTime)
 	defer cancel()
@@ -264,7 +264,7 @@ func (e *EnhancedStorageClient) VerifyUpload(key string) error {
 	}
 	
 	err := RetryWithBackoff(ctx, operation, e.config.RetryConfig, 
-		fmt.Sprintf("enhanced_verify_upload(%s)", key))
+		fmt.Sprintf("verify_upload(%s)", key))
 	
 	// Record metrics
 	if e.metrics != nil {
@@ -279,14 +279,14 @@ func (e *EnhancedStorageClient) VerifyUpload(key string) error {
 	}
 	
 	if err != nil {
-		return fmt.Errorf("enhanced upload verification failed: %w", err)
+		return fmt.Errorf("upload verification failed: %w", err)
 	}
 	
 	return nil
 }
 
 // ListObjects lists objects with comprehensive error handling
-func (e *EnhancedStorageClient) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
+func (e *StorageClient) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), e.config.MaxOperationTime)
 	defer cancel()
@@ -300,27 +300,27 @@ func (e *EnhancedStorageClient) ListObjects(bucket, prefix string) ([]ObjectInfo
 	}
 	
 	err := RetryWithBackoff(ctx, operation, e.config.RetryConfig, 
-		fmt.Sprintf("enhanced_list_objects(%s/%s)", bucket, prefix))
+		fmt.Sprintf("list_objects(%s/%s)", bucket, prefix))
 	
 	if err != nil {
-		return nil, fmt.Errorf("enhanced object listing failed: %w", err)
+		return nil, fmt.Errorf("object listing failed: %w", err)
 	}
 	
 	return result, nil
 }
 
 // GetProviderType returns the storage provider type
-func (e *EnhancedStorageClient) GetProviderType() string {
+func (e *StorageClient) GetProviderType() string {
 	return e.client.GetProviderType()
 }
 
 // GetArtifactsBucket returns the artifacts bucket name
-func (e *EnhancedStorageClient) GetArtifactsBucket() string {
+func (e *StorageClient) GetArtifactsBucket() string {
 	return e.client.GetArtifactsBucket()
 }
 
 // GetMetrics returns current storage metrics
-func (e *EnhancedStorageClient) GetMetrics() *StorageMetrics {
+func (e *StorageClient) GetMetrics() *StorageMetrics {
 	if e.metrics == nil {
 		return nil
 	}
@@ -328,7 +328,7 @@ func (e *EnhancedStorageClient) GetMetrics() *StorageMetrics {
 }
 
 // GetHealthStatus returns current storage health status
-func (e *EnhancedStorageClient) GetHealthStatus() *HealthCheckResult {
+func (e *StorageClient) GetHealthStatus() *HealthCheckResult {
 	if e.healthChecker == nil {
 		return &HealthCheckResult{
 			Status:    HealthStatusUnknown,
@@ -344,7 +344,7 @@ func (e *EnhancedStorageClient) GetHealthStatus() *HealthCheckResult {
 }
 
 // GetMetricsJSON returns metrics as JSON string
-func (e *EnhancedStorageClient) GetMetricsJSON() ([]byte, error) {
+func (e *StorageClient) GetMetricsJSON() ([]byte, error) {
 	if e.metrics == nil {
 		return []byte("{}"), nil
 	}

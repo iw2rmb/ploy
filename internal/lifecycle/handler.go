@@ -11,7 +11,7 @@ import (
 	"github.com/ploy/ploy/internal/storage"
 )
 
-func DestroyApp(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.EnvStore) error {
+func DestroyApp(c *fiber.Ctx, storeClient *storage.StorageClient, envStore *envstore.EnvStore) error {
 	app := c.Params("app")
 	force := c.Query("force") == "true"
 	
@@ -129,7 +129,7 @@ func destroyCertificates(app string, status map[string]interface{}) error {
 	return nil
 }
 
-func destroyStorageArtifacts(app string, status map[string]interface{}, storeClient *storage.Client) error {
+func destroyStorageArtifacts(app string, status map[string]interface{}, storeClient *storage.StorageClient) error {
 	log.Printf("Destroying storage artifacts for app: %s", app)
 	operations := status["operations"].(map[string]string)
 	

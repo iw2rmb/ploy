@@ -19,8 +19,7 @@ import (
 )
 
 
-var storeClient *storage.Client
-var enhancedStoreClient *storage.EnhancedStorageClient
+var storeClient *storage.StorageClient
 var envStore *envstore.EnvStore
 
 func main(){
@@ -30,9 +29,8 @@ func main(){
 	cfgPath := utils.Getenv("PLOY_STORAGE_CONFIG", "configs/storage-config.yaml")
 	if rootCfg, err := config.Load(cfgPath); err == nil {
 		if c, err := storage.New(rootCfg.Storage); err == nil { 
-			storeClient = c
-			// Initialize enhanced storage client with comprehensive error handling
-			enhancedStoreClient = storage.NewEnhancedStorageClient(c, storage.DefaultEnhancedClientConfig())
+			// Initialize storage client with comprehensive error handling
+			storeClient = storage.NewStorageClient(c, storage.DefaultClientConfig())
 		}
 	}
 	
@@ -40,7 +38,7 @@ func main(){
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
-		return build.TriggerBuild(c, storeClient, enhancedStoreClient, envStore)
+		return build.TriggerBuild(c, storeClient, envStore)
 	})
 	api.Get("/apps", build.ListApps)
 	api.Get("/status/:app", build.Status)
@@ -79,17 +77,17 @@ func main(){
 	
 	// Storage health and metrics endpoints
 	api.Get("/storage/health", func(c *fiber.Ctx) error {
-		if enhancedStoreClient == nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Enhanced storage client not initialized"})
+		if storeClient == nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Storage client not initialized"})
 		}
-		health := enhancedStoreClient.GetHealthStatus()
+		health := storeClient.GetHealthStatus()
 		return c.JSON(health)
 	})
 	api.Get("/storage/metrics", func(c *fiber.Ctx) error {
-		if enhancedStoreClient == nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Enhanced storage client not initialized"})
+		if storeClient == nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Storage client not initialized"})
 		}
-		metrics := enhancedStoreClient.GetMetrics()
+		metrics := storeClient.GetMetrics()
 		return c.JSON(metrics)
 	})
 
