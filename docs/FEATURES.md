@@ -8,12 +8,12 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 ## 🛠 Build Lanes (A–G)
 
 Auto-classified lanes:
-- **Lane A** – Unikraft Minimal (Go, C)
+- ✅ **Lane A** – Unikraft Minimal (Go, C)
   - KraftKit unikernel images
   - `<app>-<sha>.img` deterministic naming
   - SBOM + signature generation
-- **Lane B** – Unikraft POSIX (Node, Python)
-  - **Intelligent Node.js Configuration System** (Aug 2025):
+- ✅ **Lane B** – Unikraft POSIX (Node, Python)
+  - ✅ **Intelligent Node.js Configuration System** (Aug 2025):
     - Specialized B-unikraft-nodejs template for Node.js applications
     - Enhanced V8 runtime support with optimized kernel configuration
     - Threading and memory management for event loop and worker threads
@@ -24,16 +24,16 @@ Auto-classified lanes:
   - Musl libc with crypto, locale, networking, and complex math support
   - Optimized lwip networking stack with TCP/UDP, DHCP, threading
   - Dropbear SSH for debug (planned)
-- **Lane C** – OSv Java/Scala
+- ✅ **Lane C** – OSv Java/Scala
   - Jib → Capstan → `<app>-<sha>.qcow2`
   - Custom MainClass support
-- **Lane D** – FreeBSD Jails
+- ✅ **Lane D** – FreeBSD Jails
   - `<app>-<sha>-jail.tar` rootfs
   - Lightweight isolation for legacy apps
-- **Lane E** – OCI + Kontain
+- ✅ **Lane E** – OCI + Kontain
   - `harbor.local/ploy/<app>:<sha>` images
   - `io.kontain` runtime for VM isolation
-- **Lane F** – Full VMs
+- ✅ **Lane F** – Full VMs
   - `<app>-<sha>.img` via Packer
   - Maximum compatibility fallback
 - **Lane G** – WASM Runtime (planned)
@@ -46,11 +46,11 @@ Auto-classified lanes:
 ⸻
 
 ## ⚙️ Builders
-- Per-lane scripts in `build/` directory
-- Auto SBOM (Syft) + signatures (Cosign)
-- Deterministic `<app>-<sha>` naming
-- Standalone or controller invocation
-- **Advanced Node.js Build Pipeline** (Aug 2025):
+- ✅ Per-lane scripts in `build/` directory
+- ✅ Auto SBOM (Syft) + signatures (Cosign)
+- ✅ Deterministic `<app>-<sha>` naming
+- ✅ Standalone or controller invocation
+- ✅ **Advanced Node.js Build Pipeline** (Aug 2025):
   - Automatic Node.js application detection via package.json
   - Enterprise dependency management with npm ci and integrity verification
   - Production-optimized package bundling with .unikraft-bundle creation
@@ -62,32 +62,32 @@ Auto-classified lanes:
 ⸻
 
 ## 📦 Supply Chain Security
-- **Cryptographic Artifact Signing** ✅ (Aug 2025):
+- ✅ **Cryptographic Artifact Signing** (Aug 2025):
   - **Multi-Mode Signing**: Key-based, keyless OIDC, and development dummy signatures
   - **Universal Lane Support**: File-based artifacts (A,B,C,D,F) and Docker images (E)
   - **Automatic Integration**: Seamless signing immediately after successful builds
   - **Smart Prevention**: Avoids duplicate signing by checking existing signatures
   - **Cosign Compatible**: Full support for cosign key management and OIDC flows
-- **Production-Ready SBOM Generation** ✅ (Aug 2025):
+- ✅ **Production-Ready SBOM Generation** (Aug 2025):
   - **Comprehensive SBOM Support**: All build scripts generate SBOM files using modern syft scan command
   - **Multi-Format Output**: SPDX-JSON for Unikraft lanes, JSON for other lanes with full metadata
   - **Cross-Lane Coverage**: SBOM generation verified across Unikraft (A/B), jails (D), containers (E), VMs (F)
   - **Source & Artifact Analysis**: Generates SBOMs for both source dependencies and built artifacts
   - **Supply Chain Metadata**: Includes checksums, timestamps, tool versions, and artifact relationships
-- **Enhanced Keyless OIDC Integration** ✅ (Aug 2025):
+- ✅ **Enhanced Keyless OIDC Integration** (Aug 2025):
   - **Multi-Provider OIDC Support**: Auto-detection for GitHub Actions, GitLab CI, Buildkite, Google Cloud
   - **Device Flow Authentication**: Interactive and non-interactive signing modes with automatic detection
   - **Certificate Management**: Ephemeral certificate generation from Fulcio with transparency log integration
   - **Environment Adaptability**: Production keyless OIDC, development fallbacks, CI/CD pipeline optimization
   - **Enhanced Error Handling**: Graceful timeout handling, network resilience, comprehensive logging
-- **Comprehensive Signature File Generation** ✅ (Aug 2025):
+- ✅ **Comprehensive Signature File Generation** (Aug 2025):
   - **Universal .sig Files**: All build scripts generate signature files for every artifact
   - **Debug Variant Support**: Debug builds include signature generation alongside main builds  
   - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
   - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
-- Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration ✅
+- ✅ Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration
 - ✅ **Comprehensive storage upload** to SeaweedFS with artifact bundles (Aug 2025)
-- **Enhanced OPA Policy Enforcement** ✅ (Aug 2025):
+- ✅ **Enhanced OPA Policy Enforcement** (Aug 2025):
   - **Environment-Specific Policy Framework**: Production, staging, and development environments with tailored security policies
   - **Signature & SBOM Requirements**: All deployments must have cryptographic signatures and SBOMs
   - **Production Security Restrictions**: Strict enforcement of key-based/OIDC signing, vulnerability scanning, SSH/debug build controls
@@ -100,7 +100,7 @@ Auto-classified lanes:
   - **Environment Normalization**: Intelligent handling of environment name variations
   - **Comprehensive Audit Logging**: Detailed logging for all policy decisions with environment context
   - **Break-Glass Approval**: Emergency override mechanism for critical production access with full audit trail
-- **Comprehensive Artifact Integrity Verification** ✅ (Aug 2025):
+- ✅ **Comprehensive Artifact Integrity Verification** (Aug 2025):
   - **SHA-256 Checksum Verification**: All uploaded artifacts verified with cryptographic checksums to detect corruption
   - **File Size Validation**: Prevents truncated uploads and ensures complete file transfers to storage
   - **SBOM Content Validation**: Validates SPDX-JSON schema compliance and required metadata fields
@@ -108,7 +108,7 @@ Auto-classified lanes:
   - **Detailed Error Reporting**: Comprehensive failure analysis with specific reasons for verification failures
   - **Audit Trail Logging**: Complete verification history with timestamps and validation results for compliance
   - **Retry Logic Integration**: Handles temporary storage issues with intelligent retry mechanisms
-- **Lane-Specific Image Size Caps** ✅ (Aug 2025):
+- ✅ **Lane-Specific Image Size Caps** (Aug 2025):
   - **Optimized Size Limits**: Lane A (50MB), Lane B (100MB), Lane C (500MB), Lane D (200MB), Lane E (1GB), Lane F (5GB)
   - **Multi-Format Size Measurement**: File-based artifacts via filesystem and Docker images via CLI commands
   - **Pre-Deployment Enforcement**: Size caps validated before Nomad deployment to prevent resource waste
@@ -116,11 +116,11 @@ Auto-classified lanes:
   - **Comprehensive Error Reporting**: Detailed size violation messages with actual vs limit comparisons
   - **Performance Optimization**: Size limits aligned with lane performance characteristics and boot requirements
   - **Storage Efficiency**: Prevents oversized deployments while maintaining functionality requirements
-- **Enhanced Lane Detection** (Aug 2025):
-  - **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
-  - **Build System Support**: Gradle, Maven, SBT with comprehensive plugin detection
-  - **Language Accuracy**: Proper Scala vs Java identification in mixed projects
-  - **Python C-Extension Detection**: Multi-layered detection for C-extensions → Lane C
+- ✅ **Enhanced Lane Detection** (Aug 2025):
+  - ✅ **Jib Plugin Detection**: Java/Scala projects with Jib → Lane E (containerless builds)
+  - ✅ **Build System Support**: Gradle, Maven, SBT with comprehensive plugin detection
+  - ✅ **Language Accuracy**: Proper Scala vs Java identification in mixed projects
+  - ✅ **Python C-Extension Detection**: Multi-layered detection for C-extensions → Lane C
     - Source file detection: `.c`, `.cc`, `.cpp`, `.cxx`, `.pyx`, `.pxd` files
     - Library dependencies: numpy, scipy, pandas, psycopg2, lxml, pillow, cryptography
     - Build configuration: `ext_modules`, `Extension()`, `build_ext`, CMake integration
@@ -134,10 +134,10 @@ Auto-classified lanes:
 ⸻
 
 ## 🚀 Deployment
-- Nomad templates per lane in `platform/nomad/`
-- Jobs include health checks, Vault integration, canary rollouts, Consul registration
-- Controller handles rendering, submission, health polling
-- **Enhanced Health Monitoring** (Aug 2025): ✅
+- ✅ Nomad templates per lane in `platform/nomad/`
+- ✅ Jobs include health checks, Vault integration, canary rollouts, Consul registration
+- ✅ Controller handles rendering, submission, health polling
+- ✅ **Enhanced Health Monitoring** (Aug 2025):
   - **Deployment Progress Tracking**: Real-time monitoring of task group status with healthy/unhealthy allocation counts
   - **Comprehensive Health Checks**: Validates allocation status, deployment health indicators, and Consul service checks
   - **Robust Retry Logic**: Automatic retries with exponential backoff and intelligent error classification
@@ -152,88 +152,88 @@ Auto-classified lanes:
 ⸻
 
 ## 🌐 Routing & Preview
-- **Preview System**: `https://<sha>.<app>.ployd.app` triggers builds
-  - **Nomad Health Monitoring**: Proper allocation health polling before routing ✅
-  - **Smart Readiness**: Replaces naive HTTP checks with Nomad API integration ✅
-  - **Error Handling**: Meaningful feedback for failed/pending deployments ✅
-  - **Dynamic Discovery**: Endpoint detection based on allocation IP/port mapping ✅
+- ✅ **Preview System**: `https://<sha>.<app>.ployd.app` triggers builds
+  - ✅ **Nomad Health Monitoring**: Proper allocation health polling before routing
+  - ✅ **Smart Readiness**: Replaces naive HTTP checks with Nomad API integration
+  - ✅ **Error Handling**: Meaningful feedback for failed/pending deployments
+  - ✅ **Dynamic Discovery**: Endpoint detection based on allocation IP/port mapping
 - TTL cleanup for previews (planned)
-- Domains: `manifests/<app>.yaml` configuration
+- ✅ Domains: `manifests/<app>.yaml` configuration
 - TLS: Certbot integration (planned), BYOC supported
 
 ⸻
 
 ## 👩‍💻 CLI (Go + Bubble Tea)
-- `ploy apps new` – scaffold with /healthz
-- **`ploy apps destroy` – comprehensive app destruction** ✅
+- ✅ `ploy apps new` – scaffold with /healthz
+- ✅ **`ploy apps destroy` – comprehensive app destruction**
   - **Safety First**: Interactive confirmation with detailed resource warnings
   - **Complete Cleanup**: Nomad jobs, environment variables, containers, temp files
   - **Force Mode**: `--force` flag for automated workflows and CI/CD
   - **Status Reporting**: Detailed operation results with per-resource status
   - **Error Resilience**: Continues cleanup even if individual operations fail
-- `ploy push` – tar + stream to controller ✅
-  - **Validated Node.js Lane B Testing** (Aug 2025):
+- ✅ `ploy push` – tar + stream to controller
+  - ✅ **Validated Node.js Lane B Testing** (Aug 2025):
     - Successfully tested with apps/node-hello demonstrating automatic Lane B detection
     - Verified build pipeline progression from tar processing to lane validation
     - Confirmed proper request body handling eliminating EOF errors
     - OPA policy validation triggers correctly for unsigned artifacts
 - `ploy push --verify --diff` – verification branch testing (planned)
-- `ploy open` – browser launch
-- `ploy env` – manage app environment variables ✅
-- `ploy domains/certs/rollback` – operations ✅
-- **`ploy debug shell` – SSH-enabled debug instances** ✅
+- ✅ `ploy open` – browser launch
+- ✅ `ploy env` – manage app environment variables
+- ✅ `ploy domains/certs/rollback` – operations
+- ✅ **`ploy debug shell` – SSH-enabled debug instances**
   - **Debug Build System**: Lane-specific debug builds with SSH daemon
   - **SSH Key Management**: Automatic RSA key pair generation per session
   - **Debug Isolation**: Nomad debug namespace with 2-hour auto-cleanup
   - **All Lane Support**: Unikraft, OCI, OSv, and jail debug environments
   - **Development Tools**: Pre-installed debuggers, profilers, and network tools
-- Workflow: push → build → deploy → open → destroy
+- ✅ Workflow: push → build → deploy → open → destroy
 - Self-healing loop support for LLM agents
 
 ⸻
 
 ## 🗄 Storage
-- **SeaweedFS Distributed Storage** (Aug 2025):
+- ✅ **SeaweedFS Distributed Storage** (Aug 2025):
   - SeaweedFS cluster with master, volume, and filer servers for optimal small file performance
   - Collection-based organization optimized for artifact types (ploy-artifacts, ploy-metadata, ploy-debug)
   - Automated upload of complete deployment packages (artifact + SBOM + signature + certificate)
   - Upload retry logic with FileID verification for reliable storage operations
   - Enhanced metadata tracking with timestamps and artifact status information
-- **Comprehensive Error Handling & Resilience** (Aug 2025):
+- ✅ **Comprehensive Error Handling & Resilience** (Aug 2025):
   - Advanced error classification system with 10+ error types (network, timeout, corruption, rate limit, etc.)
   - Exponential backoff retry logic with configurable policies and jitter randomization
   - Context-aware timeout handling and graceful operation cancellation
   - File operation retry with automatic seek position reset and stream reopening
   - Circuit breaker pattern to prevent cascading failures during storage outages
-- **Health Monitoring & Metrics** (Aug 2025):
+- ✅ **Health Monitoring & Metrics** (Aug 2025):
   - Real-time storage operation metrics (uploads, downloads, verifications, success rates)
   - Thread-safe metrics collection with comprehensive performance analytics
   - Health status classification (healthy/degraded/unhealthy) based on failure patterns
   - Deep storage connectivity testing with configuration validation
   - API endpoints `/storage/health` and `/storage/metrics` for monitoring and diagnostics
-- **Enhanced Storage Client** (Aug 2025):
+- ✅ **Enhanced Storage Client** (Aug 2025):
   - Comprehensive wrapper combining error handling, retry logic, and monitoring
   - Operation-level timeout configuration with configurable maximum operation times
   - Graceful fallback to basic storage client when enhanced features unavailable
   - Backward compatibility with existing storage operations and interfaces
-- **Scalable Architecture**: No single point of failure, HTTP-based simple API
-- Config: `configs/storage-config.yaml` with simplified SeaweedFS-only configuration
-- Organization: Collections with proper replication strategies per artifact type
-- **Upload Verification**: Built-in methods to confirm successful storage operations
-- **Multi-File Support**: Source SBOMs, container SBOMs, and build artifacts
+- ✅ **Scalable Architecture**: No single point of failure, HTTP-based simple API
+- ✅ Config: `configs/storage-config.yaml` with simplified SeaweedFS-only configuration
+- ✅ Organization: Collections with proper replication strategies per artifact type
+- ✅ **Upload Verification**: Built-in methods to confirm successful storage operations
+- ✅ **Multi-File Support**: Source SBOMs, container SBOMs, and build artifacts
 
 ⸻
 
 ## 🔬 Sample Apps
-`apps/` directory with Go, Node, Python, .NET, Scala, Java examples.
-All include `/healthz` on port 8080.
+✅ `apps/` directory with Go, Node, Python, .NET, Scala, Java examples.
+✅ All include `/healthz` on port 8080.
 
 ⸻
 
 ## 🧪 CI/CD
-- GitHub Actions: build, SBOM, scan, keyless sign
-- GitLab CI: validate, build, supply-chain, deploy
-- Artifact upload for traceability
+- ✅ GitHub Actions: build, SBOM, scan, keyless sign
+- ✅ GitLab CI: validate, build, supply-chain, deploy
+- ✅ Artifact upload for traceability
 
 ⸻
 
@@ -249,32 +249,32 @@ All include `/healthz` on port 8080.
 - **LLM Integration**: Monitor via webhooks, fix via verification branches
 
 ## 🌍 Environment Variables
-- **Management**: `POST/GET/PUT/DELETE /v1/apps/:app/env` ✅
-- **Build-time**: Available during image creation ✅
-- **Runtime**: Injected into deployment environment ✅
-- **Storage**: File-based persistence with JSON format
-- **CLI**: `ploy env set/get/list/delete` commands ✅
-- **Integration**: All lanes support environment variables in build and deploy phases
+- ✅ **Management**: `POST/GET/PUT/DELETE /v1/apps/:app/env`
+- ✅ **Build-time**: Available during image creation
+- ✅ **Runtime**: Injected into deployment environment
+- ✅ **Storage**: File-based persistence with JSON format
+- ✅ **CLI**: `ploy env set/get/list/delete` commands
+- ✅ **Integration**: All lanes support environment variables in build and deploy phases
 
 ⸻
 
 ## 🔀 Git Integration & Repository Validation
-- **Comprehensive Git Repository Analysis** ✅ (Aug 2025):
+- ✅ **Comprehensive Git Repository Analysis** (Aug 2025):
   - **Multi-Source URL Extraction**: Repository URLs from git config, package.json, Cargo.toml, pom.xml, go.mod
   - **URL Normalization**: SSH to HTTPS conversion with .git suffix removal for consistency
   - **Repository Metadata**: Branch detection, commit analysis, contributor statistics, language analysis
   - **Repository Health Scoring**: 0-100 scoring system based on security and validation issues
-- **Security-Focused Repository Validation** ✅ (Aug 2025):
+- ✅ **Security-Focused Repository Validation** (Aug 2025):
   - **Secrets Detection**: AWS keys, private keys, API keys, passwords, tokens in source code
   - **Sensitive File Detection**: .env files, private keys, certificates, SSH keys in repository
   - **GPG Commit Validation**: Signature verification for enhanced security compliance
   - **Comprehensive Validation Results**: Errors, warnings, security issues, and actionable suggestions
-- **Environment-Specific Git Validation** ✅ (Aug 2025):
+- ✅ **Environment-Specific Git Validation** (Aug 2025):
   - **Production Environment**: Clean repo, signed commits, trusted domains, restricted branches, size limits
   - **Staging Environment**: Clean repo with unsigned commit warnings, broader branch support
   - **Development Environment**: Dirty repo warnings only, flexible validation for rapid development
   - **Configurable Validation**: Custom trusted domains, branch restrictions, size limits per environment
-- **Build Pipeline Integration** ✅ (Aug 2025):
+- ✅ **Build Pipeline Integration** (Aug 2025):
   - **Enhanced Repository Detection**: Improved `extractSourceRepository` with Git utilities
   - **Build-Time Validation**: Repository validation during build process with environment awareness
   - **Health Score Logging**: Repository health and validation results during deployment pipeline
@@ -283,8 +283,11 @@ All include `/healthz` on port 8080.
 ⸻
 
 ## 🔮 Next Steps
-- Per-app Unikraft recipes
-- Keyless OIDC Cosign integration
-- E2E testing with Nomad cluster
-- Observability (Loki/Prometheus/Grafana)
-- Traffic shifting (blue/green, canary)
+- Per-app Unikraft recipes and custom configurations
+- TTL cleanup for preview allocations to prevent resource accumulation
+- E2E testing suite with full Nomad cluster validation
+- Observability stack integration (Loki/Prometheus/Grafana)
+- Advanced traffic shifting strategies (blue/green deployments)
+- Vault secrets management integration
+- Multi-region deployment support
+- Cost optimization and resource usage analytics
