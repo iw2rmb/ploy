@@ -340,8 +340,9 @@ func (h *HealthChecker) checkConnectivity(ctx context.Context, result *HealthChe
 		Status: HealthStatusHealthy,
 	}
 	
-	// Try to list objects (lightweight operation)
-	_, err := h.client.ListObjects(h.config.TestBucket, "health-check/")
+	// Try to list objects (lightweight operation) - use actual artifacts bucket
+	bucket := h.client.GetArtifactsBucket()
+	_, err := h.client.ListObjects(bucket, "health-check/")
 	duration := time.Since(start)
 	checkResult.Duration = duration
 	
@@ -397,6 +398,7 @@ func (h *HealthChecker) checkStorageOperations(ctx context.Context, result *Heal
 	
 	// For SeaweedFS, use volume assignment testing instead of full upload/download
 	// This avoids filer directory creation issues while still testing core functionality
+	bucket := h.client.GetArtifactsBucket()
 	if seaweedClient, ok := h.client.(*SeaweedFSClient); ok {
 		// Test volume assignment first (this is the core SeaweedFS operation)
 		assignment, assignErr := seaweedClient.TestVolumeAssignment()
@@ -415,7 +417,7 @@ func (h *HealthChecker) checkStorageOperations(ctx context.Context, result *Heal
 					testKey := fmt.Sprintf("health_%d", time.Now().Unix())
 					testData := strings.NewReader("healthcheck")
 					
-					if _, uploadErr := h.client.PutObject(h.config.TestBucket, testKey, testData, "text/plain"); uploadErr != nil {
+					if _, uploadErr := h.client.PutObject(bucket, testKey, testData, "text/plain"); uploadErr != nil {
 						// Volume assignment works but upload fails - degraded state
 						if strings.Contains(uploadErr.Error(), "409 Conflict") || strings.Contains(uploadErr.Error(), "failed to create directory") {
 							checkResult.Status = HealthStatusDegraded
@@ -453,7 +455,7 @@ func (h *HealthChecker) checkStorageOperations(ctx context.Context, result *Heal
 		testKey := fmt.Sprintf("health_%d.txt", time.Now().Unix())
 		testData := strings.NewReader(strings.Repeat("A", int(h.config.TestObjectSize)))
 		
-		_, uploadErr := h.client.PutObject(h.config.TestBucket, testKey, testData, "text/plain")
+		_, uploadErr := h.client.PutObject(bucket, testKey, testData, "text/plain")
 		if uploadErr != nil {
 			checkResult.Status = HealthStatusUnhealthy
 			checkResult.Message = "Upload operation failed"
@@ -461,7 +463,7 @@ func (h *HealthChecker) checkStorageOperations(ctx context.Context, result *Heal
 			result.Status = HealthStatusUnhealthy
 		} else {
 			// Test download
-			reader, downloadErr := h.client.GetObject(h.config.TestBucket, testKey)
+			reader, downloadErr := h.client.GetObject(bucket, testKey)
 			if downloadErr != nil {
 				checkResult.Status = HealthStatusDegraded
 				checkResult.Message = "Download operation failed"
