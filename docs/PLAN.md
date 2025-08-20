@@ -52,3 +52,21 @@ Next steps to implement:
 **Phase 7: Advanced Self-Healing & Automation**
 1. Diff push with verification: `POST /v1/apps/:app/diff?verify=true` API and `ploy push --verify --diff` CLI to push diffs that create temporary git branches for isolated testing.
 2. Webhook system: `POST /v1/apps/:app/webhooks` API to configure per-app webhooks for build/deploy events, enabling external LLM agents to monitor and react to deployment status.
+
+**Phase WASM: WebAssembly Runtime Support**
+1. **WASM Runtime Integration**: Integrate wazero (pure Go) WebAssembly runtime for Lane G deployment.
+2. **Lane G Builder Implementation**: Create `controller/builders/wasm.go` with WASM module detection and bundling.
+3. **WASM Detection Logic**: Implement automatic detection of WASM compilation targets in lane picker:
+   - Direct `.wasm` and `.wat` file detection
+   - Rust `wasm32-wasi` target in Cargo.toml
+   - AssemblyScript `.asc` files and compiler configuration
+   - WASM-specific dependencies (wasm-bindgen, js-sys, web-sys, wasi)
+   - Go with `GOOS=js GOARCH=wasm` build tags
+   - C/C++ with Emscripten toolchain detection
+4. **WASM Build Pipeline**: Create `scripts/build/wasm/` directory with build scripts for different WASM compilation paths.
+5. **Nomad WASM Driver**: Configure Nomad job templates for WASM runtime execution with proper resource limits and networking.
+6. **WASI Support**: Implement WASI Preview 1 filesystem and networking interfaces for WASM modules.
+7. **Component Model Integration**: Add support for linking multiple WASM modules using the WebAssembly Component Model.
+8. **WASM Security Policies**: Extend OPA policies for WASM-specific security requirements and resource constraints.
+9. **WASM Testing**: Create sample WASM applications in `apps/` directory for Rust, Go, AssemblyScript, and C++ targets.
+10. **Lane G Documentation**: Complete WASM compilation detection analysis and integration documentation.

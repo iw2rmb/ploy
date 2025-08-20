@@ -18,6 +18,13 @@
 - **Hermit** — Rust-based unikernel runtime alternative for Lane C
 - **Capstan** — OSv image build and management tool
 
+## WASM Runtime Technologies
+- **Wazero** — Pure Go WebAssembly runtime for Lane G (no CGO dependencies)
+- **Wasmtime** — Fast and secure WebAssembly runtime with WASI support
+- **Wasmer** — Universal WebAssembly runtime with multiple execution engines
+- **WASI Preview 1** — WebAssembly System Interface for filesystem and network access
+- **Component Model** — Future standard for linking multiple WASM modules efficiently
+
 ## Container Security & Isolation
 - **Kontain** — Lightweight VM isolation for OCI containers (Lane E)
 - **Firecracker** — MicroVM technology for secure container execution
@@ -29,6 +36,11 @@
 - **Gradle/Maven** — Java ecosystem build tools with Jib integration
 - **NPM/Node.js** — JavaScript runtime and package management
 - **Python** — Scripting and application runtime with C-extension detection
+- **Cargo** — Rust package manager with wasm32-wasi target support
+- **AssemblyScript** — TypeScript-like language that compiles to WebAssembly
+- **Emscripten** — C/C++ to WebAssembly compilation toolchain
+- **wasm-pack** — Rust-generated WebAssembly package builder
+- **Pyodide** — Python scientific stack compiled to WebAssembly
 
 ## Supply Chain Security
 - **Syft** — Software Bill of Materials (SBOM) generation
