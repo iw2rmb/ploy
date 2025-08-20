@@ -248,7 +248,7 @@ Next steps to implement:
    - Add comprehensive error handling and connection retries for Consul operations
    - Create automatic fallback to file-based store when Consul unavailable
 
-2. **Move Storage Client to External Configuration**:
+2. ✅ **COMPLETED (2025-08-20)** **Move Storage Client to External Configuration**:
    - Replace singleton storage client with per-request initialization
    - Move storage configuration from embedded config to external YAML files
    - Add configuration validation and reload capabilities without service restart
