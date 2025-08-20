@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -50,11 +51,30 @@ func NewTTLCleanupService(config *TTLConfig) *TTLCleanupService {
 	
 	ctx, cancel := context.WithCancel(context.Background())
 	
+	// Create HTTP client with custom transport for better IPv4/IPv6 handling
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true, // Enable both IPv4 and IPv6
+		}).DialContext,
+		ForceAttemptHTTP2:     false,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	
+	client := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: transport,
+	}
+	
 	return &TTLCleanupService{
-		config: config,
-		ctx:    ctx,
-		cancel: cancel,
-		client: &http.Client{Timeout: 30 * time.Second},
+		config:  config,
+		ctx:     ctx,
+		cancel:  cancel,
+		client:  client,
 		running: false,
 	}
 }
@@ -90,6 +110,12 @@ func (s *TTLCleanupService) Start() error {
 		return fmt.Errorf("TTL cleanup service is already running")
 	}
 	
+	// Test Nomad connectivity before starting
+	if err := s.testNomadConnectivity(); err != nil {
+		log.Printf("Warning: Nomad connectivity test failed: %v", err)
+		log.Printf("TTL cleanup service will start but may have connection issues")
+	}
+	
 	s.running = true
 	log.Printf("Starting TTL cleanup service (interval: %v, preview TTL: %v, max age: %v)", 
 		s.config.CleanupInterval, s.config.PreviewTTL, s.config.MaxAge)
@@ -102,6 +128,32 @@ func (s *TTLCleanupService) Start() error {
 	// Start periodic cleanup
 	go s.periodicCleanup()
 	
+	return nil
+}
+
+// testNomadConnectivity tests if we can reach the Nomad API
+func (s *TTLCleanupService) testNomadConnectivity() error {
+	url := fmt.Sprintf("%s/v1/status/leader", s.config.NomadAddr)
+	
+	req, err := http.NewRequestWithContext(s.ctx, "GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create connectivity test request: %w", err)
+	}
+	
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "ploy-ttl-cleanup/1.0")
+	
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("connectivity test failed: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("connectivity test returned status %d", resp.StatusCode)
+	}
+	
+	log.Printf("Nomad connectivity test successful (URL: %s)", url)
 	return nil
 }
 
@@ -172,13 +224,26 @@ func (s *TTLCleanupService) runCleanup() error {
 func (s *TTLCleanupService) getNomadJobs() ([]NomadJob, error) {
 	url := fmt.Sprintf("%s/v1/jobs", s.config.NomadAddr)
 	
-	resp, err := s.client.Get(url)
+	// Create request with context for better timeout handling
+	req, err := http.NewRequestWithContext(s.ctx, "GET", url, nil)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	// Add headers to ensure proper handling
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "ploy-ttl-cleanup/1.0")
+	
+	resp, err := s.client.Do(req)
+	if err != nil {
+		// Enhanced error logging for network connectivity issues
+		log.Printf("Nomad API connection failed: %v (URL: %s)", err, url)
 		return nil, fmt.Errorf("failed to query Nomad API: %w", err)
 	}
 	defer resp.Body.Close()
 	
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("Nomad API returned non-200 status: %d", resp.StatusCode)
 		return nil, fmt.Errorf("Nomad API returned status %d", resp.StatusCode)
 	}
 	
@@ -187,6 +252,7 @@ func (s *TTLCleanupService) getNomadJobs() ([]NomadJob, error) {
 		return nil, fmt.Errorf("failed to decode Nomad jobs: %w", err)
 	}
 	
+	log.Printf("Successfully retrieved %d jobs from Nomad API", len(jobs))
 	return jobs, nil
 }
 
