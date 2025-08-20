@@ -8,6 +8,12 @@ go_arch: "amd64"
 # Docker configuration
 docker_compose_version: "2.24.0"
 
+# Node.js and npm versions
+nodejs_version: "20"  # LTS version
+
+# Java version
+java_version: "17"
+
 # Nomad/Consul versions
 nomad_version: "1.7.2"
 consul_version: "1.17.1"

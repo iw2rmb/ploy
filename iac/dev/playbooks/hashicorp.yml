@@ -78,10 +78,23 @@
 
     - name: Download and install Consul
       block:
+        - name: Check if Consul is already installed
+          stat:
+            path: /usr/local/bin/consul
+          register: consul_binary
+
+        - name: Get current Consul version (if installed)
+          command: /usr/local/bin/consul version
+          register: current_consul_version
+          changed_when: false
+          ignore_errors: true
+          when: consul_binary.stat.exists
+
         - name: Download Consul
           get_url:
             url: "https://releases.hashicorp.com/consul/{{ consul_version }}/consul_{{ consul_version }}_linux_amd64.zip"
             dest: /tmp/consul.zip
+          when: not consul_binary.stat.exists or consul_version not in (current_consul_version.stdout | default(''))
 
         - name: Extract Consul
           unarchive:
@@ -90,6 +103,7 @@
             remote_src: true
             owner: hashicorp
             group: hashicorp
+          when: not consul_binary.stat.exists or consul_version not in (current_consul_version.stdout | default(''))
 
         - name: Create Consul symlink
           file:
@@ -99,10 +113,23 @@
 
     - name: Download and install Vault
       block:
+        - name: Check if Vault is already installed
+          stat:
+            path: /usr/local/bin/vault
+          register: vault_binary
+
+        - name: Get current Vault version (if installed)
+          command: /usr/local/bin/vault version
+          register: current_vault_version
+          changed_when: false
+          ignore_errors: true
+          when: vault_binary.stat.exists
+
         - name: Download Vault
           get_url:
             url: "https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip"
             dest: /tmp/vault.zip
+          when: not vault_binary.stat.exists or vault_version not in (current_vault_version.stdout | default(''))
 
         - name: Extract Vault
           unarchive:
@@ -111,6 +138,7 @@
             remote_src: true
             owner: hashicorp
             group: hashicorp
+          when: not vault_binary.stat.exists or vault_version not in (current_vault_version.stdout | default(''))
 
         - name: Create Vault symlink
           file:
@@ -304,3 +332,96 @@
         create: true
         owner: ploy
         group: ploy
+
+    - name: Deploy Traefik system job to Nomad
+      block:
+        - name: Check if Traefik job is already running
+          uri:
+            url: "http://localhost:4646/v1/job/traefik-system"
+            method: GET
+            status_code: [200, 404]
+          register: traefik_job_check
+          ignore_errors: true
+
+        - name: Copy Traefik Nomad job template to VPS
+          copy:
+            src: "../../../platform/nomad/traefik-system.hcl"
+            dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
+            owner: hashicorp
+            group: hashicorp
+            mode: '0644'
+
+        - name: Validate Traefik job syntax
+          command: nomad job validate /opt/hashicorp/nomad/jobs/traefik-system.hcl
+          register: traefik_validate
+          changed_when: false
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+
+        - name: Submit Traefik system job to Nomad
+          command: nomad job run /opt/hashicorp/nomad/jobs/traefik-system.hcl
+          register: traefik_job_submit
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          when: traefik_job_check.status == 404
+
+        - name: Wait for Traefik service to be healthy
+          uri:
+            url: "http://localhost:4646/v1/job/traefik-system/allocations"
+            method: GET
+            status_code: 200
+          register: traefik_allocs
+          until: >
+            traefik_allocs.json | length > 0 and
+            (traefik_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
+          retries: 12
+          delay: 10
+
+        - name: Verify Traefik is accessible
+          uri:
+            url: "http://localhost:8080/ping"
+            method: GET
+            status_code: 200
+          register: traefik_health_check
+          retries: 6
+          delay: 10
+          until: traefik_health_check.status == 200
+
+        - name: Display Traefik deployment status
+          debug:
+            msg: "Traefik system job deployed successfully and is healthy"
+
+        - name: Create Traefik data directory for SSL certificates
+          file:
+            path: /opt/ploy/traefik-data
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Set up firewall rules for Traefik
+          ufw:
+            rule: allow
+            port: "{{ item }}"
+            comment: "Traefik routing"
+          loop:
+            - "80"   # HTTP
+            - "443"  # HTTPS
+            - "8080" # Traefik dashboard
+
+      rescue:
+        - name: Handle Traefik deployment failure
+          debug:
+            msg: "Warning: Traefik deployment failed. Manual intervention may be required."
+        
+        - name: Show Traefik job status on failure
+          command: nomad job status traefik-system
+          register: traefik_status
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          ignore_errors: true
+        
+        - name: Display failure information
+          debug:
+            var: traefik_status.stdout_lines
+          when: traefik_status.stdout_lines is defined
