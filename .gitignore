@@ -42,3 +42,6 @@ __pycache__/
 
 # Git
 .git/
+
+# Logs
+/*.log
