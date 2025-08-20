@@ -204,6 +204,7 @@ go run ./tools/lane-pick --path /path/to/project
 6. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
+    - **Controller Shutdown**: Stop any running controller before testing: `pkill -f './build/controller' || true`
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
 7. **Error Resolution**: IF any tests fail:
