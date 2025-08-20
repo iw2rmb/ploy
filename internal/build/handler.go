@@ -109,6 +109,38 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 		imagePath = img
 	}
 
+	// Copy image to persistent location for Nomad access
+	if imagePath != "" {
+		persistentDir := "/opt/ploy/artifacts"
+		if err := os.MkdirAll(persistentDir, 0755); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("failed to create persistent artifacts directory: %w", err))
+		}
+		
+		persistentImagePath := filepath.Join(persistentDir, filepath.Base(imagePath))
+		
+		// Copy the image file
+		if err := copyFile(imagePath, persistentImagePath); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("failed to copy image to persistent location: %w", err))
+		}
+		
+		// Also copy any signature files
+		if utils.FileExists(imagePath + ".sig") {
+			if err := copyFile(imagePath+".sig", persistentImagePath+".sig"); err != nil {
+				fmt.Printf("Warning: Failed to copy signature file: %v\n", err)
+			}
+		}
+		
+		// Also copy any SBOM files
+		if utils.FileExists(imagePath + ".sbom.json") {
+			if err := copyFile(imagePath+".sbom.json", persistentImagePath+".sbom.json"); err != nil {
+				fmt.Printf("Warning: Failed to copy SBOM file: %v\n", err)
+			}
+		}
+		
+		// Update imagePath to point to the persistent location
+		imagePath = persistentImagePath
+	}
+
 	// Generate comprehensive SBOM for the built artifact
 	if imagePath != "" {
 		// Generate SBOM for file-based artifacts (Lanes A, B, C, D, F)
@@ -410,4 +442,30 @@ func extractSourceRepository(srcDir string) string {
 	}
 	
 	return ""
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+	
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+	
+	if _, err := srcFile.WriteTo(dstFile); err != nil {
+		return err
+	}
+	
+	// Copy file permissions
+	if info, err := srcFile.Stat(); err == nil {
+		os.Chmod(dst, info.Mode())
+	}
+	
+	return nil
 }
