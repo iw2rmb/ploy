@@ -357,62 +357,156 @@
 319. Network error handling gracefully manages transient connectivity issues.
 320. Comprehensive error messages include actionable debugging information.
 
-## Phase 5: Git Integration and Repository Validation Tests (321-370)
+## Phase 5: Storage Error Handling and Enhanced Client Tests (321-370)
 
-### Repository Analysis and Validation (321-335)
-321. Git repository detection correctly identifies directories with .git folder structure.
-322. Git repository detection works in subdirectories of git repositories via git rev-parse.
-323. Repository URL extraction from git remote get-url origin command for HTTPS and SSH URLs.
-324. Repository URL extraction from .git/config parsing when remote command fails.
-325. Repository URL extraction from package.json repository field for Node.js projects.
-326. Repository URL extraction from Cargo.toml repository field for Rust projects.
-327. Repository URL extraction from pom.xml SCM configuration for Java/Maven projects.
-328. Repository URL extraction from go.mod module path for Go projects.
-329. URL normalization converts SSH format (git@github.com:user/repo.git) to HTTPS format.
-330. URL normalization removes .git suffix and ensures https:// prefix for consistency.
-331. Repository status detection identifies clean vs dirty repositories with uncommitted changes.
-332. Repository status detection identifies untracked files separate from staged changes.
-333. Branch detection handles normal branches, detached HEAD state, and main/master branches.
-334. Commit information extraction includes SHA, message, author, email, timestamp, and GPG status.
-335. Remote origin detection parses git remote -v output for fetch and push URLs.
+### Comprehensive Storage Error Classification (321-335)
+321. Storage errors properly classify network connectivity failures as ErrorTypeNetwork.
+322. Storage errors properly classify 401/403 authentication failures as ErrorTypeAuthentication.  
+323. Storage errors properly classify timeout operations as ErrorTypeTimeout.
+324. Storage errors properly classify 404/410 missing object errors as ErrorTypeNotFound.
+325. Storage errors properly classify 429 rate limiting as ErrorTypeRateLimit.
+326. Storage errors properly classify 503/504 service unavailable as ErrorTypeServiceUnavailable.
+327. Storage errors properly classify checksum mismatches as ErrorTypeCorruption.
+328. Storage errors properly classify disk space issues as ErrorTypeInsufficientStorage.
+329. Storage errors include operation context (bucket, key, content type) in error details.
+330. Storage errors include attempt number and retry information for debugging.
+331. Storage errors automatically determine retryable vs non-retryable based on error type.
+332. Storage errors include suggested retry delay for rate limiting and service unavailable cases.
+333. Storage error timestamps enable accurate operation duration tracking.
+334. Storage error formatting provides human-readable messages with technical details.
+335. Storage error wrapping preserves original error information for debugging.
 
-### Security Scanning and Validation (336-350)
-336. Secret detection scans for AWS access keys (AKIA pattern) in repository files.
-337. Secret detection identifies private key headers (-----BEGIN.*PRIVATE KEY-----) in code.
-338. Secret detection finds API key patterns (api_key, api-key) in configuration files.
-339. Secret detection locates password and token references in source code.
-340. Sensitive file detection identifies .env, secrets.yaml, private.key files in repository.
-341. Sensitive file detection finds certificate files (.pem, .p12, .pfx) and SSH keys.
-342. Security scanning skips binary files and .git directory for performance.
-343. Security scanning processes only text files with known extensions (.js, .py, .go, etc.).
-344. Validation result includes separate arrays for errors, warnings, security issues, suggestions.
-345. Repository validation provides comprehensive health scoring (0-100) based on issues found.
-346. Validation results include specific file paths and line numbers for detected issues.
-347. Security issue reporting provides clear descriptions and remediation suggestions.
-348. Validation configuration supports different strictness levels (None, Warning, Strict).
-349. Production validation enforces clean repositories, signed commits, and trusted origins.
-350. Development validation provides warnings without blocking deployment for flexibility.
+### Advanced Retry Logic and Backoff Strategies (336-350)
+336. Retry mechanism implements exponential backoff with configurable base delay and multiplier.
+337. Retry mechanism includes jitter randomization to prevent thundering herd problems.
+338. Retry mechanism respects context cancellation and timeout for graceful operation termination.
+339. Retry mechanism honors server-provided retry-after headers from rate limiting responses.
+340. Retry logic differentiates retryable errors (network, timeout) from non-retryable (authentication).
+341. Maximum retry attempts are configurable per operation type (upload=5, download=3, verify=3).
+342. Retry delays cap at configurable maximum (default 60 seconds) to prevent excessive waits.
+343. Retry logic resets file seek position before each retry attempt for upload operations.
+344. Retry logic reopens streams for download operations that fail mid-transfer.
+345. Retry logic includes circuit breaker pattern to prevent cascading failures.
+346. Retry statistics track success rates and failure patterns for monitoring.
+347. Retry logic logs detailed attempt information including delay calculations and error types.
+348. Context-aware retry respects operation-level timeouts and cancellation signals.
+349. Retry configuration supports per-environment customization (aggressive retry in prod).
+350. Retry mechanism gracefully handles edge cases like empty response bodies and connection resets.
 
-### Environment-Specific Git Validation (351-365)
-351. Production environment validation requires clean repository with no uncommitted changes.
-352. Production environment validation requires GPG-signed commits for security compliance.
-353. Production environment validation enforces trusted domain restrictions (github.com, gitlab.com).
-354. Production environment validation limits allowed branches to main/master/production.
-355. Production environment validation enforces maximum repository size limits (100MB).
-356. Staging environment validation requires clean repository but allows unsigned commits.
-357. Staging environment validation permits broader branch selection including develop/staging.
-358. Staging environment validation uses stricter size limits (default config) than development.
-359. Development environment validation allows dirty repositories with warnings only.
-360. Development environment validation accepts any branch with warning notifications.
-361. Development environment validation uses relaxed size limits for local development.
-362. Environment-specific validation preserves original configuration after temporary changes.
-363. Validation configuration supports custom trusted domains for enterprise environments.
-364. Repository size calculation includes all files except .git directory for accuracy.
-365. Branch validation provides clear error messages for non-allowed branches in strict mode.
+### Storage Health Monitoring and Metrics (351-365)
+351. Storage metrics track comprehensive operation statistics (uploads, downloads, verifications).
+352. Storage metrics calculate success rates, average duration, and maximum operation times.
+353. Storage metrics maintain error counts by error type for detailed failure analysis.
+354. Storage metrics track file size statistics (total bytes uploaded/downloaded).
+355. Storage health checker performs connectivity tests with configurable intervals.
+356. Storage health checker validates configuration integrity (provider type, bucket names).
+357. Storage health checker performs deep storage operations tests (upload/download/verify).
+358. Storage health status automatically classifies as healthy/degraded/unhealthy based on metrics.
+359. Health status considers consecutive failures and time since last successful operation.
+360. Health checks include test object creation and cleanup to verify full operation cycle.
+361. Metrics collection is thread-safe with proper mutex protection for concurrent access.
+362. Health monitoring provides detailed JSON status reports for API endpoints.
+363. Storage monitoring integrates with controller health endpoints (/storage/health, /storage/metrics).
+364. Metrics reset and cleanup functionality prevents unbounded memory growth over time.
+365. Health check timeout configuration prevents hanging health verification operations.
 
-### Repository Statistics and Analysis (366-370)
-366. Repository statistics include commit count, contributor count, branch count, tag count.
-367. Language statistics analysis identifies file types and calculates size by language.
-368. Contributor analysis extracts names and emails from git shortlog output.
-369. Repository summary provides human-readable validation results with all metadata.
-370. Repository information aggregates validation, statistics, and analysis into comprehensive report.
+### Enhanced Storage Client Integration (366-380)
+366. Enhanced storage client wraps existing storage providers with comprehensive error handling.
+367. Enhanced client seamlessly integrates retry logic with existing storage operations.
+368. Enhanced client provides backward compatibility with existing storage client interfaces.
+369. Enhanced client configuration supports enabling/disabling metrics and health checking.
+370. Enhanced client tracks operation-level metrics including context and performance data.
+371. Enhanced client handles file upload operations with automatic retry and error classification.
+372. Enhanced client manages download operations with stream retry and metrics tracking.
+373. Enhanced client processes artifact bundle uploads with comprehensive verification.
+374. Enhanced client integrates integrity verification with retry logic for robust operations.
+375. Enhanced client provides graceful fallback to basic storage client when unavailable.
+376. Enhanced client exposes health status and metrics through controller API endpoints.
+377. Enhanced client supports configurable operation timeouts to prevent indefinite waits.
+378. Enhanced client implements read/write file seeking with proper reset functionality.
+379. Enhanced client wraps downloaded streams with metrics tracking for bandwidth monitoring.
+380. Enhanced client initialization validates configuration and reports setup errors clearly.
+
+### Storage Error Recovery and Resilience (381-395)
+381. Storage operations recover from temporary network partitions with retry logic.
+382. Storage operations handle SeaweedFS master failover gracefully with minimal disruption.
+383. Storage operations detect and recover from corrupted uploads using checksum verification.
+384. Storage operations handle concurrent access conflicts with appropriate retry delays.
+385. Storage operations recover from partial uploads by seeking to beginning and retrying.
+386. Storage operations handle storage service restarts with connection re-establishment.
+387. Storage operations manage rate limiting with progressive backoff and queue management.
+388. Storage operations detect disk full conditions and provide actionable error messages.
+389. Storage operations handle authentication token expiry with refresh and retry logic.
+390. Storage operations recover from DNS resolution failures affecting storage endpoints.
+391. Enhanced client provides detailed error reporting for all failure scenarios.
+392. Recovery mechanisms preserve upload progress where possible to avoid full retries.
+393. Error recovery includes comprehensive logging for audit trail and debugging support.
+394. Storage resilience testing validates behavior under various failure conditions.
+395. Graceful degradation maintains core functionality when storage monitoring is unavailable.
+
+### Storage API Integration and Controller Enhancement (396-400)
+396. Controller initialization properly sets up enhanced storage client alongside basic client.
+397. Build handler uses enhanced storage client for all artifact upload operations with fallback.
+398. Storage health endpoint returns comprehensive health status including check results.
+399. Storage metrics endpoint provides real-time operational statistics and error analysis.
+400. Enhanced storage integration maintains backward compatibility with existing build workflows.
+
+## Phase 5: Git Integration and Repository Validation Tests (401-450)
+
+### Repository Analysis and Validation (401-415)
+401. Git repository detection correctly identifies directories with .git folder structure.
+402. Git repository detection works in subdirectories of git repositories via git rev-parse.
+403. Repository URL extraction from git remote get-url origin command for HTTPS and SSH URLs.
+404. Repository URL extraction from .git/config parsing when remote command fails.
+405. Repository URL extraction from package.json repository field for Node.js projects.
+406. Repository URL extraction from Cargo.toml repository field for Rust projects.
+407. Repository URL extraction from pom.xml SCM configuration for Java/Maven projects.
+408. Repository URL extraction from go.mod module path for Go projects.
+409. URL normalization converts SSH format (git@github.com:user/repo.git) to HTTPS format.
+410. URL normalization removes .git suffix and ensures https:// prefix for consistency.
+411. Repository status detection identifies clean vs dirty repositories with uncommitted changes.
+412. Repository status detection identifies untracked files separate from staged changes.
+413. Branch detection handles normal branches, detached HEAD state, and main/master branches.
+414. Commit information extraction includes SHA, message, author, email, timestamp, and GPG status.
+415. Remote origin detection parses git remote -v output for fetch and push URLs.
+
+### Security Scanning and Validation (416-430)
+416. Secret detection scans for AWS access keys (AKIA pattern) in repository files.
+417. Secret detection identifies private key headers (-----BEGIN.*PRIVATE KEY-----) in code.
+418. Secret detection finds API key patterns (api_key, api-key) in configuration files.
+419. Secret detection locates password and token references in source code.
+420. Sensitive file detection identifies .env, secrets.yaml, private.key files in repository.
+421. Sensitive file detection finds certificate files (.pem, .p12, .pfx) and SSH keys.
+422. Security scanning skips binary files and .git directory for performance.
+423. Security scanning processes only text files with known extensions (.js, .py, .go, etc.).
+424. Validation result includes separate arrays for errors, warnings, security issues, suggestions.
+425. Repository validation provides comprehensive health scoring (0-100) based on issues found.
+426. Validation results include specific file paths and line numbers for detected issues.
+427. Security issue reporting provides clear descriptions and remediation suggestions.
+428. Validation configuration supports different strictness levels (None, Warning, Strict).
+429. Production validation enforces clean repositories, signed commits, and trusted origins.
+430. Development validation provides warnings without blocking deployment for flexibility.
+
+### Environment-Specific Git Validation (431-445)
+431. Production environment validation requires clean repository with no uncommitted changes.
+432. Production environment validation requires GPG-signed commits for security compliance.
+433. Production environment validation enforces trusted domain restrictions (github.com, gitlab.com).
+434. Production environment validation limits allowed branches to main/master/production.
+435. Production environment validation enforces maximum repository size limits (100MB).
+436. Staging environment validation requires clean repository but allows unsigned commits.
+437. Staging environment validation permits broader branch selection including develop/staging.
+438. Staging environment validation uses stricter size limits (default config) than development.
+439. Development environment validation allows dirty repositories with warnings only.
+440. Development environment validation accepts any branch with warning notifications.
+441. Development environment validation uses relaxed size limits for local development.
+442. Environment-specific validation preserves original configuration after temporary changes.
+443. Validation configuration supports custom trusted domains for enterprise environments.
+444. Repository size calculation includes all files except .git directory for accuracy.
+445. Branch validation provides clear error messages for non-allowed branches in strict mode.
+
+### Repository Statistics and Analysis (446-450)
+446. Repository statistics include commit count, contributor count, branch count, tag count.
+447. Language statistics analysis identifies file types and calculates size by language.
+448. Contributor analysis extracts names and emails from git shortlog output.
+449. Repository summary provides human-readable validation results with all metadata.
+450. Repository information aggregates validation, statistics, and analysis into comprehensive report.
