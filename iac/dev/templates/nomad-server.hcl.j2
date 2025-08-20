@@ -3,12 +3,12 @@ data_dir = "/opt/hashicorp/nomad"
 log_level = "INFO"
 name = "ploy-dev-node"
 
-# Network configuration
-bind_addr = "0.0.0.0"
+# Network configuration - Bind to localhost, advertise localhost for development
+bind_addr = "127.0.0.1"
 advertise {
-  http = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
-  rpc = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
-  serf = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+  http = "127.0.0.1"
+  rpc = "127.0.0.1"
+  serf = "127.0.0.1"
 }
 
 # Enable metrics for monitoring
@@ -35,7 +35,7 @@ server {
 
 client {
   enabled = true
-  servers = ["{{ ansible_default_ipv4.address | default('127.0.0.1') }}:4647"]
+  servers = ["127.0.0.1:4647"]
   
   # Enhanced client configuration for Ploy lanes
   options {
@@ -64,7 +64,7 @@ client {
 }
 
 consul {
-  address = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}:8500"
+  address = "127.0.0.1:8500"
   auto_advertise = true
   server_auto_join = true
   client_auto_join = true
@@ -106,6 +106,7 @@ ports {
   serf = 4648
 }
 
+# Listen on all interfaces for local development access
 addresses {
   http = "0.0.0.0"
   rpc = "0.0.0.0"
