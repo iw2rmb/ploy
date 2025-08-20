@@ -462,10 +462,8 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	
-	// Copy file permissions
-	if info, err := srcFile.Stat(); err == nil {
-		os.Chmod(dst, info.Mode())
-	}
+	// Set readable permissions for Nomad access
+	os.Chmod(dst, 0755)
 	
 	return nil
 }
