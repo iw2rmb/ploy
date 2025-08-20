@@ -143,40 +143,7 @@
           - python3-venv
         state: present
 
-    - name: Install Node.js and npm
-      block:
-        - name: Check if Node.js is already installed
-          command: node --version
-          register: current_node_version
-          changed_when: false
-          ignore_errors: true
 
-        - name: Install NodeSource repository for specific Node.js version
-          shell: |
-            curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | sudo -E bash -
-          when: current_node_version.failed or nodejs_version not in (current_node_version.stdout | default(''))
-
-        - name: Install Node.js and npm
-          apt:
-            name:
-              - nodejs
-            state: present
-            update_cache: true
-          when: current_node_version.failed or nodejs_version not in (current_node_version.stdout | default(''))
-
-    - name: Install Java {{ java_version }}
-      block:
-        - name: Check if Java is already installed
-          command: java -version
-          register: current_java_version
-          changed_when: false
-          ignore_errors: true
-
-        - name: Install Java {{ java_version }}
-          apt:
-            name: openjdk-{{ java_version }}-jdk
-            state: present
-          when: current_java_version.failed or java_version not in (current_java_version.stderr | default(''))
 
     - name: Install build tools
       block:
