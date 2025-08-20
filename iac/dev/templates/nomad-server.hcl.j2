@@ -89,6 +89,13 @@ plugin "docker" {
   }
 }
 
+plugin "qemu" {
+  config {
+    # Enable QEMU driver for unikernel and VM workloads
+    image_paths = ["/opt/ploy/artifacts", "/tmp"]
+  }
+}
+
 ui {
   enabled = true
 }
