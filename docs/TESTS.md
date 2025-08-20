@@ -620,3 +620,34 @@
 540. Build process respects explicitly provided Java version over detected version.
 541. Java version logging includes source of detection (Gradle, Maven, .java-version).
 542. Build artifacts include Java version metadata for deployment verification.
+
+## TTL Cleanup for Preview Allocations Tests (543-567)
+
+### TTL Cleanup Service Functionality (543-557)
+543. TTL cleanup service automatically starts on controller startup with configured interval.
+544. TTL cleanup service identifies preview jobs using pattern `{app}-{sha}` format.
+545. TTL cleanup service calculates job age based on Nomad job SubmitTime accurately.
+546. TTL cleanup service removes preview jobs exceeding configured preview TTL (default 24h).
+547. TTL cleanup service removes preview jobs exceeding maximum age limit (default 7d).
+548. TTL cleanup service respects dry run mode and only logs cleanup actions without deletion.
+549. TTL cleanup service logs detailed information for each cleanup operation performed.
+550. TTL cleanup service handles Nomad API failures gracefully with retry logic.
+551. TTL cleanup service stops and purges jobs using `nomad job stop -purge` command.
+552. TTL cleanup service continues cleanup when individual job deletions fail.
+553. TTL cleanup service maintains statistics on cleanup operations and preview job counts.
+554. TTL cleanup service provides age distribution analytics for preview allocations.
+555. TTL cleanup service handles job not found errors gracefully during cleanup.
+556. TTL cleanup service can be started and stopped via HTTP API endpoints.
+557. TTL cleanup service configuration can be updated dynamically via API.
+
+### TTL Configuration and Management (558-567)
+558. TTL configuration loads from `/etc/ploy/cleanup-config.json` with fallback to defaults.
+559. TTL configuration supports environment variables (PLOY_PREVIEW_TTL, PLOY_CLEANUP_INTERVAL).
+560. TTL configuration validates minimum values (1min TTL, 5min interval) for safety.
+561. TTL configuration creates default config file when none exists.
+562. TTL configuration manager handles file creation and directory setup automatically.
+563. `GET /v1/cleanup/config` returns current configuration with defaults and environment info.
+564. `PUT /v1/cleanup/config` updates configuration and saves changes to file.
+565. `POST /v1/cleanup/trigger?dry_run=true` performs manual cleanup with dry run option.
+566. `GET /v1/cleanup/status` provides service status and statistics.
+567. `GET /v1/cleanup/jobs` lists current preview jobs with ages and cleanup recommendations.
