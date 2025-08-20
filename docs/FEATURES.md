@@ -32,6 +32,13 @@ Auto-classified lanes:
   - Optimized lwip networking stack with TCP/UDP, DHCP, threading
   - Dropbear SSH for debug (planned)
 - ✅ **Lane C** – OSv Java/Scala
+  - ✅ **Java Version Detection** (Aug 2025): Automatic Java version detection from build files
+    - Gradle support: `JavaLanguageVersion.of(21)`, `sourceCompatibility = "17"`, `gradle.properties`
+    - Maven support: `<maven.compiler.source>21</maven.compiler.source>`, `<java.version>11</java.version>`
+    - `.java-version` file support for explicit version specification
+    - Intelligent fallback to Java 21 default when detection fails
+    - Version validation ensuring reasonable range (8-25) for production builds
+    - Enhanced build logging with detected version information and source
   - Jib → Capstan → `<app>-<sha>.qcow2`
   - Custom MainClass support
 - ✅ **Lane D** – FreeBSD Jails
