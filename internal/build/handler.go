@@ -300,49 +300,29 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore *en
 			}
 		}
 		
-		// Upload source code SBOM with enhanced error handling if it exists
+		// Upload source code SBOM with enhanced retry and verification
 		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
 		if _, err := os.Stat(sourceSBOMPath); err == nil {
-			if f, err := os.Open(sourceSBOMPath); err == nil {
-				defer f.Close()
-				_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"source.sbom.json", f, "application/json")
-				if uploadErr != nil {
-					fmt.Printf("Warning: Failed to upload source SBOM: %v\n", uploadErr)
-				} else {
-					// Verify source SBOM upload integrity
-					verifier := storage.NewIntegrityVerifier(storeClient)
-					if info, err := verifier.VerifyUploadedFile(sourceSBOMPath, keyPrefix+"source.sbom.json"); err != nil {
-						fmt.Printf("Warning: Source SBOM integrity verification failed: %v\n", err)
-					} else {
-						fmt.Printf("Source SBOM integrity verified: %s (size: %d bytes)\n", info.StorageKey, info.UploadedSize)
-					}
-				}
+			if err := uploadFileWithRetryAndVerification(storeClient, sourceSBOMPath, keyPrefix+"source.sbom.json", "application/json"); err != nil {
+				fmt.Printf("Warning: Failed to upload source SBOM after retries: %v\n", err)
+			} else {
+				fmt.Printf("Source SBOM uploaded and verified successfully\n")
 			}
 		}
 		
-		// Upload container SBOM for Lane E with enhanced error handling if it exists in /tmp
+		// Upload container SBOM for Lane E with enhanced retry and verification
 		if dockerImage != "" {
 			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
 			if _, err := os.Stat(containerSBOMPath); err == nil {
-				if f, err := os.Open(containerSBOMPath); err == nil {
-					defer f.Close()
-					_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"container.sbom.json", f, "application/json")
-					if uploadErr != nil {
-						fmt.Printf("Warning: Failed to upload container SBOM: %v\n", uploadErr)
-					} else {
-						// Verify container SBOM upload integrity
-						verifier := storage.NewIntegrityVerifier(storeClient)
-						if info, err := verifier.VerifyUploadedFile(containerSBOMPath, keyPrefix+"container.sbom.json"); err != nil {
-							fmt.Printf("Warning: Container SBOM integrity verification failed: %v\n", err)
-						} else {
-							fmt.Printf("Container SBOM integrity verified: %s (size: %d bytes)\n", info.StorageKey, info.UploadedSize)
-						}
-					}
+				if err := uploadFileWithRetryAndVerification(storeClient, containerSBOMPath, keyPrefix+"container.sbom.json", "application/json"); err != nil {
+					fmt.Printf("Warning: Failed to upload container SBOM after retries: %v\n", err)
+				} else {
+					fmt.Printf("Container SBOM uploaded and verified successfully\n")
 				}
 			}
 		}
 		
-		// Upload metadata with enhanced error handling
+		// Upload metadata with enhanced retry and verification
 		meta := map[string]string{
 			"lane":        lane,
 			"image":       imagePath,
@@ -352,9 +332,10 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore *en
 			"signed":      fmt.Sprintf("%t", signed),
 		}
 		mb, _ := json.Marshal(meta)
-		_, metaUploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"meta.json", bytes.NewReader(mb), "application/json")
-		if metaUploadErr != nil {
-			fmt.Printf("Warning: Failed to upload metadata: %v\n", metaUploadErr)
+		if err := uploadBytesWithRetryAndVerification(storeClient, mb, keyPrefix+"meta.json", "application/json"); err != nil {
+			fmt.Printf("Warning: Failed to upload metadata after retries: %v\n", err)
+		} else {
+			fmt.Printf("Metadata uploaded and verified successfully\n")
 		}
 	}
 
@@ -488,4 +469,100 @@ func copyFile(src, dst string) error {
 	os.Chmod(dst, 0755)
 	
 	return nil
+}
+
+// uploadFileWithRetryAndVerification uploads a file with enhanced retry logic and integrity verification
+func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, filePath, storageKey, contentType string) error {
+	const maxRetries = 3
+	const baseDelay = time.Second
+	
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Open file for this attempt
+		f, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %w", filePath, err)
+		}
+		
+		// Attempt upload with verification
+		_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), storageKey, f, contentType)
+		f.Close()
+		
+		if uploadErr == nil {
+			// Upload successful, now verify integrity
+			verifier := storage.NewIntegrityVerifier(storeClient)
+			if info, verifyErr := verifier.VerifyUploadedFile(filePath, storageKey); verifyErr != nil {
+				fmt.Printf("Upload attempt %d: integrity verification failed: %v\n", attempt, verifyErr)
+				// If this is not the last attempt, continue to retry
+				if attempt < maxRetries {
+					delay := time.Duration(attempt) * baseDelay
+					fmt.Printf("Retrying upload after %v...\n", delay)
+					time.Sleep(delay)
+					continue
+				}
+				return fmt.Errorf("integrity verification failed after %d attempts: %w", maxRetries, verifyErr)
+			} else {
+				// Success: upload and verification both passed
+				fmt.Printf("File %s uploaded and verified: %s (size: %d bytes)\n", 
+					filepath.Base(filePath), info.StorageKey, info.UploadedSize)
+				return nil
+			}
+		}
+		
+		// Upload failed
+		fmt.Printf("Upload attempt %d failed: %v\n", attempt, uploadErr)
+		
+		// If this is not the last attempt, retry with exponential backoff
+		if attempt < maxRetries {
+			delay := time.Duration(attempt) * baseDelay
+			fmt.Printf("Retrying upload after %v...\n", delay)
+			time.Sleep(delay)
+		}
+	}
+	
+	return fmt.Errorf("upload failed after %d attempts", maxRetries)
+}
+
+// uploadBytesWithRetryAndVerification uploads byte data with enhanced retry logic and verification
+func uploadBytesWithRetryAndVerification(storeClient *storage.StorageClient, data []byte, storageKey, contentType string) error {
+	const maxRetries = 3
+	const baseDelay = time.Second
+	
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Create new reader for this attempt
+		reader := bytes.NewReader(data)
+		
+		// Attempt upload
+		result, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), storageKey, reader, contentType)
+		
+		if uploadErr == nil {
+			// Upload successful, verify by checking result and optionally retrieving object
+			if result != nil && result.Size == int64(len(data)) {
+				fmt.Printf("Data uploaded and size verified: %s (%d bytes)\n", storageKey, result.Size)
+				return nil
+			} else {
+				fmt.Printf("Upload attempt %d: size mismatch (expected %d, got %d)\n", 
+					attempt, len(data), result.Size)
+				// If this is not the last attempt, continue to retry
+				if attempt < maxRetries {
+					delay := time.Duration(attempt) * baseDelay
+					fmt.Printf("Retrying upload after %v...\n", delay)
+					time.Sleep(delay)
+					continue
+				}
+				return fmt.Errorf("size verification failed after %d attempts", maxRetries)
+			}
+		}
+		
+		// Upload failed
+		fmt.Printf("Upload attempt %d failed: %v\n", attempt, uploadErr)
+		
+		// If this is not the last attempt, retry with exponential backoff
+		if attempt < maxRetries {
+			delay := time.Duration(attempt) * baseDelay
+			fmt.Printf("Retrying upload after %v...\n", delay)
+			time.Sleep(delay)
+		}
+	}
+	
+	return fmt.Errorf("upload failed after %d attempts", maxRetries)
 }
