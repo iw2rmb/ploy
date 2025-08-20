@@ -1,9 +1,10 @@
 # Ploy REST API (v1)
 
-## Core Endpoints
+## Core Application Endpoints
 - `POST /v1/apps/:app/builds?sha=<sha>&lane=<A..F>&main=<MainClass>` — build & deploy; lane auto-picked if omitted.
-- `GET /v1/apps` — list apps (stub).
-- `GET /v1/status/:app` — controller status.
+- `GET /v1/apps` — list all applications.
+- `GET /v1/status/:app` — get application deployment status.
+- `DELETE /v1/apps/:app` — destroy application and all associated resources.
 
 ## Domain Management Endpoints (Implemented)
 - `POST /v1/apps/:app/domains` — add domain to app.
@@ -45,8 +46,37 @@
 **Features:**
 - Environment variables available during build phase (all lanes)
 - Environment variables injected into Nomad job templates for runtime
-- File-based storage with JSON persistence
+- Consul KV storage with automatic fallback to file-based storage
 - Full CRUD operations with proper error handling
+
+## Storage Management Endpoints (Implemented)
+- `GET /v1/storage/health` — get comprehensive storage system health status.
+  - Returns: `{"timestamp": "2025-08-20T19:35:10Z", "status": "degraded", "checks": {...}, "summary": "...", "metrics": {...}}`
+- `GET /v1/storage/metrics` — get detailed storage operation metrics.
+  - Returns: `{"total_uploads": 42, "successful_uploads": 40, "failed_uploads": 2, ...}`
+- `GET /v1/storage/config` — get current storage configuration.
+  - Returns: `{"storage": {"provider": "seaweedfs", "master": "localhost:9333", ...}}`
+- `POST /v1/storage/config/reload` — reload storage configuration without restart.
+  - Returns: `{"reloaded": true, "config": {...}, "message": "Configuration reload completed"}`
+- `POST /v1/storage/config/validate` — validate storage configuration.
+  - Returns: `{"valid": true, "message": "Configuration is valid"}`
+
+**Features:**
+- SeaweedFS distributed storage with health monitoring
+- Real-time configuration reload capabilities
+- Comprehensive storage metrics and monitoring
+- External YAML configuration management
+
+## TTL Cleanup Endpoints (Implemented)
+- `POST /v1/ttl/cleanup` — trigger manual TTL cleanup of preview allocations.
+- `GET /v1/ttl/config` — get current TTL cleanup configuration.
+- `POST /v1/ttl/config` — update TTL cleanup configuration.
+- `GET /v1/ttl/stats` — get TTL cleanup statistics and history.
+
+**Features:**
+- Automatic preview allocation cleanup with configurable TTL
+- Manual cleanup triggers for immediate resource recovery
+- Comprehensive cleanup statistics and monitoring
 
 ## Automated Remediation Framework Endpoints (Planned)
 - `POST /v1/arf/transform` — execute code transformation on repositories.

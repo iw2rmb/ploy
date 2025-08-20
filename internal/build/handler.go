@@ -269,12 +269,40 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 		return utils.ErrJSON(c, 403, fmt.Errorf("OPA policy enforcement failed: %w", err))
 	}
 
+	// Use enhanced templates with comprehensive configuration
 	jobFile, err := nomad.RenderTemplate(lane, nomad.RenderData{
-		App:         appName,
-		ImagePath:   imagePath,
-		DockerImage: dockerImage,
-		EnvVars:     appEnvVars,
-	})
+		App:           appName,
+		ImagePath:     imagePath,
+		DockerImage:   dockerImage,
+		EnvVars:       appEnvVars,
+		Version:       sha,
+		MainClass:     mainClass,
+		IsDebug:       debug,
+		
+		// Enable enhanced features
+		VaultEnabled:        true,  // Enable Vault integration for secrets
+		ConsulConfigEnabled: true,  // Enable Consul KV configuration
+		ConnectEnabled:      true,  // Enable Consul Connect service mesh
+		VolumeEnabled:       false, // Disable volumes by default (can be enabled per app)
+		DebugEnabled:        debug, // Enable debug features for debug builds
+		
+		// Resource allocation based on lane
+		InstanceCount: getInstanceCountForLane(lane),
+		CpuLimit:      getCpuLimitForLane(lane),
+		MemoryLimit:   getMemoryLimitForLane(lane),
+		HttpPort:      8080,
+		
+		// JVM-specific configuration for Lane C
+		JvmMemory:   getJvmMemoryForLane(lane),
+		JvmCpus:     2,
+		JavaVersion: "17", // Default Java version
+		
+		// Domain configuration
+		DomainSuffix: "ployd.app",
+		
+		// Build metadata
+		BuildTime: time.Now().Format(time.RFC3339),
+	}, true) // Use enhanced templates
 	if err != nil {
 		return utils.ErrJSON(c, 500, err)
 	}
@@ -565,4 +593,65 @@ func uploadBytesWithRetryAndVerification(storeClient *storage.StorageClient, dat
 	}
 	
 	return fmt.Errorf("upload failed after %d attempts", maxRetries)
+}
+// Lane-specific resource allocation functions
+
+func getInstanceCountForLane(lane string) int {
+	switch strings.ToUpper(lane) {
+	case "A", "B": // Unikraft - can run more instances due to low memory footprint
+		return 3
+	case "C": // OSv/JVM - fewer instances due to higher memory usage
+		return 2
+	case "D": // FreeBSD jail - moderate resource usage
+		return 2
+	case "E": // OCI with Kontain - good isolation, moderate overhead
+		return 2
+	case "F": // Full VM - resource intensive
+		return 1
+	default:
+		return 2
+	}
+}
+
+func getCpuLimitForLane(lane string) int {
+	switch strings.ToUpper(lane) {
+	case "A", "B": // Unikraft - very efficient, needs minimal CPU
+		return 200
+	case "C": // OSv/JVM - needs more CPU for JIT compilation and GC
+		return 1000
+	case "D": // FreeBSD jail - native performance
+		return 500
+	case "E": // OCI with Kontain - good performance with slight overhead
+		return 600
+	case "F": // Full VM - higher overhead
+		return 800
+	default:
+		return 500
+	}
+}
+
+func getMemoryLimitForLane(lane string) int {
+	switch strings.ToUpper(lane) {
+	case "A", "B": // Unikraft - extremely memory efficient
+		return 128
+	case "C": // OSv/JVM - needs memory for heap, metaspace, and JIT
+		return 1024
+	case "D": // FreeBSD jail - moderate memory usage
+		return 256
+	case "E": // OCI with Kontain - container plus isolation overhead
+		return 512
+	case "F": // Full VM - highest memory overhead
+		return 2048
+	default:
+		return 256
+	}
+}
+
+func getJvmMemoryForLane(lane string) int {
+	switch strings.ToUpper(lane) {
+	case "C": // OSv/JVM - dedicated JVM memory allocation
+		return 768 // Leave room for OS and JVM overhead
+	default:
+		return 0 // No JVM memory for non-JVM lanes
+	}
 }
