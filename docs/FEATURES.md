@@ -19,6 +19,13 @@ Auto-classified lanes:
     - Threading and memory management for event loop and worker threads
     - Advanced networking with IPv4/IPv6 and HTTP server optimizations
     - Automatic application metadata extraction from package.json
+  - ✅ **Node.js Version Detection and Management** (Aug 2025):
+    - Automatic Node.js version detection from package.json engines field
+    - Support for version ranges (^18.0.0, >=16.0.0, 18.x, ~19.5.0)
+    - Download and caching of specific Node.js versions for Unikraft builds
+    - Fallback to system Node.js when download fails or network unavailable
+    - Version-specific npm and dependency management during build process
+    - Integration with Kraft YAML generation and dependency manifests
   - Enhanced Node.js runtime support with libelf, musl, lwip libraries
   - Comprehensive V8/Node.js kconfig for POSIX environment, networking, I/O
   - Musl libc with crypto, locale, networking, and complex math support

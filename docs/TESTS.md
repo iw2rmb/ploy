@@ -510,3 +510,39 @@
 448. Contributor analysis extracts names and emails from git shortlog output.
 449. Repository summary provides human-readable validation results with all metadata.
 450. Repository information aggregates validation, statistics, and analysis into comprehensive report.
+
+## Node.js Version Detection and Management Tests (451-480)
+
+### Node.js Version Detection from package.json (451-465)
+451. Node.js application with engines.node "18" → detects Node.js v18 requirement.
+452. Node.js application with engines.node "^20.0.0" → detects Node.js v20 requirement.
+453. Node.js application with engines.node ">=16.0.0" → detects Node.js v16 requirement.
+454. Node.js application with engines.node "18.x" → detects Node.js v18 requirement.
+455. Node.js application with engines.node "~19.5.0" → detects Node.js v19 requirement.
+456. Node.js application without engines field → defaults to Node.js v18.
+457. Node.js application with empty engines object → defaults to Node.js v18.
+458. Node.js application with malformed package.json → defaults to Node.js v18.
+459. Node.js application with engines.node containing multiple versions → extracts first major version.
+460. Version detection handles complex semver ranges like ">=14.0.0 <20.0.0" → extracts first version.
+461. Version detection works with prerelease versions like "18.0.0-beta" → extracts major version 18.
+462. Version detection handles invalid version strings gracefully → defaults to v18.
+463. Build script logs detected Node.js version requirement from package.json.
+464. Kraft YAML generation includes Node.js version requirement as comment.
+465. Dependency manifest includes detected Node.js version in unikraft metadata.
+
+### Node.js Binary Download and Setup (466-480)
+466. Build script downloads Node.js v18 binary when required by package.json engines.
+467. Build script downloads Node.js v20 binary when required by package.json engines.
+468. Downloaded Node.js binary is cached in .unikraft-node directory for reuse.
+469. Build script uses cached Node.js binary if already downloaded for same version.
+470. Download handles different architectures (x64, arm64) based on host system.
+471. Download works on both Linux and macOS host systems.
+472. Build script falls back to system Node.js if download fails.
+473. Build script verifies downloaded Node.js binary with version check.
+474. Downloaded Node.js binary is used for npm install operations.
+475. Downloaded Node.js binary is used for dependency manifest generation.
+476. Downloaded Node.js binary is used for JavaScript syntax validation.
+477. Build script cleans up download archives after extraction.
+478. Multiple Node.js apps can use different downloaded versions simultaneously.
+479. Build process works when no network access available (uses system Node.js).
+480. Downloaded Node.js binaries include npm and are fully functional.
