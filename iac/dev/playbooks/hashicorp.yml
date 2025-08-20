@@ -270,6 +270,14 @@
         groups: hashicorp
         append: true
 
+    - name: Create Ploy configuration directory
+      file:
+        path: /etc/ploy
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
     - name: Initialize Vault (if not already initialized)
       uri:
         url: "http://localhost:8200/v1/sys/init"
