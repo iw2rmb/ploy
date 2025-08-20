@@ -356,3 +356,63 @@
 318. Status reporting provides detailed progress updates during deployment.
 319. Network error handling gracefully manages transient connectivity issues.
 320. Comprehensive error messages include actionable debugging information.
+
+## Phase 5: Git Integration and Repository Validation Tests (321-370)
+
+### Repository Analysis and Validation (321-335)
+321. Git repository detection correctly identifies directories with .git folder structure.
+322. Git repository detection works in subdirectories of git repositories via git rev-parse.
+323. Repository URL extraction from git remote get-url origin command for HTTPS and SSH URLs.
+324. Repository URL extraction from .git/config parsing when remote command fails.
+325. Repository URL extraction from package.json repository field for Node.js projects.
+326. Repository URL extraction from Cargo.toml repository field for Rust projects.
+327. Repository URL extraction from pom.xml SCM configuration for Java/Maven projects.
+328. Repository URL extraction from go.mod module path for Go projects.
+329. URL normalization converts SSH format (git@github.com:user/repo.git) to HTTPS format.
+330. URL normalization removes .git suffix and ensures https:// prefix for consistency.
+331. Repository status detection identifies clean vs dirty repositories with uncommitted changes.
+332. Repository status detection identifies untracked files separate from staged changes.
+333. Branch detection handles normal branches, detached HEAD state, and main/master branches.
+334. Commit information extraction includes SHA, message, author, email, timestamp, and GPG status.
+335. Remote origin detection parses git remote -v output for fetch and push URLs.
+
+### Security Scanning and Validation (336-350)
+336. Secret detection scans for AWS access keys (AKIA pattern) in repository files.
+337. Secret detection identifies private key headers (-----BEGIN.*PRIVATE KEY-----) in code.
+338. Secret detection finds API key patterns (api_key, api-key) in configuration files.
+339. Secret detection locates password and token references in source code.
+340. Sensitive file detection identifies .env, secrets.yaml, private.key files in repository.
+341. Sensitive file detection finds certificate files (.pem, .p12, .pfx) and SSH keys.
+342. Security scanning skips binary files and .git directory for performance.
+343. Security scanning processes only text files with known extensions (.js, .py, .go, etc.).
+344. Validation result includes separate arrays for errors, warnings, security issues, suggestions.
+345. Repository validation provides comprehensive health scoring (0-100) based on issues found.
+346. Validation results include specific file paths and line numbers for detected issues.
+347. Security issue reporting provides clear descriptions and remediation suggestions.
+348. Validation configuration supports different strictness levels (None, Warning, Strict).
+349. Production validation enforces clean repositories, signed commits, and trusted origins.
+350. Development validation provides warnings without blocking deployment for flexibility.
+
+### Environment-Specific Git Validation (351-365)
+351. Production environment validation requires clean repository with no uncommitted changes.
+352. Production environment validation requires GPG-signed commits for security compliance.
+353. Production environment validation enforces trusted domain restrictions (github.com, gitlab.com).
+354. Production environment validation limits allowed branches to main/master/production.
+355. Production environment validation enforces maximum repository size limits (100MB).
+356. Staging environment validation requires clean repository but allows unsigned commits.
+357. Staging environment validation permits broader branch selection including develop/staging.
+358. Staging environment validation uses stricter size limits (default config) than development.
+359. Development environment validation allows dirty repositories with warnings only.
+360. Development environment validation accepts any branch with warning notifications.
+361. Development environment validation uses relaxed size limits for local development.
+362. Environment-specific validation preserves original configuration after temporary changes.
+363. Validation configuration supports custom trusted domains for enterprise environments.
+364. Repository size calculation includes all files except .git directory for accuracy.
+365. Branch validation provides clear error messages for non-allowed branches in strict mode.
+
+### Repository Statistics and Analysis (366-370)
+366. Repository statistics include commit count, contributor count, branch count, tag count.
+367. Language statistics analysis identifies file types and calculates size by language.
+368. Contributor analysis extracts names and emails from git shortlog output.
+369. Repository summary provides human-readable validation results with all metadata.
+370. Repository information aggregates validation, statistics, and analysis into comprehensive report.

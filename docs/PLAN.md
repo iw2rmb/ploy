@@ -34,9 +34,9 @@ Next steps to implement:
 6. ✅ **COMPLETED (2025-08-19)** Ensure artifacts and signatures are properly uploaded to MinIO storage.
 
 **Phase 4: Policy Enforcement & Validation**
-1. ✅ Implement OPA policies requiring signature/SBOM for deployments. (2025-08-19)
-2. ✅ Add artifact integrity verification after storage upload. (2025-08-19)
-3. ✅ Implement image size caps per lane in OPA policies. (2025-08-19)
+1. ✅ **COMPLETED (2025-08-19)** Implement OPA policies requiring signature/SBOM for deployments.
+2. ✅ **COMPLETED (2025-08-19)** Add artifact integrity verification after storage upload.
+3. ✅ **COMPLETED (2025-08-19)** Implement image size caps per lane in OPA policies.
 4. ✅ **COMPLETED (2025-08-19)** Enhance policy enforcement for production vs development environments.
 
 **Phase 5: Build Process Enhancements**
