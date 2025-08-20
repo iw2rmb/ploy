@@ -1,7 +1,6 @@
 package nomad
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
