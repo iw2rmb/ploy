@@ -4,7 +4,7 @@ log_level = "INFO"
 name = "ploy-dev-node"
 
 # Network configuration
-bind_addr = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+bind_addr = "0.0.0.0"
 advertise {
   http = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
   rpc = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
@@ -104,4 +104,10 @@ ports {
   http = 4646
   rpc = 4647
   serf = 4648
+}
+
+addresses {
+  http = "0.0.0.0"
+  rpc = "0.0.0.0"
+  serf = "0.0.0.0"
 }
