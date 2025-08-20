@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## [2025-08-20] - Enhanced Nomad Templates & API Documentation (Phase 6 Step 3)
+
+### Added
+- **Enhanced Nomad Templates with Vault/Consul Integration**
+  - Comprehensive lane-specific templates with Vault secrets management integration
+  - Consul KV configuration support for dynamic application configuration
+  - Consul Connect service mesh integration with automatic sidecar proxy deployment
+  - Canary deployment strategies optimized for each lane type (unikernels, JVM, containers, VMs)
+  - Advanced conditional template processing with {{#if}} block support using regex-based evaluation
+  - Lane-specific resource allocation with optimized CPU, memory, and disk configurations
+  - Enhanced environment variable management with custom and legacy compatibility modes
+
+- **Template System Architecture**
+  - `controller/nomad/render.go` enhanced with conditional block processing functions
+  - Regular expression-based template substitution for complex conditional logic
+  - Comprehensive RenderData structure with feature flags and resource allocation fields
+  - Lane-specific template selection with enhanced configurations for all deployment types
+  - Driver configuration abstraction supporting QEMU, Docker, and jail drivers
+
+- **API Documentation Updates**
+  - `docs/API.md` updated with comprehensive controller endpoint documentation
+  - Added Storage Management Endpoints section (/v1/storage/health, /v1/storage/metrics, /v1/storage/config)
+  - Added TTL Cleanup Endpoints section with cleanup control and monitoring
+  - Enhanced environment variables documentation with Consul KV storage integration
+
+### Enhanced
+- **Lane-Specific Optimizations**
+  - Lane A/B (Unikraft): Microsecond boot times, minimal resource allocation (200 MHz CPU, 128 MB RAM)
+  - Lane C (OSv): JVM-optimized with JMX monitoring, Spring Boot actuator integration (1000 MHz CPU, 1024 MB RAM)
+  - Lane E (OCI): Kontain VM-level isolation with comprehensive container security options
+  - Lane F (VM): Full virtualization support with advanced resource management
+
+### Testing
+- **VPS Integration Testing**
+  - Template rendering validation for all lane types with and without advanced features
+  - Conditional processing verification for Vault, Consul, and Connect integrations
+  - Resource allocation testing ensuring lane-specific configurations are applied correctly
+  - API endpoint validation confirming controller can process enhanced template configurations
+
 ## [2025-08-20] - External Storage Configuration (Phase no-SPOF-1 Step 2)
 
 ### Added
