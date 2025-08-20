@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2025-08-20] - Comprehensive Storage Error Handling and Enhanced Client (Phase 5 Step 3)
+
+### Added
+- **Comprehensive Storage Error Classification System**
+  - `internal/storage/errors.go` with detailed error types (network, authentication, timeout, corruption, etc.)
+  - Automatic error categorization based on HTTP status codes and error messages
+  - Context-aware error information including operation details, timestamps, and retry hints
+  - Retryable vs non-retryable error classification with suggested retry delays
+
+- **Advanced Retry Logic with Exponential Backoff**
+  - `internal/storage/retry.go` with configurable retry policies and backoff strategies
+  - Context-aware timeout handling and cancellation support for graceful operation termination
+  - File operation retry with automatic seek position reset and stream reopening
+  - Comprehensive retry statistics tracking and detailed attempt logging
+
+- **Storage Health Monitoring and Metrics Collection**
+  - `internal/storage/monitoring.go` with thread-safe metrics tracking and health assessment
+  - Real-time operation statistics (uploads, downloads, verifications) with success rate calculation
+  - Health status classification (healthy/degraded/unhealthy) based on consecutive failures and timing
+  - Deep storage operations testing with connectivity validation and configuration verification
+
+- **Enhanced Storage Client Wrapper**
+  - `internal/storage/enhanced_client.go` combining error handling, retry logic, and monitoring
+  - Operation-level timeout configuration with configurable maximum operation times
+  - Metrics tracking for all storage operations with detailed performance analytics
+  - Graceful fallback to basic storage client when enhanced features unavailable
+
+### Enhanced
+- **Controller Integration**
+  - Enhanced storage client initialization alongside basic storage client in controller/main.go
+  - New API endpoints `/storage/health` and `/storage/metrics` for monitoring and diagnostics
+  - Build handler integration using enhanced client for all artifact upload operations with fallback
+
+- **Comprehensive Testing Infrastructure**
+  - 80 new test scenarios in TESTS.md covering error classification, retry logic, health monitoring
+  - `test-scripts/test-storage-error-handling.sh` for integration testing of enhanced storage functionality
+  - `test-scripts/test-storage-error-handling-unit.sh` for isolated testing of individual components
+  - Full compilation and functionality verification for both local and VPS environments
+
+### Testing
+- All storage error handling modules compile successfully and pass unit tests
+- Enhanced storage client creation and configuration validation working correctly
+- Storage error classification, retry logic, and health monitoring functioning properly
+- File operations with retry and seeking capabilities verified and operational
+- Integration with controller and build handler confirmed on both development and production environments
+
 ## [2025-08-20] - Comprehensive Git Integration and Repository Validation (Phase 5 Step 2)
 
 ### Added

@@ -199,6 +199,23 @@ Auto-classified lanes:
   - Automated upload of complete deployment packages (artifact + SBOM + signature + certificate)
   - Upload retry logic with FileID verification for reliable storage operations
   - Enhanced metadata tracking with timestamps and artifact status information
+- **Comprehensive Error Handling & Resilience** (Aug 2025):
+  - Advanced error classification system with 10+ error types (network, timeout, corruption, rate limit, etc.)
+  - Exponential backoff retry logic with configurable policies and jitter randomization
+  - Context-aware timeout handling and graceful operation cancellation
+  - File operation retry with automatic seek position reset and stream reopening
+  - Circuit breaker pattern to prevent cascading failures during storage outages
+- **Health Monitoring & Metrics** (Aug 2025):
+  - Real-time storage operation metrics (uploads, downloads, verifications, success rates)
+  - Thread-safe metrics collection with comprehensive performance analytics
+  - Health status classification (healthy/degraded/unhealthy) based on failure patterns
+  - Deep storage connectivity testing with configuration validation
+  - API endpoints `/storage/health` and `/storage/metrics` for monitoring and diagnostics
+- **Enhanced Storage Client** (Aug 2025):
+  - Comprehensive wrapper combining error handling, retry logic, and monitoring
+  - Operation-level timeout configuration with configurable maximum operation times
+  - Graceful fallback to basic storage client when enhanced features unavailable
+  - Backward compatibility with existing storage operations and interfaces
 - **Scalable Architecture**: No single point of failure, HTTP-based simple API
 - Config: `configs/storage-config.yaml` with simplified SeaweedFS-only configuration
 - Organization: Collections with proper replication strategies per artifact type
