@@ -110,6 +110,12 @@ func (s *TTLCleanupService) Start() error {
 		return fmt.Errorf("TTL cleanup service is already running")
 	}
 	
+	// Recreate context if it was previously canceled
+	if s.ctx.Err() != nil {
+		log.Printf("Recreating canceled context for TTL cleanup service")
+		s.ctx, s.cancel = context.WithCancel(context.Background())
+	}
+	
 	// Test Nomad connectivity before starting
 	if err := s.testNomadConnectivity(); err != nil {
 		log.Printf("Warning: Nomad connectivity test failed: %v", err)
