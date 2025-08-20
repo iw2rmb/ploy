@@ -21,7 +21,7 @@ import (
 	"github.com/ploy/ploy/internal/utils"
 )
 
-func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, enhancedStoreClient *storage.EnhancedStorageClient, envStore *envstore.EnvStore) error {
+func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore *envstore.EnvStore) error {
 	appName := c.Params("app")
 	sha := c.Query("sha", "dev")
 	mainClass := c.Query("main", "com.ploy.ordersvc.Main")
@@ -285,24 +285,10 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, enhancedStoreClient
 	
 	_ = nomad.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
 
-	if enhancedStoreClient != nil {
+	if storeClient != nil {
 		keyPrefix := appName + "/" + sha + "/"
 		
 		// Upload artifact bundle with comprehensive error handling and verification
-		if imagePath != "" {
-			if result, err := enhancedStoreClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
-				return utils.ErrJSON(c, 500, fmt.Errorf("enhanced artifact bundle upload with verification failed: %w", err))
-			} else {
-				fmt.Printf("Enhanced artifact bundle integrity verification: %s\n", result.GetVerificationSummary())
-				if !result.Verified {
-					return utils.ErrJSON(c, 500, fmt.Errorf("enhanced artifact integrity verification failed: %s", strings.Join(result.Errors, "; ")))
-				}
-			}
-		}
-	} else if storeClient != nil {
-		keyPrefix := appName + "/" + sha + "/"
-		
-		// Fallback to basic storage client if enhanced client not available
 		if imagePath != "" {
 			if result, err := storeClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
 				return utils.ErrJSON(c, 500, fmt.Errorf("artifact bundle upload with verification failed: %w", err))
@@ -319,22 +305,12 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, enhancedStoreClient
 		if _, err := os.Stat(sourceSBOMPath); err == nil {
 			if f, err := os.Open(sourceSBOMPath); err == nil {
 				defer f.Close()
-				var uploadErr error
-				if enhancedStoreClient != nil {
-					_, uploadErr = enhancedStoreClient.PutObject(enhancedStoreClient.GetArtifactsBucket(), keyPrefix+"source.sbom.json", f, "application/json")
-				} else {
-					_, uploadErr = storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"source.sbom.json", f, "application/json")
-				}
+				_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"source.sbom.json", f, "application/json")
 				if uploadErr != nil {
 					fmt.Printf("Warning: Failed to upload source SBOM: %v\n", uploadErr)
 				} else {
-					// Verify source SBOM upload integrity using appropriate client
-					clientForVerify := storeClient
-					if enhancedStoreClient != nil {
-						// Enhanced client uses internal storage provider for verification
-						clientForVerify = storeClient
-					}
-					verifier := storage.NewIntegrityVerifier(clientForVerify)
+					// Verify source SBOM upload integrity
+					verifier := storage.NewIntegrityVerifier(storeClient)
 					if info, err := verifier.VerifyUploadedFile(sourceSBOMPath, keyPrefix+"source.sbom.json"); err != nil {
 						fmt.Printf("Warning: Source SBOM integrity verification failed: %v\n", err)
 					} else {
@@ -350,22 +326,12 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, enhancedStoreClient
 			if _, err := os.Stat(containerSBOMPath); err == nil {
 				if f, err := os.Open(containerSBOMPath); err == nil {
 					defer f.Close()
-					var uploadErr error
-					if enhancedStoreClient != nil {
-						_, uploadErr = enhancedStoreClient.PutObject(enhancedStoreClient.GetArtifactsBucket(), keyPrefix+"container.sbom.json", f, "application/json")
-					} else {
-						_, uploadErr = storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"container.sbom.json", f, "application/json")
-					}
+					_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"container.sbom.json", f, "application/json")
 					if uploadErr != nil {
 						fmt.Printf("Warning: Failed to upload container SBOM: %v\n", uploadErr)
 					} else {
-						// Verify container SBOM upload integrity using appropriate client
-						clientForVerify := storeClient
-						if enhancedStoreClient != nil {
-							// Enhanced client uses internal storage provider for verification
-							clientForVerify = storeClient
-						}
-						verifier := storage.NewIntegrityVerifier(clientForVerify)
+						// Verify container SBOM upload integrity
+						verifier := storage.NewIntegrityVerifier(storeClient)
 						if info, err := verifier.VerifyUploadedFile(containerSBOMPath, keyPrefix+"container.sbom.json"); err != nil {
 							fmt.Printf("Warning: Container SBOM integrity verification failed: %v\n", err)
 						} else {
@@ -386,12 +352,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, enhancedStoreClient
 			"signed":      fmt.Sprintf("%t", signed),
 		}
 		mb, _ := json.Marshal(meta)
-		var metaUploadErr error
-		if enhancedStoreClient != nil {
-			_, metaUploadErr = enhancedStoreClient.PutObject(enhancedStoreClient.GetArtifactsBucket(), keyPrefix+"meta.json", bytes.NewReader(mb), "application/json")
-		} else {
-			_, metaUploadErr = storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"meta.json", bytes.NewReader(mb), "application/json")
-		}
+		_, metaUploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), keyPrefix+"meta.json", bytes.NewReader(mb), "application/json")
 		if metaUploadErr != nil {
 			fmt.Printf("Warning: Failed to upload metadata: %v\n", metaUploadErr)
 		}
