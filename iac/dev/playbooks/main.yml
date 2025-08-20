@@ -355,7 +355,7 @@
             master: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
             filer: "{{ storage_config.seaweedfs.filer | default('localhost:8888') }}"
             collection: "{{ storage_config.seaweedfs.collection | default('ploy-artifacts') }}"
-            replication: "{{ storage_config.seaweedfs.replication | default('001') }}"
+            replication: "{{ seaweedfs_single_node.replication | default(storage_config.seaweedfs.replication | default('001')) }}"
             timeout: {{ storage_config.seaweedfs.timeout | default(30) }}
             datacenter: "{{ storage_config.seaweedfs.datacenter | default('') }}"
             rack: "{{ storage_config.seaweedfs.rack | default('') }}"

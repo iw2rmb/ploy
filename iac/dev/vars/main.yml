@@ -105,3 +105,13 @@ storage_config:
     enable_metrics: true
     enable_health_check: true
     max_operation_time: "5m"
+
+# SeaweedFS collection configuration for single-node setup
+seaweedfs_single_node:
+  # Use replication 000 for single node setups
+  replication: "000"
+  # Number of volumes to create per collection
+  volumes_per_collection:
+    artifacts: 2
+    metadata: 1
+    debug: 1

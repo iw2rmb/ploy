@@ -101,7 +101,7 @@
   - Integration with existing controller architecture and clean fallback handling
 
 - **Domain Management REST API Implementation**
-  - `DomainHandler` with endpoints matching REST.md specification exactly
+  - `DomainHandler` with endpoints matching API.md specification exactly
   - `POST/GET/DELETE /v1/apps/:app/domains` endpoints with proper JSON responses
   - Domain persistence in Consul KV storage for configuration between deployments
   - Domain validation with format checking and length limits (RFC compliant)
@@ -1282,7 +1282,7 @@ The preview system now properly validates deployment health through Nomad API be
 ### Documentation
 - **Updated Documentation**
   - FEATURES.md: Environment variables section updated to "implemented" status
-  - REST.md: Full API specification with request/response examples
+  - API.md: Full API specification with request/response examples
   - CLI.md: Complete command reference with usage examples
   - TESTS.md: 23 new test scenarios (123-145) for comprehensive coverage
 

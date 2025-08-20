@@ -3,7 +3,7 @@ storage:
   master: localhost:9333
   filer: localhost:8888
   collection: ploy-artifacts
-  replication: "001"
+  replication: "000"
   timeout: 30
   datacenter: ""
   rack: ""

@@ -21,7 +21,7 @@ Auto-selects optimal lane from project structure unless overridden.
   - CONCEPT.md — architecture and purpose.
   - STACK.md — technology stack and framework dependencies.
   - CLI.md — CLI reference.
-  - REST.md — REST API routes.
+  - API.md — REST API routes.
   - STORAGE.md — storage abstraction (MinIO).
   - INFRASTRUCTURE.md — bare-metal setup.
   - SCENARIOS.md — test scenarios.

@@ -182,6 +182,26 @@
         msg: "Collection {{ item.item.name }}: {{ 'Created' if item.status in [200, 201] else 'Already exists' if item.status == 409 else 'Failed' }}"
       loop: "{{ collection_creation.results }}"
 
+    - name: Assign volumes to collections for single-node setup
+      uri:
+        url: "http://localhost:{{ seaweedfs.master_port }}/vol/grow?collection={{ item.collection }}&count={{ item.count }}&replication={{ seaweedfs_single_node.replication }}"
+        method: POST
+        status_code: [200, 400]  # 400 might indicate volumes already assigned
+      loop:
+        - collection: "{{ seaweedfs.collections.artifacts.name }}"
+          count: "{{ seaweedfs_single_node.volumes_per_collection.artifacts }}"
+        - collection: "{{ seaweedfs.collections.metadata.name }}"
+          count: "{{ seaweedfs_single_node.volumes_per_collection.metadata }}"
+        - collection: "{{ seaweedfs.collections.debug.name }}"
+          count: "{{ seaweedfs_single_node.volumes_per_collection.debug }}"
+      register: volume_assignment
+      failed_when: false
+
+    - name: Display volume assignment results
+      debug:
+        msg: "Volume assignment for {{ item.item.collection }}: {{ item.json.count if item.json is defined and 'count' in item.json else 'Failed or already assigned' }}"
+      loop: "{{ volume_assignment.results }}"
+
     - name: Create ploy storage configuration for SeaweedFS
       template:
         src: ../templates/ploy-seaweedfs-config.yaml.j2
