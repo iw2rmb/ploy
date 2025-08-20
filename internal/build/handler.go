@@ -279,10 +279,10 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 		MainClass:     mainClass,
 		IsDebug:       debug,
 		
-		// Enable enhanced features
-		VaultEnabled:        true,  // Enable Vault integration for secrets
-		ConsulConfigEnabled: true,  // Enable Consul KV configuration
-		ConnectEnabled:      true,  // Enable Consul Connect service mesh
+		// Enable enhanced features (disabled for testing)
+		VaultEnabled:        false, // Disable Vault integration for testing
+		ConsulConfigEnabled: false, // Disable Consul KV configuration for testing
+		ConnectEnabled:      false, // Disable Consul Connect service mesh for testing
 		VolumeEnabled:       false, // Disable volumes by default (can be enabled per app)
 		DebugEnabled:        debug, // Enable debug features for debug builds
 		
