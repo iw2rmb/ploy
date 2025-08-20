@@ -126,6 +126,17 @@ Auto-classified lanes:
 - Nomad templates per lane in `platform/nomad/`
 - Jobs include health checks, Vault integration, canary rollouts, Consul registration
 - Controller handles rendering, submission, health polling
+- **Enhanced Health Monitoring** (Aug 2025): ✅
+  - **Deployment Progress Tracking**: Real-time monitoring of task group status with healthy/unhealthy allocation counts
+  - **Comprehensive Health Checks**: Validates allocation status, deployment health indicators, and Consul service checks
+  - **Robust Retry Logic**: Automatic retries with exponential backoff and intelligent error classification
+  - **Failure Detection**: Early abort when allocation failure threshold exceeded (3+ failures)
+  - **Job Validation**: Pre-submission HCL syntax validation prevents deployment errors
+  - **Detailed Error Reporting**: Task event logging with driver failures, exit codes, and actionable debugging information
+  - **Concurrent Monitoring**: Background deployment and health check monitoring for faster feedback
+  - **Timeout Management**: Prevents indefinite waiting on stuck deployments with configurable deadlines
+  - **Log Streaming**: Real-time allocation log following for debugging failed deployments
+  - **Network Resilience**: Graceful handling of transient connectivity issues with retry classification
 
 ⸻
 
