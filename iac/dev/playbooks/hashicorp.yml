@@ -340,7 +340,7 @@
         owner: hashicorp
         group: hashicorp
       with_fileglob:
-        - "../../platform/nomad/*.hcl"
+        - "{{ playbook_dir }}/../../platform/nomad/*.hcl"
       ignore_errors: true
 
     - name: Create Nomad environment file for systemd
@@ -412,7 +412,7 @@
 
         - name: Copy Traefik Nomad job template to VPS
           copy:
-            src: "../../../platform/nomad/traefik-system.hcl"
+            src: "{{ playbook_dir }}/../../platform/nomad/traefik-system.hcl"
             dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
             owner: hashicorp
             group: hashicorp
