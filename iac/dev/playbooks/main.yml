@@ -63,11 +63,18 @@
           - docker-buildx-plugin
         state: present
 
-    - name: Start and enable Docker
+    - name: Check Docker service status
+      command: systemctl is-active docker
+      register: docker_service_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Start and enable Docker (if not running)
       systemd:
         name: docker
         state: started
         enabled: true
+      when: docker_service_status.stdout != "active"
 
     - name: Install Docker Compose
       block:

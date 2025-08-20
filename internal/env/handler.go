@@ -9,7 +9,7 @@ import (
 	"github.com/ploy/ploy/internal/utils"
 )
 
-func SetEnvVars(c *fiber.Ctx, envStore *envstore.EnvStore) error {
+func SetEnvVars(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	app := c.Params("app")
 	
 	var req map[string]string
@@ -31,7 +31,7 @@ func SetEnvVars(c *fiber.Ctx, envStore *envstore.EnvStore) error {
 	})
 }
 
-func GetEnvVars(c *fiber.Ctx, envStore *envstore.EnvStore) error {
+func GetEnvVars(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	app := c.Params("app")
 	
 	log.Printf("Getting environment variables for app %s", app)
@@ -47,7 +47,7 @@ func GetEnvVars(c *fiber.Ctx, envStore *envstore.EnvStore) error {
 	})
 }
 
-func SetEnvVar(c *fiber.Ctx, envStore *envstore.EnvStore) error {
+func SetEnvVar(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	app := c.Params("app")
 	key := c.Params("key")
 	
@@ -72,7 +72,7 @@ func SetEnvVar(c *fiber.Ctx, envStore *envstore.EnvStore) error {
 	})
 }
 
-func DeleteEnvVar(c *fiber.Ctx, envStore *envstore.EnvStore) error {
+func DeleteEnvVar(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	app := c.Params("app")
 	key := c.Params("key")
 	

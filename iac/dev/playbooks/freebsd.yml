@@ -18,11 +18,18 @@
           - cloud-image-utils
         state: present
 
-    - name: Start and enable libvirt
+    - name: Check libvirt service status
+      command: systemctl is-active libvirtd
+      register: libvirtd_service_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Start and enable libvirt (if not running)
       systemd:
         name: libvirtd
         state: started
         enabled: true
+      when: libvirtd_service_status.stdout != "active"
 
     - name: Add users to libvirt group
       user:

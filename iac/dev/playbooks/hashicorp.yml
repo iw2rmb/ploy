@@ -179,36 +179,57 @@
         - nomad
         - vault
 
-    - name: Start and enable Consul
+    - name: Check Consul service status
+      command: systemctl is-active consul
+      register: consul_service_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Start and enable Consul (if not running)
       systemd:
         name: consul
         state: started
         enabled: true
         daemon_reload: true
+      when: consul_service_status.stdout != "active"
 
     - name: Wait for Consul to be ready
       wait_for:
         port: 8500
         delay: 10
 
-    - name: Start and enable Vault
+    - name: Check Vault service status
+      command: systemctl is-active vault
+      register: vault_service_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Start and enable Vault (if not running)
       systemd:
         name: vault
         state: started
         enabled: true
         daemon_reload: true
+      when: vault_service_status.stdout != "active"
 
     - name: Wait for Vault to be ready
       wait_for:
         port: 8200
         delay: 10
 
-    - name: Start and enable Nomad
+    - name: Check Nomad service status
+      command: systemctl is-active nomad
+      register: nomad_service_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Start and enable Nomad (if not running)
       systemd:
         name: nomad
         state: started
         enabled: true
         daemon_reload: true
+      when: nomad_service_status.stdout != "active"
 
     - name: Wait for Nomad to be ready
       wait_for:
@@ -335,6 +356,18 @@
 
     - name: Deploy Traefik system job to Nomad
       block:
+        - name: Check if Traefik is already installed
+          stat:
+            path: /usr/local/bin/traefik
+          register: traefik_binary
+
+        - name: Get current Traefik version (if installed)
+          command: /usr/local/bin/traefik version
+          register: current_traefik_version
+          changed_when: false
+          ignore_errors: true
+          when: traefik_binary.stat.exists
+
         - name: Check if Traefik job is already running
           uri:
             url: "http://localhost:4646/v1/job/traefik-system"
@@ -342,6 +375,32 @@
             status_code: [200, 404]
           register: traefik_job_check
           ignore_errors: true
+
+        - name: Download and install Traefik binary (if needed)
+          block:
+            - name: Download Traefik
+              get_url:
+                url: "https://github.com/traefik/traefik/releases/download/v{{ traefik_version }}/traefik_v{{ traefik_version }}_linux_amd64.tar.gz"
+                dest: /tmp/traefik.tar.gz
+                timeout: 120
+              when: not traefik_binary.stat.exists or traefik_version not in (current_traefik_version.stdout | default(''))
+
+            - name: Extract Traefik
+              unarchive:
+                src: /tmp/traefik.tar.gz
+                dest: /usr/local/bin
+                remote_src: true
+                mode: '0755'
+              when: not traefik_binary.stat.exists or traefik_version not in (current_traefik_version.stdout | default(''))
+
+            - name: Verify Traefik installation
+              command: /usr/local/bin/traefik version
+              register: traefik_install_version
+              changed_when: false
+
+            - name: Display Traefik version
+              debug:
+                msg: "Traefik installed successfully: {{ traefik_install_version.stdout_lines[0] if traefik_install_version.stdout_lines else 'Version info not available' }}"
 
         - name: Copy Traefik Nomad job template to VPS
           copy:
@@ -358,7 +417,7 @@
           environment:
             NOMAD_ADDR: "http://localhost:4646"
 
-        - name: Submit Traefik system job to Nomad
+        - name: Submit Traefik system job to Nomad (if not running)
           command: nomad job run /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_job_submit
           environment:

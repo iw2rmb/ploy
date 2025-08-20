@@ -6,7 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/ploy/ploy/controller/config"
+	"github.com/ploy/ploy/controller/consul_envstore"
+	"github.com/ploy/ploy/controller/domains"
 	"github.com/ploy/ploy/controller/envstore"
+	"github.com/ploy/ploy/controller/routing"
 	"github.com/ploy/ploy/internal/build"
 	"github.com/ploy/ploy/internal/cert"
 	"github.com/ploy/ploy/internal/cleanup"
@@ -21,7 +24,7 @@ import (
 
 
 var storeClient *storage.StorageClient
-var envStore *envstore.EnvStore
+var envStore envstore.EnvStoreInterface
 
 func main(){
 	app := fiber.New()
@@ -35,7 +38,37 @@ func main(){
 		}
 	}
 	
-	envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
+	// Initialize environment store - prefer Consul if available
+	consulAddr := utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500")
+	useConsulEnv := utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true"
+	
+	if useConsulEnv {
+		if consulEnvStore, err := consul_envstore.New(consulAddr, "ploy/apps"); err == nil {
+			// Test Consul connectivity
+			if err := consulEnvStore.HealthCheck(); err == nil {
+				envStore = consulEnvStore
+				log.Printf("Using Consul KV store for environment variables at %s", consulAddr)
+			} else {
+				log.Printf("Consul env store health check failed, falling back to file-based store: %v", err)
+				envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
+			}
+		} else {
+			log.Printf("Failed to initialize Consul env store, falling back to file-based store: %v", err)
+			envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
+		}
+	} else {
+		envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
+		log.Printf("Using file-based environment store at %s", utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
+	}
+	
+	// Initialize Traefik router
+	traefikRouter, err := routing.NewTraefikRouter(consulAddr)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Traefik router: %v", err)
+		traefikRouter = nil
+	} else {
+		log.Printf("Traefik router initialized with Consul address: %s", consulAddr)
+	}
 
 	// Initialize TTL cleanup service
 	cleanupConfigPath := utils.Getenv("PLOY_CLEANUP_CONFIG", "")
@@ -89,9 +122,16 @@ func main(){
 	api.Get("/status/:app", build.Status)
 	
 	// Domain management
-	api.Post("/apps/:app/domains", domain.AddDomain)
-	api.Get("/apps/:app/domains", domain.ListDomains)
-	api.Delete("/apps/:app/domains/:domain", domain.RemoveDomain)
+	if traefikRouter != nil {
+		// Use new Traefik-based domain management
+		domainHandler := domains.NewDomainHandler(traefikRouter)
+		domains.SetupDomainRoutes(app, domainHandler)
+	} else {
+		// Fallback to existing domain management
+		api.Post("/apps/:app/domains", domain.AddDomain)
+		api.Get("/apps/:app/domains", domain.ListDomains)
+		api.Delete("/apps/:app/domains/:domain", domain.RemoveDomain)
+	}
 	
 	// Certificate management
 	api.Post("/certs/issue", cert.IssueCertificate)
