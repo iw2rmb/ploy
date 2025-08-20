@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## [2025-08-20] - Enhanced Build Artifact Upload with Retry Logic and Verification (Phase 5 Step 5)
+
+### Added
+- **Enhanced Upload Helper Functions**
+  - Added `uploadFileWithRetryAndVerification()` function with exponential backoff retry logic
+  - Added `uploadBytesWithRetryAndVerification()` function for metadata and small file uploads
+  - Implemented comprehensive retry mechanism with 3 maximum attempts and progressive delays
+  - Added detailed error logging and progress tracking for all upload operations
+
+- **Robust Upload Verification**
+  - Integrated integrity verification after each upload attempt using existing storage verifier
+  - Added size verification for byte data uploads to detect truncated transfers
+  - Implemented automatic retry on verification failures with proper seek position reset
+  - Enhanced error reporting with specific failure reasons and attempt counts
+
+- **Improved Upload Reliability**
+  - Replaced basic `PutObject()` calls with enhanced upload methods for SBOM and metadata files
+  - Added exponential backoff delay calculation (1s, 2s, 3s) to prevent overwhelming storage systems
+  - Implemented proper file handle management with automatic cleanup on retries
+  - Enhanced concurrent upload support with independent retry logic per operation
+
+### Fixed
+- **Storage Upload Robustness**
+  - Fixed potential partial upload failures by implementing proper retry with seek reset
+  - Improved error handling for network timeouts and storage service interruptions
+  - Enhanced upload progress monitoring with detailed success/failure logging
+  - Fixed potential resource leaks by ensuring proper file handle closure in retry scenarios
+
+### Testing
+- Added comprehensive test scenarios 481-511 to TESTS.md covering enhanced upload functionality
+- Created `test-scripts/test-enhanced-artifact-upload.sh` for integration testing of upload retry logic
+- Created `test-scripts/test-upload-helpers-unit.sh` for unit testing upload helper functions
+- Validated backward compatibility with existing artifact upload workflows
+
 ## [2025-08-20] - Node.js Version Detection and Management (Phase 5 Step 4)
 
 ### Added
