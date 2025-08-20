@@ -302,7 +302,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 		
 		// Build metadata
 		BuildTime: time.Now().Format(time.RFC3339),
-	}, true) // Use enhanced templates
+	})
 	if err != nil {
 		return utils.ErrJSON(c, 500, err)
 	}
