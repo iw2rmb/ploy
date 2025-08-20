@@ -20,14 +20,7 @@ type ObjectInfo struct {
 	ContentType  string
 }
 
-// StorageMetrics provides storage operation metrics
-type StorageMetrics struct {
-	TotalUploads   int64
-	FailedUploads  int64
-	TotalDownloads int64
-	FailedDownloads int64
-	TotalSize      int64
-}
+// Note: StorageMetrics is now defined in monitoring.go with comprehensive functionality
 
 // StorageProvider interface is kept for compatibility but only implemented by SeaweedFSClient
 type StorageProvider interface {

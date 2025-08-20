@@ -20,6 +20,7 @@ import (
 
 
 var storeClient *storage.Client
+var enhancedStoreClient *storage.EnhancedStorageClient
 var envStore *envstore.EnvStore
 
 func main(){
@@ -28,14 +29,18 @@ func main(){
 
 	cfgPath := utils.Getenv("PLOY_STORAGE_CONFIG", "configs/storage-config.yaml")
 	if rootCfg, err := config.Load(cfgPath); err == nil {
-		if c, err := storage.New(rootCfg.Storage); err == nil { storeClient = c }
+		if c, err := storage.New(rootCfg.Storage); err == nil { 
+			storeClient = c
+			// Initialize enhanced storage client with comprehensive error handling
+			enhancedStoreClient = storage.NewEnhancedStorageClient(c, storage.DefaultEnhancedClientConfig())
+		}
 	}
 	
 	envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
-		return build.TriggerBuild(c, storeClient, envStore)
+		return build.TriggerBuild(c, storeClient, enhancedStoreClient, envStore)
 	})
 	api.Get("/apps", build.ListApps)
 	api.Get("/status/:app", build.Status)
@@ -70,6 +75,22 @@ func main(){
 	api.Post("/apps/:app/rollback", debug.RollbackApp)
 	api.Delete("/apps/:app", func(c *fiber.Ctx) error {
 		return lifecycle.DestroyApp(c, storeClient, envStore)
+	})
+	
+	// Storage health and metrics endpoints
+	api.Get("/storage/health", func(c *fiber.Ctx) error {
+		if enhancedStoreClient == nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Enhanced storage client not initialized"})
+		}
+		health := enhancedStoreClient.GetHealthStatus()
+		return c.JSON(health)
+	})
+	api.Get("/storage/metrics", func(c *fiber.Ctx) error {
+		if enhancedStoreClient == nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Enhanced storage client not initialized"})
+		}
+		metrics := enhancedStoreClient.GetMetrics()
+		return c.JSON(metrics)
 	})
 
 	port := utils.Getenv("PORT", "8081")
