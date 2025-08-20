@@ -333,3 +333,26 @@
 298. Policy violation messages indicate specific environment requirements and violations.
 299. Audit logging captures all policy decisions with environment context for compliance.
 300. Break-glass approval mechanism allows emergency overrides with comprehensive logging.
+
+## Phase 5: Enhanced Health Monitoring Tests (301-320)
+
+301. Nomad job submission validates HCL syntax before attempting deployment.
+302. Deployment monitoring tracks task group progress with healthy/unhealthy allocation counts.
+303. Failed allocations log detailed error messages including driver failures and exit codes.
+304. Health checks verify both allocation status and deployment health indicators.
+305. Service health monitoring integrates with Consul for comprehensive health status.
+306. Retry logic distinguishes between retryable (timeout, connection) and non-retryable (policy) errors.
+307. Deployment timeout monitoring prevents indefinite waiting on stuck deployments.
+308. Allocation failure threshold triggers early abort when too many failures detected.
+309. Task state monitoring tracks individual task health within allocations.
+310. Event logging captures task lifecycle events for debugging failed deployments.
+311. Robust submission performs automatic retries with exponential backoff.
+312. Job validation runs nomad validate before submission to catch syntax errors.
+313. Plan execution shows deployment changes before applying them.
+314. Streaming logs capability follows allocation logs in real-time.
+315. Deployment rollback triggers on health check failures (future enhancement).
+316. Multiple allocation monitoring ensures minimum healthy count before success.
+317. Background monitoring runs deployment and health checks concurrently.
+318. Status reporting provides detailed progress updates during deployment.
+319. Network error handling gracefully manages transient connectivity issues.
+320. Comprehensive error messages include actionable debugging information.
