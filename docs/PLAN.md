@@ -48,7 +48,7 @@ Next steps to implement:
 
 **Phase 6: Platform Enhancement Features**
 1. ✅ **COMPLETED (2025-08-20)** Implement Java version detection for Gradle and Maven projects with fallback to default version.
-2. Add TTL cleanup for preview allocations to prevent resource accumulation.
+2. ✅ **COMPLETED (2025-08-20)** Add TTL cleanup for preview allocations to prevent resource accumulation.
 3. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
 
 **Phase 7: Advanced Self-Healing & Automation**
