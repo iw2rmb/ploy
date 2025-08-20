@@ -227,6 +227,13 @@ Auto-classified lanes:
 - ✅ Config: `configs/storage-config.yaml` with simplified SeaweedFS-only configuration
 - ✅ Organization: Collections with proper replication strategies per artifact type
 - ✅ **Upload Verification**: Built-in methods to confirm successful storage operations
+- ✅ **Enhanced Upload Retry Logic** (Aug 2025): Robust artifact upload with exponential backoff
+  - Comprehensive retry mechanism with 3 maximum attempts and progressive delays
+  - Integrity verification after each upload attempt with automatic retry on failure
+  - Size verification for byte data uploads to detect truncated transfers
+  - Proper file handle management and seek position reset for reliable retries
+  - Enhanced error reporting with specific failure reasons and attempt counts
+  - Independent retry logic for concurrent upload operations
 - ✅ **Multi-File Support**: Source SBOMs, container SBOMs, and build artifacts
 
 ⸻
