@@ -46,7 +46,7 @@ func SubmitWithMonitoring(jobPath string, timeout time.Duration) (*SubmitResult,
 
 // submitJob submits a job and parses the output
 func submitJob(jobPath string) (*SubmitResult, error) {
-	cmd := exec.Command("nomad", "job", "run", "-detach", "-json", jobPath)
+	cmd := exec.Command("nomad", "job", "run", jobPath)
 	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -60,24 +60,7 @@ func submitJob(jobPath string) (*SubmitResult, error) {
 		return nil, fmt.Errorf("command failed: %w", err)
 	}
 	
-	// Try to parse JSON output first (newer Nomad versions)
-	var jsonResult struct {
-		JobID        string `json:"JobID"`
-		EvalID       string `json:"EvalID"`
-		DeploymentID string `json:"DeploymentID"`
-	}
-	
-	if err := json.Unmarshal(output, &jsonResult); err == nil {
-		return &SubmitResult{
-			JobID:        jsonResult.JobID,
-			DeploymentID: jsonResult.DeploymentID,
-			EvalID:       jsonResult.EvalID,
-			Success:      true,
-			Message:      "Job submitted successfully",
-		}, nil
-	}
-	
-	// Fall back to parsing text output
+	// Parse text output (standard nomad job run output)
 	return parseTextOutput(string(output))
 }
 
