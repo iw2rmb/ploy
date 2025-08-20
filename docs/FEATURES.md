@@ -241,6 +241,30 @@ All include `/healthz` on port 8080.
 
 ⸻
 
+## 🔀 Git Integration & Repository Validation
+- **Comprehensive Git Repository Analysis** ✅ (Aug 2025):
+  - **Multi-Source URL Extraction**: Repository URLs from git config, package.json, Cargo.toml, pom.xml, go.mod
+  - **URL Normalization**: SSH to HTTPS conversion with .git suffix removal for consistency
+  - **Repository Metadata**: Branch detection, commit analysis, contributor statistics, language analysis
+  - **Repository Health Scoring**: 0-100 scoring system based on security and validation issues
+- **Security-Focused Repository Validation** ✅ (Aug 2025):
+  - **Secrets Detection**: AWS keys, private keys, API keys, passwords, tokens in source code
+  - **Sensitive File Detection**: .env files, private keys, certificates, SSH keys in repository
+  - **GPG Commit Validation**: Signature verification for enhanced security compliance
+  - **Comprehensive Validation Results**: Errors, warnings, security issues, and actionable suggestions
+- **Environment-Specific Git Validation** ✅ (Aug 2025):
+  - **Production Environment**: Clean repo, signed commits, trusted domains, restricted branches, size limits
+  - **Staging Environment**: Clean repo with unsigned commit warnings, broader branch support
+  - **Development Environment**: Dirty repo warnings only, flexible validation for rapid development
+  - **Configurable Validation**: Custom trusted domains, branch restrictions, size limits per environment
+- **Build Pipeline Integration** ✅ (Aug 2025):
+  - **Enhanced Repository Detection**: Improved `extractSourceRepository` with Git utilities
+  - **Build-Time Validation**: Repository validation during build process with environment awareness
+  - **Health Score Logging**: Repository health and validation results during deployment pipeline
+  - **Multi-Language Support**: Git validation across all project types and deployment lanes
+
+⸻
+
 ## 🔮 Next Steps
 - Per-app Unikraft recipes
 - Keyless OIDC Cosign integration
