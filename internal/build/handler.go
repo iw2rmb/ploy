@@ -16,6 +16,7 @@ import (
 	"github.com/ploy/ploy/controller/nomad"
 	"github.com/ploy/ploy/controller/opa"
 	"github.com/ploy/ploy/controller/supply"
+	"github.com/ploy/ploy/internal/git"
 	"github.com/ploy/ploy/internal/storage"
 	"github.com/ploy/ploy/internal/utils"
 )
@@ -222,8 +223,31 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.Client, envStore *envstore.
 	// Perform vulnerability scanning for production and staging environments
 	vulnScanPassed := performVulnerabilityScanning(imagePath, dockerImage, env)
 	
-	// Get source repository information if available
+	// Get source repository information and perform Git validation if available
 	sourceRepo := extractSourceRepository(srcDir)
+	
+	// Perform Git repository validation if this is a Git repository
+	gitUtils := git.NewGitUtils(srcDir)
+	if gitUtils.IsGitRepository() {
+		validator := git.NewValidator(nil) // Use default configuration
+		if result, err := validator.ValidateForEnvironment(srcDir, env); err == nil {
+			// Log validation results
+			if !result.Valid {
+				fmt.Printf("Git repository validation warnings:\n")
+				for _, warning := range result.Warnings {
+					fmt.Printf("  Warning: %s\n", warning)
+				}
+				for _, issue := range result.SecurityIssues {
+					fmt.Printf("  Security Issue: %s\n", issue)
+				}
+			}
+			
+			// Get repository health score
+			if health, err := validator.GetRepositoryHealth(srcDir); err == nil {
+				fmt.Printf("Repository health score: %d/100\n", health)
+			}
+		}
+	}
 	
 	if err := opa.Enforce(opa.ArtifactInput{
 		Signed:         signed,
@@ -408,22 +432,17 @@ func performVulnerabilityScanning(imagePath, dockerImage, env string) bool {
 	return true
 }
 
-// extractSourceRepository attempts to extract source repository information
+// extractSourceRepository attempts to extract source repository information using enhanced Git integration
 func extractSourceRepository(srcDir string) string {
-	// Try to read from .git/config
-	gitConfigPath := filepath.Join(srcDir, ".git", "config")
-	if data, err := os.ReadFile(gitConfigPath); err == nil {
-		lines := strings.Split(string(data), "\n")
-		for _, line := range lines {
-			if strings.Contains(line, "url =") {
-				parts := strings.Split(line, "url =")
-				if len(parts) > 1 {
-					return strings.TrimSpace(parts[1])
-				}
-			}
+	// Try using enhanced Git utilities first
+	gitUtils := git.NewGitUtils(srcDir)
+	if gitUtils.IsGitRepository() {
+		if url, err := gitUtils.GetRepositoryURL(); err == nil && url != "" {
+			return url
 		}
 	}
 	
+	// Fallback to original implementation for non-Git projects
 	// Try to read from package.json for Node.js projects
 	packageJSONPath := filepath.Join(srcDir, "package.json")
 	if data, err := os.ReadFile(packageJSONPath); err == nil {
