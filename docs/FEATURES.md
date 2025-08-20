@@ -5,7 +5,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 
 ⸻
 
-## 🛠 Build Lanes (A–F)
+## 🛠 Build Lanes (A–G)
 
 Auto-classified lanes:
 - **Lane A** – Unikraft Minimal (Go, C)
@@ -36,6 +36,12 @@ Auto-classified lanes:
 - **Lane F** – Full VMs
   - `<app>-<sha>.img` via Packer
   - Maximum compatibility fallback
+- **Lane G** – WASM Runtime (planned)
+  - Universal polyglot compilation target
+  - `<app>-<sha>.wasm` + runtime bundle
+  - Hardware-enforced sandboxing with process isolation
+  - 5–30 MB footprint, 10–50ms boot times
+  - Supports Rust, Go, C++, AssemblyScript, Python (via Pyodide)
 
 ⸻
 
@@ -119,6 +125,11 @@ Auto-classified lanes:
     - Library dependencies: numpy, scipy, pandas, psycopg2, lxml, pillow, cryptography
     - Build configuration: `ext_modules`, `Extension()`, `build_ext`, CMake integration
     - Cython support: Import detection and `.pyx` file analysis
+  - **WASM Target Detection** (planned): Automatic detection for WASM compilation targets
+    - Build configuration: `wasm32-wasi` target in Cargo.toml, `--target wasm32-wasi` flags
+    - Direct WASM files: `.wasm` and `.wat` file detection
+    - WASM-specific dependencies: wasm-bindgen, js-sys, web-sys, wasi crates
+    - AssemblyScript projects: `.asc` files and AssemblyScript compiler configuration
 
 ⸻
 

@@ -28,11 +28,14 @@ Auto-selects optimal lane from project structure unless overridden.
   - SCENARIOS.md — test scenarios.
   - FEATURES.md — feature list.
   - TESTS.md — test scenarios to implement.
+  - WASM.md — WebAssembly compilation detection and Lane G implementation guidance.
 - `CHANGELOG.md` — dated change log with Added/Fixed/Testing sections.
 
 Documents must be consistent.
 Update related documents for every prompt.
 Example: feature changes must update FEATURES.md.
+
+**WASM Implementation Rule**: When implementing any WASM-related features (Lane G detection, builders, runtime integration), ALWAYS reference `docs/WASM.md` for language-specific compilation detection patterns, configuration examples, and implementation guidelines. This document provides the authoritative specification for WASM support in Ploy.
 
 ## Testing Requirements
 **CRITICAL**: For any code changes to Ploy:
