@@ -340,20 +340,47 @@ func (h *HealthChecker) checkConnectivity(ctx context.Context, result *HealthChe
 		Status: HealthStatusHealthy,
 	}
 	
-	// Try to list objects (lightweight operation) - use actual artifacts bucket
-	bucket := h.client.GetArtifactsBucket()
-	_, err := h.client.ListObjects(bucket, "health-check/")
-	duration := time.Since(start)
-	checkResult.Duration = duration
-	
-	if err != nil {
-		checkResult.Status = HealthStatusUnhealthy
-		checkResult.Message = "Storage service unreachable"
-		checkResult.Error = err.Error()
-		result.Status = HealthStatusUnhealthy
+	// For SeaweedFS, test filer connectivity directly instead of listing objects
+	if seaweedClient, ok := h.client.(*SeaweedFSClient); ok {
+		// Test filer root directory access (lightweight HTTP request)
+		_, err := h.client.ListObjects("", "")
+		duration := time.Since(start)
+		checkResult.Duration = duration
+		
+		if err != nil {
+			// Try volume assignment as fallback connectivity test
+			if _, assignErr := seaweedClient.TestVolumeAssignment(); assignErr != nil {
+				checkResult.Status = HealthStatusUnhealthy
+				checkResult.Message = "SeaweedFS services unreachable"
+				checkResult.Error = err.Error()
+				result.Status = HealthStatusUnhealthy
+			} else {
+				checkResult.Status = HealthStatusDegraded
+				checkResult.Message = "Master reachable, filer may have directory issues"
+				checkResult.Error = err.Error()
+				if result.Status == HealthStatusHealthy {
+					result.Status = HealthStatusDegraded
+				}
+			}
+		} else {
+			checkResult.Message = fmt.Sprintf("SeaweedFS services responsive (%.2fms)", 
+				float64(duration.Nanoseconds())/1e6)
+		}
 	} else {
-		checkResult.Message = fmt.Sprintf("Storage service responsive (%.2fms)", 
-			float64(duration.Nanoseconds())/1e6)
+		// For other storage providers, try listing objects in root
+		_, err := h.client.ListObjects("", "")
+		duration := time.Since(start)
+		checkResult.Duration = duration
+		
+		if err != nil {
+			checkResult.Status = HealthStatusUnhealthy
+			checkResult.Message = "Storage service unreachable"
+			checkResult.Error = err.Error()
+			result.Status = HealthStatusUnhealthy
+		} else {
+			checkResult.Message = fmt.Sprintf("Storage service responsive (%.2fms)", 
+				float64(duration.Nanoseconds())/1e6)
+		}
 	}
 	
 	result.Checks["connectivity"] = checkResult
