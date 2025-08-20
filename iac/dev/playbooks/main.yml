@@ -334,6 +334,55 @@
       become_user: ploy
       become: true
 
+    - name: Create external storage configuration directory
+      file:
+        path: /etc/ploy/storage
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Create external storage configuration file
+      copy:
+        content: |
+          # External Storage Configuration for Ploy Controller
+          # SeaweedFS-based distributed storage
+          
+          storage:
+            provider: seaweedfs
+            
+            # SeaweedFS Configuration
+            master: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
+            filer: "{{ storage_config.seaweedfs.filer | default('localhost:8888') }}"
+            collection: "{{ storage_config.seaweedfs.collection | default('ploy-artifacts') }}"
+            replication: "{{ storage_config.seaweedfs.replication | default('001') }}"
+            timeout: {{ storage_config.seaweedfs.timeout | default(30) }}
+            datacenter: "{{ storage_config.seaweedfs.datacenter | default('') }}"
+            rack: "{{ storage_config.seaweedfs.rack | default('') }}"
+            collections:
+              artifacts: "{{ storage_config.seaweedfs.collections.artifacts | default('ploy-artifacts') }}"
+              metadata: "{{ storage_config.seaweedfs.collections.metadata | default('ploy-metadata') }}"
+              debug: "{{ storage_config.seaweedfs.collections.debug | default('ploy-debug') }}"
+            
+            # Client Configuration
+            client:
+              retry_config:
+                max_retries: {{ storage_config.client.retry_config.max_retries | default(3) }}
+                initial_delay: "{{ storage_config.client.retry_config.initial_delay | default('1s') }}"
+                max_delay: "{{ storage_config.client.retry_config.max_delay | default('30s') }}"
+                multiplier: {{ storage_config.client.retry_config.multiplier | default(2.0) }}
+              health_check_config:
+                interval: "{{ storage_config.client.health_check_config.interval | default('30s') }}"
+                timeout: "{{ storage_config.client.health_check_config.timeout | default('10s') }}"
+                failure_threshold: {{ storage_config.client.health_check_config.failure_threshold | default(3) }}
+              enable_metrics: {{ storage_config.client.enable_metrics | default(true) }}
+              enable_health_check: {{ storage_config.client.enable_health_check | default(true) }}
+              max_operation_time: "{{ storage_config.client.max_operation_time | default('5m') }}"
+        dest: /etc/ploy/storage/config.yaml
+        owner: ploy
+        group: ploy
+        mode: '0644'
+
     - name: Set up firewall
       ufw:
         rule: allow

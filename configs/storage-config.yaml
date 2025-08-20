@@ -1,12 +1,26 @@
 storage:
-  provider: s3
-  endpoint: http://minio.ploy.local:9000
-  bucket: ploy-artifacts
-  region: us-east-1
-  access_key: PLOYACCESSKEY
-  secret_key: PLOYSECRETKEY
-  path_style: true
-buckets:
-  artifacts: ploy-artifacts
-  logs: ploy-logs
-  cache: ploy-cache
+  provider: seaweedfs
+  master: localhost:9333
+  filer: localhost:8888
+  collection: ploy-artifacts
+  replication: "001"
+  timeout: 30
+  datacenter: ""
+  rack: ""
+  collections:
+    artifacts: ploy-artifacts
+    metadata: ploy-metadata
+    debug: ploy-debug
+  client:
+    retry_config:
+      max_retries: 3
+      initial_delay: "1s"
+      max_delay: "30s"
+      multiplier: 2.0
+    health_check_config:
+      interval: "30s"
+      timeout: "10s"
+      failure_threshold: 3
+    enable_metrics: true
+    enable_health_check: true
+    max_operation_time: "5m"

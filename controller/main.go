@@ -23,19 +23,27 @@ import (
 )
 
 
-var storeClient *storage.StorageClient
 var envStore envstore.EnvStoreInterface
+var storageConfigPath string
+
+// getStorageClient creates a new storage client for each request (stateless)
+func getStorageClient() (*storage.StorageClient, error) {
+	return config.CreateStorageClientFromConfig(storageConfigPath)
+}
 
 func main(){
 	app := fiber.New()
 	app.Use(preview.Router)
 
-	cfgPath := utils.Getenv("PLOY_STORAGE_CONFIG", "configs/storage-config.yaml")
-	if rootCfg, err := config.Load(cfgPath); err == nil {
-		if c, err := storage.New(rootCfg.Storage); err == nil { 
-			// Initialize storage client with comprehensive error handling
-			storeClient = storage.NewStorageClient(c, storage.DefaultClientConfig())
-		}
+	// Get storage configuration path with external config support
+	storageConfigPath = config.GetStorageConfigPath()
+	log.Printf("Using storage configuration from: %s", storageConfigPath)
+	
+	// Validate storage configuration at startup
+	if _, err := config.Load(storageConfigPath); err != nil {
+		log.Printf("Warning: Storage configuration validation failed: %v", err)
+	} else {
+		log.Printf("Storage configuration validated successfully")
 	}
 	
 	// Initialize environment store - prefer Consul if available
@@ -116,6 +124,10 @@ func main(){
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
+		storeClient, err := getStorageClient()
+		if err != nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+		}
 		return build.TriggerBuild(c, storeClient, envStore)
 	})
 	api.Get("/apps", build.ListApps)
@@ -157,23 +169,58 @@ func main(){
 	})
 	api.Post("/apps/:app/rollback", debug.RollbackApp)
 	api.Delete("/apps/:app", func(c *fiber.Ctx) error {
+		storeClient, err := getStorageClient()
+		if err != nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+		}
 		return lifecycle.DestroyApp(c, storeClient, envStore)
 	})
 	
 	// Storage health and metrics endpoints
 	api.Get("/storage/health", func(c *fiber.Ctx) error {
-		if storeClient == nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client not initialized"})
+		storeClient, err := getStorageClient()
+		if err != nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 		}
 		health := storeClient.GetHealthStatus()
 		return c.JSON(health)
 	})
 	api.Get("/storage/metrics", func(c *fiber.Ctx) error {
-		if storeClient == nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client not initialized"})
+		storeClient, err := getStorageClient()
+		if err != nil {
+			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 		}
 		metrics := storeClient.GetMetrics()
 		return c.JSON(metrics)
+	})
+	
+	// Configuration management endpoints
+	api.Get("/storage/config", func(c *fiber.Ctx) error {
+		configManager := config.NewConfigManager(storageConfigPath)
+		rootConfig, err := configManager.LoadConfig()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": err.Error()})
+		}
+		return c.JSON(rootConfig)
+	})
+	api.Post("/storage/config/reload", func(c *fiber.Ctx) error {
+		configManager := config.NewConfigManager(storageConfigPath)
+		rootConfig, reloaded, err := configManager.ReloadIfChanged()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
+		}
+		return c.JSON(fiber.Map{
+			"reloaded": reloaded,
+			"config":   rootConfig,
+			"message":  "Configuration reload completed",
+		})
+	})
+	api.Post("/storage/config/validate", func(c *fiber.Ctx) error {
+		_, err := config.Load(storageConfigPath)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
+		}
+		return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
 	})
 
 	// TTL cleanup endpoints
