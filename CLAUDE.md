@@ -12,6 +12,7 @@ Ploy deploys applications via optimized "lanes" (A-F) for performance and footpr
 - **Lane D**: FreeBSD jails for native apps
 - **Lane E**: OCI containers with VM isolation via Kontain/Firecracker
 - **Lane F**: Full VMs for stateful workloads
+- **Lane G**: Universal polyglot target for WASM
 
 Auto-selects optimal lane from project structure unless overridden.
 
@@ -24,7 +25,6 @@ Auto-selects optimal lane from project structure unless overridden.
   - API.md — REST API routes.
   - STORAGE.md — storage abstraction (MinIO).
   - INFRASTRUCTURE.md — bare-metal setup.
-  - SCENARIOS.md — test scenarios.
   - FEATURES.md — feature list.
   - TESTS.md — test scenarios to implement.
   - WASM.md — WebAssembly compilation detection and Lane G implementation guidance.

@@ -4,15 +4,46 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 )
 
 type RenderData struct {
-	App        string
-	ImagePath  string
-	DockerImage string
-	EnvVars    map[string]string
-	IsDebug    bool
+	App           string
+	ImagePath     string
+	DockerImage   string
+	EnvVars       map[string]string
+	IsDebug       bool
+	
+	// Enhanced configuration options
+	Version       string
+	InstanceCount int
+	HttpPort      int
+	GrpcPort      int
+	CpuLimit      int
+	MemoryLimit   int
+	DiskSize      int
+	
+	// Feature flags
+	VaultEnabled        bool
+	ConsulConfigEnabled bool
+	ConnectEnabled      bool
+	VolumeEnabled       bool
+	DebugEnabled        bool
+	
+	// JVM-specific options
+	JvmOpts     string
+	JvmMemory   int
+	JvmCpus     int
+	MainClass   string
+	JavaVersion string
+	
+	// Domain and TLS
+	DomainSuffix string
+	
+	// Build metadata
+	BuildTime string
 }
 
 func templateForLane(lane string) string {
@@ -41,6 +72,9 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 	var tplPath string
 	var filename string
 	
+	// Set defaults before rendering
+	data.SetDefaults()
+	
 	if data.IsDebug {
 		tplPath = debugTemplateForLane(lane)
 		filename = fmt.Sprintf("debug-%s-lane-%s.hcl", data.App, strings.ToLower(lane))
@@ -51,16 +85,170 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 	
 	b, err := os.ReadFile(tplPath); if err != nil { return "", err }
 	s := string(b)
-	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
-	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
-	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
-	s = strings.ReplaceAll(s, "{{ENV_VARS}}", renderEnvVars(data.EnvVars))
+	
+	// Apply all template substitutions
+	s = applyTemplateSubstitutions(s, data)
+	
 	out := filepath.Join(os.TempDir(), filename)
 	if err := os.WriteFile(out, []byte(s), 0644); err != nil { return "", err }
 	return out, nil
 }
 
-func renderEnvVars(envVars map[string]string) string {
+func applyTemplateSubstitutions(template string, data RenderData) string {
+	s := template
+	
+	// Process conditional blocks first
+	s = processConditionalBlocks(s, data)
+	
+	// Basic substitutions
+	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
+	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
+	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
+	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Version)) // Lane identifier
+	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
+	
+	// Network configuration
+	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
+	if data.GrpcPort > 0 {
+		s = strings.ReplaceAll(s, "{{GRPC_PORT}}", fmt.Sprintf("%d", data.GrpcPort))
+	}
+	
+	// Resource allocation
+	s = strings.ReplaceAll(s, "{{INSTANCE_COUNT}}", fmt.Sprintf("%d", data.InstanceCount))
+	s = strings.ReplaceAll(s, "{{CPU_LIMIT}}", fmt.Sprintf("%d", data.CpuLimit))
+	s = strings.ReplaceAll(s, "{{MEMORY_LIMIT}}", fmt.Sprintf("%d", data.MemoryLimit))
+	if data.DiskSize > 0 {
+		s = strings.ReplaceAll(s, "{{DISK_SIZE}}", fmt.Sprintf("%d", data.DiskSize))
+	}
+	
+	// JVM-specific configuration
+	if data.JvmOpts != "" {
+		s = strings.ReplaceAll(s, "{{JVM_OPTS}}", data.JvmOpts)
+	}
+	if data.JvmMemory > 0 {
+		s = strings.ReplaceAll(s, "{{JVM_MEMORY}}", fmt.Sprintf("%d", data.JvmMemory))
+	}
+	if data.JvmCpus > 0 {
+		s = strings.ReplaceAll(s, "{{JVM_CPUS}}", fmt.Sprintf("%d", data.JvmCpus))
+	}
+	if data.MainClass != "" {
+		s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", data.MainClass)
+	}
+	if data.JavaVersion != "" {
+		s = strings.ReplaceAll(s, "{{JAVA_VERSION}}", data.JavaVersion)
+	}
+	
+	// Domain configuration
+	if data.DomainSuffix != "" {
+		s = strings.ReplaceAll(s, "{{DOMAIN_SUFFIX}}", data.DomainSuffix)
+	} else {
+		s = strings.ReplaceAll(s, "{{DOMAIN_SUFFIX}}", "ployd.app")
+	}
+	
+	// Task naming based on lane
+	taskName := getTaskNameForLane(strings.ToUpper(data.Version))
+	s = strings.ReplaceAll(s, "{{TASK_NAME}}", taskName)
+	
+	// Driver configuration based on lane
+	driverConfig := getDriverConfigForLane(strings.ToUpper(data.Version), data)
+	s = strings.ReplaceAll(s, "{{DRIVER}}", driverConfig.Driver)
+	s = strings.ReplaceAll(s, "{{DRIVER_CONFIG}}", driverConfig.Config)
+	
+	// Build metadata
+	if data.BuildTime == "" {
+		data.BuildTime = time.Now().Format(time.RFC3339)
+	}
+	s = strings.ReplaceAll(s, "{{BUILD_TIME}}", data.BuildTime)
+	
+	// Custom environment variables
+	s = strings.ReplaceAll(s, "{{CUSTOM_ENV_VARS}}", renderCustomEnvVars(data.EnvVars))
+	
+	// Legacy environment variables block for backward compatibility
+	s = strings.ReplaceAll(s, "{{ENV_VARS}}", renderLegacyEnvVars(data.EnvVars))
+	
+	return s
+}
+
+type DriverConfig struct {
+	Driver string
+	Config string
+}
+
+func getTaskNameForLane(lane string) string {
+	switch lane {
+	case "A", "B": return "unikernel"
+	case "C": return "osv-jvm"
+	case "D": return "jail"
+	case "E": return "oci-kontain"
+	case "F": return "vm"
+	default: return "app"
+	}
+}
+
+func getDriverConfigForLane(lane string, data RenderData) DriverConfig {
+	switch lane {
+	case "A", "B":
+		return DriverConfig{
+			Driver: "qemu",
+			Config: fmt.Sprintf(`image_path = "%s"
+        args = ["-nographic", "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-%d", "-device", "virtio-net-pci,netdev=net0"]
+        accelerator = "kvm"
+        kvm = true`, data.ImagePath, data.HttpPort),
+		}
+	case "C":
+		return DriverConfig{
+			Driver: "qemu",
+			Config: fmt.Sprintf(`image_path = "%s"
+        args = ["-nographic", "-m", "%dM", "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-%d", "-device", "virtio-net-pci,netdev=net0"]
+        accelerator = "kvm"
+        kvm = true`, data.ImagePath, data.JvmMemory, data.HttpPort),
+		}
+	case "D":
+		return DriverConfig{
+			Driver: "jail",
+			Config: fmt.Sprintf(`path = "%s"
+        allow_raw_exec = true
+        exec_timeout = "30s"`, data.ImagePath),
+		}
+	case "E":
+		return DriverConfig{
+			Driver: "docker",
+			Config: fmt.Sprintf(`image = "%s"
+        runtime = "io.kontain"
+        ports = ["http", "metrics"]
+        hostname = "{{APP_NAME}}-${NOMAD_ALLOC_INDEX}"`, data.DockerImage),
+		}
+	case "F":
+		return DriverConfig{
+			Driver: "qemu",
+			Config: fmt.Sprintf(`image_path = "%s"
+        args = ["-nographic", "-m", "2048M", "-smp", "2"]
+        accelerator = "kvm"
+        kvm = true`, data.ImagePath),
+		}
+	default:
+		return DriverConfig{
+			Driver: "docker",
+			Config: fmt.Sprintf(`image = "%s"
+        ports = ["http"]`, data.DockerImage),
+		}
+	}
+}
+
+func renderCustomEnvVars(envVars map[string]string) string {
+	if len(envVars) == 0 {
+		return ""
+	}
+	
+	var envLines []string
+	for key, value := range envVars {
+		envLines = append(envLines, fmt.Sprintf("        %s = %q", key, value))
+	}
+	
+	return strings.Join(envLines, "\n")
+}
+
+func renderLegacyEnvVars(envVars map[string]string) string {
 	if len(envVars) == 0 {
 		return ""
 	}
@@ -73,4 +261,80 @@ func renderEnvVars(envVars map[string]string) string {
 	envLines = append(envLines, "      }")
 	
 	return strings.Join(envLines, "\n")
+}
+
+// SetDefaultValues sets reasonable defaults for render data
+func (r *RenderData) SetDefaults() {
+	if r.Version == "" {
+		r.Version = "latest"
+	}
+	if r.InstanceCount == 0 {
+		r.InstanceCount = 2
+	}
+	if r.HttpPort == 0 {
+		r.HttpPort = 8080
+	}
+	if r.CpuLimit == 0 {
+		r.CpuLimit = 500
+	}
+	if r.MemoryLimit == 0 {
+		r.MemoryLimit = 256
+	}
+	if r.JvmMemory == 0 {
+		r.JvmMemory = 512
+	}
+	if r.JvmCpus == 0 {
+		r.JvmCpus = 2
+	}
+	if r.BuildTime == "" {
+		r.BuildTime = time.Now().Format(time.RFC3339)
+	}
+}
+
+// processConditionalBlocks handles {{#if CONDITION}} blocks in templates
+func processConditionalBlocks(template string, data RenderData) string {
+	// Handle conditional blocks with regex
+	conditionalRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}`)
+	
+	result := conditionalRegex.ReplaceAllStringFunc(template, func(match string) string {
+		submatch := conditionalRegex.FindStringSubmatch(match)
+		if len(submatch) < 3 {
+			return ""
+		}
+		
+		condition := submatch[1]
+		content := submatch[2]
+		
+		// Evaluate condition based on RenderData fields
+		shouldInclude := evaluateCondition(condition, data)
+		
+		if shouldInclude {
+			return content
+		}
+		return ""
+	})
+	
+	return result
+}
+
+// evaluateCondition determines if a condition should be true based on RenderData
+func evaluateCondition(condition string, data RenderData) bool {
+	switch condition {
+	case "VAULT_ENABLED":
+		return data.VaultEnabled
+	case "CONSUL_CONFIG_ENABLED":
+		return data.ConsulConfigEnabled
+	case "CONNECT_ENABLED":
+		return data.ConnectEnabled
+	case "VOLUME_ENABLED":
+		return data.VolumeEnabled
+	case "DEBUG_ENABLED":
+		return data.DebugEnabled
+	case "GRPC_PORT":
+		return data.GrpcPort > 0
+	case "DISK_SIZE":
+		return data.DiskSize > 0
+	default:
+		return false
+	}
 }
