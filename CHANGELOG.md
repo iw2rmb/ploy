@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## [2025-08-20] - Java Version Detection for Gradle and Maven Projects (Phase 6 Step 1)
+
+### Added
+- **Comprehensive Java Version Detection System**
+  - Added `detectJavaVersion()` function with support for multiple build systems
+  - Gradle support for `build.gradle`, `build.gradle.kts`, and `gradle.properties` files
+  - Maven support for `pom.xml` with various version properties and compiler configurations
+  - Support for `.java-version` files for explicit version specification
+  - Intelligent version parsing from multiple patterns and formats
+
+- **Build System Integration Patterns**
+  - Gradle KTS: `JavaLanguageVersion.of(21)`, `sourceCompatibility = "17"`, `targetCompatibility = "11"`
+  - Gradle Groovy: `sourceCompatibility = '11'`, `targetCompatibility = 21`, `JavaVersion.VERSION_17`
+  - Gradle Properties: `java.version=17`, `javaVersion=21` with flexible property naming
+  - Maven Properties: `<maven.compiler.source>21</maven.compiler.source>`, `<java.version>11</java.version>`
+  - Maven Compiler Plugin: `<source>17</source>`, `<target>21</target>` in plugin configuration
+
+- **Enhanced Java OSV Builder**
+  - Updated `JavaOSVRequest` struct to include `JavaVersion` field for explicit version specification
+  - Integrated Java version detection directly into `BuildOSVJava()` function
+  - Added comprehensive fallback mechanism defaulting to Java 21 for maximum compatibility
+  - Enhanced logging for detected versions and fallback scenarios with clear debugging information
+
+- **Build Script and Template Updates**
+  - Updated `build_osv_java_with_capstan.sh` to accept `--java-version` parameter
+  - Enhanced Capstanfile template to document Java version in generated OSv images
+  - Added Java version validation ensuring reasonable range (8-25) for production use
+  - Integrated version information into build logging and artifact metadata
+
+### Fixed
+- **Java Build Process Reliability**
+  - Fixed potential build failures due to Java version mismatches between build and runtime
+  - Improved error handling for malformed build files with graceful fallback to defaults
+  - Enhanced regex patterns to handle various Java version declaration formats
+  - Fixed edge cases with commented version declarations and complex build configurations
+
+### Testing
+- Added comprehensive test scenarios 512-542 to TESTS.md covering Java version detection
+- Created `test-scripts/test-java-version-detection.sh` for functional testing of version detection
+- Created `test-scripts/test-java-version-unit.sh` for unit testing Java OSV builder functions
+- Validated compatibility with existing Java and Scala sample applications
+
 ## [2025-08-20] - Enhanced Build Artifact Upload with Retry Logic and Verification (Phase 5 Step 5)
 
 ### Added
