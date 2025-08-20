@@ -85,15 +85,15 @@
 27. Ingress node failover preserves domains & certs.
 28. Network partition between FreeBSD and Linux pools recovers cleanly.
 
-## Self-Healing Loop Integration
-29. `POST /v1/apps/:app/diff?verify=true` creates verification branch and deploys to isolated namespace.
-30. `ploy push --verify --diff patch.diff` pushes diff, returns verification URL for testing.
-31. Verification deployments auto-cleanup after TTL expiration.
-32. `POST /v1/apps/:app/webhooks` configures webhook for build/deploy events.
-33. Webhook delivers structured JSON payload on build.completed event.
-34. Webhook retry logic with exponential backoff on delivery failure.
-35. LLM agent receives webhook, analyzes failure, pushes fix via verification branch.
-36. Verification branch testing passes, manual merge triggers production deployment.
+## Automated Remediation Framework Integration
+29. `POST /v1/arf/transform` executes OpenRewrite recipe on multiple repositories.
+30. ARF transformation job tracks progress across repository batches with dependency awareness.
+31. ARF sandbox validation performs compilation, testing, and security scanning.
+32. Circuit breaker pattern prevents cascading failures with 50% failure threshold.
+33. Error classification system categorizes failures for targeted remediation.
+34. LLM-assisted recipe modification handles complex transformation patterns.
+35. Webhook system delivers transformation events to external systems.
+36. Human-in-the-loop approval workflows for high-risk transformations.
 
 ## Enhanced Lane Detection  
 37. Java project with Jib plugin → Lane E (not Lane C).
@@ -127,7 +127,7 @@
 122. C++ extensions (`.cpp`, `.cxx`) properly detected alongside C files.
 
 ## Storage & Artifacts
-40. Build artifacts (image, SBOM, signature) uploaded to S3/MinIO storage.
+40. Build artifacts (image, SBOM, signature) uploaded to S3/SeaweedFS storage.
 41. Storage retrieval for rollback operations.
 42. Storage cleanup for expired verification builds.
 
@@ -248,7 +248,7 @@
 223. SignDockerImage function supports keyless OIDC Docker image signing.
 224. Artifact signature files (.sig) are automatically created alongside build artifacts.
 225. Signed artifacts pass OPA policy validation that previously blocked unsigned artifacts.
-226. Signature files are automatically uploaded to MinIO storage alongside artifacts.
+226. Signature files are automatically uploaded to SeaweedFS storage alongside artifacts.
 227. Build handler properly handles signing failures with informative error messages.
 228. Verification logic correctly identifies signed vs unsigned artifacts for policy enforcement.
 

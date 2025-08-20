@@ -21,7 +21,7 @@ import (
 	"github.com/ploy/ploy/internal/utils"
 )
 
-func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore *envstore.EnvStore) error {
+func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
 	appName := c.Params("app")
 	sha := c.Query("sha", "dev")
 	mainClass := c.Query("main", "com.ploy.ordersvc.Main")

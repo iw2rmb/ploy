@@ -14,6 +14,12 @@ nomad_version: "1.7.2"
 consul_version: "1.17.1"
 vault_version: "1.15.4"
 
+# Traefik version
+traefik_version: "3.0.4"
+
+# Node Exporter version
+node_exporter_version: "1.7.0"
+
 # FreeBSD VM configuration
 freebsd_vm:
   name: "freebsd-dev"

@@ -48,14 +48,17 @@
 - File-based storage with JSON persistence
 - Full CRUD operations with proper error handling
 
-## Self-Healing Loop Endpoints (Planned)
-- `POST /v1/apps/:app/diff?verify=true&branch=<name>` — push diff to verification branch.
-  - Body: patch/diff content
-  - Returns: `{"branch": "verify-<timestamp>-<hash>", "url": "https://verify-<hash>.<app>.ployd.app"}`
-- `POST /v1/apps/:app/webhooks` — configure app webhooks.
-  - Body: `{"url": "https://example.com/webhook", "events": ["build.completed", "deploy.failed"], "secret": "..."}`
-- `GET /v1/apps/:app/webhooks` — list app webhooks.
-- `DELETE /v1/apps/:app/webhooks/:id` — remove webhook.
+## Automated Remediation Framework Endpoints (Planned)
+- `POST /v1/arf/transform` — execute code transformation on repositories.
+  - Body: `{"repositories": ["repo1", "repo2"], "recipe": "spring-boot-2-to-3", "strategy": "hybrid"}`
+  - Returns: `{"job_id": "arf-123", "status": "started", "estimated_time": "2h"}`
+- `GET /v1/arf/jobs/:id` — check transformation job status.
+  - Returns: `{"job_id": "arf-123", "status": "running", "progress": 65, "repositories_completed": 13, "repositories_total": 20}`
+- `POST /v1/arf/recipes` — create or update transformation recipe.
+  - Body: OpenRewrite recipe YAML content
+- `GET /v1/arf/recipes` — list available transformation recipes.
+- `POST /v1/apps/:app/webhooks` — configure app webhooks for ARF events.
+  - Body: `{"url": "https://example.com/webhook", "events": ["transform.completed", "transform.failed"], "secret": "..."}`
 
 ## Webhook Events
 - `build.started`, `build.completed`, `build.failed`

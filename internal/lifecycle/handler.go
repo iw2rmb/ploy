@@ -11,7 +11,7 @@ import (
 	"github.com/ploy/ploy/internal/storage"
 )
 
-func DestroyApp(c *fiber.Ctx, storeClient *storage.StorageClient, envStore *envstore.EnvStore) error {
+func DestroyApp(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
 	app := c.Params("app")
 	force := c.Query("force") == "true"
 	
@@ -89,7 +89,7 @@ func destroyNomadJobs(app string, status map[string]interface{}) error {
 	return nil
 }
 
-func destroyEnvironmentVariables(app string, status map[string]interface{}, envStore *envstore.EnvStore) error {
+func destroyEnvironmentVariables(app string, status map[string]interface{}, envStore envstore.EnvStoreInterface) error {
 	log.Printf("Destroying environment variables for app: %s", app)
 	operations := status["operations"].(map[string]string)
 	

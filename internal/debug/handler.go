@@ -15,7 +15,7 @@ import (
 	"github.com/ploy/ploy/internal/utils"
 )
 
-func DebugApp(c *fiber.Ctx, envStore *envstore.EnvStore) error {
+func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	app := c.Params("app")
 	lane := c.Query("lane", "")
 	

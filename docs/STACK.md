@@ -42,6 +42,17 @@
 - **wasm-pack** — Rust-generated WebAssembly package builder
 - **Pyodide** — Python scientific stack compiled to WebAssembly
 
+## Automated Remediation Framework (ARF)
+- **OpenRewrite** — Semantic-aware Java transformation engine with 2,800+ recipes
+- **Error Prone** — Google's compile-time bug detection and prevention system
+- **LLM Integration** — Hybrid intelligence for complex transformation patterns
+- **Tree-sitter** — Universal parsing infrastructure for multi-language AST support
+- **JavaParser** — Java AST manipulation for custom recipe development
+- **Lossless Semantic Trees (LST)** — OpenRewrite's format-preserving AST representation
+- **Fork-Join Framework** — Java parallel processing for concurrent transformations
+- **Circuit Breaker Libraries** — Hystrix/Resilience4j for failure handling patterns
+- **AST Caching System** — Memory-mapped files + LRU cache for performance optimization
+
 ## Supply Chain Security
 - **Syft** — Software Bill of Materials (SBOM) generation
 - **Grype** — Vulnerability scanning for container images and artifacts
@@ -50,8 +61,8 @@
 
 ## Storage & Networking
 - **SeaweedFS** — Distributed object storage optimized for small files (artifacts, SBOMs, signatures)
-- **Traefik/Envoy** — Ingress controllers and load balancing
-- **Let's Encrypt** — Automated TLS certificate provisioning
+- **Traefik** — Cloud-native reverse proxy and load balancer with automatic service discovery
+- **Let's Encrypt** — Automated TLS certificate provisioning with wildcard support
 - **Consul Connect** — Service mesh networking and mTLS
 
 ## Development & CLI

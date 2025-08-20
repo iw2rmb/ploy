@@ -122,35 +122,57 @@
 
     - name: Install monitoring tools
       block:
+        - name: Check if Node Exporter is already installed
+          stat:
+            path: /usr/local/bin/node_exporter
+          register: node_exporter_binary
+
+        - name: Get current Node Exporter version (if installed)
+          command: /usr/local/bin/node_exporter --version
+          register: current_node_exporter_version
+          changed_when: false
+          ignore_errors: true
+          when: node_exporter_binary.stat.exists
+
         - name: Install Prometheus Node Exporter
           get_url:
-            url: "https://github.com/prometheus/node_exporter/releases/latest/download/node_exporter-1.7.0.linux-amd64.tar.gz"
+            url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
             dest: /tmp/node_exporter.tar.gz
+          when: not node_exporter_binary.stat.exists or node_exporter_version not in (current_node_exporter_version.stdout | default(''))
 
         - name: Extract Node Exporter
           unarchive:
             src: /tmp/node_exporter.tar.gz
             dest: /tmp
             remote_src: true
+          when: not node_exporter_binary.stat.exists or node_exporter_version not in (current_node_exporter_version.stdout | default(''))
 
         - name: Install Node Exporter
           copy:
-            src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+            src: /tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter
             dest: /usr/local/bin/node_exporter
             remote_src: true
             mode: '0755'
+          when: not node_exporter_binary.stat.exists or node_exporter_version not in (current_node_exporter_version.stdout | default(''))
 
         - name: Create Node Exporter systemd service
           template:
             src: ../templates/node-exporter.service.j2
             dest: /etc/systemd/system/node-exporter.service
 
-        - name: Start and enable Node Exporter
+        - name: Check Node Exporter service status
+          command: systemctl is-active node-exporter
+          register: node_exporter_service_status
+          ignore_errors: true
+          changed_when: false
+
+        - name: Start and enable Node Exporter (if not running)
           systemd:
             name: node-exporter
             state: started
             enabled: true
             daemon_reload: true
+          when: node_exporter_service_status.stdout != "active"
 
     - name: Create environment setup script
       template:

@@ -4,13 +4,13 @@
 Highly available control plane + compute pools for FreeBSD/bhyve and a small Linux pool for Kontain/Firecracker.
 
 ## Hardware (minimum)
-- **FreeBSD Control Plane (3 nodes)** — Nomad servers, Consul servers, Vault (HA), Harbor (or external), MinIO, HAProxy.
+- **FreeBSD Control Plane (3 nodes)** — Nomad servers, Consul servers, Vault (HA), Harbor (or external), SeaweedFS, Traefik.
   - 8–16 cores, 64–128 GB RAM, 2 x NVMe (mirror), 2 x 10GbE.
 - **FreeBSD Compute (3 nodes)** — bhyve unikernels + jails.
   - 16–32 cores, 128–256 GB RAM, 2 x NVMe (mirror), 2 x 25GbE.
 - **Linux Compute (2 nodes)** — Firecracker/Kontain pool.
   - 16–32 cores, 128 GB RAM, NVMe, 25GbE.
-- **Optional Storage (3 nodes)** — Ceph or MinIO dedicated.
+- **Optional Storage (3 nodes)** — Ceph or SeaweedFS dedicated.
   - 8–16 cores, 64–128 GB RAM, 8 x SSD + 2 x NVMe SLOG.
 
 ## Network
@@ -23,8 +23,8 @@ Highly available control plane + compute pools for FreeBSD/bhyve and a small Lin
 3. **Install WireGuard** for node mesh; configure peering between FreeBSD and Linux pools.
 4. **Deploy Nomad/Consul/Vault** (HA): 3 servers each, TLS enabled.
 5. **Deploy Harbor + ORAS** (or connect external registry). Create `ploy` project.
-6. **Deploy MinIO** (or Ceph RGW). Configure buckets for logs/artifacts.
-7. **Ingress**: HAProxy jail with ACME (certbot) hooks. Add wildcard `*.ployd.app` DNS to Ingress VIP.
+6. **Deploy SeaweedFS** (or Ceph RGW). Configure collections for logs/artifacts.
+7. **Ingress**: Traefik with Let's Encrypt integration. Add wildcard `*.ployd.app` DNS to Ingress VIP.
 8. **Linux pool**: Install KVM, Firecracker, Kontain runtime, Nomad client.
 9. **Observability**: Prometheus, Grafana, Loki, OTEL collector on control plane; scrape Nomad/Consul and host exporters.
 10. **OPA**: Load policies enforcing SBOM/signatures and SSH gating.

@@ -1,6 +1,6 @@
 # STORAGE
 
-This document explains how Ploy abstracts storage using an S3-compatible API with **MinIO** as the default backend.
+This document explains how Ploy abstracts storage using an S3-compatible API with **SeaweedFS** as the default backend.
 
 ## Goals
 - Backend-agnostic via S3 API.
@@ -238,11 +238,11 @@ This document explains how Ploy abstracts storage, what backends are recommended
 ## Goals
 - Keep Ploy **backend-agnostic** using the **S3 API** as the single interface.
 - Optimize for **developer speed** (small objects, fast artifact IO).
-- Allow **easy migration** (self-hosted ↔ managed, MinIO ↔ Ceph/SeaweedFS).
+- Allow **easy migration** (self-hosted ↔ managed, SeaweedFS ↔ MinIO/Ceph).
 
 ## Configuration
 See `config.yaml` for a minimal, portable configuration. Key flags:
-- `endpoint`: S3-compatible URL (MinIO, SeaweedFS, Ceph RGW, AWS S3, Wasabi, B2).
+- `endpoint`: S3-compatible URL (SeaweedFS, MinIO, Ceph RGW, AWS S3, Wasabi, B2).
 - `path_style: true`: required for most non-AWS endpoints.
 - `region`: any string; defaults work for non-AWS.
 - `server_side_encryption`: optional (e.g., `AES256`).
@@ -262,11 +262,11 @@ See `config.yaml` for a minimal, portable configuration. Key flags:
 | **Managed S3**| Proprietary | ✅ Zero deployment                | Scales transparently; WAN latency considerations | S3 API            | No ops burden; global availability               | Latency; lock-in; cost                         |
 
 ## Recommended Paths
-- **Dev/Test (fast, light)**: MinIO or SeaweedFS.
+- **Dev/Test (fast, light)**: SeaweedFS or MinIO.
 - **License-sensitive**: SeaweedFS (Apache 2.0).
 - **Need Block/POSIX later**: Ceph (add via Rook when required).
 
-## Migration Playbook (MinIO → X)
+## Migration Playbook (Storage Backend Migration)
 1. Deploy target backend.
 2. Mirror buckets (`rclone sync` or `mc mirror`).
 3. Optional dual write for new artifacts.
