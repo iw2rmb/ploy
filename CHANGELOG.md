@@ -1,5 +1,106 @@
 # CHANGELOG
 
+## [2025-08-20] - TTL Cleanup for Preview Allocations Implementation (Phase 6 Step 2)
+
+### Added
+- **Comprehensive TTL Cleanup Service**
+  - Background cleanup service with configurable intervals (default: 6h) for automatic preview allocation management
+  - Preview job identification using `{app}-{sha}` pattern matching with SHA validation (7-40 characters)
+  - Age-based cleanup using Nomad job SubmitTime for accurate age calculation and cleanup decisions
+  - Dual cleanup thresholds: preview TTL (default: 24h) and maximum age limit (default: 7d)
+  - Automatic service startup on controller initialization with configurable auto-start option
+
+- **Flexible Configuration System**
+  - File-based configuration at `/etc/ploy/cleanup-config.json` with automatic default creation
+  - Environment variable support (PLOY_PREVIEW_TTL, PLOY_CLEANUP_INTERVAL, PLOY_MAX_PREVIEW_AGE, etc.)
+  - Configuration validation with minimum safety limits (1min TTL, 5min interval)
+  - Dynamic configuration updates via HTTP API with real-time service reconfiguration
+  - Support for both development and production configuration patterns
+
+- **Complete HTTP API Management**
+  - `GET /v1/cleanup/status` - Service status and operational statistics
+  - `GET /v1/cleanup/config` - Current configuration with defaults and environment info
+  - `PUT /v1/cleanup/config` - Dynamic configuration updates with validation
+  - `POST /v1/cleanup/trigger?dry_run=true` - Manual cleanup with optional dry run mode
+  - `POST /v1/cleanup/start` / `POST /v1/cleanup/stop` - Service control endpoints
+  - `GET /v1/cleanup/jobs` - Preview job listing with ages and cleanup recommendations
+
+- **Advanced Monitoring and Statistics**
+  - Age distribution analytics for preview allocations across time buckets (1h-6h-24h-7d+)
+  - Comprehensive cleanup operation statistics with success/failure tracking
+  - Real-time service health monitoring with running status and configuration details
+  - Detailed logging of all cleanup operations with job names, ages, and reasons
+
+### Enhanced
+- **Error Handling and Resilience**
+  - Graceful handling of Nomad API failures with retry logic and timeout management
+  - Continues cleanup operations when individual job deletions fail with detailed error logging
+  - "Job not found" error handling for already-removed allocations without failure
+  - Network connectivity issues handled gracefully with service degradation warnings
+
+- **Dry Run and Safety Features**
+  - Complete dry run mode for safe testing of cleanup operations without actual job deletion
+  - Configurable safety limits preventing accidental misconfiguration (minimum TTL/interval values)
+  - Detailed cleanup reasoning with specific violation messages (TTL exceeded, max age exceeded)
+  - Service control endpoints with proper validation and state management
+
+### Integration
+- **Controller Integration**
+  - Seamless integration into main controller with automatic service initialization
+  - Configuration loading with environment variable override support
+  - Enhanced imports and route setup for cleanup management endpoints
+  - Backward compatibility with existing controller functionality and API structure
+
+- **Nomad API Integration**
+  - Direct Nomad API integration for job discovery and allocation health checking
+  - Job pattern matching for preview allocation identification vs regular applications
+  - Proper job stopping and purging using `nomad job stop -purge` commands
+  - Integration with existing Nomad client patterns and error handling conventions
+
+### Testing
+- **Comprehensive Test Coverage**
+  - Added 25 new test scenarios (543-567) to TESTS.md covering all TTL cleanup functionality
+  - Created `test-scripts/test-ttl-cleanup.sh` for integration testing with live API endpoints
+  - Created `test-scripts/test-ttl-cleanup-unit.sh` for unit testing of logic patterns and validation
+  - Pattern matching, age calculation, configuration validation, and environment parsing tests
+  - Service control, API endpoint, and error handling validation scenarios
+
+### Technical Implementation
+- **Core Service Architecture (`internal/cleanup/ttl.go`)**
+  - TTLCleanupService struct with context-based lifecycle management and cancellation
+  - Background periodic cleanup with configurable intervals and graceful shutdown
+  - Pattern-based preview job identification using regex matching for `{app}-{sha}` format
+  - Age calculation using Nomad job SubmitTime for accurate cleanup timing decisions
+  - Statistics generation with age distribution and operational metrics
+
+- **Configuration Management (`internal/cleanup/config.go`)**
+  - ConfigManager struct with file-based persistence and environment variable overrides
+  - Automatic default configuration creation and validation with safety minimum values
+  - JSON-based configuration storage with proper error handling and directory creation
+  - Runtime configuration updates with validation and persistence for service restart
+
+- **HTTP API Handlers (`internal/cleanup/handler.go`)**
+  - CleanupHandler struct with comprehensive REST endpoint implementation
+  - Service control endpoints for start/stop/status management with proper state validation
+  - Configuration endpoints for retrieval, updates, and defaults with JSON schema support
+  - Manual cleanup triggers with dry run support and temporary configuration overrides
+
+### Documentation Updates
+- **FEATURES.md Enhancement**
+  - Updated preview system section with comprehensive TTL cleanup feature description
+  - Removed "TTL cleanup for preview allocations (planned)" from next steps section
+  - Added detailed feature breakdown with configuration, control, and monitoring capabilities
+
+- **Test Documentation**
+  - Added comprehensive test scenarios covering service functionality and configuration management
+  - Unit test scenarios for pattern matching, TTL logic, and configuration validation
+  - Integration test scenarios for API endpoints, service control, and error handling
+
+### Status
+**COMPLETED** - Phase 6 Step 2 from PLAN.md: "Add TTL cleanup for preview allocations to prevent resource accumulation"
+
+The TTL cleanup system provides automatic, configurable cleanup of preview allocations to prevent resource accumulation while offering comprehensive management capabilities through HTTP APIs, flexible configuration options, and robust error handling for production environments.
+
 ## [2025-08-20] - Java Version Detection for Gradle and Maven Projects (Phase 6 Step 1)
 
 ### Added

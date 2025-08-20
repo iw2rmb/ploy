@@ -171,7 +171,17 @@ Auto-classified lanes:
   - ✅ **Smart Readiness**: Replaces naive HTTP checks with Nomad API integration
   - ✅ **Error Handling**: Meaningful feedback for failed/pending deployments
   - ✅ **Dynamic Discovery**: Endpoint detection based on allocation IP/port mapping
-- TTL cleanup for previews (planned)
+- ✅ **TTL Cleanup for Preview Allocations** (Aug 2025):
+  - **Automatic Cleanup Service**: Background service with configurable intervals (default: 6h) for preview allocation cleanup
+  - **Configurable TTL**: Preview allocations cleaned after TTL expiration (default: 24h) with maximum age limit (7d)
+  - **Pattern-Based Detection**: Identifies preview jobs using `{app}-{sha}` naming pattern with SHA validation
+  - **Age-Based Cleanup**: Uses Nomad job SubmitTime for accurate age calculation and cleanup decisions
+  - **HTTP API Management**: Complete service control via REST endpoints (/cleanup/status, /config, /jobs, /trigger)
+  - **Flexible Configuration**: File-based and environment variable configuration with validation
+  - **Dry Run Mode**: Safe testing mode for cleanup operations without actual job deletion
+  - **Service Control**: Start/stop service management with automatic startup integration
+  - **Statistics & Monitoring**: Age distribution analytics and cleanup operation statistics
+  - **Error Resilience**: Graceful handling of Nomad API failures and missing jobs
 - ✅ Domains: `manifests/<app>.yaml` configuration
 - TLS: Certbot integration (planned), BYOC supported
 
@@ -305,7 +315,6 @@ Auto-classified lanes:
 
 ## 🔮 Next Steps
 - Per-app Unikraft recipes and custom configurations
-- TTL cleanup for preview allocations to prevent resource accumulation
 - E2E testing suite with full Nomad cluster validation
 - Observability stack integration (Loki/Prometheus/Grafana)
 - Advanced traffic shifting strategies (blue/green deployments)
