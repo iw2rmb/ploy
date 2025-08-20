@@ -583,3 +583,40 @@
 509. Verification process respects storage operation timeouts and cancellation.
 510. Upload verification supports batch operations for multiple files simultaneously.
 511. Enhanced upload verification maintains backward compatibility with existing workflows.
+
+## Java Version Detection and Management Tests (512-542)
+
+### Java Version Detection from Build Files (512-527)
+512. Gradle project with `java { toolchain { languageVersion.set(JavaLanguageVersion.of(21)) } }` → detects Java 21.
+513. Gradle project with `sourceCompatibility = "17"` → detects Java 17.
+514. Gradle project with `targetCompatibility = 11` → detects Java 11.
+515. Gradle KTS project with `JavaLanguageVersion.of(17)` → detects Java 17.
+516. Maven project with `<maven.compiler.source>21</maven.compiler.source>` → detects Java 21.
+517. Maven project with `<maven.compiler.target>17</maven.compiler.target>` → detects Java 17.
+518. Maven project with `<java.version>11</java.version>` → detects Java 11.
+519. Maven project with `<source>17</source>` in compiler plugin → detects Java 17.
+520. Maven project with `<target>21</target>` in compiler plugin → detects Java 21.
+521. Gradle properties file with `java.version=17` → detects Java 17.
+522. Project with `.java-version` file containing "21" → detects Java 21.
+523. Project with multiple version declarations → uses first detected version.
+524. Gradle project with `JavaVersion.VERSION_17` → detects Java 17.
+525. Build files with version ranges or complex expressions → extracts major version.
+526. Project with malformed build files → falls back to default Java 21.
+527. Build files with commented version declarations → ignores commented versions.
+
+### Java Version Integration with Build Process (528-542)
+528. Java OSV builder uses detected Java version in build script parameters.
+529. Build script receives `--java-version` parameter from Java version detection.
+530. Capstanfile template includes detected Java version as comment for documentation.
+531. Java version detection integrates with Lane C (OSv) build pipeline.
+532. Build process logs detected Java version for debugging and audit.
+533. Java version detection works for both pure Java and Scala projects.
+534. Build script falls back to Java 21 when detection fails completely.
+535. Java version validation ensures detected versions are in reasonable range (8-25).
+536. OSv build process adapts to different Java versions appropriately.
+537. Build error handling provides clear messages when Java version issues occur.
+538. Java version detection works with Jib-enabled projects in Lane E.
+539. Version detection handles edge cases like empty files or missing dependencies.
+540. Build process respects explicitly provided Java version over detected version.
+541. Java version logging includes source of detection (Gradle, Maven, .java-version).
+542. Build artifacts include Java version metadata for deployment verification.

@@ -47,8 +47,9 @@ Next steps to implement:
 5. ✅ **COMPLETED (2025-08-20)** Enhance build artifact upload with retry logic and verification.
 
 **Phase 6: Platform Enhancement Features**
-1. Add TTL cleanup for preview allocations to prevent resource accumulation.
-2. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
+1. ✅ **COMPLETED (2025-08-20)** Implement Java version detection for Gradle and Maven projects with fallback to default version.
+2. Add TTL cleanup for preview allocations to prevent resource accumulation.
+3. Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
 
 **Phase 7: Advanced Self-Healing & Automation**
 1. Diff push with verification: `POST /v1/apps/:app/diff?verify=true` API and `ploy push --verify --diff` CLI to push diffs that create temporary git branches for isolated testing.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-usage() { echo "usage: $0 --tar <jib_tar> --main <MainClass> [--out <image.qcow2>] [--app <appname>] [--sha <gitsha>]"; exit 1; }
+usage() { echo "usage: $0 --tar <jib_tar> --main <MainClass> [--out <image.qcow2>] [--app <appname>] [--sha <gitsha>] [--java-version <version>]"; exit 1; }
 
-TAR=""; MAIN=""; OUT=""; APP=""; SHA=""
+TAR=""; MAIN=""; OUT=""; APP=""; SHA=""; JAVA_VERSION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -11,6 +11,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="$2"; shift 2;;
     --app) APP="$2"; shift 2;;
     --sha) SHA="$2"; shift 2;;
+    --java-version) JAVA_VERSION="$2"; shift 2;;
     *) usage;;
   esac
 done
@@ -18,7 +19,10 @@ done
 [[ -z "$TAR" || -z "$MAIN" ]] && usage
 APP="${APP:-java-app}"
 SHA="${SHA:-dev}"
+JAVA_VERSION="${JAVA_VERSION:-21}"
 OUT="${OUT:-${APP}-${SHA}.qcow2}"
+
+echo "Building OSv Java image with Java ${JAVA_VERSION} for app: ${APP}"
 
 which capstan >/dev/null 2>&1 || { echo "capstan not found in PATH"; exit 2; }
 
@@ -40,7 +44,7 @@ for d in classes resources libs dependencies ; do
 done
 
 CF="$WORK/capstan_project/Capstanfile"; mkdir -p "$(dirname "$CF")"
-sed "s|{{MAIN_CLASS}}|$MAIN|g; s|{{APP}}|$APP|g" "$SCRIPT_DIR/Capstanfile.tmpl" > "$CF"
+sed "s|{{MAIN_CLASS}}|$MAIN|g; s|{{APP}}|$APP|g; s|{{JAVA_VERSION}}|$JAVA_VERSION|g" "$SCRIPT_DIR/Capstanfile.tmpl" > "$CF"
 
 pushd "$WORK/capstan_project" >/dev/null
 capstan build -p qemu -f qcow2 -v
