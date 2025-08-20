@@ -333,15 +333,23 @@
         group: hashicorp
         mode: '0644'
 
+    - name: Find Nomad job templates
+      find:
+        paths: "{{ playbook_dir }}/../../../platform/nomad"
+        patterns: "*.hcl"
+      register: nomad_templates
+      delegate_to: localhost
+      become: no
+
     - name: Copy Ploy Nomad job templates (if they exist)
       copy:
-        src: "{{ item }}"
+        src: "{{ item.path }}"
         dest: /opt/hashicorp/nomad/jobs/
         owner: hashicorp
         group: hashicorp
-      with_fileglob:
-        - "{{ playbook_dir }}/../../platform/nomad/*.hcl"
-      ignore_errors: true
+        mode: '0644'
+      with_items: "{{ nomad_templates.files }}"
+      when: nomad_templates.files | length > 0
 
     - name: Create Nomad environment file for systemd
       copy:
@@ -412,7 +420,7 @@
 
         - name: Copy Traefik Nomad job template to VPS
           copy:
-            src: "{{ playbook_dir }}/../../platform/nomad/traefik-system.hcl"
+            src: "{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
             dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
             owner: hashicorp
             group: hashicorp
