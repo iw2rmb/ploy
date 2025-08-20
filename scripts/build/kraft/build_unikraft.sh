@@ -21,31 +21,173 @@ has_nodejs() {
   [[ -f "$1/package.json" ]]
 }
 
+# Extract Node.js version from package.json engines field
+get_nodejs_version_from_package() {
+  local app_dir="$1"
+  local package_json="$app_dir/package.json"
+  
+  if [[ ! -f "$package_json" ]]; then
+    echo "18"  # Default version
+    return 0
+  fi
+  
+  # Extract engines.node field using node to parse JSON safely
+  local node_version
+  # Convert to absolute path for require()
+  local abs_package_json
+  abs_package_json=$(realpath "$package_json" 2>/dev/null || echo "$package_json")
+  
+  node_version=$(node -p "
+    try {
+      const pkg = require('$abs_package_json');
+      const engines = pkg.engines || {};
+      const nodeVersion = engines.node || '';
+      // Handle version ranges like '^18.0.0', '>=16.0.0', '18.x'
+      // Extract major version number
+      const match = nodeVersion.match(/(\d+)/);
+      match ? match[1] : '18';
+    } catch (e) {
+      '18';
+    }
+  " 2>/dev/null || echo "18")
+  
+  echo "$node_version"
+}
+
+# Download and extract Node.js binary for Unikraft build
+download_nodejs_for_unikraft() {
+  local version="$1"
+  local app_dir="$2"
+  local node_dir="$app_dir/.unikraft-node"
+  
+  echo "Downloading Node.js v$version for Unikraft build..."
+  
+  # Create directory for Node.js binary
+  mkdir -p "$node_dir"
+  
+  # Determine architecture and platform
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch="x64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) arch="x64" ;;  # Default to x64
+  esac
+  
+  local platform
+  case "$(uname -s)" in
+    Linux) platform="linux" ;;
+    Darwin) platform="darwin" ;;
+    *) platform="linux" ;;  # Default to linux for Unikraft
+  esac
+  
+  local node_filename="node-v$version-$platform-$arch"
+  local node_url="https://nodejs.org/dist/v$version/$node_filename.tar.xz"
+  local node_archive="$node_dir/$node_filename.tar.xz"
+  
+  # Download Node.js if not already cached
+  if [[ ! -f "$node_dir/bin/node" ]]; then
+    echo "Downloading Node.js from: $node_url"
+    
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$node_url" -o "$node_archive" || {
+        echo "Warning: Failed to download Node.js v$version, using system node"
+        return 1
+      }
+    elif command -v wget >/dev/null 2>&1; then
+      wget -q "$node_url" -O "$node_archive" || {
+        echo "Warning: Failed to download Node.js v$version, using system node"
+        return 1
+      }
+    else
+      echo "Warning: Neither curl nor wget available, using system node"
+      return 1
+    fi
+    
+    # Extract Node.js
+    echo "Extracting Node.js v$version..."
+    tar -xf "$node_archive" -C "$node_dir" --strip-components=1 || {
+      echo "Warning: Failed to extract Node.js, using system node"
+      rm -f "$node_archive"
+      return 1
+    }
+    
+    # Cleanup archive
+    rm -f "$node_archive"
+    
+    # Verify extraction
+    if [[ -f "$node_dir/bin/node" ]]; then
+      echo "✓ Node.js v$version downloaded and ready for Unikraft build"
+      "$node_dir/bin/node" --version
+    else
+      echo "Warning: Node.js extraction failed, using system node"
+      return 1
+    fi
+  else
+    echo "✓ Node.js v$version already available for Unikraft build"
+    "$node_dir/bin/node" --version
+  fi
+  
+  return 0
+}
+
+# Setup Node.js version for Unikraft build
+setup_nodejs_for_unikraft() {
+  local app_dir="$1"
+  local required_version
+  
+  echo "Setting up Node.js for Unikraft build..."
+  
+  required_version=$(get_nodejs_version_from_package "$app_dir")
+  echo "Required Node.js version: $required_version"
+  
+  # Try to download specific version for Unikraft
+  if download_nodejs_for_unikraft "$required_version" "$app_dir"; then
+    # Export path to use downloaded Node.js for build
+    export UNIKRAFT_NODE_PATH="$app_dir/.unikraft-node/bin"
+    echo "✓ Using Node.js v$required_version for Unikraft build"
+  else
+    echo "⚠ Falling back to system Node.js"
+    export UNIKRAFT_NODE_PATH=""
+  fi
+}
+
 prepare_nodejs_build() {
   local app_dir="$1"
   echo "Detected Node.js application, preparing build..."
   
-  # Check if we have Node.js and npm available
-  if ! command -v node >/dev/null 2>&1; then
-    echo "Warning: Node.js not found in PATH, build may fail"
+  # Setup Node.js version for Unikraft build
+  setup_nodejs_for_unikraft "$app_dir"
+  
+  # Check if we have Node.js and npm available (system or downloaded)
+  local node_cmd="node"
+  local npm_cmd="npm"
+  
+  if [[ -n "$UNIKRAFT_NODE_PATH" ]]; then
+    node_cmd="$UNIKRAFT_NODE_PATH/node"
+    npm_cmd="$UNIKRAFT_NODE_PATH/npm"
+    echo "Using downloaded Node.js: $node_cmd"
+  fi
+  
+  if ! command -v "$node_cmd" >/dev/null 2>&1; then
+    echo "Warning: Node.js not found, build may fail"
     return 1
   fi
   
-  if ! command -v npm >/dev/null 2>&1; then
-    echo "Warning: npm not found in PATH, build may fail"
+  if ! command -v "$npm_cmd" >/dev/null 2>&1; then
+    echo "Warning: npm not found, build may fail"
     return 1
   fi
   
   pushd "$app_dir" >/dev/null
   
-  # Enhanced dependency management
-  manage_nodejs_dependencies "$app_dir"
+  # Enhanced dependency management with specific Node.js version
+  manage_nodejs_dependencies "$app_dir" "$node_cmd" "$npm_cmd"
   
   # Package bundling and optimization
   bundle_nodejs_application "$app_dir"
   
   # Verify main entry point exists
-  verify_nodejs_entrypoint "$app_dir"
+  verify_nodejs_entrypoint "$app_dir" "$node_cmd"
   
   popd >/dev/null
   return 0
@@ -53,7 +195,9 @@ prepare_nodejs_build() {
 
 manage_nodejs_dependencies() {
   local app_dir="$1"
-  echo "Managing Node.js dependencies..."
+  local node_cmd="${2:-node}"
+  local npm_cmd="${3:-npm}"
+  echo "Managing Node.js dependencies with $node_cmd..."
   
   # Check for package-lock.json and handle accordingly
   if [[ -f "package-lock.json" ]]; then
@@ -62,16 +206,16 @@ manage_nodejs_dependencies() {
       echo "Removing existing node_modules for clean install"
       rm -rf node_modules
     fi
-    npm ci --production --silent || {
+    "$npm_cmd" ci --production --silent || {
       echo "Warning: npm ci failed, falling back to npm install..."
-      npm install --production --silent || {
+      "$npm_cmd" install --production --silent || {
         echo "Warning: npm install also failed, continuing with build..."
         return 1
       }
     }
   elif [[ -f "package.json" ]] && [[ ! -d "node_modules" ]]; then
     echo "Installing Node.js dependencies with npm install..."
-    npm install --production --silent || {
+    "$npm_cmd" install --production --silent || {
       echo "Warning: npm install failed, continuing with build..."
       return 1
     }
@@ -79,10 +223,10 @@ manage_nodejs_dependencies() {
     echo "Node.js dependencies already installed"
     # Verify dependencies are up to date
     echo "Verifying dependency integrity..."
-    npm ls --production --silent >/dev/null 2>&1 || {
+    "$npm_cmd" ls --production --silent >/dev/null 2>&1 || {
       echo "Warning: Dependency issues detected, reinstalling..."
       rm -rf node_modules
-      npm install --production --silent || {
+      "$npm_cmd" install --production --silent || {
         echo "Warning: npm install failed after cleanup, continuing..."
         return 1
       }
@@ -92,11 +236,11 @@ manage_nodejs_dependencies() {
   # Cache dependency information for build optimization
   if [[ -f "package.json" ]]; then
     local dep_count
-    dep_count=$(node -p "Object.keys(require('./package.json').dependencies || {}).length" 2>/dev/null || echo "0")
+    dep_count=$("$node_cmd" -p "Object.keys(require('./package.json').dependencies || {}).length" 2>/dev/null || echo "0")
     echo "Node.js dependencies installed: $dep_count packages"
     
     # Generate dependency manifest for Unikraft optimization
-    generate_dependency_manifest
+    generate_dependency_manifest "$node_cmd"
   fi
   
   echo "Node.js dependency management completed"
@@ -151,11 +295,12 @@ bundle_nodejs_application() {
 }
 
 generate_dependency_manifest() {
+  local node_cmd="${1:-node}"
   echo "Generating dependency manifest for Unikraft optimization..."
   
-  if [[ -f "package.json" ]] && command -v node >/dev/null 2>&1; then
+  if [[ -f "package.json" ]] && command -v "$node_cmd" >/dev/null 2>&1; then
     # Extract key dependency information
-    node -e "
+    "$node_cmd" -e "
       const pkg = require('./package.json');
       const manifest = {
         name: pkg.name || 'nodejs-app',
@@ -167,11 +312,12 @@ generate_dependency_manifest() {
         unikraft: {
           optimized: true,
           bundle_created: new Date().toISOString(),
-          production_only: true
+          production_only: true,
+          node_version: process.version
         }
       };
       require('fs').writeFileSync('.unikraft-manifest.json', JSON.stringify(manifest, null, 2));
-      console.log('Dependency manifest generated');
+      console.log('Dependency manifest generated with Node.js ' + process.version);
     " 2>/dev/null || echo "Warning: Could not generate dependency manifest"
   fi
 }
@@ -216,10 +362,11 @@ EOF
 
 verify_nodejs_entrypoint() {
   local app_dir="$1"
+  local node_cmd="${2:-node}"
   local main_file
   
   if [[ -f "package.json" ]]; then
-    main_file=$(node -p "try { require('./package.json').main || 'index.js' } catch(e) { 'index.js' }" 2>/dev/null || echo "index.js")
+    main_file=$("$node_cmd" -p "try { require('./package.json').main || 'index.js' } catch(e) { 'index.js' }" 2>/dev/null || echo "index.js")
     
     if [[ ! -f "$main_file" ]]; then
       echo "Warning: Main file '$main_file' not found, build may fail"
@@ -229,8 +376,8 @@ verify_nodejs_entrypoint() {
     echo "Verified main entry point: $main_file"
     
     # Validate main file syntax
-    echo "Validating JavaScript syntax..."
-    node -c "$main_file" 2>/dev/null || {
+    echo "Validating JavaScript syntax with $node_cmd..."
+    "$node_cmd" -c "$main_file" 2>/dev/null || {
       echo "Warning: Syntax errors detected in $main_file"
       return 1
     }

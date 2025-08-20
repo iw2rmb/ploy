@@ -18,6 +18,39 @@ detect_nodejs() {
   [[ -f "$app_dir/package.json" ]]
 }
 
+# Extract Node.js version from package.json engines field
+get_nodejs_version_requirement() {
+  local app_dir="$1"
+  local package_json="$app_dir/package.json"
+  
+  if [[ ! -f "$package_json" ]]; then
+    echo "18"  # Default version
+    return 0
+  fi
+  
+  # Extract engines.node field using node to parse JSON safely
+  local node_version
+  # Convert to absolute path for require()
+  local abs_package_json
+  abs_package_json=$(realpath "$package_json" 2>/dev/null || echo "$package_json")
+  
+  node_version=$(node -p "
+    try {
+      const pkg = require('$abs_package_json');
+      const engines = pkg.engines || {};
+      const nodeVersion = engines.node || '';
+      // Handle version ranges like '^18.0.0', '>=16.0.0', '18.x'
+      // Extract major version number
+      const match = nodeVersion.match(/(\d+)/);
+      match ? match[1] : '18';
+    } catch (e) {
+      '18';
+    }
+  " 2>/dev/null || echo "18")
+  
+  echo "$node_version"
+}
+
 # Select appropriate template based on lane and application type
 select_template() {
   local lane="$1"
@@ -50,6 +83,9 @@ configure_nodejs_template() {
     # Extract Node.js application metadata
     local app_name="nodejs-app"
     local main_file="index.js"
+    local node_version
+    
+    node_version=$(get_nodejs_version_requirement "$app_dir")
     
     if command -v node >/dev/null 2>&1; then
       app_name=$(node -p "try { require('$app_dir/package.json').name || 'nodejs-app' } catch(e) { 'nodejs-app' }" 2>/dev/null || echo "nodejs-app")
@@ -63,7 +99,10 @@ configure_nodejs_template() {
       -e "s|sources:.*|sources: ./|" \
       "$template_file" 2>/dev/null || true
     
-    echo "Generated Node.js-optimized configuration for $app_name (main: $main_file)"
+    # Add Node.js version comment to kraft.yaml
+    echo "# Node.js version requirement: $node_version" >> "$template_file"
+    
+    echo "Generated Node.js-optimized configuration for $app_name (main: $main_file, node: v$node_version)"
   else
     # Standard template customization
     sed -i.bak "s/http_port:.*/http_port: $port/" "$template_file" 2>/dev/null || true

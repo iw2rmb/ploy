@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [2025-08-20] - Node.js Version Detection and Management (Phase 5 Step 4)
+
+### Added
+- **Node.js Version Detection from package.json engines**
+  - Automatic detection of Node.js version requirements from package.json engines.node field
+  - Support for version ranges (^18.0.0, >=16.0.0, 18.x, ~19.5.0) with intelligent major version extraction
+  - Graceful fallback to Node.js v18 default when no engines field is specified
+  - Robust error handling for malformed package.json files
+
+- **Node.js Binary Download and Caching for Unikraft Builds**
+  - Automatic download of specific Node.js versions for Unikraft image builds (not VPS installation)
+  - Cross-platform support (Linux/macOS) with architecture detection (x64/arm64)
+  - Local caching in .unikraft-node directory to avoid repeated downloads
+  - Fallback to system Node.js when download fails or network is unavailable
+
+- **Enhanced Build Script Integration**
+  - Updated `scripts/build/kraft/build_unikraft.sh` with Node.js version management
+  - Version-specific npm and dependency management during build process
+  - Integration with dependency manifest generation and JavaScript syntax validation
+  - Enhanced logging of Node.js version requirements and download status
+
+- **Kraft YAML Generation Enhancement**
+  - Updated `scripts/build/kraft/gen_kraft_yaml.sh` with Node.js version detection
+  - Automatic inclusion of Node.js version requirements as comments in kraft.yaml
+  - Version-aware template selection and configuration
+
+### Testing
+- **Comprehensive Test Coverage** (tests 451-480 in TESTS.md)
+  - Unit tests for version detection from various package.json formats
+  - Integration tests for download setup and caching logic
+  - Kraft YAML generation tests with Node.js version requirements
+  - Standalone test scripts for version detection validation
+
+### Fixed
+- Fixed path resolution issues in Node.js version detection functions
+- Corrected require() path handling in bash script Node.js code execution
+- Improved error handling for malformed package.json files
+
 ## [2025-08-20] - Comprehensive Storage Error Handling and Enhanced Client (Phase 5 Step 3)
 
 ### Added
