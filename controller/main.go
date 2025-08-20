@@ -9,6 +9,7 @@ import (
 	"github.com/ploy/ploy/controller/envstore"
 	"github.com/ploy/ploy/internal/build"
 	"github.com/ploy/ploy/internal/cert"
+	"github.com/ploy/ploy/internal/cleanup"
 	"github.com/ploy/ploy/internal/debug"
 	"github.com/ploy/ploy/internal/domain"
 	"github.com/ploy/ploy/internal/env"
@@ -35,6 +36,50 @@ func main(){
 	}
 	
 	envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
+
+	// Initialize TTL cleanup service
+	cleanupConfigPath := utils.Getenv("PLOY_CLEANUP_CONFIG", "")
+	configManager := cleanup.NewConfigManager(cleanupConfigPath)
+	
+	// Load or create cleanup configuration
+	cleanupConfig, err := configManager.LoadConfig()
+	if err != nil {
+		log.Printf("Warning: Failed to load cleanup configuration, using defaults: %v", err)
+		cleanupConfig = cleanup.DefaultTTLConfig()
+	}
+	
+	// Override with environment variables if present
+	envConfig := cleanup.LoadConfigFromEnv()
+	if envConfig.PreviewTTL != cleanupConfig.PreviewTTL {
+		cleanupConfig.PreviewTTL = envConfig.PreviewTTL
+	}
+	if envConfig.CleanupInterval != cleanupConfig.CleanupInterval {
+		cleanupConfig.CleanupInterval = envConfig.CleanupInterval
+	}
+	if envConfig.MaxAge != cleanupConfig.MaxAge {
+		cleanupConfig.MaxAge = envConfig.MaxAge
+	}
+	if envConfig.DryRun != cleanupConfig.DryRun {
+		cleanupConfig.DryRun = envConfig.DryRun
+	}
+	if envConfig.NomadAddr != cleanupConfig.NomadAddr {
+		cleanupConfig.NomadAddr = envConfig.NomadAddr
+	}
+	
+	// Create TTL cleanup service
+	ttlCleanupService := cleanup.NewTTLCleanupService(cleanupConfig)
+	cleanupHandler := cleanup.NewCleanupHandler(ttlCleanupService, configManager)
+	
+	// Start TTL cleanup service if not in dry run mode or if explicitly enabled
+	autoStart := utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true"
+	if autoStart {
+		if err := ttlCleanupService.Start(); err != nil {
+			log.Printf("Warning: Failed to start TTL cleanup service: %v", err)
+		} else {
+			log.Printf("TTL cleanup service started (interval: %v, preview TTL: %v)", 
+				cleanupConfig.CleanupInterval, cleanupConfig.PreviewTTL)
+		}
+	}
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
@@ -90,6 +135,9 @@ func main(){
 		metrics := storeClient.GetMetrics()
 		return c.JSON(metrics)
 	})
+
+	// TTL cleanup endpoints
+	cleanup.SetupRoutes(app, cleanupHandler)
 
 	port := utils.Getenv("PORT", "8081")
 	log.Printf("Ploy Controller listening on :%s", port)
