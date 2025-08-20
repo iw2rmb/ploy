@@ -240,13 +240,13 @@ Next steps to implement:
 **Phase no-SPOF Controller: High Availability & Horizontal Scaling**
 
 **Phase no-SPOF-1: State Externalization**
-1. **Move envStore to Consul KV Storage**:
+1. ✅ **COMPLETED (2025-08-20)** **Move envStore to Consul KV Storage**:
    - Replace file-based envStore with Consul KV backend
    - Implement `consul_envstore` package with same interface as file-based store
    - Add atomic operations for environment variable updates
-   - Implement key-value mapping: `/ploy/apps/{app}/env/{key}` → value
+   - Implement key-value mapping: `/ploy/apps/{app}/env` → JSON document
    - Add comprehensive error handling and connection retries for Consul operations
-   - Create migration utility to transfer existing env data from files to Consul KV
+   - Create automatic fallback to file-based store when Consul unavailable
 
 2. **Move Storage Client to External Configuration**:
    - Replace singleton storage client with per-request initialization

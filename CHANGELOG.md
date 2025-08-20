@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2025-08-20] - Consul KV-based Environment Storage (Phase no-SPOF-1 Step 1)
+
+### Added
+- **Consul KV Environment Storage Backend**
+  - `consul_envstore` package implementing same interface as file-based envStore
+  - Automatic fallback to file-based storage when Consul unavailable
+  - Health check verification for Consul connectivity before switching backends
+  - Key-value mapping: `/ploy/apps/{app}/env` → JSON document with all environment variables
+
+- **EnvStoreInterface Abstraction**
+  - Common interface for environment variable storage operations
+  - Seamless switching between file-based and Consul KV backends
+  - Consistent API for all environment variable operations (GetAll, Set, SetAll, Get, Delete, ToStringArray)
+
+- **Configuration-Driven Backend Selection**
+  - `PLOY_USE_CONSUL_ENV` environment variable for backend configuration (default: true)
+  - `CONSUL_HTTP_ADDR` for Consul endpoint configuration (default: 127.0.0.1:8500)
+  - Automatic detection and graceful degradation on Consul connection failures
+
+- **Enhanced Error Handling and Logging**
+  - Comprehensive error logging for Consul operations with context
+  - Connection retry logic with health validation
+  - Atomic operations for environment variable updates in Consul KV
+  - Detailed logging for backend selection and operation results
+
+### Fixed
+- Updated all handlers to use EnvStoreInterface instead of concrete type
+- Consistent error handling across both storage backends
+- Atomic operations for environment variable updates preventing race conditions
+- Clean initialization patterns with proper resource cleanup
+
+### Testing
+- **Local Environment Validation**
+  - File-based fallback tested successfully with environment variable operations
+  - API endpoints working correctly with both storage backends
+  - Configuration switching validated with environment variables
+
+- **VPS Environment Integration Testing**
+  - Consul KV backend tested successfully on production VPS with active Consul cluster
+  - All CRUD operations validated: Set, Get, Update, Delete environment variables
+  - Data persistence verified directly in Consul KV storage at `/ploy/apps/{app}/env` keys
+  - Fallback mechanism tested with invalid Consul configuration demonstrating graceful degradation
+  - Zero downtime backend switching confirmed with proper health check integration
+
 ## [2025-08-20] - Traefik Integration & Domain Management API (Phase Networking Step 1 Verified)
 
 ### Added

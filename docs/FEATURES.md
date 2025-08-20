@@ -306,9 +306,11 @@ Auto-classified lanes:
 - ✅ **Management**: `POST/GET/PUT/DELETE /v1/apps/:app/env`
 - ✅ **Build-time**: Available during image creation
 - ✅ **Runtime**: Injected into deployment environment
-- ✅ **Storage**: File-based persistence with JSON format
+- ✅ **Storage**: Consul KV backend with automatic fallback to file-based storage
+- ✅ **High Availability**: External state storage eliminates controller SPOF for environment data
 - ✅ **CLI**: `ploy env set/get/list/delete` commands
 - ✅ **Integration**: All lanes support environment variables in build and deploy phases
+- ✅ **Atomic Operations**: Consul KV provides consistency for concurrent environment variable updates
 
 ⸻
 
