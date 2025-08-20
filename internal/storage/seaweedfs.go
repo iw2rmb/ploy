@@ -248,6 +248,22 @@ func (c *SeaweedFSClient) GetArtifactsBucket() string {
 	return c.collection
 }
 
+// TestVolumeAssignment tests if volume assignment is working without actually uploading
+func (c *SeaweedFSClient) TestVolumeAssignment() (map[string]interface{}, error) {
+	assignment, err := c.assignVolume()
+	if err != nil {
+		return nil, err
+	}
+	
+	// Return assignment details for health check
+	return map[string]interface{}{
+		"fid":       assignment.FileID,
+		"url":       assignment.URL,
+		"publicUrl": assignment.PublicURL,
+		"count":     assignment.Count,
+	}, nil
+}
+
 // SeaweedFS-specific helper methods
 
 type VolumeAssignment struct {
@@ -322,6 +338,9 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 	if err != nil {
 		return err
 	}
+	
+	// Set content-type for directory creation
+	req.Header.Set("Content-Type", "application/x-directory")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -329,7 +348,8 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+	// Accept 409 Conflict as success (directory already exists)
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
 		return fmt.Errorf("failed to create directory: %s", resp.Status)
 	}
 
