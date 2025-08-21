@@ -87,8 +87,8 @@ job "ploy-controller" {
 
       # Environment configuration
       env {
-        # Controller configuration
-        PORT = "{{ ploy.controller_port }}"
+        # Controller configuration - using dynamic port
+        PORT = "${NOMAD_PORT_http}"
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         
         # HashiCorp service addresses
@@ -158,12 +158,10 @@ EOF
         }
       }
 
-      # Port mapping
+      # Dynamic port allocation for high availability
       resources {
         network {
-          port "http" {
-            static = {{ ploy.controller_port }}
-          }
+          port "http" {}  # Dynamic port allocation
         }
       }
 

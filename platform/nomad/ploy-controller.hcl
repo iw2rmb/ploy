@@ -37,14 +37,10 @@ job "ploy-controller" {
       health_check = "checks"    # Use Consul health checks for validation
     }
     
-    # Network configuration
+    # Network configuration - Using dynamic ports for high availability
     network {
-      port "http" {
-        to = 8081          # Controller HTTP port
-      }
-      port "metrics" {
-        to = 9090          # Metrics port for monitoring
-      }
+      port "http" {}       # Dynamic port allocation for controller HTTP API
+      port "metrics" {}    # Dynamic port allocation for metrics endpoint
     }
     
     # Enhanced Consul service registration for production
@@ -228,6 +224,7 @@ job "ploy-controller" {
       env {
         # Controller configuration
         PORT = "${NOMAD_PORT_http}"
+        METRICS_PORT = "${NOMAD_PORT_metrics}"
         
         # Service discovery addresses
         CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
