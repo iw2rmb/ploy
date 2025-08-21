@@ -6,7 +6,7 @@ Quick reference for navigating Ploy's codebase. This document provides a compreh
 
 ```
 ploy/
-├── CHANGELOG.md          # Dated change log with Added/Fixed/Testing sections
+├── CHANGELOG.md         # Dated change log with Added/Fixed/Testing sections
 ├── CLAUDE.md            # LLM guidance and development protocols
 ├── go.mod               # Go module definition
 ├── go.sum               # Go module dependencies
@@ -21,7 +21,10 @@ Main HTTP API server providing REST endpoints for application deployment and man
 
 ```
 controller/
-├── main.go              # Fiber HTTP server, routing, service initialization
+├── main.go              # Stateless entry point with dependency injection
+├── server/              # Stateless server architecture
+│   ├── server.go        # Server struct with dependency injection and graceful shutdown
+│   └── handlers.go      # Request handlers with injected dependencies
 ├── config/              # Configuration management
 │   └── config.go        # Storage config loading, validation, hot reload
 ├── consul_envstore/     # Consul KV environment storage
