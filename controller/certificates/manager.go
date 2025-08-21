@@ -49,7 +49,7 @@ type DomainCertificate struct {
 }
 
 // NewCertificateManager creates a new certificate manager
-func NewCertificateManager(consulClient *consulapi.Client, storageClient storage.Interface, dnsProvider dns.Provider) (*CertificateManager, error) {
+func NewCertificateManager(consulClient *consulapi.Client, storageClient storage.StorageProvider, dnsProvider dns.Provider) (*CertificateManager, error) {
 	// Load configuration
 	config := loadCertConfig()
 
@@ -186,7 +186,7 @@ func (cm *CertificateManager) RemoveDomainCertificate(appName, domain string) er
 	log.Printf("Removing certificate for domain %s (app: %s)", domain, appName)
 
 	// Get certificate record
-	cert, err := cm.getDomainCertificate(appName, domain)
+	_, err := cm.getDomainCertificate(appName, domain)
 	if err != nil {
 		return fmt.Errorf("certificate not found: %w", err)
 	}

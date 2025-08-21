@@ -36,7 +36,7 @@ type ACMEConfig struct {
 }
 
 // NewHandler creates a new ACME handler
-func NewHandler(consulClient *consulapi.Client, storageClient storage.Interface, dnsProvider dns.Provider) (*Handler, error) {
+func NewHandler(consulClient *consulapi.Client, storageClient storage.StorageProvider, dnsProvider dns.Provider) (*Handler, error) {
 	// Load configuration
 	config, err := loadACMEConfig()
 	if err != nil {

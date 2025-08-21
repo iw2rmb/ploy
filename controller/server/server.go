@@ -12,8 +12,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/ploy/ploy/controller/acme"
+	"github.com/ploy/ploy/controller/certificates"
 	"github.com/ploy/ploy/controller/config"
 	"github.com/ploy/ploy/controller/consul_envstore"
 	"github.com/ploy/ploy/controller/dns"
@@ -34,15 +36,16 @@ import (
 
 // ServiceDependencies holds all external service dependencies
 type ServiceDependencies struct {
-	EnvStore          envstore.EnvStoreInterface
-	TraefikRouter     *routing.TraefikRouter
-	HealthChecker     *health.HealthChecker
-	CleanupHandler    *cleanup.CleanupHandler
-	TTLCleanupService *cleanup.TTLCleanupService
-	SelfUpdateHandler *selfupdate.Handler
-	DNSHandler        *dns.Handler
-	ACMEHandler       *acme.Handler
-	StorageConfigPath string
+	EnvStore           envstore.EnvStoreInterface
+	TraefikRouter      *routing.TraefikRouter
+	HealthChecker      *health.HealthChecker
+	CleanupHandler     *cleanup.CleanupHandler
+	TTLCleanupService  *cleanup.TTLCleanupService
+	SelfUpdateHandler  *selfupdate.Handler
+	DNSHandler         *dns.Handler
+	ACMEHandler        *acme.Handler
+	CertificateManager *certificates.CertificateManager
+	StorageConfigPath  string
 }
 
 // ControllerConfig holds configuration for controller initialization
@@ -167,15 +170,22 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize DNS handler: %v", err)
 	}
 
+	// Initialize Certificate Manager
+	certificateManager, err := initializeCertificateManager(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize certificate manager: %v", err)
+	}
+
 	deps := &ServiceDependencies{
-		EnvStore:          envStore,
-		TraefikRouter:     traefikRouter,
-		HealthChecker:     healthChecker,
-		CleanupHandler:    cleanupHandler,
-		TTLCleanupService: ttlService,
-		SelfUpdateHandler: selfUpdateHandler,
-		DNSHandler:        dnsHandler,
-		StorageConfigPath: cfg.StorageConfigPath,
+		EnvStore:           envStore,
+		TraefikRouter:      traefikRouter,
+		HealthChecker:      healthChecker,
+		CleanupHandler:     cleanupHandler,
+		TTLCleanupService:  ttlService,
+		SelfUpdateHandler:  selfUpdateHandler,
+		DNSHandler:         dnsHandler,
+		CertificateManager: certificateManager,
+		StorageConfigPath:  cfg.StorageConfigPath,
 	}
 
 	log.Printf("Service dependencies initialized successfully")
@@ -292,6 +302,48 @@ func initializeDNSHandler(consulAddr string) (*dns.Handler, error) {
 	return dnsHandler, nil
 }
 
+// initializeCertificateManager initializes the certificate manager
+func initializeCertificateManager(cfg *ControllerConfig) (*certificates.CertificateManager, error) {
+	// Create Consul client
+	consulConfig := consulapi.DefaultConfig()
+	if cfg.ConsulAddr != "" {
+		consulConfig.Address = cfg.ConsulAddr
+	}
+	consulClient, err := consulapi.NewClient(consulConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+	}
+
+	// Create storage client
+	storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage client: %w", err)
+	}
+
+	// Create DNS provider (for ACME DNS-01 challenges)
+	dnsProvider, err := initializeDNSProvider()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DNS provider: %w", err)
+	}
+
+	// Create certificate manager
+	certificateManager, err := certificates.NewCertificateManager(consulClient, storageClient, dnsProvider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate manager: %w", err)
+	}
+
+	log.Printf("Certificate manager initialized successfully")
+	return certificateManager, nil
+}
+
+// initializeDNSProvider creates a DNS provider for ACME challenges
+func initializeDNSProvider() (dns.Provider, error) {
+	// For now, return nil - DNS provider will be configured later when ACME is fully implemented
+	// In production, this would load configuration and create the appropriate provider
+	log.Printf("DNS provider initialization skipped - will be configured when ACME is used")
+	return nil, nil
+}
+
 // getStorageClient creates a new storage client for each request (stateless)
 func (s *Server) getStorageClient() (*storage.StorageClient, error) {
 	return config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
@@ -369,7 +421,7 @@ func (s *Server) setupRoutes() {
 func (s *Server) setupDomainRoutes(api fiber.Router) {
 	if s.dependencies.TraefikRouter != nil {
 		// Use new Traefik-based domain management
-		domainHandler := domains.NewDomainHandler(s.dependencies.TraefikRouter)
+		domainHandler := domains.NewDomainHandler(s.dependencies.TraefikRouter, s.dependencies.CertificateManager)
 		domains.SetupDomainRoutes(s.app, domainHandler)
 	} else {
 		// Fallback to existing domain management
