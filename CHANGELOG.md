@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## [2025-08-21] - Health and Readiness Endpoints (Phase no-SPOF-1 Step 3)
+
+### Added
+- **Comprehensive Health Check Infrastructure**
+  - `/health` endpoint for basic service health checking with 200/503 status codes
+  - `/ready` endpoint for readiness probes with comprehensive dependency validation
+  - `/live` endpoint for simple liveness probes (always returns 200)
+  - `/health/metrics` endpoint exposing operational metrics for monitoring
+  - All endpoints available at both root level and versioned API paths (/v1/*)
+
+- **Dependency Health Checks**
+  - Consul connectivity and leader status validation
+  - Nomad connectivity and leader status validation
+  - Vault connectivity with initialization and seal status checking
+  - SeaweedFS connectivity via storage client health status
+  - Environment store functionality validation (Consul KV or file-based)
+  - Storage configuration validation as critical dependency
+
+- **Health Check Metrics and Monitoring**
+  - Total health and readiness check counters
+  - Healthy/unhealthy and ready/not-ready response tracking
+  - Per-dependency failure counters for trend analysis
+  - Last check timestamps for monitoring freshness
+  - Average response time tracking foundation
+  - Structured logging with duration tracking for all checks
+
+- **Graceful Degradation**
+  - Critical dependencies: storage_config, consul, nomad (for readiness)
+  - Non-critical dependencies: vault, seaweedfs (for basic health)
+  - Service remains healthy if only non-critical dependencies fail
+  - Detailed error reporting for debugging while maintaining availability
+
+### Testing
+- **VPS Integration Testing**
+  - Verified Consul health checks working correctly (healthy status)
+  - Confirmed Nomad health checks detect service state accurately
+  - Validated Vault correctly reports as unhealthy when sealed
+  - Tested SeaweedFS connectivity failure handling
+  - Verified metrics collection and accumulation
+  - Confirmed logging with duration tracking for operational monitoring
+
 ## [2025-08-20] - Enhanced Nomad Templates & API Documentation (Phase 6 Step 3)
 
 ### Added
