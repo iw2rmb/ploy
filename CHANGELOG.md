@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2025-08-21] - Controller Binary Distribution System (Phase no-SPOF-3 Step 1)
+
+### Added
+- **Controller Binary Distribution System**: Comprehensive binary distribution via SeaweedFS artifact storage with version management and integrity verification
+- **Binary Caching and Distribution**: Multi-node binary caching with automatic download and local caching capabilities
+- **Automated Build Pipeline**: Cross-platform controller builds with metadata tracking and git commit integration
+- **Rollback Capabilities**: Complete rollback system for controller versions with safety checks and validation
+- **CLI Distribution Tools**: `controller-dist` command-line tool for manual binary operations (upload, download, list, build)
+- **Enhanced Nomad Integration**: Updated Nomad job configurations to use artifact downloads instead of template source copying
+
+### Fixed
+- **Raw_exec Driver Binary Access**: Resolved permission issues by using Nomad artifact downloads with integrity verification
+- **SeaweedFS Directory Creation**: Fixed directory creation by removing problematic Content-Type headers
+- **SeaweedFS Object Listing**: Corrected API integration to use JSON responses with proper Accept headers
+- **Version Discovery**: Enhanced directory listing to properly extract available controller versions
+
+### Testing
+- **VPS Integration Testing**: Full end-to-end testing of binary distribution on production VPS environment
+- **Upload/Download Verification**: Complete testing of binary upload, listing, download, and integrity verification
+- **Artifact Download Testing**: Validated Nomad artifact downloads with proper binary selection and startup scripts
+
 ## [2025-08-21] - Rolling Update Strategy Implementation (Phase no-SPOF-2 Step 4)
 
 ### Added
