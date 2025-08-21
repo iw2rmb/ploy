@@ -139,7 +139,7 @@ type Recipe struct {
 
 ### 4. Basic Transformation Engine
 
-**Objective**: Implement the core transformation workflow for single-repository operations with comprehensive error handling and metrics.
+**Objective**: Implement the core transformation workflow for single-repository operations with comprehensive error handling, metrics, and disaster recovery.
 
 **Tasks**:
 - Implement single-repository transformation workflow
@@ -147,6 +147,9 @@ type Recipe struct {
 - Add basic error classification (syntax, compilation, semantic errors)
 - Implement simple retry logic with exponential backoff
 - Create transformation metrics collection and logging
+- Add disaster recovery procedures with atomic rollback
+- Implement repository state snapshots before transformations
+- Create cost tracking for resource usage
 
 **Deliverables**:
 ```go
@@ -180,6 +183,106 @@ type TransformationResult struct {
 - Retry logic handles transient failures automatically
 - Transformation artifacts are stored in SeaweedFS with integrity verification
 - Comprehensive logging enables debugging and performance analysis
+- Disaster recovery procedures restore repository state within 30 seconds
+- Cost tracking provides accurate resource usage metrics
+
+### 5. Cost Model Framework
+
+**Objective**: Implement cost tracking and resource planning for transformation operations to enable budgeting and optimization.
+
+**Tasks**:
+- Create resource usage tracking for CPU, memory, and storage
+- Implement cost calculation models for different transformation types
+- Add budgeting controls with spending limits
+- Create cost optimization recommendations
+- Implement usage reporting and analytics
+
+**Deliverables**:
+```go
+// controller/arf/cost_model.go
+type CostModel interface {
+    TrackResourceUsage(ctx context.Context, transformation TransformationID) (*ResourceUsage, error)
+    CalculateCost(ctx context.Context, usage ResourceUsage) (*CostBreakdown, error)
+    SetBudget(ctx context.Context, budget BudgetConfig) error
+    CheckBudgetLimit(ctx context.Context, projected ProjectedCost) (*BudgetStatus, error)
+    GenerateCostReport(ctx context.Context, timeframe TimeFrame) (*CostReport, error)
+}
+
+type ResourceUsage struct {
+    TransformationID string        `json:"transformation_id"`
+    CPUSeconds       float64       `json:"cpu_seconds"`
+    MemoryGBHours    float64       `json:"memory_gb_hours"`
+    StorageGB        float64       `json:"storage_gb"`
+    NetworkGB        float64       `json:"network_gb"`
+    LLMTokens        int           `json:"llm_tokens,omitempty"`
+    Duration         time.Duration `json:"duration"`
+}
+
+type CostBreakdown struct {
+    ComputeCost    float64            `json:"compute_cost"`
+    StorageCost    float64            `json:"storage_cost"`
+    NetworkCost    float64            `json:"network_cost"`
+    LLMCost        float64            `json:"llm_cost,omitempty"`
+    TotalCost      float64            `json:"total_cost"`
+    CostPerRepo    float64            `json:"cost_per_repo"`
+    Optimizations  []CostOptimization `json:"optimizations"`
+}
+```
+
+**Acceptance Criteria**:
+- Resource tracking accuracy within 5% of actual usage
+- Cost predictions enable effective budgeting
+- Optimization recommendations reduce costs by 20%+
+- Budget controls prevent overspending
+
+### 6. Disaster Recovery & Rollback
+
+**Objective**: Implement comprehensive disaster recovery procedures to ensure safe transformations with quick rollback capabilities.
+
+**Tasks**:
+- Create atomic rollback procedures for transformation failures
+- Implement repository state snapshots using ZFS
+- Add break-glass emergency intervention procedures
+- Create recovery playbooks for different failure scenarios
+- Implement transformation checkpoint system
+
+**Deliverables**:
+```go
+// controller/arf/disaster_recovery.go
+type DisasterRecovery interface {
+    CreateSnapshot(ctx context.Context, repository Repository) (*Snapshot, error)
+    RollbackTransformation(ctx context.Context, transformationID string) error
+    CreateCheckpoint(ctx context.Context, state TransformationState) (*Checkpoint, error)
+    RestoreFromCheckpoint(ctx context.Context, checkpointID string) error
+    ExecuteEmergencyStop(ctx context.Context, reason string) error
+    GenerateRecoveryReport(ctx context.Context, incident Incident) (*RecoveryReport, error)
+}
+
+type Snapshot struct {
+    ID           string    `json:"id"`
+    Repository   string    `json:"repository"`
+    Timestamp    time.Time `json:"timestamp"`
+    ZFSSnapshot  string    `json:"zfs_snapshot"`
+    GitCommit    string    `json:"git_commit"`
+    Size         int64     `json:"size"`
+    Checksum     string    `json:"checksum"`
+}
+
+type RecoveryPlaybook struct {
+    FailureType     string          `json:"failure_type"`
+    Severity        string          `json:"severity"`
+    Steps           []RecoveryStep  `json:"steps"`
+    MaxRecoveryTime time.Duration   `json:"max_recovery_time"`
+    Escalation      EscalationPath  `json:"escalation"`
+}
+```
+
+**Acceptance Criteria**:
+- Atomic rollback completes within 30 seconds
+- Zero data loss for any transformation failure
+- Emergency stop halts all operations within 5 seconds
+- Recovery playbooks cover 95% of failure scenarios
+- Snapshots consume <10% additional storage
 
 ## Configuration Examples
 
@@ -239,23 +342,59 @@ job "arf-transform-{{ transformation_id }}" {
 
 ## Testing Strategy
 
+### Testing Infrastructure
+**Dedicated ARF Test Environment**:
+- **Test Repository Corpus**: Curated collection of 50+ repositories across different frameworks and complexity levels
+- **Lane-Specific Validation**: Utilize Ploy's existing lanes for transformation validation
+  - Lane C for Java/Scala transformations
+  - Lane B for Node.js transformations
+  - Lane A for Go transformations
+- **Regression Test Suite**: Automated test harness for recipe evolution validation
+- **Performance Benchmarking**: Baseline metrics for transformation operations
+
+```yaml
+# configs/arf-test-infrastructure.yaml
+test_infrastructure:
+  repository_corpus:
+    small_repos: 20  # < 1000 files
+    medium_repos: 20  # 1000-5000 files
+    large_repos: 10   # > 5000 files
+  
+  validation_lanes:
+    java: "lane-c"
+    nodejs: "lane-b"
+    go: "lane-a"
+    python: "lane-b"
+  
+  regression_suite:
+    recipe_versions: 3  # Keep last 3 versions for regression
+    test_coverage_threshold: 80
+    performance_regression_threshold: 20  # percent
+```
+
 ### Unit Tests
 - OpenRewrite engine initialization and recipe execution
 - Sandbox creation, execution, and cleanup
 - Recipe search and validation logic
 - AST cache performance and correctness
+- Cost tracking and resource prediction
+- Rollback procedure validation
 
 ### Integration Tests
 - End-to-end transformation workflows
 - Nomad integration with sandbox scheduling
 - SeaweedFS artifact storage and retrieval
 - ZFS snapshot creation and restoration
+- Disaster recovery procedures
+- Multi-repository corpus validation
 
 ### Performance Tests
 - AST cache performance under load
 - Parallel sandbox execution scalability
 - Recipe search response times
 - Memory usage optimization validation
+- Cost model accuracy verification
+- Resource allocation efficiency
 
 ## Success Metrics
 
@@ -265,6 +404,10 @@ job "arf-transform-{{ transformation_id }}" {
 - **Sandbox Isolation**: Complete security isolation with ZFS rollback in <5s
 - **Scalability**: 10+ concurrent transformations supported
 - **Integration**: Seamless integration with existing Lane C build pipeline
+- **Testing Coverage**: 80%+ test coverage with 50+ repository corpus
+- **Cost Tracking**: Resource usage tracked with <5% variance
+- **Disaster Recovery**: 30-second rollback capability with zero data loss
+- **Emergency Response**: 5-second emergency stop activation
 
 ## Risk Mitigation
 

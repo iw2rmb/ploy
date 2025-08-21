@@ -24,16 +24,19 @@ Phase ARF-3 represents the revolutionary integration of Large Language Models wi
 
 ## Implementation Tasks
 
-### 1. LLM-Assisted Recipe Creation
+### 1. LLM-Assisted Recipe Creation with Multi-Language Support
 
-**Objective**: Enable dynamic generation of OpenRewrite recipes using LLM analysis of error contexts and codebase patterns.
+**Objective**: Enable dynamic generation of transformation recipes for multiple languages using LLM analysis and language-specific AST tools.
 
 **Tasks**:
 - Integrate LLM API for dynamic recipe generation from error contexts
-- Implement LLM prompt engineering for OpenRewrite recipe creation
-- Add LLM response parsing into valid OpenRewrite YAML format
+- Implement LLM prompt engineering for multi-language recipe creation
+- Add LLM response parsing into valid recipe formats (OpenRewrite YAML, tree-sitter queries)
 - Create LLM-generated recipe validation and testing system
 - Implement fallback handling when LLM generation fails
+- Extend support beyond Java to Node.js, Python, Go, and Rust
+- Integrate tree-sitter for universal AST parsing across languages
+- Add WASM-specific transformation capabilities for Lane G
 
 **Deliverables**:
 ```go
@@ -50,6 +53,8 @@ type RecipeGenerationRequest struct {
     SimilarPatterns  []TransformationPattern  `json:"similar_patterns"`
     Constraints      []RecipeConstraint       `json:"constraints"`
     TargetFramework  string                   `json:"target_framework"`
+    Language         string                   `json:"language"`
+    ASTParser        string                   `json:"ast_parser"`
 }
 
 type GeneratedRecipe struct {
@@ -71,15 +76,93 @@ type LLMGenerationData struct {
 ```
 
 **Acceptance Criteria**:
-- LLM generates syntactically valid OpenRewrite YAML recipes
+- LLM generates syntactically valid recipes for Java, Node.js, Python, Go, Rust
 - Generated recipes pass validation in sandbox environments
 - Fallback to static recipes when LLM generation fails
 - Recipe generation completes within 30 seconds
 - 70%+ success rate for LLM-generated recipes on first attempt
+- Tree-sitter integration enables cross-language AST analysis
+- WASM transformations support optimization and polyfill injection
 
-### 2. Hybrid Transformation Pipeline
+### 2. Multi-Language Transformation Engine
 
-**Objective**: Create sophisticated workflows that combine OpenRewrite's deterministic transformations with LLM enhancement for complex scenarios.
+**Objective**: Extend ARF capabilities beyond Java to support transformations across Ploy's supported languages.
+
+**Tasks**:
+- Integrate tree-sitter for universal AST parsing
+- Create language-specific transformation recipes for Node.js, Python, Go
+- Implement WASM-specific optimizations for Lane G
+- Add cross-language dependency analysis
+- Create polyglot transformation capabilities
+
+**Deliverables**:
+```go
+// controller/arf/multi_language.go
+type MultiLanguageEngine interface {
+    ParseAST(ctx context.Context, code string, language string) (*UniversalAST, error)
+    GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error)
+    ValidateLanguageSupport(language string) (bool, error)
+    GetLanguageCapabilities(language string) (*LanguageCapabilities, error)
+}
+
+type UniversalAST struct {
+    Language    string              `json:"language"`
+    Parser      string              `json:"parser"`
+    RootNode    *ASTNode            `json:"root_node"`
+    Symbols     []Symbol            `json:"symbols"`
+    Imports     []Import            `json:"imports"`
+    Metadata    map[string]interface{} `json:"metadata"`
+}
+
+type LanguageCapabilities struct {
+    Language        string              `json:"language"`
+    Parsers         []string            `json:"parsers"`
+    Transformations []TransformationType `json:"transformations"`
+    Frameworks      []string            `json:"frameworks"`
+    LaneSupport     []string            `json:"lane_support"`
+}
+
+// Language-specific recipe types
+type NodeJSRecipe struct {
+    Recipe
+    PackageUpdates  map[string]string   `json:"package_updates"`
+    ESLintRules     map[string]interface{} `json:"eslint_rules"`
+    TypeScript      bool                `json:"typescript"`
+}
+
+type PythonRecipe struct {
+    Recipe
+    PipUpdates      map[string]string   `json:"pip_updates"`
+    PyUpgrade       string              `json:"pyupgrade_target"`
+    BlackConfig     map[string]interface{} `json:"black_config"`
+}
+
+type GoRecipe struct {
+    Recipe
+    GoModUpdates    map[string]string   `json:"go_mod_updates"`
+    GofmtOptions    []string            `json:"gofmt_options"`
+    StaticCheck     []string            `json:"staticcheck_rules"`
+}
+
+type WASMRecipe struct {
+    Recipe
+    OptimizationLevel   int             `json:"optimization_level"`
+    TargetFeatures      []string        `json:"target_features"`
+    PolyfillsRequired   []string        `json:"polyfills_required"`
+    MemoryConfiguration MemoryConfig    `json:"memory_config"`
+}
+```
+
+**Acceptance Criteria**:
+- Support for 5+ languages (Java, JavaScript, Python, Go, Rust)
+- Tree-sitter parses 95% of real-world code successfully
+- Language-specific recipes achieve 80%+ success rate
+- WASM optimizations reduce module size by 20%+
+- Cross-language dependency tracking prevents breaking changes
+
+### 3. Hybrid Transformation Pipeline
+
+**Objective**: Create sophisticated workflows that combine deterministic transformations with LLM enhancement for complex scenarios across multiple languages.
 
 **Tasks**:
 - Create hybrid execution workflow: OpenRewrite → LLM enhancement → validation
@@ -136,7 +219,7 @@ type ConfidenceThresholds struct {
 - Context-aware prompting improves LLM relevance by 40%
 - Solution ranking correctly identifies best transformations 90% of the time
 
-### 3. Continuous Learning System
+### 4. Continuous Learning System with Schema Design
 
 **Objective**: Implement machine learning capabilities that extract patterns from transformation outcomes to improve future strategy selection and recipe generation.
 
@@ -146,6 +229,9 @@ type ConfidenceThresholds struct {
 - Create recipe performance tracking by repository type and complexity
 - Add pattern generalization for new recipe template creation
 - Implement model retraining for strategy selection algorithms
+- Design comprehensive learning database schema
+- Implement A/B testing framework for recipe variations
+- Create feedback loop for continuous improvement
 
 **Deliverables**:
 ```go
@@ -185,14 +271,97 @@ type SuccessPattern struct {
 }
 ```
 
+**Learning Database Schema**:
+```sql
+-- Transformation outcomes table
+CREATE TABLE transformation_outcomes (
+    id UUID PRIMARY KEY,
+    transformation_id UUID NOT NULL,
+    repository_id UUID NOT NULL,
+    language VARCHAR(50),
+    framework VARCHAR(100),
+    recipe_id UUID,
+    strategy_type VARCHAR(50),
+    success BOOLEAN,
+    confidence_score FLOAT,
+    execution_time_ms INT,
+    error_classification VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Pattern templates table
+CREATE TABLE pattern_templates (
+    id UUID PRIMARY KEY,
+    pattern_signature TEXT,
+    language VARCHAR(50),
+    success_rate FLOAT,
+    usage_count INT,
+    template_recipe JSONB,
+    confidence_threshold FLOAT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    last_used TIMESTAMP
+);
+
+-- A/B test experiments
+CREATE TABLE ab_experiments (
+    id UUID PRIMARY KEY,
+    experiment_name VARCHAR(200),
+    variant_a_recipe JSONB,
+    variant_b_recipe JSONB,
+    variant_a_count INT DEFAULT 0,
+    variant_b_count INT DEFAULT 0,
+    variant_a_success_rate FLOAT,
+    variant_b_success_rate FLOAT,
+    statistical_significance FLOAT,
+    status VARCHAR(50),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Feature extraction for ML
+CREATE TABLE transformation_features (
+    transformation_id UUID PRIMARY KEY,
+    repo_size_kb INT,
+    file_count INT,
+    complexity_score FLOAT,
+    dependency_count INT,
+    test_coverage FLOAT,
+    language_features JSONB,
+    framework_features JSONB,
+    outcome_label VARCHAR(50)
+);
+```
+
+**A/B Testing Framework**:
+```go
+type ABTestFramework interface {
+    CreateExperiment(ctx context.Context, experiment ABExperiment) error
+    SelectVariant(ctx context.Context, experimentID string) (*Variant, error)
+    RecordOutcome(ctx context.Context, variantID string, success bool) error
+    AnalyzeResults(ctx context.Context, experimentID string) (*ABTestResults, error)
+    GraduateWinner(ctx context.Context, experimentID string) error
+}
+
+type ABExperiment struct {
+    ID              string          `json:"id"`
+    Name            string          `json:"name"`
+    VariantA        Recipe          `json:"variant_a"`
+    VariantB        Recipe          `json:"variant_b"`
+    TrafficSplit    float64         `json:"traffic_split"`
+    MinSampleSize   int             `json:"min_sample_size"`
+    ConfidenceLevel float64         `json:"confidence_level"`
+}
+```
+
 **Acceptance Criteria**:
 - Learning system improves strategy selection accuracy by 25% over 100 transformations
 - Pattern extraction identifies actionable insights from transformation history
 - Recipe template generation creates reusable patterns from successful outcomes
 - Model retraining prevents degradation in strategy selection performance
 - Continuous improvement demonstrates measurable enhancement over time
+- A/B testing achieves statistical significance with 95% confidence
+- Learning database handles 1M+ transformation records efficiently
 
-### 4. Transformation Strategy Selection
+### 5. Transformation Strategy Selection
 
 **Objective**: Create an intelligent system that selects optimal transformation approaches based on historical performance, repository characteristics, and resource constraints.
 
@@ -246,6 +415,118 @@ type ComplexityAnalysis struct {
 - Resource predictions are within 20% of actual usage
 - Escalation recommendations prevent unnecessary human intervention
 - Performance monitoring enables continuous strategy optimization
+
+### 6. Developer Experience Tooling
+
+**Objective**: Create comprehensive developer tools and IDE integration for recipe development, testing, and debugging.
+
+**Tasks**:
+- Create VS Code extension for ARF recipe development
+- Implement local transformation preview capabilities
+- Add dry-run mode for transformation testing
+- Create recipe development SDK with examples
+- Build interactive debugging tools for transformations
+
+**Deliverables**:
+```go
+// controller/arf/developer_tools.go
+type DeveloperTools interface {
+    PreviewTransformation(ctx context.Context, code string, recipe Recipe) (*PreviewResult, error)
+    DryRun(ctx context.Context, repository Repository, recipe Recipe) (*DryRunResult, error)
+    DebugTransformation(ctx context.Context, transformationID string) (*DebugSession, error)
+    ValidateRecipeLocally(ctx context.Context, recipe Recipe) (*ValidationResult, error)
+    GenerateRecipeFromExample(ctx context.Context, before, after string) (*Recipe, error)
+}
+
+type PreviewResult struct {
+    OriginalCode    string              `json:"original_code"`
+    TransformedCode string              `json:"transformed_code"`
+    Diff            string              `json:"diff"`
+    Warnings        []Warning           `json:"warnings"`
+    Confidence      float64             `json:"confidence"`
+}
+
+type DryRunResult struct {
+    AffectedFiles   []FileChange        `json:"affected_files"`
+    EstimatedTime   time.Duration       `json:"estimated_time"`
+    RiskAssessment  RiskAssessment      `json:"risk_assessment"`
+    Prerequisites   []Prerequisite      `json:"prerequisites"`
+    Rollback        RollbackPlan        `json:"rollback"`
+}
+
+type DebugSession struct {
+    SessionID       string              `json:"session_id"`
+    Breakpoints     []Breakpoint        `json:"breakpoints"`
+    StepHistory     []TransformStep     `json:"step_history"`
+    Variables       map[string]interface{} `json:"variables"`
+    ASTSnapshot     *UniversalAST       `json:"ast_snapshot"`
+}
+```
+
+**VS Code Extension Features**:
+```typescript
+// vscode-arf-extension/src/features.ts
+interface ARFExtension {
+    // Recipe development
+    recipeEditor: {
+        syntax: SyntaxHighlighting;
+        validation: RealTimeValidation;
+        autoComplete: IntelliSense;
+        snippets: RecipeSnippets;
+    };
+    
+    // Testing capabilities
+    testing: {
+        preview: TransformationPreview;
+        dryRun: LocalDryRun;
+        unittest: RecipeUnitTests;
+        coverage: TransformationCoverage;
+    };
+    
+    // Debugging tools
+    debugging: {
+        breakpoints: ASTBreakpoints;
+        stepThrough: TransformationStepper;
+        variables: VariableInspector;
+        history: TransformationHistory;
+    };
+    
+    // Integration
+    integration: {
+        ploy: PloyControllerConnection;
+        git: GitIntegration;
+        ci: CIPipelineIntegration;
+    };
+}
+```
+
+**Recipe Development SDK**:
+```go
+// sdk/arf/recipe_sdk.go
+type RecipeSDK struct {
+    // Recipe creation helpers
+    CreateFromTemplate(template string) *Recipe
+    AddPrecondition(condition Condition) *Recipe
+    AddTransformation(transformation Transformation) *Recipe
+    AddPostValidation(validation Validation) *Recipe
+    
+    // Testing utilities
+    TestWithFixture(fixture TestFixture) TestResult
+    BenchmarkPerformance(dataset Dataset) BenchmarkResult
+    ValidateSafety(recipe Recipe) SafetyReport
+    
+    // Example recipes
+    Examples map[string]Recipe
+}
+```
+
+**Acceptance Criteria**:
+- VS Code extension provides real-time recipe validation
+- Local preview shows transformation results in <2 seconds
+- Dry-run mode prevents accidental production changes
+- SDK includes 50+ example recipes for common patterns
+- Debugging tools enable step-by-step transformation analysis
+- Extension marketplace rating >4.5 stars
 
 ## Configuration Examples
 
@@ -483,11 +764,15 @@ response:
 ## Success Metrics
 
 - **Recipe Generation**: 70%+ success rate for LLM-generated recipes
-- **Hybrid Performance**: 85%+ success rate vs 70% for OpenRewrite alone
+- **Hybrid Performance**: 85%+ success rate vs 70% for deterministic transformations alone
 - **Learning Improvement**: 25% strategy selection accuracy improvement over 100 transformations
 - **Resource Optimization**: 30% reduction in average transformation time
 - **Confidence Calibration**: Confidence scores predict success within 10% accuracy
 - **Pattern Recognition**: 90% accuracy in identifying similar transformation patterns
+- **Multi-Language Support**: 5+ languages with 80%+ transformation success rate
+- **Developer Adoption**: 1000+ VS Code extension installations within 6 months
+- **A/B Testing**: 95% statistical confidence in recipe improvements
+- **WASM Optimization**: 20%+ size reduction for Lane G modules
 
 ## Risk Mitigation
 
