@@ -346,20 +346,36 @@
               command: /home/ploy/.cargo/bin/rustup target add wasm32-wasip1
               when: not rustup_binary.stat.exists
 
+            - name: Install WASM-related Rust tools
+              command: /home/ploy/.cargo/bin/cargo install {{ item }}
+              when: not rustup_binary.stat.exists
+              loop:
+                - wasm-bindgen-cli  # For JavaScript bindings
+                - wasm-pack         # For building Rust WASM packages
+
         - name: Install Node.js and AssemblyScript
           block:
             - name: Install Node.js using NodeSource repository
               shell: |
-                curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+                curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | sudo -E bash -
                 apt-get install -y nodejs
               args:
                 creates: /usr/bin/node
 
-            - name: Install AssemblyScript globally
+            - name: Install AssemblyScript globally (latest stable)
               npm:
                 name: assemblyscript
                 global: true
-                state: present
+                state: latest
+
+            - name: Install additional WASM tools
+              npm:
+                name: "{{ item }}"
+                global: true
+                state: latest
+              loop:
+                - wasm-pack   # For Rust WASM builds
+                - wasmtime    # WASM runtime for testing
 
         - name: Install Emscripten toolchain
           become_user: ploy
@@ -371,11 +387,12 @@
                 version: main
               register: emsdk_clone
 
-            - name: Install latest Emscripten
+            - name: Install latest stable Emscripten
               shell: |
                 cd /home/ploy/emsdk
                 ./emsdk install latest
                 ./emsdk activate latest
+                echo 'source "/home/ploy/emsdk/emsdk_env.sh"' >> /home/ploy/.bashrc
               when: emsdk_clone.changed or not ansible_check_mode
 
             - name: Add Emscripten to user PATH
