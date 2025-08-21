@@ -1,5 +1,54 @@
 # CHANGELOG
 
+## [2025-08-21] - Nomad System Job Definition (Phase no-SPOF-2 Step 1)
+
+### Added
+- **Production Nomad System Job Configuration**
+  - `platform/nomad/ploy-controller.hcl` with comprehensive system job definition
+  - Multi-instance deployment configuration with proper resource allocation (200 MHz CPU, 256 MB RAM)
+  - System job type for deployment on every Nomad client node ensuring high availability
+  - Linux-only constraint with minimum memory requirements (1GB) for stable operation
+
+- **Restart and Update Policies**
+  - Robust restart policy: 5 attempts over 10 minutes with exponential backoff delay
+  - Rolling update strategy: one node at a time with 15s health check and auto-revert on failure
+  - Graceful shutdown configuration with 30-second SIGTERM timeout
+  - Progress deadline and healthy deadline configuration for reliable deployments
+
+- **Consul Service Registration**
+  - Primary service registration as "ploy-controller" with allocation ID tagging
+  - Multiple health checks: `/health` (10s), `/ready` (15s), `/live` (30s) endpoints
+  - Metrics service registration as "ploy-controller-metrics" with Prometheus compatibility
+  - Service metadata including version, node, and datacenter information for discovery
+
+- **Environment and Configuration Management**
+  - Complete environment variable configuration for all service endpoints
+  - Template-based configuration file generation with instance identification
+  - Health check script template for operational validation
+  - External configuration path support for storage and cleanup services
+
+- **Host Volume Configuration Template**
+  - `iac/dev/templates/nomad-client-volumes.hcl` for Nomad client host volume setup
+  - Volume definitions for persistent data, configuration, logs, and build cache
+  - Proper read/write permissions and path specifications for production deployment
+
+- **Testing Configuration**
+  - `platform/nomad/ploy-controller-simple.hcl` simplified service job for validation
+  - Service type deployment with 2 instances for high availability testing
+  - Reduced complexity configuration for development and testing environments
+
+### Fixed
+- Removed unsupported system job features (affinity, spread, reschedule, parameterized)
+- Corrected Nomad job definition validation errors for system job type compatibility
+- Fixed resource allocation and constraint specifications for stable deployment
+- Removed Vault integration temporarily to resolve validation conflicts
+
+### Testing
+- Successfully validated both production and testing Nomad job definitions on VPS
+- Confirmed system job constraint compatibility and resource allocation
+- Verified health check endpoint integration with Nomad service discovery
+- Validated environment variable configuration and service registration
+
 ## [2025-08-21] - Stateless Initialization Patterns (Phase no-SPOF-1 Step 4)
 
 ### Added
