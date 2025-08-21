@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2025-08-21] - Ansible Nomad Controller Integration (Phase no-SPOF-3 Step 2)
+
+### Added
+- **Nomad-based Controller Deployment**: Complete migration from manual/systemd deployment to Nomad-managed high availability controller deployment
+- **Ansible Playbook Integration**: New `controller.yml` playbook with proper service ordering (SeaweedFS → HashiCorp → Controller → Applications)
+- **High Availability Architecture**: Multi-replica controller deployment (2+ instances) with automatic failover and rolling updates
+- **Controller Management Tools**: Comprehensive management scripts for update, rollback, status monitoring, and migration operations
+- **Binary Distribution Integration**: Seamless integration of controller binary distribution with Ansible deployment automation
+- **Service Discovery Integration**: Consul service registration with Traefik load balancer tags and health check integration
+- **Migration Assistance**: Automated migration scripts and validation tools for transitioning from systemd to Nomad deployment
+
+### Fixed
+- **Service Ordering Dependencies**: Proper dependency validation ensuring all required services (SeaweedFS, Consul, Nomad, Vault) are healthy before controller deployment
+- **Process Conflict Prevention**: Clean migration path preventing conflicts between manual and Nomad-managed controller processes
+- **Health Check Integration**: Enhanced health and readiness checks integrated with Nomad service discovery and load balancing
+
+### Testing
+- **Comprehensive Test Coverage**: Added test scenarios 568-587 for controller Nomad deployment validation
+- **Deployment Validation**: Created `test-controller-nomad-deployment.sh` script for end-to-end testing of controller deployment
+- **Management Script Testing**: Validation of all controller management tools including update, rollback, and status monitoring capabilities
+
 ## [2025-08-21] - Controller Binary Distribution System (Phase no-SPOF-3 Step 1)
 
 ### Added
