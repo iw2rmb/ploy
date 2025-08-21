@@ -254,7 +254,7 @@ job "ploy-controller" {
     
     # Main controller task
     task "ploy-controller" {
-      driver = "exec"
+      driver = "raw_exec"
       
       # Resource allocation
       resources {
