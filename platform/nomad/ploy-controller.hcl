@@ -282,7 +282,7 @@ job "ploy-controller" {
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Binary distribution configuration
-        CONTROLLER_VERSION = "latest"
+        CONTROLLER_VERSION = "test-20250821"
         CONTROLLER_BINARY_SOURCE = "seaweedfs"
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
@@ -480,33 +480,11 @@ job "ploy-controller" {
         perms = "755"
       }
       
-      # Download controller binary from SeaweedFS artifact storage with fallback
-      artifact {
-        source = "http://localhost:8888/controller-binaries/${CONTROLLER_VERSION}/linux/amd64/controller"
-        destination = "local/controller"
-        mode = "file"
-        
-        # Retry and validation configuration
-        options {
-          checksum = "file:http://localhost:8888/controller-binaries/${CONTROLLER_VERSION}/linux/amd64/controller.sha256"
-        }
-      }
-      
-      # Fallback: Local build artifact if SeaweedFS unavailable
-      artifact {
-        source = "http://localhost:8081/artifacts/controller/latest/linux/amd64/controller"
-        destination = "local/controller-fallback"
-        mode = "file"
-        options {
-          # This artifact is optional - don't fail if unavailable
-          optional = true
-        }
-      }
-      
-      # Binary execution configuration with startup script
+      # Use system binary path temporarily until binary distribution is fixed
       config {
-        command = "local/start-controller.sh"
+        command = "/usr/local/bin/ploy-controller"
         args = []
+        work_dir = "/tmp"
       }
       
       # Lifecycle hooks for rolling updates
