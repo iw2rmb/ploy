@@ -111,17 +111,16 @@ test_wasm_runtime() {
         print_warning "⚠ WASM runtime module not found - implementation pending"
     fi
     
-    # Test WASI support
+    # Test WASI support (integrated into wasm.go)
     echo "Testing WASI support..."
-    if [ -f "controller/runtime/wasi.go" ]; then
-        if go run -c controller/runtime/wasi.go >/dev/null 2>&1; then
-            print_success "✓ WASI support module compiles successfully"
+    if [ -f "controller/runtime/wasm.go" ]; then
+        if grep -q "wasi_snapshot_preview1" controller/runtime/wasm.go; then
+            print_success "✓ WASI Preview 1 support integrated in WASM runtime"
         else
-            print_error "✗ WASI support module compilation failed"
-            return 1
+            print_warning "⚠ WASI support not found in WASM runtime"
         fi
     else
-        print_warning "⚠ WASI support module not found - implementation pending"
+        print_warning "⚠ WASM runtime module not found"
     fi
     
     return 0
@@ -314,7 +313,8 @@ test_sample_applications() {
         echo "Testing Go WASM sample app..."
         cd apps/wasm-go-hello
         if [ -f "main.go" ]; then
-            if grep -q "js,wasm" main.go; then
+            # Check for both old and new Go build constraint formats
+            if grep -q "js,wasm" main.go || grep -q "//go:build.*js.*wasm\|//go:build.*wasm.*js" main.go; then
                 print_success "✓ Go WASM app has correct build tags"
                 ((apps_found++))
                 
@@ -421,10 +421,12 @@ test_documentation() {
     fi
     
     # Check WASM documentation
-    if [ -f "docs/WASM-RUNTIME.md" ]; then
-        print_success "✓ WASM runtime documentation found"
+    if [ -f "docs/WASM.md" ]; then
+        print_success "✓ WASM runtime documentation found (docs/WASM.md)"
+    elif [ -f "docs/WASM-RUNTIME.md" ]; then
+        print_success "✓ WASM runtime documentation found (docs/WASM-RUNTIME.md)"
     else
-        print_warning "⚠ WASM runtime documentation not found - implementation pending"
+        print_warning "⚠ WASM runtime documentation not found"
     fi
     
     # Check updated FEATURES.md

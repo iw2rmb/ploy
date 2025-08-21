@@ -718,3 +718,48 @@
 585. Controller version tracking maintained in `/opt/ploy/current-controller-version` file.
 586. Controller deployment validation includes dependency checks and API endpoint verification.
 587. Controller processes automatically cleaned up before migration to prevent conflicts.
+
+## WebAssembly (WASM) Runtime Support - Lane G
+
+### WASM Detection and Lane Assignment
+588. Rust WASM app with wasm32-wasi target in Cargo.toml → Lane G.
+589. Go WASM app with js/wasm build tags and syscall/js imports → Lane G.
+590. AssemblyScript project with .asc files and package.json scripts → Lane G.
+591. C++ project with Emscripten CMakeLists.txt configuration → Lane G.
+592. Direct .wasm and .wat files detected and assigned to Lane G.
+593. WASM detection takes priority over standard language detection.
+594. WASM-specific dependencies (wasm-bindgen, js-sys, web-sys) trigger Lane G.
+
+### WASM Build Pipeline
+595. wazero v1.5.0 runtime integration with security constraints.
+596. Multi-strategy WASM builder supports 5 compilation approaches.
+597. Rust wasm32-wasi compilation with cargo and wasm-bindgen.
+598. Go js/wasm compilation with GOOS/GOARCH environment variables.
+599. AssemblyScript compilation via asc compiler with optimization.
+600. C++ Emscripten compilation with WASI and browser targets.
+601. Automatic build strategy selection based on project structure.
+602. WASM module validation with magic byte checking.
+
+### WASM Runtime and Deployment
+603. WASI Preview 1 filesystem and environment interface support.
+604. WebAssembly Component Model for multi-module applications.
+605. Nomad job template with WASM-specific resource limits.
+606. ploy-wasm-runner HTTP server with health endpoints.
+607. WASM runtime metrics via /metrics endpoint.
+608. Resource constraints: 64MB memory, 30s timeout, 200 MHz CPU.
+609. Sandbox execution with controlled filesystem access.
+
+### WASM Security and Policies
+610. OPA policies with environment-specific WASM validation.
+611. Production environment requires signed WASM artifacts.
+612. WASI security with preopen directory validation.
+613. Resource limit enforcement for memory and execution time.
+614. Component Model security validation for multi-module apps.
+
+### WASM Sample Applications
+615. wasm-rust-hello: Rust with wasm-bindgen configuration.
+616. wasm-go-hello: Go with js/wasm build tags.
+617. wasm-assemblyscript-hello: AssemblyScript with package.json.
+618. wasm-cpp-hello: C++ with Emscripten CMakeLists.txt.
+619. All WASM sample apps include health endpoints on port 8080.
+620. WASM apps demonstrate complete build and deployment pipeline.
