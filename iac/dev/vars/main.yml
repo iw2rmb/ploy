@@ -75,6 +75,8 @@ build_tools:
     version: "0.100.0"
   grype:
     version: "0.74.0"
+  opa:
+    version: "0.59.0"
 
 # SeaweedFS configuration
 seaweedfs:
