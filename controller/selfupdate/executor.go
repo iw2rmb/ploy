@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/hashicorp/consul/api"
@@ -149,16 +150,9 @@ func (h *Handler) deployUpdate(ctx context.Context, sessionID string, binaryPath
 	// Update status - backup created
 	h.updateStatus(sessionID, "deploying", "Backup created, deploying new binary", 75)
 
-	// Replace current binary
-	if err := copyFile(binaryPath, currentBinary); err != nil {
-		// Restore backup on failure
-		copyFile(backupPath, currentBinary)
-		return fmt.Errorf("failed to replace binary: %w", err)
-	}
-
-	// Make executable
-	if err := os.Chmod(currentBinary, 0755); err != nil {
-		return fmt.Errorf("failed to make binary executable: %w", err)
+	// Use atomic replacement to avoid "text file busy" error
+	if err := h.atomicBinaryReplacement(binaryPath, currentBinary, backupPath); err != nil {
+		return fmt.Errorf("atomic binary replacement failed: %w", err)
 	}
 
 	// Signal for restart (will be handled by process manager)
@@ -166,7 +160,7 @@ func (h *Handler) deployUpdate(ctx context.Context, sessionID string, binaryPath
 	go func() {
 		time.Sleep(2 * time.Second)
 		log.Printf("Triggering restart for version %s", request.TargetVersion)
-		os.Exit(0) // Graceful exit, Nomad will restart
+		os.Exit(0) // Graceful exit, Nomad will restart with new binary
 	}()
 
 	return nil
@@ -176,17 +170,101 @@ func (h *Handler) deployUpdate(ctx context.Context, sessionID string, binaryPath
 func (h *Handler) emergencyDeploy(ctx context.Context, binaryPath string, info *distribution.BinaryInfo) error {
 	currentBinary := os.Args[0]
 
-	// Direct replacement
-	if err := copyFile(binaryPath, currentBinary); err != nil {
-		return fmt.Errorf("failed to replace binary: %w", err)
-	}
-
-	if err := os.Chmod(currentBinary, 0755); err != nil {
-		return fmt.Errorf("failed to make binary executable: %w", err)
+	// Use atomic replacement even for emergency updates
+	if err := h.atomicBinaryReplacement(binaryPath, currentBinary, ""); err != nil {
+		return fmt.Errorf("emergency binary replacement failed: %w", err)
 	}
 
 	// Immediate restart
 	os.Exit(0)
+	return nil
+}
+
+// atomicBinaryReplacement performs atomic binary replacement to avoid "text file busy" errors
+func (h *Handler) atomicBinaryReplacement(newBinaryPath, targetPath, backupPath string) error {
+	// Strategy 1: Use rename-based atomic replacement
+	tempPath := targetPath + ".new." + fmt.Sprintf("%d", time.Now().Unix())
+	
+	// Copy new binary to temporary location
+	if err := copyFile(newBinaryPath, tempPath); err != nil {
+		return fmt.Errorf("failed to create temporary binary: %w", err)
+	}
+	
+	// Make temporary binary executable
+	if err := os.Chmod(tempPath, 0755); err != nil {
+		os.Remove(tempPath)
+		return fmt.Errorf("failed to make temporary binary executable: %w", err)
+	}
+	
+	// Attempt atomic rename (this should work even if the target is in use)
+	if err := os.Rename(tempPath, targetPath); err != nil {
+		// If rename fails, try alternative strategies
+		log.Printf("Atomic rename failed: %v, trying alternative strategies", err)
+		os.Remove(tempPath)
+		return h.fallbackBinaryReplacement(newBinaryPath, targetPath, backupPath)
+	}
+	
+	log.Printf("Atomic binary replacement successful via rename")
+	return nil
+}
+
+// fallbackBinaryReplacement implements fallback strategies when atomic rename fails
+func (h *Handler) fallbackBinaryReplacement(newBinaryPath, targetPath, backupPath string) error {
+	// Strategy 2: Create update script and trigger external update
+	return h.createUpdateScript(newBinaryPath, targetPath, backupPath)
+}
+
+// createUpdateScript creates an external update script to handle the replacement
+func (h *Handler) createUpdateScript(newBinaryPath, targetPath, backupPath string) error {
+	scriptPath := targetPath + ".update.sh"
+	
+	// Create update script content
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+set -e
+
+NEW_BINARY="%s"
+TARGET_BINARY="%s"
+BACKUP_BINARY="%s"
+PID=%d
+
+# Wait for current process to exit
+echo "Waiting for process $PID to exit..."
+while kill -0 $PID 2>/dev/null; do
+    sleep 1
+done
+
+# Perform the update
+echo "Replacing binary..."
+if [ -n "$BACKUP_BINARY" ] && [ -f "$TARGET_BINARY" ]; then
+    cp "$TARGET_BINARY" "$BACKUP_BINARY" || true
+fi
+
+cp "$NEW_BINARY" "$TARGET_BINARY"
+chmod 755 "$TARGET_BINARY"
+
+echo "Binary update completed"
+rm -f "$0"  # Remove this script
+`, newBinaryPath, targetPath, backupPath, os.Getpid())
+
+	// Write script to file
+	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
+		return fmt.Errorf("failed to create update script: %w", err)
+	}
+	
+	// Launch update script in background
+	go func() {
+		time.Sleep(1 * time.Second) // Give some time for response to be sent
+		log.Printf("Executing external update script: %s", scriptPath)
+		
+		// Execute the script
+		exec.Command("/bin/bash", scriptPath).Start()
+		
+		// Exit current process to allow script to replace binary
+		time.Sleep(2 * time.Second)
+		os.Exit(0)
+	}()
+	
+	log.Printf("Update script created and scheduled: %s", scriptPath)
 	return nil
 }
 
