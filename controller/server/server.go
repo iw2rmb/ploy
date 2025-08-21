@@ -25,7 +25,6 @@ import (
 	"github.com/ploy/ploy/controller/routing"
 	"github.com/ploy/ploy/controller/selfupdate"
 	"github.com/ploy/ploy/internal/build"
-	"github.com/ploy/ploy/internal/cert"
 	"github.com/ploy/ploy/internal/cleanup"
 	"github.com/ploy/ploy/internal/debug"
 	"github.com/ploy/ploy/internal/domain"
@@ -321,18 +320,20 @@ func initializeCertificateManager(cfg *ControllerConfig) (*certificates.Certific
 	}
 
 	// Create DNS provider (for ACME DNS-01 challenges)
+	// Note: DNS provider can be nil for now, certificate manager should handle this gracefully
 	dnsProvider, err := initializeDNSProvider()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create DNS provider: %w", err)
+		log.Printf("Warning: DNS provider initialization failed, certificates may not work: %v", err)
+		dnsProvider = nil
 	}
 
-	// Create certificate manager
+	// Create certificate manager (it should handle nil DNS provider gracefully)
 	certificateManager, err := certificates.NewCertificateManager(consulClient, storageClient, dnsProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate manager: %w", err)
 	}
 
-	log.Printf("Certificate manager initialized successfully")
+	log.Printf("Certificate manager initialized successfully (DNS provider: %v)", dnsProvider != nil)
 	return certificateManager, nil
 }
 
@@ -368,9 +369,8 @@ func (s *Server) setupRoutes() {
 	// Domain management with dependency injection
 	s.setupDomainRoutes(api)
 	
-	// Certificate management
-	api.Post("/certs/issue", cert.IssueCertificate)
-	api.Get("/certs", cert.ListCertificates)
+	// Certificate management (Heroku-style)
+	s.setupCertificateRoutes(api)
 	
 	// Environment variables management with injected env store
 	api.Post("/apps/:app/env", s.handleSetEnvVars)
@@ -429,6 +429,118 @@ func (s *Server) setupDomainRoutes(api fiber.Router) {
 		api.Get("/apps/:app/domains", domain.ListDomains)
 		api.Delete("/apps/:app/domains/:domain", domain.RemoveDomain)
 	}
+}
+
+// setupCertificateRoutes configures Heroku-style certificate management routes
+func (s *Server) setupCertificateRoutes(api fiber.Router) {
+	if s.dependencies.CertificateManager != nil {
+		// Heroku-style certificate management routes
+		api.Get("/apps/:app/certificates", s.handleListAppCertificates)
+		api.Get("/apps/:app/certificates/:domain", s.handleGetDomainCertificate)
+		api.Post("/apps/:app/certificates/:domain/provision", s.handleProvisionCertificate)
+		api.Delete("/apps/:app/certificates/:domain", s.handleRemoveCertificate)
+		
+		log.Printf("Certificate management routes configured")
+	} else {
+		log.Printf("Certificate management routes skipped - certificate manager not available")
+	}
+}
+
+// handleListAppCertificates lists certificates for an app
+func (s *Server) handleListAppCertificates(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	if appName == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "App name is required"})
+	}
+
+	if s.dependencies.CertificateManager == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Certificate management not available"})
+	}
+
+	certificates, err := s.dependencies.CertificateManager.ListAppCertificates(appName)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Failed to list certificates: %v", err)})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": "success",
+		"app": appName,
+		"certificates": certificates,
+		"count": len(certificates),
+	})
+}
+
+// handleGetDomainCertificate gets certificate info for a domain
+func (s *Server) handleGetDomainCertificate(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	domain := c.Params("domain")
+	
+	if appName == "" || domain == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
+	}
+
+	if s.dependencies.CertificateManager == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Certificate management not available"})
+	}
+
+	certificate, err := s.dependencies.CertificateManager.GetDomainCertificate(appName, domain)
+	if err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": fmt.Sprintf("Certificate not found: %v", err)})
+	}
+
+	return c.JSON(certificate)
+}
+
+// handleProvisionCertificate manually provisions a certificate for a domain
+func (s *Server) handleProvisionCertificate(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	domain := c.Params("domain")
+	
+	if appName == "" || domain == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
+	}
+
+	if s.dependencies.CertificateManager == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Certificate management not available"})
+	}
+
+	ctx := context.Background()
+	certificate, err := s.dependencies.CertificateManager.ProvisionCertificate(ctx, appName, domain)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Failed to provision certificate: %v", err)})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": "provisioned",
+		"app": appName,
+		"domain": domain,
+		"certificate": certificate,
+	})
+}
+
+// handleRemoveCertificate removes a certificate for a domain
+func (s *Server) handleRemoveCertificate(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	domain := c.Params("domain")
+	
+	if appName == "" || domain == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
+	}
+
+	if s.dependencies.CertificateManager == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Certificate management not available"})
+	}
+
+	err := s.dependencies.CertificateManager.RemoveDomainCertificate(appName, domain)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("Failed to remove certificate: %v", err)})
+	}
+
+	return c.JSON(fiber.Map{
+		"status": "removed",
+		"app": appName,
+		"domain": domain,
+	})
 }
 
 // Start starts the server with graceful shutdown support
