@@ -156,9 +156,10 @@ func (bd *BinaryDistributor) ListVersions() ([]string, error) {
 	
 	versions := make(map[string]bool)
 	for _, obj := range objects {
-		parts := filepath.SplitList(obj.Key)
-		if len(parts) >= 2 && parts[0] == "controller-binaries" {
-			versions[parts[1]] = true
+		// obj.Key contains the directory name (version) directly
+		// from our SeaweedFS listing, e.g., "test", "v1.0.0-test"
+		if obj.Key != "" && obj.Key != "." && obj.Key != ".." {
+			versions[obj.Key] = true
 		}
 	}
 	
