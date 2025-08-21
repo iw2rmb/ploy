@@ -98,9 +98,9 @@ type CampaignProgress struct {
 - Progress tracking provides real-time visibility into campaign status
 - Repository prioritization optimizes transformation order for business value
 
-### 2. Advanced Analytics & Reporting
+### 2. Advanced Analytics & Reporting with Cost Optimization
 
-**Objective**: Provide comprehensive business intelligence and executive reporting with ROI measurement, trend analysis, and predictive insights.
+**Objective**: Provide comprehensive business intelligence and executive reporting with ROI measurement, cost optimization, and predictive insights.
 
 **Tasks**:
 - Create comprehensive transformation analytics dashboard
@@ -108,6 +108,9 @@ type CampaignProgress struct {
 - Add transformation success rate tracking and trend analysis
 - Create executive reporting with ROI calculations
 - Implement predictive analysis for transformation success probability
+- Add cost optimization recommendations and tracking
+- Implement LLM API cost management and budgeting
+- Create resource usage prediction models
 
 **Deliverables**:
 ```go
@@ -128,6 +131,27 @@ type BusinessMetrics struct {
     SecurityImprovements SecurityMetrics         `json:"security_improvements"`
     ComplianceMetrics    ComplianceMetrics       `json:"compliance_metrics"`
     CostSavings          CostSavingsMetrics      `json:"cost_savings"`
+    LLMCosts             LLMCostMetrics          `json:"llm_costs"`
+    Optimizations        []CostOptimization      `json:"optimizations"`
+}
+
+// Cost optimization structures
+type CostOptimization struct {
+    Category        string          `json:"category"`
+    CurrentCost     float64         `json:"current_cost"`
+    OptimizedCost   float64         `json:"optimized_cost"`
+    Savings         float64         `json:"savings"`
+    Implementation  string          `json:"implementation"`
+    Confidence      float64         `json:"confidence"`
+}
+
+type LLMCostMetrics struct {
+    TotalTokens     int             `json:"total_tokens"`
+    TotalCost       float64         `json:"total_cost"`
+    CostPerRepo     float64         `json:"cost_per_repo"`
+    BudgetUsed      float64         `json:"budget_used"`
+    ProjectedCost   float64         `json:"projected_cost"`
+    Optimizations   []LLMOptimization `json:"optimizations"`
 }
 
 type ROIAnalysis struct {
@@ -348,6 +372,182 @@ type ComplianceReport struct {
 - Compliance reporting supports SOX, NIST, ISO27001, and custom frameworks
 - Data privacy controls protect sensitive code and credentials throughout transformation lifecycle
 
+### 5. WASM Integration for Lane G
+
+**Objective**: Integrate WebAssembly-specific transformations for Ploy's fully-implemented Lane G runtime.
+
+**Tasks**:
+- Create WASM optimization recipes for size and performance
+- Implement WASI polyfill transformations
+- Add WebAssembly module composition capabilities
+- Support WASM component model transformations
+- Create cross-compilation transformation workflows
+
+**Deliverables**:
+```go
+// controller/arf/wasm_integration.go
+type WASMIntegration interface {
+    OptimizeWASMModule(ctx context.Context, module WASMModule) (*OptimizedModule, error)
+    InjectPolyfills(ctx context.Context, module WASMModule, required []string) (*WASMModule, error)
+    ComposeModules(ctx context.Context, modules []WASMModule) (*ComposedModule, error)
+    TransformToComponent(ctx context.Context, module WASMModule) (*ComponentModule, error)
+    CrossCompile(ctx context.Context, source SourceCode, target WASMTarget) (*WASMModule, error)
+}
+
+type WASMModule struct {
+    ID              string              `json:"id"`
+    Name            string              `json:"name"`
+    Size            int64               `json:"size"`
+    Format          string              `json:"format"`
+    Runtime         string              `json:"runtime"`
+    Imports         []WASMImport        `json:"imports"`
+    Exports         []WASMExport        `json:"exports"`
+    Optimizations   []WASMOptimization  `json:"optimizations"`
+}
+
+type WASMOptimization struct {
+    Type            string              `json:"type"`
+    SizeReduction   int64               `json:"size_reduction"`
+    Performance     float64             `json:"performance"`
+    Applied         bool                `json:"applied"`
+}
+
+type WASMTransformationRecipe struct {
+    Recipe
+    OptLevel        int                 `json:"opt_level"`
+    StripDebug      bool                `json:"strip_debug"`
+    Polyfills       []string            `json:"polyfills"`
+    TargetRuntime   string              `json:"target_runtime"`
+    ComponentModel  bool                `json:"component_model"`
+}
+```
+
+**WASM-Specific Transformations**:
+```yaml
+# configs/arf-wasm-transformations.yaml
+wasm_transformations:
+  optimizations:
+    - name: "size_optimization"
+      wasm-opt_flags: ["-Os", "--strip-debug", "--strip-producers"]
+      target_reduction: 30
+      
+    - name: "performance_optimization"
+      wasm-opt_flags: ["-O3", "--inline-functions"]
+      target_improvement: 20
+      
+  polyfills:
+    - name: "fs_polyfill"
+      when: "wasi_snapshot_preview1"
+      inject: ["@wasmer/wasi-fs"]
+      
+    - name: "network_polyfill"
+      when: "socket_imports"
+      inject: ["@wasmer/wasi-net"]
+      
+  component_model:
+    interface_types: true
+    module_linking: true
+    shared_memory: false
+```
+
+**Acceptance Criteria**:
+- WASM module size reduction of 30%+ through optimization
+- Polyfill injection success rate >95%
+- Component model transformation preserves functionality
+- Cross-compilation supports 5+ source languages
+- Integration with wazero runtime validated
+
+### 6. Operational Monitoring & Alerting
+
+**Objective**: Implement comprehensive operational monitoring with SLI/SLO tracking and intelligent alerting.
+
+**Tasks**:
+- Define comprehensive SLIs and SLOs for ARF operations
+- Create Prometheus metrics for all critical paths
+- Implement intelligent alerting with anomaly detection
+- Add distributed tracing for transformation workflows
+- Create operational runbooks for incident response
+
+**Deliverables**:
+```go
+// controller/arf/operational_monitoring.go
+type OperationalMonitoring interface {
+    DefineSLI(ctx context.Context, sli SLI) error
+    DefineSLO(ctx context.Context, slo SLO) error
+    RecordMetric(ctx context.Context, metric Metric) error
+    DetectAnomaly(ctx context.Context, metrics []Metric) (*Anomaly, error)
+    GenerateRunbook(ctx context.Context, incident Incident) (*Runbook, error)
+    CreateDashboard(ctx context.Context, config DashboardConfig) (*Dashboard, error)
+}
+
+type SLI struct {
+    Name            string              `json:"name"`
+    Query           string              `json:"query"`
+    Unit            string              `json:"unit"`
+    AggregationFunc string              `json:"aggregation_func"`
+}
+
+type SLO struct {
+    Name            string              `json:"name"`
+    SLI             string              `json:"sli"`
+    Target          float64             `json:"target"`
+    Window          time.Duration       `json:"window"`
+    ErrorBudget     float64             `json:"error_budget"`
+    AlertPolicy     AlertPolicy         `json:"alert_policy"`
+}
+
+type Anomaly struct {
+    ID              string              `json:"id"`
+    Metric          string              `json:"metric"`
+    DetectedAt      time.Time           `json:"detected_at"`
+    Severity        string              `json:"severity"`
+    Deviation       float64             `json:"deviation"`
+    PredictedCause  string              `json:"predicted_cause"`
+}
+
+type Runbook struct {
+    IncidentType    string              `json:"incident_type"`
+    Steps           []RunbookStep       `json:"steps"`
+    Automation      []AutomationAction  `json:"automation"`
+    Escalation      EscalationPolicy    `json:"escalation"`
+    PostMortem      PostMortemTemplate  `json:"post_mortem"`
+}
+```
+
+**SLI/SLO Definitions**:
+```yaml
+# configs/arf-slo-config.yaml
+slis:
+  - name: "transformation_success_rate"
+    query: "rate(arf_transformation_total{status='success'}[5m])"
+    
+  - name: "api_latency_p99"
+    query: "histogram_quantile(0.99, arf_api_duration_seconds)"
+    
+  - name: "campaign_throughput"
+    query: "rate(arf_campaign_repos_processed[1h])"
+
+slos:
+  - name: "transformation_reliability"
+    sli: "transformation_success_rate"
+    target: 0.95
+    window: "30d"
+    error_budget: 0.05
+    
+  - name: "api_performance"
+    sli: "api_latency_p99"
+    target: 0.5  # 500ms
+    window: "7d"
+    error_budget: 0.01
+```
+
+**Acceptance Criteria**:
+- 99.9% metric collection reliability
+- SLO violation detection within 1 minute
+- Anomaly detection accuracy >85%
+- Runbook automation reduces MTTR by 50%
+- Full distributed tracing coverage
+
 ## Configuration Examples
 
 ### Campaign Management Configuration
@@ -562,6 +762,10 @@ job "arf-analytics-processor" {
 - **Executive Satisfaction**: Weekly executive reports with actionable insights
 - **Compliance**: 100% audit trail coverage with regulatory framework support
 - **Performance**: Sub-second API response times under production load
+- **Cost Optimization**: 30%+ reduction in transformation costs through optimization
+- **WASM Support**: 30%+ size reduction for Lane G modules
+- **Operational Excellence**: 99.9% SLO achievement with <1hr MTTR
+- **LLM Cost Management**: <$0.10 per repository transformation average
 
 ## Risk Mitigation
 
