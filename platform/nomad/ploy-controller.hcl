@@ -319,6 +319,13 @@ job "ploy-controller" {
         # Platform wildcard certificate configuration
         PLOY_APPS_DOMAIN = "ployd.app"
         PLOY_APPS_DOMAIN_PROVIDER = "namecheap"
+        
+        # Namecheap DNS provider configuration (for testing)
+        NAMECHEAP_SANDBOX_API_KEY = "placeholder_test_key"
+        NAMECHEAP_API_USER = "iw2rmb"
+        NAMECHEAP_USERNAME = "iw2rmb"
+        NAMECHEAP_CLIENT_IP = "45.12.75.241"
+        NAMECHEAP_SANDBOX = "true"
       }
       
       # Enhanced configuration files with service mesh and rolling updates
