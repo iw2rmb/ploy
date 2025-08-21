@@ -84,19 +84,18 @@ job "ploy-controller" {
       
       # Enhanced metadata for service discovery and deployment management
       meta {
-        version = "${meta.ploy_version:1.0.0}"
+        version = "1.0.0"
         node = "${attr.unique.hostname}"
-        datacenter = "${attr.consul.datacenter:dc1}"
-        region = "${node.region:global}"
+        datacenter = "${node.datacenter}"
+        region = "${node.region}"
         deployment_id = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
-        deployment_time = "${timestamp()}"
         service_type = "system"
         load_balancer = "traefik"
         health_endpoint = "/health"
         readiness_endpoint = "/ready"
         metrics_endpoint = "/health/metrics"
         api_version = "v1"
-        environment = "${meta.environment:production}"
+        environment = "production"
       }
       
       # Primary health check using the /health endpoint
@@ -192,8 +191,8 @@ job "ploy-controller" {
         service_type = "metrics"
         scrape_interval = "15s"
         metrics_format = "prometheus"
-        version = "${meta.ploy_version:1.0.0}"
-        environment = "${meta.environment:production}"
+        version = "1.0.0"
+        environment = "production"
       }
       
       # Metrics endpoint health check with service mesh awareness
@@ -264,7 +263,7 @@ job "ploy-controller" {
         
         # Service discovery and health checks
         SERVICE_NAME = "ploy-controller"
-        SERVICE_VERSION = "${meta.ploy_version:1.0.0}"
+        SERVICE_VERSION = "1.0.0"
         HEALTH_CHECK_INTERVAL = "10s"
         READINESS_CHECK_INTERVAL = "15s"
         

@@ -57,9 +57,9 @@ job "ploy-controller-simple" {
       
       # Enhanced metadata for testing environment
       meta {
-        version = "${meta.ploy_version:1.0.0}"
+        version = "1.0.0-test"
         node = "${attr.unique.hostname}"
-        datacenter = "${attr.consul.datacenter:dc1}"
+        datacenter = "${node.datacenter}"
         environment = "testing"
         deployment_id = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
         service_type = "service"
@@ -132,7 +132,7 @@ job "ploy-controller-simple" {
         
         # Service discovery
         SERVICE_NAME = "ploy-controller"
-        SERVICE_VERSION = "${meta.ploy_version:1.0.0-test}"
+        SERVICE_VERSION = "1.0.0-test"
         
         LOG_LEVEL = "info"
         LOG_SERVICE_MESH = "true"
