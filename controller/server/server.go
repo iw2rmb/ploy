@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
+	"github.com/ploy/ploy/controller/acme"
 	"github.com/ploy/ploy/controller/config"
 	"github.com/ploy/ploy/controller/consul_envstore"
 	"github.com/ploy/ploy/controller/dns"
@@ -40,6 +41,7 @@ type ServiceDependencies struct {
 	TTLCleanupService *cleanup.TTLCleanupService
 	SelfUpdateHandler *selfupdate.Handler
 	DNSHandler        *dns.Handler
+	ACMEHandler       *acme.Handler
 	StorageConfigPath string
 }
 

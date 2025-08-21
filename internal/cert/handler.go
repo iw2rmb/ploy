@@ -1,42 +1,32 @@
 package cert
 
 import (
-	"fmt"
 	"log"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/ploy/ploy/internal/utils"
 )
 
+// Legacy handlers - deprecated in favor of /v1/certs ACME endpoints
+// These are kept for backward compatibility
+
 func IssueCertificate(c *fiber.Ctx) error {
-	var req struct {
-		Domain string `json:"domain"`
-	}
-	if err := c.BodyParser(&req); err != nil {
-		return utils.ErrJSON(c, 400, fmt.Errorf("invalid request body"))
-	}
-	
-	log.Printf("Issuing certificate for domain %s", req.Domain)
+	log.Printf("WARNING: Using deprecated certificate endpoint. Please use /v1/certs/issue instead")
 	
 	return c.JSON(fiber.Map{
-		"status":  "issued",
-		"domain":  req.Domain,
-		"message": "Certificate issued successfully",
-		"expires": time.Now().AddDate(0, 3, 0).Format("2006-01-02"),
+		"status":  "deprecated",
+		"message": "This endpoint is deprecated. Please use /v1/certs/issue for ACME certificate management",
+		"new_endpoint": "/v1/certs/issue",
+		"documentation": "See API.md for complete ACME certificate management endpoints",
 	})
 }
 
 func ListCertificates(c *fiber.Ctx) error {
-	log.Printf("Listing certificates")
+	log.Printf("WARNING: Using deprecated certificate endpoint. Please use /v1/certs instead")
 	
 	return c.JSON(fiber.Map{
-		"certificates": []fiber.Map{
-			{
-				"domain":  "example.ployd.app",
-				"status":  "valid",
-				"expires": time.Now().AddDate(0, 2, 0).Format("2006-01-02"),
-			},
-		},
+		"status":  "deprecated",
+		"message": "This endpoint is deprecated. Please use /v1/certs for ACME certificate management",
+		"new_endpoint": "/v1/certs",
+		"documentation": "See API.md for complete ACME certificate management endpoints",
 	})
 }

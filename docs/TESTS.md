@@ -40,6 +40,21 @@
 87. CLI help messages display correct usage for all new commands.
 88. Error handling for invalid arguments and missing parameters.
 
+## Heroku-style Certificate Integration (Aug 2025)
+178. `ploy domains add <app> <domain> --cert=auto` automatically provisions Let's Encrypt certificate.
+179. `ploy domains add <app> <domain> --cert=none` adds domain without certificate provisioning.
+180. `ploy domains add <app> <domain> --cert=manual` adds domain for manual certificate management.
+181. `ploy domains certificates <app> list` shows all certificates for app with status and expiration.
+182. `ploy domains certificates <app> get <domain>` displays certificate details for specific domain.
+183. `ploy domains certificates <app> provision <domain>` manually triggers certificate provisioning.
+184. `ploy domains certificates <app> remove <domain>` removes certificate for domain.
+185. Domain removal automatically cleans up associated certificates.
+186. Certificate provisioning runs in background with status tracking.
+187. Wildcard certificate reuse for *.ployd.app subdomains.
+188. Custom domain certificates issued individually.
+189. Automatic renewal service for expiring certificates.
+190. Certificate status tracking: provisioning, active, expired, failed.
+
 ## API Endpoints Implementation (Aug 2025)
 89. `POST /v1/apps/:app/domains` accepts domain JSON and returns registration status.
 90. `GET /v1/apps/:app/domains` returns list of domains for app in JSON format.
@@ -48,6 +63,18 @@
 93. `GET /v1/certs` returns list of all managed certificates with metadata.
 94. `POST /v1/apps/:app/debug` creates debug instance with SSH configuration.
 95. `POST /v1/apps/:app/debug?lane=A` creates debug instance in specified lane.
+
+## Heroku-style Certificate API Endpoints (Aug 2025)
+191. `POST /v1/apps/:app/domains` with `{"domain":"example.com","certificate":"auto"}` triggers certificate provisioning.
+192. `GET /v1/apps/:app/domains` returns domains with certificate status and expiration information.
+193. `DELETE /v1/apps/:app/domains/:domain` removes domain and associated certificate automatically.
+194. `GET /v1/apps/:app/certificates` lists all certificates for app with detailed status information.
+195. `GET /v1/apps/:app/certificates/:domain` returns certificate details for specific domain.
+196. `POST /v1/apps/:app/certificates/:domain/provision` manually triggers certificate provisioning.
+197. `DELETE /v1/apps/:app/certificates/:domain` removes certificate while keeping domain.
+198. Certificate provisioning returns immediate response with background processing.
+199. Certificate status API shows provisioning progress and error details.
+200. Domain-based certificate lifecycle management integrated with domain operations.
 
 ## DNS Management Testing (Aug 2025)
 185. DNS provider configuration validation for Cloudflare and Namecheap.
