@@ -2,254 +2,29 @@ package main
 
 import (
 	"log"
+	"os"
 
-	"github.com/gofiber/fiber/v2"
-
-	"github.com/ploy/ploy/controller/config"
-	"github.com/ploy/ploy/controller/consul_envstore"
-	"github.com/ploy/ploy/controller/domains"
-	"github.com/ploy/ploy/controller/envstore"
-	"github.com/ploy/ploy/controller/health"
-	"github.com/ploy/ploy/controller/routing"
-	"github.com/ploy/ploy/internal/build"
-	"github.com/ploy/ploy/internal/cert"
-	"github.com/ploy/ploy/internal/cleanup"
-	"github.com/ploy/ploy/internal/debug"
-	"github.com/ploy/ploy/internal/domain"
-	"github.com/ploy/ploy/internal/env"
-	"github.com/ploy/ploy/internal/lifecycle"
-	"github.com/ploy/ploy/internal/preview"
-	"github.com/ploy/ploy/internal/storage"
-	"github.com/ploy/ploy/internal/utils"
+	"github.com/ploy/ploy/controller/server"
 )
 
+func main() {
+	log.Printf("Starting Ploy Controller with stateless initialization patterns")
 
-var envStore envstore.EnvStoreInterface
-var storageConfigPath string
+	// Load configuration from environment variables
+	config := server.LoadConfigFromEnv()
 
-// getStorageClient creates a new storage client for each request (stateless)
-func getStorageClient() (*storage.StorageClient, error) {
-	return config.CreateStorageClientFromConfig(storageConfigPath)
-}
-
-func main(){
-	app := fiber.New()
-	app.Use(preview.Router)
-
-	// Get storage configuration path with external config support
-	storageConfigPath = config.GetStorageConfigPath()
-	log.Printf("Using storage configuration from: %s", storageConfigPath)
-	
-	// Validate storage configuration at startup
-	if _, err := config.Load(storageConfigPath); err != nil {
-		log.Printf("Warning: Storage configuration validation failed: %v", err)
-	} else {
-		log.Printf("Storage configuration validated successfully")
-	}
-	
-	// Initialize environment store - prefer Consul if available
-	consulAddr := utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500")
-	useConsulEnv := utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true"
-	
-	if useConsulEnv {
-		if consulEnvStore, err := consul_envstore.New(consulAddr, "ploy/apps"); err == nil {
-			// Test Consul connectivity
-			if err := consulEnvStore.HealthCheck(); err == nil {
-				envStore = consulEnvStore
-				log.Printf("Using Consul KV store for environment variables at %s", consulAddr)
-			} else {
-				log.Printf("Consul env store health check failed, falling back to file-based store: %v", err)
-				envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
-			}
-		} else {
-			log.Printf("Failed to initialize Consul env store, falling back to file-based store: %v", err)
-			envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
-		}
-	} else {
-		envStore = envstore.New(utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
-		log.Printf("Using file-based environment store at %s", utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"))
-	}
-	
-	// Initialize Traefik router
-	traefikRouter, err := routing.NewTraefikRouter(consulAddr)
+	// Create server with dependency injection
+	srv, err := server.NewServer(config)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize Traefik router: %v", err)
-		traefikRouter = nil
-	} else {
-		log.Printf("Traefik router initialized with Consul address: %s", consulAddr)
+		log.Printf("Failed to create server: %v", err)
+		os.Exit(1)
 	}
 
-	// Initialize health checker
-	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
-	healthChecker := health.NewHealthChecker(storageConfigPath, consulAddr, nomadAddr)
-	
-	// Initialize TTL cleanup service
-	cleanupConfigPath := utils.Getenv("PLOY_CLEANUP_CONFIG", "")
-	configManager := cleanup.NewConfigManager(cleanupConfigPath)
-	
-	// Load or create cleanup configuration
-	cleanupConfig, err := configManager.LoadConfig()
-	if err != nil {
-		log.Printf("Warning: Failed to load cleanup configuration, using defaults: %v", err)
-		cleanupConfig = cleanup.DefaultTTLConfig()
-	}
-	
-	// Override with environment variables if present
-	envConfig := cleanup.LoadConfigFromEnv()
-	if envConfig.PreviewTTL != cleanupConfig.PreviewTTL {
-		cleanupConfig.PreviewTTL = envConfig.PreviewTTL
-	}
-	if envConfig.CleanupInterval != cleanupConfig.CleanupInterval {
-		cleanupConfig.CleanupInterval = envConfig.CleanupInterval
-	}
-	if envConfig.MaxAge != cleanupConfig.MaxAge {
-		cleanupConfig.MaxAge = envConfig.MaxAge
-	}
-	if envConfig.DryRun != cleanupConfig.DryRun {
-		cleanupConfig.DryRun = envConfig.DryRun
-	}
-	if envConfig.NomadAddr != cleanupConfig.NomadAddr {
-		cleanupConfig.NomadAddr = envConfig.NomadAddr
-	}
-	
-	// Create TTL cleanup service
-	ttlCleanupService := cleanup.NewTTLCleanupService(cleanupConfig)
-	cleanupHandler := cleanup.NewCleanupHandler(ttlCleanupService, configManager)
-	
-	// Start TTL cleanup service if not in dry run mode or if explicitly enabled
-	autoStart := utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true"
-	if autoStart {
-		if err := ttlCleanupService.Start(); err != nil {
-			log.Printf("Warning: Failed to start TTL cleanup service: %v", err)
-		} else {
-			log.Printf("TTL cleanup service started (interval: %v, preview TTL: %v)", 
-				cleanupConfig.CleanupInterval, cleanupConfig.PreviewTTL)
-		}
+	// Start server with graceful shutdown
+	if err := srv.Start(); err != nil {
+		log.Printf("Server shutdown error: %v", err)
+		os.Exit(1)
 	}
 
-	// Health and readiness endpoints (before API group)
-	app.Get("/health", healthChecker.HealthHandler)
-	app.Get("/ready", healthChecker.ReadinessHandler)
-	app.Get("/live", healthChecker.LivenessHandler)
-	app.Get("/health/metrics", healthChecker.MetricsHandler)
-
-	api := app.Group("/v1")
-	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
-		storeClient, err := getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		return build.TriggerBuild(c, storeClient, envStore)
-	})
-	api.Get("/apps", build.ListApps)
-	api.Get("/status/:app", build.Status)
-	
-	// Domain management
-	if traefikRouter != nil {
-		// Use new Traefik-based domain management
-		domainHandler := domains.NewDomainHandler(traefikRouter)
-		domains.SetupDomainRoutes(app, domainHandler)
-	} else {
-		// Fallback to existing domain management
-		api.Post("/apps/:app/domains", domain.AddDomain)
-		api.Get("/apps/:app/domains", domain.ListDomains)
-		api.Delete("/apps/:app/domains/:domain", domain.RemoveDomain)
-	}
-	
-	// Certificate management
-	api.Post("/certs/issue", cert.IssueCertificate)
-	api.Get("/certs", cert.ListCertificates)
-	
-	// Environment variables management
-	api.Post("/apps/:app/env", func(c *fiber.Ctx) error {
-		return env.SetEnvVars(c, envStore)
-	})
-	api.Get("/apps/:app/env", func(c *fiber.Ctx) error {
-		return env.GetEnvVars(c, envStore)
-	})
-	api.Put("/apps/:app/env/:key", func(c *fiber.Ctx) error {
-		return env.SetEnvVar(c, envStore)
-	})
-	api.Delete("/apps/:app/env/:key", func(c *fiber.Ctx) error {
-		return env.DeleteEnvVar(c, envStore)
-	})
-	
-	// Debug, rollback, and destroy
-	api.Post("/apps/:app/debug", func(c *fiber.Ctx) error {
-		return debug.DebugApp(c, envStore)
-	})
-	api.Post("/apps/:app/rollback", debug.RollbackApp)
-	api.Delete("/apps/:app", func(c *fiber.Ctx) error {
-		storeClient, err := getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		return lifecycle.DestroyApp(c, storeClient, envStore)
-	})
-	
-	// Storage health and metrics endpoints
-	api.Get("/storage/health", func(c *fiber.Ctx) error {
-		storeClient, err := getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		health := storeClient.GetHealthStatus()
-		return c.JSON(health)
-	})
-	api.Get("/storage/metrics", func(c *fiber.Ctx) error {
-		storeClient, err := getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		metrics := storeClient.GetMetrics()
-		return c.JSON(metrics)
-	})
-	
-	// Configuration management endpoints
-	api.Get("/storage/config", func(c *fiber.Ctx) error {
-		configManager := config.NewConfigManager(storageConfigPath)
-		rootConfig, err := configManager.LoadConfig()
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": err.Error()})
-		}
-		return c.JSON(rootConfig)
-	})
-	api.Post("/storage/config/reload", func(c *fiber.Ctx) error {
-		configManager := config.NewConfigManager(storageConfigPath)
-		rootConfig, reloaded, err := configManager.ReloadIfChanged()
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
-		}
-		return c.JSON(fiber.Map{
-			"reloaded": reloaded,
-			"config":   rootConfig,
-			"message":  "Configuration reload completed",
-		})
-	})
-	api.Post("/storage/config/validate", func(c *fiber.Ctx) error {
-		_, err := config.Load(storageConfigPath)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
-		}
-		return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
-	})
-
-	// TTL cleanup endpoints
-	cleanup.SetupRoutes(app, cleanupHandler)
-
-	// Health endpoints in API group for versioned access
-	api.Get("/health", healthChecker.HealthHandler)
-	api.Get("/ready", healthChecker.ReadinessHandler)
-	api.Get("/live", healthChecker.LivenessHandler)
-	api.Get("/health/metrics", healthChecker.MetricsHandler)
-
-	port := utils.Getenv("PORT", "8081")
-	log.Printf("Ploy Controller listening on :%s", port)
-	log.Fatal(app.Listen(":" + port))
+	log.Printf("Ploy Controller shutdown completed")
 }
-
-
-
-
-
-
