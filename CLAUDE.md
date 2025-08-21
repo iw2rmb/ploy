@@ -166,13 +166,20 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
     - **Controller Distribution and Deployment**: If controller code was modified (version already updated in git)
-      - Build controller binary: `go build -o build/controller ./controller`
-      - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
-      - Extract version from job file: `CONTROLLER_VERSION=$(grep 'CONTROLLER_VERSION =' platform/nomad/ploy-controller.hcl | cut -d'"' -f2)`
-      - Upload controller version: `./build/controller-dist -command=upload -version=$CONTROLLER_VERSION -binary=./build/controller`
-      - **CHECKSUM UPDATE**: Get checksum from metadata and update Nomad job: `CHECKSUM=$(curl -s http://localhost:8888/ploy-artifacts/controller-binaries/$CONTROLLER_VERSION/linux/amd64/metadata.json | jq -r .sha256_hash)` and update `platform/nomad/ploy-controller.hcl` checksum field
-      - Trigger rolling update: `nomad job run platform/nomad/ploy-controller.hcl`
-      - Monitor rolling update progress: `nomad job status ploy-controller`
+      - **Automated Deployment**: Use the deployment script: `./controller/deploy.sh`
+        - Automatically extracts version from Nomad job file
+        - Builds controller and distribution tool
+        - Calculates and updates checksum in Nomad job file
+        - Uploads binary to SeaweedFS
+        - Deploys via Nomad with monitoring
+      - **Manual Alternative** (if deployment script fails):
+        - Build controller binary: `go build -o build/controller ./controller`
+        - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
+        - Extract version from job file: `CONTROLLER_VERSION=$(grep 'CONTROLLER_VERSION =' platform/nomad/ploy-controller.hcl | cut -d'"' -f2)`
+        - Upload controller version: `./build/controller-dist -command=upload -version=$CONTROLLER_VERSION -binary=./build/controller`
+        - Update checksum: `NEW_CHECKSUM=$(sha256sum build/controller | cut -d' ' -f1)` and update `platform/nomad/ploy-controller.hcl`
+        - Trigger rolling update: `nomad job run platform/nomad/ploy-controller.hcl`
+        - Monitor rolling update progress: `nomad job status ploy-controller`
       - Verify binary distribution: `./build/controller-dist -command=list`
       - Test controller functionality after update
     - Run comprehensive tests on VPS environment to validate changes work in production setup
