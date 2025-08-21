@@ -99,86 +99,28 @@ go build -o build/ploy ./cmd/ploy
 ./build/ploy open myapp
 ```
 
-## Folder Structure
+## Repository Structure
 
-**STRICT FOLDER ORGANIZATION:**
+For detailed folder structure and file locations, see `docs/REPO.md`.
 
-### `build/` - Binary Build Output
-- **Purpose**: Default folder for compiled binaries (controller, CLI)
-- **Usage**: All binary builds must output to this folder
-- **Git**: Ignored in .gitignore
-- **Commands**:
-  ```bash
-  # Build controller binary
-  go build -o build/controller ./controller
-  
-  # Build CLI binary
-  go build -o build/ploy ./cmd/ploy
-  
-  # Run binaries from build folder
-  ./build/controller
-  ./build/ploy --help
-  ```
+### Key Build Locations
+- **Binaries**: `build/` folder (git ignored)
+- **Build Scripts**: `scripts/build/` by lane type
+- **Lane Detection**: `tools/lane-pick/`
 
-### `scripts/` - Shell Scripts and Build Scripts
-- **Purpose**: Container for all shell scripts and build automation
-- **Git**: Tracked and committed
+## Architecture Overview
 
-### `scripts/build/` - Lane-Specific Build Scripts
-- **Purpose**: Build scripts for different deployment lanes
-- **Structure**:
-  - `scripts/build/kraft/` - Unikraft build scripts (Lanes A, B)
-  - `scripts/build/osv/` - OSv build scripts (Lane C)
-  - `scripts/build/jail/` - FreeBSD jail scripts (Lane D)
-  - `scripts/build/oci/` - OCI container scripts (Lane E)
-  - `scripts/build/packer/` - VM build scripts (Lane F)
-- **Git**: All build scripts are tracked and committed
+**Core Workflow**: CLI tar → Controller lane-pick → Build → Nomad deployment
 
-### Lane Picker Tool
-```bash
-# Analyze project and suggest lane
-go run ./tools/lane-pick --path /path/to/project
-```
+**Key Components** (see `docs/REPO.md` for detailed structure):
+- `controller/`: REST API server with lane-specific builders
+- `cmd/ploy/`: CLI client 
+- `internal/`: Shared libraries (storage, build, lifecycle, etc.)
+- `tools/lane-pick/`: Automated lane selection
 
-## Architecture
-
-### Core Components
-- **controller/**: REST API for builds and deployments
-  - `main.go`: Fiber HTTP server with clean routing and module delegation
-  - `builders/`: Lane-specific image builders (unikraft.go, java_osv.go, etc.)
-  - `nomad/`: HashiCorp Nomad integration for job scheduling
-  - `opa/`: Open Policy Agent for security verification
-  - `supply/`: Supply chain security (SBOM, signatures)
-
-- **cmd/ploy/**: CLI client
-  - `main.go`: Clean command router with modular handlers
-
-- **internal/**: Shared modules for controller and CLI
-  - `storage/`: Object storage abstraction
-  - `cli/`: CLI-specific modules (apps, deploy, env, domains, certs, debug, ui, utils)
-  - `preview/`: Preview host routing
-  - `build/`: Build management
-  - `domain/`: Domain management
-  - `cert/`: Certificate management
-  - `env/`: Environment variables
-  - `debug/`: Debug operations
-  - `lifecycle/`: App lifecycle management
-  - `utils/`: Shared utilities
-
-- **tools/lane-pick/**: Automated lane selection
-
-### Key Workflows
-1. **Deploy**: CLI tar → Controller lane-pick → Build → Nomad
-2. **Preview**: SHA URLs trigger builds via Host routing
-3. **Lane Selection**: Auto-detect from file patterns, dependencies
-
-### Configuration
-- Controller reads storage config from `configs/storage-config.yaml`
-- CLI respects `PLOY_CONTROLLER` env var (defaults to `http://localhost:8081/v1`)
-- App manifests in `manifests/` define domain routing
-
-### Sample Apps
-`apps/` contains reference implementations per language/lane.
+**Configuration**:
+- Storage: `configs/storage-config.yaml` or `/etc/ploy/storage/config.yaml`
+- Controller endpoint: `PLOY_CONTROLLER` env var (default: `http://localhost:8081/v1`)
 
 ## Mandatory Update Protocol
 
@@ -186,7 +128,7 @@ go run ./tools/lane-pick --path /path/to/project
 
 1. **Branch Creation**: Create new feature branch with 2-3 word name describing changes
 
-2. **File Location**: Reference `docs/REPO.md` to quickly locate proper files for modifications instead of searching through the repository
+2. **File Location**: Reference `docs/REPO.md` for repository structure and quick file navigation
 
 3. **Infrastructure Preparation**: Update Ansible playbooks and install required components BEFORE testing
     - **Ansible Playbook Updates**: Modify `iac/dev/playbooks/main.yml` to install any new tools, dependencies, or configurations required by the changes

@@ -53,6 +53,19 @@ type HealthMetrics struct {
 	AverageResponseTime   map[string]time.Duration `json:"average_response_time_ms"`
 }
 
+// DeploymentStatus represents blue-green deployment status and service mesh connectivity
+type DeploymentStatus struct {
+	Status               string                 `json:"status"`
+	Timestamp           time.Time              `json:"timestamp"`
+	DeploymentColor     string                 `json:"deployment_color"`
+	DeploymentWeight    int                    `json:"deployment_weight"`
+	DeploymentID        string                 `json:"deployment_id"`
+	ServiceMeshEnabled  bool                   `json:"service_mesh_enabled"`
+	ServiceMeshConnect  bool                   `json:"service_mesh_connect"`
+	TraefikEnabled      bool                   `json:"traefik_enabled"`
+	ServiceRegistration map[string]interface{} `json:"service_registration"`
+}
+
 // HealthChecker provides health and readiness checking functionality
 type HealthChecker struct {
 	storageConfigPath string
@@ -448,4 +461,78 @@ func (h *HealthChecker) MetricsHandler(c *fiber.Ctx) error {
 // GetMetrics returns the current health metrics
 func (h *HealthChecker) GetMetrics() *HealthMetrics {
 	return h.metricsCollector
+}
+
+// GetDeploymentStatus returns blue-green deployment and service mesh status
+func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
+	status := DeploymentStatus{
+		Status:    "healthy",
+		Timestamp: time.Now(),
+		DeploymentColor:    utils.Getenv("DEPLOYMENT_COLOR", "blue"),
+		DeploymentWeight:   utils.ParseIntEnv("DEPLOYMENT_WEIGHT", 100),
+		DeploymentID:       utils.Getenv("DEPLOYMENT_ID", "unknown"),
+		ServiceMeshEnabled: utils.Getenv("SERVICE_MESH_ENABLED", "false") == "true",
+		ServiceMeshConnect: utils.Getenv("SERVICE_MESH_CONNECT", "false") == "true",
+		TraefikEnabled:     utils.Getenv("TRAEFIK_ENABLED", "false") == "true",
+		ServiceRegistration: make(map[string]interface{}),
+	}
+
+	// Check Consul service registration status
+	consulHealth := h.checkConsul()
+	if consulHealth.Status == "healthy" {
+		status.ServiceRegistration["consul"] = map[string]interface{}{
+			"status": "registered",
+			"service_name": utils.Getenv("SERVICE_NAME", "ploy-controller"),
+			"service_version": utils.Getenv("SERVICE_VERSION", "1.0.0"),
+			"instance_id": utils.Getenv("INSTANCE_ID", "unknown"),
+		}
+	} else {
+		status.Status = "degraded"
+		status.ServiceRegistration["consul"] = map[string]interface{}{
+			"status": "failed",
+			"error": consulHealth.Error,
+		}
+	}
+
+	// Check service mesh connectivity if enabled
+	if status.ServiceMeshEnabled {
+		// Validate service mesh configuration
+		if !status.ServiceMeshConnect {
+			status.Status = "degraded"
+			status.ServiceRegistration["service_mesh"] = map[string]interface{}{
+				"status": "misconfigured",
+				"error": "Service mesh enabled but connect disabled",
+			}
+		} else {
+			status.ServiceRegistration["service_mesh"] = map[string]interface{}{
+				"status": "connected",
+				"protocol": utils.Getenv("SERVICE_MESH_PROTOCOL", "http"),
+			}
+		}
+	}
+
+	// Check Traefik integration if enabled
+	if status.TraefikEnabled {
+		status.ServiceRegistration["traefik"] = map[string]interface{}{
+			"status": "enabled",
+			"domain": utils.Getenv("TRAEFIK_DOMAIN", "api.ployd.app"),
+			"tls_enabled": utils.Getenv("TRAEFIK_TLS_ENABLED", "false") == "true",
+		}
+	}
+
+	return status
+}
+
+// DeploymentStatusHandler handles HTTP deployment status requests for blue-green deployments
+func (h *HealthChecker) DeploymentStatusHandler(c *fiber.Ctx) error {
+	deployment := h.GetDeploymentStatus()
+	
+	statusCode := 200
+	if deployment.Status == "unhealthy" {
+		statusCode = 503
+	} else if deployment.Status == "degraded" {
+		statusCode = 200 // Still healthy, but with warnings
+	}
+	
+	return c.Status(statusCode).JSON(deployment)
 }

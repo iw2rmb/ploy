@@ -252,6 +252,7 @@ func (s *Server) setupRoutes() {
 	s.app.Get("/ready", s.dependencies.HealthChecker.ReadinessHandler)
 	s.app.Get("/live", s.dependencies.HealthChecker.LivenessHandler)
 	s.app.Get("/health/metrics", s.dependencies.HealthChecker.MetricsHandler)
+	s.app.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
 
 	api := s.app.Group("/v1")
 	
@@ -297,6 +298,7 @@ func (s *Server) setupRoutes() {
 	api.Get("/ready", s.dependencies.HealthChecker.ReadinessHandler)
 	api.Get("/live", s.dependencies.HealthChecker.LivenessHandler)
 	api.Get("/health/metrics", s.dependencies.HealthChecker.MetricsHandler)
+	api.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
 
 	log.Printf("API routes configured with dependency injection")
 }

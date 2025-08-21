@@ -37,7 +37,7 @@ job "ploy-controller-simple" {
       }
     }
     
-    # Consul service registration
+    # Enhanced Consul service registration for testing
     service {
       name = "ploy-controller"
       port = "http"
@@ -45,23 +45,45 @@ job "ploy-controller-simple" {
         "ploy",
         "controller",
         "api",
+        "testing",
+        "traefik.enable=true",
+        "traefik.http.routers.ploy-controller-test.rule=Host(`api-test.ployd.app`) || PathPrefix(`/v1`)",
+        "traefik.http.services.ploy-controller-test.loadbalancer.healthcheck.path=/health",
+        "service-mesh.connect=true",
+        "blue-green.deployment=true",
+        "blue-green.weight=50",
         "${NOMAD_ALLOC_ID}"
       ]
       
-      # Health check using /health endpoint
+      # Enhanced metadata for testing environment
+      meta {
+        version = "${meta.ploy_version:1.0.0}"
+        node = "${attr.unique.hostname}"
+        datacenter = "${attr.consul.datacenter:dc1}"
+        environment = "testing"
+        deployment_id = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
+        service_type = "service"
+      }
+      
+      # Health check using /health endpoint with service mesh support
       check {
         type = "http"
         path = "/health"
         port = "http"
         interval = "15s"
         timeout = "5s"
+        success_before_passing = 1
+        failures_before_critical = 2
         check_restart {
           limit = 3
           grace = "10s"
         }
+        header {
+          "X-Service-Mesh" = ["ploy-controller-test"]
+        }
       }
       
-      # Readiness check
+      # Readiness check with auto-deregistration
       check {
         name = "readiness"
         type = "http"
@@ -69,6 +91,9 @@ job "ploy-controller-simple" {
         port = "http"
         interval = "20s"
         timeout = "8s"
+        success_before_passing = 1
+        failures_before_critical = 2
+        deregister_critical_service_after = "90s"
       }
     }
     
@@ -81,7 +106,7 @@ job "ploy-controller-simple" {
         memory = 256
       }
       
-      # Environment variables
+      # Enhanced environment variables for testing with service mesh
       env {
         PORT = "${NOMAD_PORT_http}"
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
@@ -89,7 +114,28 @@ job "ploy-controller-simple" {
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         PLOY_USE_CONSUL_ENV = "true"
         PLOY_CLEANUP_AUTO_START = "true"
+        
+        # Service mesh configuration for testing
+        SERVICE_MESH_ENABLED = "true"
+        SERVICE_MESH_PROTOCOL = "http"
+        CONSUL_CONNECT_ENABLED = "true"
+        
+        # Blue-green deployment for testing
+        BLUE_GREEN_ENABLED = "true"
+        DEPLOYMENT_COLOR = "blue"
+        DEPLOYMENT_WEIGHT = "50"
+        DEPLOYMENT_ID = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
+        
+        # Traefik integration for testing
+        TRAEFIK_ENABLED = "true"
+        TRAEFIK_DOMAIN = "api-test.ployd.app"
+        
+        # Service discovery
+        SERVICE_NAME = "ploy-controller"
+        SERVICE_VERSION = "${meta.ploy_version:1.0.0-test}"
+        
         LOG_LEVEL = "info"
+        LOG_SERVICE_MESH = "true"
         INSTANCE_ID = "${NOMAD_ALLOC_ID}"
         NODE_NAME = "${attr.unique.hostname}"
       }
