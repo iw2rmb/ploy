@@ -143,6 +143,7 @@ job "ploy-controller-simple" {
       config {
         command = "/home/ploy/ploy/build/controller"
         args = []
+        work_dir = "/home/ploy/ploy"
       }
       
       # Graceful shutdown

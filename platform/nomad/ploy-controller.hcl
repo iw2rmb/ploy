@@ -369,6 +369,7 @@ job "ploy-controller" {
       config {
         command = "/home/ploy/ploy/build/controller"
         args = []
+        work_dir = "/home/ploy/ploy"
       }
       
       # Lifecycle hooks
