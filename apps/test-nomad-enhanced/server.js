@@ -1,0 +1,1 @@
+const e=require('express')(); e.get('/healthz',(a,b)=>b.send('ok')); e.listen(8080);
