@@ -131,6 +131,7 @@ func main(){
 	app.Get("/health", healthChecker.HealthHandler)
 	app.Get("/ready", healthChecker.ReadinessHandler)
 	app.Get("/live", healthChecker.LivenessHandler)
+	app.Get("/health/metrics", healthChecker.MetricsHandler)
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
@@ -240,6 +241,7 @@ func main(){
 	api.Get("/health", healthChecker.HealthHandler)
 	api.Get("/ready", healthChecker.ReadinessHandler)
 	api.Get("/live", healthChecker.LivenessHandler)
+	api.Get("/health/metrics", healthChecker.MetricsHandler)
 
 	port := utils.Getenv("PORT", "8081")
 	log.Printf("Ploy Controller listening on :%s", port)
