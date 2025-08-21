@@ -6,17 +6,26 @@
     - ../vars/main.yml
   
   tasks:
-    - name: Install QEMU/KVM for FreeBSD VM
+    - name: Check for missing QEMU/KVM packages
+      command: dpkg -l {{ item }}
+      register: qemu_packages_check
+      failed_when: false
+      changed_when: false
+      loop:
+        - qemu-kvm
+        - libvirt-daemon-system
+        - libvirt-clients
+        - bridge-utils
+        - virtinst
+        - virt-manager
+        - cloud-image-utils
+
+    - name: Install missing QEMU/KVM packages
       apt:
-        name:
-          - qemu-kvm
-          - libvirt-daemon-system
-          - libvirt-clients
-          - bridge-utils
-          - virtinst
-          - virt-manager
-          - cloud-image-utils
+        name: "{{ item.item }}"
         state: present
+      when: item.rc != 0
+      loop: "{{ qemu_packages_check.results }}"
 
     - name: Check libvirt service status
       command: systemctl is-active libvirtd
