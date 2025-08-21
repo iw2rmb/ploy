@@ -522,7 +522,7 @@ job "ploy-controller" {
         work_dir = "/home/ploy/ploy"
       }
       
-      # Lifecycle hooks
+      # Enhanced lifecycle hooks for rolling updates
       lifecycle {
         hook = "prestart"
         sidecar = false
@@ -556,12 +556,6 @@ job "ploy-controller" {
       # Enhanced graceful shutdown configuration for rolling updates
       kill_timeout = "60s"      # Extended timeout for rolling updates
       kill_signal = "SIGTERM"   # Standard graceful shutdown signal
-      
-      # Shutdown hook for update coordination
-      lifecycle {
-        hook = "poststop"
-        sidecar = false
-      }
       
       # Log configuration
       logs {
