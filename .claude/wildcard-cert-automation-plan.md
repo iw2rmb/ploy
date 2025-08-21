@@ -41,13 +41,15 @@ Design and implement automated wildcard certificate provisioning during Ansible 
 - **Ansible Infrastructure**: `iac/dev/playbooks/main.yml` - Complete VPS setup with DNS environment variables
 
 ### Missing Components ❌
-- Platform wildcard certificate management system (separate from individual certificates)
-- PLOY_APPS_DOMAIN parameter integration and validation
-- Domain type detection (platform subdomain vs external domain)
-- Automatic platform wildcard certificate provisioning without CLI
-- Certificate existence check via storage query for platform wildcard
-- Automatic renewal service integration for platform wildcard certificate
-- Certificate selection logic (wildcard for subdomains, individual for external domains)
+- ✅ ~~Platform wildcard certificate management system (separate from individual certificates)~~
+- ✅ ~~PLOY_APPS_DOMAIN parameter integration and validation~~
+- ✅ ~~Domain type detection (platform subdomain vs external domain)~~
+- ✅ ~~Automatic platform wildcard certificate provisioning without CLI~~
+- ✅ ~~Certificate existence check via storage query for platform wildcard~~
+- ✅ ~~Automatic renewal service integration for platform wildcard certificate~~
+- ✅ ~~Certificate selection logic (wildcard for subdomains, individual for external domains)~~
+- **Traefik Configuration**: Controller access via api.{PLOY_APPS_DOMAIN}
+- **App Routing**: Automatic app routing to {app}.{PLOY_APPS_DOMAIN} pattern
 
 ## Implementation Design
 
@@ -139,6 +141,7 @@ Ready for App Deployment:
    - Remove manual certificate provisioning tasks (fully automated)
    - Add controller health check validation for certificate readiness
    - Configure Traefik to proxy controller to api.{PLOY_APPS_DOMAIN} subdomain
+   - Configure Traefik to route all deployed apps to {app}.{PLOY_APPS_DOMAIN} pattern
 
 #### Phase 4: Certificate Storage & Renewal Integration
 5. **Storage Integration Enhancement** (`controller/acme/storage.go`)
