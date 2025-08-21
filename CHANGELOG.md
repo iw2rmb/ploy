@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## [2025-08-21] - Stateless Initialization Patterns (Phase no-SPOF-1 Step 4)
+
+### Added
+- **Stateless Controller Architecture**
+  - Complete elimination of global state variables and singleton patterns
+  - New `controller/server/` package with modular server architecture
+  - Request-scoped dependency injection for all external services (Consul, Nomad, storage clients)
+  - Configuration-driven initialization through `ControllerConfig` struct loaded from environment
+  - `ServiceDependencies` struct containing all injected external service instances
+
+- **Graceful Shutdown Procedures**
+  - SIGTERM and SIGINT signal handling for proper shutdown coordination
+  - 30-second graceful shutdown timeout with connection draining
+  - Proper cleanup of TTL cleanup service before HTTP server shutdown
+  - Sequential shutdown procedure: TTL service → HTTP server → connection draining
+
+- **Enhanced Request Processing**
+  - Per-request storage client initialization (no shared connection state)
+  - Injected environment store instances in all request handlers
+  - Request-scoped dependency resolution for improved fault isolation
+  - Comprehensive error handling with proper service unavailability responses
+
+- **Comprehensive Initialization Logging**
+  - Detailed logging for all service dependency initialization steps
+  - Configuration validation logging with success/failure status
+  - Startup sequence logging: dependencies → routes → server start
+  - Shutdown sequence logging: signal received → cleanup → completion
+
+### Fixed
+- Removed all global variables from controller main.go (envStore, storageConfigPath)
+- Eliminated singleton patterns in controller initialization
+- Fixed potential race conditions in service initialization
+- Improved error handling for service unavailability during startup
+
+### Testing
+- Successfully tested stateless initialization on VPS environment
+- Verified graceful shutdown with SIGTERM signal handling
+- Confirmed health endpoints work correctly with dependency injection
+- Validated proper cleanup of resources during shutdown procedures
+
 ## [2025-08-21] - Health and Readiness Endpoints (Phase no-SPOF-1 Step 3)
 
 ### Added
