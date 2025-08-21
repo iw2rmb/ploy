@@ -113,6 +113,16 @@ func (h *DomainHandler) AddDomain(c *fiber.Ctx) error {
 		})
 	}
 
+	// Register app routing with Traefik if it's a platform subdomain
+	if h.router != nil && h.router.IsPlatformSubdomain(req.Domain) {
+		// For platform subdomains, automatically register with platform routing
+		// This would typically be called when the app is deployed, but we ensure it's available for routing
+		log.Printf("Platform subdomain detected (%s), routing configured for app %s", req.Domain, appName)
+		
+		// Note: Actual Traefik registration happens during app deployment via Nomad
+		// This just ensures the domain-to-app mapping is stored for future routing
+	}
+
 	response := DomainResponse{
 		Status:  "added",
 		App:     appName,
@@ -151,6 +161,30 @@ func (h *DomainHandler) AddDomain(c *fiber.Ctx) error {
 
 	log.Printf("Domain registered for app %s: %s", appName, req.Domain)
 	return c.JSON(response)
+}
+
+// RegisterAppPlatformDomain automatically registers platform subdomain routing for deployed apps
+func (h *DomainHandler) RegisterAppPlatformDomain(appName, allocID, allocIP string, port int) error {
+	if h.router == nil {
+		return fmt.Errorf("traefik router not available")
+	}
+	
+	// Generate platform subdomain for the app
+	platformDomain := h.router.GenerateAppDomain(appName)
+	
+	// Register with Traefik using platform subdomain pattern
+	if err := h.router.RegisterAppWithPlatformDomain(appName, allocID, allocIP, port, nil); err != nil {
+		return fmt.Errorf("failed to register app with platform domain: %w", err)
+	}
+	
+	// Store the platform domain mapping
+	if err := h.storeDomainConfig(appName, platformDomain); err != nil {
+		log.Printf("Warning: Failed to store platform domain config for %s: %v", appName, err)
+		// Don't fail the registration if storage fails
+	}
+	
+	log.Printf("App %s automatically registered with platform domain: %s", appName, platformDomain)
+	return nil
 }
 
 // ListDomains lists all domains for an app

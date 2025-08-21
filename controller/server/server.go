@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -667,6 +668,12 @@ func (s *Server) Start() error {
 		// Don't fail server startup, certificate provisioning can be retried
 	}
 
+	// Register controller with Traefik for platform domain access
+	if err := s.registerControllerWithTraefik(); err != nil {
+		log.Printf("Warning: Failed to register controller with Traefik: %v", err)
+		// Don't fail server startup, Traefik registration can be retried
+	}
+
 	// Start server in goroutine
 	go func() {
 		log.Printf("Ploy Controller listening on :%s", s.config.Port)
@@ -745,6 +752,40 @@ func (s *Server) ensurePlatformWildcardCertificate() error {
 	}
 
 	log.Printf("Platform wildcard certificate provisioning completed successfully")
+	return nil
+}
+
+// registerControllerWithTraefik registers the controller with Traefik for platform domain access
+func (s *Server) registerControllerWithTraefik() error {
+	if s.dependencies.TraefikRouter == nil {
+		log.Printf("Traefik router not available, skipping controller registration")
+		return nil
+	}
+	
+	// Get Nomad allocation information from environment
+	allocID := os.Getenv("NOMAD_ALLOC_ID")
+	allocIP := os.Getenv("NOMAD_IP_http")
+	
+	if allocID == "" || allocIP == "" {
+		log.Printf("Nomad allocation information not available (NOMAD_ALLOC_ID=%s, NOMAD_IP_http=%s), skipping Traefik registration", allocID, allocIP)
+		return nil
+	}
+	
+	// Parse port from server configuration
+	port := 8081 // Default port
+	if s.config.Port != "" {
+		if parsedPort, err := strconv.Atoi(s.config.Port); err == nil {
+			port = parsedPort
+		}
+	}
+	
+	// Register controller with Traefik
+	if err := s.dependencies.TraefikRouter.RegisterController(allocID, allocIP, port); err != nil {
+		return fmt.Errorf("failed to register controller with Traefik: %w", err)
+	}
+	
+	controllerDomain := s.dependencies.TraefikRouter.GenerateControllerDomain()
+	log.Printf("Controller registered with Traefik, accessible at: https://%s", controllerDomain)
 	return nil
 }
 
