@@ -48,8 +48,8 @@ Design and implement automated wildcard certificate provisioning during Ansible 
 - ✅ ~~Certificate existence check via storage query for platform wildcard~~
 - ✅ ~~Automatic renewal service integration for platform wildcard certificate~~
 - ✅ ~~Certificate selection logic (wildcard for subdomains, individual for external domains)~~
-- **Traefik Configuration**: Controller access via api.{PLOY_APPS_DOMAIN}
-- **App Routing**: Automatic app routing to {app}.{PLOY_APPS_DOMAIN} pattern
+- ✅ ~~Traefik Configuration: Controller access via api.{PLOY_APPS_DOMAIN}~~
+- ✅ ~~App Routing: Automatic app routing to {app}.{PLOY_APPS_DOMAIN} pattern~~
 
 ## Implementation Design
 
@@ -487,26 +487,3 @@ func (cm *CertificateManager) GetPreferredCertificate(domain string) (*DomainCer
    # Should use individual certificate  
    curl https://external-domain.com
    ```
-
-## Benefits
-
-1. **Infrastructure as Code**: Wildcard certificate provisioned during infrastructure setup
-2. **Reduced API Calls**: One certificate covers all subdomains
-3. **Faster App Deployment**: No certificate provisioning delay for new apps
-4. **Cost Efficient**: Fewer Let's Encrypt rate limit concerns
-5. **Simplified Management**: Single certificate to monitor and renew
-
-## Implementation Timeline
-
-- **Week 1**: CLI enhancement and standalone provisioning
-- **Week 2**: Ansible integration and testing
-- **Week 3**: Controller integration and domain matching
-- **Week 4**: Comprehensive testing and documentation
-
-## Risk Mitigation
-
-1. **Fallback Mechanism**: Individual certificates if wildcard fails
-2. **Staging Environment**: Test with Let's Encrypt staging first
-3. **Manual Override**: Ability to skip automatic provisioning
-4. **Certificate Validation**: Verify certificate before infrastructure completion
-5. **Error Recovery**: Retry logic and detailed error reporting

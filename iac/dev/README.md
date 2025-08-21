@@ -49,6 +49,61 @@ su - ploy -c "./test-scripts/test-traefik-integration.sh"
 
 **Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Vault 1.20.2, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
 
+## Platform Wildcard Certificate Configuration (Aug 2025)
+
+### DNS Provider Setup
+
+**Required Environment Variables:**
+
+```bash
+# Platform domain configuration
+export PLOY_APPS_DOMAIN="ployd.app"              # Your platform domain
+export PLOY_APPS_DOMAIN_PROVIDER="namecheap"     # DNS provider (namecheap or cloudflare)
+
+# Namecheap configuration
+export NAMECHEAP_API_KEY="your-api-key"          # Production API key
+export NAMECHEAP_SANDBOX_API_KEY="sandbox-key"   # Sandbox API key for testing
+export NAMECHEAP_API_USER="your-username"        # Namecheap username
+export NAMECHEAP_USERNAME="your-username"        # Same as API user
+export NAMECHEAP_CLIENT_IP="vps-ip-address"      # Your VPS IP address
+export NAMECHEAP_SANDBOX="true"                  # Use sandbox for testing
+
+# CloudFlare configuration (alternative)
+export CLOUDFLARE_API_TOKEN="your-token"
+export CLOUDFLARE_ZONE_ID="your-zone-id"
+```
+
+### Platform Certificate Features
+
+- **Automatic Wildcard Certificate**: Single `*.ployd.app` certificate covers all platform subdomains
+- **Controller Access**: Automatically accessible at `api.ployd.app`
+- **App Routing**: Apps automatically get `{app}.ployd.app` subdomains
+- **DNS-01 Challenge**: ACME DNS-01 validation for wildcard certificates
+- **Automatic Renewal**: Background certificate renewal with 30-day threshold
+- **Health Monitoring**: `/health/platform-certificates` endpoint for status
+
+### Certificate Management
+
+```bash
+# Deploy with certificate configuration
+ansible-playbook site.yml -e target_host=$TARGET_HOST
+
+# Verify platform certificate status
+curl http://$TARGET_HOST:8081/health/platform-certificates
+
+# Add domain to app (automatic certificate provisioning)
+curl -X POST http://$TARGET_HOST:8081/v1/apps/myapp/domains \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"myapp.ployd.app","certificate":"auto"}'
+```
+
+### Traefik Integration
+
+- Platform subdomains use wildcard certificate automatically
+- External domains provision individual certificates
+- Controller registered at `api.{PLOY_APPS_DOMAIN}`
+- Apps registered at `{app}.{PLOY_APPS_DOMAIN}`
+
 **Collections**: `ploy-artifacts` (build outputs), `ploy-metadata` (SBOMs, signatures), `ploy-debug` (ephemeral)
 
 ## Services After Setup
