@@ -93,7 +93,6 @@ job "ploy-controller-simple" {
         timeout = "8s"
         success_before_passing = 1
         failures_before_critical = 2
-        deregister_critical_service_after = "90s"
       }
     }
     
