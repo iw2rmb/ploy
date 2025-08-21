@@ -55,7 +55,7 @@ job "ploy-controller" {
       }
     }
     
-    # Consul service registration for load balancing
+    # Enhanced Consul service registration for load balancing and service mesh
     service {
       name = "ploy-controller"
       port = "http"
@@ -64,14 +64,39 @@ job "ploy-controller" {
         "controller",
         "api",
         "http",
+        "traefik.enable=true",
+        "traefik.http.routers.ploy-controller.rule=Host(`api.ployd.app`) || PathPrefix(`/v1`)",
+        "traefik.http.routers.ploy-controller.tls=true",
+        "traefik.http.routers.ploy-controller.tls.certresolver=letsencrypt",
+        "traefik.http.services.ploy-controller.loadbalancer.server.scheme=http",
+        "traefik.http.services.ploy-controller.loadbalancer.healthcheck.path=/health",
+        "traefik.http.services.ploy-controller.loadbalancer.healthcheck.interval=10s",
+        "traefik.http.middlewares.ploy-controller-auth.basicauth.usersfile=/etc/traefik/users",
+        "traefik.http.middlewares.ploy-controller-ratelimit.ratelimit.burst=100",
+        "traefik.http.middlewares.ploy-controller-secure.headers.sslredirect=true",
+        "traefik.http.routers.ploy-controller.middlewares=ploy-controller-ratelimit,ploy-controller-secure",
+        "service-mesh.connect=true",
+        "service-mesh.protocol=http",
+        "blue-green.deployment=true",
+        "blue-green.weight=100",
         "${NOMAD_ALLOC_ID}"  # Include allocation ID for identification
       ]
       
-      # Add metadata for service discovery
+      # Enhanced metadata for service discovery and deployment management
       meta {
-        version = "${meta.ploy_version}"
+        version = "${meta.ploy_version:1.0.0}"
         node = "${attr.unique.hostname}"
-        datacenter = "${attr.consul.datacenter}"
+        datacenter = "${attr.consul.datacenter:dc1}"
+        region = "${node.region:global}"
+        deployment_id = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
+        deployment_time = "${timestamp()}"
+        service_type = "system"
+        load_balancer = "traefik"
+        health_endpoint = "/health"
+        readiness_endpoint = "/ready"
+        metrics_endpoint = "/health/metrics"
+        api_version = "v1"
+        environment = "${meta.environment:production}"
       }
       
       # Primary health check using the /health endpoint
@@ -81,6 +106,8 @@ job "ploy-controller" {
         port = "http"
         interval = "10s"
         timeout = "5s"
+        success_before_passing = 2  # Require 2 consecutive successes before passing
+        failures_before_critical = 3  # Allow 3 failures before marking critical
         check_restart {
           limit = 3
           grace = "10s"
@@ -88,7 +115,7 @@ job "ploy-controller" {
         }
       }
       
-      # Readiness check using the /ready endpoint
+      # Readiness check using the /ready endpoint with service mesh awareness
       check {
         name = "readiness"
         type = "http"
@@ -96,13 +123,19 @@ job "ploy-controller" {
         port = "http"
         interval = "15s"
         timeout = "8s"
+        success_before_passing = 2
+        failures_before_critical = 2
         check_restart {
           limit = 2
           grace = "15s"
         }
+        # Service mesh connectivity check
+        header {
+          "X-Service-Mesh" = ["ploy-controller"]
+        }
       }
       
-      # Liveness check for basic connectivity
+      # Liveness check for basic connectivity and automatic deregistration
       check {
         name = "liveness"
         type = "http"
@@ -110,25 +143,73 @@ job "ploy-controller" {
         port = "http"
         interval = "30s"
         timeout = "3s"
+        success_before_passing = 1
+        failures_before_critical = 5  # Allow more failures for liveness
+        deregister_critical_service_after = "60s"  # Auto-deregister after 60s critical
+      }
+      
+      # Blue-green deployment health check
+      check {
+        name = "deployment-status"
+        type = "http"
+        path = "/health/deployment"
+        port = "http"
+        interval = "20s"
+        timeout = "5s"
+        success_before_passing = 1
+        failures_before_critical = 3
+        # Custom header for blue-green deployment tracking
+        header {
+          "X-Deployment-Color" = ["blue"]
+          "X-Deployment-Weight" = ["100"]
+        }
       }
     }
     
-    # Metrics service for monitoring integration
+    # Enhanced metrics service for monitoring integration with service mesh
     service {
       name = "ploy-controller-metrics"
       port = "metrics"
       tags = [
         "metrics",
         "prometheus",
-        "ploy-controller"
+        "ploy-controller",
+        "traefik.enable=true",
+        "traefik.http.routers.ploy-metrics.rule=Host(`metrics.ployd.app`) || PathPrefix(`/metrics`)",
+        "traefik.http.routers.ploy-metrics.tls=true",
+        "traefik.http.routers.ploy-metrics.tls.certresolver=letsencrypt",
+        "traefik.http.services.ploy-metrics.loadbalancer.server.scheme=http",
+        "traefik.http.middlewares.ploy-metrics-auth.basicauth.usersfile=/etc/traefik/metrics-users",
+        "traefik.http.routers.ploy-metrics.middlewares=ploy-metrics-auth",
+        "service-mesh.connect=true",
+        "service-mesh.protocol=http",
+        "monitoring.scrape=true",
+        "monitoring.path=/health/metrics"
       ]
       
+      # Metrics service metadata
+      meta {
+        service_type = "metrics"
+        scrape_interval = "15s"
+        metrics_format = "prometheus"
+        version = "${meta.ploy_version:1.0.0}"
+        environment = "${meta.environment:production}"
+      }
+      
+      # Metrics endpoint health check with service mesh awareness
       check {
         type = "http"
         path = "/health/metrics"
         port = "http"  # Use main HTTP port as metrics are served there
         interval = "30s"
         timeout = "5s"
+        success_before_passing = 1
+        failures_before_critical = 3
+        deregister_critical_service_after = "120s"
+        header {
+          "X-Service-Mesh" = ["ploy-controller-metrics"]
+          "Accept" = ["text/plain; version=0.0.4"]
+        }
       }
     }
     
@@ -163,9 +244,34 @@ job "ploy-controller" {
         PLOY_ENV_STORE_PATH = "/var/lib/ploy/env-store"
         PLOY_CLEANUP_AUTO_START = "true"
         
+        # Service mesh configuration
+        SERVICE_MESH_ENABLED = "true"
+        SERVICE_MESH_PROTOCOL = "http"
+        SERVICE_MESH_CONNECT = "true"
+        CONSUL_CONNECT_ENABLED = "true"
+        
+        # Blue-green deployment configuration
+        BLUE_GREEN_ENABLED = "true"
+        DEPLOYMENT_COLOR = "blue"
+        DEPLOYMENT_WEIGHT = "100"
+        DEPLOYMENT_ID = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
+        
+        # Traefik integration
+        TRAEFIK_ENABLED = "true"
+        TRAEFIK_DOMAIN = "api.ployd.app"
+        TRAEFIK_TLS_ENABLED = "true"
+        TRAEFIK_CERT_RESOLVER = "letsencrypt"
+        
+        # Service discovery and health checks
+        SERVICE_NAME = "ploy-controller"
+        SERVICE_VERSION = "${meta.ploy_version:1.0.0}"
+        HEALTH_CHECK_INTERVAL = "10s"
+        READINESS_CHECK_INTERVAL = "15s"
+        
         # Logging configuration
         LOG_LEVEL = "info"
         LOG_FORMAT = "json"
+        LOG_SERVICE_MESH = "true"
         
         # Nomad integration
         NOMAD_NODE_ID = "${attr.unique.hostname}"
@@ -175,26 +281,64 @@ job "ploy-controller" {
         # Instance identification
         INSTANCE_ID = "${NOMAD_ALLOC_ID}"
         NODE_NAME = "${attr.unique.hostname}"
+        CLUSTER_ID = "${node.unique.id}"
       }
       
-      # Configuration files
+      # Enhanced configuration files with service mesh and blue-green deployment
       template {
         data = <<-EOH
         # Ploy Controller Instance Configuration
-        # Generated automatically by Nomad
+        # Generated automatically by Nomad with service mesh integration
         instance_id: {{ env "NOMAD_ALLOC_ID" }}
         node_name: {{ env "attr.unique.hostname" }}
         datacenter: {{ env "node.datacenter" }}
         region: {{ env "node.region" }}
+        cluster_id: {{ env "node.unique.id" }}
         
         # Service endpoints
         consul_addr: {{ env "attr.unique.network.ip-address" }}:8500
         nomad_addr: http://{{ env "attr.unique.network.ip-address" }}:4646
         
+        # Service mesh configuration
+        service_mesh:
+          enabled: {{ env "SERVICE_MESH_ENABLED" }}
+          protocol: {{ env "SERVICE_MESH_PROTOCOL" }}
+          connect: {{ env "SERVICE_MESH_CONNECT" }}
+          consul_connect: {{ env "CONSUL_CONNECT_ENABLED" }}
+        
+        # Blue-green deployment configuration
+        deployment:
+          enabled: {{ env "BLUE_GREEN_ENABLED" }}
+          color: {{ env "DEPLOYMENT_COLOR" }}
+          weight: {{ env "DEPLOYMENT_WEIGHT" }}
+          deployment_id: {{ env "DEPLOYMENT_ID" }}
+          version: {{ env "SERVICE_VERSION" }}
+        
+        # Traefik load balancer configuration
+        traefik:
+          enabled: {{ env "TRAEFIK_ENABLED" }}
+          domain: {{ env "TRAEFIK_DOMAIN" }}
+          tls_enabled: {{ env "TRAEFIK_TLS_ENABLED" }}
+          cert_resolver: {{ env "TRAEFIK_CERT_RESOLVER" }}
+        
+        # Health check configuration
+        health:
+          check_interval: {{ env "HEALTH_CHECK_INTERVAL" }}
+          readiness_interval: {{ env "READINESS_CHECK_INTERVAL" }}
+          service_name: {{ env "SERVICE_NAME" }}
+        
         # Resource limits
         max_concurrent_builds: 3
         build_timeout: "30m"
         storage_timeout: "5m"
+        
+        # Service discovery settings
+        service_discovery:
+          auto_deregister: true
+          deregister_after: "60s"
+          health_endpoint: "/health"
+          readiness_endpoint: "/ready"
+          metrics_endpoint: "/health/metrics"
         EOH
         
         destination = "local/controller.yaml"
