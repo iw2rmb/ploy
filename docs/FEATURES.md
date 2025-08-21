@@ -194,7 +194,12 @@ Auto-classified lanes:
   - **Stateless Architecture**: All state externalized to Consul KV, SeaweedFS, and Vault
   - **Load Balancing**: Multiple controller instances behind Traefik with health checking
   - **Horizontal Scaling**: Scale controller instances based on API load and resource requirements
-  - **Rolling Updates**: Zero-downtime deployments through Nomad's update strategies
+  - ✅ **Enhanced Rolling Updates with Canary Deployment** (Aug 2025): Zero-downtime deployments with canary deployment strategy
+    - Nomad update blocks with 1 canary instance and automatic rollback on failures
+    - Comprehensive health check integration with stricter validation during updates  
+    - Extended health validation timeout (5m) and graceful shutdown coordination (60s)
+    - Update progress monitoring with Slack webhook alerts and deployment status tracking
+    - Rolling update parallelism control with 30-second stagger delay for stability
   - **Auto-Recovery**: Failed instances automatically restarted by Nomad scheduler
 
 - ✅ **External State Management**
