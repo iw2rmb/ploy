@@ -162,11 +162,14 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
-    - **Controller Deployment**: Compile and deploy controller via Nomad for production testing
+    - **Controller Distribution and Deployment**: Use binary distribution system for production testing
       - Build controller binary: `go build -o build/controller ./controller`
+      - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
+      - Upload new controller version: `./build/controller-dist -command=upload -version=test-$(date +%Y%m%d-%H%M%S) -binary=./build/controller`
       - Stop existing Nomad job if running: `nomad job stop ploy-controller || true`
-      - Deploy via Nomad: `nomad job run platform/nomad/ploy-controller.hcl`
-      - Verify deployment: `nomad job status ploy-controller`
+      - Deploy via Nomad with artifact download: `nomad job run platform/nomad/ploy-controller.hcl`
+      - Verify deployment and binary distribution: `nomad job status ploy-controller`
+      - Test binary distribution functionality: `./build/controller-dist -command=list`
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
 8. **Error Resolution**: IF any tests fail:
