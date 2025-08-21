@@ -101,7 +101,6 @@ job "ploy-controller" {
         SEAWEEDFS_FILER = "localhost:{{ seaweedfs.filer_port }}"
 
         # Deployment metadata
-        PLOY_CONTROLLER_VERSION = "{{ controller_version }}"
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"
       }

@@ -164,16 +164,22 @@ func parseVersion(version string) []int {
 	return parts
 }
 
+// Build-time version injection
+var BuildVersion = "unknown"
+
 // GetCurrentVersion attempts to determine the current controller version
 func GetCurrentVersion() string {
-	// Try to get version from environment variable first
-	if version := os.Getenv("PLOY_CONTROLLER_VERSION"); version != "" {
+	// Use build-time injected version if available
+	if BuildVersion != "" && BuildVersion != "unknown" {
+		return BuildVersion
+	}
+
+	// Fallback to environment variable for legacy compatibility
+	if version := os.Getenv("CONTROLLER_VERSION"); version != "" {
 		return version
 	}
 
-	// Try to get from build-time variable (would need to be set during build)
-	// This would require build-time injection via ldflags
-	// For now, return a default
+	// Final fallback
 	return "unknown"
 }
 
