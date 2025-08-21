@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## [2025-08-21] - Service Discovery Integration (Phase no-SPOF-2 Step 2)
+
+### Added
+- **Enhanced Consul Service Registration**
+  - Advanced service registration with comprehensive metadata (version, node, datacenter, region, deployment ID)
+  - Service mesh connectivity tags and headers for inter-service communication
+  - Blue-green deployment support with weight-based routing and deployment tracking
+  - Enhanced health checks with configurable success/failure thresholds and auto-deregistration
+
+- **Traefik Load Balancer Integration**  
+  - Comprehensive Traefik routing configuration with Host rules and PathPrefix matching
+  - SSL/TLS termination support with Let's Encrypt certificate resolver integration
+  - Rate limiting, authentication, and security headers middleware configuration
+  - Health-based load balancing with automatic failover to healthy instances
+
+- **Blue-Green Deployment Infrastructure**
+  - New `/health/deployment` endpoint for deployment status tracking and validation
+  - Deployment color, weight, and ID metadata for traffic management
+  - Service versioning with environment-specific deployment identification
+  - Deployment health validation with custom headers and status reporting
+
+- **Service Mesh Connectivity**
+  - Service mesh detection and configuration validation in health endpoints
+  - Consul Connect integration tags and protocol specification
+  - Inter-service communication headers for service mesh compatibility  
+  - Environment variable configuration for service mesh enablement
+
+- **Infrastructure Enhancements**
+  - `ParseIntEnv` utility function for environment variable integer parsing
+  - Enhanced configuration templates with service discovery settings
+  - Production and testing environment separation with different service weights
+  - Comprehensive environment variable support for all service discovery features
+
+### Fixed
+- Nomad job definition syntax compatibility with Nomad server validation requirements
+- Header configuration syntax in health check definitions 
+- Environment variable interpolation compatibility with Nomad template system
+
+### Testing
+- Validated enhanced health endpoints (`/health`, `/ready`, `/health/deployment`) on VPS
+- Confirmed Consul service registration and connectivity in production environment
+- Verified service mesh detection and Traefik configuration reporting
+- Tested blue-green deployment status tracking and metadata collection
+
 ## [2025-08-21] - Nomad System Job Definition (Phase no-SPOF-2 Step 1)
 
 ### Added
