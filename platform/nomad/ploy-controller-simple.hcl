@@ -79,7 +79,7 @@ job "ploy-controller-simple" {
           grace = "10s"
         }
         header {
-          "X-Service-Mesh" = ["ploy-controller-test"]
+          X-Service-Mesh = ["ploy-controller-test"]
         }
       }
       
