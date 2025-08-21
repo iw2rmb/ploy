@@ -51,12 +51,16 @@ controller/
     └── routing.go       # Traefik configuration management
 ```
 
-### `/cmd/ploy/` - CLI Client
-Command-line interface for interacting with the Ploy controller.
+### `/cmd/` - Command Line Applications
+Command-line interfaces for different aspects of Ploy management.
 
 ```
-cmd/ploy/
-└── main.go              # CLI command router and handlers
+cmd/
+├── ploy/                # Application-focused CLI
+│   └── main.go          # App management commands (apps, push, open, etc.)
+└── ployman/             # Infrastructure management CLI  
+    ├── main.go          # Controller and infrastructure management
+    └── controller.go    # Controller binary management commands
 ```
 
 ### `/internal/` - Shared Libraries
@@ -115,6 +119,30 @@ configs/
 
 ### `/iac/` - Infrastructure as Code
 Ansible playbooks and configuration for deployment environments. See `iac/dev/README.md` for complete setup guide.
+
+```
+iac/
+├── dev/                            # Development environment
+│   ├── site.yml                    # Main orchestration playbook
+│   ├── inventory/
+│   │   └── hosts.yml              # Target hosts configuration  
+│   ├── playbooks/                 # Individual playbooks
+│   │   ├── main.yml               # Base system setup
+│   │   ├── seaweedfs.yml          # SeaweedFS storage deployment
+│   │   ├── hashicorp.yml          # Nomad/Consul/Vault deployment
+│   │   ├── controller.yml         # Controller Nomad deployment
+│   │   ├── testing.yml            # Test environment setup
+│   │   └── freebsd.yml            # FreeBSD VM deployment
+│   ├── templates/                 # Jinja2 configuration templates
+│   │   ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│   │   ├── update-controller.sh.j2       # Controller update script
+│   │   ├── rollback-controller.sh.j2     # Controller rollback script
+│   │   ├── controller-status.sh.j2       # Controller status script
+│   │   ├── migrate-controller.sh.j2      # Controller migration script
+│   │   └── *.j2                          # Other configuration templates
+│   └── vars/
+│       └── main.yml               # Global configuration variables
+```
 
 ### `/platform/` - Platform Configuration
 Platform-specific deployment configurations.
