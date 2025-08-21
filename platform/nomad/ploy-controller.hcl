@@ -282,7 +282,7 @@ job "ploy-controller" {
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Binary distribution configuration
-        CONTROLLER_VERSION = "test-20250821-223227"
+        CONTROLLER_VERSION = "test-20250821-193946"
         CONTROLLER_BINARY_SOURCE = "seaweedfs"
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
@@ -502,7 +502,7 @@ job "ploy-controller" {
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:21e462738b0821da5cf9ca6772d7d26edf012300365baee984a7724190421e49"
+          checksum = "sha256:5afea685542a832df0657715ec6f5e17a4d0c5da61a8be6d1d8cafa957f2e182"
         }
       }
       
