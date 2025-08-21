@@ -517,7 +517,7 @@ job "ploy-controller" {
       
       # Controller startup configuration
       config {
-        command = "/home/ploy/ploy/build/controller"
+        command = "build/controller"
         args = []
         work_dir = "/home/ploy/ploy"
       }
