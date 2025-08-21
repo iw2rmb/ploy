@@ -44,6 +44,7 @@ type ServiceDependencies struct {
 	DNSHandler         *dns.Handler
 	ACMEHandler        *acme.Handler
 	CertificateManager *certificates.CertificateManager
+	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
 	StorageConfigPath  string
 }
 
@@ -175,6 +176,18 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize certificate manager: %v", err)
 	}
 
+	// Initialize Platform Wildcard Certificate Manager
+	var platformWildcardManager *certificates.PlatformWildcardCertificateManager
+	if certificateManager != nil {
+		platformWildcardManager, err = certificates.NewPlatformWildcardCertificateManager(certificateManager)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize platform wildcard certificate manager: %v", err)
+		} else if platformWildcardManager != nil {
+			// Integrate platform wildcard manager with certificate manager
+			certificateManager.SetPlatformWildcardManager(platformWildcardManager)
+		}
+	}
+
 	deps := &ServiceDependencies{
 		EnvStore:           envStore,
 		TraefikRouter:      traefikRouter,
@@ -184,6 +197,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		SelfUpdateHandler:  selfUpdateHandler,
 		DNSHandler:         dnsHandler,
 		CertificateManager: certificateManager,
+		PlatformWildcardManager: platformWildcardManager,
 		StorageConfigPath:  cfg.StorageConfigPath,
 	}
 
@@ -358,6 +372,7 @@ func (s *Server) setupRoutes() {
 	s.app.Get("/live", s.dependencies.HealthChecker.LivenessHandler)
 	s.app.Get("/health/metrics", s.dependencies.HealthChecker.MetricsHandler)
 	s.app.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
+	s.app.Get("/health/platform-certificates", s.handlePlatformCertificateHealth)
 
 	api := s.app.Group("/v1")
 	
@@ -605,6 +620,12 @@ func (s *Server) Start() error {
 	// Setup signal handling for graceful shutdown
 	signal.Notify(s.shutdownChan, os.Interrupt, syscall.SIGTERM)
 
+	// Ensure platform wildcard certificate is provisioned
+	if err := s.ensurePlatformWildcardCertificate(); err != nil {
+		log.Printf("Warning: Failed to ensure platform wildcard certificate: %v", err)
+		// Don't fail server startup, certificate provisioning can be retried
+	}
+
 	// Start server in goroutine
 	go func() {
 		log.Printf("Ploy Controller listening on :%s", s.config.Port)
@@ -657,4 +678,71 @@ func (s *Server) Shutdown() error {
 		log.Printf("Graceful shutdown completed successfully")
 		return nil
 	}
+}
+
+// ensurePlatformWildcardCertificate ensures platform wildcard certificate is provisioned
+func (s *Server) ensurePlatformWildcardCertificate() error {
+	if s.dependencies.PlatformWildcardManager == nil {
+		return nil // Platform wildcard management disabled
+	}
+
+	// Validate platform domain configuration
+	if err := s.dependencies.PlatformWildcardManager.ValidatePlatformDomain(); err != nil {
+		return fmt.Errorf("platform domain validation failed: %w", err)
+	}
+
+	// Create context with timeout for certificate provisioning
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	log.Printf("Ensuring platform wildcard certificate for domain: %s", 
+		s.dependencies.PlatformWildcardManager.GetPlatformDomain())
+
+	// Provision platform wildcard certificate if needed
+	if err := s.dependencies.PlatformWildcardManager.EnsurePlatformWildcardCertificate(ctx); err != nil {
+		return fmt.Errorf("failed to ensure platform wildcard certificate: %w", err)
+	}
+
+	log.Printf("Platform wildcard certificate provisioning completed successfully")
+	return nil
+}
+
+// handlePlatformCertificateHealth handles platform wildcard certificate health checks
+func (s *Server) handlePlatformCertificateHealth(c *fiber.Ctx) error {
+	if s.dependencies.PlatformWildcardManager == nil || !s.dependencies.PlatformWildcardManager.IsEnabled() {
+		return c.JSON(fiber.Map{
+			"status":  "disabled",
+			"message": "Platform wildcard certificate management disabled (PLOY_APPS_DOMAIN not set)",
+		})
+	}
+
+	ctx := context.Background()
+	cert, err := s.dependencies.PlatformWildcardManager.GetPlatformWildcardCertificate(ctx)
+	if err != nil {
+		return c.Status(503).JSON(fiber.Map{
+			"status": "error",
+			"error":  err.Error(),
+			"domain": s.dependencies.PlatformWildcardManager.GetWildcardDomain(),
+		})
+	}
+
+	daysUntilExpiry := int(time.Until(cert.ExpiresAt).Hours() / 24)
+	
+	// Determine health status based on expiry
+	status := "healthy"
+	if daysUntilExpiry <= 7 {
+		status = "expiring_soon"
+	} else if daysUntilExpiry <= 1 {
+		status = "critical"
+	}
+
+	return c.JSON(fiber.Map{
+		"status":             status,
+		"platform_domain":    s.dependencies.PlatformWildcardManager.GetPlatformDomain(),
+		"wildcard_domain":    cert.Domain,
+		"expires_at":         cert.ExpiresAt,
+		"days_until_expiry":  daysUntilExpiry,
+		"issued_at":          cert.IssuedAt,
+		"auto_renew_enabled": true,
+	})
 }

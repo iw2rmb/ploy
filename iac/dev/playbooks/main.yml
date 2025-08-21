@@ -342,6 +342,10 @@
           export PLOY_DNS_PROVIDER="{{ lookup('env', 'PLOY_DNS_PROVIDER') | default('namecheap') }}"
           export PLOY_DNS_DOMAIN="{{ lookup('env', 'PLOY_DNS_DOMAIN') | default('ployd.app') }}"
           export PLOY_DNS_TARGET_IP="{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
+          
+          # Platform wildcard certificate configuration
+          export PLOY_APPS_DOMAIN="{{ ploy.apps_domain }}"
+          export PLOY_APPS_DOMAIN_PROVIDER="{{ ploy.apps_domain_provider }}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Environment vars"
 
 
@@ -450,3 +454,41 @@
         - "80"    # HTTP (Traefik)
         - "443"   # HTTPS (Traefik)
         - "8080"  # Traefik dashboard
+
+    # Platform wildcard certificate health check (after controller deployment)
+    - name: Wait for controller health endpoint to be available
+      uri:
+        url: "http://localhost:{{ ploy.controller_port }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      retries: 30
+      delay: 5
+      until: health_check.status == 200
+      when: ploy.apps_domain is defined and ploy.apps_domain != ""
+
+    - name: Check platform wildcard certificate health
+      uri:
+        url: "http://localhost:{{ ploy.controller_port }}/health/platform-certificates"
+        method: GET
+        status_code: [200, 503]  # 503 is acceptable during initial provisioning
+      register: cert_health_check
+      retries: 60  # More retries for certificate provisioning
+      delay: 15
+      until: cert_health_check.status == 200
+      when: ploy.apps_domain is defined and ploy.apps_domain != ""
+      ignore_errors: true  # Don't fail playbook if certificate provisioning has issues
+
+    - name: Display platform certificate health status
+      debug:
+        msg: |
+          Platform Certificate Health Status: {{ cert_health_check.json.status if cert_health_check.json is defined else 'unavailable' }}
+          Domain: {{ cert_health_check.json.platform_domain if cert_health_check.json is defined and cert_health_check.json.platform_domain is defined else ploy.apps_domain }}
+          Wildcard: {{ cert_health_check.json.wildcard_domain if cert_health_check.json is defined and cert_health_check.json.wildcard_domain is defined else 'not provisioned' }}
+          {% if cert_health_check.json is defined and cert_health_check.json.expires_at is defined %}
+          Expires: {{ cert_health_check.json.expires_at }}
+          Days until expiry: {{ cert_health_check.json.days_until_expiry }}
+          {% endif %}
+      when: 
+        - ploy.apps_domain is defined and ploy.apps_domain != ""
+        - cert_health_check is defined

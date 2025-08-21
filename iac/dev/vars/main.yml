@@ -50,6 +50,11 @@ ploy:
     target_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
     ttl: 300
     enable_ipv6: false
+  
+  # Platform wildcard certificate configuration
+  apps_domain: "{{ lookup('env', 'PLOY_APPS_DOMAIN') | default('ployd.app') }}"
+  apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | default('namecheap') }}"
+  api_subdomain: "api"  # Controller will be accessible at api.{apps_domain}
 
 # Nomad controller deployment configuration
 nomad_controller:
