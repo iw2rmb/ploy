@@ -127,52 +127,52 @@ basic_wasm_validation if {
 }
 
 # Deployment denial rules with specific reasons
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     input.artifact_size_mb > max_wasm_size_mb
     msg := sprintf("WASM module exceeds size limit: %vMB > %vMB", [input.artifact_size_mb, max_wasm_size_mb])
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     input.wasm_config.max_memory_mb > wasm_security_requirements.max_memory_mb
     msg := sprintf("WASM memory limit exceeds maximum: %vMB > %vMB", [input.wasm_config.max_memory_mb, wasm_security_requirements.max_memory_mb])
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     input.wasm_config.allow_network == true
     not input.network_policy_approved
     msg := "WASM network access requires explicit approval"
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     has_dangerous_preopens
     msg := "WASM module attempts to access dangerous system directories"
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     count(input.wasi_preopens) > 5
     msg := sprintf("Too many WASI preopen directories: %v > 5", [count(input.wasi_preopens)])
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     input.environment == "production"
     input.signed_artifact != true
     msg := "Production WASM deployments require signed artifacts"
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     input.environment == "production"
     input.sbom_present != true
     msg := "Production WASM deployments require SBOM (Software Bill of Materials)"
 }
 
-deny_wasm_deployment[msg] {
+deny_wasm_deployment contains msg if {
     input.lane == "G"
     input.environment == "production"
     not security_scan_passed
