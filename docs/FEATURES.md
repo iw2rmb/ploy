@@ -48,11 +48,17 @@ Auto-classified lanes:
   - `harbor.local/ploy/<app>:<sha>` images
   - `io.kontain` runtime for VM isolation
 - ✅ **Lane F** – Full VMs
-  - `<app>-<sha>.img` via Packer
-  - Maximum compatibility fallback
-- **Lane G** – WASM Runtime (planned)
-  - Universal polyglot compilation target
-  - `<app>-<sha>.wasm` + runtime bundle
+- 🔄 **Lane G** – WebAssembly Runtime (Implementation Planned)
+  - ✅ **WASM Implementation Plan** (Aug 2025): Comprehensive technical specifications for WebAssembly support
+    - Multi-language WASM compilation support: Rust, Go, C/C++, AssemblyScript
+    - wazero pure Go WebAssembly runtime integration  
+    - WASI Preview 1 for filesystem and environment access
+    - Automatic WASM target detection in lane picker
+    - Component Model support for multi-module applications
+    - Production Nomad job templates with resource management
+    - OPA security policies for WASM deployment constraints
+    - Sample applications and comprehensive test suite
+  - `<app>-<sha>.wasm` module artifacts with wazero runtime
   - Hardware-enforced sandboxing with process isolation
   - 5–30 MB footprint, 10–50ms boot times
   - Supports Rust, Go, C++, AssemblyScript, Python (via Pyodide)
