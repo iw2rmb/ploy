@@ -18,6 +18,7 @@ Auto-selects optimal lane from project structure unless overridden.
 
 ## Documentation
 - `docs/` contains:
+  - REPO.md — comprehensive repository structure guide for efficient file navigation.
   - PLAN.md — LLM instructions for repo iteration.
   - CONCEPT.md — architecture and purpose.
   - STACK.md — technology stack and framework dependencies.
@@ -185,39 +186,43 @@ go run ./tools/lane-pick --path /path/to/project
 
 1. **Branch Creation**: Create new feature branch with 2-3 word name describing changes
 
-2. **Infrastructure Preparation**: Update Ansible playbooks and install required components BEFORE testing
+2. **File Location**: Reference `docs/REPO.md` to quickly locate proper files for modifications instead of searching through the repository
+
+3. **Infrastructure Preparation**: Update Ansible playbooks and install required components BEFORE testing
     - **Ansible Playbook Updates**: Modify `iac/dev/playbooks/main.yml` to install any new tools, dependencies, or configurations required by the changes
     - **Local Component Installation**: Install necessary tools and dependencies on local development environment using appropriate package managers (brew, npm, pip, etc.)
     - **VPS Component Installation**: Run Ansible playbook to provision VPS with updated components: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
     - **Verification**: Confirm all required tools are available and properly configured on both local and VPS environments before proceeding
 
-3. **Test Scenarios**: Add comprehensive test scenarios to TESTS.md (numbered sequentially) if current functionality lacks coverage
+4. **Test Scenarios**: Add comprehensive test scenarios to TESTS.md (numbered sequentially) if current functionality lacks coverage
 
-4. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
+5. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
 
-5. **Local Testing**: Execute relevant tests in local environment if applicable
+6. **Local Testing**: Execute relevant tests in local environment if applicable
     - Run local validation tests to verify changes work correctly
     - Ensure all syntax checks and basic functionality tests pass
     - Push feature branch to GitHub before VPS testing
 
-6. **VPS Testing**: Execute ALL relevant tests on VPS environment
+7. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
     - **Controller Shutdown**: Stop any running controller before testing: `pkill -f './build/controller' || true`
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
-7. **Error Resolution**: IF any tests fail:
+8. **Error Resolution**: IF any tests fail:
     - Fix identified errors in local environment
     - Re-run local tests to verify fixes
     - Push corrections to feature branch
     - Pull updated changes on VPS
     - Re-execute VPS tests until all pass
 
-8. **Documentation and Completion**: IF all tests pass successfully:
+9. **Documentation and Completion**: IF all tests pass successfully:
     - **PLAN.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in PLAN.md
     - **CHANGELOG.md Entry**: Add dated summary entry following established format with Added/Fixed/Testing sections describing changes
     - **FEATURES.md Synchronization**: Add new feature entries or modify existing ones to accurately reflect current system capabilities
     - **STACK.md Dependencies**: Update technology stack documentation when adding or modifying frameworks, tools, or dependencies
+    - **REPO.md Structure**: Update repository structure documentation if new files, folders, or architectural changes were made
+    - **API.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
     - Commit all documentation updates to feature branch
     - Merge feature branch to main branch
     - Delete feature branch locally
