@@ -195,15 +195,13 @@ func (c *SeaweedFSClient) ListObjects(bucket, prefix string) ([]ObjectInfo, erro
 	for _, entry := range result.Entries {
 		// Extract just the name from the full path
 		name := filepath.Base(entry.FullPath)
-		// Skip directories (Mode & os.ModeDir != 0)
-		if entry.Mode&(1<<31) == 0 { // Not a directory
-			objects = append(objects, ObjectInfo{
-				Key:          name,
-				Size:         entry.FileSize,
-				LastModified: entry.Mtime,
-				ContentType:  "application/octet-stream", // Default, SeaweedFS doesn't store this in listing
-			})
-		}
+		// Include both files and directories for listing
+		objects = append(objects, ObjectInfo{
+			Key:          name,
+			Size:         entry.FileSize,
+			LastModified: entry.Mtime,
+			ContentType:  "application/octet-stream", // Default, SeaweedFS doesn't store this in listing
+		})
 	}
 
 	return objects, nil
