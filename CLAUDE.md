@@ -157,17 +157,18 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 6. **Local Testing**: Execute relevant tests in local environment if applicable
     - Run local validation tests to verify changes work correctly
     - Ensure all syntax checks and basic functionality tests pass
-    - Push feature branch to GitHub before VPS testing
+    - **MANDATORY**: If controller code was modified, update CONTROLLER_VERSION in `platform/nomad/ploy-controller.hcl` before pushing
+    - **CRITICAL**: Increment version: `NEW_VERSION=test-$(date +%Y%m%d-%H%M%S)` and update `CONTROLLER_VERSION = "$NEW_VERSION"`
+    - Push feature branch to GitHub with updated CONTROLLER_VERSION
 
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
-    - **Controller Distribution and Deployment**: **MANDATORY**: Update CONTROLLER_VERSION for ANY controller modification
-      - **CRITICAL**: If controller code was modified, CONTROLLER_VERSION MUST be incremented before VPS testing
+    - **Controller Distribution and Deployment**: If controller code was modified (version already updated in git)
       - Build controller binary: `go build -o build/controller ./controller`
       - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
-      - Upload new controller version: `NEW_VERSION=test-$(date +%Y%m%d-%H%M%S) && ./build/controller-dist -command=upload -version=$NEW_VERSION -binary=./build/controller`
-      - **REQUIRED**: Update Nomad job with new version: `sed -i "s/CONTROLLER_VERSION = \".*\"/CONTROLLER_VERSION = \"$NEW_VERSION\"/" platform/nomad/ploy-controller.hcl`
+      - Extract version from job file: `CONTROLLER_VERSION=$(grep 'CONTROLLER_VERSION =' platform/nomad/ploy-controller.hcl | cut -d'"' -f2)`
+      - Upload controller version: `./build/controller-dist -command=upload -version=$CONTROLLER_VERSION -binary=./build/controller`
       - Trigger rolling update: `nomad job run platform/nomad/ploy-controller.hcl`
       - Monitor rolling update progress: `nomad job status ploy-controller`
       - Verify binary distribution: `./build/controller-dist -command=list`
