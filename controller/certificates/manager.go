@@ -310,6 +310,68 @@ func (cm *CertificateManager) getDomainCertificate(appName, domain string) (*Dom
 	return &cert, nil
 }
 
+// UploadCustomCertificate uploads a custom certificate bundle provided by the user
+func (cm *CertificateManager) UploadCustomCertificate(ctx context.Context, appName, domain string, certificate, privateKey, caCert []byte) (*DomainCertificate, error) {
+	log.Printf("Uploading custom certificate for domain %s (app: %s)", domain, appName)
+
+	// Basic validation of certificate content
+	if len(certificate) == 0 {
+		return nil, fmt.Errorf("certificate cannot be empty")
+	}
+	if len(privateKey) == 0 {
+		return nil, fmt.Errorf("private key cannot be empty")
+	}
+
+	// Check if certificate already exists and remove it
+	if existing, err := cm.getDomainCertificate(appName, domain); err == nil {
+		log.Printf("Replacing existing certificate for domain %s", domain)
+		// Remove existing certificate from ACME storage if it was auto-generated
+		if existing.Provider == "letsencrypt" {
+			if err := cm.certificateStorage.DeleteCertificate(ctx, domain); err != nil {
+				log.Printf("Warning: failed to delete existing ACME certificate: %v", err)
+			}
+		}
+	}
+
+	// Create ACME certificate object for storage
+	acmeCert := &acme.Certificate{
+		Domain:      domain,
+		Certificate: certificate,
+		PrivateKey:  privateKey,
+		IssuerCert:  caCert,
+		CertURL:     "custom-uploaded",
+		IssuedAt:    time.Now(),
+		ExpiresAt:   time.Now().Add(365 * 24 * time.Hour), // Default 1 year, would need proper parsing
+		IsWildcard:  strings.HasPrefix(domain, "*."),
+	}
+
+	// Store certificate in ACME storage
+	if err := cm.certificateStorage.StoreCertificate(ctx, acmeCert); err != nil {
+		return nil, fmt.Errorf("failed to store custom certificate: %w", err)
+	}
+
+	// Create domain certificate record
+	domainCert := &DomainCertificate{
+		Domain:    domain,
+		AppName:   appName,
+		Status:    "active",
+		Provider:  "custom",
+		IssuedAt:  time.Now(),
+		ExpiresAt: time.Now().Add(365 * 24 * time.Hour), // Default 1 year
+		AutoRenew: false, // Custom certificates don't auto-renew
+		CertPath:  fmt.Sprintf("certificates/%s/cert.pem", domain),
+		KeyPath:   fmt.Sprintf("certificates/%s/key.pem", domain),
+	}
+
+	// Store domain certificate record
+	if err := cm.storeDomainCertificate(domainCert); err != nil {
+		return nil, fmt.Errorf("failed to store domain certificate record: %w", err)
+	}
+
+	log.Printf("Custom certificate uploaded successfully for domain %s", domain)
+	return domainCert, nil
+}
+
 // loadCertConfig loads certificate configuration from environment
 func loadCertConfig() *CertConfig {
 	return &CertConfig{

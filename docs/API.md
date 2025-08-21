@@ -38,6 +38,9 @@
   - Returns: `{"status": "success", "app": "myapp", "domain": "example.com", "certificate": {"domain": "example.com", "status": "active", "provider": "letsencrypt", "issued_at": "2025-08-21 10:30:00", "expires_at": "2025-11-19 10:30:00", "auto_renew": true}}`
 - `POST /v1/apps/:app/certificates/:domain/provision` — manually provision certificate for domain.
   - Returns: `{"status": "provisioning", "app": "myapp", "domain": "example.com", "message": "Certificate provisioning started", "certificate": {"domain": "example.com", "status": "provisioning", "provider": "letsencrypt", "auto_renew": true}}`
+- `POST /v1/apps/:app/certificates/:domain/upload` — upload custom certificate bundle (multipart/form-data: certificate, private_key, ca_certificate).
+  - CLI: `ploy domains certificates myapp upload example.com --cert-file=cert.pem --key-file=key.pem --ca-file=ca.pem`
+  - Returns: `{"status": "uploaded", "app": "myapp", "domain": "example.com", "certificate": {"domain": "example.com", "status": "active", "provider": "custom", "auto_renew": false}, "message": "Custom certificate uploaded successfully"}`
 - `DELETE /v1/apps/:app/certificates/:domain` — remove certificate for domain.
   - Returns: `{"status": "removed", "app": "myapp", "domain": "example.com", "message": "Certificate removed successfully"}`
 
