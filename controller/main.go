@@ -9,6 +9,7 @@ import (
 	"github.com/ploy/ploy/controller/consul_envstore"
 	"github.com/ploy/ploy/controller/domains"
 	"github.com/ploy/ploy/controller/envstore"
+	"github.com/ploy/ploy/controller/health"
 	"github.com/ploy/ploy/controller/routing"
 	"github.com/ploy/ploy/internal/build"
 	"github.com/ploy/ploy/internal/cert"
@@ -78,6 +79,10 @@ func main(){
 		log.Printf("Traefik router initialized with Consul address: %s", consulAddr)
 	}
 
+	// Initialize health checker
+	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
+	healthChecker := health.NewHealthChecker(storageConfigPath, consulAddr, nomadAddr)
+	
 	// Initialize TTL cleanup service
 	cleanupConfigPath := utils.Getenv("PLOY_CLEANUP_CONFIG", "")
 	configManager := cleanup.NewConfigManager(cleanupConfigPath)
@@ -121,6 +126,11 @@ func main(){
 				cleanupConfig.CleanupInterval, cleanupConfig.PreviewTTL)
 		}
 	}
+
+	// Health and readiness endpoints (before API group)
+	app.Get("/health", healthChecker.HealthHandler)
+	app.Get("/ready", healthChecker.ReadinessHandler)
+	app.Get("/live", healthChecker.LivenessHandler)
 
 	api := app.Group("/v1")
 	api.Post("/apps/:app/builds", func(c *fiber.Ctx) error {
@@ -225,6 +235,11 @@ func main(){
 
 	// TTL cleanup endpoints
 	cleanup.SetupRoutes(app, cleanupHandler)
+
+	// Health endpoints in API group for versioned access
+	api.Get("/health", healthChecker.HealthHandler)
+	api.Get("/ready", healthChecker.ReadinessHandler)
+	api.Get("/live", healthChecker.LivenessHandler)
 
 	port := utils.Getenv("PORT", "8081")
 	log.Printf("Ploy Controller listening on :%s", port)
