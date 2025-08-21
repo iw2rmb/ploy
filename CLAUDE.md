@@ -164,9 +164,9 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
     - **Controller Deployment**: Compile and deploy controller via Nomad for production testing
       - Build controller binary: `go build -o build/controller ./controller`
-      - Stop existing Nomad job if running: `nomad job stop ploy-controller-simple || true`
-      - Deploy via Nomad: `nomad job run platform/nomad/ploy-controller-simple.hcl`
-      - Verify deployment: `nomad job status ploy-controller-simple`
+      - Stop existing Nomad job if running: `nomad job stop ploy-controller || true`
+      - Deploy via Nomad: `nomad job run platform/nomad/ploy-controller.hcl`
+      - Verify deployment: `nomad job status ploy-controller`
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
 8. **Error Resolution**: IF any tests fail:
