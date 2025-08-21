@@ -93,6 +93,39 @@
 - Manual cleanup triggers for immediate resource recovery
 - Comprehensive cleanup statistics and monitoring
 
+## DNS Management Endpoints (Implemented)
+- `POST /v1/dns/wildcard/setup` — configure wildcard DNS for domain.
+  - Body: `{"target_ip": "192.168.1.100", "target_cname": "load-balancer.example.com", "ttl": 300, "load_balancer": ["192.168.1.100", "192.168.1.101"]}`
+  - Returns: `{"status": "success", "message": "Wildcard DNS configured for *.ployd.app", "config": {...}}`
+- `DELETE /v1/dns/wildcard` — remove wildcard DNS configuration.
+  - Returns: `{"status": "success", "message": "Wildcard DNS removed for *.ployd.app"}`
+- `GET /v1/dns/wildcard/validate` — validate wildcard DNS propagation.
+  - Returns: `{"status": "valid", "message": "Wildcard DNS is properly configured for *.ployd.app"}`
+- `GET /v1/dns/records` — list DNS records for domain.
+  - Query params: `?domain=ployd.app` (optional)
+  - Returns: `{"domain": "ployd.app", "records": [...], "count": 5}`
+- `POST /v1/dns/records` — create DNS record.
+  - Body: `{"hostname": "api.ployd.app", "type": "A", "value": "192.168.1.100", "ttl": 300}`
+  - Returns: `{"status": "created", "record": {...}}`
+- `PUT /v1/dns/records` — update DNS record.
+  - Body: `{"hostname": "api.ployd.app", "type": "A", "value": "192.168.1.101", "ttl": 600}`
+  - Returns: `{"status": "updated", "record": {...}}`
+- `DELETE /v1/dns/records/:hostname/:type` — delete DNS record.
+  - Returns: `{"status": "deleted", "hostname": "api.ployd.app", "type": "A"}`
+- `GET /v1/dns/config` — get current DNS configuration.
+  - Returns: `{"domain": "ployd.app", "target_ip": "192.168.1.100", "ttl": 300, ...}`
+- `POST /v1/dns/config/validate` — validate DNS provider configuration.
+  - Returns: `{"status": "valid", "message": "DNS provider configuration is valid"}`
+
+**Features:**
+- Multi-provider support (Cloudflare, Namecheap)
+- Wildcard DNS configuration for automatic subdomain routing
+- Individual DNS record management (A, AAAA, CNAME, TXT, MX)
+- Load balancer IP configuration for high availability
+- IPv6 support with AAAA records
+- DNS propagation validation and testing
+- Provider-agnostic configuration via JSON or environment variables
+
 ## Automated Remediation Framework Endpoints (Planned)
 - `POST /v1/arf/transform` — execute code transformation on repositories.
   - Body: `{"repositories": ["repo1", "repo2"], "recipe": "spring-boot-2-to-3", "strategy": "hybrid"}`

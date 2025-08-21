@@ -48,6 +48,24 @@
 93. `GET /v1/certs` returns list of all managed certificates with metadata.
 94. `POST /v1/apps/:app/debug` creates debug instance with SSH configuration.
 95. `POST /v1/apps/:app/debug?lane=A` creates debug instance in specified lane.
+
+## DNS Management Testing (Aug 2025)
+185. DNS provider configuration validation for Cloudflare and Namecheap.
+186. Wildcard DNS setup via `POST /v1/dns/wildcard/setup` with target IP configuration.
+187. DNS record creation via `POST /v1/dns/records` with hostname, type, value, and TTL.
+188. DNS record update via `PUT /v1/dns/records` modifying existing record properties.
+189. DNS record deletion via `DELETE /v1/dns/records/:hostname/:type` removing specific records.
+190. DNS records listing via `GET /v1/dns/records` returning all domain records.
+191. Wildcard DNS validation via `GET /v1/dns/wildcard/validate` confirming DNS propagation.
+192. DNS configuration retrieval via `GET /v1/dns/config` showing current settings.
+193. DNS provider validation via `POST /v1/dns/config/validate` testing API credentials.
+194. Wildcard DNS removal via `DELETE /v1/dns/wildcard` cleaning up wildcard records.
+195. DNS resolution testing for created wildcard and specific subdomain records.
+196. Integration testing with both Cloudflare and Namecheap providers.
+197. Error handling for invalid DNS provider configurations and API failures.
+198. TTL configuration and verification for DNS record propagation timing.
+199. Load balancer IP configuration for multiple target IPs in wildcard setup.
+200. IPv6 AAAA record support for dual-stack DNS configurations.
 96. `POST /v1/apps/:app/rollback` accepts SHA and performs application rollback.
 97. All endpoints return proper HTTP status codes and JSON responses.
 98. Error handling returns 400 for invalid JSON and missing required fields.

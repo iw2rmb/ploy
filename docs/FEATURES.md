@@ -98,6 +98,29 @@ Auto-classified lanes:
   - **Universal .sig Files**: All build scripts generate signature files for every artifact
   - **Debug Variant Support**: Debug builds include signature generation alongside main builds  
   - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
+
+⸻
+
+## 🌐 DNS Management
+- ✅ **Multi-Provider DNS Integration** (Aug 2025):
+  - **Cloudflare Provider**: Full DNS API integration with wildcard and individual record support
+  - **Namecheap Provider**: Complete DNS management via Namecheap API with sandbox support
+  - **Provider Abstraction**: Clean interface enabling easy addition of Route53, DigitalOcean, etc.
+- ✅ **Wildcard DNS Configuration** (Aug 2025):
+  - **Automatic Subdomain Routing**: Configure `*.ployd.app` for seamless app subdomain access
+  - **Multiple Target Support**: IP addresses, CNAME targets, load balancer configurations
+  - **DNS Propagation Validation**: Real-time verification of wildcard DNS setup and functionality
+- ✅ **Complete DNS Record Management** (Aug 2025):
+  - **Full Record Type Support**: A, AAAA, CNAME, TXT, MX records with priority and TTL configuration
+  - **CRUD Operations**: Create, read, update, delete individual DNS records via REST API
+  - **IPv6 Support**: Dual-stack DNS with automatic AAAA record management
+- ✅ **Load Balancer Integration** (Aug 2025):
+  - **Multiple IP Configuration**: Support for multiple target IPs in wildcard DNS setup
+  - **High Availability**: Automatic DNS-based load balancing for production deployments
+- ✅ **Configuration Management** (Aug 2025):
+  - **Environment Variables**: Full support for environment-based DNS provider configuration
+  - **JSON Configuration**: File-based configuration with sensitive credential protection
+  - **Ansible Integration**: Automated DNS setup via infrastructure as code playbooks
   - **Graceful Fallbacks**: Handles missing cosign/syft tools in development environments
 - ✅ Vulnerability scans (Grype), advanced keyless signing (Cosign) with full OIDC integration
 - ✅ **Comprehensive storage upload** to SeaweedFS with artifact bundles (Aug 2025)

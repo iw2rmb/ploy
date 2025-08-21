@@ -383,6 +383,41 @@
         group: ploy
         mode: '0644'
 
+    - name: Create DNS configuration directory
+      file:
+        path: /etc/ploy/dns
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Create DNS configuration file
+      copy:
+        content: |
+          {
+            "provider": "{{ ploy.dns.provider }}",
+            "domain": "{{ ploy.dns.domain }}",
+            "target_ip": "{{ ploy.dns.target_ip }}",
+            "ttl": {{ ploy.dns.ttl }},
+            "enable_ipv6": {{ ploy.dns.enable_ipv6 }},
+            "cloudflare": {
+              "api_token": "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}",
+              "zone_id": "{{ lookup('env', 'CLOUDFLARE_ZONE_ID') }}"
+            },
+            "namecheap": {
+              "api_user": "{{ lookup('env', 'NAMECHEAP_API_USER') }}",
+              "api_key": "{{ lookup('env', 'NAMECHEAP_API_KEY') }}",
+              "username": "{{ lookup('env', 'NAMECHEAP_USERNAME') }}",
+              "client_ip": "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') }}",
+              "sandbox": {{ lookup('env', 'NAMECHEAP_SANDBOX') | default('false') | bool }}
+            }
+          }
+        dest: /etc/ploy/dns/config.json
+        owner: ploy
+        group: ploy
+        mode: '0600'
+      when: ploy.dns is defined
+
     - name: Set up firewall
       ufw:
         rule: allow

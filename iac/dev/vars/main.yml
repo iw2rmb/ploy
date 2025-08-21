@@ -44,6 +44,12 @@ testing_tools:
 ploy:
   controller_port: 8081
   storage_backend: "seaweedfs"
+  dns:
+    provider: "cloudflare"  # Options: cloudflare, namecheap
+    domain: "ployd.app" 
+    target_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
+    ttl: 300
+    enable_ipv6: false
 
 # Nomad controller deployment configuration
 nomad_controller:
