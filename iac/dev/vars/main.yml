@@ -72,14 +72,14 @@ seaweedfs:
   volume_port: 8080
   filer_port: 8888
   
-  # Collection configuration for different artifact types
+  # Collection configuration for different artifact types (dev environment)
   collections:
     artifacts:
       name: "ploy-artifacts"
-      replication: "001"  # Single copy for large build artifacts
+      replication: "000"  # No replication for development environment
     metadata:
       name: "ploy-metadata"
-      replication: "010"  # Replicated for small critical files (SBOMs, sigs, certs)
+      replication: "000"  # No replication for development environment
     debug:
       name: "ploy-debug"
       replication: "000"  # No replication for ephemeral debug artifacts
@@ -90,7 +90,7 @@ storage_config:
     master: "localhost:9333"
     filer: "localhost:8888"
     collection: "ploy-artifacts"
-    replication: "001"
+    replication: "000"
     timeout: 30
     datacenter: ""
     rack: ""
