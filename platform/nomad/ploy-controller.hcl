@@ -130,7 +130,7 @@ job "ploy-controller" {
         }
         # Service mesh connectivity check
         header {
-          "X-Service-Mesh" = ["ploy-controller"]
+          X-Service-Mesh = ["ploy-controller"]
         }
       }
       
@@ -159,8 +159,8 @@ job "ploy-controller" {
         failures_before_critical = 3
         # Custom header for blue-green deployment tracking
         header {
-          "X-Deployment-Color" = ["blue"]
-          "X-Deployment-Weight" = ["100"]
+          X-Deployment-Color = ["blue"]
+          X-Deployment-Weight = ["100"]
         }
       }
     }
@@ -206,8 +206,8 @@ job "ploy-controller" {
         failures_before_critical = 3
         deregister_critical_service_after = "120s"
         header {
-          "X-Service-Mesh" = ["ploy-controller-metrics"]
-          "Accept" = ["text/plain; version=0.0.4"]
+          X-Service-Mesh = ["ploy-controller-metrics"]
+          Accept = ["text/plain; version=0.0.4"]
         }
       }
     }
