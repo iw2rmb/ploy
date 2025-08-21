@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -12,7 +13,8 @@ import (
 
 // TraefikRouter handles app routing via Traefik and Consul integration
 type TraefikRouter struct {
-	consul *consulapi.Client
+	consul              *consulapi.Client
+	platformAppsDomain  string
 }
 
 // NewTraefikRouter creates a new Traefik router instance
@@ -27,12 +29,43 @@ func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
 	
-	return &TraefikRouter{consul: client}, nil
+	// Get platform apps domain from environment
+	platformAppsDomain := os.Getenv("PLOY_APPS_DOMAIN")
+	if platformAppsDomain == "" {
+		platformAppsDomain = "ployd.app" // Default fallback
+		log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
+	}
+	
+	return &TraefikRouter{
+		consul:             client,
+		platformAppsDomain: platformAppsDomain,
+	}, nil
 }
 
 // GetConsulClient returns the underlying Consul client for external access
 func (tr *TraefikRouter) GetConsulClient() *consulapi.Client {
 	return tr.consul
+}
+
+// GetPlatformAppsDomain returns the configured platform apps domain
+func (tr *TraefikRouter) GetPlatformAppsDomain() string {
+	return tr.platformAppsDomain
+}
+
+// GenerateAppDomain generates a platform subdomain for an app
+func (tr *TraefikRouter) GenerateAppDomain(appName string) string {
+	return fmt.Sprintf("%s.%s", appName, tr.platformAppsDomain)
+}
+
+// GenerateControllerDomain generates the controller domain
+func (tr *TraefikRouter) GenerateControllerDomain() string {
+	return fmt.Sprintf("api.%s", tr.platformAppsDomain)
+}
+
+// IsPlatformSubdomain checks if a domain is a platform subdomain
+func (tr *TraefikRouter) IsPlatformSubdomain(domain string) bool {
+	return strings.HasSuffix(domain, "."+tr.platformAppsDomain) &&
+		   strings.Count(domain, ".") == strings.Count(tr.platformAppsDomain, ".")+1
 }
 
 // AppRoute represents a routed application configuration
@@ -69,7 +102,7 @@ type RouteConfig struct {
 func DefaultRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "letsencrypt",
+		CertResolver:        "letsencrypt", // Traefik will automatically use wildcard cert for platform subdomains
 		HealthPath:          "/healthz",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
@@ -80,6 +113,25 @@ func DefaultRouteConfig() *RouteConfig {
 		CircuitBreaker:      true,
 		RetryAttempts:       3,
 		RateLimit:           50,
+		SecurityHeaders:     true,
+	}
+}
+
+// PlatformAppRouteConfig returns optimized configuration for platform subdomain apps
+func PlatformAppRouteConfig() *RouteConfig {
+	return &RouteConfig{
+		EnableTLS:           true,
+		CertResolver:        "letsencrypt", // Uses platform wildcard certificate automatically
+		HealthPath:          "/healthz",
+		LoadBalanceMode:     "weighted_round_robin",
+		StickySession:       false,
+		Middlewares:         []string{"platform-security-headers"},
+		HealthCheckInterval: "10s",
+		HealthCheckTimeout:  "3s",  // Faster health checks for platform apps
+		HealthCheckRetries:  3,
+		CircuitBreaker:      true,
+		RetryAttempts:       2,     // Fewer retries for platform apps
+		RateLimit:           100,   // Higher rate limit for platform apps
 		SecurityHeaders:     true,
 	}
 }
@@ -158,9 +210,11 @@ func ControllerRouteConfig() *RouteConfig {
 
 // RegisterController registers the Ploy Controller with enhanced load balancing
 func (tr *TraefikRouter) RegisterController(allocID, allocIP string, port int) error {
+	controllerDomain := tr.GenerateControllerDomain()
+	
 	route := &AppRoute{
 		App:        "ploy-controller",
-		Domain:     "api.ployd.app",
+		Domain:     controllerDomain,
 		Port:       port,
 		AllocID:    allocID,
 		AllocIP:    allocIP,
@@ -170,6 +224,32 @@ func (tr *TraefikRouter) RegisterController(allocID, allocIP string, port int) e
 	}
 	
 	config := ControllerRouteConfig()
+	
+	log.Printf("Registering Ploy Controller at: %s (platform domain: %s)", controllerDomain, tr.platformAppsDomain)
+	
+	return tr.RegisterApp(route, config)
+}
+
+// RegisterAppWithPlatformDomain registers an app with automatically generated platform subdomain
+func (tr *TraefikRouter) RegisterAppWithPlatformDomain(appName, allocID, allocIP string, port int, config *RouteConfig) error {
+	appDomain := tr.GenerateAppDomain(appName)
+	
+	route := &AppRoute{
+		App:        appName,
+		Domain:     appDomain,
+		Port:       port,
+		AllocID:    allocID,
+		AllocIP:    allocIP,
+		HealthPath: "/healthz",  // Standard health check path for apps
+		TLSEnabled: true,       // Always enable TLS for platform subdomains
+		CreatedAt:  time.Now(),
+	}
+	
+	if config == nil {
+		config = PlatformAppRouteConfig() // Use optimized config for platform apps
+	}
+	
+	log.Printf("Registering app %s at platform subdomain: %s", appName, appDomain)
 	
 	return tr.RegisterApp(route, config)
 }
