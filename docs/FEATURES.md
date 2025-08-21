@@ -429,7 +429,7 @@ Auto-classified lanes:
 
 ## 🧬 Automated Remediation Framework (ARF)
 
-**STATUS: Planned** - Comprehensive roadmap available in `docs/roadmap/arf/`
+**STATUS: Planned** - Comprehensive roadmap available in `roadmap/arf/`
 
 ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 

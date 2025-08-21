@@ -89,7 +89,7 @@ ARF leverages Ploy's existing infrastructure:
 
 ## Related Documentation
 
-- [WASM.md](../WASM.md) - WebAssembly runtime implementation
-- [PLAN.md](../PLAN.md) - Overall Ploy development roadmap
-- [FEATURES.md](../FEATURES.md) - Current platform capabilities
-- [STACK.md](../STACK.md) - Technology stack documentation
+- [WASM.md](../docs/WASM.md) - WebAssembly runtime implementation
+- [README.md](../README.md) - Overall Ploy development roadmap
+- [FEATURES.md](../docs/FEATURES.md) - Current platform capabilities
+- [STACK.md](../docs/STACK.md) - Technology stack documentation

@@ -17,15 +17,15 @@ Ploy deploys applications via optimized "lanes" (A-F) for performance and footpr
 Auto-selects optimal lane from project structure unless overridden.
 
 ## Documentation
+- README.md — architecture and purpose (at project root).
+- `roadmap/README.md` — LLM instructions for repo iteration.
 - `docs/` contains:
   - REPO.md — comprehensive repository structure guide for efficient file navigation.
-  - PLAN.md — LLM instructions for repo iteration.
-  - CONCEPT.md — architecture and purpose.
   - STACK.md — technology stack and framework dependencies.
-  - CLI.md — CLI reference.
-  - API.md — REST API routes.
+  - cmd/ploy/README.md — CLI reference.
+  - controller/README.md — REST API routes.
   - STORAGE.md — storage abstraction (MinIO).
-  - INFRASTRUCTURE.md — bare-metal setup.
+  - iac/README.md — bare-metal setup.
   - FEATURES.md — feature list.
   - TESTS.md — test scenarios to implement.
   - WASM.md — WebAssembly compilation detection and Lane G implementation guidance.
@@ -162,7 +162,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - Push feature branch to GitHub (no version updates needed at this stage)
 
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
-    - **Comprehensive Deployment**: Deploy using automated script: `./controller/deploy.sh <branch>`
+    - **Comprehensive Deployment**: Deploy using automated script: `./scripts/deploy.sh <branch>`
       - Automatically pulls feature branch to VPS
       - Generates test version number on the fly (`test-YYYYMMDD-HHMMSS`)
       - Updates CONTROLLER_VERSION temporarily in Nomad job file
@@ -185,12 +185,12 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - Push the version update to GitHub
 
 10. **Documentation and Completion**: Complete documentation updates:
-    - **PLAN.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in PLAN.md
+    - **roadmap/README.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in roadmap/README.md
     - **CHANGELOG.md Entry**: Add dated summary entry following established format with Added/Fixed/Testing sections describing changes
     - **FEATURES.md Synchronization**: Add new feature entries or modify existing ones to accurately reflect current system capabilities
     - **STACK.md Dependencies**: Update technology stack documentation when adding or modifying frameworks, tools, or dependencies
     - **REPO.md Structure**: Update repository structure documentation if new files, folders, or architectural changes were made
-    - **API.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
+    - **controller/README.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
     - **iac/dev/README.md Infrastructure**: Update infrastructure documentation when Ansible playbooks, templates, configurations, or deployment procedures are modified
     - Commit all documentation updates to feature branch
     - Merge feature branch to main branch

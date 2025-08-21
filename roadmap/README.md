@@ -90,13 +90,13 @@ Next steps to implement:
 
 The Automated Remediation Framework (ARF) represents Ploy's enterprise code transformation engine, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 
-**Implementation Roadmap**: See detailed phase documentation in `docs/roadmap/arf/`:
+**Implementation Roadmap**: See detailed phase documentation in `roadmap/arf/`:
 
-- **[Phase ARF-1: Foundation & Core Engine](docs/roadmap/arf/phase-arf-1.md)** - OpenRewrite integration, sandbox management, recipe catalog, basic transformation engine
-- **[Phase ARF-2: Self-Healing Loop & Error Recovery](docs/roadmap/arf/phase-arf-2.md)** - Circuit breakers, error-driven recipe evolution, parallel processing, multi-repository orchestration  
-- **[Phase ARF-3: LLM Integration & Hybrid Intelligence](docs/roadmap/arf/phase-arf-3.md)** - LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, strategy selection
-- **[Phase ARF-4: Security & Production Hardening](docs/roadmap/arf/phase-arf-4.md)** - Vulnerability remediation, SBOM integration, human-in-the-loop workflows, production optimization
-- **[Phase ARF-5: Production Features & Scale](docs/roadmap/arf/phase-arf-5.md)** - Multi-repository campaigns, analytics dashboards, API ecosystem, compliance framework
+- **[Phase ARF-1: Foundation & Core Engine](roadmap/arf/phase-arf-1.md)** - OpenRewrite integration, sandbox management, recipe catalog, basic transformation engine
+- **[Phase ARF-2: Self-Healing Loop & Error Recovery](roadmap/arf/phase-arf-2.md)** - Circuit breakers, error-driven recipe evolution, parallel processing, multi-repository orchestration  
+- **[Phase ARF-3: LLM Integration & Hybrid Intelligence](roadmap/arf/phase-arf-3.md)** - LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, strategy selection
+- **[Phase ARF-4: Security & Production Hardening](roadmap/arf/phase-arf-4.md)** - Vulnerability remediation, SBOM integration, human-in-the-loop workflows, production optimization
+- **[Phase ARF-5: Production Features & Scale](roadmap/arf/phase-arf-5.md)** - Multi-repository campaigns, analytics dashboards, API ecosystem, compliance framework
 
 **ARF Success Metrics & Targets**:
 - 50-80% time reduction in code migrations (baseline: manual migration time)

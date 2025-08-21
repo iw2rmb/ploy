@@ -11,7 +11,21 @@ ploy/
 ├── go.mod               # Go module definition
 ├── go.sum               # Go module dependencies
 ├── .gitignore           # Git ignore rules
-└── README.md            # Project overview
+├── README.md            # Project overview
+└── roadmap/             # Detailed implementation roadmaps
+    ├── arf/            # Automated Remediation Framework roadmap
+    │   ├── README.md           # ARF overview and phase summary
+    │   ├── phase-arf-1.md      # Foundation & Core Engine
+    │   ├── phase-arf-2.md      # Self-Healing Loop & Error Recovery
+    │   ├── phase-arf-3.md      # LLM Integration & Hybrid Intelligence
+    │   ├── phase-arf-4.md      # Security & Production Hardening
+    │   └── phase-arf-5.md      # Production Features & Scale
+    └── static-analysis/        # Static Analysis Integration Framework
+        ├── README.md           # Framework overview and roadmap
+        ├── phase-1.md          # Core Framework & Java Integration
+        ├── phase-2.md          # Multi-Language Support
+        ├── phase-3.md          # Advanced Integration & Enterprise
+        └── phase-4.md          # Production Features & Team Collaboration
 ```
 
 ## Core Application Structure
@@ -240,27 +254,13 @@ Comprehensive project documentation and specifications.
 ```
 docs/
 ├── REPO.md             # This file - repository structure guide
-├── PLAN.md             # LLM instructions for iterative development
-├── CONCEPT.md          # Architecture and core concepts
 ├── STACK.md            # Technology stack and dependencies
-├── CLI.md              # CLI reference and usage
-├── API.md              # REST API endpoint documentation
 ├── REST.md             # REST API implementation details
 ├── STORAGE.md          # Storage abstraction and configuration
-├── INFRASTRUCTURE.md   # Bare-metal setup and requirements
 ├── SCENARIOS.md        # Test scenarios and use cases
 ├── FEATURES.md         # Feature list and capabilities
 ├── TESTS.md            # Test scenarios and validation
-├── WASM.md             # WebAssembly compilation and Lane G
-└── roadmap/            # Detailed implementation roadmaps
-    ├── arf/            # Automated Remediation Framework roadmap
-    │   ├── README.md           # ARF overview and phase summary
-    │   ├── phase-arf-1.md      # Foundation & Core Engine
-    │   ├── phase-arf-2.md      # Self-Healing Loop & Error Recovery
-    │   ├── phase-arf-3.md      # LLM Integration & Hybrid Intelligence
-    │   ├── phase-arf-4.md      # Security & Production Hardening
-    │   └── phase-arf-5.md      # Production Features & Scale
-    └── static-analysis.md      # Static Analysis Integration Framework
+└── WASM.md             # WebAssembly compilation and Lane G
 ```
 
 ## Sample Applications
@@ -337,9 +337,9 @@ manifests/
 
 ## Development Workflow File Locations
 
-1. **Feature Implementation**: Start with `docs/PLAN.md` to identify requirements
-2. **API Changes**: Update `controller/main.go` and document in `docs/API.md`
-3. **CLI Changes**: Modify `cmd/ploy/main.go` and update `docs/CLI.md`
+1. **Feature Implementation**: Start with `roadmap/README.md` to identify requirements
+2. **API Changes**: Update `controller/main.go` and document in `controller/README.md`
+3. **CLI Changes**: Modify `cmd/ploy/main.go` and update `cmd/ploy/README.md`
 4. **Storage Changes**: Edit files in `internal/storage/`
 5. **Infrastructure**: Update `iac/dev/playbooks/` and `platform/`
 6. **Testing**: Add tests to `test-scripts/` and scenarios to `docs/TESTS.md`
