@@ -110,7 +110,7 @@ job "traefik-system" {
         source = "https://github.com/traefik/traefik/releases/download/v3.0.4/traefik_v3.0.4_linux_amd64.tar.gz"
         destination = "local/"
         options {
-          checksum = "sha256:e8ad5e5cfaacad1c35a5e1c60a04fbd3b1e3b2b8a3b7b8b7b8b7b8b7b8b7b8b7"
+          checksum = "sha256:c22afa9a054c4f6a447277f1fb1d357fdf36a8e5aef047492e8c73dbf7868c2a"
         }
       }
       

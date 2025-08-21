@@ -22,9 +22,9 @@ echo
 
 # Test 2: Check Traefik health endpoint
 echo "📋 Test 2: Check Traefik health endpoint"
-if curl -s -f http://localhost:8080/ping >/dev/null 2>&1; then
+if curl -s -f http://localhost:8095/ping >/dev/null 2>&1; then
     echo "✅ PASS: Traefik health endpoint responds"
-    echo "Response: $(curl -s http://localhost:8080/ping)"
+    echo "Response: $(curl -s http://localhost:8095/ping)"
 else
     echo "❌ FAIL: Traefik health endpoint not accessible"
 fi
@@ -32,9 +32,9 @@ echo
 
 # Test 3: Check Traefik API endpoint
 echo "📋 Test 3: Check Traefik API endpoint"
-if curl -s -f http://localhost:8080/api/overview >/dev/null 2>&1; then
+if curl -s -f http://localhost:8095/api/overview >/dev/null 2>&1; then
     echo "✅ PASS: Traefik API endpoint responds"
-    response=$(curl -s http://localhost:8080/api/overview)
+    response=$(curl -s http://localhost:8095/api/overview)
     echo "HTTP routers: $(echo "$response" | jq -r '.http.routers.total // "unknown"')"
     echo "HTTP services: $(echo "$response" | jq -r '.http.services.total // "unknown"')"
 else

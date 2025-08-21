@@ -101,7 +101,7 @@ job "traefik-system" {
       driver = "docker"
       
       config {
-        image = "traefik:v3.0"
+        image = "traefik:v3.5.0"
         network_mode = "host"
         
         ports = ["http", "https", "admin", "metrics"]
@@ -120,18 +120,13 @@ job "traefik-system" {
           readonly = true
         }
         
-        # Mount for static Traefik configuration files
+        
+        # Host mount for Let's Encrypt certificates
         mount {
           type = "bind"
-          source = "local/static"
-          target = "/etc/traefik/static"
-          readonly = true
+          source = "/opt/ploy/traefik-data"
+          target = "/data"
         }
-        
-        # Volume for Let's Encrypt certificates
-        volumes = [
-          "traefik-acme:/data"
-        ]
       }
       
       # Main Traefik configuration
@@ -198,24 +193,17 @@ entryPoints:
 
 # Consul Provider for Service Discovery
 providers:
-  consul:
-    endpoints:
-      - "127.0.0.1:8500"
-    exposedByDefault: false
-    watch: true
-    
   consulCatalog:
-    endpoints:
-      - "127.0.0.1:8500"
-    exposedByDefault: false
+    refreshInterval: 15s
     prefix: traefik
-    watch: true
-    connectAware: true
+    exposedByDefault: false
+    endpoint:
+      address: "127.0.0.1:8500"
+      scheme: "http"
     
   # File provider for dynamic configuration
   file:
     directory: "/etc/traefik/dynamic"
-    watch: true
 
 # Certificate Resolvers (Let's Encrypt)
 certificatesResolvers:
