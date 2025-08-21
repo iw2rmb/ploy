@@ -339,8 +339,8 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 		return err
 	}
 	
-	// Set content-type for directory creation
-	req.Header.Set("Content-Type", "application/x-directory")
+	// Don't set Content-Type header - SeaweedFS doesn't like it for directory creation
+	// req.Header.Set("Content-Type", "application/x-directory")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
