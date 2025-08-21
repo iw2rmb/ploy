@@ -6,29 +6,44 @@
     - ../vars/main.yml
   
   tasks:
-    - name: Install testing dependencies
+    - name: Check for missing testing dependencies
+      command: dpkg -l {{ item }}
+      register: testing_deps_check
+      failed_when: false
+      changed_when: false
+      loop:
+        - httpie
+        - jq
+        - tmux
+        - vim
+        - htop
+        - iotop
+        - netstat-nat
+        - tcpdump
+        - strace
+        - lsof
+        - tree
+
+    - name: Install missing testing dependencies
       apt:
-        name:
-          - httpie
-          - jq
-          - tmux
-          - vim
-          - htop
-          - iotop
-          - netstat-nat
-          - tcpdump
-          - strace
-          - lsof
-          - tree
+        name: "{{ item.item }}"
         state: present
+      when: item.rc != 0
+      loop: "{{ testing_deps_check.results }}"
 
     - name: Install Kontain runtime for Docker
       block:
+        - name: Check if Kontain is already installed
+          stat:
+            path: /usr/local/bin/km
+          register: kontain_binary
+
         - name: Download Kontain
           get_url:
             url: "https://github.com/kontainapp/km/releases/latest/download/kontain.tar.gz"
             dest: /tmp/kontain.tar.gz
           ignore_errors: true
+          when: not kontain_binary.stat.exists
 
         - name: Extract Kontain
           unarchive:
@@ -36,6 +51,7 @@
             dest: /usr/local
             remote_src: true
           ignore_errors: true
+          when: not kontain_binary.stat.exists
 
         - name: Configure Docker for Kontain runtime
           template:
@@ -45,17 +61,29 @@
 
     - name: Setup Ploy testing environment
       block:
+        - name: Check if Ploy binaries exist and are recent
+          stat:
+            path: "{{ item }}"
+          register: ploy_binaries_check
+          loop:
+            - /home/ploy/ploy/ploy-controller
+            - /home/ploy/ploy/ploy
+            - /home/ploy/ploy/lane-pick
+
         - name: Build Ploy controller
           shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o ploy-controller ./controller
           become_user: ploy
+          when: not ploy_binaries_check.results[0].stat.exists or (ansible_date_time.epoch|int - ploy_binaries_check.results[0].stat.mtime) > 3600
 
         - name: Build Ploy CLI
           shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o ploy ./cmd/ploy
           become_user: ploy
+          when: not ploy_binaries_check.results[1].stat.exists or (ansible_date_time.epoch|int - ploy_binaries_check.results[1].stat.mtime) > 3600
 
         - name: Build lane picker
           shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o lane-pick ./tools/lane-pick
           become_user: ploy
+          when: not ploy_binaries_check.results[2].stat.exists or (ansible_date_time.epoch|int - ploy_binaries_check.results[2].stat.mtime) > 3600
 
         - name: Create Ploy configuration
           template:
@@ -112,6 +140,12 @@
             owner: ploy
             group: ploy
 
+        - name: Check if test apps directory is populated
+          find:
+            paths: /home/ploy/test-apps
+            file_type: any
+          register: test_apps_content
+
         - name: Copy sample apps for testing
           copy:
             src: /home/ploy/ploy/apps/
@@ -119,6 +153,7 @@
             remote_src: true
             owner: ploy
             group: ploy
+          when: test_apps_content.matched == 0
 
     - name: Install monitoring tools
       block:

@@ -114,22 +114,7 @@ configs/
 ```
 
 ### `/iac/` - Infrastructure as Code
-Ansible playbooks and configuration for deployment environments.
-
-```
-iac/
-└── dev/                    # Development environment
-    ├── playbooks/          # Ansible playbooks
-    │   ├── main.yml        # Main playbook orchestration
-    │   ├── freebsd.yml     # FreeBSD VM and jail setup
-    │   ├── hashicorp.yml   # Consul, Nomad, Vault installation
-    │   ├── seaweedfs.yml   # Distributed storage setup
-    │   └── testing.yml     # Test environment preparation
-    ├── vars/               # Ansible variables
-    │   └── main.yml        # Environment-specific variables
-    └── templates/          # Configuration templates
-        └── ploy-storage-config.yaml.j2  # Storage config template
-```
+Ansible playbooks and configuration for deployment environments. See `iac/dev/README.md` for complete setup guide.
 
 ### `/platform/` - Platform Configuration
 Platform-specific deployment configurations.
