@@ -1258,7 +1258,7 @@ echo "All WASM detection tests passed!"
 ## Documentation Updates
 
 ### Task D.1: Update Core Documentation
-**Files**: `docs/FEATURES.md`, `docs/STACK.md`, `docs/CONCEPT.md`
+**Files**: `docs/FEATURES.md`, `docs/STACK.md`, `README.md`
 
 **FEATURES.md Additions**:
 ```markdown
@@ -1283,7 +1283,7 @@ echo "All WASM detection tests passed!"
 - Security best practices
 
 ### Task D.3: Update CLI Documentation
-**Files**: `docs/CLI.md`
+**Files**: `cmd/ploy/README.md`
 
 **CLI Additions**:
 ```markdown

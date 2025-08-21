@@ -1,4 +1,4 @@
-# INFRASTRUCTURE.md — Minimal, Bullet‑Proof Bare Metal Setup
+# Infrastructure as Code — Minimal, Bullet‑Proof Bare Metal Setup
 
 ## Target
 Highly available control plane + compute pools for FreeBSD/bhyve and a small Linux pool for Kontain/Firecracker.
