@@ -1,7 +1,7 @@
 job "ploy-controller" {
   datacenters = ["dc1"]
-  type = "service"  # Service type for high availability with load balancing
-  priority = 80     # High priority for core infrastructure service
+  type = "system"  # Runs on every Nomad client node for high availability
+  priority = 80    # High priority for core infrastructure service
   
   # Constraint to run only on Linux nodes
   constraint {
@@ -9,29 +9,43 @@ job "ploy-controller" {
     value = "linux"
   }
   
+  # Optional constraint to run only on nodes with sufficient resources
+  constraint {
+    attribute = "${attr.memory.totalbytes}"
+    operator = ">="
+    value = "1073741824"  # 1GB minimum memory
+  }
+  
+  # Note: System jobs cannot use affinity or spread blocks
+  # Placement handled by system job scheduling across all nodes
+  
   group "controller" {
-    count = 3  # Deploy 3 instances for high availability and load distribution
+    # Run 1 instance per node (system job behavior)
+    count = 1
     
     # Restart policy for critical infrastructure
     restart {
-      attempts = 3
-      interval = "5m"
-      delay = "15s"
-      mode = "delay"
+      attempts = 5           # Allow more restart attempts for critical service
+      interval = "10m"       # Reset attempt counter every 10 minutes
+      delay = "15s"          # Wait 15 seconds between restarts
+      mode = "delay"         # Continue trying to restart with exponential backoff
     }
     
-    # Enhanced update strategy for rolling updates with canary deployment
+    # Note: System jobs do not support reschedule policies
+    # System jobs automatically reschedule on node failures
+    
+    # Enhanced update strategy for rolling updates with zero downtime and canary deployment
     update {
-      max_parallel = 1           # Update one instance at a time
+      max_parallel = 2           # Update 2 nodes simultaneously for faster rollout
       min_healthy_time = "30s"   # Extended time to ensure service stability
       healthy_deadline = "5m"    # Increased deadline for complex health checks
-      progress_deadline = "10m"  # Extended overall timeout
+      progress_deadline = "15m"  # Extended overall timeout for system jobs
       auto_revert = true         # Automatically rollback failed updates
       auto_promote = false       # Require manual promotion for safety
       canary = 1                 # Enable canary deployment with 1 instance
       
-      # Stagger updates to prevent issues
-      stagger = "30s"            # 30 second delay between updates
+      # Stagger updates to prevent simultaneous node failures
+      stagger = "30s"            # 30 second delay between parallel updates
       
       # Health checks must pass before promoting canary
       health_check = "checks"    # Use Consul health checks for validation
@@ -47,7 +61,7 @@ job "ploy-controller" {
       }
     }
     
-    # Enhanced Consul service registration for production
+    # Enhanced Consul service registration for load balancing and service mesh
     service {
       name = "ploy-controller"
       port = "http"
@@ -63,6 +77,7 @@ job "ploy-controller" {
         "traefik.http.services.ploy-controller.loadbalancer.server.scheme=http",
         "traefik.http.services.ploy-controller.loadbalancer.healthcheck.path=/health",
         "traefik.http.services.ploy-controller.loadbalancer.healthcheck.interval=10s",
+        "traefik.http.middlewares.ploy-controller-auth.basicauth.usersfile=/etc/traefik/users",
         "traefik.http.middlewares.ploy-controller-ratelimit.ratelimit.burst=100",
         "traefik.http.middlewares.ploy-controller-secure.headers.sslredirect=true",
         "traefik.http.routers.ploy-controller.middlewares=ploy-controller-ratelimit,ploy-controller-secure",
@@ -70,17 +85,17 @@ job "ploy-controller" {
         "service-mesh.protocol=http",
         "blue-green.deployment=true",
         "blue-green.weight=100",
-        "${NOMAD_ALLOC_ID}"
+        "${NOMAD_ALLOC_ID}"  # Include allocation ID for identification
       ]
       
-      # Enhanced metadata for production environment
+      # Enhanced metadata for service discovery and deployment management
       meta {
         version = "1.0.0"
         node = "${attr.unique.hostname}"
         datacenter = "${node.datacenter}"
         region = "${node.region}"
         deployment_id = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
-        service_type = "service"
+        service_type = "system"
         load_balancer = "traefik"
         health_endpoint = "/health"
         readiness_endpoint = "/ready"
@@ -169,9 +184,29 @@ job "ploy-controller" {
           X-Rollback-Capability = ["enabled"]
         }
       }
+      
+      # Enhanced deployment status check with rollback monitoring
+      check {
+        name = "deployment-status"
+        type = "http"
+        path = "/health/deployment"
+        port = "http"
+        interval = "20s"
+        timeout = "5s"
+        success_before_passing = 1
+        failures_before_critical = 2  # Stricter for deployment issues
+        
+        # Enhanced headers for deployment and rollback tracking
+        header {
+          X-Deployment-Color = ["blue"]
+          X-Deployment-Weight = ["100"]
+          X-Auto-Revert = ["enabled"]
+          X-Update-Strategy = ["rolling-canary"]
+        }
+      }
     }
     
-    # Enhanced metrics service for monitoring integration
+    # Enhanced metrics service for monitoring integration with service mesh
     service {
       name = "ploy-controller-metrics"
       port = "metrics"
@@ -184,6 +219,8 @@ job "ploy-controller" {
         "traefik.http.routers.ploy-metrics.tls=true",
         "traefik.http.routers.ploy-metrics.tls.certresolver=letsencrypt",
         "traefik.http.services.ploy-metrics.loadbalancer.server.scheme=http",
+        "traefik.http.middlewares.ploy-metrics-auth.basicauth.usersfile=/etc/traefik/metrics-users",
+        "traefik.http.routers.ploy-metrics.middlewares=ploy-metrics-auth",
         "service-mesh.connect=true",
         "service-mesh.protocol=http",
         "monitoring.scrape=true",
@@ -199,7 +236,7 @@ job "ploy-controller" {
         environment = "production"
       }
       
-      # Metrics endpoint health check
+      # Metrics endpoint health check with service mesh awareness
       check {
         type = "http"
         path = "/health/metrics"
@@ -219,12 +256,16 @@ job "ploy-controller" {
     task "ploy-controller" {
       driver = "raw_exec"
       
+      # Resource allocation
       resources {
-        cpu = 200
-        memory = 256
+        cpu = 200      # 200 MHz (0.2 CPU cores)
+        memory = 256   # 256 MB RAM
+        
+        # Reserve additional resources for burst workloads
+        memory_max = 512  # Allow burst up to 512 MB
       }
       
-      # Enhanced environment variables for production with service mesh
+      # Environment variables for configuration
       env {
         # Controller configuration
         PORT = "${NOMAD_PORT_http}"
@@ -300,7 +341,7 @@ job "ploy-controller" {
         CLUSTER_ID = "${node.unique.id}"
       }
       
-      # Enhanced configuration files with service mesh and rolling updates
+      # Enhanced configuration files with service mesh and blue-green deployment
       template {
         data = <<-EOH
         # Ploy Controller Instance Configuration
@@ -415,16 +456,98 @@ job "ploy-controller" {
         perms = "755"
       }
       
-      # Binary location - use pre-built controller from ploy directory
+      # Rolling update monitoring script template
+      template {
+        data = <<-EOH
+        #!/bin/bash
+        # Rolling update monitoring and alerting script
+        set -e
+        
+        PORT={{ env "NOMAD_PORT_http" }}
+        WEBHOOK_URL="{{ env "UPDATE_ALERT_WEBHOOK" }}"
+        SERVICE_NAME="{{ env "SERVICE_NAME" }}"
+        INSTANCE_ID="{{ env "NOMAD_ALLOC_ID" }}"
+        
+        # Function to send alert
+        send_alert() {
+            local message="$1"
+            local severity="$2"
+            local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            
+            if [ -n "$WEBHOOK_URL" ]; then
+                curl -X POST "$WEBHOOK_URL" \
+                     -H "Content-Type: application/json" \
+                     -d "{
+                         \"text\": \"$severity: $SERVICE_NAME Update Alert\",
+                         \"attachments\": [{
+                             \"color\": \"$([ \"$severity\" = \"ERROR\" ] && echo \"danger\" || echo \"warning\")\",
+                             \"fields\": [
+                                 {\"title\": \"Service\", \"value\": \"$SERVICE_NAME\", \"short\": true},
+                                 {\"title\": \"Instance\", \"value\": \"$INSTANCE_ID\", \"short\": true},
+                                 {\"title\": \"Message\", \"value\": \"$message\", \"short\": false},
+                                 {\"title\": \"Timestamp\", \"value\": \"$timestamp\", \"short\": true}
+                             ]
+                         }]
+                     }" 2>/dev/null || echo "Failed to send alert"
+            fi
+        }
+        
+        # Check update progress
+        if curl -f -s "http://localhost:$PORT/health/update" > /dev/null 2>&1; then
+            echo "Update progress monitoring: OK"
+        else
+            echo "Update endpoint not available (normal during steady state)"
+        fi
+        
+        # Check deployment status
+        if ! curl -f -s "http://localhost:$PORT/health/deployment" > /dev/null 2>&1; then
+            send_alert "Deployment health check failed for instance $INSTANCE_ID" "ERROR"
+            exit 1
+        fi
+        
+        echo "Update monitoring check passed"
+        EOH
+        
+        destination = "local/update-monitor.sh"
+        perms = "755"
+      }
+      
+      # Use pre-built binary from ploy directory for now
+      # In production, this would be replaced with artifact from SeaweedFS
+      
+      # Controller startup configuration
       config {
         command = "/home/ploy/ploy/build/controller"
         args = []
       }
       
-      # Lifecycle hooks for rolling updates
+      # Enhanced lifecycle hooks for rolling updates
       lifecycle {
         hook = "prestart"
         sidecar = false
+      }
+      
+      # Enhanced service registration with update monitoring
+      service {
+        name = "ploy-controller-prestart"
+        
+        # Primary health check
+        check {
+          name = "startup-health"
+          type = "script"
+          command = "local/health-check.sh"
+          interval = "10s"
+          timeout = "8s"
+        }
+        
+        # Update monitoring check
+        check {
+          name = "update-monitoring"
+          type = "script"
+          command = "local/update-monitor.sh"
+          interval = "30s"
+          timeout = "10s"
+        }
       }
       
       # Enhanced graceful shutdown configuration for rolling updates
@@ -436,6 +559,31 @@ job "ploy-controller" {
         max_files = 5
         max_file_size = 50  # MB
       }
+      
+      # Note: Volume mounts commented out - requires host volume configuration first
+      # These would be enabled in production with proper volume setup
+    }
+    
+    # Note: Host volumes commented out - would need to be configured in Nomad client first
+    # These would be enabled in production deployment
+    
+    # Ephemeral disk for temporary build artifacts
+    ephemeral_disk {
+      size = 1000     # 1GB for temporary build files
+      migrate = false # Don't migrate on updates
+      sticky = false  # Don't preserve across restarts
     }
   }
+  
+  # Job-level metadata for operational tracking
+  meta {
+    service = "ploy-controller"
+    version = "1.0.0"
+    environment = "production"
+    contact = "ploy-team@organization.com"
+    documentation = "https://docs.ploy.dev/controller"
+  }
+  
+  # Note: Vault integration and parameterized jobs removed for system job compatibility
+  # Vault can be enabled when needed, parameterized jobs only work with batch jobs
 }
