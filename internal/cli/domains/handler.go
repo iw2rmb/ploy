@@ -1,8 +1,11 @@
 package domains
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -36,7 +39,7 @@ func printUsage() {
 	fmt.Println("  add <app> <domain> [--cert=auto|manual|none]  Add domain to app")
 	fmt.Println("  list <app>                                     List domains for app")
 	fmt.Println("  remove <app> <domain>                          Remove domain from app")
-	fmt.Println("  certificates <app> [list|get|provision|remove] <domain>  Manage certificates")
+	fmt.Println("  certificates <app> [list|get|provision|upload|remove] <domain>  Manage certificates")
 	fmt.Println("")
 	fmt.Println("Certificate options:")
 	fmt.Println("  --cert=auto     Automatically provision Let's Encrypt certificate (default)")
@@ -49,6 +52,7 @@ func printUsage() {
 	fmt.Println("  ploy domains add myapp example.com --cert=none")
 	fmt.Println("  ploy domains certificates myapp list")
 	fmt.Println("  ploy domains certificates myapp provision example.com")
+	fmt.Println("  ploy domains certificates myapp upload example.com --cert-file=cert.pem --key-file=key.pem [--ca-file=ca.pem]")
 }
 
 func handleAdd(args []string, controllerURL string) {
@@ -208,7 +212,126 @@ func handleCertificates(args []string, controllerURL string) {
 		io.Copy(os.Stdout, resp.Body)
 		fmt.Println() // Add newline
 		
+	case "upload":
+		handleCertificateUpload(args, controllerURL, app)
+		
 	default:
-		fmt.Println("usage: ploy domains certificates <app> <list|get|provision|remove> [domain]")
+		fmt.Println("usage: ploy domains certificates <app> <list|get|provision|upload|remove> [domain]")
 	}
+}
+
+// handleCertificateUpload handles uploading custom certificate bundles
+func handleCertificateUpload(args []string, controllerURL string, app string) {
+	if len(args) < 3 {
+		fmt.Println("usage: ploy domains certificates <app> upload <domain> --cert-file=<cert.pem> --key-file=<key.pem> [--ca-file=<ca.pem>]")
+		return
+	}
+	
+	domain := args[2]
+	
+	// Parse command line arguments for file paths
+	var certFile, keyFile, caFile string
+	for i := 3; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "--cert-file=") {
+			certFile = strings.TrimPrefix(arg, "--cert-file=")
+		} else if strings.HasPrefix(arg, "--key-file=") {
+			keyFile = strings.TrimPrefix(arg, "--key-file=")
+		} else if strings.HasPrefix(arg, "--ca-file=") {
+			caFile = strings.TrimPrefix(arg, "--ca-file=")
+		}
+	}
+	
+	if certFile == "" || keyFile == "" {
+		fmt.Println("Error: --cert-file and --key-file are required")
+		fmt.Println("usage: ploy domains certificates <app> upload <domain> --cert-file=<cert.pem> --key-file=<key.pem> [--ca-file=<ca.pem>]")
+		return
+	}
+	
+	// Read certificate file
+	certData, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		fmt.Printf("Error reading certificate file %s: %v\n", certFile, err)
+		return
+	}
+	
+	// Read private key file
+	keyData, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		fmt.Printf("Error reading private key file %s: %v\n", keyFile, err)
+		return
+	}
+	
+	// Read CA file if provided
+	var caData []byte
+	if caFile != "" {
+		caData, err = ioutil.ReadFile(caFile)
+		if err != nil {
+			fmt.Printf("Error reading CA file %s: %v\n", caFile, err)
+			return
+		}
+	}
+	
+	// Create multipart form data
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	
+	// Add certificate
+	certPart, err := writer.CreateFormField("certificate")
+	if err != nil {
+		fmt.Printf("Error creating certificate form field: %v\n", err)
+		return
+	}
+	certPart.Write(certData)
+	
+	// Add private key
+	keyPart, err := writer.CreateFormField("private_key")
+	if err != nil {
+		fmt.Printf("Error creating private key form field: %v\n", err)
+		return
+	}
+	keyPart.Write(keyData)
+	
+	// Add CA certificate if provided
+	if len(caData) > 0 {
+		caPart, err := writer.CreateFormField("ca_certificate")
+		if err != nil {
+			fmt.Printf("Error creating CA certificate form field: %v\n", err)
+			return
+		}
+		caPart.Write(caData)
+	}
+	
+	// Add domain
+	domainPart, err := writer.CreateFormField("domain")
+	if err != nil {
+		fmt.Printf("Error creating domain form field: %v\n", err)
+		return
+	}
+	domainPart.Write([]byte(domain))
+	
+	writer.Close()
+	
+	// Make HTTP request
+	url := fmt.Sprintf("%s/v1/apps/%s/certificates/%s/upload", controllerURL, app, domain)
+	req, err := http.NewRequest("POST", url, &body)
+	if err != nil {
+		fmt.Printf("Error creating request: %v\n", err)
+		return
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Printf("Error uploading certificate: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Upload failed with status %d\n", resp.StatusCode)
+	}
+	
+	io.Copy(os.Stdout, resp.Body)
+	fmt.Println() // Add newline
 }

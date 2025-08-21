@@ -108,6 +108,16 @@ check_api_call "POST" "$CONTROLLER_URL/apps/$APP_NAME/domains" \
 check_api_call "POST" "$CONTROLLER_URL/apps/$APP_NAME/certificates/$MANUAL_DOMAIN/provision" \
     "{}" "200" "Manually provision certificate"
 
+echo "6b. Testing custom certificate upload (Note: requires multipart form data)"
+CUSTOM_DOMAIN="custom-$(date +%s).example.com"
+check_api_call "POST" "$CONTROLLER_URL/apps/$APP_NAME/domains" \
+    "{\"domain\":\"$CUSTOM_DOMAIN\",\"certificate\":\"none\"}" \
+    "200" "Add domain for custom certificate"
+
+echo "  Custom certificate upload endpoint available at:"
+echo "  POST $CONTROLLER_URL/apps/$APP_NAME/certificates/$CUSTOM_DOMAIN/upload"
+echo "  (Use: ploy domains certificates $APP_NAME upload $CUSTOM_DOMAIN --cert-file=cert.pem --key-file=key.pem)"
+
 echo "7. Testing certificate removal"
 check_api_call "DELETE" "$CONTROLLER_URL/apps/$APP_NAME/certificates/$MANUAL_DOMAIN" "" "200" "Remove certificate"
 
