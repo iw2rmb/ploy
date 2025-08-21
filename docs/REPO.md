@@ -196,7 +196,12 @@ scripts/
     ├── osv/            # OSv build scripts (Lane C)
     ├── jail/           # FreeBSD jail scripts (Lane D)
     ├── oci/            # OCI container scripts (Lane E)
-    └── packer/         # VM build scripts (Lane F)
+    ├── packer/         # VM build scripts (Lane F)
+    └── wasm/           # WebAssembly build scripts (Lane G)
+        ├── rust-wasm32.sh      # Rust WASM compilation
+        ├── go-js-wasm.sh       # Go WASM compilation
+        ├── assemblyscript.sh   # AssemblyScript compilation
+        └── emscripten.sh       # C/C++ Emscripten compilation
 ```
 
 ### `/test-scripts/` - Test Automation
@@ -246,7 +251,16 @@ docs/
 ├── SCENARIOS.md        # Test scenarios and use cases
 ├── FEATURES.md         # Feature list and capabilities
 ├── TESTS.md            # Test scenarios and validation
-└── WASM.md             # WebAssembly compilation and Lane G
+├── WASM.md             # WebAssembly compilation and Lane G
+└── roadmap/            # Detailed implementation roadmaps
+    ├── arf/            # Automated Remediation Framework roadmap
+    │   ├── README.md           # ARF overview and phase summary
+    │   ├── phase-arf-1.md      # Foundation & Core Engine
+    │   ├── phase-arf-2.md      # Self-Healing Loop & Error Recovery
+    │   ├── phase-arf-3.md      # LLM Integration & Hybrid Intelligence
+    │   ├── phase-arf-4.md      # Security & Production Hardening
+    │   └── phase-arf-5.md      # Production Features & Scale
+    └── static-analysis.md      # Static Analysis Integration Framework
 ```
 
 ## Sample Applications
