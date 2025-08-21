@@ -118,16 +118,16 @@ Ansible playbooks and configuration for deployment environments.
 
 ```
 iac/
-└── dev/                 # Development environment
-    ├── playbooks/       # Ansible playbooks
-    │   ├── main.yml     # Main playbook orchestration
-    │   ├── freebsd.yml  # FreeBSD VM and jail setup
-    │   ├── hashicorp.yml # Consul, Nomad, Vault installation
-    │   ├── seaweedfs.yml # Distributed storage setup
-    │   └── testing.yml  # Test environment preparation
-    ├── vars/            # Ansible variables
-    │   └── main.yml     # Environment-specific variables
-    └── templates/       # Configuration templates
+└── dev/                    # Development environment
+    ├── playbooks/          # Ansible playbooks
+    │   ├── main.yml        # Main playbook orchestration
+    │   ├── freebsd.yml     # FreeBSD VM and jail setup
+    │   ├── hashicorp.yml   # Consul, Nomad, Vault installation
+    │   ├── seaweedfs.yml   # Distributed storage setup
+    │   └── testing.yml     # Test environment preparation
+    ├── vars/               # Ansible variables
+    │   └── main.yml        # Environment-specific variables
+    └── templates/          # Configuration templates
         └── ploy-storage-config.yaml.j2  # Storage config template
 ```
 
@@ -136,7 +136,7 @@ Platform-specific deployment configurations.
 
 ```
 platform/
-└── nomad/              # Nomad job definitions
+└── nomad/                          # Nomad job definitions
     ├── ploy-controller.hcl         # Production system job for Ploy Controller
     ├── ploy-controller-simple.hcl  # Simplified service job for testing
     ├── traefik-simple.hcl          # Basic Traefik configuration
@@ -150,10 +150,10 @@ platform/
 Compiled binaries and build artifacts.
 
 ```
-build/                   # Created during build process
-├── controller          # Controller binary
-├── ploy               # CLI binary
-└── kraft/             # Unikraft build tools
+build/                      # Created during build process
+├── controller              # Controller binary
+├── ploy                    # CLI binary
+└── kraft/                  # Unikraft build tools
     ├── gen_kraft_yaml.sh   # Kraft YAML generator
     └── build_unikraft.sh   # Unikraft build script
 ```
