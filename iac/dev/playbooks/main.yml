@@ -342,8 +342,12 @@
               when: not rustup_binary.stat.exists
               ignore_errors: true
 
-            - name: Add wasm32-wasip1 target (new name)
+            - name: Add wasm32-wasip1 target (new WASI name)
               command: /home/ploy/.cargo/bin/rustup target add wasm32-wasip1
+              when: not rustup_binary.stat.exists
+
+            - name: Add wasm32-unknown-unknown target (browser WASM)
+              command: /home/ploy/.cargo/bin/rustup target add wasm32-unknown-unknown
               when: not rustup_binary.stat.exists
 
             - name: Install WASM-related Rust tools
