@@ -254,7 +254,7 @@ job "ploy-controller" {
     
     # Main controller task
     task "ploy-controller" {
-      driver = "raw_exec"
+      driver = "exec"
       
       # Resource allocation
       resources {
@@ -517,9 +517,8 @@ job "ploy-controller" {
       
       # Controller startup configuration
       config {
-        command = "build/controller"
+        command = "/home/ploy/ploy/build/controller"
         args = []
-        work_dir = "/home/ploy/ploy"
       }
       
       # Enhanced lifecycle hooks for rolling updates
