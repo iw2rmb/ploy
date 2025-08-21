@@ -15,6 +15,7 @@ import (
 
 	"github.com/ploy/ploy/controller/config"
 	"github.com/ploy/ploy/controller/consul_envstore"
+	"github.com/ploy/ploy/controller/dns"
 	"github.com/ploy/ploy/controller/domains"
 	"github.com/ploy/ploy/controller/envstore"
 	"github.com/ploy/ploy/controller/health"
@@ -38,6 +39,7 @@ type ServiceDependencies struct {
 	CleanupHandler    *cleanup.CleanupHandler
 	TTLCleanupService *cleanup.TTLCleanupService
 	SelfUpdateHandler *selfupdate.Handler
+	DNSHandler        *dns.Handler
 	StorageConfigPath string
 }
 
@@ -157,6 +159,12 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize self-update handler: %v", err)
 	}
 
+	// Initialize DNS handler
+	dnsHandler, err := initializeDNSHandler(cfg.ConsulAddr)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize DNS handler: %v", err)
+	}
+
 	deps := &ServiceDependencies{
 		EnvStore:          envStore,
 		TraefikRouter:     traefikRouter,
@@ -164,6 +172,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		CleanupHandler:    cleanupHandler,
 		TTLCleanupService: ttlService,
 		SelfUpdateHandler: selfUpdateHandler,
+		DNSHandler:        dnsHandler,
 		StorageConfigPath: cfg.StorageConfigPath,
 	}
 
@@ -270,6 +279,17 @@ func initializeSelfUpdateHandler(cfg *ControllerConfig) (*selfupdate.Handler, er
 	return handler, nil
 }
 
+// initializeDNSHandler initializes DNS management handler
+func initializeDNSHandler(consulAddr string) (*dns.Handler, error) {
+	dnsHandler, err := dns.NewHandler(consulAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create DNS handler: %w", err)
+	}
+
+	log.Printf("DNS handler initialized with Consul address: %s", consulAddr)
+	return dnsHandler, nil
+}
+
 // getStorageClient creates a new storage client for each request (stateless)
 func (s *Server) getStorageClient() (*storage.StorageClient, error) {
 	return config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
@@ -326,6 +346,11 @@ func (s *Server) setupRoutes() {
 	// Self-update endpoints with dependency injection
 	if s.dependencies.SelfUpdateHandler != nil {
 		selfupdate.SetupRoutes(s.app, s.dependencies.SelfUpdateHandler)
+	}
+
+	// DNS management endpoints with dependency injection
+	if s.dependencies.DNSHandler != nil {
+		dns.SetupDNSRoutes(s.app, s.dependencies.DNSHandler)
 	}
 
 	// Health endpoints in API group for versioned access

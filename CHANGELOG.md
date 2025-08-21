@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [2025-08-21] - Wildcard DNS Configuration (Phase Networking-2 Step 1)
+
+### Added
+- **Multi-Provider DNS Integration**: Complete DNS management system with Cloudflare and Namecheap provider support
+- **Wildcard DNS Configuration**: Full `*.ployd.app` wildcard DNS setup for automatic subdomain routing to deployed applications
+- **DNS API Endpoints**: Comprehensive REST API for DNS management (`/v1/dns/wildcard/*`, `/v1/dns/records`, `/v1/dns/config`)
+- **Provider Abstraction Layer**: Clean DNS provider interface enabling easy addition of Route53, DigitalOcean, and other providers
+- **Load Balancer DNS Support**: Multiple target IP configuration for high availability wildcard DNS setups
+- **IPv6 AAAA Record Support**: Dual-stack DNS with automatic AAAA record management for modern networking
+- **DNS Configuration Management**: Environment variable and JSON file-based configuration with Ansible integration
+
+### Fixed
+- **DNS Record Management**: Complete CRUD operations for all DNS record types (A, AAAA, CNAME, TXT, MX) with proper validation
+- **DNS Propagation Validation**: Real-time DNS resolution testing and wildcard configuration verification
+- **Error Handling**: Comprehensive error handling for DNS provider API failures and configuration issues
+
+### Testing
+- **DNS Integration Tests**: Added test scenarios 185-200 covering all DNS management functionality
+- **Provider Validation**: Comprehensive testing framework for both Cloudflare and Namecheap providers
+- **DNS Resolution Testing**: Validation of wildcard DNS propagation and subdomain routing functionality
+
 ## [2025-08-21] - Controller Self-Update Capability (Phase no-SPOF-3 Step 3)
 
 ### Added

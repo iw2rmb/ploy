@@ -52,16 +52,18 @@ Next steps to implement:
 3. ✅ **COMPLETED (2025-08-20)** Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
 
 **Phase Networking: Production Domain Routing**
-1. ✅ **COMPLETED (2025-08-20)** Deploy Traefik as system job on all Nomad nodes for load balancing and SSL termination.
-2. Implement wildcard DNS configuration for `*.ployd.app` domain routing.
-3. Create Consul service registration with Traefik labels for automatic route discovery.
-4. Add domain management API endpoints: `POST/GET/DELETE /v1/apps/:app/domains`.
-5. Implement Let's Encrypt wildcard certificate management with automatic renewal.
-6. Create health checking system for routed applications with traffic management.
-7. Add blue-green deployment support with gradual traffic shifting via Traefik weights.
-8. Implement CLI commands for domain management: `ploy domains add/remove/list`.
-9. Create SeaweedFS-backed domain mapping storage for persistence and recovery.
-10. Add geographic routing support for multi-region deployments.
+1. ✅ **COMPLETED (2025-08-20)** Traefik deployment as system job on all Nomad nodes
+2. ✅ **COMPLETED (2025-08-21)** Consul service registration with Traefik labels (Phase no-SPOF-2)
+3. ✅ **COMPLETED** Domain management API endpoints (`POST/GET/DELETE /v1/apps/:app/domains`)
+4. ✅ **COMPLETED (2025-08-21)** Health checking system with traffic management (Phase no-SPOF-2)
+5. ✅ **COMPLETED** CLI commands for domain management (`ploy domains add/remove/list`)
+
+**Phase Networking-2: Production Domain Routing**
+1. **Wildcard DNS Configuration**: Set up wildcard DNS for `*.ployd.app` domain routing
+2. **Let's Encrypt Integration**: Implement wildcard certificate management with automatic renewal
+3. **Blue-Green Deployment**: Add gradual traffic shifting via Traefik weights
+4. **Geographic Routing**: Add multi-region deployment support with geo-aware routing
+5. **Domain Storage Enhancement** (Optional): Evaluate if domain mapping should migrate from Consul KV to SeaweedFS
 
 **Phase WASM: WebAssembly Runtime Support**
 1. **WASM Runtime Integration**: Integrate wazero (pure Go) WebAssembly runtime for Lane G deployment.
