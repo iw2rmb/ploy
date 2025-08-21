@@ -17,12 +17,13 @@ import (
 
 // CertificateManager manages Heroku-style certificate provisioning for domains
 type CertificateManager struct {
-	acmeClient      *acme.Client
-	certificateStorage *acme.CertificateStorage
-	renewalService  *acme.RenewalService
-	dnsProvider     dns.Provider
-	consulClient    *consulapi.Client
-	config          *CertConfig
+	acmeClient              *acme.Client
+	certificateStorage      *acme.CertificateStorage
+	renewalService          *acme.RenewalService
+	dnsProvider             dns.Provider
+	consulClient            *consulapi.Client
+	config                  *CertConfig
+	platformWildcardManager *PlatformWildcardCertificateManager
 }
 
 // CertConfig holds certificate management configuration
@@ -87,6 +88,12 @@ func NewCertificateManager(consulClient *consulapi.Client, storageClient storage
 	return manager, nil
 }
 
+// SetPlatformWildcardManager sets the platform wildcard certificate manager
+func (cm *CertificateManager) SetPlatformWildcardManager(pwm *PlatformWildcardCertificateManager) {
+	cm.platformWildcardManager = pwm
+	log.Printf("Platform wildcard certificate manager integrated with certificate manager")
+}
+
 // ProvisionCertificate provisions a certificate for a domain (Heroku-style)
 func (cm *CertificateManager) ProvisionCertificate(ctx context.Context, appName, domain string) (*DomainCertificate, error) {
 	log.Printf("Provisioning certificate for domain %s (app: %s)", domain, appName)
@@ -111,16 +118,29 @@ func (cm *CertificateManager) ProvisionCertificate(ctx context.Context, appName,
 		return nil, fmt.Errorf("failed to store initial certificate record: %w", err)
 	}
 
-	// Determine certificate type (wildcard for ployd.app subdomains, regular for custom domains)
+	// Determine certificate type using platform wildcard manager
 	var cert *acme.Certificate
 	var err error
+	var usedWildcard bool
 
-	if cm.isDefaultDomainSubdomain(domain) {
-		// For *.ployd.app subdomains, use wildcard certificate
-		cert, err = cm.ensureWildcardCertificate(ctx, cm.config.DefaultDomain)
-	} else {
-		// For custom domains, issue individual certificates
+	// Check if platform wildcard certificate manager is available and domain matches
+	if cm.platformWildcardManager != nil && cm.platformWildcardManager.IsPlatformSubdomain(domain) {
+		// Use platform wildcard certificate
+		cert, usedWildcard, err = cm.platformWildcardManager.GetCertificateForDomain(ctx, domain)
+		if err != nil {
+			log.Printf("Failed to get platform wildcard certificate for %s: %v", domain, err)
+		}
+	}
+
+	// Fallback to individual certificate for external domains or if wildcard fails
+	if cert == nil {
+		log.Printf("Issuing individual certificate for external domain: %s", domain)
 		cert, err = cm.acmeClient.IssueCertificate(ctx, []string{domain})
+		usedWildcard = false
+	}
+
+	if usedWildcard {
+		log.Printf("Using platform wildcard certificate for domain: %s", domain)
 	}
 
 	if err != nil {
@@ -130,12 +150,14 @@ func (cm *CertificateManager) ProvisionCertificate(ctx context.Context, appName,
 		return nil, fmt.Errorf("failed to issue certificate: %w", err)
 	}
 
-	// Store certificate
-	if err := cm.certificateStorage.StoreCertificate(ctx, cert); err != nil {
-		domainCert.Status = "failed"
-		domainCert.LastError = fmt.Sprintf("failed to store certificate: %v", err)
-		cm.storeDomainCertificate(domainCert)
-		return nil, fmt.Errorf("failed to store certificate: %w", err)
+	// Store certificate (skip for platform wildcard certificates - already stored)
+	if !usedWildcard {
+		if err := cm.certificateStorage.StoreCertificate(ctx, cert); err != nil {
+			domainCert.Status = "failed"
+			domainCert.LastError = fmt.Sprintf("failed to store certificate: %v", err)
+			cm.storeDomainCertificate(domainCert)
+			return nil, fmt.Errorf("failed to store certificate: %w", err)
+		}
 	}
 
 	// Update domain certificate record
