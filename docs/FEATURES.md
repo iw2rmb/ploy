@@ -429,69 +429,79 @@ Auto-classified lanes:
 
 ## 🧬 Automated Remediation Framework (ARF)
 
-ARF provides enterprise-grade automated code transformation and self-healing capabilities for Java projects using OpenRewrite and LLM integration.
+**STATUS: Planned** - Comprehensive roadmap available in `docs/roadmap/arf/`
 
-### Core Transformation Engine
-- ✅ **Multi-Repository Orchestration**: Dependency-aware transformation across hundreds of repositories simultaneously
-- ✅ **OpenRewrite Integration**: 2,800+ recipes for framework migrations, security patches, and API upgrades
-- ✅ **Hybrid Intelligence**: OpenRewrite for deterministic transformations + LLM assistance for complex patterns
-- ✅ **Recipe Discovery & Creation**: Static catalog search, dynamic generation, and LLM-assisted recipe creation
+ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 
-### Self-Healing Loop System
-- ✅ **Error Classification**: Automatic categorization (recipe_mismatch, compilation_failure, semantic_change, incomplete_transformation)
-- ✅ **Circuit Breaker Pattern**: 50% failure threshold with exponential backoff to prevent cascading failures
-- ✅ **Error-Driven Evolution**: Automatic recipe modification based on failure analysis
-- ✅ **Parallel Solution Testing**: Fork-join framework for concurrent error remediation attempts
+### 📋 **Planned Core Transformation Engine**
+- ⏳ **Multi-Repository Orchestration**: Dependency-aware transformation across hundreds of repositories simultaneously
+- ⏳ **OpenRewrite Integration**: 2,800+ recipes for framework migrations, security patches, and API upgrades
+- ⏳ **Multi-Language Support**: Java, C#, Python, Go, JavaScript/TypeScript, Rust, C/C++ via tree-sitter AST parsing
+- ⏳ **Hybrid Intelligence**: OpenRewrite for deterministic transformations + LLM assistance for complex patterns
+- ⏳ **Recipe Discovery & Creation**: Static catalog search, dynamic generation, and LLM-assisted recipe creation
 
-### Sandbox Validation & Testing
-- ✅ **Multi-Lane Sandbox**: Leverages Ploy's Lane C (OSv) for Java build validation and testing
-- ✅ **Isolation**: FreeBSD jails and ZFS snapshots for secure transformation environments
-- ✅ **Validation Pipeline**: Compilation testing, security scanning, behavioral preservation checks
-- ✅ **Rollback Capability**: Git SHA-based checkpoints for granular rollback operations
+### 📋 **Planned Self-Healing Loop System**
+- ⏳ **Error Classification**: Automatic categorization (recipe_mismatch, compilation_failure, semantic_change, incomplete_transformation)
+- ⏳ **Circuit Breaker Pattern**: 50% failure threshold with exponential backoff to prevent cascading failures
+- ⏳ **Error-Driven Evolution**: Automatic recipe modification based on failure analysis with A/B testing framework
+- ⏳ **Parallel Solution Testing**: Fork-join framework for concurrent error remediation attempts with confidence scoring
 
-### Intelligence & Learning
-- ✅ **Transformation Strategy Selection**: Historical performance analysis with confidence scoring
-- ✅ **Continuous Learning**: Pattern extraction from successful/failed transformations
-- ✅ **Confidence Scoring**: Multi-layered validation (token confidence + build success + test coverage)
-- ✅ **Recipe Performance Tracking**: Success rate analytics by repository type and complexity
+### 📋 **Planned Sandbox Validation & Testing**
+- ⏳ **Multi-Lane Sandbox**: Leverages Ploy's existing lanes for language-specific build validation and testing
+- ⏳ **Isolation**: FreeBSD jails and ZFS snapshots for secure transformation environments with disaster recovery
+- ⏳ **Validation Pipeline**: Compilation testing, security scanning, behavioral preservation checks
+- ⏳ **Cost Model Framework**: Resource usage tracking, budgeting controls, and optimization recommendations
 
-### Security & Vulnerability Management
-- ✅ **Automated Vulnerability Remediation**: OpenRewrite recipes for security patches and CVE fixes
-- ✅ **SBOM Integration**: Supply chain tracking with Syft for transformation artifacts
-- ✅ **Dynamic Security Recipe Generation**: LLM-generated recipes for specific vulnerabilities
-- ✅ **Compliance Validation**: Security best practices enforcement during transformations
+### 📋 **Planned Intelligence & Learning**
+- ⏳ **Transformation Strategy Selection**: Historical performance analysis with confidence scoring and resource prediction
+- ⏳ **Continuous Learning**: Pattern extraction from successful/failed transformations with PostgreSQL vector similarity
+- ⏳ **Confidence Scoring**: Multi-layered validation (token confidence + build success + test coverage)
+- ⏳ **Developer Experience Tooling**: VS Code extension, local preview, debugging tools, and recipe development SDK
 
-### Human-in-the-Loop Integration
-- ✅ **Webhook System**: GitHub/Slack/PagerDuty integration for approval workflows
-- ✅ **Progressive Delegation**: Multi-stage approval (developer → team lead → architecture → security)
-- ✅ **Error Escalation**: Automated escalation when confidence thresholds not met
-- ✅ **Diff Visualization**: Comprehensive transformation diffs for human review
+### 📋 **Planned Security & Vulnerability Management**
+- ⏳ **Enhanced Vulnerability Remediation**: Real-time feeds from NVD, GitHub Advisory, Snyk with zero-day response workflows
+- ⏳ **SBOM Integration**: Supply chain tracking with comprehensive artifact signing using Cosign integration
+- ⏳ **Dynamic Security Recipe Generation**: LLM-generated recipes for specific vulnerabilities with CVE-to-recipe mapping
+- ⏳ **Data Retention & GDPR Compliance**: Comprehensive data lifecycle management with configurable retention policies
 
-### Performance & Scalability
-- ✅ **AST Caching**: Memory-mapped files + LRU cache for 10x performance improvement
-- ✅ **Parallel Processing**: Nomad scheduler integration for distributed execution
-- ✅ **Resource Optimization**: JVM tuning (G1GC, 4GB+ heap) for codebase processing
-- ✅ **Distributed Architecture**: Consul service mesh for multi-repository coordination
+### 📋 **Planned Human-in-the-Loop Integration**
+- ⏳ **Webhook System**: GitHub/Slack/PagerDuty integration for approval workflows with progressive delegation
+- ⏳ **Multi-Stage Approval**: Configurable workflows (developer → team lead → architecture → security)
+- ⏳ **Error Escalation**: Automated escalation when confidence thresholds not met with intelligent routing
+- ⏳ **Diff Visualization**: Comprehensive transformation diffs for human review with security impact analysis
 
-### Use Case Coverage
-- ✅ **Framework Migrations**: Spring Boot upgrades, JUnit 4→5, Java 8→11→17→21
-- ✅ **Security Patching**: Log4Shell remediation, dependency upgrades, vulnerability fixes
-- ✅ **API Modernization**: Deprecated API removal, library version upgrades
-- ✅ **Code Quality**: Technical debt reduction, coding standards enforcement
-- ✅ **Complex Refactoring**: Large-scale architectural changes across multiple repositories
+### 📋 **Planned Performance & Scalability**
+- ⏳ **High Availability Integration**: Distributed processing with Consul leader election and state management
+- ⏳ **AST Caching**: Memory-mapped files + LRU cache for 10x performance improvement with error pattern database
+- ⏳ **Parallel Processing**: Nomad scheduler integration for distributed execution with monitoring infrastructure
+- ⏳ **Production Optimization**: JVM tuning (G1GC, 4GB+ heap) with operational monitoring and SLI/SLO tracking
+
+### 📋 **Planned Enterprise Features**
+- ⏳ **Multi-Repository Campaign Management**: 200-500 repositories per campaign with progress tracking and analytics
+- ⏳ **Advanced Analytics & Cost Optimization**: Business impact measurement, ROI calculations, and LLM API cost management
+- ⏳ **WASM Integration**: Lane G-specific transformations with size optimization and polyfill injection
+- ⏳ **API Ecosystem**: Complete REST API with CLI integration (`ploy arf` commands) and SDK libraries
+
+### 📋 **Planned Use Case Coverage**
+- ⏳ **Framework Migrations**: Spring Boot upgrades, JUnit 4→5, Java 8→11→17→21, .NET Framework → .NET Core/5+
+- ⏳ **Security Patching**: Log4Shell remediation, dependency upgrades, vulnerability fixes with 4-hour critical response
+- ⏳ **API Modernization**: Deprecated API removal, library version upgrades across multiple languages
+- ⏳ **Code Quality**: Technical debt reduction, coding standards enforcement with static analysis integration
+- ⏳ **Complex Refactoring**: Large-scale architectural changes across multiple repositories with impact analysis
 
 **Integration Points:**
-- Lane C (OSv) for Java validation and testing
-- Nomad scheduler for parallel sandbox execution  
-- SeaweedFS for AST cache and artifact storage
-- Consul Connect for service mesh coordination
-- Existing `controller/builders/java_osv.go` integration
+- All Ploy lanes for language-specific validation and testing
+- Nomad scheduler for parallel sandbox execution and resource management
+- SeaweedFS for AST cache, artifact storage, and transformation tracking
+- Consul service mesh for distributed coordination and leader election
+- Existing builder pipeline integration with enhanced validation
 
-**Expected Performance:**
-- 50-80% time reduction in code migrations
-- 95% success rates for well-defined transformations
+**Target Performance Metrics:**
+- 50-80% time reduction in code migrations vs manual effort
+- 95% success rates for well-defined transformations  
 - Days to weeks completion vs months manual effort
-- Mid-scale processing (hundreds of repositories)
+- 200-500 repositories per transformation campaign
+- 300%+ ROI demonstration with measurable business value
 
 ⸻
 
