@@ -48,6 +48,12 @@ func (pwm *PlatformWildcardCertificateManager) EnsurePlatformWildcardCertificate
 	if !pwm.enabled {
 		return nil
 	}
+	
+	// Check if DNS provider is available for wildcard certificate provisioning
+	if pwm.dnsProvider == nil {
+		log.Printf("DNS provider not available, platform wildcard certificate provisioning disabled")
+		return nil
+	}
 
 	wildcardDomain := "*." + pwm.platformDomain
 	log.Printf("Ensuring platform wildcard certificate for %s", wildcardDomain)

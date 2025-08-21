@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -353,10 +354,50 @@ func initializeCertificateManager(cfg *ControllerConfig) (*certificates.Certific
 
 // initializeDNSProvider creates a DNS provider for ACME challenges
 func initializeDNSProvider() (dns.Provider, error) {
-	// For now, return nil - DNS provider will be configured later when ACME is fully implemented
-	// In production, this would load configuration and create the appropriate provider
-	log.Printf("DNS provider initialization skipped - will be configured when ACME is used")
-	return nil, nil
+	// Get DNS provider type from environment
+	providerType := os.Getenv("PLOY_APPS_DOMAIN_PROVIDER")
+	if providerType == "" {
+		log.Printf("PLOY_APPS_DOMAIN_PROVIDER not set, DNS provider disabled")
+		return nil, nil
+	}
+	
+	log.Printf("Initializing DNS provider: %s", providerType)
+	
+	switch strings.ToLower(providerType) {
+	case "namecheap":
+		return initializeNamecheapProvider()
+	default:
+		return nil, fmt.Errorf("unsupported DNS provider: %s", providerType)
+	}
+}
+
+// initializeNamecheapProvider creates a Namecheap DNS provider
+func initializeNamecheapProvider() (dns.Provider, error) {
+	config := dns.NamecheapConfig{
+		APIUser:  os.Getenv("NAMECHEAP_API_USER"),
+		APIKey:   os.Getenv("NAMECHEAP_API_KEY"),
+		Username: os.Getenv("NAMECHEAP_USERNAME"),
+		ClientIP: os.Getenv("NAMECHEAP_CLIENT_IP"),
+		Sandbox:  os.Getenv("NAMECHEAP_SANDBOX") == "true",
+	}
+	
+	// Validate required configuration
+	if config.APIUser == "" || config.APIKey == "" || config.Username == "" || config.ClientIP == "" {
+		return nil, fmt.Errorf("Namecheap DNS provider requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, NAMECHEAP_USERNAME, and NAMECHEAP_CLIENT_IP environment variables")
+	}
+	
+	provider, err := dns.NewNamecheapProvider(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Namecheap provider: %w", err)
+	}
+	
+	// Validate configuration
+	if err := provider.ValidateConfiguration(); err != nil {
+		return nil, fmt.Errorf("Namecheap provider configuration validation failed: %w", err)
+	}
+	
+	log.Printf("Namecheap DNS provider initialized successfully")
+	return provider, nil
 }
 
 // getStorageClient creates a new storage client for each request (stateless)
