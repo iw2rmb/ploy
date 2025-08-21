@@ -2,15 +2,17 @@
 # Global configuration for Ploy dev environment
 
 # Go version for building Ploy
-go_version: "1.22.0"
+go_version: "1.23.0"  # Latest stable Go
 go_arch: "amd64"
 
 # Docker configuration
-docker_compose_version: "2.24.0"
+docker_compose_version: "2.29.2"  # Latest stable Docker Compose
 
+# Node.js configuration for WASM development
+nodejs_version: "20"  # LTS version for stability
 
 # Nomad/Consul versions
-nomad_version: "1.10.4"
+nomad_version: "1.12.3"  # Latest stable Nomad
 consul_version: "1.21.4"
 vault_version: "1.20.2"
 
@@ -66,17 +68,17 @@ nomad_controller:
 # Build tools for different lanes
 build_tools:
   kraft: 
-    version: "0.7.6"
+    version: "0.11.6"  # Latest stable KraftKit
   capstan:
     version: "0.54.0"
   cosign:
-    version: "2.2.2"
+    version: "2.4.0"   # Latest stable Cosign
   syft:
-    version: "0.100.0"
+    version: "1.12.0"  # Latest stable Syft
   grype:
-    version: "0.74.0"
+    version: "0.84.0"  # Latest stable Grype
   opa:
-    version: "0.59.0"
+    version: "0.69.0"  # Latest stable OPA
 
 # SeaweedFS configuration
 seaweedfs:
