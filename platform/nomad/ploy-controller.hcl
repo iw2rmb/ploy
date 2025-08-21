@@ -16,19 +16,8 @@ job "ploy-controller" {
     value = "1073741824"  # 1GB minimum memory
   }
   
-  # Affinity rule for optimal placement - prefer nodes with more CPU
-  affinity {
-    attribute = "${attr.cpu.numcores}"
-    operator = ">="
-    value = "2"
-    weight = 50
-  }
-  
-  # Spread across different availability zones if labeled
-  spread {
-    attribute = "${meta.zone}"
-    weight = 100
-  }
+  # Note: System jobs cannot use affinity or spread blocks
+  # Placement handled by system job scheduling across all nodes
   
   group "controller" {
     # Run 1 instance per node (system job behavior)
@@ -42,15 +31,8 @@ job "ploy-controller" {
       mode = "delay"         # Continue trying to restart with exponential backoff
     }
     
-    # Reschedule policy for node failures
-    reschedule {
-      attempts = 3           # Try to reschedule up to 3 times
-      interval = "24h"       # Reset attempt counter daily
-      delay = "30s"          # Initial delay before rescheduling
-      delay_function = "exponential"  # Exponential backoff
-      max_delay = "10m"      # Maximum delay between attempts
-      unlimited = false      # Don't reschedule indefinitely
-    }
+    # Note: System jobs do not support reschedule policies
+    # System jobs automatically reschedule on node failures
     
     # Update strategy for rolling updates with zero downtime
     update {
@@ -239,24 +221,13 @@ job "ploy-controller" {
         perms = "755"
       }
       
-      # Binary artifact configuration
-      artifact {
-        source = "file:///usr/local/bin/ploy-controller"
-        destination = "local/ploy-controller"
-        mode = "file"
-        options {
-          checksum = "file:///usr/local/bin/ploy-controller.sha256"
-        }
-      }
+      # Use pre-built binary from ploy directory for now
+      # In production, this would be replaced with artifact from SeaweedFS
       
       # Controller startup configuration
       config {
-        command = "local/ploy-controller"
+        command = "/home/ploy/ploy/build/controller"
         args = []
-        
-        # Process configuration
-        pid_mode = "private"
-        ipc_mode = "private"
       }
       
       # Lifecycle hooks
@@ -286,46 +257,12 @@ job "ploy-controller" {
         max_file_size = 50  # MB
       }
       
-      # Volume mounts for persistent data
-      volume_mount {
-        volume = "ploy-data"
-        destination = "/var/lib/ploy"
-        read_only = false
-      }
-      
-      volume_mount {
-        volume = "ploy-config"
-        destination = "/etc/ploy"
-        read_only = true
-      }
-      
-      volume_mount {
-        volume = "ploy-logs"
-        destination = "/var/log/ploy"
-        read_only = false
-      }
+      # Note: Volume mounts commented out - requires host volume configuration first
+      # These would be enabled in production with proper volume setup
     }
     
-    # Shared data volume for application state
-    volume "ploy-data" {
-      type = "host"
-      source = "ploy-data"
-      read_only = false
-    }
-    
-    # Configuration volume (read-only)
-    volume "ploy-config" {
-      type = "host"
-      source = "ploy-config"
-      read_only = true
-    }
-    
-    # Logs volume for centralized logging
-    volume "ploy-logs" {
-      type = "host"
-      source = "ploy-logs"
-      read_only = false
-    }
+    # Note: Host volumes commented out - would need to be configured in Nomad client first
+    # These would be enabled in production deployment
     
     # Ephemeral disk for temporary build artifacts
     ephemeral_disk {
@@ -344,15 +281,6 @@ job "ploy-controller" {
     documentation = "https://docs.ploy.dev/controller"
   }
   
-  # Vault integration for secrets management
-  vault {
-    policies = ["ploy-controller"]
-    change_mode = "restart"
-  }
-  
-  # Parameterized job configuration for different environments
-  parameterized {
-    meta_optional = ["environment", "log_level", "storage_backend"]
-    meta_required = []
-  }
+  # Note: Vault integration and parameterized jobs removed for system job compatibility
+  # Vault can be enabled when needed, parameterized jobs only work with batch jobs
 }
