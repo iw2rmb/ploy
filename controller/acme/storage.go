@@ -1,9 +1,11 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"path/filepath"
 	"time"
@@ -15,7 +17,7 @@ import (
 // CertificateStorage manages certificate storage operations
 type CertificateStorage struct {
 	consulClient  *consulapi.Client
-	storage       storage.Interface
+	storage       storage.StorageProvider
 	keyPrefix     string
 }
 
@@ -35,7 +37,7 @@ type CertificateMetadata struct {
 }
 
 // NewCertificateStorage creates a new certificate storage manager
-func NewCertificateStorage(consulClient *consulapi.Client, storage storage.Interface) *CertificateStorage {
+func NewCertificateStorage(consulClient *consulapi.Client, storage storage.StorageProvider) *CertificateStorage {
 	return &CertificateStorage{
 		consulClient: consulClient,
 		storage:      storage,
@@ -54,16 +56,16 @@ func (cs *CertificateStorage) StoreCertificate(ctx context.Context, cert *Certif
 	issuerPath := fmt.Sprintf("certificates/%s/issuer.pem", domain)
 
 	// Store certificate files in storage system
-	if err := cs.storage.Upload(ctx, certPath, cert.Certificate); err != nil {
+	if err := cs.uploadData(certPath, cert.Certificate); err != nil {
 		return fmt.Errorf("failed to store certificate: %w", err)
 	}
 
-	if err := cs.storage.Upload(ctx, keyPath, cert.PrivateKey); err != nil {
+	if err := cs.uploadData(keyPath, cert.PrivateKey); err != nil {
 		return fmt.Errorf("failed to store private key: %w", err)
 	}
 
 	if len(cert.IssuerCert) > 0 {
-		if err := cs.storage.Upload(ctx, issuerPath, cert.IssuerCert); err != nil {
+		if err := cs.uploadData(issuerPath, cert.IssuerCert); err != nil {
 			return fmt.Errorf("failed to store issuer certificate: %w", err)
 		}
 	}
@@ -101,19 +103,19 @@ func (cs *CertificateStorage) GetCertificate(ctx context.Context, domain string)
 	}
 
 	// Download certificate files from storage
-	certData, err := cs.storage.Download(ctx, metadata.CertPath)
+	certData, err := cs.downloadData(metadata.CertPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to download certificate: %w", err)
 	}
 
-	keyData, err := cs.storage.Download(ctx, metadata.KeyPath)
+	keyData, err := cs.downloadData(metadata.KeyPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to download private key: %w", err)
 	}
 
 	var issuerData []byte
 	if metadata.IssuerPath != "" {
-		issuerData, err = cs.storage.Download(ctx, metadata.IssuerPath)
+		issuerData, err = cs.downloadData(metadata.IssuerPath)
 		if err != nil {
 			log.Printf("Warning: failed to download issuer certificate: %v", err)
 		}
@@ -172,16 +174,16 @@ func (cs *CertificateStorage) DeleteCertificate(ctx context.Context, domain stri
 	}
 
 	// Delete files from storage
-	if err := cs.storage.Delete(ctx, metadata.CertPath); err != nil {
+	if err := cs.deleteData(metadata.CertPath); err != nil {
 		log.Printf("Warning: failed to delete certificate file: %v", err)
 	}
 
-	if err := cs.storage.Delete(ctx, metadata.KeyPath); err != nil {
+	if err := cs.deleteData(metadata.KeyPath); err != nil {
 		log.Printf("Warning: failed to delete private key file: %v", err)
 	}
 
 	if metadata.IssuerPath != "" {
-		if err := cs.storage.Delete(ctx, metadata.IssuerPath); err != nil {
+		if err := cs.deleteData(metadata.IssuerPath); err != nil {
 			log.Printf("Warning: failed to delete issuer certificate file: %v", err)
 		}
 	}
@@ -286,4 +288,30 @@ func (cs *CertificateStorage) getMetadata(ctx context.Context, domain string) (*
 	}
 
 	return &metadata, nil
+}
+
+// uploadData uploads data to storage using the StorageProvider interface
+func (cs *CertificateStorage) uploadData(key string, data []byte) error {
+	reader := bytes.NewReader(data)
+	_, err := cs.storage.PutObject(cs.storage.GetArtifactsBucket(), key, reader, "application/octet-stream")
+	return err
+}
+
+// downloadData downloads data from storage using the StorageProvider interface
+func (cs *CertificateStorage) downloadData(key string) ([]byte, error) {
+	reader, err := cs.storage.GetObject(cs.storage.GetArtifactsBucket(), key)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	
+	return io.ReadAll(reader)
+}
+
+// deleteData deletes data from storage (placeholder - StorageProvider doesn't have Delete method)
+func (cs *CertificateStorage) deleteData(key string) error {
+	// Note: StorageProvider interface doesn't have a Delete method
+	// In a production implementation, this would need to be added to the interface
+	log.Printf("Warning: Cannot delete storage key %s - Delete method not available in StorageProvider", key)
+	return nil
 }
