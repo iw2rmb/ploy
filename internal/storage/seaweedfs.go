@@ -85,6 +85,18 @@ func ensureHTTPScheme(addr string) string {
 // StorageProvider interface implementation for SeaweedFS
 
 func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*PutObjectResult, error) {
+	// Get volume assignment from master
+	assignment, err := c.assignVolume()
+	if err != nil {
+		return nil, fmt.Errorf("failed to assign volume: %w", err)
+	}
+
+	// Upload to volume server
+	fileID, size, err := c.uploadToVolume(assignment, body, contentType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload to volume: %w", err)
+	}
+
 	// Create directory structure in filer if needed
 	dir := filepath.Dir(key)
 	if dir != "." && dir != "/" {
@@ -93,57 +105,15 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 		}
 	}
 
-	// Use filer's direct upload endpoint which handles both volume upload and registration
-	url := fmt.Sprintf("%s/%s/%s?collection=%s&replication=%s", c.filerURL, bucket, key, c.collection, c.replication)
-	
-	// Create multipart form data
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-	
-	// Add file field
-	fileWriter, err := writer.CreateFormFile("file", filepath.Base(key))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create form file: %w", err)
+	// Register file in filer
+	if err := c.registerInFiler(bucket, key, fileID, contentType, size); err != nil {
+		return nil, fmt.Errorf("failed to register in filer: %w", err)
 	}
-	
-	_, err = io.Copy(fileWriter, body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to copy file data: %w", err)
-	}
-	
-	writer.Close()
-	
-	// Make the request
-	req, err := http.NewRequest("POST", url, &buf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("upload failed: %s", resp.Status)
-	}
-	
-	// Parse response to get file info
-	var result struct {
-		Name string `json:"name"`
-		Size int64  `json:"size"`
-	}
-	
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-	
+
 	return &PutObjectResult{
-		ETag:     "", // Not provided by filer direct upload
+		ETag:     fileID,
 		Location: fmt.Sprintf("%s/%s", bucket, key),
-		Size:     result.Size,
+		Size:     size,
 	}, nil
 }
 
@@ -395,23 +365,24 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 func (c *SeaweedFSClient) registerInFiler(bucket, key, fileID, contentType string, size int64) error {
 	url := fmt.Sprintf("%s/%s/%s", c.filerURL, bucket, key)
 
-	// Create the file metadata
-	metadata := map[string]interface{}{
-		"fid":  fileID,
-		"size": size,
-		"mime": contentType,
+	// Create multipart form data with file metadata
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	
+	// Add metadata fields
+	writer.WriteField("fid", fileID)
+	writer.WriteField("size", fmt.Sprintf("%d", size))
+	if contentType != "" {
+		writer.WriteField("mime", contentType)
 	}
+	
+	writer.Close()
 
-	jsonData, err := json.Marshal(metadata)
+	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		return err
 	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
