@@ -198,3 +198,39 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - Pull updated main branch on VPS
 
 **NO EXCEPTIONS**: Every code change must complete this comprehensive protocol. Incomplete updates violate project standards and compromise system integrity. The infrastructure preparation step is particularly critical for ensuring all environments have consistent tooling and dependencies.
+
+## Specialized Agent Integration
+
+**Agent System**: Claude Code supports specialized agents for complex tasks. This repository defines project-specific agents in `.claude/agents.json` with automatic selection based on task patterns.
+
+**Available Specialized Agents**:
+- `ploy-lane-analyzer`: Lane detection, performance analysis, WASM compilation detection
+- `ploy-infrastructure-manager`: VPS deployment, Nomad operations, Ansible playbooks  
+- `ploy-api-developer`: REST API endpoints, controller logic, Go Fiber development
+- `ploy-cli-developer`: CLI commands, user experience, command parsing
+- `ploy-certificate-specialist`: ACME integration, SSL/TLS, certificate lifecycle
+- `ploy-testing-coordinator`: MUP compliance, VPS testing, test automation
+- `ploy-storage-architect`: SeaweedFS, distributed storage, storage abstraction
+- `ploy-security-auditor`: Security reviews, vulnerability assessment, access control
+
+**Agent Selection**: Use `.claude/agent-selector.js` to automatically recommend appropriate agents based on:
+- Task keywords and description
+- File paths being modified  
+- Domain-specific triggers
+- Confidence scoring (threshold: 0.7)
+
+**MUP Agent Alignment**: When following Mandatory Update Protocol:
+- **Step 4-5** (Test Scenarios/Implementation): Use `ploy-testing-coordinator` for comprehensive test development
+- **Step 6** (Local Testing): Use domain-specific agents (e.g., `ploy-api-developer` for API changes)
+- **Step 7** (VPS Testing): Use `ploy-infrastructure-manager` for deployment and `ploy-testing-coordinator` for test execution
+- **Step 10** (Documentation): Use `general-purpose` agent or handle directly for documentation updates
+
+**Agent Usage**: When task complexity warrants specialized expertise, invoke via Task tool:
+```
+Task(
+  subagent_type="ploy-certificate-specialist",
+  prompt="Implement ACME certificate renewal with DNS challenge validation..."
+)
+```
+
+**Agent Updates**: When modifying agent capabilities or adding new specializations, update `.claude/agents.json` configuration and ensure agent expertise aligns with current system architecture and MUP requirements.
