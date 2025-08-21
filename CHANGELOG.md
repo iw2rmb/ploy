@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [2025-08-21] - Rolling Update Strategy Implementation (Phase no-SPOF-2 Step 4)
+
+### Added
+- **Enhanced Rolling Update Strategy with Canary Deployment**
+  - Configured Nomad update blocks with canary deployment (1 instance) for zero-downtime updates
+  - Enhanced health check integration with stricter requirements for update validation
+  - Extended graceful shutdown timeout (60s) for proper rolling update coordination
+  - Update parallelism control with 30-second stagger delay between parallel updates
+
+- **Comprehensive Health Check Integration**
+  - Enhanced primary health check with 3 consecutive successes required for update validation
+  - Stricter failure tolerance (2 failures) during updates with extended grace periods
+  - Rolling update progress monitoring endpoint (/health/update) with canary status tracking
+  - Enhanced readiness check with dependency validation for Consul, Nomad, SeaweedFS, and Vault
+
+- **Automatic Rollback and Monitoring**
+  - Auto-rollback configuration on failed updates with health check integration
+  - Rolling update monitoring script with Slack webhook integration for progress alerts
+  - Update progress reporting with deployment status tracking and failure notifications
+  - Enhanced deployment status check with rollback capability monitoring
+
+- **Zero-Downtime Deployment Configuration**
+  - Extended health validation timeout (5m) and canary promotion delay (5m) for stability
+  - Rolling update environment variables with configurable thresholds and timing
+  - Enhanced service mesh integration with update phase tracking headers
+  - Comprehensive update monitoring templates with alerting capabilities
+
+### Fixed
+- Resolved duplicate lifecycle block error in Nomad job definition
+- Fixed script check configuration by removing unsupported success_before_passing parameter
+- Corrected binary path configuration for raw_exec driver compatibility
+
+### Testing
+- Validated rolling update strategy configuration with Nomad job validation
+- Tested canary deployment functionality and automatic rollback mechanisms
+- Verified health check integration and update progress monitoring
+- Demonstrated zero-downtime update workflow with proper staging and validation
+
 ## [2025-08-21] - Advanced Traefik Load Balancing (Phase no-SPOF-2 Step 3)
 
 ### Added

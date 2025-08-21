@@ -10,6 +10,7 @@ Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu V
 **Cleanup:** Remove conflicting configurations (PATH duplicates, env var conflicts)
 **Templates:** Use Jinja2 templates for all configuration files, never hardcode values
 **Error Handling:** Set `failed_when: false` for optional components, proper status codes for API calls
+**Rolling Updates:** Configure Nomad jobs with canary deployments, health checks, and automatic rollback
 
 ## Quick Setup
 
