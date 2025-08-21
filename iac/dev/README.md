@@ -2,6 +2,15 @@
 
 Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu VPS.
 
+## Playbook Management Rules
+
+**Idempotency:** Always add presence checks before installations (`dpkg -l`, `stat`, `systemctl is-active`)
+**Performance:** Use `when` conditions to skip redundant operations (60-80% faster reruns)
+**Validation:** Include version verification and service status checks after installations
+**Cleanup:** Remove conflicting configurations (PATH duplicates, env var conflicts)
+**Templates:** Use Jinja2 templates for all configuration files, never hardcode values
+**Error Handling:** Set `failed_when: false` for optional components, proper status codes for API calls
+
 ## Quick Setup
 
 **Prerequisites:** Ubuntu 20.04+, 8GB RAM, 4 CPU, 80GB storage, SSH access, Ansible 2.9+
