@@ -204,7 +204,14 @@ Auto-classified lanes:
   - ✅ **SSL/TLS Termination**: Let's Encrypt certificate management with TLS 1.2/1.3 and strong cipher suites
   - ✅ **Dynamic Middleware Configuration**: Service-specific middleware chains with global middleware reuse
   - ✅ **Enhanced Health Checking**: Configurable intervals, timeouts, retries with proper scheme and header support
-  - **Wildcard SSL/TLS**: Let's Encrypt wildcard certificates for `*.ployd.app` domain (planned)
+  - ✅ **Platform Wildcard SSL/TLS** (Aug 2025): Automatic `*.ployd.app` wildcard certificate provisioning
+    - **Automatic Platform Certificate**: Single wildcard certificate covers all platform subdomains
+    - **DNS-01 Challenge Support**: ACME DNS-01 validation for wildcard certificate issuance
+    - **Multi-Provider DNS Integration**: Namecheap and CloudFlare DNS provider support
+    - **Intelligent Certificate Selection**: Wildcard for platform subdomains, individual for external domains
+    - **Automatic Renewal Service**: Background certificate renewal with configurable thresholds
+    - **SeaweedFS Certificate Storage**: Distributed certificate storage for multi-instance access
+    - **Health Monitoring Endpoints**: Platform certificate status and expiry tracking
   - **Blue-Green Deployments**: Gradual traffic shifting with Traefik weight-based routing (planned)
   - **Geographic Routing**: Multi-region support with proximity-based traffic direction (planned)
   - ✅ **Minimal Footprint**: ~40MB binary with 50-100MB RAM per instance
@@ -275,8 +282,16 @@ Auto-classified lanes:
   - **Service Control**: Start/stop service management with automatic startup integration
   - **Statistics & Monitoring**: Age distribution analytics and cleanup operation statistics
   - **Error Resilience**: Graceful handling of Nomad API failures and missing jobs
-- ✅ Domains: `manifests/<app>.yaml` configuration
-- TLS: Certbot integration (planned), BYOC supported
+- ✅ **Heroku-Style Domain Management** (Aug 2025): Complete domain and certificate automation
+  - **Platform Domain Pattern**: Automatic `{app}.ployd.app` subdomain assignment for all apps
+  - **Controller Access Domain**: Controller accessible at `api.ployd.app` via Traefik
+  - **Domain API Endpoints**: `POST /v1/apps/{app}/domains` for adding custom domains
+  - **Automatic Certificate Provisioning**: `certificate: auto` triggers Let's Encrypt provisioning
+  - **Custom Certificate Upload**: Support for uploading custom SSL certificates via API
+  - **Domain Type Detection**: Automatic detection of platform vs external domains
+  - **Traefik Integration**: Automatic routing configuration for all registered domains
+  - **Consul KV Storage**: Persistent domain-to-app mapping storage
+- ✅ TLS: Full Let's Encrypt integration with DNS-01 challenges, BYOC supported
 
 ⸻
 
