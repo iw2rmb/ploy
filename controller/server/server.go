@@ -19,6 +19,7 @@ import (
 	"github.com/ploy/ploy/controller/envstore"
 	"github.com/ploy/ploy/controller/health"
 	"github.com/ploy/ploy/controller/routing"
+	"github.com/ploy/ploy/controller/selfupdate"
 	"github.com/ploy/ploy/internal/build"
 	"github.com/ploy/ploy/internal/cert"
 	"github.com/ploy/ploy/internal/cleanup"
@@ -36,6 +37,7 @@ type ServiceDependencies struct {
 	HealthChecker     *health.HealthChecker
 	CleanupHandler    *cleanup.CleanupHandler
 	TTLCleanupService *cleanup.TTLCleanupService
+	SelfUpdateHandler *selfupdate.Handler
 	StorageConfigPath string
 }
 
@@ -149,12 +151,19 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize cleanup service: %v", err)
 	}
 
+	// Initialize self-update handler
+	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize self-update handler: %v", err)
+	}
+
 	deps := &ServiceDependencies{
 		EnvStore:          envStore,
 		TraefikRouter:     traefikRouter,
 		HealthChecker:     healthChecker,
 		CleanupHandler:    cleanupHandler,
 		TTLCleanupService: ttlService,
+		SelfUpdateHandler: selfUpdateHandler,
 		StorageConfigPath: cfg.StorageConfigPath,
 	}
 
@@ -240,6 +249,27 @@ func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *
 	return cleanupHandler, ttlCleanupService, nil
 }
 
+// initializeSelfUpdateHandler initializes self-update handler
+func initializeSelfUpdateHandler(cfg *ControllerConfig) (*selfupdate.Handler, error) {
+	// Create storage client for self-update operations
+	storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage client for self-update: %w", err)
+	}
+
+	// Get current controller version
+	currentVersion := selfupdate.GetCurrentVersion()
+
+	// Create self-update handler
+	handler, err := selfupdate.NewHandler(storageClient, cfg.ConsulAddr, currentVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create self-update handler: %w", err)
+	}
+
+	log.Printf("Self-update handler initialized (current version: %s)", currentVersion)
+	return handler, nil
+}
+
 // getStorageClient creates a new storage client for each request (stateless)
 func (s *Server) getStorageClient() (*storage.StorageClient, error) {
 	return config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
@@ -291,6 +321,11 @@ func (s *Server) setupRoutes() {
 	// TTL cleanup endpoints with dependency injection
 	if s.dependencies.CleanupHandler != nil {
 		cleanup.SetupRoutes(s.app, s.dependencies.CleanupHandler)
+	}
+
+	// Self-update endpoints with dependency injection
+	if s.dependencies.SelfUpdateHandler != nil {
+		selfupdate.SetupRoutes(s.app, s.dependencies.SelfUpdateHandler)
 	}
 
 	// Health endpoints in API group for versioned access
