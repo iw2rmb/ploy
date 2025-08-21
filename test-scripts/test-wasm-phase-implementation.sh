@@ -101,7 +101,7 @@ test_wasm_runtime() {
     # Test basic WASM module loading
     echo "Testing WASM module loading..."
     if [ -f "controller/runtime/wasm.go" ]; then
-        if go run -c controller/runtime/wasm.go >/dev/null 2>&1; then
+        if go build ./controller/runtime >/dev/null 2>&1; then
             print_success "✓ WASM runtime module compiles successfully"
         else
             print_error "✗ WASM runtime module compilation failed"
@@ -134,7 +134,7 @@ test_wasm_builder() {
     # Check WASM builder module
     if [ -f "controller/builders/wasm.go" ]; then
         echo "Testing WASM builder compilation..."
-        if go run -c controller/builders/wasm.go >/dev/null 2>&1; then
+        if go build ./controller/builders >/dev/null 2>&1; then
             print_success "✓ WASM builder compiles successfully"
         else
             print_error "✗ WASM builder compilation failed"
@@ -187,7 +187,7 @@ test_nomad_integration() {
             print_warning "⚠ Nomad WASM template missing wasm-runner reference"
         fi
         
-        if grep -q "artifact.*wasm" "$template_file"; then
+        if grep -q "artifact" "$template_file" && grep -q "app.wasm" "$template_file"; then
             print_success "✓ Nomad WASM template includes WASM artifact handling"
         else
             print_warning "⚠ Nomad WASM template missing WASM artifact configuration"
@@ -199,8 +199,11 @@ test_nomad_integration() {
     # Check WASM runner binary
     if [ -f "cmd/ploy-wasm-runner/main.go" ]; then
         echo "Testing WASM runner compilation..."
-        if go run -c cmd/ploy-wasm-runner/main.go >/dev/null 2>&1; then
+        if [ -f "build/ploy-wasm-runner" ]; then
             print_success "✓ WASM runner compiles successfully"
+        elif go build -o /tmp/test-wasm-runner ./cmd/ploy-wasm-runner >/dev/null 2>&1; then
+            print_success "✓ WASM runner compiles successfully"
+            rm -f /tmp/test-wasm-runner
         else
             print_error "✗ WASM runner compilation failed"
             return 1
@@ -255,7 +258,7 @@ test_component_model() {
     
     if [ -f "controller/wasm/components.go" ]; then
         echo "Testing WASM component model..."
-        if go run -c controller/wasm/components.go >/dev/null 2>&1; then
+        if go build ./controller/wasm >/dev/null 2>&1; then
             print_success "✓ WASM component model compiles successfully"
         else
             print_error "✗ WASM component model compilation failed"

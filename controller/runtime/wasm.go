@@ -183,6 +183,16 @@ func (w *WASMRuntime) Close(ctx context.Context) error {
 	return w.runtime.Close(ctx)
 }
 
+// Runtime returns the underlying wazero runtime for advanced operations
+func (w *WASMRuntime) Runtime() wazero.Runtime {
+	return w.runtime
+}
+
+// DefaultModuleConfig returns the default module configuration
+func DefaultModuleConfig() wazero.ModuleConfig {
+	return wazero.NewModuleConfig().WithName("default")
+}
+
 // WASIConfig configures WASI (WebAssembly System Interface) settings
 type WASIConfig struct {
 	Args     []string               // Command line arguments
