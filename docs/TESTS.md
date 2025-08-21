@@ -651,3 +651,25 @@
 565. `POST /v1/cleanup/trigger?dry_run=true` performs manual cleanup with dry run option.
 566. `GET /v1/cleanup/status` provides service status and statistics.
 567. `GET /v1/cleanup/jobs` lists current preview jobs with ages and cleanup recommendations.
+
+### Controller Nomad Deployment (568-587)
+568. Ansible playbook deploys controller via Nomad job instead of systemd service.
+569. Controller binary distributed via SeaweedFS with version management and integrity verification.
+570. Nomad controller job runs with high availability (2+ replicas) across different nodes.
+571. Controller deployment includes proper service ordering: SeaweedFS → HashiCorp → Controller.
+572. Controller health checks (`/health` and `/ready`) integrated with Nomad service discovery.
+573. Controller deployment supports rolling updates with canary deployment strategy.
+574. Controller binary downloaded from SeaweedFS artifacts during Nomad task startup.
+575. `ployman controller upload <version>` uploads controller binary to SeaweedFS storage.
+576. `ployman controller download <version>` downloads specific controller version locally.
+577. `ployman controller list` displays all available controller versions in storage.
+578. `ployman controller rollback <version>` performs controller rollback with health validation.
+579. `ployman controller build <version>` builds and distributes controller across platforms.
+580. Controller update script performs rolling update with health monitoring and automatic rollback.
+581. Controller rollback script validates target version and performs safe rollback with verification.
+582. Controller status script shows Nomad job status, allocations, and API health information.
+583. Migration script validates environment and assists transition from systemd to Nomad deployment.
+584. Controller management scripts available in `/home/ploy/controller-scripts/` directory.
+585. Controller version tracking maintained in `/opt/ploy/current-controller-version` file.
+586. Controller deployment validation includes dependency checks and API endpoint verification.
+587. Controller processes automatically cleaned up before migration to prevent conflicts.

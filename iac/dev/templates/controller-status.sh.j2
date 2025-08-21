@@ -1,0 +1,107 @@
+#!/bin/bash
+# Controller Status Script
+# Shows comprehensive status of Ploy controller deployment
+
+set -e
+
+PLOY_DIR="/home/ploy/ploy"
+
+echo "=== Ploy Controller Status ==="
+
+# Check if we're in the right directory
+if [[ ! -d "$PLOY_DIR" ]]; then
+    echo "Error: Ploy directory not found at $PLOY_DIR"
+    exit 1
+fi
+
+cd "$PLOY_DIR"
+
+# Current version
+echo "🔍 Current Version:"
+CURRENT_VERSION=$(cat /opt/ploy/current-controller-version 2>/dev/null || echo "unknown")
+echo "  Version: $CURRENT_VERSION"
+
+# Nomad job status
+echo ""
+echo "🎯 Nomad Job Status:"
+export NOMAD_ADDR="http://localhost:4646"
+
+if nomad job status ploy-controller >/dev/null 2>&1; then
+    echo "  Job Status: $(nomad job status -short ploy-controller | grep Status | awk '{print $3}')"
+    
+    # Allocation details
+    echo ""
+    echo "📦 Allocations:"
+    nomad job allocs ploy-controller | head -10
+    
+    # Health check status
+    echo ""
+    echo "🏥 Service Health:"
+    ALLOC_ID=$(nomad job allocs -short ploy-controller | grep running | head -1 | awk '{print $1}')
+    if [[ -n "$ALLOC_ID" ]]; then
+        echo "  Allocation ID: $ALLOC_ID"
+        echo "  Node: $(nomad alloc status $ALLOC_ID | grep 'Node Name' | awk '{print $3}')"
+    fi
+else
+    echo "  ❌ No controller job found in Nomad"
+fi
+
+# API health check
+echo ""
+echo "🌐 API Health:"
+if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" >/dev/null; then
+    echo "  ✅ Health endpoint: http://localhost:{{ ploy.controller_port }}/health"
+    
+    # Try to get detailed health info
+    HEALTH_RESPONSE=$(curl -s "http://localhost:{{ ploy.controller_port }}/health" | jq . 2>/dev/null || echo "Unable to parse health response")
+    echo "  Health Details: $HEALTH_RESPONSE"
+else
+    echo "  ❌ Health endpoint unreachable: http://localhost:{{ ploy.controller_port }}/health"
+fi
+
+# Readiness check
+if curl -f -s "http://localhost:{{ ploy.controller_port }}/ready" >/dev/null; then
+    echo "  ✅ Readiness endpoint: http://localhost:{{ ploy.controller_port }}/ready"
+else
+    echo "  ❌ Readiness endpoint unreachable: http://localhost:{{ ploy.controller_port }}/ready"
+fi
+
+# Available versions in storage
+echo ""
+echo "📚 Available Versions in Storage:"
+if [[ -f "./build/controller-dist" ]]; then
+    ./build/controller-dist -command=list | head -10
+else
+    echo "  ⚠️  controller-dist tool not found"
+fi
+
+# Service discovery
+echo ""
+echo "🔍 Service Discovery:"
+if curl -s "http://localhost:8500/v1/health/service/ploy-controller" >/dev/null 2>&1; then
+    CONSUL_SERVICES=$(curl -s "http://localhost:8500/v1/health/service/ploy-controller" | jq -r '.[].Service.Address + ":" + (.[].Service.Port | tostring)' | sort | uniq)
+    echo "  Consul Services:"
+    echo "$CONSUL_SERVICES" | sed 's/^/    /'
+else
+    echo "  ⚠️  Unable to query Consul service discovery"
+fi
+
+# Recent logs (if accessible)
+echo ""
+echo "📋 Recent Logs:"
+if [[ -n "$ALLOC_ID" ]]; then
+    echo "  Last 10 log lines:"
+    nomad alloc logs -tail -n 10 "$ALLOC_ID" 2>/dev/null | sed 's/^/    /' || echo "    Unable to fetch logs"
+else
+    echo "  ⚠️  No running allocation found"
+fi
+
+# Resource usage
+echo ""
+echo "💾 Resource Usage:"
+if [[ -n "$ALLOC_ID" ]]; then
+    nomad alloc status "$ALLOC_ID" | grep -A 5 "Resource Usage" | sed 's/^/  /'
+fi
+
+echo ""
+echo "=== Status Check Complete ==="

@@ -45,6 +45,13 @@ ploy:
   controller_port: 8081
   storage_backend: "seaweedfs"
 
+# Nomad controller deployment configuration
+nomad_controller:
+  replicas: 2
+  resources:
+    cpu: 500    # MHz
+    memory: 512 # MB
+
 # Build tools for different lanes
 build_tools:
   kraft: 

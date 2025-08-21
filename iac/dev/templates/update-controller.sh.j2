@@ -1,0 +1,95 @@
+#!/bin/bash
+# Controller Update Script
+# Updates Ploy controller to latest version via Nomad rolling deployment
+
+set -e
+
+PLOY_DIR="/home/ploy/ploy"
+CONTROLLER_DIR="/home/ploy/controller-scripts"
+
+echo "=== Ploy Controller Update ==="
+
+# Check if we're in the right directory
+if [[ ! -d "$PLOY_DIR" ]]; then
+    echo "Error: Ploy directory not found at $PLOY_DIR"
+    exit 1
+fi
+
+cd "$PLOY_DIR"
+
+# Generate new version
+NEW_VERSION="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+echo "New controller version: $NEW_VERSION"
+
+# Build controller binary
+echo "Building controller binary..."
+go build -o build/controller ./controller
+
+# Build distribution tool
+echo "Building distribution tool..."
+go build -o build/controller-dist ./tools/controller-dist
+
+# Upload new controller version
+echo "Uploading controller binary to SeaweedFS..."
+./build/controller-dist \
+    -command=upload \
+    -version="$NEW_VERSION" \
+    -binary=./build/controller \
+    -platform=linux \
+    -arch=amd64
+
+# Update Nomad job template with new version
+echo "Updating Nomad job configuration..."
+sudo sed -i "s/controller_version: \".*\"/controller_version: \"$NEW_VERSION\"/" \
+    /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+
+# Trigger rolling update
+echo "Triggering Nomad rolling update..."
+export NOMAD_ADDR="http://localhost:4646"
+nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+
+# Monitor deployment
+echo "Monitoring deployment progress..."
+TIMEOUT=300  # 5 minutes
+START_TIME=$(date +%s)
+
+while true; do
+    CURRENT_TIME=$(date +%s)
+    if (( CURRENT_TIME - START_TIME > TIMEOUT )); then
+        echo "Error: Deployment timeout after 5 minutes"
+        exit 1
+    fi
+
+    # Check allocation status
+    ALLOCS=$(nomad job allocs -json ploy-controller | jq -r '.[].ClientStatus' | sort | uniq -c)
+    RUNNING_COUNT=$(echo "$ALLOCS" | grep -c "running" || echo "0")
+    TOTAL_COUNT=$(nomad job allocs -json ploy-controller | jq '. | length')
+
+    echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
+
+    if [[ "$RUNNING_COUNT" == "$TOTAL_COUNT" ]] && [[ "$RUNNING_COUNT" -gt "0" ]]; then
+        echo "All allocations are running!"
+        break
+    fi
+
+    sleep 10
+done
+
+# Verify health
+echo "Verifying controller health..."
+sleep 30  # Allow time for startup
+
+if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" > /dev/null; then
+    echo "✅ Controller health check passed"
+else
+    echo "❌ Controller health check failed"
+    echo "Rolling back to previous version..."
+    "$CONTROLLER_DIR/rollback-controller.sh"
+    exit 1
+fi
+
+# Save current version
+echo "$NEW_VERSION" | sudo tee /opt/ploy/current-controller-version > /dev/null
+
+echo "✅ Controller updated successfully to version $NEW_VERSION"
+echo "API endpoint: http://localhost:{{ ploy.controller_port }}/health"
