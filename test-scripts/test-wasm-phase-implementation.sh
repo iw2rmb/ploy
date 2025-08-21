@@ -2,7 +2,25 @@
 # Test scenarios for Phase WASM: WebAssembly Runtime Support
 set -euo pipefail
 
-source "$(dirname "$0")/common-test-functions.sh"
+# Common test functions (inline)
+print_test_header() {
+    echo ""
+    echo "===================="
+    echo "🧪 $1"
+    echo "===================="
+}
+
+print_success() {
+    echo -e "\033[32m$1\033[0m"
+}
+
+print_error() {
+    echo -e "\033[31m$1\033[0m"
+}
+
+print_warning() {
+    echo -e "\033[33m$1\033[0m"
+}
 
 # WASM Phase Implementation Test Suite
 echo "🧪 Starting Phase WASM Implementation Tests..."
@@ -14,7 +32,7 @@ test_wasm_detection() {
     # Test Rust WASM detection
     echo "Testing Rust WASM detection..."
     if [ -d "apps/wasm-rust-hello" ]; then
-        result=$(./build/ploy lane-pick --path apps/wasm-rust-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./build/ploy-lane-pick --path apps/wasm-rust-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ Rust WASM detected as Lane G"
         else
@@ -28,7 +46,7 @@ test_wasm_detection() {
     # Test Go WASM detection  
     echo "Testing Go WASM detection..."
     if [ -d "apps/wasm-go-hello" ]; then
-        result=$(./build/ploy lane-pick --path apps/wasm-go-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./build/ploy-lane-pick --path apps/wasm-go-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ Go WASM detected as Lane G"
         else
@@ -42,7 +60,7 @@ test_wasm_detection() {
     # Test AssemblyScript detection
     echo "Testing AssemblyScript detection..."
     if [ -d "apps/wasm-assemblyscript-hello" ]; then
-        result=$(./build/ploy lane-pick --path apps/wasm-assemblyscript-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./build/ploy-lane-pick --path apps/wasm-assemblyscript-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ AssemblyScript detected as Lane G"
         else
@@ -56,7 +74,7 @@ test_wasm_detection() {
     # Test C++ Emscripten detection
     echo "Testing C++ Emscripten detection..."
     if [ -d "apps/wasm-cpp-hello" ]; then
-        result=$(./build/ploy lane-pick --path apps/wasm-cpp-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./build/ploy-lane-pick --path apps/wasm-cpp-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ C++ Emscripten detected as Lane G"
         else
