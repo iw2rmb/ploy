@@ -329,12 +329,19 @@ func LoadDNSConfig() (*DNSConfig, error) {
 				APIKey:   os.Getenv("CLOUDFLARE_API_KEY"),
 			}
 		} else if provider == "namecheap" {
+			// Use appropriate API key based on sandbox setting
+			sandbox := os.Getenv("NAMECHEAP_SANDBOX") == "true"
+			apiKey := os.Getenv("NAMECHEAP_API_KEY")
+			if sandbox && os.Getenv("NAMECHEAP_SANDBOX_API_KEY") != "" {
+				apiKey = os.Getenv("NAMECHEAP_SANDBOX_API_KEY")
+			}
+			
 			config.Namecheap = &NamecheapConfig{
 				APIUser:  os.Getenv("NAMECHEAP_API_USER"),
-				APIKey:   os.Getenv("NAMECHEAP_API_KEY"),
+				APIKey:   apiKey,
 				Username: os.Getenv("NAMECHEAP_USERNAME"),
 				ClientIP: os.Getenv("NAMECHEAP_CLIENT_IP"),
-				Sandbox:  os.Getenv("NAMECHEAP_SANDBOX") == "true",
+				Sandbox:  sandbox,
 			}
 		}
 		

@@ -329,11 +329,12 @@
           export CLOUDFLARE_API_TOKEN="{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
           export CLOUDFLARE_ZONE_ID="{{ lookup('env', 'CLOUDFLARE_ZONE_ID') }}"
           {% endif %}
-          {% if lookup('env', 'NAMECHEAP_API_KEY') %}
+          {% if lookup('env', 'NAMECHEAP_API_KEY') or lookup('env', 'NAMECHEAP_SANDBOX_API_KEY') %}
           export NAMECHEAP_API_KEY="{{ lookup('env', 'NAMECHEAP_API_KEY') }}"
-          export NAMECHEAP_API_USER="{{ lookup('env', 'NAMECHEAP_API_USER') }}"
-          export NAMECHEAP_USERNAME="{{ lookup('env', 'NAMECHEAP_USERNAME') }}"
-          export NAMECHEAP_CLIENT_IP="{{ lookup('env', 'NAMECHEAP_CLIENT_IP') }}"
+          export NAMECHEAP_SANDBOX_API_KEY="{{ lookup('env', 'NAMECHEAP_SANDBOX_API_KEY') }}"
+          export NAMECHEAP_API_USER="{{ lookup('env', 'NAMECHEAP_API_USER') | default('iw2rmb') }}"
+          export NAMECHEAP_USERNAME="{{ lookup('env', 'NAMECHEAP_USERNAME') | default('iw2rmb') }}"
+          export NAMECHEAP_CLIENT_IP="{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address']) }}"
           export NAMECHEAP_SANDBOX="{{ lookup('env', 'NAMECHEAP_SANDBOX') | default('true') }}"
           {% endif %}
           

@@ -295,6 +295,7 @@ job "ploy-controller" {
         
         # Namecheap DNS provider configuration
         NAMECHEAP_API_KEY = "c8615d72b5794eb0a52cbf1cf22fc42f"
+        NAMECHEAP_SANDBOX_API_KEY = "4ecde47766444cc4b464d017c9dc3749"
         NAMECHEAP_API_USER = "iw2rmb"
         NAMECHEAP_USERNAME = "iw2rmb"
         NAMECHEAP_CLIENT_IP = "45.12.75.241"
