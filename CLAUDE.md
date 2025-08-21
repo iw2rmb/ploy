@@ -165,6 +165,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - **STACK.md Dependencies**: Update technology stack documentation when adding or modifying frameworks, tools, or dependencies
     - **REPO.md Structure**: Update repository structure documentation if new files, folders, or architectural changes were made
     - **API.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
+    - **iac/dev/README.md Infrastructure**: Update infrastructure documentation when Ansible playbooks, templates, configurations, or deployment procedures are modified
     - Commit all documentation updates to feature branch
     - Merge feature branch to main branch
     - Delete feature branch locally
