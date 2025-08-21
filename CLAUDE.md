@@ -61,20 +61,34 @@ Test: `ssh root@$TARGET_HOST && su - ploy && ./test-scripts/test-*.sh`
 
 ## Development Commands
 
-### Controller (Backend API)
+### Controller (Backend API) - Local Testing Only
+**Note:** Direct controller execution is for local development only. On VPS, use Nomad deployment.
+
 ```bash
-# Build and start the controller from build/ folder
+# LOCAL DEVELOPMENT ONLY - Build and start the controller from build/ folder
 go build -o build/controller ./controller
 ./build/controller
 
-# Or run directly (development)
+# LOCAL DEVELOPMENT ONLY - Or run directly for development
 go run ./controller
 
-# Start with custom config
+# LOCAL DEVELOPMENT ONLY - Start with custom config
 PLOY_STORAGE_CONFIG=path/to/config.yaml ./build/controller
 
-# Start on different port
+# LOCAL DEVELOPMENT ONLY - Start on different port
 PORT=8082 ./build/controller
+```
+
+**For VPS/Production Testing:**
+```bash
+# Build controller binary
+go build -o build/controller ./controller
+
+# Deploy via Nomad (production method)
+nomad job run platform/nomad/ploy-controller-simple.hcl
+
+# Check deployment status
+nomad job status ploy-controller-simple
 ```
 
 ### CLI Tool
@@ -148,7 +162,11 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
-    - **Controller Shutdown**: Stop any running controller before testing: `pkill -f './build/controller' || true`
+    - **Controller Deployment**: Compile and deploy controller via Nomad for production testing
+      - Build controller binary: `go build -o build/controller ./controller`
+      - Stop existing Nomad job if running: `nomad job stop ploy-controller-simple || true`
+      - Deploy via Nomad: `nomad job run platform/nomad/ploy-controller-simple.hcl`
+      - Verify deployment: `nomad job status ploy-controller-simple`
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
 8. **Error Resolution**: IF any tests fail:
