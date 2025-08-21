@@ -50,23 +50,37 @@ type AppRoute struct {
 
 // RouteConfig holds configuration for app routing
 type RouteConfig struct {
-	EnableTLS       bool     `json:"enable_tls"`
-	CertResolver    string   `json:"cert_resolver"`
-	HealthPath      string   `json:"health_path"`
-	LoadBalanceMode string   `json:"load_balance_mode"`
-	StickySession   bool     `json:"sticky_session"`
-	Middlewares     []string `json:"middlewares,omitempty"`
+	EnableTLS           bool     `json:"enable_tls"`
+	CertResolver        string   `json:"cert_resolver"`
+	HealthPath          string   `json:"health_path"`
+	LoadBalanceMode     string   `json:"load_balance_mode"`
+	StickySession       bool     `json:"sticky_session"`
+	Middlewares         []string `json:"middlewares,omitempty"`
+	HealthCheckInterval string   `json:"health_check_interval"`
+	HealthCheckTimeout  string   `json:"health_check_timeout"`
+	HealthCheckRetries  int      `json:"health_check_retries"`
+	CircuitBreaker      bool     `json:"circuit_breaker"`
+	RetryAttempts       int      `json:"retry_attempts"`
+	RateLimit           int      `json:"rate_limit"`
+	SecurityHeaders     bool     `json:"security_headers"`
 }
 
 // DefaultRouteConfig returns default routing configuration
 func DefaultRouteConfig() *RouteConfig {
 	return &RouteConfig{
-		EnableTLS:       true,
-		CertResolver:    "letsencrypt",
-		HealthPath:      "/healthz",
-		LoadBalanceMode: "round_robin",
-		StickySession:   false,
-		Middlewares:     []string{},
+		EnableTLS:           true,
+		CertResolver:        "letsencrypt",
+		HealthPath:          "/healthz",
+		LoadBalanceMode:     "weighted_round_robin",
+		StickySession:       false,
+		Middlewares:         []string{},
+		HealthCheckInterval: "10s",
+		HealthCheckTimeout:  "5s",
+		HealthCheckRetries:  3,
+		CircuitBreaker:      true,
+		RetryAttempts:       3,
+		RateLimit:           50,
+		SecurityHeaders:     true,
 	}
 }
 
@@ -123,6 +137,43 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 	return nil
 }
 
+// ControllerRouteConfig returns optimized configuration for Ploy Controller
+func ControllerRouteConfig() *RouteConfig {
+	return &RouteConfig{
+		EnableTLS:           true,
+		CertResolver:        "letsencrypt",
+		HealthPath:          "/health",
+		LoadBalanceMode:     "weighted_round_robin",
+		StickySession:       false,
+		Middlewares:         []string{"ploy-controller-cors"}, // Use global middleware
+		HealthCheckInterval: "10s",
+		HealthCheckTimeout:  "5s",
+		HealthCheckRetries:  3,
+		CircuitBreaker:      true,
+		RetryAttempts:       3,
+		RateLimit:           100, // Higher rate limit for controller
+		SecurityHeaders:     true,
+	}
+}
+
+// RegisterController registers the Ploy Controller with enhanced load balancing
+func (tr *TraefikRouter) RegisterController(allocID, allocIP string, port int) error {
+	route := &AppRoute{
+		App:        "ploy-controller",
+		Domain:     "api.ployd.app",
+		Port:       port,
+		AllocID:    allocID,
+		AllocIP:    allocIP,
+		HealthPath: "/health",
+		TLSEnabled: true,
+		CreatedAt:  time.Now(),
+	}
+	
+	config := ControllerRouteConfig()
+	
+	return tr.RegisterApp(route, config)
+}
+
 // buildTraefikTags constructs Traefik configuration tags
 func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) []string {
 	tags := []string{
@@ -153,10 +204,14 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 	serviceName := fmt.Sprintf("%s-service", route.App)
 	tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%d", serviceName, route.Port))
 	
-	// Health check configuration
+	// Advanced health check configuration
 	if config.HealthPath != "" {
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.path=%s", serviceName, config.HealthPath))
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.interval=10s", serviceName))
+		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.interval=%s", serviceName, config.HealthCheckInterval))
+		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.timeout=%s", serviceName, config.HealthCheckTimeout))
+		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.retries=%d", serviceName, config.HealthCheckRetries))
+		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.scheme=http", serviceName))
+		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.headers.X-Health-Check=traefik", serviceName))
 	}
 	
 	// Load balancing configuration
@@ -170,10 +225,52 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.sticky.cookie.name=%s-session", serviceName, route.App))
 	}
 	
-	// Middlewares
-	if len(config.Middlewares) > 0 {
-		middlewares := strings.Join(config.Middlewares, ",")
-		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, middlewares))
+	// Build dynamic middleware chain
+	middlewares := make([]string, 0, len(config.Middlewares)+5)
+	middlewares = append(middlewares, config.Middlewares...)
+	
+	// Add rate limiting if configured
+	if config.RateLimit > 0 {
+		rateLimitName := fmt.Sprintf("%s-ratelimit", route.App)
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.burst=%d", rateLimitName, config.RateLimit*2))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.average=%d", rateLimitName, config.RateLimit))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.period=1m", rateLimitName))
+		middlewares = append(middlewares, rateLimitName)
+	}
+	
+	// Add security headers if enabled
+	if config.SecurityHeaders {
+		securityName := fmt.Sprintf("%s-security", route.App)
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.sslredirect=true", securityName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.forcestsheader=true", securityName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.stsincludesubdomains=true", securityName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.stsseconds=63072000", securityName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.customresponseheaders.X-Content-Type-Options=nosniff", securityName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.customresponseheaders.X-Frame-Options=DENY", securityName))
+		middlewares = append(middlewares, securityName)
+	}
+	
+	// Add circuit breaker if enabled
+	if config.CircuitBreaker {
+		circuitBreakerName := fmt.Sprintf("%s-circuitbreaker", route.App)
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.expression=NetworkErrorRatio() > 0.30", circuitBreakerName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.checkperiod=10s", circuitBreakerName))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.fallbackduration=30s", circuitBreakerName))
+		middlewares = append(middlewares, circuitBreakerName)
+	}
+	
+	// Add retry middleware if configured
+	if config.RetryAttempts > 0 {
+		retryName := fmt.Sprintf("%s-retry", route.App)
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.retry.attempts=%d", retryName, config.RetryAttempts))
+		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.retry.initialinterval=100ms", retryName))
+		middlewares = append(middlewares, retryName)
+	}
+	
+	// Apply middleware chain to router
+	if len(middlewares) > 0 {
+		middlewareChain := strings.Join(middlewares, ",")
+		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, middlewareChain))
 	}
 	
 	return tags

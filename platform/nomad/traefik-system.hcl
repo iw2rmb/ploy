@@ -120,6 +120,14 @@ job "traefik-system" {
           readonly = true
         }
         
+        # Mount for static Traefik configuration files
+        mount {
+          type = "bind"
+          source = "local/static"
+          target = "/etc/traefik/static"
+          readonly = true
+        }
+        
         # Volume for Let's Encrypt certificates
         volumes = [
           "traefik-acme:/data"
@@ -257,6 +265,89 @@ serversTransport:
       idleConnTimeout: 90s
 EOF
         destination = "local/traefik.yml"
+        perms = "644"
+      }
+      
+      # Controller load balancer configuration - copied from platform/traefik/controller-load-balancer.yml
+      template {
+        data = <<EOF
+# Traefik Dynamic Configuration for Ploy Controller Load Balancing
+http:
+  middlewares:
+    ploy-controller-ratelimit:
+      rateLimit:
+        burst: 100
+        period: "1m"
+        average: 50
+        sourceCriterion:
+          requestHeaderName: "X-Forwarded-For"
+          requestHost: true
+    
+    ploy-controller-security:
+      headers:
+        sslRedirect: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 63072000
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Content-Type-Options: "nosniff"
+          X-Frame-Options: "DENY"
+          X-XSS-Protection: "1; mode=block"
+          Referrer-Policy: "strict-origin-when-cross-origin"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        frameOptions: "DENY"
+    
+    ploy-controller-circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.30 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
+        checkPeriod: "10s"
+        fallbackDuration: "30s"
+        recoveryDuration: "60s"
+    
+    ploy-controller-retry:
+      retry:
+        attempts: 3
+        initialInterval: "100ms"
+    
+    ploy-controller-compress:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+        minResponseBodyBytes: 1024
+
+  routers:
+    ploy-controller-api:
+      rule: "Host(`api.ployd.app`) && PathPrefix(`/v1`)"
+      entryPoints:
+        - "websecure"
+      service: "ploy-controller@consulcatalog"
+      middlewares:
+        - "ploy-controller-ratelimit"
+        - "ploy-controller-security"
+        - "ploy-controller-circuit-breaker"
+        - "ploy-controller-retry"
+        - "ploy-controller-compress"
+      tls:
+        certResolver: "letsencrypt"
+      priority: 100
+    
+    ploy-controller-health:
+      rule: "Host(`api.ployd.app`) && (PathPrefix(`/health`) || PathPrefix(`/ready`) || PathPrefix(`/live`))"
+      entryPoints:
+        - "websecure"
+      service: "ploy-controller@consulcatalog"
+      middlewares:
+        - "ploy-controller-security"
+        - "ploy-controller-compress"
+      tls:
+        certResolver: "letsencrypt"
+      priority: 200
+EOF
+        destination = "local/dynamic/controller-load-balancer.yml"
         perms = "644"
       }
       
