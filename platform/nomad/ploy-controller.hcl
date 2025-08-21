@@ -284,6 +284,12 @@ job "ploy-controller" {
         UPDATE_STAGGER_DELAY = "30s"
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
+        # Binary distribution configuration
+        CONTROLLER_VERSION = "latest"
+        CONTROLLER_BINARY_SOURCE = "seaweedfs"
+        BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
+        BINARY_INTEGRITY_CHECK = "true"
+        
         # Logging configuration
         LOG_LEVEL = "info"
         LOG_FORMAT = "json"
@@ -415,17 +421,94 @@ job "ploy-controller" {
         perms = "755"
       }
       
-      # Copy controller binary template
+      # Binary selection and integrity verification script
       template {
-        source = "/home/ploy/ploy/build/controller"
-        destination = "local/controller"
+        data = <<-EOH
+        #!/bin/bash
+        # Controller binary selection and integrity verification
+        set -e
+        
+        BINARY_PATH=""
+        
+        # Function to verify binary integrity
+        verify_binary() {
+            local binary_path="$1"
+            local expected_hash_file="$2"
+            
+            if [ ! -f "$binary_path" ]; then
+                echo "Binary not found: $binary_path"
+                return 1
+            fi
+            
+            if [ -f "$expected_hash_file" ]; then
+                local expected_hash=$(cat "$expected_hash_file")
+                local actual_hash=$(sha256sum "$binary_path" | cut -d' ' -f1)
+                
+                if [ "$expected_hash" != "$actual_hash" ]; then
+                    echo "Hash mismatch for $binary_path"
+                    echo "Expected: $expected_hash"
+                    echo "Actual: $actual_hash"
+                    return 1
+                fi
+                echo "Binary integrity verified: $binary_path"
+            else
+                echo "Warning: No hash file found for $binary_path, skipping integrity check"
+            fi
+            
+            # Make binary executable
+            chmod +x "$binary_path"
+            return 0
+        }
+        
+        # Try primary binary from SeaweedFS
+        if verify_binary "local/controller" "local/controller.sha256"; then
+            BINARY_PATH="local/controller"
+            echo "Using primary controller binary from SeaweedFS"
+        elif [ -f "local/controller-fallback" ] && verify_binary "local/controller-fallback" "local/controller-fallback.sha256"; then
+            BINARY_PATH="local/controller-fallback"
+            echo "Using fallback controller binary"
+        else
+            echo "ERROR: No valid controller binary found"
+            echo "Available files:"
+            ls -la local/
+            exit 1
+        fi
+        
+        # Execute the selected binary
+        echo "Starting controller with binary: $BINARY_PATH"
+        exec "./$BINARY_PATH"
+        EOH
+        
+        destination = "local/start-controller.sh"
         perms = "755"
-        change_mode = "restart"
       }
       
-      # Binary execution configuration
+      # Download controller binary from SeaweedFS artifact storage with fallback
+      artifact {
+        source = "http://localhost:8888/controller-binaries/${CONTROLLER_VERSION}/linux/amd64/controller"
+        destination = "local/controller"
+        mode = "file"
+        
+        # Retry and validation configuration
+        options {
+          checksum = "file:http://localhost:8888/controller-binaries/${CONTROLLER_VERSION}/linux/amd64/controller.sha256"
+        }
+      }
+      
+      # Fallback: Local build artifact if SeaweedFS unavailable
+      artifact {
+        source = "http://localhost:8081/artifacts/controller/latest/linux/amd64/controller"
+        destination = "local/controller-fallback"
+        mode = "file"
+        options {
+          # This artifact is optional - don't fail if unavailable
+          optional = true
+        }
+      }
+      
+      # Binary execution configuration with startup script
       config {
-        command = "local/controller"
+        command = "local/start-controller.sh"
         args = []
       }
       
