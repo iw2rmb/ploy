@@ -20,14 +20,21 @@ job "ploy-controller-simple" {
       mode = "delay"
     }
     
-    # Update strategy for rolling updates
+    # Enhanced update strategy for rolling updates with canary deployment
     update {
-      max_parallel = 1
-      min_healthy_time = "15s"
-      healthy_deadline = "3m"
-      progress_deadline = "5m"
-      auto_revert = true
-      auto_promote = false
+      max_parallel = 1           # Update one instance at a time
+      min_healthy_time = "30s"   # Extended time to ensure service stability
+      healthy_deadline = "5m"    # Increased deadline for complex health checks
+      progress_deadline = "10m"  # Extended overall timeout
+      auto_revert = true         # Automatically rollback failed updates
+      auto_promote = false       # Require manual promotion for safety
+      canary = 1                 # Enable canary deployment with 1 instance
+      
+      # Stagger updates to prevent issues
+      stagger = "30s"            # 30 second delay between updates
+      
+      # Health checks must pass before promoting canary
+      health_check = "checks"    # Use Consul health checks for validation
     }
     
     # Network configuration
