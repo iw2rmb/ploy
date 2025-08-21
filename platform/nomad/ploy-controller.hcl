@@ -415,9 +415,17 @@ job "ploy-controller" {
         perms = "755"
       }
       
-      # Binary location - use pre-built controller from ploy directory
+      # Copy controller binary template
+      template {
+        source = "/home/ploy/ploy/build/controller"
+        destination = "local/controller"
+        perms = "755"
+        change_mode = "restart"
+      }
+      
+      # Binary execution configuration
       config {
-        command = "/home/ploy/ploy/build/controller"
+        command = "local/controller"
         args = []
       }
       
