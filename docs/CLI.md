@@ -5,15 +5,19 @@
 ## Commands
 ### `ploy apps new`
 ```
-ploy apps new --lang <go|node> --name <app>
+ploy apps new --lang <go|node|rust|cpp> --name <app>
 ```
 Scaffolds a minimal app with `/healthz` on port 8080.
 
+**WebAssembly Support**: Create WASM-compatible applications using `--lang rust` for Rust WASM projects or `--lang cpp` for Emscripten-based C++ projects.
+
 ### `ploy push`
 ```
-ploy push -a <app> [-lane A|B|C|D|E|F] [-main com.example.Main] [-sha <sha>]
+ploy push -a <app> [-lane A|B|C|D|E|F|G] [-main com.example.Main] [-sha <sha>]
 ```
 Streams a tar of the working tree (respects `.gitignore`) to the controller, which lane-picks and builds & deploys.
+
+**Lane G - WebAssembly Support**: Applications with WASM compilation targets are automatically detected and routed to Lane G for WebAssembly deployment with wazero runtime.
 
 
 ### `ploy open`
@@ -39,9 +43,11 @@ ploy certs list
 
 ### `ploy debug` (implemented)
 ```
-ploy debug shell <app> [--lane <A-F>]
+ploy debug shell <app> [--lane <A-F|G>]
 ```
 **Debug Operations**: Create debug instances with SSH access enabled. Optionally specify lane for debug build.
+
+**WASM Debug Support**: Lane G debug instances provide WASM runtime debugging with SSH access to the wazero runtime environment.
 
 ### `ploy rollback` (implemented)
 ```
@@ -87,3 +93,34 @@ ploy webhooks list <app>
 ploy webhooks remove <app> <webhook-id>
 ```
 **ARF Integration**: Configure webhooks for ARF transformation events and external system integration.
+
+## WebAssembly (WASM) Commands
+
+### Usage Examples for Lane G
+```bash
+# Deploy Rust WASM application (auto-detected)
+ploy push -a rust-wasm-app
+
+# Deploy Go WASM application (auto-detected)  
+ploy push -a go-wasm-app
+
+# Deploy AssemblyScript application (auto-detected)
+ploy push -a assemblyscript-app
+
+# Force Lane G deployment
+ploy push -a my-app -lane G
+
+# Create WASM debug instance
+ploy debug shell my-wasm-app -lane G
+
+# Check WASM app status
+ploy open my-wasm-app
+```
+
+### WASM-Specific Features
+- **Automatic Detection**: WASM targets automatically routed to Lane G
+- **Multi-Language Support**: Rust, Go, C/C++, AssemblyScript compilation
+- **Runtime Features**: wazero runtime with WASI Preview 1 support
+- **Security**: OPA policies with WASM-specific validation
+- **Component Model**: Multi-module WASM applications supported
+- **Performance**: 10-50ms boot times, 5-30MB footprint

@@ -38,7 +38,8 @@ controller/
 │   ├── java_osv.go      # Lane C - OSv/Hermit VMs for JVM
 │   ├── freebsd_jail.go  # Lane D - FreeBSD jails
 │   ├── oci.go           # Lane E - OCI containers
-│   └── vm.go            # Lane F - Full VMs
+│   ├── vm.go            # Lane F - Full VMs
+│   └── wasm.go          # Lane G - WebAssembly modules
 ├── nomad/               # HashiCorp Nomad integration
 │   └── nomad.go         # Job scheduling and deployment
 ├── opa/                 # Open Policy Agent security
@@ -58,6 +59,8 @@ Command-line interfaces for different aspects of Ploy management.
 cmd/
 ├── ploy/                # Application-focused CLI
 │   └── main.go          # App management commands (apps, push, open, etc.)
+├── ploy-wasm-runner/    # WebAssembly runtime HTTP server
+│   └── main.go          # wazero-based WASM module execution
 └── ployman/             # Infrastructure management CLI  
     ├── main.go          # Controller and infrastructure management
     └── controller.go    # Controller binary management commands
@@ -103,6 +106,10 @@ internal/
 │   ├── cleanup.go       # Main cleanup service
 │   ├── config.go        # Cleanup configuration
 │   └── handlers.go      # HTTP handlers for cleanup endpoints
+├── git/                 # Git repository integration
+│   ├── repository.go    # Git repository analysis
+│   ├── validator.go     # Repository validation
+│   └── utils.go         # Git utilities
 └── utils/               # Shared utilities
     └── utils.go         # Common utility functions
 ```
@@ -149,12 +156,20 @@ Platform-specific deployment configurations.
 
 ```
 platform/
-└── nomad/                          # Nomad job definitions
-    ├── ploy-controller.hcl         # Production system job for Ploy Controller
-    ├── ploy-controller-simple.hcl  # Simplified service job for testing
-    ├── traefik-simple.hcl          # Basic Traefik configuration
-    ├── traefik-system.hcl          # System Traefik with Docker
-    └── traefik-system-rawexec.hcl  # System Traefik with raw exec
+├── nomad/                          # Nomad job definitions
+│   ├── ploy-controller.hcl         # Production system job for Ploy Controller
+│   ├── ploy-controller-simple.hcl  # Simplified service job for testing
+│   ├── traefik-simple.hcl          # Basic Traefik configuration
+│   ├── traefik-system.hcl          # System Traefik with Docker
+│   ├── traefik-system-rawexec.hcl  # System Traefik with raw exec
+│   └── templates/                  # Nomad job templates for deployment lanes
+│       ├── lane-a-unikraft.hcl.j2  # Lane A - Unikraft minimal
+│       ├── lane-b-unikraft.hcl.j2  # Lane B - Unikraft POSIX
+│       ├── lane-c-osv.hcl.j2       # Lane C - OSv JVM
+│       ├── lane-d-jail.hcl.j2      # Lane D - FreeBSD jails
+│       ├── lane-e-oci.hcl.j2       # Lane E - OCI containers
+│       ├── lane-f-vm.hcl.j2        # Lane F - Full VMs
+│       └── wasm-app.hcl.j2         # Lane G - WebAssembly applications
 ```
 
 ## Development and Testing
@@ -241,10 +256,14 @@ Sample applications demonstrating each deployment lane.
 
 ```
 apps/
-├── node-hello/         # Node.js application (Lane B/C)
-├── go-simple/          # Go application (Lane A/B)
-├── java-spring/        # Java Spring application (Lane C)
-└── python-flask/       # Python Flask application (Lane E)
+├── node-hello/              # Node.js application (Lane B/C)
+├── go-simple/               # Go application (Lane A/B)
+├── java-spring/             # Java Spring application (Lane C)
+├── python-flask/            # Python Flask application (Lane E)
+├── wasm-rust-hello/         # Rust WASM application (Lane G)
+├── wasm-go-hello/           # Go WASM application (Lane G)
+├── wasm-assemblyscript-hello/  # AssemblyScript WASM application (Lane G)
+└── wasm-cpp-hello/          # C++ WASM application (Lane G)
 ```
 
 Each app contains:
@@ -266,7 +285,7 @@ Files that influence automatic lane selection:
 - **Lane D (FreeBSD Jail)**: `jail.conf`, `.freebsd/`, native binaries
 - **Lane E (OCI Container)**: `Dockerfile`, `container.yaml`
 - **Lane F (VM)**: `Vagrantfile`, `vm.yaml`, `packer.json`
-- **Lane G (WASM)**: `*.wasm`, `wasm-pack`, `.wasm/`
+- **Lane G (WASM)**: `*.wasm`, `*.wat`, `Cargo.toml` (wasm32-wasi), `package.json` (AssemblyScript), `CMakeLists.txt` (Emscripten)
 
 ### Manifest Files
 Application deployment configuration:

@@ -18,12 +18,14 @@
 - **Hermit** — Rust-based unikernel runtime alternative for Lane C
 - **Capstan** — OSv image build and management tool
 
-## WASM Runtime Technologies
-- **Wazero** — Pure Go WebAssembly runtime for Lane G (no CGO dependencies)
-- **Wasmtime** — Fast and secure WebAssembly runtime with WASI support
-- **Wasmer** — Universal WebAssembly runtime with multiple execution engines
-- **WASI Preview 1** — WebAssembly System Interface for filesystem and network access
-- **Component Model** — Future standard for linking multiple WASM modules efficiently
+## WASM Runtime Technologies (Lane G - Fully Implemented)
+- **wazero v1.5.0** — Production-deployed pure Go WebAssembly runtime (no CGO dependencies)
+- **WASI Preview 1** — Implemented WebAssembly System Interface for controlled filesystem and environment access
+- **WebAssembly Component Model** — Multi-module WASM application support with dependency management
+- **wasm-bindgen** — Rust to WebAssembly binding generator for browser and WASI targets
+- **js-sys/web-sys** — JavaScript and Web API bindings for Rust WASM modules
+- **AssemblyScript Compiler** — TypeScript-like syntax compiled to optimized WebAssembly
+- **Emscripten SDK** — C/C++ to WebAssembly toolchain with WASI and browser targets
 
 ## Container Security & Isolation
 - **Kontain** — Lightweight VM isolation for OCI containers (Lane E)
@@ -36,11 +38,12 @@
 - **Gradle/Maven** — Java ecosystem build tools with Jib integration
 - **NPM/Node.js** — JavaScript runtime and package management
 - **Python** — Scripting and application runtime with C-extension detection
-- **Cargo** — Rust package manager with wasm32-wasi target support
-- **AssemblyScript** — TypeScript-like language that compiles to WebAssembly
-- **Emscripten** — C/C++ to WebAssembly compilation toolchain
-- **wasm-pack** — Rust-generated WebAssembly package builder
-- **Pyodide** — Python scientific stack compiled to WebAssembly
+- **Cargo** — Rust package manager with production wasm32-wasi target support and cdylib crate types
+- **AssemblyScript Compiler** — Production-ready TypeScript-like language compiling to optimized WebAssembly
+- **Emscripten SDK** — Complete C/C++ to WebAssembly compilation toolchain with WASI and browser support
+- **wasm-pack** — Rust-generated WebAssembly package builder with npm integration
+- **wasm-bindgen-cli** — Command-line tool for generating JavaScript bindings for Rust WASM modules
+- **Pyodide** — Python scientific stack compiled to WebAssembly (future support planned)
 
 ## Automated Remediation Framework (ARF)
 - **OpenRewrite** — Semantic-aware Java transformation engine with 2,800+ recipes

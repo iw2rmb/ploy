@@ -16,7 +16,8 @@
 - **Versioned Access**: All health endpoints also available at `/v1/health`, `/v1/ready`, `/v1/live`, `/v1/health/metrics`
 
 ## Core Application Endpoints
-- `POST /v1/apps/:app/builds?sha=<sha>&lane=<A..F>&main=<MainClass>` — build & deploy; lane auto-picked if omitted.
+- `POST /v1/apps/:app/builds?sha=<sha>&lane=<A..G>&main=<MainClass>` — build & deploy; lane auto-picked if omitted.
+  - **Lane G Support**: WebAssembly applications automatically detected and routed to wazero runtime
 - `GET /v1/apps` — list all applications.
 - `GET /v1/status/:app` — get application deployment status.
 - `DELETE /v1/apps/:app` — destroy application and all associated resources.
@@ -50,9 +51,10 @@
 
 ## Debug & Operations Endpoints (Implemented)
 - `POST /v1/apps/:app/debug` — create debug instance with SSH.
-  - Query params: `?lane=<A-F>` (optional)
+  - Query params: `?lane=<A-G>` (optional, includes Lane G for WASM debugging)
   - Body: `{"ssh_enabled": true}`
   - Returns: `{"status": "debug_created", "app": "myapp", "instance": "debug-myapp-123", "ssh_enabled": true, "ssh_command": "ssh debug@debug-myapp-123.debug.ployd.app"}`
+  - **WASM Debug Support**: Lane G debug instances provide SSH access to wazero runtime environment
 - `POST /v1/apps/:app/rollback` — rollback app to previous version.
   - Body: `{"sha": "abc123def456"}`
   - Returns: `{"status": "rolled_back", "app": "myapp", "sha": "abc123def456", "message": "Application rolled back successfully"}`
@@ -153,5 +155,37 @@
 - `build.started`, `build.completed`, `build.failed`
 - `deploy.started`, `deploy.completed`, `deploy.failed`
 - Payload: `{"event": "build.completed", "app": "myapp", "sha": "abc123", "timestamp": "...", "logs": "...", "metadata": {...}}`
+
+## WebAssembly Runtime Endpoints (Lane G - Implemented)
+
+### WASM Application Health and Metrics
+When deployed to Lane G, WASM applications expose additional runtime endpoints via the ploy-wasm-runner service:
+
+- `GET /<app>/health` — standard application health check
+  - Returns: `{"status": "success", "message": "WASM module executed successfully", "runtime": "wazero", "timestamp": "..."}`
+- `GET /<app>/wasm-health` — WASM runtime-specific health validation  
+  - Returns: `{"status": "healthy", "wasm_runtime": "wazero", "module_loaded": true, "max_memory_mb": 64, "timeout": "30s"}`
+- `GET /<app>/metrics` — Prometheus-compatible WASM runtime metrics
+  - Returns: WASM execution counts, duration histograms, memory usage, and runtime statistics
+
+### WASM Build Process
+- **Automatic Detection**: Lane picker detects WASM compilation targets (Rust wasm32-wasi, Go js/wasm, AssemblyScript, Emscripten)
+- **Multi-Strategy Builds**: Automatic build strategy selection based on project structure and language
+- **Component Model**: Support for multi-module WASM applications with dependency management
+- **Security Validation**: OPA policies with WASM-specific constraints for production deployments
+
+### WASM Runtime Features
+- **wazero Runtime**: Pure Go WebAssembly runtime v1.5.0 with no CGO dependencies
+- **WASI Preview 1**: WebAssembly System Interface for controlled filesystem and environment access
+- **Resource Limits**: Memory (64MB default, 128MB max), execution time (30s default), CPU constraints
+- **Sandboxing**: Hardware-enforced isolation with process-level separation
+- **Performance**: 10-50ms boot times, 5-30MB footprint
+
+### Supported Languages and Compilation
+- **Rust**: `cargo build --target wasm32-wasi` with wasm-bindgen integration
+- **Go**: `GOOS=js GOARCH=wasm go build` with syscall/js support
+- **C/C++**: Emscripten toolchain with WASI and browser targets  
+- **AssemblyScript**: TypeScript-like syntax compiled to optimized WebAssembly
+- **Component Model**: Multi-module applications with interface validation
 
 Preview host (`<sha>.<app>.ployd.app`) calls `/v1/apps/:app/builds` and proxies on readiness.
