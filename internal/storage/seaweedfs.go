@@ -161,8 +161,14 @@ func (c *SeaweedFSClient) GetObject(bucket, key string) (io.ReadCloser, error) {
 }
 
 func (c *SeaweedFSClient) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
-	url := fmt.Sprintf("%s/%s/%s?pretty=y", c.filerURL, bucket, prefix)
-	resp, err := c.httpClient.Get(url)
+	url := fmt.Sprintf("%s/%s/%s", c.filerURL, bucket, prefix)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -174,10 +180,10 @@ func (c *SeaweedFSClient) ListObjects(bucket, prefix string) ([]ObjectInfo, erro
 
 	var result struct {
 		Entries []struct {
-			Name  string `json:"Name"`
-			Size  int64  `json:"Size"`
-			Mode  int64  `json:"Mode"`
-			Mtime string `json:"Mtime"`
+			FullPath string `json:"FullPath"`
+			FileSize int64  `json:"FileSize"`
+			Mode     int64  `json:"Mode"`
+			Mtime    string `json:"Mtime"`
 		} `json:"Entries"`
 	}
 
@@ -187,11 +193,13 @@ func (c *SeaweedFSClient) ListObjects(bucket, prefix string) ([]ObjectInfo, erro
 
 	var objects []ObjectInfo
 	for _, entry := range result.Entries {
+		// Extract just the name from the full path
+		name := filepath.Base(entry.FullPath)
 		// Skip directories (Mode & os.ModeDir != 0)
 		if entry.Mode&(1<<31) == 0 { // Not a directory
 			objects = append(objects, ObjectInfo{
-				Key:          prefix + "/" + entry.Name,
-				Size:         entry.Size,
+				Key:          name,
+				Size:         entry.FileSize,
 				LastModified: entry.Mtime,
 				ContentType:  "application/octet-stream", // Default, SeaweedFS doesn't store this in listing
 			})
