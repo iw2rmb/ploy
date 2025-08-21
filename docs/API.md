@@ -1,5 +1,20 @@
 # Ploy REST API (v1)
 
+## Health and Readiness Endpoints
+- `GET /health` — basic service health check.
+  - Returns 200 if service is healthy (critical dependencies OK)
+  - Returns 503 if service is unhealthy
+  - Response includes dependency status for Consul, Nomad, Vault, SeaweedFS
+- `GET /ready` — comprehensive readiness probe.
+  - Returns 200 if service is ready (all critical dependencies OK)
+  - Returns 503 if service is not ready
+  - Critical dependencies: storage_config, consul, nomad
+- `GET /live` — simple liveness probe.
+  - Always returns 200 with alive status
+- `GET /health/metrics` — health check metrics for monitoring.
+  - Returns counts, failure rates, and timing information
+- **Versioned Access**: All health endpoints also available at `/v1/health`, `/v1/ready`, `/v1/live`, `/v1/health/metrics`
+
 ## Core Application Endpoints
 - `POST /v1/apps/:app/builds?sha=<sha>&lane=<A..F>&main=<MainClass>` — build & deploy; lane auto-picked if omitted.
 - `GET /v1/apps` — list all applications.
