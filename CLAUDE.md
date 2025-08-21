@@ -65,11 +65,12 @@ Test: `ssh root@$TARGET_HOST && su - ploy && ./test-scripts/test-*.sh`
 **Note:** Direct controller execution is for local development only. On VPS, use Nomad deployment.
 
 ```bash
-# LOCAL DEVELOPMENT ONLY - Build and start the controller from build/ folder
-go build -o build/controller ./controller
+# LOCAL DEVELOPMENT ONLY - Build with version injection and start the controller
+VERSION="dev-$(date +%Y%m%d-%H%M%S)"
+go build -ldflags "-X github.com/iw2rmb/ploy/controller/selfupdate.BuildVersion=$VERSION" -o build/controller ./controller
 ./build/controller
 
-# LOCAL DEVELOPMENT ONLY - Or run directly for development
+# LOCAL DEVELOPMENT ONLY - Or run directly for development (without version injection)
 go run ./controller
 
 # LOCAL DEVELOPMENT ONLY - Start with custom config
@@ -157,41 +158,32 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 6. **Local Testing**: Execute relevant tests in local environment if applicable
     - Run local validation tests to verify changes work correctly
     - Ensure all syntax checks and basic functionality tests pass
-    - **MANDATORY**: If controller code was modified, update CONTROLLER_VERSION in `platform/nomad/ploy-controller.hcl` before pushing
-    - **CRITICAL**: Increment version: `NEW_VERSION=test-$(date +%Y%m%d-%H%M%S)` and update `CONTROLLER_VERSION = "$NEW_VERSION"`
-    - **REQUIRED**: Set up PLOY_CONTROLLER_VERSION environment variable for version reporting: `export PLOY_CONTROLLER_VERSION=$NEW_VERSION`
-    - Push feature branch to GitHub with updated CONTROLLER_VERSION
+    - Push feature branch to GitHub (no version updates needed at this stage)
 
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
-    - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
-    - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
-    - **Controller Distribution and Deployment**: If controller code was modified (version already updated in git)
-      - **Automated Deployment**: Use the deployment script: `./controller/deploy.sh`
-        - Automatically extracts version from Nomad job file
-        - Builds controller and distribution tool
-        - Calculates and updates checksum in Nomad job file
-        - Uploads binary to SeaweedFS
-        - Deploys via Nomad with monitoring
-      - **Manual Alternative** (if deployment script fails):
-        - Build controller binary: `go build -o build/controller ./controller`
-        - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
-        - Extract version from job file: `CONTROLLER_VERSION=$(grep 'CONTROLLER_VERSION =' platform/nomad/ploy-controller.hcl | cut -d'"' -f2)`
-        - Upload controller version: `./build/controller-dist -command=upload -version=$CONTROLLER_VERSION -binary=./build/controller`
-        - Update checksum: `NEW_CHECKSUM=$(sha256sum build/controller | cut -d' ' -f1)` and update `platform/nomad/ploy-controller.hcl`
-        - Trigger rolling update: `nomad job run platform/nomad/ploy-controller.hcl`
-        - Monitor rolling update progress: `nomad job status ploy-controller`
-      - Verify binary distribution: `./build/controller-dist -command=list`
-      - Test controller functionality after update
+    - **Comprehensive Deployment**: Deploy using automated script: `./controller/deploy.sh <branch>`
+      - Automatically pulls feature branch to VPS
+      - Generates test version number on the fly (`test-YYYYMMDD-HHMMSS`)
+      - Updates CONTROLLER_VERSION temporarily in Nomad job file
+      - Builds both CLI and controller for comprehensive testing
+      - Calculates and updates checksum in Nomad job file
+      - Uploads binary to SeaweedFS
+      - Verifies binary distribution
+      - Deploys via Nomad with monitoring
+      - Test controller functionality after deployment
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
 8. **Error Resolution**: IF any tests fail:
     - Fix identified errors in local environment
     - Re-run local tests to verify fixes
     - Push corrections to feature branch
-    - Pull updated changes on VPS
-    - Re-execute VPS tests until all pass
+    - Re-execute VPS tests until all pass (each run generates a new test version)
 
-9. **Documentation and Completion**: IF all tests pass successfully:
+9. **Version Commit**: IF all tests pass successfully:
+    - **Commit Test Version**: Commit the successful test version to feature branch: `git add platform/nomad/ploy-controller.hcl && git commit -m "Update controller version after successful testing"`
+    - Push the version update to GitHub
+
+10. **Documentation and Completion**: Complete documentation updates:
     - **PLAN.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in PLAN.md
     - **CHANGELOG.md Entry**: Add dated summary entry following established format with Added/Fixed/Testing sections describing changes
     - **FEATURES.md Synchronization**: Add new feature entries or modify existing ones to accurately reflect current system capabilities
