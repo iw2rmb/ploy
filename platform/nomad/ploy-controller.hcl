@@ -287,6 +287,19 @@ job "ploy-controller" {
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
         
+        # DNS configuration environment variables
+        PLOY_DNS_PROVIDER = "namecheap"
+        PLOY_DNS_DOMAIN = "ployd.app"
+        PLOY_DNS_TARGET_IP = "45.12.75.241"
+        PLOY_DNS_CONFIG_PATH = "/etc/ploy/dns/config.json"
+        
+        # Namecheap DNS provider configuration
+        NAMECHEAP_API_KEY = "c8615d72b5794eb0a52cbf1cf22fc42f"
+        NAMECHEAP_API_USER = "iw2rmb"
+        NAMECHEAP_USERNAME = "iw2rmb"
+        NAMECHEAP_CLIENT_IP = "45.12.75.241"
+        NAMECHEAP_SANDBOX = "true"
+        
         # Logging configuration
         LOG_LEVEL = "info"
         LOG_FORMAT = "json"
