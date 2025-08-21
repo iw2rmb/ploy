@@ -162,14 +162,15 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - Authenticate with GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT environment variables
     - Pull feature branch to VPS: `git fetch origin && git checkout <branch> && git pull origin <branch>`
-    - **Controller Distribution and Deployment**: Use binary distribution system for production testing
+    - **Controller Distribution and Deployment**: Use binary distribution system with rolling updates
       - Build controller binary: `go build -o build/controller ./controller`
       - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
-      - Upload new controller version: `./build/controller-dist -command=upload -version=test-$(date +%Y%m%d-%H%M%S) -binary=./build/controller`
-      - Stop existing Nomad job if running: `nomad job stop ploy-controller || true`
-      - Deploy via Nomad with artifact download: `nomad job run platform/nomad/ploy-controller.hcl`
-      - Verify deployment and binary distribution: `nomad job status ploy-controller`
-      - Test binary distribution functionality: `./build/controller-dist -command=list`
+      - Upload new controller version: `NEW_VERSION=test-$(date +%Y%m%d-%H%M%S) && ./build/controller-dist -command=upload -version=$NEW_VERSION -binary=./build/controller`
+      - Update Nomad job with new version: `sed -i "s/CONTROLLER_VERSION = \".*\"/CONTROLLER_VERSION = \"$NEW_VERSION\"/" platform/nomad/ploy-controller.hcl`
+      - Trigger rolling update: `nomad job run platform/nomad/ploy-controller.hcl`
+      - Monitor rolling update progress: `nomad job status ploy-controller`
+      - Verify binary distribution: `./build/controller-dist -command=list`
+      - Test controller functionality after update
     - Run comprehensive tests on VPS environment to validate changes work in production setup
 
 8. **Error Resolution**: IF any tests fail:
