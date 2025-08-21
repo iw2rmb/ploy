@@ -159,6 +159,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - Ensure all syntax checks and basic functionality tests pass
     - **MANDATORY**: If controller code was modified, update CONTROLLER_VERSION in `platform/nomad/ploy-controller.hcl` before pushing
     - **CRITICAL**: Increment version: `NEW_VERSION=test-$(date +%Y%m%d-%H%M%S)` and update `CONTROLLER_VERSION = "$NEW_VERSION"`
+    - **REQUIRED**: Set up PLOY_CONTROLLER_VERSION environment variable for version reporting: `export PLOY_CONTROLLER_VERSION=$NEW_VERSION`
     - Push feature branch to GitHub with updated CONTROLLER_VERSION
 
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
@@ -169,6 +170,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
       - Build distribution tool: `go build -o build/controller-dist ./tools/controller-dist`
       - Extract version from job file: `CONTROLLER_VERSION=$(grep 'CONTROLLER_VERSION =' platform/nomad/ploy-controller.hcl | cut -d'"' -f2)`
       - Upload controller version: `./build/controller-dist -command=upload -version=$CONTROLLER_VERSION -binary=./build/controller`
+      - **CHECKSUM UPDATE**: Get checksum from metadata and update Nomad job: `CHECKSUM=$(curl -s http://localhost:8888/ploy-artifacts/controller-binaries/$CONTROLLER_VERSION/linux/amd64/metadata.json | jq -r .sha256_hash)` and update `platform/nomad/ploy-controller.hcl` checksum field
       - Trigger rolling update: `nomad job run platform/nomad/ploy-controller.hcl`
       - Monitor rolling update progress: `nomad job status ploy-controller`
       - Verify binary distribution: `./build/controller-dist -command=list`

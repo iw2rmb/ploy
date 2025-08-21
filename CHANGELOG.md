@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [2025-08-21] - Controller Self-Update Capability (Phase no-SPOF-3 Step 3)
+
+### Added
+- **Self-Update API Endpoints**: New REST API endpoints for controller self-update operations (`/v1/controller/update`, `/update/status`, `/rollback`, `/version`, `/versions`)
+- **Update Strategy Support**: Multiple update strategies including rolling, blue-green, and emergency update approaches
+- **Consul-Based Coordination**: Inter-controller instance coordination during updates using Consul sessions and distributed locks
+- **Binary Validation System**: Comprehensive validation including checksum verification, platform compatibility, and system resource checks
+- **Rollback Mechanisms**: Automatic and manual rollback capabilities with last-known-good version detection
+- **Update Orchestration**: Proper sequencing and safety checks for coordinated controller updates across multiple instances
+
+### Fixed
+- **Version Reporting**: Enhanced version detection and reporting through PLOY_CONTROLLER_VERSION environment variable
+- **Binary Integrity Checks**: Added SHA256 checksum validation for controller binary artifacts during self-update processes
+- **Error Handling**: Comprehensive error handling with graceful degradation and session cleanup during failed updates
+
+### Testing
+- **Self-Update Validation**: Comprehensive testing of self-update capability including API endpoints, validation logic, and error scenarios
+- **Coordination Testing**: Verification of inter-controller coordination and distributed locking mechanisms during updates
+- **Rollback Testing**: Validation of rollback mechanisms and emergency update procedures
+
 ## [2025-08-21] - Ansible Nomad Controller Integration (Phase no-SPOF-3 Step 2)
 
 ### Added

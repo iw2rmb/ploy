@@ -216,6 +216,14 @@ Auto-classified lanes:
     - Service discovery integration with Consul registration and Traefik load balancer configuration
     - Health check integration with Nomad service discovery for seamless load balancing
     - Process conflict prevention with clean migration paths and validation tools
+  - ✅ **Controller Self-Update Capability** (Aug 2025): In-place controller updates with coordination and safety
+    - RESTful self-update API endpoints: `/v1/controller/update`, `/update/status`, `/rollback`, `/version`, `/versions`
+    - Multiple update strategies: rolling, blue-green, and emergency update approaches
+    - Consul-based coordination between controller instances during updates with distributed locking
+    - Comprehensive validation: binary integrity (SHA256), platform compatibility, system resource checks
+    - Atomic binary replacement to avoid "text file busy" errors with fallback external update scripts
+    - Automatic and manual rollback capabilities with last-known-good version detection
+    - Update orchestration with proper sequencing, safety checks, and graceful error handling
   - **Auto-Recovery**: Failed instances automatically restarted by Nomad scheduler
 
 - ✅ **External State Management**
