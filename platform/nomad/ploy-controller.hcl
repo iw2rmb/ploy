@@ -144,7 +144,6 @@ job "ploy-controller" {
         timeout = "3s"
         success_before_passing = 1
         failures_before_critical = 5  # Allow more failures for liveness
-        deregister_critical_service_after = "60s"  # Auto-deregister after 60s critical
       }
       
       # Blue-green deployment health check
@@ -204,7 +203,6 @@ job "ploy-controller" {
         timeout = "5s"
         success_before_passing = 1
         failures_before_critical = 3
-        deregister_critical_service_after = "120s"
         header {
           X-Service-Mesh = ["ploy-controller-metrics"]
           Accept = ["text/plain; version=0.0.4"]
