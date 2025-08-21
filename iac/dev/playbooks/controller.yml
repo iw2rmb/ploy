@@ -1,0 +1,280 @@
+---
+# Ploy Controller Deployment via Nomad
+#
+# This playbook handles the controller deployment through Nomad instead of systemd:
+# - Builds controller binary and distribution tools
+# - Uploads controller binary to SeaweedFS storage
+# - Deploys controller as Nomad job with high availability
+# - Validates controller deployment and health
+# - Implements proper service ordering and dependencies
+#
+- name: Deploy Ploy Controller via Nomad
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Ensure proper service ordering - verify dependencies are running
+      block:
+        - name: Wait for SeaweedFS services to be healthy
+          wait_for:
+            port: "{{ item }}"
+            delay: 5
+            timeout: 60
+          loop:
+            - "{{ seaweedfs.master_port }}"
+            - "{{ seaweedfs.volume_port }}"
+            - "{{ seaweedfs.filer_port }}"
+
+        - name: Wait for HashiCorp services to be healthy
+          wait_for:
+            port: "{{ item }}"
+            delay: 5
+            timeout: 60
+          loop:
+            - "8500"  # Consul
+            - "4646"  # Nomad
+            - "8200"  # Vault
+
+        - name: Verify Nomad cluster is ready
+          uri:
+            url: "http://localhost:4646/v1/status/leader"
+            method: GET
+            status_code: 200
+          register: nomad_leader_check
+          retries: 6
+          delay: 10
+          until: nomad_leader_check.status == 200
+
+        - name: Display service dependency status
+          debug:
+            msg: "All required services (SeaweedFS, Consul, Nomad, Vault) are healthy and ready"
+
+    - name: Build controller binary and distribution tools
+      block:
+        - name: Build controller binary
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o build/controller ./controller
+          become_user: ploy
+          register: controller_build
+          changed_when: controller_build.rc == 0
+
+        - name: Build controller distribution tool
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o build/controller-dist ./tools/controller-dist
+          become_user: ploy
+          register: controller_dist_build
+          changed_when: controller_dist_build.rc == 0
+
+        - name: Build ployman CLI for controller management
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o build/ployman ./cmd/ployman
+          become_user: ploy
+          register: ployman_build
+          changed_when: ployman_build.rc == 0
+
+        - name: Verify binaries were created successfully
+          stat:
+            path: "/home/ploy/ploy/build/{{ item }}"
+          register: binary_check
+          loop:
+            - controller
+            - controller-dist
+            - ployman
+
+        - name: Display build results
+          debug:
+            msg: "Successfully built: {{ item.item }} (exists: {{ item.stat.exists }})"
+          loop: "{{ binary_check.results }}"
+
+    - name: Upload controller binary to SeaweedFS
+      block:
+        - name: Generate unique controller version for this deployment
+          shell: echo "$(date +%Y%m%d-%H%M%S)-$(cd /home/ploy/ploy && git rev-parse --short HEAD)"
+          register: controller_version
+          become_user: ploy
+          changed_when: false
+
+        - name: Set controller version variable
+          set_fact:
+            current_controller_version: "{{ controller_version.stdout }}"
+
+        - name: Upload controller binary to SeaweedFS
+          shell: |
+            cd /home/ploy/ploy
+            ./build/controller-dist \
+              -command=upload \
+              -version={{ current_controller_version }} \
+              -binary=./build/controller \
+              -platform=linux \
+              -arch=amd64
+          become_user: ploy
+          register: controller_upload
+          changed_when: controller_upload.rc == 0
+
+        - name: Verify controller binary upload
+          shell: |
+            cd /home/ploy/ploy
+            ./build/controller-dist -command=list
+          become_user: ploy
+          register: controller_list
+          changed_when: false
+
+        - name: Display upload results
+          debug:
+            msg: "Controller version {{ current_controller_version }} uploaded successfully"
+          when: current_controller_version in controller_list.stdout
+
+    - name: Deploy controller Nomad job
+      block:
+        - name: Copy controller Nomad job template
+          template:
+            src: ../templates/nomad-ploy-controller.hcl.j2
+            dest: /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+            owner: hashicorp
+            group: hashicorp
+            mode: '0644'
+          vars:
+            controller_version: "{{ current_controller_version }}"
+
+        - name: Validate controller job syntax
+          command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+          register: controller_validate
+          changed_when: false
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+
+        - name: Check if controller job is already running
+          uri:
+            url: "http://localhost:4646/v1/job/ploy-controller"
+            method: GET
+            status_code: [200, 404]
+          register: controller_job_check
+          ignore_errors: true
+
+        - name: Deploy controller job to Nomad
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+          register: controller_job_deploy
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          when: controller_job_check.status == 404
+
+        - name: Update existing controller job (rolling update)
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+          register: controller_job_update
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          when: controller_job_check.status == 200
+
+        - name: Wait for controller allocation to be running
+          uri:
+            url: "http://localhost:4646/v1/job/ploy-controller/allocations"
+            method: GET
+            status_code: 200
+          register: controller_allocs
+          until: >
+            controller_allocs.json | length > 0 and
+            (controller_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
+          retries: 20
+          delay: 15
+
+        - name: Display controller deployment status
+          debug:
+            msg: "Controller job deployed successfully with {{ controller_allocs.json | length }} allocation(s)"
+
+    - name: Validate controller deployment
+      block:
+        - name: Wait for controller health endpoint to be available
+          uri:
+            url: "http://localhost:{{ ploy.controller_port }}/health"
+            method: GET
+            status_code: 200
+          register: controller_health
+          retries: 12
+          delay: 10
+          until: controller_health.status == 200
+
+        - name: Verify controller readiness
+          uri:
+            url: "http://localhost:{{ ploy.controller_port }}/ready"
+            method: GET
+            status_code: 200
+          register: controller_ready
+          retries: 6
+          delay: 10
+          until: controller_ready.status == 200
+
+        - name: Test controller API endpoints
+          uri:
+            url: "http://localhost:{{ ploy.controller_port }}/v1/health"
+            method: GET
+            status_code: 200
+          register: controller_api_test
+
+        - name: Display controller validation results
+          debug:
+            msg: "Controller is healthy and ready. API endpoints responding correctly."
+
+        - name: Save current controller version for future reference
+          copy:
+            content: "{{ current_controller_version }}"
+            dest: /opt/ploy/current-controller-version
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+    - name: Configure controller management tools
+      block:
+        - name: Create controller management scripts directory
+          file:
+            path: /home/ploy/controller-scripts
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create controller update script
+          template:
+            src: ../templates/update-controller.sh.j2
+            dest: /home/ploy/controller-scripts/update-controller.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create controller rollback script
+          template:
+            src: ../templates/rollback-controller.sh.j2
+            dest: /home/ploy/controller-scripts/rollback-controller.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create controller status script
+          template:
+            src: ../templates/controller-status.sh.j2
+            dest: /home/ploy/controller-scripts/controller-status.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create controller migration script
+          template:
+            src: ../templates/migrate-controller.sh.j2
+            dest: /home/ploy/controller-scripts/migrate-controller.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+    - name: Set up firewall for controller
+      ufw:
+        rule: allow
+        port: "{{ ploy.controller_port }}"
+        comment: "Ploy Controller API"
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          Controller deployment completed successfully:
+          - Version: {{ current_controller_version }}
+          - Binary distribution: Enabled via SeaweedFS
+          - Deployment method: Nomad job
+          - Health endpoint: http://localhost:{{ ploy.controller_port }}/health
+          - Management tools: Available in /home/ploy/controller-scripts/

@@ -1,0 +1,106 @@
+#!/bin/bash
+# Controller Rollback Script
+# Rolls back Ploy controller to a previous version
+
+set -e
+
+PLOY_DIR="/home/ploy/ploy"
+CONTROLLER_DIR="/home/ploy/controller-scripts"
+
+echo "=== Ploy Controller Rollback ==="
+
+# Check if we're in the right directory
+if [[ ! -d "$PLOY_DIR" ]]; then
+    echo "Error: Ploy directory not found at $PLOY_DIR"
+    exit 1
+fi
+
+cd "$PLOY_DIR"
+
+# List available versions
+echo "Available controller versions:"
+./build/controller-dist -command=list
+
+# Get target version
+if [[ $# -eq 0 ]]; then
+    echo "Usage: $0 <target-version>"
+    echo "Or run interactively:"
+    read -p "Enter target version to rollback to: " TARGET_VERSION
+else
+    TARGET_VERSION="$1"
+fi
+
+if [[ -z "$TARGET_VERSION" ]]; then
+    echo "Error: No target version specified"
+    exit 1
+fi
+
+# Get current version
+CURRENT_VERSION=$(cat /opt/ploy/current-controller-version 2>/dev/null || echo "unknown")
+echo "Current version: $CURRENT_VERSION"
+echo "Target version: $TARGET_VERSION"
+
+# Confirm rollback
+read -p "Are you sure you want to rollback? (y/N): " CONFIRM
+if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
+    echo "Rollback cancelled"
+    exit 0
+fi
+
+# Use ployman CLI for rollback
+echo "Initiating rollback using ployman..."
+./build/ployman controller rollback "$TARGET_VERSION"
+
+# Update Nomad job template with rollback version
+echo "Updating Nomad job configuration for rollback..."
+sudo sed -i "s/controller_version: \".*\"/controller_version: \"$TARGET_VERSION\"/" \
+    /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+
+# Trigger rolling update to rollback version
+echo "Triggering Nomad rolling update to rollback version..."
+export NOMAD_ADDR="http://localhost:4646"
+nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+
+# Monitor rollback deployment
+echo "Monitoring rollback progress..."
+TIMEOUT=300  # 5 minutes
+START_TIME=$(date +%s)
+
+while true; do
+    CURRENT_TIME=$(date +%s)
+    if (( CURRENT_TIME - START_TIME > TIMEOUT )); then
+        echo "Error: Rollback timeout after 5 minutes"
+        exit 1
+    fi
+
+    # Check allocation status
+    ALLOCS=$(nomad job allocs -json ploy-controller | jq -r '.[].ClientStatus' | sort | uniq -c)
+    RUNNING_COUNT=$(echo "$ALLOCS" | grep -c "running" || echo "0")
+    TOTAL_COUNT=$(nomad job allocs -json ploy-controller | jq '. | length')
+
+    echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
+
+    if [[ "$RUNNING_COUNT" == "$TOTAL_COUNT" ]] && [[ "$RUNNING_COUNT" -gt "0" ]]; then
+        echo "All allocations are running!"
+        break
+    fi
+
+    sleep 10
+done
+
+# Verify rollback health
+echo "Verifying controller health after rollback..."
+sleep 30  # Allow time for startup
+
+if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" > /dev/null; then
+    echo "✅ Controller rollback health check passed"
+    # Update current version file
+    echo "$TARGET_VERSION" | sudo tee /opt/ploy/current-controller-version > /dev/null
+    echo "✅ Rollback completed successfully to version $TARGET_VERSION"
+else
+    echo "❌ Controller health check failed after rollback"
+    echo "Manual intervention required"
+    exit 1
+fi
+
+echo "API endpoint: http://localhost:{{ ploy.controller_port }}/health"

@@ -1,0 +1,181 @@
+# Ploy Controller - High Availability Nomad Job
+# 
+# This job deploys the Ploy controller with:
+# - High availability across multiple nodes
+# - Rolling updates with health checks
+# - Binary distribution via SeaweedFS
+# - Service discovery integration
+# - Load balancing via Traefik
+
+job "ploy-controller" {
+  datacenters = ["dc1"]
+  type = "service"
+  priority = 80
+
+  # High availability configuration
+  # Run multiple instances across different nodes
+  group "controller" {
+    count = {{ nomad_controller.replicas | default(2) }}
+
+    # Spread across different nodes for availability
+    constraint {
+      distinct_hosts = true
+    }
+
+    # Rolling update configuration
+    update {
+      max_parallel = 1
+      min_healthy_time = "30s"
+      healthy_deadline = "5m"
+      progress_deadline = "10m"
+      auto_revert = true
+      canary = 1
+    }
+
+    # Host volumes for controller artifacts and logs
+    volume "ploy-artifacts" {
+      type      = "host"
+      source    = "ploy-artifacts"
+      read_only = false
+    }
+
+    volume "ploy-logs" {
+      type      = "host"
+      source    = "ploy-logs" 
+      read_only = false
+    }
+
+    # Restart policy
+    restart {
+      attempts = 3
+      interval = "10m"
+      delay = "30s"
+      mode = "fail"
+    }
+
+    task "controller" {
+      driver = "raw_exec"
+
+      # Binary distribution via artifact download
+      artifact {
+        source = "http://localhost:{{ seaweedfs.filer_port }}/controller-binaries/{{ controller_version }}/linux/amd64/controller"
+        destination = "local/controller"
+        mode = "file"
+        options {
+          checksum = "file:http://localhost:{{ seaweedfs.filer_port }}/controller-binaries/{{ controller_version }}/linux/amd64/controller.sha256"
+        }
+      }
+
+      # Mount volumes
+      volume_mount {
+        volume      = "ploy-artifacts"
+        destination = "/opt/ploy/artifacts"
+        read_only   = false
+      }
+
+      volume_mount {
+        volume      = "ploy-logs"
+        destination = "/opt/ploy/logs"
+        read_only   = false
+      }
+
+      # Resource allocation
+      resources {
+        cpu = {{ nomad_controller.resources.cpu | default(500) }}
+        memory = {{ nomad_controller.resources.memory | default(512) }}
+      }
+
+      # Environment configuration
+      env {
+        # Controller configuration
+        PORT = "{{ ploy.controller_port }}"
+        PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
+        
+        # HashiCorp service addresses
+        CONSUL_ADDR = "http://localhost:8500"
+        NOMAD_ADDR = "http://localhost:4646"
+        VAULT_ADDR = "http://localhost:8200"
+
+        # SeaweedFS configuration
+        SEAWEEDFS_MASTER = "localhost:{{ seaweedfs.master_port }}"
+        SEAWEEDFS_FILER = "localhost:{{ seaweedfs.filer_port }}"
+
+        # Deployment metadata
+        PLOY_CONTROLLER_VERSION = "{{ controller_version }}"
+        PLOY_DEPLOYMENT_METHOD = "nomad"
+        PLOY_NODE_ID = "${node.unique.name}"
+      }
+
+      # Make binary executable and start
+      template {
+        data = <<EOF
+#!/bin/bash
+chmod +x local/controller
+exec local/controller
+EOF
+        destination = "local/start-controller.sh"
+        perms = "755"
+      }
+
+      config {
+        command = "/bin/bash"
+        args = ["local/start-controller.sh"]
+      }
+
+      # Health checks
+      service {
+        name = "ploy-controller"
+        port = "http"
+        tags = [
+          "controller",
+          "api",
+          "traefik.enable=true",
+          "traefik.http.routers.controller.rule=PathPrefix(`/v1`)",
+          "traefik.http.routers.controller.entrypoints=web",
+          "traefik.http.services.controller.loadbalancer.server.port={{ ploy.controller_port }}"
+        ]
+
+        # Health check endpoint
+        check {
+          type = "http"
+          path = "/health"
+          interval = "10s"
+          timeout = "3s"
+          check_restart {
+            limit = 3
+            grace = "10s"
+            ignore_warnings = false
+          }
+        }
+
+        # Readiness check
+        check {
+          name = "readiness"
+          type = "http"
+          path = "/ready"
+          interval = "15s"
+          timeout = "5s"
+        }
+      }
+
+      # Port mapping
+      resources {
+        network {
+          port "http" {
+            static = {{ ploy.controller_port }}
+          }
+        }
+      }
+
+      # Graceful shutdown
+      kill_timeout = "30s"
+      kill_signal = "SIGTERM"
+
+      # Logging configuration
+      logs {
+        max_files = 10
+        max_file_size = 10
+      }
+    }
+  }
+}

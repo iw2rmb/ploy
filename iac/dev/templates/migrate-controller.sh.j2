@@ -1,0 +1,122 @@
+#!/bin/bash
+# Controller Migration Script
+# Migrates from systemd-based controller to Nomad-based deployment
+
+set -e
+
+echo "=== Ploy Controller Migration ==="
+echo "Migrating from systemd to Nomad deployment"
+
+# Check for existing manual controller processes
+echo "🔍 Checking for existing controller processes..."
+EXISTING_PROCESSES=$(pgrep -f "ploy.*controller|controller.*ploy" || true)
+
+if [[ -n "$EXISTING_PROCESSES" ]]; then
+    echo "❌ Found running controller processes:"
+    ps aux | grep -E "ploy.*controller|controller.*ploy" | grep -v grep || true
+    echo ""
+    echo "Please stop all manual controller processes before migration:"
+    echo "  pkill -f 'ploy.*controller|controller.*ploy'"
+    echo ""
+    echo "Then re-run this migration script."
+    exit 1
+fi
+
+# Check for systemd service
+echo "🔍 Checking for existing systemd service..."
+if systemctl is-active --quiet ploy-controller 2>/dev/null; then
+    echo "❌ Found active ploy-controller systemd service"
+    echo "Please stop and disable the systemd service:"
+    echo "  sudo systemctl stop ploy-controller"
+    echo "  sudo systemctl disable ploy-controller"
+    echo "  sudo rm /etc/systemd/system/ploy-controller.service"
+    echo "  sudo systemctl daemon-reload"
+    echo ""
+    echo "Then re-run this migration script."
+    exit 1
+fi
+
+echo "✅ No conflicting controller processes found"
+
+# Check dependencies
+echo "🔍 Checking required services..."
+REQUIRED_SERVICES=("seaweedfs-master:{{ seaweedfs.master_port }}" "consul:8500" "nomad:4646" "vault:8200")
+
+for service in "${REQUIRED_SERVICES[@]}"; do
+    SERVICE_NAME="${service%:*}"
+    SERVICE_PORT="${service#*:}"
+    
+    if ! curl -f -s "http://localhost:$SERVICE_PORT/v1/status/leader" >/dev/null 2>&1 && \
+       ! curl -f -s "http://localhost:$SERVICE_PORT" >/dev/null 2>&1 && \
+       ! nc -z localhost "$SERVICE_PORT" >/dev/null 2>&1; then
+        echo "❌ $SERVICE_NAME is not accessible on port $SERVICE_PORT"
+        echo "Please ensure all required services are running before migration"
+        exit 1
+    fi
+    echo "✅ $SERVICE_NAME is accessible on port $SERVICE_PORT"
+done
+
+# Backup existing environment data
+echo "💾 Backing up existing environment data..."
+BACKUP_DIR="/opt/ploy/migration-backup-$(date +%Y%m%d-%H%M%S)"
+sudo mkdir -p "$BACKUP_DIR"
+
+# Backup file-based env store if it exists
+if [[ -d "/home/ploy/ploy/envstore" ]]; then
+    sudo cp -r /home/ploy/ploy/envstore "$BACKUP_DIR/" || true
+    echo "✅ Backed up file-based environment store to $BACKUP_DIR/envstore"
+fi
+
+# Backup any existing config files
+if [[ -f "/home/ploy/ploy/configs/storage-config.yaml" ]]; then
+    sudo cp /home/ploy/ploy/configs/storage-config.yaml "$BACKUP_DIR/" || true
+    echo "✅ Backed up storage config to $BACKUP_DIR/storage-config.yaml"
+fi
+
+# Migration validation
+echo "🔄 Starting migration validation..."
+
+# Test SeaweedFS connectivity
+if curl -f -s "http://localhost:{{ seaweedfs.filer_port }}/dir/status" >/dev/null; then
+    echo "✅ SeaweedFS filer is accessible"
+else
+    echo "❌ SeaweedFS filer is not accessible"
+    echo "Migration cannot proceed without working storage"
+    exit 1
+fi
+
+# Test Nomad job validation
+echo "🔍 Validating Nomad job template..."
+if [[ -f "/opt/hashicorp/nomad/jobs/ploy-controller.hcl" ]]; then
+    export NOMAD_ADDR="http://localhost:4646"
+    if nomad job validate /opt/hashicorp/nomad/jobs/ploy-controller.hcl; then
+        echo "✅ Nomad job template is valid"
+    else
+        echo "❌ Nomad job template validation failed"
+        exit 1
+    fi
+else
+    echo "❌ Nomad job template not found at /opt/hashicorp/nomad/jobs/ploy-controller.hcl"
+    echo "Please run the Ansible playbook first to generate the template"
+    exit 1
+fi
+
+# Migration readiness summary
+echo ""
+echo "📋 Migration Readiness Summary:"
+echo "✅ No conflicting controller processes"
+echo "✅ Required services are running"
+echo "✅ SeaweedFS storage is accessible"
+echo "✅ Nomad job template is valid"
+echo "✅ Environment data backed up to $BACKUP_DIR"
+
+echo ""
+echo "🚀 Migration is ready to proceed!"
+echo ""
+echo "Next steps:"
+echo "1. Deploy controller via Ansible: ansible-playbook -i inventory/hosts.yml playbooks/controller.yml"
+echo "2. Or run controller update script: /home/ploy/controller-scripts/update-controller.sh"
+echo "3. Verify deployment: /home/ploy/controller-scripts/controller-status.sh"
+
+echo ""
+echo "=== Migration Validation Complete ==="
