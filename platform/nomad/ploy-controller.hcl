@@ -34,15 +34,21 @@ job "ploy-controller" {
     # Note: System jobs do not support reschedule policies
     # System jobs automatically reschedule on node failures
     
-    # Update strategy for rolling updates with zero downtime
+    # Enhanced update strategy for rolling updates with zero downtime and canary deployment
     update {
-      max_parallel = 1       # Update one node at a time for system jobs
-      min_healthy_time = "15s"   # Wait for service to be healthy
-      healthy_deadline = "3m"    # Give up if not healthy within 3 minutes
-      progress_deadline = "10m"  # Overall update timeout
+      max_parallel = 2           # Update 2 nodes simultaneously for faster rollout
+      min_healthy_time = "30s"   # Extended time to ensure service stability
+      healthy_deadline = "5m"    # Increased deadline for complex health checks
+      progress_deadline = "15m"  # Extended overall timeout for system jobs
       auto_revert = true         # Automatically rollback failed updates
       auto_promote = false       # Require manual promotion for safety
-      canary = 0                 # No canary deployment for system jobs
+      canary = 1                 # Enable canary deployment with 1 instance
+      
+      # Stagger updates to prevent simultaneous node failures
+      stagger = "30s"            # 30 second delay between parallel updates
+      
+      # Health checks must pass before promoting canary
+      health_check = "checks"    # Use Consul health checks for validation
     }
     
     # Network configuration
@@ -98,39 +104,52 @@ job "ploy-controller" {
         environment = "production"
       }
       
-      # Primary health check using the /health endpoint
+      # Enhanced primary health check for rolling update validation
       check {
         type = "http"
         path = "/health"
         port = "http"
         interval = "10s"
         timeout = "5s"
-        success_before_passing = 2  # Require 2 consecutive successes before passing
-        failures_before_critical = 3  # Allow 3 failures before marking critical
+        success_before_passing = 3  # Require 3 consecutive successes for update validation
+        failures_before_critical = 2  # Stricter failure tolerance during updates
+        
+        # Enhanced check restart for rolling updates
         check_restart {
-          limit = 3
-          grace = "10s"
-          ignore_warnings = false
+          limit = 2                # Reduced restart limit during updates
+          grace = "20s"            # Extended grace period for clean shutdown
+          ignore_warnings = false  # Fail fast on warnings during updates
+        }
+        
+        # Custom headers for update validation
+        header {
+          X-Health-Check = ["rolling-update"]
+          X-Update-Strategy = ["canary-enabled"]
+          X-Service-Mesh = ["ploy-controller"]
         }
       }
       
-      # Readiness check using the /ready endpoint with service mesh awareness
+      # Enhanced readiness check for rolling update dependency validation
       check {
         name = "readiness"
         type = "http"
         path = "/ready"
         port = "http"
-        interval = "15s"
-        timeout = "8s"
-        success_before_passing = 2
-        failures_before_critical = 2
+        interval = "10s"           # More frequent checks during updates
+        timeout = "10s"            # Extended timeout for dependency checks
+        success_before_passing = 3 # Stricter requirement for readiness
+        failures_before_critical = 2  # Fail faster on readiness issues
+        
         check_restart {
-          limit = 2
-          grace = "15s"
+          limit = 1              # Single restart attempt for readiness failures
+          grace = "30s"          # Extended grace for dependency cleanup
         }
-        # Service mesh connectivity check
+        
+        # Enhanced headers for update validation
         header {
           X-Service-Mesh = ["ploy-controller"]
+          X-Update-Phase = ["canary-validation"]
+          X-Dependency-Check = ["consul,nomad,seaweedfs,vault"]
         }
       }
       
@@ -146,7 +165,27 @@ job "ploy-controller" {
         failures_before_critical = 5  # Allow more failures for liveness
       }
       
-      # Blue-green deployment health check
+      # Rolling update progress monitoring health check
+      check {
+        name = "update-progress"
+        type = "http"
+        path = "/health/update"
+        port = "http"
+        interval = "15s"
+        timeout = "8s"
+        success_before_passing = 2
+        failures_before_critical = 3
+        
+        # Custom headers for update progress tracking
+        header {
+          X-Update-Strategy = ["canary-rollout"]
+          X-Update-Phase = ["${META_UPDATE_PHASE}"]  # Will be set during updates
+          X-Canary-Status = ["${META_CANARY_STATUS}"]
+          X-Rollback-Capability = ["enabled"]
+        }
+      }
+      
+      # Enhanced deployment status check with rollback monitoring
       check {
         name = "deployment-status"
         type = "http"
@@ -155,11 +194,14 @@ job "ploy-controller" {
         interval = "20s"
         timeout = "5s"
         success_before_passing = 1
-        failures_before_critical = 3
-        # Custom header for blue-green deployment tracking
+        failures_before_critical = 2  # Stricter for deployment issues
+        
+        # Enhanced headers for deployment and rollback tracking
         header {
           X-Deployment-Color = ["blue"]
           X-Deployment-Weight = ["100"]
+          X-Auto-Revert = ["enabled"]
+          X-Update-Strategy = ["rolling-canary"]
         }
       }
     }
@@ -259,11 +301,29 @@ job "ploy-controller" {
         TRAEFIK_TLS_ENABLED = "true"
         TRAEFIK_CERT_RESOLVER = "letsencrypt"
         
-        # Service discovery and health checks
+        # Service discovery and enhanced health checks
         SERVICE_NAME = "ploy-controller"
         SERVICE_VERSION = "1.0.0"
         HEALTH_CHECK_INTERVAL = "10s"
-        READINESS_CHECK_INTERVAL = "15s"
+        READINESS_CHECK_INTERVAL = "10s"
+        UPDATE_HEALTH_CHECK_INTERVAL = "15s"
+        
+        # Rolling update configuration
+        ROLLING_UPDATE_ENABLED = "true"
+        CANARY_DEPLOYMENT_ENABLED = "true"
+        AUTO_ROLLBACK_ENABLED = "true"
+        UPDATE_STRATEGY = "rolling-canary"
+        
+        # Update monitoring and alerting
+        UPDATE_MONITORING_ENABLED = "true"
+        UPDATE_ALERT_WEBHOOK = "https://hooks.slack.com/services/ploy-updates"
+        UPDATE_PROGRESS_REPORTING = "true"
+        ROLLBACK_THRESHOLD_FAILURES = "2"
+        
+        # Update timing configuration
+        CANARY_PROMOTION_DELAY = "5m"
+        UPDATE_STAGGER_DELAY = "30s"
+        HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Logging configuration
         LOG_LEVEL = "info"
@@ -318,11 +378,30 @@ job "ploy-controller" {
           tls_enabled: {{ env "TRAEFIK_TLS_ENABLED" }}
           cert_resolver: {{ env "TRAEFIK_CERT_RESOLVER" }}
         
-        # Health check configuration
+        # Enhanced health check configuration for rolling updates
         health:
           check_interval: {{ env "HEALTH_CHECK_INTERVAL" }}
           readiness_interval: {{ env "READINESS_CHECK_INTERVAL" }}
+          update_check_interval: {{ env "UPDATE_HEALTH_CHECK_INTERVAL" }}
           service_name: {{ env "SERVICE_NAME" }}
+          
+        # Rolling update configuration
+        rolling_update:
+          enabled: {{ env "ROLLING_UPDATE_ENABLED" }}
+          strategy: {{ env "UPDATE_STRATEGY" }}
+          canary_enabled: {{ env "CANARY_DEPLOYMENT_ENABLED" }}
+          auto_rollback: {{ env "AUTO_ROLLBACK_ENABLED" }}
+          promotion_delay: {{ env "CANARY_PROMOTION_DELAY" }}
+          stagger_delay: {{ env "UPDATE_STAGGER_DELAY" }}
+          health_timeout: {{ env "HEALTH_VALIDATION_TIMEOUT" }}
+          rollback_threshold: {{ env "ROLLBACK_THRESHOLD_FAILURES" }}
+          
+        # Update monitoring and alerting
+        monitoring:
+          enabled: {{ env "UPDATE_MONITORING_ENABLED" }}
+          progress_reporting: {{ env "UPDATE_PROGRESS_REPORTING" }}
+          alert_webhook: {{ env "UPDATE_ALERT_WEBHOOK" }}
+          metrics_enabled: true
         
         # Resource limits
         max_concurrent_builds: 3
@@ -342,23 +421,94 @@ job "ploy-controller" {
         change_mode = "restart"
       }
       
-      # Health check script template
+      # Enhanced health check script template
       template {
         data = <<-EOH
         #!/bin/bash
-        # Health check script for Ploy Controller
+        # Enhanced health check script for Ploy Controller with rolling update support
         set -e
         
-        # Check if controller is responding
-        curl -f -s http://localhost:{{ env "NOMAD_PORT_http" }}/health > /dev/null
+        PORT={{ env "NOMAD_PORT_http" }}
         
-        # Check if ready endpoint is healthy
-        curl -f -s http://localhost:{{ env "NOMAD_PORT_http" }}/ready > /dev/null
+        # Check if controller is responding
+        echo "Checking controller health..."
+        curl -f -s -H "X-Health-Check: rolling-update" \
+             -H "X-Update-Strategy: canary-enabled" \
+             http://localhost:$PORT/health > /dev/null
+        
+        # Check if ready endpoint is healthy with dependency validation
+        echo "Checking controller readiness..."
+        curl -f -s -H "X-Update-Phase: canary-validation" \
+             -H "X-Dependency-Check: consul,nomad,seaweedfs,vault" \
+             http://localhost:$PORT/ready > /dev/null
+        
+        # Check update progress if monitoring is enabled
+        if [ "{{ env "UPDATE_MONITORING_ENABLED" }}" = "true" ]; then
+            echo "Checking update progress..."
+            curl -f -s -H "X-Update-Strategy: canary-rollout" \
+                 http://localhost:$PORT/health/update > /dev/null || echo "Update endpoint not available (normal during steady state)"
+        fi
         
         echo "Controller health check passed"
         EOH
         
         destination = "local/health-check.sh"
+        perms = "755"
+      }
+      
+      # Rolling update monitoring script template
+      template {
+        data = <<-EOH
+        #!/bin/bash
+        # Rolling update monitoring and alerting script
+        set -e
+        
+        PORT={{ env "NOMAD_PORT_http" }}
+        WEBHOOK_URL="{{ env "UPDATE_ALERT_WEBHOOK" }}"
+        SERVICE_NAME="{{ env "SERVICE_NAME" }}"
+        INSTANCE_ID="{{ env "NOMAD_ALLOC_ID" }}"
+        
+        # Function to send alert
+        send_alert() {
+            local message="$1"
+            local severity="$2"
+            local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            
+            if [ -n "$WEBHOOK_URL" ]; then
+                curl -X POST "$WEBHOOK_URL" \
+                     -H "Content-Type: application/json" \
+                     -d "{
+                         \"text\": \"$severity: $SERVICE_NAME Update Alert\",
+                         \"attachments\": [{
+                             \"color\": \"$([ \"$severity\" = \"ERROR\" ] && echo \"danger\" || echo \"warning\")\",
+                             \"fields\": [
+                                 {\"title\": \"Service\", \"value\": \"$SERVICE_NAME\", \"short\": true},
+                                 {\"title\": \"Instance\", \"value\": \"$INSTANCE_ID\", \"short\": true},
+                                 {\"title\": \"Message\", \"value\": \"$message\", \"short\": false},
+                                 {\"title\": \"Timestamp\", \"value\": \"$timestamp\", \"short\": true}
+                             ]
+                         }]
+                     }" 2>/dev/null || echo "Failed to send alert"
+            fi
+        }
+        
+        # Check update progress
+        if curl -f -s "http://localhost:$PORT/health/update" > /dev/null 2>&1; then
+            echo "Update progress monitoring: OK"
+        else
+            echo "Update endpoint not available (normal during steady state)"
+        fi
+        
+        # Check deployment status
+        if ! curl -f -s "http://localhost:$PORT/health/deployment" > /dev/null 2>&1; then
+            send_alert "Deployment health check failed for instance $INSTANCE_ID" "ERROR"
+            exit 1
+        fi
+        
+        echo "Update monitoring check passed"
+        EOH
+        
+        destination = "local/update-monitor.sh"
         perms = "755"
       }
       
@@ -378,20 +528,40 @@ job "ploy-controller" {
         sidecar = false
       }
       
-      # Service registration delay to ensure readiness
+      # Enhanced service registration with update monitoring
       service {
         name = "ploy-controller-prestart"
+        
+        # Primary health check
         check {
+          name = "startup-health"
           type = "script"
           command = "local/health-check.sh"
           interval = "10s"
-          timeout = "5s"
+          timeout = "8s"
+        }
+        
+        # Update monitoring check
+        check {
+          name = "update-monitoring"
+          type = "script"
+          command = "local/update-monitor.sh"
+          interval = "30s"
+          timeout = "10s"
+          success_before_passing = 1
+          failures_before_critical = 3
         }
       }
       
-      # Graceful shutdown configuration
-      kill_timeout = "30s"
-      kill_signal = "SIGTERM"
+      # Enhanced graceful shutdown configuration for rolling updates
+      kill_timeout = "60s"      # Extended timeout for rolling updates
+      kill_signal = "SIGTERM"   # Standard graceful shutdown signal
+      
+      # Shutdown hook for update coordination
+      lifecycle {
+        hook = "poststop"
+        sidecar = false
+      }
       
       # Log configuration
       logs {
