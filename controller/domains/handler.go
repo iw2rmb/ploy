@@ -1,6 +1,7 @@
 package domains
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,31 +10,50 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/ploy/ploy/controller/certificates"
 	"github.com/ploy/ploy/controller/routing"
 )
 
 // DomainHandler handles domain management API endpoints
 type DomainHandler struct {
-	router *routing.TraefikRouter
+	router    *routing.TraefikRouter
+	certManager *certificates.CertificateManager
 }
 
 // NewDomainHandler creates a new domain handler
-func NewDomainHandler(router *routing.TraefikRouter) *DomainHandler {
-	return &DomainHandler{router: router}
+func NewDomainHandler(router *routing.TraefikRouter, certManager *certificates.CertificateManager) *DomainHandler {
+	return &DomainHandler{
+		router:      router,
+		certManager: certManager,
+	}
 }
 
 // DomainRequest represents a domain registration request
 type DomainRequest struct {
-	Domain string `json:"domain"`
+	Domain       string `json:"domain"`
+	Certificate  string `json:"certificate,omitempty"`  // "auto", "manual", or "none"
+	CertProvider string `json:"cert_provider,omitempty"` // "letsencrypt" (default)
 }
 
 // DomainResponse represents a domain API response
 type DomainResponse struct {
-	Status  string   `json:"status"`
-	App     string   `json:"app,omitempty"`
-	Domain  string   `json:"domain,omitempty"`
-	Domains []string `json:"domains,omitempty"`
-	Message string   `json:"message,omitempty"`
+	Status       string                    `json:"status"`
+	App          string                    `json:"app,omitempty"`
+	Domain       string                    `json:"domain,omitempty"`
+	Domains      []string                  `json:"domains,omitempty"`
+	Message      string                    `json:"message,omitempty"`
+	Certificate  *CertificateInfo          `json:"certificate,omitempty"`
+	Certificates []*CertificateInfo        `json:"certificates,omitempty"`
+}
+
+// CertificateInfo represents certificate information in API responses
+type CertificateInfo struct {
+	Domain    string `json:"domain"`
+	Status    string `json:"status"`    // "active", "provisioning", "failed", "expired"
+	Provider  string `json:"provider"`  // "letsencrypt", "custom"
+	IssuedAt  string `json:"issued_at,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+	AutoRenew bool   `json:"auto_renew"`
 }
 
 // SetupDomainRoutes configures domain management API routes
@@ -42,6 +62,12 @@ func SetupDomainRoutes(app *fiber.App, handler *DomainHandler) {
 	app.Post("/v1/apps/:app/domains", handler.AddDomain)
 	app.Get("/v1/apps/:app/domains", handler.ListDomains)
 	app.Delete("/v1/apps/:app/domains/:domain", handler.RemoveDomain)
+	
+	// Certificate management for domains (Heroku-style)
+	app.Get("/v1/apps/:app/certificates", handler.ListCertificates)
+	app.Get("/v1/apps/:app/certificates/:domain", handler.GetCertificate)
+	app.Post("/v1/apps/:app/certificates/:domain/provision", handler.ProvisionCertificate)
+	app.Delete("/v1/apps/:app/certificates/:domain", handler.RemoveCertificate)
 }
 
 // AddDomain adds a domain to an app
@@ -87,14 +113,44 @@ func (h *DomainHandler) AddDomain(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Printf("Domain registered for app %s: %s", appName, req.Domain)
-
-	return c.JSON(DomainResponse{
+	response := DomainResponse{
 		Status:  "added",
 		App:     appName,
 		Domain:  req.Domain,
 		Message: "Domain registered successfully",
-	})
+	}
+
+	// Handle certificate provisioning (Heroku-style)
+	certificateMode := req.Certificate
+	if certificateMode == "" {
+		certificateMode = "auto" // Default to automatic certificate provisioning
+	}
+
+	if certificateMode == "auto" && h.certManager != nil {
+		log.Printf("Auto-provisioning certificate for domain %s", req.Domain)
+		
+		// Start certificate provisioning in background
+		go func() {
+			ctx := context.Background()
+			cert, err := h.certManager.ProvisionCertificate(ctx, appName, req.Domain)
+			if err != nil {
+				log.Printf("Failed to provision certificate for %s: %v", req.Domain, err)
+			} else {
+				log.Printf("Certificate provisioned for %s: %s", req.Domain, cert.Status)
+			}
+		}()
+
+		response.Certificate = &CertificateInfo{
+			Domain:    req.Domain,
+			Status:    "provisioning",
+			Provider:  "letsencrypt",
+			AutoRenew: true,
+		}
+		response.Message = "Domain registered successfully, certificate provisioning started"
+	}
+
+	log.Printf("Domain registered for app %s: %s", appName, req.Domain)
+	return c.JSON(response)
 }
 
 // ListDomains lists all domains for an app
@@ -142,14 +198,36 @@ func (h *DomainHandler) ListDomains(c *fiber.Ctx) error {
 	domainMap[defaultDomain] = true
 
 	var domains []string
+	var certificates []*CertificateInfo
+
 	for domain := range domainMap {
 		domains = append(domains, domain)
+		
+		// Get certificate info for each domain if certificate manager is available
+		if h.certManager != nil {
+			if cert, err := h.certManager.GetDomainCertificate(appName, domain); err == nil {
+				certInfo := &CertificateInfo{
+					Domain:    cert.Domain,
+					Status:    cert.Status,
+					Provider:  cert.Provider,
+					AutoRenew: cert.AutoRenew,
+				}
+				if !cert.IssuedAt.IsZero() {
+					certInfo.IssuedAt = cert.IssuedAt.Format("2006-01-02 15:04:05")
+				}
+				if !cert.ExpiresAt.IsZero() {
+					certInfo.ExpiresAt = cert.ExpiresAt.Format("2006-01-02 15:04:05")
+				}
+				certificates = append(certificates, certInfo)
+			}
+		}
 	}
 
 	return c.JSON(DomainResponse{
-		Status:  "success",
-		App:     appName,
-		Domains: domains,
+		Status:       "success",
+		App:          appName,
+		Domains:      domains,
+		Certificates: certificates,
 	})
 }
 
@@ -185,6 +263,15 @@ func (h *DomainHandler) RemoveDomain(c *fiber.Ctx) error {
 			if err := h.router.UnregisterApp(appName, route.AllocID); err != nil {
 				log.Printf("Failed to unregister route for %s: %v", domain, err)
 			}
+		}
+	}
+
+	// Remove associated certificate
+	if h.certManager != nil {
+		if err := h.certManager.RemoveDomainCertificate(appName, domain); err != nil {
+			log.Printf("Warning: Failed to remove certificate for domain %s: %v", domain, err)
+		} else {
+			log.Printf("Certificate removed for domain %s", domain)
 		}
 	}
 
@@ -334,3 +421,181 @@ func (h *DomainHandler) removeDomainConfig(appName, domain string) error {
 
 	return nil
 }
+
+// Certificate management handlers (Heroku-style)
+
+// ListCertificates lists all certificates for an app
+func (h *DomainHandler) ListCertificates(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	if appName == "" {
+		return c.Status(http.StatusBadRequest).JSON(DomainResponse{
+			Status:  "error",
+			Message: "App name is required",
+		})
+	}
+
+	if h.certManager == nil {
+		return c.Status(http.StatusServiceUnavailable).JSON(DomainResponse{
+			Status:  "error",
+			Message: "Certificate management not available",
+		})
+	}
+
+	certs, err := h.certManager.ListAppCertificates(appName)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(DomainResponse{
+			Status:  "error",
+			Message: fmt.Sprintf("Failed to list certificates: %v", err),
+		})
+	}
+
+	var certInfos []*CertificateInfo
+	for _, cert := range certs {
+		certInfo := &CertificateInfo{
+			Domain:    cert.Domain,
+			Status:    cert.Status,
+			Provider:  cert.Provider,
+			AutoRenew: cert.AutoRenew,
+		}
+		if !cert.IssuedAt.IsZero() {
+			certInfo.IssuedAt = cert.IssuedAt.Format("2006-01-02 15:04:05")
+		}
+		if !cert.ExpiresAt.IsZero() {
+			certInfo.ExpiresAt = cert.ExpiresAt.Format("2006-01-02 15:04:05")
+		}
+		certInfos = append(certInfos, certInfo)
+	}
+
+	return c.JSON(DomainResponse{
+		Status:       "success",
+		App:          appName,
+		Certificates: certInfos,
+	})
+}
+
+// GetCertificate gets certificate information for a specific domain
+func (h *DomainHandler) GetCertificate(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	domain := c.Params("domain")
+
+	if appName == "" || domain == "" {
+		return c.Status(http.StatusBadRequest).JSON(DomainResponse{
+			Status:  "error",
+			Message: "App name and domain are required",
+		})
+	}
+
+	if h.certManager == nil {
+		return c.Status(http.StatusServiceUnavailable).JSON(DomainResponse{
+			Status:  "error",
+			Message: "Certificate management not available",
+		})
+	}
+
+	cert, err := h.certManager.GetDomainCertificate(appName, domain)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(DomainResponse{
+			Status:  "error",
+			Message: fmt.Sprintf("Certificate not found: %v", err),
+		})
+	}
+
+	certInfo := &CertificateInfo{
+		Domain:    cert.Domain,
+		Status:    cert.Status,
+		Provider:  cert.Provider,
+		AutoRenew: cert.AutoRenew,
+	}
+	if !cert.IssuedAt.IsZero() {
+		certInfo.IssuedAt = cert.IssuedAt.Format("2006-01-02 15:04:05")
+	}
+	if !cert.ExpiresAt.IsZero() {
+		certInfo.ExpiresAt = cert.ExpiresAt.Format("2006-01-02 15:04:05")
+	}
+
+	return c.JSON(DomainResponse{
+		Status:      "success",
+		App:         appName,
+		Domain:      domain,
+		Certificate: certInfo,
+	})
+}
+
+// ProvisionCertificate manually provisions a certificate for a domain
+func (h *DomainHandler) ProvisionCertificate(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	domain := c.Params("domain")
+
+	if appName == "" || domain == "" {
+		return c.Status(http.StatusBadRequest).JSON(DomainResponse{
+			Status:  "error",
+			Message: "App name and domain are required",
+		})
+	}
+
+	if h.certManager == nil {
+		return c.Status(http.StatusServiceUnavailable).JSON(DomainResponse{
+			Status:  "error",
+			Message: "Certificate management not available",
+		})
+	}
+
+	// Start certificate provisioning in background
+	go func() {
+		ctx := context.Background()
+		cert, err := h.certManager.ProvisionCertificate(ctx, appName, domain)
+		if err != nil {
+			log.Printf("Failed to provision certificate for %s: %v", domain, err)
+		} else {
+			log.Printf("Certificate provisioned for %s: %s", domain, cert.Status)
+		}
+	}()
+
+	return c.JSON(DomainResponse{
+		Status:  "provisioning",
+		App:     appName,
+		Domain:  domain,
+		Message: "Certificate provisioning started",
+		Certificate: &CertificateInfo{
+			Domain:    domain,
+			Status:    "provisioning",
+			Provider:  "letsencrypt",
+			AutoRenew: true,
+		},
+	})
+}
+
+// RemoveCertificate removes a certificate for a domain
+func (h *DomainHandler) RemoveCertificate(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	domain := c.Params("domain")
+
+	if appName == "" || domain == "" {
+		return c.Status(http.StatusBadRequest).JSON(DomainResponse{
+			Status:  "error",
+			Message: "App name and domain are required",
+		})
+	}
+
+	if h.certManager == nil {
+		return c.Status(http.StatusServiceUnavailable).JSON(DomainResponse{
+			Status:  "error",
+			Message: "Certificate management not available",
+		})
+	}
+
+	if err := h.certManager.RemoveDomainCertificate(appName, domain); err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(DomainResponse{
+			Status:  "error",
+			Message: fmt.Sprintf("Failed to remove certificate: %v", err),
+		})
+	}
+
+	return c.JSON(DomainResponse{
+		Status:  "removed",
+		App:     appName,
+		Domain:  domain,
+		Message: "Certificate removed successfully",
+	})
+}
+

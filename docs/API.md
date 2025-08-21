@@ -21,21 +21,29 @@
 - `GET /v1/status/:app` — get application deployment status.
 - `DELETE /v1/apps/:app` — destroy application and all associated resources.
 
-## Domain Management Endpoints (Implemented)
-- `POST /v1/apps/:app/domains` — add domain to app.
-  - Body: `{"domain": "example.com"}`
-  - Returns: `{"status": "added", "app": "myapp", "domain": "example.com", "message": "Domain registered successfully"}`
-- `GET /v1/apps/:app/domains` — list domains for app.
-  - Returns: `{"app": "myapp", "domains": ["myapp.ployd.app", "example.com"]}`
-- `DELETE /v1/apps/:app/domains/:domain` — remove domain from app.
+## Domain Management Endpoints (Heroku-style with Automatic Certificate Provisioning)
+- `POST /v1/apps/:app/domains` — add domain to app with automatic certificate provisioning.
+  - Body: `{"domain": "example.com", "certificate": "auto", "cert_provider": "letsencrypt"}`
+  - Certificate options: `"auto"` (default, automatic Let's Encrypt), `"manual"` (user-managed), `"none"` (no certificate)
+  - Returns: `{"status": "added", "app": "myapp", "domain": "example.com", "message": "Domain registered successfully, certificate provisioning started", "certificate": {"domain": "example.com", "status": "provisioning", "provider": "letsencrypt", "auto_renew": true}}`
+- `GET /v1/apps/:app/domains` — list domains for app with certificate information.
+  - Returns: `{"status": "success", "app": "myapp", "domains": ["myapp.ployd.app", "example.com"], "certificates": [{"domain": "example.com", "status": "active", "provider": "letsencrypt", "issued_at": "2025-08-21 10:30:00", "expires_at": "2025-11-19 10:30:00", "auto_renew": true}]}`
+- `DELETE /v1/apps/:app/domains/:domain` — remove domain from app (automatically removes associated certificate).
   - Returns: `{"status": "removed", "app": "myapp", "domain": "example.com", "message": "Domain removed successfully"}`
 
-## Certificate Management Endpoints (Implemented)
-- `POST /v1/certs/issue` — issue TLS certificate.
-  - Body: `{"domain": "example.com"}`
-  - Returns: `{"status": "issued", "domain": "example.com", "message": "Certificate issued successfully", "expires": "2025-11-18"}`
-- `GET /v1/certs` — list all managed certificates.
-  - Returns: `{"certificates": [{"domain": "example.com", "status": "valid", "expires": "2025-11-18"}]}`
+## Certificate Management Endpoints (Heroku-style, Domain-based)
+- `GET /v1/apps/:app/certificates` — list all certificates for app.
+  - Returns: `{"status": "success", "app": "myapp", "certificates": [{"domain": "example.com", "status": "active", "provider": "letsencrypt", "issued_at": "2025-08-21 10:30:00", "expires_at": "2025-11-19 10:30:00", "auto_renew": true}]}`
+- `GET /v1/apps/:app/certificates/:domain` — get certificate details for domain.
+  - Returns: `{"status": "success", "app": "myapp", "domain": "example.com", "certificate": {"domain": "example.com", "status": "active", "provider": "letsencrypt", "issued_at": "2025-08-21 10:30:00", "expires_at": "2025-11-19 10:30:00", "auto_renew": true}}`
+- `POST /v1/apps/:app/certificates/:domain/provision` — manually provision certificate for domain.
+  - Returns: `{"status": "provisioning", "app": "myapp", "domain": "example.com", "message": "Certificate provisioning started", "certificate": {"domain": "example.com", "status": "provisioning", "provider": "letsencrypt", "auto_renew": true}}`
+- `DELETE /v1/apps/:app/certificates/:domain` — remove certificate for domain.
+  - Returns: `{"status": "removed", "app": "myapp", "domain": "example.com", "message": "Certificate removed successfully"}`
+
+## Legacy Certificate Endpoints (Deprecated)
+- `POST /v1/certs/issue` — **DEPRECATED** - Use domain-based certificate management instead.
+- `GET /v1/certs` — **DEPRECATED** - Use `/v1/apps/:app/certificates` instead.
 
 ## Debug & Operations Endpoints (Implemented)
 - `POST /v1/apps/:app/debug` — create debug instance with SSH.

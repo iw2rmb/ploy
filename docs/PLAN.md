@@ -59,8 +59,8 @@ Next steps to implement:
 5. ✅ **COMPLETED** CLI commands for domain management (`ploy domains add/remove/list`)
 
 **Phase Networking-2: Production Domain Routing**
-1. **Wildcard DNS Configuration**: Set up wildcard DNS for `*.ployd.app` domain routing
-2. **Let's Encrypt Integration**: Implement wildcard certificate management with automatic renewal
+1. ✅ **COMPLETED (2025-08-21)** **Wildcard DNS Configuration**: Set up wildcard DNS for `*.ployd.app` domain routing
+2. **Heroku-style Certificate Management**: Integrate Let's Encrypt with domain management for automatic certificate provisioning and renewal when domains are added to apps (similar to Heroku's certificate management)
 3. **Blue-Green Deployment**: Add gradual traffic shifting via Traefik weights
 4. **Geographic Routing**: Add multi-region deployment support with geo-aware routing
 5. **Domain Storage Enhancement** (Optional): Evaluate if domain mapping should migrate from Consul KV to SeaweedFS
