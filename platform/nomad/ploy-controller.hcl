@@ -548,8 +548,6 @@ job "ploy-controller" {
           command = "local/update-monitor.sh"
           interval = "30s"
           timeout = "10s"
-          success_before_passing = 1
-          failures_before_critical = 3
         }
       }
       
