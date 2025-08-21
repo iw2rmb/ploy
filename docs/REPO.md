@@ -137,8 +137,10 @@ Platform-specific deployment configurations.
 ```
 platform/
 └── nomad/              # Nomad job definitions
-    ├── traefik-simple.hcl      # Basic Traefik configuration
-    ├── traefik-system.hcl      # System Traefik with Docker
+    ├── ploy-controller.hcl         # Production system job for Ploy Controller
+    ├── ploy-controller-simple.hcl  # Simplified service job for testing
+    ├── traefik-simple.hcl          # Basic Traefik configuration
+    ├── traefik-system.hcl          # System Traefik with Docker
     └── traefik-system-rawexec.hcl  # System Traefik with raw exec
 ```
 
