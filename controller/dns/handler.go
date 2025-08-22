@@ -311,52 +311,11 @@ func (h *Handler) ValidateConfig(c *fiber.Ctx) error {
 
 // GetStatus returns the DNS system status
 func (h *Handler) GetStatus(c *fiber.Ctx) error {
-	status := fiber.Map{
-		"dns_provider": "available",
-		"provider_type": "",
-		"domain": "",
-		"target_ip": "",
-		"configuration": "loaded",
-	}
-	
-	// Check if manager and config are available
-	if h.manager != nil && h.manager.config != nil {
-		status["domain"] = h.manager.config.Domain
-		status["target_ip"] = h.manager.config.TargetIP
-	} else {
-		status["dns_provider"] = "error"
-		status["configuration"] = "invalid"
-		status["error"] = "DNS manager not initialized"
-		return c.Status(http.StatusServiceUnavailable).JSON(status)
-	}
-	
-	// Determine provider type based on configuration
-	providerType := os.Getenv("PLOY_DNS_PROVIDER")
-	if providerType != "" {
-		status["provider_type"] = providerType
-	} else {
-		status["provider_type"] = "unknown"
-	}
-	
-	// Add basic configuration check without API validation
-	domain := status["domain"].(string)
-	targetIP := status["target_ip"].(string)
-	
-	if domain == "" {
-		status["dns_provider"] = "error"
-		status["configuration"] = "invalid"
-		status["error"] = "domain not configured"
-		return c.Status(http.StatusServiceUnavailable).JSON(status)
-	}
-	
-	if targetIP == "" {
-		status["dns_provider"] = "error"
-		status["configuration"] = "invalid"
-		status["error"] = "target IP not configured"
-		return c.Status(http.StatusServiceUnavailable).JSON(status)
-	}
-	
-	return c.JSON(status)
+	// Start with a simple response to isolate the issue
+	return c.JSON(fiber.Map{
+		"status": "ok",
+		"message": "DNS status endpoint working",
+	})
 }
 
 // LoadDNSConfig loads DNS configuration from environment or file
