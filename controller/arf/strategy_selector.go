@@ -181,7 +181,7 @@ func (s *DefaultStrategySelector) RecommendEscalation(ctx context.Context, failu
 
 	for _, failure := range failures {
 		failureTypes[failure.ErrorMessage]++
-		strategiesTried[failure.RecipeID.Primary] = true
+		strategiesTried[StrategyType(failure.RecipeID)] = true
 	}
 
 	// Determine escalation based on patterns

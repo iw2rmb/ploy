@@ -290,9 +290,9 @@ func (re *DefaultRecipeEvolution) findSimilarPatterns(ctx context.Context, failu
 	for _, ep := range errorPatterns {
 		pattern := FailurePattern{
 			Signature:       ep.Signature,
-			Frequency:       int32(ep.Occurrences),
+			Frequency:       ep.Occurrences,
 			FailureRate:     float64(ep.Occurrences) / 100.0,
-			CommonErrors:    []string{ep.ErrorMessage},
+			CommonErrors:    []string{"transformation_error"},
 			ContextFactors:  []string{"environment_specific"},
 			Mitigations:     []string{"review_configuration"},
 		}
