@@ -30,6 +30,18 @@ func NewPlatformWildcardCertificateManager(certManager *CertificateManager) (*Pl
 		log.Println("PLOY_APPS_DOMAIN not set, platform wildcard certificate provisioning disabled")
 		return &PlatformWildcardCertificateManager{enabled: false}, nil
 	}
+	
+	// Check if this is a dev environment
+	environment := os.Getenv("PLOY_ENVIRONMENT")
+	if environment == "dev" {
+		// For dev environment, use dev subdomain
+		devSubdomain := os.Getenv("PLOY_DEV_SUBDOMAIN")
+		if devSubdomain == "" {
+			devSubdomain = "dev"
+		}
+		platformDomain = fmt.Sprintf("%s.%s", devSubdomain, platformDomain)
+		log.Printf("Development environment detected, using dev subdomain: %s", platformDomain)
+	}
 
 	log.Printf("Platform wildcard certificate manager enabled for domain: %s", platformDomain)
 
