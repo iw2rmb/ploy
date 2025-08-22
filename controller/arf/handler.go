@@ -10,9 +10,15 @@ import (
 
 // Handler provides HTTP endpoints for ARF operations
 type Handler struct {
-	engine    ARFEngine
-	catalog   RecipeCatalog
-	sandboxMgr SandboxManager
+	engine           ARFEngine
+	catalog          RecipeCatalog
+	sandboxMgr       SandboxManager
+	llmGenerator     LLMRecipeGenerator
+	learningSystem   LearningSystem
+	hybridPipeline   HybridPipeline
+	multiLangEngine  MultiLanguageEngine
+	abTestFramework  ABTestFramework
+	strategySelector StrategySelector
 }
 
 // NewHandler creates a new ARF HTTP handler
@@ -21,6 +27,31 @@ func NewHandler(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManag
 		engine:     engine,
 		catalog:    catalog,
 		sandboxMgr: sandboxMgr,
+	}
+}
+
+// NewHandlerWithPhase3 creates a new ARF HTTP handler with Phase 3 components
+func NewHandlerWithPhase3(
+	engine ARFEngine,
+	catalog RecipeCatalog,
+	sandboxMgr SandboxManager,
+	llmGen LLMRecipeGenerator,
+	learning LearningSystem,
+	hybrid HybridPipeline,
+	multiLang MultiLanguageEngine,
+	abTest ABTestFramework,
+	strategy StrategySelector,
+) *Handler {
+	return &Handler{
+		engine:           engine,
+		catalog:          catalog,
+		sandboxMgr:       sandboxMgr,
+		llmGenerator:     llmGen,
+		learningSystem:   learning,
+		hybridPipeline:   hybrid,
+		multiLangEngine:  multiLang,
+		abTestFramework:  abTest,
+		strategySelector: strategy,
 	}
 }
 
@@ -841,7 +872,21 @@ func (h *Handler) GenerateLLMRecipe(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	// Mock LLM recipe generation for now
+	// Use actual LLM generator if available, otherwise fall back to mock
+	if h.llmGenerator != nil {
+		ctx := c.Context()
+		generatedRecipe, err := h.llmGenerator.GenerateRecipe(ctx, request)
+		if err != nil {
+			// Log error and fall back to mock
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Failed to generate recipe",
+				"details": err.Error(),
+			})
+		}
+		return c.Status(201).JSON(generatedRecipe)
+	}
+
+	// Fallback mock implementation
 	generatedRecipe := &GeneratedRecipe{
 		Recipe: Recipe{
 			ID:          "generated-" + strconv.FormatInt(time.Now().Unix(), 10),
@@ -1045,7 +1090,26 @@ func (h *Handler) RecordTransformationOutcome(c *fiber.Ctx) error {
 func (h *Handler) ExtractLearningPatterns(c *fiber.Ctx) error {
 	timeWindowStr := c.Query("time_window", "7d")
 	
-	// Mock pattern extraction
+	// Parse time window
+	timeWindow, err := time.ParseDuration(timeWindowStr)
+	if err != nil {
+		timeWindow = 7 * 24 * time.Hour // Default to 7 days
+	}
+	
+	// Use actual learning system if available
+	if h.learningSystem != nil {
+		ctx := c.Context()
+		patterns, err := h.learningSystem.ExtractPatterns(ctx, timeWindow)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Failed to extract patterns",
+				"details": err.Error(),
+			})
+		}
+		return c.JSON(patterns)
+	}
+	
+	// Fallback mock pattern extraction
 	patterns := &PatternAnalysis{
 		SuccessPatterns: []SuccessPattern{
 			{

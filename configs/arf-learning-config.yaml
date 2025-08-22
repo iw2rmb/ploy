@@ -1,0 +1,155 @@
+# ARF Phase 3 - Learning System Configuration
+# This file configures the continuous learning system that improves
+# transformation strategies based on historical outcomes
+
+learning_system:
+  # Database configuration
+  database:
+    # Connection string from environment variable
+    connection_url: "${ARF_LEARNING_DB_URL}"
+    max_connections: 10
+    connection_timeout: "5s"
+    
+    # Schema management
+    auto_migrate: true
+    schema_version: "1.0.0"
+  
+  # Pattern extraction configuration
+  pattern_extraction:
+    minimum_samples: 10           # Minimum samples for pattern recognition
+    time_window: "30d"           # Time window for pattern analysis
+    significance_threshold: 0.05  # Statistical significance threshold
+    
+    # Pattern categories
+    categories:
+      - "compilation_errors"
+      - "runtime_errors"
+      - "test_failures"
+      - "performance_issues"
+      - "security_vulnerabilities"
+      - "code_quality"
+    
+    # Feature extraction
+    features:
+      repository:
+        - "language"
+        - "framework"
+        - "size_kb"
+        - "file_count"
+        - "complexity_score"
+      
+      transformation:
+        - "recipe_type"
+        - "strategy_used"
+        - "execution_time"
+        - "changes_count"
+        - "files_affected"
+  
+  # Model training configuration
+  model_retraining:
+    enabled: true
+    frequency: "weekly"          # Retraining frequency
+    minimum_data_points: 100     # Minimum data for retraining
+    validation_split: 0.2        # Train/validation split
+    
+    # Model parameters
+    algorithms:
+      - "decision_tree"
+      - "random_forest"
+      - "gradient_boosting"
+    
+    hyperparameters:
+      max_depth: 10
+      min_samples_split: 5
+      n_estimators: 100
+  
+  # Strategy weight updates
+  strategy_updates:
+    weight_adjustment_rate: 0.1   # Learning rate for weight updates
+    stability_period: "7d"        # Period before applying updates
+    rollback_threshold: 0.95      # Rollback if success rate drops
+    
+    # Weight bounds
+    min_weight: 0.1
+    max_weight: 0.9
+    
+    # Update triggers
+    triggers:
+      - type: "performance_degradation"
+        threshold: 0.1
+      - type: "new_pattern_discovered"
+        confidence: 0.9
+      - type: "scheduled"
+        interval: "24h"
+  
+  # A/B testing configuration
+  ab_testing:
+    enabled: true
+    default_traffic_split: 0.5    # 50/50 split by default
+    minimum_sample_size: 100      # Minimum samples per variant
+    confidence_level: 0.95        # Statistical confidence level
+    
+    # Test parameters
+    max_concurrent_tests: 5
+    test_duration: "7d"
+    early_stop_threshold: 0.99    # Stop if clear winner
+    
+    # Metrics to track
+    metrics:
+      - "success_rate"
+      - "execution_time"
+      - "resource_usage"
+      - "user_satisfaction"
+  
+  # Feedback loop configuration
+  feedback_loop:
+    enabled: true
+    collection_methods:
+      - "automatic"    # From build/test results
+      - "explicit"     # User feedback
+      - "implicit"     # From usage patterns
+    
+    # Feedback processing
+    processing:
+      batch_size: 100
+      processing_interval: "1h"
+      priority_queue: true
+    
+    # Feedback weights
+    weights:
+      build_success: 0.3
+      test_success: 0.3
+      performance: 0.2
+      user_rating: 0.2
+  
+  # Data retention
+  data_retention:
+    transformation_outcomes: "90d"
+    pattern_templates: "1y"
+    ab_test_results: "180d"
+    raw_metrics: "30d"
+    
+    # Archival settings
+    archive:
+      enabled: true
+      format: "parquet"
+      compression: "snappy"
+      location: "/archive/arf-learning"
+  
+  # Monitoring and alerting
+  monitoring:
+    metrics_export: true
+    export_interval: "1m"
+    
+    alerts:
+      - name: "learning_degradation"
+        condition: "success_rate < 0.7"
+        severity: "warning"
+      
+      - name: "pattern_anomaly"
+        condition: "anomaly_score > 0.9"
+        severity: "info"
+      
+      - name: "database_connection_failure"
+        condition: "connection_failures > 5"
+        severity: "critical"
