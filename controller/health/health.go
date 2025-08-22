@@ -539,7 +539,7 @@ func (h *HealthChecker) DeploymentStatusHandler(c *fiber.Ctx) error {
 
 // UpdateStatusHandler handles rolling update progress monitoring
 func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
-	h.metrics.TotalHealthChecks++
+	h.metricsCollector.TotalHealthChecks++
 	
 	// Check if we're currently in an update process
 	// This is a simplified implementation - in production this would track actual update state
@@ -573,6 +573,6 @@ func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
 		}
 	}
 	
-	h.metrics.HealthyResponses++
+	h.metricsCollector.HealthyResponses++
 	return c.Status(200).JSON(status)
 }
