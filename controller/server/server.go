@@ -880,7 +880,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	maxSandboxes := 10
 	defaultTTL := 30 * time.Minute
 
-	sandboxMgr := arf.NewFreeBSDJailManager(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
+	sandboxMgr := arf.NewSandboxManagerForOS(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
 
 	// Initialize recipe catalog
 	keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "arf")

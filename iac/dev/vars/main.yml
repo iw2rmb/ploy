@@ -74,7 +74,7 @@ build_tools:
   cosign:
     version: "2.4.0"   # Latest stable Cosign
   syft:
-    version: "1.12.0"  # Latest stable Syft
+    version: "1.3.0"  # Latest stable Syft
   grype:
     version: "0.84.0"  # Latest stable Grype
   opa:
