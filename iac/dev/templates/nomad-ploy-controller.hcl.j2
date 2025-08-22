@@ -127,6 +127,28 @@ job "ploy-controller" {
         LLM_MAX_TOKENS = "{{ llm_max_tokens | default('2048') }}"
         LLM_TEMPERATURE = "{{ llm_temperature | default('0.1') }}"
 
+        # Platform wildcard certificate configuration
+        PLOY_APPS_DOMAIN = "{{ ploy.apps_domain }}"
+        PLOY_APPS_DOMAIN_PROVIDER = "{{ ploy.apps_domain_provider }}"
+        
+        # Development environment wildcard certificate (*.dev.ployd.app)
+        # This is for DEV environment ONLY
+        {% if ploy_environment is defined and ploy_environment == 'dev' %}
+        PLOY_DEV_SUBDOMAIN = "dev"
+        PLOY_DEV_APPS_DOMAIN = "dev.{{ ploy.apps_domain }}"
+        PLOY_WILDCARD_DOMAIN = "*.dev.{{ ploy.apps_domain }}"
+        PLOY_CONTROLLER_DOMAIN = "api.dev.{{ ploy.apps_domain }}"
+        PLOY_ENVIRONMENT = "dev"
+        {% endif %}
+        
+        # DNS provider credentials (from Vault in production)
+        {% if ploy.apps_domain_provider == 'namecheap' %}
+        NAMECHEAP_API_USER = "{{ vault_namecheap_api_user | default('') }}"
+        NAMECHEAP_API_KEY = "{{ vault_namecheap_api_key | default('') }}"
+        {% elif ploy.apps_domain_provider == 'cloudflare' %}
+        CLOUDFLARE_API_TOKEN = "{{ vault_cloudflare_api_token | default('') }}"
+        {% endif %}
+        
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"

@@ -1,0 +1,80 @@
+# Development Environment Wildcard Certificate Configuration
+# This configuration is for DEV environment ONLY
+# It provisions a wildcard certificate for *.dev.ployd.app
+
+# Development subdomain configuration
+ploy_dev_subdomain: "dev"
+
+# Full domain for development environment
+# This will create a wildcard certificate for *.dev.ployd.app
+ploy_dev_apps_domain: "{{ ploy_dev_subdomain }}.{{ ploy.apps_domain }}"
+
+# Certificate configuration for dev environment
+ploy_dev_certificate:
+  # Wildcard domain to provision
+  wildcard_domain: "*.{{ ploy_dev_apps_domain }}"
+  
+  # Base domain (needed for DNS challenge)
+  base_domain: "{{ ploy_dev_apps_domain }}"
+  
+  # Apps will be accessible at:
+  # - api.dev.ployd.app (controller)
+  # - myapp.dev.ployd.app (deployed apps)
+  # - test.dev.ployd.app (test apps)
+  
+  # Certificate storage paths
+  cert_path: "/etc/ploy/certs/dev-wildcard.crt"
+  key_path: "/etc/ploy/certs/dev-wildcard.key"
+  
+  # Let's Encrypt configuration
+  staging: false  # Use production Let's Encrypt for valid certs
+  email: "admin@ployd.app"
+  
+  # Auto-renewal configuration
+  auto_renew: true
+  renewal_threshold_days: 30
+
+# Environment-specific routing
+ploy_dev_routing:
+  # Controller endpoint for dev environment
+  controller_domain: "api.{{ ploy_dev_apps_domain }}"
+  
+  # App pattern for dev environment
+  app_pattern: "{app}.{{ ploy_dev_apps_domain }}"
+  
+  # Examples:
+  # - node-hello.dev.ployd.app
+  # - java-app.dev.ployd.app
+  # - test-app.dev.ployd.app
+
+# Traefik configuration for dev wildcard
+traefik_dev_config:
+  # Router for dev controller
+  controller_router:
+    rule: "Host(`api.{{ ploy_dev_apps_domain }}`)"
+    service: "ploy-controller"
+    tls:
+      certResolver: "dev-wildcard"
+      domains:
+        - main: "{{ ploy_dev_apps_domain }}"
+          sans:
+            - "*.{{ ploy_dev_apps_domain }}"
+  
+  # Dynamic router for dev apps
+  apps_router:
+    rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy_dev_apps_domain }}`)"
+    service: "dynamic-apps"
+    tls:
+      certResolver: "dev-wildcard"
+
+# DNS-01 Challenge Configuration
+dns_challenge_config:
+  # Provider is inherited from main configuration
+  provider: "{{ ploy.apps_domain_provider }}"
+  
+  # DNS propagation check
+  propagation_timeout: 120
+  polling_interval: 10
+  
+  # TTL for challenge records
+  ttl: 60

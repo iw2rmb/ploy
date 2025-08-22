@@ -19,10 +19,19 @@ import (
 	"github.com/ploy/ploy/internal/git"
 	"github.com/ploy/ploy/internal/storage"
 	"github.com/ploy/ploy/internal/utils"
+	"github.com/ploy/ploy/internal/validation"
 )
 
 func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
 	appName := c.Params("app")
+	
+	// Validate app name
+	if err := validation.ValidateAppName(appName); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid app name",
+			"details": err.Error(),
+		})
+	}
 	sha := c.Query("sha", "dev")
 	mainClass := c.Query("main", "com.ploy.ordersvc.Main")
 	lane := c.Query("lane", "")

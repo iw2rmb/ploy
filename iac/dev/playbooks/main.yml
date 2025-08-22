@@ -629,6 +629,15 @@
           # Platform wildcard certificate configuration
           export PLOY_APPS_DOMAIN="{{ ploy.apps_domain }}"
           export PLOY_APPS_DOMAIN_PROVIDER="{{ ploy.apps_domain_provider }}"
+          
+          # Development environment wildcard certificate (*.dev.ployd.app)
+          # This is for DEV environment ONLY
+          {% if ploy_environment is defined and ploy_environment == 'dev' %}
+          export PLOY_DEV_SUBDOMAIN="dev"
+          export PLOY_DEV_APPS_DOMAIN="dev.{{ ploy.apps_domain }}"
+          export PLOY_WILDCARD_DOMAIN="*.dev.{{ ploy.apps_domain }}"
+          export PLOY_CONTROLLER_DOMAIN="api.dev.{{ ploy.apps_domain }}"
+          {% endif %}
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Environment vars"
 
 
