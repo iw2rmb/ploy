@@ -33,12 +33,20 @@ type NamecheapConfig struct {
 
 // NamecheapResponse represents the standard Namecheap API response structure
 type NamecheapResponse struct {
-	XMLName xml.Name `xml:"ApiResponse"`
+	XMLName xml.Name `xml:"http://api.namecheap.com/xml.response ApiResponse"`
 	Status  string   `xml:"Status,attr"`
 	Errors  struct {
 		Error []NamecheapError `xml:"Error"`
 	} `xml:"Errors"`
-	CommandResponse interface{} `xml:"CommandResponse"`
+	CommandResponse NamecheapCommandResponse `xml:"CommandResponse"`
+}
+
+// NamecheapCommandResponse wraps command-specific responses
+type NamecheapCommandResponse struct {
+	DomainDNSGetHostsResult *NamecheapDNSGetHostsResult `xml:"DomainDNSGetHostsResult"`
+	DomainDNSSetHostsResult *NamecheapDNSSetHostsResult `xml:"DomainDNSSetHostsResult"`
+	// For other responses we don't have specific structs for
+	Raw string `xml:",innerxml"`
 }
 
 // NamecheapError represents an API error from Namecheap
@@ -47,14 +55,12 @@ type NamecheapError struct {
 	Description string `xml:",chardata"`
 }
 
-// NamecheapDNSGetListResponse represents response from DNS getList API
-type NamecheapDNSGetListResponse struct {
-	DomainDNSGetListResult struct {
-		Domain     string                `xml:"Domain,attr"`
-		EmailType  string                `xml:"EmailType,attr"`
-		IsUsingOurDNS bool               `xml:"IsUsingOurDNS,attr"`
-		Host       []NamecheapHostRecord `xml:"host"`
-	} `xml:"DomainDNSGetListResult"`
+// NamecheapDNSGetHostsResult represents the result from DNS getHosts API
+type NamecheapDNSGetHostsResult struct {
+	Domain        string                `xml:"Domain,attr"`
+	EmailType     string                `xml:"EmailType,attr"`
+	IsUsingOurDNS bool                  `xml:"IsUsingOurDNS,attr"`
+	Host          []NamecheapHostRecord `xml:"host"`
 }
 
 // NamecheapHostRecord represents a DNS host record
@@ -71,12 +77,10 @@ type NamecheapHostRecord struct {
 	IsDDNSEnabled      bool   `xml:"IsDDNSEnabled,attr"`
 }
 
-// NamecheapDNSSetHostsResponse represents response from DNS setHosts API
-type NamecheapDNSSetHostsResponse struct {
-	DomainDNSSetHostsResult struct {
-		Domain    string `xml:"Domain,attr"`
-		IsSuccess bool   `xml:"IsSuccess,attr"`
-	} `xml:"DomainDNSSetHostsResult"`
+// NamecheapDNSSetHostsResult represents the result from DNS setHosts API
+type NamecheapDNSSetHostsResult struct {
+	Domain    string `xml:"Domain,attr"`
+	IsSuccess bool   `xml:"IsSuccess,attr"`
 }
 
 // NewNamecheapProvider creates a new Namecheap DNS provider
@@ -366,13 +370,14 @@ func (np *NamecheapProvider) getHostRecords(ctx context.Context, domain string) 
 		return nil, fmt.Errorf("API error")
 	}
 
-	// Parse the command response
-	var listResponse NamecheapDNSGetListResponse
-	if err := xml.Unmarshal([]byte(fmt.Sprintf("<root>%s</root>", resp.CommandResponse)), &listResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	// Check if we have the expected response
+	if resp.CommandResponse.DomainDNSGetHostsResult == nil {
+		// Log the raw response for debugging
+		log.Printf("Unexpected response structure. Raw CommandResponse: %s", resp.CommandResponse.Raw)
+		return nil, fmt.Errorf("unexpected response structure: no DomainDNSGetHostsResult")
 	}
 
-	return listResponse.DomainDNSGetListResult.Host, nil
+	return resp.CommandResponse.DomainDNSGetHostsResult.Host, nil
 }
 
 // setHostRecords sets all host records for a domain
@@ -436,6 +441,9 @@ func (np *NamecheapProvider) makeRequest(ctx context.Context, params url.Values)
 	if err != nil {
 		return nil, err
 	}
+
+	// Debug: Log raw response
+	log.Printf("Namecheap API raw response: %s", string(body))
 
 	var ncResp NamecheapResponse
 	if err := xml.Unmarshal(body, &ncResp); err != nil {

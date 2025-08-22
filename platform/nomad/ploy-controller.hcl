@@ -511,13 +511,13 @@ job "ploy-controller" {
       
       # Download controller binary from SeaweedFS artifact storage
       artifact {
-        source = "http://localhost:8888/ploy-artifacts/controller-binaries/${CONTROLLER_VERSION}/linux/amd64/controller"
+        source = "http://45.12.75.241:8080/8,7c7539080801"
         destination = "local/controller"
         mode = "file"
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:6d9f0251e7c2a5b2dd82dedaa7c86f34ec336725dd90c5c8616da85209206dbd"
+          checksum = "sha256:a04e52ea3f0b58b7c1935791a22131b05377de9d8f57c9f0f8723e58f628863f"
         }
       }
       
