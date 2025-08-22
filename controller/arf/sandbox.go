@@ -334,10 +334,13 @@ func (m *MockSandboxManager) CreateSandbox(ctx context.Context, config SandboxCo
 		ttl = 30 * time.Minute
 	}
 
+	rootPath := fmt.Sprintf("/tmp/mock-sandbox-%s", sandboxID[5:15])
+	workspacePath := filepath.Join(rootPath, "workspace")
+
 	sandbox := &Sandbox{
 		ID:         sandboxID,
 		JailName:   fmt.Sprintf("mock-sandbox-%s", sandboxID[5:15]),
-		RootPath:   fmt.Sprintf("/tmp/mock-sandbox-%s", sandboxID[5:15]),
+		RootPath:   rootPath,
 		WorkingDir: "/workspace",
 		CreatedAt:  time.Now(),
 		ExpiresAt:  time.Now().Add(ttl),
@@ -346,14 +349,26 @@ func (m *MockSandboxManager) CreateSandbox(ctx context.Context, config SandboxCo
 		Metadata:   make(map[string]string),
 	}
 
+	// Create mock sandbox directory structure
+	if err := os.MkdirAll(workspacePath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create mock sandbox workspace: %w", err)
+	}
+
 	m.sandboxes[sandboxID] = sandbox
 	return sandbox, nil
 }
 
 // DestroySandbox removes a mock sandbox
 func (m *MockSandboxManager) DestroySandbox(ctx context.Context, sandboxID string) error {
-	if _, exists := m.sandboxes[sandboxID]; !exists {
+	sandbox, exists := m.sandboxes[sandboxID]
+	if !exists {
 		return fmt.Errorf("sandbox %s not found", sandboxID)
+	}
+	
+	// Clean up mock sandbox directory
+	if err := os.RemoveAll(sandbox.RootPath); err != nil {
+		// Log error but don't fail - this is a mock sandbox
+		fmt.Printf("Warning: Failed to clean up mock sandbox directory %s: %v\n", sandbox.RootPath, err)
 	}
 	
 	delete(m.sandboxes, sandboxID)

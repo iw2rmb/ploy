@@ -91,9 +91,11 @@ run_test test_endpoint "POST" "/v1/arf/circuit-breaker/reset?id=test-breaker" "C
 # Error-Driven Recipe Evolution Testing
 run_test_section "Recipe Management"
 run_test test_endpoint "GET" "/v1/arf/recipes" "List recipes"
-run_test test_endpoint "GET" "/v1/arf/recipes/test-recipe" "Get specific recipe (before creation)" "" 404
-run_test test_endpoint "POST" "/v1/arf/recipes" "Create recipe" '{"id":"test-recipe","name":"Test Recipe","description":"A test recipe for validation","language":"java","source":"org.openrewrite.java.cleanup.UnnecessaryParentheses","category":"cleanup","confidence":0.9}' 201
-run_test test_endpoint "GET" "/v1/arf/recipes/test-recipe" "Get specific recipe (after creation)"
+# Use timestamp-based unique recipe ID to avoid conflicts from previous runs
+RECIPE_ID="test-recipe-$(date +%s)"
+run_test test_endpoint "GET" "/v1/arf/recipes/$RECIPE_ID" "Get specific recipe (before creation)" "" 404
+run_test test_endpoint "POST" "/v1/arf/recipes" "Create recipe" "{\"id\":\"$RECIPE_ID\",\"name\":\"Test Recipe\",\"description\":\"A test recipe for validation\",\"language\":\"java\",\"source\":\"org.openrewrite.java.cleanup.UnnecessaryParentheses\",\"category\":\"cleanup\",\"confidence\":0.9}" 201
+run_test test_endpoint "GET" "/v1/arf/recipes/$RECIPE_ID" "Get specific recipe (after creation)"
 
 # Parallel Error Resolution Testing
 run_test_section "Parallel Error Resolution"
