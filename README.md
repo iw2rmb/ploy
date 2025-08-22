@@ -121,7 +121,7 @@ curl http://localhost:8081/version/detailed
 ### Deployment
 ```bash
 # Deploy to Nomad with automatic version discovery
-./scripts/deploy-nomad.sh
+./scripts/deploy.sh
 
 # The script automatically:
 # - Builds controller with version
@@ -174,8 +174,8 @@ The dev environment uses `*.dev.ployd.app` subdomain pattern:
    export NAMECHEAP_API_KEY="your-api-key" 
    export NAMECHEAP_USERNAME="your-username"
    
-   # Deploy controller with wildcard certificate
-   ./scripts/deploy-with-ssl.sh
+   # Deploy controller with wildcard certificate support
+   ./scripts/deploy.sh
    ```
 
 ### Protected App Names
