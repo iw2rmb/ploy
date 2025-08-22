@@ -2,7 +2,7 @@ package version
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/ploy/ploy/internal/version"
+	"github.com/iw2rmb/ploy/internal/version"
 )
 
 // RegisterRoutes registers version endpoints

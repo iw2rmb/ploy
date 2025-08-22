@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/ploy/ploy/controller/config"
-	"github.com/ploy/ploy/internal/distribution"
-	"github.com/ploy/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/controller/config"
+	"github.com/iw2rmb/ploy/internal/distribution"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 func main() {

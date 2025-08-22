@@ -10,8 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/hashicorp/consul/api"
-	"github.com/ploy/ploy/internal/distribution"
-	"github.com/ploy/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/distribution"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 // Handler handles controller self-update operations

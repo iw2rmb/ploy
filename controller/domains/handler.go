@@ -10,8 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	consulapi "github.com/hashicorp/consul/api"
-	"github.com/ploy/ploy/controller/certificates"
-	"github.com/ploy/ploy/controller/routing"
+	"github.com/iw2rmb/ploy/controller/certificates"
+	"github.com/iw2rmb/ploy/controller/routing"
 )
 
 // DomainHandler handles domain management API endpoints

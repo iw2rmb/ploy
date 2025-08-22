@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ploy/ploy/controller/acme"
-	"github.com/ploy/ploy/controller/dns"
+	"github.com/iw2rmb/ploy/controller/acme"
+	"github.com/iw2rmb/ploy/controller/dns"
 )
 
 // PlatformWildcardCertificateManager handles automatic wildcard certificate provisioning

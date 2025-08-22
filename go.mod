@@ -1,4 +1,4 @@
-module github.com/ploy/ploy
+module github.com/iw2rmb/ploy
 
 go 1.24.0
 

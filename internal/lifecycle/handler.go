@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/ploy/ploy/controller/envstore"
-	"github.com/ploy/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 func DestroyApp(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {

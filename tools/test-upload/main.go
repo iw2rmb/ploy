@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ploy/ploy/controller/config"
-	"github.com/ploy/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/controller/config"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 func main() {

@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/ploy/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 // StorageConfig represents the complete storage configuration

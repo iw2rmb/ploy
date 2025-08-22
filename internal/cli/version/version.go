@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ploy/ploy/internal/version"
+	"github.com/iw2rmb/ploy/internal/version"
 )
 
 // VersionCmd handles version command
