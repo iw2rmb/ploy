@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/ploy/ploy/controller/envstore"
-	"github.com/ploy/ploy/internal/utils"
+	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 func SetEnvVars(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {

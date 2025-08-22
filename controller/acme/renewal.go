@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ploy/ploy/controller/dns"
+	"github.com/iw2rmb/ploy/controller/dns"
 )
 
 // RenewalService manages automatic certificate renewal

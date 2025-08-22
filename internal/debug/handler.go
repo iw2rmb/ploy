@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/ploy/ploy/controller/builders"
-	"github.com/ploy/ploy/controller/envstore"
-	"github.com/ploy/ploy/controller/nomad"
-	"github.com/ploy/ploy/controller/opa"
-	"github.com/ploy/ploy/internal/utils"
+	"github.com/iw2rmb/ploy/controller/builders"
+	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/controller/nomad"
+	"github.com/iw2rmb/ploy/controller/opa"
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {

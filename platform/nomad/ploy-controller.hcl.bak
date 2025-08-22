@@ -226,9 +226,9 @@ job "ploy-controller" {
         PORT = "${NOMAD_PORT_http}"
         METRICS_PORT = "${NOMAD_PORT_metrics}"
         
-        # Service discovery addresses
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
-        NOMAD_ADDR = "http://${attr.unique.network.ip-address}:4646"
+        # Service discovery addresses (use localhost since Consul/Nomad are on same node)
+        CONSUL_HTTP_ADDR = "127.0.0.1:8500"
+        NOMAD_ADDR = "http://127.0.0.1:4646"
         
         # External configuration paths
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
@@ -282,7 +282,7 @@ job "ploy-controller" {
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Binary distribution configuration
-        CONTROLLER_VERSION = "arf-phase3-implementation-20250822-210201"
+        CONTROLLER_VERSION = "main-20250823-003215"
         CONTROLLER_BINARY_SOURCE = "seaweedfs"
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
@@ -299,7 +299,7 @@ job "ploy-controller" {
         NAMECHEAP_API_USER = "iw2rmb"
         NAMECHEAP_USERNAME = "iw2rmb"
         NAMECHEAP_CLIENT_IP = "45.12.75.241"
-        NAMECHEAP_SANDBOX = "true"
+        NAMECHEAP_SANDBOX = "false"
         
         # Logging configuration
         LOG_LEVEL = "info"
@@ -517,7 +517,7 @@ job "ploy-controller" {
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:922d2e431126d373e75c5a7ba230f34dae170879f5a8bbae9fdaa22677ed17f4"
+          checksum = "sha256:437cbe0fc9bfa30eaaf24aa48fdabedac24759d0acdfc5d63633148443cf2c37"
         }
       }
       

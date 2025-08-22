@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/ploy/ploy/internal/distribution"
+	"github.com/iw2rmb/ploy/internal/distribution"
 )
 
 // createUpdateSession creates a Consul session for update coordination

@@ -17,7 +17,7 @@ import (
 	"github.com/go-acme/lego/v4/challenge/dns01"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/registration"
-	"github.com/ploy/ploy/controller/dns"
+	"github.com/iw2rmb/ploy/controller/dns"
 )
 
 // Client represents an ACME client for Let's Encrypt operations

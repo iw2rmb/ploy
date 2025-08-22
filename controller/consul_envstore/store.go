@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/ploy/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/controller/envstore"
 )
 
 type ConsulEnvStore struct {

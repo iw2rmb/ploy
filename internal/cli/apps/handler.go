@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ploy/ploy/internal/cli/utils"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 func AppsCmd(args []string, controllerURL string) {
