@@ -107,6 +107,11 @@ job "ploy-controller" {
         ARF_JAIL_BASE_DIR = "/jail"
         ARF_JAIL_TEMPLATE_DIR = "/jail/template"
         ARF_JAIL_INTERFACE = "lo0"
+        
+        # OpenRewrite configuration for transformations
+        JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
+        ARF_OPENREWRITE_JAR = "/usr/local/bin/rewrite-maven.jar"
+        ARF_WORKING_DIR = "/tmp/arf"
 
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
