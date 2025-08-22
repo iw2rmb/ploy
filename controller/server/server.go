@@ -27,6 +27,7 @@ import (
 	"github.com/ploy/ploy/controller/routing"
 	"github.com/ploy/ploy/controller/selfupdate"
 	"github.com/ploy/ploy/controller/arf"
+	"github.com/ploy/ploy/controller/version"
 	"github.com/ploy/ploy/internal/build"
 	"github.com/ploy/ploy/internal/cleanup"
 	"github.com/ploy/ploy/internal/debug"
@@ -493,6 +494,9 @@ func (s *Server) setupRoutes() {
 		s.dependencies.ARFHandler.RegisterRoutes(s.app)
 		log.Printf("ARF routes registered successfully")
 	}
+
+	// Version endpoints
+	version.RegisterRoutes(s.app)
 
 	// Health endpoints in API group for versioned access
 	api.Get("/health", s.dependencies.HealthChecker.HealthHandler)
