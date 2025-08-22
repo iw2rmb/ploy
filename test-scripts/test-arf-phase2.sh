@@ -92,7 +92,7 @@ run_test test_endpoint "POST" "/v1/arf/circuit-breaker/reset?id=test-breaker" "C
 run_test_section "Recipe Management"
 run_test test_endpoint "GET" "/v1/arf/recipes" "List recipes"
 run_test test_endpoint "GET" "/v1/arf/recipes/test-recipe" "Get specific recipe" "" 404
-run_test test_endpoint "POST" "/v1/arf/recipes" "Create recipe" '{"id":"test-recipe","name":"Test Recipe","description":"A test recipe for validation","language":"java","source":"org.openrewrite.java.cleanup.UnnecessaryParentheses","category":"cleanup","confidence":0.9}'
+run_test test_endpoint "POST" "/v1/arf/recipes" "Create recipe" '{"id":"test-recipe","name":"Test Recipe","description":"A test recipe for validation","language":"java","source":"org.openrewrite.java.cleanup.UnnecessaryParentheses","category":"cleanup","confidence":0.9}' 201
 
 # Parallel Error Resolution Testing
 run_test_section "Parallel Error Resolution"
@@ -124,13 +124,13 @@ run_test test_endpoint "GET" "/v1/arf/patterns/recommendations?error_type=import
 
 # Transformation Execution Testing
 run_test_section "Transformation Execution"
-run_test test_endpoint "POST" "/v1/arf/transform" "Execute transformation" '{"recipe_id":"optimize-imports","codebase":{"language":"java","build_tool":"maven"}}'
+run_test test_endpoint "POST" "/v1/arf/transform" "Execute transformation" '{"recipe_id":"cleanup.unused-imports","codebase":{"language":"java","build_tool":"maven"}}'
 run_test test_endpoint "GET" "/v1/arf/transforms/test-transform-123" "Get transformation result" "" 404
 
 # Sandbox Management Testing
 run_test_section "Sandbox Management"
 run_test test_endpoint "GET" "/v1/arf/sandboxes" "List sandboxes"
-run_test test_endpoint "POST" "/v1/arf/sandboxes" "Create sandbox" '{"repository":"https://github.com/example/test.git","language":"java","build_tool":"maven","ttl":"30m0s"}'
+run_test test_endpoint "POST" "/v1/arf/sandboxes" "Create sandbox" '{"repository":"https://github.com/example/test.git","language":"java","build_tool":"maven"}'
 run_test test_endpoint "DELETE" "/v1/arf/sandboxes/test-sandbox-123" "Destroy sandbox" "" 500
 
 # System Integration Testing
