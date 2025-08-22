@@ -14,10 +14,25 @@ import (
 	"github.com/ploy/ploy/internal/cli/domains"
 	"github.com/ploy/ploy/internal/cli/env"
 	"github.com/ploy/ploy/internal/cli/ui"
-	"github.com/ploy/ploy/internal/cli/utils"
+	"github.com/ploy/ploy/internal/cli/version"
 )
 
-var controllerURL = utils.Getenv("PLOY_CONTROLLER", "http://localhost:8081/v1")
+var controllerURL = getControllerURL()
+
+func getControllerURL() string {
+	// First check if PLOY_CONTROLLER is explicitly set
+	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
+		return url
+	}
+	
+	// Check if PLOY_APPS_DOMAIN is set for SSL endpoint
+	if domain := os.Getenv("PLOY_APPS_DOMAIN"); domain != "" {
+		return fmt.Sprintf("https://api.%s/v1", domain)
+	}
+	
+	// Default to localhost
+	return "http://localhost:8081/v1"
+}
 
 func main() {
 	if len(os.Args) > 1 {
@@ -40,6 +55,8 @@ func main() {
 			debug.RollbackCmd(os.Args[2:], controllerURL)
 		case "arf":
 			arf.ARFCmd(os.Args[2:], controllerURL)
+		case "version":
+			version.VersionCmd(os.Args[2:], controllerURL)
 		default:
 			ui.Usage()
 		}

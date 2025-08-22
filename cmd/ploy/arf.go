@@ -666,13 +666,6 @@ func clearCache() error {
 
 // Helper functions
 
-func getControllerURL() string {
-	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
-		return url
-	}
-	return "http://localhost:8081"
-}
-
 func makeAPIRequest(method, url string, body []byte) ([]byte, error) {
 	var req *http.Request
 	var err error
