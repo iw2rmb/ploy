@@ -271,9 +271,7 @@ func (e *OpenRewriteEngine) executeInSandbox(ctx context.Context, sandbox *Sandb
 
 	// Use Maven to execute OpenRewrite (simpler approach for testing)
 	args := []string{
-		"org.openrewrite.maven:rewrite-maven:8.60.0:run",
-		"-Drewrite.recipeArtifactCoordinates=org.openrewrite:rewrite-java",
-		"-Drewrite.activeRecipes=org.openrewrite.java.cleanup.UnnecessaryParentheses",
+		"rewrite:run",
 	}
 
 	// Set timeout context
@@ -312,17 +310,17 @@ func (e *OpenRewriteEngine) createMavenProject(pomPath string) error {
             <plugin>
                 <groupId>org.openrewrite.maven</groupId>
                 <artifactId>rewrite-maven-plugin</artifactId>
-                <version>8.60.0</version>
+                <version>5.42.2</version>
                 <configuration>
                     <activeRecipes>
-                        <recipe>org.openrewrite.java.cleanup.UnnecessaryParentheses</recipe>
+                        <recipe>org.openrewrite.java.RemoveUnusedImports</recipe>
                     </activeRecipes>
                 </configuration>
                 <dependencies>
                     <dependency>
-                        <groupId>org.openrewrite.recipe</groupId>
+                        <groupId>org.openrewrite</groupId>
                         <artifactId>rewrite-java</artifactId>
-                        <version>8.60.0</version>
+                        <version>8.37.2</version>
                     </dependency>
                 </dependencies>
             </plugin>
