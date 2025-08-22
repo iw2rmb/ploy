@@ -28,7 +28,7 @@ job "ploy-controller" {
       progress_deadline = "10m"  # Extended overall timeout
       auto_revert = true         # Automatically rollback failed updates
       auto_promote = false       # Require manual promotion for safety
-      canary = 1                 # Enable canary deployment with 1 instance
+      canary = 0                 # Disable canary deployment for testing
       
       # Stagger updates to prevent issues
       stagger = "30s"            # 30 second delay between updates
