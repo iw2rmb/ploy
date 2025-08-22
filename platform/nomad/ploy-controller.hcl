@@ -299,7 +299,7 @@ job "ploy-controller" {
         NAMECHEAP_API_USER = "iw2rmb"
         NAMECHEAP_USERNAME = "iw2rmb"
         NAMECHEAP_CLIENT_IP = "45.12.75.241"
-        NAMECHEAP_SANDBOX = "true"
+        NAMECHEAP_SANDBOX = "false"
         
         # Logging configuration
         LOG_LEVEL = "info"

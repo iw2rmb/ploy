@@ -1,0 +1,83 @@
+# Production Environment Wildcard Certificate Configuration
+# This configuration is for PRODUCTION environment
+# It provisions a wildcard certificate for *.ployd.app
+
+# Production certificate configuration
+ploy_prod_certificate:
+  # Wildcard domain to provision
+  wildcard_domain: "*.{{ ploy.apps_domain }}"
+  
+  # Base domain (needed for DNS challenge)
+  base_domain: "{{ ploy.apps_domain }}"
+  
+  # Apps will be accessible at:
+  # - api.ployd.app (controller)
+  # - myapp.ployd.app (deployed apps)
+  # - userapp.ployd.app (user apps)
+  
+  # Certificate storage paths
+  cert_path: "/etc/ploy/certs/prod-wildcard.crt"
+  key_path: "/etc/ploy/certs/prod-wildcard.key"
+  
+  # Let's Encrypt configuration - PRODUCTION
+  staging: false  # Use production Let's Encrypt for valid certs
+  email: "admin@ployd.app"
+  
+  # Auto-renewal configuration
+  auto_renew: true
+  renewal_threshold_days: 30
+
+# Environment-specific routing for production
+ploy_prod_routing:
+  # Controller endpoint for production environment
+  controller_domain: "api.{{ ploy.apps_domain }}"
+  
+  # App pattern for production environment
+  app_pattern: "{app}.{{ ploy.apps_domain }}"
+  
+  # Examples:
+  # - node-hello.ployd.app
+  # - java-app.ployd.app
+  # - user-site.ployd.app
+
+# Traefik configuration for production wildcard
+traefik_prod_config:
+  # Router for production controller
+  controller_router:
+    rule: "Host(`api.{{ ploy.apps_domain }}`)"
+    service: "ploy-controller"
+    tls:
+      certResolver: "prod-wildcard"
+      domains:
+        - main: "{{ ploy.apps_domain }}"
+          sans:
+            - "*.{{ ploy.apps_domain }}"
+  
+  # Dynamic router for production apps
+  apps_router:
+    rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy.apps_domain }}`)"
+    service: "dynamic-apps"
+    tls:
+      certResolver: "prod-wildcard"
+
+# DNS-01 Challenge Configuration for Production
+dns_challenge_config:
+  # Provider configuration
+  provider: "{{ ploy.apps_domain_provider }}"
+  
+  # DNS propagation check - stricter for production
+  propagation_timeout: 300  # 5 minutes
+  polling_interval: 15
+  
+  # TTL for challenge records
+  ttl: 60
+
+# Production API configuration
+prod_api_config:
+  # Use production Namecheap API (not sandbox)
+  use_production_api: true
+  
+  # Rate limiting for production
+  rate_limit:
+    requests_per_minute: 120
+    burst: 20

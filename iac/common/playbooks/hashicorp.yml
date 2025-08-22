@@ -148,7 +148,7 @@
 
     - name: Create Consul configuration
       template:
-        src: ../../common/templates/consul-server.hcl.j2
+        src: ../templates/consul-server.hcl.j2
         dest: /etc/consul.d/consul.hcl
         owner: hashicorp
         group: hashicorp
@@ -156,7 +156,7 @@
 
     - name: Create Nomad server configuration
       template:
-        src: ../../common/templates/nomad-server.hcl.j2
+        src: ../templates/nomad-server.hcl.j2
         dest: /etc/nomad.d/nomad.hcl
         owner: hashicorp
         group: hashicorp
@@ -164,7 +164,7 @@
 
     - name: Create Vault configuration
       template:
-        src: ../../common/templates/vault.hcl.j2
+        src: ../templates/vault.hcl.j2
         dest: /etc/vault.d/vault.hcl
         owner: hashicorp
         group: hashicorp
@@ -172,7 +172,7 @@
 
     - name: Create systemd service files
       template:
-        src: "../../common/templates/{{ item }}.service.j2"
+        src: "../templates/{{ item }}.service.j2"
         dest: "/etc/systemd/system/{{ item }}.service"
       loop:
         - consul
@@ -343,7 +343,7 @@
 
     - name: Copy Ploy Nomad job templates (if they exist)
       copy:
-        src: ../../common/templates/"{{ item.path }}"
+        src: "{{ item.path }}"
         dest: /opt/hashicorp/nomad/jobs/
         owner: hashicorp
         group: hashicorp
@@ -420,7 +420,7 @@
 
         - name: Copy Traefik Nomad job template to VPS
           copy:
-            src: ../../common/templates/"{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
+            src: "{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
             dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
             owner: hashicorp
             group: hashicorp

@@ -139,30 +139,44 @@ configs/
 ```
 
 ### `/iac/` - Infrastructure as Code
-Ansible playbooks and configuration for deployment environments. See `iac/dev/README.md` for complete setup guide.
+Ansible playbooks and configuration for deployment environments. Uses unified template system for consistency between dev and prod.
 
 ```
 iac/
+├── common/                         # Shared infrastructure components
+│   ├── playbooks/                  # Reusable playbooks
+│   │   ├── controller.yml          # Controller deployment logic
+│   │   ├── seaweedfs.yml          # SeaweedFS storage deployment
+│   │   └── hashicorp.yml          # Nomad/Consul/Vault deployment
+│   └── templates/                  # Unified Jinja2 templates
+│       ├── consul-server.hcl.j2   # Linux Consul server configuration
+│       ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
+│       ├── nomad-server.hcl.j2    # Linux Nomad server configuration
+│       ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
+│       ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│       ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
+│       ├── update-controller.sh.j2 # Controller management scripts
+│       └── *.j2                    # Platform service templates
 ├── dev/                            # Development environment
 │   ├── site.yml                    # Main orchestration playbook
-│   ├── inventory/
-│   │   └── hosts.yml              # Target hosts configuration  
-│   ├── playbooks/                 # Individual playbooks
-│   │   ├── main.yml               # Base system setup
-│   │   ├── seaweedfs.yml          # SeaweedFS storage deployment
-│   │   ├── hashicorp.yml          # Nomad/Consul/Vault deployment
-│   │   ├── controller.yml         # Controller Nomad deployment
+│   ├── inventory/hosts.yml         # Target hosts configuration  
+│   ├── playbooks/                  # Environment-specific playbooks
+│   │   ├── main.yml               # Dev system setup with wildcard SSL
+│   │   ├── seaweedfs.yml          # Dev SeaweedFS (mode 000)
+│   │   ├── hashicorp.yml          # Dev HashiCorp stack
+│   │   ├── controller.yml         # Dev controller deployment
 │   │   ├── testing.yml            # Test environment setup
 │   │   └── freebsd.yml            # FreeBSD VM deployment
-│   ├── templates/                 # Jinja2 configuration templates
-│   │   ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
-│   │   ├── update-controller.sh.j2       # Controller update script
-│   │   ├── rollback-controller.sh.j2     # Controller rollback script
-│   │   ├── controller-status.sh.j2       # Controller status script
-│   │   ├── migrate-controller.sh.j2      # Controller migration script
-│   │   └── *.j2                          # Other configuration templates
 │   └── vars/
-│       └── main.yml               # Global configuration variables
+│       ├── main.yml               # Dev configuration variables
+│       └── dev-wildcard.yml       # Dev wildcard certificate config
+└── prod/                           # Production environment
+    ├── site.yml                    # Production orchestration playbook
+    ├── inventory/hosts.yml         # Production hosts configuration
+    ├── playbooks/main.yml          # Production system setup
+    └── vars/
+        ├── main.yml               # Production configuration variables
+        └── prod-wildcard.yml      # Production wildcard certificate config
 ```
 
 ### `/platform/` - Platform Configuration

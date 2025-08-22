@@ -1,0 +1,139 @@
+datacenter = "dc1"
+data_dir = "/var/db/nomad"
+log_level = "INFO"
+name = "ploy-freebsd-{{ ansible_hostname }}"
+
+# FreeBSD network configuration
+bind_addr = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+advertise {
+  http = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+  rpc = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+  serf = "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+}
+
+# Enable metrics for monitoring
+telemetry {
+  prometheus_metrics = true
+  publish_allocation_metrics = true
+  publish_node_metrics = true
+}
+
+# FreeBSD node runs as client only
+server {
+  enabled = false
+}
+
+client {
+  enabled = true
+  servers = ["{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}:4647"]
+  
+  # FreeBSD-specific client configuration for jail driver
+  options {
+    "driver.jail.enable" = "1"
+    "driver.exec.enable" = "1"
+    "driver.raw_exec.enable" = "1"
+    # Disable Docker on FreeBSD
+    "driver.docker.enable" = "0"
+  }
+  
+  # FreeBSD resource configuration
+  reserved {
+    cpu = 200
+    memory = 512
+    disk = 2048
+  }
+  
+  # FreeBSD host volumes for persistent storage
+  host_volume "ploy-artifacts" {
+    path      = "/opt/ploy/artifacts"
+    read_only = false
+  }
+  
+  host_volume "ploy-logs" {
+    path      = "/opt/ploy/logs"
+    read_only = false
+  }
+  
+  host_volume "jail-data" {
+    path      = "/opt/ploy/jails"
+    read_only = false
+  }
+  
+  # FreeBSD-specific metadata for lane selection
+  meta {
+    "os" = "freebsd"
+    "jail_support" = "true"
+    "bhyve_support" = "true"
+    "unikernel_support" = "true"
+    "docker_support" = "false"
+    "lane_d_capable" = "true"
+    "lane_f_capable" = "true"
+  }
+  
+  # Node class for FreeBSD workloads
+  node_class = "freebsd-worker"
+}
+
+consul {
+  address = "{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}:8500"
+  auto_advertise = true
+  server_auto_join = false
+  client_auto_join = true
+}
+
+vault {
+  enabled = false
+  address = "http://{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}:8200"
+}
+
+# FreeBSD jail driver configuration
+plugin "jail" {
+  config {
+    # Enable jail driver for FreeBSD containers
+    enabled = true
+    
+    # Jail-specific configuration
+    jail_manage_etc_hosts = true
+    jail_inherit_fib = true
+    
+    # Resource limits
+    jail_enforce_statfs = 2
+  }
+}
+
+# Bhyve driver for VM workloads (Lane F)
+plugin "qemu" {
+  config {
+    # Enable QEMU/Bhyve driver for VM workloads
+    image_paths = ["/opt/ploy/artifacts", "/tmp", "/opt/ploy/vm-images"]
+    
+    # FreeBSD-specific VM configuration
+    accelerator = "hvf"  # Use Hypervisor Framework on supported systems
+  }
+}
+
+ui {
+  enabled = false
+}
+
+ports {
+  http = 4646
+  rpc = 4647
+  serf = 4648
+}
+
+# Listen on all interfaces for client access
+addresses {
+  http = "0.0.0.0"
+  rpc = "0.0.0.0"
+  serf = "0.0.0.0"
+}
+
+# FreeBSD-specific logging
+log_file = "/var/log/nomad/"
+log_rotate_duration = "24h"
+log_rotate_max_files = 7
+
+# Enable syslog integration
+enable_syslog = true
+syslog_facility = "LOCAL1"

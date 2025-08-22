@@ -193,3 +193,79 @@ The following app names are **reserved** for platform use:
 - **Automatic Renewal**: Let's Encrypt certificates renew automatically  
 - **DNS-01 Challenge**: Works behind firewalls and with dynamic IPs
 - **Production Ready**: Uses production Let's Encrypt (not staging)
+
+## Infrastructure as Code
+
+Ploy provides **unified infrastructure automation** using Ansible for consistent deployment across development and production environments.
+
+### Unified Template System
+
+**Template Consolidation**: All environments use shared templates from `iac/common/templates/` for consistency and simplified maintenance.
+
+**Environment Structure**:
+```
+iac/
+├── common/              # Shared infrastructure components
+│   ├── playbooks/       # Reusable deployment logic
+│   └── templates/       # Unified Jinja2 configuration templates
+├── dev/                 # Development environment (single-node)
+│   ├── README.md        # Development setup guide
+│   ├── site.yml         # Dev deployment orchestration
+│   └── playbooks/       # Dev-specific configurations
+└── prod/                # Production environment (multi-node HA)
+    ├── README.md        # Production deployment guide
+    ├── site.yml         # Production deployment orchestration
+    └── playbooks/       # Production configurations
+```
+
+### FreeBSD Integration
+
+**FreeBSD Worker Nodes**: Specialized configurations for FreeBSD nodes that provide unique capabilities for certain workload types.
+
+**Lane Support**:
+- **Lane D**: FreeBSD jail containers for native application isolation
+- **Lane F**: Bhyve/QEMU virtual machines for stateful workloads
+- **Unikernel Support**: Specialized runtime for minimal unikernel execution
+
+**Template Features**:
+- `consul-freebsd.hcl.j2` - FreeBSD Consul client configuration
+- `nomad-freebsd.hcl.j2` - FreeBSD Nomad client with jail and bhyve drivers
+- FreeBSD-specific paths, logging, and service integration
+
+### Deployment Environments
+
+**Development Environment** (`iac/dev/`):
+- Single-node deployment with optional FreeBSD VM
+- Domain: `*.dev.ployd.app`
+- SeaweedFS mode: `000` (no replication)
+- Sandbox SSL certificates
+
+**Production Environment** (`iac/prod/`):
+- Multi-node cluster (minimum 3 nodes: 2 Linux + 1 FreeBSD)
+- Domain: `*.ployd.app`
+- SeaweedFS mode: `001` (cross-node replication)
+- Production SSL certificates
+- High availability for all services
+
+### Quick Deployment
+
+**Development**:
+```bash
+cd iac/dev
+ansible-playbook site.yml -e target_host=$TARGET_HOST
+```
+
+**Production**:
+```bash
+cd iac/prod
+ansible-playbook site.yml -i inventory/hosts.yml
+```
+
+**Infrastructure Benefits**:
+- **Consistency**: Same configuration logic across dev and prod
+- **Maintainability**: Single location for template updates
+- **FreeBSD Support**: Native jail and VM capabilities
+- **SSL Automation**: Wildcard certificate provisioning and renewal
+- **High Availability**: Multi-node production deployment with redundancy
+
+See `iac/README.md` for complete infrastructure documentation.

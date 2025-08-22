@@ -138,7 +138,7 @@
 
         - name: Copy controller Nomad job template
           template:
-            src: ../../common/templates/nomad-ploy-controller.hcl.j2
+            src: ../templates/nomad-ploy-controller.hcl.j2
             dest: /opt/hashicorp/nomad/jobs/ploy-controller.hcl
             owner: hashicorp
             group: hashicorp
@@ -245,7 +245,7 @@
 
         - name: Create controller update script
           template:
-            src: ../../common/templates/update-controller.sh.j2
+            src: ../templates/update-controller.sh.j2
             dest: /home/ploy/controller-scripts/update-controller.sh
             owner: ploy
             group: ploy
@@ -253,7 +253,7 @@
 
         - name: Create controller rollback script
           template:
-            src: ../../common/templates/rollback-controller.sh.j2
+            src: ../templates/rollback-controller.sh.j2
             dest: /home/ploy/controller-scripts/rollback-controller.sh
             owner: ploy
             group: ploy
@@ -261,7 +261,7 @@
 
         - name: Create controller status script
           template:
-            src: ../../common/templates/controller-status.sh.j2
+            src: ../templates/controller-status.sh.j2
             dest: /home/ploy/controller-scripts/controller-status.sh
             owner: ploy
             group: ploy
@@ -269,7 +269,7 @@
 
         - name: Create controller migration script
           template:
-            src: ../../common/templates/migrate-controller.sh.j2
+            src: ../templates/migrate-controller.sh.j2
             dest: /home/ploy/controller-scripts/migrate-controller.sh
             owner: ploy
             group: ploy

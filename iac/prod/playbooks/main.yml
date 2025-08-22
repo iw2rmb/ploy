@@ -1,0 +1,502 @@
+---
+# Ploy Production Environment Setup Playbook
+# 
+# This playbook sets up a production Ploy environment with:
+# - Multi-node cluster (minimum 3 nodes: 2 Linux + 1 FreeBSD)
+# - Production-grade configuration
+# - SeaweedFS with replication
+# - Platform wildcard certificates for *.ployd.app
+# - High availability setup
+#
+
+- name: Validate Production Cluster Requirements
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Check minimum node count
+      fail:
+        msg: "Production requires minimum {{ cluster_requirements.min_nodes }} nodes, found {{ groups['all'] | length }}"
+      when: groups['all'] | length < cluster_requirements.min_nodes
+
+    - name: Check Linux node count
+      fail:
+        msg: "Production requires minimum {{ cluster_requirements.min_linux_nodes }} Linux nodes, found {{ groups['linux_hosts'] | default([]) | length }}"
+      when: groups['linux_hosts'] | default([]) | length < cluster_requirements.min_linux_nodes
+
+    - name: Check FreeBSD node count
+      fail:
+        msg: "Production requires minimum {{ cluster_requirements.min_freebsd_nodes }} FreeBSD nodes, found {{ groups['freebsd_hosts'] | default([]) | length }}"
+      when: groups['freebsd_hosts'] | default([]) | length < cluster_requirements.min_freebsd_nodes
+
+    - name: Display cluster topology
+      debug:
+        msg: |
+          Production Cluster Topology:
+          - Total nodes: {{ groups['all'] | length }}
+          - Linux nodes: {{ groups['linux_hosts'] | default([]) | length }}
+          - FreeBSD nodes: {{ groups['freebsd_hosts'] | default([]) | length }}
+          ✅ Meets production requirements
+
+- name: Setup Ploy Production Environment
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/prod-wildcard.yml
+  
+  tasks:
+    - name: Update system packages
+      apt:
+        update_cache: true
+        upgrade: dist
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install basic development tools
+      apt:
+        name: "{{ testing_tools }}"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+        state: present
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Install Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Install Go
+      block:
+        - name: Download Go
+          get_url:
+            url: "https://golang.org/dl/go{{ go_version }}.linux-{{ go_arch }}.tar.gz"
+            dest: /tmp/go.tar.gz
+
+        - name: Remove existing Go installation
+          file:
+            path: /usr/local/go
+            state: absent
+
+        - name: Extract Go
+          unarchive:
+            src: /tmp/go.tar.gz
+            dest: /usr/local
+            remote_src: true
+
+        - name: Configure system PATH with Go
+          lineinfile:
+            path: /etc/environment
+            regexp: '^PATH='
+            line: 'PATH="/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"'
+            create: true
+
+    - name: Install Python3 and pip
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+        state: present
+
+    - name: Install Java for production workloads
+      apt:
+        name:
+          - openjdk-17-jdk
+          - maven
+          - gradle
+        state: present
+
+    - name: Set JAVA_HOME environment variable
+      lineinfile:
+        path: /etc/environment
+        regexp: '^JAVA_HOME='
+        line: 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
+        create: true
+
+    - name: Install build tools
+      block:
+        - name: Install make and build-essential
+          apt:
+            name:
+              - build-essential
+              - cmake
+              - pkg-config
+            state: present
+
+        - name: Download KraftKit
+          get_url:
+            url: "https://github.com/unikraft/kraftkit/releases/download/v{{ build_tools.kraft.version }}/kraft_{{ build_tools.kraft.version }}_linux_amd64.tar.gz"
+            dest: /tmp/kraft.tar.gz
+
+        - name: Extract KraftKit
+          unarchive:
+            src: /tmp/kraft.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Make KraftKit executable
+          file:
+            path: /usr/local/bin/kraft
+            mode: '0755'
+
+        - name: Download Cosign
+          get_url:
+            url: "https://github.com/sigstore/cosign/releases/download/v{{ build_tools.cosign.version }}/cosign-linux-amd64"
+            dest: /usr/local/bin/cosign
+            mode: '0755'
+
+        - name: Download Syft
+          get_url:
+            url: "https://github.com/anchore/syft/releases/download/v{{ build_tools.syft.version }}/syft_{{ build_tools.syft.version }}_linux_amd64.tar.gz"
+            dest: /tmp/syft.tar.gz
+
+        - name: Extract Syft
+          unarchive:
+            src: /tmp/syft.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Download Grype
+          get_url:
+            url: "https://github.com/anchore/grype/releases/download/v{{ build_tools.grype.version }}/grype_{{ build_tools.grype.version }}_linux_amd64.tar.gz"
+            dest: /tmp/grype.tar.gz
+
+        - name: Extract Grype
+          unarchive:
+            src: /tmp/grype.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Download OPA
+          get_url:
+            url: "https://github.com/open-policy-agent/opa/releases/download/v{{ build_tools.opa.version }}/opa_linux_amd64"
+            dest: /usr/local/bin/opa
+            mode: '0755'
+
+    # SSL Certificate Provisioning Infrastructure for Production
+    - name: Install SSL certificate management tools
+      block:
+        - name: Install certbot for Let's Encrypt ACME client
+          apt:
+            name:
+              - certbot
+            state: present
+
+        - name: Install lego ACME client for production DNS provider support
+          get_url:
+            url: "https://github.com/go-acme/lego/releases/download/v{{ lego_version | default('4.14.2') }}/lego_v{{ lego_version | default('4.14.2') }}_linux_amd64.tar.gz"
+            dest: /tmp/lego.tar.gz
+
+        - name: Extract lego ACME client
+          unarchive:
+            src: /tmp/lego.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Make lego executable
+          file:
+            path: /usr/local/bin/lego
+            mode: '0755'
+
+        - name: Create SSL certificates directory
+          file:
+            path: /etc/ploy/certs
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+    - name: Setup platform certificate renewal automation
+      block:
+        - name: Setup production platform certificate renewal cron job
+          cron:
+            name: "Production Platform Certificate Renewal"
+            minute: "0"
+            hour: "2"  # 2 AM for production
+            day: "*/14"  # Bi-weekly check for production
+            user: ploy
+            job: "cd /etc/ploy/certs && /usr/local/bin/lego --dns=namecheap --domains='{{ ploy_prod_certificate.wildcard_domain }}' renew >> /var/log/ploy-platform-cert-renewal.log 2>&1"
+            state: present
+
+    - name: Configure production DNS API environment
+      block:
+        - name: Set production Namecheap API environment variables
+          blockinfile:
+            path: /home/ploy/.bashrc
+            create: true
+            owner: ploy
+            group: ploy
+            mode: '0644'
+            block: |
+              # Production SSL Certificate Automation Environment
+              export CERT_EMAIL="{{ ploy_prod_certificate.email }}"
+              export ACME_STAGING="{{ ploy_prod_certificate.staging }}"
+              
+              # Certificate storage paths
+              export CERT_DIR="/etc/ploy/certs"
+              export PROD_CERT_PATH="{{ ploy_prod_certificate.cert_path }}"
+              export PROD_KEY_PATH="{{ ploy_prod_certificate.key_path }}"
+              
+              # Production certificate domains
+              export PROD_WILDCARD_DOMAIN="{{ ploy_prod_certificate.wildcard_domain }}"
+              export PROD_BASE_DOMAIN="{{ ploy_prod_certificate.base_domain }}"
+              export PROD_CONTROLLER_DOMAIN="{{ ploy_prod_routing.controller_domain }}"
+              
+              # Use production Namecheap API (not sandbox)
+              export NAMECHEAP_API_KEY="{{ lookup('env', 'NAMECHEAP_API_KEY') }}"
+              export NAMECHEAP_API_USER="{{ lookup('env', 'NAMECHEAP_API_USER') | default('iw2rmb') }}"
+              export NAMECHEAP_USERNAME="{{ lookup('env', 'NAMECHEAP_USERNAME') | default('iw2rmb') }}"
+              export NAMECHEAP_CLIENT_IP="{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - Production SSL Certificate vars"
+
+    - name: Initialize SSL certificate provisioning for production environment
+      block:
+        - name: Check if DNS records are properly configured for production
+          shell: |
+            PROD_IP=$(dig +short {{ ploy_prod_certificate.base_domain }} | tail -n1)
+            API_IP=$(dig +short {{ ploy_prod_routing.controller_domain }} | tail -n1)
+            TARGET_IP="{{ ansible_default_ipv4.address }}"
+            
+            if [ "$PROD_IP" = "$TARGET_IP" ] && [ "$API_IP" = "$TARGET_IP" ]; then
+              echo "DNS_READY"
+            else
+              echo "DNS_NOT_READY"
+              echo "Current: {{ ploy_prod_certificate.base_domain }} -> $PROD_IP"
+              echo "Current: {{ ploy_prod_routing.controller_domain }} -> $API_IP"
+              echo "Required: $TARGET_IP"
+            fi
+          register: dns_status
+          changed_when: false
+
+        - name: Display production DNS configuration status
+          debug:
+            msg: |
+              Production DNS Configuration Status: {{ dns_status.stdout_lines[0] }}
+              {% if dns_status.stdout_lines|length > 1 %}
+              Details:
+              {% for line in dns_status.stdout_lines[1:] %}
+                {{ line }}
+              {% endfor %}
+              {% endif %}
+
+        - name: Provision production platform wildcard certificate (if DNS is ready and API credentials are available)
+          become_user: ploy
+          shell: |
+            if [ -n "$NAMECHEAP_API_KEY" ] && [ "{{ dns_status.stdout_lines[0] }}" = "DNS_READY" ]; then
+              # Use lego directly for production platform certificate provisioning
+              export NAMECHEAP_CLIENT_IP="{{ ansible_default_ipv4.address }}"
+              export CERT_EMAIL="{{ ploy_prod_certificate.email }}"
+              
+              mkdir -p /etc/ploy/certs
+              cd /etc/ploy/certs
+              
+              /usr/local/bin/lego \
+                --server="https://acme-v02.api.letsencrypt.org/directory" \
+                --email="$CERT_EMAIL" \
+                --dns=namecheap \
+                --domains="{{ ploy_prod_certificate.wildcard_domain }}" \
+                --accept-tos \
+                run
+              
+              # Copy certificates to expected locations for controller
+              CLEAN_DOMAIN=$(echo "{{ ploy_prod_certificate.wildcard_domain }}" | sed 's/\*\.//')
+              if [ -f ".lego/certificates/$CLEAN_DOMAIN.crt" ]; then
+                cp ".lego/certificates/$CLEAN_DOMAIN.crt" "{{ ploy_prod_certificate.cert_path }}"
+                cp ".lego/certificates/$CLEAN_DOMAIN.key" "{{ ploy_prod_certificate.key_path }}"
+                chown ploy:ploy "{{ ploy_prod_certificate.cert_path }}" "{{ ploy_prod_certificate.key_path }}"
+                echo "Production platform wildcard certificate provisioned successfully"
+              else
+                echo "Certificate provisioning failed - files not found"
+                exit 1
+              fi
+            else
+              echo "Skipping production certificate provisioning - DNS not ready or API credentials missing"
+              echo "Production platform wildcard certificate must be provisioned during infrastructure setup"
+            fi
+          register: prod_cert_provision_result
+          when: 
+            - lookup('env', 'NAMECHEAP_API_KEY')
+          ignore_errors: true
+
+        - name: Display production certificate provisioning result
+          debug:
+            msg: "{{ prod_cert_provision_result.stdout_lines if prod_cert_provision_result.stdout_lines is defined else 'Production certificate provisioning skipped' }}"
+          when: prod_cert_provision_result is defined
+
+    - name: Create ploy user for production
+      user:
+        name: ploy
+        groups: docker
+        append: true
+        shell: /bin/bash
+        create_home: true
+
+    - name: Set production environment variables for ploy user
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Production environment variables
+          export PLOY_ENVIRONMENT="prod"
+          export PLOY_APPS_DOMAIN="{{ ploy.apps_domain }}"
+          export PLOY_APPS_DOMAIN_PROVIDER="{{ ploy.apps_domain_provider }}"
+          export PLOY_CONTROLLER_DOMAIN="api.{{ ploy.apps_domain }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Production environment vars"
+
+    - name: Clone Ploy repository
+      git:
+        repo: https://github.com/iw2rmb/ploy.git
+        dest: /home/ploy/ploy
+        force: true
+      become_user: ploy
+      become: true
+
+    - name: Create external storage configuration directory
+      file:
+        path: /etc/ploy/storage
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Create production storage configuration file
+      copy:
+        content: |
+          # Production Storage Configuration for Ploy Controller
+          # SeaweedFS-based distributed storage with replication
+          
+          storage:
+            provider: seaweedfs
+            
+            # Production SeaweedFS Configuration
+            master: "{{ storage_config.seaweedfs.master }}"
+            filer: "{{ storage_config.seaweedfs.filer }}"
+            collection: "{{ storage_config.seaweedfs.collection }}"
+            replication: "{{ storage_config.seaweedfs.replication }}"
+            timeout: {{ storage_config.seaweedfs.timeout }}
+            datacenter: "{{ storage_config.seaweedfs.datacenter }}"
+            rack: "{{ storage_config.seaweedfs.rack }}"
+            collections:
+              artifacts: "{{ storage_config.seaweedfs.collections.artifacts }}"
+              metadata: "{{ storage_config.seaweedfs.collections.metadata }}"
+              debug: "{{ storage_config.seaweedfs.collections.debug }}"
+            
+            # Production Client Configuration
+            client:
+              retry_config:
+                max_retries: {{ storage_config.client.retry_config.max_retries }}
+                initial_delay: "{{ storage_config.client.retry_config.initial_delay }}"
+                max_delay: "{{ storage_config.client.retry_config.max_delay }}"
+                multiplier: {{ storage_config.client.retry_config.multiplier }}
+              health_check_config:
+                interval: "{{ storage_config.client.health_check_config.interval }}"
+                timeout: "{{ storage_config.client.health_check_config.timeout }}"
+                failure_threshold: {{ storage_config.client.health_check_config.failure_threshold }}
+              enable_metrics: {{ storage_config.client.enable_metrics }}
+              enable_health_check: {{ storage_config.client.enable_health_check }}
+              max_operation_time: "{{ storage_config.client.max_operation_time }}"
+        dest: /etc/ploy/storage/config.yaml
+        owner: ploy
+        group: ploy
+        mode: '0644'
+
+    - name: Set up production firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - "22"
+        - "{{ ploy.controller_port }}"
+        - "4646"  # Nomad
+        - "8500"  # Consul
+        - "8200"  # Vault
+        - "80"    # HTTP (Traefik)
+        - "443"   # HTTPS (Traefik)
+        - "8080"  # Traefik dashboard
+        - "9333"  # SeaweedFS master
+        - "8888"  # SeaweedFS filer
+        - "{{ seaweedfs.volume_port }}"  # SeaweedFS volume
+
+- name: Configure FreeBSD Production Nodes
+  hosts: freebsd_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Install required packages on FreeBSD
+      pkgng:
+        name:
+          - python39
+          - git
+          - curl
+          - jq
+        state: present
+
+    - name: Create ploy user on FreeBSD
+      user:
+        name: ploy
+        shell: /bin/sh
+        create_home: true
+
+    - name: Set FreeBSD environment variables
+      blockinfile:
+        path: /home/ploy/.profile
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # FreeBSD production environment
+          export PLOY_ENVIRONMENT="prod"
+          export PLOY_NODE_TYPE="freebsd"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - FreeBSD production vars"
+
+    - name: Display FreeBSD node configuration
+      debug:
+        msg: |
+          FreeBSD Production Node Configured:
+          - Hostname: {{ ansible_hostname }}
+          - OS: {{ ansible_system }} {{ ansible_release }}
+          - Role: Production worker node
+          - Services: Nomad client, Jail runtime
