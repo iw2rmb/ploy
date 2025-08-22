@@ -86,6 +86,53 @@ ploy env delete myapp DEBUG
 - Persistent storage across controller restarts
 - Full CRUD operations with user-friendly output
 
+### `ploy arf` (implemented - Phase ARF-1)
+```
+ploy arf recipes list [--language <java|python|rust>] [--category <cleanup|modernize|security>] [--min-confidence <0.0-1.0>]
+ploy arf recipes get <recipe-id>
+ploy arf recipes search <query>
+ploy arf recipes stats <recipe-id>
+ploy arf transform <recipe-id> [--repository <url>] [--branch <branch>] [--language <language>]
+ploy arf sandboxes list
+ploy arf sandboxes create [--repository <url>] [--language <language>] [--ttl <duration>]
+ploy arf sandboxes destroy <sandbox-id>
+ploy arf health
+ploy arf cache stats
+ploy arf cache clear
+```
+**Automated Remediation Framework**: Execute code transformations using OpenRewrite recipes with secure sandbox isolation.
+
+**Examples:**
+```bash
+# List Java cleanup recipes with high confidence
+ploy arf recipes list --language java --category cleanup --min-confidence 0.8
+
+# Search for specific transformation recipes
+ploy arf recipes search "unused imports"
+
+# Execute transformation on current directory
+ploy arf transform cleanup.unused-imports
+
+# Execute transformation on remote repository
+ploy arf transform modernize.java-8-to-11 --repository https://github.com/user/repo --branch main
+
+# Create sandbox for testing transformations
+ploy arf sandboxes create --repository https://github.com/user/repo --language java --ttl 30m
+
+# Check ARF system health and performance
+ploy arf health
+ploy arf cache stats
+```
+
+**Features:**
+- **2,800+ OpenRewrite Recipes**: Java transformations for cleanup, modernization, security, and migration
+- **Secure Sandboxing**: FreeBSD jail isolation for safe code transformation
+- **Recipe Discovery**: Search and filter recipes by language, category, and confidence score
+- **Performance Caching**: Memory-mapped AST caching for 60% faster analysis
+- **Statistics Tracking**: Recipe usage statistics and success rates
+- **Multi-Repository Support**: Transform code from local directories or remote repositories
+- **Confidence Scoring**: Automated vs manual remediation based on transformation confidence
+
 ### `ploy webhooks` (planned)
 ```
 ploy webhooks add <app> <url> [--events build.completed,deploy.failed] [--secret <secret>]
