@@ -51,7 +51,8 @@ func SetupDNSRoutes(app *fiber.App, handler *Handler) {
 	api.Put("/records", handler.UpdateRecord)
 	api.Delete("/records/:hostname/:type", handler.DeleteRecord)
 	
-	// DNS configuration
+	// DNS configuration and status
+	api.Get("/status", handler.GetStatus)
 	api.Get("/config", handler.GetConfig)
 	api.Post("/config/validate", handler.ValidateConfig)
 }
@@ -306,6 +307,39 @@ func (h *Handler) ValidateConfig(c *fiber.Ctx) error {
 		"status":  "valid",
 		"message": "DNS provider configuration is valid",
 	})
+}
+
+// GetStatus returns the DNS system status
+func (h *Handler) GetStatus(c *fiber.Ctx) error {
+	status := fiber.Map{
+		"dns_provider": "available",
+		"provider_type": "",
+		"domain": h.manager.config.Domain,
+		"target_ip": h.manager.config.TargetIP,
+		"configuration": "loaded",
+	}
+	
+	// Determine provider type based on configuration
+	if h.manager.config.Domain != "" {
+		switch {
+		case os.Getenv("PLOY_DNS_PROVIDER") == "namecheap":
+			status["provider_type"] = "namecheap"
+		case os.Getenv("PLOY_DNS_PROVIDER") == "cloudflare":
+			status["provider_type"] = "cloudflare"
+		default:
+			status["provider_type"] = "unknown"
+		}
+	}
+	
+	// Validate configuration
+	if err := h.provider.ValidateConfiguration(); err != nil {
+		status["dns_provider"] = "error"
+		status["configuration"] = "invalid"
+		status["error"] = err.Error()
+		return c.Status(http.StatusServiceUnavailable).JSON(status)
+	}
+	
+	return c.JSON(status)
 }
 
 // LoadDNSConfig loads DNS configuration from environment or file
