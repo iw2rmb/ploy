@@ -68,14 +68,7 @@ const (
 )
 
 
-// FailurePattern represents a recurring failure pattern
-type FailurePattern struct {
-	Pattern       string                 `json:"pattern"`
-	Frequency     int                    `json:"frequency"`
-	LastSeen      time.Time              `json:"last_seen"`
-	Context       map[string]interface{} `json:"context"`
-	SuccessfulFix string                 `json:"successful_fix,omitempty"`
-}
+// Note: FailurePattern type is defined in learning_system.go
 
 // TransformationFailure contains details about a failed transformation
 type TransformationFailure struct {

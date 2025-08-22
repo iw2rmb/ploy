@@ -79,6 +79,18 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// Pattern learning endpoints
 	arf.Get("/patterns/stats", h.GetPatternLearningStats)
 	arf.Get("/patterns/recommendations", h.GetPatternRecommendations)
+
+	// ARF Phase 3 - LLM Integration & Hybrid Intelligence
+	arf.Post("/recipes/generate", h.GenerateLLMRecipe)
+	arf.Post("/recipes/optimize", h.OptimizeRecipe) 
+	arf.Post("/hybrid/transform", h.ExecuteHybridTransformation)
+	arf.Post("/strategies/select", h.SelectTransformationStrategy)
+	arf.Get("/complexity/analyze/:repository", h.AnalyzeComplexity)
+	arf.Post("/learning/record", h.RecordTransformationOutcome)
+	arf.Get("/learning/patterns", h.ExtractLearningPatterns)
+	arf.Post("/ab-test/create", h.CreateABTest)
+	arf.Get("/ab-test/:id/results", h.GetABTestResults)
+	arf.Post("/ab-test/:id/graduate", h.GraduateABTest)
 }
 
 // Recipe endpoints
@@ -818,5 +830,362 @@ func (h *Handler) GetPatternRecommendations(c *fiber.Ctx) error {
 		},
 		"total_recommendations": len(recommendations),
 		"timestamp": time.Now(),
+	})
+}
+
+// ARF Phase 3 - LLM Integration & Hybrid Intelligence handlers
+
+func (h *Handler) GenerateLLMRecipe(c *fiber.Ctx) error {
+	var request RecipeGenerationRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Mock LLM recipe generation for now
+	generatedRecipe := &GeneratedRecipe{
+		Recipe: Recipe{
+			ID:          "generated-" + strconv.FormatInt(time.Now().Unix(), 10),
+			Name:        "LLM Generated Recipe",
+			Description: "Generated recipe based on error context and codebase analysis",
+			Language:    request.Language,
+			Category:    CategoryCleanup,
+			Source:      "llm.generated.Recipe",
+			Version:     "1.0.0",
+			Tags:        []string{"llm-generated", "experimental"},
+			Options:     make(map[string]string),
+		},
+		Confidence:  0.75,
+		Explanation: "Generated using LLM analysis of error context and similar patterns",
+		LLMMetadata: LLMGenerationData{
+			Model:          "gpt-4",
+			PromptTokens:   250,
+			ResponseTokens: 150,
+			Temperature:    0.1,
+			RequestTime:    time.Now(),
+			ProcessingTime: 2 * time.Second,
+		},
+	}
+
+	return c.Status(201).JSON(generatedRecipe)
+}
+
+func (h *Handler) OptimizeRecipe(c *fiber.Ctx) error {
+	var request struct {
+		Recipe   Recipe                 `json:"recipe"`
+		Feedback TransformationFeedback `json:"feedback"`
+	}
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Mock recipe optimization
+	optimizedRecipe := request.Recipe
+	optimizedRecipe.Version = "1.1.0"
+	optimizedRecipe.Description += " - Optimized based on feedback"
+
+	return c.JSON(fiber.Map{
+		"optimized_recipe": optimizedRecipe,
+		"improvements": []string{
+			"Enhanced error handling",
+			"Improved performance",
+			"Better validation",
+		},
+		"confidence_improvement": 0.1,
+		"optimized_at": time.Now(),
+	})
+}
+
+func (h *Handler) ExecuteHybridTransformation(c *fiber.Ctx) error {
+	var request HybridRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Mock hybrid transformation execution
+	result := &HybridResult{
+		TransformationResult: TransformationResult{
+			Success:         true,
+			ExecutionTime:   45 * time.Second,
+			ChangesApplied:  3,
+			FilesModified:   []string{"Main.java", "Utils.java", "Config.java"},
+			Diff:            "Mock hybrid transformation diff",
+			ValidationScore: 0.92,
+			RecipeID:        request.PrimaryRecipe.ID,
+			Metadata: map[string]interface{}{
+				"hybrid_approach": "sequential",
+				"llm_enhanced":    true,
+				"openrewrite_base": true,
+			},
+		},
+		Strategy: TransformationStrategy{
+			Primary:    StrategyHybridSequential,
+			Confidence: 0.92,
+			Reasoning:  "Hybrid approach selected due to complexity analysis",
+		},
+		TotalTime:       45 * time.Second,
+		ConfidenceScore: 0.92,
+	}
+
+	return c.JSON(result)
+}
+
+func (h *Handler) SelectTransformationStrategy(c *fiber.Ctx) error {
+	var request StrategyRequest
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Mock strategy selection
+	strategy := &SelectedStrategy{
+		Primary: TransformationStrategy{
+			Primary:    StrategyHybridSequential,
+			Confidence: 0.85,
+			Reasoning:  "Selected based on complexity and resource analysis",
+		},
+		Alternatives: []TransformationStrategy{
+			{Primary: StrategyOpenRewriteOnly, Confidence: 0.7},
+			{Primary: StrategyLLMOnly, Confidence: 0.6},
+		},
+		Confidence: 0.85,
+		Reasoning: StrategyReasoning{
+			PrimaryFactors: []string{"Medium complexity", "Good test coverage", "Time constraints"},
+			ComplexityScore: 0.6,
+			HistoricalData: "Based on 150 similar transformations",
+			Explanation: "Hybrid sequential approach provides best balance of accuracy and resource usage",
+		},
+		ResourceEstimate: ResourcePrediction{
+			EstimatedCPU:    1500,
+			EstimatedMemory: 1536 * 1024 * 1024, // 1.5GB
+			EstimatedTime:   3 * time.Minute,
+			EstimatedCost:   0.15,
+			Confidence:      0.8,
+		},
+		TimeEstimate: 3 * time.Minute,
+		RiskAssessment: RiskAssessment{
+			OverallRisk:        0.25,
+			FailureProbability: 0.15,
+			RiskFactors: []RiskFactor{
+				{
+					Type:        "complexity",
+					Severity:    0.6,
+					Probability: 0.3,
+					Description: "Medium complexity may require careful handling",
+					Mitigation:  "Use staged transformation with validation",
+				},
+			},
+			MitigationSteps: []string{
+				"Execute in sandbox environment",
+				"Validate before applying",
+				"Maintain rollback capability",
+			},
+		},
+	}
+
+	return c.JSON(strategy)
+}
+
+func (h *Handler) AnalyzeComplexity(c *fiber.Ctx) error {
+	repositoryParam := c.Params("repository")
+
+	// Mock complexity analysis
+	analysis := &ComplexityAnalysis{
+		OverallComplexity: 0.6,
+		FactorBreakdown: map[string]float64{
+			"language":      0.4,
+			"framework":     0.5,
+			"size":          0.7,
+			"dependencies":  0.8,
+			"build_tool":    0.3,
+			"test_coverage": 0.4,
+		},
+		PredictedChallenges: []PredictedChallenge{
+			{
+				Type:        "dependency_complexity",
+				Severity:    0.8,
+				Description: "Complex dependency graph with potential conflicts",
+				Mitigation:  "Analyze dependency compatibility before transformation",
+			},
+			{
+				Type:        "size_complexity",
+				Severity:    0.7,
+				Description: "Large codebase requires staged transformation",
+				Mitigation:  "Break transformation into smaller, manageable chunks",
+			},
+		},
+		RecommendedApproach: RecommendedApproach{
+			Strategy:     StrategyHybridSequential,
+			Confidence:   0.8,
+			Reasoning:    "Medium-high complexity benefits from hybrid approach with LLM enhancement",
+			Alternatives: []StrategyType{StrategyLLMOnly, StrategyTreeSitter},
+		},
+	}
+
+	return c.JSON(fiber.Map{
+		"repository":        repositoryParam,
+		"complexity_analysis": analysis,
+		"analyzed_at":       time.Now(),
+	})
+}
+
+func (h *Handler) RecordTransformationOutcome(c *fiber.Ctx) error {
+	var outcome TransformationOutcome
+	if err := c.BodyParser(&outcome); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Mock outcome recording
+	return c.JSON(fiber.Map{
+		"outcome_recorded": true,
+		"transformation_id": outcome.TransformationID,
+		"recorded_at":      time.Now(),
+		"learning_updated": true,
+	})
+}
+
+func (h *Handler) ExtractLearningPatterns(c *fiber.Ctx) error {
+	timeWindowStr := c.Query("time_window", "7d")
+	
+	// Mock pattern extraction
+	patterns := &PatternAnalysis{
+		SuccessPatterns: []SuccessPattern{
+			{
+				Signature:   "java-spring-cleanup",
+				Frequency:   45,
+				SuccessRate: 0.92,
+				OptimalStrategy: TransformationStrategy{
+					Primary:    StrategyOpenRewriteOnly,
+					Confidence: 0.9,
+				},
+				ContextFactors: []string{"java", "spring-boot", "maven"},
+			},
+		},
+		FailurePatterns: []FailurePattern{
+			{
+				Signature:      "java-complex-migration",
+				Frequency:      8,
+				FailureRate:    0.35,
+				CommonErrors:   []string{"compilation_failure", "dependency_conflict"},
+				ContextFactors: []string{"java", "legacy", "gradle"},
+				Mitigations:    []string{"Use staged approach", "Validate dependencies"},
+			},
+		},
+		StrategyEffectiveness: map[string]float64{
+			"openrewrite_only":    0.78,
+			"llm_only":           0.65,
+			"hybrid_sequential":   0.88,
+			"hybrid_parallel":     0.72,
+			"tree_sitter":        0.70,
+		},
+		RecommendedUpdates: []StrategyUpdate{
+			{
+				StrategyType:      StrategyHybridSequential,
+				CurrentWeight:     0.8,
+				RecommendedWeight: 0.85,
+				Reasoning:         "Consistently high performance across different scenarios",
+				Evidence:          []string{"88% effectiveness", "High user satisfaction"},
+			},
+		},
+		Confidence:        0.87,
+		AnalysisTimestamp: time.Now(),
+	}
+
+	return c.JSON(fiber.Map{
+		"patterns":     patterns,
+		"time_window":  timeWindowStr,
+		"extracted_at": time.Now(),
+	})
+}
+
+func (h *Handler) CreateABTest(c *fiber.Ctx) error {
+	var experiment ABExperiment
+	if err := c.BodyParser(&experiment); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Mock A/B test creation
+	if experiment.ID == "" {
+		experiment.ID = "abtest-" + strconv.FormatInt(time.Now().Unix(), 10)
+	}
+
+	return c.Status(201).JSON(fiber.Map{
+		"experiment_created": true,
+		"experiment_id":      experiment.ID,
+		"status":            "active",
+		"created_at":        time.Now(),
+		"traffic_split":     experiment.TrafficSplit,
+		"min_sample_size":   experiment.MinSampleSize,
+	})
+}
+
+func (h *Handler) GetABTestResults(c *fiber.Ctx) error {
+	experimentID := c.Params("id")
+
+	// Mock A/B test results
+	results := &ABTestResults{
+		ExperimentID: experimentID,
+		VariantAResults: VariantResults{
+			VariantID:       experimentID + "-variant-a",
+			TotalTrials:     150,
+			Successes:       132,
+			SuccessRate:     0.88,
+			ConfidenceInterval: ConfidenceInterval{
+				Lower:      0.82,
+				Upper:      0.94,
+				Confidence: 0.95,
+			},
+			AverageExecutionTime: 45 * time.Second,
+		},
+		VariantBResults: VariantResults{
+			VariantID:       experimentID + "-variant-b",
+			TotalTrials:     145,
+			Successes:       138,
+			SuccessRate:     0.95,
+			ConfidenceInterval: ConfidenceInterval{
+				Lower:      0.91,
+				Upper:      0.98,
+				Confidence: 0.95,
+			},
+			AverageExecutionTime: 48 * time.Second,
+		},
+		StatisticalTest: StatisticalTestResult{
+			TestType:    "two_proportion_z_test",
+			PValue:      0.02,
+			ZScore:      2.31,
+			Significant: true,
+			EffectSize:  0.07,
+			PowerAnalysis: PowerAnalysis{
+				Power:             0.85,
+				MinDetectableDiff: 0.05,
+				RecommendedSample: 100,
+			},
+		},
+		Recommendation: ABTestRecommendation{
+			Action:         "adopt_b",
+			Confidence:     0.98,
+			WinningVariant: "variant_b",
+			Reasoning:      "Variant B shows statistically significant improvement (p=0.02)",
+			NextSteps: []string{
+				"Deploy variant B to production",
+				"Monitor performance metrics",
+				"Document learnings",
+			},
+		},
+		AnalyzedAt: time.Now(),
+	}
+
+	return c.JSON(results)
+}
+
+func (h *Handler) GraduateABTest(c *fiber.Ctx) error {
+	experimentID := c.Params("id")
+
+	// Mock A/B test graduation
+	return c.JSON(fiber.Map{
+		"experiment_graduated": true,
+		"experiment_id":        experimentID,
+		"winning_variant":      "variant_b",
+		"promoted_at":          time.Now(),
+		"performance_gain":     "7% improvement in success rate",
+		"status":              "completed",
 	})
 }

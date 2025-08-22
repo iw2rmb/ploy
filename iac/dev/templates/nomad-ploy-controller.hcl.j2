@@ -112,6 +112,20 @@ job "ploy-controller" {
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
         ARF_OPENREWRITE_JAR = "/usr/local/bin/rewrite-maven.jar"
         ARF_WORKING_DIR = "/tmp/arf"
+        
+        # ARF Phase 3 - LLM Integration & Learning System
+        ARF_LEARNING_DB_URL = "postgres://ploy:{{ arf_db_password | default('arf_dev_password') }}@localhost/arf_learning?sslmode=disable"
+        ARF_TREE_SITTER_PATH = "/usr/local/bin/tree-sitter"
+        ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
+        ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
+        TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
+        
+        # LLM API Configuration (use Vault secrets in production)
+        LLM_PROVIDER = "{{ llm_provider | default('openai') }}"
+        LLM_MODEL = "{{ llm_model | default('gpt-4') }}"
+        LLM_API_KEY = "{{ vault_llm_api_key | default('') }}"
+        LLM_MAX_TOKENS = "{{ llm_max_tokens | default('2048') }}"
+        LLM_TEMPERATURE = "{{ llm_temperature | default('0.1') }}"
 
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"

@@ -829,3 +829,97 @@
 618. wasm-cpp-hello: C++ with Emscripten CMakeLists.txt.
 619. All WASM sample apps include health endpoints on port 8080.
 620. WASM apps demonstrate complete build and deployment pipeline.
+
+## ARF Phase 3: LLM Integration & Hybrid Intelligence Tests (621-700)
+
+### LLM API Integration Testing (621-635)
+621. `POST /v1/arf/recipes/generate` with error context generates LLM-assisted recipe successfully.
+622. LLM recipe generation request includes codebase language, framework, and error type.
+623. LLM recipe generation responds with structured recipe including OpenRewrite rules.
+624. Generated recipes include confidence score, estimated time, and resource requirements.
+625. LLM integration validates API key configuration and provider connectivity.
+626. Recipe generation handles different LLM providers (OpenAI, Anthropic) with appropriate models.
+627. Generated recipes include fallback rules for cases where LLM enhancement fails.
+628. `POST /v1/arf/recipes/validate` validates generated recipes against transformation requirements.
+629. Recipe validation checks syntax correctness and compatibility with target languages.
+630. `POST /v1/arf/recipes/optimize` improves existing recipes based on transformation feedback.
+631. Recipe optimization analyzes success rates and suggests improvements using LLM insights.
+632. LLM integration includes prompt engineering templates for different transformation types.
+633. API handles LLM service timeouts gracefully with fallback to predefined recipes.
+634. Token usage tracking and cost monitoring for LLM API calls per transformation.
+635. LLM integration supports multiple model sizes for different complexity levels.
+
+### Multi-Language AST Parsing and Analysis (636-650)
+636. `POST /v1/arf/ast/parse` with Java code returns comprehensive AST using tree-sitter.
+637. `POST /v1/arf/ast/parse` with JavaScript code identifies modules, classes, and functions.
+638. `POST /v1/arf/ast/parse` with TypeScript code handles type annotations and interfaces.
+639. `POST /v1/arf/ast/parse` with Python code processes classes, functions, and imports.
+640. `POST /v1/arf/ast/parse` with Go code analyzes package structure, functions, and types.
+641. `POST /v1/arf/ast/parse` with Rust code parses modules, structs, and trait implementations.
+642. AST parsing provides symbol table extraction with scope and visibility information.
+643. Universal AST representation normalizes syntax trees across different languages.
+644. AST analysis identifies transformation opportunities and complexity patterns.
+645. Multi-language engine determines cross-language compatibility for transformations.
+646. AST parsing handles syntax errors gracefully and provides partial analysis results.
+647. Language-specific transformations generated based on AST analysis and patterns.
+648. AST parsing supports large codebases with efficient memory usage and streaming.
+649. Cross-language symbol resolution for polyglot codebases with multiple languages.
+650. AST analysis provides detailed metrics on code complexity and transformation difficulty.
+
+### Hybrid Transformation Pipeline Testing (651-665)
+651. `POST /v1/arf/hybrid/transform` executes hybrid OpenRewrite + LLM transformation successfully.
+652. Hybrid transformation selects optimal strategy based on complexity analysis and constraints.
+653. Sequential strategy executes OpenRewrite rules followed by LLM enhancement.
+654. Parallel strategy runs OpenRewrite and LLM transformations concurrently with merge.
+655. Tree-sitter strategy uses AST-based transformations with language-specific optimizations.
+656. LLM-enhanced strategy applies pure LLM transformations with validation feedback.
+657. Strategy selection considers resource availability, time constraints, and accuracy requirements.
+658. Hybrid pipeline provides confidence scoring for each transformation approach.
+659. Transformation results include detailed change analysis and impact assessment.
+660. Pipeline handles transformation conflicts with automatic resolution strategies.
+661. Hybrid approach optimizes for speed vs accuracy based on transformation context.
+662. Transformation caching reduces redundant operations for similar code patterns.
+663. Pipeline supports rollback functionality for failed or unsatisfactory transformations.
+664. Resource prediction accurately estimates CPU, memory, and time requirements.
+665. Hybrid transformations maintain consistency across multi-file and multi-module projects.
+
+### Continuous Learning System Testing (666-680)
+666. `POST /v1/arf/learning/record` stores transformation outcomes with success metrics.
+667. Learning system analyzes transformation patterns across multiple repositories and languages.
+668. Pattern extraction identifies successful transformation strategies for specific error types.
+669. Learning database stores transformation metadata with outcome classification.
+670. `GET /v1/arf/learning/patterns` returns learned patterns with confidence scores.
+671. Strategy weight updates optimize future transformation selection based on historical success.
+672. Learning system identifies anti-patterns that consistently lead to transformation failures.
+673. Pattern analysis provides recommendations for improving transformation recipes.
+674. Learning database supports time-based analysis for tracking improvement trends.
+675. PostgreSQL vector similarity matching finds related transformation cases efficiently.
+676. Learning system adapts to different codebases and organizational coding patterns.
+677. Transformation outcome prediction based on historical data and code similarity.
+678. Learning analytics provide insights into transformation success rates by language and framework.
+679. Automated pattern discovery identifies new transformation opportunities without human intervention.
+680. Learning system privacy controls ensure sensitive code patterns are not stored inappropriately.
+
+### Strategy Selection and Complexity Analysis (681-695)
+681. `POST /v1/arf/strategies/select` chooses optimal transformation strategy for given repository.
+682. Strategy selection analyzes repository size, language complexity, and available resources.
+683. Complexity analysis provides multi-factor scoring including code patterns and dependencies.
+684. Risk assessment evaluates potential transformation impacts and failure probability.
+685. Resource prediction estimates CPU, memory, disk, and time requirements accurately.
+686. Strategy selector handles constraint-based selection with time and resource limits.
+687. Escalation recommendations suggest alternative approaches for failed transformations.
+688. Complexity metrics include cyclomatic complexity, coupling, and architectural patterns.
+689. Strategy selection supports user preferences and organizational policy constraints.
+690. Decision tree analysis explains strategy selection reasoning with transparent criteria.
+691. Strategy selector adapts recommendations based on transformation history and success rates.
+692. Complexity analysis identifies high-risk areas requiring manual review or approval.
+693. Multi-repository analysis provides batch transformation planning and resource allocation.
+694. Strategy selection integrates with continuous learning for improved future recommendations.
+695. Performance benchmarking validates strategy selection accuracy against actual outcomes.
+
+### A/B Testing Framework for Recipe Optimization (696-700)
+696. `POST /v1/arf/ab-test/create` establishes A/B testing experiments for recipe variants.
+697. A/B testing framework randomly assigns transformation requests to different recipe variants.
+698. `GET /v1/arf/ab-test/results` provides statistical analysis of experiment outcomes.
+699. Statistical significance testing determines when sufficient data exists for conclusions.
+700. A/B testing includes confidence intervals, p-values, and power analysis for rigorous evaluation.
