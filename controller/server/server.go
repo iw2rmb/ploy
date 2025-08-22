@@ -26,6 +26,7 @@ import (
 	"github.com/ploy/ploy/controller/health"
 	"github.com/ploy/ploy/controller/routing"
 	"github.com/ploy/ploy/controller/selfupdate"
+	"github.com/ploy/ploy/controller/arf"
 	"github.com/ploy/ploy/internal/build"
 	"github.com/ploy/ploy/internal/cleanup"
 	"github.com/ploy/ploy/internal/debug"
@@ -47,6 +48,7 @@ type ServiceDependencies struct {
 	ACMEHandler        *acme.Handler
 	CertificateManager *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
+	ARFHandler         *arf.Handler
 	StorageConfigPath  string
 }
 
@@ -190,6 +192,12 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		}
 	}
 
+	// Initialize ARF Handler
+	arfHandler, err := initializeARFHandler(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize ARF handler: %v", err)
+	}
+
 	deps := &ServiceDependencies{
 		EnvStore:           envStore,
 		TraefikRouter:      traefikRouter,
@@ -200,6 +208,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		DNSHandler:         dnsHandler,
 		CertificateManager: certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
+		ARFHandler:         arfHandler,
 		StorageConfigPath:  cfg.StorageConfigPath,
 	}
 
@@ -476,6 +485,12 @@ func (s *Server) setupRoutes() {
 	// DNS management endpoints with dependency injection
 	if s.dependencies.DNSHandler != nil {
 		dns.SetupDNSRoutes(s.app, s.dependencies.DNSHandler)
+	}
+
+	// ARF (Automated Remediation Framework) endpoints
+	if s.dependencies.ARFHandler != nil {
+		s.dependencies.ARFHandler.RegisterRoutes(s.app)
+		log.Printf("ARF routes registered successfully")
 	}
 
 	// Health endpoints in API group for versioned access
@@ -841,4 +856,61 @@ func (s *Server) handlePlatformCertificateHealth(c *fiber.Ctx) error {
 		"issued_at":          cert.IssuedAt,
 		"auto_renew_enabled": true,
 	})
+}
+
+// initializeARFHandler initializes the Automated Remediation Framework handler
+func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
+	log.Printf("Initializing ARF (Automated Remediation Framework)")
+
+	// Initialize AST cache
+	cacheDir := utils.Getenv("ARF_CACHE_DIR", "/tmp/arf-cache")
+	maxCacheSize := int64(1024 * 1024 * 1024) // 1GB default
+	maxEntries := 10000
+	
+	cache, err := arf.NewMemoryMappedCache(cacheDir, maxCacheSize, maxEntries)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AST cache: %w", err)
+	}
+
+	// Initialize sandbox manager
+	jailBaseDir := utils.Getenv("ARF_JAIL_BASE_DIR", "/jail/arf")
+	jailTemplateDir := utils.Getenv("ARF_JAIL_TEMPLATE_DIR", "/jail/template")
+	jailInterface := utils.Getenv("ARF_JAIL_INTERFACE", "lo0")
+	maxSandboxes := 10
+	defaultTTL := 30 * time.Minute
+
+	sandboxMgr := arf.NewFreeBSDJailManager(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
+
+	// Initialize recipe catalog
+	keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "arf")
+	catalog, err := arf.NewConsulRecipeCatalog(cfg.ConsulAddr, keyPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create recipe catalog: %w", err)
+	}
+
+	// Initialize OpenRewrite engine
+	jarPath := utils.Getenv("ARF_OPENREWRITE_JAR", "/usr/local/lib/openrewrite-cli.jar")
+	javaHome := utils.Getenv("JAVA_HOME", "/usr/local/openjdk")
+	workingDir := utils.Getenv("ARF_WORKING_DIR", "/tmp/arf")
+
+	engine := arf.NewOpenRewriteEngine(jarPath, javaHome, workingDir, cache, sandboxMgr)
+
+	// Initialize and populate catalog with default recipes
+	recipes, err := engine.ListAvailableRecipes()
+	if err == nil {
+		for _, recipe := range recipes {
+			if err := catalog.StoreRecipe(context.Background(), recipe); err != nil {
+				log.Printf("Warning: Failed to store recipe %s: %v", recipe.ID, err)
+			}
+		}
+		log.Printf("Loaded %d default recipes into catalog", len(recipes))
+	} else {
+		log.Printf("Warning: Failed to load default recipes: %v", err)
+	}
+
+	// Create ARF handler
+	handler := arf.NewHandler(engine, catalog, sandboxMgr)
+
+	log.Printf("ARF handler initialized successfully")
+	return handler, nil
 }

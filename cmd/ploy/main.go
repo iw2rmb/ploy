@@ -37,6 +37,11 @@ func main() {
 			debug.DebugCmd(os.Args[2:], controllerURL)
 		case "rollback":
 			debug.RollbackCmd(os.Args[2:], controllerURL)
+		case "arf":
+			if err := handleARFCommand(os.Args); err != nil {
+				fmt.Printf("ARF command failed: %v\n", err)
+				os.Exit(1)
+			}
 		default:
 			ui.Usage()
 		}

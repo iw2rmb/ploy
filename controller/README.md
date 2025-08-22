@@ -139,17 +139,43 @@
 - DNS propagation validation and testing
 - Provider-agnostic configuration via JSON or environment variables
 
-## Automated Remediation Framework Endpoints (Planned)
-- `POST /v1/arf/transform` — execute code transformation on repositories.
-  - Body: `{"repositories": ["repo1", "repo2"], "recipe": "spring-boot-2-to-3", "strategy": "hybrid"}`
-  - Returns: `{"job_id": "arf-123", "status": "started", "estimated_time": "2h"}`
-- `GET /v1/arf/jobs/:id` — check transformation job status.
-  - Returns: `{"job_id": "arf-123", "status": "running", "progress": 65, "repositories_completed": 13, "repositories_total": 20}`
-- `POST /v1/arf/recipes` — create or update transformation recipe.
-  - Body: OpenRewrite recipe YAML content
-- `GET /v1/arf/recipes` — list available transformation recipes.
-- `POST /v1/apps/:app/webhooks` — configure app webhooks for ARF events.
-  - Body: `{"url": "https://example.com/webhook", "events": ["transform.completed", "transform.failed"], "secret": "..."}`
+## Automated Remediation Framework Endpoints (Phase ARF-1 - Implemented)
+
+### Recipe Management
+- `GET /v1/arf/recipes` — list available transformation recipes with filtering.
+  - Query params: `?language=java&category=cleanup&min_confidence=0.8`
+  - Returns: `{"recipes": [...], "count": 42}`
+- `GET /v1/arf/recipes/:id` — get detailed recipe information.
+  - Returns: Recipe object with metadata, options, and usage statistics
+- `POST /v1/arf/recipes` — create new transformation recipe.
+  - Body: `{"id": "custom-recipe", "name": "...", "source": "org.openrewrite.java.cleanup.Custom", ...}`
+  - Returns: `{"message": "Recipe created successfully", "recipe_id": "custom-recipe"}`
+- `PUT /v1/arf/recipes/:id` — update existing recipe.
+- `DELETE /v1/arf/recipes/:id` — delete recipe from catalog.
+- `GET /v1/arf/recipes/search?q=<query>` — search recipes by name, description, or tags.
+- `GET /v1/arf/recipes/:id/metadata` — get comprehensive recipe metadata.
+- `GET /v1/arf/recipes/:id/stats` — get recipe usage statistics and performance metrics.
+
+### Transformation Execution  
+- `POST /v1/arf/transform` — execute code transformation with OpenRewrite.
+  - Body: `{"recipe_id": "cleanup.unused-imports", "codebase": {"repository": "...", "branch": "main", "language": "java"}, "options": {...}}`
+  - Returns: `{"recipe_id": "...", "success": true, "changes_applied": 5, "files_modified": ["Main.java"], "execution_time": "2s", "validation_score": 0.95}`
+- `GET /v1/arf/transforms/:id` — get transformation result (future implementation).
+
+### Sandbox Management
+- `GET /v1/arf/sandboxes` — list active FreeBSD jail sandboxes.
+  - Returns: `{"sandboxes": [...], "count": 3}`
+- `POST /v1/arf/sandboxes` — create new isolated sandbox environment.
+  - Body: `{"repository": "...", "branch": "main", "language": "java", "ttl": "30m", "memory_limit": "2G"}`
+  - Returns: Sandbox object with jail details and expiration time
+- `DELETE /v1/arf/sandboxes/:id` — destroy sandbox and cleanup resources.
+
+### System Operations
+- `GET /v1/arf/health` — comprehensive ARF system health check.
+  - Returns: `{"status": "healthy", "components": {"engine": {...}, "cache": {...}}}`
+- `GET /v1/arf/cache/stats` — AST cache performance metrics.
+  - Returns: `{"hits": 1250, "misses": 200, "hit_rate": 0.86, "size": 1500, "memory_usage": 524288000}`
+- `POST /v1/arf/cache/clear` — clear AST cache (maintenance operation).
 
 ## Webhook Events
 - `build.started`, `build.completed`, `build.failed`

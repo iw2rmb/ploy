@@ -150,6 +150,52 @@
           - python3-venv
         state: present
 
+    - name: Install Java and build tools for ARF
+      apt:
+        name:
+          - openjdk-17-jdk
+          - maven
+          - gradle
+        state: present
+
+    - name: Set JAVA_HOME environment variable
+      lineinfile:
+        path: /etc/environment
+        regexp: '^JAVA_HOME='
+        line: 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
+        create: true
+
+    - name: Download OpenRewrite CLI
+      get_url:
+        url: "https://github.com/openrewrite/rewrite/releases/download/v{{ openrewrite_version }}/rewrite-{{ openrewrite_version }}.jar"
+        dest: /usr/local/bin/rewrite.jar
+        mode: '0644'
+      vars:
+        openrewrite_version: "8.21.0"
+
+    - name: Create OpenRewrite CLI wrapper script
+      copy:
+        content: |
+          #!/bin/bash
+          exec java -jar /usr/local/bin/rewrite.jar "$@"
+        dest: /usr/local/bin/rewrite
+        mode: '0755'
+
+    - name: Add ARF environment variables for ploy user
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # ARF (Automated Remediation Framework) environment variables
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export OPENREWRITE_JAR_PATH=/usr/local/bin/rewrite.jar
+          export ARF_SANDBOX_BASE_DIR=/tmp/arf-sandboxes
+          export ARF_CACHE_DIR=/tmp/arf-cache
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - ARF vars"
+
 
 
     - name: Install build tools
