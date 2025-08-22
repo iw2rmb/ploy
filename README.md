@@ -138,3 +138,58 @@ The CLI automatically discovers the controller endpoint:
 3. Default → `http://localhost:8081/v1`
 
 This enables seamless operation across local development, staging, and production environments.
+
+## Development Environment SSL Setup
+
+Ploy supports **automatic wildcard certificate provisioning** for development environments using Let's Encrypt.
+
+### DNS Configuration (Required First)
+
+The dev environment uses `*.dev.ployd.app` subdomain pattern:
+- **Controller**: `api.dev.ployd.app` 
+- **Apps**: `{app}.dev.ployd.app`
+- **Wildcard Certificate**: `*.dev.ployd.app`
+
+### Setup Process
+
+1. **Add DNS Records** (Manual or Automated)
+   ```bash
+   # Check what DNS records are needed
+   ./scripts/setup-dev-dns.sh
+   
+   # Manually add to Namecheap:
+   # Type: A, Host: dev, Value: YOUR_VPS_IP
+   # Type: A, Host: *.dev, Value: YOUR_VPS_IP
+   ```
+
+2. **Verify DNS Propagation**
+   ```bash
+   ./scripts/test-dns-propagation.sh
+   ```
+
+3. **Deploy with SSL**
+   ```bash
+   # Set DNS API credentials
+   export NAMECHEAP_API_USER="your-api-user"
+   export NAMECHEAP_API_KEY="your-api-key" 
+   export NAMECHEAP_USERNAME="your-username"
+   
+   # Deploy controller with wildcard certificate
+   ./scripts/deploy-with-ssl.sh
+   ```
+
+### Protected App Names
+
+The following app names are **reserved** for platform use:
+- `api` (controller endpoint)
+- `controller`, `admin`, `dashboard`
+- `metrics`, `health`, `console`
+- `www`, `ploy`, `system`
+- `traefik`, `nomad`, `consul`, `vault`
+
+### SSL Benefits
+
+- **Single Wildcard Certificate**: Covers all dev apps automatically
+- **Automatic Renewal**: Let's Encrypt certificates renew automatically  
+- **DNS-01 Challenge**: Works behind firewalls and with dynamic IPs
+- **Production Ready**: Uses production Let's Encrypt (not staging)
