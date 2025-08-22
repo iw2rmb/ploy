@@ -319,6 +319,17 @@ job "ploy-controller" {
         # Platform wildcard certificate configuration
         PLOY_APPS_DOMAIN = "ployd.app"
         PLOY_APPS_DOMAIN_PROVIDER = "namecheap"
+        
+        # ARF Phase 3 - LLM Integration & Learning System
+        ARF_LEARNING_DB_URL = "postgres://ploy:arf_dev_password@localhost/arf_learning?sslmode=disable"
+        ARF_TREE_SITTER_PATH = "/usr/local/bin/tree-sitter"
+        ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
+        ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
+        ARF_SANDBOX_BASE_DIR = "/tmp/arf-sandboxes"
+        ARF_CACHE_DIR = "/tmp/arf-cache"
+        TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
+        JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
+        OPENREWRITE_JAR_PATH = "/usr/local/bin/rewrite.jar"
       }
       
       # Enhanced configuration files with service mesh and rolling updates
