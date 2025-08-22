@@ -9,7 +9,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
 	
 	"github.com/ploy/ploy/controller/arf/db"
