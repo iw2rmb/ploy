@@ -217,7 +217,7 @@ main() {
     
     # Test 696: Create A/B Test
     run_test "Create A/B Testing Experiment" \
-        "test_http_endpoint 'POST' '/arf/ab-test/create' '{\"name\":\"recipe-optimization-test\",\"variants\":[{\"id\":\"A\",\"recipe_id\":\"recipe-v1\"},{\"id\":\"B\",\"recipe_id\":\"recipe-v2\"}],\"traffic_split\":0.5}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ab-test/create' '{\"name\":\"recipe-optimization-test\",\"variants\":[{\"id\":\"A\",\"recipe_id\":\"recipe-v1\"},{\"id\":\"B\",\"recipe_id\":\"recipe-v2\"}],\"traffic_split\":0.5}' '201'" \
         "success" "696"
     
     # Test 698: Get A/B Test Results
