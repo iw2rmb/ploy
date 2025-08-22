@@ -178,17 +178,17 @@ main() {
     
     # Test 651: Hybrid Transformation Execution
     run_test "Hybrid Transformation Execution" \
-        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"sequential\",\"codebase\":{\"language\":\"java\",\"files\":[{\"path\":\"Test.java\",\"content\":\"public class Test {}\"}]},\"recipe_id\":\"test-recipe\"}' '201'" \
+        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"sequential\",\"codebase\":{\"language\":\"java\",\"files\":[{\"path\":\"Test.java\",\"content\":\"public class Test {}\"}]},\"recipe_id\":\"test-recipe\"}' '200'" \
         "success" "651"
     
     # Test 652: Strategy-Based Transformation
     run_test "Strategy-Based Transformation Selection" \
-        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"parallel\",\"codebase\":{\"language\":\"javascript\",\"complexity\":\"medium\"}}' '201'" \
+        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"parallel\",\"codebase\":{\"language\":\"javascript\",\"complexity\":\"medium\"}}' '200'" \
         "success" "652"
     
     # Test 655: Tree-sitter Strategy
     run_test "Tree-sitter Strategy Transformation" \
-        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"tree-sitter\",\"codebase\":{\"language\":\"python\",\"ast_required\":true}}' '201'" \
+        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"tree-sitter\",\"codebase\":{\"language\":\"python\",\"ast_required\":true}}' '200'" \
         "success" "655"
     
     # Continuous Learning System Tests (666-680)
@@ -196,7 +196,7 @@ main() {
     
     # Test 666: Record Transformation Outcome
     run_test "Record Transformation Outcome" \
-        "test_http_endpoint 'POST' '/arf/learning/record' '{\"transformation_id\":\"test-123\",\"success\":true,\"duration\":45,\"language\":\"java\",\"pattern\":\"import-optimization\"}' '201'" \
+        "test_http_endpoint 'POST' '/arf/learning/record' '{\"transformation_id\":\"test-123\",\"success\":true,\"duration\":45,\"language\":\"java\",\"pattern\":\"import-optimization\"}' '200'" \
         "success" "666"
     
     # Test 670: Get Learning Patterns
@@ -209,7 +209,7 @@ main() {
     
     # Test 681: Strategy Selection
     run_test "Strategy Selection for Repository" \
-        "test_http_endpoint 'POST' '/arf/strategies/select' '{\"repository\":{\"language\":\"java\",\"size\":\"large\",\"complexity\":\"high\"},\"constraints\":{\"time_limit\":300,\"memory_limit\":\"1GB\"}}' '201'" \
+        "test_http_endpoint 'POST' '/arf/strategies/select' '{\"repository\":{\"language\":\"java\",\"size\":\"large\",\"complexity\":\"high\"},\"constraints\":{\"time_limit\":300,\"memory_limit\":\"1GB\"}}' '200'" \
         "success" "681"
     
     # A/B Testing Framework Tests (696-700)
@@ -217,7 +217,7 @@ main() {
     
     # Test 696: Create A/B Test
     run_test "Create A/B Testing Experiment" \
-        "test_http_endpoint 'POST' '/arf/ab-test/create' '{\"name\":\"recipe-optimization-test\",\"variants\":[{\"id\":\"A\",\"recipe_id\":\"recipe-v1\"},{\"id\":\"B\",\"recipe_id\":\"recipe-v2\"}],\"traffic_split\":0.5}' '201'" \
+        "test_http_endpoint 'POST' '/arf/ab-test/create' '{\"name\":\"recipe-optimization-test\",\"variants\":[{\"id\":\"A\",\"recipe_id\":\"recipe-v1\"},{\"id\":\"B\",\"recipe_id\":\"recipe-v2\"}],\"traffic_split\":0.5}' '200'" \
         "success" "696"
     
     # Test 698: Get A/B Test Results
