@@ -189,7 +189,86 @@
         dest: /usr/local/bin/rewrite
         mode: '0755'
 
-    - name: Add ARF environment variables for ploy user
+    - name: Install PostgreSQL for ARF learning database
+      apt:
+        name:
+          - postgresql-14
+          - postgresql-contrib-14
+          - postgresql-client-14
+          - libpq-dev
+        state: present
+
+    - name: Start and enable PostgreSQL
+      systemd:
+        name: postgresql
+        state: started
+        enabled: true
+
+    - name: Create ARF learning database
+      become_user: postgres
+      postgresql_db:
+        name: arf_learning
+        owner: ploy
+        state: present
+
+    - name: Create ARF database user
+      become_user: postgres
+      postgresql_user:
+        name: ploy
+        password: "{{ arf_db_password | default('arf_dev_password') }}"
+        db: arf_learning
+        priv: ALL
+        state: present
+
+    - name: Install tree-sitter CLI for multi-language AST parsing
+      block:
+        - name: Check if tree-sitter is installed
+          stat:
+            path: /usr/local/bin/tree-sitter
+          register: tree_sitter_binary
+
+        - name: Download tree-sitter CLI
+          get_url:
+            url: "https://github.com/tree-sitter/tree-sitter/releases/download/v{{ tree_sitter_version }}/tree-sitter-linux-x64.gz"
+            dest: /tmp/tree-sitter.gz
+          vars:
+            tree_sitter_version: "0.20.8"
+          when: not tree_sitter_binary.stat.exists
+
+        - name: Extract tree-sitter CLI
+          shell: |
+            gunzip /tmp/tree-sitter.gz
+            mv /tmp/tree-sitter /usr/local/bin/tree-sitter
+            chmod +x /usr/local/bin/tree-sitter
+          when: not tree_sitter_binary.stat.exists
+
+        - name: Install tree-sitter language parsers
+          npm:
+            name: "{{ item }}"
+            global: true
+            state: latest
+          loop:
+            - tree-sitter-cli
+            - tree-sitter-java
+            - tree-sitter-javascript
+            - tree-sitter-typescript
+            - tree-sitter-python
+            - tree-sitter-go
+            - tree-sitter-rust
+            - tree-sitter-c
+            - tree-sitter-cpp
+
+    - name: Install LLM API dependencies
+      pip:
+        name:
+          - openai>=1.0.0
+          - anthropic>=0.7.0
+          - requests>=2.28.0
+          - tiktoken>=0.5.0
+        state: present
+        executable: pip3
+
+    - name: Add ARF Phase 3 environment variables for ploy user
       blockinfile:
         path: /home/ploy/.bashrc
         create: true
@@ -202,6 +281,15 @@
           export OPENREWRITE_JAR_PATH=/usr/local/bin/rewrite.jar
           export ARF_SANDBOX_BASE_DIR=/tmp/arf-sandboxes
           export ARF_CACHE_DIR=/tmp/arf-cache
+          
+          # ARF Phase 3 - LLM Integration & Learning
+          export ARF_LEARNING_DB_URL="postgres://ploy:{{ arf_db_password | default('arf_dev_password') }}@localhost/arf_learning?sslmode=disable"
+          export ARF_TREE_SITTER_PATH=/usr/local/bin/tree-sitter
+          export ARF_LLM_CACHE_DIR=/tmp/arf-llm-cache
+          export ARF_AB_TEST_DIR=/tmp/arf-ab-tests
+          
+          # Tree-sitter parser paths
+          export TREE_SITTER_PARSER_DIR=/usr/local/lib/node_modules
         marker: "# {mark} ANSIBLE MANAGED BLOCK - ARF vars"
 
 

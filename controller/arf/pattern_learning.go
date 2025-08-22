@@ -35,19 +35,7 @@ type ErrorPatternRecord struct {
 	Metadata         map[string]interface{} `json:"metadata"`
 }
 
-// ErrorContext provides context information about an error
-type ErrorContext struct {
-	FilePath           string            `json:"file_path"`
-	LineNumber         int               `json:"line_number"`
-	ColumnNumber       int               `json:"column_number"`
-	SurroundingCode    string            `json:"surrounding_code"`
-	StackTrace         string            `json:"stack_trace,omitempty"`
-	BuildTool          string            `json:"build_tool"`
-	Dependencies       []string          `json:"dependencies"`
-	FrameworksUsed     []string          `json:"frameworks_used"`
-	ProjectStructure   []string          `json:"project_structure"`
-	EnvironmentInfo    map[string]string `json:"environment_info"`
-}
+// Note: ErrorContext type is defined in llm_integration.go
 
 // SuccessfulFix represents a fix that successfully resolved a pattern
 type SuccessfulFix struct {
@@ -234,7 +222,7 @@ func (pls *DefaultPatternLearningService) generatePatternID(pattern ErrorPattern
 		pattern.ErrorType, 
 		pattern.Language,
 		normalizeErrorMessage(pattern.ErrorMessage),
-		pattern.Context.FilePath)
+		pattern.Context.SourceFile)
 	
 	return fmt.Sprintf("pattern_%x", []byte(key))
 }
@@ -295,8 +283,8 @@ func (pls *DefaultPatternLearningService) updatePatternIndex(pattern ErrorPatter
 	pls.patternIndex[languageKey] = append(pls.patternIndex[languageKey], pattern.ID)
 	
 	// Index by file extension
-	if pattern.Context.FilePath != "" {
-		ext := getFileExtension(pattern.Context.FilePath)
+	if pattern.Context.SourceFile != "" {
+		ext := getFileExtension(pattern.Context.SourceFile)
 		if ext != "" {
 			extKey := "extension:" + ext
 			pls.patternIndex[extKey] = append(pls.patternIndex[extKey], pattern.ID)
@@ -343,7 +331,7 @@ func (pls *DefaultPatternLearningService) FindSimilarPatterns(ctx context.Contex
 	candidateIDs := make(map[string]bool)
 	
 	// Look for patterns with same file extension
-	ext := getFileExtension(errorContext.FilePath)
+	ext := getFileExtension(errorContext.SourceFile)
 	if ext != "" {
 		extKey := "extension:" + ext
 		for _, id := range pls.patternIndex[extKey] {
@@ -352,9 +340,9 @@ func (pls *DefaultPatternLearningService) FindSimilarPatterns(ctx context.Contex
 	}
 	
 	// Look for patterns with same build tool
-	if errorContext.BuildTool != "" {
+	if errorContext.Metadata["build_tool"] != "" {
 		for _, pattern := range pls.patterns {
-			if pattern.Context.BuildTool == errorContext.BuildTool {
+			if pattern.Context.Metadata["build_tool"] == errorContext.Metadata["build_tool"] {
 				candidateIDs[pattern.ID] = true
 			}
 		}
@@ -423,29 +411,29 @@ func (pls *DefaultPatternLearningService) calculateSimilarity(ctx1, ctx2 ErrorCo
 	var factors int
 	
 	// File path similarity (30% weight)
-	if pathSimilarity := pls.calculatePathSimilarity(ctx1.FilePath, ctx2.FilePath); pathSimilarity > 0 {
+	if pathSimilarity := pls.calculatePathSimilarity(ctx1.SourceFile, ctx2.SourceFile); pathSimilarity > 0 {
 		score += pathSimilarity * 0.3
 	}
 	factors++
 	
 	// Build tool similarity (15% weight)
-	if ctx1.BuildTool == ctx2.BuildTool && ctx1.BuildTool != "" {
+	if getStringValue(ctx1.Metadata, "build_tool") == getStringValue(ctx2.Metadata, "build_tool") && getStringValue(ctx1.Metadata, "build_tool") != "" {
 		score += 0.15
 	}
 	factors++
 	
 	// Dependencies similarity (20% weight)
-	depSimilarity := pls.calculateSliceSimilarity(ctx1.Dependencies, ctx2.Dependencies)
+	depSimilarity := pls.calculateSliceSimilarity(getStringSliceValue(ctx1.Metadata, "dependencies"), getStringSliceValue(ctx2.Metadata, "dependencies"))
 	score += depSimilarity * 0.2
 	factors++
 	
 	// Frameworks similarity (15% weight)
-	frameworkSimilarity := pls.calculateSliceSimilarity(ctx1.FrameworksUsed, ctx2.FrameworksUsed)
+	frameworkSimilarity := pls.calculateSliceSimilarity(getStringSliceValue(ctx1.Metadata, "frameworks"), getStringSliceValue(ctx2.Metadata, "frameworks"))
 	score += frameworkSimilarity * 0.15
 	factors++
 	
 	// Surrounding code similarity (20% weight)
-	codeSimilarity := pls.calculateCodeSimilarity(ctx1.SurroundingCode, ctx2.SurroundingCode)
+	codeSimilarity := pls.calculateCodeSimilarity(getStringValue(ctx1.Metadata, "surrounding_code"), getStringValue(ctx2.Metadata, "surrounding_code"))
 	score += codeSimilarity * 0.2
 	factors++
 	
@@ -555,30 +543,30 @@ func (pls *DefaultPatternLearningService) calculateCodeSimilarity(code1, code2 s
 func (pls *DefaultPatternLearningService) identifyMatchingFactors(ctx1, ctx2 ErrorContext) []string {
 	factors := make([]string, 0)
 	
-	if getFileExtension(ctx1.FilePath) == getFileExtension(ctx2.FilePath) {
+	if getFileExtension(ctx1.SourceFile) == getFileExtension(ctx2.SourceFile) {
 		factors = append(factors, "same_file_type")
 	}
 	
-	if ctx1.BuildTool == ctx2.BuildTool && ctx1.BuildTool != "" {
+	if getStringValue(ctx1.Metadata, "build_tool") == getStringValue(ctx2.Metadata, "build_tool") && getStringValue(ctx1.Metadata, "build_tool") != "" {
 		factors = append(factors, "same_build_tool")
 	}
 	
-	if len(ctx1.Dependencies) > 0 && len(ctx2.Dependencies) > 0 {
-		commonDeps := pls.calculateSliceSimilarity(ctx1.Dependencies, ctx2.Dependencies)
+	if len(getStringSliceValue(ctx1.Metadata, "dependencies")) > 0 && len(getStringSliceValue(ctx2.Metadata, "dependencies")) > 0 {
+		commonDeps := pls.calculateSliceSimilarity(getStringSliceValue(ctx1.Metadata, "dependencies"), getStringSliceValue(ctx2.Metadata, "dependencies"))
 		if commonDeps > 0.3 {
 			factors = append(factors, "similar_dependencies")
 		}
 	}
 	
-	if len(ctx1.FrameworksUsed) > 0 && len(ctx2.FrameworksUsed) > 0 {
-		commonFrameworks := pls.calculateSliceSimilarity(ctx1.FrameworksUsed, ctx2.FrameworksUsed)
+	if len(getStringSliceValue(ctx1.Metadata, "frameworks")) > 0 && len(getStringSliceValue(ctx2.Metadata, "frameworks")) > 0 {
+		commonFrameworks := pls.calculateSliceSimilarity(getStringSliceValue(ctx1.Metadata, "frameworks"), getStringSliceValue(ctx2.Metadata, "frameworks"))
 		if commonFrameworks > 0.3 {
 			factors = append(factors, "similar_frameworks")
 		}
 	}
 	
-	if ctx1.SurroundingCode != "" && ctx2.SurroundingCode != "" {
-		codeSim := pls.calculateCodeSimilarity(ctx1.SurroundingCode, ctx2.SurroundingCode)
+	if getStringValue(ctx1.Metadata, "surrounding_code") != "" && getStringValue(ctx2.Metadata, "surrounding_code") != "" {
+		codeSim := pls.calculateCodeSimilarity(getStringValue(ctx1.Metadata, "surrounding_code"), getStringValue(ctx2.Metadata, "surrounding_code"))
 		if codeSim > 0.4 {
 			factors = append(factors, "similar_code_structure")
 		}
@@ -931,4 +919,31 @@ func (pls *DefaultPatternLearningService) extractPrerequisites(fix SuccessfulFix
 	}
 	
 	return prerequisites
+}
+
+// Helper functions for accessing metadata fields
+func getStringValue(metadata map[string]interface{}, key string) string {
+	if val, ok := metadata[key]; ok {
+		if s, ok := val.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func getStringSliceValue(metadata map[string]interface{}, key string) []string {
+	if val, ok := metadata[key]; ok {
+		if slice, ok := val.([]interface{}); ok {
+			result := make([]string, 0, len(slice))
+			for _, item := range slice {
+				if s, ok := item.(string); ok {
+					result = append(result, s)
+				}
+			}
+			return result
+		} else if slice, ok := val.([]string); ok {
+			return slice
+		}
+	}
+	return []string{}
 }
