@@ -453,11 +453,16 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Multi-Lane Integration**: Leverages Ploy's existing lanes for language-specific build validation
 - ✅ **Sandbox Management**: TTL cleanup, resource monitoring, and automatic environment cleanup
 
-### ✅ **Implemented Intelligence & Learning**
+### ✅ **Implemented Intelligence & Learning (ARF Phase 3)**
 - ✅ **Error Pattern Learning Database**: PostgreSQL vector similarity for pattern matching and solution caching
 - ✅ **Confidence Scoring**: Multi-layered validation with recipe effectiveness tracking
 - ✅ **Pattern Matching Algorithms**: Vector embeddings for cross-repository learning and generalization
 - ✅ **Monitoring Infrastructure**: Comprehensive metrics, alerting, and distributed tracing for ARF operations
+- ✅ **LLM Recipe Generation**: OpenAI/Anthropic integration for dynamic recipe creation based on context
+- ✅ **Hybrid Transformation Pipeline**: Intelligent combination of OpenRewrite and LLM approaches
+- ✅ **Multi-Language AST Support**: Tree-sitter integration for universal language parsing
+- ✅ **A/B Testing Framework**: Statistical validation of recipe improvements with confidence intervals
+- ✅ **Continuous Learning System**: Pattern extraction from historical transformations with retraining
 
 ### ✅ **Implemented High Availability & Performance**
 - ✅ **Distributed Processing**: Consul leader election and state management for multi-controller coordination
@@ -467,6 +472,8 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 
 ### ✅ **Implemented API & CLI Integration**
 - ✅ **Comprehensive REST API**: Complete `/v1/arf/*` endpoint suite for recipes, transformations, sandboxes, monitoring
+- ✅ **ARF Phase 3 Endpoints**: 30+ new endpoints for LLM generation, hybrid pipelines, learning system, A/B testing
+- ✅ **Ploy CLI Integration**: `ploy arf` commands for recipe management, transformation, validation, patterns, testing
 - ✅ **CLI Integration**: Full `ploy arf` command suite for recipe management, transformations, and health checks
 - ✅ **Cache Management**: Cache statistics, clearing, and optimization through API and CLI
 - ✅ **System Monitoring**: Health checks, metrics collection, and operational statistics
