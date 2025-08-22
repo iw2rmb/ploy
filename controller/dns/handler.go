@@ -314,9 +314,20 @@ func (h *Handler) GetStatus(c *fiber.Ctx) error {
 	status := fiber.Map{
 		"dns_provider": "available",
 		"provider_type": "",
-		"domain": h.manager.config.Domain,
-		"target_ip": h.manager.config.TargetIP,
+		"domain": "",
+		"target_ip": "",
 		"configuration": "loaded",
+	}
+	
+	// Check if manager and config are available
+	if h.manager != nil && h.manager.config != nil {
+		status["domain"] = h.manager.config.Domain
+		status["target_ip"] = h.manager.config.TargetIP
+	} else {
+		status["dns_provider"] = "error"
+		status["configuration"] = "invalid"
+		status["error"] = "DNS manager not initialized"
+		return c.Status(http.StatusServiceUnavailable).JSON(status)
 	}
 	
 	// Determine provider type based on configuration
@@ -328,14 +339,17 @@ func (h *Handler) GetStatus(c *fiber.Ctx) error {
 	}
 	
 	// Add basic configuration check without API validation
-	if h.manager.config.Domain == "" {
+	domain := status["domain"].(string)
+	targetIP := status["target_ip"].(string)
+	
+	if domain == "" {
 		status["dns_provider"] = "error"
 		status["configuration"] = "invalid"
 		status["error"] = "domain not configured"
 		return c.Status(http.StatusServiceUnavailable).JSON(status)
 	}
 	
-	if h.manager.config.TargetIP == "" {
+	if targetIP == "" {
 		status["dns_provider"] = "error"
 		status["configuration"] = "invalid"
 		status["error"] = "target IP not configured"
