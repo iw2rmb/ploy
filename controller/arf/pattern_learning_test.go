@@ -2,7 +2,6 @@ package arf
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 )
@@ -547,7 +546,7 @@ func TestErrorMessageNormalization(t *testing.T) {
 	}
 }
 
-func TestRiskAssessment(t *testing.T) {
+func TestPatternRiskAssessment(t *testing.T) {
 	pls := NewPatternLearningService().(*DefaultPatternLearningService)
 	
 	// Low risk fix

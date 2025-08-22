@@ -2,14 +2,15 @@ package arf
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestParallelResolverCreation(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	cb := NewCircuitBreaker(CircuitConfig{
 		FailureThreshold: 5,
 		OpenTimeout:      time.Second,
@@ -29,8 +30,8 @@ func TestParallelResolverCreation(t *testing.T) {
 }
 
 func TestDependencyGraphBuilding(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
 	resolver := NewParallelResolver(engine, catalog, cb).(*DefaultParallelResolver)
@@ -69,8 +70,8 @@ func TestDependencyGraphBuilding(t *testing.T) {
 }
 
 func TestExecutionBatches(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
 	resolver := NewParallelResolver(engine, catalog, cb).(*DefaultParallelResolver)
@@ -110,8 +111,8 @@ func TestExecutionBatches(t *testing.T) {
 }
 
 func TestParallelErrorResolution(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{
 		recipes: []Recipe{
 			{
 				ID:          "test-recipe-1",
@@ -179,8 +180,8 @@ func TestParallelErrorResolution(t *testing.T) {
 }
 
 func TestWorkerPoolStats(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
 	resolver := NewParallelResolver(engine, catalog, cb)
@@ -217,10 +218,10 @@ func TestWorkerPoolStats(t *testing.T) {
 }
 
 func TestContextCancellation(t *testing.T) {
-	engine := &MockEngine{
+	engine := &MockParallelEngine{
 		delay: 100 * time.Millisecond, // Slow operations
 	}
-	catalog := &MockRecipeCatalog{
+	catalog := &MockParallelRecipeCatalog{
 		recipes: []Recipe{
 			{ID: "slow-recipe", Name: "Slow Recipe", Confidence: 0.9},
 		},
@@ -240,7 +241,7 @@ func TestContextCancellation(t *testing.T) {
 	defer cancel()
 	
 	startTime := time.Now()
-	result, err := resolver.ResolveErrors(ctx, errors, codebase)
+	result, _ := resolver.ResolveErrors(ctx, errors, codebase)
 	duration := time.Since(startTime)
 	
 	// Should respect context timeout
@@ -260,8 +261,8 @@ func TestContextCancellation(t *testing.T) {
 }
 
 func TestConcurrentExecution(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{
 		recipes: []Recipe{
 			{ID: "concurrent-recipe", Name: "Concurrent Recipe", Confidence: 0.9},
 		},
@@ -286,7 +287,7 @@ func TestConcurrentExecution(t *testing.T) {
 	var concurrentExecutions int64
 	
 	// Replace engine with tracking version
-	trackingEngine := &MockEngine{
+	trackingEngine := &MockParallelEngine{
 		executeFunc: func(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error) {
 			current := atomic.AddInt64(&concurrentExecutions, 1)
 			defer atomic.AddInt64(&concurrentExecutions, -1)
@@ -327,8 +328,8 @@ func TestConcurrentExecution(t *testing.T) {
 }
 
 func TestErrorRelevanceFiltering(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{
 		recipes: []Recipe{
 			{
 				ID:         "security-recipe",
@@ -419,17 +420,17 @@ func TestBatchFormatting(t *testing.T) {
 
 // Mock implementations for testing
 
-type MockEngine struct {
+type MockParallelEngine struct {
 	recipes     []Recipe
 	delay       time.Duration
 	executeFunc func(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error)
 }
 
-func (m *MockEngine) ValidateRecipe(recipe Recipe) error {
+func (m *MockParallelEngine) ValidateRecipe(recipe Recipe) error {
 	return nil
 }
 
-func (m *MockEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error) {
+func (m *MockParallelEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx, recipe, codebase)
 	}
@@ -450,28 +451,35 @@ func (m *MockEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, codebase 
 	}, nil
 }
 
-func (m *MockEngine) ListAvailableRecipes() ([]Recipe, error) {
+func (m *MockParallelEngine) ListAvailableRecipes() ([]Recipe, error) {
 	return m.recipes, nil
 }
 
-func (m *MockEngine) GetRecipeMetadata(recipeID string) (*RecipeMetadata, error) {
+func (m *MockParallelEngine) GetRecipeMetadata(recipeID string) (*RecipeMetadata, error) {
 	return &RecipeMetadata{
 		Recipe:              Recipe{ID: recipeID},
 		ApplicableLanguages: []string{"java"},
 		SuccessRate:         0.9,
-		AverageExecutionTime: 100 * time.Millisecond,
 	}, nil
 }
 
-type MockRecipeCatalog struct {
+func (m *MockParallelEngine) CacheAST(key string, ast *AST) error {
+	return nil
+}
+
+func (m *MockParallelEngine) GetCachedAST(key string) (*AST, bool) {
+	return nil, false
+}
+
+type MockParallelRecipeCatalog struct {
 	recipes []Recipe
 }
 
-func (m *MockRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]Recipe, error) {
+func (m *MockParallelRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]Recipe, error) {
 	return m.recipes, nil
 }
 
-func (m *MockRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*Recipe, error) {
+func (m *MockParallelRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*Recipe, error) {
 	for _, recipe := range m.recipes {
 		if recipe.ID == recipeID {
 			return &recipe, nil
@@ -480,32 +488,30 @@ func (m *MockRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*Re
 	return nil, fmt.Errorf("recipe not found: %s", recipeID)
 }
 
-func (m *MockRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) error {
+func (m *MockParallelRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) error {
 	return nil
 }
 
-func (m *MockRecipeCatalog) UpdateRecipe(ctx context.Context, recipe Recipe) error {
+func (m *MockParallelRecipeCatalog) UpdateRecipe(ctx context.Context, recipe Recipe) error {
 	return nil
 }
 
-func (m *MockRecipeCatalog) DeleteRecipe(ctx context.Context, recipeID string) error {
+func (m *MockParallelRecipeCatalog) DeleteRecipe(ctx context.Context, recipeID string) error {
 	return nil
 }
 
-func (m *MockRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]Recipe, error) {
+func (m *MockParallelRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]Recipe, error) {
 	return m.recipes, nil
 }
 
-func (m *MockRecipeCatalog) GetRecipeStats(ctx context.Context, recipeID string) (*RecipeStats, error) {
+func (m *MockParallelRecipeCatalog) GetRecipeStats(ctx context.Context, recipeID string) (*RecipeStats, error) {
 	return &RecipeStats{
 		TotalExecutions:   10,
 		SuccessfulRuns:    8,
 		FailedRuns:        2,
-		AverageExecutionTime: 150 * time.Millisecond,
-		LastUsed:          time.Now(),
 	}, nil
 }
 
-func (m *MockRecipeCatalog) UpdateRecipeStats(ctx context.Context, recipeID string, success bool, executionTime time.Duration) error {
+func (m *MockParallelRecipeCatalog) UpdateRecipeStats(ctx context.Context, recipeID string, success bool, executionTime time.Duration) error {
 	return nil
 }

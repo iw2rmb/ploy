@@ -7,8 +7,8 @@ import (
 )
 
 func TestMultiRepoOrchestratorCreation(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -20,8 +20,8 @@ func TestMultiRepoOrchestratorCreation(t *testing.T) {
 }
 
 func TestDependencyAnalysis(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -74,8 +74,8 @@ func TestDependencyAnalysis(t *testing.T) {
 }
 
 func TestExecutionLevels(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -159,8 +159,8 @@ func TestCircularDependencyDetection(t *testing.T) {
 }
 
 func TestExecutionPlanCreation(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -252,8 +252,8 @@ func TestRiskAssessment(t *testing.T) {
 }
 
 func TestBatchTransformationWorkflow(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -314,8 +314,8 @@ func TestBatchTransformationWorkflow(t *testing.T) {
 }
 
 func TestDryRunExecution(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -352,8 +352,8 @@ func TestDryRunExecution(t *testing.T) {
 }
 
 func TestOrchestrationStatusTracking(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
@@ -425,8 +425,8 @@ func TestOrchestrationStatusTracking(t *testing.T) {
 }
 
 func TestParallelPhaseExecution(t *testing.T) {
-	engine := &MockEngine{}
-	catalog := &MockRecipeCatalog{}
+	engine := &MockParallelEngine{}
+	catalog := &MockParallelRecipeCatalog{}
 	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
