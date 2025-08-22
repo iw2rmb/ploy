@@ -118,27 +118,27 @@ main() {
     
     # Test 621: LLM Recipe Generation
     run_test "LLM Recipe Generation" \
-        "test_http_endpoint 'POST' '/arf/recipes/generate' '{\"language\":\"java\",\"framework\":\"spring\",\"error_type\":\"compilation\",\"context\":\"Missing dependency\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/recipes/generate' '{\"language\":\"java\",\"framework\":\"spring\",\"error_type\":\"compilation\",\"context\":\"Missing dependency\"}' '201'" \
         "success" "621"
     
     # Test 622: Recipe Generation Request Format
     run_test "Recipe Generation Request Validation" \
-        "test_http_endpoint 'POST' '/arf/recipes/generate' '{\"language\":\"javascript\",\"framework\":\"react\",\"error_type\":\"runtime\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/recipes/generate' '{\"language\":\"javascript\",\"framework\":\"react\",\"error_type\":\"runtime\"}' '201'" \
         "success" "622"
     
     # Test 623: Generated Recipe Structure
     run_test "Generated Recipe Structure Validation" \
-        "test_http_endpoint 'POST' '/arf/recipes/generate' '{\"language\":\"python\",\"framework\":\"django\",\"error_type\":\"import\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/recipes/generate' '{\"language\":\"python\",\"framework\":\"django\",\"error_type\":\"import\"}' '201'" \
         "success" "623"
     
     # Test 628: Recipe Validation
     run_test "Recipe Validation Endpoint" \
-        "test_http_endpoint 'POST' '/arf/recipes/validate' '{\"recipe_id\":\"test-recipe\",\"rules\":[{\"pattern\":\"import.*\",\"replacement\":\"from . import\"}]}' '200'" \
+        "test_http_endpoint 'POST' '/arf/recipes/validate' '{\"recipe_id\":\"test-recipe\",\"rules\":[{\"pattern\":\"import.*\",\"replacement\":\"from . import\"}]}' '201'" \
         "success" "628"
     
     # Test 630: Recipe Optimization
     run_test "Recipe Optimization Endpoint" \
-        "test_http_endpoint 'POST' '/arf/recipes/optimize' '{\"recipe_id\":\"test-recipe\",\"feedback\":{\"success_rate\":0.85,\"avg_time\":120}}' '200'" \
+        "test_http_endpoint 'POST' '/arf/recipes/optimize' '{\"recipe_id\":\"test-recipe\",\"feedback\":{\"success_rate\":0.85,\"avg_time\":120}}' '201'" \
         "success" "630"
     
     # Multi-Language AST Parsing Tests (636-650)
@@ -146,27 +146,27 @@ main() {
     
     # Test 636: Java AST Parsing
     run_test "Java AST Parsing" \
-        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"public class Test { public void method() {} }\",\"language\":\"java\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"public class Test { public void method() {} }\",\"language\":\"java\"}' '201'" \
         "success" "636"
     
     # Test 637: JavaScript AST Parsing
     run_test "JavaScript AST Parsing" \
-        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"const obj = { method() { return 42; } };\",\"language\":\"javascript\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"const obj = { method() { return 42; } };\",\"language\":\"javascript\"}' '201'" \
         "success" "637"
     
     # Test 638: TypeScript AST Parsing
     run_test "TypeScript AST Parsing" \
-        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"interface User { name: string; age: number; }\",\"language\":\"typescript\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"interface User { name: string; age: number; }\",\"language\":\"typescript\"}' '201'" \
         "success" "638"
     
     # Test 639: Python AST Parsing
     run_test "Python AST Parsing" \
-        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"class Example:\\n    def __init__(self):\\n        pass\",\"language\":\"python\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"class Example:\\n    def __init__(self):\\n        pass\",\"language\":\"python\"}' '201'" \
         "success" "639"
     
     # Test 640: Go AST Parsing
     run_test "Go AST Parsing" \
-        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"package main\\n\\nfunc main() {\\n    println(\\\"Hello\\\")\\n}\",\"language\":\"go\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ast/parse' '{\"code\":\"package main\\n\\nfunc main() {\\n    println(\\\"Hello\\\")\\n}\",\"language\":\"go\"}' '201'" \
         "success" "640"
     
     # Hybrid Transformation Pipeline Tests (651-665)
@@ -174,17 +174,17 @@ main() {
     
     # Test 651: Hybrid Transformation Execution
     run_test "Hybrid Transformation Execution" \
-        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"sequential\",\"codebase\":{\"language\":\"java\",\"files\":[{\"path\":\"Test.java\",\"content\":\"public class Test {}\"}]},\"recipe_id\":\"test-recipe\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"sequential\",\"codebase\":{\"language\":\"java\",\"files\":[{\"path\":\"Test.java\",\"content\":\"public class Test {}\"}]},\"recipe_id\":\"test-recipe\"}' '201'" \
         "success" "651"
     
     # Test 652: Strategy-Based Transformation
     run_test "Strategy-Based Transformation Selection" \
-        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"parallel\",\"codebase\":{\"language\":\"javascript\",\"complexity\":\"medium\"}}' '200'" \
+        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"parallel\",\"codebase\":{\"language\":\"javascript\",\"complexity\":\"medium\"}}' '201'" \
         "success" "652"
     
     # Test 655: Tree-sitter Strategy
     run_test "Tree-sitter Strategy Transformation" \
-        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"tree-sitter\",\"codebase\":{\"language\":\"python\",\"ast_required\":true}}' '200'" \
+        "test_http_endpoint 'POST' '/arf/hybrid/transform' '{\"strategy\":\"tree-sitter\",\"codebase\":{\"language\":\"python\",\"ast_required\":true}}' '201'" \
         "success" "655"
     
     # Continuous Learning System Tests (666-680)
@@ -192,7 +192,7 @@ main() {
     
     # Test 666: Record Transformation Outcome
     run_test "Record Transformation Outcome" \
-        "test_http_endpoint 'POST' '/arf/learning/record' '{\"transformation_id\":\"test-123\",\"success\":true,\"duration\":45,\"language\":\"java\",\"pattern\":\"import-optimization\"}' '200'" \
+        "test_http_endpoint 'POST' '/arf/learning/record' '{\"transformation_id\":\"test-123\",\"success\":true,\"duration\":45,\"language\":\"java\",\"pattern\":\"import-optimization\"}' '201'" \
         "success" "666"
     
     # Test 670: Get Learning Patterns
@@ -205,7 +205,7 @@ main() {
     
     # Test 681: Strategy Selection
     run_test "Strategy Selection for Repository" \
-        "test_http_endpoint 'POST' '/arf/strategies/select' '{\"repository\":{\"language\":\"java\",\"size\":\"large\",\"complexity\":\"high\"},\"constraints\":{\"time_limit\":300,\"memory_limit\":\"1GB\"}}' '200'" \
+        "test_http_endpoint 'POST' '/arf/strategies/select' '{\"repository\":{\"language\":\"java\",\"size\":\"large\",\"complexity\":\"high\"},\"constraints\":{\"time_limit\":300,\"memory_limit\":\"1GB\"}}' '201'" \
         "success" "681"
     
     # A/B Testing Framework Tests (696-700)
@@ -213,7 +213,7 @@ main() {
     
     # Test 696: Create A/B Test
     run_test "Create A/B Testing Experiment" \
-        "test_http_endpoint 'POST' '/arf/ab-test/create' '{\"name\":\"recipe-optimization-test\",\"variants\":[{\"id\":\"A\",\"recipe_id\":\"recipe-v1\"},{\"id\":\"B\",\"recipe_id\":\"recipe-v2\"}],\"traffic_split\":0.5}' '200'" \
+        "test_http_endpoint 'POST' '/arf/ab-test/create' '{\"name\":\"recipe-optimization-test\",\"variants\":[{\"id\":\"A\",\"recipe_id\":\"recipe-v1\"},{\"id\":\"B\",\"recipe_id\":\"recipe-v2\"}],\"traffic_split\":0.5}' '201'" \
         "success" "696"
     
     # Test 698: Get A/B Test Results
