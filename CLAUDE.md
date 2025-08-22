@@ -155,11 +155,20 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 
 5. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
 
-6. **Local Testing**: Execute relevant tests in local environment if applicable
-    - **Compilation Check**: Build both controller and CLI to verify compilation: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy`
+6. **Local Testing**: Execute relevant tests in local environment
+    - **Compilation Check**: ALWAYS build both controller and CLI locally to verify compilation before any VPS deployment:
+      ```bash
+      go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy
+      ```
+    - **Local Build Verification**: If compilation fails locally, DO NOT proceed to VPS testing
     - Run local validation tests to verify changes work correctly
     - Ensure all syntax checks and basic functionality tests pass
-    - Push feature branch to GitHub (no version updates needed at this stage)
+    - Test locally with environment variables when applicable:
+      ```bash
+      PORT=8081 ./build/controller  # Test controller locally
+      ./build/ploy apps new --lang go --name test-app  # Test CLI locally
+      ```
+    - Push feature branch to GitHub only after local builds succeed
 
 7. **VPS Testing**: Execute ALL relevant tests on VPS environment
     - **Comprehensive Deployment**: Deploy using automated script: `./scripts/deploy.sh <branch>`
