@@ -84,3 +84,57 @@ Ploy's **controller is designed as a horizontally scalable, stateless applicatio
 - **Secrets** → Vault integration with dynamic credential management
 
 This architecture makes the controller "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
+
+## Building and Versioning
+
+Ploy uses **automated version generation** from git metadata, eliminating manual version management.
+
+### Build System
+```bash
+# Build controller with automatic versioning
+./scripts/build.sh controller
+
+# Build CLI
+./scripts/build.sh cli
+
+# Build all components
+./scripts/build.sh all
+```
+
+### Version Management
+- **Automatic Generation**: Versions derived from git branch, commit, and timestamp
+- **Build-Time Injection**: Version metadata injected via Go ldflags during compilation
+- **Version Format**: `{branch}-{YYYYMMDD-HHMMSS}-{commit}[-dirty]`
+- **Tagged Releases**: Git tags override automatic versioning
+
+### Version Discovery
+```bash
+# CLI version
+./build/ploy version
+./build/ploy version --detailed
+
+# Controller endpoints
+curl http://localhost:8081/version
+curl http://localhost:8081/version/detailed
+```
+
+### Deployment
+```bash
+# Deploy to Nomad with automatic version discovery
+./scripts/deploy-nomad.sh
+
+# The script automatically:
+# - Builds controller with version
+# - Uploads to SeaweedFS
+# - Updates Nomad job with version/checksum
+# - Deploys via Nomad
+# - Verifies deployment
+```
+
+### Dynamic Controller Endpoint
+The CLI automatically discovers the controller endpoint:
+1. **PLOY_CONTROLLER** environment variable (highest priority)
+2. **PLOY_APPS_DOMAIN** → `https://api.{domain}/v1` (SSL with wildcard cert)
+3. Default → `http://localhost:8081/v1`
+
+This enables seamless operation across local development, staging, and production environments.

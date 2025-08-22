@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [2025-08-22] - Go-Based Controller Versioning System
+
+### Added
+- **✅ Build-Time Version Injection**: Automatic version generation from git information using ldflags
+- **✅ Version Package**: Centralized version information with build metadata and runtime statistics
+- **✅ Version Endpoints**: Controller exposes /version and /version/detailed for version discovery
+- **✅ CLI Version Command**: Display CLI and controller versions with detailed build information
+- **✅ Automated Build Script**: Generate consistent versions across builds with git metadata
+- **✅ Nomad Deployment Script**: Automatic version discovery and artifact management for deployments
+- **✅ Dynamic SSL Endpoint**: CLI automatically uses https://api.${PLOY_APPS_DOMAIN} when configured
+
+### Fixed
+- **✅ Manual Version Management**: Replaced CONTROLLER_VERSION manual updates with automated system
+- **✅ Build Reproducibility**: Consistent version generation across environments
+- **✅ Deployment Automation**: No more manual version editing in Nomad job files
+
+### Testing
+- **✅ Local version endpoint verification**
+- **✅ CLI version command functionality**
+- **✅ Build script version generation**
+- **✅ SSL endpoint resolution with PLOY_APPS_DOMAIN**
+
 ## [2025-08-22] - ARF Phase 3: Implementation & Testing Complete
 
 ### Added
