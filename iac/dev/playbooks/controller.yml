@@ -13,6 +13,7 @@
   become: true
   vars_files:
     - ../vars/main.yml
+    - ../vars/dev-wildcard.yml
   
   tasks:
     - name: Ensure proper service ordering - verify dependencies are running

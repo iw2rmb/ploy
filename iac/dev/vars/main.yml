@@ -42,12 +42,15 @@ testing_tools:
   - wget
   - unzip
 
+# Environment configuration
+ploy_environment: "dev"  # Enables development environment features including wildcard certificates
+
 # Ploy specific configuration
 ploy:
   controller_port: 8081
   storage_backend: "seaweedfs"
   dns:
-    provider: "cloudflare"  # Options: cloudflare, namecheap
+    provider: "namecheap"  # Use namecheap for dev environment
     domain: "ployd.app" 
     target_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
     ttl: 300
