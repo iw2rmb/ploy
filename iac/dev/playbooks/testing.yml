@@ -55,7 +55,7 @@
 
         - name: Configure Docker for Kontain runtime
           template:
-            src: ../templates/docker-daemon.json.j2
+            src: ../../common/templates/docker-daemon.json.j2
             dest: /etc/docker/daemon.json
           notify: restart docker
 
@@ -87,7 +87,7 @@
 
         - name: Create Ploy configuration
           template:
-            src: ../templates/ploy-storage-config.yaml.j2
+            src: ../../common/templates/ploy-storage-config.yaml.j2
             dest: /home/ploy/ploy/configs/storage-config.yaml
             owner: ploy
             group: ploy
@@ -101,7 +101,7 @@
 
         - name: Create lane detection test script
           template:
-            src: ../templates/test-lane-detection.sh.j2
+            src: ../../common/templates/test-lane-detection.sh.j2
             dest: /home/ploy/test-scripts/test-lane-detection.sh
             owner: ploy
             group: ploy
@@ -109,7 +109,7 @@
 
         - name: Create build pipeline test script
           template:
-            src: ../templates/test-build-pipeline.sh.j2
+            src: ../../common/templates/test-build-pipeline.sh.j2
             dest: /home/ploy/test-scripts/test-build-pipeline.sh
             owner: ploy
             group: ploy
@@ -117,7 +117,7 @@
 
         - name: Create API test script
           template:
-            src: ../templates/test-api.sh.j2
+            src: ../../common/templates/test-api.sh.j2
             dest: /home/ploy/test-scripts/test-api.sh
             owner: ploy
             group: ploy
@@ -125,7 +125,7 @@
 
         - name: Create webhook test script
           template:
-            src: ../templates/test-webhooks.sh.j2
+            src: ../../common/templates/test-webhooks.sh.j2
             dest: /home/ploy/test-scripts/test-webhooks.sh
             owner: ploy
             group: ploy
@@ -192,7 +192,7 @@
 
         - name: Create Node Exporter systemd service
           template:
-            src: ../templates/node-exporter.service.j2
+            src: ../../common/templates/node-exporter.service.j2
             dest: /etc/systemd/system/node-exporter.service
 
         - name: Check Node Exporter service status
@@ -211,7 +211,7 @@
 
     - name: Create environment setup script
       template:
-        src: ../templates/setup-env.sh.j2
+        src: ../../common/templates/setup-env.sh.j2
         dest: /home/ploy/setup-env.sh
         owner: ploy
         group: ploy

@@ -1,0 +1,41 @@
+---
+# Complete Ploy Production Environment Setup
+# 
+# REQUIREMENTS:
+# - Minimum 3 nodes (2 Linux + 1 FreeBSD)
+# - Production-grade configuration
+# - High availability setup
+#
+# EXECUTION:
+# cd iac/prod && ansible-playbook site.yml -i inventory/hosts.yml
+#
+# SERVICE ORDERING:
+# 1. Cluster validation and basic setup
+# 2. SeaweedFS (distributed storage with replication)
+# 3. HashiCorp Stack (Nomad/Consul/Vault cluster)
+# 4. Controller (production deployment)
+# 5. FreeBSD nodes (worker configuration)
+
+- import_playbook: playbooks/main.yml
+
+- import_playbook: ../common/playbooks/seaweedfs.yml
+  vars:
+    # Override for production replication
+    seaweedfs_replication: "001"
+    seaweedfs_cluster_mode: true
+
+- import_playbook: ../common/playbooks/hashicorp.yml
+  vars:
+    # Production cluster configuration
+    nomad_cluster_mode: true
+    consul_cluster_mode: true
+    vault_cluster_mode: true
+    cluster_size: "{{ groups['linux_hosts'] | length }}"
+
+- import_playbook: ../common/playbooks/controller.yml
+  vars:
+    # Production controller settings
+    controller_replicas: 3
+    controller_resources:
+      cpu: 1000
+      memory: 1024

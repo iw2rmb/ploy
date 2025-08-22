@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2025-08-22] - Template Consolidation and FreeBSD Configuration
+
+### Added
+- **✅ FreeBSD Consul Configuration**: Template for FreeBSD-specific Consul client configuration
+- **✅ FreeBSD Nomad Configuration**: Template for FreeBSD worker nodes with jail and bhyve support
+- **✅ Template Consolidation**: Unified template system using `iac/common/templates/` for both dev and prod
+
+### Fixed
+- **✅ Template Path Resolution**: Corrected all template references to use common directory
+- **✅ Duplicate Template Maintenance**: Eliminated duplicate templates between dev and prod environments
+- **✅ Syntax Validation**: All Ansible playbooks now pass syntax validation
+
+### Testing
+- **✅ Ansible syntax validation for dev and prod environments**
+- **✅ Template path verification across all playbooks**
+- **✅ Missing template detection and resolution**
+
 ## [2025-08-22] - Go-Based Controller Versioning System
 
 ### Added

@@ -78,7 +78,7 @@
 
     - name: Create SeaweedFS master service
       template:
-        src: ../../common/templates/seaweedfs-master.service.j2
+        src: ../templates/seaweedfs-master.service.j2
         dest: /etc/systemd/system/seaweedfs-master.service
         owner: root
         group: root
@@ -86,7 +86,7 @@
 
     - name: Create SeaweedFS volume service
       template:
-        src: ../../common/templates/seaweedfs-volume.service.j2
+        src: ../templates/seaweedfs-volume.service.j2
         dest: /etc/systemd/system/seaweedfs-volume.service
         owner: root
         group: root
@@ -94,7 +94,7 @@
 
     - name: Create SeaweedFS filer service
       template:
-        src: ../../common/templates/seaweedfs-filer.service.j2
+        src: ../templates/seaweedfs-filer.service.j2
         dest: /etc/systemd/system/seaweedfs-filer.service
         owner: root
         group: root
@@ -204,7 +204,7 @@
 
     - name: Create ploy storage configuration for SeaweedFS
       template:
-        src: ../../common/templates/ploy-seaweedfs-config.yaml.j2
+        src: ../templates/ploy-seaweedfs-config.yaml.j2
         dest: /home/ploy/ploy/configs/seaweedfs-config.yaml
         owner: ploy
         group: ploy

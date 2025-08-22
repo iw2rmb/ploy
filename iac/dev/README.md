@@ -49,6 +49,45 @@ su - ploy -c "./test-scripts/test-traefik-integration.sh"
 
 **Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Vault 1.20.2, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
 
+## Template System (Aug 2025)
+
+**Unified Templates**: All development environment configurations use shared templates from `../common/templates/` for consistency with production.
+
+### Template Structure
+
+```
+iac/
+├── common/templates/           # Shared configuration templates
+│   ├── consul-server.hcl.j2   # Linux Consul server configuration
+│   ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
+│   ├── nomad-server.hcl.j2    # Linux Nomad server configuration
+│   ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
+│   ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│   ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
+│   ├── vault.hcl.j2           # Vault configuration
+│   └── *.j2                   # Management scripts and service templates
+├── dev/playbooks/             # Dev-specific playbooks referencing common templates
+└── prod/playbooks/            # Prod-specific playbooks using same templates
+```
+
+### FreeBSD Integration
+
+**FreeBSD Templates**: Specialized configurations for FreeBSD worker nodes with unique capabilities.
+
+**Key Features**:
+- **consul-freebsd.hcl.j2**: Client-only Consul configuration joining Linux servers
+- **nomad-freebsd.hcl.j2**: Nomad client with jail and bhyve driver support
+- **Lane Support**: Native FreeBSD jails (Lane D) and bhyve VMs (Lane F)
+- **FreeBSD Paths**: Uses proper FreeBSD filesystem locations (`/var/db/`, `/var/log/`)
+- **Service Integration**: Syslog integration and rc.d script generation
+
+### Template Benefits
+
+- **Consistency**: Same configuration logic across dev and prod environments
+- **Maintainability**: Single location for template updates and bug fixes
+- **Validation**: Unified syntax checking and testing across environments
+- **Flexibility**: Environment-specific variable customization via vars files
+
 ## Platform Wildcard Certificate Configuration (Aug 2025)
 
 ### DNS Provider Setup

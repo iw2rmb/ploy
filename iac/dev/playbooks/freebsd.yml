@@ -77,12 +77,12 @@
 
     - name: Create cloud-init user-data
       template:
-        src: ../templates/freebsd-user-data.yml.j2
+        src: ../../common/templates/freebsd-user-data.yml.j2
         dest: /tmp/freebsd-user-data.yml
 
     - name: Create cloud-init meta-data
       template:
-        src: ../templates/freebsd-meta-data.yml.j2
+        src: ../../common/templates/freebsd-meta-data.yml.j2
         dest: /tmp/freebsd-meta-data.yml
 
     - name: Create cloud-init ISO
@@ -260,17 +260,17 @@
 
     - name: Create Nomad configuration
       template:
-        src: ../templates/nomad-freebsd.hcl.j2
+        src: ../../common/templates/nomad-freebsd.hcl.j2
         dest: /usr/local/etc/nomad.hcl
 
     - name: Create Consul configuration
       template:
-        src: ../templates/consul-freebsd.hcl.j2
+        src: ../../common/templates/consul-freebsd.hcl.j2
         dest: /usr/local/etc/consul.hcl
 
     - name: Create rc.d scripts for Nomad and Consul
       template:
-        src: "../templates/{{ item }}.j2"
+        src: "../../common/templates/{{ item }}.j2"
         dest: "/usr/local/etc/rc.d/{{ item }}"
         mode: '0755'
       loop:
