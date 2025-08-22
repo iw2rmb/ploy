@@ -273,7 +273,6 @@ docs/
 ├── STORAGE.md          # Storage abstraction and configuration
 ├── SCENARIOS.md        # Test scenarios and use cases
 ├── FEATURES.md         # Feature list and capabilities
-├── TESTS.md            # Test scenarios and validation
 └── WASM.md             # WebAssembly compilation and Lane G
 ```
 
@@ -356,7 +355,7 @@ manifests/
 3. **CLI Changes**: Modify `cmd/ploy/main.go` and update `cmd/ploy/README.md`
 4. **Storage Changes**: Edit files in `internal/storage/`
 5. **Infrastructure**: Update `iac/dev/playbooks/` and `platform/`
-6. **Testing**: Add tests to `test-scripts/` and scenarios to `docs/TESTS.md`
+6. **Testing**: Add tests to `test-scripts/` and update `test-scripts/README.md`
 7. **Documentation**: Update relevant files in `docs/` and `CHANGELOG.md`
 
 This structure enables efficient navigation and quick location of relevant files for any development task.

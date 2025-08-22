@@ -251,16 +251,6 @@ echo -e "${YELLOW}Built and deployed:${NC}"
 echo "  - Ploy CLI: build/ploy"
 echo "  - Controller: version $CONTROLLER_VERSION"
 echo ""
-
-# Check if DNS/SSL configuration is needed
-if [ -n "$PLOY_DNS_PROVIDER" ] || [ -n "$NAMECHEAP_API_KEY" ]; then
-    echo -e "${BLUE}SSL/DNS Configuration:${NC}"
-    echo "  - DNS Provider: ${PLOY_DNS_PROVIDER:-namecheap}"
-    echo "  - Domain: ${PLOY_DNS_DOMAIN:-ployd.app}"
-    echo "  - Wildcard Certificate: *.${PLOY_DNS_DOMAIN:-ployd.app}"
-    echo ""
-fi
-
 echo -e "${YELLOW}IMPORTANT: Version $CONTROLLER_VERSION is temporary for testing.${NC}"
 echo -e "${YELLOW}If tests are successful, commit this version and merge to main.${NC}"
 echo -e "${YELLOW}If tests fail, the version will be reverted automatically.${NC}"
@@ -270,10 +260,6 @@ echo "1. Monitor deployment: nomad job status ploy-controller"
 echo "2. Check allocation health: nomad alloc status <alloc-id>"
 echo "3. View logs: nomad alloc logs <alloc-id>"
 echo "4. Test controller: curl http://localhost:<port>/health"
-if [ -n "$PLOY_DNS_PROVIDER" ]; then
-    echo "5. Check DNS status: curl http://localhost:<port>/v1/dns/status"
-    echo "6. Test SSL certificate: curl https://api.${PLOY_DNS_DOMAIN:-ployd.app}/health"
-fi
-echo "7. Run comprehensive tests to validate the deployment"
+echo "5. Run comprehensive tests to validate the deployment"
 echo ""
 echo -e "${BLUE}All components from branch '$BRANCH' deployed successfully!${NC}"
