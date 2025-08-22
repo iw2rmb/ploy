@@ -177,6 +177,84 @@
   - Returns: `{"hits": 1250, "misses": 200, "hit_rate": 0.86, "size": 1500, "memory_usage": 524288000}`
 - `POST /v1/arf/cache/clear` — clear AST cache (maintenance operation).
 
+## Automated Remediation Framework Endpoints (Phase ARF-3: LLM Integration & Hybrid Intelligence - Implemented)
+
+### LLM Recipe Generation
+- `POST /v1/arf/llm/generate` — generate transformation recipe using LLM.
+  - Body: `{"repository_context": {...}, "transformation_type": "cleanup", "language": "java", "error_context": "..."}`
+  - Returns: `{"recipe": {...}, "confidence": 0.85, "explanation": "Generated recipe for Java cleanup"}`
+- `POST /v1/arf/llm/validate` — validate LLM-generated recipe.
+  - Body: `{"recipe": {...}, "test_cases": [...]}`
+  - Returns: `{"valid": true, "safety_score": 0.92, "warnings": [], "test_results": [...]}`
+- `POST /v1/arf/llm/optimize` — optimize recipe based on feedback.
+  - Body: `{"recipe_id": "...", "feedback": {"success_rate": 0.85, "execution_time": 120, "errors": [...]}}`
+  - Returns: `{"optimized_recipe": {...}, "improvements": ["reduced complexity", "better error handling"]}`
+
+### Hybrid Transformation Pipeline
+- `POST /v1/arf/hybrid/transform` — execute hybrid transformation combining OpenRewrite and LLM.
+  - Body: `{"strategy": "sequential|parallel|fallback", "primary_recipe": "...", "enhancement_mode": "none|post_processing|full", "codebase": {...}}`
+  - Returns: `{"primary_result": {...}, "enhanced_result": {...}, "strategy_used": "parallel", "confidence": 0.91}`
+- `GET /v1/arf/hybrid/strategies` — get available transformation strategies.
+  - Returns: `{"strategies": ["openrewrite_only", "llm_only", "sequential", "parallel", "fallback"], "default": "sequential"}`
+- `POST /v1/arf/hybrid/strategy/select` — select optimal strategy for transformation.
+  - Body: `{"repository": {...}, "complexity_score": 0.75, "time_constraint": 300, "quality_requirement": "high"}`
+  - Returns: `{"recommended_strategy": "parallel", "confidence": 0.88, "reasoning": "High complexity with sufficient time"}`
+
+### Multi-Language AST Support
+- `POST /v1/arf/ast/parse` — parse code into AST using tree-sitter.
+  - Body: `{"code": "public class Test { ... }", "language": "java"}`
+  - Returns: `{"ast": {...}, "language": "java", "parser": "tree-sitter", "nodes": 42}`
+- `GET /v1/arf/ast/languages` — get supported languages for AST parsing.
+  - Returns: `{"languages": ["java", "javascript", "typescript", "python", "go", "rust", "c", "cpp"], "parser": "tree-sitter"}`
+- `POST /v1/arf/ast/transform` — apply AST-based transformation.
+  - Body: `{"ast": {...}, "transformations": [{"type": "rename", "target": "variable", "from": "oldName", "to": "newName"}]}`
+  - Returns: `{"transformed_ast": {...}, "code": "...", "changes": 3}`
+
+### Learning System & Pattern Extraction
+- `POST /v1/arf/learning/record` — record transformation outcome for learning.
+  - Body: `{"transformation_id": "...", "recipe_id": "...", "success": true, "metrics": {...}, "feedback": {...}}`
+  - Returns: `{"recorded": true, "pattern_extracted": true, "pattern_id": "pattern-123"}`
+- `GET /v1/arf/learning/patterns` — get learned transformation patterns.
+  - Query params: `?language=java&error_type=compilation&min_confidence=0.7`
+  - Returns: `{"patterns": [...], "count": 25, "avg_success_rate": 0.87}`
+- `POST /v1/arf/learning/extract` — extract patterns from historical data.
+  - Body: `{"time_window": "30d", "min_samples": 10, "categories": ["compilation_errors", "test_failures"]}`
+  - Returns: `{"patterns_extracted": 12, "categories": {...}, "confidence_scores": {...}}`
+- `GET /v1/arf/learning/stats` — get learning system statistics.
+  - Returns: `{"total_transformations": 1542, "success_rate": 0.86, "patterns_learned": 87, "last_update": "..."}`
+- `POST /v1/arf/learning/retrain` — trigger model retraining.
+  - Body: `{"algorithms": ["decision_tree", "random_forest"], "validation_split": 0.2}`
+  - Returns: `{"retrain_started": true, "estimated_time": "5m", "data_points": 1000}`
+
+### A/B Testing Framework
+- `POST /v1/arf/ab-test/create` — create A/B test for recipe optimization.
+  - Body: `{"name": "spring-boot-migration-test", "variants": [{"id": "A", "recipe_id": "..."}, {"id": "B", "recipe_id": "..."}], "sample_size": 100, "traffic_split": 0.5}`
+  - Returns: `{"test_id": "ab-test-123", "status": "running", "start_time": "...", "estimated_duration": "7d"}`
+- `GET /v1/arf/ab-test/:id` — get A/B test status and interim results.
+  - Returns: `{"test_id": "...", "status": "running", "variants": {...}, "current_results": {...}, "confidence_level": 0.92}`
+- `POST /v1/arf/ab-test/:id/stop` — stop A/B test and get final results.
+  - Returns: `{"test_id": "...", "winner": "B", "improvement": 0.15, "confidence": 0.95, "final_results": {...}}`
+- `GET /v1/arf/ab-test/results` — get historical A/B test results.
+  - Query params: `?experiment_id=...&from=2025-01-01&to=2025-08-01`
+  - Returns: `{"results": [...], "total_tests": 42, "avg_improvement": 0.12}`
+
+### Strategy Selection & Complexity Analysis
+- `POST /v1/arf/strategies/select` — select optimal transformation strategy.
+  - Body: `{"repository": {...}, "constraints": {"time_limit": 300, "memory_limit": "2GB"}, "requirements": {"min_confidence": 0.8}}`
+  - Returns: `{"strategy": "hybrid", "confidence": 0.89, "estimated_time": 180, "reasoning": "..."}`
+- `POST /v1/arf/complexity/analyze` — analyze codebase complexity.
+  - Body: `{"repository": {...}, "metrics": ["cyclomatic", "coupling", "cohesion"]}`
+  - Returns: `{"complexity_score": 0.72, "metrics": {...}, "recommendation": "Use hybrid approach"}`
+- `GET /v1/arf/strategies/weights` — get current strategy selection weights.
+  - Returns: `{"weights": {"complexity": 0.3, "time": 0.4, "success": 0.3}, "last_updated": "..."}`
+- `POST /v1/arf/strategies/weights` — update strategy selection weights.
+  - Body: `{"weights": {"complexity": 0.4, "time": 0.3, "success": 0.3}}`
+  - Returns: `{"updated": true, "new_weights": {...}, "effective_from": "..."}`
+
+### ARF System Status
+- `GET /v1/arf/status` — comprehensive ARF Phase 3 system status.
+  - Returns: `{"llm_enabled": true, "learning_enabled": true, "multi_lang_enabled": true, "ab_testing_enabled": true, "active_tests": 3, "patterns_learned": 87, "transformations_today": 42}`
+
 ## Webhook Events
 - `build.started`, `build.completed`, `build.failed`
 - `deploy.started`, `deploy.completed`, `deploy.failed`

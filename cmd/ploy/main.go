@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ploy/ploy/internal/cli/apps"
+	"github.com/ploy/ploy/internal/cli/arf"
 	"github.com/ploy/ploy/internal/cli/certs"
 	"github.com/ploy/ploy/internal/cli/debug"
 	"github.com/ploy/ploy/internal/cli/deploy"
@@ -38,10 +39,7 @@ func main() {
 		case "rollback":
 			debug.RollbackCmd(os.Args[2:], controllerURL)
 		case "arf":
-			if err := handleARFCommand(os.Args); err != nil {
-				fmt.Printf("ARF command failed: %v\n", err)
-				os.Exit(1)
-			}
+			arf.ARFCmd(os.Args[2:], controllerURL)
 		default:
 			ui.Usage()
 		}

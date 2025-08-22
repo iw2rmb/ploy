@@ -37,5 +37,11 @@ Usage:
   ploy certs issue <domain>
   ploy certs list
   ploy debug shell <app> [--lane <A-F>]
-  ploy rollback <app> <sha>`)
+  ploy rollback <app> <sha>
+  ploy arf recipe generate --repo <path> --type <type>
+  ploy arf transform <path> --recipe <id>
+  ploy arf validate <recipe-file>
+  ploy arf patterns list
+  ploy arf test ab --recipe1 <id> --recipe2 <id>
+  ploy arf status`)
 }
