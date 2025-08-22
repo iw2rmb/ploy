@@ -72,59 +72,6 @@ func (m *MockEngine) GetCachedAST(key string) (*AST, bool) {
 	return nil, false
 }
 
-type MockSandboxManager struct {
-	sandboxes map[string]*Sandbox
-}
-
-func NewMockSandboxManager() *MockSandboxManager {
-	return &MockSandboxManager{
-		sandboxes: make(map[string]*Sandbox),
-	}
-}
-
-func (m *MockSandboxManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {
-	sandbox := &Sandbox{
-		ID:         "test-sandbox-" + time.Now().Format("20060102150405"),
-		JailName:   "test-jail",
-		RootPath:   "/jail/test",
-		WorkingDir: "/workspace",
-		CreatedAt:  time.Now(),
-		ExpiresAt:  time.Now().Add(config.TTL),
-		Status:     SandboxStatusReady,
-		Config:     config,
-	}
-	m.sandboxes[sandbox.ID] = sandbox
-	return sandbox, nil
-}
-
-func (m *MockSandboxManager) DestroySandbox(ctx context.Context, sandboxID string) error {
-	delete(m.sandboxes, sandboxID)
-	return nil
-}
-
-func (m *MockSandboxManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {
-	var infos []SandboxInfo
-	for _, sandbox := range m.sandboxes {
-		infos = append(infos, SandboxInfo{
-			ID:        sandbox.ID,
-			JailName:  sandbox.JailName,
-			Status:    sandbox.Status,
-			CreatedAt: sandbox.CreatedAt,
-			ExpiresAt: sandbox.ExpiresAt,
-		})
-	}
-	return infos, nil
-}
-
-func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error {
-	now := time.Now()
-	for id, sandbox := range m.sandboxes {
-		if now.After(sandbox.ExpiresAt) {
-			delete(m.sandboxes, id)
-		}
-	}
-	return nil
-}
 
 type ValidationError struct {
 	Message string
