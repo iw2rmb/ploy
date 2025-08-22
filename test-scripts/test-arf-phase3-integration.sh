@@ -142,7 +142,7 @@ main() {
     
     # Test 630: Recipe Optimization
     run_test "Recipe Optimization Endpoint" \
-        "test_http_endpoint 'POST' '/arf/recipes/optimize' '{\"recipe_id\":\"test-recipe\",\"feedback\":{\"success_rate\":0.85,\"avg_time\":120}}' '201'" \
+        "test_http_endpoint 'POST' '/arf/recipes/optimize' '{\"recipe_id\":\"test-recipe\",\"feedback\":{\"success_rate\":0.85,\"avg_time\":120}}' '200'" \
         "success" "630"
     
     # Multi-Language AST Parsing Tests (636-650)
