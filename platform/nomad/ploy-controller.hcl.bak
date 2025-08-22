@@ -506,7 +506,7 @@ job "ploy-controller" {
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:5b7832634fcd550c57364bb4274497046c0fa7641ad37a38566d702cb874104f"
+          checksum = "sha256:8bac24666083bac3a4571eda2726b76b7b985613ec90045051cdfd7ef718ff29"
         }
       }
       

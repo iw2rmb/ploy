@@ -165,7 +165,7 @@ func NewPostgreSQLLearningSystem() (*PostgreSQLLearningSystem, error) {
 	system := &PostgreSQLLearningSystem{
 		pool:            pool,
 		learningDB:      learningDB,
-		abTestFramework: NewDefaultABTestFramework(pool),
+		abTestFramework: NewDefaultABTestFramework(nil), // TODO: Update A/B testing framework to use pgx
 		patternMatcher:  NewDefaultPatternMatcher(),
 		strategyWeights: make(map[StrategyType]float64),
 	}
@@ -185,7 +185,7 @@ func NewPostgreSQLLearningSystem() (*PostgreSQLLearningSystem, error) {
 
 // RecordTransformationOutcome records the outcome of a transformation for learning
 func (ls *PostgreSQLLearningSystem) RecordTransformationOutcome(ctx context.Context, outcome TransformationOutcome) error {
-	tx, err := ls.db.BeginTx(ctx, nil)
+	tx, err := ls.pool.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -318,7 +318,7 @@ func (ls *PostgreSQLLearningSystem) UpdateStrategyWeights(ctx context.Context, p
 				updated_at = EXCLUDED.updated_at,
 				reasoning = EXCLUDED.reasoning`
 		
-		_, err := ls.db.ExecContext(ctx, updateQuery,
+		_, err := ls.pool.ExecContext(ctx, updateQuery,
 			string(update.StrategyType),
 			newWeight,
 			time.Now(),
@@ -380,7 +380,7 @@ func (ls *PostgreSQLLearningSystem) GenerateRecipeTemplate(ctx context.Context, 
 			template_recipe, confidence_threshold, created_at, last_used
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
-	_, err = ls.db.ExecContext(ctx, insertQuery,
+	_, err = ls.pool.ExecContext(ctx, insertQuery,
 		template.ID,
 		pattern.Signature,
 		"multi", // Multi-language template
@@ -415,7 +415,7 @@ func (ls *PostgreSQLLearningSystem) extractSuccessPatterns(ctx context.Context, 
 		HAVING COUNT(*) >= 5 AND AVG(CASE WHEN success THEN 1.0 ELSE 0.0 END) >= 0.8
 		ORDER BY success_rate DESC, frequency DESC`
 
-	rows, err := ls.db.QueryContext(ctx, query, since)
+	rows, err := ls.pool.QueryContext(ctx, query, since)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +469,7 @@ func (ls *PostgreSQLLearningSystem) extractFailurePatterns(ctx context.Context, 
 		HAVING COUNT(*) >= 3
 		ORDER BY failure_rate DESC, frequency DESC`
 
-	rows, err := ls.db.QueryContext(ctx, query, since)
+	rows, err := ls.pool.QueryContext(ctx, query, since)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +519,7 @@ func (ls *PostgreSQLLearningSystem) calculateStrategyEffectiveness(ctx context.C
 		WHERE created_at >= $1
 		GROUP BY strategy_type`
 
-	rows, err := ls.db.QueryContext(ctx, query, since)
+	rows, err := ls.pool.QueryContext(ctx, query, since)
 	if err != nil {
 		return nil, err
 	}
@@ -680,7 +680,7 @@ func (ls *PostgreSQLLearningSystem) initializeSchema() error {
 	}
 
 	for _, schema := range schemas {
-		if _, err := ls.db.Exec(schema); err != nil {
+		if _, err := ls.pool.Exec(schema); err != nil {
 			return fmt.Errorf("failed to create schema: %w", err)
 		}
 	}
@@ -690,7 +690,7 @@ func (ls *PostgreSQLLearningSystem) initializeSchema() error {
 
 func (ls *PostgreSQLLearningSystem) loadStrategyWeights() error {
 	query := `SELECT strategy_type, weight FROM strategy_weights`
-	rows, err := ls.db.Query(query)
+	rows, err := ls.pool.Query(query)
 	if err != nil {
 		// Initialize default weights if table is empty
 		ls.strategyWeights = map[StrategyType]float64{
