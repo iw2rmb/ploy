@@ -400,8 +400,19 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check cache stats
-	stats := h.engine.(*OpenRewriteEngine).cache.Stats()
+	// Check cache stats (safely handle different engine types)
+	var cacheStats ASTCacheStats
+	if openRewriteEngine, ok := h.engine.(*OpenRewriteEngine); ok {
+		cacheStats = openRewriteEngine.cache.Stats()
+	} else {
+		// For mock engines or other implementations, provide default stats
+		cacheStats = ASTCacheStats{
+			Size:    0,
+			Hits:    0,
+			Misses:  0,
+			HitRate: 0,
+		}
+	}
 
 	return c.JSON(fiber.Map{
 		"status": "healthy",
@@ -411,10 +422,10 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 				"available_recipes": len(recipes),
 			},
 			"cache": fiber.Map{
-				"hits": stats.Hits,
-				"misses": stats.Misses,
-				"hit_rate": stats.HitRate,
-				"size": stats.Size,
+				"hits": cacheStats.Hits,
+				"misses": cacheStats.Misses,
+				"hit_rate": cacheStats.HitRate,
+				"size": cacheStats.Size,
 			},
 		},
 	})
