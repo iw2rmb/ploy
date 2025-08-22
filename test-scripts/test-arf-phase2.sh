@@ -91,8 +91,9 @@ run_test test_endpoint "POST" "/v1/arf/circuit-breaker/reset?id=test-breaker" "C
 # Error-Driven Recipe Evolution Testing
 run_test_section "Recipe Management"
 run_test test_endpoint "GET" "/v1/arf/recipes" "List recipes"
-run_test test_endpoint "GET" "/v1/arf/recipes/test-recipe" "Get specific recipe" "" 404
+run_test test_endpoint "GET" "/v1/arf/recipes/test-recipe" "Get specific recipe (before creation)" "" 404
 run_test test_endpoint "POST" "/v1/arf/recipes" "Create recipe" '{"id":"test-recipe","name":"Test Recipe","description":"A test recipe for validation","language":"java","source":"org.openrewrite.java.cleanup.UnnecessaryParentheses","category":"cleanup","confidence":0.9}' 201
+run_test test_endpoint "GET" "/v1/arf/recipes/test-recipe" "Get specific recipe (after creation)"
 
 # Parallel Error Resolution Testing
 run_test_section "Parallel Error Resolution"
@@ -130,7 +131,7 @@ run_test test_endpoint "GET" "/v1/arf/transforms/test-transform-123" "Get transf
 # Sandbox Management Testing
 run_test_section "Sandbox Management"
 run_test test_endpoint "GET" "/v1/arf/sandboxes" "List sandboxes"
-run_test test_endpoint "POST" "/v1/arf/sandboxes" "Create sandbox" '{"repository":"https://github.com/example/test.git","language":"java","build_tool":"maven"}'
+run_test test_endpoint "POST" "/v1/arf/sandboxes" "Create sandbox" '{"repository":"https://github.com/example/test.git","language":"java","build_tool":"maven"}' 201
 run_test test_endpoint "DELETE" "/v1/arf/sandboxes/test-sandbox-123" "Destroy sandbox" "" 500
 
 # System Integration Testing
