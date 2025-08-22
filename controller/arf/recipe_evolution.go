@@ -289,16 +289,18 @@ func (re *DefaultRecipeEvolution) findSimilarPatterns(ctx context.Context, failu
 	patterns := make([]FailurePattern, 0, len(errorPatterns))
 	for _, ep := range errorPatterns {
 		pattern := FailurePattern{
-			Pattern:   ep.Signature,
-			Frequency: ep.Occurrences,
-			LastSeen:  ep.LastSeen,
-			Context:   convertStringMap(ep.Context.EnvironmentInfo),
+			Signature:       ep.Signature,
+			Frequency:       int32(ep.Occurrences),
+			FailureRate:     float64(ep.Occurrences) / 100.0,
+			CommonErrors:    []string{ep.ErrorMessage},
+			ContextFactors:  []string{"environment_specific"},
+			Mitigations:     []string{"review_configuration"},
 		}
 
 		// Find successful fix if available
 		for _, solution := range ep.Solutions {
 			if solution.Success {
-				pattern.SuccessfulFix = solution.Description
+				pattern.Mitigations[0] = solution.Description
 				break
 			}
 		}
@@ -335,11 +337,11 @@ func (re *DefaultRecipeEvolution) generateSuggestedFixes(failure TransformationF
 
 	// Add fixes from similar patterns
 	for _, pattern := range patterns {
-		if pattern.SuccessfulFix != "" {
+		if pattern.Mitigations[0] != "" {
 			mod := RecipeModification{
 				Type:          ModificationAddRule,
 				Target:        "pattern_based_fix",
-				Change:        pattern.SuccessfulFix,
+				Change:        pattern.Mitigations[0],
 				Justification: fmt.Sprintf("Based on successful fix for similar pattern (frequency: %d)", pattern.Frequency),
 				Priority:      5,
 				RiskLevel:     RiskLevelModerate,

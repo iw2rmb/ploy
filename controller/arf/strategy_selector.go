@@ -180,8 +180,8 @@ func (s *DefaultStrategySelector) RecommendEscalation(ctx context.Context, failu
 	strategiesTried := make(map[StrategyType]bool)
 
 	for _, failure := range failures {
-		failureTypes[failure.ErrorType]++
-		strategiesTried[failure.Strategy.Primary] = true
+		failureTypes[failure.ErrorMessage]++
+		strategiesTried[failure.RecipeID.Primary] = true
 	}
 
 	// Determine escalation based on patterns
@@ -359,7 +359,7 @@ func (s *DefaultStrategySelector) isMultiLanguageScenario(request StrategyReques
 	// Simple heuristic - could be enhanced with actual analysis
 	return request.Repository.Language == "mixed" || 
 		   request.TransformationType == "migration" &&
-		   (request.Repository.Framework == "polyglot" || request.Repository.Framework == "microservices")
+		   (request.Repository.Metadata["framework"] == "polyglot" || request.Repository.Metadata["framework"] == "microservices")
 }
 
 func (s *DefaultStrategySelector) extractStrategies(scored []scoredStrategy) []TransformationStrategy {
