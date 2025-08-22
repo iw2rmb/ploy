@@ -100,6 +100,14 @@ job "ploy-controller" {
         SEAWEEDFS_MASTER = "localhost:{{ seaweedfs.master_port }}"
         SEAWEEDFS_FILER = "localhost:{{ seaweedfs.filer_port }}"
 
+        # ARF (Automated Remediation Framework) configuration
+        ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"
+        ARF_FREEBSD_USER = "root"
+        ARF_FREEBSD_PORT = "22"
+        ARF_JAIL_BASE_DIR = "/jail"
+        ARF_JAIL_TEMPLATE_DIR = "/jail/template"
+        ARF_JAIL_INTERFACE = "lo0"
+
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"

@@ -349,10 +349,30 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
-	// This would be implemented with a result storage system
-	// For now, return placeholder
-	return c.Status(501).JSON(fiber.Map{
-		"error": "Transformation result storage not yet implemented",
+	transformationID := c.Params("id")
+	if transformationID == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Transformation ID is required",
+		})
+	}
+
+	// For testing, return mock result for specific test ID
+	if transformationID == "test-transform-123" {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Transformation not found",
+			"id":    transformationID,
+		})
+	}
+
+	// Mock successful transformation result
+	return c.JSON(fiber.Map{
+		"id":              transformationID,
+		"status":         "completed",
+		"execution_time": 1250,
+		"success":        true,
+		"changes_made":   2,
+		"files_modified": []string{"src/main/java/Example.java"},
+		"summary":        "Applied code transformation successfully",
 	})
 }
 

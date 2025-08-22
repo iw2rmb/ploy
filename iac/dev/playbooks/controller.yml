@@ -125,6 +125,16 @@
 
     - name: Deploy controller Nomad job
       block:
+        - name: Read FreeBSD VM IP from file (if available)
+          slurp:
+            src: /tmp/freebsd_vm_ip
+          register: freebsd_ip_file
+          ignore_errors: true
+
+        - name: Set FreeBSD VM IP variable
+          set_fact:
+            freebsd_vm_ip: "{{ freebsd_ip_file.content | b64decode | trim if freebsd_ip_file.content is defined else freebsd_vm.ip }}"
+
         - name: Copy controller Nomad job template
           template:
             src: ../templates/nomad-ploy-controller.hcl.j2
@@ -134,6 +144,7 @@
             mode: '0644'
           vars:
             controller_version: "{{ current_controller_version }}"
+            freebsd_vm_dynamic_ip: "{{ freebsd_vm_ip }}"
 
         - name: Validate controller job syntax
           command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-controller.hcl

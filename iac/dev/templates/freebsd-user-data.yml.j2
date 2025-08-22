@@ -3,32 +3,45 @@ users:
   - name: freebsd
     groups: wheel
     sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/tcsh
+    passwd: "$6$rounds=4096$5xjsOqBw$wJNKNt5LCO2dq.YnDXs7R./.yyTQOOD1K1p2KPvTL8Gw8D12nWM5HEuL1z8zEL1YJ1Pw6K3s2k1K3s2k1K3s21"  # ploydev
+  - name: root
+    passwd: "$6$rounds=4096$5xjsOqBw$wJNKNt5LCO2dq.YnDXs7R./.yyTQOOD1K1p2KPvTL8Gw8D12nWM5HEuL1z8zEL1YJ1Pw6K3s2k1K3s2k1K3s21"  # ploydev
     ssh_authorized_keys:
-      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7... # Replace with your SSH public key
+      - "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
 
 package_update: true
-package_upgrade: true
+package_upgrade: false
 
 packages:
   - python3
   - py39-pip
   - bash
   - curl
+  - sudo
 
 runcmd:
+  # Configure SSH
   - echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
+  - echo 'PasswordAuthentication yes' >> /etc/ssh/sshd_config
   - service sshd restart
-  - pw usermod root -h 0 <<< 'ploydev'
-
-network:
-  version: 2
-  ethernets:
-    {{ freebsd_vm.network_interface }}:
-      dhcp4: false
-      addresses:
-        - {{ freebsd_vm.ip }}/24
-      gateway4: {{ freebsd_vm.gateway }}
-      nameservers:
-        addresses:
-          - 8.8.8.8
-          - 1.1.1.1
+  
+  # Configure network (FreeBSD style)
+  - sysrc ifconfig_vtnet0="inet {{ freebsd_vm.ip }} netmask {{ freebsd_vm.netmask }}"
+  - sysrc defaultrouter="{{ freebsd_vm.gateway }}"
+  - echo 'nameserver 8.8.8.8' > /etc/resolv.conf
+  - echo 'nameserver 1.1.1.1' >> /etc/resolv.conf
+  - service netif restart
+  - service routing restart
+  
+  # Install basic tools for ARF
+  - pkg install -y go git node18 npm openjdk17
+  
+  # Enable jail system
+  - sysrc jail_enable="YES"
+  - mkdir -p /usr/local/etc/jail.conf.d
+  - mkdir -p /jail/template
+  
+  # Enable kernel modules for containers/virtualization
+  - kldload vmm || echo "vmm already loaded or not available"
+  - echo 'vmm_load="YES"' >> /boot/loader.conf

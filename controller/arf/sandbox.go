@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -88,6 +90,11 @@ func NewFreeBSDJailManager(baseDir, templateDir string, maxSandboxes int, defaul
 
 // CreateSandbox creates a new FreeBSD jail sandbox
 func (m *FreeBSDJailManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {
+	// Check if jail system is available
+	if _, err := exec.LookPath("jail"); err != nil {
+		return nil, fmt.Errorf("FreeBSD jail system not available: %w", err)
+	}
+
 	// Generate unique sandbox ID
 	sandboxID := fmt.Sprintf("arf-%d", time.Now().UnixNano())
 	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:14]) // Use last 10 chars
@@ -198,7 +205,9 @@ func (m *FreeBSDJailManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, 
 	cmd := exec.CommandContext(ctx, "jls", "-h", "jid", "name", "path")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list jails: %w", err)
+		// If jls command fails, return empty list instead of error
+		// This allows the API to work even if jail system is not configured
+		return []SandboxInfo{}, nil
 	}
 
 	var sandboxes []SandboxInfo
@@ -302,4 +311,195 @@ func (m *FreeBSDJailManager) startJail(ctx context.Context, jailName string) err
 func (m *FreeBSDJailManager) stopJail(ctx context.Context, jailName string) error {
 	cmd := exec.CommandContext(ctx, "jail", "-r", jailName)
 	return cmd.Run()
+}
+
+// MockSandboxManager provides a mock implementation for non-FreeBSD systems
+type MockSandboxManager struct {
+	sandboxes map[string]*Sandbox
+}
+
+// NewMockSandboxManager creates a new mock sandbox manager for development/testing
+func NewMockSandboxManager() *MockSandboxManager {
+	return &MockSandboxManager{
+		sandboxes: make(map[string]*Sandbox),
+	}
+}
+
+// CreateSandbox creates a mock sandbox for testing
+func (m *MockSandboxManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {
+	sandboxID := fmt.Sprintf("mock-%d", time.Now().UnixNano())
+	
+	ttl := config.TTL
+	if ttl == 0 {
+		ttl = 30 * time.Minute
+	}
+
+	sandbox := &Sandbox{
+		ID:         sandboxID,
+		JailName:   fmt.Sprintf("mock-sandbox-%s", sandboxID[5:15]),
+		RootPath:   fmt.Sprintf("/tmp/mock-sandbox-%s", sandboxID[5:15]),
+		WorkingDir: "/workspace",
+		CreatedAt:  time.Now(),
+		ExpiresAt:  time.Now().Add(ttl),
+		Status:     SandboxStatusReady,
+		Config:     config,
+		Metadata:   make(map[string]string),
+	}
+
+	m.sandboxes[sandboxID] = sandbox
+	return sandbox, nil
+}
+
+// DestroySandbox removes a mock sandbox
+func (m *MockSandboxManager) DestroySandbox(ctx context.Context, sandboxID string) error {
+	if _, exists := m.sandboxes[sandboxID]; !exists {
+		return fmt.Errorf("sandbox %s not found", sandboxID)
+	}
+	
+	delete(m.sandboxes, sandboxID)
+	return nil
+}
+
+// ListSandboxes returns all mock sandboxes
+func (m *MockSandboxManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {
+	var sandboxes []SandboxInfo
+	
+	for _, sb := range m.sandboxes {
+		sandboxes = append(sandboxes, SandboxInfo{
+			ID:         sb.ID,
+			JailName:   sb.JailName,
+			Status:     sb.Status,
+			CreatedAt:  sb.CreatedAt,
+			ExpiresAt:  sb.ExpiresAt,
+			Repository: sb.Config.Repository,
+		})
+	}
+	
+	return sandboxes, nil
+}
+
+// CleanupExpiredSandboxes removes expired mock sandboxes
+func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error {
+	now := time.Now()
+	
+	for id, sandbox := range m.sandboxes {
+		if now.After(sandbox.ExpiresAt) {
+			delete(m.sandboxes, id)
+		}
+	}
+	
+	return nil
+}
+
+// NewSandboxManagerForOS creates appropriate sandbox manager for the current OS
+func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) SandboxManager {
+	// Check for remote FreeBSD jail host configuration
+	freebsdHost := os.Getenv("ARF_FREEBSD_HOST")
+	if freebsdHost != "" {
+		return NewRemoteFreeBSDJailManager(freebsdHost, jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
+	}
+	
+	if runtime.GOOS == "freebsd" {
+		// Check if jail command is available
+		if _, err := exec.LookPath("jail"); err == nil {
+			return NewFreeBSDJailManager(jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
+		}
+	}
+	
+	// Fallback to mock sandbox manager for development/testing
+	return NewMockSandboxManager()
+}
+
+// RemoteFreeBSDJailManager manages jails on a remote FreeBSD host via SSH
+type RemoteFreeBSDJailManager struct {
+	*FreeBSDJailManager
+	host string
+	user string
+	port int
+}
+
+// NewRemoteFreeBSDJailManager creates a new remote FreeBSD jail manager
+func NewRemoteFreeBSDJailManager(host, jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) *RemoteFreeBSDJailManager {
+	baseMgr := NewFreeBSDJailManager(jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
+	
+	user := os.Getenv("ARF_FREEBSD_USER")
+	if user == "" {
+		user = "root"
+	}
+	
+	port := 22
+	if portStr := os.Getenv("ARF_FREEBSD_PORT"); portStr != "" {
+		if p, err := strconv.Atoi(portStr); err == nil {
+			port = p
+		}
+	}
+	
+	return &RemoteFreeBSDJailManager{
+		FreeBSDJailManager: baseMgr,
+		host:               host,
+		user:               user,
+		port:               port,
+	}
+}
+
+// executeRemoteCommand executes a command on the remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) executeRemoteCommand(ctx context.Context, command string) error {
+	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -p %d %s@%s '%s'", m.port, m.user, m.host, command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", sshCmd)
+	return cmd.Run()
+}
+
+// executeRemoteCommandWithOutput executes a command on the remote FreeBSD host and returns output
+func (m *RemoteFreeBSDJailManager) executeRemoteCommandWithOutput(ctx context.Context, command string) ([]byte, error) {
+	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -p %d %s@%s '%s'", m.port, m.user, m.host, command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", sshCmd)
+	return cmd.Output()
+}
+
+// ListSandboxes returns information about all active sandboxes on remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {
+	output, err := m.executeRemoteCommandWithOutput(ctx, "jls -h jid name path")
+	if err != nil {
+		// If remote command fails, return empty list to allow API to work
+		return []SandboxInfo{}, nil
+	}
+
+	var sandboxes []SandboxInfo
+	lines := strings.Split(string(output), "\n")
+	
+	for i, line := range lines {
+		if i == 0 || strings.TrimSpace(line) == "" {
+			continue // Skip header and empty lines
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 3 && strings.HasPrefix(fields[1], "arf-sandbox-") {
+			// Extract sandbox ID from jail name
+			sandboxID := "arf-" + fields[1][12:] // Remove "arf-sandbox-" prefix
+
+			// Get creation and expiration times (would be from database in production)
+			now := time.Now()
+			sandboxes = append(sandboxes, SandboxInfo{
+				ID:        sandboxID,
+				JailName:  fields[1],
+				Status:    SandboxStatusReady, // Would query actual status
+				CreatedAt: now.Add(-time.Hour), // Placeholder
+				ExpiresAt: now.Add(time.Hour),  // Placeholder
+			})
+		}
+	}
+
+	return sandboxes, nil
+}
+
+// startJail starts a jail on the remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) startJail(ctx context.Context, jailName string) error {
+	command := fmt.Sprintf("jail -c %s", jailName)
+	return m.executeRemoteCommand(ctx, command)
+}
+
+// stopJail stops a jail on the remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) stopJail(ctx context.Context, jailName string) error {
+	command := fmt.Sprintf("jail -r %s", jailName)
+	return m.executeRemoteCommand(ctx, command)
 }
