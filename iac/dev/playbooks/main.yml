@@ -19,6 +19,7 @@
   become: true
   vars_files:
     - ../vars/main.yml
+    - ../vars/dev-wildcard.yml
   
   tasks:
     - name: Update system packages
@@ -276,6 +277,7 @@
         state: present
         executable: pip3
         extra_args: --break-system-packages
+      ignore_errors: true  # Ignore conflicts with system packages
 
     - name: Add ARF Phase 3 environment variables for ploy user
       blockinfile:
@@ -746,6 +748,169 @@
         - "80"    # HTTP (Traefik)
         - "443"   # HTTPS (Traefik)
         - "8080"  # Traefik dashboard
+
+    # SSL Certificate Provisioning Infrastructure
+    - name: Install SSL certificate management tools
+      block:
+        - name: Install certbot for Let's Encrypt ACME client
+          apt:
+            name:
+              - certbot
+              - python3-certbot-dns-cloudflare
+            state: present
+
+        - name: Install lego ACME client (alternative to certbot with better DNS provider support)
+          get_url:
+            url: "https://github.com/go-acme/lego/releases/download/v{{ lego_version | default('4.14.2') }}/lego_v{{ lego_version | default('4.14.2') }}_linux_amd64.tar.gz"
+            dest: /tmp/lego.tar.gz
+
+        - name: Extract lego ACME client
+          unarchive:
+            src: /tmp/lego.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+
+        - name: Make lego executable
+          file:
+            path: /usr/local/bin/lego
+            mode: '0755'
+
+        - name: Create SSL certificates directory
+          file:
+            path: /etc/ploy/certs
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create SSL certificate scripts directory
+          file:
+            path: /home/ploy/ploy/scripts/ssl
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+    - name: Setup platform certificate renewal automation
+      block:
+        - name: Create DNS validation script
+          template:
+            src: validate-dns-records.sh.j2
+            dest: /home/ploy/ploy/scripts/ssl/validate-dns-records.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Setup platform certificate renewal cron job (lego-based)
+          cron:
+            name: "Platform Wildcard Certificate Renewal"
+            minute: "0"
+            hour: "3"
+            day: "*/7"  # Weekly check
+            user: ploy
+            job: "cd /etc/ploy/certs && /usr/local/bin/lego --dns=namecheap --domains='{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}' renew >> /var/log/ploy-platform-cert-renewal.log 2>&1"
+            state: present
+
+    - name: Configure Namecheap DNS API environment
+      block:
+        - name: Set Namecheap API environment variables for certificate automation
+          blockinfile:
+            path: /home/ploy/.bashrc
+            create: true
+            owner: ploy
+            group: ploy
+            mode: '0644'
+            block: |
+              # SSL Certificate Automation Environment
+              export CERT_EMAIL="{{ ploy_dev_certificate.email | default('admin@ployd.app') }}"
+              export ACME_STAGING="{{ ploy_dev_certificate.staging | default('false') }}"
+              
+              # Certificate storage paths
+              export CERT_DIR="/etc/ploy/certs"
+              export DEV_CERT_PATH="{{ ploy_dev_certificate.cert_path | default('/etc/ploy/certs/dev-wildcard.crt') }}"
+              export DEV_KEY_PATH="{{ ploy_dev_certificate.key_path | default('/etc/ploy/certs/dev-wildcard.key') }}"
+              
+              # Dev environment certificate domains
+              export DEV_WILDCARD_DOMAIN="{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}"
+              export DEV_BASE_DOMAIN="{{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }}"
+              export DEV_CONTROLLER_DOMAIN="{{ ploy_dev_routing.controller_domain | default('api.dev.ployd.app') }}"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - SSL Certificate vars"
+
+    - name: Initialize SSL certificate provisioning for dev environment
+      block:
+        - name: Check if DNS records are properly configured
+          shell: |
+            DEV_IP=$(dig +short {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} | tail -n1)
+            API_IP=$(dig +short {{ ploy_dev_routing.controller_domain | default('api.dev.ployd.app') }} | tail -n1)
+            TARGET_IP="{{ ansible_default_ipv4.address }}"
+            
+            if [ "$DEV_IP" = "$TARGET_IP" ] && [ "$API_IP" = "$TARGET_IP" ]; then
+              echo "DNS_READY"
+            else
+              echo "DNS_NOT_READY"
+              echo "Current: {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} -> $DEV_IP"
+              echo "Current: {{ ploy_dev_routing.controller_domain | default('api.dev.ployd.app') }} -> $API_IP"
+              echo "Required: $TARGET_IP"
+            fi
+          register: dns_status
+          changed_when: false
+
+        - name: Display DNS configuration status
+          debug:
+            msg: |
+              DNS Configuration Status: {{ dns_status.stdout_lines[0] }}
+              {% if dns_status.stdout_lines|length > 1 %}
+              Details:
+              {% for line in dns_status.stdout_lines[1:] %}
+                {{ line }}
+              {% endfor %}
+              {% endif %}
+
+        - name: Provision platform wildcard certificate (if DNS is ready and API credentials are available)
+          become_user: ploy
+          shell: |
+            cd /home/ploy/ploy
+            if [ -n "$NAMECHEAP_API_KEY" ] && [ "{{ dns_status.stdout_lines[0] }}" = "DNS_READY" ]; then
+              # Use lego directly for platform certificate provisioning (infrastructure-level)
+              export NAMECHEAP_CLIENT_IP="{{ ansible_default_ipv4.address }}"
+              export CERT_EMAIL="{{ ploy_dev_certificate.email | default('admin@ployd.app') }}"
+              
+              mkdir -p /etc/ploy/certs
+              cd /etc/ploy/certs
+              
+              /usr/local/bin/lego \
+                --server="{{ 'https://acme-staging-v02.api.letsencrypt.org/directory' if ploy_dev_certificate.staging | default(false) else 'https://acme-v02.api.letsencrypt.org/directory' }}" \
+                --email="$CERT_EMAIL" \
+                --dns=namecheap \
+                --domains="{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}" \
+                --accept-tos \
+                run
+              
+              # Copy certificates to expected locations for controller
+              CLEAN_DOMAIN=$(echo "{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}" | sed 's/\*\.//')
+              if [ -f ".lego/certificates/$CLEAN_DOMAIN.crt" ]; then
+                cp ".lego/certificates/$CLEAN_DOMAIN.crt" "{{ ploy_dev_certificate.cert_path | default('/etc/ploy/certs/dev-wildcard.crt') }}"
+                cp ".lego/certificates/$CLEAN_DOMAIN.key" "{{ ploy_dev_certificate.key_path | default('/etc/ploy/certs/dev-wildcard.key') }}"
+                chown ploy:ploy "{{ ploy_dev_certificate.cert_path | default('/etc/ploy/certs/dev-wildcard.crt') }}" "{{ ploy_dev_certificate.key_path | default('/etc/ploy/certs/dev-wildcard.key') }}"
+                echo "Platform wildcard certificate provisioned successfully"
+              else
+                echo "Certificate provisioning failed - files not found"
+                exit 1
+              fi
+            else
+              echo "Skipping platform certificate provisioning - DNS not ready or API credentials missing"
+              echo "Platform wildcard certificate must be provisioned during infrastructure setup"
+            fi
+          register: cert_provision_result
+          when: 
+            - ploy_environment is defined and ploy_environment == 'dev'
+            - lookup('env', 'NAMECHEAP_API_KEY') or lookup('env', 'NAMECHEAP_SANDBOX_API_KEY')
+          ignore_errors: true
+
+        - name: Display certificate provisioning result
+          debug:
+            msg: "{{ cert_provision_result.stdout_lines if cert_provision_result.stdout_lines is defined else 'Certificate provisioning skipped' }}"
+          when: cert_provision_result is defined
 
     # Platform wildcard certificate health check (after controller deployment)
     - name: Wait for controller health endpoint to be available

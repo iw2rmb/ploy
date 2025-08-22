@@ -4,6 +4,6 @@
 - import_playbook: playbooks/main.yml
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
-- import_playbook: playbooks/controller.yml  
+- import_playbook: playbooks/controller.yml
 - import_playbook: playbooks/freebsd.yml
 - import_playbook: playbooks/testing.yml

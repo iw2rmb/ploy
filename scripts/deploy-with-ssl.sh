@@ -35,10 +35,29 @@ echo -e "${YELLOW}Step 1: Checking DNS propagation...${NC}"
 if ./scripts/test-dns-propagation.sh > /dev/null 2>&1; then
     echo -e "${GREEN}✓ DNS propagation complete${NC}"
 else
-    echo -e "${RED}✗ DNS records not yet propagated${NC}"
-    echo "Please run: ./scripts/test-dns-propagation.sh"
-    echo "Wait for DNS to propagate before proceeding."
-    exit 1
+    echo -e "${YELLOW}⚠ DNS records need updating${NC}"
+    echo ""
+    echo "Please update DNS records in Namecheap control panel:"
+    echo "  Host: dev, Value: $VPS_IP"
+    echo "  Host: *.dev, Value: $VPS_IP"
+    echo ""
+    echo "Or run: ./scripts/update-dev-dns.sh (if DNS API is configured)"
+    echo ""
+    read -p "Have you updated the DNS records? (y/N): " confirm
+    if [[ ! $confirm =~ ^[Yy]$ ]]; then
+        echo "Please update DNS records and try again."
+        exit 1
+    fi
+    
+    echo "Waiting 5 minutes for DNS propagation..."
+    sleep 300
+    
+    if ./scripts/test-dns-propagation.sh > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ DNS propagation complete${NC}"
+    else
+        echo -e "${RED}✗ DNS still not propagated. Please wait and try again.${NC}"
+        exit 1
+    fi
 fi
 
 # Check DNS API credentials
