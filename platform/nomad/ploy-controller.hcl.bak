@@ -28,7 +28,7 @@ job "ploy-controller" {
       progress_deadline = "10m"  # Extended overall timeout
       auto_revert = true         # Automatically rollback failed updates
       auto_promote = false       # Require manual promotion for safety
-      canary = 1                 # Enable canary deployment with 1 instance
+      canary = 0                 # Disable canary deployment for testing
       
       # Stagger updates to prevent issues
       stagger = "30s"            # 30 second delay between updates
@@ -282,7 +282,7 @@ job "ploy-controller" {
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Binary distribution configuration
-        CONTROLLER_VERSION = "arf-phase3-implementation-20250822-194126"
+        CONTROLLER_VERSION = "arf-phase3-implementation-20250822-210201"
         CONTROLLER_BINARY_SOURCE = "seaweedfs"
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
@@ -319,6 +319,17 @@ job "ploy-controller" {
         # Platform wildcard certificate configuration
         PLOY_APPS_DOMAIN = "ployd.app"
         PLOY_APPS_DOMAIN_PROVIDER = "namecheap"
+        
+        # ARF Phase 3 - LLM Integration & Learning System
+        ARF_LEARNING_DB_URL = "postgres://ploy:arf_dev_password@localhost/arf_learning?sslmode=disable"
+        ARF_TREE_SITTER_PATH = "/usr/local/bin/tree-sitter"
+        ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
+        ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
+        ARF_SANDBOX_BASE_DIR = "/tmp/arf-sandboxes"
+        ARF_CACHE_DIR = "/tmp/arf-cache"
+        TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
+        JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
+        OPENREWRITE_JAR_PATH = "/usr/local/bin/rewrite.jar"
       }
       
       # Enhanced configuration files with service mesh and rolling updates
@@ -506,7 +517,7 @@ job "ploy-controller" {
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:8bac24666083bac3a4571eda2726b76b7b985613ec90045051cdfd7ef718ff29"
+          checksum = "sha256:922d2e431126d373e75c5a7ba230f34dae170879f5a8bbae9fdaa22677ed17f4"
         }
       }
       

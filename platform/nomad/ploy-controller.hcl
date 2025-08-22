@@ -282,7 +282,7 @@ job "ploy-controller" {
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Binary distribution configuration
-        CONTROLLER_VERSION = "arf-phase3-implementation-20250822-194126"
+        CONTROLLER_VERSION = "arf-phase3-implementation-20250822-210201"
         CONTROLLER_BINARY_SOURCE = "seaweedfs"
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
@@ -517,7 +517,7 @@ job "ploy-controller" {
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:55042e7d3c8252fe308934ed223e5eb3765889a85706a5238bcd3bb674045ed1"
+          checksum = "sha256:437cbe0fc9bfa30eaaf24aa48fdabedac24759d0acdfc5d63633148443cf2c37"
         }
       }
       
