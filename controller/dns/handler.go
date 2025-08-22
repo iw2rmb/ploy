@@ -320,22 +320,25 @@ func (h *Handler) GetStatus(c *fiber.Ctx) error {
 	}
 	
 	// Determine provider type based on configuration
-	if h.manager.config.Domain != "" {
-		switch {
-		case os.Getenv("PLOY_DNS_PROVIDER") == "namecheap":
-			status["provider_type"] = "namecheap"
-		case os.Getenv("PLOY_DNS_PROVIDER") == "cloudflare":
-			status["provider_type"] = "cloudflare"
-		default:
-			status["provider_type"] = "unknown"
-		}
+	providerType := os.Getenv("PLOY_DNS_PROVIDER")
+	if providerType != "" {
+		status["provider_type"] = providerType
+	} else {
+		status["provider_type"] = "unknown"
 	}
 	
-	// Validate configuration
-	if err := h.provider.ValidateConfiguration(); err != nil {
+	// Add basic configuration check without API validation
+	if h.manager.config.Domain == "" {
 		status["dns_provider"] = "error"
 		status["configuration"] = "invalid"
-		status["error"] = err.Error()
+		status["error"] = "domain not configured"
+		return c.Status(http.StatusServiceUnavailable).JSON(status)
+	}
+	
+	if h.manager.config.TargetIP == "" {
+		status["dns_provider"] = "error"
+		status["configuration"] = "invalid"
+		status["error"] = "target IP not configured"
 		return c.Status(http.StatusServiceUnavailable).JSON(status)
 	}
 	
