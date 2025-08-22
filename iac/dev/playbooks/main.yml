@@ -165,19 +165,27 @@
         line: 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64'
         create: true
 
-    - name: Download OpenRewrite CLI
+    - name: Download OpenRewrite Maven plugin (for ARF integration)
       get_url:
-        url: "https://github.com/openrewrite/rewrite/releases/download/v{{ openrewrite_version }}/rewrite-{{ openrewrite_version }}.jar"
-        dest: /usr/local/bin/rewrite.jar
+        url: "https://repo1.maven.org/maven2/org/openrewrite/rewrite-maven/{{ openrewrite_version }}/rewrite-maven-{{ openrewrite_version }}.jar"
+        dest: /usr/local/bin/rewrite-maven.jar
         mode: '0644'
       vars:
-        openrewrite_version: "8.21.0"
+        openrewrite_version: "8.60.0"
+      ignore_errors: true
 
-    - name: Create OpenRewrite CLI wrapper script
+    - name: Create OpenRewrite CLI wrapper script for Maven-based transformations
       copy:
         content: |
           #!/bin/bash
-          exec java -jar /usr/local/bin/rewrite.jar "$@"
+          # OpenRewrite CLI wrapper for ARF integration
+          # Uses Maven plugin for code transformations
+          if [ -f pom.xml ]; then
+            mvn org.openrewrite.maven:rewrite-maven:8.60.0:run -Drewrite.recipeArtifactCoordinates=org.openrewrite:rewrite-java -Drewrite.activeRecipes="$1"
+          else
+            echo "Error: Maven project (pom.xml) required for OpenRewrite transformations"
+            exit 1
+          fi
         dest: /usr/local/bin/rewrite
         mode: '0755'
 

@@ -48,6 +48,72 @@
 182. `ploy domains certificates <app> get <domain>` displays certificate details for specific domain.
 183. `ploy domains certificates <app> provision <domain>` manually triggers certificate provisioning.
 184. `ploy domains certificates <app> remove <domain>` removes certificate for domain.
+
+## ARF (Automated Remediation Framework) Phase 2 Testing (Aug 2025)
+
+### Circuit Breaker System Testing
+185. GET `/v1/arf/circuit-breaker/stats` returns circuit breaker statistics with success rates.
+186. GET `/v1/arf/circuit-breaker/state?id=<breaker>` returns specific circuit breaker state.  
+187. POST `/v1/arf/circuit-breaker/reset?id=<breaker>` resets circuit breaker and returns success.
+188. Circuit breaker stats show realistic metrics for total/successful/failed requests.
+
+### Error-Driven Recipe Evolution Testing
+189. GET `/v1/arf/recipes` returns list of available transformation recipes with metadata.
+190. GET `/v1/arf/recipes/<id>` returns specific recipe details and configuration.
+191. POST `/v1/arf/recipes` creates new custom recipe and returns recipe ID.
+192. PUT `/v1/arf/recipes/<id>` updates existing recipe configuration.
+193. DELETE `/v1/arf/recipes/<id>` removes recipe from catalog.
+194. GET `/v1/arf/recipes/<id>/stats` returns recipe execution statistics and success rates.
+
+### Parallel Error Resolution Testing  
+195. GET `/v1/arf/parallel-resolver/stats` returns parallel processing statistics.
+196. POST `/v1/arf/parallel-resolver/config` updates max workers configuration.
+197. Parallel resolver stats show active/queued/completed tasks and worker utilization.
+198. Configuration updates validate worker limits between 1-32 workers.
+
+### Multi-Repository Orchestration Testing
+199. GET `/v1/arf/multi-repo/stats` returns orchestration statistics and success rates.
+200. POST `/v1/arf/multi-repo/orchestrate` starts batch transformation across repositories.
+201. GET `/v1/arf/multi-repo/orchestrations/<id>` returns orchestration status and progress.
+202. Orchestration request validates repository list and recipe IDs.
+203. Orchestration status shows detailed progress for each repository.
+
+### High Availability Integration Testing
+204. GET `/v1/arf/ha/stats` returns cluster health and workload distribution.
+205. GET `/v1/arf/ha/nodes` returns individual node status and health metrics.
+206. HA stats show cluster size, healthy/unhealthy nodes, and leader election.
+207. Node status includes heartbeat timestamps and workload percentages.
+
+### Monitoring Infrastructure Testing
+208. GET `/v1/arf/monitoring/metrics` returns comprehensive system and transformation metrics.
+209. GET `/v1/arf/monitoring/alerts` returns active alerts with severity levels.
+210. Monitoring metrics include CPU, memory, disk usage and error rates.
+211. Alert system shows warnings, critical alerts, and component-specific issues.
+
+### Pattern Learning Database Testing
+212. GET `/v1/arf/patterns/stats` returns pattern learning statistics and accuracy.
+213. GET `/v1/arf/patterns/recommendations?error_type=<type>&language=<lang>` returns targeted recommendations.
+214. Pattern stats show total patterns, learning rate, and recommendation accuracy.
+215. Recommendations include confidence scores, estimated impact, and match counts.
+
+### Transformation Execution Testing
+216. POST `/v1/arf/transform` initiates code transformation with recipe selection.
+217. GET `/v1/arf/transforms/<id>` returns transformation result and applied changes.
+218. Transformation requests validate codebase format and recipe compatibility.
+219. Transformation results show success/failure status and detailed change summary.
+
+### Sandbox Management Testing  
+220. GET `/v1/arf/sandboxes` returns list of active transformation sandboxes.
+221. POST `/v1/arf/sandboxes` creates new isolated sandbox environment.
+222. DELETE `/v1/arf/sandboxes/<id>` destroys sandbox and cleans up resources.
+223. Sandbox creation validates resource limits and security constraints.
+
+### System Integration Testing
+224. GET `/v1/arf/health` returns overall ARF system health status.
+225. GET `/v1/arf/cache/stats` returns AST cache performance statistics.
+226. POST `/v1/arf/cache/clear` clears transformation cache and returns confirmation.
+227. Health check validates engine availability and component connectivity.
+228. Cache stats show hit/miss ratios and memory utilization.
 185. Domain removal automatically cleans up associated certificates.
 186. Certificate provisioning runs in background with status tracking.
 187. Wildcard certificate reuse for *.ployd.app subdomains.

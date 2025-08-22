@@ -11,6 +11,7 @@ require (
 	github.com/hashicorp/consul/api v1.32.1
 	github.com/hashicorp/nomad/api v0.0.0-20250820214743-694e0ac2e3e4
 	github.com/hashicorp/vault/api v1.20.0
+	github.com/tetratelabs/wazero v1.5.0
 	golang.org/x/crypto v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -54,7 +55,6 @@ require (
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/tetratelabs/wazero v1.5.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect

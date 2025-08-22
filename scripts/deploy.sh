@@ -99,7 +99,7 @@ pull_branch
 
 # Step 2: Generate test version number
 echo -e "${YELLOW}Generating test version number...${NC}"
-TEST_VERSION="test-$(date +%Y%m%d-%H%M%S)"
+TEST_VERSION="$BRANCH-$(date +%Y%m%d-%H%M%S)"
 echo -e "${GREEN}Generated test version: $TEST_VERSION${NC}"
 
 # Step 3: Update Nomad job file with test version

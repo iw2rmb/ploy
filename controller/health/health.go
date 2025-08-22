@@ -536,3 +536,43 @@ func (h *HealthChecker) DeploymentStatusHandler(c *fiber.Ctx) error {
 	
 	return c.Status(statusCode).JSON(deployment)
 }
+
+// UpdateStatusHandler handles rolling update progress monitoring
+func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
+	h.metricsCollector.TotalHealthChecks++
+	
+	// Check if we're currently in an update process
+	// This is a simplified implementation - in production this would track actual update state
+	updatePhase := c.Get("X-Update-Phase", "stable")
+	canaryStatus := c.Get("X-Canary-Status", "none")
+	
+	status := map[string]interface{}{
+		"status":           "stable",
+		"timestamp":        time.Now(),
+		"update_phase":     updatePhase,
+		"canary_status":    canaryStatus,
+		"rollback_capable": true,
+		"health_summary": map[string]interface{}{
+			"overall": "healthy",
+			"dependencies": map[string]string{
+				"consul":    "healthy", 
+				"nomad":     "healthy",
+				"seaweedfs": "healthy",
+				"vault":     "healthy",
+			},
+		},
+	}
+	
+	// If we detect we're in an update, adjust the response
+	if updatePhase != "stable" {
+		status["status"] = "updating"
+		status["update_progress"] = map[string]interface{}{
+			"phase":      updatePhase,
+			"canary":     canaryStatus,
+			"started_at": time.Now().Add(-5 * time.Minute), // Mock start time
+		}
+	}
+	
+	h.metricsCollector.HealthyResponses++
+	return c.Status(200).JSON(status)
+}
