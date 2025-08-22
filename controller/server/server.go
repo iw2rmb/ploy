@@ -437,6 +437,7 @@ func (s *Server) setupRoutes() {
 	s.app.Get("/live", s.dependencies.HealthChecker.LivenessHandler)
 	s.app.Get("/health/metrics", s.dependencies.HealthChecker.MetricsHandler)
 	s.app.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
+	s.app.Get("/health/update", s.dependencies.HealthChecker.UpdateStatusHandler)
 	s.app.Get("/health/platform-certificates", s.handlePlatformCertificateHealth)
 
 	api := s.app.Group("/v1")
@@ -879,7 +880,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	maxSandboxes := 10
 	defaultTTL := 30 * time.Minute
 
-	sandboxMgr := arf.NewFreeBSDJailManager(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
+	sandboxMgr := arf.NewSandboxManagerForOS(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
 
 	// Initialize recipe catalog
 	keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "arf")

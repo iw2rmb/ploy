@@ -282,7 +282,7 @@ job "ploy-controller" {
         HEALTH_VALIDATION_TIMEOUT = "5m"
         
         # Binary distribution configuration
-        CONTROLLER_VERSION = "test-20250821-232902"
+        CONTROLLER_VERSION = "arf-phase-2-implementation-20250822-181829"
         CONTROLLER_BINARY_SOURCE = "seaweedfs"
         BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
         BINARY_INTEGRITY_CHECK = "true"
@@ -315,6 +315,10 @@ job "ploy-controller" {
         INSTANCE_ID = "${NOMAD_ALLOC_ID}"
         NODE_NAME = "${attr.unique.hostname}"
         CLUSTER_ID = "${node.unique.id}"
+        
+        # Platform wildcard certificate configuration
+        PLOY_APPS_DOMAIN = "ployd.app"
+        PLOY_APPS_DOMAIN_PROVIDER = "namecheap"
       }
       
       # Enhanced configuration files with service mesh and rolling updates
@@ -502,7 +506,7 @@ job "ploy-controller" {
         
         # Use metadata.json for integrity validation
         options {
-          checksum = "sha256:5afea685542a832df0657715ec6f5e17a4d0c5da61a8be6d1d8cafa957f2e182"
+          checksum = "sha256:5b7832634fcd550c57364bb4274497046c0fa7641ad37a38566d702cb874104f"
         }
       }
       

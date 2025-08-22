@@ -92,6 +92,22 @@
       args:
         creates: /var/lib/libvirt/images/freebsd-dev-cloud-init.iso
 
+    - name: Check if FreeBSD VM already exists
+      command: virsh dominfo freebsd-dev
+      register: vm_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Remove existing FreeBSD VM if it exists (for clean setup)
+      command: virsh destroy freebsd-dev
+      when: vm_exists.rc == 0
+      ignore_errors: true
+
+    - name: Remove existing FreeBSD VM definition
+      command: virsh undefine freebsd-dev --remove-all-storage
+      when: vm_exists.rc == 0
+      ignore_errors: true
+
     - name: Create FreeBSD VM
       command: >
         virt-install
@@ -100,19 +116,50 @@
         --vcpus {{ freebsd_vm.cpus }}
         --disk path=/var/lib/libvirt/images/freebsd-dev.qcow2,format=qcow2
         --disk path=/var/lib/libvirt/images/freebsd-dev-cloud-init.iso,device=cdrom
-        --network bridge=virbr0
+        --network bridge=virbr0,model=virtio
         --os-variant freebsd13.0
         --import
         --noautoconsole
-      args:
-        creates: /etc/libvirt/qemu/freebsd-dev.xml
+      register: vm_created
 
-    - name: Wait for FreeBSD VM to be accessible
+    - name: Start FreeBSD VM
+      command: virsh start freebsd-dev
+      when: vm_created.changed
+      ignore_errors: true
+
+    - name: Get FreeBSD VM IP address from DHCP
+      shell: virsh domifaddr freebsd-dev | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | head -1
+      register: vm_ip_result
+      retries: 10
+      delay: 30
+      until: vm_ip_result.stdout != ""
+
+    - name: Set FreeBSD VM IP fact
+      set_fact:
+        freebsd_vm_actual_ip: "{{ vm_ip_result.stdout }}"
+
+    - name: Display FreeBSD VM IP
+      debug:
+        msg: "FreeBSD VM is accessible at IP: {{ freebsd_vm_actual_ip }}"
+
+    - name: Wait for FreeBSD VM SSH to be accessible
       wait_for:
-        host: "{{ freebsd_vm.ip }}"
+        host: "{{ freebsd_vm_actual_ip }}"
         port: 22
-        delay: 60
+        delay: 30
         timeout: 300
+      when: freebsd_vm_actual_ip is defined
+
+    - name: Add FreeBSD VM to inventory for configuration
+      add_host:
+        name: freebsd-vm-dynamic
+        ansible_host: "{{ freebsd_vm_actual_ip }}"
+        ansible_user: root
+        ansible_ssh_pass: ploydev
+        ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        ansible_python_interpreter: /usr/local/bin/python3
+        groups: freebsd_vms_dynamic
+      when: freebsd_vm_actual_ip is defined
 
 - name: Configure FreeBSD VM
   hosts: freebsd_vms
@@ -253,7 +300,104 @@
 
     - name: Clone Ploy repository on FreeBSD
       git:
-        repo: https://github.com/ploy/ploy.git
+        repo: https://github.com/iw2rmb/ploy.git
         dest: /home/freebsd/ploy
         force: true
       become_user: freebsd
+
+- name: Configure FreeBSD VM (Dynamic IP)
+  hosts: freebsd_vms_dynamic
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Update FreeBSD package repository
+      pkgng:
+        name: pkg
+        state: latest
+
+    - name: Install essential packages for ARF
+      pkgng:
+        name:
+          - python3
+          - py39-pip
+          - bash
+          - curl
+          - wget
+          - git
+          - go
+          - node18
+          - npm
+          - openjdk17
+        state: present
+
+    - name: Enable jail system
+      service:
+        name: jail
+        enabled: true
+
+    - name: Create jail base directory
+      file:
+        path: /jail
+        state: directory
+        mode: '0755'
+
+    - name: Create jail template directory
+      file:
+        path: /jail/template
+        state: directory
+        mode: '0755'
+
+    - name: Create basic jail template (minimal FreeBSD base)
+      shell: |
+        if [ ! -d /jail/template/bin ]; then
+          mkdir -p /jail/template/{bin,sbin,usr/bin,usr/sbin,lib,libexec,etc,var/run,tmp}
+          cp -R /bin /jail/template/
+          cp -R /sbin /jail/template/
+          cp -R /usr/bin /jail/template/usr/
+          cp -R /usr/sbin /jail/template/usr/
+          cp -R /lib /jail/template/
+          cp -R /libexec /jail/template/
+          cp -R /etc /jail/template/
+          chmod 1777 /jail/template/tmp
+        fi
+      args:
+        creates: /jail/template/bin
+
+    - name: Create jail.conf.d directory
+      file:
+        path: /usr/local/etc/jail.conf.d
+        state: directory
+
+    - name: Clone Ploy repository on FreeBSD VM
+      git:
+        repo: https://github.com/iw2rmb/ploy.git
+        dest: /root/ploy
+        force: true
+
+    - name: Build Ploy controller on FreeBSD for testing
+      shell: |
+        cd /root/ploy
+        /usr/local/bin/go build -o controller-freebsd ./controller
+      args:
+        creates: /root/ploy/controller-freebsd
+
+    - name: Store FreeBSD VM IP for controller configuration
+      delegate_to: localhost
+      copy:
+        content: "{{ ansible_host }}"
+        dest: /tmp/freebsd_vm_ip
+        mode: '0644'
+
+    - name: Display FreeBSD VM configuration status
+      debug:
+        msg: |
+          FreeBSD VM configured successfully:
+          - IP: {{ ansible_host }}
+          - Jail system enabled
+          - ARF dependencies installed
+          - Ploy repository cloned
+          - Ready for ARF sandbox operations
+          - IP saved to /tmp/freebsd_vm_ip for controller deployment
