@@ -43,6 +43,14 @@ type Metrics struct {
 	CertificateOperations *prometheus.CounterVec
 	CertificateExpiry     *prometheus.GaugeVec
 	
+	// Performance metrics
+	CacheHitRate        *prometheus.GaugeVec
+	CacheOperations     *prometheus.CounterVec
+	ConnectionPoolUsage *prometheus.GaugeVec
+	ConnectionPoolOps   *prometheus.CounterVec
+	ConfigLoadTime      *prometheus.HistogramVec
+	StartupTime         prometheus.Gauge
+	
 	registry  *prometheus.Registry
 	startTime time.Time
 	logger    *log.Logger
@@ -194,6 +202,55 @@ func (m *Metrics) initializeMetrics() {
 		},
 		[]string{"domain", "app"},
 	)
+
+	// Performance metrics
+	m.CacheHitRate = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ploy_controller_cache_hit_rate",
+			Help: "Cache hit rate percentage",
+		},
+		[]string{"cache_type"}, // envstore, config, etc.
+	)
+
+	m.CacheOperations = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_controller_cache_operations_total",
+			Help: "Total number of cache operations",
+		},
+		[]string{"cache_type", "operation"}, // get, set, delete, clear
+	)
+
+	m.ConnectionPoolUsage = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ploy_controller_connection_pool_usage",
+			Help: "Current connection pool usage",
+		},
+		[]string{"service"}, // consul, nomad, storage
+	)
+
+	m.ConnectionPoolOps = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_controller_connection_pool_operations_total",
+			Help: "Total number of connection pool operations",
+		},
+		[]string{"service", "operation"}, // acquire, release, create
+	)
+
+	m.ConfigLoadTime = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ploy_controller_config_load_duration_seconds",
+			Help:    "Time spent loading configuration files",
+			Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1}, // 1ms to 1s
+		},
+		[]string{"config_type", "cached"}, // storage, cleanup; true, false
+	)
+
+	m.StartupTime = prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "ploy_controller_startup_duration_seconds",
+			Help: "Time taken for controller startup",
+		},
+	)
 }
 
 // registerMetrics registers all metrics with the Prometheus registry
@@ -214,6 +271,12 @@ func (m *Metrics) registerMetrics() {
 		m.CertificatesTotal,
 		m.CertificateOperations,
 		m.CertificateExpiry,
+		m.CacheHitRate,
+		m.CacheOperations,
+		m.ConnectionPoolUsage,
+		m.ConnectionPoolOps,
+		m.ConfigLoadTime,
+		m.StartupTime,
 	}
 
 	for _, metric := range metrics {
@@ -359,4 +422,40 @@ func (m *Metrics) StartUptimeUpdater() {
 			}
 		}
 	}()
+}
+
+// Performance metrics recording methods
+
+// RecordCacheHitRate records cache hit rate percentage
+func (m *Metrics) RecordCacheHitRate(cacheType string, hitRate float64) {
+	m.CacheHitRate.WithLabelValues(cacheType).Set(hitRate)
+}
+
+// RecordCacheOperation records cache operations
+func (m *Metrics) RecordCacheOperation(cacheType, operation string) {
+	m.CacheOperations.WithLabelValues(cacheType, operation).Inc()
+}
+
+// UpdateConnectionPoolUsage updates connection pool usage
+func (m *Metrics) UpdateConnectionPoolUsage(service string, usage float64) {
+	m.ConnectionPoolUsage.WithLabelValues(service).Set(usage)
+}
+
+// RecordConnectionPoolOperation records connection pool operations
+func (m *Metrics) RecordConnectionPoolOperation(service, operation string) {
+	m.ConnectionPoolOps.WithLabelValues(service, operation).Inc()
+}
+
+// RecordConfigLoadTime records configuration loading time
+func (m *Metrics) RecordConfigLoadTime(configType string, cached bool, duration time.Duration) {
+	cachedStr := "false"
+	if cached {
+		cachedStr = "true"
+	}
+	m.ConfigLoadTime.WithLabelValues(configType, cachedStr).Observe(duration.Seconds())
+}
+
+// RecordStartupTime records controller startup time
+func (m *Metrics) RecordStartupTime(duration time.Duration) {
+	m.StartupTime.Set(duration.Seconds())
 }
