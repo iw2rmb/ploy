@@ -163,6 +163,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Post("/workflow", h.CreateWorkflow)
 	arf.Post("/workflow/create", h.CreateWorkflow) // Alternative route for tests
 	arf.Post("/workflow/:id/approve", h.ApproveWorkflow)
+	arf.Post("/workflow/:id/reject", h.RejectWorkflow)
 	arf.Get("/workflow/:id/history", h.GetApprovalHistory)
 	arf.Delete("/workflow/:id", h.CancelWorkflow)
 	arf.Get("/workflow/pending", h.GetPendingWorkflows)
@@ -174,6 +175,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 
 	// Phase 4: Production Optimization
 	arf.Post("/optimize/execution", h.OptimizeExecution)
+	arf.Post("/optimize/system", h.OptimizeSystemPerformance)
 	arf.Get("/optimize/metrics", h.GetPerformanceMetrics)
 	arf.Get("/optimize/report", h.GetOptimizationReport)
 	arf.Get("/optimize/resources", h.GetResourceUtilization)
