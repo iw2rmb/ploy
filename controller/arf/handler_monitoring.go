@@ -431,3 +431,46 @@ func (h *Handler) GetPatternRecommendations(c *fiber.Ctx) error {
 		"context":         context,
 	})
 }
+
+// GetProductionMetrics returns production metrics for Phase 4
+func (h *Handler) GetProductionMetrics(c *fiber.Ctx) error {
+	// Mock production metrics - in real implementation would call h.productionOptimizer
+	metrics := fiber.Map{
+		"timestamp": time.Now(),
+		"system": fiber.Map{
+			"uptime":           "72h 15m",
+			"cpu_usage":        45.2,
+			"memory_usage":     68.7,
+			"disk_usage":       34.1,
+			"network_io":       "12.4MB/s",
+		},
+		"performance": fiber.Map{
+			"avg_response_time":    "245ms",
+			"requests_per_second":  156.7,
+			"error_rate":          0.02,
+			"success_rate":        0.98,
+			"throughput":          "89.2 ops/sec",
+		},
+		"optimization": fiber.Map{
+			"cache_hit_rate":      0.84,
+			"compression_ratio":   0.67,
+			"resource_efficiency": 0.92,
+			"cost_reduction":      23.5,
+		},
+		"health": fiber.Map{
+			"overall_status":      "healthy",
+			"critical_alerts":     0,
+			"warning_alerts":      2,
+			"info_alerts":         5,
+			"last_health_check":   time.Now().Add(-30 * time.Second),
+		},
+		"scaling": fiber.Map{
+			"active_instances":    3,
+			"target_instances":    3,
+			"auto_scaling":        true,
+			"scale_events_today":  2,
+		},
+	}
+
+	return c.JSON(metrics)
+}
