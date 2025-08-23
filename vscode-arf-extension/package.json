@@ -1,0 +1,255 @@
+{
+  "name": "ploy-arf-extension",
+  "displayName": "Ploy ARF - Recipe Development Toolkit",
+  "description": "Development tools for creating and testing Automated Remediation Framework (ARF) transformation recipes",
+  "version": "1.0.0",
+  "publisher": "ploy-platform",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iw2rmb/ploy"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "ploy",
+    "arf",
+    "code-transformation",
+    "recipe-development",
+    "openrewrite",
+    "llm-integration"
+  ],
+  "icon": "media/icon.png",
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "arf-recipe",
+        "aliases": ["ARF Recipe", "arf-recipe"],
+        "extensions": [".arf.yaml", ".arf.yml", ".recipe.yaml", ".recipe.yml"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "arf-recipe",
+        "scopeName": "source.arf-recipe",
+        "path": "./syntaxes/arf-recipe.tmGrammar.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "arf.createRecipe",
+        "title": "Create New ARF Recipe",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.validateRecipe",
+        "title": "Validate Recipe",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.previewTransformation",
+        "title": "Preview Transformation",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.dryRun",
+        "title": "Dry Run Recipe",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.testRecipe",
+        "title": "Test Recipe",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.generateFromLLM",
+        "title": "Generate Recipe with LLM",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.connectToController",
+        "title": "Connect to ARF Controller",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.deployRecipe",
+        "title": "Deploy Recipe to Controller",
+        "category": "ARF"
+      },
+      {
+        "command": "arf.openDocumentation",
+        "title": "Open ARF Documentation",
+        "category": "ARF"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceLangId == arf-recipe",
+          "command": "arf.validateRecipe",
+          "group": "1_arf@1"
+        },
+        {
+          "when": "resourceLangId == arf-recipe",
+          "command": "arf.previewTransformation",
+          "group": "1_arf@2"
+        },
+        {
+          "when": "resourceLangId == arf-recipe",
+          "command": "arf.dryRun",
+          "group": "1_arf@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "explorerResourceIsFolder",
+          "command": "arf.createRecipe",
+          "group": "1_arf@1"
+        }
+      ]
+    },
+    "snippets": [
+      {
+        "language": "arf-recipe",
+        "path": "./snippets/arf-recipes.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "ARF Extension Configuration",
+      "properties": {
+        "arf.controllerUrl": {
+          "type": "string",
+          "default": "http://localhost:8081/v1",
+          "description": "URL of the ARF controller API"
+        },
+        "arf.llm.provider": {
+          "type": "string",
+          "enum": ["openai", "anthropic", "azure"],
+          "default": "openai",
+          "description": "LLM provider for recipe generation"
+        },
+        "arf.llm.model": {
+          "type": "string",
+          "default": "gpt-4",
+          "description": "LLM model to use for recipe generation"
+        },
+        "arf.validation.realTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time recipe validation"
+        },
+        "arf.preview.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-update preview when recipe changes"
+        },
+        "arf.dryRun.sandbox": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use sandbox for dry-run executions"
+        },
+        "arf.templates.directory": {
+          "type": "string",
+          "default": "~/.arf/templates",
+          "description": "Directory containing recipe templates"
+        },
+        "arf.logging.level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Logging level for ARF extension"
+        }
+      }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "arfRecipes",
+          "name": "ARF Recipes",
+          "when": "workspaceContainsArfRecipes"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "arf-toolkit",
+          "title": "ARF Toolkit",
+          "icon": "$(tools)"
+        }
+      ]
+    },
+    "webviews": [
+      {
+        "viewType": "arf.recipePreview",
+        "title": "Recipe Preview"
+      },
+      {
+        "viewType": "arf.transformationResult",
+        "title": "Transformation Result"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "arf",
+        "required": ["recipe"],
+        "properties": {
+          "recipe": {
+            "type": "string",
+            "description": "Path to the ARF recipe file"
+          },
+          "target": {
+            "type": "string",
+            "description": "Target code directory or file"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Execute as dry run"
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.2.0",
+    "@typescript-eslint/parser": "^6.2.0",
+    "eslint": "^8.45.0",
+    "typescript": "^5.1.6",
+    "@vscode/test-electron": "^2.3.4",
+    "@vscode/vsce": "^2.19.0"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "yaml": "^2.3.1",
+    "ajv": "^8.12.0",
+    "ws": "^8.13.0"
+  },
+  "activationEvents": [
+    "onLanguage:arf-recipe",
+    "workspaceContains:**/*.arf.yaml",
+    "workspaceContains:**/*.recipe.yaml",
+    "onCommand:arf.createRecipe"
+  ]
+}

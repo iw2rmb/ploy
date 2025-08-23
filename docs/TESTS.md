@@ -439,6 +439,258 @@ Tests are organized into suites that can be run automatically:
 - ✅ Failover procedures
 - ✅ Resource cleanup
 
+### ARF Phase 3: LLM Integration & Hybrid Intelligence
+- 🔄 LLM-assisted recipe generation
+- 🔄 Multi-language transformation engine
+- 🔄 Hybrid transformation pipeline
+- 🔄 Continuous learning system
+- 🔄 Intelligent strategy selection
+
+## ARF Phase 3 Test Scenarios
+
+### 14. LLM Integration Tests
+
+#### 14.1 LLM Recipe Generation
+- **Test ID**: LLM-001
+- **Objective**: Verify LLM can generate valid transformation recipes
+- **Prerequisites**: LLM API key configured, OpenAI API accessible
+- **Steps**:
+  1. Configure LLM integration with valid API key
+  2. Create transformation request with Java compilation error
+  3. Send request to `/v1/arf/recipes/generate`
+  4. Verify generated recipe has valid syntax and structure
+  5. Validate confidence score above threshold (0.7)
+- **Expected Results**: Valid recipe generated with explanation and confidence score
+
+#### 14.2 Multi-Language Recipe Generation
+- **Test ID**: LLM-002
+- **Objective**: Test LLM recipe generation across multiple languages
+- **Prerequisites**: Sample projects in Java, JavaScript, Python, Go, Rust
+- **Steps**:
+  1. For each supported language:
+     - Create error context (compilation/runtime error)
+     - Generate recipe using LLM
+     - Validate recipe syntax for target language
+  2. Compare generation quality across languages
+- **Expected Results**: 70%+ success rate for all supported languages
+
+#### 14.3 LLM Caching and Performance
+- **Test ID**: LLM-003
+- **Objective**: Verify LLM response caching and performance optimization
+- **Prerequisites**: Redis cache configured
+- **Steps**:
+  1. Send identical recipe generation request
+  2. Measure response time for first request
+  3. Send same request again, verify cache hit
+  4. Measure response time for cached request
+  5. Verify cache TTL behavior
+- **Expected Results**: Cache hit provides <100ms response, 90%+ faster than API call
+
+#### 14.4 LLM Fallback Handling
+- **Test ID**: LLM-004
+- **Objective**: Test graceful fallback when LLM unavailable
+- **Prerequisites**: Ability to simulate LLM API failures
+- **Steps**:
+  1. Configure invalid API key or block API access
+  2. Attempt recipe generation
+  3. Verify fallback to static recipes
+  4. Check error logging and metrics
+- **Expected Results**: System continues operation with static recipes, error properly logged
+
+### 15. Multi-Language Transformation Engine Tests
+
+#### 15.1 Tree-Sitter AST Parsing
+- **Test ID**: ML-001
+- **Objective**: Verify tree-sitter can parse code for all supported languages
+- **Prerequisites**: Tree-sitter parsers installed for Java, JS, Python, Go, Rust
+- **Steps**:
+  1. For each language, create sample source files
+  2. Parse AST using multi-language engine
+  3. Verify AST structure contains expected nodes
+  4. Check symbol and import extraction
+- **Expected Results**: 95%+ parse success rate, accurate symbol/import detection
+
+#### 15.2 Cross-Language Transformation
+- **Test ID**: ML-002
+- **Objective**: Test transformations work across different languages
+- **Prerequisites**: Sample codebases in multiple languages
+- **Steps**:
+  1. Apply similar transformation type to different languages
+  2. Compare transformation quality and accuracy
+  3. Verify language-specific patterns are respected
+- **Expected Results**: Consistent transformation behavior across languages
+
+#### 15.3 WASM Optimization Transformations
+- **Test ID**: ML-003
+- **Objective**: Verify WASM-specific optimizations work correctly
+- **Prerequisites**: WASM sample projects, wasm-opt tool
+- **Steps**:
+  1. Apply WASM optimization recipe to Rust/Go WASM project
+  2. Measure binary size before/after transformation
+  3. Verify functionality preserved after optimization
+  4. Check optimization level compliance
+- **Expected Results**: 20%+ size reduction, functionality preserved
+
+### 16. Hybrid Transformation Pipeline Tests
+
+#### 16.1 Sequential Hybrid Transformation
+- **Test ID**: HYB-001
+- **Objective**: Test OpenRewrite → LLM enhancement pipeline
+- **Prerequisites**: Java project with migration needs
+- **Steps**:
+  1. Execute OpenRewrite recipe first
+  2. Enhance result using LLM
+  3. Compare confidence scores before/after enhancement
+  4. Verify combined result quality
+- **Expected Results**: Enhanced result has higher confidence (85%+ vs 70%)
+
+#### 16.2 Parallel Hybrid Transformation
+- **Test ID**: HYB-002
+- **Objective**: Test parallel execution of OpenRewrite and LLM
+- **Prerequisites**: Complex transformation scenario
+- **Steps**:
+  1. Execute OpenRewrite and LLM transformations in parallel
+  2. Measure total execution time
+  3. Compare results from both approaches
+  4. Verify best result is selected
+- **Expected Results**: Faster than sequential (50%+ time reduction), best result chosen
+
+#### 16.3 Strategy Selection Accuracy
+- **Test ID**: HYB-003
+- **Objective**: Verify optimal strategy selection based on complexity
+- **Prerequisites**: Various complexity levels of transformation scenarios
+- **Steps**:
+  1. Create simple, moderate, and complex transformation scenarios
+  2. Let system select optimal strategy for each
+  3. Verify strategy matches expected approach
+  4. Measure success rates for each strategy type
+- **Expected Results**: 90%+ correct strategy selection, success rates match predictions
+
+#### 16.4 Confidence Calibration
+- **Test ID**: HYB-004
+- **Objective**: Test that confidence scores accurately predict success
+- **Prerequisites**: Historical transformation data
+- **Steps**:
+  1. Execute 100 transformations with confidence scoring
+  2. Track actual success vs predicted confidence
+  3. Calculate calibration error
+  4. Verify confidence thresholds are appropriate
+- **Expected Results**: Confidence within 10% of actual success rate
+
+### 17. Continuous Learning System Tests
+
+#### 17.1 Pattern Extraction
+- **Test ID**: CL-001
+- **Objective**: Verify system learns from successful transformation patterns
+- **Prerequisites**: PostgreSQL learning database, sample transformation history
+- **Steps**:
+  1. Record 50+ successful transformations
+  2. Run pattern extraction analysis
+  3. Verify identified patterns match expected results
+  4. Check pattern generalization accuracy
+- **Expected Results**: 90%+ pattern recognition accuracy, actionable insights generated
+
+#### 17.2 Strategy Weight Updates
+- **Test ID**: CL-002
+- **Objective**: Test automatic strategy weight adjustment based on performance
+- **Prerequisites**: Multiple strategy executions with varying success rates
+- **Steps**:
+  1. Execute transformations using different strategies
+  2. Record success/failure rates
+  3. Trigger strategy weight updates
+  4. Verify weights adjusted in correct direction
+- **Expected Results**: 25%+ improvement in strategy selection accuracy over time
+
+#### 17.3 Recipe Template Generation
+- **Test ID**: CL-003
+- **Objective**: Verify system can generate reusable recipe templates from patterns
+- **Prerequisites**: Identified success patterns from learning system
+- **Steps**:
+  1. Extract successful transformation pattern
+  2. Generate recipe template from pattern
+  3. Apply template to new similar scenario
+  4. Verify template effectiveness
+- **Expected Results**: Generated templates achieve 80%+ success rate on similar scenarios
+
+#### 17.4 A/B Testing Framework
+- **Test ID**: CL-004
+- **Objective**: Test A/B testing of recipe variations
+- **Prerequisites**: Multiple recipe variants for same transformation type
+- **Steps**:
+  1. Set up A/B experiment with two recipe variants
+  2. Execute transformations using both variants
+  3. Collect statistical data on success rates
+  4. Verify statistical significance calculation
+  5. Graduate winning variant
+- **Expected Results**: 95% statistical confidence achieved, winning variant identified
+
+### 18. Developer Experience Tooling Tests
+
+#### 18.1 VS Code Extension Functionality
+- **Test ID**: DEV-001
+- **Objective**: Test VS Code extension for recipe development
+- **Prerequisites**: VS Code with ARF extension installed
+- **Steps**:
+  1. Create new recipe file in VS Code
+  2. Verify syntax highlighting and validation
+  3. Test recipe preview functionality
+  4. Use dry-run mode on sample code
+- **Expected Results**: Real-time validation, accurate previews, working dry-run
+
+#### 18.2 Recipe SDK Usage
+- **Test ID**: DEV-002
+- **Objective**: Verify Recipe SDK enables easy recipe creation
+- **Prerequisites**: Recipe SDK installed
+- **Steps**:
+  1. Use SDK to create new recipe from template
+  2. Add custom transformations using SDK helpers
+  3. Test recipe with SDK validation tools
+  4. Generate recipe documentation using SDK
+- **Expected Results**: Recipe created in <5 minutes, passes all validations
+
+#### 18.3 Local Development Workflow
+- **Test ID**: DEV-003
+- **Objective**: Test complete local development workflow
+- **Prerequisites**: Local development environment set up
+- **Steps**:
+  1. Develop new recipe using VS Code extension
+  2. Test recipe locally using SDK
+  3. Submit recipe to local ARF instance
+  4. Verify transformation execution
+- **Expected Results**: End-to-end workflow completes successfully
+
+## ARF Phase 3 Success Metrics
+
+### LLM Integration
+- 70%+ success rate for LLM-generated recipes on first attempt
+- <30 seconds recipe generation time
+- 90%+ cache hit rate for similar requests
+- Graceful fallback to static recipes when LLM unavailable
+
+### Multi-Language Support
+- 95%+ AST parsing success rate across all supported languages
+- 80%+ transformation success rate for each language
+- Consistent behavior across language boundaries
+- 20%+ WASM binary size reduction with preserved functionality
+
+### Hybrid Intelligence
+- 85%+ success rate for hybrid transformations vs 70% for single-strategy
+- 50%+ time reduction with parallel hybrid execution
+- 90%+ accuracy in strategy selection based on complexity
+- Confidence scores within 10% of actual success rates
+
+### Continuous Learning
+- 90%+ pattern recognition accuracy from transformation history
+- 25%+ improvement in strategy selection over 100 transformations
+- 80%+ success rate for generated recipe templates
+- A/B testing achieves 95% statistical confidence
+
+### Developer Experience
+- Recipe development time <5 minutes using SDK and tools
+- Real-time validation and preview in VS Code extension
+- 100% of example recipes work out-of-the-box
+- Complete local development workflow in <10 minutes
+
 ## Success Criteria
 
 ### Reliability

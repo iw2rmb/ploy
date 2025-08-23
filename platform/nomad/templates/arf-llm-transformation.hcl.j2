@@ -1,0 +1,370 @@
+# ARF Phase 3 - LLM-Enhanced Hybrid Transformation Job Template
+# This template supports sequential and parallel hybrid transformation strategies
+
+job "arf-llm-transform-{{ transformation_id }}" {
+  datacenters = ["{{ datacenter }}"]
+  type = "batch"
+  
+  constraint {
+    attribute = "${attr.kernel.name}"
+    value     = "freebsd"
+  }
+  
+  # Priority for transformation tasks
+  priority = 75
+  
+  group "hybrid-transformation" {
+    count = 1
+    
+    # Restart policy for batch jobs
+    restart {
+      attempts = 3
+      interval = "30m"
+      delay    = "15s"
+      mode     = "fail"
+    }
+    
+    # Network configuration for inter-task communication
+    network {
+      mode = "bridge"
+      
+      port "metrics" {
+        to = 9090
+      }
+    }
+    
+    # Shared volume for transformation artifacts
+    volume "shared-workspace" {
+      type      = "host"
+      source    = "arf-workspace"
+      read_only = false
+    }
+    
+    # Primary OpenRewrite transformation task
+    task "openrewrite-transform" {
+      driver = "jail"
+      
+      config {
+        path = "/zroot/jails/arf-or-{{ transformation_id }}"
+        command = "/usr/local/bin/arf-openrewrite-executor"
+        args = [
+          "--recipe", "/local/primary-recipe.yaml",
+          "--repository", "/input/repository.tar.gz",
+          "--output", "/shared/openrewrite-result.tar.gz",
+          "--format", "json",
+          "--timeout", "{{ openrewrite_timeout | default('15m') }}",
+          "--metrics-port", "9090"
+        ]
+      }
+      
+      # OpenRewrite resource requirements
+      resources {
+        cpu    = {{ openrewrite_cpu | default(2000) }}
+        memory = {{ openrewrite_memory | default(4096) }}
+        disk   = {{ openrewrite_disk | default(10240) }}
+      }
+      
+      # Mount shared workspace
+      volume_mount {
+        volume      = "shared-workspace"
+        destination = "/shared"
+        read_only   = false
+      }
+      
+      # Transformation recipe configuration
+      template {
+        data = <<-EOH
+{{ primary_recipe | to_yaml }}
+        EOH
+        destination = "local/primary-recipe.yaml"
+        change_mode = "noop"
+      }
+      
+      # Environment variables for OpenRewrite
+      env {
+        JAVA_OPTS = "-Xmx3G -XX:+UseG1GC"
+        OPENREWRITE_CACHE_DIR = "/shared/cache"
+        TRANSFORMATION_ID = "{{ transformation_id }}"
+        STAGE = "primary"
+      }
+      
+      # Health checking
+      service {
+        name = "arf-openrewrite-{{ transformation_id }}"
+        port = "metrics"
+        
+        check {
+          type     = "http"
+          path     = "/health"
+          interval = "30s"
+          timeout  = "5s"
+        }
+      }
+      
+      # Artifacts collection
+      artifact {
+        source = "{{ artifact_source }}/repository.tar.gz"
+        destination = "input/"
+        mode = "file"
+      }
+      
+      # Logs configuration
+      logs {
+        max_files     = 3
+        max_file_size = 50
+      }
+    }
+    
+    # LLM enhancement task (runs conditionally based on strategy)
+    {% if strategy == "sequential" or strategy == "parallel" %}
+    task "llm-enhancement" {
+      driver = "exec"
+      
+      {% if strategy == "sequential" %}
+      # Sequential: wait for OpenRewrite to complete
+      lifecycle {
+        hook = "poststart"
+        sidecar = false
+      }
+      {% endif %}
+      
+      config {
+        command = "/usr/local/bin/arf-llm-enhancer"
+        args = [
+          "--base-result", "/shared/openrewrite-result.tar.gz",
+          "--context", "/local/llm-context.json",
+          "--model", "{{ llm_model | default('gpt-4') }}",
+          "--temperature", "{{ llm_temperature | default('0.1') }}",
+          "--output", "/shared/llm-enhanced-result.tar.gz",
+          "--confidence-threshold", "{{ confidence_threshold | default('0.7') }}"
+        ]
+      }
+      
+      # LLM enhancement resource requirements  
+      resources {
+        cpu    = {{ llm_cpu | default(1000) }}
+        memory = {{ llm_memory | default(2048) }}
+        disk   = {{ llm_disk | default(5120) }}
+      }
+      
+      # Mount shared workspace
+      volume_mount {
+        volume      = "shared-workspace"
+        destination = "/shared"
+        read_only   = false
+      }
+      
+      # LLM context configuration
+      template {
+        data = <<-EOH
+{
+  "transformation_id": "{{ transformation_id }}",
+  "language": "{{ language }}",
+  "framework": "{{ framework }}",
+  "error_context": {{ error_context | to_json }},
+  "codebase_context": {{ codebase_context | to_json }},
+  "similar_patterns": {{ similar_patterns | to_json }},
+  "constraints": {{ constraints | to_json }},
+  "enhancement_mode": "{{ enhancement_mode | default('PostProcessing') }}",
+  "llm_provider": "{{ llm_provider | default('openai') }}"
+}
+        EOH
+        destination = "local/llm-context.json"
+        change_mode = "noop"
+      }
+      
+      # Environment variables for LLM
+      env {
+        LLM_API_KEY = "{{ llm_api_key }}"
+        LLM_MODEL = "{{ llm_model | default('gpt-4') }}"
+        LLM_MAX_TOKENS = "{{ llm_max_tokens | default('2048') }}"
+        LLM_TIMEOUT = "{{ llm_timeout | default('30s') }}"
+        CACHE_ENABLED = "{{ cache_enabled | default('true') }}"
+        CACHE_TTL = "{{ cache_ttl | default('24h') }}"
+        TRANSFORMATION_ID = "{{ transformation_id }}"
+        STAGE = "enhancement"
+      }
+      
+      # LLM service registration
+      service {
+        name = "arf-llm-{{ transformation_id }}"
+        
+        meta {
+          transformation-id = "{{ transformation_id }}"
+          stage = "enhancement"
+          model = "{{ llm_model | default('gpt-4') }}"
+        }
+      }
+      
+      # Logs configuration
+      logs {
+        max_files     = 2
+        max_file_size = 25
+      }
+    }
+    {% endif %}
+    
+    # Tree-sitter AST analysis task (optional for multi-language support)
+    {% if enable_tree_sitter %}
+    task "tree-sitter-analysis" {
+      driver = "exec"
+      
+      config {
+        command = "/usr/local/bin/arf-tree-sitter-analyzer"
+        args = [
+          "--repository", "/input/repository.tar.gz",
+          "--language", "{{ language }}",
+          "--parser", "{{ ast_parser }}",
+          "--output", "/shared/ast-analysis.json",
+          "--symbols", "true",
+          "--imports", "true"
+        ]
+      }
+      
+      # Tree-sitter resource requirements
+      resources {
+        cpu    = {{ tree_sitter_cpu | default(500) }}
+        memory = {{ tree_sitter_memory | default(1024) }}
+        disk   = {{ tree_sitter_disk | default(2048) }}
+      }
+      
+      # Mount shared workspace
+      volume_mount {
+        volume      = "shared-workspace"
+        destination = "/shared"
+        read_only   = false
+      }
+      
+      # Environment for tree-sitter
+      env {
+        TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
+        NODE_PATH = "/usr/local/lib/node_modules"
+        TRANSFORMATION_ID = "{{ transformation_id }}"
+        STAGE = "ast-analysis"
+      }
+      
+      # Tree-sitter service
+      service {
+        name = "arf-tree-sitter-{{ transformation_id }}"
+        
+        meta {
+          transformation-id = "{{ transformation_id }}"
+          language = "{{ language }}"
+          parser = "{{ ast_parser }}"
+        }
+      }
+    }
+    {% endif %}
+    
+    # Validation and integration task
+    task "validator-integrator" {
+      driver = "jail"
+      
+      # Run after all other tasks complete
+      lifecycle {
+        hook = "poststart"
+        sidecar = false
+      }
+      
+      config {
+        path = "/zroot/jails/arf-validator-{{ transformation_id }}"
+        command = "/usr/local/bin/arf-validator-integrator"
+        args = [
+          "--strategy", "{{ strategy }}",
+          "--openrewrite-result", "/shared/openrewrite-result.tar.gz",
+          {% if strategy == "sequential" or strategy == "parallel" %}
+          "--llm-result", "/shared/llm-enhanced-result.tar.gz",
+          {% endif %}
+          {% if enable_tree_sitter %}
+          "--ast-analysis", "/shared/ast-analysis.json",
+          {% endif %}
+          "--validation-suite", "/local/validation.yaml",
+          "--output", "/output/final-result.tar.gz",
+          "--report", "/output/transformation-report.json",
+          "--confidence-threshold", "{{ final_confidence_threshold | default('0.8') }}"
+        ]
+      }
+      
+      # Validation resource requirements
+      resources {
+        cpu    = {{ validator_cpu | default(1000) }}
+        memory = {{ validator_memory | default(2048) }}
+        disk   = {{ validator_disk | default(5120) }}
+      }
+      
+      # Mount shared workspace and output
+      volume_mount {
+        volume      = "shared-workspace"
+        destination = "/shared"
+        read_only   = true
+      }
+      
+      # Validation configuration
+      template {
+        data = <<-EOH
+validation:
+  syntax_check: {{ syntax_check | default(true) }}
+  compilation_check: {{ compilation_check | default(true) }}
+  test_execution: {{ test_execution | default(false) }}
+  security_scan: {{ security_scan | default(true) }}
+  
+  thresholds:
+    min_confidence: {{ min_confidence | default(0.7) }}
+    max_warnings: {{ max_warnings | default(5) }}
+    max_errors: {{ max_errors | default(0) }}
+  
+  integration:
+    combine_strategy: "{{ combine_strategy | default('best_confidence') }}"
+    fallback_to_openrewrite: {{ fallback_to_openrewrite | default(true) }}
+    preserve_original: {{ preserve_original | default(true) }}
+        EOH
+        destination = "local/validation.yaml"
+        change_mode = "noop"
+      }
+      
+      # Environment for validator
+      env {
+        TRANSFORMATION_ID = "{{ transformation_id }}"
+        STRATEGY = "{{ strategy }}"
+        LANGUAGE = "{{ language }}"
+        FRAMEWORK = "{{ framework }}"
+        STAGE = "validation"
+      }
+      
+      # Final result upload
+      artifact {
+        source = "output/"
+        destination = "{{ result_destination }}"
+        mode = "dir"
+      }
+      
+      # Validation service
+      service {
+        name = "arf-validator-{{ transformation_id }}"
+        
+        meta {
+          transformation-id = "{{ transformation_id }}"
+          stage = "validation"
+          strategy = "{{ strategy }}"
+          final-step = "true"
+        }
+      }
+    }
+  }
+  
+  # Parameterized job configuration
+  parameterized {
+    payload       = "optional"
+    meta_required = ["transformation_id", "strategy", "language"]
+    meta_optional = ["framework", "llm_model", "timeout"]
+  }
+  
+  # Job metadata
+  meta {
+    version = "{{ job_version | default('1.0.0') }}"
+    arf_phase = "3"
+    transformation_type = "hybrid_llm"
+    created_by = "arf-controller"
+    created_at = "{{ ansible_date_time.iso8601 }}"
+  }
+}
