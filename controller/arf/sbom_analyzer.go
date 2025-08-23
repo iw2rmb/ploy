@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -164,9 +163,9 @@ type SyftSBOM struct {
 func NewSyftSBOMAnalyzer() *SyftSBOMAnalyzer {
 	return &SyftSBOMAnalyzer{
 		cveDatabase:      NewNVDDatabase(),
-		vulnerabilityDB:  NewOSVDatabase(),
-		licenseAnalyzer:  NewSPDXLicenseAnalyzer(),
-		riskCalculator:   NewCVSSRiskCalculator(),
+		vulnerabilityDB:  nil, // OSV database integration placeholder
+		licenseAnalyzer:  nil, // SPDX license analyzer placeholder
+		riskCalculator:   nil, // CVSS risk calculator placeholder
 	}
 }
 

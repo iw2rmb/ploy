@@ -13,7 +13,7 @@ import (
 type RecipeEvolution interface {
 	AnalyzeFailure(ctx context.Context, failure TransformationFailure) (*FailureAnalysis, error)
 	EvolveRecipe(ctx context.Context, recipe Recipe, analysis FailureAnalysis) (*Recipe, error)
-	ValidateEvolution(ctx context.Context, original, evolved Recipe) (*ValidationResult, error)
+	ValidateEvolution(ctx context.Context, original, evolved Recipe) (*EvolutionValidationResult, error)
 	RollbackRecipe(ctx context.Context, recipeID string, version int) error
 }
 
@@ -82,18 +82,18 @@ type TransformationFailure struct {
 	OperationLogs  []string               `json:"operation_logs,omitempty"`
 }
 
-// ValidationResult contains the results of recipe evolution validation
-type ValidationResult struct {
+// EvolutionValidationResult contains the results of recipe evolution validation
+type EvolutionValidationResult struct {
 	Valid           bool                   `json:"valid"`
 	SafetyScore     float64                `json:"safety_score"`
 	Warnings        []string               `json:"warnings"`
 	CriticalIssues  []string               `json:"critical_issues"`
-	TestResults     []ValidationTest       `json:"test_results"`
+	TestResults     []EvolutionValidationTest       `json:"test_results"`
 	RecommendAction ValidationAction       `json:"recommend_action"`
 }
 
-// ValidationTest represents a specific validation check
-type ValidationTest struct {
+// EvolutionValidationTest represents a specific validation check
+type EvolutionValidationTest struct {
 	Name        string    `json:"name"`
 	Status      string    `json:"status"`
 	Description string    `json:"description"`
@@ -120,7 +120,7 @@ type RecipeVersion struct {
 	CreatedAt     time.Time              `json:"created_at"`
 	CreatedBy     string                 `json:"created_by"`
 	Rollbackable  bool                   `json:"rollbackable"`
-	TestResults   *ValidationResult      `json:"test_results,omitempty"`
+	TestResults   *EvolutionValidationResult      `json:"test_results,omitempty"`
 }
 
 // convertStringMap converts map[string]string to map[string]interface{}
@@ -699,18 +699,18 @@ func (re *DefaultRecipeEvolution) appendToOptionArray(recipe Recipe, key, value 
 }
 
 // ValidateEvolution validates that an evolved recipe is safe to use
-func (re *DefaultRecipeEvolution) ValidateEvolution(ctx context.Context, original, evolved Recipe) (*ValidationResult, error) {
-	result := &ValidationResult{
+func (re *DefaultRecipeEvolution) ValidateEvolution(ctx context.Context, original, evolved Recipe) (*EvolutionValidationResult, error) {
+	result := &EvolutionValidationResult{
 		Valid:       true,
 		SafetyScore: 1.0,
 		Warnings:    []string{},
 		CriticalIssues: []string{},
-		TestResults: []ValidationTest{},
+		TestResults: []EvolutionValidationTest{},
 		RecommendAction: ActionApprove,
 	}
 
 	// Validate confidence change
-	confidenceTest := ValidationTest{
+	confidenceTest := EvolutionValidationTest{
 		Name:        "confidence_validation",
 		Description: "Check if evolved recipe maintains reasonable confidence",
 		Runtime:     10 * time.Millisecond,
@@ -735,7 +735,7 @@ func (re *DefaultRecipeEvolution) ValidateEvolution(ctx context.Context, origina
 	result.TestResults = append(result.TestResults, confidenceTest)
 
 	// Validate evolution options
-	optionsTest := ValidationTest{
+	optionsTest := EvolutionValidationTest{
 		Name:        "options_validation",
 		Description: "Validate evolved recipe options",
 		Runtime:     5 * time.Millisecond,

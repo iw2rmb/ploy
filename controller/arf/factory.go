@@ -211,13 +211,13 @@ func (m *mockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGen
 	}, nil
 }
 
-func (m *mockLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*ValidationResult, error) {
-	return &ValidationResult{
+func (m *mockLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
+	return &EvolutionValidationResult{
 		Valid:          true,
 		SafetyScore:    1.0,
 		Warnings:       []string{},
 		CriticalIssues: []string{},
-		TestResults:    []ValidationTest{},
+		TestResults:    []EvolutionValidationTest{},
 	}, nil
 }
 

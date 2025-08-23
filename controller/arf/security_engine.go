@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -143,15 +141,7 @@ type ValidationCriteria struct {
 	SuccessRate float64          `json:"required_success_rate"`
 }
 
-// ValidationTest represents a single validation test
-type ValidationTest struct {
-	Type        string                 `json:"type"`
-	Command     string                 `json:"command,omitempty"`
-	Expected    interface{}            `json:"expected"`
-	Description string                 `json:"description"`
-	Critical    bool                   `json:"critical"`
-	Parameters  map[string]interface{} `json:"parameters"`
-}
+// ValidationTest type is defined in shared_types.go
 
 // RollbackStrategy defines how to roll back failed remediations
 type RollbackStrategy struct {
@@ -169,14 +159,7 @@ type RollbackStep struct {
 	Order       int                    `json:"order"`
 }
 
-// EstimatedEffort represents the effort required for remediation
-type EstimatedEffort struct {
-	Level       string        `json:"level"` // low, medium, high, critical
-	TimeMinutes int           `json:"estimated_minutes"`
-	Complexity  int           `json:"complexity_score"` // 1-10
-	Risk        string        `json:"risk_level"`
-	Resources   []string      `json:"required_resources"`
-}
+// EstimatedEffort type is defined in shared_types.go
 
 // ExploitabilityInfo provides information about exploit potential
 type ExploitabilityInfo struct {
@@ -224,15 +207,7 @@ type VulnerabilityInfo struct {
 	Discovery       VulnerabilityDiscovery `json:"discovery"`
 }
 
-// Dependency represents a software dependency
-type Dependency struct {
-	Name      string            `json:"name"`
-	Version   string            `json:"version"`
-	Ecosystem string            `json:"ecosystem"`
-	Type      string            `json:"type"`
-	Path      string            `json:"path,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata"`
-}
+// Dependency type is defined in shared_types.go
 
 // SecurityContext provides context for security analysis
 type SecurityContext struct {
@@ -252,63 +227,7 @@ type VulnerabilityDiscovery struct {
 	Source      string    `json:"source"`
 }
 
-// RiskAssessment represents overall security risk assessment
-type RiskAssessment struct {
-	OverallRisk      string                    `json:"overall_risk"`
-	RiskScore        float64                   `json:"risk_score"`
-	CriticalCount    int                       `json:"critical_count"`
-	HighCount        int                       `json:"high_count"`
-	MediumCount      int                       `json:"medium_count"`
-	LowCount         int                       `json:"low_count"`
-	Recommendations  []SecurityRecommendation  `json:"recommendations"`
-	Timeline         RemediationTimeline       `json:"timeline"`
-	ComplianceStatus ComplianceStatus          `json:"compliance"`
-}
-
-// SecurityRecommendation represents an actionable security recommendation
-type SecurityRecommendation struct {
-	Priority    int             `json:"priority"`
-	Category    string          `json:"category"`
-	Title       string          `json:"title"`
-	Description string          `json:"description"`
-	Action      string          `json:"action"`
-	Impact      string          `json:"impact"`
-	Effort      EstimatedEffort `json:"effort"`
-	Urgency     string          `json:"urgency"`
-}
-
-// RemediationTimeline provides timeline for addressing vulnerabilities
-type RemediationTimeline struct {
-	Immediate []string `json:"immediate"` // < 24 hours
-	Short     []string `json:"short_term"` // < 1 week
-	Medium    []string `json:"medium_term"` // < 1 month
-	Long      []string `json:"long_term"` // > 1 month
-}
-
-// ComplianceStatus tracks compliance with security frameworks
-type ComplianceStatus struct {
-	Frameworks map[string]FrameworkCompliance `json:"frameworks"`
-	Overall    string                         `json:"overall_status"`
-	Issues     []ComplianceIssue              `json:"issues"`
-}
-
-// FrameworkCompliance represents compliance with a specific framework
-type FrameworkCompliance struct {
-	Name        string  `json:"name"`
-	Version     string  `json:"version"`
-	Score       float64 `json:"score"`
-	Status      string  `json:"status"`
-	Requirements map[string]bool `json:"requirements"`
-}
-
-// ComplianceIssue represents a compliance-related issue
-type ComplianceIssue struct {
-	Framework   string   `json:"framework"`
-	Requirement string   `json:"requirement"`
-	Description string   `json:"description"`
-	Severity    string   `json:"severity"`
-	Actions     []string `json:"required_actions"`
-}
+// RiskAssessment and related types are defined in shared_types.go
 
 // VulnerabilityPriority represents prioritized vulnerability information
 type VulnerabilityPriority struct {
@@ -363,15 +282,7 @@ type RemediationResult struct {
 	RollbackRequired bool                   `json:"rollback_required"`
 }
 
-// ValidationResult represents the outcome of a validation test
-type ValidationResult struct {
-	Test        ValidationTest `json:"test"`
-	Success     bool           `json:"success"`
-	Output      string         `json:"output"`
-	Error       string         `json:"error,omitempty"`
-	Duration    time.Duration  `json:"duration"`
-	Critical    bool           `json:"critical"`
-}
+// ValidationResult type is defined in shared_types.go
 
 // ChangeSummary summarizes changes made during remediation
 type ChangeSummary struct {
@@ -441,7 +352,7 @@ func NewSecurityEngine() *SecurityEngine {
 		grypePath:    "grype",
 		cveDatabase:  NewNVDDatabase(),
 		remediator:   NewOpenRewriteRemediator(),
-		riskAnalyzer: NewCVSSRiskAnalyzer(),
+		riskAnalyzer: nil, // CVSS risk analyzer placeholder
 		sbomAnalyzer: NewSyftSBOMAnalyzer(),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
