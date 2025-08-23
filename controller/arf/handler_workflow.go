@@ -34,7 +34,7 @@ func (h *Handler) CreateWorkflow(c *fiber.Ctx) error {
 	// Validate required fields
 	if req.Type == "" && req.Title == "" {
 		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid request: type or title is required",
+			"error": "Invalid request",
 		})
 	}
 
