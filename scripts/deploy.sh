@@ -97,6 +97,36 @@ get_git_version() {
     echo ""
 }
 
+# Function to clean up existing deployment
+cleanup_deployment() {
+    echo -e "${YELLOW}Cleaning up existing controller deployment...${NC}"
+    
+    # Stop existing controller job if running
+    if nomad job status ploy-controller >/dev/null 2>&1; then
+        echo -e "${YELLOW}Stopping existing controller job...${NC}"
+        nomad job stop ploy-controller >/dev/null 2>&1
+        
+        # Wait for job to be fully stopped
+        local max_wait=30
+        local wait_count=0
+        while [ $wait_count -lt $max_wait ]; do
+            if nomad job status ploy-controller 2>/dev/null | grep -q "Status.*dead"; then
+                echo -e "${GREEN}✓ Controller job stopped successfully${NC}"
+                break
+            fi
+            sleep 1
+            wait_count=$((wait_count + 1))
+        done
+        
+        if [ $wait_count -ge $max_wait ]; then
+            echo -e "${YELLOW}⚠ Controller job stop timeout, proceeding with deployment${NC}"
+        fi
+    else
+        echo -e "${GREEN}✓ No existing controller job found${NC}"
+    fi
+    echo ""
+}
+
 # Function to pull branch
 pull_branch() {
     echo -e "${YELLOW}Updating repository to branch '$BRANCH'...${NC}"
@@ -228,19 +258,19 @@ job "ploy-controller" {
     restart {
       attempts = 3
       interval = "5m"
-      delay = "15s"
+      delay = "30s"
       mode = "delay"
     }
     
     update {
       max_parallel = 1
-      min_healthy_time = "30s"
-      healthy_deadline = "5m"
-      progress_deadline = "10m"
+      min_healthy_time = "60s"
+      healthy_deadline = "10m"
+      progress_deadline = "15m"
       auto_revert = true
       auto_promote = false
       canary = 0
-      stagger = "30s"
+      stagger = "45s"
       health_check = "checks"
     }
     
@@ -258,14 +288,14 @@ job "ploy-controller" {
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-controller.rule=Host(\`api.dev.ployd.app\`) || Host(\`api.ployd.app\`)",
-        "traefik.http.routers.ploy-controller.tls=true",
-        "traefik.http.routers.ploy-controller.tls.certresolver=dev-wildcard",
-        "traefik.http.routers.ploy-controller.tls.domains[0].main=dev.ployd.app",
-        "traefik.http.routers.ploy-controller.tls.domains[0].sans=*.dev.ployd.app",
-        "traefik.http.services.ploy-controller.loadbalancer.server.scheme=http",
-        "traefik.http.services.ploy-controller.loadbalancer.healthcheck.path=/health",
-        "traefik.http.services.ploy-controller.loadbalancer.healthcheck.interval=10s",
+        "traefik.http.routers.ploy-controller-dynamic.rule=Host(\`api.dev.ployd.app\`) || Host(\`api.ployd.app\`)",
+        "traefik.http.routers.ploy-controller-dynamic.tls=true",
+        "traefik.http.routers.ploy-controller-dynamic.tls.certresolver=dev-wildcard",
+        "traefik.http.routers.ploy-controller-dynamic.tls.domains[0].main=dev.ployd.app",
+        "traefik.http.routers.ploy-controller-dynamic.tls.domains[0].sans=*.dev.ployd.app",
+        "traefik.http.services.ploy-controller-dynamic.loadbalancer.server.scheme=http",
+        "traefik.http.services.ploy-controller-dynamic.loadbalancer.healthcheck.path=/health",
+        "traefik.http.services.ploy-controller-dynamic.loadbalancer.healthcheck.interval=15s",
         "blue-green.deployment=true",
         "blue-green.weight=100",
         "\${NOMAD_ALLOC_ID}"
@@ -287,14 +317,14 @@ job "ploy-controller" {
         type = "http"
         path = "/health"
         port = "http"
-        interval = "10s"
-        timeout = "5s"
-        success_before_passing = 3
-        failures_before_critical = 2
+        interval = "15s"
+        timeout = "10s"
+        success_before_passing = 1
+        failures_before_critical = 3
         
         check_restart {
-          limit = 2
-          grace = "20s"
+          limit = 3
+          grace = "30s"
           ignore_warnings = false
         }
       }
@@ -304,10 +334,10 @@ job "ploy-controller" {
         type = "http"
         path = "/ready"
         port = "http"
-        interval = "10s"
-        timeout = "10s"
-        success_before_passing = 3
-        failures_before_critical = 2
+        interval = "20s"
+        timeout = "15s"
+        success_before_passing = 1
+        failures_before_critical = 3
       }
       
       check {
@@ -316,7 +346,7 @@ job "ploy-controller" {
         path = "/live"
         port = "http"
         interval = "30s"
-        timeout = "3s"
+        timeout = "5s"
         success_before_passing = 1
         failures_before_critical = 5
       }
@@ -571,25 +601,28 @@ verify_deployment() {
 echo -e "${BLUE}Starting Git-native deployment...${NC}"
 echo ""
 
-# Step 1: Pull the specified branch
+# Step 1: Clean up existing deployment
+cleanup_deployment
+
+# Step 2: Pull the specified branch
 pull_branch
 
-# Step 2: Generate Git-based version
+# Step 3: Generate Git-based version
 get_git_version
 
-# Step 3: Build binaries with version injection
+# Step 4: Build binaries with version injection
 build_binaries
 
-# Step 4: Generate checksums
+# Step 5: Generate checksums
 generate_checksums
 
-# Step 5: Upload binaries to SeaweedFS
+# Step 6: Upload binaries to SeaweedFS
 upload_binaries
 
-# Step 6: Create dynamic Nomad job
+# Step 7: Create dynamic Nomad job
 create_nomad_job
 
-# Step 7: Deploy via Nomad
+# Step 8: Deploy via Nomad
 if deploy_nomad; then
     echo -e "${GREEN}✓ Nomad deployment successful${NC}"
 else
@@ -597,7 +630,7 @@ else
     exit 1
 fi
 
-# Step 8: Verify deployment
+# Step 9: Verify deployment
 if verify_deployment; then
     echo -e "${GREEN}✓ Deployment verification successful${NC}"
 else
