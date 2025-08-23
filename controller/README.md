@@ -59,6 +59,22 @@
   - Body: `{"sha": "abc123def456"}`
   - Returns: `{"status": "rolled_back", "app": "myapp", "sha": "abc123def456", "message": "Application rolled back successfully"}`
 
+## Blue-Green Deployment Endpoints (New)
+- `POST /v1/apps/:app/deploy/blue-green` — start blue-green deployment with new version.
+  - Body: `{"version": "v2.0.0"}`
+  - Returns: `{"status": "deployment_started", "message": "Blue-green deployment initiated successfully", "deployment": {"app_name": "myapp", "blue_version": "v1.0.0", "green_version": "v2.0.0", "active_color": "blue", "blue_weight": 100, "green_weight": 0, "status": "deploying"}}`
+- `GET /v1/apps/:app/blue-green/status` — get current blue-green deployment status.
+  - Returns: `{"status": "success", "deployment": {"app_name": "myapp", "blue_version": "v1.0.0", "green_version": "v2.0.0", "active_color": "blue", "blue_weight": 75, "green_weight": 25, "status": "shifting", "last_shift_time": "2025-08-23T10:30:00Z"}}`
+- `POST /v1/apps/:app/blue-green/shift` — manually shift traffic between blue and green.
+  - Body: `{"target_weight": 50}` (0-100, percentage for green version)
+  - Returns: `{"status": "success", "message": "Traffic shifted successfully", "target_weight": 50}`
+- `POST /v1/apps/:app/blue-green/auto-shift` — automatically shift traffic using default strategy (0% → 10% → 25% → 50% → 75% → 100%).
+  - Returns: `{"status": "success", "message": "Automatic traffic shifting started"}`
+- `POST /v1/apps/:app/blue-green/complete` — complete blue-green deployment (make green version 100% active).
+  - Returns: `{"status": "success", "message": "Blue-green deployment completed successfully"}`
+- `POST /v1/apps/:app/blue-green/rollback` — rollback to blue version (revert traffic to previous version).
+  - Returns: `{"status": "success", "message": "Blue-green deployment rolled back successfully"}`
+
 ## Environment Variables Endpoints (Implemented)
 - `POST /v1/apps/:app/env` — set multiple environment variables.
   - Body: `{"NODE_ENV": "production", "DATABASE_URL": "postgres://localhost", "DEBUG": "true"}`

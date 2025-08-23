@@ -18,6 +18,7 @@ func PushCmd(args []string, controllerURL string) {
 	lane := fs.String("lane", "", "lane override (A..F)")
 	main := fs.String("main", "com.ploy.ordersvc.Main", "Java main class for lane C")
 	sha := fs.String("sha", "", "git sha to annotate")
+	bluegreen := fs.Bool("blue-green", false, "use blue-green deployment")
 	fs.Parse(args)
 
 	if *sha == "" {
@@ -26,6 +27,14 @@ func PushCmd(args []string, controllerURL string) {
 		} else {
 			*sha = time.Now().Format("20060102-150405")
 		}
+	}
+
+	// Check if blue-green deployment is requested
+	if *bluegreen {
+		fmt.Printf("🔄 Starting blue-green deployment for %s...\n", *app)
+		fmt.Println("Blue-green deployments are handled via the bluegreen command")
+		fmt.Printf("Use: ploy bluegreen deploy %s %s\n", *app, *sha)
+		return
 	}
 
 	ign, _ := utils.ReadGitignore(".")

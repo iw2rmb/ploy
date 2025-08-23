@@ -38,6 +38,12 @@ Usage:
   ploy certs list
   ploy debug shell <app> [--lane <A-F>]
   ploy rollback <app> <sha>
+  ploy bluegreen deploy <app> <version>
+  ploy bluegreen status <app>
+  ploy bluegreen shift <app> <weight>
+  ploy bluegreen auto-shift <app>
+  ploy bluegreen complete <app>
+  ploy bluegreen rollback <app>
   ploy arf recipe generate --repo <path> --type <type>
   ploy arf transform <path> --recipe <id>
   ploy arf validate <recipe-file>
