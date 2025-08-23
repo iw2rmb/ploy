@@ -172,9 +172,9 @@ func TestExecutionPlanCreation(t *testing.T) {
 			{"repo-a"},
 			{"repo-b", "repo-c"},
 		},
-		Dependencies: []Dependency{
-			{From: "repo-b", To: "repo-a", Critical: true},
-			{From: "repo-c", To: "repo-a", Critical: false},
+		Dependencies: []RepoDependency{
+			{From: "repo-b", To: "repo-a", Critical: true, Type: DependencyLibrary},
+			{From: "repo-c", To: "repo-a", Critical: false, Type: DependencyLibrary},
 		},
 	}
 	
@@ -221,7 +221,7 @@ func TestRiskAssessment(t *testing.T) {
 	lowRiskAnalysis := &DependencyAnalysis{
 		CircularDeps:  [][]string{},
 		CriticalPaths: [][]string{},
-		Dependencies:  []Dependency{{From: "a", To: "b"}},
+		Dependencies:  []RepoDependency{{From: "a", To: "b", Type: DependencyLibrary}},
 	}
 	
 	lowRiskRecipes := []Recipe{
@@ -237,7 +237,7 @@ func TestRiskAssessment(t *testing.T) {
 	highRiskAnalysis := &DependencyAnalysis{
 		CircularDeps:  [][]string{{"a", "b", "a"}},
 		CriticalPaths: [][]string{{"a", "b", "c"}},
-		Dependencies: make([]Dependency, 20), // Many dependencies
+		Dependencies: make([]RepoDependency, 20), // Many dependencies
 	}
 	
 	highRiskRecipes := []Recipe{
@@ -481,9 +481,9 @@ func TestCriticalPathIdentification(t *testing.T) {
 		"repo-c": {},
 	}
 	
-	dependencies := []Dependency{
-		{From: "repo-a", To: "repo-b", Critical: true},
-		{From: "repo-b", To: "repo-c", Critical: true},
+	dependencies := []RepoDependency{
+		{From: "repo-a", To: "repo-b", Critical: true, Type: DependencyLibrary},
+		{From: "repo-b", To: "repo-c", Critical: true, Type: DependencyLibrary},
 	}
 	
 	paths := orchestrator.identifyCriticalPaths(graph, dependencies)

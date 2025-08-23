@@ -4,9 +4,27 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 This file must be followed for every prompt execution.
 
+## Core Testing Principles
+
+**CRITICAL TESTING RULE**: Claude Code must ONLY perform build testing locally. All other testing MUST be performed on VPS.
+
+### Local Testing (Claude Code Environment)
+- **BUILD COMPILATION ONLY**: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy`
+- **SYNTAX VERIFICATION**: Static analysis, imports, basic compilation checks
+- **FILE STRUCTURE**: Ensure files exist and are properly organized
+- **NO RUNTIME TESTING**: Never start servers, execute binaries, or run functional tests locally
+
+### VPS Testing (Production Environment)
+- **ALL FUNCTIONAL TESTING**: API endpoints, CLI commands, integration tests
+- **RUNTIME VALIDATION**: Controller startup, service deployment, full workflows
+- **INFRASTRUCTURE TESTING**: Nomad, Consul, storage, networking
+- **END-TO-END SCENARIOS**: Complete user journeys and system interactions
+
+**Rationale**: Local Claude Code environment lacks the full infrastructure stack (Nomad, Consul, storage) required for meaningful functional testing. Only VPS provides the complete production-like environment needed for validation.
+
 ## Project Overview
 
-Ploy deploys applications via optimized "lanes" (A-F) for performance and footprint:
+Ploy deploys applications via optimized "lanes" (A-G) for performance and footprint:
 - **Lane A/B**: Unikraft-based unikernels (1-40MB, microsecond boot)
 - **Lane C**: OSv/Hermit VMs for JVM/.NET (50-200MB)
 - **Lane D**: FreeBSD jails for native apps
@@ -58,81 +76,94 @@ Example: feature changes must update FEATURES.md.
 - Read: complete file contents
 
 ## Testing Requirements
-**CRITICAL**: For any code changes to Ploy:
-- Use VPS testing environment in `iac/dev/`
-- SSH to VPS and run relevant test scenarios from TESTS.md
-- Test on both Linux host and FreeBSD VM as appropriate
-- Verify changes work in full stack (controller + CLI + Nomad)
-- Required test categories based on change type:
-  - Lane detection changes: Run lane-detection tests
-  - API changes: Run API and build-pipeline tests  
-  - CLI changes: Run CLI and integration tests
-  - FreeBSD features: Test on FreeBSD VM (jails, bhyve)
-  - Self-healing features: Run webhook tests
 
-Setup: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
-Test: `ssh root@$TARGET_HOST && su - ploy && ./test-scripts/test-*.sh`
+**CRITICAL VPS-ONLY TESTING RULE**: All runtime and functional testing MUST be performed on VPS. Local testing is LIMITED to build compilation only. Claude Code CAN and SHOULD connect to VPS via SSH to execute functional tests.
+
+### VPS Testing Environment Requirements
+- **Mandatory VPS Testing**: Use VPS testing environment in `iac/dev/` for ALL functional validation
+- **Full Stack Testing**: Test complete system (controller + CLI + Nomad + Consul + storage)
+- **Infrastructure Dependencies**: Only VPS provides the complete production-like infrastructure stack
+- **Required test categories based on change type**:
+  - Lane detection changes: Run lane-detection tests on VPS
+  - API changes: Run API and build-pipeline tests on VPS
+  - CLI changes: Run CLI and integration tests on VPS
+  - FreeBSD features: Test on FreeBSD VM (jails, bhyve) on VPS
+  - Self-healing features: Run webhook tests on VPS
+
+### VPS Setup and Access Protocol
+**Setup**: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
+
+**Claude Code VPS Testing**: Claude Code MUST use SSH to connect to VPS for all functional testing:
+```bash
+ssh root@$TARGET_HOST "su - ploy -c 'command'"
+# or
+ssh root@$TARGET_HOST
+su - ploy
+./test-scripts/test-*.sh
+```
 
 **VPS Access Protocol**: 
-- Always connect to VPS as root user: `ssh root@$TARGET_HOST`
-- Switch to ploy user for all operations: `su - ploy -c 'command'` or `su - ploy` then execute commands
+- Claude Code connects to VPS as root user: `ssh root@$TARGET_HOST`
+- Always switch to ploy user for all operations: `su - ploy -c 'command'` or interactive `su - ploy`
 - The ploy user owns the repository and has proper permissions for testing and execution
 - Always use `$TARGET_HOST` environment variable instead of hardcoded IP addresses
+- Claude Code can and should execute VPS commands remotely via SSH
+
+**Why VPS Testing is Mandatory**:
+- **Complete Infrastructure Stack**: VPS provides Nomad, Consul, SeaweedFS, and networking required for realistic testing
+- **Production Parity**: VPS environment mirrors production deployment architecture
+- **System Integration**: Only VPS can validate end-to-end workflows and component interactions
+- **Resource Constraints**: Local Claude Code environment cannot replicate production resource allocation and limits
 
 ## Development Commands
 
-### Controller (Backend API) - Local Testing Only
-**Note:** Direct controller execution is for local development only. On VPS, use Nomad deployment.
+### Local Build Commands (Claude Code Environment)
+**ONLY build compilation allowed locally. NO runtime execution.**
 
 ```bash
-# LOCAL DEVELOPMENT ONLY - Build with version injection and start the controller
-VERSION="dev-$(date +%Y%m%d-%H%M%S)"
-go build -ldflags "-X github.com/iw2rmb/ploy/controller/selfupdate.BuildVersion=$VERSION" -o build/controller ./controller
-./build/controller
-
-# LOCAL DEVELOPMENT ONLY - Or run directly for development (without version injection)
-go run ./controller
-
-# LOCAL DEVELOPMENT ONLY - Start with custom config
-PLOY_STORAGE_CONFIG=path/to/config.yaml ./build/controller
-
-# LOCAL DEVELOPMENT ONLY - Start on different port
-PORT=8082 ./build/controller
-```
-
-**For VPS/Production Testing:**
-```bash
-# Build controller binary
+# Build controller binary (compilation test only)
 go build -o build/controller ./controller
 
+# Build CLI binary (compilation test only)
+go build -o build/ploy ./cmd/ploy
+
+# Build with version injection (compilation test only)
+VERSION="dev-$(date +%Y%m%d-%H%M%S)"
+go build -ldflags "-X github.com/iw2rmb/ploy/controller/selfupdate.BuildVersion=$VERSION" -o build/controller ./controller
+```
+
+**PROHIBITED in Claude Code Environment:**
+```bash
+# ❌ DO NOT execute binaries locally
+./build/controller
+go run ./controller
+PORT=8082 ./build/controller
+
+# ❌ DO NOT run test scripts locally
+./test-scripts/test-*.sh
+
+# ❌ DO NOT start services locally
+nomad job run platform/nomad/ploy-controller-simple.hcl
+```
+
+### VPS Runtime Commands (Production Environment)
+**ALL runtime testing must be performed on VPS.**
+
+```bash
 # Deploy via Nomad (production method)
 nomad job run platform/nomad/ploy-controller-simple.hcl
 
 # Check deployment status
 nomad job status ploy-controller-simple
+
+# Run test scripts
+./test-scripts/test-arf-phase4-security.sh
+
+# CLI testing
+./build/ploy apps new --lang go --name test-app
+./build/ploy push -a test-app
 ```
 
-### CLI Tool
-```bash
-# Build the CLI to build/ folder (default binary location)
-go build -o build/ploy ./cmd/ploy
-
-# Run CLI from build folder
-./build/ploy apps new --lang go --name myapp
-./build/ploy apps new --lang node --name myapp
-
-# Deploy app (auto lane-pick)
-./build/ploy push -a myapp
-
-# Deploy with specific lane
-./build/ploy push -a myapp -lane B
-
-# Deploy Java app with custom main class
-./build/ploy push -a myapp -lane C -main com.example.CustomMain
-
-# Open deployed app
-./build/ploy open myapp
-```
 
 ## Repository Structure
 
@@ -175,43 +206,86 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 
 5. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
 
-6. **Local Testing**: Execute relevant tests in local environment
-    - **Compilation Check**: ALWAYS build both controller and CLI locally to verify compilation before any VPS deployment:
+6. **Local Build Verification**: Execute ONLY compilation testing in local environment
+    - **MANDATORY Compilation Check**: ALWAYS build both controller and CLI locally to verify compilation before any VPS deployment:
       ```bash
       go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy
       ```
-    - **Local Build Verification**: If compilation fails locally, DO NOT proceed to VPS testing
-    - Run local validation tests to verify changes work correctly
-    - Ensure all syntax checks and basic functionality tests pass
-    - Test locally with environment variables when applicable:
-      ```bash
-      PORT=8081 ./build/controller  # Test controller locally
-      ./build/ploy apps new --lang go --name test-app  # Test CLI locally
-      ```
+    - **Build Failure Protocol**: If compilation fails locally, DO NOT proceed to VPS testing
+    - **PROHIBITED Local Activities**: 
+      - ❌ DO NOT execute binaries locally (`./build/controller`, `./build/ploy`)
+      - ❌ DO NOT run test scripts locally (`./test-scripts/test-*.sh`)
+      - ❌ DO NOT start services locally (`go run ./controller`)
+    - **Syntax and Import Validation**: Ensure Go modules, imports, and basic syntax are correct
+    - **File Structure Verification**: Confirm all required files exist and are properly organized
     - Push feature branch to GitHub only after local builds succeed
 
-7. **VPS Testing**: Execute ALL relevant tests on VPS environment
-    - **Comprehensive Deployment**: Deploy using automated script: `./scripts/deploy.sh <branch>`
-      - Automatically pulls feature branch to VPS
-      - Generates test version number on the fly (`test-YYYYMMDD-HHMMSS`)
-      - Updates CONTROLLER_VERSION temporarily in Nomad job file
-      - Builds both CLI and controller for comprehensive testing
-      - Calculates and updates checksum in Nomad job file
-      - Uploads binary to SeaweedFS
-      - Verifies binary distribution
-      - Deploys via Nomad with monitoring
-      - Test controller functionality after deployment
-    - Run comprehensive tests on VPS environment to validate changes work in production setup
+7. **VPS Runtime Testing**: Execute ALL functional and integration tests on VPS environment ONLY
+    - **MANDATORY VPS Testing**: All runtime validation must occur on VPS with full infrastructure stack
+    - **Streamlined Deployment Options** (choose one):
+      
+      **Option A: Automated Git-Based Deployment** (Preferred):
+      ```bash
+      # Deploy using Git-based automated script with native versioning
+      ./scripts/deploy.sh <branch>
+      ```
+      - Automatically generates Git-based version: `{branch}-{git-describe}-{timestamp}`
+      - Builds both CLI and controller with version injection via ldflags
+      - Creates dynamic Nomad job configuration (no manual file editing)
+      - Uploads binary to SeaweedFS with versioned artifact URLs
+      - Deploys via templated Nomad configuration
+      - Monitors deployment progress and health checks
+      
+      **Option B: Controller Self-Update Endpoint** (For existing deployments):
+      ```bash
+      # Update to latest version
+      curl -X POST https://api.dev.ployd.app/v1/controller/update/latest
+      
+      # Update to specific branch
+      curl -X POST https://api.dev.ployd.app/v1/controller/update/branch/main
+      
+      # Git-based deployment with custom parameters
+      curl -X POST https://api.dev.ployd.app/v1/controller/deploy/git \
+           -d '{"branch": "feature-branch", "strategy": "rolling", "force": false}'
+      ```
+      - Uses Git metadata for version tracking and deployment coordination
+      - Supports rolling updates, blue-green, and emergency deployment strategies  
+      - Includes validation, health checks, and automatic rollback capabilities
+      - Provides deployment status monitoring via `/v1/controller/update/status`
+      
+    - **Deployment Verification**: Confirm successful deployment using diagnostic tools:
+      ```bash
+      # Run SSL/DNS diagnostics
+      ./scripts/diagnose-ssl.sh
+      
+      # Check controller version and Git metadata  
+      curl https://api.dev.ployd.app/v1/controller/version
+      
+      # Monitor update status if using self-update endpoint
+      curl https://api.dev.ployd.app/v1/controller/update/status
+      ```
+    
+    - **Full Stack Validation**: Test controller functionality, API endpoints, CLI commands, and integration workflows
+    - **Infrastructure Testing**: Validate Nomad deployment, Consul coordination, storage operations
+    - **End-to-End Scenarios**: Run comprehensive test suites from `test-scripts/` directory
 
-8. **Error Resolution**: IF any tests fail:
+8. **Error Resolution**: IF any VPS tests fail:
     - Fix identified errors in local environment
-    - Re-run local tests to verify fixes
-    - Push corrections to feature branch
+    - Re-run local build compilation to verify fixes
+    - Push corrections to feature branch  
     - Re-execute VPS tests until all pass (each run generates a new test version)
 
-9. **Version Commit**: IF all tests pass successfully:
-    - **Commit Test Version**: Commit the successful test version to feature branch: `git add platform/nomad/ploy-controller.hcl && git commit -m "Update controller version after successful testing"`
-    - Push the version update to GitHub
+9. **Success Confirmation**: IF all tests pass successfully:
+    - **Git-Based Version Management**: No manual version commits needed - versions are automatically generated from Git metadata
+    - **Deployment Success Verification**: 
+      ```bash
+      # Verify successful deployment and version
+      curl https://api.dev.ployd.app/v1/controller/version
+      
+      # Check that Git metadata matches expected values
+      curl https://api.dev.ployd.app/v1/controller/update/available
+      ```
+    - **Feature Branch Ready**: Feature branch is validated and ready for merge to main
 
 10. **Documentation and Completion**: Complete documentation updates:
     - **roadmap/README.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in roadmap/README.md
@@ -250,8 +324,8 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 
 **MUP Agent Alignment**: When following Mandatory Update Protocol:
 - **Step 4-5** (Test Scenarios/Implementation): Use `ploy-testing-coordinator` for comprehensive test development
-- **Step 6** (Local Testing): Use domain-specific agents (e.g., `ploy-api-developer` for API changes)
-- **Step 7** (VPS Testing): Use `ploy-infrastructure-manager` for deployment and `ploy-testing-coordinator` for test execution
+- **Step 6** (Local Build Verification): Use domain-specific agents (e.g., `ploy-api-developer` for API changes) for compilation testing only
+- **Step 7** (VPS Runtime Testing): Use `ploy-infrastructure-manager` for deployment and `ploy-testing-coordinator` for test execution
 - **Step 10** (Documentation): Use `general-purpose` agent or handle directly for documentation updates
 
 **Agent Usage**: When task complexity warrants specialized expertise, invoke via Task tool:
@@ -263,3 +337,38 @@ Task(
 ```
 
 **Agent Updates**: When modifying agent capabilities or adding new specializations, update `.claude/agents.json` configuration and ensure agent expertise aligns with current system architecture and MUP requirements.
+
+## Summary: Testing Environment Separation
+
+### Claude Code (Local Environment) - BUILD ONLY
+✅ **Allowed Locally**:
+- Build compilation: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy`
+- Syntax validation and import checking
+- File structure verification
+- Code analysis and development
+
+❌ **PROHIBITED Locally**:
+- Running binaries: `./build/controller`, `./build/ploy`, `go run ./controller`
+- Executing test scripts: `./test-scripts/test-*.sh`
+- Starting services or servers
+- API endpoint testing
+- Integration testing
+- Functional validation
+
+✅ **Claude Code VPS Access**:
+- SSH to VPS for functional testing: `ssh root@$TARGET_HOST "su - ploy -c 'command'"`
+- Execute test scripts on VPS: `ssh root@$TARGET_HOST "su - ploy -c './test-scripts/test-*.sh'"`
+- Deploy and validate on VPS: `ssh root@$TARGET_HOST "su - ploy -c './scripts/deploy.sh <branch>'"`
+
+### VPS Environment - RUNTIME TESTING ONLY
+✅ **Required for ALL functional testing** (accessible via SSH):
+- Controller deployment via Nomad
+- API endpoint validation
+- CLI command testing
+- Integration workflows
+- End-to-end scenarios
+- Infrastructure testing (Nomad, Consul, storage)
+- Test script execution
+- Performance benchmarking
+
+**Rationale**: Local Claude Code environment lacks the complete infrastructure stack (Nomad, Consul, SeaweedFS, networking) required for meaningful functional testing. Claude Code must connect to VPS via SSH to access the production-like environment.
