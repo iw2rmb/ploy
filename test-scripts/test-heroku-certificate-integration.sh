@@ -7,7 +7,7 @@ set -e
 
 APP_NAME="test-cert-$(date +%s)"
 TEST_DOMAIN="test-$(date +%s).example.com"
-CONTROLLER_URL="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
 
 echo "=== Testing Heroku-style Certificate Integration ==="
 echo "App: $APP_NAME"

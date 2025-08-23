@@ -5,7 +5,7 @@
 
 set -e
 
-CONTROLLER_URL="${PLOY_CONTROLLER:-http://localhost:8081}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app}"
 PLOY_APPS_DOMAIN="${PLOY_APPS_DOMAIN:-ployd.app}"
 
 echo "=== Testing Platform Wildcard Certificate System ==="

@@ -732,6 +732,15 @@
         group: ploy
         mode: '0644'
         block: |
+          # Ploy Controller API endpoint configuration
+          export PLOY_APPS_DOMAIN={{ ploy.apps_domain | default('ployd.app') }}
+          export PLOY_ENVIRONMENT={{ ploy_environment | default('dev') }}
+          {% if ploy_environment == 'dev' %}
+          export PLOY_CONTROLLER=https://api.dev.{{ ploy.apps_domain | default('ployd.app') }}/v1
+          {% else %}
+          export PLOY_CONTROLLER=https://api.{{ ploy.apps_domain | default('ployd.app') }}/v1
+          {% endif %}
+          
           # ARF (Automated Remediation Framework) environment variables
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export OPENREWRITE_JAR_PATH=/usr/local/bin/rewrite.jar

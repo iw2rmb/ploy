@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-CONTROLLER_URL="http://localhost:8081"
+CONTROLLER_URL="https://api.dev.ployd.app"
 if [ ! -z "$1" ]; then
     CONTROLLER_URL="$1"
 fi

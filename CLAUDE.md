@@ -185,14 +185,50 @@ nomad job run platform/nomad/ploy-controller.hcl
 
 **Testing Commands:**
 ```bash
-# Run test scripts after deployment
+# Test scripts automatically use HTTPS endpoints based on environment
 ./test-scripts/test-arf-phase4-security.sh
+
+# Environment variables are set by Ansible:
+# - PLOY_APPS_DOMAIN=ployd.app
+# - PLOY_ENVIRONMENT=dev  
+# - PLOY_CONTROLLER=https://api.dev.ployd.app/v1
 
 # VPS CLI testing (via SSH only)
 ssh root@$TARGET_HOST "su - ploy -c './build/ploy apps new --lang go --name test-app'"
 ssh root@$TARGET_HOST "su - ploy -c './build/ploy push -a test-app'"
+
+# Manual endpoint override (if needed)
+PLOY_CONTROLLER=https://api.dev.ployd.app/v1 ./test-scripts/test-env-vars.sh
 ```
 
+## App Naming Restrictions
+
+**Reserved App Names:** The following names are reserved for platform use and cannot be used when deploying apps:
+
+- `api` - Reserved for controller API endpoint (api.dev.ployd.app, api.ployd.app)
+- `dev` - Reserved for dev environment subdomain (dev.ployd.app)
+- `controller`, `admin`, `dashboard`, `metrics`, `health`, `console`, `www`
+- `ploy`, `system`, `traefik`, `nomad`, `consul`, `vault`, `seaweedfs`
+
+**App Name Validation Rules:**
+- 2-63 characters long
+- Start with a letter, end with letter or number
+- Contain only lowercase letters, numbers, and hyphens
+- Cannot contain consecutive hyphens (`--`)
+- Cannot start with reserved prefixes: `ploy-`, `system-`
+
+**Examples:**
+```bash
+# ✅ Valid app names
+./build/ploy apps new --name hello-world
+./build/ploy apps new --name my-java-app
+./build/ploy apps new --name test123
+
+# ❌ Invalid app names (will be rejected)
+./build/ploy apps new --name api        # Reserved
+./build/ploy apps new --name dev        # Reserved
+./build/ploy apps new --name ploy-test  # Reserved prefix
+```
 
 ## Repository Structure
 

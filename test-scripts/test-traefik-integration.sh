@@ -6,7 +6,7 @@
 set -e
 
 echo "=== Testing Traefik Advanced Load Balancing Integration ==="
-echo "Base URL: ${PLOY_CONTROLLER:-http://localhost:8081}"
+echo "Base URL: ${PLOY_CONTROLLER:-https://api.dev.ployd.app}"
 echo
 
 # Test 1: Check Nomad has Traefik job
@@ -55,7 +55,15 @@ echo
 
 # Test 5: Test domain management API endpoints  
 echo "📋 Test 5: Test domain management API endpoints"
-BASE_URL="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
+# Dynamic controller endpoint based on environment
+PLOY_APPS_DOMAIN=${PLOY_APPS_DOMAIN:-"ployd.app"}
+PLOY_ENVIRONMENT=${PLOY_ENVIRONMENT:-"dev"}
+
+if [ "$PLOY_ENVIRONMENT" = "dev" ]; then
+    BASE_URL="${PLOY_CONTROLLER:-https://api.dev.${PLOY_APPS_DOMAIN}/v1}"
+else
+    BASE_URL="${PLOY_CONTROLLER:-https://api.${PLOY_APPS_DOMAIN}/v1}"
+fi
 
 # Test routing health endpoint
 if curl -s -f "$BASE_URL/routing/health" >/dev/null 2>&1; then

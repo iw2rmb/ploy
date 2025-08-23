@@ -6,8 +6,16 @@ set -euo pipefail
 echo "=== Testing Enhanced Nomad Health Monitoring ==="
 echo "================================================"
 
-# Configuration
-PLOY_CONTROLLER=${PLOY_CONTROLLER:-http://localhost:8081/v1}
+# Dynamic controller endpoint based on environment
+PLOY_APPS_DOMAIN=${PLOY_APPS_DOMAIN:-"ployd.app"}
+PLOY_ENVIRONMENT=${PLOY_ENVIRONMENT:-"dev"}
+
+if [ "$PLOY_ENVIRONMENT" = "dev" ]; then
+    PLOY_CONTROLLER="${PLOY_CONTROLLER:-https://api.dev.${PLOY_APPS_DOMAIN}/v1}"
+else
+    PLOY_CONTROLLER="${PLOY_CONTROLLER:-https://api.${PLOY_APPS_DOMAIN}/v1}"
+fi
+
 TEST_APP="test-health-monitor"
 TEST_DIR="/tmp/test-health-$$"
 

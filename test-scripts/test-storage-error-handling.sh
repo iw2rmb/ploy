@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONTROLLER_URL="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
 
 # Colors for output
 RED='\033[0;31m'

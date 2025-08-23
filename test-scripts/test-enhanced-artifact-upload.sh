@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
 TEST_APP_NAME="test-enhanced-upload-$$"
 TEST_DIR="/tmp/ploy-enhanced-upload-test-$$"
 
