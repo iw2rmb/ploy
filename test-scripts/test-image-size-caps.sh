@@ -35,7 +35,7 @@ test_info() {
 # Check if controller is running
 check_controller() {
     test_info "Checking if controller is running..."
-    if ! curl -s http://localhost:8081/v1/apps > /dev/null; then
+    if ! curl -s https://api.dev.ployd.app/v1/apps > /dev/null; then
         test_failed "Controller not running on port 8081. Start it first."
     fi
     test_passed "Controller is running"
@@ -176,7 +176,7 @@ EOF
     
     # Test deployment on Lane A - should pass size cap (small Go app)
     RESPONSE=$(curl -s -X POST \
-        "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
+        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -231,7 +231,7 @@ EOF
     
     # Test deployment with break-glass override
     RESPONSE=$(curl -s -X POST \
-        "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=A&env=prod&break_glass=true" \
+        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=prod&break_glass=true" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     

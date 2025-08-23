@@ -35,7 +35,7 @@ test_info() {
 # Check if controller is running
 check_controller() {
     test_info "Checking if controller is running..."
-    if ! curl -s http://localhost:8081/v1/apps > /dev/null; then
+    if ! curl -s https://api.dev.ployd.app/v1/apps > /dev/null; then
         test_failed "Controller not running on port 8081. Start it first."
     fi
     test_passed "Controller is running"
@@ -80,7 +80,7 @@ test_production_policies() {
     
     # Test production deployment with development signing (should fail)
     RESPONSE=$(curl -s -X POST \
-        "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=B&env=production&debug=false" \
+        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=B&env=production&debug=false" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -110,7 +110,7 @@ test_staging_policies() {
     
     # Test staging deployment
     RESPONSE=$(curl -s -X POST \
-        "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=B&env=staging&debug=false" \
+        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=B&env=staging&debug=false" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -139,7 +139,7 @@ test_development_policies() {
     
     # Test development deployment (should pass easily)
     RESPONSE=$(curl -s -X POST \
-        "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=B&env=dev&debug=true" \
+        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=B&env=dev&debug=true" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -169,7 +169,7 @@ test_environment_normalization() {
     for env in "prod" "production" "live"; do
         test_info "Testing environment variation: $env"
         RESPONSE=$(curl -s -X POST \
-            "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=B&env=$env" \
+            "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=B&env=$env" \
             -H "Content-Type: application/octet-stream" \
             --data-binary "@$TEST_APP.tar")
         
@@ -190,7 +190,7 @@ test_ssh_debug_policies() {
         test_info "Testing debug build in $env environment"
         
         RESPONSE=$(curl -s -X POST \
-            "http://localhost:8081/v1/apps/test-debug/debug?env=$env&lane=B" \
+            "https://api.dev.ployd.app/v1/apps/test-debug/debug?env=$env&lane=B" \
             -H "Content-Type: application/json" \
             -d '{}')
         
@@ -272,7 +272,7 @@ test_breakglass_approval() {
     
     # Test production deployment with break-glass
     RESPONSE=$(curl -s -X POST \
-        "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=B&env=production&break_glass=true&debug=true" \
+        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=B&env=production&break_glass=true&debug=true" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     

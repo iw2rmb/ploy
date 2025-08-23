@@ -53,7 +53,7 @@ echo -e "${YELLOW}Test 4: Testing controller version endpoint...${NC}"
 CONTROLLER_PID=$!
 sleep 3
 
-RESPONSE=$(curl -s http://localhost:8081/version)
+RESPONSE=$(curl -s https://api.dev.ployd.app/version)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Version endpoint working:${NC}"
     echo "$RESPONSE" | jq .
@@ -65,7 +65,7 @@ fi
 
 # Test 5: Test detailed version endpoint
 echo -e "${YELLOW}Test 5: Testing detailed version endpoint...${NC}"
-DETAILED=$(curl -s http://localhost:8081/version/detailed)
+DETAILED=$(curl -s https://api.dev.ployd.app/version/detailed)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Detailed version endpoint working:${NC}"
     echo "$DETAILED" | jq .

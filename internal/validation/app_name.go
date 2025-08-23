@@ -9,6 +9,7 @@ import (
 // Reserved app names that cannot be used by users
 var reservedAppNames = map[string]bool{
 	"api":        true,  // Reserved for controller API endpoint
+	"dev":        true,  // Reserved for dev environment subdomain
 	"controller": true,  // Reserved for controller service
 	"admin":      true,  // Reserved for admin interface
 	"dashboard":  true,  // Reserved for dashboard

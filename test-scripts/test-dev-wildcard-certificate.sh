@@ -32,7 +32,7 @@ echo -e "${YELLOW}Test 1: Verifying reserved app names...${NC}"
 
 # Try to create an app named 'api' (should fail)
 echo "Attempting to create app named 'api' (should fail)..."
-RESPONSE=$(curl -s -X POST http://localhost:8081/v1/apps/api/builds \
+RESPONSE=$(curl -s -X POST https://api.dev.ployd.app/v1/apps/api/builds \
   -H "Content-Type: application/tar" \
   --data-binary @/dev/null 2>&1 || true)
 
@@ -46,7 +46,7 @@ fi
 # Test other reserved names
 RESERVED_NAMES=("controller" "admin" "dashboard" "metrics" "health")
 for name in "${RESERVED_NAMES[@]}"; do
-    RESPONSE=$(curl -s -X POST http://localhost:8081/v1/apps/$name/builds \
+    RESPONSE=$(curl -s -X POST https://api.dev.ployd.app/v1/apps/$name/builds \
       -H "Content-Type: application/tar" \
       --data-binary @/dev/null 2>&1 || true)
     
@@ -128,7 +128,7 @@ tar -czf "$TEMP_DIR/app.tar" -C "$TEMP_DIR" index.js package.json
 
 # Deploy the app
 echo "Deploying test app..."
-RESPONSE=$(curl -s -X POST "http://localhost:8081/v1/apps/$TEST_APP/builds?lane=B" \
+RESPONSE=$(curl -s -X POST "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=B" \
   -H "Content-Type: application/tar" \
   --data-binary "@$TEMP_DIR/app.tar")
 
@@ -161,7 +161,7 @@ done
 # Test 6: Check certificate status endpoint
 echo -e "${YELLOW}Test 6: Checking certificate status...${NC}"
 
-CERT_STATUS=$(curl -s http://localhost:8081/health/platform-certificates)
+CERT_STATUS=$(curl -s https://api.dev.ployd.app/health/platform-certificates)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Certificate status endpoint accessible${NC}"
     echo "$CERT_STATUS" | jq . 2>/dev/null || echo "$CERT_STATUS"

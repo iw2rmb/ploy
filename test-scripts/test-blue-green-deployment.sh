@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Test configuration
 TEST_APP="test-bluegreen-app"
-CONTROLLER_URL="http://localhost:8081/v1"
+CONTROLLER_URL="https://api.dev.ployd.app/v1"
 VERSION_1="v1.0.0"
 VERSION_2="v1.1.0"
 TIMEOUT=300  # 5 minutes timeout
