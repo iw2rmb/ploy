@@ -37,6 +37,26 @@ Example: feature changes must update FEATURES.md.
 
 **WASM Implementation Rule**: When implementing any WASM-related features (Lane G detection, builders, runtime integration), ALWAYS reference `docs/WASM.md` for language-specific compilation detection patterns, configuration examples, and implementation guidelines. This document provides the authoritative specification for WASM support in Ploy.
 
+## Code Analysis Tools
+
+**MANDATORY**: Use MCP aster tools for all code analysis tasks:
+
+- **Symbol Search**: `mcp__aster__aster_search` — semantic code search (functions, classes, variables)
+- **Code Context**: `mcp__aster__aster_slice` — intelligent code slicing around symbols  
+- **Definition Lookup**: `mcp__aster__aster_getDefinition` — find symbol definitions
+- **Reference Tracking**: `mcp__aster__aster_getReferences` — find all symbol usage
+
+**Benefits over Grep/Glob**:
+- Understands code semantics vs plain text matching
+- Provides precise symbol locations with context
+- Reduces noise from comments/strings  
+- Faster than full-text search on large codebases
+
+**When to use traditional tools**:
+- Grep: regex patterns, comments, log messages, strings
+- Glob: file discovery by name/extension patterns
+- Read: complete file contents
+
 ## Testing Requirements
 **CRITICAL**: For any code changes to Ploy:
 - Use VPS testing environment in `iac/dev/`

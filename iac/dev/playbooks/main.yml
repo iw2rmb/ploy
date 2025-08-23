@@ -274,10 +274,224 @@
           - anthropic>=0.7.0
           - requests>=2.28.0
           - tiktoken>=0.5.0
+          - redis>=4.5.0
+          - sqlalchemy>=2.0.0
+          - psycopg2-binary>=2.9.0
+          - numpy>=1.24.0
+          - scipy>=1.10.0
         state: present
         executable: pip3
         extra_args: --break-system-packages
       ignore_errors: true  # Ignore conflicts with system packages
+
+    - name: Install Redis for LLM caching and coordination
+      apt:
+        name:
+          - redis-server
+          - redis-tools
+        state: present
+
+    - name: Configure Redis for ARF Phase 3
+      copy:
+        content: |
+          # Redis configuration for ARF Phase 3 - LLM caching and coordination
+          bind 127.0.0.1
+          port 6379
+          protected-mode yes
+          timeout 0
+          tcp-keepalive 300
+          
+          # Memory configuration
+          maxmemory 1gb
+          maxmemory-policy allkeys-lru
+          
+          # Persistence for learning data
+          save 900 1
+          save 300 10
+          save 60 10000
+          
+          # Logging
+          loglevel notice
+          logfile /var/log/redis/redis-server.log
+          
+          # Database configuration
+          databases 16
+          
+          # ARF-specific databases:
+          # db 0: LLM response cache
+          # db 1: Recipe template cache  
+          # db 2: Learning pattern cache
+          # db 3: A/B test coordination
+          # db 4: Performance metrics
+        dest: /etc/redis/redis-arf.conf
+        backup: yes
+
+    - name: Start and enable Redis
+      systemd:
+        name: redis-server
+        state: started
+        enabled: true
+
+    - name: Create ARF Phase 3 executables and tools
+      block:
+        - name: Create ARF executables directory
+          file:
+            path: /usr/local/bin/arf-executors
+            state: directory
+            mode: '0755'
+
+        - name: Create ARF Phase 3 executor stub scripts
+          copy:
+            content: |
+              #!/bin/bash
+              # ARF Phase 3 - {{ item.name }}
+              # This is a development stub - actual implementation will be built by the controller
+              
+              echo "ARF Phase 3 {{ item.name }} - Development Environment"
+              echo "Arguments: $@"
+              echo "Working Directory: $(pwd)"
+              echo ""
+              
+              # {{ item.description }}
+              
+              {% for command in item.commands %}
+              echo "{{ command }}"
+              {% endfor %}
+              
+              # Simulate execution time
+              sleep {{ item.sim_time | default(2) }}
+              
+              {% if item.exit_success | default(true) %}
+              echo "{{ item.name }} completed successfully"
+              exit 0
+              {% else %}
+              echo "{{ item.name }} simulation - some features require actual controller"
+              exit 1
+              {% endif %}
+            dest: "/usr/local/bin/{{ item.binary }}"
+            mode: '0755'
+          loop:
+            - name: "LLM Recipe Generator"
+              binary: "arf-llm-generator"
+              description: "Generates ARF recipes using Large Language Models"
+              commands:
+                - "Analyzing error context..."
+                - "Querying LLM for recipe generation..."
+                - "Validating generated recipe syntax..."
+                - "Optimizing recipe confidence..."
+              sim_time: 5
+              exit_success: true
+            
+            - name: "Multi-Language AST Parser"
+              binary: "arf-multi-lang-parser"
+              description: "Parses code using tree-sitter for multiple languages"
+              commands:
+                - "Detecting source language..."
+                - "Loading tree-sitter parser..."
+                - "Parsing AST structure..."
+                - "Extracting symbols and imports..."
+              sim_time: 3
+              exit_success: true
+            
+            - name: "Hybrid Pipeline Coordinator" 
+              binary: "arf-hybrid-coordinator"
+              description: "Coordinates OpenRewrite and LLM transformations"
+              commands:
+                - "Analyzing transformation complexity..."
+                - "Selecting optimal strategy..."
+                - "Coordinating parallel execution..."
+                - "Merging transformation results..."
+              sim_time: 8
+              exit_success: true
+            
+            - name: "Learning Pattern Extractor"
+              binary: "arf-learning-extractor"
+              description: "Extracts patterns from transformation history"
+              commands:
+                - "Querying transformation database..."
+                - "Running statistical analysis..."
+                - "Extracting success patterns..."
+                - "Updating strategy weights..."
+              sim_time: 4
+              exit_success: true
+            
+            - name: "A/B Test Manager"
+              binary: "arf-ab-test-manager" 
+              description: "Manages A/B testing experiments for recipes"
+              commands:
+                - "Setting up experiment configuration..."
+                - "Tracking transformation outcomes..."
+                - "Computing statistical significance..."
+                - "Generating recommendations..."
+              sim_time: 3
+              exit_success: true
+
+        - name: Create ARF Phase 3 validation tools
+          copy:
+            content: |
+              #!/bin/bash
+              # ARF Phase 3 Validation Suite
+              
+              echo "🔍 ARF Phase 3 Infrastructure Validation"
+              echo "========================================"
+              echo ""
+              
+              # Check database connectivity
+              echo "Checking PostgreSQL connection..."
+              if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
+                  echo "✅ PostgreSQL: Ready"
+              else
+                  echo "❌ PostgreSQL: Not available"
+              fi
+              
+              # Check Redis connectivity  
+              echo "Checking Redis connection..."
+              if redis-cli ping > /dev/null 2>&1; then
+                  echo "✅ Redis: Ready"
+              else
+                  echo "❌ Redis: Not available"
+              fi
+              
+              # Check tree-sitter installation
+              echo "Checking tree-sitter installation..."
+              if command -v tree-sitter >/dev/null 2>&1; then
+                  echo "✅ Tree-sitter: $(tree-sitter --version)"
+              else
+                  echo "❌ Tree-sitter: Not installed"
+              fi
+              
+              # Check language parsers
+              echo "Checking language parsers..."
+              parser_count=0
+              for parser in tree-sitter-java tree-sitter-javascript tree-sitter-python tree-sitter-go; do
+                  if npm list -g "$parser" >/dev/null 2>&1; then
+                      parser_count=$((parser_count + 1))
+                  fi
+              done
+              echo "✅ Language parsers: $parser_count/4 installed"
+              
+              # Check Python dependencies
+              echo "Checking Python LLM dependencies..."
+              python_deps=0
+              for dep in openai anthropic requests redis sqlalchemy; do
+                  if python3 -c "import $dep" >/dev/null 2>&1; then
+                      python_deps=$((python_deps + 1))
+                  fi
+              done
+              echo "✅ Python LLM deps: $python_deps/5 available"
+              
+              echo ""
+              echo "ARF Phase 3 validation complete."
+              
+              if [ "$parser_count" -ge 3 ] && [ "$python_deps" -ge 4 ]; then
+                  echo "🎉 Infrastructure ready for ARF Phase 3 testing"
+                  exit 0
+              else
+                  echo "⚠️  Some dependencies missing - proceed with caution"  
+                  exit 1
+              fi
+            dest: /usr/local/bin/arf-phase3-validate
+            mode: '0755'
 
     - name: Add ARF Phase 3 environment variables for ploy user
       blockinfile:
@@ -301,6 +515,52 @@
           
           # Tree-sitter parser paths
           export TREE_SITTER_PARSER_DIR=/usr/local/lib/node_modules
+          
+          # Redis configuration for ARF Phase 3
+          export ARF_REDIS_URL="redis://localhost:6379"
+          export ARF_REDIS_LLM_DB=0
+          export ARF_REDIS_TEMPLATE_DB=1
+          export ARF_REDIS_PATTERN_DB=2
+          export ARF_REDIS_AB_TEST_DB=3
+          export ARF_REDIS_METRICS_DB=4
+          
+          # LLM Configuration
+          export ARF_LLM_PROVIDER="${ARF_LLM_PROVIDER:-openai}"
+          export ARF_LLM_MODEL="${ARF_LLM_MODEL:-gpt-4}"
+          export ARF_LLM_TEMPERATURE="${ARF_LLM_TEMPERATURE:-0.1}"
+          export ARF_LLM_MAX_TOKENS="${ARF_LLM_MAX_TOKENS:-2048}"
+          export ARF_LLM_TIMEOUT="${ARF_LLM_TIMEOUT:-30s}"
+          export ARF_LLM_CACHE_ENABLED="${ARF_LLM_CACHE_ENABLED:-true}"
+          export ARF_LLM_CACHE_TTL="${ARF_LLM_CACHE_TTL:-24h}"
+          
+          # Hybrid Pipeline Configuration
+          export ARF_HYBRID_DEFAULT_STRATEGY="${ARF_HYBRID_DEFAULT_STRATEGY:-sequential}"
+          export ARF_HYBRID_CONFIDENCE_THRESHOLD="${ARF_HYBRID_CONFIDENCE_THRESHOLD:-0.7}"
+          export ARF_HYBRID_TIMEOUT="${ARF_HYBRID_TIMEOUT:-15m}"
+          export ARF_HYBRID_MAX_PARALLEL_TASKS="${ARF_HYBRID_MAX_PARALLEL_TASKS:-3}"
+          
+          # Learning System Configuration
+          export ARF_LEARNING_ENABLED="${ARF_LEARNING_ENABLED:-true}"
+          export ARF_LEARNING_MIN_SAMPLES="${ARF_LEARNING_MIN_SAMPLES:-10}"
+          export ARF_LEARNING_PATTERN_CONFIDENCE="${ARF_LEARNING_PATTERN_CONFIDENCE:-0.8}"
+          export ARF_LEARNING_UPDATE_INTERVAL="${ARF_LEARNING_UPDATE_INTERVAL:-1h}"
+          
+          # A/B Testing Configuration
+          export ARF_AB_TEST_ENABLED="${ARF_AB_TEST_ENABLED:-true}"
+          export ARF_AB_TEST_MIN_SAMPLE_SIZE="${ARF_AB_TEST_MIN_SAMPLE_SIZE:-50}"
+          export ARF_AB_TEST_CONFIDENCE_LEVEL="${ARF_AB_TEST_CONFIDENCE_LEVEL:-0.95}"
+          export ARF_AB_TEST_MAX_DURATION="${ARF_AB_TEST_MAX_DURATION:-7d}"
+          
+          # Multi-Language Support
+          export ARF_SUPPORTED_LANGUAGES="java,javascript,typescript,python,go,rust,c,cpp"
+          export ARF_DEFAULT_LANGUAGE_TIMEOUT="30s"
+          export ARF_AST_CACHE_SIZE="1000"
+          
+          # Development and Debug Settings
+          export ARF_DEBUG_MODE="${ARF_DEBUG_MODE:-false}"
+          export ARF_LOG_LEVEL="${ARF_LOG_LEVEL:-info}"
+          export ARF_METRICS_ENABLED="${ARF_METRICS_ENABLED:-true}"
+          export ARF_PROFILING_ENABLED="${ARF_PROFILING_ENABLED:-false}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - ARF vars"
 
 
