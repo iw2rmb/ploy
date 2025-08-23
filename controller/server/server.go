@@ -20,10 +20,12 @@ import (
 	"github.com/iw2rmb/ploy/controller/certificates"
 	"github.com/iw2rmb/ploy/controller/config"
 	"github.com/iw2rmb/ploy/controller/consul_envstore"
+	"github.com/iw2rmb/ploy/controller/coordination"
 	"github.com/iw2rmb/ploy/controller/dns"
 	"github.com/iw2rmb/ploy/controller/domains"
 	"github.com/iw2rmb/ploy/controller/envstore"
 	"github.com/iw2rmb/ploy/controller/health"
+	"github.com/iw2rmb/ploy/controller/metrics"
 	"github.com/iw2rmb/ploy/controller/routing"
 	"github.com/iw2rmb/ploy/controller/selfupdate"
 	"github.com/iw2rmb/ploy/controller/arf"
@@ -50,6 +52,8 @@ type ServiceDependencies struct {
 	CertificateManager *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
 	ARFHandler         *arf.Handler
+	CoordinationManager *coordination.CoordinationManager
+	Metrics            *metrics.Metrics
 	StorageConfigPath  string
 }
 
@@ -83,10 +87,12 @@ func LoadConfigFromEnv() *ControllerConfig {
 
 // Server represents the stateless controller server
 type Server struct {
-	app          *fiber.App
-	config       *ControllerConfig
-	dependencies *ServiceDependencies
-	shutdownChan chan os.Signal
+	app            *fiber.App
+	config         *ControllerConfig
+	dependencies   *ServiceDependencies
+	shutdownChan   chan os.Signal
+	coordinationCtx context.Context
+	coordinationCancel context.CancelFunc
 }
 
 // NewServer creates a new controller server with dependency injection
@@ -115,13 +121,25 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${method} ${path} - ${latency}\n",
 	}))
+	
+	// Add metrics middleware if metrics are available
+	if deps.Metrics != nil {
+		app.Use(deps.Metrics.MetricsMiddleware())
+		deps.Metrics.StartUptimeUpdater()
+	}
+	
 	app.Use(preview.Router)
 
+	// Create coordination context
+	coordinationCtx, coordinationCancel := context.WithCancel(context.Background())
+
 	server := &Server{
-		app:          app,
-		config:       config,
-		dependencies: deps,
-		shutdownChan: make(chan os.Signal, 1),
+		app:                app,
+		config:             config,
+		dependencies:       deps,
+		shutdownChan:       make(chan os.Signal, 1),
+		coordinationCtx:    coordinationCtx,
+		coordinationCancel: coordinationCancel,
 	}
 
 	// Setup routes
@@ -199,6 +217,15 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize ARF handler: %v", err)
 	}
 
+	// Initialize Metrics
+	metricsInstance := metrics.NewMetrics()
+	
+	// Initialize Coordination Manager with metrics
+	coordinationManager, err := initializeCoordinationManagerWithMetrics(cfg, metricsInstance)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize coordination manager: %v", err)
+	}
+	
 	deps := &ServiceDependencies{
 		EnvStore:           envStore,
 		TraefikRouter:      traefikRouter,
@@ -210,6 +237,8 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		CertificateManager: certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
 		ARFHandler:         arfHandler,
+		CoordinationManager: coordinationManager,
+		Metrics:            metricsInstance,
 		StorageConfigPath:  cfg.StorageConfigPath,
 	}
 
@@ -440,6 +469,13 @@ func (s *Server) setupRoutes() {
 	s.app.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
 	s.app.Get("/health/update", s.dependencies.HealthChecker.UpdateStatusHandler)
 	s.app.Get("/health/platform-certificates", s.handlePlatformCertificateHealth)
+	s.app.Get("/health/coordination", s.handleCoordinationHealth)
+	
+	// Prometheus metrics endpoint
+	if s.dependencies.Metrics != nil {
+		s.app.Get("/metrics", s.dependencies.Metrics.Handler())
+		log.Printf("Prometheus metrics endpoint configured at /metrics")
+	}
 
 	api := s.app.Group("/v1")
 	
@@ -696,6 +732,18 @@ func (s *Server) Start() error {
 	// Setup signal handling for graceful shutdown
 	signal.Notify(s.shutdownChan, os.Interrupt, syscall.SIGTERM)
 
+	// Start coordination manager for leader election
+	if s.dependencies.CoordinationManager != nil {
+		go func() {
+			log.Printf("Starting coordination manager")
+			if err := s.dependencies.CoordinationManager.Run(s.coordinationCtx); err != nil {
+				log.Printf("Coordination manager error: %v", err)
+			}
+		}()
+	} else {
+		log.Printf("Coordination manager not available, running in single-instance mode")
+	}
+
 	// Ensure platform wildcard certificate is provisioned
 	if err := s.ensurePlatformWildcardCertificate(); err != nil {
 		log.Printf("Warning: Failed to ensure platform wildcard certificate: %v", err)
@@ -727,11 +775,26 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown() error {
 	log.Printf("Starting graceful shutdown procedure")
 
+	// Cancel coordination context first to stop leader election
+	if s.coordinationCancel != nil {
+		log.Printf("Stopping coordination manager")
+		s.coordinationCancel()
+		
+		// Give coordination manager time to clean up
+		time.Sleep(2 * time.Second)
+	}
+
+	// Stop coordination manager
+	if s.dependencies.CoordinationManager != nil {
+		s.dependencies.CoordinationManager.Stop()
+		log.Printf("Coordination manager stopped")
+	}
+
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 	defer cancel()
 
-	// Stop TTL cleanup service first
+	// Stop TTL cleanup service
 	if s.dependencies.TTLCleanupService != nil {
 		log.Printf("Stopping TTL cleanup service")
 		if err := s.dependencies.TTLCleanupService.Stop(); err != nil {
@@ -918,4 +981,55 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 
 	log.Printf("ARF handler initialized successfully")
 	return handler, nil
+}
+
+// initializeCoordinationManager initializes the coordination manager for leader election
+func initializeCoordinationManager(cfg *ControllerConfig) (*coordination.CoordinationManager, error) {
+	return initializeCoordinationManagerWithMetrics(cfg, nil)
+}
+
+// initializeCoordinationManagerWithMetrics initializes the coordination manager with metrics
+func initializeCoordinationManagerWithMetrics(cfg *ControllerConfig, metrics *metrics.Metrics) (*coordination.CoordinationManager, error) {
+	log.Printf("Initializing coordination manager for leader election")
+
+	coordinationMgr, err := coordination.NewCoordinationManagerWithMetrics(cfg.ConsulAddr, metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create coordination manager: %w", err)
+	}
+
+	log.Printf("Coordination manager initialized successfully")
+	return coordinationMgr, nil
+}
+
+// handleCoordinationHealth handles coordination and leader election health checks
+func (s *Server) handleCoordinationHealth(c *fiber.Ctx) error {
+	if s.dependencies.CoordinationManager == nil {
+		return c.JSON(fiber.Map{
+			"status":  "disabled",
+			"message": "Coordination manager not initialized",
+		})
+	}
+
+	isLeader := s.dependencies.CoordinationManager.IsLeader()
+	status := "follower"
+	if isLeader {
+		status = "leader"
+	}
+
+	response := fiber.Map{
+		"status":    status,
+		"is_leader": isLeader,
+		"timestamp": time.Now(),
+	}
+
+	// Add TTL cleanup status if we're the leader
+	if isLeader {
+		// Note: TTL cleanup stats would be available through the coordination manager
+		// This is a placeholder for future implementation
+		response["coordination_tasks"] = fiber.Map{
+			"ttl_cleanup": "active",
+		}
+	}
+
+	return c.JSON(response)
 }
