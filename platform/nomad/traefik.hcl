@@ -118,7 +118,24 @@ job "traefik-system" {
           "--metrics.prometheus=true",
           "--metrics.prometheus.addEntryPointsLabels=true",
           "--metrics.prometheus.addRoutersLabels=true",
-          "--metrics.prometheus.addServicesLabels=true"
+          "--metrics.prometheus.addServicesLabels=true",
+          # Let's Encrypt ACME certificate resolver with Namecheap DNS challenge
+          "--certificatesresolvers.letsencrypt.acme.dnschallenge=true",
+          "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=namecheap",
+          "--certificatesresolvers.letsencrypt.acme.email=admin@ployd.app",
+          "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
+          "--certificatesresolvers.letsencrypt.acme.dnschallenge.delayBeforeCheck=30",
+          "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          # Dev environment wildcard certificate resolver
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge=true",
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.provider=namecheap",
+          "--certificatesresolvers.dev-wildcard.acme.email=admin@ployd.app",
+          "--certificatesresolvers.dev-wildcard.acme.storage=/data/dev-wildcard-acme.json",
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.delayBeforeCheck=30",
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          # HTTP to HTTPS redirect
+          "--entrypoints.web.http.redirections.entrypoint.to=websecure",
+          "--entrypoints.web.http.redirections.entrypoint.scheme=https"
         ]
         
         mount {
@@ -151,10 +168,72 @@ EOF
         perms = "644"
       }
       
+      # Dev environment wildcard certificate configuration
+      template {
+        data = <<EOF
+# Dev environment SSL certificate configuration
+# Wildcard certificate for *.dev.ployd.app
+tls:
+  options:
+    default:
+      sslStrategies:
+        - "tls.SniStrict"
+      minVersion: "VersionTLS12"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_RSA_WITH_AES_128_GCM_SHA256"
+
+http:
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    
+    secure-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - OPTIONS
+          - PUT
+          - POST
+          - DELETE
+        accessControlMaxAge: 100
+        hostsProxyHeaders:
+          - "X-Forwarded-Host"
+        referrerPolicy: "same-origin"
+        sslRedirect: true
+        sslHost: ""
+        sslForceHost: false
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        customFrameOptionsValue: "SAMEORIGIN"
+EOF
+        destination = "local/dynamic/ssl-config.yml"
+        perms = "644"
+      }
+      
       # Environment variables for Traefik
       env {
         # Consul configuration
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
+        
+        # Namecheap DNS provider for Let's Encrypt ACME challenges
+        NAMECHEAP_API_USER = "iw2rmb"
+        NAMECHEAP_API_KEY = "c8615d72b5794eb0a52cbf1cf22fc42f"
+        NAMECHEAP_SANDBOX = "false"
+        
+        # DNS challenge configuration
+        ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
+        NAMECHEAP_CLIENT_IP = "45.12.75.241"
+        NAMECHEAP_USERNAME = "iw2rmb"
       }
       
       resources {

@@ -1299,13 +1299,32 @@
             path: /usr/local/bin/lego
             mode: '0755'
 
-        - name: Create SSL certificates directory
+        - name: Create SSL certificates directory (for legacy compatibility)
           file:
             path: /etc/ploy/certs
             state: directory
             owner: ploy
             group: ploy
             mode: '0755'
+
+        - name: Create Traefik data directory for ACME certificates
+          file:
+            path: /opt/ploy/traefik-data
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Initialize ACME certificate files (with proper permissions)
+          file:
+            path: "{{ item }}"
+            state: touch
+            owner: root
+            group: root
+            mode: '0600'
+          loop:
+            - /opt/ploy/traefik-data/acme.json
+            - /opt/ploy/traefik-data/dev-wildcard-acme.json
 
         - name: Create SSL certificate scripts directory
           file:
@@ -1325,15 +1344,10 @@
             group: ploy
             mode: '0755'
 
-        - name: Setup platform certificate renewal cron job (lego-based)
+        - name: Remove platform certificate renewal cron job (now handled by Traefik)
           cron:
             name: "Platform Wildcard Certificate Renewal"
-            minute: "0"
-            hour: "3"
-            day: "*/7"  # Weekly check
-            user: ploy
-            job: "cd /etc/ploy/certs && /usr/local/bin/lego --dns=namecheap --domains='{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}' renew >> /var/log/ploy-platform-cert-renewal.log 2>&1"
-            state: present
+            state: absent
 
     - name: Configure Namecheap DNS API environment
       block:
@@ -1390,51 +1404,26 @@
               {% endfor %}
               {% endif %}
 
-        - name: Provision platform wildcard certificate (if DNS is ready and API credentials are available)
-          become_user: ploy
-          shell: |
-            cd /home/ploy/ploy
-            if [ -n "$NAMECHEAP_API_KEY" ] && [ "{{ dns_status.stdout_lines[0] }}" = "DNS_READY" ]; then
-              # Use lego directly for platform certificate provisioning (infrastructure-level)
-              export NAMECHEAP_CLIENT_IP="{{ ansible_default_ipv4.address }}"
-              export CERT_EMAIL="{{ ploy_dev_certificate.email | default('admin@ployd.app') }}"
-              
-              mkdir -p /etc/ploy/certs
-              cd /etc/ploy/certs
-              
-              /usr/local/bin/lego \
-                --server="{{ 'https://acme-staging-v02.api.letsencrypt.org/directory' if ploy_dev_certificate.staging | default(false) else 'https://acme-v02.api.letsencrypt.org/directory' }}" \
-                --email="$CERT_EMAIL" \
-                --dns=namecheap \
-                --domains="{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}" \
-                --accept-tos \
-                run
-              
-              # Copy certificates to expected locations for controller
-              CLEAN_DOMAIN=$(echo "{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}" | sed 's/\*\.//')
-              if [ -f ".lego/certificates/$CLEAN_DOMAIN.crt" ]; then
-                cp ".lego/certificates/$CLEAN_DOMAIN.crt" "{{ ploy_dev_certificate.cert_path | default('/etc/ploy/certs/dev-wildcard.crt') }}"
-                cp ".lego/certificates/$CLEAN_DOMAIN.key" "{{ ploy_dev_certificate.key_path | default('/etc/ploy/certs/dev-wildcard.key') }}"
-                chown ploy:ploy "{{ ploy_dev_certificate.cert_path | default('/etc/ploy/certs/dev-wildcard.crt') }}" "{{ ploy_dev_certificate.key_path | default('/etc/ploy/certs/dev-wildcard.key') }}"
-                echo "Platform wildcard certificate provisioned successfully"
-              else
-                echo "Certificate provisioning failed - files not found"
-                exit 1
-              fi
-            else
-              echo "Skipping platform certificate provisioning - DNS not ready or API credentials missing"
-              echo "Platform wildcard certificate must be provisioned during infrastructure setup"
-            fi
-          register: cert_provision_result
-          when: 
-            - ploy_environment is defined and ploy_environment == 'dev'
-            - lookup('env', 'NAMECHEAP_SANDBOX_API_KEY')
-          ignore_errors: true
-
-        - name: Display certificate provisioning result
+        - name: Skip manual certificate provisioning (now handled by Traefik ACME)
           debug:
-            msg: "{{ cert_provision_result.stdout_lines if cert_provision_result.stdout_lines is defined else 'Certificate provisioning skipped' }}"
-          when: cert_provision_result is defined
+            msg: |
+              Manual certificate provisioning disabled - Traefik will automatically obtain certificates via ACME.
+              Traefik configuration includes:
+              - DNS challenge with Namecheap provider
+              - Wildcard certificate for {{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}
+              - Automatic certificate renewal
+              
+              Certificate will be available at: https://api.dev.ployd.app
+          when: ploy_environment is defined and ploy_environment == 'dev'
+
+        - name: Display certificate provisioning approach
+          debug:
+            msg: |
+              Certificate provisioning approach: Traefik ACME automation
+              - Certificates will be automatically obtained when Traefik starts
+              - DNS challenge will use Namecheap API
+              - Wildcard certificate will cover *.dev.ployd.app
+              - No manual intervention required
 
     # Platform wildcard certificate health check (after controller deployment)
     - name: Wait for controller health endpoint to be available
