@@ -1,0 +1,17 @@
+# Aster configuration
+storage:
+  type: sqlite
+  parameters:
+    path: .aster/index.db
+
+languages:
+  - go
+  - java
+  - typescript
+  - javascript  
+  - rust
+  - python
+
+parser:
+  incremental: true
+  max_file_size: 10MB
