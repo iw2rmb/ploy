@@ -30,7 +30,7 @@ func TestPatternRecording(t *testing.T) {
 				"dependencies": []string{"junit", "mockito"},
 			},
 		},
-		Severity: SeverityMedium,
+		Severity: PatternSeverityMedium,
 	}
 	
 	err := pls.RecordPattern(ctx, pattern)
@@ -275,7 +275,7 @@ func TestPatternStatistics(t *testing.T) {
 					"build_tool": "npm",
 				},
 			},
-			Severity: SeverityHigh,
+			Severity: PatternSeverityHigh,
 		},
 		{
 			ErrorType: "type_error",
@@ -286,7 +286,7 @@ func TestPatternStatistics(t *testing.T) {
 					"build_tool": "npm",
 				},
 			},
-			Severity: SeverityMedium,
+			Severity: PatternSeverityMedium,
 		},
 		{
 			ErrorType: "syntax_error",
@@ -297,7 +297,7 @@ func TestPatternStatistics(t *testing.T) {
 					"build_tool": "pip",
 				},
 			},
-			Severity: SeverityLow,
+			Severity: PatternSeverityLow,
 		},
 	}
 	
@@ -326,8 +326,8 @@ func TestPatternStatistics(t *testing.T) {
 		t.Errorf("Expected 1 JavaScript pattern, got %d", stats.PatternsByLanguage["javascript"])
 	}
 	
-	if stats.PatternsBySeverity[SeverityHigh] != 1 {
-		t.Errorf("Expected 1 high severity pattern, got %d", stats.PatternsBySeverity[SeverityHigh])
+	if stats.PatternsBySeverity[PatternSeverityHigh] != 1 {
+		t.Errorf("Expected 1 high severity pattern, got %d", stats.PatternsBySeverity[PatternSeverityHigh])
 	}
 	
 	if stats.GeneratedAt.IsZero() {
