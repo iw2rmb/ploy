@@ -108,7 +108,7 @@ type TransformationFeedback struct {
 	ErrorMessages       []string               `json:"error_messages"`
 	CompilationResults  CompilationResult      `json:"compilation_results"`
 	TestResults         TestResult             `json:"test_results"`
-	PerformanceMetrics  PerformanceMetrics     `json:"performance_metrics"`
+	PerformanceMetrics  LLMPerformanceMetrics  `json:"performance_metrics"`
 	UserFeedback        map[string]interface{} `json:"user_feedback"`
 }
 
@@ -131,8 +131,8 @@ type TestResult struct {
 	FailureDetails  []string  `json:"failure_details"`
 }
 
-// PerformanceMetrics contains runtime performance data
-type PerformanceMetrics struct {
+// LLMPerformanceMetrics contains runtime performance data for LLM operations
+type LLMPerformanceMetrics struct {
 	ExecutionTime    time.Duration `json:"execution_time"`
 	MemoryUsage      int64         `json:"memory_usage"`
 	CPUUtilization   float64       `json:"cpu_utilization"`

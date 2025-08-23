@@ -284,6 +284,237 @@
         extra_args: --break-system-packages
       ignore_errors: true  # Ignore conflicts with system packages
 
+    # ARF Phase 4: Security & Production Hardening Dependencies
+    - name: Install security scanning dependencies
+      apt:
+        name:
+          - libssl-dev
+          - libffi-dev
+          - libxml2-dev
+          - libxslt1-dev
+          - zlib1g-dev
+          - libjpeg-dev
+          - libpng-dev
+          - build-essential
+          - pkg-config
+        state: present
+
+    - name: Install vulnerability database management tools
+      pip:
+        name:
+          - cvss>=2.4
+          - python-nvd3>=0.15.0
+          - safety>=2.3.0
+          - bandit>=1.7.0
+          - semgrep>=1.0.0
+          - cyclonedx-bom>=3.11.0
+          - spdx-tools>=0.8.0
+          - packageurl-python>=0.11.0
+        state: present
+        executable: pip3
+        extra_args: --break-system-packages
+      ignore_errors: true
+
+    - name: Install SBOM generation and analysis tools
+      block:
+        - name: Install syft for SBOM generation
+          get_url:
+            url: "https://github.com/anchore/syft/releases/download/v{{ syft_version }}/syft_{{ syft_version }}_linux_amd64.tar.gz"
+            dest: /tmp/syft.tar.gz
+          vars:
+            syft_version: "0.95.0"
+
+        - name: Extract and install syft
+          unarchive:
+            src: /tmp/syft.tar.gz
+            dest: /tmp
+            remote_src: true
+            creates: /tmp/syft
+
+        - name: Move syft to system PATH
+          copy:
+            src: /tmp/syft
+            dest: /usr/local/bin/syft
+            mode: '0755'
+            remote_src: true
+
+        - name: Install grype for vulnerability scanning
+          get_url:
+            url: "https://github.com/anchore/grype/releases/download/v{{ grype_version }}/grype_{{ grype_version }}_linux_amd64.tar.gz"
+            dest: /tmp/grype.tar.gz
+          vars:
+            grype_version: "0.73.0"
+
+        - name: Extract and install grype
+          unarchive:
+            src: /tmp/grype.tar.gz
+            dest: /tmp
+            remote_src: true
+            creates: /tmp/grype
+
+        - name: Move grype to system PATH
+          copy:
+            src: /tmp/grype
+            dest: /usr/local/bin/grype
+            mode: '0755'
+            remote_src: true
+
+    - name: Configure NVD API for vulnerability data
+      block:
+        - name: Create NVD API configuration directory
+          file:
+            path: /etc/ploy/nvd
+            state: directory
+            mode: '0755'
+            owner: ploy
+            group: ploy
+
+        - name: Create NVD API configuration file
+          copy:
+            content: |
+              # NVD API Configuration for ARF Phase 4
+              # API documentation: https://nvd.nist.gov/developers/vulnerabilities
+              api_endpoint: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+              rate_limit: 5  # requests per second for public API
+              timeout: 30  # seconds
+              cache_duration: 3600  # 1 hour in seconds
+              # To use enhanced rate limits, add your API key:
+              # api_key: "your-nvd-api-key-here"
+            dest: /etc/ploy/nvd/config.yaml
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+    - name: Install human workflow and notification dependencies
+      pip:
+        name:
+          - jinja2>=3.1.0
+          - pyyaml>=6.0
+          - markdown>=3.4.0
+          - email-validator>=2.0.0
+          - python-dateutil>=2.8.0
+          - croniter>=1.4.0
+          - pytz>=2023.3
+          - celery>=5.3.0
+          - kombu>=5.3.0
+        state: present
+        executable: pip3
+        extra_args: --break-system-packages
+      ignore_errors: true
+
+    - name: Install production monitoring dependencies
+      apt:
+        name:
+          - htop
+          - iotop
+          - netstat-nat
+          - tcpdump
+          - strace
+          - lsof
+          - sysstat
+          - procps
+        state: present
+
+    - name: Configure performance monitoring tools
+      block:
+        - name: Enable sysstat data collection
+          replace:
+            path: /etc/default/sysstat
+            regexp: '^ENABLED="false"'
+            replace: 'ENABLED="true"'
+
+        - name: Start sysstat service
+          systemd:
+            name: sysstat
+            state: started
+            enabled: true
+
+    - name: Create ARF Phase 4 configuration directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: ploy
+        group: ploy
+      loop:
+        - /etc/ploy/security
+        - /etc/ploy/workflows
+        - /etc/ploy/monitoring
+        - /var/log/ploy/security
+        - /var/log/ploy/workflows
+        - /var/cache/ploy/vulnerability-db
+
+    - name: Configure security scanning settings
+      copy:
+        content: |
+          # ARF Phase 4 Security Configuration
+          security:
+            vulnerability_scanning:
+              enabled: true
+              scan_interval: 24h  # Daily scans
+              critical_threshold: 9.0  # CVSS score threshold for critical alerts
+              databases:
+                - nvd
+                - osv
+                - github_advisory
+            
+            remediation:
+              auto_apply: false  # Require human approval
+              max_concurrent: 3  # Maximum concurrent remediation operations
+              timeout: 30m  # Maximum time per remediation
+              
+            human_workflow:
+              enabled: true
+              approval_required: true
+              escalation_timeout: 4h  # Escalate if no response within 4 hours
+              notification_channels:
+                - email
+                - webhook
+            
+            compliance:
+              frameworks:
+                - owasp
+                - nist
+              reporting_interval: weekly
+              
+          monitoring:
+            performance:
+              enabled: true
+              collection_interval: 30s
+              retention_period: 7d
+              alert_thresholds:
+                cpu_usage: 80
+                memory_usage: 80
+                disk_usage: 85
+                error_rate: 5  # 5%
+                
+            metrics:
+              endpoint: "/v1/metrics"
+              format: "prometheus"
+              
+          production:
+            optimization:
+              enabled: true
+              auto_scaling: true
+              resource_limits:
+                max_cpu: 4
+                max_memory: 8g
+                max_disk: 50g
+              
+            caching:
+              enabled: true
+              ttl: 30m
+              max_size: 1g
+              
+            rate_limiting:
+              enabled: true
+              requests_per_minute: 60
+              burst_size: 10
+        dest: /etc/ploy/security/config.yaml
+        owner: ploy
+        group: ploy
+        mode: '0644'
+
     - name: Install Redis for LLM caching and coordination
       apt:
         name:
@@ -515,6 +746,39 @@
           
           # Tree-sitter parser paths
           export TREE_SITTER_PARSER_DIR=/usr/local/lib/node_modules
+          
+          # ARF Phase 4 - Security & Production Hardening
+          export ARF_SECURITY_CONFIG_DIR=/etc/ploy/security
+          export ARF_NVD_CONFIG_FILE=/etc/ploy/nvd/config.yaml
+          export ARF_VULNERABILITY_CACHE_DIR=/var/cache/ploy/vulnerability-db
+          export ARF_WORKFLOW_LOG_DIR=/var/log/ploy/workflows
+          export ARF_SECURITY_LOG_DIR=/var/log/ploy/security
+          export ARF_MONITORING_CONFIG_DIR=/etc/ploy/monitoring
+          
+          # Security scanning tools
+          export SYFT_PATH=/usr/local/bin/syft
+          export GRYPE_PATH=/usr/local/bin/grype
+          export ARF_SCAN_RESULTS_DIR=/tmp/arf-scan-results
+          
+          # Human workflow configuration
+          export ARF_WORKFLOW_ENGINE=enabled
+          export ARF_APPROVAL_TIMEOUT=4h
+          export ARF_ESCALATION_ENABLED=true
+          export ARF_NOTIFICATION_CHANNELS=email,webhook
+          
+          # Production optimization
+          export ARF_OPTIMIZATION_ENABLED=true
+          export ARF_PERFORMANCE_MONITORING=enabled
+          export ARF_METRICS_COLLECTION_INTERVAL=30s
+          export ARF_CACHE_ENABLED=true
+          export ARF_BATCH_PROCESSING=enabled
+          export ARF_CIRCUIT_BREAKER_ENABLED=true
+          export ARF_RATE_LIMITING_ENABLED=true
+          
+          # Security compliance
+          export ARF_COMPLIANCE_FRAMEWORKS=owasp,nist
+          export ARF_SECURITY_BASELINE=production
+          export ARF_AUDIT_LOGGING=enabled
           
           # Redis configuration for ARF Phase 3
           export ARF_REDIS_URL="redis://localhost:6379"

@@ -50,13 +50,13 @@ type RepositoryMetadata struct {
 type EnvironmentContext struct {
 	PlatformVersion   string            `json:"platform_version"`
 	ControllerVersion string            `json:"controller_version"`
-	ResourcesUsed     ResourceUsage     `json:"resources_used"`
+	ResourcesUsed     LearningResourceUsage `json:"resources_used"`
 	ConfigurationHash string            `json:"configuration_hash"`
 	NodeInfo          map[string]interface{} `json:"node_info"`
 }
 
-// ResourceUsage tracks actual resource consumption
-type ResourceUsage struct {
+// LearningResourceUsage tracks actual resource consumption for learning
+type LearningResourceUsage struct {
 	CPUMillis    int64 `json:"cpu_millis"`
 	MemoryBytes  int64 `json:"memory_bytes"`
 	DiskBytes    int64 `json:"disk_bytes"`
