@@ -222,7 +222,15 @@ Auto-classified lanes:
     - **Automatic Renewal Service**: Background certificate renewal with configurable thresholds
     - **SeaweedFS Certificate Storage**: Distributed certificate storage for multi-instance access
     - **Health Monitoring Endpoints**: Platform certificate status and expiry tracking
-  - **Blue-Green Deployments**: Gradual traffic shifting with Traefik weight-based routing (planned)
+  - ✅ **Blue-Green Deployments** (Aug 2025): Gradual traffic shifting with Traefik weight-based routing
+    - **Parallel Version Deployment**: Deploy new version alongside existing version without downtime
+    - **Traffic Weight Management**: Manual and automatic traffic shifting between blue and green versions
+    - **Health-Based Validation**: Comprehensive health checks before traffic migration steps
+    - **Gradual Traffic Migration**: Default strategy: 0% → 10% → 25% → 50% → 75% → 100%
+    - **Automatic Rollback**: Instant rollback to previous version on health check failures
+    - **CLI Integration**: Complete CLI support for deployment, monitoring, and rollback operations
+    - **API-Driven Control**: RESTful endpoints for programmatic blue-green deployment management
+    - **Consul State Management**: Deployment state persistence with distributed coordination
   - **Geographic Routing**: Multi-region support with proximity-based traffic direction (planned)
   - ✅ **Minimal Footprint**: ~40MB binary with 50-100MB RAM per instance
   - ✅ **No Single Point of Failure**: Masterless architecture with shared configuration
@@ -536,7 +544,6 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - Per-app Unikraft recipes and custom configurations
 - E2E testing suite with full Nomad cluster validation
 - Observability stack integration (Loki/Prometheus/Grafana)
-- Advanced traffic shifting strategies (blue/green deployments)
 - Vault secrets management integration
 - Multi-region deployment support
 - Cost optimization and resource usage analytics
