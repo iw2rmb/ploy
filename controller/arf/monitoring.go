@@ -77,11 +77,7 @@ type MetricsQuery struct {
 	Limit       int               `json:"limit"`
 }
 
-// TimeRange specifies a time range for queries
-type TimeRange struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
-}
+// TimeRange type is defined in common_types.go
 
 // MetricsResult contains the result of a metrics query
 type MetricsResult struct {

@@ -691,6 +691,306 @@ Tests are organized into suites that can be run automatically:
 - 100% of example recipes work out-of-the-box
 - Complete local development workflow in <10 minutes
 
+## ARF Phase 4: Security & Production Hardening Test Scenarios
+
+### Test 29: Vulnerability Detection and Assessment
+
+**Purpose**: Test comprehensive vulnerability scanning and assessment capabilities
+
+**Setup**: 
+1. Deploy sample applications with known vulnerabilities
+2. Generate SBOMs for each application
+3. Configure NVD API access and vulnerability databases
+
+**Test Steps**:
+1. Run security scan on vulnerable Java application:
+   ```bash
+   ./build/ploy arf security scan --type sbom --target /path/to/app.jar
+   ```
+2. Verify vulnerability report contains:
+   - Critical vulnerabilities with CVSS scores
+   - Affected dependencies with version information
+   - Fix recommendations with upgrade paths
+   - Risk assessment and prioritization
+3. Test different scanning modes:
+   - SBOM-based scanning
+   - Container image scanning
+   - Source code scanning
+4. Validate NVD API integration:
+   - CVE lookup and enrichment
+   - CVSS score calculation
+   - Remediation guidance extraction
+
+**Expected Results**:
+- 90%+ accuracy in vulnerability detection
+- Complete CVE information retrieval within 30 seconds
+- Risk scores match industry standards
+- Remediation recommendations are actionable
+
+### Test 30: Security Remediation Engine
+
+**Purpose**: Test automated security remediation with OpenRewrite integration
+
+**Setup**:
+1. Prepare codebases with security vulnerabilities
+2. Configure OpenRewrite recipes for security fixes
+3. Set up sandbox environments for safe testing
+
+**Test Steps**:
+1. Generate remediation recipe for SQL injection vulnerability:
+   ```bash
+   ./build/ploy arf remediation generate --cve CVE-2023-1234 --codebase /path/to/vulnerable/app
+   ```
+2. Apply remediation in sandbox:
+   ```bash
+   ./build/ploy arf remediation apply --recipe-id remedy-123 --sandbox
+   ```
+3. Test different remediation types:
+   - Dependency upgrades
+   - Code transformations for security fixes
+   - Configuration changes
+   - Security hardening measures
+4. Validate rollback capabilities:
+   ```bash
+   ./build/ploy arf remediation rollback --recipe-id remedy-123
+   ```
+
+**Expected Results**:
+- 85%+ success rate for automated remediation
+- Zero false positives in critical vulnerability fixes
+- Complete rollback within 30 seconds
+- Comprehensive change validation
+
+### Test 31: Human-in-the-Loop Workflows
+
+**Purpose**: Test approval and review workflows for security changes
+
+**Setup**:
+1. Configure stakeholders and approval chains
+2. Set up notification systems (email, webhooks)
+3. Define security policies and thresholds
+
+**Test Steps**:
+1. Create high-severity remediation requiring approval:
+   ```bash
+   ./build/ploy arf workflow create --type approval --priority critical --recipe remedy-456
+   ```
+2. Test approval process:
+   - Notification delivery to stakeholders
+   - Approval decision processing
+   - Escalation on timeout
+   - Multi-level approval chains
+3. Test review workflows:
+   - Security code reviews
+   - Architecture impact assessments
+   - Business impact evaluations
+4. Validate audit trail:
+   ```bash
+   ./build/ploy arf workflow audit --id workflow-789
+   ```
+
+**Expected Results**:
+- 100% notification delivery
+- Approval decisions processed within 5 seconds
+- Complete audit trail for compliance
+- Proper escalation handling
+
+### Test 32: SBOM Security Analysis
+
+**Purpose**: Test comprehensive SBOM generation and security analysis
+
+**Setup**:
+1. Prepare applications with diverse dependencies
+2. Configure syft and grype tools
+3. Set up license policy definitions
+
+**Test Steps**:
+1. Generate enhanced SBOM with security metadata:
+   ```bash
+   ./build/ploy arf sbom generate --target /path/to/app --format spdx-json --security-analysis
+   ```
+2. Analyze SBOM for security issues:
+   ```bash
+   ./build/ploy arf sbom analyze --sbom-file app.sbom.json --deep-scan
+   ```
+3. Test different SBOM formats:
+   - SPDX JSON/XML
+   - CycloneDX JSON/XML
+   - Syft native format
+4. Validate license compliance checking:
+   ```bash
+   ./build/ploy arf sbom compliance --sbom-file app.sbom.json --policy corporate-policy
+   ```
+
+**Expected Results**:
+- Complete dependency discovery (95%+ coverage)
+- Accurate vulnerability correlation
+- License compliance validation
+- Security metrics calculation
+
+### Test 33: Production Performance Monitoring
+
+**Purpose**: Test real-time performance monitoring and optimization
+
+**Setup**:
+1. Deploy ARF system under load
+2. Configure performance monitoring tools
+3. Set up alerting thresholds
+
+**Test Steps**:
+1. Monitor performance during high-load operations:
+   ```bash
+   ./build/ploy arf monitor start --duration 30m --load-test
+   ```
+2. Test auto-scaling capabilities:
+   - CPU/memory threshold breaches
+   - Automatic instance scaling
+   - Load distribution
+3. Validate circuit breaker functionality:
+   ```bash
+   ./build/ploy arf circuit-breaker test --failure-rate 50%
+   ```
+4. Test rate limiting:
+   ```bash
+   ./build/ploy arf rate-limit test --requests 1000 --duration 60s
+   ```
+
+**Expected Results**:
+- Sub-100ms API response times under normal load
+- Graceful degradation under extreme load
+- Circuit breaker activation within 5 seconds
+- Rate limiting accuracy within 2%
+
+### Test 34: Security Compliance Framework
+
+**Purpose**: Test compliance with security frameworks (OWASP, NIST)
+
+**Setup**:
+1. Configure compliance frameworks
+2. Define security baselines
+3. Set up reporting templates
+
+**Test Steps**:
+1. Run OWASP compliance assessment:
+   ```bash
+   ./build/ploy arf compliance assess --framework owasp --baseline production
+   ```
+2. Generate NIST cybersecurity framework report:
+   ```bash
+   ./build/ploy arf compliance report --framework nist --format pdf --timeframe 30d
+   ```
+3. Test continuous compliance monitoring:
+   - Real-time compliance scoring
+   - Deviation alerts
+   - Remediation tracking
+4. Validate audit evidence collection:
+   ```bash
+   ./build/ploy arf compliance evidence --framework owasp --control A06
+   ```
+
+**Expected Results**:
+- Complete framework coverage
+- Accurate compliance scoring
+- Actionable remediation plans
+- Audit-ready evidence
+
+### Test 35: Multi-Tenant Security Isolation
+
+**Purpose**: Test security isolation in multi-tenant environments
+
+**Setup**:
+1. Configure multiple tenant environments
+2. Set up role-based access controls
+3. Define security boundaries
+
+**Test Steps**:
+1. Test tenant isolation:
+   ```bash
+   ./build/ploy arf security test-isolation --tenant-a app1 --tenant-b app2
+   ```
+2. Validate access controls:
+   - User permission enforcement
+   - Resource access boundaries
+   - Data segregation
+3. Test security event correlation:
+   ```bash
+   ./build/ploy arf security events --tenant tenant-1 --timeframe 24h
+   ```
+4. Validate encryption in transit and at rest:
+   ```bash
+   ./build/ploy arf security encryption-test --all-interfaces
+   ```
+
+**Expected Results**:
+- Zero cross-tenant data leakage
+- 100% access control enforcement
+- Complete security event correlation
+- End-to-end encryption validation
+
+### Test 36: Disaster Recovery and Business Continuity
+
+**Purpose**: Test security-focused disaster recovery capabilities
+
+**Setup**:
+1. Configure backup systems
+2. Set up secondary environments
+3. Define recovery procedures
+
+**Test Steps**:
+1. Test security data backup and recovery:
+   ```bash
+   ./build/ploy arf backup create --include-security-data
+   ./build/ploy arf backup restore --backup-id backup-123 --validate-integrity
+   ```
+2. Simulate security incident response:
+   - Compromise detection
+   - Incident containment
+   - System recovery
+   - Post-incident analysis
+3. Test security configuration consistency:
+   ```bash
+   ./build/ploy arf config validate --environment production --against-baseline
+   ```
+
+**Expected Results**:
+- Complete security data recovery
+- Incident response within 15 minutes
+- Configuration drift detection
+- Zero security control degradation
+
+### Test 37: Integration Security Testing
+
+**Purpose**: Test security of all system integrations
+
+**Setup**:
+1. Identify all external integrations
+2. Configure security scanning tools
+3. Set up API security testing
+
+**Test Steps**:
+1. Test API security:
+   ```bash
+   ./build/ploy arf security api-test --endpoint /v1/arf/security --auth-test
+   ```
+2. Validate webhook security:
+   - Signature verification
+   - Payload validation
+   - Rate limiting
+3. Test third-party integration security:
+   - NVD API security
+   - Git repository access
+   - Container registry security
+4. Database security testing:
+   ```bash
+   ./build/ploy arf security db-test --connection-security --injection-test
+   ```
+
+**Expected Results**:
+- All API endpoints properly secured
+- Webhook authenticity verified
+- Third-party connections encrypted
+- Database injection prevention
+
 ## Success Criteria
 
 ### Reliability

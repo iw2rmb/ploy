@@ -65,10 +65,10 @@ type FailedAttempt struct {
 type PatternSeverity string
 
 const (
-	SeverityLow      PatternSeverity = "low"
-	SeverityMedium   PatternSeverity = "medium"
-	SeverityHigh     PatternSeverity = "high"
-	SeverityCritical PatternSeverity = "critical"
+	PatternSeverityLow      PatternSeverity = "low"
+	PatternSeverityMedium   PatternSeverity = "medium"
+	PatternSeverityHigh     PatternSeverity = "high"
+	PatternSeverityCritical PatternSeverity = "critical"
 )
 
 // SimilarPattern represents a pattern similar to a given error context
