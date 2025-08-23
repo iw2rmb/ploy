@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/controller/performance"
 )
 
 // StorageConfig represents the complete storage configuration
@@ -66,12 +67,29 @@ type ConfigManager struct {
 	configPath   string
 	lastModTime  time.Time
 	mu           sync.RWMutex
+	cache        *performance.StatefulCache
+	cacheEnabled bool
 }
 
 // NewConfigManager creates a new configuration manager
 func NewConfigManager(configPath string) *ConfigManager {
 	return &ConfigManager{
-		configPath: configPath,
+		configPath:   configPath,
+		cache:        performance.NewStatefulCache(10 * time.Minute), // 10-minute cache
+		cacheEnabled: true,
+	}
+}
+
+// NewConfigManagerWithCache creates a config manager with configurable caching
+func NewConfigManagerWithCache(configPath string, cacheTTL time.Duration, enableCache bool) *ConfigManager {
+	var cache *performance.StatefulCache
+	if enableCache && cacheTTL > 0 {
+		cache = performance.NewStatefulCache(cacheTTL)
+	}
+	return &ConfigManager{
+		configPath:   configPath,
+		cache:        cache,
+		cacheEnabled: enableCache,
 	}
 }
 
@@ -81,14 +99,31 @@ func Load(path string) (Root, error) {
 	return manager.LoadConfig()
 }
 
-// LoadConfig loads the configuration file with validation
+// LoadConfig loads the configuration file with validation and caching
 func (cm *ConfigManager) LoadConfig() (Root, error) {
+	// Check cache first if enabled
+	if cm.cacheEnabled && cm.cache != nil {
+		fileInfo, err := os.Stat(cm.configPath)
+		if err == nil {
+			cacheKey := fmt.Sprintf("config:%s:%d", cm.configPath, fileInfo.ModTime().Unix())
+			if cached, found := cm.cache.Get(cacheKey); found {
+				if config, ok := cached.(Root); ok {
+					return config, nil
+				}
+			}
+		}
+	}
+
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
 	// Check if file exists
-	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
+	fileInfo, err := os.Stat(cm.configPath)
+	if os.IsNotExist(err) {
 		return Root{}, fmt.Errorf("configuration file not found: %s", cm.configPath)
+	}
+	if err != nil {
+		return Root{}, fmt.Errorf("failed to stat config file: %w", err)
 	}
 
 	// Read the file
@@ -106,6 +141,12 @@ func (cm *ConfigManager) LoadConfig() (Root, error) {
 	// Validate the configuration
 	if err := cm.validateConfig(&config); err != nil {
 		return Root{}, fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	// Cache the result if caching is enabled
+	if cm.cacheEnabled && cm.cache != nil {
+		cacheKey := fmt.Sprintf("config:%s:%d", cm.configPath, fileInfo.ModTime().Unix())
+		cm.cache.Set(cacheKey, config)
 	}
 
 	return config, nil
@@ -309,4 +350,69 @@ func GetStorageConfigPath() string {
 
 	// Fallback to embedded config
 	return "configs/storage-config.yaml"
+}
+
+// ClearCache clears the configuration cache
+func (cm *ConfigManager) ClearCache() {
+	if cm.cache != nil {
+		cm.cache.Clear()
+	}
+}
+
+// GetCacheStats returns cache performance statistics
+func (cm *ConfigManager) GetCacheStats() performance.CacheStats {
+	if cm.cache != nil {
+		return cm.cache.Stats()
+	}
+	return performance.CacheStats{}
+}
+
+// OptimizedStorageClientFactory creates storage clients with connection pooling
+type OptimizedStorageClientFactory struct {
+	configManager *ConfigManager
+	mu            sync.RWMutex
+}
+
+// NewOptimizedStorageClientFactory creates a factory for optimized storage clients
+func NewOptimizedStorageClientFactory(configPath string) *OptimizedStorageClientFactory {
+	return &OptimizedStorageClientFactory{
+		configManager: NewConfigManagerWithCache(configPath, 5*time.Minute, true),
+	}
+}
+
+// CreateClient creates a storage client with optimized configuration loading
+func (f *OptimizedStorageClientFactory) CreateClient() (*storage.StorageClient, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	// Load configuration from cache if possible
+	config, err := f.configManager.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load storage config: %w", err)
+	}
+
+	// Convert to storage config format
+	storageConfig := config.Storage.ToStorageConfig()
+
+	// Create storage provider
+	provider, err := storage.New(storageConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage provider: %w", err)
+	}
+
+	// Convert client config
+	clientConfig, err := config.Storage.Client.ToClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert client config: %w", err)
+	}
+
+	// Create enhanced storage client
+	return storage.NewStorageClient(provider, clientConfig), nil
+}
+
+// GetStats returns factory statistics
+func (f *OptimizedStorageClientFactory) GetStats() map[string]interface{} {
+	return map[string]interface{}{
+		"config_cache_stats": f.configManager.GetCacheStats(),
+	}
 }
