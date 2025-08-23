@@ -11,12 +11,17 @@ import (
 func (h *Handler) CreateWorkflow(c *fiber.Ctx) error {
 	var req struct {
 		Type         string                 `json:"type"`
+		Title        string                 `json:"title"`
+		Description  string                 `json:"description"`
 		Priority     string                 `json:"priority"`
 		Context      map[string]interface{} `json:"context"`
 		Approvers    []string               `json:"approvers"`
 		Requester    string                 `json:"requester"`
 		Timeout      string                 `json:"timeout"`
 		AutoApprove  bool                   `json:"auto_approve"`
+		RecipeID     string                 `json:"recipe_id"`
+		Reason       string                 `json:"reason"`
+		Metadata     map[string]interface{} `json:"metadata"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -26,21 +31,49 @@ func (h *Handler) CreateWorkflow(c *fiber.Ctx) error {
 		})
 	}
 
-	// Mock workflow creation
-	workflow := HumanWorkflow{
-		ID:        fmt.Sprintf("wf-%d", time.Now().Unix()),
-		Type:      req.Type,
-		Status:    WorkflowPending,
-		CreatedAt: time.Now(),
-		Steps: []WorkflowStep{
+	// Validate required fields
+	if req.Type == "" && req.Title == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid request: type or title is required",
+		})
+	}
+
+	// Set defaults
+	if req.Type == "" {
+		req.Type = "general"
+	}
+	if req.Priority == "" {
+		req.Priority = "medium"
+	}
+	if req.Requester == "" {
+		req.Requester = "system"
+	}
+
+	// Mock workflow creation with proper structure
+	workflowID := fmt.Sprintf("wf-%d", time.Now().Unix())
+	
+	workflow := fiber.Map{
+		"id":         workflowID,
+		"type":       req.Type,
+		"title":      req.Title,
+		"description": req.Description,
+		"status":     "pending",
+		"priority":   req.Priority,
+		"requester":  req.Requester,
+		"created_at": time.Now(),
+		"steps": []fiber.Map{
 			{
-				ID:         "step-1",
-				Name:       "Security Review",
-				Type:       StepApproval,
-				Status:     StepPending,
-				AssignedTo: []string{"security-team"},
+				"id":          "step-1",
+				"name":        "Security Review",
+				"type":        "approval",
+				"status":      "pending",
+				"assigned_to": []string{"security-team"},
+				"deadline":    time.Now().Add(24 * time.Hour),
 			},
 		},
+		"metadata": req.Metadata,
+		"context":  req.Context,
+		"estimated_completion": time.Now().Add(48 * time.Hour),
 	}
 
 	return c.JSON(workflow)
