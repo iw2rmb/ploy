@@ -32,7 +32,7 @@ type SelectedStrategy struct {
 	Reasoning         StrategyReasoning       `json:"reasoning"`
 	ResourceEstimate  ResourcePrediction      `json:"resource_estimate"`
 	TimeEstimate      time.Duration           `json:"time_estimate"`
-	RiskAssessment    RiskAssessment          `json:"risk_assessment"`
+	RiskAssessment    StrategyRiskAssessment          `json:"risk_assessment"`
 }
 
 // StrategyReasoning explains why a strategy was selected
@@ -53,8 +53,8 @@ type ResourcePrediction struct {
 	Confidence       float64       `json:"confidence"`
 }
 
-// RiskAssessment evaluates the risks of a transformation strategy
-type RiskAssessment struct {
+// StrategyRiskAssessment evaluates the risks of a transformation strategy
+type StrategyRiskAssessment struct {
 	OverallRisk      float64     `json:"overall_risk"`
 	RiskFactors      []RiskFactor `json:"risk_factors"`
 	MitigationSteps  []string    `json:"mitigation_steps"`
@@ -434,7 +434,7 @@ func (s *DefaultStrategySelector) estimateExecutionTime(strategy TransformationS
 	return adjustedTime
 }
 
-func (s *DefaultStrategySelector) assessRisks(strategy TransformationStrategy, request StrategyRequest, complexity ComplexityAnalysis) RiskAssessment {
+func (s *DefaultStrategySelector) assessRisks(strategy TransformationStrategy, request StrategyRequest, complexity ComplexityAnalysis) StrategyRiskAssessment {
 	var riskFactors []RiskFactor
 
 	// Strategy-specific risks
@@ -487,7 +487,7 @@ func (s *DefaultStrategySelector) assessRisks(strategy TransformationStrategy, r
 		"Maintain rollback capability",
 	}
 
-	return RiskAssessment{
+	return StrategyRiskAssessment{
 		OverallRisk:        overallRisk,
 		RiskFactors:        riskFactors,
 		MitigationSteps:    mitigationSteps,

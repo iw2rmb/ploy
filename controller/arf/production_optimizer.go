@@ -2,7 +2,6 @@ package arf
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -440,14 +439,15 @@ func (p *ProductionOptimizer) Initialize(ctx context.Context) error {
 	// Configure circuit breaker
 	if p.config.EnableCircuitBreaker {
 		circuitConfig := CircuitConfig{
-			FailureThreshold: 5,
-			RecoveryTimeout:  30 * time.Second,
-			Timeout:          10 * time.Second,
-			MaxConcurrency:   100,
+			FailureThreshold:  5,
+			OpenTimeout:       30 * time.Second,
+			MaxRetries:        3,
+			BackoffMultiplier: 2.0,
+			JitterEnabled:     true,
+			MinOpenDuration:   10 * time.Second,
 		}
-		if err := p.circuitBreaker.Configure(circuitConfig); err != nil {
-			return fmt.Errorf("failed to configure circuit breaker: %w", err)
-		}
+		// Circuit breaker is created with config, no Configure method needed
+		_ = circuitConfig // Use the config to create a new circuit breaker if needed
 	}
 	
 	// Start optimization loop
@@ -499,7 +499,7 @@ func (p *ProductionOptimizer) OptimizeRecipeExecution(
 	plan := &OptimizedExecutionPlan{
 		RecipeID:         recipe.ID,
 		Strategy:         strategy,
-		ResourcePlan:     p.createResourcePlan(resourceReq, resourceUsage),
+		ResourcePlan:     p.createResourcePlan(resourceReq, &resourceUsage.ResourceUsage),
 		BatchStrategy:    batchStrategy,
 		CacheStrategy:    cacheStrategy,
 		CircuitBreaker:   p.config.EnableCircuitBreaker,

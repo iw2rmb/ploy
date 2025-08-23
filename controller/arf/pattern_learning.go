@@ -203,7 +203,7 @@ func (pls *DefaultPatternLearningService) RecordPattern(ctx context.Context, pat
 		// New pattern
 		pattern.FrequencyCount = 1
 		if pattern.Severity == "" {
-			pattern.Severity = SeverityLow
+			pattern.Severity = PatternSeverityLow
 		}
 		
 		pls.patterns[pattern.ID] = pattern
@@ -305,19 +305,19 @@ func getFileExtension(path string) string {
 func (pls *DefaultPatternLearningService) calculateSeverity(frequency int, fixes []SuccessfulFix) PatternSeverity {
 	// High frequency patterns are more severe
 	if frequency >= 50 {
-		return SeverityCritical
+		return PatternSeverityCritical
 	} else if frequency >= 20 {
-		return SeverityHigh
+		return PatternSeverityHigh
 	} else if frequency >= 10 {
-		return SeverityMedium
+		return PatternSeverityMedium
 	}
 	
 	// If there are no successful fixes, it's more severe
 	if len(fixes) == 0 && frequency >= 5 {
-		return SeverityHigh
+		return PatternSeverityHigh
 	}
 	
-	return SeverityLow
+	return PatternSeverityLow
 }
 
 // FindSimilarPatterns finds patterns similar to the given error context

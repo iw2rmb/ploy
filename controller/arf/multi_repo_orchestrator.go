@@ -23,7 +23,7 @@ type BatchTransformationRequest struct {
 	Repositories    []Repository `json:"repositories"`
 	Recipes         []Recipe     `json:"recipes"`
 	Options         BatchOptions `json:"options"`
-	Dependencies    []Dependency `json:"dependencies,omitempty"`
+	Dependencies    []RepoDependency `json:"dependencies,omitempty"`
 }
 
 // Repository represents a source code repository for transformation
@@ -48,8 +48,8 @@ type BatchOptions struct {
 	CreatePullRequest bool          `json:"create_pull_request"`
 }
 
-// Dependency represents a relationship between repositories
-type Dependency struct {
+// RepoDependency represents a relationship between repositories
+type RepoDependency struct {
 	From         string       `json:"from"`          // Source repository ID
 	To           string       `json:"to"`            // Target repository ID
 	Type         DependencyType `json:"type"`        // Type of dependency
@@ -99,7 +99,7 @@ type RepoTransformationResult struct {
 // DependencyAnalysis contains the analysis of dependencies between repositories
 type DependencyAnalysis struct {
 	TotalRepositories int                    `json:"total_repositories"`
-	Dependencies      []Dependency           `json:"dependencies"`
+	Dependencies      []RepoDependency           `json:"dependencies"`
 	DependencyGraph   map[string][]string    `json:"dependency_graph"`
 	ExecutionLevels   [][]string             `json:"execution_levels"`
 	CriticalPaths     [][]string             `json:"critical_paths"`
@@ -267,10 +267,10 @@ func (mro *DefaultMultiRepoOrchestrator) AnalyzeDependencies(ctx context.Context
 	}
 	
 	// Extract explicit dependencies from repository metadata
-	dependencies := make([]Dependency, 0)
+	dependencies := make([]RepoDependency, 0)
 	for _, repo := range repositories {
 		for _, depID := range repo.Dependencies {
-			dep := Dependency{
+			dep := RepoDependency{
 				From:         repo.ID,
 				To:           depID,
 				Type:         DependencyLibrary, // Default type
@@ -421,11 +421,11 @@ func (mro *DefaultMultiRepoOrchestrator) createExecutionLevels(repositories []Re
 }
 
 // identifyCriticalPaths identifies critical dependency paths
-func (mro *DefaultMultiRepoOrchestrator) identifyCriticalPaths(graph map[string][]string, dependencies []Dependency) [][]string {
+func (mro *DefaultMultiRepoOrchestrator) identifyCriticalPaths(graph map[string][]string, dependencies []RepoDependency) [][]string {
 	criticalPaths := make([][]string, 0)
 	
 	// Find critical dependencies
-	criticalDeps := make([]Dependency, 0)
+	criticalDeps := make([]RepoDependency, 0)
 	for _, dep := range dependencies {
 		if dep.Critical {
 			criticalDeps = append(criticalDeps, dep)

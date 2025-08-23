@@ -15,7 +15,7 @@ import (
 // LLMRecipeGenerator defines the interface for LLM-assisted recipe generation
 type LLMRecipeGenerator interface {
 	GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error)
-	ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*ValidationResult, error)
+	ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error)
 	OptimizeRecipe(ctx context.Context, recipe Recipe, feedback TransformationFeedback) (*Recipe, error)
 }
 
@@ -249,13 +249,13 @@ func (g *OpenAILLMGenerator) GenerateRecipe(ctx context.Context, request RecipeG
 }
 
 // ValidateGenerated validates a generated recipe through compilation and testing
-func (g *OpenAILLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*ValidationResult, error) {
-	result := &ValidationResult{
+func (g *OpenAILLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
+	result := &EvolutionValidationResult{
 		Valid:           true,
 		SafetyScore:     1.0,
 		Warnings:        []string{},
 		CriticalIssues:  []string{},
-		TestResults:     []ValidationTest{},
+		TestResults:     []EvolutionValidationTest{},
 		RecommendAction: ActionApprove,
 	}
 

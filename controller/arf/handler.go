@@ -1006,7 +1006,7 @@ func (h *Handler) SelectTransformationStrategy(c *fiber.Ctx) error {
 			Confidence:      0.8,
 		},
 		TimeEstimate: 3 * time.Minute,
-		RiskAssessment: RiskAssessment{
+		RiskAssessment: StrategyRiskAssessment{
 			OverallRisk:        0.25,
 			FailureProbability: 0.15,
 			RiskFactors: []RiskFactor{
