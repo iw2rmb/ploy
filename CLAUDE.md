@@ -146,22 +146,51 @@ PORT=8082 ./build/controller
 nomad job run platform/nomad/ploy-controller-simple.hcl
 ```
 
-### VPS Runtime Commands (Production Environment)
-**ALL runtime testing must be performed on VPS.**
+### VPS Controller Deployment (STRICT PROTOCOL)
+**CRITICAL**: Controller deployment must follow this exact order:
 
+**1. PRIMARY METHOD - Self-Update Endpoint:**
 ```bash
-# Deploy via Nomad (production method)
-nomad job run platform/nomad/ploy-controller-simple.hcl
+# Update to latest version
+curl -X POST https://api.dev.ployd.app/v1/controller/update/latest
 
-# Check deployment status
-nomad job status ploy-controller-simple
+# Deploy specific branch  
+curl -X POST https://api.dev.ployd.app/v1/controller/deploy/git -d '{"branch": "main"}'
 
-# Run test scripts
+# Check update status
+curl https://api.dev.ployd.app/v1/controller/update/status
+```
+
+**2. FALLBACK METHOD - Deploy Script (ONLY if self-update fails):**
+```bash
+# Use ONLY when self-update endpoint fails
+./scripts/deploy.sh main
+```
+
+**3. INVESTIGATION REQUIRED if both methods fail:**
+- Self-update endpoint errors → Fix controller/selfupdate/ code
+- Deploy script errors → Fix scripts/deploy.sh or platform/nomad/ploy-controller.hcl
+- These are CRITICAL system failures requiring immediate resolution
+
+**ABSOLUTELY PROHIBITED:**
+```bash
+# ❌ NEVER run controller manually (anywhere)
+./build/controller
+go run ./controller
+PORT=8081 ./build/controller
+
+# ❌ NEVER use direct Nomad commands for controller
+nomad job run platform/nomad/ploy-controller.hcl
+```
+
+**Testing Commands:**
+```bash
+# Run test scripts after deployment
 ./test-scripts/test-arf-phase4-security.sh
 
-# CLI testing
-./build/ploy apps new --lang go --name test-app
-./build/ploy push -a test-app
+# VPS CLI testing (via SSH only)
+ssh root@$TARGET_HOST "su - ploy -c './build/ploy apps new --lang go --name test-app'"
+ssh root@$TARGET_HOST "su - ploy -c './build/ploy push -a test-app'"
 ```
 
 

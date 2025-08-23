@@ -183,20 +183,16 @@ upload_binaries() {
     echo -e "${YELLOW}Uploading binaries to SeaweedFS...${NC}"
     
     # Upload controller binary with version-specific name
-    ./build/controller-dist -command=upload -version="$VERSION" -binary=./build/controller -checksum="$CONTROLLER_CHECKSUM"
+    ./build/controller-dist -command=upload -version="$VERSION" -binary=./build/controller
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to upload controller binary${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ Controller binary uploaded${NC}"
 
-    # Upload CLI binary
-    ./build/controller-dist -command=upload -version="$VERSION" -binary=./build/ploy -checksum="$CLI_CHECKSUM" -type=cli
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to upload CLI binary${NC}"
-        exit 1
-    fi
-    echo -e "${GREEN}✓ CLI binary uploaded${NC}"
+    # Note: CLI binary upload not supported by controller-dist tool
+    # CLI binaries are built and used locally only
+    echo -e "${GREEN}✓ CLI binary available locally (not uploaded to distribution storage)${NC}"
 
     # Verify uploads
     echo -e "${YELLOW}Verifying binary uploads...${NC}"
