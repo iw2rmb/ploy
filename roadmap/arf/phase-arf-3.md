@@ -24,16 +24,19 @@ Phase ARF-3 represents the revolutionary integration of Large Language Models wi
 
 ## Implementation Tasks
 
-### 1. LLM-Assisted Recipe Creation with Multi-Language Support
+### 1. LLM-Assisted Recipe Creation with Multi-Model Support
 
-**Objective**: Enable dynamic generation of transformation recipes for multiple languages using LLM analysis and language-specific AST tools.
+**Objective**: Enable dynamic generation of transformation recipes using multiple LLM providers with intelligent model selection, prompt management, and language-specific AST tools.
 
 **Tasks**:
-- Integrate LLM API for dynamic recipe generation from error contexts
-- Implement LLM prompt engineering for multi-language recipe creation
+- Integrate multiple LLM providers (OpenAI, Claude, Gemini, Llama) with unified interface
+- Implement intelligent model selection based on task complexity and cost optimization
+- Create prompt template management system with versioning and A/B testing
+- Add context-aware prompt engineering for multi-language recipe creation
+- Implement prompt effectiveness tracking and optimization
 - Add LLM response parsing into valid recipe formats (OpenRewrite YAML, tree-sitter queries)
 - Create LLM-generated recipe validation and testing system
-- Implement fallback handling when LLM generation fails
+- Implement fallback handling with model switching when primary fails
 - Extend support beyond Java to Node.js, Python, Go, and Rust
 - Integrate tree-sitter for universal AST parsing across languages
 - Add WASM-specific transformation capabilities for Lane G
@@ -45,6 +48,26 @@ type LLMRecipeGenerator interface {
     GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error)
     ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*ValidationResult, error)
     OptimizeRecipe(ctx context.Context, recipe Recipe, feedback TransformationFeedback) (*Recipe, error)
+    SelectModel(ctx context.Context, task TaskComplexity) (*LLMModel, error)
+    CompareModels(ctx context.Context, request RecipeGenerationRequest) (*ModelComparison, error)
+}
+
+// Multi-model support
+type LLMProvider string
+const (
+    ProviderOpenAI    LLMProvider = "openai"
+    ProviderClaude    LLMProvider = "claude"
+    ProviderGemini    LLMProvider = "gemini"
+    ProviderLlama     LLMProvider = "llama"
+)
+
+type LLMModel struct {
+    Provider        LLMProvider      `json:"provider"`
+    ModelID         string           `json:"model_id"`
+    Capabilities    ModelCapabilities `json:"capabilities"`
+    CostPerToken    float64          `json:"cost_per_token"`
+    Latency         time.Duration    `json:"latency"`
+    MaxTokens       int              `json:"max_tokens"`
 }
 
 type RecipeGenerationRequest struct {
@@ -55,6 +78,8 @@ type RecipeGenerationRequest struct {
     TargetFramework  string                   `json:"target_framework"`
     Language         string                   `json:"language"`
     ASTParser        string                   `json:"ast_parser"`
+    PreferredModel   *LLMModel                `json:"preferred_model,omitempty"`
+    ModelStrategy    ModelSelectionStrategy   `json:"model_strategy"`
 }
 
 type GeneratedRecipe struct {
@@ -67,22 +92,61 @@ type GeneratedRecipe struct {
 
 type LLMGenerationData struct {
     Model           string            `json:"model"`
+    Provider        LLMProvider       `json:"provider"`
     PromptTokens    int               `json:"prompt_tokens"`
     ResponseTokens  int               `json:"response_tokens"`
     Temperature     float64           `json:"temperature"`
     RequestTime     time.Time         `json:"request_time"`
     ProcessingTime  time.Duration     `json:"processing_time"`
+    Cost            float64           `json:"cost"`
+}
+
+// Prompt Management System
+type PromptManager interface {
+    GetPrompt(ctx context.Context, templateID string, vars map[string]interface{}) (*Prompt, error)
+    CreatePromptTemplate(ctx context.Context, template PromptTemplate) error
+    UpdatePromptTemplate(ctx context.Context, templateID string, template PromptTemplate) error
+    GetPromptVersion(ctx context.Context, templateID string, version int) (*PromptTemplate, error)
+    TestPromptEffectiveness(ctx context.Context, templateID string) (*PromptMetrics, error)
+    SelectOptimalPrompt(ctx context.Context, task TaskType) (*PromptTemplate, error)
+}
+
+type PromptTemplate struct {
+    ID              string                 `json:"id"`
+    Name            string                 `json:"name"`
+    Version         int                    `json:"version"`
+    Template        string                 `json:"template"`
+    Variables       []PromptVariable       `json:"variables"`
+    ModelSpecific   map[LLMProvider]string `json:"model_specific"`
+    Effectiveness   float64                `json:"effectiveness"`
+    UsageCount      int                    `json:"usage_count"`
+    LastUsed        time.Time              `json:"last_used"`
+    Tags            []string               `json:"tags"`
+}
+
+type PromptMetrics struct {
+    TemplateID      string          `json:"template_id"`
+    SuccessRate     float64         `json:"success_rate"`
+    AverageTokens   int             `json:"average_tokens"`
+    AverageCost     float64         `json:"average_cost"`
+    ResponseQuality float64         `json:"response_quality"`
+    ModelScores     map[string]float64 `json:"model_scores"`
 }
 ```
 
 **Acceptance Criteria**:
+- Support for 4+ LLM providers with seamless switching
+- Model selection optimizes for cost/performance based on task complexity
+- Prompt templates achieve 15% better success rate than ad-hoc prompts
 - LLM generates syntactically valid recipes for Java, Node.js, Python, Go, Rust
 - Generated recipes pass validation in sandbox environments
-- Fallback to static recipes when LLM generation fails
+- Automatic fallback between models when primary fails
 - Recipe generation completes within 30 seconds
 - 70%+ success rate for LLM-generated recipes on first attempt
 - Tree-sitter integration enables cross-language AST analysis
 - WASM transformations support optimization and polyfill injection
+- Prompt versioning tracks effectiveness across 100+ iterations
+- Cost optimization reduces LLM API expenses by 30%
 
 ### 2. Multi-Language Transformation Engine
 
@@ -219,19 +283,23 @@ type ConfidenceThresholds struct {
 - Context-aware prompting improves LLM relevance by 40%
 - Solution ranking correctly identifies best transformations 90% of the time
 
-### 4. Continuous Learning System with Schema Design
+### 4. Continuous Learning System with Vector Similarity Search
 
-**Objective**: Implement machine learning capabilities that extract patterns from transformation outcomes to improve future strategy selection and recipe generation.
+**Objective**: Implement advanced machine learning capabilities with vector embeddings for pattern similarity, enabling sophisticated pattern matching and strategy optimization.
 
 **Tasks**:
-- Add success pattern extraction from completed transformations
-- Implement failure pattern analysis and cataloging
-- Create recipe performance tracking by repository type and complexity
-- Add pattern generalization for new recipe template creation
-- Implement model retraining for strategy selection algorithms
-- Design comprehensive learning database schema
-- Implement A/B testing framework for recipe variations
-- Create feedback loop for continuous improvement
+- Implement vector embedding generation for code patterns using transformer models
+- Add pgvector extension for PostgreSQL vector similarity search
+- Create embedding-based pattern clustering and classification
+- Implement semantic similarity search for finding related transformations
+- Add success pattern extraction from completed transformations with embeddings
+- Implement failure pattern analysis with vector-based anomaly detection
+- Create recipe performance tracking with similarity-based recommendations
+- Add pattern generalization using embedding space analysis
+- Implement model retraining for strategy selection with neural networks
+- Design comprehensive learning database schema with vector storage
+- Implement A/B testing framework with statistical significance testing
+- Create feedback loop with reinforcement learning optimization
 
 **Deliverables**:
 ```go
@@ -241,6 +309,42 @@ type LearningSystem interface {
     ExtractPatterns(ctx context.Context, timeWindow time.Duration) (*PatternAnalysis, error)
     UpdateStrategyWeights(ctx context.Context, patterns PatternAnalysis) error
     GenerateRecipeTemplate(ctx context.Context, pattern SuccessPattern) (*RecipeTemplate, error)
+    // Vector similarity methods
+    GenerateEmbedding(ctx context.Context, code string) (*CodeEmbedding, error)
+    FindSimilarPatterns(ctx context.Context, embedding CodeEmbedding, threshold float64) ([]SimilarPattern, error)
+    ClusterPatterns(ctx context.Context, embeddings []CodeEmbedding) (*PatternClusters, error)
+    AnalyzeEmbeddingSpace(ctx context.Context) (*EmbeddingAnalysis, error)
+}
+
+// Vector similarity types
+type CodeEmbedding struct {
+    ID          string          `json:"id"`
+    Vector      []float32       `json:"vector"`
+    Dimension   int             `json:"dimension"`
+    Model       string          `json:"model"`
+    Metadata    EmbeddingMetadata `json:"metadata"`
+    CreatedAt   time.Time       `json:"created_at"`
+}
+
+type SimilarPattern struct {
+    Pattern     SuccessPattern  `json:"pattern"`
+    Similarity  float64         `json:"similarity"`
+    Distance    float64         `json:"distance"`
+    Embedding   CodeEmbedding   `json:"embedding"`
+}
+
+type PatternClusters struct {
+    Clusters    []PatternCluster `json:"clusters"`
+    Centroids   []CodeEmbedding  `json:"centroids"`
+    Quality     ClusterQuality   `json:"quality"`
+}
+
+type VectorSearchEngine interface {
+    IndexEmbedding(ctx context.Context, embedding CodeEmbedding) error
+    SearchNearest(ctx context.Context, query CodeEmbedding, k int) ([]SimilarPattern, error)
+    SearchByThreshold(ctx context.Context, query CodeEmbedding, threshold float64) ([]SimilarPattern, error)
+    UpdateIndex(ctx context.Context) error
+    GetIndexStats() (*IndexStatistics, error)
 }
 
 type TransformationOutcome struct {
@@ -271,9 +375,12 @@ type SuccessPattern struct {
 }
 ```
 
-**Learning Database Schema**:
+**Learning Database Schema with Vector Storage**:
 ```sql
--- Transformation outcomes table
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Transformation outcomes table with embeddings
 CREATE TABLE transformation_outcomes (
     id UUID PRIMARY KEY,
     transformation_id UUID NOT NULL,
@@ -286,21 +393,34 @@ CREATE TABLE transformation_outcomes (
     confidence_score FLOAT,
     execution_time_ms INT,
     error_classification VARCHAR(100),
+    code_embedding vector(768), -- 768-dim embeddings from transformer models
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Pattern templates table
+-- Create index for vector similarity search
+CREATE INDEX transformation_embedding_idx ON transformation_outcomes 
+USING ivfflat (code_embedding vector_cosine_ops)
+WITH (lists = 100);
+
+-- Pattern templates table with vector embeddings
 CREATE TABLE pattern_templates (
     id UUID PRIMARY KEY,
     pattern_signature TEXT,
+    pattern_embedding vector(768),
     language VARCHAR(50),
     success_rate FLOAT,
     usage_count INT,
     template_recipe JSONB,
     confidence_threshold FLOAT,
+    cluster_id INT,
     created_at TIMESTAMP DEFAULT NOW(),
     last_used TIMESTAMP
 );
+
+-- Index for pattern similarity search
+CREATE INDEX pattern_embedding_idx ON pattern_templates 
+USING ivfflat (pattern_embedding vector_cosine_ops)
+WITH (lists = 50);
 
 -- A/B test experiments
 CREATE TABLE ab_experiments (
@@ -327,7 +447,30 @@ CREATE TABLE transformation_features (
     test_coverage FLOAT,
     language_features JSONB,
     framework_features JSONB,
+    feature_embedding vector(256), -- Lower-dim features for clustering
     outcome_label VARCHAR(50)
+);
+
+-- Pattern similarity cache for fast lookups
+CREATE TABLE pattern_similarity_cache (
+    id UUID PRIMARY KEY,
+    pattern_a_id UUID NOT NULL,
+    pattern_b_id UUID NOT NULL,
+    similarity_score FLOAT NOT NULL,
+    distance_metric VARCHAR(50),
+    computed_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(pattern_a_id, pattern_b_id)
+);
+
+-- Embedding models metadata
+CREATE TABLE embedding_models (
+    id UUID PRIMARY KEY,
+    model_name VARCHAR(100) NOT NULL,
+    model_version VARCHAR(50),
+    dimension INT NOT NULL,
+    provider VARCHAR(50),
+    performance_metrics JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
@@ -353,13 +496,18 @@ type ABExperiment struct {
 ```
 
 **Acceptance Criteria**:
-- Learning system improves strategy selection accuracy by 25% over 100 transformations
+- Vector similarity search finds related patterns with 90%+ precision
+- Embedding generation processes code in <500ms per file
+- Similarity search returns results in <100ms for 1M+ embeddings
+- Pattern clustering identifies 20+ distinct transformation categories
+- Learning system improves strategy selection accuracy by 35% using embeddings
 - Pattern extraction identifies actionable insights from transformation history
 - Recipe template generation creates reusable patterns from successful outcomes
 - Model retraining prevents degradation in strategy selection performance
 - Continuous improvement demonstrates measurable enhancement over time
 - A/B testing achieves statistical significance with 95% confidence
-- Learning database handles 1M+ transformation records efficiently
+- Learning database handles 1M+ transformation records with sub-second queries
+- Vector indexes maintain performance with 10M+ embeddings
 
 ### 5. Transformation Strategy Selection
 
