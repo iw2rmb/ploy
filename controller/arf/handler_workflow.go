@@ -110,6 +110,38 @@ func (h *Handler) ApproveWorkflow(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+// RejectWorkflow rejects a workflow step
+func (h *Handler) RejectWorkflow(c *fiber.Ctx) error {
+	workflowID := c.Params("id")
+	
+	var req struct {
+		RejectorID string `json:"rejector_id"`
+		Reason     string `json:"reason"`
+		Comments   string `json:"comments"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error":   "Invalid request",
+			"details": err.Error(),
+		})
+	}
+
+	// Mock rejection processing
+	response := fiber.Map{
+		"workflow_id": workflowID,
+		"step_id":     "step-1",
+		"decision":    "rejected",
+		"rejector":    req.RejectorID,
+		"reason":      req.Reason,
+		"timestamp":   time.Now(),
+		"status":      "rejected",
+		"next_step":   nil,
+	}
+
+	return c.JSON(response)
+}
+
 // GetApprovalHistory gets the approval history for a workflow
 func (h *Handler) GetApprovalHistory(c *fiber.Ctx) error {
 	workflowID := c.Params("id")
