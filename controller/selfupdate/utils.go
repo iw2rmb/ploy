@@ -164,8 +164,7 @@ func parseVersion(version string) []int {
 	return parts
 }
 
-// Build-time version injection
-var BuildVersion = "unknown"
+// Build-time version injection (declared in handler.go)
 
 // GetCurrentVersion attempts to determine the current controller version
 func GetCurrentVersion() string {

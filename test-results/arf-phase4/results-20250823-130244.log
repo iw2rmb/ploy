@@ -1,0 +1,28 @@
+FAIL: SBOM Vulnerability Scan
+FAIL: Container Vulnerability Scan
+FAIL: Source Code Vulnerability Scan
+FAIL: Generate Remediation Plan
+FAIL: Get Security Report
+FAIL: Get Compliance Status
+FAIL: Generate SBOM
+FAIL: Analyze SBOM for Vulnerabilities
+FAIL: Check SBOM Compliance
+FAIL: Get SBOM Report
+FAIL: Create Remediation Approval Workflow
+FAIL: Get Pending Workflows
+FAIL: Get Workflow Status
+FAIL: Approve Workflow
+FAIL: Create Security Review Workflow
+FAIL: Reject Workflow
+FAIL: Optimize Recipe Execution
+FAIL: Get Optimization Metrics (24h)
+FAIL: Get Optimization Report
+FAIL: Optimize System Performance
+FAIL: E2E: Scan -> Analyze -> Remediate
+PASS: Performance: Multiple Concurrent Scans
+FAIL: Compliance: OWASP and NIST Framework Check
+FAIL: Error: Invalid Scan Type
+FAIL: Error: Missing Required Fields
+PASS: Error: Non-existent Workflow
+PASS: Performance: API Response Time < 100ms
+PASS: Performance: Concurrent Workflow Creation
