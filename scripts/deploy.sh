@@ -258,9 +258,11 @@ job "ploy-controller" {
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-controller.rule=Host(\`api.dev.ployd.app\`) || PathPrefix(\`/v1\`)",
+        "traefik.http.routers.ploy-controller.rule=Host(\`api.dev.ployd.app\`) || Host(\`api.ployd.app\`)",
         "traefik.http.routers.ploy-controller.tls=true",
-        "traefik.http.routers.ploy-controller.tls.certresolver=letsencrypt",
+        "traefik.http.routers.ploy-controller.tls.certresolver=dev-wildcard",
+        "traefik.http.routers.ploy-controller.tls.domains[0].main=dev.ployd.app",
+        "traefik.http.routers.ploy-controller.tls.domains[0].sans=*.dev.ployd.app",
         "traefik.http.services.ploy-controller.loadbalancer.server.scheme=http",
         "traefik.http.services.ploy-controller.loadbalancer.healthcheck.path=/health",
         "traefik.http.services.ploy-controller.loadbalancer.healthcheck.interval=10s",
@@ -454,7 +456,7 @@ job "ploy-controller" {
       
       # Dynamic binary download from SeaweedFS
       artifact {
-        source = "http://45.12.75.241:8080/\${NOMAD_META_binary_path}"
+        source = "http://45.12.75.241:8080/ploy-artifacts/controller-binaries/$VERSION/linux/amd64/controller"
         destination = "local/controller"
         mode = "file"
         
@@ -463,16 +465,6 @@ job "ploy-controller" {
         }
       }
       
-      # Binary metadata template for dynamic path resolution
-      template {
-        data = <<-EOH
-        binary_path={{ env "SEAWEEDFS_BINARY_PATH" | default "auto-generated-path-for-$VERSION" }}
-        EOH
-        
-        destination = "local/binary-meta.env"
-        env = true
-        change_mode = "restart"
-      }
       
       config {
         command = "local/controller"
