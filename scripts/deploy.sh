@@ -456,7 +456,7 @@ job "ploy-controller" {
       
       # Dynamic binary download from SeaweedFS
       artifact {
-        source = "http://45.12.75.241:8080/ploy-artifacts/controller-binaries/$VERSION/linux/amd64/controller"
+        source = "http://45.12.75.241:8888/ploy-artifacts/controller-binaries/$VERSION/linux/amd64/controller"
         destination = "local/controller"
         mode = "file"
         
