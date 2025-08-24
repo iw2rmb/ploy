@@ -312,6 +312,30 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 	})
 }
 
+// GetBenchmark handles GET /benchmark/:id to get full benchmark details
+func (h *Handler) GetBenchmark(c *fiber.Ctx) error {
+	benchmarkID := c.Params("id")
+	
+	if h.benchmarkManager == nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "No benchmarks found",
+		})
+	}
+	
+	h.benchmarkManager.mu.RLock()
+	benchmark, exists := h.benchmarkManager.getBenchmark(benchmarkID)
+	h.benchmarkManager.mu.RUnlock()
+	
+	if !exists {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Benchmark not found",
+		})
+	}
+	
+	// Return the full benchmark object including all details
+	return c.JSON(benchmark)
+}
+
 // GetBenchmarkStatus handles GET /benchmark/status/:id
 func (h *Handler) GetBenchmarkStatus(c *fiber.Ctx) error {
 	benchmarkID := c.Params("id")
