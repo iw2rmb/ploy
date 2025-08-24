@@ -133,6 +133,79 @@ ploy arf cache stats
 - **Multi-Repository Support**: Transform code from local directories or remote repositories
 - **Confidence Scoring**: Automated vs manual remediation based on transformation confidence
 
+### `ploy arf benchmark` (implemented - Phase ARF-4.5: Deployment Integration)
+```
+ploy arf benchmark run <name> --repository <url> [--transformations <recipe-ids>] [--app-name <name>] [--lane <A-G>]
+ploy arf benchmark list [--active] [--completed]
+ploy arf benchmark status <benchmark-id>
+ploy arf benchmark logs <benchmark-id> [--stage <transformation|deployment|testing>]
+ploy arf benchmark stop <benchmark-id>
+```
+**ARF Benchmark Pipeline**: Execute comprehensive benchmarks with real application deployment and HTTP testing.
+
+**Examples:**
+```bash
+# Run Java Spring Boot migration benchmark with deployment
+ploy arf benchmark run java-migration --repository https://github.com/spring-projects/spring-petclinic --transformations org.springframework.boot.upgrade.SpringBoot_2_7 --app-name test-petclinic --lane C
+
+# Monitor benchmark progress
+ploy arf benchmark status bench-123
+
+# View benchmark deployment logs
+ploy arf benchmark logs bench-123 --stage deployment
+
+# List all active benchmarks
+ploy arf benchmark list --active
+```
+
+### `ploy arf sandbox` (enhanced - Deployment Integration)
+```
+ploy arf sandbox create <name> --repository <url> [--app-name <name>] [--lane <A-G>] [--ttl <duration>]
+ploy arf sandbox list [--show-apps]
+ploy arf sandbox status <sandbox-id>
+ploy arf sandbox destroy <sandbox-id>
+ploy arf sandbox logs <sandbox-id>
+ploy arf sandbox test-http <sandbox-id> [--endpoint <health|root|all>]
+```
+**Deployment Sandbox Management**: Create sandboxes with full application deployment and HTTP testing capabilities.
+
+**Examples:**
+```bash
+# Create deployment sandbox with Java application
+ploy arf sandbox create test-env --repository https://github.com/user/java-app --app-name sandbox-test --lane C --ttl 2h
+
+# Test HTTP endpoints of deployed application
+ploy arf sandbox test-http sandbox-456 --endpoint health
+
+# View deployment logs
+ploy arf sandbox logs sandbox-456
+
+# List all sandboxes with deployed applications
+ploy arf sandbox list --show-apps
+```
+
+### `ploy arf workflow` (implemented - End-to-End Integration)
+```
+ploy arf workflow run <name> --repository <url> [--transformations <recipe-ids>] [--deployment-config <config>]
+ploy arf workflow status <workflow-id>
+ploy arf workflow metrics <workflow-id> [--format <json|table>]
+ploy arf workflow logs <workflow-id> [--stage <all|transformation|deployment|testing|cleanup>]
+ploy arf workflow stop <workflow-id>
+```
+**End-to-End Workflow Management**: Execute complete ARF workflows with transformation, deployment, testing, and cleanup.
+
+**Examples:**
+```bash
+# Run complete Java migration workflow
+ploy arf workflow run java-e2e --repository https://github.com/user/app --transformations cleanup.unused-imports,modernize.java-8-to-11 --deployment-config '{"lane": "auto", "health_check": true}'
+
+# Get comprehensive workflow metrics
+ploy arf workflow metrics wf-789 --format table
+
+# View all workflow logs
+ploy arf workflow logs wf-789 --stage all
+```
+
 ### `ploy webhooks` (planned)
 ```
 ploy webhooks add <app> <url> [--events build.completed,deploy.failed] [--secret <secret>]

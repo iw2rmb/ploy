@@ -13,10 +13,11 @@ import (
 // Phase3Config contains configuration for ARF Phase 3 components
 type Phase3Config struct {
 	// LLM Configuration
-	LLMProvider    string `yaml:"llm_provider"`    // openai, anthropic, azure
+	LLMProvider    string `yaml:"llm_provider"`    // openai, anthropic, azure, ollama, cohere
 	LLMAPIKey      string `yaml:"llm_api_key"`
 	LLMModel       string `yaml:"llm_model"`
 	LLMTemperature float64 `yaml:"llm_temperature"`
+	LLMBaseURL     string `yaml:"llm_base_url"`     // For Ollama and custom endpoints
 	
 	// Learning System Configuration
 	LearningDBURL     string        `yaml:"learning_db_url"`
