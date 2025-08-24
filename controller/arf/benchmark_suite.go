@@ -13,6 +13,22 @@ import (
 	"time"
 )
 
+// getControllerURLForBenchmark detects the appropriate controller URL for benchmark deployment
+func getControllerURLForBenchmark() string {
+	// Priority 1: Explicit PLOY_CONTROLLER environment variable
+	if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {
+		return controllerURL
+	}
+	
+	// Priority 2: Self-reference if running inside controller (check for PORT)
+	if port := os.Getenv("PORT"); port != "" {
+		return fmt.Sprintf("http://localhost:%s/v1", port)
+	}
+	
+	// Priority 3: Default development endpoint
+	return "https://api.dev.ployd.app/v1"
+}
+
 // BenchmarkConfig defines configuration for a benchmark test run
 type BenchmarkConfig struct {
 	// Test identification
@@ -252,14 +268,9 @@ func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
 		}
 	}
 	
-	// Create sandbox manager (will use deployment integration if PLOY_CONTROLLER is set)
-	sandboxMgr := NewSandboxManagerForOS(
-		"/tmp/arf-jails", 
-		"/tmp/arf-templates", 
-		5, 
-		config.TimeoutPerIteration*2, 
-		"lo0",
-	)
+	// Create deployment sandbox manager with controller URL detection
+	controllerURL := getControllerURLForBenchmark()
+	sandboxMgr := NewDeploymentSandboxManager(controllerURL)
 	
 	return &BenchmarkSuite{
 		config:          config,
@@ -468,7 +479,7 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 	// Check if we have a deployment-integrated sandbox manager
 	deploySandbox, ok := bs.sandboxMgr.(*DeploymentSandboxManager)
 	if !ok {
-		return nil, fmt.Errorf("Application deployment requires DeploymentSandboxManager - check PLOY_CONTROLLER environment")
+		return nil, fmt.Errorf("Application deployment requires DeploymentSandboxManager - this should not happen with the new initialization")
 	}
 
 	// Detect language and build tool for sandbox configuration
