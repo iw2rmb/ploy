@@ -323,6 +323,10 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 		
 		result, err := suite.Run(ctx)
 		
+		// Update benchmark status and results
+		endTime := time.Now()
+		duration := endTime.Sub(running.StartTime)
+		
 		h.benchmarkManager.mu.Lock()
 		if err != nil {
 			running.Status = "failed"
@@ -333,14 +337,15 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 			running.Result = result
 			running.AddLog("INFO", "execution", "Benchmark execution completed", fmt.Sprintf("Successful completion with %d iterations", len(result.Iterations)))
 		}
-		endTime := time.Now()
 		running.EndTime = &endTime
-		
-		duration := endTime.Sub(running.StartTime)
 		running.AddLog("INFO", "completion", "Benchmark finished", fmt.Sprintf("Total duration: %s, Status: %s", duration, running.Status))
 		
-		// Update in distributed storage
-		h.benchmarkManager.updateBenchmark(running)
+		// Persist status changes to distributed storage
+		if updateErr := h.benchmarkManager.updateBenchmark(running); updateErr != nil {
+			running.AddLog("ERROR", "completion", "Failed to update benchmark status", fmt.Sprintf("Storage update error: %v", updateErr))
+		} else {
+			running.AddLog("INFO", "completion", "Benchmark status updated successfully", fmt.Sprintf("Final status: %s", running.Status))
+		}
 		h.benchmarkManager.mu.Unlock()
 	}()
 	
