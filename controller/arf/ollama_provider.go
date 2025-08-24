@@ -596,3 +596,26 @@ func NewOllamaLLMGenerator() (LLMRecipeGenerator, error) {
 	
 	return NewOllamaProvider(config)
 }
+
+// NewOllamaLLMGeneratorWithConfig creates a new Ollama LLM generator with explicit configuration
+func NewOllamaLLMGeneratorWithConfig(model, baseURL string, temperature float64, contextLength int) (LLMRecipeGenerator, error) {
+	config := OllamaConfig{
+		BaseURL:       baseURL,
+		Model:         model,
+		Temperature:   temperature,
+		ContextLength: contextLength,
+	}
+	
+	// Set defaults if not provided
+	if config.BaseURL == "" {
+		config.BaseURL = "http://localhost:11434"
+	}
+	if config.Temperature == 0 {
+		config.Temperature = 0.1
+	}
+	if config.ContextLength == 0 {
+		config.ContextLength = 4096
+	}
+	
+	return NewOllamaProvider(config)
+}
