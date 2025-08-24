@@ -161,7 +161,7 @@ type BenchmarkSuite struct {
 	outputWriter    io.Writer
 	gitOps          *GitOperations
 	buildOps        *BuildOperations
-	mockOpenRewrite *MockOpenRewriteEngine
+	openRewriteEngine *BuiltinOpenRewriteEngine
 	sandboxMgr      SandboxManager
 }
 
@@ -238,7 +238,7 @@ func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
 			}
 		}
 	}
-	// For OpenRewrite-only recipes, multiLang will be nil and we'll use MockOpenRewriteEngine directly
+	// For OpenRewrite-only recipes, multiLang will be nil and we'll use BuiltinOpenRewriteEngine directly
 	
 	// Create output directory if needed
 	if config.OutputDir != "" {
@@ -262,7 +262,7 @@ func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
 		multiLangEngine: multiLang,
 		gitOps:          NewGitOperations(config.OutputDir),
 		buildOps:        NewBuildOperations(config.TimeoutPerIteration),
-		mockOpenRewrite: NewMockOpenRewriteEngine(),
+		openRewriteEngine: NewBuiltinOpenRewriteEngine(),
 		sandboxMgr:     sandboxMgr,
 	}, nil
 }
@@ -552,7 +552,7 @@ func (bs *BenchmarkSuite) detectDeploymentErrors(ctx context.Context, repoPath s
 
 func (bs *BenchmarkSuite) applyOpenRewriteRecipe(ctx context.Context, repoPath string, recipeID string) error {
 	// Apply the recipe using mock OpenRewrite engine
-	result, err := bs.mockOpenRewrite.ApplyRecipe(ctx, recipeID, repoPath)
+	result, err := bs.openRewriteEngine.ApplyRecipe(ctx, recipeID, repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to apply recipe %s: %w", recipeID, err)
 	}
