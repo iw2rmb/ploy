@@ -408,7 +408,20 @@ func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error 
 
 // NewSandboxManagerForOS creates appropriate sandbox manager for the current OS
 func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) SandboxManager {
-	// Check if we have a controller URL configured (preferred method)
+	// Check if we're running inside the controller itself
+	// The controller sets PORT environment variable and also has PLOY_VERSION set by Nomad
+	port := os.Getenv("PORT")
+	ployVersion := os.Getenv("PLOY_VERSION")
+	
+	// If we have both PORT and PLOY_VERSION, we're running inside the controller
+	if port != "" && ployVersion != "" {
+		// We're inside the controller, use localhost to call ourselves
+		controllerURL := fmt.Sprintf("http://localhost:%s/v1", port)
+		fmt.Printf("Running inside controller (version %s), using self-reference: %s\n", ployVersion, controllerURL)
+		return NewDeploymentSandboxManager(controllerURL)
+	}
+	
+	// Check if we have a controller URL configured (for external clients)
 	if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {
 		fmt.Printf("Using deployment sandbox manager with controller: %s\n", controllerURL)
 		return NewDeploymentSandboxManager(controllerURL)
