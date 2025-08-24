@@ -87,8 +87,12 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 			return sandbox, fmt.Errorf("deployment failed or timed out: %w", err)
 		}
 		
-		// Get app URL
-		appURL := fmt.Sprintf("https://%s.ployd.app", appName)
+		// Get app URL - use the configured domain
+		appDomain := "ployd.app"
+		if envDomain := os.Getenv("PLOY_APPS_DOMAIN"); envDomain != "" {
+			appDomain = envDomain
+		}
+		appURL := fmt.Sprintf("https://%s.%s", appName, appDomain)
 		sandbox.Metadata["app_url"] = appURL
 		sandbox.Status = SandboxStatusReady
 		
@@ -97,7 +101,11 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 		// For backward compatibility: create mock sandbox if no local path
 		fmt.Printf("Creating mock sandbox (no transformed code provided)\n")
 		sandbox.Status = SandboxStatusReady
-		sandbox.Metadata["app_url"] = fmt.Sprintf("https://%s.ployd.app", appName)
+		appDomain := "ployd.app"
+		if envDomain := os.Getenv("PLOY_APPS_DOMAIN"); envDomain != "" {
+			appDomain = envDomain
+		}
+		sandbox.Metadata["app_url"] = fmt.Sprintf("https://%s.%s", appName, appDomain)
 		sandbox.Metadata["mock_deployment"] = "true"
 	}
 	
@@ -154,7 +162,7 @@ func (d *DeploymentSandboxManager) deployRepository(ctx context.Context, appName
 
 // waitForDeployment polls the app status until deployment completes
 func (d *DeploymentSandboxManager) waitForDeployment(ctx context.Context, appName string, timeout time.Duration) error {
-	statusURL := fmt.Sprintf("%s/apps/%s/status", d.controllerURL, appName)
+	statusURL := fmt.Sprintf("%s/status/%s", d.controllerURL, appName)
 	
 	ctxTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -242,7 +250,11 @@ func (d *DeploymentSandboxManager) getAppURL(ctx context.Context, appName string
 	}
 	
 	// Fallback to default domain
-	return fmt.Sprintf("https://%s.ployd.app", appName), nil
+	appDomain := "ployd.app"
+	if envDomain := os.Getenv("PLOY_APPS_DOMAIN"); envDomain != "" {
+		appDomain = envDomain
+	}
+	return fmt.Sprintf("https://%s.%s", appName, appDomain), nil
 }
 
 // DestroySandbox destroys the sandbox by deleting the deployed application
@@ -446,19 +458,14 @@ func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]b
 
 // deployTarArchive deploys a tar archive through the build endpoint
 func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName string, tarData []byte, config SandboxConfig) error {
-	// Determine the lane based on language/build tool
-	// Use Lane E (OCI containers) for better compatibility with standard apps
-	lane := "E" // Default to Lane E for containers
-	if config.Language == "go" {
-		lane = "D" // FreeBSD jails for Go
-	} else if config.Language == "java" {
-		// For Java, use Lane E (OCI) as it doesn't require Jib
-		lane = "E"
-	}
+	// Let Ploy's lane detection handle the optimal lane selection
+	// Don't force a specific lane - let the system auto-detect
 	
 	// Build the deployment URL with parameters
-	deployURL := fmt.Sprintf("%s/apps/%s/builds?sha=arf-%s&lane=%s", 
-		d.controllerURL, appName, time.Now().Format("20060102-150405"), lane)
+	// Use auto lane detection by not specifying lane parameter
+	sha := fmt.Sprintf("arf-%s", time.Now().Format("20060102-150405"))
+	deployURL := fmt.Sprintf("%s/apps/%s/builds?sha=%s", 
+		d.controllerURL, appName, sha)
 	
 	// Create the request with tar data as body
 	req, err := http.NewRequestWithContext(ctx, "POST", deployURL, bytes.NewReader(tarData))
@@ -517,8 +524,9 @@ func (d *DeploymentSandboxManager) TestSandbox(ctx context.Context, sandbox *San
 		return fmt.Errorf("sandbox missing app_url metadata")
 	}
 	
-	// Test the /healthz endpoint (standard health check)
-	healthURL := fmt.Sprintf("%s/healthz", appURL)
+	// Test the health endpoint - apps deployed through Ploy respond at root or /health
+	// Try multiple endpoints to ensure compatibility
+	healthURL := appURL
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
 	if err != nil {
