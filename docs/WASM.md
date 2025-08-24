@@ -371,11 +371,16 @@ This detection system ensures accurate Lane G routing while providing fallback o
 - **Resource Limits**: Memory, execution time, and CPU constraints
 - **Sandboxing**: Secure execution environment with controlled filesystem access
 
-#### 4. HTTP Runner (`cmd/ploy-wasm-runner/main.go`)
+#### 4. HTTP Runtime Engine (`cmd/ploy-wasm-runner/main.go`)
+
+**IMPORTANT**: This is a deployment runtime component, NOT a CLI tool. It runs INSIDE deployed containers as the WASM execution engine, similar to how Node.js runtime runs JavaScript or JVM runs Java bytecode.
+
+- **Runtime Role**: Main process in Lane G containers that executes compiled WASM modules
 - **HTTP Server**: Complete HTTP server for WASM module execution
 - **Health Endpoints**: `/health`, `/wasm-health`, `/metrics` for monitoring
 - **Graceful Shutdown**: Proper cleanup and signal handling
 - **Request Handling**: Per-request WASM module execution with timeout control
+- **Deployment Artifact**: Gets packaged with app.wasm into container images
 
 #### 5. Component Model (`controller/wasm/components.go`)
 - **Multi-Module Support**: WebAssembly Component Model for complex applications

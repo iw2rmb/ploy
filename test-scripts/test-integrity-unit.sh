@@ -95,13 +95,13 @@ test_build_handler_integration() {
 test_scenarios_documented() {
     test_info "Test 5: Verify test scenarios added to TESTS.md"
     
-    if grep -q "Artifact Integrity Verification Implementation" "$PROJECT_ROOT/docs/TESTS.md"; then
+    if grep -q "Artifact Integrity Verification Implementation" "$PROJECT_ROOT/test-scripts/README.md"; then
         test_passed "Test scenarios documented in TESTS.md"
     else
         test_failed "Test scenarios not added to TESTS.md"
     fi
     
-    if grep -q "checksum verification" "$PROJECT_ROOT/docs/TESTS.md"; then
+    if grep -q "checksum verification" "$PROJECT_ROOT/test-scripts/README.md"; then
         test_passed "Checksum verification scenarios documented"
     else
         test_failed "Checksum verification scenarios missing"

@@ -1,5 +1,75 @@
 # CHANGELOG
 
+## [2025-08-24] - ARF Deployment Integration & Naming Refinement
+
+### Added
+- **✅ Complete Deployment Integration**: ARF now fully integrated with core deployment system
+- **✅ DeploymentSandboxManager**: Native deployment system integration replacing separate sandbox management
+- **✅ Multi-Stage Application Testing**: Deployed applications tested via HTTP endpoints with health checks
+- **✅ Error Analysis Pipeline**: Comprehensive deployment log analysis and error categorization for self-healing
+- **✅ Sandbox Lifecycle Management**: Automatic deployment creation and cleanup with TTL management
+
+### Implementation
+- **✅ DeploymentSandboxManager** (`deployment_sandbox.go`): Native deployment integration using controller APIs
+- **✅ Application Testing Pipeline** (`benchmark_suite.go`): Real HTTP testing of deployed transformed applications
+- **✅ Error Detection System**: Deployment logs analysis, build system validation, configuration error detection
+- **✅ Naming Convention Refinement**: Removed redundant "PaaS"/"Ploy" references throughout ARF codebase
+
+### Testing
+- **✅ Compilation Success**: All ARF components compile with clean deployment integration
+- **✅ Multi-Lane Deployment**: Supports automatic lane detection and deployment for Java, Node.js, Go, Python applications
+- **✅ End-to-End Pipeline**: Complete transformation → deployment → testing → error analysis → cleanup workflow
+
+---
+
+## [2025-08-24] - ARF Benchmark MVP: Core Operations & Build Integration
+
+### Added
+- **✅ Git Operations**: Complete Git integration for repository cloning, diff tracking, and version control
+- **✅ Build System Support**: Multi-language build validation (Maven, Gradle, npm, Go, Python)
+- **✅ Test Execution Framework**: Automated test execution with result parsing for multiple frameworks
+- **✅ Error Detection**: Compilation error parsing and categorization across languages
+- **✅ Mock OpenRewrite Engine**: Simulated transformations for MVP testing without full OpenRewrite
+- **✅ Metrics Collection**: File changes, line diffs, test results, and build status tracking
+
+### Implementation
+- **✅ Git Operations** (`git_operations.go`): Clone, diff, commit, and metrics collection
+- **✅ Build Operations** (`build_operations.go`): Build system detection, validation, and test execution
+- **✅ Mock OpenRewrite** (`openrewrite_mock.go`): Simulated Java migrations and Spring Boot upgrades
+- **✅ Benchmark Runner** (`benchmark_test_runner.go`): Standalone test runner for local execution
+- **✅ Minimal Test Config**: Quick validation configuration for MVP testing
+
+### Testing
+- **✅ Compilation Success**: All components compile and integrate successfully
+- **✅ Minimal Benchmark Test**: End-to-end test script for basic functionality verification
+- **✅ Multi-Build System Support**: Handles Maven, Gradle, npm, and other build systems
+
+---
+
+## [2025-08-24] - ARF Phase 8: Benchmark Test Suite & Multi-LLM Support
+
+### Added
+- **✅ Benchmark Test Suite**: Comprehensive benchmark framework for evaluating ARF transformation effectiveness
+- **✅ Multi-LLM Provider Support**: Ollama integration for local LLM models alongside OpenAI support
+- **✅ Iteration Tracking**: Detailed tracking of every self-healing iteration with full diff capture
+- **✅ Performance Profiling**: Stage-wise time measurements for all transformation operations
+- **✅ Comprehensive Reporting**: HTML and JSON reports with metrics, diffs, and comparative analysis
+- **✅ A/B Testing Integration**: Support for comparing multiple LLM providers and strategies
+
+### Implementation
+- **✅ Benchmark Suite Core**: `benchmark_suite.go` with full iteration and metrics tracking
+- **✅ Ollama Provider**: Complete LLM provider implementation for local model execution
+- **✅ Benchmark Manager**: HTTP endpoints for running, monitoring, and comparing benchmarks
+- **✅ Configuration System**: YAML-based benchmark configuration for reproducible testing
+- **✅ Test Scripts**: Automated benchmark execution scripts with multi-provider support
+
+### Testing
+- **✅ Compilation Verification**: All new components successfully compile and integrate
+- **✅ Multi-Provider Testing**: Framework supports OpenAI, Ollama, with placeholders for Anthropic/Azure
+- **✅ Benchmark Configuration**: Example Java 11→17 migration benchmark configuration
+
+---
+
 ## [2025-08-23] - ARF Phase 4: Security & Production Hardening Complete
 
 ### Added
@@ -42,7 +112,7 @@
 - **✅ Graceful Shutdown**: SIGTERM handling with connection draining verification
 - **✅ Metrics Collection**: Prometheus endpoint functionality and metrics accuracy
 - **✅ VPS Integration**: Full production testing on VPS environment with Consul/Nomad
-- **✅ Comprehensive Test Documentation**: Created docs/TESTS.md with 40+ test scenarios
+- **✅ Comprehensive Test Documentation**: Created test-scripts/README.md with 40+ test scenarios
 
 ### Architecture
 - **✅ High Availability**: 99.9% uptime capability with <30 second failover
