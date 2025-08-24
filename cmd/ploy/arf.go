@@ -796,6 +796,21 @@ func handleBenchmarkRun(args []string) error {
 		},
 	}
 
+	// Add LLM provider configuration (required for benchmark suite)
+	llmProvider := os.Getenv("ARF_LLM_PROVIDER")
+	llmModel := os.Getenv("ARF_LLM_MODEL")
+	
+	// Set defaults if not configured
+	if llmProvider == "" {
+		llmProvider = "ollama"
+	}
+	if llmModel == "" {
+		llmModel = "codellama:7b"
+	}
+	
+	benchmarkConfig["llm_provider"] = llmProvider
+	benchmarkConfig["llm_model"] = llmModel
+
 	if transformations != "" {
 		recipeList := strings.Split(transformations, ",")
 		var transformationList []map[string]interface{}
