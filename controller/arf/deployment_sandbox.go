@@ -22,10 +22,11 @@ type DeploymentSandboxManager struct {
 	controllerURL string
 	httpClient    *http.Client
 	apiKey        string
+	logger        func(level, stage, message, details string) // Add logger support
 }
 
 // NewDeploymentSandboxManager creates a new deployment-integrated sandbox manager
-func NewDeploymentSandboxManager(controllerURL string) *DeploymentSandboxManager {
+func NewDeploymentSandboxManager(controllerURL string, logger func(level, stage, message, details string)) *DeploymentSandboxManager {
 	if controllerURL == "" {
 		controllerURL = "https://api.dev.ployd.app/v1"
 	}
@@ -35,17 +36,15 @@ func NewDeploymentSandboxManager(controllerURL string) *DeploymentSandboxManager
 		httpClient: &http.Client{
 			Timeout: 10 * time.Minute, // Long timeout for builds
 		},
+		logger: logger,
 	}
 }
 
 // CreateSandbox creates a sandbox by deploying the repository as a temporary application
 func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {
-	fmt.Printf("=== CreateSandbox Debug Start ===\n")
-	fmt.Printf("Repository: %s\n", config.Repository)
-	fmt.Printf("LocalPath: %s\n", config.LocalPath)
-	fmt.Printf("Language: %s\n", config.Language)
-	fmt.Printf("BuildTool: %s\n", config.BuildTool)
-	fmt.Printf("Controller URL: %s\n", d.controllerURL)
+	if d.logger != nil {
+		d.logger("DEBUG", "sandbox_creation", "CreateSandbox started", fmt.Sprintf("Repository: %s, LocalPath: %s, Language: %s, BuildTool: %s, Controller: %s", config.Repository, config.LocalPath, config.Language, config.BuildTool, d.controllerURL))
+	}
 	
 	// Generate unique app name for this sandbox
 	sandboxID := uuid.New().String()[:8]
@@ -80,7 +79,9 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 		
 		// Check if directory exists
 		if _, err := os.Stat(config.LocalPath); os.IsNotExist(err) {
-			fmt.Printf("ERROR: LocalPath directory does not exist: %s\n", config.LocalPath)
+			if d.logger != nil {
+				d.logger("ERROR", "sandbox_creation", "LocalPath directory does not exist", fmt.Sprintf("Path: %s", config.LocalPath))
+			}
 			sandbox.Status = SandboxStatusError
 			return sandbox, fmt.Errorf("local path does not exist: %s", config.LocalPath)
 		}
@@ -90,7 +91,9 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 		fmt.Printf("Creating tar archive from directory: %s\n", config.LocalPath)
 		tarData, err := d.createTarFromDirectory(config.LocalPath)
 		if err != nil {
-			fmt.Printf("ERROR: Failed to create tar from directory: %v\n", err)
+			if d.logger != nil {
+				d.logger("ERROR", "sandbox_creation", "Failed to create tar archive", fmt.Sprintf("Directory: %s, Error: %v", config.LocalPath, err))
+			}
 			sandbox.Status = SandboxStatusError
 			return sandbox, fmt.Errorf("failed to create tar from transformed code: %w", err)
 		}
@@ -99,7 +102,9 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 		// Deploy the tar archive
 		fmt.Printf("About to call deployTarArchive...\n")
 		if err := d.deployTarArchive(ctx, appName, tarData, config); err != nil {
-			fmt.Printf("ERROR: deployTarArchive failed: %v\n", err)
+			if d.logger != nil {
+				d.logger("ERROR", "sandbox_creation", "deployTarArchive failed", fmt.Sprintf("App: %s, Error: %v", appName, err))
+			}
 			sandbox.Status = SandboxStatusError
 			return sandbox, fmt.Errorf("failed to deploy sandbox app: %w", err)
 		}
