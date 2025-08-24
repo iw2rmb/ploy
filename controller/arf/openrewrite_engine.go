@@ -33,8 +33,9 @@ func NewBuiltinOpenRewriteEngine() *BuiltinOpenRewriteEngine {
 
 // registerRecipes sets up OpenRewrite transformation handlers
 func (m *BuiltinOpenRewriteEngine) registerRecipes() {
-	// Java 11 to 17 migration
+	// Java 11 to 17 migration (register both common variations)
 	m.recipes["org.openrewrite.java.migrate.Java11toJava17"] = m.java11To17Migration
+	m.recipes["org.openrewrite.java.migrate.JavaVersion11to17"] = m.java11To17Migration
 	
 	// Spring Boot 3 upgrade
 	m.recipes["org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0"] = m.springBoot3Upgrade
