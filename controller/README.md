@@ -271,6 +271,54 @@
 - `GET /v1/arf/status` — comprehensive ARF Phase 3 system status.
   - Returns: `{"llm_enabled": true, "learning_enabled": true, "multi_lang_enabled": true, "ab_testing_enabled": true, "active_tests": 3, "patterns_learned": 87, "transformations_today": 42}`
 
+## Automated Remediation Framework Endpoints (Phase ARF-4.5: Deployment Integration - Implemented)
+
+### Benchmark & Testing Pipeline
+- `POST /v1/arf/benchmark/run` — execute comprehensive ARF benchmark with deployment integration.
+  - Body: `{"name": "java-migration-test", "repository": "...", "transformations": [...], "deployment_config": {"app_name": "...", "lane": "auto"}}`
+  - Returns: `{"benchmark_id": "bench-123", "status": "running", "stages": ["transformation", "deployment", "application_testing", "cleanup"]}`
+- `GET /v1/arf/benchmark/:id/status` — get benchmark execution status and progress.
+  - Returns: `{"benchmark_id": "...", "status": "running", "current_stage": "deployment", "progress": 0.6, "start_time": "..."}`
+- `GET /v1/arf/benchmark/status` — list all active benchmarks.
+  - Returns: `{"benchmarks": [...], "active_count": 3, "completed_today": 15}`
+
+### Deployment Sandbox Management
+- `POST /v1/arf/sandboxes` — create deployment sandbox with full application lifecycle.
+  - Body: `{"name": "test-sandbox", "repository": "...", "app_name": "...", "lane": "C", "ttl": "1h"}`
+  - Returns: `{"sandbox_id": "sandbox-456", "app_name": "...", "deployment_url": "...", "expires_at": "..."}`
+- `GET /v1/arf/sandboxes` — list active deployment sandboxes.
+  - Returns: `{"sandboxes": [...], "count": 5, "total_deployed_apps": 12}`
+- `GET /v1/arf/sandboxes/:id` — get detailed sandbox information and deployment status.
+  - Returns: `{"sandbox_id": "...", "name": "...", "app_name": "...", "deployment_status": "healthy", "http_endpoints": [...], "metrics": {...}}`
+- `DELETE /v1/arf/sandboxes/:id` — destroy sandbox and cleanup deployed application.
+  - Returns: `{"status": "destroyed", "cleanup_operations": ["nomad_job_stopped", "domains_removed", "storage_cleaned"]}`
+
+### Application HTTP Testing
+- `GET /v1/arf/benchmark/:id/endpoints` — get HTTP endpoints for deployed test application.
+  - Returns: `{"endpoints": [{"url": "https://test-app.dev.ployd.app", "type": "main"}, {"url": "https://test-app.dev.ployd.app/healthz", "type": "health"}]}`
+- `POST /v1/arf/benchmark/:id/test-http` — execute HTTP endpoint testing on deployed application.
+  - Body: `{"endpoints": ["health", "root"], "timeout": 30, "retry_count": 3}`
+  - Returns: `{"test_results": [...], "success_rate": 0.95, "average_response_time": 150, "errors": []}`
+
+### Error Analysis & Log Parsing  
+- `GET /v1/arf/benchmark/:id/errors` — get comprehensive error analysis from deployment logs.
+  - Returns: `{"errors": [...], "categories": {"build": 2, "deployment": 1, "runtime": 0}, "severity": {...}}`
+- `POST /v1/arf/benchmark/:id/analyze-logs` — trigger detailed log analysis for error detection.
+  - Returns: `{"analysis_started": true, "patterns_checked": 25, "error_categories": [...], "estimated_completion": "2m"}`
+
+### End-to-End Workflow Management
+- `POST /v1/arf/workflow/run` — execute complete end-to-end ARF workflow with real deployment.
+  - Body: `{"name": "e2e-test", "repository": "...", "transformations": [...], "deployment_config": {...}, "metrics_collection": {"enabled": true}}`
+  - Returns: `{"workflow_id": "wf-789", "stages": [...], "estimated_duration": "10m", "deployment_integration": true}`
+- `GET /v1/arf/workflow/:id/status` — get end-to-end workflow execution status.
+  - Returns: `{"workflow_id": "...", "status": "running", "current_stage": "application_testing", "deployed_app": "...", "metrics": {...}}`
+- `GET /v1/arf/workflow/:id/metrics` — get comprehensive workflow performance metrics.
+  - Returns: `{"performance_metrics": {...}, "deployment_metrics": {...}, "http_test_results": {...}, "resource_usage": {...}}`
+
+### ARF Deployment Integration Status
+- `GET /v1/arf/deployment/status` — get deployment integration system status.
+  - Returns: `{"deployment_integration": true, "active_sandboxes": 5, "deployed_test_apps": 12, "total_benchmarks": 47, "last_deployment": "..."}`
+
 ## Webhook Events
 - `build.started`, `build.completed`, `build.failed`
 - `deploy.started`, `deploy.completed`, `deploy.failed`

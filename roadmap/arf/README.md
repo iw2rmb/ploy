@@ -13,7 +13,7 @@ ARF combines proven static analysis tools with modern AI capabilities to create 
 
 ## Implementation Phases
 
-The ARF implementation is structured in 5 progressive phases:
+The ARF implementation is structured in 8 progressive phases:
 
 ### [Phase ARF-1: Foundation & Core Engine](./phase-arf-1.md) ✅ COMPLETED
 **Foundation Infrastructure** - OpenRewrite integration, sandbox management, recipe catalog, and basic transformation engine.
@@ -33,25 +33,27 @@ The ARF implementation is structured in 5 progressive phases:
 - ✅ Fork-Join parallel error resolution
 - ✅ Dependency-aware multi-repository orchestration
 
-### [Phase ARF-3: LLM Integration & Hybrid Intelligence](./phase-arf-3.md)
+### [Phase ARF-3: LLM Integration & Hybrid Intelligence](./phase-arf-3.md) ✅ COMPLETED
 **AI-Enhanced Transformations** - LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, and intelligent strategy selection.
 
-**Key Deliverables:**
-- Dynamic recipe generation using LLM APIs
-- Hybrid OpenRewrite + LLM transformation workflows
-- Success/failure pattern learning system
-- Context-aware transformation strategy selection
+**Key Deliverables:** ✅
+- ✅ Dynamic recipe generation using OpenAI LLM APIs
+- ✅ Hybrid OpenRewrite + LLM transformation workflows
+- ✅ Success/failure pattern learning system with PostgreSQL
+- ✅ Context-aware transformation strategy selection
+- ✅ Multi-language AST support with tree-sitter
 
-### [Phase ARF-4: Security & Production Hardening](./phase-arf-4.md)
+### [Phase ARF-4: Security & Production Hardening](./phase-arf-4.md) ⚠️ FRAMEWORK COMPLETE
 **Security & Governance** - Vulnerability remediation, SBOM integration, human-in-the-loop workflows, and production optimization.
 
-**Key Deliverables:**
-- Security-specific CVE remediation recipes
-- SBOM tracking and supply chain security
-- Progressive delegation workflows with approval systems
-- Production performance optimization (4GB+ heap, G1GC)
+**Key Deliverables:** ⚠️
+- ⚠️ Security-specific CVE remediation recipes (mocked)
+- ⚠️ SBOM tracking and supply chain security (mocked)
+- ⚠️ Progressive delegation workflows with approval systems (framework only)
+- ✅ Production performance optimization structure
+- ✅ Complete API endpoints and test suites
 
-### [Phase ARF-5: Production Features & Scale](./phase-arf-5.md)
+### [Phase ARF-5: Production Features & Scale](./phase-arf-5.md) 📋 PLANNED
 **Enterprise Scale & Integration** - Multi-repository campaigns, analytics dashboards, API ecosystem, and compliance framework.
 
 **Key Deliverables:**
@@ -59,6 +61,37 @@ The ARF implementation is structured in 5 progressive phases:
 - Business impact analytics and ROI measurement
 - REST API and CLI integration (`ploy arf` commands)
 - Audit logging and compliance reporting
+
+### [Phase ARF-6: Intelligent Dependency Resolution](./phase-arf-6.md) 📋 PLANNED
+**Automated Dependency Conflict Resolution** - Web intelligence, minimal reproduction, iterative resolution, and knowledge base.
+
+**Key Deliverables:**
+- Dependency graph analysis and conflict detection
+- Minimal reproduction environment generator (90% size reduction)
+- Web intelligence integration (Stack Overflow, GitHub, Maven Central)
+- Iterative version resolver with A/B testing
+- OpenRewrite recipe generation for successful resolutions
+
+### [Phase ARF-7: Production Implementation](./phase-arf-7.md) 📋 PLANNED
+**Replace Mock Components** - Production implementations of all mocked services from earlier phases.
+
+**Key Deliverables:**
+- Real CVE database integration (NVD, GitHub Advisory, Snyk)
+- Production workflow services (GitHub, JIRA, Slack, email)
+- FreeBSD jail sandbox implementation with ZFS
+- Real OpenRewrite execution with actual transformations
+- Enterprise service integrations
+
+### [Phase ARF-8: Benchmark Test Suite & Multi-LLM Support](./phase-arf-8.md) 📋 PLANNED
+**Comprehensive Testing & Evaluation** - Benchmark suite with multiple LLM providers and detailed iteration tracking.
+
+**Key Deliverables:**
+- Multi-LLM provider support (Ollama, Anthropic, Azure, Cohere)
+- Comprehensive benchmark test suite for repository-specific testing
+- Detailed iteration tracking with diffs for each self-healing attempt
+- Stage-wise performance profiling and time measurements
+- Comparative analysis and reporting across providers
+- Cost tracking and optimization recommendations
 
 ## Success Metrics & Targets
 

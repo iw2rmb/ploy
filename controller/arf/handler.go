@@ -20,6 +20,8 @@ type Handler struct {
 	sbomAnalyzer        *SyftSBOMAnalyzer
 	workflowEngine      *HumanWorkflowEngine
 	productionOptimizer *ProductionOptimizer
+	// Phase 8 components
+	benchmarkManager    *BenchmarkManager
 }
 
 // NewHandler creates a new ARF HTTP handler
@@ -185,4 +187,14 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	
 	// Phase 4: Production Metrics (additional endpoint for test compatibility)
 	arf.Get("/production/metrics", h.GetProductionMetrics)
+	
+	// Phase 8: Benchmark Test Suite
+	arf.Post("/benchmark/run", h.RunBenchmarkSuite)
+	arf.Get("/benchmark/status/:id", h.GetBenchmarkStatus)
+	arf.Get("/benchmark/results/:id", h.GetBenchmarkResults)
+	arf.Get("/benchmark/errors/:id", h.GetBenchmarkErrors)
+	arf.Post("/benchmark/compare", h.CompareBenchmarks)
+	arf.Post("/benchmark/report/:id", h.GenerateBenchmarkReport)
+	arf.Get("/benchmark/list", h.ListBenchmarks)
+	arf.Delete("/benchmark/:id", h.CancelBenchmark)
 }

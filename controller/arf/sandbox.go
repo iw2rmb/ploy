@@ -408,6 +408,19 @@ func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error 
 
 // NewSandboxManagerForOS creates appropriate sandbox manager for the current OS
 func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) SandboxManager {
+	// Check if we have a controller URL configured (preferred method)
+	if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {
+		fmt.Printf("Using deployment sandbox manager with controller: %s\n", controllerURL)
+		return NewDeploymentSandboxManager(controllerURL)
+	}
+	
+	// Check for default environment (ploy CLI available)
+	if _, err := exec.LookPath("ploy"); err == nil {
+		fmt.Println("Using deployment sandbox manager with default controller")
+		// Use default controller URL
+		return NewDeploymentSandboxManager("https://api.dev.ployd.app/v1")
+	}
+	
 	// Check for remote FreeBSD jail host configuration
 	freebsdHost := os.Getenv("ARF_FREEBSD_HOST")
 	if freebsdHost != "" {
@@ -422,6 +435,7 @@ func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, d
 	}
 	
 	// Fallback to mock sandbox manager for development/testing
+	fmt.Println("Warning: Using mock sandbox manager. Set PLOY_CONTROLLER env var for deployment integration.")
 	return NewMockSandboxManager()
 }
 

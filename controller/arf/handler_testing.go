@@ -350,8 +350,8 @@ func (h *Handler) RunBenchmark(c *fiber.Ctx) error {
 	})
 }
 
-// GetBenchmarkResults returns benchmark results
-func (h *Handler) GetBenchmarkResults(c *fiber.Ctx) error {
+// GetBenchmarkResultsMock returns mock benchmark results (replaced by real implementation in benchmark_manager.go)
+func (h *Handler) GetBenchmarkResultsMock(c *fiber.Ctx) error {
 	benchmarkID := c.Params("id")
 	
 	// Mock benchmark results

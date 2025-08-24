@@ -1,0 +1,32 @@
+name: minimal_test
+description: Minimal viable benchmark test for basic functionality verification
+
+# Repository configuration - use a small, simple Java project
+repo_url: https://github.com/spring-guides/gs-rest-service.git
+repo_branch: main
+
+# Task configuration
+task_type: migration
+source_lang: java
+target_spec: "java:17"
+recipe_ids:
+  - org.openrewrite.java.migrate.Java11toJava17
+
+# LLM configuration - use mock for testing
+llm_provider: ollama
+llm_model: codellama:7b
+llm_options:
+  temperature: "0.1"
+  max_tokens: "1000"
+  base_url: "http://localhost:11434"
+
+# Minimal iteration control
+max_iterations: 2
+timeout_per_iteration: 2m
+stop_on_success: true
+
+# Output configuration
+output_dir: ./benchmark_results/minimal_test
+capture_full_diffs: true
+capture_partial_diffs: false
+save_intermediate_state: false

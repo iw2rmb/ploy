@@ -1,0 +1,38 @@
+name: java11to17_migration
+description: Benchmark test for migrating Java 11 applications to Java 17
+
+# Repository configuration
+repo_url: https://github.com/spring-projects/spring-petclinic.git
+repo_branch: main
+# local_path: /path/to/local/repo  # Optional: use local repository instead
+
+# Task configuration
+task_type: migration
+source_lang: java
+target_spec: "java:17"
+recipe_ids:
+  - org.openrewrite.java.migrate.Java11toJava17
+  - org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0
+  - org.openrewrite.java.spring.boot3.SpringBoot3BestPractices
+
+# LLM configuration for self-healing
+llm_provider: ollama  # Options: openai, ollama, anthropic, azure
+llm_model: codellama:7b  # For Ollama: codellama:7b, deepseek-coder:6.7b, etc.
+llm_options:
+  temperature: "0.1"
+  max_tokens: "2000"
+  # For Ollama:
+  base_url: "http://localhost:11434"
+  # For OpenAI:
+  # api_key: "sk-..."
+
+# Iteration control
+max_iterations: 10
+timeout_per_iteration: 5m
+stop_on_success: true
+
+# Output configuration
+output_dir: ./benchmark_results/java11to17
+capture_full_diffs: true
+capture_partial_diffs: true
+save_intermediate_state: true

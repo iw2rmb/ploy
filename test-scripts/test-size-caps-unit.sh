@@ -170,13 +170,13 @@ test_build_handler_integration() {
 test_scenarios_documented() {
     test_info "Test 7: Verify test scenarios added to TESTS.md"
     
-    if grep -q "Image Size Caps per Lane Implementation" "$PROJECT_ROOT/docs/TESTS.md"; then
+    if grep -q "Image Size Caps per Lane Implementation" "$PROJECT_ROOT/test-scripts/README.md"; then
         test_passed "Test scenarios documented in TESTS.md"
     else
         test_failed "Test scenarios not added to TESTS.md"
     fi
     
-    if grep -q "lane-specific image size limits" "$PROJECT_ROOT/docs/TESTS.md"; then
+    if grep -q "lane-specific image size limits" "$PROJECT_ROOT/test-scripts/README.md"; then
         test_passed "Size cap enforcement scenarios documented"
     else
         test_failed "Size cap enforcement scenarios missing"
@@ -185,7 +185,7 @@ test_scenarios_documented() {
     # Check for specific lane limits in documentation
     expected_limits=("50MB" "100MB" "500MB" "200MB" "1GB" "5GB")
     for limit in "${expected_limits[@]}"; do
-        if grep -q "$limit" "$PROJECT_ROOT/docs/TESTS.md"; then
+        if grep -q "$limit" "$PROJECT_ROOT/test-scripts/README.md"; then
             test_passed "Lane limit $limit documented"
         else
             test_failed "Lane limit $limit not documented"
