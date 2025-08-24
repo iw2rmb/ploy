@@ -563,6 +563,86 @@
         state: started
         enabled: true
 
+    - name: Install Ollama for local LLM inference
+      block:
+        - name: Check if Ollama is already installed
+          stat:
+            path: /usr/local/bin/ollama
+          register: ollama_binary
+
+        - name: Download Ollama installer
+          get_url:
+            url: https://ollama.com/install.sh
+            dest: /tmp/ollama-install.sh
+            mode: '0755'
+          when: not ollama_binary.stat.exists
+
+        - name: Install Ollama
+          shell: /tmp/ollama-install.sh
+          when: not ollama_binary.stat.exists
+
+        - name: Create systemd service for Ollama
+          copy:
+            content: |
+              [Unit]
+              Description=Ollama Server
+              After=network-online.target
+
+              [Service]
+              ExecStart=/usr/local/bin/ollama serve
+              User=ploy
+              Group=ploy
+              Restart=always
+              RestartSec=3
+              Environment="OLLAMA_HOST=127.0.0.1:11434"
+              Environment="OLLAMA_MODELS=/home/ploy/.ollama/models"
+              Environment="OLLAMA_MAX_LOADED_MODELS=2"
+              Environment="OLLAMA_NUM_PARALLEL=1"
+
+              [Install]
+              WantedBy=default.target
+            dest: /etc/systemd/system/ollama.service
+            mode: '0644'
+
+        - name: Create Ollama models directory
+          file:
+            path: /home/ploy/.ollama/models
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Reload systemd daemon
+          systemd:
+            daemon_reload: true
+
+        - name: Start and enable Ollama service
+          systemd:
+            name: ollama
+            state: started
+            enabled: true
+
+        - name: Wait for Ollama service to start
+          wait_for:
+            host: 127.0.0.1
+            port: 11434
+            delay: 5
+            timeout: 30
+
+        - name: Download CodeLlama model for ARF (7B parameter model for code)
+          become_user: ploy
+          command: /usr/local/bin/ollama pull codellama:7b
+          async: 300  # 5 minutes timeout
+          poll: 10    # Check every 10 seconds
+          ignore_errors: true  # Don't fail if model download times out
+
+        - name: Download Llama2 model for general text processing (7B parameter model)
+          become_user: ploy
+          command: /usr/local/bin/ollama pull llama2:7b
+          async: 300  # 5 minutes timeout
+          poll: 10    # Check every 10 seconds
+          ignore_errors: true  # Don't fail if model download times out
+
     - name: Create ARF Phase 3 executables and tools
       block:
         - name: Create ARF executables directory
@@ -711,6 +791,29 @@
               done
               echo "✅ Python LLM deps: $python_deps/5 available"
               
+              # Check Ollama installation and service
+              echo "Checking Ollama installation..."
+              if command -v ollama >/dev/null 2>&1; then
+                  echo "✅ Ollama: $(ollama --version 2>/dev/null || echo 'installed')"
+                  
+                  # Check if Ollama service is running
+                  if systemctl is-active ollama >/dev/null 2>&1; then
+                      echo "✅ Ollama service: running"
+                      
+                      # Check if models are available
+                      model_count=$(ollama list 2>/dev/null | grep -c "codellama\|llama2" || echo "0")
+                      if [ "$model_count" -gt 0 ]; then
+                          echo "✅ Ollama models: $model_count available"
+                      else
+                          echo "⚠️  Ollama models: downloading in background"
+                      fi
+                  else
+                      echo "❌ Ollama service: not running"
+                  fi
+              else
+                  echo "❌ Ollama: not installed"
+              fi
+              
               echo ""
               echo "ARF Phase 3 validation complete."
               
@@ -798,13 +901,22 @@
           export ARF_REDIS_METRICS_DB=4
           
           # LLM Configuration
-          export ARF_LLM_PROVIDER="${ARF_LLM_PROVIDER:-openai}"
-          export ARF_LLM_MODEL="${ARF_LLM_MODEL:-gpt-4}"
+          export ARF_LLM_PROVIDER="${ARF_LLM_PROVIDER:-ollama}"
+          export ARF_LLM_MODEL="${ARF_LLM_MODEL:-codellama:7b}"
           export ARF_LLM_TEMPERATURE="${ARF_LLM_TEMPERATURE:-0.1}"
           export ARF_LLM_MAX_TOKENS="${ARF_LLM_MAX_TOKENS:-2048}"
           export ARF_LLM_TIMEOUT="${ARF_LLM_TIMEOUT:-30s}"
           export ARF_LLM_CACHE_ENABLED="${ARF_LLM_CACHE_ENABLED:-true}"
           export ARF_LLM_CACHE_TTL="${ARF_LLM_CACHE_TTL:-24h}"
+          
+          # Ollama Configuration
+          export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
+          export OLLAMA_MODELS_DIR="/home/ploy/.ollama/models"
+          export ARF_OLLAMA_ENDPOINT="http://127.0.0.1:11434"
+          export ARF_OLLAMA_CODE_MODEL="codellama:7b"
+          export ARF_OLLAMA_TEXT_MODEL="llama2:7b"
+          export ARF_OLLAMA_TIMEOUT="120s"
+          export ARF_OLLAMA_MAX_RETRIES="3"
           
           # Hybrid Pipeline Configuration
           export ARF_HYBRID_DEFAULT_STRATEGY="${ARF_HYBRID_DEFAULT_STRATEGY:-sequential}"
