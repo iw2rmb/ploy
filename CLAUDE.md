@@ -9,7 +9,7 @@ This file must be followed for every prompt execution.
 **CRITICAL TESTING RULE**: Claude Code must ONLY perform build testing locally. All other testing MUST be performed on VPS.
 
 ### Local Testing (Claude Code Environment)
-- **BUILD COMPILATION ONLY**: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy`
+- **BUILD COMPILATION ONLY**: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...`
 - **SYNTAX VERIFICATION**: Static analysis, imports, basic compilation checks
 - **FILE STRUCTURE**: Ensure files exist and are properly organized
 - **NO RUNTIME TESTING**: Never start servers, execute binaries, or run functional tests locally
@@ -278,11 +278,12 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 5. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
 
 6. **Local Build Verification**: Execute ONLY compilation testing in local environment
-    - **MANDATORY Compilation Check**: ALWAYS build both controller and CLI locally to verify compilation before any VPS deployment:
+    - **MANDATORY Compilation Check**: ALWAYS build controller, CLI, and ALL TESTS locally to verify compilation before any VPS deployment:
       ```bash
-      go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy
+      go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...
       ```
     - **Build Failure Protocol**: If compilation fails locally, DO NOT proceed to VPS testing
+    - **Test Compilation Critical**: Test files MUST compile to catch interface changes, missing parameters, and type errors
     - **PROHIBITED Local Activities**: 
       - ❌ DO NOT execute binaries locally (`./build/controller`, `./build/ploy`)
       - ❌ DO NOT run test scripts locally (`./test-scripts/test-*.sh`)
@@ -413,7 +414,7 @@ Task(
 
 ### Claude Code (Local Environment) - BUILD ONLY
 ✅ **Allowed Locally**:
-- Build compilation: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy`
+- Build compilation: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...`
 - Syntax validation and import checking
 - File structure verification
 - Code analysis and development
