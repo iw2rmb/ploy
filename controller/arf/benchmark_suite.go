@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -172,7 +173,30 @@ func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
 	
 	switch config.LLMProvider {
 	case "ollama":
-		llmGen, err = NewOllamaLLMGenerator()
+		// Extract Ollama configuration from config
+		model := config.LLMModel
+		baseURL := "http://localhost:11434" // default
+		temperature := 0.1 // default
+		contextLength := 4096 // default
+		
+		// Override with options if provided
+		if config.LLMOptions != nil {
+			if url, ok := config.LLMOptions["base_url"]; ok && url != "" {
+				baseURL = url
+			}
+			if tempStr, ok := config.LLMOptions["temperature"]; ok && tempStr != "" {
+				if temp, parseErr := strconv.ParseFloat(tempStr, 64); parseErr == nil {
+					temperature = temp
+				}
+			}
+			if tokensStr, ok := config.LLMOptions["max_tokens"]; ok && tokensStr != "" {
+				if tokens, parseErr := strconv.Atoi(tokensStr); parseErr == nil {
+					contextLength = tokens
+				}
+			}
+		}
+		
+		llmGen, err = NewOllamaLLMGeneratorWithConfig(model, baseURL, temperature, contextLength)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Ollama generator: %w", err)
 		}
