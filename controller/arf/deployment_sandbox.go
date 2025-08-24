@@ -574,11 +574,18 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 	// Read response body
 	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
+		if d.logger != nil {
+			d.logger("ERROR", "deployment", "Failed to read response body", fmt.Sprintf("Error: %v", readErr))
+		}
 		fmt.Printf("Error reading response body: %v\n", readErr)
 		return fmt.Errorf("failed to read response: %w", readErr)
 	}
 	
 	// Log complete response details
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "HTTP response received", fmt.Sprintf("Status: %d %s, Body size: %d bytes", resp.StatusCode, resp.Status, len(body)))
+		d.logger("DEBUG", "deployment", "Response body content", string(body))
+	}
 	fmt.Printf("=== ARF Deployment Response ===\n")
 	fmt.Printf("Status: %d %s\n", resp.StatusCode, resp.Status)
 	fmt.Printf("Response Headers: %+v\n", resp.Header)
@@ -590,14 +597,23 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 		var errorResp map[string]interface{}
 		if err := json.Unmarshal(body, &errorResp); err == nil {
 			if errMsg, ok := errorResp["error"].(string); ok {
+				if d.logger != nil {
+					d.logger("ERROR", "deployment", "Deployment failed with parsed error", fmt.Sprintf("Status: %d, Error: %s", resp.StatusCode, errMsg))
+				}
 				fmt.Printf("Parsed Error Message: %s\n", errMsg)
 				return fmt.Errorf("deployment failed: %s", errMsg)
 			}
+		}
+		if d.logger != nil {
+			d.logger("ERROR", "deployment", "Deployment failed with raw error", fmt.Sprintf("Status: %d, Response: %s", resp.StatusCode, string(body)))
 		}
 		fmt.Printf("Raw Error Response: %s\n", string(body))
 		return fmt.Errorf("deploy request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 	
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "Deployment request successful", fmt.Sprintf("Status: %d", resp.StatusCode))
+	}
 	fmt.Printf("Deployment request successful! Status: %d\n", resp.StatusCode)
 	
 	// Parse successful response
