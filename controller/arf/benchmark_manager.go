@@ -13,6 +13,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// BenchmarkLogEntry represents a single log entry during benchmark execution
+type BenchmarkLogEntry struct {
+	Timestamp time.Time `json:"timestamp"`
+	Level     string    `json:"level"`     // INFO, WARN, ERROR
+	Stage     string    `json:"stage"`     // initialization, repository_preparation, etc.
+	Message   string    `json:"message"`
+	Details   string    `json:"details,omitempty"` // Additional details like error traces
+}
+
 // BenchmarkManager manages benchmark test executions with distributed storage
 type BenchmarkManager struct {
 	benchmarks  map[string]*RunningBenchmark // Local cache for running benchmarks
@@ -24,16 +33,29 @@ type BenchmarkManager struct {
 
 // RunningBenchmark represents a benchmark in progress
 type RunningBenchmark struct {
-	ID              string           `json:"id"`
-	Config          *BenchmarkConfig `json:"config"`
-	Suite           *BenchmarkSuite  `json:"-"`
-	Status          string           `json:"status"` // running, completed, failed, cancelled
-	CurrentIteration int             `json:"current_iteration"`
-	StartTime       time.Time        `json:"start_time"`
-	EndTime         *time.Time       `json:"end_time,omitempty"`
-	Result          *BenchmarkResult `json:"result,omitempty"`
-	Errors          []string         `json:"errors,omitempty"`
+	ID              string              `json:"id"`
+	Config          *BenchmarkConfig    `json:"config"`
+	Suite           *BenchmarkSuite     `json:"-"`
+	Status          string              `json:"status"` // running, completed, failed, cancelled
+	CurrentIteration int                `json:"current_iteration"`
+	StartTime       time.Time           `json:"start_time"`
+	EndTime         *time.Time          `json:"end_time,omitempty"`
+	Result          *BenchmarkResult    `json:"result,omitempty"`
+	Errors          []string            `json:"errors,omitempty"`
+	Logs            []BenchmarkLogEntry `json:"logs"`
 	cancelFunc      context.CancelFunc
+}
+
+// AddLog adds a log entry to the running benchmark
+func (rb *RunningBenchmark) AddLog(level, stage, message, details string) {
+	logEntry := BenchmarkLogEntry{
+		Timestamp: time.Now(),
+		Level:     level,
+		Stage:     stage,
+		Message:   message,
+		Details:   details,
+	}
+	rb.Logs = append(rb.Logs, logEntry)
 }
 
 // NewBenchmarkManager creates a new benchmark manager with Consul storage
@@ -73,6 +95,7 @@ func (bm *BenchmarkManager) storeBenchmark(benchmark *RunningBenchmark) error {
 			EndTime:          benchmark.EndTime,
 			Result:           benchmark.Result,
 			Errors:           benchmark.Errors,
+			Logs:             benchmark.Logs, // Include logs in serialization
 			cancelFunc:       nil, // Cannot serialize
 		}
 		
@@ -146,6 +169,7 @@ func (bm *BenchmarkManager) updateBenchmark(benchmark *RunningBenchmark) error {
 			EndTime:          benchmark.EndTime,
 			Result:           benchmark.Result,
 			Errors:           benchmark.Errors,
+			Logs:             benchmark.Logs, // Include logs in serialization
 			cancelFunc:       nil, // Cannot serialize
 		}
 		
@@ -246,27 +270,35 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 		config.OutputDir = req.OutputDir
 	}
 	
-	// Create benchmark suite
-	suite, err := NewBenchmarkSuite(config)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error": fmt.Sprintf("Failed to create benchmark suite: %v", err),
-		})
-	}
-	
-	// Create running benchmark
+	// Create running benchmark first (to get logger)
 	benchmarkID := fmt.Sprintf("bench-%d", time.Now().Unix())
 	ctx, cancel := context.WithCancel(context.Background())
 	
 	running := &RunningBenchmark{
 		ID:               benchmarkID,
 		Config:           config,
-		Suite:            suite,
+		Suite:            nil, // Will be set after creation
 		Status:           "running",
 		CurrentIteration: 0,
 		StartTime:        time.Now(),
+		Logs:             make([]BenchmarkLogEntry, 0), // Initialize logs slice
 		cancelFunc:       cancel,
 	}
+	
+	// Add initial log entry
+	running.AddLog("INFO", "initialization", "Benchmark started", fmt.Sprintf("Created benchmark with ID %s", benchmarkID))
+	
+	// Create benchmark suite with logger
+	suite, err := NewBenchmarkSuite(config, running.AddLog)
+	if err != nil {
+		running.AddLog("ERROR", "initialization", "Failed to create benchmark suite", fmt.Sprintf("Error: %v", err))
+		return c.Status(500).JSON(fiber.Map{
+			"error": fmt.Sprintf("Failed to create benchmark suite: %v", err),
+		})
+	}
+	
+	// Set suite reference
+	running.Suite = suite
 	
 	// Store in manager
 	if h.benchmarkManager == nil {
@@ -287,18 +319,25 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 	
 	// Run benchmark asynchronously
 	go func() {
+		running.AddLog("INFO", "execution", "Starting benchmark execution", fmt.Sprintf("Beginning test suite run for repository: %s", config.RepoURL))
+		
 		result, err := suite.Run(ctx)
 		
 		h.benchmarkManager.mu.Lock()
 		if err != nil {
 			running.Status = "failed"
 			running.Errors = append(running.Errors, err.Error())
+			running.AddLog("ERROR", "execution", "Benchmark execution failed", fmt.Sprintf("Error: %v", err))
 		} else {
 			running.Status = "completed"
 			running.Result = result
+			running.AddLog("INFO", "execution", "Benchmark execution completed", fmt.Sprintf("Successful completion with %d iterations", len(result.Iterations)))
 		}
 		endTime := time.Now()
 		running.EndTime = &endTime
+		
+		duration := endTime.Sub(running.StartTime)
+		running.AddLog("INFO", "completion", "Benchmark finished", fmt.Sprintf("Total duration: %s, Status: %s", duration, running.Status))
 		
 		// Update in distributed storage
 		h.benchmarkManager.updateBenchmark(running)
@@ -434,55 +473,33 @@ func (h *Handler) GetBenchmarkLogs(c *fiber.Ctx) error {
 		})
 	}
 	
-	// For now, return mock logs until we implement proper logging
-	mockLogs := []map[string]interface{}{
-		{
+	// Return real execution logs from benchmark run
+	var allLogs []map[string]interface{}
+	for _, logEntry := range running.Logs {
+		allLogs = append(allLogs, map[string]interface{}{
+			"timestamp": logEntry.Timestamp,
+			"level":     logEntry.Level,
+			"stage":     logEntry.Stage,
+			"message":   logEntry.Message,
+			"details":   logEntry.Details,
+		})
+	}
+	
+	// If no logs yet (benchmark just started), add an initial log
+	if len(allLogs) == 0 {
+		allLogs = append(allLogs, map[string]interface{}{
 			"timestamp": running.StartTime,
 			"level":     "INFO",
 			"stage":     "initialization",
 			"message":   fmt.Sprintf("Starting benchmark %s", running.Config.Name),
-		},
-		{
-			"timestamp": running.StartTime.Add(1 * time.Second),
-			"level":     "INFO",
-			"stage":     "repository_preparation",
-			"message":   fmt.Sprintf("Cloning repository: %s", running.Config.RepoURL),
-		},
-		{
-			"timestamp": running.StartTime.Add(5 * time.Second),
-			"level":     "INFO",
-			"stage":     "openrewrite_transform",
-			"message":   fmt.Sprintf("Applying %d OpenRewrite recipes", len(running.Config.RecipeIDs)),
-		},
-		{
-			"timestamp": running.StartTime.Add(10 * time.Second),
-			"level":     "INFO",
-			"stage":     "deployment",
-			"message":   "Deploying transformed application to Ploy",
-		},
-		{
-			"timestamp": running.StartTime.Add(20 * time.Second),
-			"level":     "INFO",
-			"stage":     "application_testing",
-			"message":   "Testing deployed application endpoints",
-		},
-	}
-	
-	// Add completion log if benchmark is done
-	if running.EndTime != nil {
-		mockLogs = append(mockLogs, map[string]interface{}{
-			"timestamp": *running.EndTime,
-			"level":     "INFO", 
-			"stage":     "completion",
-			"message":   fmt.Sprintf("Benchmark completed with status: %s", running.Status),
 		})
 	}
 	
 	// Filter logs by stage if specified
-	filteredLogs := mockLogs
+	filteredLogs := allLogs
 	if stage != "all" {
 		filteredLogs = []map[string]interface{}{}
-		for _, log := range mockLogs {
+		for _, log := range allLogs {
 			if log["stage"] == stage {
 				filteredLogs = append(filteredLogs, log)
 			}
