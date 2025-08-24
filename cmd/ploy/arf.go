@@ -841,7 +841,7 @@ func handleBenchmarkRun(args []string) error {
 		
 		// Iteration control
 		"max_iterations":        maxIterations,
-		"timeout_per_iteration": "10m",
+		"timeout_per_iteration": 600000000000, // 10 minutes in nanoseconds
 		"stop_on_success":       true,
 		
 		// Output configuration
@@ -899,6 +899,13 @@ func handleBenchmarkRun(args []string) error {
 	fmt.Println()
 
 	url := fmt.Sprintf("%s/arf/benchmark/run", arfControllerURL)
+	
+	// Debug: print request body
+	if debugMode := os.Getenv("DEBUG_ARF"); debugMode != "" {
+		fmt.Printf("DEBUG: Request URL: %s\n", url)
+		fmt.Printf("DEBUG: Request body: %s\n", string(data))
+	}
+	
 	response, err := makeAPIRequest("POST", url, data)
 	if err != nil {
 		return fmt.Errorf("failed to start benchmark: %w", err)
