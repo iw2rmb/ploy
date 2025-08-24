@@ -108,7 +108,9 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 	
 	// Store in manager
 	if h.benchmarkManager == nil {
-		h.benchmarkManager = NewBenchmarkManager("./benchmark_results")
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Benchmark manager not initialized",
+		})
 	}
 	
 	h.benchmarkManager.mu.Lock()

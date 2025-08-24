@@ -25,7 +25,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new ARF HTTP handler
-func NewHandler(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManager) *Handler {
+func NewHandler(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManager, benchmarkMgr *BenchmarkManager) *Handler {
 	return &Handler{
 		engine:     engine,
 		catalog:    catalog,
@@ -38,6 +38,8 @@ func NewHandler(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManag
 			EnableCircuitBreaker: true,
 			EnableCaching:        true,
 		}),
+		// Phase 8 components
+		benchmarkManager:    benchmarkMgr,
 	}
 }
 
@@ -52,6 +54,7 @@ func NewHandlerWithPhase3(
 	multiLang MultiLanguageEngine,
 	abTest ABTestFramework,
 	strategy StrategySelector,
+	benchmarkMgr *BenchmarkManager,
 ) *Handler {
 	return &Handler{
 		engine:           engine,
@@ -71,6 +74,8 @@ func NewHandlerWithPhase3(
 			EnableCircuitBreaker: true,
 			EnableCaching:        true,
 		}),
+		// Phase 8 components
+		benchmarkManager:    benchmarkMgr,
 	}
 }
 

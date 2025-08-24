@@ -239,6 +239,9 @@ func CreateHandlerWithPhase3(engine ARFEngine, catalog RecipeCatalog, sandboxMgr
 		return nil, fmt.Errorf("failed to initialize Phase 3 components: %w", err)
 	}
 	
+	// Create shared benchmark manager
+	benchmarkMgr := NewBenchmarkManager("./benchmark_results")
+
 	// Create handler with Phase 3 components
 	return NewHandlerWithPhase3(
 		engine,
@@ -250,5 +253,6 @@ func CreateHandlerWithPhase3(engine ARFEngine, catalog RecipeCatalog, sandboxMgr
 		components.MultiLangEngine,
 		components.ABTestFramework,
 		components.StrategySelector,
+		benchmarkMgr,
 	), nil
 }
