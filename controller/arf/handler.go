@@ -201,5 +201,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Post("/benchmark/compare", h.CompareBenchmarks)
 	arf.Post("/benchmark/report/:id", h.GenerateBenchmarkReport)
 	arf.Get("/benchmark/list", h.ListBenchmarks)
+	arf.Get("/benchmark/:id", h.GetBenchmark) // Get full benchmark details
 	arf.Delete("/benchmark/:id", h.CancelBenchmark)
 }
