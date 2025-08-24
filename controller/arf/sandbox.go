@@ -419,20 +419,20 @@ func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, d
 		// We're inside the controller, use localhost to call ourselves
 		controllerURL := fmt.Sprintf("http://localhost:%s/v1", port)
 		fmt.Printf("Running inside controller (version %s), using self-reference: %s\n", ployVersion, controllerURL)
-		return NewDeploymentSandboxManager(controllerURL)
+		return NewDeploymentSandboxManager(controllerURL, nil)
 	}
 	
 	// Check if we have a controller URL configured (for external clients)
 	if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {
 		fmt.Printf("Using deployment sandbox manager with controller: %s\n", controllerURL)
-		return NewDeploymentSandboxManager(controllerURL)
+		return NewDeploymentSandboxManager(controllerURL, nil)
 	}
 	
 	// Check for default environment (ploy CLI available)
 	if _, err := exec.LookPath("ploy"); err == nil {
 		fmt.Println("Using deployment sandbox manager with default controller")
 		// Use default controller URL
-		return NewDeploymentSandboxManager("https://api.dev.ployd.app/v1")
+		return NewDeploymentSandboxManager("https://api.dev.ployd.app/v1", nil)
 	}
 	
 	// Check for remote FreeBSD jail host configuration

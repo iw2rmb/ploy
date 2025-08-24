@@ -274,7 +274,7 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 	
 	// Create deployment sandbox manager with controller URL detection
 	controllerURL := getControllerURLForBenchmark()
-	sandboxMgr := NewDeploymentSandboxManager(controllerURL)
+	sandboxMgr := NewDeploymentSandboxManager(controllerURL, logger)
 	
 	return &BenchmarkSuite{
 		config:          config,
