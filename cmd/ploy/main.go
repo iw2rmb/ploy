@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/iw2rmb/ploy/internal/cli/apps"
-	"github.com/iw2rmb/ploy/internal/cli/arf"
 	"github.com/iw2rmb/ploy/internal/cli/bluegreen"
 	"github.com/iw2rmb/ploy/internal/cli/certs"
 	"github.com/iw2rmb/ploy/internal/cli/debug"
@@ -55,7 +54,7 @@ func main() {
 		case "rollback":
 			debug.RollbackCmd(os.Args[2:], controllerURL)
 		case "arf":
-			arf.ARFCmd(os.Args[2:], controllerURL)
+			ARFCmd(os.Args[2:], controllerURL)
 		case "bluegreen":
 			bluegreen.BlueGreenCmd(os.Args[2:], controllerURL)
 		case "version":
