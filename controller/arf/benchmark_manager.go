@@ -356,11 +356,46 @@ func (h *Handler) GetBenchmarkStatus(c *fiber.Ctx) error {
 		})
 	}
 	
+	// Build comprehensive status response with all benchmark details
 	response := fiber.Map{
 		"benchmark_id":      running.ID,
 		"status":           running.Status,
 		"current_iteration": running.CurrentIteration,
 		"start_time":       running.StartTime,
+		
+		// Include benchmark configuration details
+		"name":             running.Config.Name,
+		"repository":       running.Config.RepoURL,
+		"repo_branch":      running.Config.RepoBranch,
+		"task_type":        running.Config.TaskType,
+		"source_lang":      running.Config.SourceLang,
+		"target_spec":      running.Config.TargetSpec,
+		"recipe_ids":       running.Config.RecipeIDs,
+		"max_iterations":   running.Config.MaxIterations,
+		
+		// Deployment configuration details
+		"app_name":         "",  // Will be filled from deployment config
+		"lane":            "",   // Will be filled from deployment config
+		
+		// Progress calculation
+		"progress":         0.0,
+	}
+	
+	// Extract deployment configuration if available
+	if running.Config.DeploymentConfig != nil {
+		deployConfig := running.Config.DeploymentConfig
+		if appName, exists := deployConfig["app_name"]; exists {
+			response["app_name"] = appName
+		}
+		if lane, exists := deployConfig["lane"]; exists {
+			response["lane"] = lane
+		}
+	}
+	
+	// Calculate progress based on iteration and stages
+	if running.Config.MaxIterations > 0 {
+		progress := float64(running.CurrentIteration) / float64(running.Config.MaxIterations)
+		response["progress"] = progress
 	}
 	
 	if running.EndTime != nil {
@@ -373,6 +408,89 @@ func (h *Handler) GetBenchmarkStatus(c *fiber.Ctx) error {
 	}
 	
 	return c.JSON(response)
+}
+
+// GetBenchmarkLogs handles GET /benchmark/logs/:id
+func (h *Handler) GetBenchmarkLogs(c *fiber.Ctx) error {
+	benchmarkID := c.Params("id")
+	stage := c.Query("stage", "all")
+	
+	if h.benchmarkManager == nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "No benchmarks found",
+		})
+	}
+	
+	h.benchmarkManager.mu.RLock()
+	running, exists := h.benchmarkManager.getBenchmark(benchmarkID)
+	h.benchmarkManager.mu.RUnlock()
+	
+	if !exists {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Benchmark not found",
+		})
+	}
+	
+	// For now, return mock logs until we implement proper logging
+	mockLogs := []map[string]interface{}{
+		{
+			"timestamp": running.StartTime,
+			"level":     "INFO",
+			"stage":     "initialization",
+			"message":   fmt.Sprintf("Starting benchmark %s", running.Config.Name),
+		},
+		{
+			"timestamp": running.StartTime.Add(1 * time.Second),
+			"level":     "INFO",
+			"stage":     "repository_preparation",
+			"message":   fmt.Sprintf("Cloning repository: %s", running.Config.RepoURL),
+		},
+		{
+			"timestamp": running.StartTime.Add(5 * time.Second),
+			"level":     "INFO",
+			"stage":     "openrewrite_transform",
+			"message":   fmt.Sprintf("Applying %d OpenRewrite recipes", len(running.Config.RecipeIDs)),
+		},
+		{
+			"timestamp": running.StartTime.Add(10 * time.Second),
+			"level":     "INFO",
+			"stage":     "deployment",
+			"message":   "Deploying transformed application to Ploy",
+		},
+		{
+			"timestamp": running.StartTime.Add(20 * time.Second),
+			"level":     "INFO",
+			"stage":     "application_testing",
+			"message":   "Testing deployed application endpoints",
+		},
+	}
+	
+	// Add completion log if benchmark is done
+	if running.EndTime != nil {
+		mockLogs = append(mockLogs, map[string]interface{}{
+			"timestamp": *running.EndTime,
+			"level":     "INFO", 
+			"stage":     "completion",
+			"message":   fmt.Sprintf("Benchmark completed with status: %s", running.Status),
+		})
+	}
+	
+	// Filter logs by stage if specified
+	filteredLogs := mockLogs
+	if stage != "all" {
+		filteredLogs = []map[string]interface{}{}
+		for _, log := range mockLogs {
+			if log["stage"] == stage {
+				filteredLogs = append(filteredLogs, log)
+			}
+		}
+	}
+	
+	return c.JSON(fiber.Map{
+		"benchmark_id": benchmarkID,
+		"stage":        stage,
+		"logs":         filteredLogs,
+	})
 }
 
 // GetBenchmarkResults handles GET /benchmark/results/:id

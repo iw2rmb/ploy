@@ -197,6 +197,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Post("/benchmark/run", h.RunBenchmarkSuite)
 	arf.Get("/benchmark/status/:id", h.GetBenchmarkStatus)
 	arf.Get("/benchmark/results/:id", h.GetBenchmarkResults)
+	arf.Get("/benchmark/logs/:id", h.GetBenchmarkLogs)
 	arf.Get("/benchmark/errors/:id", h.GetBenchmarkErrors)
 	arf.Post("/benchmark/compare", h.CompareBenchmarks)
 	arf.Post("/benchmark/report/:id", h.GenerateBenchmarkReport)

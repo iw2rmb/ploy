@@ -45,6 +45,9 @@ type BenchmarkConfig struct {
 	CaptureFullDiffs   bool   `json:"capture_full_diffs" yaml:"capture_full_diffs"`
 	CapturePartialDiffs bool   `json:"capture_partial_diffs" yaml:"capture_partial_diffs"`
 	SaveIntermediateState bool `json:"save_intermediate_state" yaml:"save_intermediate_state"`
+	
+	// Deployment configuration
+	DeploymentConfig   map[string]interface{} `json:"deployment_config,omitempty" yaml:"deployment_config,omitempty"`
 }
 
 // BenchmarkIteration represents a single iteration in the benchmark
