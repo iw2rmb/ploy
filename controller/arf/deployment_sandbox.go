@@ -1,12 +1,15 @@
 package arf
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	
@@ -60,16 +63,43 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 		},
 	}
 	
-	// For now, create a mock sandbox without actual deployment
-	// This allows benchmarks to proceed and test transformation logic
-	// TODO: Implement proper git-to-tar conversion and deployment
-	fmt.Printf("Creating mock sandbox for benchmark testing (deployment disabled)\n")
-	fmt.Printf("Repository: %s, Branch: %s, App: %s\n", config.Repository, config.Branch, appName)
-	
-	// Mark sandbox as ready immediately
-	sandbox.Status = SandboxStatusReady
-	sandbox.Metadata["app_url"] = fmt.Sprintf("https://%s.ployd.app", appName)
-	sandbox.Metadata["mock_deployment"] = "true"
+	// Check if LocalPath is provided (transformed code location)
+	// If LocalPath is set, it means we have already cloned and transformed the code
+	if config.LocalPath != "" {
+		fmt.Printf("Deploying transformed code from: %s\n", config.LocalPath)
+		
+		// Create tar from the transformed repository
+		tarData, err := d.createTarFromDirectory(config.LocalPath)
+		if err != nil {
+			sandbox.Status = SandboxStatusError
+			return sandbox, fmt.Errorf("failed to create tar from transformed code: %w", err)
+		}
+		
+		// Deploy the tar archive
+		if err := d.deployTarArchive(ctx, appName, tarData, config); err != nil {
+			sandbox.Status = SandboxStatusError
+			return sandbox, fmt.Errorf("failed to deploy sandbox app: %w", err)
+		}
+		
+		// Wait for deployment to complete
+		if err := d.waitForDeployment(ctx, appName, 5*time.Minute); err != nil {
+			sandbox.Status = SandboxStatusError
+			return sandbox, fmt.Errorf("deployment failed or timed out: %w", err)
+		}
+		
+		// Get app URL
+		appURL := fmt.Sprintf("https://%s.ployd.app", appName)
+		sandbox.Metadata["app_url"] = appURL
+		sandbox.Status = SandboxStatusReady
+		
+		fmt.Printf("Sandbox deployed successfully: %s\n", appURL)
+	} else {
+		// For backward compatibility: create mock sandbox if no local path
+		fmt.Printf("Creating mock sandbox (no transformed code provided)\n")
+		sandbox.Status = SandboxStatusReady
+		sandbox.Metadata["app_url"] = fmt.Sprintf("https://%s.ployd.app", appName)
+		sandbox.Metadata["mock_deployment"] = "true"
+	}
 	
 	return sandbox, nil
 }
@@ -353,6 +383,110 @@ func (d *DeploymentSandboxManager) CleanupExpiredSandboxes(ctx context.Context) 
 		return fmt.Errorf("cleanup errors: %s", strings.Join(errors, "; "))
 	}
 	
+	return nil
+}
+
+// createTarFromDirectory creates a tar archive from a directory
+func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]byte, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	defer tw.Close()
+	
+	// Walk through the directory and add files to tar
+	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		
+		// Skip .git directory
+		if strings.Contains(path, ".git") {
+			return nil
+		}
+		
+		// Create tar header
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+		
+		// Update the name to be relative to sourceDir
+		relPath, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+		
+		// Write header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		
+		// If it's a file, write its contents
+		if !info.IsDir() {
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+			
+			if _, err := io.Copy(tw, file); err != nil {
+				return err
+			}
+		}
+		
+		return nil
+	})
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tar archive: %w", err)
+	}
+	
+	return buf.Bytes(), nil
+}
+
+// deployTarArchive deploys a tar archive through the build endpoint
+func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName string, tarData []byte, config SandboxConfig) error {
+	// Determine the lane based on language/build tool
+	lane := "C" // Default to Lane C for Java
+	if config.Language == "go" {
+		lane = "D"
+	} else if config.Language == "python" {
+		lane = "E"
+	}
+	
+	// Build the deployment URL with parameters
+	deployURL := fmt.Sprintf("%s/apps/%s/builds?sha=arf-%s&lane=%s", 
+		d.controllerURL, appName, time.Now().Format("20060102-150405"), lane)
+	
+	// Create the request with tar data as body
+	req, err := http.NewRequestWithContext(ctx, "POST", deployURL, bytes.NewReader(tarData))
+	if err != nil {
+		return fmt.Errorf("failed to create deploy request: %w", err)
+	}
+	
+	// Set content type for tar
+	req.Header.Set("Content-Type", "application/x-tar")
+	req.Header.Set("Content-Length", fmt.Sprintf("%d", len(tarData)))
+	
+	if d.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+d.apiKey)
+	}
+	
+	// Send the request
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("deploy request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	// Read response body
+	body, _ := io.ReadAll(resp.Body)
+	
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("deploy request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+	
+	fmt.Printf("Deployment initiated for %s (status: %d)\n", appName, resp.StatusCode)
 	return nil
 }
 

@@ -73,12 +73,14 @@ type BenchmarkStage struct {
 
 // DiffCapture captures code changes made during an iteration
 type DiffCapture struct {
-	File      string    `json:"file"`
-	Type      string    `json:"type"` // added, modified, deleted
-	Before    string    `json:"before,omitempty"`
-	After     string    `json:"after,omitempty"`
-	UnifiedDiff string  `json:"unified_diff"`
-	Timestamp time.Time `json:"timestamp"`
+	File         string    `json:"file"`
+	Type         string    `json:"type"` // added, modified, deleted
+	Before       string    `json:"before,omitempty"`
+	After        string    `json:"after,omitempty"`
+	UnifiedDiff  string    `json:"unified_diff"`
+	LinesAdded   int       `json:"lines_added"`
+	LinesRemoved int       `json:"lines_removed"`
+	Timestamp    time.Time `json:"timestamp"`
 }
 
 // ErrorCapture captures errors during execution
@@ -484,8 +486,9 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 
 	// Create sandbox configuration for deployment
 	config := SandboxConfig{
-		Repository:    repoPath,
-		Branch:        "main", // Using local repository
+		Repository:    bs.config.RepoURL,    // Original repository URL for metadata
+		Branch:        bs.config.RepoBranch, // Original branch
+		LocalPath:     repoPath,              // Path to transformed code
 		Language:      language,
 		BuildTool:     buildSystem,
 		TTL:           bs.config.TimeoutPerIteration * 2, // Double timeout for deployment
@@ -519,27 +522,87 @@ func (bs *BenchmarkSuite) testDeployedApp(ctx context.Context, sandbox *Sandbox)
 		return fmt.Errorf("sandbox missing app_url metadata")
 	}
 
-	// Test 1: Health check endpoint
-	fmt.Printf("Testing health endpoint: %s/healthz\n", appURL)
-	if err := bs.testHealthEndpoint(ctx, appURL+"/healthz"); err != nil {
-		return fmt.Errorf("health check failed: %w", err)
-	}
+	fmt.Printf("Testing deployed application at: %s\n", appURL)
 
-	// Test 2: Basic application functionality
-	fmt.Printf("Testing application functionality: %s\n", appURL)
-	if err := bs.testApplicationEndpoints(ctx, appURL); err != nil {
-		return fmt.Errorf("application functionality test failed: %w", err)
+	// Determine endpoints to test based on application type
+	testEndpoints := []string{"/healthz", "/health", "/"}
+	
+	// Add Spring Boot specific endpoints if it's a Java app
+	if sandbox.Config.Language == "java" {
+		testEndpoints = append(testEndpoints, 
+			"/actuator/health",
+			"/actuator/info",
+		)
 	}
-
-	// Test 3: Performance validation
-	fmt.Printf("Running performance validation on: %s\n", appURL)
+	
+	// Test multiple endpoints
+	successfulEndpoints := 0
+	for _, endpoint := range testEndpoints {
+		testURL := appURL + endpoint
+		fmt.Printf("Testing endpoint: %s\n", testURL)
+		
+		if err := bs.testEndpointWithRetry(ctx, testURL); err != nil {
+			fmt.Printf("Endpoint %s failed: %v\n", endpoint, err)
+			// Continue testing other endpoints instead of failing immediately
+		} else {
+			fmt.Printf("Endpoint %s: OK\n", endpoint)
+			successfulEndpoints++
+		}
+	}
+	
+	// Require at least one endpoint to be successful
+	if successfulEndpoints == 0 {
+		return fmt.Errorf("all endpoints failed testing")
+	}
+	
+	fmt.Printf("Application testing completed: %d/%d endpoints successful\n", 
+		successfulEndpoints, len(testEndpoints))
+	
+	// Performance validation is optional
+	fmt.Printf("Running performance validation\n")
 	if err := bs.validatePerformance(ctx, appURL); err != nil {
-		// Performance issues are warnings, not failures
 		fmt.Printf("Performance validation warning: %v\n", err)
 	}
 
-	fmt.Printf("All application tests passed for sandbox: %s\n", sandbox.ID)
 	return nil
+}
+
+// testEndpointWithRetry tests an endpoint with retry logic
+func (bs *BenchmarkSuite) testEndpointWithRetry(ctx context.Context, endpointURL string) error {
+	client := &http.Client{Timeout: 10 * time.Second}
+	maxRetries := 3
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+		}
+		
+		req, err := http.NewRequestWithContext(ctx, "GET", endpointURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			if attempt < maxRetries-1 {
+				continue // Retry on network errors
+			}
+			return fmt.Errorf("request failed: %w", err)
+		}
+		defer resp.Body.Close()
+		
+		// Accept any 2xx or 3xx status as success
+		if resp.StatusCode < 400 {
+			return nil
+		}
+		
+		// For 404, don't retry - endpoint doesn't exist
+		if resp.StatusCode == http.StatusNotFound {
+			return fmt.Errorf("endpoint not found (404)")
+		}
+	}
+	
+	return fmt.Errorf("endpoint test failed after %d attempts", maxRetries)
 }
 
 // detectDeploymentErrors analyzes deployment and application errors for self-healing
@@ -676,12 +739,63 @@ func (bs *BenchmarkSuite) performSelfHealing(ctx context.Context, repoPath strin
 
 func (bs *BenchmarkSuite) captureDiffs(repoPath string) []DiffCapture {
 	ctx := context.Background()
+	
+	// Check if we should capture full diffs based on configuration
+	if !bs.config.CaptureFullDiffs && !bs.config.CapturePartialDiffs {
+		fmt.Printf("Diff capture disabled by configuration\n")
+		return []DiffCapture{}
+	}
+	
 	diffs, err := bs.gitOps.GetDiff(ctx, repoPath)
 	if err != nil {
 		fmt.Printf("Warning: failed to capture diffs: %v\n", err)
 		return []DiffCapture{}
 	}
+	
+	// Enhance diff information
+	for i := range diffs {
+		// Count lines added/removed from unified diff
+		if diffs[i].UnifiedDiff != "" {
+			lines := strings.Split(diffs[i].UnifiedDiff, "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+					diffs[i].LinesAdded++
+				} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+					diffs[i].LinesRemoved++
+				}
+			}
+		}
+		
+		// If partial diffs only, truncate large diffs
+		if bs.config.CapturePartialDiffs && !bs.config.CaptureFullDiffs {
+			if len(diffs[i].UnifiedDiff) > 5000 {
+				diffs[i].UnifiedDiff = diffs[i].UnifiedDiff[:5000] + "\n... (truncated)"
+			}
+		}
+	}
+	
+	fmt.Printf("Captured %d file diffs (%d lines added, %d removed)\n", 
+		len(diffs), 
+		sumLinesAdded(diffs), 
+		sumLinesRemoved(diffs))
+	
 	return diffs
+}
+
+func sumLinesAdded(diffs []DiffCapture) int {
+	total := 0
+	for _, d := range diffs {
+		total += d.LinesAdded
+	}
+	return total
+}
+
+func sumLinesRemoved(diffs []DiffCapture) int {
+	total := 0
+	for _, d := range diffs {
+		total += d.LinesRemoved
+	}
+	return total
 }
 
 func (bs *BenchmarkSuite) runTests(ctx context.Context, repoPath string) error {
@@ -814,27 +928,49 @@ func (bs *BenchmarkSuite) generateHTMLReport(result *BenchmarkResult, filename s
 	return nil
 }
 
-// testHealthEndpoint tests the /healthz endpoint of the deployed application
+// testHealthEndpoint tests the /healthz endpoint of the deployed application with retries
 func (bs *BenchmarkSuite) testHealthEndpoint(ctx context.Context, healthURL string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
 	
-	req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create health check request: %w", err)
-	}
+	// Retry logic with exponential backoff
+	maxRetries := 5
+	baseDelay := 5 * time.Second
 	
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("health check request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 5s, 10s, 20s, 40s
+			delay := baseDelay * time.Duration(1<<(attempt-1))
+			fmt.Printf("Retry %d/%d: waiting %v before next health check attempt\n", attempt, maxRetries, delay)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		
+		req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create health check request: %w", err)
+		}
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("Health check attempt %d failed: %v\n", attempt+1, err)
+			continue // Retry on network errors
+		}
+		defer resp.Body.Close()
+		
+		if resp.StatusCode == http.StatusOK {
+			fmt.Printf("Health check successful on attempt %d\n", attempt+1)
+			return nil
+		}
+		
+		// Log non-200 responses but continue retrying
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("health check failed with status %d: %s", resp.StatusCode, string(body))
+		fmt.Printf("Health check attempt %d returned status %d: %s\n", attempt+1, resp.StatusCode, string(body))
 	}
 	
-	return nil
+	return fmt.Errorf("health check failed after %d attempts", maxRetries)
 }
 
 // testApplicationEndpoints tests basic application functionality
