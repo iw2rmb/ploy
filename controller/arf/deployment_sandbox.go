@@ -505,6 +505,10 @@ func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]b
 
 // deployTarArchive deploys a tar archive through the build endpoint
 func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName string, tarData []byte, config SandboxConfig) error {
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "deployTarArchive started", fmt.Sprintf("App: %s, Tar size: %d bytes, Controller: %s", appName, len(tarData), d.controllerURL))
+	}
+	
 	// Let Ploy's lane detection handle the optimal lane selection
 	// Don't force a specific lane - let the system auto-detect
 	
@@ -514,10 +518,21 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 	deployURL := fmt.Sprintf("%s/apps/%s/builds?sha=%s", 
 		d.controllerURL, appName, sha)
 	
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "Built deployment URL", fmt.Sprintf("URL: %s, SHA: %s", deployURL, sha))
+	}
+	
 	// Create the request with tar data as body
 	req, err := http.NewRequestWithContext(ctx, "POST", deployURL, bytes.NewReader(tarData))
 	if err != nil {
+		if d.logger != nil {
+			d.logger("ERROR", "deployment", "Failed to create HTTP request", fmt.Sprintf("URL: %s, Error: %v", deployURL, err))
+		}
 		return fmt.Errorf("failed to create deploy request: %w", err)
+	}
+	
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "HTTP request created successfully", fmt.Sprintf("Method: POST, URL: %s", deployURL))
 	}
 	
 	// Set content type for tar
@@ -538,10 +553,21 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 	fmt.Printf("Controller URL: %s\n", d.controllerURL)
 	
 	// Send the request
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "Sending HTTP request", fmt.Sprintf("URL: %s, Content-Type: %s", deployURL, req.Header.Get("Content-Type")))
+	}
+	
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
+		if d.logger != nil {
+			d.logger("ERROR", "deployment", "HTTP request failed", fmt.Sprintf("URL: %s, Error: %v", deployURL, err))
+		}
 		fmt.Printf("HTTP Request Error: %v\n", err)
 		return fmt.Errorf("deploy request failed: %w", err)
+	}
+	
+	if d.logger != nil {
+		d.logger("DEBUG", "deployment", "HTTP request completed", fmt.Sprintf("Status: %d %s", resp.StatusCode, resp.Status))
 	}
 	defer resp.Body.Close()
 	
