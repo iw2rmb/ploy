@@ -43,6 +43,7 @@ Manual testing requires:
 - **Provider Factory**: Dynamic provider selection and configuration
 - **Cost Tracking**: Token usage and cost estimation per provider
 - **Streaming Support**: Handle streaming responses from compatible providers
+- **Auto Model Management**: Automatic download and installation of required models
 
 #### 3. Iteration & Diff Tracking
 - **Comprehensive Diffs**: Capture code changes for each iteration
@@ -307,6 +308,130 @@ func (f *LLMProviderFactory) CreateProvider(providerType string, config map[stri
     default:
         return nil, fmt.Errorf("unsupported provider: %s", providerType)
     }
+}
+```
+
+#### 4. Auto Model Management
+
+```go
+// controller/arf/model_manager.go
+type ModelManager interface {
+    EnsureModelAvailable(ctx context.Context, provider, model string) error
+    DownloadModel(ctx context.Context, provider, model string) error
+    ListAvailableModels(ctx context.Context, provider string) ([]ModelInfo, error)
+    GetModelStatus(ctx context.Context, provider, model string) ModelStatus
+    GetModelSize(provider, model string) (int64, error)
+    PurgeUnusedModels(ctx context.Context, provider string, keepCount int) error
+}
+
+type ModelInfo struct {
+    Name         string            `json:"name"`
+    Provider     string            `json:"provider"`
+    Size         int64             `json:"size_bytes"`
+    Downloaded   bool              `json:"downloaded"`
+    LastUsed     time.Time         `json:"last_used"`
+    Capabilities map[string]string `json:"capabilities"`
+    Tags         []string          `json:"tags"`
+}
+
+type ModelStatus struct {
+    Available     bool      `json:"available"`
+    Downloading   bool      `json:"downloading"`
+    Progress      float64   `json:"progress"`
+    Downloaded    bool      `json:"downloaded"`
+    LastChecked   time.Time `json:"last_checked"`
+    Error         string    `json:"error,omitempty"`
+}
+
+type OllamaModelManager struct {
+    client     *http.Client
+    baseURL    string
+    timeout    time.Duration
+}
+
+func (m *OllamaModelManager) EnsureModelAvailable(ctx context.Context, provider, model string) error {
+    if provider != "ollama" {
+        return fmt.Errorf("unsupported provider for auto-download: %s", provider)
+    }
+    
+    // Check if model is already available
+    status := m.GetModelStatus(ctx, provider, model)
+    if status.Available {
+        return nil
+    }
+    
+    // Auto-download if not available
+    log.Printf("Model %s not found, downloading automatically...", model)
+    return m.DownloadModel(ctx, provider, model)
+}
+
+func (m *OllamaModelManager) DownloadModel(ctx context.Context, provider, model string) error {
+    req := map[string]string{
+        "name": model,
+    }
+    
+    data, err := json.Marshal(req)
+    if err != nil {
+        return fmt.Errorf("failed to marshal request: %w", err)
+    }
+    
+    httpReq, err := http.NewRequestWithContext(ctx, "POST", m.baseURL+"/api/pull", bytes.NewBuffer(data))
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+    httpReq.Header.Set("Content-Type", "application/json")
+    
+    resp, err := m.client.Do(httpReq)
+    if err != nil {
+        return fmt.Errorf("failed to download model: %w", err)
+    }
+    defer resp.Body.Close()
+    
+    if resp.StatusCode != http.StatusOK {
+        return fmt.Errorf("model download failed with status: %d", resp.StatusCode)
+    }
+    
+    // Stream progress (optional)
+    scanner := bufio.NewScanner(resp.Body)
+    for scanner.Scan() {
+        var progress map[string]interface{}
+        if err := json.Unmarshal(scanner.Bytes(), &progress); err == nil {
+            if status, ok := progress["status"].(string); ok && status == "success" {
+                log.Printf("Model %s downloaded successfully", model)
+                return nil
+            }
+        }
+    }
+    
+    return scanner.Err()
+}
+```
+
+**Auto Model Management Features:**
+
+1. **Automatic Model Detection**: Automatically detect when required models are missing
+2. **Smart Downloading**: Download models on-demand when first needed for benchmarks
+3. **Progress Tracking**: Show download progress for large models
+4. **Model Caching**: Cache downloaded models and reuse across benchmark runs
+5. **Storage Management**: Automatic cleanup of unused models to save disk space
+6. **Provider-Agnostic**: Support auto-download for different LLM providers
+7. **Error Recovery**: Graceful handling of failed downloads with retry logic
+8. **Size Estimation**: Show estimated download size before starting
+9. **Background Downloads**: Non-blocking downloads with status monitoring
+10. **Model Validation**: Verify model integrity after download
+
+**Integration with Benchmark Suite:**
+
+```go
+// Automatic model management in benchmark execution
+func (s *BenchmarkSuite) runIteration(ctx context.Context, config *BenchmarkConfig, iteration int) (*IterationResult, error) {
+    // Ensure required model is available before starting
+    if err := s.modelManager.EnsureModelAvailable(ctx, config.LLMProvider, config.LLMModel); err != nil {
+        return nil, fmt.Errorf("failed to ensure model availability: %w", err)
+    }
+    
+    // Continue with benchmark execution
+    return s.executeTransformation(ctx, config, iteration)
 }
 ```
 
