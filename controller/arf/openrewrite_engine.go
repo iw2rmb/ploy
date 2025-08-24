@@ -11,44 +11,44 @@ import (
 	"time"
 )
 
-// MockOpenRewriteEngine provides simulated OpenRewrite transformations for testing
-type MockOpenRewriteEngine struct {
-	recipes map[string]MockRecipeHandler
+// BuiltinOpenRewriteEngine provides OpenRewrite transformations for Java code migration
+type BuiltinOpenRewriteEngine struct {
+	recipes map[string]RecipeHandler
 }
 
-// MockRecipeHandler defines how a mock recipe transforms code
-type MockRecipeHandler func(ctx context.Context, repoPath string) (*TransformationResult, error)
+// RecipeHandler defines how a recipe transforms code
+type RecipeHandler func(ctx context.Context, repoPath string) (*TransformationResult, error)
 
-// NewMockOpenRewriteEngine creates a mock OpenRewrite engine for testing
-func NewMockOpenRewriteEngine() *MockOpenRewriteEngine {
-	engine := &MockOpenRewriteEngine{
-		recipes: make(map[string]MockRecipeHandler),
+// NewBuiltinOpenRewriteEngine creates an OpenRewrite engine for code transformations
+func NewBuiltinOpenRewriteEngine() *BuiltinOpenRewriteEngine {
+	engine := &BuiltinOpenRewriteEngine{
+		recipes: make(map[string]RecipeHandler),
 	}
 	
-	// Register mock recipes
-	engine.registerMockRecipes()
+	// Register recipes
+	engine.registerRecipes()
 	
 	return engine
 }
 
-// registerMockRecipes sets up mock transformations
-func (m *MockOpenRewriteEngine) registerMockRecipes() {
+// registerRecipes sets up OpenRewrite transformation handlers
+func (m *BuiltinOpenRewriteEngine) registerRecipes() {
 	// Java 11 to 17 migration
-	m.recipes["org.openrewrite.java.migrate.Java11toJava17"] = m.mockJava11To17Migration
+	m.recipes["org.openrewrite.java.migrate.Java11toJava17"] = m.java11To17Migration
 	
 	// Spring Boot 3 upgrade
-	m.recipes["org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0"] = m.mockSpringBoot3Upgrade
+	m.recipes["org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0"] = m.springBoot3Upgrade
 	
 	// Spring Boot 3 best practices
-	m.recipes["org.openrewrite.java.spring.boot3.SpringBoot3BestPractices"] = m.mockSpringBoot3BestPractices
+	m.recipes["org.openrewrite.java.spring.boot3.SpringBoot3BestPractices"] = m.springBoot3BestPractices
 	
 	// Generic cleanup recipes
-	m.recipes["org.openrewrite.java.cleanup.UnnecessaryParentheses"] = m.mockRemoveUnnecessaryParentheses
-	m.recipes["org.openrewrite.java.cleanup.RemoveUnusedImports"] = m.mockRemoveUnusedImports
+	m.recipes["org.openrewrite.java.cleanup.UnnecessaryParentheses"] = m.removeUnnecessaryParentheses
+	m.recipes["org.openrewrite.java.cleanup.RemoveUnusedImports"] = m.removeUnusedImports
 }
 
-// ApplyRecipe applies a mock recipe to the repository
-func (m *MockOpenRewriteEngine) ApplyRecipe(ctx context.Context, recipeID string, repoPath string) (*TransformationResult, error) {
+// ApplyRecipe applies an OpenRewrite recipe to the repository
+func (m *BuiltinOpenRewriteEngine) ApplyRecipe(ctx context.Context, recipeID string, repoPath string) (*TransformationResult, error) {
 	handler, exists := m.recipes[recipeID]
 	if !exists {
 		// Return a generic transformation for unknown recipes
@@ -58,8 +58,8 @@ func (m *MockOpenRewriteEngine) ApplyRecipe(ctx context.Context, recipeID string
 	return handler(ctx, repoPath)
 }
 
-// mockJava11To17Migration simulates Java version migration
-func (m *MockOpenRewriteEngine) mockJava11To17Migration(ctx context.Context, repoPath string) (*TransformationResult, error) {
+// java11To17Migration simulates Java version migration
+func (m *BuiltinOpenRewriteEngine) java11To17Migration(ctx context.Context, repoPath string) (*TransformationResult, error) {
 	startTime := time.Now()
 	
 	result := &TransformationResult{
@@ -104,8 +104,8 @@ func (m *MockOpenRewriteEngine) mockJava11To17Migration(ctx context.Context, rep
 	return result, nil
 }
 
-// mockSpringBoot3Upgrade simulates Spring Boot 3 upgrade
-func (m *MockOpenRewriteEngine) mockSpringBoot3Upgrade(ctx context.Context, repoPath string) (*TransformationResult, error) {
+// springBoot3Upgrade simulates Spring Boot 3 upgrade
+func (m *BuiltinOpenRewriteEngine) springBoot3Upgrade(ctx context.Context, repoPath string) (*TransformationResult, error) {
 	startTime := time.Now()
 	
 	result := &TransformationResult{
@@ -140,8 +140,8 @@ func (m *MockOpenRewriteEngine) mockSpringBoot3Upgrade(ctx context.Context, repo
 	return result, nil
 }
 
-// mockSpringBoot3BestPractices applies Spring Boot 3 best practices
-func (m *MockOpenRewriteEngine) mockSpringBoot3BestPractices(ctx context.Context, repoPath string) (*TransformationResult, error) {
+// springBoot3BestPractices applies Spring Boot 3 best practices
+func (m *BuiltinOpenRewriteEngine) springBoot3BestPractices(ctx context.Context, repoPath string) (*TransformationResult, error) {
 	startTime := time.Now()
 	
 	result := &TransformationResult{
@@ -175,8 +175,8 @@ func (m *MockOpenRewriteEngine) mockSpringBoot3BestPractices(ctx context.Context
 	return result, nil
 }
 
-// mockRemoveUnnecessaryParentheses removes unnecessary parentheses
-func (m *MockOpenRewriteEngine) mockRemoveUnnecessaryParentheses(ctx context.Context, repoPath string) (*TransformationResult, error) {
+// removeUnnecessaryParentheses removes unnecessary parentheses
+func (m *BuiltinOpenRewriteEngine) removeUnnecessaryParentheses(ctx context.Context, repoPath string) (*TransformationResult, error) {
 	startTime := time.Now()
 	
 	result := &TransformationResult{
@@ -202,8 +202,8 @@ func (m *MockOpenRewriteEngine) mockRemoveUnnecessaryParentheses(ctx context.Con
 	return result, nil
 }
 
-// mockRemoveUnusedImports removes unused imports
-func (m *MockOpenRewriteEngine) mockRemoveUnusedImports(ctx context.Context, repoPath string) (*TransformationResult, error) {
+// removeUnusedImports removes unused imports
+func (m *BuiltinOpenRewriteEngine) removeUnusedImports(ctx context.Context, repoPath string) (*TransformationResult, error) {
 	startTime := time.Now()
 	
 	result := &TransformationResult{
@@ -230,7 +230,7 @@ func (m *MockOpenRewriteEngine) mockRemoveUnusedImports(ctx context.Context, rep
 }
 
 // genericTransformation provides a generic transformation for unknown recipes
-func (m *MockOpenRewriteEngine) genericTransformation(ctx context.Context, repoPath string, recipeID string) (*TransformationResult, error) {
+func (m *BuiltinOpenRewriteEngine) genericTransformation(ctx context.Context, repoPath string, recipeID string) (*TransformationResult, error) {
 	startTime := time.Now()
 	
 	result := &TransformationResult{
@@ -248,7 +248,7 @@ func (m *MockOpenRewriteEngine) genericTransformation(ctx context.Context, repoP
 
 // Helper functions for mock transformations
 
-func (m *MockOpenRewriteEngine) findJavaFiles(repoPath string, limit int) []string {
+func (m *BuiltinOpenRewriteEngine) findJavaFiles(repoPath string, limit int) []string {
 	var files []string
 	count := 0
 	
@@ -268,7 +268,7 @@ func (m *MockOpenRewriteEngine) findJavaFiles(repoPath string, limit int) []stri
 	return files
 }
 
-func (m *MockOpenRewriteEngine) updateMavenJavaVersion(pomPath string, version string) error {
+func (m *BuiltinOpenRewriteEngine) updateMavenJavaVersion(pomPath string, version string) error {
 	content, err := ioutil.ReadFile(pomPath)
 	if err != nil {
 		return err
@@ -287,7 +287,7 @@ func (m *MockOpenRewriteEngine) updateMavenJavaVersion(pomPath string, version s
 	return ioutil.WriteFile(pomPath, []byte(text), 0644)
 }
 
-func (m *MockOpenRewriteEngine) updateGradleJavaVersion(gradlePath string, version string) error {
+func (m *BuiltinOpenRewriteEngine) updateGradleJavaVersion(gradlePath string, version string) error {
 	content, err := ioutil.ReadFile(gradlePath)
 	if err != nil {
 		return err
@@ -304,7 +304,7 @@ func (m *MockOpenRewriteEngine) updateGradleJavaVersion(gradlePath string, versi
 	return ioutil.WriteFile(gradlePath, []byte(text), 0644)
 }
 
-func (m *MockOpenRewriteEngine) updateSpringBootVersion(pomPath string, version string) error {
+func (m *BuiltinOpenRewriteEngine) updateSpringBootVersion(pomPath string, version string) error {
 	content, err := ioutil.ReadFile(pomPath)
 	if err != nil {
 		return err
@@ -320,7 +320,7 @@ func (m *MockOpenRewriteEngine) updateSpringBootVersion(pomPath string, version 
 	return ioutil.WriteFile(pomPath, []byte(text), 0644)
 }
 
-func (m *MockOpenRewriteEngine) addJava17Features(javaFile string) bool {
+func (m *BuiltinOpenRewriteEngine) addJava17Features(javaFile string) bool {
 	content, err := ioutil.ReadFile(javaFile)
 	if err != nil {
 		return false
@@ -351,7 +351,7 @@ func (m *MockOpenRewriteEngine) addJava17Features(javaFile string) bool {
 	return modified
 }
 
-func (m *MockOpenRewriteEngine) updateJavaxToJakarta(javaFile string) bool {
+func (m *BuiltinOpenRewriteEngine) updateJavaxToJakarta(javaFile string) bool {
 	content, err := ioutil.ReadFile(javaFile)
 	if err != nil {
 		return false
@@ -372,7 +372,7 @@ func (m *MockOpenRewriteEngine) updateJavaxToJakarta(javaFile string) bool {
 	return false
 }
 
-func (m *MockOpenRewriteEngine) addConfigComment(configFile string) bool {
+func (m *BuiltinOpenRewriteEngine) addConfigComment(configFile string) bool {
 	content, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return false
@@ -387,14 +387,14 @@ func (m *MockOpenRewriteEngine) addConfigComment(configFile string) bool {
 	return false
 }
 
-func (m *MockOpenRewriteEngine) removeParentheses(javaFile string) bool {
+func (m *BuiltinOpenRewriteEngine) removeParentheses(javaFile string) bool {
 	// Simulate removing unnecessary parentheses
 	// In reality, this would parse and modify the AST
 	rand.Seed(time.Now().UnixNano())
 	return rand.Float32() > 0.5 // 50% chance of making changes
 }
 
-func (m *MockOpenRewriteEngine) cleanImports(javaFile string) bool {
+func (m *BuiltinOpenRewriteEngine) cleanImports(javaFile string) bool {
 	// Simulate cleaning imports
 	// In reality, this would analyze usage and remove unused imports
 	rand.Seed(time.Now().UnixNano())
