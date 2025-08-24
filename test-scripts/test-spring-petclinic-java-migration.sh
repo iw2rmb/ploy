@@ -6,7 +6,7 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}"))" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "=== Spring PetClinic Java Migration Test ==="
@@ -120,7 +120,7 @@ test_recipe_availability() {
     # List available recipes and check for Java 11→17 migration
     test_info "Fetching available OpenRewrite recipes"
     RECIPES_RESPONSE=$(curl -s "$CONTROLLER_URL/arf/recipes")
-    RECIPE_COUNT=$(echo "$RECIPES_RESPONSE" | jq -r '.count // 0')
+    RECIPE_COUNT=$(echo "$RECIPES_RESPONSE" | jq -r '.pagination.total_count // 0')
     
     if [[ "$RECIPE_COUNT" -eq 0 ]]; then
         test_failed "No recipes available in ARF system"
