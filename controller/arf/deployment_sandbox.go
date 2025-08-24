@@ -447,10 +447,12 @@ func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]b
 // deployTarArchive deploys a tar archive through the build endpoint
 func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName string, tarData []byte, config SandboxConfig) error {
 	// Determine the lane based on language/build tool
-	lane := "C" // Default to Lane C for Java
+	// Use Lane E (OCI containers) for better compatibility with standard apps
+	lane := "E" // Default to Lane E for containers
 	if config.Language == "go" {
-		lane = "D"
-	} else if config.Language == "python" {
+		lane = "D" // FreeBSD jails for Go
+	} else if config.Language == "java" {
+		// For Java, use Lane E (OCI) as it doesn't require Jib
 		lane = "E"
 	}
 	
@@ -473,6 +475,9 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 	}
 	
 	// Send the request
+	fmt.Printf("Sending deployment request to: %s\n", deployURL)
+	fmt.Printf("Tar archive size: %d bytes\n", len(tarData))
+	
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("deploy request failed: %w", err)
@@ -483,7 +488,22 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 	body, _ := io.ReadAll(resp.Body)
 	
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		// Parse error response for better debugging
+		var errorResp map[string]interface{}
+		if err := json.Unmarshal(body, &errorResp); err == nil {
+			if errMsg, ok := errorResp["error"].(string); ok {
+				return fmt.Errorf("deployment failed: %s", errMsg)
+			}
+		}
 		return fmt.Errorf("deploy request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+	
+	// Parse successful response
+	var deployResp map[string]interface{}
+	if err := json.Unmarshal(body, &deployResp); err == nil {
+		if buildID, ok := deployResp["build_id"].(string); ok {
+			fmt.Printf("Build initiated with ID: %s\n", buildID)
+		}
 	}
 	
 	fmt.Printf("Deployment initiated for %s (status: %d)\n", appName, resp.StatusCode)
