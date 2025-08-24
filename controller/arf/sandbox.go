@@ -37,6 +37,7 @@ type Sandbox struct {
 type SandboxConfig struct {
 	Repository    string        `json:"repository"`
 	Branch        string        `json:"branch"`
+	LocalPath     string        `json:"local_path"`     // Path to transformed code (if already cloned/modified)
 	Language      string        `json:"language"`
 	BuildTool     string        `json:"build_tool"`
 	TTL           time.Duration `json:"ttl"`
