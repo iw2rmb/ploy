@@ -63,6 +63,23 @@ func runJibBuildTar(src string, envVars map[string]string) (string, error) {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	
+	// Ensure gradlew and mvnw are executable
+	gradlewPath := filepath.Join(src, "gradlew")
+	if exists(gradlewPath) {
+		fmt.Println("Making gradlew executable...")
+		if err := os.Chmod(gradlewPath, 0755); err != nil {
+			fmt.Printf("Warning: Failed to make gradlew executable: %v\n", err)
+		}
+	}
+	
+	mvnwPath := filepath.Join(src, "mvnw")
+	if exists(mvnwPath) {
+		fmt.Println("Making mvnw executable...")
+		if err := os.Chmod(mvnwPath, 0755); err != nil {
+			fmt.Printf("Warning: Failed to make mvnw executable: %v\n", err)
+		}
+	}
+	
 	// Check for Gradle build
 	if exists(filepath.Join(src, "gradlew")) && (exists(filepath.Join(src, "build.gradle")) || exists(filepath.Join(src, "build.gradle.kts"))) {
 		fmt.Println("Detected Gradle project, checking for Jib plugin...")
@@ -303,6 +320,12 @@ func tryMinimalJibBuild(src string, env []string) (string, error) {
 // trySpringBootBuildGradle attempts to build using direct Jib for Gradle
 func trySpringBootBuildGradle(src string, env []string) (string, error) {
 	fmt.Println("Attempting direct Jib build for Gradle...")
+	
+	// Ensure gradlew is executable
+	gradlewPath := filepath.Join(src, "gradlew")
+	if err := os.Chmod(gradlewPath, 0755); err != nil {
+		fmt.Printf("Warning: Failed to make gradlew executable: %v\n", err)
+	}
 	
 	// First compile the project
 	fmt.Println("Running: ./gradlew classes -x test")
