@@ -129,7 +129,7 @@ func printRecipesUsage() {
 }
 
 func listRecipes(language string) error {
-	url := fmt.Sprintf("%s/v1/arf/recipes", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
 	if language != "" {
 		url += "?language=" + language
 	}
@@ -173,7 +173,7 @@ func listRecipes(language string) error {
 }
 
 func getRecipe(recipeID string) error {
-	url := fmt.Sprintf("%s/v1/arf/recipes/%s", arfControllerURL, recipeID)
+	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get recipe: %w", err)
@@ -205,7 +205,7 @@ func getRecipe(recipeID string) error {
 }
 
 func searchRecipes(query string) error {
-	url := fmt.Sprintf("%s/v1/arf/recipes/search?q=%s", arfControllerURL, query)
+	url := fmt.Sprintf("%s/arf/recipes/search?q=%s", arfControllerURL, query)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to search recipes: %w", err)
@@ -241,7 +241,7 @@ func searchRecipes(query string) error {
 }
 
 func getRecipeStats(recipeID string) error {
-	url := fmt.Sprintf("%s/v1/arf/recipes/%s/stats", arfControllerURL, recipeID)
+	url := fmt.Sprintf("%s/arf/recipes/%s/stats", arfControllerURL, recipeID)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get recipe stats: %w", err)
@@ -309,7 +309,7 @@ func createRecipeInteractive() error {
 		return fmt.Errorf("failed to serialize recipe: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/arf/recipes", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
 	_, err = makeAPIRequest("POST", url, data)
 	if err != nil {
 		return fmt.Errorf("failed to create recipe: %w", err)
@@ -417,7 +417,7 @@ func executeTransformation(recipeID, repository, branch, language string) error 
 	}
 
 	// Execute transformation
-	url := fmt.Sprintf("%s/v1/arf/transform", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
 	response, err := makeAPIRequest("POST", url, data)
 	if err != nil {
 		return fmt.Errorf("transformation failed: %w", err)
@@ -508,7 +508,7 @@ func printSandboxUsage() {
 }
 
 func listSandboxes() error {
-	url := fmt.Sprintf("%s/v1/arf/sandboxes", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/sandboxes", arfControllerURL)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to list sandboxes: %w", err)
@@ -570,7 +570,7 @@ func createSandboxInteractive() error {
 		return fmt.Errorf("failed to serialize config: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/arf/sandboxes", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/sandboxes", arfControllerURL)
 	response, err := makeAPIRequest("POST", url, data)
 	if err != nil {
 		return fmt.Errorf("failed to create sandbox: %w", err)
@@ -591,7 +591,7 @@ func createSandboxInteractive() error {
 }
 
 func destroySandbox(sandboxID string) error {
-	url := fmt.Sprintf("%s/v1/arf/sandboxes/%s", arfControllerURL, sandboxID)
+	url := fmt.Sprintf("%s/arf/sandboxes/%s", arfControllerURL, sandboxID)
 	_, err := makeAPIRequest("DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to destroy sandbox: %w", err)
@@ -604,7 +604,7 @@ func destroySandbox(sandboxID string) error {
 // Health and cache commands
 
 func handleARFHealthCommand() error {
-	url := fmt.Sprintf("%s/v1/arf/health", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/health", arfControllerURL)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("health check failed: %w", err)
@@ -648,7 +648,7 @@ func handleARFCacheCommand(args []string) error {
 }
 
 func getCacheStats() error {
-	url := fmt.Sprintf("%s/v1/arf/cache/stats", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/cache/stats", arfControllerURL)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get cache stats: %w", err)
@@ -670,7 +670,7 @@ func getCacheStats() error {
 }
 
 func clearCache() error {
-	url := fmt.Sprintf("%s/v1/arf/cache/clear", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/cache/clear", arfControllerURL)
 	_, err := makeAPIRequest("POST", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to clear cache: %w", err)
@@ -823,7 +823,7 @@ func handleBenchmarkRun(args []string) error {
 	}
 	fmt.Println()
 
-	url := fmt.Sprintf("%s/v1/arf/benchmark/run", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/benchmark/run", arfControllerURL)
 	response, err := makeAPIRequest("POST", url, data)
 	if err != nil {
 		return fmt.Errorf("failed to start benchmark: %w", err)
@@ -861,7 +861,7 @@ func handleBenchmarkList(args []string) error {
 		}
 	}
 
-	url := fmt.Sprintf("%s/v1/arf/benchmark/list", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/benchmark/list", arfControllerURL)
 	if activeOnly {
 		url += "?status=running"
 	} else if completedOnly {
@@ -926,7 +926,7 @@ func handleBenchmarkList(args []string) error {
 }
 
 func handleBenchmarkStatus(benchmarkID string) error {
-	url := fmt.Sprintf("%s/v1/arf/benchmark/status/%s", arfControllerURL, benchmarkID)
+	url := fmt.Sprintf("%s/arf/benchmark/status/%s", arfControllerURL, benchmarkID)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get benchmark status: %w", err)
@@ -996,7 +996,7 @@ func handleBenchmarkLogs(args []string) error {
 		}
 	}
 
-	url := fmt.Sprintf("%s/v1/arf/benchmark/logs/%s", arfControllerURL, benchmarkID)
+	url := fmt.Sprintf("%s/arf/benchmark/logs/%s", arfControllerURL, benchmarkID)
 	if stage != "all" {
 		url += "?stage=" + stage
 	}
@@ -1036,7 +1036,7 @@ func handleBenchmarkLogs(args []string) error {
 }
 
 func handleBenchmarkStop(benchmarkID string) error {
-	url := fmt.Sprintf("%s/v1/arf/benchmark/stop/%s", arfControllerURL, benchmarkID)
+	url := fmt.Sprintf("%s/arf/benchmark/stop/%s", arfControllerURL, benchmarkID)
 	_, err := makeAPIRequest("POST", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to stop benchmark: %w", err)
