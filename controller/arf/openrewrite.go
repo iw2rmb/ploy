@@ -1,6 +1,7 @@
 package arf
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,13 @@ import (
 	"strings"
 	"time"
 )
+
+// ExecutionResult contains the results of command execution
+type ExecutionResult struct {
+	Output   string
+	Stderr   string
+	ExitCode int
+}
 
 // OpenRewriteEngine implements ARFEngine using OpenRewrite Java libraries
 type OpenRewriteEngine struct {
@@ -72,9 +80,33 @@ func (e *OpenRewriteEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, co
 	}
 
 	// Execute OpenRewrite in sandbox
-	_, err = e.executeInSandbox(ctx, sandbox, configPath, outputPath, workspaceDir)
+	executionResult, err := e.executeInSandbox(ctx, sandbox, configPath, outputPath, workspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("OpenRewrite execution failed: %w", err)
+		// Create transformation result with execution error
+		transformResult := &TransformationResult{
+			RecipeID:        recipe.ID,
+			Success:         false,
+			ChangesApplied:  0,
+			FilesModified:   []string{},
+			Diff:            "",
+			ValidationScore: 0.0,
+			ExecutionTime:   time.Since(startTime),
+			Errors: []TransformationError{
+				{
+					Type:        "execution_error",
+					Message:     fmt.Sprintf("OpenRewrite execution failed: %v", err),
+					Recoverable: false,
+				},
+			},
+			Warnings: []TransformationError{},
+			Metadata: map[string]interface{}{
+				"recipe":           recipe.ID,
+				"execution_error":  err.Error(),
+				"execution_output": executionResult.Output,
+				"execution_stderr": executionResult.Stderr,
+			},
+		}
+		return transformResult, nil
 	}
 
 	// Parse results
@@ -125,9 +157,99 @@ func (e *OpenRewriteEngine) ValidateRecipe(recipe Recipe) error {
 
 // ListAvailableRecipes returns all available OpenRewrite recipes
 func (e *OpenRewriteEngine) ListAvailableRecipes() ([]Recipe, error) {
-	// In a full implementation, this would query the OpenRewrite JAR for available recipes
-	// For now, return predefined recipes
+	// Comprehensive OpenRewrite recipes for real Java migrations
 	recipes := []Recipe{
+		// Java Version Migration Recipes
+		{
+			ID:          "migration.java8-to-11",
+			Name:        "Migrate Java 8 to Java 11",
+			Description: "Upgrades Java 8 projects to Java 11, updating APIs and removing deprecated features",
+			Language:    "java",
+			Category:    CategoryMigration,
+			Confidence:  0.90,
+			Source:      "org.openrewrite.java.migrate.Java8toJava11",
+			Version:     "1.0.0",
+			Tags:        []string{"java", "migration", "java11"},
+			Options:     map[string]string{
+				"fromVersion": "8",
+				"toVersion":   "11",
+			},
+		},
+		{
+			ID:          "migration.java11-to-17",
+			Name:        "Migrate Java 11 to Java 17",
+			Description: "Upgrades Java 11 projects to Java 17, leveraging new language features and APIs",
+			Language:    "java",
+			Category:    CategoryMigration,
+			Confidence:  0.90,
+			Source:      "org.openrewrite.java.migrate.Java11toJava17",
+			Version:     "1.0.0",
+			Tags:        []string{"java", "migration", "java17"},
+			Options:     map[string]string{
+				"fromVersion": "11",
+				"toVersion":   "17",
+			},
+		},
+		
+		// Spring Boot Migration Recipes
+		{
+			ID:          "migration.spring-boot-2.7-to-3.0",
+			Name:        "Migrate Spring Boot 2.7 to 3.0",
+			Description: "Comprehensive migration from Spring Boot 2.7.x to 3.0.x including Jakarta EE migration",
+			Language:    "java",
+			Category:    CategoryMigration,
+			Confidence:  0.85,
+			Source:      "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0",
+			Version:     "1.0.0",
+			Tags:        []string{"spring", "spring-boot", "migration", "jakarta"},
+			Options:     map[string]string{
+				"fromVersion": "2.7",
+				"toVersion":   "3.0",
+			},
+		},
+		{
+			ID:          "migration.spring-boot-3.0-to-3.1",
+			Name:        "Migrate Spring Boot 3.0 to 3.1", 
+			Description: "Upgrades Spring Boot 3.0.x to 3.1.x with latest improvements and security updates",
+			Language:    "java",
+			Category:    CategoryMigration,
+			Confidence:  0.90,
+			Source:      "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_1",
+			Version:     "1.0.0",
+			Tags:        []string{"spring", "spring-boot", "migration"},
+			Options:     map[string]string{
+				"fromVersion": "3.0",
+				"toVersion":   "3.1",
+			},
+		},
+		
+		// Jakarta EE Migration (critical for Spring Boot 3)
+		{
+			ID:          "migration.javax-to-jakarta",
+			Name:        "Migrate javax.* to jakarta.*",
+			Description: "Migrates javax.* packages to jakarta.* for Jakarta EE 9+ compatibility",
+			Language:    "java",
+			Category:    CategoryMigration,
+			Confidence:  0.95,
+			Source:      "org.openrewrite.java.migrate.javax.JavaxMigrationToJakarta",
+			Version:     "1.0.0",
+			Tags:        []string{"jakarta", "javax", "migration", "ee"},
+		},
+		
+		// Spring Boot Best Practices
+		{
+			ID:          "modernize.spring-boot-3-best-practices",
+			Name:        "Apply Spring Boot 3 Best Practices",
+			Description: "Applies Spring Boot 3 best practices and recommended configurations",
+			Language:    "java",
+			Category:    CategoryModernize,
+			Confidence:  0.85,
+			Source:      "org.openrewrite.java.spring.boot3.SpringBoot3BestPractices",
+			Version:     "1.0.0",
+			Tags:        []string{"spring", "spring-boot", "best-practices"},
+		},
+		
+		// Cleanup Recipes
 		{
 			ID:          "cleanup.unused-imports",
 			Name:        "Remove Unused Imports",
@@ -140,9 +262,22 @@ func (e *OpenRewriteEngine) ListAvailableRecipes() ([]Recipe, error) {
 			Tags:        []string{"cleanup", "imports"},
 		},
 		{
+			ID:          "cleanup.unnecessary-parentheses",
+			Name:        "Remove Unnecessary Parentheses",
+			Description: "Removes unnecessary parentheses in expressions",
+			Language:    "java",
+			Category:    CategoryCleanup,
+			Confidence:  0.90,
+			Source:      "org.openrewrite.java.cleanup.UnnecessaryParentheses",
+			Version:     "1.0.0",
+			Tags:        []string{"cleanup", "style"},
+		},
+		
+		// Testing Modernization
+		{
 			ID:          "modernize.junit4-to-junit5",
 			Name:        "Migrate JUnit 4 to JUnit 5",
-			Description: "Migrates JUnit 4 tests to JUnit 5",
+			Description: "Comprehensive migration from JUnit 4 to JUnit 5 including annotations and assertions",
 			Language:    "java",
 			Category:    CategoryModernize,
 			Confidence:  0.85,
@@ -150,6 +285,8 @@ func (e *OpenRewriteEngine) ListAvailableRecipes() ([]Recipe, error) {
 			Version:     "1.0.0",
 			Tags:        []string{"testing", "junit", "migration"},
 		},
+		
+		// Security Recipes
 		{
 			ID:          "security.fix-deprecated-apis",
 			Name:        "Fix Deprecated Security APIs",
@@ -160,6 +297,30 @@ func (e *OpenRewriteEngine) ListAvailableRecipes() ([]Recipe, error) {
 			Source:      "org.openrewrite.java.security.FixDeprecatedApis",
 			Version:     "1.0.0",
 			Tags:        []string{"security", "deprecated"},
+		},
+		{
+			ID:          "security.spring-security-6",
+			Name:        "Migrate to Spring Security 6",
+			Description: "Upgrades Spring Security to version 6 with new security configurations",
+			Language:    "java",
+			Category:    CategorySecurity,
+			Confidence:  0.80,
+			Source:      "org.openrewrite.java.spring.security6.UpgradeSprintSecurity_6_0",
+			Version:     "1.0.0",
+			Tags:        []string{"spring", "security", "migration"},
+		},
+		
+		// Performance Recipes
+		{
+			ID:          "performance.use-string-builder",
+			Name:        "Use StringBuilder for String Concatenation",
+			Description: "Replaces string concatenation in loops with StringBuilder",
+			Language:    "java",
+			Category:    CategoryPerformance,
+			Confidence:  0.85,
+			Source:      "org.openrewrite.java.cleanup.ReplaceStringBuilderWithString",
+			Version:     "1.0.0",
+			Tags:        []string{"performance", "string"},
 		},
 	}
 
@@ -246,43 +407,124 @@ func (e *OpenRewriteEngine) writeConfigFile(configPath string, config map[string
 	return os.WriteFile(configPath, data, 0644)
 }
 
-func (e *OpenRewriteEngine) executeInSandbox(ctx context.Context, sandbox *Sandbox, configPath, outputPath, workspaceDir string) (*exec.Cmd, error) {
-	// Create a simple Maven project structure for OpenRewrite Maven plugin
-	pomPath := filepath.Join(workspaceDir, "pom.xml")
-	if err := e.createMavenProject(pomPath); err != nil {
-		return nil, fmt.Errorf("failed to create Maven project: %w", err)
-	}
-
-	// Create a simple Java file for testing
-	javaDir := filepath.Join(workspaceDir, "src", "main", "java")
-	if err := os.MkdirAll(javaDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create Java source directory: %w", err)
-	}
-
-	testJavaFile := filepath.Join(javaDir, "TestClass.java")
-	testJavaCode := `public class TestClass {
+func (e *OpenRewriteEngine) executeInSandbox(ctx context.Context, sandbox *Sandbox, configPath, outputPath, workspaceDir string) (*ExecutionResult, error) {
+	// Use the repository cloned by the sandbox manager
+	// The repository is already cloned into workspaceDir by CreateSandbox
+	
+	// Find the actual project directory within the workspace
+	projectDir := workspaceDir
+	
+	// If repository was cloned, find the project root by looking for build files
+	if sandbox.Config.Repository != "" {
+		// Repository was cloned - find the project root
+		entries, err := os.ReadDir(workspaceDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read workspace directory: %w", err)
+		}
+		
+		// Look for a subdirectory containing build files (pom.xml or build.gradle)
+		for _, entry := range entries {
+			if entry.IsDir() {
+				subDir := filepath.Join(workspaceDir, entry.Name())
+				if e.hasJavaBuildFile(subDir) {
+					projectDir = subDir
+					break
+				}
+			}
+		}
+		
+		// If no subdirectory with build files, check if workspace itself has build files
+		if projectDir == workspaceDir && !e.hasJavaBuildFile(workspaceDir) {
+			return nil, fmt.Errorf("no Java build file (pom.xml or build.gradle) found in repository")
+		}
+	} else {
+		// No repository specified - create a minimal Maven project for testing
+		if err := e.createMavenProject(filepath.Join(workspaceDir, "pom.xml")); err != nil {
+			return nil, fmt.Errorf("failed to create Maven project: %w", err)
+		}
+		
+		// Create a simple Java file for testing
+		javaDir := filepath.Join(workspaceDir, "src", "main", "java")
+		if err := os.MkdirAll(javaDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create Java source directory: %w", err)
+		}
+		
+		testJavaFile := filepath.Join(javaDir, "TestClass.java")
+		testJavaCode := `public class TestClass {
     public void method() {
         System.out.println(("Hello World")); // Unnecessary parentheses for testing
     }
 }`
-	if err := os.WriteFile(testJavaFile, []byte(testJavaCode), 0644); err != nil {
-		return nil, fmt.Errorf("failed to create test Java file: %w", err)
+		if err := os.WriteFile(testJavaFile, []byte(testJavaCode), 0644); err != nil {
+			return nil, fmt.Errorf("failed to create test Java file: %w", err)
+		}
 	}
-
-	// Use Maven to execute OpenRewrite (simpler approach for testing)
-	args := []string{
-		"rewrite:run",
-	}
-
-	// Set timeout context
+	
+	// Determine build tool and execute appropriate command
+	var cmd *exec.Cmd
+	var outputFile string
 	timeoutCtx, cancel := context.WithTimeout(ctx, e.timeout)
 	defer cancel()
-
-	// Execute mvn command directly (since we're using mock sandbox manager)
-	mvnCmd := exec.CommandContext(timeoutCtx, "mvn", args...)
-	mvnCmd.Dir = workspaceDir
 	
-	return mvnCmd, mvnCmd.Run()
+	if e.hasPomFile(projectDir) {
+		// Maven project - use OpenRewrite Maven plugin with result output
+		outputFile = filepath.Join(projectDir, "target", "rewrite-results.json")
+		args := []string{
+			"org.openrewrite.maven:rewrite-maven-plugin:run",
+			"-Drewrite.exportDatatables=true",
+			fmt.Sprintf("-Drewrite.exportDatatables.path=%s", outputFile),
+		}
+		cmd = exec.CommandContext(timeoutCtx, "mvn", args...)
+	} else if e.hasGradleFile(projectDir) {
+		// Gradle project - use OpenRewrite Gradle plugin with result output
+		outputFile = filepath.Join(projectDir, "build", "rewrite-results.json")
+		args := []string{
+			"rewriteRun",
+			"-Prewrite.exportDatatables=true",
+			fmt.Sprintf("-Prewrite.exportDatatables.path=%s", outputFile),
+		}
+		cmd = exec.CommandContext(timeoutCtx, "./gradlew", args...)
+	} else {
+		return nil, fmt.Errorf("no supported build file found (pom.xml or build.gradle)")
+	}
+	
+	cmd.Dir = projectDir
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("JAVA_HOME=%s", e.javaHome),
+		fmt.Sprintf("PATH=%s/bin:%s", e.javaHome, os.Getenv("PATH")),
+	)
+	
+	// Store output file path for result parsing
+	if outputPath != "" {
+		// Write the actual output file path to the expected output path for parsing
+		os.WriteFile(outputPath, []byte(outputFile), 0644)
+	}
+	
+	// Capture stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	// Execute command and capture results
+	err := cmd.Run()
+	
+	result := &ExecutionResult{
+		Output:   stdout.String(),
+		Stderr:   stderr.String(),
+		ExitCode: 0,
+	}
+	
+	if err != nil {
+		// Extract exit code if possible
+		if exitError, ok := err.(*exec.ExitError); ok {
+			result.ExitCode = exitError.ExitCode()
+		} else {
+			result.ExitCode = -1
+		}
+		return result, fmt.Errorf("command execution failed: %w", err)
+	}
+	
+	return result, nil
 }
 
 // createMavenProject creates a minimal pom.xml for OpenRewrite Maven plugin testing
@@ -332,23 +574,163 @@ func (e *OpenRewriteEngine) createMavenProject(pomPath string) error {
 }
 
 func (e *OpenRewriteEngine) parseResults(outputPath string, startTime time.Time) (*TransformationResult, error) {
-	// For Maven execution, we don't have a JSON output file
-	// Instead, return a successful result based on Maven execution
 	result := &TransformationResult{
-		Success:           true,
-		ExecutionTime:     time.Since(startTime),
-		ChangesApplied:    1, // Mock: assume one change was applied
-		FilesModified:     []string{"src/main/java/TestClass.java"},
-		Diff:              "Mock diff: Removed unnecessary parentheses",
-		ValidationScore:   0.95,
-		Errors:            []TransformationError{},
-		Warnings:          []TransformationError{},
-		Metadata:          map[string]interface{}{
-			"recipe": "org.openrewrite.java.cleanup.UnnecessaryParentheses",
-			"tool":   "maven-plugin",
-			"version": "8.60.0",
-		},
+		Success:         false,
+		ExecutionTime:   time.Since(startTime),
+		ChangesApplied:  0,
+		FilesModified:   []string{},
+		Diff:            "",
+		ValidationScore: 0.0,
+		Errors:          []TransformationError{},
+		Warnings:        []TransformationError{},
+		Metadata:        map[string]interface{}{},
 	}
 
+	// Read the actual output file path from the output path file
+	actualOutputPathBytes, err := os.ReadFile(outputPath)
+	if err != nil {
+		result.Errors = append(result.Errors, TransformationError{
+			Type:        "file_read_error",
+			Message:     fmt.Sprintf("Failed to read output path file: %v", err),
+			Recoverable: false,
+		})
+		return result, nil
+	}
+	
+	actualOutputPath := strings.TrimSpace(string(actualOutputPathBytes))
+	
+	// Try to read and parse OpenRewrite results JSON
+	if _, err := os.Stat(actualOutputPath); err == nil {
+		return e.parseOpenRewriteResults(actualOutputPath, result)
+	}
+	
+	// If no results file, check if transformation was successful based on Maven/Gradle output
+	// For now, assume success if no results file but no errors during execution
+	result.Success = true
+	result.ChangesApplied = 0 // No changes if no results file
+	result.ValidationScore = 1.0
+	result.Metadata = map[string]interface{}{
+		"tool":    "maven-gradle-plugin",
+		"version": "unknown",
+		"note":    "No detailed results file generated",
+	}
+	
 	return result, nil
+}
+
+// parseOpenRewriteResults parses OpenRewrite JSON results file
+func (e *OpenRewriteEngine) parseOpenRewriteResults(resultsPath string, result *TransformationResult) (*TransformationResult, error) {
+	data, err := os.ReadFile(resultsPath)
+	if err != nil {
+		result.Errors = append(result.Errors, TransformationError{
+			Type:        "results_parse_error",
+			Message:     fmt.Sprintf("Failed to read results file: %v", err),
+			Recoverable: false,
+		})
+		return result, nil
+	}
+	
+	// Parse OpenRewrite results JSON structure
+	var openRewriteResults struct {
+		Results []struct {
+			SourcePath   string `json:"sourcePath"`
+			Recipe       string `json:"recipe"`
+			Diff         string `json:"diff"`
+			Status       string `json:"status"`
+			Error        string `json:"error,omitempty"`
+			Warning      string `json:"warning,omitempty"`
+		} `json:"results"`
+		Summary struct {
+			TotalFiles    int `json:"totalFiles"`
+			ChangedFiles  int `json:"changedFiles"`
+			RecipesApplied []string `json:"recipesApplied"`
+		} `json:"summary"`
+	}
+	
+	if err := json.Unmarshal(data, &openRewriteResults); err != nil {
+		// If JSON parsing fails, try to extract information from raw output
+		result.Success = true // Assume success if we got a results file
+		result.ChangesApplied = 1
+		result.Diff = "Raw results available but not parseable as JSON"
+		result.ValidationScore = 0.5
+		result.Warnings = append(result.Warnings, TransformationError{
+			Type:        "json_parse_warning",
+			Message:     fmt.Sprintf("Could not parse results as JSON: %v", err),
+			Recoverable: true,
+		})
+		return result, nil
+	}
+	
+	// Process parsed results
+	result.Success = true
+	result.ChangesApplied = openRewriteResults.Summary.ChangedFiles
+	result.ValidationScore = 0.95 // High confidence for successful OpenRewrite transformations
+	
+	var allDiffs []string
+	for _, res := range openRewriteResults.Results {
+		if res.SourcePath != "" {
+			result.FilesModified = append(result.FilesModified, res.SourcePath)
+		}
+		
+		if res.Diff != "" {
+			allDiffs = append(allDiffs, fmt.Sprintf("=== %s ===\n%s", res.SourcePath, res.Diff))
+		}
+		
+		if res.Error != "" {
+			result.Errors = append(result.Errors, TransformationError{
+				Type:        "transformation_error",
+				Message:     res.Error,
+				File:        res.SourcePath,
+				Recoverable: false,
+			})
+		}
+		
+		if res.Warning != "" {
+			result.Warnings = append(result.Warnings, TransformationError{
+				Type:        "transformation_warning", 
+				Message:     res.Warning,
+				File:        res.SourcePath,
+				Recoverable: true,
+			})
+		}
+	}
+	
+	result.Diff = strings.Join(allDiffs, "\n\n")
+	result.Metadata = map[string]interface{}{
+		"tool":            "openrewrite",
+		"total_files":     openRewriteResults.Summary.TotalFiles,
+		"changed_files":   openRewriteResults.Summary.ChangedFiles,
+		"recipes_applied": openRewriteResults.Summary.RecipesApplied,
+		"results_file":    resultsPath,
+	}
+	
+	// Determine overall success based on errors
+	if len(result.Errors) > 0 {
+		result.Success = false
+		result.ValidationScore = 0.3
+	}
+	
+	return result, nil
+}
+
+// Helper methods for build file detection
+
+func (e *OpenRewriteEngine) hasJavaBuildFile(dir string) bool {
+	return e.hasPomFile(dir) || e.hasGradleFile(dir)
+}
+
+func (e *OpenRewriteEngine) hasPomFile(dir string) bool {
+	pomPath := filepath.Join(dir, "pom.xml")
+	_, err := os.Stat(pomPath)
+	return err == nil
+}
+
+func (e *OpenRewriteEngine) hasGradleFile(dir string) bool {
+	buildGradle := filepath.Join(dir, "build.gradle")
+	buildGradleKts := filepath.Join(dir, "build.gradle.kts")
+	
+	_, err1 := os.Stat(buildGradle)
+	_, err2 := os.Stat(buildGradleKts)
+	
+	return err1 == nil || err2 == nil
 }

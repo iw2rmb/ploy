@@ -127,21 +127,36 @@ cleanup_deployment() {
     echo ""
 }
 
-# Function to pull branch
+# Function to pull branch with automatic stashing
 pull_branch() {
     echo -e "${YELLOW}Updating repository to branch '$BRANCH'...${NC}"
+    
+    # Stash any local changes before pulling
+    if ! git diff --quiet; then
+        echo -e "${YELLOW}Stashing local changes...${NC}"
+        git stash push -m "Auto-stash before deploy to $BRANCH - $(date)"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to stash local changes${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ Local changes stashed${NC}"
+    fi
+    
+    # Fetch latest changes
     git fetch origin
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to fetch from origin${NC}"
         exit 1
     fi
 
+    # Checkout the target branch
     git checkout "$BRANCH"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to checkout branch '$BRANCH'${NC}"
         exit 1
     fi
 
+    # Pull latest changes from remote
     git pull origin "$BRANCH"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to pull branch '$BRANCH' from origin${NC}"

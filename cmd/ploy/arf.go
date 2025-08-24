@@ -19,41 +19,40 @@ import (
 
 var arfControllerURL string
 
-// ARFCmd handles ARF (Automated Recipe Framework) commands
+// ARFCmd is the exported entry point for ARF commands from main.go
 func ARFCmd(args []string, controllerURL string) {
-	// Set the global controller URL
 	arfControllerURL = controllerURL
-	
-	if len(args) == 0 {
+	if err := handleARFCommand(args); err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+}
+
+func handleARFCommand(args []string) error {
+	if len(args) < 1 {
 		printARFUsage()
-		return
+		return nil
 	}
 
 	subcommand := args[0]
 	switch subcommand {
-	case "recipes", "recipe":
-		handleARFRecipesCommand(args[1:])
+	case "recipes":
+		return handleARFRecipesCommand(args[1:])
 	case "transform":
-		handleARFTransformCommand(args[1:])
+		return handleARFTransformCommand(args[1:])
 	case "sandbox":
-		handleARFSandboxCommand(args[1:])
-	case "health":
-		handleARFHealthCommand()
-	case "cache":
-		handleARFCacheCommand(args[1:])
+		return handleARFSandboxCommand(args[1:])
 	case "benchmark":
-		handleARFBenchmarkCommand(args[1:])
-	case "validate":
-		handleARFValidateCommand(args[1:])
-	case "patterns":
-		handleARFPatternsCommand(args[1:])
-	case "test":
-		handleARFTestCommand(args[1:])
-	case "status":
-		handleARFStatusCommand()
+		return handleARFBenchmarkCommand(args[1:])
+	case "workflow":
+		return handleARFWorkflowCommand(args[1:])
+	case "health":
+		return handleARFHealthCommand()
+	case "cache":
+		return handleARFCacheCommand(args[1:])
 	default:
 		fmt.Printf("Unknown ARF subcommand: %s\n", subcommand)
 		printARFUsage()
+		return nil
 	}
 }
 
@@ -63,14 +62,11 @@ func printARFUsage() {
 	fmt.Println("Available subcommands:")
 	fmt.Println("  recipes    Manage transformation recipes")
 	fmt.Println("  transform  Execute code transformations")
-	fmt.Println("  validate   Validate recipe files")
-	fmt.Println("  patterns   Manage learning patterns")
-	fmt.Println("  test       Test components (A/B, sandbox, pipeline)")
-	fmt.Println("  benchmark  Run benchmark tests")
 	fmt.Println("  sandbox    Manage sandboxes")
+	fmt.Println("  benchmark  Run and manage transformation benchmarks")
+	fmt.Println("  workflow   Execute end-to-end transformation workflows")
 	fmt.Println("  health     Check ARF system health")
 	fmt.Println("  cache      Manage AST cache")
-	fmt.Println("  status     Check ARF system status")
 	fmt.Println()
 	fmt.Println("Use 'ploy arf <subcommand> --help' for more information")
 }
@@ -684,347 +680,7 @@ func clearCache() error {
 	return nil
 }
 
-// Helper functions
-
-func makeAPIRequest(method, url string, body []byte) ([]byte, error) {
-	var req *http.Request
-	var err error
-
-	if body != nil {
-		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-	} else {
-		req, err = http.NewRequest(method, url, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errorResponse map[string]interface{}
-		if json.Unmarshal(responseBody, &errorResponse) == nil {
-			if errMsg, ok := errorResponse["error"].(string); ok {
-				return nil, fmt.Errorf("API error: %s", errMsg)
-			}
-		}
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(responseBody))
-	}
-
-	return responseBody, nil
-}
-
-func promptUser(prompt string) string {
-	fmt.Print(prompt)
-	var input string
-	fmt.Scanln(&input)
-	return input
-}
-
-// Additional command handlers for complete ARF functionality
-
-func handleARFValidateCommand(args []string) error {
-	if len(args) == 0 {
-		fmt.Println("Usage: ploy arf validate <recipe-file>")
-		return nil
-	}
-
-	recipePath := args[0]
-	
-	// Read recipe file
-	content, err := os.ReadFile(recipePath)
-	if err != nil {
-		return fmt.Errorf("error reading recipe: %w", err)
-	}
-
-	// Send for validation
-	url := fmt.Sprintf("%s/arf/validate", arfControllerURL)
-	response, err := makeAPIRequest("POST", url, content)
-	if err != nil {
-		return fmt.Errorf("error validating: %w", err)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if valid, ok := result["valid"].(bool); ok && valid {
-		fmt.Println("✓ Recipe is valid")
-	} else {
-		fmt.Println("✗ Recipe validation failed")
-		if errors, ok := result["errors"].([]interface{}); ok {
-			for _, err := range errors {
-				fmt.Printf("  - %v\n", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func handleARFPatternsCommand(args []string) error {
-	if len(args) == 0 {
-		fmt.Println("Pattern commands:")
-		fmt.Println("  list     - List learned patterns")
-		fmt.Println("  extract  - Extract new patterns")
-		fmt.Println("  stats    - Pattern statistics")
-		return nil
-	}
-
-	switch args[0] {
-	case "list":
-		return listPatterns(args[1:])
-	case "extract":
-		return extractPatterns()
-	case "stats":
-		return patternStats()
-	default:
-		fmt.Printf("Unknown patterns command: %s\n", args[0])
-	}
-	return nil
-}
-
-func listPatterns(args []string) error {
-	var category string
-	for i := 0; i < len(args); i++ {
-		if args[i] == "--category" && i+1 < len(args) {
-			category = args[i+1]
-			break
-		}
-	}
-
-	url := fmt.Sprintf("%s/arf/learning/patterns", arfControllerURL)
-	if category != "" {
-		url += "?category=" + category
-	}
-
-	response, err := makeAPIRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("error fetching patterns: %w", err)
-	}
-
-	var patterns []map[string]interface{}
-	if err := json.Unmarshal(response, &patterns); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Println("Learned Patterns:")
-	fmt.Println("=================")
-	for _, pattern := range patterns {
-		fmt.Printf("- %s (confidence: %.2f)\n", 
-			pattern["name"],
-			pattern["confidence"])
-	}
-	
-	return nil
-}
-
-func extractPatterns() error {
-	fmt.Println("Extracting patterns from historical data...")
-	
-	url := fmt.Sprintf("%s/arf/learning/extract", arfControllerURL)
-	response, err := makeAPIRequest("POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if count, ok := result["patterns_extracted"].(float64); ok {
-		fmt.Printf("✓ Extracted %d new patterns\n", int(count))
-	}
-	
-	return nil
-}
-
-func patternStats() error {
-	url := fmt.Sprintf("%s/arf/learning/stats", arfControllerURL)
-	response, err := makeAPIRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
-	}
-
-	var stats map[string]interface{}
-	if err := json.Unmarshal(response, &stats); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Println("Pattern Statistics:")
-	fmt.Println("==================")
-	fmt.Printf("Total Patterns: %v\n", stats["total_patterns"])
-	fmt.Printf("Success Rate: %.2f%%\n", stats["success_rate"])
-	fmt.Printf("Last Update: %v\n", stats["last_update"])
-	
-	return nil
-}
-
-func handleARFTestCommand(args []string) error {
-	if len(args) == 0 {
-		fmt.Println("Test commands:")
-		fmt.Println("  ab       - A/B test recipes")
-		fmt.Println("  sandbox  - Test in sandbox")
-		fmt.Println("  pipeline - Test pipeline")
-		return nil
-	}
-
-	switch args[0] {
-	case "ab":
-		return abTest(args[1:])
-	case "sandbox":
-		return sandboxTest(args[1:])
-	case "pipeline":
-		return pipelineTest()
-	default:
-		fmt.Printf("Unknown test command: %s\n", args[0])
-	}
-	return nil
-}
-
-func abTest(args []string) error {
-	var recipe1, recipe2 string
-	var samples int = 100
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--recipe1":
-			if i+1 < len(args) {
-				recipe1 = args[i+1]
-				i++
-			}
-		case "--recipe2":
-			if i+1 < len(args) {
-				recipe2 = args[i+1]
-				i++
-			}
-		case "--samples":
-			if i+1 < len(args) {
-				fmt.Sscanf(args[i+1], "%d", &samples)
-				i++
-			}
-		}
-	}
-
-	if recipe1 == "" || recipe2 == "" {
-		fmt.Println("Error: Both --recipe1 and --recipe2 required")
-		return nil
-	}
-
-	fmt.Printf("Starting A/B test: %s vs %s\n", recipe1, recipe2)
-	
-	request := map[string]interface{}{
-		"recipe_a": recipe1,
-		"recipe_b": recipe2,
-		"sample_size": samples,
-	}
-
-	body, _ := json.Marshal(request)
-	url := fmt.Sprintf("%s/arf/test/ab", arfControllerURL)
-	response, err := makeAPIRequest("POST", url, body)
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Printf("Test ID: %s\n", result["test_id"])
-	fmt.Println("Test started. Check status with 'ploy arf status'")
-	
-	return nil
-}
-
-func sandboxTest(args []string) error {
-	if len(args) == 0 {
-		fmt.Println("Usage: ploy arf test sandbox <recipe-id>")
-		return nil
-	}
-
-	recipeID := args[0]
-	fmt.Printf("Testing recipe %s in sandbox...\n", recipeID)
-
-	url := fmt.Sprintf("%s/arf/test/sandbox/%s", arfControllerURL, recipeID)
-	response, err := makeAPIRequest("POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if success, ok := result["success"].(bool); ok && success {
-		fmt.Println("✓ Sandbox test passed")
-	} else {
-		fmt.Println("✗ Sandbox test failed")
-		if msg, ok := result["error"].(string); ok {
-			fmt.Printf("  Error: %s\n", msg)
-		}
-	}
-	
-	return nil
-}
-
-func pipelineTest() error {
-	fmt.Println("Testing transformation pipeline...")
-
-	url := fmt.Sprintf("%s/arf/test/pipeline", arfControllerURL)
-	response, err := makeAPIRequest("POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
-	}
-
-	fmt.Println(string(response))
-	return nil
-}
-
-func handleARFStatusCommand() error {
-	url := fmt.Sprintf("%s/arf/status", arfControllerURL)
-	response, err := makeAPIRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("error fetching status: %w", err)
-	}
-
-	var status map[string]interface{}
-	if err := json.Unmarshal(response, &status); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Println("ARF System Status")
-	fmt.Println("=================")
-	fmt.Printf("LLM Integration: %v\n", status["llm_enabled"])
-	fmt.Printf("Learning System: %v\n", status["learning_enabled"])
-	fmt.Printf("Multi-Language: %v\n", status["multi_lang_enabled"])
-	fmt.Printf("A/B Testing: %v\n", status["ab_testing_enabled"])
-	
-	if tests, ok := status["active_tests"].([]interface{}); ok && len(tests) > 0 {
-		fmt.Printf("\nActive A/B Tests: %d\n", len(tests))
-	}
-	
-	return nil
-}
-
-// Benchmark command handlers
+// Benchmark commands
 
 func handleARFBenchmarkCommand(args []string) error {
 	if len(args) == 0 {
@@ -1032,7 +688,8 @@ func handleARFBenchmarkCommand(args []string) error {
 		return nil
 	}
 
-	switch args[0] {
+	action := args[0]
+	switch action {
 	case "run":
 		return handleBenchmarkRun(args[1:])
 	case "list":
@@ -1043,62 +700,43 @@ func handleARFBenchmarkCommand(args []string) error {
 			return nil
 		}
 		return handleBenchmarkStatus(args[1])
-	case "results":
-		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf benchmark results <benchmark-id>")
-			return nil
-		}
-		return handleBenchmarkResults(args[1])
-	case "errors":
-		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf benchmark errors <benchmark-id>")
-			return nil
-		}
-		return handleBenchmarkErrors(args[1])
 	case "logs":
 		if len(args) < 2 {
 			fmt.Println("Usage: ploy arf benchmark logs <benchmark-id> [--stage <stage>]")
 			return nil
 		}
 		return handleBenchmarkLogs(args[1:])
-	case "compare":
-		return handleBenchmarkCompare(args[1:])
-	case "report":
+	case "stop":
 		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf benchmark report <benchmark-id> [--format <html|pdf|markdown>]")
+			fmt.Println("Usage: ploy arf benchmark stop <benchmark-id>")
 			return nil
 		}
-		return handleBenchmarkReport(args[1:])
-	case "cancel":
-		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf benchmark cancel <benchmark-id>")
-			return nil
-		}
-		return handleBenchmarkCancel(args[1])
-	default:
-		fmt.Printf("Unknown benchmark command: %s\n", args[0])
+		return handleBenchmarkStop(args[1])
+	case "--help":
 		printBenchmarkUsage()
+		return nil
+	default:
+		fmt.Printf("Unknown benchmark action: %s\n", action)
+		printBenchmarkUsage()
+		return nil
 	}
-	return nil
 }
 
 func printBenchmarkUsage() {
-	fmt.Println("Benchmark Commands:")
+	fmt.Println("Usage: ploy arf benchmark <action> [options]")
 	fmt.Println()
-	fmt.Println("  ploy arf benchmark run <name> --repository <url> [options]")
-	fmt.Println("  ploy arf benchmark list [--active|--completed]")
-	fmt.Println("  ploy arf benchmark status <benchmark-id>")
-	fmt.Println("  ploy arf benchmark results <benchmark-id>")
-	fmt.Println("  ploy arf benchmark errors <benchmark-id>")
-	fmt.Println("  ploy arf benchmark logs <benchmark-id> [--stage <stage>]")
-	fmt.Println("  ploy arf benchmark compare <id1> <id2> [<id3>...]")
-	fmt.Println("  ploy arf benchmark report <benchmark-id> [--format <html|pdf|markdown>]")
-	fmt.Println("  ploy arf benchmark cancel <benchmark-id>")
+	fmt.Println("Available actions:")
+	fmt.Println("  run <name>           Run a new benchmark")
+	fmt.Println("  list                 List benchmarks")
+	fmt.Println("  status <id>          Get benchmark status")
+	fmt.Println("  logs <id>            Get benchmark logs")
+	fmt.Println("  stop <id>            Stop running benchmark")
 	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  ploy arf benchmark run test-java --repository https://github.com/spring-projects/spring-petclinic.git")
-	fmt.Println("  ploy arf benchmark list --active")
-	fmt.Println("  ploy arf benchmark status bench-1234567890")
+	fmt.Println("Run options:")
+	fmt.Println("  --repository <url>   Repository URL")
+	fmt.Println("  --transformations <recipes> Comma-separated recipe IDs")
+	fmt.Println("  --app-name <name>    Application name for deployment")
+	fmt.Println("  --lane <A-G>         Deployment lane")
 }
 
 func handleBenchmarkRun(args []string) error {
@@ -1106,13 +744,13 @@ func handleBenchmarkRun(args []string) error {
 		fmt.Println("Usage: ploy arf benchmark run <name> --repository <url> [options]")
 		return nil
 	}
-	
+
 	benchmarkName := args[0]
 	repository := ""
 	transformations := ""
 	appName := ""
 	lane := "auto"
-	
+
 	// Parse arguments
 	for i := 1; i < len(args); i++ {
 		switch args[i] {
@@ -1138,20 +776,20 @@ func handleBenchmarkRun(args []string) error {
 			}
 		}
 	}
-	
+
 	if repository == "" {
 		fmt.Println("Error: --repository is required")
 		return nil
 	}
-	
+
 	if appName == "" {
 		appName = fmt.Sprintf("bench-%s-%d", benchmarkName, time.Now().Unix())
 	}
 
-	// Create benchmark config matching BenchmarkConfig struct fields
+	// Create benchmark config
 	benchmarkConfig := map[string]interface{}{
-		"name":     benchmarkName,
-		"repo_url": repository,  // Fixed: was "repository", should be "repo_url"
+		"name":       benchmarkName,
+		"repository": repository,
 		"deployment_config": map[string]interface{}{
 			"app_name": appName,
 			"lane":     lane,
@@ -1366,74 +1004,6 @@ func handleBenchmarkStatus(benchmarkID string) error {
 	return nil
 }
 
-func handleBenchmarkResults(benchmarkID string) error {
-	url := fmt.Sprintf("%s/arf/benchmark/results/%s", arfControllerURL, benchmarkID)
-	response, err := makeAPIRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get benchmark results: %w", err)
-	}
-
-	var results map[string]interface{}
-	if err := json.Unmarshal(response, &results); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	// Pretty print results as JSON
-	output, _ := json.MarshalIndent(results, "", "  ")
-	fmt.Println(string(output))
-
-	return nil
-}
-
-func handleBenchmarkErrors(benchmarkID string) error {
-	url := fmt.Sprintf("%s/arf/benchmark/errors/%s", arfControllerURL, benchmarkID)
-	response, err := makeAPIRequest("GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get benchmark errors: %w", err)
-	}
-
-	var data struct {
-		BenchmarkID string `json:"benchmark_id"`
-		Status      string `json:"status"`
-		Errors      []struct {
-			Stage      string    `json:"stage"`
-			Type       string    `json:"type"`
-			Message    string    `json:"message"`
-			Details    string    `json:"details"`
-			Timestamp  time.Time `json:"timestamp"`
-		} `json:"errors"`
-		ErrorCount  int `json:"error_count"`
-	}
-
-	if err := json.Unmarshal(response, &data); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Printf("Benchmark Errors: %s\n", data.BenchmarkID)
-	fmt.Printf("Status: %s\n", data.Status)
-	fmt.Printf("Total Errors: %d\n", data.ErrorCount)
-	fmt.Println()
-
-	if data.ErrorCount == 0 {
-		fmt.Println("No errors found")
-		return nil
-	}
-
-	for i, err := range data.Errors {
-		fmt.Printf("Error %d:\n", i+1)
-		fmt.Printf("  Stage: %s\n", err.Stage)
-		fmt.Printf("  Type: %s\n", err.Type)
-		fmt.Printf("  Message: %s\n", err.Message)
-		if err.Details != "" {
-			fmt.Printf("  Details: %s\n", err.Details)
-		}
-		fmt.Printf("  Time: %s\n", err.Timestamp.Format("15:04:05"))
-		fmt.Println()
-	}
-
-	return nil
-}
-
 func handleBenchmarkLogs(args []string) error {
 	benchmarkID := args[0]
 	stage := "all"
@@ -1478,123 +1048,84 @@ func handleBenchmarkLogs(args []string) error {
 	fmt.Println(strings.Repeat("=", 60))
 
 	for _, log := range logs.Logs {
-		fmt.Printf("[%s] [%s] [%s] %s\n",
-			log.Timestamp.Format("15:04:05"),
-			log.Level,
-			log.Stage,
-			log.Message)
+		timestamp := log.Timestamp.Format("15:04:05")
+		fmt.Printf("[%s] [%s] [%s] %s\n", timestamp, log.Level, log.Stage, log.Message)
 	}
 
 	return nil
 }
 
-func handleBenchmarkCompare(args []string) error {
-	if len(args) < 2 {
-		fmt.Println("Usage: ploy arf benchmark compare <id1> <id2> [<id3>...]")
-		return nil
-	}
-
-	request := map[string]interface{}{
-		"results": args,
-	}
-
-	data, err := json.Marshal(request)
+func handleBenchmarkStop(benchmarkID string) error {
+	url := fmt.Sprintf("%s/arf/benchmark/stop/%s", arfControllerURL, benchmarkID)
+	_, err := makeAPIRequest("POST", url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to serialize request: %w", err)
+		return fmt.Errorf("failed to stop benchmark: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/arf/benchmark/compare", arfControllerURL)
-	response, err := makeAPIRequest("POST", url, data)
-	if err != nil {
-		return fmt.Errorf("failed to compare benchmarks: %w", err)
-	}
-
-	var comparison map[string]interface{}
-	if err := json.Unmarshal(response, &comparison); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	// Pretty print comparison as JSON
-	output, _ := json.MarshalIndent(comparison, "", "  ")
-	fmt.Println(string(output))
-
+	fmt.Printf("Benchmark %s stopped successfully\n", benchmarkID)
 	return nil
 }
 
-func handleBenchmarkReport(args []string) error {
-	benchmarkID := args[0]
-	format := "html"
-	includeDiffs := true
+// Workflow commands (placeholder implementation)
 
-	// Parse options
-	for i := 1; i < len(args); i++ {
-		switch args[i] {
-		case "--format":
-			if i+1 < len(args) {
-				format = args[i+1]
-				i++
-			}
-		case "--no-diffs":
-			includeDiffs = false
+func handleARFWorkflowCommand(args []string) error {
+	fmt.Println("Workflow commands are not yet implemented")
+	fmt.Println("Available workflow actions will include:")
+	fmt.Println("  run     - Execute end-to-end workflow")
+	fmt.Println("  status  - Get workflow status")
+	fmt.Println("  metrics - Get workflow metrics")
+	fmt.Println("  logs    - Get workflow logs")
+	fmt.Println("  stop    - Stop running workflow")
+	return nil
+}
+
+// Helper functions
+
+func makeAPIRequest(method, url string, body []byte) ([]byte, error) {
+	var req *http.Request
+	var err error
+
+	if body != nil {
+		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req, err = http.NewRequest(method, url, nil)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	request := map[string]interface{}{
-		"format":        format,
-		"include_diffs": includeDiffs,
-	}
-
-	data, err := json.Marshal(request)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to serialize request: %w", err)
+		return nil, err
 	}
+	defer resp.Body.Close()
 
-	url := fmt.Sprintf("%s/arf/benchmark/report/%s", arfControllerURL, benchmarkID)
-	response, err := makeAPIRequest("POST", url, data)
+	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to generate report: %w", err)
+		return nil, err
 	}
 
-	var result struct {
-		BenchmarkID string    `json:"benchmark_id"`
-		ReportURL   string    `json:"report_url"`
-		Format      string    `json:"format"`
-		GeneratedAt time.Time `json:"generated_at"`
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errorResponse map[string]interface{}
+		if json.Unmarshal(responseBody, &errorResponse) == nil {
+			if errMsg, ok := errorResponse["error"].(string); ok {
+				return nil, fmt.Errorf("API error: %s", errMsg)
+			}
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(responseBody))
 	}
 
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Printf("Report generated successfully!\n")
-	fmt.Printf("Benchmark ID: %s\n", result.BenchmarkID)
-	fmt.Printf("Format: %s\n", result.Format)
-	fmt.Printf("URL: %s\n", result.ReportURL)
-	fmt.Printf("Generated: %s\n", result.GeneratedAt.Format("2006-01-02 15:04:05"))
-
-	return nil
+	return responseBody, nil
 }
 
-func handleBenchmarkCancel(benchmarkID string) error {
-	url := fmt.Sprintf("%s/arf/benchmark/%s", arfControllerURL, benchmarkID)
-	response, err := makeAPIRequest("DELETE", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to cancel benchmark: %w", err)
-	}
-
-	var result struct {
-		BenchmarkID string `json:"benchmark_id"`
-		Status      string `json:"status"`
-		Message     string `json:"message"`
-	}
-
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	fmt.Printf("✅ %s\n", result.Message)
-	fmt.Printf("Benchmark ID: %s\n", result.BenchmarkID)
-	fmt.Printf("Status: %s\n", result.Status)
-
-	return nil
+func promptUser(prompt string) string {
+	fmt.Print(prompt)
+	var input string
+	fmt.Scanln(&input)
+	return input
 }
