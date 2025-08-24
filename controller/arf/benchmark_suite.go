@@ -378,25 +378,66 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 	}
 	
 	// Stage 1: OpenRewrite transformation
+	if bs.logger != nil {
+		bs.logger("INFO", "openrewrite_transform", "Starting OpenRewrite transformation stage", fmt.Sprintf("Applying %d recipes", len(bs.config.RecipeIDs)))
+	}
+	
 	stage1 := bs.runStage("openrewrite_transform", func() error {
 		// Apply OpenRewrite recipes
-		for _, recipeID := range bs.config.RecipeIDs {
+		for i, recipeID := range bs.config.RecipeIDs {
+			if bs.logger != nil {
+				bs.logger("INFO", "openrewrite_transform", fmt.Sprintf("Applying recipe %d/%d", i+1, len(bs.config.RecipeIDs)), fmt.Sprintf("Recipe: %s", recipeID))
+			}
 			if err := bs.applyOpenRewriteRecipe(ctx, repoPath, recipeID); err != nil {
+				if bs.logger != nil {
+					bs.logger("ERROR", "openrewrite_transform", "Recipe application failed", fmt.Sprintf("Recipe %s failed: %v", recipeID, err))
+				}
 				return err
 			}
+		}
+		if bs.logger != nil {
+			bs.logger("INFO", "openrewrite_transform", "All recipes applied successfully", "")
 		}
 		return nil
 	})
 	iteration.Stages = append(iteration.Stages, stage1)
 	
+	if bs.logger != nil {
+		bs.logger("INFO", "openrewrite_transform", "OpenRewrite stage completed", fmt.Sprintf("Status: %s", stage1.Status))
+	}
+	
 	// Stage 2: Application Deployment
 	var sandbox *Sandbox
+	if bs.logger != nil {
+		bs.logger("INFO", "deployment", "Starting application deployment stage", fmt.Sprintf("Repository path: %s", repoPath))
+	}
+	
 	stage2 := bs.runStage("deployment", func() error {
+		if bs.logger != nil {
+			bs.logger("INFO", "deployment", "Calling deployApplication method", "")
+		}
 		var err error
 		sandbox, err = bs.deployApplication(ctx, repoPath)
+		if err != nil {
+			if bs.logger != nil {
+				bs.logger("ERROR", "deployment", "Deployment failed", fmt.Sprintf("Error: %v", err))
+			}
+		} else if sandbox != nil {
+			if bs.logger != nil {
+				bs.logger("INFO", "deployment", "Deployment successful", fmt.Sprintf("Sandbox ID: %s", sandbox.ID))
+			}
+		} else {
+			if bs.logger != nil {
+				bs.logger("WARN", "deployment", "Deployment returned nil sandbox", "")
+			}
+		}
 		return err
 	})
 	iteration.Stages = append(iteration.Stages, stage2)
+	
+	if bs.logger != nil {
+		bs.logger("INFO", "deployment", "Deployment stage completed", fmt.Sprintf("Status: %s", stage2.Status))
+	}
 	
 	// Stage 3: Application Testing
 	stage3 := bs.runStage("application_testing", func() error {
@@ -517,14 +558,28 @@ func (bs *BenchmarkSuite) runStage(name string, fn func() error) BenchmarkStage 
 
 // deployApplication deploys the transformed application for testing
 func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string) (*Sandbox, error) {
+	if bs.logger != nil {
+		bs.logger("INFO", "deployment", "deployApplication method called", fmt.Sprintf("repoPath: %s", repoPath))
+	}
+	
 	// Check if we have a deployment-integrated sandbox manager
 	deploySandbox, ok := bs.sandboxMgr.(*DeploymentSandboxManager)
 	if !ok {
+		if bs.logger != nil {
+			bs.logger("ERROR", "deployment", "Sandbox manager type assertion failed", fmt.Sprintf("Expected DeploymentSandboxManager, got: %T", bs.sandboxMgr))
+		}
 		return nil, fmt.Errorf("Application deployment requires DeploymentSandboxManager - this should not happen with the new initialization")
+	}
+	
+	if bs.logger != nil {
+		bs.logger("INFO", "deployment", "DeploymentSandboxManager confirmed", "")
 	}
 
 	// Detect language and build tool for sandbox configuration
 	buildSystem := bs.buildOps.DetectBuildSystem(repoPath)
+	if bs.logger != nil {
+		bs.logger("INFO", "deployment", "Build system detected", fmt.Sprintf("Build system: %s", buildSystem))
+	}
 
 	// Determine language from build system
 	language := "java" // Default for ARF benchmarks
@@ -552,16 +607,32 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 		NetworkAccess: true, // Required for health checks
 		TempSpace:     "2G",
 	}
+	
+	if bs.logger != nil {
+		bs.logger("INFO", "deployment", "Created sandbox configuration", fmt.Sprintf("Language: %s, BuildTool: %s, LocalPath: %s", language, buildSystem, repoPath))
+		bs.logger("INFO", "deployment", "About to call CreateSandbox", "This should trigger DeploymentSandboxManager.CreateSandbox")
+	}
 
-	// Deploy application
-	fmt.Printf("Deploying application (language: %s, build: %s)\n", language, buildSystem)
+	// Deploy application - this is the critical call that should trigger our debug output
 	sandbox, err := deploySandbox.CreateSandbox(ctx, config)
 	if err != nil {
+		if bs.logger != nil {
+			bs.logger("ERROR", "deployment", "CreateSandbox failed", fmt.Sprintf("Error: %v", err))
+		}
 		return nil, fmt.Errorf("Application deployment failed: %w", err)
 	}
 
-	fmt.Printf("Application deployed successfully: %s (URL: %s)\n", 
-		sandbox.ID, sandbox.Metadata["app_url"])
+	if bs.logger != nil {
+		if sandbox != nil {
+			appURL := "unknown"
+			if url, ok := sandbox.Metadata["app_url"]; ok {
+				appURL = fmt.Sprintf("%v", url)
+			}
+			bs.logger("INFO", "deployment", "CreateSandbox succeeded", fmt.Sprintf("Sandbox ID: %s, URL: %s, Status: %s", sandbox.ID, appURL, sandbox.Status))
+		} else {
+			bs.logger("WARN", "deployment", "CreateSandbox returned nil sandbox", "")
+		}
+	}
 	
 	return sandbox, nil
 }
