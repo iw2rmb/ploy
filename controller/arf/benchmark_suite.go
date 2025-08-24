@@ -215,11 +215,30 @@ func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
 		return nil, fmt.Errorf("unsupported LLM provider: %s", config.LLMProvider)
 	}
 	
-	// Create multi-language engine
-	multiLang, err := NewTreeSitterMultiLanguageEngine()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create multi-language engine: %w", err)
+	// Determine if we need multi-language engine or can use OpenRewrite directly
+	var multiLang MultiLanguageEngine
+	needsTreeSitter := false
+	
+	// Check if all recipes are OpenRewrite-based
+	for _, recipeID := range config.RecipeIDs {
+		if !strings.HasPrefix(recipeID, "org.openrewrite.") {
+			needsTreeSitter = true
+			break
+		}
 	}
+	
+	if needsTreeSitter {
+		// Only create Tree-sitter engine if we have non-OpenRewrite recipes
+		multiLang, err = NewTreeSitterMultiLanguageEngine()
+		if err != nil {
+			// Fallback to mock engine if Tree-sitter parsers are not available
+			multiLang, err = NewMockMultiLanguageEngine()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create multi-language engine: %w", err)
+			}
+		}
+	}
+	// For OpenRewrite-only recipes, multiLang will be nil and we'll use MockOpenRewriteEngine directly
 	
 	// Create output directory if needed
 	if config.OutputDir != "" {
