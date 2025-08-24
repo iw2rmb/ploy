@@ -40,9 +40,18 @@ func NewDeploymentSandboxManager(controllerURL string) *DeploymentSandboxManager
 
 // CreateSandbox creates a sandbox by deploying the repository as a temporary application
 func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {
+	fmt.Printf("=== CreateSandbox Debug Start ===\n")
+	fmt.Printf("Repository: %s\n", config.Repository)
+	fmt.Printf("LocalPath: %s\n", config.LocalPath)
+	fmt.Printf("Language: %s\n", config.Language)
+	fmt.Printf("BuildTool: %s\n", config.BuildTool)
+	fmt.Printf("Controller URL: %s\n", d.controllerURL)
+	
 	// Generate unique app name for this sandbox
 	sandboxID := uuid.New().String()[:8]
 	appName := fmt.Sprintf("arf-benchmark-%s", sandboxID)
+	fmt.Printf("Generated App Name: %s\n", appName)
+	fmt.Printf("Generated Sandbox ID: %s\n", sandboxID)
 	
 	// Create the sandbox metadata
 	sandbox := &Sandbox{
@@ -62,30 +71,48 @@ func (d *DeploymentSandboxManager) CreateSandbox(ctx context.Context, config San
 			"deploy_type":  "arf_benchmark",
 		},
 	}
+	fmt.Printf("Created sandbox metadata successfully\n")
 	
 	// Check if LocalPath is provided (transformed code location)
 	// If LocalPath is set, it means we have already cloned and transformed the code
 	if config.LocalPath != "" {
-		fmt.Printf("Deploying transformed code from: %s\n", config.LocalPath)
+		fmt.Printf("LocalPath provided: %s\n", config.LocalPath)
+		
+		// Check if directory exists
+		if _, err := os.Stat(config.LocalPath); os.IsNotExist(err) {
+			fmt.Printf("ERROR: LocalPath directory does not exist: %s\n", config.LocalPath)
+			sandbox.Status = SandboxStatusError
+			return sandbox, fmt.Errorf("local path does not exist: %s", config.LocalPath)
+		}
+		fmt.Printf("LocalPath directory verified to exist\n")
 		
 		// Create tar from the transformed repository
+		fmt.Printf("Creating tar archive from directory: %s\n", config.LocalPath)
 		tarData, err := d.createTarFromDirectory(config.LocalPath)
 		if err != nil {
+			fmt.Printf("ERROR: Failed to create tar from directory: %v\n", err)
 			sandbox.Status = SandboxStatusError
 			return sandbox, fmt.Errorf("failed to create tar from transformed code: %w", err)
 		}
+		fmt.Printf("Tar archive created successfully, size: %d bytes\n", len(tarData))
 		
 		// Deploy the tar archive
+		fmt.Printf("About to call deployTarArchive...\n")
 		if err := d.deployTarArchive(ctx, appName, tarData, config); err != nil {
+			fmt.Printf("ERROR: deployTarArchive failed: %v\n", err)
 			sandbox.Status = SandboxStatusError
 			return sandbox, fmt.Errorf("failed to deploy sandbox app: %w", err)
 		}
+		fmt.Printf("deployTarArchive completed successfully\n")
 		
 		// Wait for deployment to complete
+		fmt.Printf("Starting deployment polling...\n")
 		if err := d.waitForDeployment(ctx, appName, 5*time.Minute); err != nil {
+			fmt.Printf("ERROR: waitForDeployment failed: %v\n", err)
 			sandbox.Status = SandboxStatusError
 			return sandbox, fmt.Errorf("deployment failed or timed out: %w", err)
 		}
+		fmt.Printf("Deployment polling completed successfully\n")
 		
 		// Get app URL - use the configured domain
 		appDomain := "ployd.app"
