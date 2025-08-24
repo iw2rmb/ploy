@@ -1087,8 +1087,11 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		log.Printf("Warning: Failed to load default recipes: %v", err)
 	}
 
+	// Create shared benchmark manager
+	benchmarkMgr := arf.NewBenchmarkManager("./benchmark_results")
+
 	// Create ARF handler
-	handler := arf.NewHandler(engine, catalog, sandboxMgr)
+	handler := arf.NewHandler(engine, catalog, sandboxMgr, benchmarkMgr)
 
 	log.Printf("ARF handler initialized successfully")
 	return handler, nil
