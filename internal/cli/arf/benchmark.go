@@ -228,7 +228,7 @@ func handleBenchmarkRun(args []string) error {
 	}
 	fmt.Println()
 
-	url := fmt.Sprintf("%s/arf/benchmark/run", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/benchmarks", arfControllerURL)
 
 	// Debug: print request body
 	if debugMode := os.Getenv("DEBUG_ARF"); debugMode != "" {
@@ -273,7 +273,7 @@ func handleBenchmarkList(args []string) error {
 		}
 	}
 
-	url := fmt.Sprintf("%s/arf/benchmark/list", arfControllerURL)
+	url := fmt.Sprintf("%s/arf/benchmarks", arfControllerURL)
 	if activeOnly {
 		url += "?status=running"
 	} else if completedOnly {
@@ -338,7 +338,7 @@ func handleBenchmarkList(args []string) error {
 }
 
 func handleBenchmarkStatus(benchmarkID string) error {
-	url := fmt.Sprintf("%s/arf/benchmark/status/%s", arfControllerURL, benchmarkID)
+	url := fmt.Sprintf("%s/arf/benchmarks/%s/status", arfControllerURL, benchmarkID)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get benchmark status: %w", err)
@@ -408,7 +408,7 @@ func handleBenchmarkLogs(args []string) error {
 		}
 	}
 
-	url := fmt.Sprintf("%s/arf/benchmark/logs/%s", arfControllerURL, benchmarkID)
+	url := fmt.Sprintf("%s/arf/benchmarks/%s/logs", arfControllerURL, benchmarkID)
 	if stage != "all" {
 		url += "?stage=" + stage
 	}
@@ -448,7 +448,7 @@ func handleBenchmarkLogs(args []string) error {
 }
 
 func handleBenchmarkStop(benchmarkID string) error {
-	url := fmt.Sprintf("%s/arf/benchmark/stop/%s", arfControllerURL, benchmarkID)
+	url := fmt.Sprintf("%s/arf/benchmarks/%s/stop", arfControllerURL, benchmarkID)
 	_, err := makeAPIRequest("POST", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to stop benchmark: %w", err)

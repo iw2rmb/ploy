@@ -193,15 +193,15 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// Phase 4: Production Metrics (additional endpoint for test compatibility)
 	arf.Get("/production/metrics", h.GetProductionMetrics)
 	
-	// Phase 8: Benchmark Test Suite
-	arf.Post("/benchmark/run", h.RunBenchmarkSuite)
-	arf.Get("/benchmark/status/:id", h.GetBenchmarkStatus)
-	arf.Get("/benchmark/results/:id", h.GetBenchmarkResults)
-	arf.Get("/benchmark/logs/:id", h.GetBenchmarkLogs)
-	arf.Get("/benchmark/errors/:id", h.GetBenchmarkErrors)
-	arf.Post("/benchmark/compare", h.CompareBenchmarks)
-	arf.Post("/benchmark/report/:id", h.GenerateBenchmarkReport)
-	arf.Get("/benchmark/list", h.ListBenchmarks)
-	arf.Get("/benchmark/:id", h.GetBenchmark) // Get full benchmark details
-	arf.Delete("/benchmark/:id", h.CancelBenchmark)
+	// Phase 8: RESTful Benchmark Test Suite API
+	arf.Post("/benchmarks", h.RunBenchmarkSuite)                    // Create new benchmark
+	arf.Get("/benchmarks", h.ListBenchmarks)                        // List all benchmarks  
+	arf.Get("/benchmarks/:id", h.GetBenchmark)                      // Get benchmark details
+	arf.Get("/benchmarks/:id/status", h.GetBenchmarkStatus)         // Get benchmark status
+	arf.Get("/benchmarks/:id/logs", h.GetBenchmarkLogs)             // Get benchmark logs
+	arf.Get("/benchmarks/:id/results", h.GetBenchmarkResults)       // Get benchmark results
+	arf.Get("/benchmarks/:id/errors", h.GetBenchmarkErrors)         // Get benchmark errors
+	arf.Post("/benchmarks/:id/stop", h.CancelBenchmark)             // Stop benchmark
+	arf.Post("/benchmarks/:id/reports", h.GenerateBenchmarkReport)  // Generate report
+	arf.Post("/benchmarks/compare", h.CompareBenchmarks)             // Compare benchmarks
 }
