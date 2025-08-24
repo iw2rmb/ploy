@@ -356,29 +356,31 @@ func (h *Handler) GetBenchmarkStatus(c *fiber.Ctx) error {
 		})
 	}
 	
-	// Build comprehensive status response with all benchmark details
+	// Build comprehensive status response with field names matching CLI expectations
 	response := fiber.Map{
-		"benchmark_id":      running.ID,
-		"status":           running.Status,
-		"current_iteration": running.CurrentIteration,
-		"start_time":       running.StartTime,
-		
-		// Include benchmark configuration details
+		// Primary fields (matching CLI struct)
+		"id":               running.ID,
 		"name":             running.Config.Name,
+		"status":           running.Status,
+		"current_stage":    "", // Will be updated based on suite progress
+		"progress":         0.0,
+		"started_at":       running.StartTime,
+		"completed_at":     nil, // Will be set if benchmark is completed
 		"repository":       running.Config.RepoURL,
+		"app_name":         "",  // Will be filled from deployment config
+		"lane":            "",   // Will be filled from deployment config
+		
+		// Additional fields for completeness  
+		"current_iteration": running.CurrentIteration,
 		"repo_branch":      running.Config.RepoBranch,
 		"task_type":        running.Config.TaskType,
 		"source_lang":      running.Config.SourceLang,
 		"target_spec":      running.Config.TargetSpec,
 		"recipe_ids":       running.Config.RecipeIDs,
 		"max_iterations":   running.Config.MaxIterations,
-		
-		// Deployment configuration details
-		"app_name":         "",  // Will be filled from deployment config
-		"lane":            "",   // Will be filled from deployment config
-		
-		// Progress calculation
-		"progress":         0.0,
+		"transformations_count": len(running.Config.RecipeIDs),
+		"successful_stages": []string{}, // TODO: Track successful stages
+		"failed_stages":    []string{},  // TODO: Track failed stages
 	}
 	
 	// Extract deployment configuration if available
@@ -398,8 +400,9 @@ func (h *Handler) GetBenchmarkStatus(c *fiber.Ctx) error {
 		response["progress"] = progress
 	}
 	
+	// Set completion time if benchmark is finished
 	if running.EndTime != nil {
-		response["end_time"] = *running.EndTime
+		response["completed_at"] = *running.EndTime
 		response["duration"] = running.EndTime.Sub(running.StartTime).String()
 	}
 	
