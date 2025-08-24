@@ -102,6 +102,12 @@ su - ploy
 ./test-scripts/test-*.sh
 ```
 
+**VPS Deployment Protocol**: Use `scripts/deploy.sh` which automatically handles git operations:
+```bash
+./scripts/deploy.sh <branch>  # Automatically stashes, fetches, checkouts, and pulls
+```
+**Note**: No manual `git pull` needed - deploy script handles all git operations including stashing local changes before pulling.
+
 **VPS Access Protocol**: 
 - Claude Code connects to VPS as root user: `ssh root@$TARGET_HOST`
 - Always switch to ploy user for all operations: `su - ploy -c 'command'` or interactive `su - ploy`
