@@ -2,20 +2,24 @@ package arf
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"sync"
 	"time"
 	
 	"github.com/gofiber/fiber/v2"
+	"github.com/hashicorp/consul/api"
 	"gopkg.in/yaml.v3"
 )
 
-// BenchmarkManager manages benchmark test executions
+// BenchmarkManager manages benchmark test executions with distributed storage
 type BenchmarkManager struct {
-	benchmarks  map[string]*RunningBenchmark
+	benchmarks  map[string]*RunningBenchmark // Local cache for running benchmarks
 	mu          sync.RWMutex
 	resultsPath string
+	consulClient *api.Client
+	consulPrefix string // Key prefix for Consul storage
 }
 
 // RunningBenchmark represents a benchmark in progress
@@ -32,12 +36,170 @@ type RunningBenchmark struct {
 	cancelFunc      context.CancelFunc
 }
 
-// NewBenchmarkManager creates a new benchmark manager
+// NewBenchmarkManager creates a new benchmark manager with Consul storage
 func NewBenchmarkManager(resultsPath string) *BenchmarkManager {
-	return &BenchmarkManager{
-		benchmarks:  make(map[string]*RunningBenchmark),
-		resultsPath: resultsPath,
+	// Initialize Consul client
+	consulConfig := api.DefaultConfig()
+	consulClient, err := api.NewClient(consulConfig)
+	if err != nil {
+		// Fall back to in-memory only if Consul is not available
+		fmt.Printf("Warning: Failed to connect to Consul, using in-memory storage only: %v\n", err)
+		consulClient = nil
 	}
+	
+	return &BenchmarkManager{
+		benchmarks:   make(map[string]*RunningBenchmark),
+		resultsPath:  resultsPath,
+		consulClient: consulClient,
+		consulPrefix: "arf/benchmarks",
+	}
+}
+
+// storeBenchmark stores a benchmark in both local cache and Consul
+func (bm *BenchmarkManager) storeBenchmark(benchmark *RunningBenchmark) error {
+	// Store in local cache first
+	bm.benchmarks[benchmark.ID] = benchmark
+	
+	// Store in Consul if available
+	if bm.consulClient != nil {
+		// Create serializable version (exclude Suite and cancelFunc)
+		serializable := &RunningBenchmark{
+			ID:               benchmark.ID,
+			Config:           benchmark.Config,
+			Suite:            nil, // Cannot serialize, will be nil
+			Status:           benchmark.Status,
+			CurrentIteration: benchmark.CurrentIteration,
+			StartTime:        benchmark.StartTime,
+			EndTime:          benchmark.EndTime,
+			Result:           benchmark.Result,
+			Errors:           benchmark.Errors,
+			cancelFunc:       nil, // Cannot serialize
+		}
+		
+		data, err := json.Marshal(serializable)
+		if err != nil {
+			return fmt.Errorf("failed to marshal benchmark: %v", err)
+		}
+		
+		key := fmt.Sprintf("%s/%s", bm.consulPrefix, benchmark.ID)
+		kv := bm.consulClient.KV()
+		_, err = kv.Put(&api.KVPair{
+			Key:   key,
+			Value: data,
+		}, nil)
+		if err != nil {
+			fmt.Printf("Warning: Failed to store benchmark in Consul: %v\n", err)
+		}
+	}
+	
+	return nil
+}
+
+// getBenchmark retrieves a benchmark from local cache or Consul
+func (bm *BenchmarkManager) getBenchmark(benchmarkID string) (*RunningBenchmark, bool) {
+	// Check local cache first
+	if benchmark, exists := bm.benchmarks[benchmarkID]; exists {
+		return benchmark, true
+	}
+	
+	// Check Consul if available
+	if bm.consulClient != nil {
+		key := fmt.Sprintf("%s/%s", bm.consulPrefix, benchmarkID)
+		kv := bm.consulClient.KV()
+		pair, _, err := kv.Get(key, nil)
+		if err != nil {
+			fmt.Printf("Warning: Failed to get benchmark from Consul: %v\n", err)
+			return nil, false
+		}
+		
+		if pair != nil {
+			var benchmark RunningBenchmark
+			if err := json.Unmarshal(pair.Value, &benchmark); err != nil {
+				fmt.Printf("Warning: Failed to unmarshal benchmark from Consul: %v\n", err)
+				return nil, false
+			}
+			
+			// Store in local cache for future access
+			bm.benchmarks[benchmarkID] = &benchmark
+			return &benchmark, true
+		}
+	}
+	
+	return nil, false
+}
+
+// updateBenchmark updates a benchmark in both local cache and Consul
+func (bm *BenchmarkManager) updateBenchmark(benchmark *RunningBenchmark) error {
+	// Update local cache
+	bm.benchmarks[benchmark.ID] = benchmark
+	
+	// Update in Consul if available
+	if bm.consulClient != nil {
+		// Create serializable version (exclude Suite and cancelFunc)
+		serializable := &RunningBenchmark{
+			ID:               benchmark.ID,
+			Config:           benchmark.Config,
+			Suite:            nil, // Cannot serialize
+			Status:           benchmark.Status,
+			CurrentIteration: benchmark.CurrentIteration,
+			StartTime:        benchmark.StartTime,
+			EndTime:          benchmark.EndTime,
+			Result:           benchmark.Result,
+			Errors:           benchmark.Errors,
+			cancelFunc:       nil, // Cannot serialize
+		}
+		
+		data, err := json.Marshal(serializable)
+		if err != nil {
+			return fmt.Errorf("failed to marshal benchmark: %v", err)
+		}
+		
+		key := fmt.Sprintf("%s/%s", bm.consulPrefix, benchmark.ID)
+		kv := bm.consulClient.KV()
+		_, err = kv.Put(&api.KVPair{
+			Key:   key,
+			Value: data,
+		}, nil)
+		if err != nil {
+			fmt.Printf("Warning: Failed to update benchmark in Consul: %v\n", err)
+		}
+	}
+	
+	return nil
+}
+
+// listAllBenchmarks retrieves all benchmarks from both local cache and Consul
+func (bm *BenchmarkManager) listAllBenchmarks() map[string]*RunningBenchmark {
+	allBenchmarks := make(map[string]*RunningBenchmark)
+	
+	// Add local benchmarks
+	for id, benchmark := range bm.benchmarks {
+		allBenchmarks[id] = benchmark
+	}
+	
+	// Add benchmarks from Consul if available
+	if bm.consulClient != nil {
+		kv := bm.consulClient.KV()
+		pairs, _, err := kv.List(bm.consulPrefix, nil)
+		if err != nil {
+			fmt.Printf("Warning: Failed to list benchmarks from Consul: %v\n", err)
+		} else {
+			for _, pair := range pairs {
+				var benchmark RunningBenchmark
+				if err := json.Unmarshal(pair.Value, &benchmark); err != nil {
+					fmt.Printf("Warning: Failed to unmarshal benchmark from Consul: %v\n", err)
+					continue
+				}
+				
+				// Only add if not already in local cache
+				if _, exists := allBenchmarks[benchmark.ID]; !exists {
+					allBenchmarks[benchmark.ID] = &benchmark
+				}
+			}
+		}
+	}
+	
+	return allBenchmarks
 }
 
 // RunBenchmarkSuite handles POST /benchmark/run
@@ -114,8 +276,14 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 	}
 	
 	h.benchmarkManager.mu.Lock()
-	h.benchmarkManager.benchmarks[benchmarkID] = running
+	err = h.benchmarkManager.storeBenchmark(running)
 	h.benchmarkManager.mu.Unlock()
+	
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": fmt.Sprintf("Failed to store benchmark: %v", err),
+		})
+	}
 	
 	// Run benchmark asynchronously
 	go func() {
@@ -131,6 +299,9 @@ func (h *Handler) RunBenchmarkSuite(c *fiber.Ctx) error {
 		}
 		endTime := time.Now()
 		running.EndTime = &endTime
+		
+		// Update in distributed storage
+		h.benchmarkManager.updateBenchmark(running)
 		h.benchmarkManager.mu.Unlock()
 	}()
 	
@@ -152,7 +323,7 @@ func (h *Handler) GetBenchmarkStatus(c *fiber.Ctx) error {
 	}
 	
 	h.benchmarkManager.mu.RLock()
-	running, exists := h.benchmarkManager.benchmarks[benchmarkID]
+	running, exists := h.benchmarkManager.getBenchmark(benchmarkID)
 	h.benchmarkManager.mu.RUnlock()
 	
 	if !exists {
@@ -191,7 +362,7 @@ func (h *Handler) GetBenchmarkResults(c *fiber.Ctx) error {
 	}
 	
 	h.benchmarkManager.mu.RLock()
-	running, exists := h.benchmarkManager.benchmarks[benchmarkID]
+	running, exists := h.benchmarkManager.getBenchmark(benchmarkID)
 	h.benchmarkManager.mu.RUnlock()
 	
 	if !exists {
@@ -227,7 +398,7 @@ func (h *Handler) GetBenchmarkErrors(c *fiber.Ctx) error {
 	}
 	
 	h.benchmarkManager.mu.RLock()
-	running, exists := h.benchmarkManager.benchmarks[benchmarkID]
+	running, exists := h.benchmarkManager.getBenchmark(benchmarkID)
 	h.benchmarkManager.mu.RUnlock()
 	
 	if !exists {
@@ -279,7 +450,7 @@ func (h *Handler) CompareBenchmarks(c *fiber.Ctx) error {
 	var results []*BenchmarkResult
 	h.benchmarkManager.mu.RLock()
 	for _, id := range req.Results {
-		if running, exists := h.benchmarkManager.benchmarks[id]; exists {
+		if running, exists := h.benchmarkManager.getBenchmark(id); exists {
 			if running.Result != nil {
 				results = append(results, running.Result)
 			}
@@ -320,7 +491,7 @@ func (h *Handler) GenerateBenchmarkReport(c *fiber.Ctx) error {
 	}
 	
 	h.benchmarkManager.mu.RLock()
-	running, exists := h.benchmarkManager.benchmarks[benchmarkID]
+	running, exists := h.benchmarkManager.getBenchmark(benchmarkID)
 	h.benchmarkManager.mu.RUnlock()
 	
 	if !exists {
@@ -358,8 +529,9 @@ func (h *Handler) ListBenchmarks(c *fiber.Ctx) error {
 	h.benchmarkManager.mu.RLock()
 	defer h.benchmarkManager.mu.RUnlock()
 	
+	allBenchmarks := h.benchmarkManager.listAllBenchmarks()
 	benchmarks := []fiber.Map{}
-	for id, running := range h.benchmarkManager.benchmarks {
+	for id, running := range allBenchmarks {
 		benchmark := fiber.Map{
 			"id":         id,
 			"name":       running.Config.Name,
@@ -399,12 +571,18 @@ func (h *Handler) CancelBenchmark(c *fiber.Ctx) error {
 	}
 	
 	h.benchmarkManager.mu.Lock()
-	running, exists := h.benchmarkManager.benchmarks[benchmarkID]
+	running, exists := h.benchmarkManager.getBenchmark(benchmarkID)
 	if exists && running.Status == "running" {
-		running.cancelFunc()
+		// Note: cancelFunc may not be available for benchmarks loaded from Consul
+		if running.cancelFunc != nil {
+			running.cancelFunc()
+		}
 		running.Status = "cancelled"
 		endTime := time.Now()
 		running.EndTime = &endTime
+		
+		// Update in distributed storage
+		h.benchmarkManager.updateBenchmark(running)
 	}
 	h.benchmarkManager.mu.Unlock()
 	
