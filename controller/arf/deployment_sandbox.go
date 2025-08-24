@@ -164,27 +164,42 @@ func (d *DeploymentSandboxManager) deployRepository(ctx context.Context, appName
 func (d *DeploymentSandboxManager) waitForDeployment(ctx context.Context, appName string, timeout time.Duration) error {
 	statusURL := fmt.Sprintf("%s/status/%s", d.controllerURL, appName)
 	
+	fmt.Printf("=== ARF Deployment Polling ===\n")
+	fmt.Printf("App Name: %s\n", appName)
+	fmt.Printf("Status URL: %s\n", statusURL)
+	fmt.Printf("Timeout: %v\n", timeout)
+	
 	ctxTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	
+	attempt := 0
 	for {
 		select {
 		case <-ctxTimeout.Done():
+			fmt.Printf("Deployment polling timeout after %v (attempted %d times)\n", timeout, attempt)
 			return fmt.Errorf("deployment timeout after %v", timeout)
 		case <-ticker.C:
+			attempt++
+			fmt.Printf("Polling attempt %d: Checking app status...\n", attempt)
+			
 			status, err := d.getAppStatus(ctxTimeout, statusURL)
 			if err != nil {
+				fmt.Printf("Status check failed (attempt %d): %v\n", attempt, err)
 				// Continue polling on errors
 				continue
 			}
 			
+			fmt.Printf("Status response (attempt %d): %s\n", attempt, status)
+			
 			switch status {
 			case "running", "healthy":
+				fmt.Printf("Deployment successful! App is %s after %d attempts\n", status, attempt)
 				return nil
 			case "failed", "stopped":
+				fmt.Printf("Deployment failed with final status: %s after %d attempts\n", status, attempt)
 				return fmt.Errorf("deployment failed with status: %s", status)
 			default:
 				// Continue polling for "building", "deploying", etc.
@@ -481,29 +496,51 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 		req.Header.Set("Authorization", "Bearer "+d.apiKey)
 	}
 	
-	// Send the request
-	fmt.Printf("Sending deployment request to: %s\n", deployURL)
-	fmt.Printf("Tar archive size: %d bytes\n", len(tarData))
+	// Log comprehensive deployment request details
+	fmt.Printf("=== ARF Deployment Debug ===\n")
+	fmt.Printf("URL: %s\n", deployURL)
+	fmt.Printf("App Name: %s\n", appName)
+	fmt.Printf("SHA: %s\n", sha)
+	fmt.Printf("Tar Size: %d bytes\n", len(tarData))
+	fmt.Printf("Headers: %+v\n", req.Header)
+	fmt.Printf("Controller URL: %s\n", d.controllerURL)
 	
+	// Send the request
 	resp, err := d.httpClient.Do(req)
 	if err != nil {
+		fmt.Printf("HTTP Request Error: %v\n", err)
 		return fmt.Errorf("deploy request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	
 	// Read response body
-	body, _ := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		fmt.Printf("Error reading response body: %v\n", readErr)
+		return fmt.Errorf("failed to read response: %w", readErr)
+	}
+	
+	// Log complete response details
+	fmt.Printf("=== ARF Deployment Response ===\n")
+	fmt.Printf("Status: %d %s\n", resp.StatusCode, resp.Status)
+	fmt.Printf("Response Headers: %+v\n", resp.Header)
+	fmt.Printf("Response Body: %s\n", string(body))
+	fmt.Printf("Response Size: %d bytes\n", len(body))
 	
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		// Parse error response for better debugging
 		var errorResp map[string]interface{}
 		if err := json.Unmarshal(body, &errorResp); err == nil {
 			if errMsg, ok := errorResp["error"].(string); ok {
+				fmt.Printf("Parsed Error Message: %s\n", errMsg)
 				return fmt.Errorf("deployment failed: %s", errMsg)
 			}
 		}
+		fmt.Printf("Raw Error Response: %s\n", string(body))
 		return fmt.Errorf("deploy request failed with status %d: %s", resp.StatusCode, string(body))
 	}
+	
+	fmt.Printf("Deployment request successful! Status: %d\n", resp.StatusCode)
 	
 	// Parse successful response
 	var deployResp map[string]interface{}
