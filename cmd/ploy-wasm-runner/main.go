@@ -1,4 +1,21 @@
-// ploy-wasm-runner executes WASM modules using wazero runtime
+// ploy-wasm-runner - WebAssembly Runtime Engine for Lane G Deployments
+//
+// This is a DEPLOYMENT RUNTIME COMPONENT, not a CLI tool.
+// It runs INSIDE deployed containers to execute WASM modules.
+//
+// Architecture Role:
+//   - Deployed as the main process in Lane G containers
+//   - Executes compiled WASM modules via HTTP interface
+//   - Similar to Node.js runtime, JVM, or Python interpreter
+//
+// Deployment Flow:
+//   1. Controller compiles user code to WASM
+//   2. Controller builds this binary for target architecture
+//   3. Both get packaged into deployment artifact
+//   4. Nomad deploys container with this as entrypoint
+//   5. This serves HTTP by executing the WASM module
+//
+// See README.md for detailed documentation.
 package main
 
 import (

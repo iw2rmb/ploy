@@ -786,8 +786,8 @@ func handleBenchmarkRun(args []string) error {
 		appName = fmt.Sprintf("bench-%s-%d", benchmarkName, time.Now().Unix())
 	}
 
-	// Create benchmark request
-	request := map[string]interface{}{
+	// Create benchmark config
+	benchmarkConfig := map[string]interface{}{
 		"name":       benchmarkName,
 		"repository": repository,
 		"deployment_config": map[string]interface{}{
@@ -805,7 +805,12 @@ func handleBenchmarkRun(args []string) error {
 				"recipe": strings.TrimSpace(recipe),
 			})
 		}
-		request["transformations"] = transformationList
+		benchmarkConfig["transformations"] = transformationList
+	}
+
+	// Wrap config in the format controller expects
+	request := map[string]interface{}{
+		"config": benchmarkConfig,
 	}
 
 	// Submit benchmark
