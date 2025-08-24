@@ -475,6 +475,13 @@ func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]b
 		}
 		header.Name = relPath
 		
+		// Preserve executable permissions for scripts
+		if !info.IsDir() && (strings.HasSuffix(path, "gradlew") || 
+			strings.HasSuffix(path, "mvnw") || 
+			strings.HasSuffix(path, ".sh")) {
+			header.Mode = 0755
+		}
+		
 		// Write header
 		if err := tw.WriteHeader(header); err != nil {
 			return err
