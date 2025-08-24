@@ -733,10 +733,15 @@ func printBenchmarkUsage() {
 	fmt.Println("  stop <id>            Stop running benchmark")
 	fmt.Println()
 	fmt.Println("Run options:")
-	fmt.Println("  --repository <url>   Repository URL")
+	fmt.Println("  --repository <url>   Repository URL (required)")
+	fmt.Println("  --branch <name>      Git branch (default: main)")
 	fmt.Println("  --transformations <recipes> Comma-separated recipe IDs")
 	fmt.Println("  --app-name <name>    Application name for deployment")
-	fmt.Println("  --lane <A-G>         Deployment lane")
+	fmt.Println("  --lane <A-G>         Deployment lane (default: auto)")
+	fmt.Println("  --iterations <num>   Max iterations (default: 3)")
+	fmt.Println()
+	fmt.Println("Predefined benchmarks:")
+	fmt.Println("  java11to17_migration Uses default Java 11->17 migration recipes")
 }
 
 func handleBenchmarkRun(args []string) error {
@@ -747,9 +752,11 @@ func handleBenchmarkRun(args []string) error {
 
 	benchmarkName := args[0]
 	repository := ""
+	branch := "main"
 	transformations := ""
 	appName := ""
 	lane := "auto"
+	maxIterations := 3
 
 	// Parse arguments
 	for i := 1; i < len(args); i++ {
@@ -757,6 +764,11 @@ func handleBenchmarkRun(args []string) error {
 		case "--repository":
 			if i+1 < len(args) {
 				repository = args[i+1]
+				i++
+			}
+		case "--branch":
+			if i+1 < len(args) {
+				branch = args[i+1]
 				i++
 			}
 		case "--transformations":
@@ -774,6 +786,13 @@ func handleBenchmarkRun(args []string) error {
 				lane = args[i+1]
 				i++
 			}
+		case "--iterations":
+			if i+1 < len(args) {
+				if val, err := strconv.Atoi(args[i+1]); err == nil {
+					maxIterations = val
+				}
+				i++
+			}
 		}
 	}
 
@@ -786,10 +805,52 @@ func handleBenchmarkRun(args []string) error {
 		appName = fmt.Sprintf("bench-%s-%d", benchmarkName, time.Now().Unix())
 	}
 
-	// Create benchmark config
+	// Create recipe IDs list from transformations or use default Java migration recipes
+	var recipeIDs []string
+	if transformations != "" {
+		recipeIDs = strings.Split(transformations, ",")
+		for i, recipe := range recipeIDs {
+			recipeIDs[i] = strings.TrimSpace(recipe)
+		}
+	} else if benchmarkName == "java11to17_migration" {
+		// Default Java migration recipes
+		recipeIDs = []string{
+			"org.openrewrite.java.migrate.JavaVersion11to17",
+			"org.openrewrite.java.migrate.javax.JavaxToJakarta",
+		}
+	} else {
+		fmt.Println("Error: --transformations is required or use a predefined benchmark")
+		return nil
+	}
+
+	// Create benchmark config with proper field mapping to match BenchmarkConfig struct
 	benchmarkConfig := map[string]interface{}{
-		"name":       benchmarkName,
-		"repository": repository,
+		// Test identification
+		"name":        benchmarkName,
+		"description": fmt.Sprintf("Benchmark test for %s", benchmarkName),
+		
+		// Repository configuration - FIXED FIELD MAPPING
+		"repo_url":    repository,  // Fixed: was "repository", now "repo_url" 
+		"repo_branch": branch,      // Added: missing field
+		
+		// Task configuration
+		"task_type":   "migration",
+		"source_lang": "java",
+		"target_spec": "java:17",
+		"recipe_ids":  recipeIDs,   // Fixed: proper recipe format
+		
+		// Iteration control
+		"max_iterations":        maxIterations,
+		"timeout_per_iteration": "10m",
+		"stop_on_success":       true,
+		
+		// Output configuration
+		"output_dir":              fmt.Sprintf("/tmp/arf-benchmark-%s", benchmarkName),
+		"capture_full_diffs":      true,
+		"capture_partial_diffs":   false,
+		"save_intermediate_state": true,
+		
+		// Deployment metadata
 		"deployment_config": map[string]interface{}{
 			"app_name": appName,
 			"lane":     lane,
@@ -808,19 +869,13 @@ func handleBenchmarkRun(args []string) error {
 		llmModel = "codellama:7b"
 	}
 	
+	// Add LLM configuration to benchmark config
 	benchmarkConfig["llm_provider"] = llmProvider
 	benchmarkConfig["llm_model"] = llmModel
-
-	if transformations != "" {
-		recipeList := strings.Split(transformations, ",")
-		var transformationList []map[string]interface{}
-		for _, recipe := range recipeList {
-			transformationList = append(transformationList, map[string]interface{}{
-				"type":   "openrewrite",
-				"recipe": strings.TrimSpace(recipe),
-			})
-		}
-		benchmarkConfig["transformations"] = transformationList
+	benchmarkConfig["llm_options"] = map[string]string{
+		"base_url":     "http://localhost:11434",
+		"temperature":  "0.1",
+		"max_tokens":   "4096",
 	}
 
 	// Wrap config in the format controller expects
