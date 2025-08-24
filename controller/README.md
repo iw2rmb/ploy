@@ -273,14 +273,31 @@
 
 ## Automated Remediation Framework Endpoints (Phase ARF-4.5: Deployment Integration - Implemented)
 
-### Benchmark & Testing Pipeline
-- `POST /v1/arf/benchmark/run` — execute comprehensive ARF benchmark with deployment integration.
+### Benchmark & Testing Pipeline (RESTful API)
+- `POST /v1/arf/benchmarks` — create and execute comprehensive ARF benchmark with deployment integration.
   - Body: `{"name": "java-migration-test", "repository": "...", "transformations": [...], "deployment_config": {"app_name": "...", "lane": "auto"}}`
   - Returns: `{"benchmark_id": "bench-123", "status": "running", "stages": ["transformation", "deployment", "application_testing", "cleanup"]}`
-- `GET /v1/arf/benchmark/:id/status` — get benchmark execution status and progress.
-  - Returns: `{"benchmark_id": "...", "status": "running", "current_stage": "deployment", "progress": 0.6, "start_time": "..."}`
-- `GET /v1/arf/benchmark/status` — list all active benchmarks.
+- `GET /v1/arf/benchmarks` — list all benchmarks.
+  - Query params: `?status=running|completed` for filtering
   - Returns: `{"benchmarks": [...], "active_count": 3, "completed_today": 15}`
+- `GET /v1/arf/benchmarks/:id` — get full benchmark details.
+  - Returns: `{"benchmark_id": "...", "config": {...}, "result": {...}, "status": "completed"}`
+- `GET /v1/arf/benchmarks/:id/status` — get benchmark execution status and progress.
+  - Returns: `{"id": "...", "status": "running", "current_stage": "deployment", "progress": 0.6, "started_at": "..."}`
+- `GET /v1/arf/benchmarks/:id/logs` — get benchmark execution logs.
+  - Query params: `?stage=all|initialization|repository_preparation|openrewrite_transform|deployment|application_testing`
+  - Returns: `{"benchmark_id": "...", "stage": "all", "logs": [...]}`
+- `GET /v1/arf/benchmarks/:id/results` — get benchmark execution results.
+  - Returns: `{"benchmark_id": "...", "results": {...}, "metrics": {...}, "summary": {...}}`
+- `GET /v1/arf/benchmarks/:id/errors` — get benchmark execution errors.
+  - Returns: `{"benchmark_id": "...", "errors": [...], "error_count": 2}`
+- `POST /v1/arf/benchmarks/:id/stop` — stop running benchmark.
+  - Returns: `{"benchmark_id": "...", "status": "stopping"}`
+- `POST /v1/arf/benchmarks/:id/reports` — generate benchmark report.
+  - Returns: `{"report_id": "...", "status": "generating"}`
+- `POST /v1/arf/benchmarks/compare` — compare multiple benchmarks.
+  - Body: `{"benchmark_ids": ["bench-123", "bench-456"], "metrics": ["performance", "success_rate"]}`
+  - Returns: `{"comparison_id": "...", "results": {...}}`
 
 ### Deployment Sandbox Management
 - `POST /v1/arf/sandboxes` — create deployment sandbox with full application lifecycle.
@@ -294,16 +311,16 @@
   - Returns: `{"status": "destroyed", "cleanup_operations": ["nomad_job_stopped", "domains_removed", "storage_cleaned"]}`
 
 ### Application HTTP Testing
-- `GET /v1/arf/benchmark/:id/endpoints` — get HTTP endpoints for deployed test application.
+- `GET /v1/arf/benchmarks/:id/endpoints` — get HTTP endpoints for deployed test application.
   - Returns: `{"endpoints": [{"url": "https://test-app.dev.ployd.app", "type": "main"}, {"url": "https://test-app.dev.ployd.app/healthz", "type": "health"}]}`
-- `POST /v1/arf/benchmark/:id/test-http` — execute HTTP endpoint testing on deployed application.
+- `POST /v1/arf/benchmarks/:id/test-http` — execute HTTP endpoint testing on deployed application.
   - Body: `{"endpoints": ["health", "root"], "timeout": 30, "retry_count": 3}`
   - Returns: `{"test_results": [...], "success_rate": 0.95, "average_response_time": 150, "errors": []}`
 
 ### Error Analysis & Log Parsing  
-- `GET /v1/arf/benchmark/:id/errors` — get comprehensive error analysis from deployment logs.
+- `GET /v1/arf/benchmarks/:id/errors` — get comprehensive error analysis from deployment logs.
   - Returns: `{"errors": [...], "categories": {"build": 2, "deployment": 1, "runtime": 0}, "severity": {...}}`
-- `POST /v1/arf/benchmark/:id/analyze-logs` — trigger detailed log analysis for error detection.
+- `POST /v1/arf/benchmarks/:id/analyze-logs` — trigger detailed log analysis for error detection.
   - Returns: `{"analysis_started": true, "patterns_checked": 25, "error_categories": [...], "estimated_completion": "2m"}`
 
 ### End-to-End Workflow Management
