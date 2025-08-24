@@ -384,7 +384,155 @@ func ListApps(c *fiber.Ctx) error {
 }
 
 func Status(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{"status": "ok"})
+	appName := c.Params("app")
+	
+	// Validate app name
+	if err := validation.ValidateAppName(appName); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid app name",
+			"details": err.Error(),
+		})
+	}
+	
+	// Get status from Nomad for all lanes that might be running
+	lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	var activeJob *nomad.JobStatus
+	var lastError error
+	
+	monitor := nomad.NewHealthMonitor()
+	
+	for _, lane := range lanes {
+		jobName := appName + "-lane-" + lane
+		if job, err := monitor.GetJobStatus(jobName); err == nil && job != nil {
+			activeJob = job
+			break
+		} else if err != nil {
+			lastError = err
+		}
+	}
+	
+	if activeJob == nil {
+		// No active job found, check if it's a known app
+		if lastError != nil {
+			return c.Status(404).JSON(fiber.Map{
+				"status": "not_found",
+				"message": "App not found or not deployed",
+				"details": lastError.Error(),
+			})
+		}
+		return c.Status(404).JSON(fiber.Map{
+			"status": "not_found", 
+			"message": "App not found or not deployed",
+		})
+	}
+	
+	// Map Nomad job status to ARF-compatible status
+	status := mapNomadStatusToARF(activeJob.Status)
+	
+	return c.JSON(fiber.Map{
+		"status": status,
+		"job_name": activeJob.Name,
+		"lane": extractLaneFromJobName(activeJob.Name),
+		"deployment_id": activeJob.ID,
+		"job_type": activeJob.Type,
+		"stable": activeJob.Stable,
+		"version": activeJob.Version,
+	})
+}
+
+// mapNomadStatusToARF converts Nomad job status to ARF-compatible status
+func mapNomadStatusToARF(nomadStatus string) string {
+	switch strings.ToLower(nomadStatus) {
+	case "pending":
+		return "building"
+	case "running":
+		return "deploying" 
+	case "dead":
+		return "stopped"
+	default:
+		// For running allocations, we need to check health
+		return "running"
+	}
+}
+
+// extractLaneFromJobName extracts lane from job name format: appname-lane-x
+func extractLaneFromJobName(jobName string) string {
+	parts := strings.Split(jobName, "-lane-")
+	if len(parts) == 2 {
+		return strings.ToUpper(parts[1])
+	}
+	return "unknown"
+}
+
+// GetLogs retrieves logs from the deployed application
+func GetLogs(c *fiber.Ctx) error {
+	appName := c.Params("app")
+	
+	// Validate app name
+	if err := validation.ValidateAppName(appName); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Invalid app name",
+			"details": err.Error(),
+		})
+	}
+	
+	// Optional query parameters
+	lines := c.Query("lines", "100")
+	_ = c.Query("follow", "false") == "true" // follow parameter for future streaming implementation
+	
+	// Find the active job for this app across all lanes
+	lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	var activeJobName string
+	
+	monitor := nomad.NewHealthMonitor()
+	
+	for _, lane := range lanes {
+		jobName := appName + "-lane-" + lane
+		if job, err := monitor.GetJobStatus(jobName); err == nil && job != nil {
+			activeJobName = jobName
+			break
+		}
+	}
+	
+	if activeJobName == "" {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "App not found or not deployed",
+		})
+	}
+	
+	// Get allocations for the job
+	allocations, err := monitor.GetJobAllocations(activeJobName)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Failed to retrieve allocations",
+			"details": err.Error(),
+		})
+	}
+	
+	if len(allocations) == 0 {
+		return c.JSON(fiber.Map{
+			"app_name": appName,
+			"job_name": activeJobName,
+			"logs": "No running allocations found",
+			"lines_requested": lines,
+			"timestamp": time.Now().UTC(),
+		})
+	}
+	
+	// For now, return allocation status info as logs
+	// In a real implementation, we would use Nomad API to get actual logs
+	logsText := fmt.Sprintf("Job: %s\nAllocations found: %d\n", activeJobName, len(allocations))
+	for i, alloc := range allocations {
+		logsText += fmt.Sprintf("Allocation %d: %s (%s)\n", i+1, alloc.ID, alloc.ClientStatus)
+	}
+	
+	return c.JSON(fiber.Map{
+		"app_name": appName,
+		"job_name": activeJobName,
+		"logs": logsText,
+		"lines_requested": lines,
+		"timestamp": time.Now().UTC(),
+	})
 }
 
 // determineSigningMethod analyzes the signing method used for the artifact

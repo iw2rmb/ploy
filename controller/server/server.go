@@ -569,7 +569,8 @@ func (s *Server) setupRoutes() {
 	// Application build endpoints with request-scoped storage
 	api.Post("/apps/:app/builds", s.handleTriggerBuild)
 	api.Get("/apps", build.ListApps)
-	api.Get("/status/:app", build.Status)
+	api.Get("/apps/:app/status", build.Status)
+	api.Get("/apps/:app/logs", build.GetLogs)
 	
 	// Domain management with dependency injection
 	s.setupDomainRoutes(api)
