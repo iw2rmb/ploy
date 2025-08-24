@@ -401,9 +401,32 @@ func (bs *BenchmarkSuite) prepareRepository() (string, error) {
 		return bs.config.LocalPath, nil
 	}
 	
+	// Determine base directory with proper fallback chain
+	var baseDir string
+	
+	// Priority 1: Use Nomad allocation directory if available (always writable)
+	allocDir := os.Getenv("NOMAD_ALLOC_DIR")
+	if allocDir != "" {
+		baseDir = filepath.Join(allocDir, "arf-benchmark")
+		fmt.Printf("Using Nomad alloc directory for benchmarks: %s\n", baseDir)
+	} else if bs.config.OutputDir != "" {
+		// Priority 2: Use configured output directory
+		baseDir = bs.config.OutputDir
+		fmt.Printf("Using configured output directory: %s\n", baseDir)
+	} else {
+		// Priority 3: Fallback to system temp directory
+		baseDir = filepath.Join(os.TempDir(), "arf-benchmark")
+		fmt.Printf("Using system temp directory: %s\n", baseDir)
+	}
+	
+	// Ensure base directory exists with proper permissions
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
+	}
+	
 	// Create unique directory for this benchmark run
 	timestamp := time.Now().Unix()
-	tempDir := filepath.Join(os.TempDir(), "arf-benchmark", fmt.Sprintf("%s-%d", bs.config.Name, timestamp))
+	tempDir := filepath.Join(baseDir, fmt.Sprintf("%s-%d", bs.config.Name, timestamp))
 	
 	// Clone the repository
 	ctx := context.Background()
