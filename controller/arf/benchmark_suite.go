@@ -174,6 +174,9 @@ type ComparisonResult struct {
 }
 
 // BenchmarkSuite manages benchmark test execution
+// LogFunction defines a function that can receive log messages from the benchmark suite
+type LogFunction func(level, stage, message, details string)
+
 type BenchmarkSuite struct {
 	config          *BenchmarkConfig
 	llmGenerator    LLMRecipeGenerator
@@ -184,10 +187,11 @@ type BenchmarkSuite struct {
 	buildOps        *BuildOperations
 	openRewriteEngine *BuiltinOpenRewriteEngine
 	sandboxMgr      SandboxManager
+	logger          LogFunction // Callback for logging
 }
 
 // NewBenchmarkSuite creates a new benchmark suite
-func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
+func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkSuite, error) {
 	// Create LLM generator based on provider
 	var llmGen LLMRecipeGenerator
 	var err error
@@ -280,11 +284,16 @@ func NewBenchmarkSuite(config *BenchmarkConfig) (*BenchmarkSuite, error) {
 		buildOps:        NewBuildOperations(config.TimeoutPerIteration),
 		openRewriteEngine: NewBuiltinOpenRewriteEngine(),
 		sandboxMgr:     sandboxMgr,
+		logger:         logger,
 	}, nil
 }
 
 // Run executes the benchmark test
 func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
+	if bs.logger != nil {
+		bs.logger("INFO", "repository_preparation", "Starting repository preparation", fmt.Sprintf("Repository: %s, Branch: %s", bs.config.RepoURL, bs.config.RepoBranch))
+	}
+	
 	result := &BenchmarkResult{
 		Config:    *bs.config,
 		StartTime: time.Now(),
@@ -293,20 +302,44 @@ func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
 	// Clone or prepare repository
 	repoPath, err := bs.prepareRepository()
 	if err != nil {
+		if bs.logger != nil {
+			bs.logger("ERROR", "repository_preparation", "Failed to prepare repository", fmt.Sprintf("Error: %v", err))
+		}
 		return nil, fmt.Errorf("failed to prepare repository: %w", err)
 	}
 	
+	if bs.logger != nil {
+		bs.logger("INFO", "repository_preparation", "Repository prepared successfully", fmt.Sprintf("Local path: %s", repoPath))
+	}
+	
 	// Run iterations
+	if bs.logger != nil {
+		bs.logger("INFO", "iteration_execution", "Starting iterations", fmt.Sprintf("Maximum iterations: %d", bs.config.MaxIterations))
+	}
+	
 	for i := 0; i < bs.config.MaxIterations; i++ {
+		if bs.logger != nil {
+			bs.logger("INFO", "iteration_execution", fmt.Sprintf("Starting iteration %d", i+1), "")
+		}
+		
 		iteration, err := bs.runIteration(ctx, i+1, repoPath)
 		if err != nil {
-			fmt.Printf("Iteration %d failed: %v\n", i+1, err)
+			if bs.logger != nil {
+				bs.logger("ERROR", "iteration_execution", fmt.Sprintf("Iteration %d failed", i+1), fmt.Sprintf("Error: %v", err))
+			}
 		}
 		
 		result.Iterations = append(result.Iterations, *iteration)
 		
+		if bs.logger != nil {
+			bs.logger("INFO", "iteration_execution", fmt.Sprintf("Iteration %d completed", i+1), fmt.Sprintf("Status: %s", iteration.Status))
+		}
+		
 		// Check if we should stop
 		if bs.config.StopOnSuccess && iteration.Status == "success" {
+			if bs.logger != nil {
+				bs.logger("INFO", "iteration_execution", "Stopping iterations early", "Success achieved, StopOnSuccess enabled")
+			}
 			break
 		}
 		
@@ -321,9 +354,17 @@ func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
 	result.TotalDuration = result.EndTime.Sub(result.StartTime)
 	result.Summary = bs.generateSummary(result)
 	
+	if bs.logger != nil {
+		bs.logger("INFO", "summary_generation", "Generated benchmark summary", fmt.Sprintf("Total iterations: %d, Total duration: %s", len(result.Iterations), result.TotalDuration))
+	}
+	
 	// Save final result
 	if err := bs.saveResult(result); err != nil {
-		fmt.Printf("Warning: failed to save result: %v\n", err)
+		if bs.logger != nil {
+			bs.logger("WARN", "result_saving", "Failed to save result", fmt.Sprintf("Error: %v", err))
+		}
+	} else if bs.logger != nil {
+		bs.logger("INFO", "result_saving", "Benchmark result saved successfully", "")
 	}
 	
 	return result, nil

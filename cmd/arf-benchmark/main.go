@@ -49,7 +49,18 @@ func main() {
 	
 	// Create benchmark suite
 	fmt.Println("Creating benchmark suite...")
-	suite, err := arf.NewBenchmarkSuite(&config)
+	
+	// Create simple logger for standalone command
+	logger := func(level, stage, message, details string) {
+		timestamp := time.Now().Format("15:04:05")
+		if details != "" {
+			fmt.Printf("[%s] [%s] [%s] %s - %s\n", timestamp, level, stage, message, details)
+		} else {
+			fmt.Printf("[%s] [%s] [%s] %s\n", timestamp, level, stage, message)
+		}
+	}
+	
+	suite, err := arf.NewBenchmarkSuite(&config, logger)
 	if err != nil {
 		log.Fatalf("Failed to create benchmark suite: %v", err)
 	}
