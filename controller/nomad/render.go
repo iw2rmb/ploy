@@ -182,6 +182,10 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	// DEBUG: Add a marker to see if template processing is happening
 	s = strings.ReplaceAll(s, "# Persistent volume for JVM heap dumps and logs", "# TEMPLATE_PROCESSING_EXECUTED - Persistent volume for JVM heap dumps and logs")
 	
+	// EMERGENCY FIX: Directly handle the problematic DEBUG_ENABLED block that's breaking HCL
+	// Remove the DEBUG_ENABLED conditional block that's causing syntax errors
+	s = regexp.MustCompile(`(?s)\s*\{\{#if DEBUG_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(s, "")
+	
 	// Process conditional blocks first
 	s = processConditionalBlocks(s, data)
 	
