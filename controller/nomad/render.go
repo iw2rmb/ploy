@@ -380,37 +380,74 @@ func (r *RenderData) SetDefaults() {
 func processConditionalBlocks(template string, data RenderData) string {
 	result := template
 	
-	// DEBUG: Add a marker to confirm this function is called
-	result = strings.ReplaceAll(result, "task \"osv-jvm\" {", "task \"osv-jvm\" { # CONDITIONAL_PROCESSING_EXECUTED")
+	// Process each conditional block type based on RenderData values
+	// Use regex to match entire blocks including surrounding whitespace
 	
-	// Simple and reliable approach: process conditions based on RenderData values
-	// Since closing tags are confirmed present, use simple string replacement
-	
-	// Handle DEBUG_ENABLED (false by default)
+	// Handle DEBUG_ENABLED blocks
 	if !data.DebugEnabled {
-		// Find and remove specific DEBUG_ENABLED blocks
-		result = strings.ReplaceAll(result, "      {{#if DEBUG_ENABLED}}\n      port \"debug\" {\n        to = 5005\n      }\n      {{/if}}", "")
-		result = strings.ReplaceAll(result, "        {{#if DEBUG_ENABLED}}\n        DEBUG_PORT = \"5005\"\n        JAVA_TOOL_OPTIONS = \"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005\"\n        {{/if}}", "")
+		// Remove debug port block with surrounding whitespace
+		debugPortRe := regexp.MustCompile(`(?m)^\s*\{\{#if DEBUG_ENABLED\}\}\n.*?port "debug".*?\n.*?\}\n\s*\{\{/if\}\}\n?`)
+		result = debugPortRe.ReplaceAllString(result, "")
+		
+		// Remove debug env vars block
+		debugEnvRe := regexp.MustCompile(`(?m)^\s*\{\{#if DEBUG_ENABLED\}\}.*?\{\{/if\}\}\n?`)
+		result = debugEnvRe.ReplaceAllString(result, "")
 	}
 	
-	// Handle VOLUME_ENABLED (false by default)
+	// Handle VOLUME_ENABLED blocks
 	if !data.VolumeEnabled {
-		// Find and remove specific VOLUME_ENABLED blocks
-		result = strings.ReplaceAll(result, "    {{#if VOLUME_ENABLED}}\n    volume \"jvm-data\" {\n      type      = \"host\"\n      source    = \"jvm-data\"\n      read_only = false\n    }\n    {{/if}}", "")
-		result = strings.ReplaceAll(result, "      {{#if VOLUME_ENABLED}}\n        type   = \"host\"\n        source = \"jvm-data\"\n      {{/if}}", "")
+		// Remove volume definition block with surrounding whitespace
+		volumeRe := regexp.MustCompile(`(?ms)^\s*\{\{#if VOLUME_ENABLED\}\}.*?volume "jvm-data".*?\{\{/if\}\}\n?`)
+		result = volumeRe.ReplaceAllString(result, "")
+		
+		// Remove volume mount blocks
+		volumeMountRe := regexp.MustCompile(`(?ms)^\s*\{\{#if VOLUME_ENABLED\}\}.*?source = "jvm-data".*?\{\{/if\}\}\n?`)
+		result = volumeMountRe.ReplaceAllString(result, "")
 	}
 	
-	// For now, just remove all remaining conditional tags to make HCL valid
-	// This is a temporary fix to get Lane C deployment working
-	result = strings.ReplaceAll(result, "{{#if CONNECT_ENABLED}}", "")
-	result = strings.ReplaceAll(result, "{{#if VAULT_ENABLED}}", "")  
-	result = strings.ReplaceAll(result, "{{#if CONSUL_CONFIG_ENABLED}}", "")
-	result = strings.ReplaceAll(result, "{{#if GRPC_PORT}}", "")
-	result = strings.ReplaceAll(result, "{{#if DISK_SIZE}}", "")
-	result = strings.ReplaceAll(result, "{{/if}}", "")
+	// Handle CONNECT_ENABLED blocks
+	if !data.ConnectEnabled {
+		connectRe := regexp.MustCompile(`(?ms)^\s*\{\{#if CONNECT_ENABLED\}\}.*?\{\{/if\}\}\n?`)
+		result = connectRe.ReplaceAllString(result, "")
+	}
 	
-	// Clean up any remaining whitespace
-	result = regexp.MustCompile(`\n\s*\n\s*\n`).ReplaceAllString(result, "\n\n")
+	// Handle VAULT_ENABLED blocks
+	if !data.VaultEnabled {
+		vaultRe := regexp.MustCompile(`(?ms)^\s*\{\{#if VAULT_ENABLED\}\}.*?\{\{/if\}\}\n?`)
+		result = vaultRe.ReplaceAllString(result, "")
+	}
+	
+	// Handle CONSUL_CONFIG_ENABLED blocks
+	if !data.ConsulConfigEnabled {
+		consulRe := regexp.MustCompile(`(?ms)^\s*\{\{#if CONSUL_CONFIG_ENABLED\}\}.*?\{\{/if\}\}\n?`)
+		result = consulRe.ReplaceAllString(result, "")
+	}
+	
+	// Handle GRPC_PORT blocks
+	if data.GrpcPort <= 0 {
+		grpcRe := regexp.MustCompile(`(?ms)^\s*\{\{#if GRPC_PORT\}\}.*?\{\{/if\}\}\n?`)
+		result = grpcRe.ReplaceAllString(result, "")
+	}
+	
+	// Handle DISK_SIZE blocks
+	if data.DiskSize <= 0 {
+		diskRe := regexp.MustCompile(`(?ms)^\s*\{\{#if DISK_SIZE\}\}.*?\{\{/if\}\}\n?`)
+		result = diskRe.ReplaceAllString(result, "")
+	}
+	
+	// Generic cleanup: remove any remaining conditional tags (for blocks we kept)
+	result = regexp.MustCompile(`\{\{#if [A-Z_]+\}\}`).ReplaceAllString(result, "")
+	result = regexp.MustCompile(`\{\{/if\}\}`).ReplaceAllString(result, "")
+	
+	// Clean up excessive blank lines (more aggressive cleanup)
+	// First pass: reduce multiple blank lines to single blank lines
+	result = regexp.MustCompile(`\n\s*\n\s*\n+`).ReplaceAllString(result, "\n\n")
+	
+	// Second pass: remove blank lines between closing and opening braces
+	result = regexp.MustCompile(`\}\n\s*\n(\s*[a-z#])`).ReplaceAllString(result, "}\n$1")
+	
+	// Third pass: ensure no blank lines after network block close
+	result = regexp.MustCompile(`(port.*?\n.*?\})\n\s*\}`).ReplaceAllString(result, "$1\n    }")
 	
 	return result
 }
