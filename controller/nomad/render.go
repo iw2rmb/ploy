@@ -376,56 +376,71 @@ func (r *RenderData) SetDefaults() {
 // processConditionalBlocks handles {{#if CONDITION}} blocks in templates
 func processConditionalBlocks(template string, data RenderData) string {
 	result := template
-	iteration := 0
 	
-	// Process conditional blocks iteratively to handle nesting
-	for {
-		iteration++
-		// Find innermost conditional blocks (blocks that don't contain other {{#if}} blocks)
-		// Use original precise regex that only captures the conditional block content
-		innermostRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}([^{]*(?:\{[^{]|[^{])*?)\{\{/if\}\}`)
-		
-		matches := innermostRegex.FindAllStringSubmatch(result, -1)
-		if len(matches) == 0 {
-			// No more conditional blocks to process
-			break
-		}
-		
-		// DEBUG: Log what we found
-		fmt.Printf("DEBUG: Template processing iteration %d, found %d conditional blocks\n", iteration, len(matches))
-		for i, match := range matches {
-			fmt.Printf("  Block %d: condition=%s\n", i+1, match[1])
-		}
-		
-		// Process each innermost block
-		result = innermostRegex.ReplaceAllStringFunc(result, func(match string) string {
-			submatch := innermostRegex.FindStringSubmatch(match)
-			if len(submatch) < 3 {
-				return ""
-			}
-			
-			condition := submatch[1]
-			content := submatch[2]
-			
-			// Evaluate condition based on RenderData fields
-			shouldInclude := evaluateCondition(condition, data)
-			
-			// DEBUG: Log condition evaluation
-			fmt.Printf("  DEBUG: Condition %s = %t (VaultEnabled=%t, ConnectEnabled=%t, ConsulConfigEnabled=%t)\n", 
-				condition, shouldInclude, data.VaultEnabled, data.ConnectEnabled, data.ConsulConfigEnabled)
-			
-			if shouldInclude {
-				return content
-			}
-			// If condition is false, remove the block but preserve surrounding structure
-			return ""
-		})
-		
-		// Prevent infinite loops
-		if iteration > 10 {
-			fmt.Printf("DEBUG: Breaking after %d iterations to prevent infinite loop\n", iteration)
-			break
-		}
+	// Aggressive approach: handle all known conditions with simple string replacements
+	// This bypasses the regex complexity and forces the processing to work
+	
+	// Handle CONNECT_ENABLED (true by default for enhanced deployments)
+	if data.ConnectEnabled {
+		result = strings.ReplaceAll(result, "{{#if CONNECT_ENABLED}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End CONNECT_ENABLED)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire CONNECT_ENABLED blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	}
+	
+	// Handle VAULT_ENABLED (true by default for secret management)
+	if data.VaultEnabled {
+		result = strings.ReplaceAll(result, "{{#if VAULT_ENABLED}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End VAULT_ENABLED)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire VAULT_ENABLED blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	}
+	
+	// Handle CONSUL_CONFIG_ENABLED (true by default for configuration)
+	if data.ConsulConfigEnabled {
+		result = strings.ReplaceAll(result, "{{#if CONSUL_CONFIG_ENABLED}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End CONSUL_CONFIG_ENABLED)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire CONSUL_CONFIG_ENABLED blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if CONSUL_CONFIG_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	}
+	
+	// Handle VOLUME_ENABLED (false by default)
+	if data.VolumeEnabled {
+		result = strings.ReplaceAll(result, "{{#if VOLUME_ENABLED}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End VOLUME_ENABLED)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire VOLUME_ENABLED blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if VOLUME_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	}
+	
+	// Handle DEBUG_ENABLED (based on build type)
+	if data.DebugEnabled {
+		result = strings.ReplaceAll(result, "{{#if DEBUG_ENABLED}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End DEBUG_ENABLED)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire DEBUG_ENABLED blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if DEBUG_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	}
+	
+	// Handle GRPC_PORT condition (based on port > 0)
+	if data.GrpcPort > 0 {
+		result = strings.ReplaceAll(result, "{{#if GRPC_PORT}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End GRPC_PORT)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire GRPC_PORT blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if GRPC_PORT\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	}
+	
+	// Handle DISK_SIZE condition (based on size > 0)
+	if data.DiskSize > 0 {
+		result = strings.ReplaceAll(result, "{{#if DISK_SIZE}}", "")
+		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End DISK_SIZE)?`).ReplaceAllString(result, "")
+	} else {
+		// Remove entire DISK_SIZE blocks
+		result = regexp.MustCompile(`(?s)\s*\{\{#if DISK_SIZE\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
 	}
 	
 	// Clean up multiple consecutive blank lines that result from removed blocks
