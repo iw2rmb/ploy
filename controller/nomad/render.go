@@ -380,8 +380,8 @@ func processConditionalBlocks(template string, data RenderData) string {
 	// Process conditional blocks iteratively to handle nesting
 	for {
 		// Find innermost conditional blocks (blocks that don't contain other {{#if}} blocks)
-		// Updated regex to capture leading whitespace and comments for better cleanup
-		innermostRegex := regexp.MustCompile(`(?s)(\s*)(#[^\n]*\n)?\s*\{\{#if\s+(\w+)\}\}([^{]*(?:\{[^{]|[^{])*?)\{\{/if\}\}\s*`)
+		// Use original precise regex that only captures the conditional block content
+		innermostRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}([^{]*(?:\{[^{]|[^{])*?)\{\{/if\}\}`)
 		
 		matches := innermostRegex.FindAllStringSubmatch(result, -1)
 		if len(matches) == 0 {
@@ -392,32 +392,29 @@ func processConditionalBlocks(template string, data RenderData) string {
 		// Process each innermost block
 		result = innermostRegex.ReplaceAllStringFunc(result, func(match string) string {
 			submatch := innermostRegex.FindStringSubmatch(match)
-			if len(submatch) < 5 {
+			if len(submatch) < 3 {
 				return ""
 			}
 			
-			leadingWhitespace := submatch[1]
-			comment := submatch[2]
-			condition := submatch[3]
-			content := submatch[4]
+			condition := submatch[1]
+			content := submatch[2]
 			
 			// Evaluate condition based on RenderData fields
 			shouldInclude := evaluateCondition(condition, data)
 			
 			if shouldInclude {
-				// Include the comment if it exists
-				if comment != "" {
-					return leadingWhitespace + comment + content
-				}
 				return content
 			}
-			// If condition is false, remove everything including associated comment
+			// If condition is false, remove the block but preserve surrounding structure
 			return ""
 		})
 	}
 	
-	// Clean up excessive blank lines that might remain
+	// Clean up multiple consecutive blank lines that result from removed blocks
 	result = regexp.MustCompile(`\n\s*\n\s*\n`).ReplaceAllString(result, "\n\n")
+	
+	// Clean up comment lines that are left hanging without content
+	result = regexp.MustCompile(`(?m)^\s*#[^\n]*\n\s*\n`).ReplaceAllString(result, "\n")
 	
 	return result
 }
