@@ -1,4 +1,4 @@
-job "{{APP_NAME}}-lane-c" {
+job "{{APP_NAME}}" {
   datacenters = ["dc1"]
   type = "service"
   priority = 60  # High priority for JVM workloads
@@ -15,7 +15,7 @@ job "{{APP_NAME}}-lane-c" {
   }
   
   group "app" {
-    count = {{INSTANCE_COUNT}}
+    count = 1
     
     restart { 
       attempts = 3
@@ -33,7 +33,7 @@ job "{{APP_NAME}}-lane-c" {
     
     network { 
       port "http" { 
-        to = {{HTTP_PORT}} 
+        to = 8080 
       }
       port "metrics" {
         to = 9090
@@ -103,13 +103,19 @@ job "{{APP_NAME}}-lane-c" {
       }
       {{/if}}
       
+      artifact {
+        source      = "{{IMAGE_PATH}}"
+        destination = "local/"
+        mode        = "file"
+      }
+      
       config {
-        image_path = "{{IMAGE_PATH}}"
+        image_path = "local/{{APP_NAME}}.qcow2"
         args = [
           "-nographic",
-          "-smp", "{{JVM_CPUS}}",
-          "-m", "{{JVM_MEMORY}}M",
-          "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}},hostfwd=tcp::${NOMAD_PORT_jmx}-:9999",
+          "-smp", "2",
+          "-m", "512M",
+          "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:8080,hostfwd=tcp::${NOMAD_PORT_jmx}-:9999",
           "-device", "virtio-net-pci,netdev=net0"
         ]
         accelerator = "kvm"
@@ -140,7 +146,7 @@ job "{{APP_NAME}}-lane-c" {
         MAIN_CLASS = "{{MAIN_CLASS}}"
         
         # Network configuration
-        SERVER_PORT = "{{HTTP_PORT}}"
+        SERVER_PORT = "8080"
         METRICS_PORT = "9090"
         JMX_PORT = "9999"
         {{#if DEBUG_ENABLED}}
@@ -236,15 +242,13 @@ EOF
           "version-{{VERSION}}",
           "java-{{JAVA_VERSION}}",
           "traefik.enable=true",
-          "traefik.http.routers.{{APP_NAME}}-c.rule=Host(`{{APP_NAME}}-c.{{DOMAIN_SUFFIX}}`)",
-          "traefik.http.routers.{{APP_NAME}}-c.tls.certresolver=letsencrypt",
-          "traefik.http.services.{{APP_NAME}}-c.loadbalancer.healthcheck.path=/actuator/health",
-          "traefik.http.services.{{APP_NAME}}-c.loadbalancer.healthcheck.interval=10s"
+          "traefik.http.routers.{{APP_NAME}}.rule=Host(`{{APP_NAME}}.{{DOMAIN_SUFFIX}}`)",
+          "traefik.http.services.{{APP_NAME}}.loadbalancer.server.port=${NOMAD_PORT_http}"
         ]
         
         check { 
           type     = "http" 
-          path     = "/actuator/health" 
+          path     = "/health" 
           interval = "15s" 
           timeout  = "5s"
           check_restart {
@@ -252,13 +256,6 @@ EOF
             grace = "30s"
             ignore_warnings = false
           }
-        }
-        
-        check {
-          type     = "http"
-          path     = "/actuator/health/readiness"
-          interval = "30s"
-          timeout  = "10s"
         }
         
         {{#if CONNECT_ENABLED}}
@@ -316,11 +313,8 @@ EOF
       
       # JVM-optimized resources
       resources { 
-        cpu = {{CPU_LIMIT}}      # Typically 1000-2000 MHz for JVM
-        memory = {{MEMORY_LIMIT}} # Typically 512-2048 MB for JVM
-        {{#if DISK_SIZE}}
-        disk = {{DISK_SIZE}}     # For heap dumps and logs
-        {{/if}}
+        cpu = 1000      # 1000 MHz for JVM
+        memory = 512    # 512 MB for JVM
       }
       
       logs { 
