@@ -192,6 +192,11 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	s = regexp.MustCompile(`(?s)\s*\{\{#if GRPC_PORT\}\}.*?\{\{/if\}\}`).ReplaceAllString(s, "")
 	s = regexp.MustCompile(`(?s)\s*\{\{#if DISK_SIZE\}\}.*?\{\{/if\}\}`).ReplaceAllString(s, "")
 	
+	// CLEANUP: Fix malformed HCL structure left by conditional block removal
+	// Remove orphaned closing braces and clean up structure
+	s = regexp.MustCompile(`(?m)^\s*\}\s*\n\s*\}\s*\n\s*\}\s*\n`).ReplaceAllString(s, "    }\n")
+	s = regexp.MustCompile(`(?m)^\s*\}\s*\n\s*\}\s*\n`).ReplaceAllString(s, "    }\n")
+	
 	// Process conditional blocks first
 	s = processConditionalBlocks(s, data)
 	
