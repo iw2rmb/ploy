@@ -383,6 +383,13 @@ func processConditionalBlocks(template string, data RenderData) string {
 	// DEBUG: Add a marker to confirm this function is called
 	result = strings.ReplaceAll(result, "task \"osv-jvm\" {", "task \"osv-jvm\" { # CONDITIONAL_PROCESSING_EXECUTED")
 	
+	// DEBUG: Add debug marker to trace template state
+	if strings.Contains(result, "{{/if}}") {
+		result = strings.ReplaceAll(result, "{{/if}}", "{{/if}} # CLOSING_TAG_PRESENT")
+	} else {
+		result = strings.ReplaceAll(result, "# JVM-specific configuration", "# CLOSING_TAGS_MISSING - JVM-specific configuration")
+	}
+	
 	// Aggressive approach: handle all known conditions with simple string replacements
 	// This bypasses the regex complexity and forces the processing to work
 	
