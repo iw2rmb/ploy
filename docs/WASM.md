@@ -461,7 +461,7 @@ Working sample applications are available in:
 ### Testing & Validation
 
 #### Comprehensive Test Suite
-Located in `test-scripts/test-wasm-phase-implementation.sh`:
+Located in `tests/scripts/test-wasm-phase-implementation.sh`:
 - Lane detection accuracy testing
 - Build pipeline validation for all languages
 - Runtime functionality verification

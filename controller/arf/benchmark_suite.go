@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // getControllerURLForBenchmark detects the appropriate controller URL for benchmark deployment
@@ -180,12 +182,11 @@ type LogFunction func(level, stage, message, details string)
 type BenchmarkSuite struct {
 	config          *BenchmarkConfig
 	llmGenerator    LLMRecipeGenerator
-	arfEngine       ARFEngine
 	multiLangEngine MultiLanguageEngine
 	outputWriter    io.Writer
 	gitOps          *GitOperations
 	buildOps        *BuildOperations
-	openRewriteEngine *BuiltinOpenRewriteEngine
+	recipeExecutor  *RecipeExecutor
 	sandboxMgr      SandboxManager
 	logger          LogFunction // Callback for logging
 }
@@ -263,7 +264,7 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 			}
 		}
 	}
-	// For OpenRewrite-only recipes, multiLang will be nil and we'll use BuiltinOpenRewriteEngine directly
+	// For OpenRewrite-only recipes, multiLang will be nil and we'll use RecipeExecutor directly
 	
 	// Create output directory if needed
 	if config.OutputDir != "" {
@@ -276,13 +277,17 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 	controllerURL := getControllerURLForBenchmark()
 	sandboxMgr := NewDeploymentSandboxManager(controllerURL, logger)
 	
+	// Create a simple in-memory recipe storage for now
+	// In production, this would use SeaweedFS storage
+	recipeStorage := NewInMemoryRecipeStorage()
+	
 	return &BenchmarkSuite{
 		config:          config,
 		llmGenerator:    llmGen,
 		multiLangEngine: multiLang,
 		gitOps:          NewGitOperations(config.OutputDir),
 		buildOps:        NewBuildOperations(config.TimeoutPerIteration),
-		openRewriteEngine: NewBuiltinOpenRewriteEngine(),
+		recipeExecutor:  NewRecipeExecutor(recipeStorage, sandboxMgr),
 		sandboxMgr:     sandboxMgr,
 		logger:         logger,
 	}, nil
@@ -763,10 +768,44 @@ func (bs *BenchmarkSuite) detectDeploymentErrors(ctx context.Context, repoPath s
 }
 
 func (bs *BenchmarkSuite) applyOpenRewriteRecipe(ctx context.Context, repoPath string, recipeID string) error {
-	// Apply the recipe using mock OpenRewrite engine
-	result, err := bs.openRewriteEngine.ApplyRecipe(ctx, recipeID, repoPath)
+	// Try to load recipe from examples directory first
+	recipePath := filepath.Join("controller/arf/examples", recipeID + ".yaml")
+	var recipe *models.Recipe
+	var err error
+	
+	if _, statErr := os.Stat(recipePath); statErr == nil {
+		// Load from file
+		recipe, err = LoadRecipeFromFile(recipePath)
+		if err != nil {
+			return fmt.Errorf("failed to load recipe from file %s: %w", recipePath, err)
+		}
+	} else {
+		// Try to get from storage or use mock
+		result, err := bs.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, repoPath)
+		if err != nil {
+			return fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
+		}
+		
+		if !result.Success {
+			return fmt.Errorf("recipe %s failed", recipeID)
+		}
+		
+		fmt.Printf("Applied recipe %s: %d changes in %d files\n", 
+			recipeID, result.ChangesApplied, len(result.FilesModified))
+		
+		// Commit the changes to track them
+		if result.ChangesApplied > 0 {
+			commitMsg := fmt.Sprintf("Applied recipe: %s", recipeID)
+			bs.gitOps.CommitChanges(ctx, repoPath, commitMsg)
+		}
+		
+		return nil
+	}
+	
+	// Execute the loaded recipe
+	result, err := bs.recipeExecutor.ExecuteRecipeObject(ctx, recipe, repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to apply recipe %s: %w", recipeID, err)
+		return fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 	}
 	
 	if !result.Success {
@@ -778,7 +817,7 @@ func (bs *BenchmarkSuite) applyOpenRewriteRecipe(ctx context.Context, repoPath s
 	
 	// Commit the changes to track them
 	if result.ChangesApplied > 0 {
-		commitMsg := fmt.Sprintf("Applied OpenRewrite recipe: %s", recipeID)
+		commitMsg := fmt.Sprintf("Applied recipe: %s", recipeID)
 		bs.gitOps.CommitChanges(ctx, repoPath, commitMsg)
 	}
 	

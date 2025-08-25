@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // ABTestFramework defines the interface for A/B testing recipe variations
@@ -22,8 +24,8 @@ type ABTestFramework interface {
 type ABExperiment struct {
 	ID              string          `json:"id"`
 	Name            string          `json:"name"`
-	VariantA        Recipe          `json:"variant_a"`
-	VariantB        Recipe          `json:"variant_b"`
+	VariantA        *models.Recipe  `json:"variant_a"`
+	VariantB        *models.Recipe  `json:"variant_b"`
 	TrafficSplit    float64         `json:"traffic_split"`
 	MinSampleSize   int             `json:"min_sample_size"`
 	ConfidenceLevel float64         `json:"confidence_level"`
@@ -32,7 +34,7 @@ type ABExperiment struct {
 // Variant represents a recipe variant in an experiment
 type Variant struct {
 	ID         string  `json:"id"`
-	Recipe     Recipe  `json:"recipe"`
+	Recipe     *models.Recipe `json:"recipe"`
 	Weight     float64 `json:"weight"`
 	IsControl  bool    `json:"is_control"`
 }
@@ -155,26 +157,26 @@ func (f *DefaultABTestFramework) SelectVariant(ctx context.Context, experimentID
 	useVariantA := totalCount%2 == 0
 
 	if useVariantA {
-		var recipe Recipe
+		var recipe models.Recipe
 		if err := json.Unmarshal(variantAJSON, &recipe); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal variant A: %w", err)
 		}
 
 		return &Variant{
 			ID:        experimentID + "-variant-a",
-			Recipe:    recipe,
+			Recipe:    &recipe,
 			Weight:    0.5,
 			IsControl: true,
 		}, nil
 	} else {
-		var recipe Recipe
+		var recipe models.Recipe
 		if err := json.Unmarshal(variantBJSON, &recipe); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal variant B: %w", err)
 		}
 
 		return &Variant{
 			ID:        experimentID + "-variant-b",
-			Recipe:    recipe,
+			Recipe:    &recipe,
 			Weight:    0.5,
 			IsControl: false,
 		}, nil

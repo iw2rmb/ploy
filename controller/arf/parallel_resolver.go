@@ -6,6 +6,18 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	
+	"github.com/iw2rmb/ploy/controller/arf/models"
+)
+
+// Recipe category constants for backward compatibility
+const (
+	CategoryCleanup       = "cleanup"
+	CategoryModernize     = "modernization"
+	CategoryMigration     = "migration"
+	CategorySecurity      = "security"
+	CategoryPerformance   = "performance"
+	CategoryRefactoring   = "refactoring"
 )
 
 // ParallelResolver manages concurrent error resolution across multiple files/components
@@ -62,7 +74,7 @@ type ResolutionTask struct {
 
 // DefaultParallelResolver implements the ParallelResolver interface
 type DefaultParallelResolver struct {
-	engine         ARFEngine
+	recipeExecutor *RecipeExecutor
 	catalog        RecipeCatalog
 	circuitBreaker CircuitBreaker
 	maxWorkers     int
@@ -78,14 +90,14 @@ type DefaultParallelResolver struct {
 }
 
 // NewParallelResolver creates a new parallel error resolver
-func NewParallelResolver(engine ARFEngine, catalog RecipeCatalog, cb CircuitBreaker) ParallelResolver {
+func NewParallelResolver(executor *RecipeExecutor, catalog RecipeCatalog, cb CircuitBreaker) ParallelResolver {
 	maxWorkers := runtime.NumCPU()
 	if maxWorkers > 8 {
 		maxWorkers = 8 // Cap at 8 for reasonable resource usage
 	}
 	
 	resolver := &DefaultParallelResolver{
-		engine:         engine,
+		recipeExecutor: executor,
 		catalog:        catalog,
 		circuitBreaker: cb,
 		maxWorkers:     maxWorkers,
@@ -382,7 +394,7 @@ func (pr *DefaultParallelResolver) resolveError(ctx context.Context, transformat
 }
 
 // findRecipesForError finds recipes that can potentially resolve the given error
-func (pr *DefaultParallelResolver) findRecipesForError(ctx context.Context, error TransformationError) ([]Recipe, error) {
+func (pr *DefaultParallelResolver) findRecipesForError(ctx context.Context, error TransformationError) ([]*models.Recipe, error) {
 	// Search for recipes based on error type and context
 	filters := RecipeFilters{
 		Category: CategoryCleanup, // Default to cleanup, could be more sophisticated
@@ -404,30 +416,23 @@ func (pr *DefaultParallelResolver) findRecipesForError(ctx context.Context, erro
 	}
 	
 	// Filter and rank recipes by relevance to the error
-	relevant := make([]Recipe, 0)
+	relevant := make([]*models.Recipe, 0)
 	for _, recipe := range recipes {
 		if pr.isRecipeRelevant(recipe, error) {
 			relevant = append(relevant, recipe)
 		}
 	}
 	
-	// Sort by confidence (highest first)
-	for i := 0; i < len(relevant)-1; i++ {
-		for j := i + 1; j < len(relevant); j++ {
-			if relevant[i].Confidence < relevant[j].Confidence {
-				relevant[i], relevant[j] = relevant[j], relevant[i]
-			}
-		}
-	}
+	// TODO: Add sorting by relevance score when metadata is available
 	
 	return relevant, nil
 }
 
 // isRecipeRelevant determines if a recipe is relevant for resolving the given error
-func (pr *DefaultParallelResolver) isRecipeRelevant(recipe Recipe, error TransformationError) bool {
+func (pr *DefaultParallelResolver) isRecipeRelevant(recipe *models.Recipe, error TransformationError) bool {
 	// Simple relevance check based on keywords in recipe name/description
 	errorKeywords := []string{error.Type, error.Message}
-	recipeText := recipe.Name + " " + recipe.Description
+	recipeText := recipe.Metadata.Name + " " + recipe.Metadata.Description
 	
 	for _, keyword := range errorKeywords {
 		if keyword != "" && len(keyword) > 3 { // Avoid very short keywords
@@ -442,7 +447,7 @@ func (pr *DefaultParallelResolver) isRecipeRelevant(recipe Recipe, error Transfo
 }
 
 // applyRecipeToError applies a specific recipe to resolve an error
-func (pr *DefaultParallelResolver) applyRecipeToError(ctx context.Context, recipe Recipe, transformationError TransformationError, codebase Codebase) error {
+func (pr *DefaultParallelResolver) applyRecipeToError(ctx context.Context, recipe *models.Recipe, transformationError TransformationError, codebase Codebase) error {
 	// Create a focused codebase containing only the problematic file
 	focusedCodebase := Codebase{
 		Repository: codebase.Repository,
@@ -453,7 +458,7 @@ func (pr *DefaultParallelResolver) applyRecipeToError(ctx context.Context, recip
 	}
 	
 	// Execute the recipe on the focused codebase
-	result, err := pr.engine.ExecuteRecipe(ctx, recipe, focusedCodebase)
+	result, err := pr.recipeExecutor.ExecuteRecipeObject(ctx, recipe, focusedCodebase.Path)
 	if err != nil {
 		return fmt.Errorf("recipe execution failed: %w", err)
 	}

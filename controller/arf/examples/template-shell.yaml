@@ -1,0 +1,141 @@
+# Template for shell script-based transformation recipe
+metadata:
+  name: "example-shell-recipe"
+  description: "Example recipe using shell scripts for code transformation"
+  version: "1.0.0"
+  author: "your-name"
+  tags:
+    - "shell"
+    - "automation"
+    - "devops"
+  categories:
+    - "automation"
+    - "deployment"
+  languages:
+    - "shell"
+    - "any"
+  license: "MIT"
+  documentation: "https://docs.example.com/recipes/shell"
+
+steps:
+  - name: "Prepare Environment"
+    type: "shell"
+    description: "Set up the working environment"
+    config:
+      commands:
+        - "echo 'Starting transformation process...'"
+        - "export TRANSFORMATION_DATE=$(date +%Y%m%d)"
+        - "mkdir -p backup/$TRANSFORMATION_DATE"
+      shell: "/bin/bash"
+      working_dir: "."
+    on_error: "fail"
+    timeout: "2m"
+
+  - name: "Backup Current State"
+    type: "shell"
+    description: "Create backup of current code"
+    config:
+      commands:
+        - "cp -r src backup/$TRANSFORMATION_DATE/"
+        - "git diff > backup/$TRANSFORMATION_DATE/uncommitted.patch"
+      shell: "/bin/bash"
+    on_error: "fail"
+    timeout: "5m"
+
+  - name: "Update Configuration Files"
+    type: "shell"
+    description: "Modify configuration using sed"
+    config:
+      commands:
+        - |
+          find . -name "*.properties" -type f -exec sed -i.bak \
+            -e 's/spring.version=2.7.0/spring.version=3.0.0/g' \
+            -e 's/java.version=11/java.version=17/g' {} \;
+        - |
+          find . -name "*.yaml" -type f -exec sed -i.bak \
+            -e 's/version: 2.7.0/version: 3.0.0/g' {} \;
+      shell: "/bin/bash"
+    on_error: "continue"
+    timeout: "5m"
+
+  - name: "Run Custom Transformation Script"
+    type: "shell"
+    description: "Execute project-specific transformation"
+    config:
+      script: |
+        #!/bin/bash
+        set -e
+        
+        # Custom transformation logic
+        echo "Running custom transformations..."
+        
+        # Example: Update import statements
+        find src -name "*.java" -type f | while read file; do
+          sed -i 's/javax\./jakarta\./g' "$file"
+        done
+        
+        # Example: Update configuration
+        if [ -f "application.yml" ]; then
+          yq eval '.spring.version = "3.0.0"' -i application.yml
+        fi
+        
+        echo "Custom transformations completed"
+      shell: "/bin/bash"
+    conditions:
+      - type: "command_available"
+        value: "yq"
+    on_error: "continue"
+    timeout: "10m"
+
+  - name: "Verify Changes"
+    type: "shell"
+    description: "Verify the transformation results"
+    config:
+      commands:
+        - "echo 'Verifying changes...'"
+        - "git diff --stat"
+        - "find . -name '*.bak' -type f | wc -l"
+      shell: "/bin/bash"
+    on_error: "continue"
+    timeout: "2m"
+
+  - name: "Cleanup"
+    type: "shell"
+    description: "Remove temporary files"
+    config:
+      commands:
+        - "find . -name '*.bak' -type f -delete"
+        - "echo 'Transformation completed successfully'"
+      shell: "/bin/bash"
+    on_error: "continue"
+    timeout: "2m"
+
+execution:
+  parallel: false
+  timeout: "30m"
+  resource_limits:
+    cpu: "1"
+    memory: "2Gi"
+  environment:
+    SHELL: "/bin/bash"
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+
+validation:
+  pre_conditions:
+    - type: "command_available"
+      config:
+        commands:
+          - "bash"
+          - "sed"
+          - "find"
+          - "git"
+  
+  post_conditions:
+    - type: "file_exists"
+      config:
+        paths:
+          - "backup/$TRANSFORMATION_DATE"
+    - type: "shell_command"
+      config:
+        command: "test $(find . -name '*.bak' -type f | wc -l) -eq 0"
+        must_succeed: true

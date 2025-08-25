@@ -1,826 +1,629 @@
-# Phase ARF-5: Production Features & Scale
+# Phase ARF-5: Generic Recipe Management System
 
-**Duration**: Enterprise scale and integration phase
-**Prerequisites**: Phase ARF-4 completed with security and production hardening
-**Dependencies**: Enterprise integrations, analytics infrastructure, compliance systems
+**Duration**: 6-8 weeks for complete recipe management platform
+**Prerequisites**: Phase ARF-4 completed with deployment integration and benchmark system
+**Dependencies**: Recipe storage system, CLI integration, OpenRewrite tooling
+**Status**: 📋 **PLANNED** - Universal code transformation platform (2025)
 
 ## Overview
 
-Phase ARF-5 represents the culmination of the Automated Remediation Framework, delivering enterprise-scale capabilities, comprehensive analytics, extensive integration ecosystem, and full production readiness. This phase transforms ARF from a sophisticated transformation tool into a complete enterprise platform for code modernization and maintenance.
+Phase ARF-5 transforms ARF from a hardcoded Java migration tool into a **universal code transformation platform** with user-controlled recipe management. This phase replaces fixed transformation logic with a flexible, generic recipe system that allows users to upload, manage, and execute custom transformation recipes alongside built-in OpenRewrite recipes.
+
+The generic recipe management system enables organizations to create, share, and maintain their own transformation logic while leveraging the full power of ARF's deployment integration, benchmarking, and error recovery capabilities.
 
 ## Technical Architecture
 
 ### Core Components
-- **Multi-Repository Campaign Manager**: Coordinating hundreds of repositories
-- **Business Analytics Engine**: ROI measurement and executive reporting
-- **Integration Ecosystem**: REST APIs, CLI tools, and SDK libraries
-- **Compliance Framework**: Audit logging and regulatory reporting
+- **Recipe Management Engine**: CRUD operations for user-defined recipes
+- **Generic Recipe Executor**: Plugin-based execution framework supporting multiple recipe types
+- **Recipe Storage System**: Metadata indexing, search, and filtering capabilities
+- **CLI Recipe Interface**: Complete command-line interface for recipe lifecycle management
 
 ### Integration Points
-- **Enterprise Systems**: JIRA, ServiceNow, Azure DevOps, Jenkins
-- **Analytics Platforms**: Tableau, PowerBI, Grafana dashboards
-- **Compliance Systems**: GRC platforms, audit management tools
-- **External APIs**: GitHub Enterprise, GitLab, Bitbucket integration
+- **ARF Benchmark System**: Execute user recipes through existing benchmark infrastructure
+- **OpenRewrite Integration**: Dynamic configuration generation for real OpenRewrite execution
+- **Lane C Deployment**: Deploy transformed applications through existing OSv pipeline
+- **Template Processing**: Recipe metadata integration with deployment templates
 
-## Implementation Tasks
+## Implementation Phases
 
-### 1. Multi-Repository Scale Management
+### Phase ARF-5.1: Recipe Data Model & Storage (2 weeks)
 
-**Objective**: Enable coordinated transformation campaigns across hundreds of repositories with sophisticated dependency management and impact assessment.
+**Objective**: Create foundational recipe management infrastructure with storage, validation, and metadata management.
 
-**Tasks**:
-- Implement mid-scale multi-repository coordination (hundreds of repos)
-- Add cross-repository dependency analysis and impact assessment
-- Create organization-wide transformation campaigns with progress tracking
-- Implement repository prioritization and resource allocation
-- Add transformation scheduling and queue management
+#### Core Data Structures
 
-**Deliverables**:
 ```go
-// controller/arf/campaign_manager.go
-type CampaignManager interface {
-    CreateCampaign(ctx context.Context, campaign Campaign) (*CampaignResult, error)
-    ExecuteCampaign(ctx context.Context, campaignID string) (*ExecutionPlan, error)
-    GetCampaignStatus(campaignID string) (*CampaignStatus, error)
-    PauseCampaign(campaignID string) error
-    ResumeCampaign(campaignID string) error
-    CancelCampaign(campaignID string) error
-    GenerateCampaignReport(campaignID string) (*CampaignReport, error)
+// controller/arf/recipe.go
+type Recipe struct {
+    Metadata    RecipeMetadata     `json:"metadata" yaml:"metadata"`
+    Recipes     []RecipeStep       `json:"recipes" yaml:"recipes"`
+    Execution   ExecutionConfig    `json:"execution" yaml:"execution"`
+    CreatedAt   time.Time          `json:"created_at"`
+    UpdatedAt   time.Time          `json:"updated_at"`
 }
 
-type Campaign struct {
-    ID                  string                    `json:"id"`
-    Name                string                    `json:"name"`
-    Description         string                    `json:"description"`
-    Repositories        []RepositoryTarget        `json:"repositories"`
-    Transformations     []TransformationSpec      `json:"transformations"`
-    Schedule            CampaignSchedule          `json:"schedule"`
-    Priorities          RepositoryPriorities      `json:"priorities"`
-    ResourceLimits      ResourceLimits            `json:"resource_limits"`
-    Notifications       []NotificationConfig      `json:"notifications"`
-    RollbackStrategy    RollbackStrategy          `json:"rollback_strategy"`
+type RecipeMetadata struct {
+    ID          string            `json:"id" yaml:"id"`
+    Name        string            `json:"name" yaml:"name"`
+    Description string            `json:"description" yaml:"description"`
+    Version     string            `json:"version" yaml:"version"`
+    Author      string            `json:"author" yaml:"author"`
+    Language    string            `json:"language" yaml:"language"`
+    Tags        []string          `json:"tags" yaml:"tags"`
+    Homepage    string            `json:"homepage,omitempty" yaml:"homepage,omitempty"`
+    Repository  string            `json:"repository,omitempty" yaml:"repository,omitempty"`
 }
 
-type RepositoryTarget struct {
-    Repository      Repository              `json:"repository"`
-    Priority        int                     `json:"priority"`
-    Dependencies    []string                `json:"dependencies"`
-    ImpactAnalysis  ImpactAnalysis         `json:"impact_analysis"`
-    Constraints     []RepositoryConstraint `json:"constraints"`
-    CustomConfig    map[string]interface{} `json:"custom_config"`
+type RecipeStep struct {
+    Type        string                 `json:"type" yaml:"type"`           // openrewrite, script, composite
+    ID          string                 `json:"id,omitempty" yaml:"id,omitempty"`
+    Script      string                 `json:"script,omitempty" yaml:"script,omitempty"`
+    Config      map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
+    Condition   string                 `json:"condition,omitempty" yaml:"condition,omitempty"`
 }
 
-type CampaignStatus struct {
-    ID              string                    `json:"id"`
-    Status          CampaignState            `json:"status"`
-    Progress        CampaignProgress         `json:"progress"`
-    Timeline        CampaignTimeline         `json:"timeline"`
-    ResourceUsage   ResourceUsageMetrics     `json:"resource_usage"`
-    Issues          []CampaignIssue          `json:"issues"`
-    NextActions     []RecommendedAction      `json:"next_actions"`
-}
-
-type CampaignProgress struct {
-    TotalRepositories     int                    `json:"total_repositories"`
-    CompletedRepositories int                    `json:"completed_repositories"`
-    FailedRepositories    int                    `json:"failed_repositories"`
-    InProgressRepositories int                   `json:"in_progress_repositories"`
-    PercentComplete       float64               `json:"percent_complete"`
-    EstimatedCompletion   time.Time             `json:"estimated_completion"`
-    DetailedProgress      map[string]RepoProgress `json:"detailed_progress"`
+type ExecutionConfig struct {
+    StopOnFailure   bool          `json:"stop_on_failure" yaml:"stop_on_failure"`
+    MaxIterations   int           `json:"max_iterations" yaml:"max_iterations"`
+    Timeout         time.Duration `json:"timeout" yaml:"timeout"`
+    RetryOnFailure  bool          `json:"retry_on_failure" yaml:"retry_on_failure"`
+    Environment     map[string]string `json:"environment,omitempty" yaml:"environment,omitempty"`
 }
 ```
 
-**Acceptance Criteria**:
-- Campaign management supports 200-500 repositories per campaign
-- Cross-repository dependency analysis correctly identifies impact chains
-- Resource allocation prevents system overload during large campaigns
-- Progress tracking provides real-time visibility into campaign status
-- Repository prioritization optimizes transformation order for business value
+#### Recipe Storage Interface
 
-### 2. Advanced Analytics & Reporting with Cost Optimization
-
-**Objective**: Provide comprehensive business intelligence and executive reporting with ROI measurement, cost optimization, and predictive insights.
-
-**Tasks**:
-- Create comprehensive transformation analytics dashboard
-- Implement business impact measurement (time savings, error reduction)
-- Add transformation success rate tracking and trend analysis
-- Create executive reporting with ROI calculations
-- Implement predictive analysis for transformation success probability
-- Add cost optimization recommendations and tracking
-- Implement LLM API cost management and budgeting
-- Create resource usage prediction models
-
-**Deliverables**:
 ```go
-// controller/arf/analytics_engine.go
-type AnalyticsEngine interface {
-    GenerateBusinessMetrics(ctx context.Context, timeframe TimeFrame) (*BusinessMetrics, error)
-    CalculateROI(ctx context.Context, campaign Campaign) (*ROIAnalysis, error)
-    GenerateExecutiveReport(ctx context.Context, request ReportRequest) (*ExecutiveReport, error)
-    PredictTransformationSuccess(ctx context.Context, repository Repository) (*SuccessPrediction, error)
-    TrackTrends(ctx context.Context, metrics []MetricType) (*TrendAnalysis, error)
-    ExportAnalytics(ctx context.Context, format ExportFormat) (*AnalyticsExport, error)
-}
-
-type BusinessMetrics struct {
-    TimeSavings          TimeSavingsMetrics      `json:"time_savings"`
-    ErrorReduction       ErrorReductionMetrics   `json:"error_reduction"`
-    ProductivityGains    ProductivityMetrics     `json:"productivity_gains"`
-    SecurityImprovements SecurityMetrics         `json:"security_improvements"`
-    ComplianceMetrics    ComplianceMetrics       `json:"compliance_metrics"`
-    CostSavings          CostSavingsMetrics      `json:"cost_savings"`
-    LLMCosts             LLMCostMetrics          `json:"llm_costs"`
-    Optimizations        []CostOptimization      `json:"optimizations"`
-}
-
-// Cost optimization structures
-type CostOptimization struct {
-    Category        string          `json:"category"`
-    CurrentCost     float64         `json:"current_cost"`
-    OptimizedCost   float64         `json:"optimized_cost"`
-    Savings         float64         `json:"savings"`
-    Implementation  string          `json:"implementation"`
-    Confidence      float64         `json:"confidence"`
-}
-
-type LLMCostMetrics struct {
-    TotalTokens     int             `json:"total_tokens"`
-    TotalCost       float64         `json:"total_cost"`
-    CostPerRepo     float64         `json:"cost_per_repo"`
-    BudgetUsed      float64         `json:"budget_used"`
-    ProjectedCost   float64         `json:"projected_cost"`
-    Optimizations   []LLMOptimization `json:"optimizations"`
-}
-
-type ROIAnalysis struct {
-    TotalInvestment     MonetaryValue          `json:"total_investment"`
-    DirectSavings       MonetaryValue          `json:"direct_savings"`
-    IndirectBenefits    []IndirectBenefit      `json:"indirect_benefits"`
-    PaybackPeriod       time.Duration          `json:"payback_period"`
-    ROIPercentage       float64                `json:"roi_percentage"`
-    NPV                 MonetaryValue          `json:"npv"`
-    IRR                 float64                `json:"irr"`
-    RiskAdjustedROI     float64                `json:"risk_adjusted_roi"`
-}
-
-type ExecutiveReport struct {
-    Summary             ExecutiveSummary       `json:"summary"`
-    KeyMetrics          []KeyMetric           `json:"key_metrics"`
-    Achievements        []Achievement         `json:"achievements"`
-    Challenges          []Challenge           `json:"challenges"`
-    Recommendations     []Recommendation      `json:"recommendations"`
-    FutureOutlook       FutureOutlook         `json:"future_outlook"`
-    Appendices          []ReportAppendix      `json:"appendices"`
-}
-
-type SuccessPrediction struct {
-    Repository          Repository             `json:"repository"`
-    PredictedSuccess    float64               `json:"predicted_success"`
-    ConfidenceInterval  ConfidenceInterval    `json:"confidence_interval"`
-    RiskFactors         []RiskFactor          `json:"risk_factors"`
-    SuccessFactors      []SuccessFactor       `json:"success_factors"`
-    Recommendations     []PredictiveRecommendation `json:"recommendations"`
-}
-```
-
-**Acceptance Criteria**:
-- Analytics dashboard provides real-time business intelligence
-- ROI calculations demonstrate measurable business value (target: 300%+ ROI)
-- Executive reports deliver actionable insights for strategic decision-making
-- Predictive analysis achieves 85%+ accuracy in success prediction
-- Trend analysis identifies patterns and optimization opportunities
-
-### 3. Integration & API Ecosystem
-
-**Objective**: Create comprehensive integration capabilities with REST APIs, CLI tools, and SDK libraries for seamless enterprise ecosystem integration.
-
-**Tasks**:
-- Create REST API endpoints for external integration (`/v1/arf/*`)
-- Add CLI commands: `ploy arf transform`, `ploy arf status`, `ploy arf recipes`
-- Implement webhook system for real-time transformation events
-- Create basic SDK libraries for external system integration
-- Add transformation result export capabilities
-
-**Deliverables**:
-```go
-// controller/arf/api_gateway.go
-type APIGateway interface {
-    RegisterEndpoints(router *mux.Router) error
-    AuthenticateRequest(ctx context.Context, request *http.Request) (*AuthContext, error)
-    ValidatePermissions(ctx context.Context, auth AuthContext, resource string) error
-    RateLimitRequest(ctx context.Context, clientID string) error
-    LogAPIUsage(ctx context.Context, request APIRequest, response APIResponse) error
-}
-
-// CLI integration
-type CLIIntegration interface {
-    TransformCommand(args []string) error
-    StatusCommand(args []string) error
-    RecipeCommand(args []string) error
-    CampaignCommand(args []string) error
-    AnalyticsCommand(args []string) error
-}
-
-// SDK interfaces
-type ARFSDKGo interface {
-    CreateTransformation(ctx context.Context, request TransformationRequest) (*TransformationResponse, error)
-    GetTransformationStatus(ctx context.Context, id string) (*TransformationStatus, error)
-    CreateCampaign(ctx context.Context, campaign Campaign) (*CampaignResponse, error)
-    GetAnalytics(ctx context.Context, request AnalyticsRequest) (*AnalyticsResponse, error)
-}
-
-// Webhook system
-type WebhookManager interface {
-    RegisterWebhook(ctx context.Context, webhook WebhookConfig) error
-    UnregisterWebhook(ctx context.Context, webhookID string) error
-    SendWebhookEvent(ctx context.Context, event WebhookEvent) error
-    GetWebhookHistory(ctx context.Context, webhookID string) (*WebhookHistory, error)
-}
-```
-
-**REST API Endpoints**:
-```yaml
-# Transformation Management
-POST   /v1/arf/transformations        # Create transformation
-GET    /v1/arf/transformations        # List transformations
-GET    /v1/arf/transformations/{id}   # Get transformation details
-DELETE /v1/arf/transformations/{id}   # Cancel transformation
-
-# Campaign Management  
-POST   /v1/arf/campaigns              # Create campaign
-GET    /v1/arf/campaigns              # List campaigns
-GET    /v1/arf/campaigns/{id}         # Get campaign status
-PUT    /v1/arf/campaigns/{id}/pause   # Pause campaign
-PUT    /v1/arf/campaigns/{id}/resume  # Resume campaign
-
-# Recipe Management
-GET    /v1/arf/recipes                # List available recipes
-GET    /v1/arf/recipes/{id}           # Get recipe details
-POST   /v1/arf/recipes/search         # Search recipes
-POST   /v1/arf/recipes/generate       # Generate custom recipe
-
-# Analytics & Reporting
-GET    /v1/arf/analytics/metrics      # Get business metrics
-GET    /v1/arf/analytics/roi          # Get ROI analysis
-POST   /v1/arf/analytics/reports      # Generate custom report
-GET    /v1/arf/analytics/trends       # Get trend analysis
-
-# Integration & Webhooks
-POST   /v1/arf/webhooks               # Register webhook
-GET    /v1/arf/webhooks               # List webhooks
-DELETE /v1/arf/webhooks/{id}          # Unregister webhook
-```
-
-**CLI Commands**:
-```bash
-# Transformation operations
-ploy arf transform --repository github.com/company/app --recipe spring-boot-3
-ploy arf status --transformation trans-123
-ploy arf cancel --transformation trans-123
-
-# Campaign operations
-ploy arf campaign create --config campaign.yaml
-ploy arf campaign status --campaign camp-456
-ploy arf campaign pause --campaign camp-456
-
-# Recipe operations
-ploy arf recipes list --category security
-ploy arf recipes search --query "spring boot migration"
-ploy arf recipes generate --cve CVE-2023-12345
-
-# Analytics operations
-ploy arf analytics --timeframe 30d --format json
-ploy arf report --type executive --output report.pdf
-```
-
-**Acceptance Criteria**:
-- REST API provides complete programmatic access to ARF functionality
-- CLI commands integrate seamlessly with existing `ploy` command structure
-- SDK libraries support Go, Python, and JavaScript/TypeScript
-- Webhook system delivers real-time events with 99.9% reliability
-- Export capabilities support JSON, CSV, PDF, and Excel formats
-
-### 4. Production Security & Compliance
-
-**Objective**: Implement enterprise-grade security, authentication, authorization, and comprehensive compliance reporting for regulatory requirements.
-
-**Tasks**:
-- Implement basic authentication and authorization (API keys)
-- Add audit logging for transformation activities
-- Create transformation approval workflows with webhook integration
-- Implement data privacy controls for sensitive code transformations
-- Add basic compliance reporting for code transformation activities
-
-**Deliverables**:
-```go
-// controller/arf/security_compliance.go
-type SecurityCompliance interface {
-    AuthenticateUser(ctx context.Context, credentials AuthCredentials) (*UserContext, error)
-    AuthorizeAction(ctx context.Context, user UserContext, action string) error
-    LogAuditEvent(ctx context.Context, event AuditEvent) error
-    GenerateComplianceReport(ctx context.Context, framework ComplianceFramework) (*ComplianceReport, error)
-    ValidateDataPrivacy(ctx context.Context, data SensitiveData) (*PrivacyValidation, error)
-    EncryptSensitiveData(ctx context.Context, data []byte) (*EncryptedData, error)
-}
-
-type AuthCredentials struct {
-    Type        AuthType               `json:"type"`
-    APIKey      string                 `json:"api_key,omitempty"`
-    JWT         string                 `json:"jwt,omitempty"`
-    Certificate *x509.Certificate      `json:"certificate,omitempty"`
-    OAuth       *OAuthCredentials      `json:"oauth,omitempty"`
-}
-
-type UserContext struct {
-    UserID      string                 `json:"user_id"`
-    Username    string                 `json:"username"`
-    Roles       []Role                 `json:"roles"`
-    Permissions []Permission           `json:"permissions"`
-    Groups      []Group                `json:"groups"`
-    Attributes  map[string]interface{} `json:"attributes"`
-}
-
-type AuditEvent struct {
-    ID          string                 `json:"id"`
-    Timestamp   time.Time              `json:"timestamp"`
-    User        UserContext            `json:"user"`
-    Action      string                 `json:"action"`
-    Resource    string                 `json:"resource"`
-    Details     map[string]interface{} `json:"details"`
-    Result      AuditResult            `json:"result"`
-    IPAddress   string                 `json:"ip_address"`
-    UserAgent   string                 `json:"user_agent"`
-}
-
-type ComplianceReport struct {
-    Framework           ComplianceFramework    `json:"framework"`
-    GeneratedAt         time.Time              `json:"generated_at"`
-    ReportingPeriod     TimeRange              `json:"reporting_period"`
-    ControlAssessments  []ControlAssessment    `json:"control_assessments"`
-    Violations          []ComplianceViolation  `json:"violations"`
-    Recommendations     []ComplianceRecommendation `json:"recommendations"`
-    AttestationRequired bool                   `json:"attestation_required"`
-}
-```
-
-**Acceptance Criteria**:
-- Authentication supports API keys, JWT tokens, OAuth, and certificate-based auth
-- Authorization provides fine-grained access control based on roles and permissions
-- Audit logging captures 100% of transformation activities with immutable records
-- Compliance reporting supports SOX, NIST, ISO27001, and custom frameworks
-- Data privacy controls protect sensitive code and credentials throughout transformation lifecycle
-
-### 5. WASM Integration for Lane G
-
-**Objective**: Integrate WebAssembly-specific transformations for Ploy's fully-implemented Lane G runtime.
-
-**Tasks**:
-- Create WASM optimization recipes for size and performance
-- Implement WASI polyfill transformations
-- Add WebAssembly module composition capabilities
-- Support WASM component model transformations
-- Create cross-compilation transformation workflows
-
-**Deliverables**:
-```go
-// controller/arf/wasm_integration.go
-type WASMIntegration interface {
-    OptimizeWASMModule(ctx context.Context, module WASMModule) (*OptimizedModule, error)
-    InjectPolyfills(ctx context.Context, module WASMModule, required []string) (*WASMModule, error)
-    ComposeModules(ctx context.Context, modules []WASMModule) (*ComposedModule, error)
-    TransformToComponent(ctx context.Context, module WASMModule) (*ComponentModule, error)
-    CrossCompile(ctx context.Context, source SourceCode, target WASMTarget) (*WASMModule, error)
-}
-
-type WASMModule struct {
-    ID              string              `json:"id"`
-    Name            string              `json:"name"`
-    Size            int64               `json:"size"`
-    Format          string              `json:"format"`
-    Runtime         string              `json:"runtime"`
-    Imports         []WASMImport        `json:"imports"`
-    Exports         []WASMExport        `json:"exports"`
-    Optimizations   []WASMOptimization  `json:"optimizations"`
-}
-
-type WASMOptimization struct {
-    Type            string              `json:"type"`
-    SizeReduction   int64               `json:"size_reduction"`
-    Performance     float64             `json:"performance"`
-    Applied         bool                `json:"applied"`
-}
-
-type WASMTransformationRecipe struct {
-    Recipe
-    OptLevel        int                 `json:"opt_level"`
-    StripDebug      bool                `json:"strip_debug"`
-    Polyfills       []string            `json:"polyfills"`
-    TargetRuntime   string              `json:"target_runtime"`
-    ComponentModel  bool                `json:"component_model"`
-}
-```
-
-**WASM-Specific Transformations**:
-```yaml
-# configs/arf-wasm-transformations.yaml
-wasm_transformations:
-  optimizations:
-    - name: "size_optimization"
-      wasm-opt_flags: ["-Os", "--strip-debug", "--strip-producers"]
-      target_reduction: 30
-      
-    - name: "performance_optimization"
-      wasm-opt_flags: ["-O3", "--inline-functions"]
-      target_improvement: 20
-      
-  polyfills:
-    - name: "fs_polyfill"
-      when: "wasi_snapshot_preview1"
-      inject: ["@wasmer/wasi-fs"]
-      
-    - name: "network_polyfill"
-      when: "socket_imports"
-      inject: ["@wasmer/wasi-net"]
-      
-  component_model:
-    interface_types: true
-    module_linking: true
-    shared_memory: false
-```
-
-**Acceptance Criteria**:
-- WASM module size reduction of 30%+ through optimization
-- Polyfill injection success rate >95%
-- Component model transformation preserves functionality
-- Cross-compilation supports 5+ source languages
-- Integration with wazero runtime validated
-
-### 6. Operational Monitoring & Alerting
-
-**Objective**: Implement comprehensive operational monitoring with SLI/SLO tracking and intelligent alerting.
-
-**Tasks**:
-- Define comprehensive SLIs and SLOs for ARF operations
-- Create Prometheus metrics for all critical paths
-- Implement intelligent alerting with anomaly detection
-- Add distributed tracing for transformation workflows
-- Create operational runbooks for incident response
-
-**Deliverables**:
-```go
-// controller/arf/operational_monitoring.go
-type OperationalMonitoring interface {
-    DefineSLI(ctx context.Context, sli SLI) error
-    DefineSLO(ctx context.Context, slo SLO) error
-    RecordMetric(ctx context.Context, metric Metric) error
-    DetectAnomaly(ctx context.Context, metrics []Metric) (*Anomaly, error)
-    GenerateRunbook(ctx context.Context, incident Incident) (*Runbook, error)
-    CreateDashboard(ctx context.Context, config DashboardConfig) (*Dashboard, error)
-}
-
-type SLI struct {
-    Name            string              `json:"name"`
-    Query           string              `json:"query"`
-    Unit            string              `json:"unit"`
-    AggregationFunc string              `json:"aggregation_func"`
-}
-
-type SLO struct {
-    Name            string              `json:"name"`
-    SLI             string              `json:"sli"`
-    Target          float64             `json:"target"`
-    Window          time.Duration       `json:"window"`
-    ErrorBudget     float64             `json:"error_budget"`
-    AlertPolicy     AlertPolicy         `json:"alert_policy"`
-}
-
-type Anomaly struct {
-    ID              string              `json:"id"`
-    Metric          string              `json:"metric"`
-    DetectedAt      time.Time           `json:"detected_at"`
-    Severity        string              `json:"severity"`
-    Deviation       float64             `json:"deviation"`
-    PredictedCause  string              `json:"predicted_cause"`
-}
-
-type Runbook struct {
-    IncidentType    string              `json:"incident_type"`
-    Steps           []RunbookStep       `json:"steps"`
-    Automation      []AutomationAction  `json:"automation"`
-    Escalation      EscalationPolicy    `json:"escalation"`
-    PostMortem      PostMortemTemplate  `json:"post_mortem"`
-}
-```
-
-**SLI/SLO Definitions**:
-```yaml
-# configs/arf-slo-config.yaml
-slis:
-  - name: "transformation_success_rate"
-    query: "rate(arf_transformation_total{status='success'}[5m])"
+// controller/arf/recipe_store.go
+type RecipeStore interface {
+    // CRUD Operations
+    CreateRecipe(ctx context.Context, recipe *Recipe) error
+    GetRecipe(ctx context.Context, id string) (*Recipe, error)
+    UpdateRecipe(ctx context.Context, recipe *Recipe) error
+    DeleteRecipe(ctx context.Context, id string) error
     
-  - name: "api_latency_p99"
-    query: "histogram_quantile(0.99, arf_api_duration_seconds)"
+    // Query Operations
+    ListRecipes(ctx context.Context, filters RecipeFilters) ([]*Recipe, error)
+    SearchRecipes(ctx context.Context, query string) ([]*Recipe, error)
+    GetRecipesByAuthor(ctx context.Context, author string) ([]*Recipe, error)
+    GetRecipesByLanguage(ctx context.Context, language string) ([]*Recipe, error)
+    GetRecipesByTags(ctx context.Context, tags []string) ([]*Recipe, error)
     
-  - name: "campaign_throughput"
-    query: "rate(arf_campaign_repos_processed[1h])"
+    // Metadata Operations
+    ValidateRecipe(recipe *Recipe) error
+    GetRecipeStats() (*RecipeStats, error)
+}
 
-slos:
-  - name: "transformation_reliability"
-    sli: "transformation_success_rate"
-    target: 0.95
-    window: "30d"
-    error_budget: 0.05
+type RecipeFilters struct {
+    Language    string   `json:"language,omitempty"`
+    Tags        []string `json:"tags,omitempty"`
+    Author      string   `json:"author,omitempty"`
+    MinVersion  string   `json:"min_version,omitempty"`
+    MaxVersion  string   `json:"max_version,omitempty"`
+    Limit       int      `json:"limit,omitempty"`
+    Offset      int      `json:"offset,omitempty"`
+}
+```
+
+#### File-Based Storage Implementation
+
+```go
+// controller/arf/file_recipe_store.go
+type FileRecipeStore struct {
+    basePath    string
+    indexCache  map[string]*Recipe
+    mutex       sync.RWMutex
+}
+
+func NewFileRecipeStore(basePath string) (*FileRecipeStore, error) {
+    store := &FileRecipeStore{
+        basePath:   basePath,
+        indexCache: make(map[string]*Recipe),
+    }
     
-  - name: "api_performance"
-    sli: "api_latency_p99"
-    target: 0.5  # 500ms
-    window: "7d"
-    error_budget: 0.01
+    // Create directory structure
+    if err := os.MkdirAll(filepath.Join(basePath, "recipes"), 0755); err != nil {
+        return nil, fmt.Errorf("failed to create recipes directory: %w", err)
+    }
+    
+    // Build initial index
+    if err := store.buildIndex(); err != nil {
+        return nil, fmt.Errorf("failed to build recipe index: %w", err)
+    }
+    
+    return store, nil
+}
 ```
 
-**Acceptance Criteria**:
-- 99.9% metric collection reliability
-- SLO violation detection within 1 minute
-- Anomaly detection accuracy >85%
-- Runbook automation reduces MTTR by 50%
-- Full distributed tracing coverage
+#### Recipe Validation System
 
-## Configuration Examples
+```go
+// controller/arf/recipe_validator.go
+type RecipeValidator struct {
+    supportedTypes map[string]bool
+    supportedLangs map[string]bool
+}
 
-### Campaign Management Configuration
-```yaml
-# configs/arf-campaign-config.yaml
-campaign_management:
-  defaults:
-    batch_size: 50
-    max_parallel_repos: 10
-    timeout_per_repo: "2h"
-    retry_attempts: 3
-  
-  resource_limits:
-    max_campaigns: 10
-    max_total_repos: 500
-    cpu_limit: "50000m"
-    memory_limit: "100Gi"
-  
-  scheduling:
-    business_hours_only: true
-    timezone: "America/New_York"
-    maintenance_windows:
-      - day: "sunday"
-        start: "02:00"
-        end: "06:00"
-```
-
-### Analytics Configuration
-```yaml
-# configs/arf-analytics-config.yaml
-analytics:
-  metrics_collection:
-    real_time_enabled: true
-    batch_interval: "5m"
-    retention_period: "2y"
-  
-  business_metrics:
-    currency: "USD"
-    hourly_developer_rate: 150
-    infrastructure_cost_per_hour: 10
-  
-  reporting:
-    executive_report_schedule: "weekly"
-    dashboard_refresh_interval: "1m"
-    export_formats: ["json", "csv", "pdf", "excel"]
-```
-
-### Integration Configuration
-```yaml
-# configs/arf-integration-config.yaml
-integration:
-  api:
-    rate_limiting:
-      requests_per_minute: 1000
-      burst_size: 100
-    authentication:
-      methods: ["api_key", "jwt", "oauth"]
-      session_timeout: "24h"
-  
-  webhooks:
-    max_webhooks_per_user: 10
-    retry_attempts: 3
-    timeout: "30s"
-    events:
-      - "transformation.started"
-      - "transformation.completed"
-      - "transformation.failed"
-      - "campaign.started"
-      - "campaign.completed"
-  
-  cli:
-    auto_update_enabled: true
-    telemetry_enabled: false
-    default_output_format: "table"
-```
-
-## Nomad Job Templates
-
-### Campaign Coordinator Job
-```hcl
-# platform/nomad/templates/arf-campaign-coordinator.hcl.j2
-job "arf-campaign-{{ campaign_id }}" {
-  datacenters = ["{{ datacenter }}"]
-  type = "service"
-  
-  group "coordinator" {
-    task "campaign-manager" {
-      driver = "exec"
-      
-      config {
-        command = "/usr/local/bin/arf-campaign-coordinator"
-        args = [
-          "--campaign-id", "{{ campaign_id }}",
-          "--config", "/local/campaign-config.json",
-          "--parallelism", "{{ parallelism }}"
-        ]
-      }
-      
-      template {
-        data = <<-EOH
-{{ campaign_config | to_json }}
-EOH
-        destination = "local/campaign-config.json"
-      }
-      
-      service {
-        name = "arf-campaign-{{ campaign_id }}"
-        port = "http"
-        
-        check {
-          type     = "http"
-          path     = "/health"
-          interval = "10s"
-          timeout  = "3s"
+func (v *RecipeValidator) ValidateRecipe(recipe *Recipe) error {
+    // Validate metadata
+    if err := v.validateMetadata(&recipe.Metadata); err != nil {
+        return fmt.Errorf("metadata validation failed: %w", err)
+    }
+    
+    // Validate recipe steps
+    for i, step := range recipe.Recipes {
+        if err := v.validateRecipeStep(&step, i); err != nil {
+            return fmt.Errorf("recipe step %d validation failed: %w", i, err)
         }
-      }
-      
-      resources {
-        cpu    = 1000
-        memory = 2048
-        disk   = 5120
-      }
-    }
-  }
-}
-```
-
-### Analytics Processing Job
-```hcl
-# platform/nomad/templates/arf-analytics-processor.hcl.j2
-job "arf-analytics-processor" {
-  datacenters = ["{{ datacenter }}"]
-  type = "batch"
-  
-  periodic {
-    cron             = "0 */6 * * *"
-    prohibit_overlap = true
-  }
-  
-  group "processor" {
-    task "metrics-aggregator" {
-      driver = "exec"
-      
-      config {
-        command = "/usr/local/bin/arf-analytics-processor"
-        args = [
-          "--timeframe", "6h",
-          "--output", "/shared/metrics.json"
-        ]
-      }
-      
-      resources {
-        cpu    = 2000
-        memory = 4096
-        disk   = 10240
-      }
     }
     
-    task "report-generator" {
-      driver = "exec"
-      
-      config {
-        command = "/usr/local/bin/arf-report-generator"
-        args = [
-          "--metrics", "/shared/metrics.json",
-          "--templates", "/local/report-templates",
-          "--output", "/output/reports"
-        ]
-      }
-      
-      resources {
-        cpu    = 1000
-        memory = 2048
-        disk   = 5120
-      }
+    // Validate execution config
+    if err := v.validateExecutionConfig(&recipe.Execution); err != nil {
+        return fmt.Errorf("execution config validation failed: %w", err)
     }
-  }
+    
+    return nil
 }
 ```
 
-## Testing Strategy
+### Phase ARF-5.2: CLI Integration & User Interface (1 week)
 
-### Scale Tests
-- Campaign execution with 200-500 repositories
-- Concurrent transformation processing under load
-- Resource allocation and queue management validation
-- Performance degradation analysis at scale
+**Objective**: Implement comprehensive CLI commands for recipe management integrated with existing `ploy arf` command structure.
 
-### Integration Tests
-- End-to-end API integration workflows
-- CLI command functionality and error handling
-- Webhook delivery reliability and retry logic
-- SDK library functionality across multiple languages
+#### CLI Command Structure
 
-### Analytics Tests
-- Business metrics calculation accuracy
-- ROI analysis validation with real data
-- Report generation performance and formatting
-- Predictive model accuracy assessment
+```go
+// internal/cli/arf/recipe.go
+func NewRecipeCommand() *cli.Command {
+    return &cli.Command{
+        Name:  "recipe",
+        Usage: "Manage ARF transformation recipes",
+        Subcommands: []*cli.Command{
+            &cli.Command{
+                Name:   "list",
+                Usage:  "List available recipes",
+                Flags: []cli.Flag{
+                    &cli.StringFlag{Name: "language", Usage: "Filter by programming language"},
+                    &cli.StringSliceFlag{Name: "tags", Usage: "Filter by tags (comma-separated)"},
+                    &cli.StringFlag{Name: "author", Usage: "Filter by recipe author"},
+                    &cli.StringFlag{Name: "format", Value: "table", Usage: "Output format (table, json, yaml)"},
+                },
+                Action: listRecipes,
+            },
+            &cli.Command{
+                Name:      "upload",
+                Usage:     "Upload a new recipe from file",
+                ArgsUsage: "<recipe.yaml>",
+                Flags: []cli.Flag{
+                    &cli.BoolFlag{Name: "validate-only", Usage: "Only validate recipe without uploading"},
+                },
+                Action: uploadRecipe,
+            },
+            &cli.Command{
+                Name:      "update", 
+                Usage:     "Update an existing recipe",
+                ArgsUsage: "<recipe-id> <recipe.yaml>",
+                Action: updateRecipe,
+            },
+            &cli.Command{
+                Name:      "delete",
+                Usage:     "Delete a recipe",
+                ArgsUsage: "<recipe-id>",
+                Flags: []cli.Flag{
+                    &cli.BoolFlag{Name: "force", Usage: "Skip confirmation prompt"},
+                },
+                Action: deleteRecipe,
+            },
+            &cli.Command{
+                Name:      "show",
+                Usage:     "Show detailed recipe information",
+                ArgsUsage: "<recipe-id>",
+                Flags: []cli.Flag{
+                    &cli.StringFlag{Name: "format", Value: "yaml", Usage: "Output format (yaml, json)"},
+                },
+                Action: showRecipe,
+            },
+            &cli.Command{
+                Name:   "search",
+                Usage:  "Search recipes by keyword",
+                ArgsUsage: "<search-query>",
+                Action: searchRecipes,
+            },
+            &cli.Command{
+                Name:   "validate",
+                Usage:  "Validate a recipe file",
+                ArgsUsage: "<recipe.yaml>",
+                Action: validateRecipe,
+            },
+        },
+    }
+}
+```
 
-### Security Tests
-- Authentication and authorization validation
-- Audit logging completeness and integrity
-- Compliance reporting accuracy
-- Data privacy protection verification
+#### Enhanced Benchmark Integration
+
+```go
+// Update existing benchmark command to support recipe arrays
+func runBenchmark(c *cli.Context) error {
+    // Parse recipes parameter
+    recipesFlag := c.StringSlice("recipes")
+    if len(recipesFlag) == 0 {
+        return fmt.Errorf("--recipes parameter required")
+    }
+    
+    // Validate recipes exist and are accessible
+    recipeStore := getRecipeStore()
+    for _, recipeID := range recipesFlag {
+        if _, err := recipeStore.GetRecipe(c.Context, recipeID); err != nil {
+            return fmt.Errorf("recipe '%s' not found: %w", recipeID, err)
+        }
+    }
+    
+    // Create benchmark config with user recipes
+    config := &BenchmarkConfig{
+        Name:         c.String("name"),
+        Repository:   c.String("repository"),
+        UserRecipes:  recipesFlag,  // New field for user-specified recipes
+        // ... existing config
+    }
+    
+    return executeBenchmark(c.Context, config)
+}
+```
+
+### Phase ARF-5.3: Generic Recipe Execution Engine (2-3 weeks)
+
+**Objective**: Replace hardcoded transformation logic with a flexible, plugin-based recipe execution system supporting multiple transformation types.
+
+#### Generic Recipe Executor Interface
+
+```go
+// controller/arf/recipe_executor.go
+type RecipeExecutor interface {
+    ExecuteRecipe(ctx context.Context, recipe *RecipeStep, repoPath string) (*TransformationResult, error)
+    ValidateRecipe(recipe *RecipeStep) error
+    GetSupportedType() string
+    GetRequirements() ExecutorRequirements
+}
+
+type ExecutorRequirements struct {
+    Tools        []string          `json:"tools"`         // Required external tools
+    Environment  map[string]string `json:"environment"`   // Required environment variables
+    Languages    []string          `json:"languages"`     // Supported programming languages
+}
+
+type GenericRecipeEngine struct {
+    executors    map[string]RecipeExecutor
+    recipeStore  RecipeStore
+    logger       Logger
+}
+
+func NewGenericRecipeEngine(recipeStore RecipeStore) *GenericRecipeEngine {
+    engine := &GenericRecipeEngine{
+        executors:   make(map[string]RecipeExecutor),
+        recipeStore: recipeStore,
+    }
+    
+    // Register built-in executors
+    engine.RegisterExecutor("openrewrite", NewOpenRewriteExecutor())
+    engine.RegisterExecutor("script", NewScriptExecutor())
+    engine.RegisterExecutor("composite", NewCompositeExecutor(engine))
+    
+    return engine
+}
+
+func (e *GenericRecipeEngine) ExecuteUserRecipes(ctx context.Context, recipeIDs []string, repoPath string) (*TransformationResult, error) {
+    var aggregatedResult *TransformationResult
+    
+    for _, recipeID := range recipeIDs {
+        recipe, err := e.recipeStore.GetRecipe(ctx, recipeID)
+        if err != nil {
+            return nil, fmt.Errorf("failed to load recipe %s: %w", recipeID, err)
+        }
+        
+        result, err := e.executeRecipe(ctx, recipe, repoPath)
+        if err != nil {
+            if recipe.Execution.StopOnFailure {
+                return nil, fmt.Errorf("recipe %s failed: %w", recipeID, err)
+            }
+            // Log error and continue
+            e.logger.Error("Recipe execution failed", "recipe", recipeID, "error", err)
+            continue
+        }
+        
+        // Aggregate results
+        aggregatedResult = e.mergeResults(aggregatedResult, result)
+    }
+    
+    return aggregatedResult, nil
+}
+```
+
+#### OpenRewrite Executor Implementation
+
+```go
+// controller/arf/openrewrite_executor.go
+type OpenRewriteExecutor struct {
+    tempDir     string
+    javaHome    string
+    mavenHome   string
+    gradleHome  string
+}
+
+func (e *OpenReWriteExecutor) ExecuteRecipe(ctx context.Context, recipe *RecipeStep, repoPath string) (*TransformationResult, error) {
+    // Detect build system
+    buildSystem := e.detectBuildSystem(repoPath)
+    
+    switch buildSystem {
+    case "maven":
+        return e.executeMavenRecipe(ctx, recipe, repoPath)
+    case "gradle":
+        return e.executeGradleRecipe(ctx, recipe, repoPath)
+    default:
+        return nil, fmt.Errorf("unsupported build system: %s", buildSystem)
+    }
+}
+
+func (e *OpenRewriteExecutor) executeMavenRecipe(ctx context.Context, recipe *RecipeStep, repoPath string) (*TransformationResult, error) {
+    // Generate temporary rewrite.yml configuration
+    configPath := filepath.Join(e.tempDir, "rewrite.yml")
+    if err := e.generateRewriteConfig(recipe, configPath); err != nil {
+        return nil, fmt.Errorf("failed to generate rewrite config: %w", err)
+    }
+    
+    // Execute maven rewrite:run
+    cmd := exec.CommandContext(ctx, "mvn", 
+        "org.openrewrite.maven:rewrite-maven-plugin:run",
+        "-Drewrite.configLocation=" + configPath,
+        "-f", filepath.Join(repoPath, "pom.xml"))
+    
+    cmd.Dir = repoPath
+    output, err := cmd.CombinedOutput()
+    
+    if err != nil {
+        return nil, fmt.Errorf("maven rewrite execution failed: %w, output: %s", err, output)
+    }
+    
+    // Parse results and generate diff
+    return e.parseTransformationResults(ctx, repoPath, string(output))
+}
+```
+
+#### Script Executor Implementation
+
+```go
+// controller/arf/script_executor.go
+type ScriptExecutor struct {
+    sandboxManager SandboxManager
+    allowedShells  map[string]bool
+}
+
+func (e *ScriptExecutor) ExecuteRecipe(ctx context.Context, recipe *RecipeStep, repoPath string) (*TransformationResult, error) {
+    // Validate script safety
+    if err := e.validateScript(recipe.Script); err != nil {
+        return nil, fmt.Errorf("script validation failed: %w", err)
+    }
+    
+    // Create secure execution environment
+    sandbox, err := e.sandboxManager.CreateSandbox(ctx, SandboxConfig{
+        LocalPath:     repoPath,
+        TTL:          30 * time.Minute,
+        NetworkAccess: false, // Scripts run offline for security
+        CPULimit:     "1",
+        MemoryLimit:  "512M",
+    })
+    if err != nil {
+        return nil, fmt.Errorf("failed to create script sandbox: %w", err)
+    }
+    defer e.sandboxManager.DestroySandbox(ctx, sandbox.ID)
+    
+    // Execute script in sandbox
+    result, err := e.executeScriptInSandbox(ctx, sandbox, recipe.Script)
+    if err != nil {
+        return nil, fmt.Errorf("script execution failed: %w", err)
+    }
+    
+    return result, nil
+}
+```
+
+### Phase ARF-5.4: Recipe Discovery & Management Features (1 week)
+
+**Objective**: Implement advanced search, filtering, and recipe ecosystem features for comprehensive recipe management.
+
+#### Advanced Search Implementation
+
+```go
+// controller/arf/recipe_search.go
+type RecipeSearchEngine struct {
+    store       RecipeStore
+    indexer     *SearchIndexer
+}
+
+type SearchQuery struct {
+    Query       string            `json:"query"`
+    Language    string            `json:"language,omitempty"`
+    Tags        []string          `json:"tags,omitempty"`
+    Author      string            `json:"author,omitempty"`
+    MinVersion  string            `json:"min_version,omitempty"`
+    MaxVersion  string            `json:"max_version,omitempty"`
+    Limit       int               `json:"limit,omitempty"`
+    Offset      int               `json:"offset,omitempty"`
+    SortBy      string            `json:"sort_by,omitempty"`    // name, author, created_at, updated_at
+    SortOrder   string            `json:"sort_order,omitempty"` // asc, desc
+}
+
+func (s *RecipeSearchEngine) Search(ctx context.Context, query SearchQuery) (*SearchResult, error) {
+    // Full-text search across recipe metadata
+    matches, err := s.indexer.Search(query.Query)
+    if err != nil {
+        return nil, fmt.Errorf("search index query failed: %w", err)
+    }
+    
+    // Apply filters
+    filtered := s.applyFilters(matches, query)
+    
+    // Sort results
+    sorted := s.sortResults(filtered, query.SortBy, query.SortOrder)
+    
+    // Apply pagination
+    paginated := s.paginate(sorted, query.Limit, query.Offset)
+    
+    return &SearchResult{
+        Recipes:    paginated,
+        Total:      len(filtered),
+        Query:      query,
+        ExecutionTime: time.Since(start),
+    }, nil
+}
+```
+
+#### Built-in Recipe Catalog
+
+```go
+// controller/arf/builtin_recipes.go
+type BuiltinRecipeCatalog struct {
+    recipes map[string]*Recipe
+}
+
+func NewBuiltinRecipeCatalog() *BuiltinRecipeCatalog {
+    catalog := &BuiltinRecipeCatalog{
+        recipes: make(map[string]*Recipe),
+    }
+    
+    // Load built-in recipes
+    catalog.loadJavaRecipes()
+    catalog.loadSpringRecipes()
+    catalog.loadCleanupRecipes()
+    
+    return catalog
+}
+
+func (c *BuiltinRecipeCatalog) loadJavaRecipes() {
+    // Java 8 to 11 migration
+    c.recipes["java8to11"] = &Recipe{
+        Metadata: RecipeMetadata{
+            ID:          "java8to11",
+            Name:        "Java 8 to 11 Migration",
+            Description: "Complete Java 8 to 11 migration with API updates",
+            Version:     "1.0.0",
+            Author:      "ploy-builtin",
+            Language:    "java",
+            Tags:        []string{"java", "migration", "jvm"},
+        },
+        Recipes: []RecipeStep{
+            {Type: "openrewrite", ID: "org.openrewrite.java.migrate.JavaVersion8to11"},
+            {Type: "openrewrite", ID: "org.openrewrite.java.migrate.javax.HttpClientMigration"},
+        },
+        Execution: ExecutionConfig{
+            StopOnFailure: true,
+            MaxIterations: 1,
+            Timeout:       30 * time.Minute,
+        },
+    }
+    
+    // Similar patterns for java11to17, java17to21, etc.
+}
+```
+
+#### Recipe Recommendation System
+
+```go
+// controller/arf/recipe_recommender.go
+type RecipeRecommender struct {
+    catalog         *BuiltinRecipeCatalog
+    projectAnalyzer *ProjectAnalyzer
+}
+
+func (r *RecipeRecommender) RecommendRecipes(ctx context.Context, projectPath string) ([]*Recipe, error) {
+    // Analyze project structure
+    analysis, err := r.projectAnalyzer.AnalyzeProject(projectPath)
+    if err != nil {
+        return nil, fmt.Errorf("project analysis failed: %w", err)
+    }
+    
+    var recommendations []*Recipe
+    
+    // Language-specific recommendations
+    switch analysis.Language {
+    case "java":
+        recommendations = append(recommendations, r.recommendJavaRecipes(analysis)...)
+    case "python":
+        recommendations = append(recommendations, r.recommendPythonRecipes(analysis)...)
+    }
+    
+    // Framework-specific recommendations  
+    if analysis.HasFramework("spring-boot") {
+        recommendations = append(recommendations, r.recommendSpringRecipes(analysis)...)
+    }
+    
+    return recommendations, nil
+}
+```
+
+## API Integration
+
+### REST API Endpoints
+
+```go
+// Recipe Management API
+POST   /v1/arf/recipes                    // Upload new recipe
+GET    /v1/arf/recipes                    // List recipes with filtering
+GET    /v1/arf/recipes/{id}               // Get specific recipe
+PUT    /v1/arf/recipes/{id}               // Update recipe
+DELETE /v1/arf/recipes/{id}               // Delete recipe
+
+// Recipe Discovery API  
+GET    /v1/arf/recipes/search             // Search recipes
+GET    /v1/arf/recipes/recommend          // Get recipe recommendations
+GET    /v1/arf/recipes/builtin            // List built-in recipes
+GET    /v1/arf/recipes/stats              // Get recipe statistics
+
+// Recipe Execution API
+POST   /v1/arf/recipes/validate           // Validate recipe without storing
+POST   /v1/arf/benchmark/run              // Run benchmark with custom recipes
+```
+
+### Benchmark Integration
+
+```go
+// Enhanced BenchmarkConfig with recipe support
+type BenchmarkConfig struct {
+    // Existing fields...
+    UserRecipes    []string `json:"user_recipes,omitempty"`    // User recipe IDs
+    BuiltinRecipes []string `json:"builtin_recipes,omitempty"` // Built-in recipe IDs
+    RecipeConfig   map[string]interface{} `json:"recipe_config,omitempty"` // Per-recipe configuration
+}
+```
 
 ## Success Metrics
 
-- **Scale Achievement**: 200-500 repositories per campaign with linear performance
-- **Business Value**: 300%+ ROI demonstration with measurable time savings
-- **Integration Adoption**: 90% API uptime with comprehensive ecosystem support
-- **Executive Satisfaction**: Weekly executive reports with actionable insights
-- **Compliance**: 100% audit trail coverage with regulatory framework support
-- **Performance**: Sub-second API response times under production load
-- **Cost Optimization**: 30%+ reduction in transformation costs through optimization
-- **WASM Support**: 30%+ size reduction for Lane G modules
-- **Operational Excellence**: 99.9% SLO achievement with <1hr MTTR
-- **LLM Cost Management**: <$0.10 per repository transformation average
+### Functional Requirements
+- ✅ Users can upload, update, delete custom recipes via CLI and API
+- ✅ Recipe arrays support complex multi-step transformations  
+- ✅ OpenRewrite recipes execute with real Maven/Gradle integration
+- ✅ Custom script recipes execute securely in sandboxed environments
+- ✅ Recipe search finds relevant recipes in <2 seconds
+- ✅ Built-in recipe catalog provides 20+ common migration patterns
 
-## Risk Mitigation
+### Performance Requirements
+- Recipe upload and validation completes in <30 seconds
+- Recipe search handles 1000+ recipes with <2 second response time
+- Recipe execution integrates with existing benchmark system
+- Support 10+ concurrent recipe executions without conflicts
 
-### Scale Risks
-- **Resource Exhaustion**: Adaptive resource allocation and queue management
-- **Coordination Failures**: Circuit breakers and graceful degradation
-- **Data Consistency**: Distributed transaction management and conflict resolution
+### User Experience  
+- Intuitive CLI following existing `ploy arf` patterns
+- Clear validation error messages with specific line numbers
+- Recipe recommendations based on project analysis
+- Comprehensive recipe documentation with examples
 
-### Business Risks
-- **ROI Validation**: Conservative estimates and comprehensive tracking
-- **Executive Expectations**: Clear communication and realistic timelines
-- **Adoption Resistance**: Comprehensive training and change management
+## Next Phase Dependencies
 
-### Technical Risks
-- **API Reliability**: Redundancy and comprehensive monitoring
-- **Data Privacy**: Encryption and access control validation
-- **Integration Complexity**: Phased rollout and comprehensive testing
+Phase ARF-5 enables:
+- **Phase ARF-6**: Enterprise recipe governance with approval workflows
+- **Phase ARF-7**: Recipe marketplace and sharing ecosystem  
+- **Phase ARF-8**: Advanced analytics and recipe performance optimization
 
-## Deployment Strategy
-
-### Phase 5A: Core Platform (Months 1-2)
-- Multi-repository campaign management
-- Basic analytics and reporting
-- REST API foundation
-- Core CLI commands
-
-### Phase 5B: Advanced Analytics (Months 3-4)
-- Executive reporting and dashboards
-- ROI calculation and business metrics
-- Predictive analysis capabilities
-- Advanced visualization
-
-### Phase 5C: Integration Ecosystem (Months 5-6)
-- Comprehensive API coverage
-- SDK libraries and documentation
-- Webhook system and external integrations
-- Third-party platform connectors
-
-### Phase 5D: Compliance & Security (Months 7-8)
-- Authentication and authorization
-- Audit logging and compliance reporting
-- Data privacy and encryption
-- Regulatory framework support
-
-## Enterprise Readiness Checklist
-
-- ✅ **Scale Management**: 200-500 repository coordination
-- ✅ **Business Intelligence**: ROI measurement and executive reporting
-- ✅ **API Ecosystem**: Comprehensive REST API and SDK support
-- ✅ **CLI Integration**: Full command-line tool integration
-- ✅ **Webhook System**: Real-time event delivery
-- ✅ **Security Framework**: Authentication, authorization, and audit logging
-- ✅ **Compliance Reporting**: Regulatory framework support
-- ✅ **Performance**: Production-grade scalability and reliability
-- ✅ **Documentation**: Complete API documentation and user guides
-- ✅ **Support**: Enterprise support infrastructure and procedures
-
-Phase ARF-5 delivers a complete enterprise transformation platform ready for organization-wide deployment and long-term operational success.
+The generic recipe management foundation transforms ARF into a universal code transformation platform where any migration logic can be expressed, shared, and executed through the existing ARF infrastructure.

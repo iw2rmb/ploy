@@ -1,5 +1,76 @@
 # CHANGELOG
 
+## [2025-08-25] - TDD Phase 1: Testing Foundation & Infrastructure Implementation
+
+### Added
+- **✅ Comprehensive Test Utilities Package**: Enhanced `internal/testutils/` with custom assertions, database utilities, and testing helpers
+- **✅ Mock Infrastructure**: Complete mock implementations for Nomad, Consul, and Storage clients with realistic behavior simulation
+- **✅ Advanced Custom Assertions**: 20+ specialized assertion functions including JSON comparison, slice validation, file operations, and async testing
+- **✅ Database Testing Framework**: Full PostgreSQL integration with migration support, test data seeding, and transaction isolation
+- **✅ Builder Pattern Test Objects**: Fluent API builders for applications, deployments, services, and jobs with chaining support
+- **✅ Application Fixtures**: Comprehensive test fixtures for Go, Node.js, Java, and WebAssembly applications with realistic structure
+- **✅ GitHub Actions CI/CD Pipeline**: Multi-stage testing pipeline with unit, integration, security, and performance tests
+- **✅ golangci-lint Configuration**: 40+ linters configured for comprehensive code quality checks with project-specific rules
+- **✅ Enhanced Makefile**: TDD-focused build automation with test generation, fuzzing, coverage thresholds, and watch mode
+
+### Fixed
+- **✅ Test Environment Isolation**: Proper cleanup and isolation between test runs to prevent flaky tests
+- **✅ Service Dependency Management**: Automated service health checks and wait strategies for integration tests
+- **✅ Test Data Management**: Comprehensive seeding and cleanup strategies for reproducible test environments
+- **✅ Coverage Reporting**: Unified coverage collection across unit and integration test suites
+
+### Implementation
+- **✅ Testing Standards Documentation**: Complete testing guide with TDD principles, best practices, and troubleshooting
+- **✅ Local Development Environment**: Enhanced Docker Compose stack with health checks and service orchestration
+- **✅ Integration Test Framework**: HTTP client utilities, API test helpers, and service test coordination
+- **✅ Performance Testing Tools**: Load testing utilities, benchmark analysis, and performance regression detection
+- **✅ Test Architecture**: Following testing pyramid (70% unit, 20% integration, 10% E2E) with proper separation
+
+### Testing
+- **✅ Unit Test Coverage**: Enhanced coverage tracking with 60% minimum threshold enforcement
+- **✅ Integration Test Suite**: Complete service integration testing with Docker container management
+- **✅ Security Testing**: Automated vulnerability scanning and security lint checks in CI pipeline
+- **✅ Performance Benchmarking**: Baseline performance metrics with regression detection
+- **✅ TDD Workflow Support**: Watch mode, test generation, and Red-Green-Refactor cycle automation
+
+---
+
+## [2025-08-25] - ARF Phase 5.1: Complete Recipe Data Model & Storage Implementation
+
+### Added
+- **✅ ARF Recipe Storage System**: Complete enterprise storage backend with SeaweedFS and Consul integration
+- **✅ Production Configuration Management**: Environment-driven backend selection (production: SeaweedFS+Consul, development: memory)
+- **✅ Recipe Search & Indexing**: Full-text search with relevance scoring and metadata-based filtering
+- **✅ Storage Backend Abstraction**: Clean separation between RecipeStorage and RecipeCatalog interfaces
+- **✅ Recipe Validation Framework**: Security rules enforcement with sandbox requirements and resource limits
+- **✅ Comprehensive Test Suite**: Four complete test suites for storage integration, fallbacks, configuration, and comprehensive testing
+- **✅ Recipe Statistics Tracking**: Usage metrics, success rates, execution times, and performance analytics
+- **✅ Caching Layer**: TTL-based recipe caching with automatic invalidation for improved performance
+
+### Fixed
+- **✅ Backward Compatibility Removal**: Eliminated deprecated mock data and fallback methods for clean interfaces
+- **✅ Storage Backend Consistency**: Unified storage operations across all API handlers
+- **✅ Retry Logic Implementation**: Exponential backoff for SeaweedFS and Consul operations with configurable timeouts
+- **✅ Error Handling Enhancement**: Comprehensive error messages with proper context and debugging information
+- **✅ Soft Deletion Support**: Deletion markers for SeaweedFS due to hard deletion limitations
+
+### Implementation
+- **✅ SeaweedFS Storage Backend**: Complete implementation with retry logic, caching, and deletion marker support
+- **✅ Consul Index Backend**: Enhanced search with performance optimizations and relevance ranking
+- **✅ Recipe Validation System**: Security rule enforcement with command filtering and resource constraints
+- **✅ Configuration Management**: LoadConfigFromEnv() with automatic production/development backend selection
+- **✅ Handler Integration**: All API handlers updated to use storage backend instead of direct catalog access
+- **✅ Nomad Template Updates**: Production and development templates with proper ARF environment variables
+
+### Testing
+- **✅ Storage Integration Tests**: Core CRUD operations, validation, search functionality testing
+- **✅ Backend Fallback Tests**: Graceful degradation and failover mechanism validation
+- **✅ Configuration Analysis Tests**: Environment detection and backend configuration verification
+- **✅ Comprehensive Test Runner**: Master test orchestrator with detailed JSON reporting and statistics
+- **✅ VPS-Ready Test Scripts**: All tests designed for runtime validation on VPS infrastructure per MUP requirements
+
+---
+
 ## [2025-08-25] - Lane C OSv Pipeline & Java 11→17 Migration Success
 
 ### Added
@@ -1531,7 +1602,7 @@ The Git integration system now provides enterprise-grade repository analysis, se
 
 ### Added
 - **Node.js Lane B Testing Validation**
-  - Successfully tested `ploy push` with apps/node-hello using automatic Lane B detection
+  - Successfully tested `ploy push` with tests/apps/node-hello using automatic Lane B detection
   - Verified lane detection correctly identifies Node.js applications via package.json
   - Confirmed build pipeline progression through tar processing and lane validation
   - Added comprehensive test scenarios (210-216) in TESTS.md for Node.js Lane B testing

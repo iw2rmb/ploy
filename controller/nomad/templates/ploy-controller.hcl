@@ -332,6 +332,27 @@ job "ploy-controller" {
         TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
         OPENREWRITE_JAR_PATH = "/usr/local/bin/rewrite.jar"
+        
+        # ARF Phase 5.1 - Production Storage Backend Configuration
+        PLOY_ENVIRONMENT = "production"
+        ARF_STORAGE_BACKEND = "seaweedfs"
+        ARF_INDEX_BACKEND = "consul"
+        ARF_SEAWEEDFS_MASTER_URL = "http://127.0.0.1:9333"
+        ARF_SEAWEEDFS_FILER_URL = "http://127.0.0.1:8888"
+        ARF_CONSUL_ADDR = "127.0.0.1:8500"
+        ARF_CONSUL_PREFIX = "ploy/arf"
+        
+        # ARF Validation & Security Configuration
+        ARF_VALIDATION_ENABLED = "true"
+        ARF_VALIDATION_STRICT = "true"
+        ARF_ENABLE_ENCRYPTION = "false"
+        ARF_ENABLE_AUDIT_LOG = "true"
+        ARF_AUDIT_LOG_PATH = "/var/log/ploy/arf-audit.log"
+        
+        # ARF Jail Sandbox Configuration
+        ARF_JAIL_BASE_DIR = "/jail/arf"
+        ARF_JAIL_TEMPLATE_DIR = "/jail/template"
+        ARF_JAIL_INTERFACE = "lo0"
       }
       
       # Enhanced configuration files with service mesh and rolling updates

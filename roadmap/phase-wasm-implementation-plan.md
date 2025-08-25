@@ -1167,9 +1167,9 @@ int main() {
 }
 ```
 
-**Testing Scripts** (`test-scripts/test-wasm-*.sh`):
+**Testing Scripts** (`tests/scripts/test-wasm-*.sh`):
 
-`test-scripts/test-wasm-lane-detection.sh`:
+`tests/scripts/test-wasm-lane-detection.sh`:
 ```bash
 #!/bin/bash
 set -euo pipefail
@@ -1230,7 +1230,7 @@ echo "All WASM detection tests passed!"
 - Component model functionality
 
 ### Integration Testing
-**Files**: `test-scripts/test-wasm-integration.sh`
+**Files**: `tests/scripts/test-wasm-integration.sh`
 
 **Test Scenarios**:
 1. End-to-end WASM app deployment

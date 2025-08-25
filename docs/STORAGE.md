@@ -37,12 +37,12 @@ This pack includes:
 # Ploy storage configuration
 storage:
   provider: s3                 # keep this "s3" to ensure portability
-  endpoint: http://minio.ploy.local:9000  # MinIO/SeaweedFS/Ceph RGW/S3
+  endpoint: http://seaweedfs.ploy.local:8333  # SeaweedFS S3 API/Ceph RGW/AWS S3
   bucket: ploy-artifacts       # default artifact bucket
   region: us-east-1            # fake region is fine for most S3-compatible backends
   access_key: PLOYACCESSKEY
   secret_key: PLOYSECRETKEY
-  path_style: true             # required for MinIO/SeaweedFS/Ceph RGW
+  path_style: true             # required for SeaweedFS/Ceph RGW
   # Optional features
   # server_side_encryption: "AES256"   # or "aws:kms" if using AWS S3
   # tls_insecure_skip_verify: false     # set true ONLY for dev
@@ -207,7 +207,7 @@ if s3c2 != nil {
 
 ⸻
 
-4) Migration Strategy (MinIO → X)
+4) Migration Strategy (Storage Backend Migration)
 
 Principles
 	•	Treat storage as an S3 endpoint only. No vendor-specific calls.
@@ -215,8 +215,8 @@ Principles
 	•	Prefer DNS indirection (e.g., s3.ploy.local) so a cutover is a single DNS change.
 
 Steps
-	1.	Deploy target backend (SeaweedFS/Ceph RGW/Managed S3).
-	2.	Mirror: rclone sync s3:minio/ploy-artifacts s3:target/ploy-artifacts (or mc mirror).
+	1.	Deploy target backend (Alternative S3-compatible storage).
+	2.	Mirror: rclone sync s3:source/ploy-artifacts s3:target/ploy-artifacts (or mc mirror).
 	3.	Dual-write (optional): enable temporary dual writes for new artifacts.
 	4.	Smoke-test: run ploy push + artifact fetch against target.
 	5.	Flip: change endpoint in config.yaml or repoint DNS.
@@ -238,11 +238,11 @@ This document explains how Ploy abstracts storage, what backends are recommended
 ## Goals
 - Keep Ploy **backend-agnostic** using the **S3 API** as the single interface.
 - Optimize for **developer speed** (small objects, fast artifact IO).
-- Allow **easy migration** (self-hosted ↔ managed, SeaweedFS ↔ MinIO/Ceph).
+- Allow **easy migration** (self-hosted ↔ managed, SeaweedFS ↔ other S3-compatible backends).
 
 ## Configuration
 See `config.yaml` for a minimal, portable configuration. Key flags:
-- `endpoint`: S3-compatible URL (SeaweedFS, MinIO, Ceph RGW, AWS S3, Wasabi, B2).
+- `endpoint`: S3-compatible URL (SeaweedFS, Ceph RGW, AWS S3, Wasabi, B2).
 - `path_style: true`: required for most non-AWS endpoints.
 - `region`: any string; defaults work for non-AWS.
 - `server_side_encryption`: optional (e.g., `AES256`).
@@ -251,20 +251,20 @@ See `config.yaml` for a minimal, portable configuration. Key flags:
 
 | Solution      | License     | Deployment Ease                 | Performance Notes                               | Interfaces        | Pros                                              | Cons                                           |
 |---------------|-------------|---------------------------------|--------------------------------------------------|-------------------|---------------------------------------------------|------------------------------------------------|
-| **MinIO**     | AGPLv3      | ✅ Single binary / Helm         | Very fast S3, great for small objects            | S3 only           | Cloud-native, strong AWS API fidelity             | AGPLv3; object-only                           |
 | **SeaweedFS** | Apache 2.0  | ✅ Single binary; simple cluster | Excellent small-object perf; in-memory metadata  | S3 + Filer (POSIX) | Permissive license; FS+Object; simple ops        | Smaller ecosystem                              |
 | **Garage**    | AGPLv3      | ✅ Simple; Rust binary           | Low-latency; 2–10 node clusters                  | S3 only           | Minimal footprint; self-healing                  | AGPLv3; limited scale                          |
 | **Zenko**     | Apache 2.0  | ❌ Multi-service                 | Enterprise-grade; multi-cloud replication        | S3 + connectors   | Multi-cloud sync and policy                       | Heavier ops                                    |
 | **LeoFS**     | Apache 2.0  | ⚠ Erlang cluster                 | Stable; high concurrency                         | S3 only           | Reliable; niche deployments                      | Smaller community                              |
 | **JuiceFS**   | Apache 2.0  | ⚠ Client+metadata DB             | Great sequential IO; strong FS semantics         | POSIX + S3 gw     | POSIX + S3 hybrid                                | Metadata dependency; more moving parts         |
 | **Ceph (RGW)**| LGPLv2.1    | ❌ Heavier (cephadm/Rook)        | Good large-object; slower small-object latency   | S3 + Block + File | Unified storage; battle-tested                    | Complex ops; resource-heavy                    |
-| **Swift**     | Apache 2.0  | ❌ Complex                        | Stable; slower vs MinIO/SeaweedFS                | Object only       | Proven at scale                                  | Legacy feel; less active community             |
+| **Swift**     | Apache 2.0  | ❌ Complex                        | Stable; slower vs SeaweedFS                      | Object only       | Proven at scale                                  | Legacy feel; less active community             |
 | **Managed S3**| Proprietary | ✅ Zero deployment                | Scales transparently; WAN latency considerations | S3 API            | No ops burden; global availability               | Latency; lock-in; cost                         |
 
 ## Recommended Paths
-- **Dev/Test (fast, light)**: SeaweedFS or MinIO.
+- **Dev/Test (fast, light)**: SeaweedFS (default for Ploy).
 - **License-sensitive**: SeaweedFS (Apache 2.0).
 - **Need Block/POSIX later**: Ceph (add via Rook when required).
+- **Production**: SeaweedFS for most workloads; consider managed S3 for global scale.
 
 ## Migration Playbook (Storage Backend Migration)
 1. Deploy target backend.

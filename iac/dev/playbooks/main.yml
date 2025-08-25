@@ -5,7 +5,7 @@
 # - Development tools (Go, Node.js, Java, Python)
 # - Build tools (KraftKit, Cosign, Syft, Grype)
 # - Container runtime (Docker)
-# - Object storage (MinIO)
+# - Object storage (SeaweedFS)
 # - Proper PATH configuration to avoid conflicts
 # - GitHub credentials setup for the ploy user
 #

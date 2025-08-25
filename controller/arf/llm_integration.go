@@ -10,13 +10,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // LLMRecipeGenerator defines the interface for LLM-assisted recipe generation
 type LLMRecipeGenerator interface {
 	GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error)
 	ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error)
-	OptimizeRecipe(ctx context.Context, recipe Recipe, feedback TransformationFeedback) (*Recipe, error)
+	OptimizeRecipe(ctx context.Context, recipe *models.Recipe, feedback TransformationFeedback) (*models.Recipe, error)
 }
 
 // RecipeGenerationRequest contains all context needed for LLM recipe generation
@@ -32,7 +34,7 @@ type RecipeGenerationRequest struct {
 
 // GeneratedRecipe represents an LLM-generated transformation recipe
 type GeneratedRecipe struct {
-	Recipe       Recipe            `json:"recipe"`
+	Recipe       *models.Recipe    `json:"recipe"`
 	Confidence   float64           `json:"confidence"`
 	Explanation  string            `json:"explanation"`
 	LLMMetadata  LLMGenerationData `json:"llm_metadata"`
@@ -283,10 +285,10 @@ func (g *OpenAILLMGenerator) ValidateGenerated(ctx context.Context, recipe Gener
 }
 
 // OptimizeRecipe improves a recipe based on feedback from previous executions
-func (g *OpenAILLMGenerator) OptimizeRecipe(ctx context.Context, recipe Recipe, feedback TransformationFeedback) (*Recipe, error) {
+func (g *OpenAILLMGenerator) OptimizeRecipe(ctx context.Context, recipe *models.Recipe, feedback TransformationFeedback) (*models.Recipe, error) {
 	if feedback.Success && feedback.TestResults.Success {
 		// Recipe is working well, minimal optimization needed
-		return &recipe, nil
+		return recipe, nil
 	}
 
 	// Build optimization prompt based on feedback
@@ -482,16 +484,17 @@ func (g *OpenAILLMGenerator) parseOpenAIResponse(response *OpenAIResponse, start
 	}
 
 	// Build recipe from parsed data
-	recipe := Recipe{
-		ID:          g.getStringField(recipeData, "id"),
-		Name:        g.getStringField(recipeData, "name"),
-		Description: g.getStringField(recipeData, "description"),
-		Language:    g.getStringField(recipeData, "language"),
-		Category:    RecipeCategory(g.getStringField(recipeData, "category")),
-		Source:      g.getStringField(recipeData, "source"),
-		Version:     "1.0.0", // Default version for generated recipes
-		Tags:        g.getStringSliceField(recipeData, "tags"),
-		Options:     g.getStringMapField(recipeData, "options"),
+	recipe := &models.Recipe{
+		ID: g.getStringField(recipeData, "id"),
+		Metadata: models.RecipeMetadata{
+			Name:        g.getStringField(recipeData, "name"),
+			Description: g.getStringField(recipeData, "description"),
+			Version:     "1.0.0", // Default version for generated recipes
+			Languages:   []string{g.getStringField(recipeData, "language")},
+			Categories:  []string{g.getStringField(recipeData, "category")},
+			Tags:        g.getStringSliceField(recipeData, "tags"),
+		},
+		Steps: []models.RecipeStep{}, // Will be populated based on source
 	}
 
 	confidence := g.getFloatField(recipeData, "confidence")
@@ -598,7 +601,7 @@ func (g *OpenAILLMGenerator) extractJSONFromResponse(content string) string {
 	return jsonStr
 }
 
-func (g *OpenAILLMGenerator) buildOptimizationPrompt(recipe Recipe, feedback TransformationFeedback) string {
+func (g *OpenAILLMGenerator) buildOptimizationPrompt(recipe *models.Recipe, feedback TransformationFeedback) string {
 	var prompt strings.Builder
 
 	prompt.WriteString("Optimize the following transformation recipe based on execution feedback:\n\n")
@@ -637,7 +640,7 @@ func (g *OpenAILLMGenerator) buildOptimizationPrompt(recipe Recipe, feedback Tra
 	return prompt.String()
 }
 
-func (g *OpenAILLMGenerator) parseOptimizedRecipe(response *OpenAIResponse, originalRecipe Recipe) (*Recipe, error) {
+func (g *OpenAILLMGenerator) parseOptimizedRecipe(response *OpenAIResponse, originalRecipe *models.Recipe) (*models.Recipe, error) {
 	if len(response.Choices) == 0 {
 		return nil, fmt.Errorf("no choices in optimization response")
 	}
@@ -654,42 +657,47 @@ func (g *OpenAILLMGenerator) parseOptimizedRecipe(response *OpenAIResponse, orig
 	optimizedRecipe := originalRecipe
 	
 	if name := g.getStringField(recipeData, "name"); name != "" {
-		optimizedRecipe.Name = name
+		optimizedRecipe.Metadata.Name = name
 	}
 	if desc := g.getStringField(recipeData, "description"); desc != "" {
-		optimizedRecipe.Description = desc
+		optimizedRecipe.Metadata.Description = desc
 	}
-	if source := g.getStringField(recipeData, "source"); source != "" {
-		optimizedRecipe.Source = source
+	if version := g.getStringField(recipeData, "version"); version != "" {
+		optimizedRecipe.Metadata.Version = version
 	}
-	if options := g.getStringMapField(recipeData, "options"); len(options) > 0 {
-		optimizedRecipe.Options = options
+	if tags := g.getStringSliceField(recipeData, "tags"); len(tags) > 0 {
+		optimizedRecipe.Metadata.Tags = tags
 	}
 
-	return &optimizedRecipe, nil
+	return optimizedRecipe, nil
 }
 
-func (g *OpenAILLMGenerator) validateRecipeSyntax(recipe Recipe) error {
+func (g *OpenAILLMGenerator) validateRecipeSyntax(recipe *models.Recipe) error {
 	// Basic syntax validation
 	if recipe.ID == "" {
 		return fmt.Errorf("recipe ID is required")
 	}
-	if recipe.Name == "" {
+	if recipe.Metadata.Name == "" {
 		return fmt.Errorf("recipe name is required")
 	}
-	if recipe.Language == "" {
-		return fmt.Errorf("recipe language is required")
+	if len(recipe.Metadata.Languages) == 0 {
+		return fmt.Errorf("recipe languages are required")
 	}
-	if recipe.Source == "" {
-		return fmt.Errorf("recipe source is required")
+	if len(recipe.Steps) == 0 {
+		return fmt.Errorf("recipe must have at least one step")
 	}
 
 	return nil
 }
 
-func (g *OpenAILLMGenerator) validateRecipeSemantics(recipe Recipe) error {
+func (g *OpenAILLMGenerator) validateRecipeSemantics(recipe *models.Recipe) error {
 	// Semantic validation based on language and category
-	switch recipe.Language {
+	if len(recipe.Metadata.Languages) == 0 {
+		return fmt.Errorf("no languages specified for recipe")
+	}
+	
+	// Check first language for validation
+	switch recipe.Metadata.Languages[0] {
 	case "java":
 		return g.validateJavaRecipe(recipe)
 	case "javascript", "typescript":
@@ -699,29 +707,42 @@ func (g *OpenAILLMGenerator) validateRecipeSemantics(recipe Recipe) error {
 	case "go":
 		return g.validateGoRecipe(recipe)
 	default:
-		return fmt.Errorf("unsupported language for semantic validation: %s", recipe.Language)
+		return fmt.Errorf("unsupported language for semantic validation: %s", recipe.Metadata.Languages[0])
 	}
 }
 
-func (g *OpenAILLMGenerator) validateJavaRecipe(recipe Recipe) error {
+func (g *OpenAILLMGenerator) validateJavaRecipe(recipe *models.Recipe) error {
 	// Java-specific semantic validation
-	if recipe.Category == CategoryMigration && !strings.Contains(recipe.Source, "org.openrewrite") {
-		return fmt.Errorf("Java migration recipes should use OpenRewrite classes")
+	// Check if this is a migration recipe
+	for _, cat := range recipe.Metadata.Categories {
+		if cat == "migration" {
+			// Ensure at least one OpenRewrite step exists
+			hasOpenRewrite := false
+			for _, step := range recipe.Steps {
+				if step.Type == models.StepTypeOpenRewrite {
+					hasOpenRewrite = true
+					break
+				}
+			}
+			if !hasOpenRewrite {
+				return fmt.Errorf("Java migration recipes should have at least one OpenRewrite step")
+			}
+		}
 	}
 	return nil
 }
 
-func (g *OpenAILLMGenerator) validateJavaScriptRecipe(recipe Recipe) error {
+func (g *OpenAILLMGenerator) validateJavaScriptRecipe(recipe *models.Recipe) error {
 	// JavaScript-specific semantic validation
 	return nil
 }
 
-func (g *OpenAILLMGenerator) validatePythonRecipe(recipe Recipe) error {
+func (g *OpenAILLMGenerator) validatePythonRecipe(recipe *models.Recipe) error {
 	// Python-specific semantic validation
 	return nil
 }
 
-func (g *OpenAILLMGenerator) validateGoRecipe(recipe Recipe) error {
+func (g *OpenAILLMGenerator) validateGoRecipe(recipe *models.Recipe) error {
 	// Go-specific semantic validation
 	return nil
 }

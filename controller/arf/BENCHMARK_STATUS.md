@@ -42,7 +42,7 @@ go build -o build/controller ./controller
 go build -o build/ploy ./cmd/ploy
 
 # 2. Run minimal test
-./test-scripts/test-arf-benchmark-minimal.sh
+./tests/scripts/test-arf-benchmark-minimal.sh
 
 # 3. Check results
 ls benchmark_results/minimal_test/
@@ -179,7 +179,7 @@ save_intermediate_state: true
 
 - Phase 8 Specification: `roadmap/arf/phase-arf-8.md`
 - Implementation Plan: `roadmap/arf/phase-arf-7.md`
-- Test Scripts: `test-scripts/test-arf-benchmark-*.sh`
+- Test Scripts: `tests/scripts/test-arf-benchmark-*.sh`
 - Configuration: `controller/arf/benchmark_configs/`
 
 ## ✨ Summary

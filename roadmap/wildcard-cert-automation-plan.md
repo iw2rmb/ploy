@@ -157,7 +157,7 @@ Ready for App Deployment:
    - Add platform wildcard certificate discovery methods
 
 #### Phase 5: Testing & Documentation
-7. **Test Scenarios** (`test-scripts/`)
+7. **Test Scenarios** (`tests/scripts/`)
    - Automatic wildcard certificate provisioning test
    - Controller startup with certificate validation test
    - Multi-instance certificate accessibility test

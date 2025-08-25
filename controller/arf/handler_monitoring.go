@@ -66,7 +66,7 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 		"status": "healthy",
 		"timestamp": time.Now(),
 		"components": fiber.Map{
-			"engine":         h.engine != nil,
+			"recipe_executor": h.recipeExecutor != nil,
 			"catalog":        h.catalog != nil,
 			"sandbox_mgr":    h.sandboxMgr != nil,
 			"llm_generator":  h.llmGenerator != nil,
@@ -85,7 +85,7 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 	}
 
 	// Check if all critical components are available
-	if h.engine == nil || h.catalog == nil || h.sandboxMgr == nil {
+	if h.recipeExecutor == nil || h.catalog == nil || h.sandboxMgr == nil {
 		health["status"] = "degraded"
 	}
 

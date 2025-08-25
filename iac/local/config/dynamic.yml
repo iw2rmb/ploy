@@ -1,0 +1,156 @@
+# Traefik dynamic configuration for local development
+# This file defines static routes and middleware for local testing
+
+http:
+  # Routers configuration
+  routers:
+    # API router for development controller access
+    ploy-api:
+      rule: "Host(`api.local.dev`) || Host(`localhost`) && PathPrefix(`/v1`)"
+      service: ploy-controller
+      entryPoints:
+        - web
+      middlewares:
+        - api-cors
+        - api-headers
+    
+    # Consul UI router
+    consul-ui:
+      rule: "Host(`consul.local.dev`) || Host(`localhost`) && PathPrefix(`/ui/consul`)"
+      service: consul-ui
+      entryPoints:
+        - web
+      middlewares:
+        - strip-consul-prefix
+    
+    # Nomad UI router
+    nomad-ui:
+      rule: "Host(`nomad.local.dev`) || Host(`localhost`) && PathPrefix(`/ui/nomad`)"
+      service: nomad-ui
+      entryPoints:
+        - web
+      middlewares:
+        - strip-nomad-prefix
+    
+    # SeaweedFS Filer UI router
+    seaweedfs-ui:
+      rule: "Host(`storage.local.dev`) || Host(`localhost`) && PathPrefix(`/ui/storage`)"
+      service: seaweedfs-filer
+      entryPoints:
+        - web
+      middlewares:
+        - strip-storage-prefix
+    
+    # Traefik Dashboard (already handled by API but added for clarity)
+    traefik-dashboard:
+      rule: "Host(`traefik.local.dev`) || (Host(`localhost`) && PathPrefix(`/dashboard`))"
+      service: api@internal
+      entryPoints:
+        - web
+
+  # Services configuration
+  services:
+    # Ploy Controller service (when running locally)
+    ploy-controller:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8081"
+        healthCheck:
+          path: "/v1/health"
+          interval: "10s"
+          timeout: "5s"
+    
+    # Consul UI service
+    consul-ui:
+      loadBalancer:
+        servers:
+          - url: "http://consul:8500"
+    
+    # Nomad UI service
+    nomad-ui:
+      loadBalancer:
+        servers:
+          - url: "http://nomad:4646"
+    
+    # SeaweedFS Filer service
+    seaweedfs-filer:
+      loadBalancer:
+        servers:
+          - url: "http://seaweedfs-filer:8888"
+
+  # Middleware configuration
+  middlewares:
+    # CORS middleware for API access
+    api-cors:
+      headers:
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlExposeHeaders:
+          - "*"
+        accessControlMaxAge: 100
+        addVaryHeader: true
+    
+    # API headers middleware
+    api-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: http
+          X-Real-IP: ""
+        customResponseHeaders:
+          X-Ploy-Environment: local
+          X-Ploy-Version: dev
+    
+    # Strip prefix middlewares for UI access
+    strip-consul-prefix:
+      stripPrefix:
+        prefixes:
+          - "/ui/consul"
+    
+    strip-nomad-prefix:
+      stripPrefix:
+        prefixes:
+          - "/ui/nomad"
+    
+    strip-storage-prefix:
+      stripPrefix:
+        prefixes:
+          - "/ui/storage"
+    
+    # Basic auth for sensitive UIs (disabled for local development)
+    # basic-auth:
+    #   basicAuth:
+    #     users:
+    #       - "admin:$2y$10$..."  # admin:admin
+    
+    # Rate limiting for API endpoints
+    api-rate-limit:
+      rateLimit:
+        average: 100
+        period: "1m"
+        burst: 50
+    
+    # Request/response size limits
+    api-buffering:
+      buffering:
+        maxRequestBodyBytes: 10485760  # 10MB
+        maxResponseBodyBytes: 10485760  # 10MB
+        memRequestBodyBytes: 1048576   # 1MB
+        memResponseBodyBytes: 1048576  # 1MB
+
+# TCP configuration (for future use)
+tcp:
+  routers: {}
+  services: {}
+
+# UDP configuration (for future use)  
+udp:
+  routers: {}
+  services: {}

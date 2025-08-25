@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // ExecuteTransformation executes a transformation using a recipe
@@ -126,7 +127,7 @@ func (h *Handler) SelectTransformationStrategy(c *fiber.Ctx) error {
 func (h *Handler) AnalyzeComplexity(c *fiber.Ctx) error {
 	var req struct {
 		Repository Repository `json:"repository"`
-		Recipe     Recipe     `json:"recipe"`
+		Recipe     *models.Recipe `json:"recipe"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -294,7 +295,7 @@ func (h *Handler) OptimizeRecipe(c *fiber.Ctx) error {
 	}
 
 	var req struct {
-		Recipe   Recipe                 `json:"recipe"`
+		Recipe   *models.Recipe         `json:"recipe"`
 		Feedback TransformationFeedback `json:"feedback"`
 	}
 

@@ -24,7 +24,7 @@ ansible-playbook site.yml -e target_host=$TARGET_HOST
 
 # Test deployment
 ssh root@$TARGET_HOST
-su - ploy -c "./test-scripts/test-traefik-integration.sh"
+su - ploy -c "./tests/scripts/test-traefik-integration.sh"
 ```
 
 ## Architecture
@@ -157,7 +157,7 @@ su - ploy -c "./test-traefik-integration.sh"
 curl localhost:{4646,8500,8200}/v1/status/leader
 
 # Lane detection and API
-./test-scripts/test-{lane-detection,build-pipeline,api}.sh
+./tests/scripts/test-{lane-detection,build-pipeline,api}.sh
 
 # Storage and routing
 curl localhost:9333/{vol/status,cluster/status}

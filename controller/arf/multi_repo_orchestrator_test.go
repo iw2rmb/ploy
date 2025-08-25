@@ -4,15 +4,20 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 func TestMultiRepoOrchestratorCreation(t *testing.T) {
-	engine := &MockParallelEngine{}
+	// Create mock storage and components for executor  
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb)
 	
 	if orchestrator == nil {
 		t.Fatal("Expected non-nil orchestrator")
@@ -20,12 +25,14 @@ func TestMultiRepoOrchestratorCreation(t *testing.T) {
 }
 
 func TestDependencyAnalysis(t *testing.T) {
-	engine := &MockParallelEngine{}
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb)
 	
 	repositories := []Repository{
 		{
@@ -74,12 +81,14 @@ func TestDependencyAnalysis(t *testing.T) {
 }
 
 func TestExecutionLevels(t *testing.T) {
-	engine := &MockParallelEngine{}
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb).(*DefaultMultiRepoOrchestrator)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb).(*DefaultMultiRepoOrchestrator)
 	
 	repositories := []Repository{
 		{ID: "repo-a", Dependencies: []string{"repo-b"}},
@@ -178,8 +187,20 @@ func TestExecutionPlanCreation(t *testing.T) {
 		},
 	}
 	
-	recipes := []Recipe{
-		{ID: "test-recipe", Category: CategoryCleanup, Confidence: 0.9},
+	recipes := []*models.Recipe{
+		{
+			ID: "test-recipe",
+			Metadata: models.RecipeMetadata{
+				Name:       "test-recipe",
+				Author:     "test-author",
+				Categories: []string{"code-cleanup"},
+			},
+			Steps: []models.RecipeStep{{
+				Name: "test-step",
+				Type: models.StepTypeOpenRewrite,
+				Config: map[string]interface{}{"recipe": "test"},
+			}},
+		},
 	}
 	
 	ctx := context.Background()
