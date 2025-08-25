@@ -376,91 +376,32 @@ func (r *RenderData) SetDefaults() {
 	}
 }
 
-// processConditionalBlocks handles {{#if CONDITION}} blocks in templates
+// processConditionalBlocks handles {{#if CONDITION}} blocks in templates  
 func processConditionalBlocks(template string, data RenderData) string {
 	result := template
 	
 	// DEBUG: Add a marker to confirm this function is called
 	result = strings.ReplaceAll(result, "task \"osv-jvm\" {", "task \"osv-jvm\" { # CONDITIONAL_PROCESSING_EXECUTED")
 	
-	// DEBUG: Add debug marker to trace template state
-	if strings.Contains(result, "{{/if}}") {
-		result = strings.ReplaceAll(result, "{{/if}}", "{{/if}} # CLOSING_TAG_PRESENT")
-	} else {
-		result = strings.ReplaceAll(result, "# JVM-specific configuration", "# CLOSING_TAGS_MISSING - JVM-specific configuration")
-	}
+	// Simple and reliable approach: process conditions based on RenderData values
+	// Since closing tags are confirmed present, use simple string replacement
 	
-	// Aggressive approach: handle all known conditions with simple string replacements
-	// This bypasses the regex complexity and forces the processing to work
-	
-	// Handle CONNECT_ENABLED (true by default for enhanced deployments)
-	if data.ConnectEnabled {
-		result = strings.ReplaceAll(result, "{{#if CONNECT_ENABLED}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End CONNECT_ENABLED)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire CONNECT_ENABLED blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
-	}
-	
-	// Handle VAULT_ENABLED (true by default for secret management)
-	if data.VaultEnabled {
-		result = strings.ReplaceAll(result, "{{#if VAULT_ENABLED}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End VAULT_ENABLED)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire VAULT_ENABLED blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
-	}
-	
-	// Handle CONSUL_CONFIG_ENABLED (true by default for configuration)
-	if data.ConsulConfigEnabled {
-		result = strings.ReplaceAll(result, "{{#if CONSUL_CONFIG_ENABLED}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End CONSUL_CONFIG_ENABLED)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire CONSUL_CONFIG_ENABLED blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if CONSUL_CONFIG_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	// Handle DEBUG_ENABLED (false by default)
+	if !data.DebugEnabled {
+		// Find and remove specific DEBUG_ENABLED blocks
+		result = strings.ReplaceAll(result, "      {{#if DEBUG_ENABLED}}\n      port \"debug\" {\n        to = 5005\n      }\n      {{/if}}", "")
+		result = strings.ReplaceAll(result, "        {{#if DEBUG_ENABLED}}\n        DEBUG_PORT = \"5005\"\n        JAVA_TOOL_OPTIONS = \"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005\"\n        {{/if}}", "")
 	}
 	
 	// Handle VOLUME_ENABLED (false by default)
-	if data.VolumeEnabled {
-		result = strings.ReplaceAll(result, "{{#if VOLUME_ENABLED}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End VOLUME_ENABLED)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire VOLUME_ENABLED blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if VOLUME_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
+	if !data.VolumeEnabled {
+		// Find and remove specific VOLUME_ENABLED blocks
+		result = strings.ReplaceAll(result, "    {{#if VOLUME_ENABLED}}\n    volume \"jvm-data\" {\n      type      = \"host\"\n      source    = \"jvm-data\"\n      read_only = false\n    }\n    {{/if}}", "")
+		result = strings.ReplaceAll(result, "      {{#if VOLUME_ENABLED}}\n        type   = \"host\"\n        source = \"jvm-data\"\n      {{/if}}", "")
 	}
 	
-	// Handle DEBUG_ENABLED (based on build type)
-	if data.DebugEnabled {
-		result = strings.ReplaceAll(result, "{{#if DEBUG_ENABLED}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End DEBUG_ENABLED)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire DEBUG_ENABLED blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if DEBUG_ENABLED\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
-	}
-	
-	// Handle GRPC_PORT condition (based on port > 0)
-	if data.GrpcPort > 0 {
-		result = strings.ReplaceAll(result, "{{#if GRPC_PORT}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End GRPC_PORT)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire GRPC_PORT blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if GRPC_PORT\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
-	}
-	
-	// Handle DISK_SIZE condition (based on size > 0)
-	if data.DiskSize > 0 {
-		result = strings.ReplaceAll(result, "{{#if DISK_SIZE}}", "")
-		result = regexp.MustCompile(`(?s)\{\{/if\}\}(\s*# End DISK_SIZE)?`).ReplaceAllString(result, "")
-	} else {
-		// Remove entire DISK_SIZE blocks
-		result = regexp.MustCompile(`(?s)\s*\{\{#if DISK_SIZE\}\}.*?\{\{/if\}\}`).ReplaceAllString(result, "")
-	}
-	
-	// Clean up multiple consecutive blank lines that result from removed blocks
+	// Clean up any remaining whitespace
 	result = regexp.MustCompile(`\n\s*\n\s*\n`).ReplaceAllString(result, "\n\n")
-	
-	// Clean up comment lines that are left hanging without content
-	result = regexp.MustCompile(`(?m)^\s*#[^\n]*\n\s*\n`).ReplaceAllString(result, "\n")
 	
 	return result
 }
