@@ -375,26 +375,38 @@ func (r *RenderData) SetDefaults() {
 
 // processConditionalBlocks handles {{#if CONDITION}} blocks in templates
 func processConditionalBlocks(template string, data RenderData) string {
-	// Handle conditional blocks with regex
-	conditionalRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}`)
+	result := template
 	
-	result := conditionalRegex.ReplaceAllStringFunc(template, func(match string) string {
-		submatch := conditionalRegex.FindStringSubmatch(match)
-		if len(submatch) < 3 {
+	// Process conditional blocks iteratively to handle nesting
+	for {
+		// Find innermost conditional blocks (blocks that don't contain other {{#if}} blocks)
+		innermostRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}([^{]*(?:\{[^{]|[^{])*?)\{\{/if\}\}`)
+		
+		matches := innermostRegex.FindAllStringSubmatch(result, -1)
+		if len(matches) == 0 {
+			// No more conditional blocks to process
+			break
+		}
+		
+		// Process each innermost block
+		result = innermostRegex.ReplaceAllStringFunc(result, func(match string) string {
+			submatch := innermostRegex.FindStringSubmatch(match)
+			if len(submatch) < 3 {
+				return ""
+			}
+			
+			condition := submatch[1]
+			content := submatch[2]
+			
+			// Evaluate condition based on RenderData fields
+			shouldInclude := evaluateCondition(condition, data)
+			
+			if shouldInclude {
+				return content
+			}
 			return ""
-		}
-		
-		condition := submatch[1]
-		content := submatch[2]
-		
-		// Evaluate condition based on RenderData fields
-		shouldInclude := evaluateCondition(condition, data)
-		
-		if shouldInclude {
-			return content
-		}
-		return ""
-	})
+		})
+	}
 	
 	return result
 }
