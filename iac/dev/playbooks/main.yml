@@ -143,6 +143,17 @@
             path: /root/go
             state: directory
 
+    - name: Install QEMU for OSv runtime support
+      apt:
+        name:
+          - qemu-system-x86
+          - qemu-utils
+          - qemu-system-common
+          - libvirt-daemon-system
+          - libvirt-clients
+        state: present
+        update_cache: yes
+
     - name: Install Python3 and pip
       apt:
         name:
@@ -989,6 +1000,28 @@
         - name: Display KraftKit version
           debug:
             msg: "KraftKit installed successfully: {{ kraft_version.stdout_lines[0] if kraft_version.stdout_lines else 'Version info not available' }}"
+
+        - name: Check if Capstan is already installed
+          stat:
+            path: /usr/local/bin/capstan
+          register: capstan_binary
+
+        - name: Download Capstan for OSv builds
+          get_url:
+            url: "https://github.com/cloudius-systems/capstan/releases/download/v{{ build_tools.capstan.version }}/capstan"
+            dest: /usr/local/bin/capstan
+            mode: '0755'
+          when: not capstan_binary.stat.exists
+
+        - name: Verify Capstan installation
+          command: /usr/local/bin/capstan --version
+          register: capstan_version
+          changed_when: false
+          ignore_errors: true
+
+        - name: Display Capstan version
+          debug:
+            msg: "Capstan installed successfully: {{ capstan_version.stdout if capstan_version.rc == 0 else 'Version check not available' }}"
 
         - name: Check if Cosign is already installed
           stat:

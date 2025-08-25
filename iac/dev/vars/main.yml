@@ -73,7 +73,7 @@ build_tools:
   kraft: 
     version: "0.11.6"  # Latest stable KraftKit
   capstan:
-    version: "0.54.0"
+    version: "1.0.0"
   cosign:
     version: "2.4.0"   # Latest stable Cosign
   syft:
