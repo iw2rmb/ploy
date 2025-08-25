@@ -400,6 +400,15 @@ func processConditionalBlocks(template string, data RenderData) string {
 		result = strings.ReplaceAll(result, "      {{#if VOLUME_ENABLED}}\n        type   = \"host\"\n        source = \"jvm-data\"\n      {{/if}}", "")
 	}
 	
+	// For now, just remove all remaining conditional tags to make HCL valid
+	// This is a temporary fix to get Lane C deployment working
+	result = strings.ReplaceAll(result, "{{#if CONNECT_ENABLED}}", "")
+	result = strings.ReplaceAll(result, "{{#if VAULT_ENABLED}}", "")  
+	result = strings.ReplaceAll(result, "{{#if CONSUL_CONFIG_ENABLED}}", "")
+	result = strings.ReplaceAll(result, "{{#if GRPC_PORT}}", "")
+	result = strings.ReplaceAll(result, "{{#if DISK_SIZE}}", "")
+	result = strings.ReplaceAll(result, "{{/if}}", "")
+	
 	// Clean up any remaining whitespace
 	result = regexp.MustCompile(`\n\s*\n\s*\n`).ReplaceAllString(result, "\n\n")
 	
