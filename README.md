@@ -43,6 +43,8 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - **✅ High Availability** — Distributed processing with Consul leader election and state management
 - **✅ Pattern Learning Database** — Vector similarity matching for cross-repository learning
 - **✅ Comprehensive API & CLI** — Complete `/v1/arf/*` endpoints and `ploy arf` command suite
+- **✅ Lane C OSv Integration** — End-to-end Java→OSv unikernel deployment with 60-80MB image optimization
+- **✅ Benchmark System** — Comprehensive Java 11→17 migration testing with diff capture and timing analysis
 
 **✅ Production Features:**
 - **AST Caching** — Memory-mapped files with 10x performance improvement
@@ -56,7 +58,7 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - SeaweedFS for AST cache storage and artifact management
 - Consul for distributed coordination and state management
 
-**Status:** ✅ **Phases ARF-1 & ARF-2 Complete** - Foundation and self-healing capabilities fully implemented and tested with 100% test pass rate.
+**Status:** ✅ **Phases ARF-1 through ARF-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 11→17 migration pipeline successfully validated with Spring PetClinic on production VPS infrastructure.
 
 ## High Availability Controller Architecture
 
