@@ -376,9 +376,11 @@ func (r *RenderData) SetDefaults() {
 // processConditionalBlocks handles {{#if CONDITION}} blocks in templates
 func processConditionalBlocks(template string, data RenderData) string {
 	result := template
+	iteration := 0
 	
 	// Process conditional blocks iteratively to handle nesting
 	for {
+		iteration++
 		// Find innermost conditional blocks (blocks that don't contain other {{#if}} blocks)
 		// Use original precise regex that only captures the conditional block content
 		innermostRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}([^{]*(?:\{[^{]|[^{])*?)\{\{/if\}\}`)
@@ -387,6 +389,12 @@ func processConditionalBlocks(template string, data RenderData) string {
 		if len(matches) == 0 {
 			// No more conditional blocks to process
 			break
+		}
+		
+		// DEBUG: Log what we found
+		fmt.Printf("DEBUG: Template processing iteration %d, found %d conditional blocks\n", iteration, len(matches))
+		for i, match := range matches {
+			fmt.Printf("  Block %d: condition=%s\n", i+1, match[1])
 		}
 		
 		// Process each innermost block
@@ -402,12 +410,22 @@ func processConditionalBlocks(template string, data RenderData) string {
 			// Evaluate condition based on RenderData fields
 			shouldInclude := evaluateCondition(condition, data)
 			
+			// DEBUG: Log condition evaluation
+			fmt.Printf("  DEBUG: Condition %s = %t (VaultEnabled=%t, ConnectEnabled=%t, ConsulConfigEnabled=%t)\n", 
+				condition, shouldInclude, data.VaultEnabled, data.ConnectEnabled, data.ConsulConfigEnabled)
+			
 			if shouldInclude {
 				return content
 			}
 			// If condition is false, remove the block but preserve surrounding structure
 			return ""
 		})
+		
+		// Prevent infinite loops
+		if iteration > 10 {
+			fmt.Printf("DEBUG: Breaking after %d iterations to prevent infinite loop\n", iteration)
+			break
+		}
 	}
 	
 	// Clean up multiple consecutive blank lines that result from removed blocks
