@@ -182,9 +182,6 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	// DEBUG: Add a marker to see if template processing is happening
 	s = strings.ReplaceAll(s, "# Persistent volume for JVM heap dumps and logs", "# TEMPLATE_PROCESSING_EXECUTED - Persistent volume for JVM heap dumps and logs")
 	
-	// DEBUG: Add a marker to show original template has closing tags
-	s = strings.ReplaceAll(s, "{{/if}}", "{{/if}} # CLOSING_TAG_FOUND")
-	
 	// Process conditional blocks first (proper implementation without interference)
 	s = processConditionalBlocks(s, data)
 	
