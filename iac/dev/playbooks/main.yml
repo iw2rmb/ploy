@@ -1023,6 +1023,129 @@
           debug:
             msg: "Capstan installed successfully: {{ capstan_version.stdout if capstan_version.rc == 0 else 'Version check not available' }}"
 
+        - name: Setup OSv base image for Capstan
+          block:
+            - name: Create capstan repository structure for hashicorp user
+              file:
+                path: /opt/hashicorp/.capstan/repository/cloudius/osv/mike
+                state: directory
+                owner: hashicorp
+                group: hashicorp
+                mode: '0755'
+              become: true
+
+            - name: Download OSv loader image
+              get_url:
+                url: "https://github.com/cloudius-systems/osv/releases/download/v0.57.0/osv-loader.qemu.x86_64"
+                dest: /tmp/osv-loader.qemu
+                mode: '0644'
+              become: true
+
+            - name: Compress OSv loader image
+              archive:
+                path: /tmp/osv-loader.qemu
+                dest: /opt/hashicorp/.capstan/repository/cloudius/osv/mike/osv-loader.qemu.gz
+                format: gz
+                remove: true
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Create index.yaml for OSv base image
+              copy:
+                content: |
+                  format_version: "1"
+                  version: "v0.57.0"
+                  created: "2025-08-25T06:00:00Z"
+                  description: "OSv base image for capstan"
+                  platform: "x86_64"
+                dest: /opt/hashicorp/.capstan/repository/cloudius/osv/index.yaml
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+        - name: Setup Capstan Java packages
+          block:
+            - name: Create capstan packages directory
+              file:
+                path: /opt/hashicorp/.capstan/packages
+                state: directory
+                owner: hashicorp
+                group: hashicorp
+                mode: '0755'
+              become: true
+
+            - name: Download osv.bootstrap package from GitHub
+              shell: |
+                sudo -u hashicorp capstan package pull osv.bootstrap
+              ignore_errors: true
+              become: true
+
+            - name: Download openjdk8-zulu-full package from S3
+              get_url:
+                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-full.mpm"
+                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-full.mpm
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Download openjdk8-zulu-full package YAML from S3
+              get_url:
+                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-full.yaml"
+                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-full.yaml
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Download openjdk8-zulu-compact1 package from S3
+              get_url:
+                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-compact1.mpm"
+                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-compact1.mpm
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Download openjdk8-zulu-compact1 package YAML from S3
+              get_url:
+                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-compact1.yaml"
+                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-compact1.yaml
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Download osv-loader from S3 to mike directory
+              get_url:
+                url: "https://mikelangelo-capstan.s3.amazonaws.com/mike/osv-loader/osv-loader.qemu.gz"
+                dest: /opt/hashicorp/.capstan/repository/mike/osv-loader/osv-loader.qemu.gz
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Download osv-loader index from S3
+              get_url:
+                url: "https://mikelangelo-capstan.s3.amazonaws.com/mike/osv-loader/index.yaml"
+                dest: /opt/hashicorp/.capstan/repository/mike/osv-loader/index.yaml
+                owner: hashicorp
+                group: hashicorp
+                mode: '0644'
+              become: true
+
+            - name: Ensure mike directory structure exists
+              file:
+                path: /opt/hashicorp/.capstan/repository/mike/osv-loader
+                state: directory
+                owner: hashicorp
+                group: hashicorp
+                mode: '0755'
+              become: true
+
         - name: Check if Cosign is already installed
           stat:
             path: /usr/local/bin/cosign

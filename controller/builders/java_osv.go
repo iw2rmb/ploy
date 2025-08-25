@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type JavaOSVRequest struct {
@@ -644,9 +645,15 @@ func detectJavaVersionFromFile(srcDir string) string {
 	return ""
 }
 
-// buildOSvWithCapstan builds an OSv image using capstan directly
+// buildOSvWithCapstan builds an OSv image using capstan package approach
 func buildOSvWithCapstan(jibTar, mainClass, app, sha, outputPath, javaVersion string) error {
-	fmt.Printf("Building OSv image with capstan for app: %s\n", app)
+	fmt.Printf("Building OSv image with capstan package approach for app: %s\n", app)
+	
+	// Check if capstan is available
+	if _, err := exec.LookPath("capstan"); err != nil {
+		fmt.Println("Warning: capstan not found in PATH, falling back to container-based build")
+		return buildWithJibContainer(jibTar, mainClass, app, sha, outputPath)
+	}
 	
 	// Create a temporary working directory
 	workDir, err := ioutil.TempDir("", "osv-build-*")
@@ -666,62 +673,81 @@ func buildOSvWithCapstan(jibTar, mainClass, app, sha, outputPath, javaVersion st
 		return fmt.Errorf("failed to extract tar: %w", err)
 	}
 	
-	// Create capstan project structure
-	projectDir := filepath.Join(workDir, "capstan_project")
-	filesDir := filepath.Join(projectDir, "files", "app")
-	if err := os.MkdirAll(filesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create capstan project structure: %w", err)
+	// Create capstan package structure
+	projectDir := filepath.Join(workDir, "package")
+	metaDir := filepath.Join(projectDir, "meta")
+	if err := os.MkdirAll(metaDir, 0755); err != nil {
+		return fmt.Errorf("failed to create package structure: %w", err)
 	}
 	
-	// Copy application files to capstan structure
+	// Copy application files to package root
 	for _, dir := range []string{"classes", "resources", "libs", "dependencies"} {
 		srcPath := filepath.Join(stagingDir, dir)
 		if exists(srcPath) {
-			dstPath := filepath.Join(filesDir, dir)
+			dstPath := filepath.Join(projectDir, dir)
 			if err := copyDir(srcPath, dstPath); err != nil {
 				fmt.Printf("Warning: failed to copy %s: %v\n", dir, err)
 			}
 		}
 	}
 	
-	// Create Capstanfile
-	capstanfileContent := fmt.Sprintf(`# Java %s application build for OSv
-base: cloudius/osv
-cmdline: "/java.so -XX:+UnlockExperimentalVMOptions -XX:+UseZGC -cp /app/classes:/app/resources:/app/libs/* %s"
-name: ploy/%s
-`, javaVersion, mainClass, app)
+	// Determine which Java package to use
+	javaPackage := "openjdk8-zulu-full" // Default for Java 8
 	
-	capstanfilePath := filepath.Join(projectDir, "Capstanfile")
-	if err := ioutil.WriteFile(capstanfilePath, []byte(capstanfileContent), 0644); err != nil {
-		return fmt.Errorf("failed to write Capstanfile: %w", err)
+	// Create package.yaml
+	packageYaml := fmt.Sprintf(`name: %s
+title: %s
+author: ploy
+version: "1.0"
+require:
+- %s
+created: "%s"
+`, app, app, javaPackage, time.Now().Format(time.RFC3339))
+	
+	packageYamlPath := filepath.Join(metaDir, "package.yaml")
+	if err := ioutil.WriteFile(packageYamlPath, []byte(packageYaml), 0644); err != nil {
+		return fmt.Errorf("failed to write package.yaml: %w", err)
 	}
 	
-	// Check if capstan is available
-	if _, err := exec.LookPath("capstan"); err != nil {
-		fmt.Println("Warning: capstan not found in PATH, falling back to container-based build")
-		return buildWithJibContainer(jibTar, mainClass, app, sha, outputPath)
+	// Create run.yaml with proper Java configuration
+	runYaml := fmt.Sprintf(`runtime: java
+config_set:
+  default:
+    main: %s
+    classpath:
+      - /classes
+      - /resources
+      - /libs/*
+      - /dependencies/*
+    jvm_args: "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC"
+config_set_default: default
+`, mainClass)
+	
+	runYamlPath := filepath.Join(metaDir, "run.yaml")
+	if err := ioutil.WriteFile(runYamlPath, []byte(runYaml), 0644); err != nil {
+		return fmt.Errorf("failed to write run.yaml: %w", err)
 	}
 	
-	// Build with capstan
-	fmt.Println("Building OSv image with capstan...")
-	imageName := fmt.Sprintf("ploy/%s", app)
-	cmd := exec.Command("capstan", "build", "-p", "qemu", "-v", imageName)
-	cmd.Dir = projectDir
+	// Compose the package into an OSv image
+	fmt.Println("Composing OSv image with capstan package...")
+	imageName := fmt.Sprintf("ploy-%s", app)
+	composeCmd := exec.Command("capstan", "package", "compose", "--pull-missing", imageName)
+	composeCmd.Dir = projectDir
 	
-	// Capture stderr to get detailed error messages
+	// Capture stderr for debugging
 	var stderr bytes.Buffer
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = &stderr
+	composeCmd.Stdout = os.Stdout
+	composeCmd.Stderr = &stderr
 	
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("capstan build failed: %w, stderr: %s", err, stderr.String())
+	if err := composeCmd.Run(); err != nil {
+		return fmt.Errorf("capstan package compose failed: %w, stderr: %s", err, stderr.String())
 	}
 	
-	// Find the generated image
-	imgPath := filepath.Join(os.Getenv("HOME"), ".capstan", "repository", "ploy", app, "qemu", app+".qcow2")
+	// Find the generated image - package compose creates it in capstan repository
+	imgPath := filepath.Join(os.Getenv("HOME"), ".capstan", "repository", imageName, imageName+".qemu")
 	if !exists(imgPath) {
-		// Try alternative path
-		imgPath = filepath.Join(projectDir, app+".qcow2")
+		// Try without ploy prefix
+		imgPath = filepath.Join(os.Getenv("HOME"), ".capstan", "repository", app, app+".qemu")
 		if !exists(imgPath) {
 			return fmt.Errorf("capstan image not found at expected locations")
 		}
@@ -732,7 +758,7 @@ name: ploy/%s
 		return fmt.Errorf("failed to copy image to output: %w", err)
 	}
 	
-	fmt.Printf("OSv image successfully created: %s\n", outputPath)
+	fmt.Printf("OSv image successfully created: %s (size: %.2f MB)\n", outputPath, float64(fileSize(outputPath))/(1024*1024))
 	return nil
 }
 
@@ -844,3 +870,12 @@ func copyDir(src, dst string) error {
 }
 
 // copyFile is already defined in wasm.go, so we'll use that one
+
+// fileSize returns the size of a file in bytes
+func fileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
+}
