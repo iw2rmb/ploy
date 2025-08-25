@@ -719,7 +719,9 @@ config_set:
       - /resources
       - /libs/*
       - /dependencies/*
-    jvm_args: "-XX:+UnlockExperimentalVMOptions -XX:+UseZGC"
+    jvm_args:
+      - "-XX:+UnlockExperimentalVMOptions"
+      - "-XX:+UseZGC"
 config_set_default: default
 `, mainClass)
 	
