@@ -177,25 +177,7 @@ func CreateTempFile(t *testing.T, dir, pattern, content string) string {
 	return file.Name()
 }
 
-// AssertEventually retries an assertion until it passes or times out
-func AssertEventually(t *testing.T, assertion func() bool, timeout time.Duration, message string) {
-	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	for {
-		select {
-		case <-ctx.Done():
-			t.Fatalf("Assertion failed within timeout: %s", message)
-		default:
-			if assertion() {
-				return
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-}
+// Note: AssertEventually is defined in assertions.go
 
 // SkipIfNoDocker skips the test if Docker is not available
 func SkipIfNoDocker(t *testing.T) {

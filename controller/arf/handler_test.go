@@ -12,7 +12,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/controller/arf/models"
-	"github.com/iw2rmb/ploy/controller/arf/storage"
 )
 
 // Mock implementations for testing
@@ -65,11 +64,9 @@ func (m *MockEngine) CacheAST(key string, ast *AST) error {
 	return nil
 }
 
-
 func (m *MockEngine) GetCachedAST(key string) (*AST, bool) {
 	return nil, false
 }
-
 
 type ValidationError struct {
 	Message string
@@ -99,8 +96,8 @@ func setupTestHandler() (*Handler, *RecipeExecutor, *MockRecipeCatalog, *MockSan
 			Categories:  []string{"code-cleanup"},
 		},
 		Steps: []models.RecipeStep{{
-			Name: "cleanup-step",
-			Type: models.StepTypeOpenRewrite,
+			Name:   "cleanup-step",
+			Type:   models.StepTypeOpenRewrite,
 			Config: map[string]interface{}{"recipe": "org.openrewrite.java.cleanup.TestRecipe"},
 		}},
 	}
@@ -208,8 +205,8 @@ func TestHandlerCreateRecipe(t *testing.T) {
 				Categories:  []string{"modernization"},
 			},
 			Steps: []models.RecipeStep{{
-				Name: "modernize-step",
-				Type: models.StepTypeOpenRewrite,
+				Name:   "modernize-step",
+				Type:   models.StepTypeOpenRewrite,
 				Config: map[string]interface{}{"recipe": "org.openrewrite.java.modernize.NewRecipe"},
 			}},
 		}
@@ -491,8 +488,8 @@ func BenchmarkHandlerListRecipes(b *testing.B) {
 				Categories:  []string{"code-cleanup"},
 			},
 			Steps: []models.RecipeStep{{
-				Name: "bench-step",
-				Type: models.StepTypeOpenRewrite,
+				Name:   "bench-step",
+				Type:   models.StepTypeOpenRewrite,
 				Config: map[string]interface{}{"recipe": "bench"},
 			}},
 		}

@@ -417,12 +417,6 @@ func (suite *DatabaseTestSuite) AssertRecordExists(table string, conditions map[
 		i++
 	}
 
-	query := fmt.Sprintf(
-		"SELECT COUNT(*) FROM %s WHERE %s",
-		table,
-		strings.Join(whereParts, " AND "),
-	)
-
 	count := suite.DB.CountRows(suite.t, table, strings.Join(whereParts, " AND "), values...)
 	require.Greater(suite.t, count, 0, "Expected record to exist in table %s", table)
 }
