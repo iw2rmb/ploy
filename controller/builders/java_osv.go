@@ -2,6 +2,7 @@ package builders
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"errors"
 	"fmt"
@@ -706,11 +707,14 @@ name: ploy/%s
 	imageName := fmt.Sprintf("ploy/%s", app)
 	cmd := exec.Command("capstan", "build", "-p", "qemu", "-v", imageName)
 	cmd.Dir = projectDir
+	
+	// Capture stderr to get detailed error messages
+	var stderr bytes.Buffer
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = &stderr
 	
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("capstan build failed: %w", err)
+		return fmt.Errorf("capstan build failed: %w, stderr: %s", err, stderr.String())
 	}
 	
 	// Find the generated image
