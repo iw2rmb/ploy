@@ -440,12 +440,6 @@ func (c *SeaweedFSClient) uploadFile(keyPrefix, filePath, contentType string) er
 
 	key := keyPrefix + filepath.Base(filePath)
 
-	// Get file info for verification
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
-	}
-
 	// Retry upload up to 3 times
 	var lastErr error
 	for attempt := 1; attempt <= 3; attempt++ {
@@ -461,13 +455,13 @@ func (c *SeaweedFSClient) uploadFile(keyPrefix, filePath, contentType string) er
 			continue
 		}
 
-		// Verify upload by checking if we got a file ID
-		if result.ETag != "" {
-			fmt.Printf("Successfully uploaded to SeaweedFS %s (size: %d bytes, FileID: %s)\n", key, fileInfo.Size(), result.ETag)
+		// Verify upload by checking if we got a valid result with size
+		if result != nil && result.Size > 0 {
+			fmt.Printf("Successfully uploaded to SeaweedFS %s (size: %d bytes)\n", key, result.Size)
 			return nil
 		}
 
-		lastErr = fmt.Errorf("upload completed but no file ID received")
+		lastErr = fmt.Errorf("upload completed but no valid result received")
 	}
 
 	return fmt.Errorf("failed to upload after 3 attempts: %w", lastErr)

@@ -14,15 +14,17 @@ import (
 
 // RecipeExecutor executes transformation recipes
 type RecipeExecutor struct {
-	storage    storage.RecipeStorage
-	sandboxMgr SandboxManager
+	storage         storage.RecipeStorage
+	sandboxMgr      SandboxManager
+	openRewriteEngine *OpenRewriteEngine
 }
 
 // NewRecipeExecutor creates a new recipe executor
 func NewRecipeExecutor(storage storage.RecipeStorage, sandboxMgr SandboxManager) *RecipeExecutor {
 	return &RecipeExecutor{
-		storage:    storage,
-		sandboxMgr: sandboxMgr,
+		storage:           storage,
+		sandboxMgr:        sandboxMgr,
+		openRewriteEngine: NewOpenRewriteEngine(),
 	}
 }
 
@@ -110,9 +112,8 @@ func (e *RecipeExecutor) executeStep(ctx context.Context, step *models.RecipeSte
 	// Execute based on step type
 	switch step.Type {
 	case models.StepTypeOpenRewrite:
-		// For now, return a mock result
-		// Real OpenRewrite execution will be implemented in Phase 5.3
-		return e.executeMockOpenRewrite(ctx, step, repoPath)
+		// Use real OpenRewrite engine
+		return e.openRewriteEngine.Execute(ctx, step, repoPath)
 	case models.StepTypeShellScript:
 		// Shell script execution placeholder
 		return nil, fmt.Errorf("shell script execution not yet implemented")

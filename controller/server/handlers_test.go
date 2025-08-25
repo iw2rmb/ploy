@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -15,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/iw2rmb/ploy/controller/envstore"
 )
 
 // Mock storage client for testing
@@ -47,17 +48,17 @@ type MockEnvStore struct {
 	mock.Mock
 }
 
-func (m *MockEnvStore) Get(appName, key string) (string, error) {
+func (m *MockEnvStore) Get(appName, key string) (string, bool, error) {
 	args := m.Called(appName, key)
-	return args.String(0), args.Error(1)
+	return args.String(0), args.Bool(1), args.Error(2)
 }
 
-func (m *MockEnvStore) GetAll(appName string) (map[string]string, error) {
+func (m *MockEnvStore) GetAll(appName string) (envstore.AppEnvVars, error) {
 	args := m.Called(appName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(map[string]string), args.Error(1)
+	return args.Get(0).(envstore.AppEnvVars), args.Error(1)
 }
 
 func (m *MockEnvStore) Set(appName, key, value string) error {
@@ -68,6 +69,19 @@ func (m *MockEnvStore) Set(appName, key, value string) error {
 func (m *MockEnvStore) Delete(appName, key string) error {
 	args := m.Called(appName, key)
 	return args.Error(0)
+}
+
+func (m *MockEnvStore) SetAll(appName string, envVars envstore.AppEnvVars) error {
+	args := m.Called(appName, envVars)
+	return args.Error(0)
+}
+
+func (m *MockEnvStore) ToStringArray(appName string) ([]string, error) {
+	args := m.Called(appName)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
 }
 
 // Mock config manager
@@ -98,8 +112,22 @@ func createTestApp() *fiber.App {
 	return app
 }
 
-func createMockServer() *Server {
-	return &Server{
+// TestableServer extends Server with mockable methods for testing
+type TestableServer struct {
+	*Server
+	mockStorageClient func() (interface{}, error)
+}
+
+func (ts *TestableServer) getStorageClient() (interface{}, error) {
+	if ts.mockStorageClient != nil {
+		return ts.mockStorageClient()
+	}
+	// This would normally call the real method, but in tests we always use mock
+	return nil, fmt.Errorf("no mock storage client configured")
+}
+
+func createMockServer() *TestableServer {
+	server := &Server{
 		app:    createTestApp(),
 		config: &ControllerConfig{},
 		dependencies: &ServiceDependencies{
@@ -107,6 +135,7 @@ func createMockServer() *Server {
 			StorageConfigPath: "/test/config",
 		},
 	}
+	return &TestableServer{Server: server}
 }
 
 func TestParseIntEnv(t *testing.T) {
@@ -272,18 +301,17 @@ func TestServer_HandleStorageHealth_Success(t *testing.T) {
 	server := createMockServer()
 	
 	// Override getStorageClient to return our mock
-	originalGetStorageClient := server.getStorageClient
-	server.getStorageClient = func() (*MockStorageClient, error) {
+	server.mockStorageClient = func() (interface{}, error) {
 		return mockStorage, nil
 	}
-	defer func() { server.getStorageClient = originalGetStorageClient }()
 
 	// Set up route
 	server.app.Get("/storage/health", func(c *fiber.Ctx) error {
-		storeClient, err := server.getStorageClient()
+		storeClientInterface, err := server.getStorageClient()
 		if err != nil {
 			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 		}
+		storeClient := storeClientInterface.(*MockStorageClient)
 		health := storeClient.GetHealthStatus()
 		return c.JSON(health)
 	})
@@ -310,18 +338,18 @@ func TestServer_HandleStorageHealth_Error(t *testing.T) {
 	server := createMockServer()
 	
 	// Override getStorageClient to return error
-	server.getStorageClient = func() (*MockStorageClient, error) {
+	server.mockStorageClient = func() (interface{}, error) {
 		return nil, fmt.Errorf("storage initialization failed")
 	}
 
 	// Set up route
 	server.app.Get("/storage/health", func(c *fiber.Ctx) error {
-		storeClient, err := server.getStorageClient()
+		_, err := server.getStorageClient()
 		if err != nil {
 			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 		}
-		health := storeClient.GetHealthStatus()
-		return c.JSON(health)
+		// This won't be reached in the error test
+		return c.JSON(map[string]interface{}{"status": "healthy"})
 	})
 
 	// Test request
@@ -353,16 +381,17 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 	server := createMockServer()
 	
 	// Override getStorageClient to return our mock
-	server.getStorageClient = func() (*MockStorageClient, error) {
+	server.mockStorageClient = func() (interface{}, error) {
 		return mockStorage, nil
 	}
 
 	// Set up route
 	server.app.Get("/storage/metrics", func(c *fiber.Ctx) error {
-		storeClient, err := server.getStorageClient()
+		storeClientInterface, err := server.getStorageClient()
 		if err != nil {
 			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 		}
+		storeClient := storeClientInterface.(*MockStorageClient)
 		metrics := storeClient.GetMetrics()
 		return c.JSON(metrics)
 	})
@@ -389,7 +418,7 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 func TestServer_HandleGetEnvVars(t *testing.T) {
 	// Create mock environment store
 	mockEnvStore := &MockEnvStore{}
-	expectedVars := map[string]string{
+	expectedVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",
 		"DEBUG":        "true",
@@ -795,15 +824,16 @@ func BenchmarkServer_HandleStorageHealth(b *testing.B) {
 	mockStorage.On("GetHealthStatus").Return(healthStatus)
 
 	server := createMockServer()
-	server.getStorageClient = func() (*MockStorageClient, error) {
+	server.mockStorageClient = func() (interface{}, error) {
 		return mockStorage, nil
 	}
 
 	server.app.Get("/storage/health", func(c *fiber.Ctx) error {
-		storeClient, err := server.getStorageClient()
+		storeClientInterface, err := server.getStorageClient()
 		if err != nil {
 			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed"})
 		}
+		storeClient := storeClientInterface.(*MockStorageClient)
 		health := storeClient.GetHealthStatus()
 		return c.JSON(health)
 	})
@@ -818,7 +848,7 @@ func BenchmarkServer_HandleStorageHealth(b *testing.B) {
 
 func BenchmarkServer_HandleGetEnvVars(b *testing.B) {
 	mockEnvStore := &MockEnvStore{}
-	envVars := map[string]string{
+	envVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",
 	}

@@ -168,12 +168,15 @@ func TestCircularDependencyDetection(t *testing.T) {
 }
 
 func TestExecutionPlanCreation(t *testing.T) {
-	engine := &MockParallelEngine{}
+	// Create mock storage and components for executor  
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb)
 	
 	analysis := &DependencyAnalysis{
 		TotalRepositories: 3,
@@ -245,8 +248,12 @@ func TestRiskAssessment(t *testing.T) {
 		Dependencies:  []RepoDependency{{From: "a", To: "b", Type: DependencyLibrary}},
 	}
 	
-	lowRiskRecipes := []Recipe{
-		{Category: CategoryCleanup, Confidence: 0.9},
+	lowRiskRecipes := []*models.Recipe{
+		{
+			Metadata: models.RecipeMetadata{
+				Categories: []string{CategoryCleanup},
+			},
+		},
 	}
 	
 	risk := orchestrator.assessRiskLevel(lowRiskAnalysis, lowRiskRecipes)
@@ -261,9 +268,17 @@ func TestRiskAssessment(t *testing.T) {
 		Dependencies: make([]RepoDependency, 20), // Many dependencies
 	}
 	
-	highRiskRecipes := []Recipe{
-		{Category: CategorySecurity, Confidence: 0.6},
-		{Category: CategoryMigration, Confidence: 0.7},
+	highRiskRecipes := []*models.Recipe{
+		{
+			Metadata: models.RecipeMetadata{
+				Categories: []string{CategorySecurity},
+			},
+		},
+		{
+			Metadata: models.RecipeMetadata{
+				Categories: []string{CategoryMigration},
+			},
+		},
 	}
 	
 	risk = orchestrator.assessRiskLevel(highRiskAnalysis, highRiskRecipes)
@@ -273,12 +288,15 @@ func TestRiskAssessment(t *testing.T) {
 }
 
 func TestBatchTransformationWorkflow(t *testing.T) {
-	engine := &MockParallelEngine{}
+	// Create mock storage and components for executor  
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb)
 	
 	request := BatchTransformationRequest{
 		OrchestrationID: "test-orchestration-1",
@@ -286,8 +304,14 @@ func TestBatchTransformationWorkflow(t *testing.T) {
 			{ID: "repo-1", URL: "https://github.com/test/repo1", Dependencies: []string{}},
 			{ID: "repo-2", URL: "https://github.com/test/repo2", Dependencies: []string{"repo-1"}},
 		},
-		Recipes: []Recipe{
-			{ID: "test-recipe", Name: "Test Recipe", Category: CategoryCleanup, Confidence: 0.9},
+		Recipes: []*models.Recipe{
+			{
+				ID: "test-recipe",
+				Metadata: models.RecipeMetadata{
+					Name: "Test Recipe", 
+					Categories: []string{CategoryCleanup},
+				},
+			},
 		},
 		Options: BatchOptions{
 			ParallelExecution: true,
@@ -335,20 +359,28 @@ func TestBatchTransformationWorkflow(t *testing.T) {
 }
 
 func TestDryRunExecution(t *testing.T) {
-	engine := &MockParallelEngine{}
+	// Create mock storage and components for executor  
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb)
 	
 	request := BatchTransformationRequest{
 		OrchestrationID: "dry-run-test",
 		Repositories: []Repository{
 			{ID: "repo-1", URL: "https://github.com/test/repo1"},
 		},
-		Recipes: []Recipe{
-			{ID: "test-recipe", Category: CategoryCleanup},
+		Recipes: []*models.Recipe{
+			{
+				ID: "test-recipe",
+				Metadata: models.RecipeMetadata{
+					Categories: []string{CategoryCleanup},
+				},
+			},
 		},
 		Options: BatchOptions{
 			DryRun: true,
@@ -373,12 +405,15 @@ func TestDryRunExecution(t *testing.T) {
 }
 
 func TestOrchestrationStatusTracking(t *testing.T) {
-	engine := &MockParallelEngine{}
+	// Create mock storage and components for executor  
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb)
 	
 	// Test non-existent orchestration
 	status, err := orchestrator.GetOrchestrationStatus("non-existent")
@@ -395,8 +430,13 @@ func TestOrchestrationStatusTracking(t *testing.T) {
 		Repositories: []Repository{
 			{ID: "repo-1", URL: "https://github.com/test/repo1"},
 		},
-		Recipes: []Recipe{
-			{ID: "test-recipe", Category: CategoryCleanup},
+		Recipes: []*models.Recipe{
+			{
+				ID: "test-recipe",
+				Metadata: models.RecipeMetadata{
+					Categories: []string{CategoryCleanup},
+				},
+			},
 		},
 		Options: BatchOptions{DryRun: false},
 	}
@@ -446,19 +486,27 @@ func TestOrchestrationStatusTracking(t *testing.T) {
 }
 
 func TestParallelPhaseExecution(t *testing.T) {
-	engine := &MockParallelEngine{}
+	// Create mock storage and components for executor  
+	storage := NewInMemoryRecipeStorage()
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := &MockParallelRecipeCatalog{}
-	resolver := NewParallelResolver(engine, catalog, NewCircuitBreaker(CircuitConfig{}))
+	resolver := NewParallelResolver(executor, catalog, NewCircuitBreaker(CircuitConfig{}))
 	cb := NewCircuitBreaker(CircuitConfig{})
 	
-	orchestrator := NewMultiRepoOrchestrator(engine, catalog, resolver, cb).(*DefaultMultiRepoOrchestrator)
+	orchestrator := NewMultiRepoOrchestrator(executor, catalog, resolver, cb).(*DefaultMultiRepoOrchestrator)
 	
 	// Create a phase with multiple repositories (should execute in parallel)
 	phase := ExecutionPhase{
 		PhaseNumber:  1,
 		Repositories: []string{"repo-1", "repo-2", "repo-3"},
-		Recipes: []Recipe{
-			{ID: "test-recipe", Category: CategoryCleanup},
+		Recipes: []*models.Recipe{
+			{
+				ID: "test-recipe",
+				Metadata: models.RecipeMetadata{
+					Categories: []string{CategoryCleanup},
+				},
+			},
 		},
 		ParallelSafe: true,
 	}

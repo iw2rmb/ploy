@@ -90,12 +90,12 @@ A simple Go application for testing Ploy deployment.
 
 ## Endpoints
 
-- \`GET /\` - Returns a welcome message
-- \`GET /health\` - Health check endpoint
+- ` + "`" + `GET /` + "`" + ` - Returns a welcome message
+- ` + "`" + `GET /health` + "`" + ` - Health check endpoint
 
 ## Environment Variables
 
-- \`PORT\` - Server port (default: 8080)
+- ` + "`" + `PORT` + "`" + ` - Server port (default: 8080)
 `,
 			},
 		},
@@ -267,13 +267,13 @@ A simple Node.js/Express application for testing Ploy deployment.
 
 ## Endpoints
 
-- \`GET /\` - Welcome message
-- \`GET /health\` - Health check
-- \`GET /info\` - Application info
+- ` + "`" + `GET /` + "`" + ` - Welcome message
+- ` + "`" + `GET /health` + "`" + ` - Health check
+- ` + "`" + `GET /info` + "`" + ` - Application info
 
 ## Environment Variables
 
-- \`PORT\` - Server port (default: 3000)
+- ` + "`" + `PORT` + "`" + ` - Server port (default: 3000)
 `,
 			},
 		},
@@ -392,16 +392,16 @@ A Spring Boot application for testing Ploy deployment.
 
 ## Endpoints
 
-- \`GET /\` - Welcome message
-- \`GET /info\` - Application info
-- \`GET /actuator/health\` - Health check
-- \`GET /actuator/info\` - Actuator info
+- ` + "`" + `GET /` + "`" + ` - Welcome message
+- ` + "`" + `GET /info` + "`" + ` - Application info
+- ` + "`" + `GET /actuator/health` + "`" + ` - Health check
+- ` + "`" + `GET /actuator/info` + "`" + ` - Actuator info
 
 ## Build
 
-\` + "`" + `\` + "`" + `\` + "`" + `bash
+` + "```" + `bash
 ./gradlew build
-\` + "`" + `\` + "`" + `\` + "`" + `
+` + "```" + `
 `,
 			},
 		},

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -374,8 +375,8 @@ func TestPutObjectResult_CommonPatterns(t *testing.T) {
 			Size:     5242880, // 5MB
 		}
 
-		assert.HasPrefix(t, result.ETag, "\"")
-		assert.HasSuffix(t, result.ETag, "\"")
+		assert.True(t, strings.HasPrefix(result.ETag, "\""))
+		assert.True(t, strings.HasSuffix(result.ETag, "\""))
 		assert.Contains(t, result.Location, "https://")
 	})
 }

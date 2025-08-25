@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"io"
 	"strings"
@@ -12,8 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	
-	"github.com/iw2rmb/ploy/internal/testutils/mocks"
 )
 
 // MockStorageProvider implements StorageProvider for testing
