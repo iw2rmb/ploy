@@ -1044,14 +1044,212 @@ func (bs *BenchmarkSuite) saveResult(result *BenchmarkResult) error {
 		return err
 	}
 	
-	// Generate HTML report
-	htmlFile := strings.Replace(filename, ".json", ".html", 1)
-	return bs.generateHTMLReport(result, htmlFile)
+	// Generate Markdown report
+	markdownFile := strings.Replace(filename, ".json", ".md", 1)
+	return bs.generateMarkdownReport(result, markdownFile)
 }
 
-func (bs *BenchmarkSuite) generateHTMLReport(result *BenchmarkResult, filename string) error {
-	// TODO: Implement HTML report generation with charts and diffs
-	return nil
+func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filename string) error {
+	var report strings.Builder
+	
+	// Report Header
+	report.WriteString(fmt.Sprintf("# ARF Benchmark Report: %s\n\n", result.Config.Name))
+	report.WriteString(fmt.Sprintf("**Generated:** %s  \n", time.Now().Format("2006-01-02 15:04:05 UTC")))
+	report.WriteString(fmt.Sprintf("**Duration:** %s  \n", result.TotalDuration.Round(time.Second)))
+	report.WriteString(fmt.Sprintf("**Repository:** %s  \n", result.Config.RepoURL))
+	if result.Config.RepoBranch != "" {
+		report.WriteString(fmt.Sprintf("**Branch:** %s  \n", result.Config.RepoBranch))
+	}
+	report.WriteString("\n---\n\n")
+	
+	// Executive Summary
+	report.WriteString("## 📊 Executive Summary\n\n")
+	summary := result.Summary
+	report.WriteString(fmt.Sprintf("- **Total Iterations:** %d\n", summary.TotalIterations))
+	report.WriteString(fmt.Sprintf("- **Successful:** %d (%.1f%%)\n", summary.SuccessfulIterations, 
+		float64(summary.SuccessfulIterations)/float64(summary.TotalIterations)*100))
+	report.WriteString(fmt.Sprintf("- **Partial Success:** %d\n", summary.PartialIterations))
+	report.WriteString(fmt.Sprintf("- **Failed:** %d\n", summary.FailedIterations))
+	report.WriteString(fmt.Sprintf("- **Average Iteration Time:** %s\n", summary.AverageIterationTime.Round(time.Millisecond)))
+	report.WriteString(fmt.Sprintf("- **Total Files Modified:** %d\n", summary.TotalFilesModified))
+	report.WriteString(fmt.Sprintf("- **Total Lines Changed:** %d\n", summary.TotalLinesChanged))
+	report.WriteString(fmt.Sprintf("- **Final Compile Status:** %t\n", summary.FinalCompileStatus))
+	report.WriteString(fmt.Sprintf("- **Final Test Status:** %t\n", summary.FinalTestStatus))
+	
+	// LLM Analytics
+	if summary.TotalLLMCalls > 0 {
+		report.WriteString(fmt.Sprintf("- **LLM Calls:** %d\n", summary.TotalLLMCalls))
+		report.WriteString(fmt.Sprintf("- **LLM Tokens:** %d\n", summary.TotalLLMTokens))
+		if summary.TotalLLMCost > 0 {
+			report.WriteString(fmt.Sprintf("- **LLM Cost:** $%.4f\n", summary.TotalLLMCost))
+		}
+	}
+	report.WriteString("\n")
+	
+	// Configuration Details
+	report.WriteString("## ⚙️ Configuration\n\n")
+	report.WriteString("| Setting | Value |\n")
+	report.WriteString("|---------|-------|\n")
+	report.WriteString(fmt.Sprintf("| Task Type | %s |\n", result.Config.TaskType))
+	report.WriteString(fmt.Sprintf("| Source Language | %s |\n", result.Config.SourceLang))
+	report.WriteString(fmt.Sprintf("| Target Specification | %s |\n", result.Config.TargetSpec))
+	report.WriteString(fmt.Sprintf("| Max Iterations | %d |\n", result.Config.MaxIterations))
+	report.WriteString(fmt.Sprintf("| Timeout Per Iteration | %s |\n", result.Config.TimeoutPerIteration))
+	report.WriteString(fmt.Sprintf("| Stop On Success | %t |\n", result.Config.StopOnSuccess))
+	if result.Config.LLMProvider != "" {
+		report.WriteString(fmt.Sprintf("| LLM Provider | %s |\n", result.Config.LLMProvider))
+		report.WriteString(fmt.Sprintf("| LLM Model | %s |\n", result.Config.LLMModel))
+	}
+	
+	// Recipe Information
+	if len(result.Config.RecipeIDs) > 0 {
+		report.WriteString(fmt.Sprintf("| Applied Recipes | %d |\n", len(result.Config.RecipeIDs)))
+		report.WriteString("\n**Applied Recipes:**\n")
+		for i, recipe := range result.Config.RecipeIDs {
+			report.WriteString(fmt.Sprintf("%d. `%s`\n", i+1, recipe))
+		}
+	}
+	report.WriteString("\n")
+	
+	// Iteration Details
+	report.WriteString("## 🔄 Iteration Details\n\n")
+	for i, iteration := range result.Iterations {
+		report.WriteString(fmt.Sprintf("### Iteration %d - %s\n\n", iteration.Number, strings.ToUpper(iteration.Status)))
+		report.WriteString(fmt.Sprintf("**Duration:** %s  \n", iteration.Duration.Round(time.Millisecond)))
+		report.WriteString(fmt.Sprintf("**Started:** %s  \n", iteration.StartTime.Format("15:04:05")))
+		
+		// Stage Breakdown
+		if len(iteration.Stages) > 0 {
+			report.WriteString("\n**Stage Breakdown:**\n")
+			report.WriteString("| Stage | Status | Duration |\n")
+			report.WriteString("|-------|--------|----------|\n")
+			for _, stage := range iteration.Stages {
+				status := "✅"
+				if stage.Status != "success" {
+					status = "❌"
+				}
+				report.WriteString(fmt.Sprintf("| %s | %s %s | %s |\n", 
+					stage.Name, status, stage.Status, stage.Duration.Round(time.Millisecond)))
+			}
+		}
+		
+		// Metrics
+		if iteration.Metrics.FilesModified > 0 || iteration.Metrics.LinesAdded > 0 || iteration.Metrics.LinesRemoved > 0 {
+			report.WriteString("\n**Metrics:**\n")
+			if iteration.Metrics.FilesAnalyzed > 0 {
+				report.WriteString(fmt.Sprintf("- Files Analyzed: %d\n", iteration.Metrics.FilesAnalyzed))
+			}
+			if iteration.Metrics.FilesModified > 0 {
+				report.WriteString(fmt.Sprintf("- Files Modified: %d\n", iteration.Metrics.FilesModified))
+			}
+			if iteration.Metrics.LinesAdded > 0 {
+				report.WriteString(fmt.Sprintf("- Lines Added: %d\n", iteration.Metrics.LinesAdded))
+			}
+			if iteration.Metrics.LinesRemoved > 0 {
+				report.WriteString(fmt.Sprintf("- Lines Removed: %d\n", iteration.Metrics.LinesRemoved))
+			}
+			if iteration.Metrics.TestsRun > 0 {
+				report.WriteString(fmt.Sprintf("- Tests Run: %d (Passed: %d)\n", 
+					iteration.Metrics.TestsRun, iteration.Metrics.TestsPassed))
+			}
+		}
+		
+		// Errors
+		if len(iteration.Errors) > 0 {
+			report.WriteString("\n**Errors:**\n")
+			for j, err := range iteration.Errors {
+				report.WriteString(fmt.Sprintf("%d. **%s** (%s): %s\n", 
+					j+1, err.Type, err.Stage, err.Message))
+				if err.Details != "" && len(err.Details) < 200 {
+					report.WriteString(fmt.Sprintf("   ```\n   %s\n   ```\n", err.Details))
+				}
+			}
+		}
+		
+		// LLM Calls
+		if len(iteration.LLMCalls) > 0 {
+			report.WriteString("\n**LLM Calls:**\n")
+			for j, call := range iteration.LLMCalls {
+				status := "✅"
+				if !call.Success {
+					status = "❌"
+				}
+				report.WriteString(fmt.Sprintf("%d. %s **%s** (%s) - %d in + %d out tokens, %s", 
+					j+1, status, call.Purpose, call.Model, 
+					call.InputTokens, call.OutputTokens, call.Duration.Round(time.Millisecond)))
+				if call.Cost > 0 {
+					report.WriteString(fmt.Sprintf(" - $%.4f", call.Cost))
+				}
+				report.WriteString("\n")
+			}
+		}
+		
+		if i < len(result.Iterations)-1 {
+			report.WriteString("\n---\n\n")
+		} else {
+			report.WriteString("\n")
+		}
+	}
+	
+	// Code Changes (Diffs)
+	allDiffs := []DiffCapture{}
+	for _, iteration := range result.Iterations {
+		allDiffs = append(allDiffs, iteration.Diffs...)
+	}
+	
+	if len(allDiffs) > 0 {
+		report.WriteString("## 🔧 Code Changes\n\n")
+		report.WriteString(fmt.Sprintf("Total files with changes: %d\n\n", len(allDiffs)))
+		
+		for i, diff := range allDiffs {
+			if i >= 10 { // Limit to first 10 diffs to avoid huge reports
+				report.WriteString(fmt.Sprintf("... and %d more files\n", len(allDiffs)-10))
+				break
+			}
+			
+			report.WriteString(fmt.Sprintf("### %s `%s`\n\n", strings.Title(diff.Type), diff.File))
+			report.WriteString(fmt.Sprintf("**Lines:** +%d -%d  \n", diff.LinesAdded, diff.LinesRemoved))
+			report.WriteString(fmt.Sprintf("**Timestamp:** %s  \n", diff.Timestamp.Format("15:04:05")))
+			
+			if diff.UnifiedDiff != "" && len(diff.UnifiedDiff) < 2000 {
+				report.WriteString("\n```diff\n")
+				report.WriteString(diff.UnifiedDiff)
+				report.WriteString("\n```\n\n")
+			} else if len(diff.UnifiedDiff) >= 2000 {
+				report.WriteString(fmt.Sprintf("\n*Diff too large (%d characters) - truncated*\n\n", len(diff.UnifiedDiff)))
+			}
+		}
+	}
+	
+	// Performance Analysis
+	if len(result.Iterations) > 1 {
+		report.WriteString("## 📈 Performance Analysis\n\n")
+		
+		// Timing trends
+		report.WriteString("**Iteration Timing:**\n")
+		report.WriteString("| Iteration | Duration | Status |\n")
+		report.WriteString("|-----------|----------|--------|\n")
+		for _, iteration := range result.Iterations {
+			status := "✅"
+			if iteration.Status == "failed" {
+				status = "❌"
+			} else if iteration.Status == "partial" {
+				status = "⚠️"
+			}
+			report.WriteString(fmt.Sprintf("| %d | %s | %s %s |\n", 
+				iteration.Number, iteration.Duration.Round(time.Millisecond), 
+				status, iteration.Status))
+		}
+		report.WriteString("\n")
+	}
+	
+	// Footer
+	report.WriteString("---\n\n")
+	report.WriteString("*Generated by Ploy ARF Benchmark Suite*  \n")
+	report.WriteString(fmt.Sprintf("*Report created: %s*\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
+	
+	// Write the report
+	return os.WriteFile(filename, []byte(report.String()), 0644)
 }
 
 // testHealthEndpoint tests the /healthz endpoint of the deployed application with retries

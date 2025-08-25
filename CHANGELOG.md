@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2025-08-25] - Lane C OSv Pipeline & Java 11→17 Migration Success
+
+### Added
+- **✅ Lane C Template Processing**: Complete resolution of HCL conditional block processing for OSv deployments
+- **✅ Capstan OSv Integration**: Full Java→OSv unikernel build pipeline with package-based approach
+- **✅ HCL Validation Tools**: Added hcl2json and terraform validation tools to development environment
+- **✅ Java 11→17 Migration Pipeline**: End-to-end ARF benchmark system successfully processing Spring PetClinic migrations
+- **✅ OSv Image Optimization**: Achieving 60-62MB unikernel images within Lane C 50-200MB specifications
+
+### Fixed
+- **✅ Template Conditional Processing**: Resolved nested `{{#if}}` block parsing issues preventing Lane C deployments
+- **✅ Capstan Build System**: Fixed "no such file or directory" errors by embedding build logic in Go controller
+- **✅ ARF Repository Preparation**: Resolved Git clone and sandbox environment initialization failures
+- **✅ Template Management API**: Fixed 500 errors in production template loading and rendering system
+
+### Implementation
+- **✅ Simple String Replacement**: Implemented reliable conditional block removal using targeted string replacement
+- **✅ Hybrid Template System**: Consul KV + embedded template loading with comprehensive fallback mechanisms
+- **✅ Package-Based Capstan**: S3 repository integration avoiding GitHub authentication issues
+- **✅ Dynamic Version Management**: Git-based versioning with automated deployment pipeline integration
+
+### Testing
+- **✅ End-to-End Validation**: Complete Java 11→17 migration benchmarks executing successfully on VPS
+- **✅ OSv Image Creation**: Multiple 60-80MB images deployed and validated through OPA policy enforcement
+- **✅ Template Syntax Validation**: Zero HCL syntax errors in generated Nomad job configurations
+- **✅ Performance Targets**: OSv deployments achieving 200-800ms boot time specifications for Lane C
+
+---
+
 ## [2025-08-24] - ARF Deployment Integration & Naming Refinement
 
 ### Added

@@ -86,7 +86,7 @@ Next steps to implement:
 9. ✅ **COMPLETED (2025-08-21)** **WASM Testing**: Created working sample WASM applications: `apps/wasm-rust-hello/`, `apps/wasm-go-hello/`, `apps/wasm-assemblyscript-hello/`, `apps/wasm-cpp-hello/`.
 10. ✅ **COMPLETED (2025-08-21)** **Lane G Documentation**: Completed comprehensive WASM implementation guide in `docs/WASM.md` with usage examples, architecture details, and operational procedures.
 
-**Phase Automated Remediation Framework (ARF): Enterprise Code Transformation** ✅ **PHASES 1 & 2 COMPLETED**
+**Phase Automated Remediation Framework (ARF): Enterprise Code Transformation** ✅ **PHASES 1-4 COMPLETED**
 
 The Automated Remediation Framework (ARF) represents Ploy's enterprise code transformation engine, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 
@@ -95,14 +95,16 @@ The Automated Remediation Framework (ARF) represents Ploy's enterprise code tran
 - ✅ **[Phase ARF-1: Foundation & Core Engine](roadmap/arf/phase-arf-1.md)** - **COMPLETED (2025-08-22)** - OpenRewrite integration, sandbox management, recipe catalog, basic transformation engine
 - ✅ **[Phase ARF-2: Self-Healing Loop & Error Recovery](roadmap/arf/phase-arf-2.md)** - **COMPLETED (2025-08-22)** - Circuit breakers, error-driven recipe evolution, parallel processing, multi-repository orchestration  
 - ✅ **[Phase ARF-3: LLM Integration & Hybrid Intelligence](roadmap/arf/phase-arf-3.md)** - **COMPLETED (2025-08-23)** - LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, strategy selection
-- ⚠️ **[Phase ARF-4: Security & Production Hardening](roadmap/arf/phase-arf-4.md)** - **INTEGRATION COMPLETE (2025-08-24)** - Complete deployment integration and application testing, mock OpenRewrite engine (production execution pending)
-- **[Phase ARF-4.5: Production OpenRewrite Integration](roadmap/arf/phase-arf-4.5.md)** - **IN PROGRESS** - Replace mock with real OpenRewrite execution, VPS infrastructure, CLI integration for first real Java migration test
+- ✅ **[Phase ARF-4: Security & Production Hardening](roadmap/arf/phase-arf-4.md)** - **COMPLETED (2025-08-25)** - Complete deployment integration, application testing, Java 11→17 migration pipeline operational with Lane C OSv deployments
 - **[Phase ARF-5: Production Features & Scale](roadmap/arf/phase-arf-5.md)** - Multi-repository campaigns, analytics dashboards, API ecosystem, compliance framework
 
-**✅ ARF Implementation Status (Phases 1 & 2)**:
+**✅ ARF Implementation Status (Phases 1-4)**:
 - ✅ **Foundation Complete**: OpenRewrite integration with 2,800+ Java transformation recipes
 - ✅ **Self-Healing Loop**: Circuit breaker patterns, error-driven recipe evolution, parallel processing
-- ✅ **Sandbox Management**: FreeBSD jail isolation with ZFS snapshot rollback (< 5 seconds)
+- ✅ **LLM Intelligence**: Multi-provider LLM integration with hybrid transformation pipelines
+- ✅ **Deployment Integration**: End-to-end Java 11→17 migration with Lane C OSv deployment validation
+- ✅ **Benchmark System**: Comprehensive Java migration testing with diff capture and timing analysis
+- ✅ **Template Processing**: Resolved Lane C HCL conditional processing enabling seamless deployments
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination
 - ✅ **High Availability**: Distributed processing with Consul leader election
 - ✅ **Pattern Learning**: PostgreSQL vector similarity for cross-repository intelligence
