@@ -155,6 +155,98 @@
             group: ploy
           when: test_apps_content.matched == 0
 
+    - name: Install HCL template validation tools
+      block:
+        - name: Check if hcl2json is already installed
+          stat:
+            path: /usr/local/bin/hcl2json
+          register: hcl2json_binary
+
+        - name: Download and install hcl2json
+          block:
+            - name: Download hcl2json
+              get_url:
+                url: "https://github.com/tmccombs/hcl2json/releases/latest/download/hcl2json_linux_amd64"
+                dest: /usr/local/bin/hcl2json
+                mode: '0755'
+          when: not hcl2json_binary.stat.exists
+
+        - name: Check if terraform is already installed
+          stat:
+            path: /usr/local/bin/terraform
+          register: terraform_binary
+
+        - name: Install terraform for HCL validation
+          block:
+            - name: Download terraform
+              get_url:
+                url: "https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip"
+                dest: /tmp/terraform.zip
+
+            - name: Install unzip if needed
+              apt:
+                name: unzip
+                state: present
+
+            - name: Extract terraform
+              unarchive:
+                src: /tmp/terraform.zip
+                dest: /usr/local/bin/
+                remote_src: true
+
+            - name: Make terraform executable
+              file:
+                path: /usr/local/bin/terraform
+                mode: '0755'
+          when: not terraform_binary.stat.exists
+
+        - name: Create template validation script
+          copy:
+            content: |
+              #!/bin/bash
+              # HCL Template Validation Script
+              # Usage: ./validate-template.sh <template-file>
+              
+              TEMPLATE_FILE="$1"
+              
+              if [ -z "$TEMPLATE_FILE" ]; then
+                echo "Usage: $0 <template-file>"
+                exit 1
+              fi
+              
+              if [ ! -f "$TEMPLATE_FILE" ]; then
+                echo "Error: Template file '$TEMPLATE_FILE' not found"
+                exit 1
+              fi
+              
+              echo "=== HCL Template Validation for: $TEMPLATE_FILE ==="
+              
+              # Test 1: Basic HCL syntax validation with hcl2json
+              echo "1. Testing basic HCL syntax..."
+              if hcl2json "$TEMPLATE_FILE" >/dev/null 2>&1; then
+                echo "   ✓ HCL syntax validation passed"
+              else
+                echo "   ✗ HCL syntax validation failed:"
+                hcl2json "$TEMPLATE_FILE" 2>&1 | sed 's/^/     /'
+                exit 1
+              fi
+              
+              # Test 2: Nomad job validation
+              echo "2. Testing Nomad job validation..."
+              if nomad job validate "$TEMPLATE_FILE" >/dev/null 2>&1; then
+                echo "   ✓ Nomad job validation passed"
+              else
+                echo "   ✗ Nomad job validation failed:"
+                nomad job validate "$TEMPLATE_FILE" 2>&1 | sed 's/^/     /'
+                exit 1
+              fi
+              
+              echo "=== All validations passed! ==="
+            dest: /home/ploy/validate-template.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
     - name: Install monitoring tools
       block:
         - name: Check if Node Exporter is already installed
