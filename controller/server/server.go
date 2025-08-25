@@ -29,6 +29,7 @@ import (
 	"github.com/iw2rmb/ploy/controller/metrics"
 	"github.com/iw2rmb/ploy/controller/routing"
 	"github.com/iw2rmb/ploy/controller/selfupdate"
+	"github.com/iw2rmb/ploy/controller/templates"
 	"github.com/iw2rmb/ploy/controller/arf"
 	"github.com/iw2rmb/ploy/controller/version"
 	"github.com/iw2rmb/ploy/internal/bluegreen"
@@ -620,6 +621,15 @@ func (s *Server) setupRoutes() {
 	if s.dependencies.ARFHandler != nil {
 		s.dependencies.ARFHandler.RegisterRoutes(s.app)
 		log.Printf("ARF routes registered successfully")
+	}
+
+	// Template management endpoints
+	templateHandler, err := initializeTemplateHandler()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize template handler: %v", err)
+	} else {
+		templates.SetupRoutes(s.app, templateHandler)
+		log.Printf("Template management routes registered successfully")
 	}
 
 	// Version endpoints
@@ -1355,4 +1365,15 @@ func (s *Server) handleRollbackBlueGreenDeployment(c *fiber.Ctx) error {
 		"status":  "success", 
 		"message": "Blue-green deployment rolled back successfully",
 	})
+}
+
+// initializeTemplateHandler creates a new template handler
+func initializeTemplateHandler() (*templates.Handler, error) {
+	log.Printf("Initializing template management handler")
+	handler, err := templates.NewHandler()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create template handler: %w", err)
+	}
+	log.Printf("Template management handler initialized successfully")
+	return handler, nil
 }

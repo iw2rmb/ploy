@@ -1,12 +1,15 @@
 package nomad
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	consulapi "github.com/hashicorp/consul/api"
 )
 
 type RenderData struct {
@@ -46,6 +49,57 @@ type RenderData struct {
 	BuildTime string
 }
 
+//go:embed templates/*.hcl
+var templateFS embed.FS
+
+// ConsulTemplateClient wraps Consul client for template operations
+type ConsulTemplateClient struct {
+	client *consulapi.Client
+}
+
+// NewConsulTemplateClient creates a new Consul template client
+func NewConsulTemplateClient() (*ConsulTemplateClient, error) {
+	config := consulapi.DefaultConfig()
+	client, err := consulapi.NewClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consul client: %w", err)
+	}
+	return &ConsulTemplateClient{client: client}, nil
+}
+
+// GetTemplate retrieves a template from Consul KV with embedded fallback
+func (c *ConsulTemplateClient) GetTemplate(templatePath string) ([]byte, error) {
+	// Try Consul KV first
+	keyPath := fmt.Sprintf("ploy/templates/%s", filepath.Base(templatePath))
+	pair, _, err := c.client.KV().Get(keyPath, nil)
+	if err == nil && pair != nil && len(pair.Value) > 0 {
+		return pair.Value, nil
+	}
+
+	// Fall back to embedded templates
+	embeddedPath := fmt.Sprintf("templates/%s", filepath.Base(templatePath))
+	content, err := templateFS.ReadFile(embeddedPath)
+	if err != nil {
+		return nil, fmt.Errorf("template not found in Consul KV or embedded FS: %s", templatePath)
+	}
+	return content, nil
+}
+
+// PutTemplate stores a template in Consul KV
+func (c *ConsulTemplateClient) PutTemplate(templatePath string, content []byte) error {
+	keyPath := fmt.Sprintf("ploy/templates/%s", filepath.Base(templatePath))
+	_, err := c.client.KV().Put(&consulapi.KVPair{
+		Key:   keyPath,
+		Value: content,
+	}, nil)
+	return err
+}
+
+// GetTemplateFS returns the embedded template filesystem for external access
+func GetTemplateFS() embed.FS {
+	return templateFS
+}
+
 func templateForLane(lane string) string {
 	switch strings.ToUpper(lane) {
 	case "A": return "platform/nomad/lane-a-unikraft.hcl"
@@ -68,6 +122,30 @@ func debugTemplateForLane(lane string) string {
 	}
 }
 
+// loadTemplateContent loads template content using hybrid approach: Consul KV first, then embedded fallback
+func loadTemplateContent(templatePath string) ([]byte, error) {
+	// Try to create Consul client (fail gracefully if not available)
+	consulClient, err := NewConsulTemplateClient()
+	if err == nil {
+		// Consul is available, try to get template from KV store
+		content, err := consulClient.GetTemplate(templatePath)
+		if err == nil {
+			return content, nil
+		}
+		// Log the Consul error but continue to embedded fallback
+		// Note: In production, this could be logged via structured logging
+	}
+
+	// Fall back to embedded templates
+	templateFile := filepath.Base(templatePath)
+	embeddedPath := fmt.Sprintf("templates/%s", templateFile)
+	content, err := templateFS.ReadFile(embeddedPath)
+	if err != nil {
+		return nil, fmt.Errorf("template not found in embedded FS: %s (consul error: %v)", templatePath, err)
+	}
+	return content, nil
+}
+
 func RenderTemplate(lane string, data RenderData) (string, error) {
 	var tplPath string
 	var filename string
@@ -83,7 +161,11 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 		filename = fmt.Sprintf("%s-lane-%s.hcl", data.App, strings.ToLower(lane))
 	}
 	
-	b, err := os.ReadFile(tplPath); if err != nil { return "", err }
+	// Use hybrid template loading: Consul KV with embedded fallback
+	b, err := loadTemplateContent(tplPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to load template %s: %w", tplPath, err)
+	}
 	s := string(b)
 	
 	// Apply all template substitutions
