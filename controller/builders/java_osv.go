@@ -686,9 +686,7 @@ func buildOSvWithCapstan(jibTar, mainClass, app, sha, outputPath, javaVersion st
 	// Create Capstanfile
 	capstanfileContent := fmt.Sprintf(`# Java %s application build for OSv
 base: cloudius/osv
-cmdline: >-
-  /java.so -XX:+UnlockExperimentalVMOptions -XX:+UseZGC
-  -cp /app/classes:/app/resources:/app/libs/* %s
+cmdline: "/java.so -XX:+UnlockExperimentalVMOptions -XX:+UseZGC -cp /app/classes:/app/resources:/app/libs/* %s"
 name: ploy/%s
 `, javaVersion, mainClass, app)
 	
