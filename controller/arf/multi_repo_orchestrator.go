@@ -6,13 +6,15 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // MultiRepoOrchestrator manages coordinated transformations across multiple repositories
 type MultiRepoOrchestrator interface {
 	OrchestrateBatchTransformation(ctx context.Context, request BatchTransformationRequest) (*BatchTransformationResult, error)
 	AnalyzeDependencies(ctx context.Context, repositories []Repository) (*DependencyAnalysis, error)
-	CreateExecutionPlan(ctx context.Context, analysis *DependencyAnalysis, recipes []Recipe) (*ExecutionPlan, error)
+	CreateExecutionPlan(ctx context.Context, analysis *DependencyAnalysis, recipes []*models.Recipe) (*ExecutionPlan, error)
 	ExecutePlan(ctx context.Context, plan *ExecutionPlan) (*BatchTransformationResult, error)
 	GetOrchestrationStatus(orchestrationID string) (*OrchestrationStatus, error)
 }
@@ -21,7 +23,7 @@ type MultiRepoOrchestrator interface {
 type BatchTransformationRequest struct {
 	OrchestrationID string       `json:"orchestration_id"`
 	Repositories    []Repository `json:"repositories"`
-	Recipes         []Recipe     `json:"recipes"`
+	Recipes         []*models.Recipe `json:"recipes"`
 	Options         BatchOptions `json:"options"`
 	Dependencies    []RepoDependency `json:"dependencies,omitempty"`
 }
@@ -121,7 +123,7 @@ type ExecutionPlan struct {
 type ExecutionPhase struct {
 	PhaseNumber   int                       `json:"phase_number"`
 	Repositories  []string                  `json:"repositories"`
-	Recipes       []Recipe                  `json:"recipes"`
+	Recipes       []*models.Recipe          `json:"recipes"`
 	ParallelSafe  bool                      `json:"parallel_safe"`
 	Dependencies  []string                  `json:"dependencies"`
 	EstimatedTime time.Duration             `json:"estimated_time"`
@@ -163,7 +165,7 @@ type OrchestrationStatus struct {
 
 // DefaultMultiRepoOrchestrator implements the MultiRepoOrchestrator interface
 type DefaultMultiRepoOrchestrator struct {
-	engine           ARFEngine
+	recipeExecutor   *RecipeExecutor
 	catalog          RecipeCatalog
 	parallelResolver ParallelResolver
 	circuitBreaker   CircuitBreaker
@@ -174,9 +176,9 @@ type DefaultMultiRepoOrchestrator struct {
 }
 
 // NewMultiRepoOrchestrator creates a new multi-repository orchestrator
-func NewMultiRepoOrchestrator(engine ARFEngine, catalog RecipeCatalog, resolver ParallelResolver, cb CircuitBreaker) MultiRepoOrchestrator {
+func NewMultiRepoOrchestrator(executor *RecipeExecutor, catalog RecipeCatalog, resolver ParallelResolver, cb CircuitBreaker) MultiRepoOrchestrator {
 	return &DefaultMultiRepoOrchestrator{
-		engine:               engine,
+		recipeExecutor:       executor,
 		catalog:              catalog,
 		parallelResolver:     resolver,
 		circuitBreaker:       cb,
@@ -473,7 +475,7 @@ func (mro *DefaultMultiRepoOrchestrator) traceDependencyPath(graph map[string][]
 }
 
 // CreateExecutionPlan creates an execution plan based on dependency analysis
-func (mro *DefaultMultiRepoOrchestrator) CreateExecutionPlan(ctx context.Context, analysis *DependencyAnalysis, recipes []Recipe) (*ExecutionPlan, error) {
+func (mro *DefaultMultiRepoOrchestrator) CreateExecutionPlan(ctx context.Context, analysis *DependencyAnalysis, recipes []*models.Recipe) (*ExecutionPlan, error) {
 	plan := &ExecutionPlan{
 		CreatedAt:   time.Now(),
 		TotalPhases: len(analysis.ExecutionLevels),
@@ -539,7 +541,7 @@ func (mro *DefaultMultiRepoOrchestrator) estimatePhaseTime(repoCount, recipeCoun
 }
 
 // assessRiskLevel assesses the risk level of the execution plan
-func (mro *DefaultMultiRepoOrchestrator) assessRiskLevel(analysis *DependencyAnalysis, recipes []Recipe) RiskLevel {
+func (mro *DefaultMultiRepoOrchestrator) assessRiskLevel(analysis *DependencyAnalysis, recipes []*models.Recipe) RiskLevel {
 	riskScore := 0
 	
 	// Factor in circular dependencies
@@ -553,10 +555,12 @@ func (mro *DefaultMultiRepoOrchestrator) assessRiskLevel(analysis *DependencyAna
 	
 	// Factor in recipe risk (security recipes are higher risk)
 	for _, recipe := range recipes {
-		if recipe.Category == CategorySecurity {
-			riskScore += 5
-		} else if recipe.Category == CategoryMigration {
-			riskScore += 3
+		for _, cat := range recipe.Metadata.Categories {
+			if cat == "security" {
+				riskScore += 5
+			} else if cat == "migration" {
+				riskScore += 3
+			}
 		}
 	}
 	
@@ -658,7 +662,7 @@ func (mro *DefaultMultiRepoOrchestrator) executePhase(ctx context.Context, phase
 }
 
 // executeRepositoryTransformation executes transformation on a single repository
-func (mro *DefaultMultiRepoOrchestrator) executeRepositoryTransformation(ctx context.Context, repositoryID string, recipes []Recipe) RepoTransformationResult {
+func (mro *DefaultMultiRepoOrchestrator) executeRepositoryTransformation(ctx context.Context, repositoryID string, recipes []*models.Recipe) RepoTransformationResult {
 	startTime := time.Now()
 	
 	result := RepoTransformationResult{
@@ -689,7 +693,7 @@ func (mro *DefaultMultiRepoOrchestrator) executeRepositoryTransformation(ctx con
 		
 		// Execute recipe with circuit breaker protection
 		err := mro.circuitBreaker.Execute(ctx, func() error {
-			transformResult, err := mro.engine.ExecuteRecipe(ctx, recipe, codebase)
+			transformResult, err := mro.recipeExecutor.ExecuteRecipeObject(ctx, recipe, codebase.Path)
 			if err != nil {
 				return err
 			}

@@ -1,0 +1,43 @@
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_host: 127.0.0.1
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  
+  vars:
+    # macOS specific variables
+    homebrew_path: "/opt/homebrew"
+    homebrew_bin_path: "{{ homebrew_path }}/bin"
+    
+    # Development environment
+    ploy_dev_user: "{{ ansible_user_id }}"
+    ploy_dev_home: "{{ ansible_user_dir }}"
+    ploy_project_path: "{{ ansible_user_dir }}/ploy"
+    
+    # Docker configuration
+    docker_compose_version: "2.20.0"
+    
+    # Go configuration  
+    go_version: "1.21.0"
+    go_path: "{{ ansible_user_dir }}/go"
+    
+    # Node.js configuration (for some tools)
+    nodejs_version: "18"
+    
+    # Test configuration
+    test_database_name: "ploy_test"
+    test_database_user: "ploy"
+    test_database_password: "ploy-test"
+    
+    # Service ports (for validation)
+    consul_port: 8500
+    nomad_port: 4646
+    seaweedfs_master_port: 9333
+    seaweedfs_filer_port: 8888
+    seaweedfs_volume_port: 8080
+    postgres_port: 5432
+    redis_port: 6379
+    traefik_http_port: 80
+    traefik_https_port: 443
+    traefik_dashboard_port: 8080

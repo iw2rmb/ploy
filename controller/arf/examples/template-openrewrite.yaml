@@ -1,0 +1,67 @@
+# Template for OpenRewrite-based transformation recipe
+metadata:
+  name: "example-openrewrite-recipe"
+  description: "Example recipe using OpenRewrite for Java code transformation"
+  version: "1.0.0"
+  author: "your-name"
+  tags:
+    - "java"
+    - "migration"
+    - "openrewrite"
+  categories:
+    - "migration"
+    - "modernization"
+  languages:
+    - "java"
+  min_platform: "1.0.0"
+  max_platform: "2.0.0"
+  license: "MIT"
+  documentation: "https://docs.example.com/recipes/openrewrite"
+
+steps:
+  - name: "Apply OpenRewrite Recipe"
+    type: "openrewrite"
+    description: "Execute OpenRewrite transformation recipe"
+    config:
+      recipe: "org.openrewrite.java.migrate.Java11toJava17"
+      options:
+        addJavaVersion: "17"
+        removeJavaVersion: "11"
+    conditions:
+      - type: "file_exists"
+        value: "pom.xml"
+    on_error: "fail"
+    timeout: "10m"
+    retry:
+      max_attempts: 3
+      backoff: "exponential"
+
+execution:
+  parallel: false
+  timeout: "30m"
+  resource_limits:
+    cpu: "2"
+    memory: "4Gi"
+  environment:
+    JAVA_HOME: "/usr/local/openjdk"
+    MAVEN_OPTS: "-Xmx2g"
+
+validation:
+  pre_conditions:
+    - type: "language_version"
+      config:
+        language: "java"
+        min_version: "11"
+        max_version: "17"
+    - type: "build_tool"
+      config:
+        tools: ["maven", "gradle"]
+  post_conditions:
+    - type: "compilation"
+      config:
+        language: "java"
+        must_compile: true
+    - type: "tests"
+      config:
+        must_pass: true
+        min_coverage: 80

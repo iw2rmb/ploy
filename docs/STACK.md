@@ -64,6 +64,13 @@
 
 ## Storage & Networking
 - **SeaweedFS** — Distributed object storage optimized for small files (artifacts, SBOMs, signatures)
+  - **ARF Recipe Storage** — Recipe persistence with retry logic, caching, and deletion markers
+  - **Binary Artifact Storage** — Controller binaries and deployment artifacts
+  - **SBOM & Signature Storage** — Distributed storage for security artifacts
+- **Consul** — Service discovery, configuration, and distributed coordination
+  - **ARF Recipe Indexing** — Full-text search with relevance scoring for recipe discovery
+  - **Configuration Management** — Environment-driven backend selection and settings
+  - **Service Registration** — Dynamic service discovery and health monitoring
 - **Traefik** — Cloud-native reverse proxy and load balancer with automatic service discovery
 - **Let's Encrypt** — Automated TLS certificate provisioning with wildcard support
 - **Consul Connect** — Service mesh networking and mTLS
@@ -92,3 +99,13 @@
 - **libvirt** — Virtualization management API and tooling
 - **cloud-init** — VM initialization and configuration automation
 - **rg (ripgrep)** — Fast text search for codebase analysis
+
+## Testing & Quality Assurance
+- **ARF Storage Test Suite** — Comprehensive integration testing for recipe storage backends
+  - **Storage Integration Tests** — CRUD operations, validation, search functionality testing
+  - **Backend Fallback Tests** — Graceful degradation and failover mechanism validation  
+  - **Configuration Analysis Tests** — Environment detection and backend configuration verification
+  - **Comprehensive Test Runner** — Master test orchestrator with JSON reporting and statistics
+- **VPS Runtime Testing** — All functional testing performed on production-like VPS infrastructure
+- **Go Testing Framework** — Native Go testing with compilation validation and error checking
+- **JSON Test Reporting** — Structured test results with timestamps, statistics, and detailed analysis

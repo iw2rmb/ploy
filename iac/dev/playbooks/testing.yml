@@ -94,7 +94,7 @@
 
         - name: Create test scripts directory
           file:
-            path: /home/ploy/test-scripts
+            path: /home/ploy/tests/scripts
             state: directory
             owner: ploy
             group: ploy
@@ -102,7 +102,7 @@
         - name: Create lane detection test script
           template:
             src: ../../common/templates/test-lane-detection.sh.j2
-            dest: /home/ploy/test-scripts/test-lane-detection.sh
+            dest: /home/ploy/tests/scripts/test-lane-detection.sh
             owner: ploy
             group: ploy
             mode: '0755'
@@ -110,7 +110,7 @@
         - name: Create build pipeline test script
           template:
             src: ../../common/templates/test-build-pipeline.sh.j2
-            dest: /home/ploy/test-scripts/test-build-pipeline.sh
+            dest: /home/ploy/tests/scripts/test-build-pipeline.sh
             owner: ploy
             group: ploy
             mode: '0755'
@@ -118,7 +118,7 @@
         - name: Create API test script
           template:
             src: ../../common/templates/test-api.sh.j2
-            dest: /home/ploy/test-scripts/test-api.sh
+            dest: /home/ploy/tests/scripts/test-api.sh
             owner: ploy
             group: ploy
             mode: '0755'
@@ -126,7 +126,7 @@
         - name: Create webhook test script
           template:
             src: ../../common/templates/test-webhooks.sh.j2
-            dest: /home/ploy/test-scripts/test-webhooks.sh
+            dest: /home/ploy/tests/scripts/test-webhooks.sh
             owner: ploy
             group: ploy
             mode: '0755'

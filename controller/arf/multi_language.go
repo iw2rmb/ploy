@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // MultiLanguageEngine defines the interface for universal AST parsing and transformation
 type MultiLanguageEngine interface {
 	ParseAST(ctx context.Context, code string, language string) (*UniversalAST, error)
-	GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error)
+	GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error)
 	ValidateLanguageSupport(language string) (bool, error)
 	GetLanguageCapabilities(language string) (*LanguageCapabilities, error)
 }
@@ -109,7 +111,7 @@ type CodeChange struct {
 
 // NodeJSRecipe represents Node.js specific transformation recipes
 type NodeJSRecipe struct {
-	Recipe
+	*models.Recipe
 	PackageUpdates  map[string]string      `json:"package_updates"`
 	ESLintRules     map[string]interface{} `json:"eslint_rules"`
 	TypeScript      bool                   `json:"typescript"`
@@ -117,7 +119,7 @@ type NodeJSRecipe struct {
 
 // PythonRecipe represents Python specific transformation recipes  
 type PythonRecipe struct {
-	Recipe
+	*models.Recipe
 	PipUpdates      map[string]string      `json:"pip_updates"`
 	PyUpgrade       string                 `json:"pyupgrade_target"`
 	BlackConfig     map[string]interface{} `json:"black_config"`
@@ -125,7 +127,7 @@ type PythonRecipe struct {
 
 // GoRecipe represents Go specific transformation recipes
 type GoRecipe struct {
-	Recipe
+	*models.Recipe
 	GoModUpdates    map[string]string `json:"go_mod_updates"`
 	GofmtOptions    []string          `json:"gofmt_options"`
 	StaticCheck     []string          `json:"staticcheck_rules"`
@@ -133,7 +135,7 @@ type GoRecipe struct {
 
 // WASMRecipe represents WebAssembly specific transformation recipes
 type WASMRecipe struct {
-	Recipe
+	*models.Recipe
 	OptimizationLevel   int          `json:"optimization_level"`
 	TargetFeatures      []string     `json:"target_features"`
 	PolyfillsRequired   []string     `json:"polyfills_required"`
@@ -240,7 +242,7 @@ func (e *TreeSitterMultiLanguageEngine) ParseAST(ctx context.Context, code strin
 }
 
 // GenerateTransformation creates a transformation based on AST analysis and recipe
-func (e *TreeSitterMultiLanguageEngine) GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (e *TreeSitterMultiLanguageEngine) GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	switch ast.Language {
 	case "java":
 		return e.generateJavaTransformation(ctx, ast, recipe)
@@ -807,11 +809,11 @@ func (e *TreeSitterMultiLanguageEngine) extractImportModuleFromNode(node *ASTNod
 
 // Language-specific transformation generators
 
-func (e *TreeSitterMultiLanguageEngine) generateJavaTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (e *TreeSitterMultiLanguageEngine) generateJavaTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	// Generate Java-specific transformations based on recipe
 	transformation := &Transformation{
 		ID:       fmt.Sprintf("java-transform-%d", time.Now().Unix()),
-		Type:     TransformationType(recipe.Category),
+		Type:     TransformationTypeRefactor, // Default type
 		Language: "java",
 		Changes:  []CodeChange{},
 		Metadata: make(map[string]interface{}),
@@ -826,10 +828,10 @@ func (e *TreeSitterMultiLanguageEngine) generateJavaTransformation(ctx context.C
 	return transformation, nil
 }
 
-func (e *TreeSitterMultiLanguageEngine) generateJavaScriptTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (e *TreeSitterMultiLanguageEngine) generateJavaScriptTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	transformation := &Transformation{
 		ID:       fmt.Sprintf("js-transform-%d", time.Now().Unix()),
-		Type:     TransformationType(recipe.Category),
+		Type:     TransformationTypeRefactor, // Default type
 		Language: ast.Language,
 		Changes:  []CodeChange{},
 		Metadata: make(map[string]interface{}),
@@ -838,10 +840,10 @@ func (e *TreeSitterMultiLanguageEngine) generateJavaScriptTransformation(ctx con
 	return transformation, nil
 }
 
-func (e *TreeSitterMultiLanguageEngine) generatePythonTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (e *TreeSitterMultiLanguageEngine) generatePythonTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	transformation := &Transformation{
 		ID:       fmt.Sprintf("py-transform-%d", time.Now().Unix()),
-		Type:     TransformationType(recipe.Category),
+		Type:     TransformationTypeRefactor, // Default type
 		Language: "python",
 		Changes:  []CodeChange{},
 		Metadata: make(map[string]interface{}),
@@ -850,10 +852,10 @@ func (e *TreeSitterMultiLanguageEngine) generatePythonTransformation(ctx context
 	return transformation, nil
 }
 
-func (e *TreeSitterMultiLanguageEngine) generateGoTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (e *TreeSitterMultiLanguageEngine) generateGoTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	transformation := &Transformation{
 		ID:       fmt.Sprintf("go-transform-%d", time.Now().Unix()),
-		Type:     TransformationType(recipe.Category),
+		Type:     TransformationTypeRefactor, // Default type
 		Language: "go",
 		Changes:  []CodeChange{},
 		Metadata: make(map[string]interface{}),
@@ -862,10 +864,10 @@ func (e *TreeSitterMultiLanguageEngine) generateGoTransformation(ctx context.Con
 	return transformation, nil
 }
 
-func (e *TreeSitterMultiLanguageEngine) generateRustTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (e *TreeSitterMultiLanguageEngine) generateRustTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	transformation := &Transformation{
 		ID:       fmt.Sprintf("rust-transform-%d", time.Now().Unix()),
-		Type:     TransformationType(recipe.Category),
+		Type:     TransformationTypeRefactor, // Default type
 		Language: "rust",
 		Changes:  []CodeChange{},
 		Metadata: make(map[string]interface{}),
@@ -933,7 +935,7 @@ func (m *MockMultiLanguageEngine) ParseAST(ctx context.Context, code string, lan
 }
 
 // GenerateTransformation creates a mock transformation
-func (m *MockMultiLanguageEngine) GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error) {
+func (m *MockMultiLanguageEngine) GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe *models.Recipe) (*Transformation, error) {
 	return &Transformation{
 		ID:       "mock-transformation",
 		Type:     TransformationTypeMigration,

@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TEST_SCRIPTS_DIR="${PROJECT_ROOT}/test-scripts"
+TEST_SCRIPTS_DIR="${PROJECT_ROOT}/tests/scripts"
 
 echo "Updating test scripts to use HTTPS endpoints..."
 echo "Project root: $PROJECT_ROOT"
@@ -62,7 +62,7 @@ echo "✅ All test scripts updated successfully!"
 echo "Backup files created with .backup extension"
 echo
 echo "To verify the changes:"
-echo "  grep -n 'api\.dev\.ployd\.app\|PLOY_ENVIRONMENT' test-scripts/*.sh"
+echo "  grep -n 'api\.dev\.ployd\.app\|PLOY_ENVIRONMENT' tests/scripts/*.sh"
 echo
 echo "To remove backup files after verification:"
-echo "  rm test-scripts/*.backup"
+echo "  rm tests/scripts/*.backup"

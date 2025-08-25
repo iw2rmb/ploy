@@ -180,7 +180,7 @@ job "ploy-controller" {
         PLOY_APPS_DOMAIN = "ployd.app"
         PLOY_APPS_DOMAIN_PROVIDER = "namecheap"
         
-        # ARF Configuration
+        # ARF Phase 3 - LLM Integration & Learning System
         ARF_LEARNING_DB_URL = "postgres://ploy:arf_dev_password@localhost/arf_learning?sslmode=disable"
         ARF_TREE_SITTER_PATH = "/usr/local/bin/tree-sitter"
         ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
@@ -190,6 +190,24 @@ job "ploy-controller" {
         TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
         OPENREWRITE_JAR_PATH = "/usr/local/bin/rewrite.jar"
+        
+        # ARF Phase 5.1 - Development Storage Backend Configuration
+        PLOY_ENVIRONMENT = "development"
+        ARF_STORAGE_BACKEND = "memory"
+        ARF_INDEX_BACKEND = "memory"
+        ARF_CONSUL_ADDR = "127.0.0.1:8500"
+        ARF_CONSUL_PREFIX = "ploy/arf/dev"
+        
+        # ARF Validation & Security Configuration (relaxed for development)
+        ARF_VALIDATION_ENABLED = "true"
+        ARF_VALIDATION_STRICT = "false"
+        ARF_ENABLE_ENCRYPTION = "false"
+        ARF_ENABLE_AUDIT_LOG = "false"
+        
+        # ARF Jail Sandbox Configuration
+        ARF_JAIL_BASE_DIR = "/jail/arf/dev"
+        ARF_JAIL_TEMPLATE_DIR = "/jail/template"
+        ARF_JAIL_INTERFACE = "lo0"
         
         # Logging
         LOG_LEVEL = "info"

@@ -1,0 +1,158 @@
+# Spring Boot 3.0 Upgrade Recipe
+metadata:
+  name: spring-boot-3-upgrade
+  description: Upgrades Spring Boot applications from 2.x to 3.0 with Jakarta EE migration
+  author: Ploy Platform
+  version: 1.0.0
+  license: MIT
+  homepage: https://ployd.app/recipes/spring-boot-upgrade
+  tags:
+    - spring-boot
+    - spring
+    - jakarta
+    - migration
+    - framework-upgrade
+  categories:
+    - framework-migration
+    - api-migration
+  languages:
+    - java
+    - kotlin
+  frameworks:
+    - spring-boot
+    - spring-framework
+    - maven
+    - gradle
+  requirements:
+    - Java 17 or higher
+    - Spring Boot 2.5+ current version
+
+steps:
+  - name: Upgrade Spring Boot Version
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0
+      description: Main Spring Boot 3.0 upgrade including dependency updates
+    on_error: fail
+    timeout: 10m
+
+  - name: Migrate javax to Jakarta
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.migrate.javax.MigrateJavaxToJakarta
+      description: Migrate all javax.* imports to jakarta.*
+      options:
+        include_test_sources: true
+    on_error: fail
+    timeout: 5m
+
+  - name: Update Spring Security Configuration
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.spring.boot3.SpringBootSecurity
+      description: Update deprecated Spring Security configurations
+    conditions:
+      - type: file_exists
+        value: "**/SecurityConfig.java"
+    on_error: continue
+    timeout: 3m
+
+  - name: Update Spring Data Configuration
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.spring.data.UpgradeSpringData_3_0
+      description: Update Spring Data for compatibility with Spring Boot 3
+    on_error: continue
+    timeout: 3m
+
+  - name: Apply Spring Boot 3 Best Practices
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.spring.boot3.SpringBoot3BestPractices
+      description: Apply recommended patterns and practices for Spring Boot 3
+    on_error: continue
+    timeout: 5m
+
+  - name: Update Configuration Properties
+    type: regex
+    config:
+      pattern: "spring\\.resources\\."
+      replacement: "spring.web.resources."
+      file_pattern: "**/application*.{properties,yml,yaml}"
+      description: Update deprecated configuration properties
+    on_error: continue
+    timeout: 1m
+
+  - name: Remove Unnecessary Annotations
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.spring.boot3.RemoveUnnecessaryAnnotations
+      description: Remove annotations that are no longer needed in Spring Boot 3
+    on_error: continue
+    timeout: 2m
+
+  - name: Update Test Annotations
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.spring.boot3.UpdateTestAnnotations
+      description: Update test annotations for JUnit 5 and Spring Boot 3
+    conditions:
+      - type: file_exists
+        value: "src/test/**/*.java"
+    on_error: continue
+    timeout: 3m
+
+  - name: Format Code
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.format.AutoFormat
+      options:
+        style: AOSP
+    on_error: continue
+    timeout: 2m
+
+execution:
+  parallelism: 1  # Sequential execution for safety
+  max_duration: 30m
+  retry_policy:
+    max_attempts: 1
+    backoff: 10s
+  sandbox:
+    enabled: true
+    allow_network: true  # May need to download dependencies
+    allow_file_write: true
+    max_memory: 3GB
+    max_cpu: 2
+    isolation_level: medium
+  environment:
+    JAVA_HOME: /usr/lib/jvm/java-17-openjdk
+    SPRING_PROFILES_ACTIVE: migration
+
+validation:
+  required_files:
+    - pom.xml
+    - build.gradle
+  file_patterns:
+    - "**/*.java"
+    - "**/*.kt"
+    - "**/application*.properties"
+    - "**/application*.yml"
+  min_file_count: 5
+  max_repo_size: 2147483648  # 2GB
+  language_detection:
+    primary: java
+    secondary:
+      - kotlin
+    min_confidence: 0.8
+    required: true
+  custom_rules:
+    - name: Check Spring Boot Version
+      description: Ensure current version is Spring Boot 2.5+
+      type: file_content
+      value: "<spring-boot.version>2.[5-9]"
+      required: true
+    - name: Check Java Version
+      description: Ensure Java 17 is configured
+      type: file_content
+      value: "<java.version>17</java.version>"
+      required: false

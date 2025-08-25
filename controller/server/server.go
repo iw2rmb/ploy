@@ -1051,15 +1051,16 @@ func (s *Server) handlePlatformCertificateHealth(c *fiber.Ctx) error {
 func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	log.Printf("Initializing ARF (Automated Remediation Framework)")
 
-	// Initialize AST cache
-	cacheDir := utils.Getenv("ARF_CACHE_DIR", "/tmp/arf-cache")
-	maxCacheSize := int64(1024 * 1024 * 1024) // 1GB default
-	maxEntries := 10000
+	// Load ARF configuration from environment
+	arfConfig := arf.LoadConfigFromEnv()
 	
-	cache, err := arf.NewMemoryMappedCache(cacheDir, maxCacheSize, maxEntries)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create AST cache: %w", err)
+	// Validate configuration
+	if err := arfConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("ARF configuration validation failed: %w", err)
 	}
+	
+	log.Printf("ARF configuration loaded: storage=%s, index=%s, validation=%v", 
+		arfConfig.Storage.Backend, arfConfig.Index.Backend, arfConfig.Validation.Enabled)
 
 	// Initialize sandbox manager
 	jailBaseDir := utils.Getenv("ARF_JAIL_BASE_DIR", "/jail/arf")
@@ -1070,38 +1071,53 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 
 	sandboxMgr := arf.NewSandboxManagerForOS(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
 
-	// Initialize recipe catalog
-	keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "arf")
-	catalog, err := arf.NewConsulRecipeCatalog(cfg.ConsulAddr, keyPrefix)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create recipe catalog: %w", err)
-	}
-
-	// Initialize OpenRewrite engine
-	jarPath := utils.Getenv("ARF_OPENREWRITE_JAR", "/usr/local/lib/openrewrite-cli.jar")
-	javaHome := utils.Getenv("JAVA_HOME", "/usr/local/openjdk")
-	workingDir := utils.Getenv("ARF_WORKING_DIR", "/tmp/arf")
-
-	engine := arf.NewOpenRewriteEngine(jarPath, javaHome, workingDir, cache, sandboxMgr)
-
-	// Initialize and populate catalog with default recipes
-	recipes, err := engine.ListAvailableRecipes()
-	if err == nil {
-		for _, recipe := range recipes {
-			if err := catalog.StoreRecipe(context.Background(), recipe); err != nil {
-				log.Printf("Warning: Failed to store recipe %s: %v", recipe.ID, err)
-			}
-		}
-		log.Printf("Loaded %d default recipes into catalog", len(recipes))
-	} else {
-		log.Printf("Warning: Failed to load default recipes: %v", err)
-	}
-
 	// Create shared benchmark manager
 	benchmarkMgr := arf.NewBenchmarkManager("./benchmark_results")
 
-	// Create ARF handler
-	handler := arf.NewHandler(engine, catalog, sandboxMgr, benchmarkMgr)
+	// Initialize storage backend
+	recipeStorage, err := arfConfig.InitializeStorage()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize ARF storage backend, falling back to in-memory: %v", err)
+		recipeStorage = arf.NewInMemoryRecipeStorage()
+	}
+
+	// Initialize index backend
+	recipeIndex, err := arfConfig.InitializeIndex()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize ARF index backend: %v", err)
+		recipeIndex = nil
+	}
+
+	// Initialize validator
+	recipeValidator := arfConfig.InitializeValidator()
+
+	// Initialize recipe executor
+	engine := arf.NewRecipeExecutor(recipeStorage, sandboxMgr)
+
+	// Create ARF handler based on available backends
+	var handler *arf.Handler
+	if recipeStorage != nil && (recipeIndex != nil || arfConfig.Storage.Backend == "memory") {
+		// Use storage-aware handler
+		handler = arf.NewHandlerWithStorage(
+			engine,
+			recipeStorage,
+			recipeIndex,
+			recipeValidator,
+			sandboxMgr,
+			benchmarkMgr,
+		)
+		log.Printf("ARF handler initialized with storage backend: %s", arfConfig.Storage.Backend)
+	} else {
+		// Fallback to catalog-based handler
+		keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "arf")
+		catalog, err := arf.NewConsulRecipeCatalog(cfg.ConsulAddr, keyPrefix)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create recipe catalog: %w", err)
+		}
+		
+		handler = arf.NewHandler(engine, catalog, sandboxMgr, benchmarkMgr)
+		log.Printf("ARF handler initialized with catalog fallback")
+	}
 
 	log.Printf("ARF handler initialized successfully")
 	return handler, nil

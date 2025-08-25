@@ -4,26 +4,29 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/controller/arf/models"
+	"github.com/iw2rmb/ploy/controller/arf/storage"
 )
 
 // Mock implementations for testing
 type MockEngine struct {
-	recipes map[string]Recipe
+	recipes map[string]*models.Recipe
 }
 
 func NewMockEngine() *MockEngine {
 	return &MockEngine{
-		recipes: make(map[string]Recipe),
+		recipes: make(map[string]*models.Recipe),
 	}
 }
 
-func (m *MockEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error) {
+func (m *MockEngine) ExecuteRecipe(ctx context.Context, recipe *models.Recipe, codebase Codebase) (*TransformationResult, error) {
 	return &TransformationResult{
 		RecipeID:        recipe.ID,
 		Success:         true,
@@ -34,39 +37,34 @@ func (m *MockEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, codebase 
 	}, nil
 }
 
-func (m *MockEngine) ValidateRecipe(recipe Recipe) error {
+func (m *MockEngine) ValidateRecipe(recipe *models.Recipe) error {
 	if recipe.ID == "" {
 		return &ValidationError{Message: "Recipe ID is required"}
 	}
 	return nil
 }
 
-func (m *MockEngine) ListAvailableRecipes() ([]Recipe, error) {
-	var recipes []Recipe
+func (m *MockEngine) ListAvailableRecipes() ([]*models.Recipe, error) {
+	var recipes []*models.Recipe
 	for _, recipe := range m.recipes {
 		recipes = append(recipes, recipe)
 	}
 	return recipes, nil
 }
 
-func (m *MockEngine) GetRecipeMetadata(recipeID string) (*RecipeMetadata, error) {
+func (m *MockEngine) GetRecipeMetadata(recipeID string) (*models.RecipeMetadata, error) {
 	recipe, exists := m.recipes[recipeID]
 	if !exists {
 		return nil, &RecipeNotFoundError{RecipeID: recipeID}
 	}
 
-	return &RecipeMetadata{
-		Recipe:              recipe,
-		ApplicableLanguages: []string{recipe.Language},
-		SuccessRate:         recipe.Confidence,
-		CreatedAt:           time.Now().Add(-24 * time.Hour),
-		UpdatedAt:           time.Now(),
-	}, nil
+	return &recipe.Metadata, nil
 }
 
 func (m *MockEngine) CacheAST(key string, ast *AST) error {
 	return nil
 }
+
 
 func (m *MockEngine) GetCachedAST(key string) (*AST, bool) {
 	return nil, false
@@ -81,27 +79,35 @@ func (e *ValidationError) Error() string {
 	return e.Message
 }
 
-func setupTestHandler() (*Handler, *MockEngine, *MockRecipeCatalog, *MockSandboxManager) {
-	engine := NewMockEngine()
-	catalog := NewMockRecipeCatalog()
+func setupTestHandler() (*Handler, *RecipeExecutor, *MockRecipeCatalog, *MockSandboxManager) {
+	// Create mock storage and sandbox manager for RecipeExecutor
+	storage := NewInMemoryRecipeStorage()
 	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storage, sandboxMgr)
+	catalog := NewMockRecipeCatalog()
 	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(engine, catalog, sandboxMgr, benchmarkMgr)
+	handler := NewHandler(executor, catalog, sandboxMgr, benchmarkMgr)
 
 	// Add some test recipes
-	testRecipe := Recipe{
-		ID:          "test-recipe",
-		Name:        "Test Recipe",
-		Description: "A test recipe",
-		Language:    "java",
-		Category:    CategoryCleanup,
-		Confidence:  0.9,
-		Source:      "org.openrewrite.java.cleanup.TestRecipe",
+	testRecipe := &models.Recipe{
+		ID: "test-recipe",
+		Metadata: models.RecipeMetadata{
+			Name:        "test-recipe",
+			Description: "A test recipe",
+			Author:      "test-author",
+			Languages:   []string{"java"},
+			Categories:  []string{"code-cleanup"},
+		},
+		Steps: []models.RecipeStep{{
+			Name: "cleanup-step",
+			Type: models.StepTypeOpenRewrite,
+			Config: map[string]interface{}{"recipe": "org.openrewrite.java.cleanup.TestRecipe"},
+		}},
 	}
-	engine.recipes[testRecipe.ID] = testRecipe
+	storage.CreateRecipe(context.Background(), testRecipe)
 	catalog.StoreRecipe(context.Background(), testRecipe)
 
-	return handler, engine, catalog, sandboxMgr
+	return handler, executor, catalog, sandboxMgr
 }
 
 func TestHandlerListRecipes(t *testing.T) {
@@ -164,7 +170,7 @@ func TestHandlerGetRecipe(t *testing.T) {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
 		}
 
-		var recipe Recipe
+		var recipe models.Recipe
 		json.NewDecoder(resp.Body).Decode(&recipe)
 
 		if recipe.ID != "test-recipe" {
@@ -192,14 +198,20 @@ func TestHandlerCreateRecipe(t *testing.T) {
 	handler.RegisterRoutes(app)
 
 	t.Run("create valid recipe", func(t *testing.T) {
-		recipe := Recipe{
-			ID:          "new-recipe",
-			Name:        "New Recipe",
-			Description: "A new test recipe",
-			Language:    "java",
-			Category:    CategoryModernize,
-			Confidence:  0.85,
-			Source:      "org.openrewrite.java.modernize.NewRecipe",
+		recipe := &models.Recipe{
+			ID: "new-recipe",
+			Metadata: models.RecipeMetadata{
+				Name:        "new-recipe",
+				Description: "A new test recipe",
+				Author:      "test-author",
+				Languages:   []string{"java"},
+				Categories:  []string{"modernization"},
+			},
+			Steps: []models.RecipeStep{{
+				Name: "modernize-step",
+				Type: models.StepTypeOpenRewrite,
+				Config: map[string]interface{}{"recipe": "org.openrewrite.java.modernize.NewRecipe"},
+			}},
 		}
 
 		body, _ := json.Marshal(recipe)
@@ -217,8 +229,11 @@ func TestHandlerCreateRecipe(t *testing.T) {
 	})
 
 	t.Run("create invalid recipe", func(t *testing.T) {
-		recipe := Recipe{
-			Name: "Invalid Recipe",
+		recipe := models.Recipe{
+			Metadata: models.RecipeMetadata{
+				Name: "invalid-recipe",
+				// Missing required author field to make it invalid
+			},
 			// Missing required ID field
 		}
 
@@ -462,17 +477,25 @@ func TestHandlerRecipeStats(t *testing.T) {
 }
 
 func BenchmarkHandlerListRecipes(b *testing.B) {
-	handler, engine, catalog, _ := setupTestHandler()
+	handler, _, catalog, _ := setupTestHandler()
 
 	// Add many recipes for benchmarking
 	for i := 0; i < 1000; i++ {
-		recipe := Recipe{
-			ID:       "bench-recipe-" + string(rune(i)),
-			Name:     "Benchmark Recipe " + string(rune(i)),
-			Language: "java",
-			Category: CategoryCleanup,
+		recipe := &models.Recipe{
+			ID: fmt.Sprintf("bench-recipe-%d", i),
+			Metadata: models.RecipeMetadata{
+				Name:        fmt.Sprintf("benchmark-recipe-%d", i),
+				Description: fmt.Sprintf("Benchmark Recipe %d", i),
+				Author:      "bench-author",
+				Languages:   []string{"java"},
+				Categories:  []string{"code-cleanup"},
+			},
+			Steps: []models.RecipeStep{{
+				Name: "bench-step",
+				Type: models.StepTypeOpenRewrite,
+				Config: map[string]interface{}{"recipe": "bench"},
+			}},
 		}
-		engine.recipes[recipe.ID] = recipe
 		catalog.StoreRecipe(context.Background(), recipe)
 	}
 

@@ -1,0 +1,81 @@
+# Traefik static configuration for local development
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Entry points configuration
+entryPoints:
+  web:
+    address: ":80"
+    # Redirect HTTP to HTTPS in production
+    # http:
+    #   redirections:
+    #     entrypoint:
+    #       to: websecure
+    #       scheme: https
+  websecure:
+    address: ":443"
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: true  # Only for local development
+
+# Provider configuration
+providers:
+  # File provider for static routes
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+  # Consul provider for service discovery
+  consul:
+    endpoints:
+      - "consul:8500"
+    rootKey: "traefik"
+    
+    # Service discovery configuration
+    expose:
+      service: "traefik"
+    
+    # Health check configuration
+    healthcheck:
+      interval: "10s"
+      timeout: "5s"
+
+# Certificate resolvers (for production)
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "admin@local.dev"
+      storage: "/data/acme.json"
+      # HTTP Challenge for local development
+      httpChallenge:
+        entryPoint: web
+
+# Logging configuration
+log:
+  level: INFO
+  format: json
+
+# Access logs for debugging
+accessLog:
+  format: json
+  filters:
+    statusCodes:
+      - "400-599"
+
+# Metrics (disabled for local development)
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+# Tracing (disabled for local development)
+# tracing:
+#   jaeger:
+#     localAgentHostPort: "jaeger:14268"
+
+# Ping endpoint for health checks
+ping:
+  entryPoint: "web"

@@ -232,17 +232,6 @@ scripts/
         └── emscripten.sh       # C/C++ Emscripten compilation
 ```
 
-### `/test-scripts/` - Test Automation
-Executable test scripts for validation and CI/CD.
-
-```
-test-scripts/
-├── test-*.sh           # Individual test scenarios
-├── test-health-monitoring.sh    # Health endpoint testing
-├── test-git-integration.sh      # Git workflow testing
-├── test-traefik-integration.sh  # Traefik routing testing
-└── test-artifact-integrity.sh   # Storage integrity testing
-```
 
 ### `/tools/` - Development Tools
 Standalone tools for development and debugging.
@@ -278,22 +267,24 @@ docs/
 
 ## Sample Applications
 
-### `/apps/` - Reference Applications
-Sample applications demonstrating each deployment lane.
+### `/tests/` - Testing Infrastructure
+Comprehensive testing assets including scripts and reference applications.
 
 ```
-apps/
-├── node-hello/              # Node.js application (Lane B/C)
-├── go-simple/               # Go application (Lane A/B)
-├── java-spring/             # Java Spring application (Lane C)
-├── python-flask/            # Python Flask application (Lane E)
-├── wasm-rust-hello/         # Rust WASM application (Lane G)
-├── wasm-go-hello/           # Go WASM application (Lane G)
-├── wasm-assemblyscript-hello/  # AssemblyScript WASM application (Lane G)
-└── wasm-cpp-hello/          # C++ WASM application (Lane G)
+tests/
+├── scripts/                 # Test scripts for various scenarios
+│   ├── test-*.sh           # Individual test scripts
+│   └── README.md           # Test script documentation
+└── apps/                   # Reference applications for testing
+    ├── node-hello/         # Node.js application (Lane B/C)
+    ├── go-hellosvc/        # Go application (Lane A/B)
+    ├── java-ordersvc/      # Java Spring application (Lane C)
+    ├── dotnet-ordersvc/    # .NET application (Lane C)
+    ├── python-api/         # Python Flask application (Lane E)
+    └── nginx-edge/         # Nginx static content (Lane E)
 ```
 
-Each app contains:
+Each test app contains:
 ```
 app-name/
 ├── src/                # Application source code
@@ -314,13 +305,56 @@ Files that influence automatic lane selection:
 - **Lane F (VM)**: `Vagrantfile`, `vm.yaml`, `packer.json`
 - **Lane G (WASM)**: `*.wasm`, `*.wat`, `Cargo.toml` (wasm32-wasi), `package.json` (AssemblyScript), `CMakeLists.txt` (Emscripten)
 
-### Manifest Files
+### `/lanes/` - Lane-Specific Configurations
+Lane-specific build configurations and templates.
+
+```
+lanes/
+├── A-unikraft-minimal/  # Lane A - Minimal Unikraft
+│   └── kraft.yaml       # Kraft configuration
+├── B-unikraft-nodejs/   # Lane B - Node.js Unikraft
+│   └── kraft.yaml       # Kraft configuration
+└── B-unikraft-posix/    # Lane B - POSIX Unikraft
+    └── kraft.yaml       # Kraft configuration
+```
+
+### `/manifests/` - Application Manifests
 Application deployment configuration:
 
 ```
 manifests/
-├── app-name.yaml       # Application deployment manifest
-└── domains.yaml        # Domain routing configuration
+└── java-ordersvc.yaml   # Java order service manifest
+```
+
+### `/policies/` - Security Policies
+OPA security policies.
+
+```
+policies/
+└── wasm.rego            # WebAssembly security policy
+```
+
+### `/test-results/` - Test Execution Results
+Stored test execution results and reports.
+
+```
+test-results/
+└── arf-phase4/          # ARF Phase 4 test results
+    ├── compliance-status.json
+    ├── container-scan.json
+    ├── security-report.json
+    ├── sbom-*.json
+    └── [other test results]
+```
+
+### `/vscode-arf-extension/` - VS Code Extension
+ARF VS Code extension for development.
+
+```
+vscode-arf-extension/
+├── package.json         # Extension manifest
+└── src/
+    └── extension.ts     # Extension entry point
 ```
 
 ## Key File Locations Quick Reference
@@ -332,8 +366,8 @@ manifests/
 
 ### Health and Monitoring
 - Health endpoints: `controller/health/health.go`
-- Storage metrics: `internal/storage/metrics.go`
-- TTL cleanup: `internal/cleanup/`
+- Storage monitoring: `internal/storage/monitoring.go`
+- TTL cleanup: `internal/cleanup/ttl.go`, `controller/coordination/ttl_cleanup.go`
 
 ### API Endpoints
 - Main router: `controller/main.go:35-248`
@@ -344,9 +378,9 @@ manifests/
 
 ### Build and Deployment
 - Lane selection: `tools/lane-pick/main.go`
-- Build triggers: `internal/build/build.go`
-- Nomad jobs: `controller/nomad/nomad.go`
-- Storage operations: `internal/storage/client.go`
+- Build triggers: Handled through controller builders
+- Nomad jobs: `controller/nomad/client.go`, `controller/nomad/submit.go`
+- Storage operations: `internal/storage/client.go`, `internal/storage/seaweedfs.go`
 
 ## Development Workflow File Locations
 
@@ -355,7 +389,7 @@ manifests/
 3. **CLI Changes**: Modify `cmd/ploy/main.go` and update `cmd/ploy/README.md`
 4. **Storage Changes**: Edit files in `internal/storage/`
 5. **Infrastructure**: Update `iac/dev/playbooks/` and `platform/`
-6. **Testing**: Add tests to `test-scripts/` and update `test-scripts/README.md`
+6. **Testing**: Add tests to `tests/scripts/` and update `tests/scripts/README.md`
 7. **Documentation**: Update relevant files in `docs/` and `CHANGELOG.md`
 
 This structure enables efficient navigation and quick location of relevant files for any development task.

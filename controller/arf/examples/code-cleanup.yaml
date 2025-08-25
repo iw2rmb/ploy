@@ -1,0 +1,159 @@
+# Generic Code Cleanup Recipe
+metadata:
+  name: java-code-cleanup
+  description: Comprehensive code cleanup and modernization for Java projects
+  author: Ploy Platform
+  version: 1.1.0
+  license: MIT
+  tags:
+    - cleanup
+    - refactoring
+    - code-quality
+    - best-practices
+    - formatting
+  categories:
+    - code-cleanup
+    - best-practices
+    - refactoring
+  languages:
+    - java
+  frameworks:
+    - maven
+    - gradle
+
+steps:
+  - name: Remove Unused Imports
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.RemoveUnusedImports
+      description: Remove all unused import statements
+    on_error: continue
+    timeout: 2m
+
+  - name: Remove Unnecessary Parentheses
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.UnnecessaryParentheses
+      description: Remove redundant parentheses in expressions
+    on_error: continue
+    timeout: 2m
+
+  - name: Simplify Boolean Expressions
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.SimplifyBooleanExpression
+      description: Simplify complex boolean expressions
+    on_error: continue
+    timeout: 2m
+
+  - name: Use Diamond Operator
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.UseDiamondOperator
+      description: Use diamond operator for generic instance creation
+    conditions:
+      - type: min_java_version
+        value: "7"
+    on_error: continue
+    timeout: 2m
+
+  - name: Replace String Literals
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.ReplaceStringLiteralEqualsWithConstant
+      description: Replace string literal comparisons with constant-first pattern
+    on_error: continue
+    timeout: 2m
+
+  - name: Final Local Variables
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.FinalizeLocalVariables
+      description: Add final modifier to effectively final local variables
+    on_error: continue
+    timeout: 3m
+
+  - name: Remove Empty Blocks
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.EmptyBlock
+      description: Remove empty code blocks
+    on_error: continue
+    timeout: 1m
+
+  - name: Simplify Method Chains
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.SimplifyMethodChain
+      description: Simplify unnecessary method chains
+    on_error: continue
+    timeout: 2m
+
+  - name: Use Static Imports
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.cleanup.UseStaticImport
+      options:
+        static_methods:
+          - java.util.Collections.*
+          - java.util.Arrays.*
+          - org.junit.Assert.*
+    conditions:
+      - type: min_java_version
+        value: "5"
+    on_error: continue
+    timeout: 2m
+
+  - name: Fix Whitespace
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.format.NormalizeTabsOrSpaces
+      options:
+        use_tabs: false
+        tab_size: 4
+    on_error: continue
+    timeout: 2m
+
+  - name: Order Imports
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.OrderImports
+      options:
+        groups:
+          - java.*
+          - javax.*
+          - org.*
+          - com.*
+          - static *
+    on_error: continue
+    timeout: 2m
+
+  - name: Apply Code Formatting
+    type: openrewrite
+    config:
+      recipe: org.openrewrite.java.format.AutoFormat
+      options:
+        style: GOOGLE
+    on_error: continue
+    timeout: 3m
+
+execution:
+  parallelism: 4  # Can run many cleanup tasks in parallel
+  max_duration: 10m
+  sandbox:
+    enabled: true
+    allow_network: false
+    allow_file_write: true
+    max_memory: 1GB
+    max_cpu: 2
+    isolation_level: low
+
+validation:
+  file_patterns:
+    - "**/*.java"
+  min_file_count: 1
+  max_repo_size: 536870912  # 512MB
+  language_detection:
+    primary: java
+    min_confidence: 0.6
+    required: true

@@ -8,27 +8,29 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // RecipeCatalog provides recipe storage and discovery capabilities
 type RecipeCatalog interface {
-	StoreRecipe(ctx context.Context, recipe Recipe) error
-	GetRecipe(ctx context.Context, recipeID string) (*Recipe, error)
-	ListRecipes(ctx context.Context, filters RecipeFilters) ([]Recipe, error)
-	UpdateRecipe(ctx context.Context, recipe Recipe) error
+	StoreRecipe(ctx context.Context, recipe *models.Recipe) error
+	GetRecipe(ctx context.Context, recipeID string) (*models.Recipe, error)
+	ListRecipes(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error)
+	UpdateRecipe(ctx context.Context, recipe *models.Recipe) error
 	DeleteRecipe(ctx context.Context, recipeID string) error
-	SearchRecipes(ctx context.Context, query string) ([]Recipe, error)
+	SearchRecipes(ctx context.Context, query string) ([]*models.Recipe, error)
 	GetRecipeStats(ctx context.Context, recipeID string) (*RecipeStats, error)
 	UpdateRecipeStats(ctx context.Context, recipeID string, success bool, executionTime time.Duration) error
 }
 
 // RecipeFilters defines search criteria for recipes
 type RecipeFilters struct {
-	Language     string         `json:"language,omitempty"`
-	Category     RecipeCategory `json:"category,omitempty"`
-	Tags         []string       `json:"tags,omitempty"`
-	MinConfidence float64       `json:"min_confidence,omitempty"`
-	MaxConfidence float64       `json:"max_confidence,omitempty"`
+	Language      string   `json:"language,omitempty"`
+	Category      string   `json:"category,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	Author        string   `json:"author,omitempty"`
+	MinConfidence float64  `json:"min_confidence,omitempty"`
+	MaxConfidence float64  `json:"max_confidence,omitempty"`
 }
 
 // RecipeStats tracks usage and performance metrics for recipes
@@ -72,7 +74,7 @@ func NewConsulRecipeCatalog(consulAddr, keyPrefix string) (*ConsulRecipeCatalog,
 }
 
 // StoreRecipe stores a recipe in the Consul KV store
-func (c *ConsulRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) error {
+func (c *ConsulRecipeCatalog) StoreRecipe(ctx context.Context, recipe *models.Recipe) error {
 	// Validate recipe before storing
 	if recipe.ID == "" {
 		return fmt.Errorf("recipe ID is required")
@@ -112,7 +114,7 @@ func (c *ConsulRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) er
 }
 
 // GetRecipe retrieves a recipe by ID
-func (c *ConsulRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*Recipe, error) {
+func (c *ConsulRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*models.Recipe, error) {
 	key := fmt.Sprintf("%s/%s", c.keyPrefix, recipeID)
 	kv := c.client.KV()
 
@@ -125,7 +127,7 @@ func (c *ConsulRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*
 		return nil, fmt.Errorf("recipe %s not found", recipeID)
 	}
 
-	var recipe Recipe
+	var recipe models.Recipe
 	if err := json.Unmarshal(pair.Value, &recipe); err != nil {
 		return nil, fmt.Errorf("failed to deserialize recipe: %w", err)
 	}
@@ -134,22 +136,22 @@ func (c *ConsulRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*
 }
 
 // ListRecipes returns all recipes matching the given filters
-func (c *ConsulRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]Recipe, error) {
+func (c *ConsulRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error) {
 	kv := c.client.KV()
 	pairs, _, err := kv.List(c.keyPrefix, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list recipes from Consul: %w", err)
 	}
 
-	var recipes []Recipe
+	var recipes []*models.Recipe
 	for _, pair := range pairs {
-		var recipe Recipe
+		var recipe models.Recipe
 		if err := json.Unmarshal(pair.Value, &recipe); err != nil {
 			continue // Skip malformed recipes
 		}
 
-		if c.matchesFilters(recipe, filters) {
-			recipes = append(recipes, recipe)
+		if c.matchesFilters(&recipe, filters) {
+			recipes = append(recipes, &recipe)
 		}
 	}
 
@@ -157,7 +159,7 @@ func (c *ConsulRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFil
 }
 
 // UpdateRecipe updates an existing recipe
-func (c *ConsulRecipeCatalog) UpdateRecipe(ctx context.Context, recipe Recipe) error {
+func (c *ConsulRecipeCatalog) UpdateRecipe(ctx context.Context, recipe *models.Recipe) error {
 	// Check if recipe exists
 	existing, err := c.GetRecipe(ctx, recipe.ID)
 	if err != nil {
@@ -194,8 +196,8 @@ func (c *ConsulRecipeCatalog) DeleteRecipe(ctx context.Context, recipeID string)
 }
 
 // SearchRecipes performs a text search across recipe names and descriptions
-func (c *ConsulRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]Recipe, error) {
-	query = strings.ToLower(query)
+func (c *ConsulRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]*models.Recipe, error) {
+	queryLower := strings.ToLower(query)
 	
 	kv := c.client.KV()
 	pairs, _, err := kv.List(c.keyPrefix, nil)
@@ -203,22 +205,22 @@ func (c *ConsulRecipeCatalog) SearchRecipes(ctx context.Context, query string) (
 		return nil, fmt.Errorf("failed to search recipes in Consul: %w", err)
 	}
 
-	var matchingRecipes []Recipe
+	recipes := []*models.Recipe{}
 	for _, pair := range pairs {
-		var recipe Recipe
+		var recipe models.Recipe
 		if err := json.Unmarshal(pair.Value, &recipe); err != nil {
 			continue
 		}
 
 		// Search in name, description, and tags
-		if c.containsQuery(recipe.Name, query) ||
-		   c.containsQuery(recipe.Description, query) ||
-		   c.containsQueryInTags(recipe.Tags, query) {
-			matchingRecipes = append(matchingRecipes, recipe)
+		if c.containsQuery(recipe.Metadata.Name, queryLower) ||
+		   c.containsQuery(recipe.Metadata.Description, queryLower) ||
+		   c.containsQueryInTags(recipe.Metadata.Tags, queryLower) {
+			recipes = append(recipes, &recipe)
 		}
 	}
 
-	return matchingRecipes, nil
+	return recipes, nil
 }
 
 // GetRecipeStats retrieves usage statistics for a recipe
@@ -307,22 +309,37 @@ func (c *ConsulRecipeCatalog) storeRecipeStats(ctx context.Context, stats *Recip
 	return nil
 }
 
-func (c *ConsulRecipeCatalog) matchesFilters(recipe Recipe, filters RecipeFilters) bool {
+func (c *ConsulRecipeCatalog) matchesFilters(recipe *models.Recipe, filters RecipeFilters) bool {
 	// Language filter
-	if filters.Language != "" && recipe.Language != filters.Language {
-		return false
+	if filters.Language != "" {
+		hasLanguage := false
+		for _, lang := range recipe.Metadata.Languages {
+			if lang == filters.Language {
+				hasLanguage = true
+				break
+			}
+		}
+		if !hasLanguage {
+			return false
+		}
 	}
 
 	// Category filter
-	if filters.Category != "" && recipe.Category != filters.Category {
-		return false
+	if filters.Category != "" {
+		hasCategory := false
+		for _, cat := range recipe.Metadata.Categories {
+			if cat == filters.Category {
+				hasCategory = true
+				break
+			}
+		}
+		if !hasCategory {
+			return false
+		}
 	}
 
-	// Confidence range filter
-	if filters.MinConfidence > 0 && recipe.Confidence < filters.MinConfidence {
-		return false
-	}
-	if filters.MaxConfidence > 0 && recipe.Confidence > filters.MaxConfidence {
+	// Author filter
+	if filters.Author != "" && recipe.Metadata.Author != filters.Author {
 		return false
 	}
 
@@ -331,7 +348,7 @@ func (c *ConsulRecipeCatalog) matchesFilters(recipe Recipe, filters RecipeFilter
 		hasAllTags := true
 		for _, filterTag := range filters.Tags {
 			found := false
-			for _, recipeTag := range recipe.Tags {
+			for _, recipeTag := range recipe.Metadata.Tags {
 				if strings.EqualFold(recipeTag, filterTag) {
 					found = true
 					break

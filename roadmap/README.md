@@ -23,7 +23,7 @@ Next steps to implement:
 2. ✅ **COMPLETED (2025-08-19)** Extend `build/kraft/build_unikraft.sh` with Node.js detection and build steps.
 3. ✅ **COMPLETED (2025-08-19)** Add Node.js dependency handling (npm install, package bundling) to build process.
 4. ✅ **COMPLETED (2025-08-19)** Create Node.js-specific Unikraft configuration within existing template system.
-5. ✅ **COMPLETED (2025-08-19)** Test `ploy push` with `apps/node-hello` example using enhanced Lane B detection.
+5. ✅ **COMPLETED (2025-08-19)** Test `ploy push` with `tests/apps/node-hello` example using enhanced Lane B detection.
 
 **Phase 3: Supply Chain Security Implementation**
 1. ✅ **COMPLETED (2025-08-19)** Implement cryptographic signing of build artifacts during build process.
@@ -96,7 +96,19 @@ The Automated Remediation Framework (ARF) represents Ploy's enterprise code tran
 - ✅ **[Phase ARF-2: Self-Healing Loop & Error Recovery](roadmap/arf/phase-arf-2.md)** - **COMPLETED (2025-08-22)** - Circuit breakers, error-driven recipe evolution, parallel processing, multi-repository orchestration  
 - ✅ **[Phase ARF-3: LLM Integration & Hybrid Intelligence](roadmap/arf/phase-arf-3.md)** - **COMPLETED (2025-08-23)** - LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, strategy selection
 - ✅ **[Phase ARF-4: Security & Production Hardening](roadmap/arf/phase-arf-4.md)** - **COMPLETED (2025-08-25)** - Complete deployment integration, application testing, Java 11→17 migration pipeline operational with Lane C OSv deployments
-- **[Phase ARF-5: Production Features & Scale](roadmap/arf/phase-arf-5.md)** - Multi-repository campaigns, analytics dashboards, API ecosystem, compliance framework
+
+**Phase ARF-5: Generic Recipe Management System** - **IN PROGRESS** ✅
+Comprehensive transformation of ARF into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
+
+- ✅ **[Phase ARF-5.1: Recipe Data Model & Storage](roadmap/arf/phase-arf-5.1.md)** - ✅ **COMPLETED 2025-08-25** - Recipe data structures, SeaweedFS storage backend, validation framework, and YAML format specification
+- 📋 **[Phase ARF-5.2: CLI Integration & User Interface](roadmap/arf/phase-arf-5.2.md)** - Complete CLI commands for recipe management: upload, update, delete, list, search, run, compose with benchmark integration
+- 📋 **[Phase ARF-5.3: Generic Recipe Execution Engine](roadmap/arf/phase-arf-5.3.md)** - Plugin-based execution framework replacing mock transformations with real OpenRewrite, shell scripts, and AST transformations
+- 📋 **[Phase ARF-5.4: Recipe Discovery & Management Features](roadmap/arf/phase-arf-5.4.md)** - Recipe marketplace, intelligent discovery, dependency management, quality assurance, and community features
+
+**Future Phases**:
+- **Phase ARF-6: Enterprise Recipe Governance** - Recipe approval workflows, governance policies, and enterprise compliance frameworks
+- **Phase ARF-7: Advanced Analytics & Intelligence** - Usage analytics, trend analysis, predictive recipe recommendations, and transformation impact assessment
+- **Phase ARF-8: Multi-Cloud Recipe Distribution** - Distributed recipe registries, cross-platform synchronization, and federated recipe ecosystems
 
 **✅ ARF Implementation Status (Phases 1-4)**:
 - ✅ **Foundation Complete**: OpenRewrite integration with 2,800+ Java transformation recipes

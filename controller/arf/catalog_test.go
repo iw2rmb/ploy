@@ -4,22 +4,24 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // MockRecipeCatalog for testing without Consul dependency
 type MockRecipeCatalog struct {
-	recipes map[string]Recipe
+	recipes map[string]*models.Recipe
 	stats   map[string]*RecipeStats
 }
 
 func NewMockRecipeCatalog() *MockRecipeCatalog {
 	return &MockRecipeCatalog{
-		recipes: make(map[string]Recipe),
+		recipes: make(map[string]*models.Recipe),
 		stats:   make(map[string]*RecipeStats),
 	}
 }
 
-func (m *MockRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) error {
+func (m *MockRecipeCatalog) StoreRecipe(ctx context.Context, recipe *models.Recipe) error {
 	m.recipes[recipe.ID] = recipe
 	if _, exists := m.stats[recipe.ID]; !exists {
 		m.stats[recipe.ID] = &RecipeStats{
@@ -30,16 +32,16 @@ func (m *MockRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) erro
 	return nil
 }
 
-func (m *MockRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*Recipe, error) {
+func (m *MockRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*models.Recipe, error) {
 	recipe, exists := m.recipes[recipeID]
 	if !exists {
 		return nil, &RecipeNotFoundError{RecipeID: recipeID}
 	}
-	return &recipe, nil
+	return recipe, nil
 }
 
-func (m *MockRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]Recipe, error) {
-	var result []Recipe
+func (m *MockRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error) {
+	var result []*models.Recipe
 	for _, recipe := range m.recipes {
 		if m.matchesFilters(recipe, filters) {
 			result = append(result, recipe)
@@ -48,7 +50,7 @@ func (m *MockRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilte
 	return result, nil
 }
 
-func (m *MockRecipeCatalog) UpdateRecipe(ctx context.Context, recipe Recipe) error {
+func (m *MockRecipeCatalog) UpdateRecipe(ctx context.Context, recipe *models.Recipe) error {
 	if _, exists := m.recipes[recipe.ID]; !exists {
 		return &RecipeNotFoundError{RecipeID: recipe.ID}
 	}
@@ -65,12 +67,12 @@ func (m *MockRecipeCatalog) DeleteRecipe(ctx context.Context, recipeID string) e
 	return nil
 }
 
-func (m *MockRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]Recipe, error) {
-	var result []Recipe
+func (m *MockRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]*models.Recipe, error) {
+	var result []*models.Recipe
 	for _, recipe := range m.recipes {
-		if m.containsQuery(recipe.Name, query) ||
-		   m.containsQuery(recipe.Description, query) ||
-		   m.containsQueryInTags(recipe.Tags, query) {
+		if m.containsQuery(recipe.Metadata.Name, query) ||
+		   m.containsQuery(recipe.Metadata.Description, query) ||
+		   m.containsQueryInTags(recipe.Metadata.Tags, query) {
 			result = append(result, recipe)
 		}
 	}
@@ -117,19 +119,56 @@ func (m *MockRecipeCatalog) UpdateRecipeStats(ctx context.Context, recipeID stri
 	return nil
 }
 
-func (m *MockRecipeCatalog) matchesFilters(recipe Recipe, filters RecipeFilters) bool {
-	if filters.Language != "" && recipe.Language != filters.Language {
+func (m *MockRecipeCatalog) matchesFilters(recipe *models.Recipe, filters RecipeFilters) bool {
+	// Language filter - check if recipe supports the language
+	if filters.Language != "" {
+		hasLanguage := false
+		for _, lang := range recipe.Metadata.Languages {
+			if lang == filters.Language {
+				hasLanguage = true
+				break
+			}
+		}
+		if !hasLanguage {
+			return false
+		}
+	}
+	
+	// Category filter - check if recipe has the category
+	if filters.Category != "" {
+		hasCategory := false
+		for _, cat := range recipe.Metadata.Categories {
+			if cat == filters.Category {
+				hasCategory = true
+				break
+			}
+		}
+		if !hasCategory {
+			return false
+		}
+	}
+	
+	// Author filter
+	if filters.Author != "" && recipe.Metadata.Author != filters.Author {
 		return false
 	}
-	if filters.Category != "" && recipe.Category != filters.Category {
-		return false
+	
+	// Tags filter - recipe must have all specified tags
+	if len(filters.Tags) > 0 {
+		for _, filterTag := range filters.Tags {
+			found := false
+			for _, recipeTag := range recipe.Metadata.Tags {
+				if recipeTag == filterTag {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		}
 	}
-	if filters.MinConfidence > 0 && recipe.Confidence < filters.MinConfidence {
-		return false
-	}
-	if filters.MaxConfidence > 0 && recipe.Confidence > filters.MaxConfidence {
-		return false
-	}
+	
 	return true
 }
 
@@ -160,16 +199,26 @@ func TestRecipeCatalogOperations(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Store and retrieve recipe", func(t *testing.T) {
-		recipe := Recipe{
-			ID:          "test-recipe-1",
-			Name:        "Test Recipe 1",
-			Description: "A test recipe for unit testing",
-			Language:    "java",
-			Category:    CategoryCleanup,
-			Confidence:  0.9,
-			Source:      "org.openrewrite.java.cleanup.TestRecipe1",
-			Version:     "1.0.0",
-			Tags:        []string{"test", "cleanup"},
+		recipe := &models.Recipe{
+			ID: "test-recipe-1",
+			Metadata: models.RecipeMetadata{
+				Name:        "test-recipe-1",
+				Description: "A test recipe for unit testing",
+				Author:      "test-author",
+				Version:     "1.0.0",
+				Languages:   []string{"java"},
+				Categories:  []string{"code-cleanup"},
+				Tags:        []string{"test", "cleanup"},
+			},
+			Steps: []models.RecipeStep{
+				{
+					Name: "cleanup-step",
+					Type: models.StepTypeOpenRewrite,
+					Config: map[string]interface{}{
+						"recipe": "org.openrewrite.java.cleanup.TestRecipe1",
+					},
+				},
+			},
 		}
 
 		// Store recipe
@@ -187,30 +236,39 @@ func TestRecipeCatalogOperations(t *testing.T) {
 		if retrieved.ID != recipe.ID {
 			t.Errorf("Expected ID %s, got %s", recipe.ID, retrieved.ID)
 		}
-		if retrieved.Name != recipe.Name {
-			t.Errorf("Expected name %s, got %s", recipe.Name, retrieved.Name)
+		if retrieved.Metadata.Name != recipe.Metadata.Name {
+			t.Errorf("Expected name %s, got %s", recipe.Metadata.Name, retrieved.Metadata.Name)
 		}
-		if retrieved.Confidence != recipe.Confidence {
-			t.Errorf("Expected confidence %f, got %f", recipe.Confidence, retrieved.Confidence)
+		if retrieved.Metadata.Description != recipe.Metadata.Description {
+			t.Errorf("Expected description %s, got %s", recipe.Metadata.Description, retrieved.Metadata.Description)
 		}
 	})
 
 	t.Run("Update recipe", func(t *testing.T) {
-		recipe := Recipe{
-			ID:          "update-recipe",
-			Name:        "Update Recipe",
-			Description: "Original description",
-			Language:    "java",
-			Category:    CategoryCleanup,
-			Confidence:  0.8,
+		recipe := &models.Recipe{
+			ID: "update-recipe",
+			Metadata: models.RecipeMetadata{
+				Name:        "update-recipe",
+				Description: "Original description",
+				Author:      "test-author",
+				Version:     "1.0.0",
+				Languages:   []string{"java"},
+				Categories:  []string{"code-cleanup"},
+			},
+			Steps: []models.RecipeStep{
+				{
+					Name: "update-step",
+					Type: models.StepTypeOpenRewrite,
+					Config: map[string]interface{}{"recipe": "test"},
+				},
+			},
 		}
 
 		// Store original
 		catalog.StoreRecipe(ctx, recipe)
 
 		// Update recipe
-		recipe.Description = "Updated description"
-		recipe.Confidence = 0.95
+		recipe.Metadata.Description = "Updated description"
 		err := catalog.UpdateRecipe(ctx, recipe)
 		if err != nil {
 			t.Fatalf("Failed to update recipe: %v", err)
@@ -222,19 +280,26 @@ func TestRecipeCatalogOperations(t *testing.T) {
 			t.Fatalf("Failed to retrieve updated recipe: %v", err)
 		}
 
-		if retrieved.Description != "Updated description" {
-			t.Errorf("Expected updated description, got %s", retrieved.Description)
-		}
-		if retrieved.Confidence != 0.95 {
-			t.Errorf("Expected updated confidence 0.95, got %f", retrieved.Confidence)
+		if retrieved.Metadata.Description != "Updated description" {
+			t.Errorf("Expected updated description, got %s", retrieved.Metadata.Description)
 		}
 	})
 
 	t.Run("Delete recipe", func(t *testing.T) {
-		recipe := Recipe{
-			ID:       "delete-recipe",
-			Name:     "Delete Recipe",
-			Language: "java",
+		recipe := &models.Recipe{
+			ID: "delete-recipe",
+			Metadata: models.RecipeMetadata{
+				Name:      "delete-recipe",
+				Author:    "test-author",
+				Languages: []string{"java"},
+			},
+			Steps: []models.RecipeStep{
+				{
+					Name:   "delete-step",
+					Type:   models.StepTypeOpenRewrite,
+					Config: map[string]interface{}{"recipe": "test"},
+				},
+			},
 		}
 
 		// Store and verify
@@ -259,27 +324,51 @@ func TestRecipeCatalogOperations(t *testing.T) {
 
 	t.Run("List recipes with filters", func(t *testing.T) {
 		// Add test recipes
-		recipes := []Recipe{
+		recipes := []*models.Recipe{
 			{
-				ID:         "java-recipe-1",
-				Name:       "Java Cleanup 1",
-				Language:   "java",
-				Category:   CategoryCleanup,
-				Confidence: 0.9,
+				ID: "java-recipe-1",
+				Metadata: models.RecipeMetadata{
+					Name:       "java-cleanup-1",
+					Description: "Java cleanup recipe",
+					Author:     "test-author",
+					Languages:  []string{"java"},
+					Categories: []string{"code-cleanup"},
+				},
+				Steps: []models.RecipeStep{{
+					Name:   "cleanup",
+					Type:   models.StepTypeOpenRewrite,
+					Config: map[string]interface{}{"recipe": "cleanup"},
+				}},
 			},
 			{
-				ID:         "java-recipe-2",
-				Name:       "Java Modernize 1",
-				Language:   "java",
-				Category:   CategoryModernize,
-				Confidence: 0.8,
+				ID: "java-recipe-2",
+				Metadata: models.RecipeMetadata{
+					Name:       "java-modernize-1",
+					Description: "Java modernization recipe",
+					Author:     "test-author",
+					Languages:  []string{"java"},
+					Categories: []string{"modernization"},
+				},
+				Steps: []models.RecipeStep{{
+					Name:   "modernize",
+					Type:   models.StepTypeOpenRewrite,
+					Config: map[string]interface{}{"recipe": "modernize"},
+				}},
 			},
 			{
-				ID:         "python-recipe-1",
-				Name:       "Python Cleanup 1",
-				Language:   "python",
-				Category:   CategoryCleanup,
-				Confidence: 0.85,
+				ID: "python-recipe-1",
+				Metadata: models.RecipeMetadata{
+					Name:       "python-cleanup-1",
+					Description: "Python cleanup recipe",
+					Author:     "test-author",
+					Languages:  []string{"python"},
+					Categories: []string{"code-cleanup"},
+				},
+				Steps: []models.RecipeStep{{
+					Name:   "cleanup",
+					Type:   models.StepTypeShellScript,
+					Config: map[string]interface{}{"script": "cleanup.py"},
+				}},
 			},
 		}
 
@@ -297,7 +386,7 @@ func TestRecipeCatalogOperations(t *testing.T) {
 		}
 
 		// Test category filter
-		cleanupRecipes, err := catalog.ListRecipes(ctx, RecipeFilters{Category: CategoryCleanup})
+		cleanupRecipes, err := catalog.ListRecipes(ctx, RecipeFilters{Category: "code-cleanup"})
 		if err != nil {
 			t.Fatalf("Failed to list cleanup recipes: %v", err)
 		}
@@ -305,19 +394,19 @@ func TestRecipeCatalogOperations(t *testing.T) {
 			t.Errorf("Expected 2 cleanup recipes, got %d", len(cleanupRecipes))
 		}
 
-		// Test confidence filter
-		highConfidenceRecipes, err := catalog.ListRecipes(ctx, RecipeFilters{MinConfidence: 0.85})
+		// Test author filter
+		authorRecipes, err := catalog.ListRecipes(ctx, RecipeFilters{Author: "test-author"})
 		if err != nil {
-			t.Fatalf("Failed to list high confidence recipes: %v", err)
+			t.Fatalf("Failed to list author recipes: %v", err)
 		}
-		if len(highConfidenceRecipes) != 2 {
-			t.Errorf("Expected 2 high confidence recipes, got %d", len(highConfidenceRecipes))
+		if len(authorRecipes) != 3 {
+			t.Errorf("Expected 3 author recipes, got %d", len(authorRecipes))
 		}
 
 		// Test combined filters
 		javaCleanupRecipes, err := catalog.ListRecipes(ctx, RecipeFilters{
 			Language: "java",
-			Category: CategoryCleanup,
+			Category: "code-cleanup",
 		})
 		if err != nil {
 			t.Fatalf("Failed to list Java cleanup recipes: %v", err)
@@ -328,18 +417,26 @@ func TestRecipeCatalogOperations(t *testing.T) {
 	})
 
 	t.Run("Search recipes", func(t *testing.T) {
-		recipe := Recipe{
-			ID:          "search-recipe",
-			Name:        "Searchable Recipe",
-			Description: "This recipe can be found by search",
-			Language:    "java",
-			Tags:        []string{"searchable", "test"},
+		recipe := &models.Recipe{
+			ID: "search-recipe",
+			Metadata: models.RecipeMetadata{
+				Name:        "searchable-recipe",
+				Description: "This recipe can be found by search",
+				Author:      "test-author",
+				Languages:   []string{"java"},
+				Tags:        []string{"searchable", "test"},
+			},
+			Steps: []models.RecipeStep{{
+				Name:   "search-step",
+				Type:   models.StepTypeOpenRewrite,
+				Config: map[string]interface{}{"recipe": "search"},
+			}},
 		}
 
 		catalog.StoreRecipe(ctx, recipe)
 
 		// Search by name (simplified mock implementation)
-		results, err := catalog.SearchRecipes(ctx, "Searchable Recipe")
+		results, err := catalog.SearchRecipes(ctx, "searchable-recipe")
 		if err != nil {
 			t.Fatalf("Failed to search recipes: %v", err)
 		}
@@ -353,10 +450,18 @@ func TestRecipeStats(t *testing.T) {
 	catalog := NewMockRecipeCatalog()
 	ctx := context.Background()
 
-	recipe := Recipe{
-		ID:       "stats-recipe",
-		Name:     "Stats Recipe",
-		Language: "java",
+	recipe := &models.Recipe{
+		ID: "stats-recipe",
+		Metadata: models.RecipeMetadata{
+			Name:      "stats-recipe",
+			Author:    "test-author",
+			Languages: []string{"java"},
+		},
+		Steps: []models.RecipeStep{{
+			Name:   "stats-step",
+			Type:   models.StepTypeOpenRewrite,
+			Config: map[string]interface{}{"recipe": "stats"},
+		}},
 	}
 
 	catalog.StoreRecipe(ctx, recipe)
@@ -431,80 +536,90 @@ func TestRecipeStats(t *testing.T) {
 func TestRecipeFilters(t *testing.T) {
 	tests := []struct {
 		name    string
-		recipe  Recipe
+		recipe  *models.Recipe
 		filters RecipeFilters
 		matches bool
 	}{
 		{
 			name: "language filter match",
-			recipe: Recipe{
-				Language:   "java",
-				Confidence: 0.9,
+			recipe: &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:      "test-recipe",
+					Author:    "test-author",
+					Languages: []string{"java"},
+				},
 			},
 			filters: RecipeFilters{Language: "java"},
 			matches: true,
 		},
 		{
 			name: "language filter no match",
-			recipe: Recipe{
-				Language:   "python",
-				Confidence: 0.9,
+			recipe: &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:      "test-recipe",
+					Author:    "test-author",
+					Languages: []string{"python"},
+				},
 			},
 			filters: RecipeFilters{Language: "java"},
 			matches: false,
 		},
 		{
-			name: "confidence filter match",
-			recipe: Recipe{
-				Language:   "java",
-				Confidence: 0.9,
+			name: "category filter match",
+			recipe: &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:       "test-recipe",
+					Author:     "test-author",
+					Languages:  []string{"java"},
+					Categories: []string{"code-cleanup"},
+				},
 			},
-			filters: RecipeFilters{MinConfidence: 0.8},
+			filters: RecipeFilters{Category: "code-cleanup"},
 			matches: true,
 		},
 		{
-			name: "confidence filter no match",
-			recipe: Recipe{
-				Language:   "java",
-				Confidence: 0.7,
+			name: "author filter match",
+			recipe: &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:      "test-recipe",
+					Author:    "test-author",
+					Languages: []string{"java"},
+				},
 			},
-			filters: RecipeFilters{MinConfidence: 0.8},
-			matches: false,
-		},
-		{
-			name: "category filter match",
-			recipe: Recipe{
-				Language: "java",
-				Category: CategoryCleanup,
-			},
-			filters: RecipeFilters{Category: CategoryCleanup},
+			filters: RecipeFilters{Author: "test-author"},
 			matches: true,
 		},
 		{
 			name: "multiple filters match",
-			recipe: Recipe{
-				Language:   "java",
-				Category:   CategoryCleanup,
-				Confidence: 0.9,
+			recipe: &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:       "test-recipe",
+					Author:     "test-author",
+					Languages:  []string{"java"},
+					Categories: []string{"code-cleanup"},
+				},
 			},
 			filters: RecipeFilters{
-				Language:      "java",
-				Category:      CategoryCleanup,
-				MinConfidence: 0.8,
+				Language: "java",
+				Category: "code-cleanup",
+				Author:   "test-author",
 			},
 			matches: true,
 		},
 		{
 			name: "multiple filters no match",
-			recipe: Recipe{
-				Language:   "java",
-				Category:   CategoryModernize,
-				Confidence: 0.9,
+			recipe: &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:       "test-recipe",
+					Author:     "test-author",
+					Languages:  []string{"java"},
+					Categories: []string{"modernization"},
+				},
 			},
 			filters: RecipeFilters{
-				Language:      "java",
-				Category:      CategoryCleanup,
-				MinConfidence: 0.8,
+				Language: "java",
+				Category: "code-cleanup",
+				Author:   "test-author",
 			},
 			matches: false,
 		},

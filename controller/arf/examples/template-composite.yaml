@@ -1,0 +1,145 @@
+# Template for composite recipe with multiple transformation steps
+metadata:
+  name: "example-composite-recipe"
+  description: "Example recipe combining multiple transformation types"
+  version: "1.0.0"
+  author: "your-name"
+  tags:
+    - "multi-language"
+    - "comprehensive"
+    - "migration"
+  categories:
+    - "migration"
+    - "cleanup"
+    - "security"
+  languages:
+    - "java"
+    - "javascript"
+    - "yaml"
+  min_platform: "1.0.0"
+  license: "Apache-2.0"
+  documentation: "https://docs.example.com/recipes/composite"
+
+steps:
+  # Step 1: Update dependencies
+  - name: "Update Dependencies"
+    type: "file_op"
+    description: "Update package versions in configuration files"
+    config:
+      operation: "replace"
+      files:
+        - "pom.xml"
+        - "package.json"
+      patterns:
+        - from: "<spring.version>2.7.0</spring.version>"
+          to: "<spring.version>3.0.0</spring.version>"
+        - from: '"react": "^17.0.0"'
+          to: '"react": "^18.0.0"'
+    on_error: "fail"
+    timeout: "5m"
+
+  # Step 2: Apply code transformations
+  - name: "Modernize Java Code"
+    type: "openrewrite"
+    description: "Apply Java modernization recipes"
+    config:
+      recipe: "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0"
+    conditions:
+      - type: "file_exists"
+        value: "pom.xml"
+    on_error: "continue"
+    timeout: "15m"
+
+  # Step 3: Fix security vulnerabilities
+  - name: "Security Patches"
+    type: "regex_replace"
+    description: "Apply security-related code changes"
+    config:
+      pattern: 'System\.out\.println\((.*?)\)'
+      replacement: 'logger.info($1)'
+      file_pattern: "**/*.java"
+    on_error: "continue"
+    timeout: "5m"
+
+  # Step 4: Format and cleanup
+  - name: "Code Cleanup"
+    type: "shell"
+    description: "Run formatters and linters"
+    config:
+      commands:
+        - "mvn spotless:apply"
+        - "npm run prettier"
+        - "npm run eslint --fix"
+    conditions:
+      - type: "command_available"
+        value: "mvn"
+    on_error: "continue"
+    timeout: "10m"
+
+  # Step 5: Update documentation
+  - name: "Update Documentation"
+    type: "ast_transform"
+    description: "Update API documentation"
+    config:
+      language: "java"
+      transform: "update_javadoc"
+      options:
+        add_missing: true
+        update_deprecated: true
+    on_error: "continue"
+    timeout: "5m"
+
+  # Step 6: Validate changes
+  - name: "Validate Transformations"
+    type: "composite"
+    description: "Run validation sub-recipes"
+    config:
+      recipes:
+        - "validate-java-compilation"
+        - "validate-test-coverage"
+        - "validate-security-scan"
+    on_error: "fail"
+    timeout: "20m"
+
+execution:
+  parallel: false
+  stop_on_error: false
+  timeout: "60m"
+  resource_limits:
+    cpu: "4"
+    memory: "8Gi"
+  environment:
+    JAVA_HOME: "/usr/local/openjdk"
+    NODE_ENV: "production"
+  sandbox:
+    enabled: true
+    cleanup_after: true
+
+validation:
+  pre_conditions:
+    - type: "repository_state"
+      config:
+        must_be_clean: true
+        branch_pattern: "^(main|master|develop)$"
+    - type: "language_version"
+      config:
+        language: "java"
+        min_version: "11"
+    - type: "language_version"
+      config:
+        language: "node"
+        min_version: "16"
+  
+  post_conditions:
+    - type: "compilation"
+      config:
+        language: "java"
+        must_compile: true
+    - type: "tests"
+      config:
+        must_pass: true
+        min_coverage: 75
+    - type: "security_scan"
+      config:
+        max_critical: 0
+        max_high: 5

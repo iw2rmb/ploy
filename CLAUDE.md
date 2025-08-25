@@ -4,23 +4,29 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 This file must be followed for every prompt execution.
 
-## Core Testing Principles
+## Testing Framework
 
-**CRITICAL TESTING RULE**: Claude Code must ONLY perform build testing locally. All other testing MUST be performed on VPS.
+**CRITICAL RULE**: All development follows strict Test-Driven Development (TDD) with environment separation.
 
-### Local Testing (Claude Code Environment)
-- **BUILD COMPILATION ONLY**: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...`
-- **SYNTAX VERIFICATION**: Static analysis, imports, basic compilation checks
-- **FILE STRUCTURE**: Ensure files exist and are properly organized
-- **NO RUNTIME TESTING**: Never start servers, execute binaries, or run functional tests locally
+### Environment Separation
+- **LOCAL (Claude Code)**: Unit tests, build compilation, TDD RED/GREEN phases only
+- **VPS (Production-like)**: Integration, functional, E2E tests, TDD REFACTOR phase
+- **Rationale**: Local lacks infrastructure stack (Nomad, Consul, SeaweedFS) required for realistic testing
 
-### VPS Testing (Production Environment)
-- **ALL FUNCTIONAL TESTING**: API endpoints, CLI commands, integration tests
-- **RUNTIME VALIDATION**: Controller startup, service deployment, full workflows
-- **INFRASTRUCTURE TESTING**: Nomad, Consul, storage, networking
-- **END-TO-END SCENARIOS**: Complete user journeys and system interactions
+### TDD Red-Green-Refactor Cycle (MANDATORY)
+1. **RED** (Local): Write failing unit tests describing desired behavior BEFORE implementation
+2. **GREEN** (Local): Write minimal code to make tests pass, verify with `make test-unit`  
+3. **REFACTOR** (VPS): Improve code maintainability while keeping all tests green
 
-**Rationale**: Local Claude Code environment lacks the full infrastructure stack (Nomad, Consul, storage) required for meaningful functional testing. Only VPS provides the complete production-like environment needed for validation.
+### Testing Hierarchy (70/20/10 Pyramid)
+- **70% Unit Tests**: Fast, isolated testing with `internal/testutils/` mocks (LOCAL)
+- **20% Integration Tests**: Component interaction testing (VPS)
+- **10% End-to-End Tests**: Complete user scenario validation (VPS)
+
+### Coverage Requirements
+- **60% minimum** for all new code (`make test-coverage-threshold`)
+- **90% threshold** for critical system components
+- **Documentation**: Complete standards in `docs/TESTING.md`
 
 ## Project Overview
 
@@ -42,10 +48,10 @@ Auto-selects optimal lane from project structure unless overridden.
   - STACK.md — technology stack and framework dependencies.
   - cmd/ploy/README.md — CLI reference.
   - controller/README.md — REST API routes.
-  - STORAGE.md — storage abstraction (MinIO).
+  - STORAGE.md — storage abstraction (SeaweedFS).
   - iac/README.md — bare-metal setup.
   - FEATURES.md — feature list.
-  - TESTS.md — test scenarios to implement.
+  - TESTING.md — comprehensive testing guide with TDD principles, best practices, and infrastructure.
   - WASM.md — WebAssembly compilation detection and Lane G implementation guidance.
 - `CHANGELOG.md` — dated change log with Added/Fixed/Testing sections.
 
@@ -75,137 +81,104 @@ Example: feature changes must update FEATURES.md.
 - Glob: file discovery by name/extension patterns
 - Read: complete file contents
 
-## Testing Requirements
+## VPS Testing Protocol
 
-**CRITICAL VPS-ONLY TESTING RULE**: All runtime and functional testing MUST be performed on VPS. Local testing is LIMITED to build compilation only. Claude Code CAN and SHOULD connect to VPS via SSH to execute functional tests.
-
-### VPS Testing Environment Requirements
-- **Mandatory VPS Testing**: Use VPS testing environment in `iac/dev/` for ALL functional validation
-- **Full Stack Testing**: Test complete system (controller + CLI + Nomad + Consul + storage)
-- **Infrastructure Dependencies**: Only VPS provides the complete production-like infrastructure stack
-- **Required test categories based on change type**:
-  - Lane detection changes: Run lane-detection tests on VPS
-  - API changes: Run API and build-pipeline tests on VPS
-  - CLI changes: Run CLI and integration tests on VPS
-  - FreeBSD features: Test on FreeBSD VM (jails, bhyve) on VPS
-  - Self-healing features: Run webhook tests on VPS
-
-### VPS Setup and Access Protocol
+### Environment Setup
 **Setup**: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
 
-**Claude Code VPS Testing**: Claude Code MUST use SSH to connect to VPS for all functional testing:
-```bash
-ssh root@$TARGET_HOST "su - ploy -c 'command'"
-# or
-ssh root@$TARGET_HOST
-su - ploy
-./test-scripts/test-*.sh
-```
+### Access Pattern
+**SSH Connection**: `ssh root@$TARGET_HOST` → `su - ploy` (always use ploy user for operations)
 
-**VPS Deployment Protocol**: Use `scripts/deploy.sh` which automatically handles git operations:
-```bash
-./scripts/deploy.sh <branch>  # Automatically stashes, fetches, checkouts, and pulls
-```
-**Note**: No manual `git pull` needed - deploy script handles all git operations including stashing local changes before pulling.
-
-**VPS Access Protocol**: 
-- Claude Code connects to VPS as root user: `ssh root@$TARGET_HOST`
-- Always switch to ploy user for all operations: `su - ploy -c 'command'` or interactive `su - ploy`
-- The ploy user owns the repository and has proper permissions for testing and execution
-- Always use `$TARGET_HOST` environment variable instead of hardcoded IP addresses
-- Claude Code can and should execute VPS commands remotely via SSH
-
-**Why VPS Testing is Mandatory**:
-- **Complete Infrastructure Stack**: VPS provides Nomad, Consul, SeaweedFS, and networking required for realistic testing
-- **Production Parity**: VPS environment mirrors production deployment architecture
-- **System Integration**: Only VPS can validate end-to-end workflows and component interactions
-- **Resource Constraints**: Local Claude Code environment cannot replicate production resource allocation and limits
+### Required Test Categories by Change Type
+- **Lane detection**: Lane-detection tests on VPS
+- **API changes**: API and build-pipeline tests on VPS  
+- **CLI changes**: CLI and integration tests on VPS
+- **FreeBSD features**: Test on FreeBSD VM (jails, bhyve) on VPS
 
 ## Development Commands
 
-### Local Build Commands (Claude Code Environment)
-**ONLY build compilation allowed locally. NO runtime execution.**
+### Command Reference
 
+**LOCAL (Allowed):**
 ```bash
-# Build controller binary (compilation test only)
-go build -o build/controller ./controller
+# Git Status and Sync
+git branch                            # Show current branch
+git status                            # Show working directory status
+git merge main                        # Merge main into current branch (when needed)
 
-# Build CLI binary (compilation test only)
-go build -o build/ploy ./cmd/ploy
+# TDD Development Cycle (on current branch)
+make tdd                              # TDD watch mode  
+make test-unit                        # Unit tests (GREEN phase)
+make test-coverage-threshold          # Verify 60% minimum coverage
 
-# Build with version injection (compilation test only)
-VERSION="dev-$(date +%Y%m%d-%H%M%S)"
-go build -ldflags "-X github.com/iw2rmb/ploy/controller/selfupdate.BuildVersion=$VERSION" -o build/controller ./controller
+# Build Verification (MANDATORY before VPS testing)
+go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...
+
+# Test Development
+make test-generate                    # Generate test files
+go test -v ./internal/package_name    # Specific package tests
+
+# Completion Workflow (when done with work)
+git checkout main && git merge <current-branch> && git push origin main && git checkout <current-branch>
 ```
 
-**PROHIBITED in Claude Code Environment:**
+**VPS (Integration/Functional):**
 ```bash
-# ❌ DO NOT execute binaries locally
-./build/controller
-go run ./controller
-PORT=8082 ./build/controller
+# Deployment
+./scripts/deploy.sh <branch>          # Automated deployment
+ssh root@$TARGET_HOST "su - ploy -c './tests/scripts/test-*.sh'"  # Test execution
 
-# ❌ DO NOT run test scripts locally
-./test-scripts/test-*.sh
-
-# ❌ DO NOT start services locally
-nomad job run platform/nomad/ploy-controller-simple.hcl
+# Controller Management  
+curl -X POST https://api.dev.ployd.app/v1/controller/update/latest           # Self-update
+curl https://api.dev.ployd.app/v1/controller/version                         # Version check
 ```
 
-### VPS Controller Deployment (STRICT PROTOCOL)
-**CRITICAL**: Controller deployment must follow this exact order:
+**PROHIBITED (Never):**
+- Execute binaries locally: `./build/controller`, `go run ./controller`
+- Run integration tests locally: `./tests/scripts/test-*.sh`
+- Manual controller deployment: `nomad job run platform/nomad/ploy-controller.hcl`
 
-**1. PRIMARY METHOD - Self-Update Endpoint:**
+### Git Current Branch Workflow
+
+**Current Branch Verification:**
 ```bash
-# Update to latest version
-curl -X POST https://api.dev.ployd.app/v1/controller/update/latest
-
-# Deploy specific branch  
-curl -X POST https://api.dev.ployd.app/v1/controller/deploy/git -d '{"branch": "main"}'
-
-# Check update status
-curl https://api.dev.ployd.app/v1/controller/update/status
+# Verify current worktree branch
+git branch                            # Shows current branch (marked with *)
+git status                            # Shows working directory status
 ```
 
-**2. FALLBACK METHOD - Deploy Script (ONLY if self-update fails):**
+**Development on Current Branch:**
 ```bash
-# Use ONLY when self-update endpoint fails
-./scripts/deploy.sh main
+# Standard development workflow on current worktree branch
+make tdd                              # TDD development
+make test-unit                        # Unit testing
+git add . && git commit -m "message"  # Commit changes to current branch
+
+# Synchronization with main (if needed during development)
+git fetch origin main                 # Update main branch reference
+git merge main                        # Merge main into current branch
 ```
 
-**3. INVESTIGATION REQUIRED if both methods fail:**
-- Self-update endpoint errors → Fix controller/selfupdate/ code
-- Deploy script errors → Fix scripts/deploy.sh or platform/nomad/ploy-controller.hcl
-- These are CRITICAL system failures requiring immediate resolution
-
-**ABSOLUTELY PROHIBITED:**
+**Completion Workflow:**
 ```bash
-# ❌ NEVER run controller manually (anywhere)
-./build/controller
-go run ./controller
-PORT=8081 ./build/controller
-
-# ❌ NEVER use direct Nomad commands for controller
-nomad job run platform/nomad/ploy-controller.hcl
+# When work is complete - merge to main and return
+CURRENT_BRANCH=$(git branch --show-current)  # Store current branch name
+git checkout main                            # Switch to main branch
+git merge $CURRENT_BRANCH                    # Merge current branch to main
+git push origin main                         # Push merged changes
+git checkout $CURRENT_BRANCH                 # Return to worktree branch
 ```
 
-**Testing Commands:**
-```bash
-# Test scripts automatically use HTTPS endpoints based on environment
-./test-scripts/test-arf-phase4-security.sh
+**Current Branch Benefits:**
+- **Worktree Isolation**: Work stays in dedicated worktree branch
+- **No Branch Management**: No need to create/delete branches
+- **Simple Sync**: Easy to merge main when needed
+- **Return to Work**: Always return to worktree branch after completion
 
-# Environment variables are set by Ansible:
-# - PLOY_APPS_DOMAIN=ployd.app
-# - PLOY_ENVIRONMENT=dev  
-# - PLOY_CONTROLLER=https://api.dev.ployd.app/v1
-
-# VPS CLI testing (via SSH only)
-ssh root@$TARGET_HOST "su - ploy -c './build/ploy apps new --lang go --name test-app'"
-ssh root@$TARGET_HOST "su - ploy -c './build/ploy push -a test-app'"
-
-# Manual endpoint override (if needed)
-PLOY_CONTROLLER=https://api.dev.ployd.app/v1 ./test-scripts/test-env-vars.sh
-```
+### Controller Deployment Priority Order
+1. **Self-Update Endpoint** (Primary): `curl -X POST https://api.dev.ployd.app/v1/controller/update/latest`
+2. **Deploy Script** (Fallback): `./scripts/deploy.sh <branch>` 
+3. **Investigation Required** if both methods fail
 
 ## App Naming Restrictions
 
@@ -263,7 +236,12 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 
 **CRITICAL**: For EVERY codebase modification, execute ALL steps below in exact order:
 
-1. **Branch Creation**: Create new feature branch with 2-3 word name describing changes
+1. **Git Current Branch Verification**: Verify working environment and current worktree branch
+    - **Verify Current Branch**: `git branch` (current worktree branch marked with *)
+    - **Check Working Status**: `git status` (shows current working directory state)
+    - **Worktree Isolation**: Work stays on current worktree branch, no new branches created
+    - **Branch Context**: Worktree already provides branch isolation from main repository
+    - **Benefits**: Simplified workflow, no branch management overhead, direct worktree development
 
 2. **File Location**: Reference `docs/REPO.md` for repository structure and quick file navigation
 
@@ -273,93 +251,43 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - **VPS Component Installation**: Run Ansible playbook to provision VPS with updated components: `cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST`
     - **Verification**: Confirm all required tools are available and properly configured on both local and VPS environments before proceeding
 
-4. **Test Scenarios**: Add comprehensive test scenarios to TESTS.md (numbered sequentially) if current functionality lacks coverage
+4. **Test-First Development**: Write comprehensive failing tests BEFORE implementing functionality
+    - **MANDATORY TDD Compliance**: Follow `docs/TESTING.md` Red-Green-Refactor cycle strictly
+    - **Write Failing Tests First**: Create unit tests that describe desired behavior before writing any implementation code
+    - **Use Testing Infrastructure**: Leverage `internal/testutils/` mocks, builders, and fixtures for test creation
+    - **Coverage Target**: Ensure new tests will achieve minimum 60% coverage for the feature being developed
+    - **Test Compilation**: Verify all tests compile locally to catch interface and parameter errors early
 
-5. **Test Implementation**: Create executable test scripts for any new scenarios defined in previous step
+5. **Test Implementation Verification**: Confirm test infrastructure is properly established
+    - Create unit tests in appropriate `*_test.go` files alongside source code
+    - Add integration test scenarios to `tests/integration/` if component interactions are involved
+    - Update comprehensive test scenarios in `docs/TESTING.md` examples if needed
+    - Ensure test files compile and fail appropriately (RED phase of TDD cycle)
 
-6. **Local Build Verification**: Execute ONLY compilation testing in local environment
-    - **MANDATORY Compilation Check**: ALWAYS build controller, CLI, and ALL TESTS locally to verify compilation before any VPS deployment:
-      ```bash
-      go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...
-      ```
-    - **Build Failure Protocol**: If compilation fails locally, DO NOT proceed to VPS testing
-    - **Test Compilation Critical**: Test files MUST compile to catch interface changes, missing parameters, and type errors
-    - **PROHIBITED Local Activities**: 
-      - ❌ DO NOT execute binaries locally (`./build/controller`, `./build/ploy`)
-      - ❌ DO NOT run test scripts locally (`./test-scripts/test-*.sh`)
-      - ❌ DO NOT start services locally (`go run ./controller`)
-    - **Syntax and Import Validation**: Ensure Go modules, imports, and basic syntax are correct
-    - **File Structure Verification**: Confirm all required files exist and are properly organized
-    - Push feature branch to GitHub only after local builds succeed
+6. **Implementation Phase (TDD GREEN)**: Implement minimal code to make failing tests pass on current branch
+    - **Write Minimal Implementation**: Create only enough code to make the failing tests pass (on current worktree branch)
+    - **Execute LOCAL Commands**: Use build verification and unit testing commands from Command Reference above
+    - **Status Verification**: Confirm working directory and branch status via `git status`
+    - **Build Failure Protocol**: If compilation or unit tests fail locally, DO NOT proceed to VPS testing
+    - **Coverage Verification**: Ensure 60% minimum coverage via `make test-coverage-threshold`
+    - **Commit to Current Branch**: `git add . && git commit -m "descriptive message"` on current branch
+    - Push current branch to GitHub only after local builds and unit tests succeed
 
-7. **VPS Runtime Testing**: Execute ALL functional and integration tests on VPS environment ONLY
-    - **MANDATORY VPS Testing**: All runtime validation must occur on VPS with full infrastructure stack
-    - **Streamlined Deployment Options** (choose one):
-      
-      **Option A: Automated Git-Based Deployment** (Preferred):
-      ```bash
-      # Deploy using Git-based automated script with native versioning
-      ./scripts/deploy.sh <branch>
-      ```
-      - Automatically generates Git-based version: `{branch}-{git-describe}-{timestamp}`
-      - Builds both CLI and controller with version injection via ldflags
-      - Creates dynamic Nomad job configuration (no manual file editing)
-      - Uploads binary to SeaweedFS with versioned artifact URLs
-      - Deploys via templated Nomad configuration
-      - Monitors deployment progress and health checks
-      
-      **Option B: Controller Self-Update Endpoint** (For existing deployments):
-      ```bash
-      # Update to latest version
-      curl -X POST https://api.dev.ployd.app/v1/controller/update/latest
-      
-      # Update to specific branch
-      curl -X POST https://api.dev.ployd.app/v1/controller/update/branch/main
-      
-      # Git-based deployment with custom parameters
-      curl -X POST https://api.dev.ployd.app/v1/controller/deploy/git \
-           -d '{"branch": "feature-branch", "strategy": "rolling", "force": false}'
-      ```
-      - Uses Git metadata for version tracking and deployment coordination
-      - Supports rolling updates, blue-green, and emergency deployment strategies  
-      - Includes validation, health checks, and automatic rollback capabilities
-      - Provides deployment status monitoring via `/v1/controller/update/status`
-      
-    - **Deployment Verification**: Confirm successful deployment using diagnostic tools:
-      ```bash
-      # Run SSL/DNS diagnostics
-      ./scripts/diagnose-ssl.sh
-      
-      # Check controller version and Git metadata  
-      curl https://api.dev.ployd.app/v1/controller/version
-      
-      # Monitor update status if using self-update endpoint
-      curl https://api.dev.ployd.app/v1/controller/update/status
-      ```
-    
-    - **Full Stack Validation**: Test controller functionality, API endpoints, CLI commands, and integration workflows
-    - **Infrastructure Testing**: Validate Nomad deployment, Consul coordination, storage operations
-    - **End-to-End Scenarios**: Run comprehensive test suites from `test-scripts/` directory
+7. **VPS Integration & Functional Testing**: Execute comprehensive testing and TDD REFACTOR phase
+    - **Execute VPS Commands**: Use deployment and testing commands from Command Reference above
+    - **TDD REFACTOR Phase**: After tests pass, refactor code for maintainability while keeping tests green
+    - **Testing Hierarchy**: Execute 20% integration + 10% E2E tests per Testing Framework
+    - **Deployment Verification**: Confirm success via `curl https://api.dev.ployd.app/v1/controller/version`
+    - **Full Stack Validation**: Run comprehensive test suites from `tests/scripts/` directory
 
 8. **Error Resolution**: IF any VPS tests fail:
-    - Fix identified errors in local environment
-    - Re-run local build compilation to verify fixes
-    - Push corrections to feature branch  
-    - Re-execute VPS tests until all pass (each run generates a new test version)
+    - **Fix on Current Branch**: Address identified errors on current worktree branch (not main branch)
+    - **Local Verification**: Re-run build compilation and unit tests on current branch to verify fixes
+    - **Commit Corrections**: `git add . && git commit -m "Fix: <description of error resolution>"`
+    - **Push Current Branch**: Push corrections to current branch
+    - **Re-execute VPS Tests**: Deploy and test again until all VPS tests pass (each run generates new test version)
 
-9. **Success Confirmation**: IF all tests pass successfully:
-    - **Git-Based Version Management**: No manual version commits needed - versions are automatically generated from Git metadata
-    - **Deployment Success Verification**: 
-      ```bash
-      # Verify successful deployment and version
-      curl https://api.dev.ployd.app/v1/controller/version
-      
-      # Check that Git metadata matches expected values
-      curl https://api.dev.ployd.app/v1/controller/update/available
-      ```
-    - **Feature Branch Ready**: Feature branch is validated and ready for merge to main
-
-10. **Documentation and Completion**: Complete documentation updates:
+9. **Documentation Updates**: Complete all documentation updates on current branch before merge
     - **roadmap/README.md Updates**: Mark corresponding implementation step as completed with ✅ and current date if step exists in roadmap/README.md
     - **CHANGELOG.md Entry**: Add dated summary entry following established format with Added/Fixed/Testing sections describing changes
     - **FEATURES.md Synchronization**: Add new feature entries or modify existing ones to accurately reflect current system capabilities
@@ -367,10 +295,18 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - **REPO.md Structure**: Update repository structure documentation if new files, folders, or architectural changes were made
     - **controller/README.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
     - **iac/dev/README.md Infrastructure**: Update infrastructure documentation when Ansible playbooks, templates, configurations, or deployment procedures are modified
-    - Commit all documentation updates to feature branch
-    - Merge feature branch to main branch
-    - Delete feature branch locally
-    - Pull updated main branch on VPS
+    - **Final Commit**: `git add . && git commit -m "Complete documentation updates for <feature>"`
+    - **Version Verification**: Use controller version check commands from Command Reference above to confirm deployment success
+
+10. **Main Branch Integration**: Complete work integration and return to worktree branch
+    - **Check Current Branch**: `git branch` (note current worktree branch name)
+    - **Sync with Main (if needed)**: `git merge main` (merge main into current branch if not up-to-date)
+    - **Switch to Main**: `git checkout main`
+    - **Merge Current Branch**: `git merge <current-worktree-branch>` (merge worktree branch to main)
+    - **Push to Origin**: `git push origin main` (integrate changes to remote repository)
+    - **Return to Worktree**: `git checkout <current-worktree-branch>` (return to worktree branch)
+    - **VPS Update**: Pull merged main branch on VPS infrastructure: `ssh root@$TARGET_HOST "su - ploy -c 'git pull origin main'"`
+    - **Verification**: Confirm back on worktree branch with `git branch` and clean working directory
 
 **NO EXCEPTIONS**: Every code change must complete this comprehensive protocol. Incomplete updates violate project standards and compromise system integrity. The infrastructure preparation step is particularly critical for ensuring all environments have consistent tooling and dependencies.
 
@@ -410,37 +346,3 @@ Task(
 
 **Agent Updates**: When modifying agent capabilities or adding new specializations, update `.claude/agents.json` configuration and ensure agent expertise aligns with current system architecture and MUP requirements.
 
-## Summary: Testing Environment Separation
-
-### Claude Code (Local Environment) - BUILD ONLY
-✅ **Allowed Locally**:
-- Build compilation: `go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...`
-- Syntax validation and import checking
-- File structure verification
-- Code analysis and development
-
-❌ **PROHIBITED Locally**:
-- Running binaries: `./build/controller`, `./build/ploy`, `go run ./controller`
-- Executing test scripts: `./test-scripts/test-*.sh`
-- Starting services or servers
-- API endpoint testing
-- Integration testing
-- Functional validation
-
-✅ **Claude Code VPS Access**:
-- SSH to VPS for functional testing: `ssh root@$TARGET_HOST "su - ploy -c 'command'"`
-- Execute test scripts on VPS: `ssh root@$TARGET_HOST "su - ploy -c './test-scripts/test-*.sh'"`
-- Deploy and validate on VPS: `ssh root@$TARGET_HOST "su - ploy -c './scripts/deploy.sh <branch>'"`
-
-### VPS Environment - RUNTIME TESTING ONLY
-✅ **Required for ALL functional testing** (accessible via SSH):
-- Controller deployment via Nomad
-- API endpoint validation
-- CLI command testing
-- Integration workflows
-- End-to-end scenarios
-- Infrastructure testing (Nomad, Consul, storage)
-- Test script execution
-- Performance benchmarking
-
-**Rationale**: Local Claude Code environment lacks the complete infrastructure stack (Nomad, Consul, SeaweedFS, networking) required for meaningful functional testing. Claude Code must connect to VPS via SSH to access the production-like environment.

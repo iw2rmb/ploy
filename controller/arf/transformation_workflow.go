@@ -11,9 +11,9 @@ import (
 
 // TransformationWorkflow orchestrates the complete transformation → deployment → testing pipeline
 type TransformationWorkflow struct {
-	arfEngine   ARFEngine
-	sandboxMgr  SandboxManager
-	workspaceDir string
+	recipeExecutor *RecipeExecutor
+	sandboxMgr     SandboxManager
+	workspaceDir   string
 }
 
 // WorkflowConfig defines parameters for the complete transformation workflow
@@ -73,9 +73,9 @@ type WorkflowError struct {
 }
 
 // NewTransformationWorkflow creates a new transformation workflow orchestrator
-func NewTransformationWorkflow(arfEngine ARFEngine, sandboxMgr SandboxManager, workspaceDir string) *TransformationWorkflow {
+func NewTransformationWorkflow(executor *RecipeExecutor, sandboxMgr SandboxManager, workspaceDir string) *TransformationWorkflow {
 	return &TransformationWorkflow{
-		arfEngine:    arfEngine,
+		recipeExecutor: executor,
 		sandboxMgr:   sandboxMgr,
 		workspaceDir: workspaceDir,
 	}
@@ -213,40 +213,13 @@ func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, conf
 
 // executeTransformation applies a single transformation recipe
 func (w *TransformationWorkflow) executeTransformation(ctx context.Context, sandbox *Sandbox, recipeID string) (*TransformationResult, error) {
-	// Get recipe metadata
-	recipe, exists := w.arfEngine.(*OpenRewriteEngine).recipes[recipeID]
-	if !exists {
-		// Try to load recipe if not in cache
-		recipes, err := w.arfEngine.ListAvailableRecipes()
-		if err != nil {
-			return nil, fmt.Errorf("failed to list recipes: %w", err)
-		}
-		
-		for _, r := range recipes {
-			if r.ID == recipeID {
-				recipe = r
-				exists = true
-				break
-			}
-		}
-		
-		if !exists {
-			return nil, fmt.Errorf("recipe %s not found", recipeID)
-		}
+	// Execute the recipe directly using the executor
+	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 	}
 	
-	// Create codebase from sandbox
-	codebase := Codebase{
-		Repository: sandbox.Config.Repository,
-		Branch:     sandbox.Config.Branch,
-		Path:       sandbox.WorkingDir,
-		Language:   sandbox.Config.Language,
-		BuildTool:  sandbox.Config.BuildTool,
-		Metadata:   sandbox.Metadata,
-	}
-	
-	// Execute the transformation
-	return w.arfEngine.ExecuteRecipe(ctx, recipe, codebase)
+	return result, nil
 }
 
 // deployTransformedCode commits the transformed code and deploys it

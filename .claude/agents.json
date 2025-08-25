@@ -161,7 +161,7 @@
       "controller/": "ploy-api-developer",
       "internal/cli/": "ploy-cli-developer",
       "tools/lane-pick/": "ploy-lane-analyzer",
-      "test-scripts/": "ploy-testing-coordinator",
+      "tests/": "ploy-testing-coordinator",
       "iac/": "ploy-infrastructure-manager",
       "internal/storage/": "ploy-storage-architect",
       "controller/acme/": "ploy-certificate-specialist"

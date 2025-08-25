@@ -2,11 +2,15 @@ package arf
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/controller/arf/storage"
 )
 
 // Handler provides HTTP endpoints for ARF operations
 type Handler struct {
-	engine           ARFEngine
+	recipeExecutor   *RecipeExecutor
+	recipeStorage    storage.RecipeStorage
+	recipeIndex      storage.RecipeIndexStore
+	recipeValidator  storage.RecipeValidator
 	catalog          RecipeCatalog
 	sandboxMgr       SandboxManager
 	llmGenerator     LLMRecipeGenerator
@@ -25,9 +29,9 @@ type Handler struct {
 }
 
 // NewHandler creates a new ARF HTTP handler
-func NewHandler(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManager, benchmarkMgr *BenchmarkManager) *Handler {
+func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager, benchmarkMgr *BenchmarkManager) *Handler {
 	return &Handler{
-		engine:     engine,
+		recipeExecutor: executor,
 		catalog:    catalog,
 		sandboxMgr: sandboxMgr,
 		// Initialize Phase 4 components
@@ -43,9 +47,38 @@ func NewHandler(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManag
 	}
 }
 
+// NewHandlerWithStorage creates a new ARF HTTP handler with storage backend
+func NewHandlerWithStorage(
+	executor *RecipeExecutor,
+	recipeStorage storage.RecipeStorage,
+	recipeIndex storage.RecipeIndexStore,
+	recipeValidator storage.RecipeValidator,
+	sandboxMgr SandboxManager,
+	benchmarkMgr *BenchmarkManager,
+) *Handler {
+	return &Handler{
+		recipeExecutor:  executor,
+		recipeStorage:   recipeStorage,
+		recipeIndex:     recipeIndex,
+		recipeValidator: recipeValidator,
+		catalog:         nil, // Will use storage directly
+		sandboxMgr:      sandboxMgr,
+		// Initialize Phase 4 components
+		securityEngine:      NewSecurityEngine(),
+		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
+		workflowEngine:      NewHumanWorkflowEngine(nil, nil, nil, nil, nil),
+		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
+			EnableCircuitBreaker: true,
+			EnableCaching:        true,
+		}),
+		// Phase 8 components
+		benchmarkManager: benchmarkMgr,
+	}
+}
+
 // NewHandlerWithPhase3 creates a new ARF HTTP handler with Phase 3 components
 func NewHandlerWithPhase3(
-	engine ARFEngine,
+	executor *RecipeExecutor,
 	catalog RecipeCatalog,
 	sandboxMgr SandboxManager,
 	llmGen LLMRecipeGenerator,
@@ -57,7 +90,7 @@ func NewHandlerWithPhase3(
 	benchmarkMgr *BenchmarkManager,
 ) *Handler {
 	return &Handler{
-		engine:           engine,
+		recipeExecutor:   executor,
 		catalog:          catalog,
 		sandboxMgr:       sandboxMgr,
 		llmGenerator:     llmGen,
@@ -90,6 +123,9 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Put("/recipes/:id", h.UpdateRecipe)
 	arf.Delete("/recipes/:id", h.DeleteRecipe)
 	arf.Get("/recipes/search", h.SearchRecipes)
+	arf.Post("/recipes/upload", h.UploadRecipe)
+	arf.Post("/recipes/validate", h.ValidateRecipe)
+	arf.Get("/recipes/:id/download", h.DownloadRecipe)
 
 	// Recipe metadata and stats
 	arf.Get("/recipes/:id/metadata", h.GetRecipeMetadata)

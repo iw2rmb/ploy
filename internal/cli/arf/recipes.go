@@ -4,52 +4,174 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
-	"text/tabwriter"
-	"time"
 
-	"github.com/iw2rmb/ploy/controller/arf"
+	"github.com/iw2rmb/ploy/controller/arf/models"
+	"gopkg.in/yaml.v3"
 )
 
 // Recipe management commands
 
+// RecipeFilter contains filtering options for recipe listing
+type RecipeFilter struct {
+	Language   string
+	Category   string
+	Tags       []string
+	Author     string
+	Limit      int
+	Offset     int
+	MinRating  float64
+	SortBy     string
+	SortOrder  string
+}
+
+// CommandFlags contains common flags for recipe commands
+type CommandFlags struct {
+	DryRun       bool
+	Force        bool
+	Verbose      bool
+	Strict       bool
+	OutputFormat string
+	OutputFile   string
+	Name         string
+	Template     string
+	Interactive  bool
+}
+
 func handleARFRecipesCommand(args []string) error {
 	if len(args) == 0 {
-		return listRecipes("")
+		return listRecipes(RecipeFilter{}, "table", false)
 	}
 
 	action := args[0]
 	switch action {
-	case "list":
-		language := ""
-		if len(args) > 1 && args[1] == "--language" && len(args) > 2 {
-			language = args[2]
-		}
-		return listRecipes(language)
-	case "get":
+	case "list", "ls":
+		return handleRecipeList(args[1:])
+	case "get", "show":
 		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf recipes get <recipe-id>")
+			fmt.Println("Usage: ploy arf recipe show <recipe-id> [--verbose] [--output json|yaml|table]")
 			return nil
 		}
-		return getRecipe(args[1])
+		flags := parseCommonFlags(args[2:])
+		return showRecipe(args[1], flags)
 	case "search":
 		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf recipes search <query>")
+			fmt.Println("Usage: ploy arf recipe search <query> [--output json|yaml|table] [--limit <n>]")
 			return nil
 		}
-		return searchRecipes(strings.Join(args[1:], " "))
+		// Extract search query (everything except flags)
+		query := ""
+		queryArgs := []string{}
+		for i := 1; i < len(args); i++ {
+			if !strings.HasPrefix(args[i], "--") {
+				queryArgs = append(queryArgs, args[i])
+			} else {
+				// Stop at first flag
+				break
+			}
+		}
+		query = strings.Join(queryArgs, " ")
+		
+		flags := parseCommonFlags(args[len(queryArgs)+1:])
+		return searchRecipes(query, flags)
+	case "upload", "u":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe upload <recipe-file> [--name <name>] [--dry-run] [--force]")
+			return nil
+		}
+		flags := parseCommonFlags(args[2:])
+		return uploadRecipe(args[1], flags)
+	case "update":
+		if len(args) < 3 {
+			fmt.Println("Usage: ploy arf recipe update <recipe-id> <recipe-file> [--force]")
+			return nil
+		}
+		flags := parseCommonFlags(args[3:])
+		return updateRecipe(args[1], args[2], flags)
+	case "delete", "del", "rm":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe delete <recipe-id> [--force]")
+			return nil
+		}
+		flags := parseCommonFlags(args[2:])
+		return deleteRecipe(args[1], flags)
+	case "download", "dl":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe download <recipe-id> [--output <file>]")
+			return nil
+		}
+		flags := parseCommonFlags(args[2:])
+		return downloadRecipe(args[1], flags)
+	case "validate":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe validate <recipe-file> [--strict]")
+			return nil
+		}
+		flags := parseCommonFlags(args[2:])
+		return validateRecipe(args[1], flags)
 	case "stats":
 		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf recipes stats <recipe-id>")
+			fmt.Println("Usage: ploy arf recipe stats <recipe-id> [--output json|yaml|table]")
 			return nil
 		}
-		return getRecipeStats(args[1])
-	case "create":
-		return createRecipeInteractive()
-	case "--help":
+		flags := parseCommonFlags(args[2:])
+		return getRecipeStats(args[1], flags)
+	case "create", "init":
+		flags := parseCommonFlags(args[1:])
+		return createRecipeInteractive(flags)
+	case "run":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe run <recipe-id> [--repo <url>] [--branch <branch>] [--output-dir <dir>] [--report]")
+			return nil
+		}
+		flags := parseCommonFlags(args[2:])
+		return runRecipe(args[1], flags)
+	case "compose":
+		if len(args) < 3 {
+			fmt.Println("Usage: ploy arf recipe compose <recipe-id1> <recipe-id2> [...] [--name <composition-name>] [--repo <url>] [options]")
+			return nil
+		}
+		return composeRecipes(args[1:])
+	case "import":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe import <archive-file> [--overwrite] [--validate-only]")
+			return nil
+		}
+		flags := parseCommonFlags(args[2:])
+		return importRecipes(args[1], flags)
+	case "export":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe export --output <archive-file> [--tag <tag>] [--author <author>] [--format tar.gz|zip]")
+			return nil
+		}
+		flags := parseCommonFlags(args[1:])
+		return exportRecipes(flags)
+	case "--help", "-h":
 		printRecipesUsage()
 		return nil
+	case "help":
+		if len(args) > 1 {
+			// Show help for specific command
+			helpSys := NewHelpSystem()
+			return helpSys.ShowHelp(args[1])
+		}
+		printRecipesUsage()
+		return nil
+	case "examples":
+		helpSys := NewHelpSystem()
+		return helpSys.ShowExamples()
+	case "quickstart":
+		helpSys := NewHelpSystem()
+		return helpSys.ShowQuickStart()
+	case "templates":
+		flags := parseCommonFlags(args[1:])
+		return listTemplates(flags.OutputFormat, flags.Verbose)
+	case "config":
+		if len(args) < 2 {
+			fmt.Println("Usage: ploy arf recipe config <show|set|reset|list> [key] [value]")
+			return nil
+		}
+		return handleConfigCommand(args[1:])
 	default:
 		fmt.Printf("Unknown recipes action: %s\n", action)
 		printRecipesUsage()
@@ -58,94 +180,148 @@ func handleARFRecipesCommand(args []string) error {
 }
 
 func printRecipesUsage() {
-	fmt.Println("Usage: ploy arf recipes <action> [options]")
+	fmt.Println("Usage: ploy arf recipe <action> [options]")
 	fmt.Println()
 	fmt.Println("Available actions:")
-	fmt.Println("  list                    List all available recipes")
-	fmt.Println("  list --language <lang>  List recipes for specific language")
-	fmt.Println("  get <recipe-id>         Get recipe details")
-	fmt.Println("  search <query>          Search recipes by name/description")
-	fmt.Println("  stats <recipe-id>       Get recipe usage statistics")
-	fmt.Println("  create                  Create new recipe interactively")
+	fmt.Println("  list, ls [--filter]              List available recipes with optional filtering")
+	fmt.Println("  show <recipe-id>                 Display recipe details")
+	fmt.Println("  search <query>                   Search recipes by name/description")
+	fmt.Println("  upload, u <recipe-file>          Upload a new recipe from YAML file")
+	fmt.Println("  update <id> <recipe-file>        Update existing recipe")
+	fmt.Println("  delete, del, rm <recipe-id>      Delete a recipe")
+	fmt.Println("  download, dl <recipe-id>         Download recipe to YAML file")
+	fmt.Println("  validate <recipe-file>           Validate recipe without uploading")
+	fmt.Println("  stats <recipe-id>                Get recipe usage statistics")
+	fmt.Println("  create, init                     Create new recipe interactively")
+	fmt.Println("  run <recipe-id>                  Execute recipe against repository")
+	fmt.Println("  compose <recipe-ids...>          Chain multiple recipes in sequence")
+	fmt.Println("  import <archive-file>            Import recipes from archive")
+	fmt.Println("  export --output <file>           Export recipes to archive")
+	fmt.Println()
+	fmt.Println("Common flags:")
+	fmt.Println("  --output, -o <format>            Output format: table, json, yaml")
+	fmt.Println("  --verbose, -v                    Show detailed information")
+	fmt.Println("  --force, -f                      Force operation (skip confirmations)")
+	fmt.Println("  --dry-run, -n                    Validate without executing")
+	fmt.Println("  --strict, -s                     Enable strict validation")
+	fmt.Println()
+	fmt.Println("List filters:")
+	fmt.Println("  --language <lang>                Filter by programming language")
+	fmt.Println("  --category <cat>                 Filter by category")
+	fmt.Println("  --tag <tag>                      Filter by tag (can be used multiple times)")
+	fmt.Println("  --author <author>                Filter by author")
+	fmt.Println("  --limit <n>                      Maximum number of results (default: 20)")
+	fmt.Println("  --offset <n>                     Offset for pagination (default: 0)")
+	fmt.Println("  --sort-by <field>                Sort by: name, created, updated, rating")
+	fmt.Println("  --sort-order <order>             Sort order: asc, desc (default: asc)")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  ploy arf recipe list --language java --output json")
+	fmt.Println("  ploy arf recipe upload my-recipe.yaml --dry-run")
+	fmt.Println("  ploy arf recipe search 'spring migration' --limit 5")
+	fmt.Println("  ploy arf recipe run java11to17 --repo https://github.com/user/repo")
+	fmt.Println("  ploy arf recipe compose recipe1 recipe2 --name 'full-migration'")
+	fmt.Println("  ploy arf recipe export --output recipes-backup.tar.gz --tag migration")
 }
 
-func listRecipes(language string) error {
-	url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
-	if language != "" {
-		url += "?language=" + language
+func handleRecipeList(args []string) error {
+	// Parse filter and common flags
+	filter, remainingArgs := ParseFilterFlags(args)
+	flags := parseCommonFlags(remainingArgs)
+	
+	// Validate filter values
+	if err := ValidateFilterValues(filter); err != nil {
+		PrintError(err)
+		return err
 	}
+	
+	// Validate output format
+	if err := ValidateOutputFormat(flags.OutputFormat); err != nil {
+		PrintError(err)
+		return err
+	}
+	
+	return listRecipes(filter, flags.OutputFormat, flags.Verbose)
+}
 
+func listRecipes(filter RecipeFilter, outputFormat string, verbose bool) error {
+	// Build API query
+	queryString := BuildAPIQuery(filter)
+	url := fmt.Sprintf("%s/arf/recipes%s", arfControllerURL, queryString)
+
+	// Make API request
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to list recipes: %w", err)
+		cliErr := NewCLIError("Failed to retrieve recipes", 1).
+			WithCause(err).
+			WithSuggestion("Check network connectivity and controller status")
+		PrintError(cliErr)
+		return cliErr
 	}
 
+	// Parse response
 	var data struct {
-		Recipes []arf.Recipe `json:"recipes"`
-		Count   int          `json:"count"`
+		Recipes []models.Recipe `json:"recipes"`
+		Count   int             `json:"count"`
+		Total   int             `json:"total,omitempty"` // Total count for pagination
 	}
 
 	if err := json.Unmarshal(response, &data); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
+		cliErr := NewCLIError("Failed to parse recipe data", 1).WithCause(err)
+		PrintError(cliErr)
+		return cliErr
 	}
 
-	if data.Count == 0 {
-		fmt.Println("No recipes found")
-		return nil
+	// Convert to Recipe pointers for consistency
+	recipes := make([]*models.Recipe, len(data.Recipes))
+	for i := range data.Recipes {
+		recipes[i] = &data.Recipes[i]
 	}
 
-	// Display recipes in table format
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tLANGUAGE\tCATEGORY\tCONFIDENCE\tTAGS")
-	fmt.Fprintln(w, "--\t----\t--------\t--------\t----------\t----")
+	// Sort recipes client-side if requested (in case API doesn't support sorting)
+	SortRecipes(recipes, filter.SortBy, filter.SortOrder)
 
-	for _, recipe := range data.Recipes {
-		tags := strings.Join(recipe.Tags, ",")
-		if len(tags) > 30 {
-			tags = tags[:27] + "..."
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%.2f\t%s\n",
-			recipe.ID, recipe.Name, recipe.Language, recipe.Category, recipe.Confidence, tags)
+	// Create paginated result
+	totalCount := data.Total
+	if totalCount == 0 {
+		totalCount = data.Count
+	}
+	
+	page := (filter.Offset / filter.Limit) + 1
+	if page < 1 {
+		page = 1
+	}
+	paginationInfo := NewPaginationInfo(page, filter.Limit, totalCount)
+	
+	result := PaginatedResult{
+		Recipes:    recipes,
+		Pagination: paginationInfo,
+		Filter:     filter,
 	}
 
-	w.Flush()
-	fmt.Printf("\nTotal: %d recipes\n", data.Count)
-	return nil
+	// Display results with pagination
+	return DisplayAdvancedPaginatedResult(result, outputFormat, verbose)
 }
 
-func getRecipe(recipeID string) error {
+func showRecipe(recipeID string, flags CommandFlags) error {
 	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get recipe: %w", err)
 	}
 
-	var recipe arf.Recipe
+	var recipe models.Recipe
 	if err := json.Unmarshal(response, &recipe); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	fmt.Printf("Recipe: %s\n", recipe.ID)
-	fmt.Printf("Name: %s\n", recipe.Name)
-	fmt.Printf("Description: %s\n", recipe.Description)
-	fmt.Printf("Language: %s\n", recipe.Language)
-	fmt.Printf("Category: %s\n", recipe.Category)
-	fmt.Printf("Confidence: %.2f\n", recipe.Confidence)
-	fmt.Printf("Source: %s\n", recipe.Source)
-	fmt.Printf("Version: %s\n", recipe.Version)
-	fmt.Printf("Tags: %s\n", strings.Join(recipe.Tags, ", "))
-
-	if len(recipe.Options) > 0 {
-		fmt.Println("\nOptions:")
-		for key, value := range recipe.Options {
-			fmt.Printf("  %s: %s\n", key, value)
-		}
-	}
+	// Use formatting utility
+	return FormatRecipeDetails(&recipe, flags.OutputFormat, flags.Verbose)
 
 	return nil
 }
 
-func searchRecipes(query string) error {
+func searchRecipes(query string, flags CommandFlags) error {
 	url := fmt.Sprintf("%s/arf/recipes/search?q=%s", arfControllerURL, query)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
@@ -153,109 +329,369 @@ func searchRecipes(query string) error {
 	}
 
 	var data struct {
-		Recipes []arf.Recipe `json:"recipes"`
-		Count   int          `json:"count"`
-		Query   string       `json:"query"`
+		Recipes []models.Recipe `json:"recipes"`
+		Count   int             `json:"count"`
+		Query   string          `json:"query"`
 	}
 
 	if err := json.Unmarshal(response, &data); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	fmt.Printf("Search results for \"%s\":\n\n", data.Query)
-
-	if data.Count == 0 {
-		fmt.Println("No recipes found")
-		return nil
+	// Convert to Recipe pointers for consistency
+	recipes := make([]*models.Recipe, len(data.Recipes))
+	for i := range data.Recipes {
+		recipes[i] = &data.Recipes[i]
 	}
 
-	for _, recipe := range data.Recipes {
-		fmt.Printf("• %s (%s)\n", recipe.Name, recipe.ID)
-		fmt.Printf("  %s\n", recipe.Description)
-		fmt.Printf("  Language: %s | Category: %s | Confidence: %.2f\n",
-			recipe.Language, recipe.Category, recipe.Confidence)
-		fmt.Println()
-	}
-
-	fmt.Printf("Total: %d recipes\n", data.Count)
-	return nil
+	// Use formatting utility
+	return FormatSearchResults(recipes, data.Query, flags.OutputFormat, flags.Verbose)
 }
 
-func getRecipeStats(recipeID string) error {
+func getRecipeStats(recipeID string, flags CommandFlags) error {
 	url := fmt.Sprintf("%s/arf/recipes/%s/stats", arfControllerURL, recipeID)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get recipe stats: %w", err)
 	}
 
-	var stats arf.RecipeStats
+	var stats map[string]interface{}
 	if err := json.Unmarshal(response, &stats); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	fmt.Printf("Recipe Statistics: %s\n", stats.RecipeID)
-	fmt.Printf("Total Executions: %d\n", stats.TotalExecutions)
-	fmt.Printf("Successful Runs: %d\n", stats.SuccessfulRuns)
-	fmt.Printf("Failed Runs: %d\n", stats.FailedRuns)
-	fmt.Printf("Success Rate: %.2f%%\n", stats.SuccessRate*100)
+	// Handle different output formats
+	switch flags.OutputFormat {
+	case "json":
+		output, _ := json.MarshalIndent(stats, "", "  ")
+		fmt.Println(string(output))
+	case "yaml":
+		output, _ := yaml.Marshal(stats)
+		fmt.Println(string(output))
+	default: // table format
+		fmt.Printf("Recipe Statistics: %s\n", stats["recipe_id"])
+		if totalExec, ok := stats["total_executions"].(float64); ok {
+			fmt.Printf("Total Executions: %d\n", int(totalExec))
+		}
+		if successfulRuns, ok := stats["successful_runs"].(float64); ok {
+			fmt.Printf("Successful Runs: %d\n", int(successfulRuns))
+		}
+		if failedRuns, ok := stats["failed_runs"].(float64); ok {
+			fmt.Printf("Failed Runs: %d\n", int(failedRuns))
+		}
+		if successRate, ok := stats["success_rate"].(float64); ok {
+			fmt.Printf("Success Rate: %.2f%%\n", successRate*100)
+		}
 
-	if stats.TotalExecutions > 0 {
-		fmt.Printf("Average Execution Time: %s\n", stats.AvgExecutionTime.String())
-		fmt.Printf("Last Executed: %s\n", stats.LastExecuted.Format(time.RFC3339))
-		fmt.Printf("First Executed: %s\n", stats.FirstExecuted.Format(time.RFC3339))
-	}
-
-	return nil
-}
-
-func createRecipeInteractive() error {
-	fmt.Println("Creating new recipe (interactive mode)")
-	fmt.Println("Press Ctrl+C to cancel at any time")
-	fmt.Println()
-
-	recipe := arf.Recipe{
-		Options: make(map[string]string),
-	}
-
-	// Get basic recipe information
-	recipe.ID = promptUser("Recipe ID: ")
-	recipe.Name = promptUser("Name: ")
-	recipe.Description = promptUser("Description: ")
-	recipe.Language = promptUser("Language (java/go/python/etc): ")
-
-	categoryStr := promptUser("Category (cleanup/modernize/security/etc): ")
-	recipe.Category = arf.RecipeCategory(categoryStr)
-
-	confidenceStr := promptUser("Confidence (0.0-1.0): ")
-	if conf, err := strconv.ParseFloat(confidenceStr, 64); err == nil {
-		recipe.Confidence = conf
-	} else {
-		recipe.Confidence = 0.8 // Default
-	}
-
-	recipe.Source = promptUser("OpenRewrite class name: ")
-	recipe.Version = promptUser("Version (optional): ")
-
-	tagsStr := promptUser("Tags (comma-separated): ")
-	if tagsStr != "" {
-		recipe.Tags = strings.Split(tagsStr, ",")
-		for i, tag := range recipe.Tags {
-			recipe.Tags[i] = strings.TrimSpace(tag)
+		if totalExec, ok := stats["total_executions"].(float64); ok && totalExec > 0 {
+			if avgTime, ok := stats["avg_execution_time"].(string); ok {
+				fmt.Printf("Average Execution Time: %s\n", avgTime)
+			}
+			if lastExec, ok := stats["last_executed"].(string); ok {
+				fmt.Printf("Last Executed: %s\n", lastExec)
+			}
+			if firstExec, ok := stats["first_executed"].(string); ok {
+				fmt.Printf("First Executed: %s\n", firstExec)
+			}
 		}
 	}
 
-	// Serialize and send
-	data, err := json.Marshal(recipe)
+	return nil
+}
+
+// uploadRecipe uploads a new recipe from a YAML file
+func uploadRecipe(recipePath string, flags CommandFlags) error {
+	// Read recipe file
+	data, err := os.ReadFile(recipePath)
+	if err != nil {
+		return fmt.Errorf("failed to read recipe file: %w", err)
+	}
+	
+	// Parse YAML
+	var recipe models.Recipe
+	if err := yaml.Unmarshal(data, &recipe); err != nil {
+		return fmt.Errorf("failed to parse recipe YAML: %w", err)
+	}
+	
+	// Override name if specified
+	if flags.Name != "" {
+		recipe.Metadata.Name = flags.Name
+	}
+	
+	// Validate recipe
+	if err := recipe.Validate(); err != nil {
+		if !flags.Force {
+			return fmt.Errorf("recipe validation failed: %w", err)
+		}
+		fmt.Printf("Warning: %v (continuing due to --force)\n", err)
+	}
+	
+	// Dry run mode
+	if flags.DryRun {
+		fmt.Printf("Recipe '%s' is valid and ready for upload\n", recipe.Metadata.Name)
+		return nil
+	}
+	
+	// Send to API
+	recipeJSON, err := json.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to serialize recipe: %w", err)
 	}
-
-	url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
-	_, err = makeAPIRequest("POST", url, data)
+	
+	url := fmt.Sprintf("%s/arf/recipes/upload", arfControllerURL)
+	response, err := makeAPIRequest("POST", url, recipeJSON)
 	if err != nil {
-		return fmt.Errorf("failed to create recipe: %w", err)
+		return fmt.Errorf("upload failed: %w", err)
 	}
-
-	fmt.Printf("\nRecipe '%s' created successfully!\n", recipe.ID)
+	
+	var result struct {
+		ID      string `json:"id"`
+		Message string `json:"message"`
+	}
+	json.Unmarshal(response, &result)
+	
+	fmt.Printf("Recipe '%s' uploaded successfully (ID: %s)\n", recipe.Metadata.Name, result.ID)
 	return nil
 }
+
+// updateRecipe updates an existing recipe from a YAML file
+func updateRecipe(recipeID, recipePath string, flags CommandFlags) error {
+	// Read recipe file
+	data, err := os.ReadFile(recipePath)
+	if err != nil {
+		return fmt.Errorf("failed to read recipe file: %w", err)
+	}
+	
+	// Parse YAML
+	var recipe models.Recipe
+	if err := yaml.Unmarshal(data, &recipe); err != nil {
+		return fmt.Errorf("failed to parse recipe YAML: %w", err)
+	}
+	
+	// Validate recipe
+	if err := recipe.Validate(); err != nil {
+		return fmt.Errorf("recipe validation failed: %w", err)
+	}
+	
+	// Send to API
+	recipeJSON, err := json.Marshal(recipe)
+	if err != nil {
+		return fmt.Errorf("failed to serialize recipe: %w", err)
+	}
+	
+	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
+	_, err = makeAPIRequest("PUT", url, recipeJSON)
+	if err != nil {
+		return fmt.Errorf("update failed: %w", err)
+	}
+	
+	fmt.Printf("Recipe '%s' updated successfully\n", recipeID)
+	return nil
+}
+
+// deleteRecipe deletes a recipe by ID
+func deleteRecipe(recipeID string, flags CommandFlags) error {
+	// Confirm deletion unless force flag is set
+	if !flags.Force {
+		fmt.Printf("Are you sure you want to delete recipe '%s'? (y/N): ", recipeID)
+		var confirm string
+		fmt.Scanln(&confirm)
+		if strings.ToLower(confirm) != "y" {
+			fmt.Println("Deletion cancelled")
+			return nil
+		}
+	}
+	
+	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
+	_, err := makeAPIRequest("DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("deletion failed: %w", err)
+	}
+	
+	fmt.Printf("Recipe '%s' deleted successfully\n", recipeID)
+	return nil
+}
+
+// downloadRecipe downloads a recipe to a YAML file
+func downloadRecipe(recipeID string, flags CommandFlags) error {
+	// Fetch recipe from API
+	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
+	response, err := makeAPIRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch recipe: %w", err)
+	}
+	
+	var recipe models.Recipe
+	if err := json.Unmarshal(response, &recipe); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	// Convert to YAML
+	yamlData, err := yaml.Marshal(recipe)
+	if err != nil {
+		return fmt.Errorf("failed to convert to YAML: %w", err)
+	}
+	
+	// Determine output file name
+	outputFile := flags.OutputFile
+	if outputFile == "" {
+		outputFile = fmt.Sprintf("%s.yaml", recipeID)
+	}
+	
+	// Write to file
+	if err := os.WriteFile(outputFile, yamlData, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	
+	fmt.Printf("Recipe downloaded to %s\n", outputFile)
+	return nil
+}
+
+// validateRecipe validates a recipe file without uploading
+func validateRecipe(recipePath string, flags CommandFlags) error {
+	// Read recipe file
+	data, err := os.ReadFile(recipePath)
+	if err != nil {
+		return fmt.Errorf("failed to read recipe file: %w", err)
+	}
+	
+	// Parse YAML
+	var recipe models.Recipe
+	if err := yaml.Unmarshal(data, &recipe); err != nil {
+		return fmt.Errorf("failed to parse recipe YAML: %w", err)
+	}
+	
+	// Basic validation
+	if err := recipe.Validate(); err != nil {
+		fmt.Printf("❌ Recipe validation failed: %v\n", err)
+		return nil
+	}
+	
+	// Additional strict validation
+	if flags.Strict {
+		warnings := []string{}
+		
+		// Check for missing optional but recommended fields
+		if recipe.Metadata.MinPlatform == "" {
+			warnings = append(warnings, "Missing minimum platform version")
+		}
+		if len(recipe.Metadata.Tags) == 0 {
+			warnings = append(warnings, "No tags specified")
+		}
+		if recipe.Metadata.License == "" {
+			warnings = append(warnings, "No license specified")
+		}
+		
+		// Check step configurations
+		for i, step := range recipe.Steps {
+			if step.Timeout.Duration == 0 {
+				warnings = append(warnings, fmt.Sprintf("Step %d (%s) has no timeout specified", i+1, step.Name))
+			}
+		}
+		
+		if len(warnings) > 0 {
+			fmt.Println("⚠️  Warnings (strict mode):")
+			for _, warning := range warnings {
+				fmt.Printf("  - %s\n", warning)
+			}
+		}
+	}
+	
+	fmt.Printf("✅ Recipe '%s' is valid\n", recipe.Metadata.Name)
+	
+	// Display recipe summary
+	fmt.Printf("\nRecipe Summary:\n")
+	fmt.Printf("  Name: %s\n", recipe.Metadata.Name)
+	fmt.Printf("  Version: %s\n", recipe.Metadata.Version)
+	fmt.Printf("  Steps: %d\n", len(recipe.Steps))
+	fmt.Printf("  Languages: %s\n", strings.Join(recipe.Metadata.Languages, ", "))
+	fmt.Printf("  Categories: %s\n", strings.Join(recipe.Metadata.Categories, ", "))
+	
+	return nil
+}
+
+// UploadFlags contains flags for the upload command (legacy)
+type UploadFlags struct {
+	DryRun bool
+	Force  bool
+	Name   string
+}
+
+// parseCommonFlags parses common command flags
+func parseCommonFlags(args []string) CommandFlags {
+	flags := CommandFlags{
+		OutputFormat: "table", // Default output format
+	}
+	
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--dry-run", "-n":
+			flags.DryRun = true
+		case "--force", "-f":
+			flags.Force = true
+		case "--verbose", "-v":
+			flags.Verbose = true
+		case "--strict", "-s":
+			flags.Strict = true
+		case "--interactive", "-i":
+			flags.Interactive = true
+		case "--output", "-o":
+			if i+1 < len(args) {
+				flags.OutputFormat = args[i+1]
+				i++
+			}
+		case "--name":
+			if i+1 < len(args) {
+				flags.Name = args[i+1]
+				i++
+			}
+		case "--template", "-t":
+			if i+1 < len(args) {
+				flags.Template = args[i+1]
+				i++
+			}
+		case "--file":
+			if i+1 < len(args) {
+				flags.OutputFile = args[i+1]
+				i++
+			}
+		}
+	}
+	return flags
+}
+
+// Helper functions to parse command flags (legacy support)
+func parseUploadFlags(args []string) UploadFlags {
+	flags := parseCommonFlags(args)
+	return UploadFlags{
+		DryRun: flags.DryRun,
+		Force:  flags.Force,
+		Name:   flags.Name,
+	}
+}
+
+// Legacy flag parsing functions for backward compatibility
+func parseVerboseFlag(args []string) bool {
+	flags := parseCommonFlags(args)
+	return flags.Verbose
+}
+
+func parseForceFlag(args []string) bool {
+	flags := parseCommonFlags(args)
+	return flags.Force
+}
+
+func parseStrictFlag(args []string) bool {
+	flags := parseCommonFlags(args)
+	return flags.Strict
+}
+
+func parseOutputFile(args []string) string {
+	flags := parseCommonFlags(args)
+	return flags.OutputFile
+}
+
+
+
+
+

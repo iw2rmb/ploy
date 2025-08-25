@@ -5,6 +5,27 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 
 ⸻
 
+## 🧪 Test-Driven Development (TDD) Infrastructure
+
+✅ **Comprehensive Testing Framework** (Aug 2025):
+- **TDD Phase 1 Complete**: Full testing foundation with 70%/20%/10% pyramid (Unit/Integration/E2E)
+- **Custom Assertions**: 20+ specialized assertions for JSON, async operations, file validation, error handling
+- **Mock Infrastructure**: Complete mock implementations for Nomad, Consul, Storage with realistic behavior
+- **Test Utilities**: Builder patterns, fixtures for Go/Node.js/Java/WASM apps, database testing framework
+- **CI/CD Pipeline**: GitHub Actions with unit, integration, security, and performance testing stages
+- **Local Development**: Docker Compose test environment with automated service orchestration
+- **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
+- **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
+
+✅ **Testing Standards & Quality** (Aug 2025):
+- **golangci-lint**: 40+ linters configured for comprehensive code quality enforcement
+- **Security Testing**: Automated vulnerability scanning with gosec and govulncheck
+- **Performance Testing**: Load testing utilities, benchmark analysis, regression detection
+- **Test Architecture**: Following testing pyramid principles with proper isolation and cleanup
+- **Documentation**: Complete testing guide with TDD principles, best practices, troubleshooting
+
+⸻
+
 ## 🛠 Build Lanes (A–G)
 
 Auto-classified lanes:
@@ -240,6 +261,60 @@ Auto-classified lanes:
   - ✅ **Minimal Footprint**: ~40MB binary with 50-100MB RAM per instance
   - ✅ **No Single Point of Failure**: Masterless architecture with shared configuration
 
+## 🔍 Static Analysis Framework (Phase 1 Complete - Dec 2024)
+
+### Core Infrastructure
+- ✅ **Analysis Engine**: Language-agnostic orchestrator with plugin architecture
+  - Dynamic analyzer registration for multiple languages
+  - Standardized issue classification and severity system
+  - Result aggregation and reporting across languages
+  - In-memory caching with automatic expiration
+  - Parallel analysis execution for performance
+
+### Java Error Prone Integration
+- ✅ **Deep Google Error Prone Integration**: 400+ bug pattern detection
+  - Maven and Gradle build system auto-detection
+  - Custom checker configuration with severity mapping
+  - Support for all Error Prone built-in patterns
+  - Custom pattern development for Ploy-specific issues
+  - Incremental analysis with caching
+
+### ARF Integration
+- ✅ **Automated Remediation**: Direct pipeline to ARF for automatic fixes
+  - Issue-to-recipe mapping for common patterns
+  - ARF trigger generation from analysis results
+  - Human-in-the-loop workflow creation for critical issues
+  - Confidence scoring for automated fixes
+  - Batch remediation support
+
+### API and CLI
+- ✅ **RESTful API**: Complete analysis API endpoints
+  - `/v1/analysis/analyze` - Run analysis on repository
+  - `/v1/analysis/languages` - List supported languages
+  - `/v1/analysis/config` - Configuration management
+  - `/v1/analysis/results` - Result retrieval and history
+  - `/v1/analysis/issues/{id}/fixes` - Fix suggestions
+
+- ✅ **CLI Commands**: Full command-line interface
+  - `ploy analyze run --app myapp` - Run analysis
+  - `ploy analyze run --app myapp --fix` - Run with auto-fix
+  - `ploy analyze languages` - List supported languages
+  - `ploy analyze config` - Manage configuration
+  - `ploy analyze results` - View analysis history
+
+### Configuration
+- ✅ **Flexible Configuration**: YAML-based configuration system
+  - Language-specific analyzer settings
+  - Custom rule definitions
+  - Quality gates and thresholds
+  - ARF integration settings
+  - Performance optimization controls
+
+### Next Phases (Planned)
+- **Phase 2**: Multi-language support (Python, Go, JavaScript, C#, Rust)
+- **Phase 3**: Enterprise features and advanced ARF integration
+- **Phase 4**: CI/CD integration and team collaboration
+
 ## 🏗 High Availability Controller Architecture
 
 - ✅ **Zero-SPOF Controller Design**
@@ -335,7 +410,7 @@ Auto-classified lanes:
   - **Error Resilience**: Continues cleanup even if individual operations fail
 - ✅ `ploy push` – tar + stream to controller
   - ✅ **Validated Node.js Lane B Testing** (Aug 2025):
-    - Successfully tested with apps/node-hello demonstrating automatic Lane B detection
+    - Successfully tested with tests/apps/node-hello demonstrating automatic Lane B detection
     - Verified build pipeline progression from tar processing to lane validation
     - Confirmed proper request body handling eliminating EOF errors
     - OPA policy validation triggers correctly for unsigned artifacts
@@ -398,7 +473,7 @@ Auto-classified lanes:
 ⸻
 
 ## 🔬 Sample Apps
-✅ `apps/` directory with Go, Node, Python, .NET, Scala, Java examples.
+✅ `tests/apps/` directory with Go, Node, Python, .NET, Scala, Java examples.
 ✅ All include `/healthz` on port 8080.
 
 ⸻
@@ -539,11 +614,37 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Cache Management**: Cache statistics, clearing, and optimization through API and CLI
 - ✅ **System Monitoring**: Health checks, metrics collection, and operational statistics
 
-### 📋 **Planned Phase 5: Enterprise Scale**
-- ⏳ **Multi-Repository Campaign Management**: 200-500 repositories per campaign with progress tracking
-- ⏳ **Advanced Analytics & Cost Optimization**: Business impact measurement, ROI calculations, LLM API cost management
-- ⏳ **WASM Integration**: Lane G-specific transformations with size optimization and polyfill injection
-- ⏳ **Enterprise Integration**: Complete REST API with CLI integration and SDK libraries
+### ✅ **Phase 5: Universal Recipe Management Platform** - IN PROGRESS ✅
+Comprehensive transformation of ARF into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
+
+**✅ Phase 5.1: Recipe Data Model & Storage** - ✅ **COMPLETED (2025-08-25)**
+- ✅ **Recipe Data Structures**: Complete models.Recipe with metadata, steps, validation rules, and execution configuration
+- ✅ **SeaweedFS Storage Backend**: Production-ready integration with retry logic, caching, and deletion marker support
+- ✅ **Consul Index Backend**: Enhanced search with relevance scoring and performance optimization
+- ✅ **Security Validation Framework**: Complete recipe validation with security rules, resource limits, and command filtering
+- ✅ **Configuration Management**: Environment-driven backend selection (production: SeaweedFS+Consul, development: memory)
+- ✅ **API Integration**: All handlers updated to use storage backend with graceful fallbacks
+- ✅ **Comprehensive Testing**: Four complete test suites for integration, fallbacks, configuration, and comprehensive validation
+
+**Phase 5.2: CLI Integration & User Interface**
+- Complete `ploy arf recipe` command suite: upload, update, delete, list, search, run, compose
+- Recipe discovery with intelligent filtering by tags, languages, frameworks, and categories
+- Recipe execution integration with existing benchmark system for seamless testing
+- Import/export functionality enabling recipe sharing and backup capabilities
+
+**Phase 5.3: Generic Recipe Execution Engine**
+- Plugin-based execution framework replacing current mock transformations
+- Real OpenRewrite integration with Maven/Gradle execution for authentic transformations
+- Shell script engine with comprehensive security validation and sandboxing
+- AST transformation engine supporting multiple programming languages
+- Multi-step recipe orchestration with error handling and rollback capabilities
+
+**Phase 5.4: Recipe Discovery & Ecosystem**
+- Recipe marketplace with community-contributed transformations and ratings
+- Intelligent codebase analysis for automated recipe recommendations
+- Dependency management with automatic resolution and conflict detection
+- Quality assurance framework with automated testing and security scanning
+- Community features including reviews, collaboration, and recipe forking
 
 ### 📋 **Planned Phase 6: Intelligent Dependency Resolution**
 - ⏳ **Dependency Graph Analysis**: Complete dependency trees with conflict detection

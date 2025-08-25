@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 func TestParallelResolverCreation(t *testing.T) {
@@ -421,16 +423,16 @@ func TestBatchFormatting(t *testing.T) {
 // Mock implementations for testing
 
 type MockParallelEngine struct {
-	recipes     []Recipe
+	recipes     []*models.Recipe
 	delay       time.Duration
-	executeFunc func(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error)
+	executeFunc func(ctx context.Context, recipe *models.Recipe, codebase Codebase) (*TransformationResult, error)
 }
 
-func (m *MockParallelEngine) ValidateRecipe(recipe Recipe) error {
+func (m *MockParallelEngine) ValidateRecipe(recipe *models.Recipe) error {
 	return nil
 }
 
-func (m *MockParallelEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error) {
+func (m *MockParallelEngine) ExecuteRecipe(ctx context.Context, recipe *models.Recipe, codebase Codebase) (*TransformationResult, error) {
 	if m.executeFunc != nil {
 		return m.executeFunc(ctx, recipe, codebase)
 	}
@@ -451,15 +453,16 @@ func (m *MockParallelEngine) ExecuteRecipe(ctx context.Context, recipe Recipe, c
 	}, nil
 }
 
-func (m *MockParallelEngine) ListAvailableRecipes() ([]Recipe, error) {
+func (m *MockParallelEngine) ListAvailableRecipes() ([]*models.Recipe, error) {
 	return m.recipes, nil
 }
 
-func (m *MockParallelEngine) GetRecipeMetadata(recipeID string) (*RecipeMetadata, error) {
-	return &RecipeMetadata{
-		Recipe:              Recipe{ID: recipeID},
-		ApplicableLanguages: []string{"java"},
-		SuccessRate:         0.9,
+func (m *MockParallelEngine) GetRecipeMetadata(recipeID string) (*models.RecipeMetadata, error) {
+	return &models.RecipeMetadata{
+		Name:        recipeID,
+		Author:      "test-author",
+		Languages:   []string{"java"},
+		Description: "Test recipe",
 	}, nil
 }
 
@@ -472,27 +475,27 @@ func (m *MockParallelEngine) GetCachedAST(key string) (*AST, bool) {
 }
 
 type MockParallelRecipeCatalog struct {
-	recipes []Recipe
+	recipes []*models.Recipe
 }
 
-func (m *MockParallelRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]Recipe, error) {
+func (m *MockParallelRecipeCatalog) ListRecipes(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error) {
 	return m.recipes, nil
 }
 
-func (m *MockParallelRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*Recipe, error) {
+func (m *MockParallelRecipeCatalog) GetRecipe(ctx context.Context, recipeID string) (*models.Recipe, error) {
 	for _, recipe := range m.recipes {
 		if recipe.ID == recipeID {
-			return &recipe, nil
+			return recipe, nil
 		}
 	}
 	return nil, fmt.Errorf("recipe not found: %s", recipeID)
 }
 
-func (m *MockParallelRecipeCatalog) StoreRecipe(ctx context.Context, recipe Recipe) error {
+func (m *MockParallelRecipeCatalog) StoreRecipe(ctx context.Context, recipe *models.Recipe) error {
 	return nil
 }
 
-func (m *MockParallelRecipeCatalog) UpdateRecipe(ctx context.Context, recipe Recipe) error {
+func (m *MockParallelRecipeCatalog) UpdateRecipe(ctx context.Context, recipe *models.Recipe) error {
 	return nil
 }
 
@@ -500,7 +503,7 @@ func (m *MockParallelRecipeCatalog) DeleteRecipe(ctx context.Context, recipeID s
 	return nil
 }
 
-func (m *MockParallelRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]Recipe, error) {
+func (m *MockParallelRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]*models.Recipe, error) {
 	return m.recipes, nil
 }
 

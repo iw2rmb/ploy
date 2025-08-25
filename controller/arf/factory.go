@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 	
+	"github.com/iw2rmb/ploy/controller/arf/models"
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
 )
 
@@ -133,9 +134,9 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 	components.MultiLangEngine = multiLang
 	
 	// Initialize Hybrid Pipeline
-	// Note: We need a proper ARFEngine implementation, using nil for now
+	// Note: We need a proper RecipeExecutor, using nil for now
 	components.HybridPipeline = NewDefaultHybridPipeline(
-		nil, // ARFEngine (OpenRewrite) - needs to be initialized separately
+		nil, // RecipeExecutor - needs to be initialized separately
 		components.LLMGenerator,
 		components.MultiLangEngine,
 	)
@@ -198,14 +199,16 @@ type mockLLMGenerator struct{}
 
 func (m *mockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
 	return &GeneratedRecipe{
-		Recipe: Recipe{
-			ID:          fmt.Sprintf("mock-%d", time.Now().Unix()),
-			Name:        "Mock Generated Recipe",
-			Description: "This is a mock generated recipe",
-			Language:    request.Language,
-			Category:    CategoryCleanup,
-			Source:      "mock.generated.Recipe",
-			Version:     "1.0.0",
+		Recipe: &models.Recipe{
+			ID: fmt.Sprintf("mock-%d", time.Now().Unix()),
+			Metadata: models.RecipeMetadata{
+				Name:        "Mock Generated Recipe",
+				Description: "This is a mock generated recipe",
+				Languages:   []string{request.Language},
+				Categories:  []string{"cleanup"},
+				Version:     "1.0.0",
+			},
+			Steps: []models.RecipeStep{},
 		},
 		Confidence:  0.5,
 		Explanation: "Mock generation - no LLM configured",
@@ -222,14 +225,14 @@ func (m *mockLLMGenerator) ValidateGenerated(ctx context.Context, recipe Generat
 	}, nil
 }
 
-func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe Recipe, feedback TransformationFeedback) (*Recipe, error) {
+func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe *models.Recipe, feedback TransformationFeedback) (*models.Recipe, error) {
 	optimized := recipe
-	optimized.Version = "1.1.0"
-	return &optimized, nil
+	optimized.Metadata.Version = "1.1.0"
+	return optimized, nil
 }
 
 // CreateHandlerWithPhase3 creates a handler with all Phase 3 components initialized
-func CreateHandlerWithPhase3(engine ARFEngine, catalog RecipeCatalog, sandboxMgr SandboxManager) (*Handler, error) {
+func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) (*Handler, error) {
 	// Load configuration
 	config := LoadPhase3ConfigFromEnv()
 	
@@ -244,7 +247,7 @@ func CreateHandlerWithPhase3(engine ARFEngine, catalog RecipeCatalog, sandboxMgr
 
 	// Create handler with Phase 3 components
 	return NewHandlerWithPhase3(
-		engine,
+		executor,
 		catalog,
 		sandboxMgr,
 		components.LLMGenerator,

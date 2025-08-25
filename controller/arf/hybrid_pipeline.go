@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/iw2rmb/ploy/controller/arf/models"
 )
 
 // HybridPipeline defines the interface for combining OpenRewrite and LLM transformations
@@ -17,7 +19,7 @@ type HybridPipeline interface {
 // HybridRequest contains all information needed for hybrid transformation
 type HybridRequest struct {
 	Repository      Repository              `json:"repository"`
-	PrimaryRecipe   Recipe                  `json:"primary_recipe"`
+	PrimaryRecipe   *models.Recipe          `json:"primary_recipe"`
 	Context         TransformationContext   `json:"context"`
 	EnhancementMode EnhancementMode         `json:"enhancement_mode"`
 	Confidence      ConfidenceThresholds    `json:"confidence"`
@@ -148,7 +150,7 @@ type RecommendedApproach struct {
 
 // DefaultHybridPipeline implements the hybrid transformation pipeline
 type DefaultHybridPipeline struct {
-	openRewriteEngine   ARFEngine
+	recipeExecutor      *RecipeExecutor
 	llmGenerator        LLMRecipeGenerator
 	multiLangEngine     MultiLanguageEngine
 	strategySelector    StrategySelector
@@ -159,12 +161,12 @@ type DefaultHybridPipeline struct {
 
 // NewDefaultHybridPipeline creates a new hybrid pipeline
 func NewDefaultHybridPipeline(
-	openRewriteEngine ARFEngine,
+	recipeExecutor *RecipeExecutor,
 	llmGenerator LLMRecipeGenerator,
 	multiLangEngine MultiLanguageEngine,
 ) *DefaultHybridPipeline {
 	return &DefaultHybridPipeline{
-		openRewriteEngine: openRewriteEngine,
+		recipeExecutor: recipeExecutor,
 		llmGenerator:     llmGenerator,
 		multiLangEngine:  multiLangEngine,
 		strategySelector: NewDefaultStrategySelector(),
@@ -298,12 +300,10 @@ func (p *DefaultHybridPipeline) EnhanceWithLLM(ctx context.Context, baseResult T
 
 func (p *DefaultHybridPipeline) executeOpenRewriteOnly(ctx context.Context, request HybridRequest, strategy TransformationStrategy) (*HybridResult, error) {
 	// Execute using OpenRewrite engine only
-	result, err := p.openRewriteEngine.ExecuteRecipe(ctx, request.PrimaryRecipe, Codebase{
-		Repository: request.Repository.URL,
-		Branch:     request.Repository.Branch,
-		Language:   request.Repository.Language,
-		BuildTool:  request.Repository.BuildTool,
-	})
+	// ExecuteRecipeObject takes a recipe and path to repository
+	// For now, use the repository URL as the path (in real implementation this would be a local checkout)
+	// For now, use the repository URL as path - in real implementation this would be a cloned local path
+	result, err := p.recipeExecutor.ExecuteRecipeObject(ctx, request.PrimaryRecipe, request.Repository.URL)
 	
 	if err != nil {
 		return nil, fmt.Errorf("OpenRewrite execution failed: %w", err)

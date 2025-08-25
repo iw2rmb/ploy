@@ -1,0 +1,352 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - test/testdata
+    - .cache
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*_gen\\.go$"
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+  sort-results: true
+
+linters:
+  enable:
+    # Default linters
+    - errcheck        # Check for unchecked errors
+    - gosimple        # Simplify code
+    - govet          # Go vet
+    - ineffassign    # Detect ineffectual assignments
+    - staticcheck    # Static analysis
+    - typecheck      # Type checking
+    - unused         # Check for unused constants, variables, functions and types
+    
+    # Additional quality linters
+    - asciicheck     # Check for non-ASCII identifiers
+    - bidichk        # Check for dangerous unicode character sequences
+    - bodyclose      # Check for HTTP response body closes
+    - contextcheck   # Check for context cancellation
+    - cyclop         # Check cyclomatic complexity
+    - dupl           # Check for code duplication
+    - durationcheck  # Check for two durations multiplied together
+    - errorlint      # Find code that will cause problems with Go 1.13 error wrapping
+    - exhaustive     # Check exhaustiveness of enum switch statements
+    - exportloopref  # Check for pointers to enclosing loop variables
+    - forbidigo      # Forbid identifiers
+    - funlen         # Check function length
+    - gci            # Control Go package import order and make it always deterministic
+    - gocognit       # Compute and check the cognitive complexity of functions
+    - goconst        # Find repeated strings that could be replaced by a constant
+    - gocritic       # Comprehensive Go source code linter
+    - gocyclo        # Compute and check the cyclomatic complexity of functions
+    - godot          # Check if comments end in a period
+    - gofmt          # Check whether code was gofmt-ed
+    - gofumpt        # Check whether code was gofumpt-ed
+    - goheader       # Check for license headers
+    - goimports      # Fix imports and format code
+    - gomnd          # Detect magic numbers
+    - gomodguard     # Allow and block lists linter for direct Go module dependencies
+    - goprintffuncname # Check that printf-like functions are named with f at the end
+    - gosec          # Inspect source code for security problems
+    - lll            # Report long lines
+    - makezero       # Find slice declarations with non-zero initial length
+    - misspell       # Find commonly misspelled English words in comments
+    - nakedret       # Find naked returns in functions greater than a specified function length
+    - nestif         # Report deeply nested if statements
+    - nilerr         # Find the code that returns nil even if it checks that the error is not nil
+    - nlreturn       # Check for new line before return and branch statements
+    - noctx          # Find sending HTTP request without context.Context
+    - nolintlint     # Report ill-formed or insufficient nolint directives
+    - prealloc       # Find slice declarations that could potentially be preallocated
+    - predeclared    # Find code that shadows one of Go's predeclared identifiers
+    - revive         # Fast, configurable, extensible, flexible, and beautiful linter for Go
+    - rowserrcheck   # Check whether Err of rows is checked successfully
+    - sqlclosecheck  # Check that sql.Rows and sql.Stmt are closed
+    - thelper        # Detect golang test helpers without t.Helper() call
+    - tparallel      # Detect inappropriate usage of t.Parallel() method in Go test codes
+    - unconvert      # Remove unnecessary type conversions
+    - unparam        # Report unused function parameters
+    - wastedassign   # Find wasted assignment statements
+    - whitespace     # Detection of leading and trailing whitespace
+
+  disable:
+    - deadcode       # Deprecated
+    - exhaustivestruct # Too strict for most use cases
+    - golint         # Deprecated
+    - ifshort        # Deprecated
+    - interfacer     # Deprecated
+    - maligned       # Deprecated
+    - nosnakecase    # We allow snake_case in some contexts
+    - scopelint      # Deprecated
+    - structcheck    # Deprecated
+    - varcheck       # Deprecated
+    - wrapcheck      # Too strict for our current codebase
+
+linters-settings:
+  cyclop:
+    max-complexity: 15
+    package-average: 10.0
+    
+  dupl:
+    threshold: 100
+    
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (*database/sql.DB).Close
+      - (*database/sql.Rows).Close
+      - (*database/sql.Stmt).Close
+      - (*os.File).Close
+      
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+    
+  exhaustive:
+    check-generated: false
+    default-signifies-exhaustive: true
+    
+  forbidigo:
+    forbid:
+      - '^print.*$'      # Forbid print functions
+      - 'fmt\.Print.*'   # Forbid fmt.Print* functions in production code
+      
+  funlen:
+    lines: 80
+    statements: 50
+    
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/iw2rmb/ploy)
+    skip-generated: true
+    custom-order: true
+    
+  gocognit:
+    min-complexity: 20
+    
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    ignore-tests: true
+    
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+    disabled-checks:
+      - commentedOutCode
+      - whyNoLint # We use nolint directives appropriately
+    settings:
+      hugeParam:
+        sizeThreshold: 100
+      rangeExprCopy:
+        sizeThreshold: 512
+        skipTestFuncs: true
+        
+  gocyclo:
+    min-complexity: 15
+    
+  godot:
+    scope: declarations
+    exclude:
+      - '^ \* '  # Exclude list items in comments
+    capital: false
+    
+  gofumpt:
+    extra-rules: true
+    
+  goheader:
+    template: |-
+      Copyright {{ YEAR }} Ploy Project
+      Licensed under the Apache License, Version 2.0
+    
+  goimports:
+    local-prefixes: github.com/iw2rmb/ploy
+    
+  gomnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+    ignored-numbers:
+      - '0'
+      - '1'
+      - '2'
+      - '3'
+      - '8'
+      - '10'
+      - '16'
+      - '24'
+      - '32'
+      - '60'
+      - '64'
+      - '100'
+      - '128'
+      - '256'
+      - '512'
+      - '1000'
+      - '1024'
+    ignored-functions:
+      - 'time.Duration'
+      - 'context.WithTimeout'
+      - 'context.WithDeadline'
+      
+  gomodguard:
+    blocked:
+      modules: []
+      versions: []
+    allowed:
+      modules: []
+      domains: []
+      
+  gosec:
+    excludes:
+      - G104 # Audit errors not checked (too noisy)
+      - G204 # Subprocess launched with variable (often intentional)
+    config:
+      G306: "0644" # Allow 644 file permissions
+      
+  lll:
+    line-length: 120
+    tab-width: 4
+    
+  makezero:
+    always: false
+    
+  misspell:
+    locale: US
+    ignore-words:
+      - ploy
+      - unikernel
+      - unikraft
+      - seaweedfs
+      - nomad
+      - consul
+      - traefik
+      
+  nakedret:
+    max-func-lines: 30
+    
+  nestif:
+    min-complexity: 5
+    
+  nlreturn:
+    block-size: 2
+    
+  nolintlint:
+    allow-leading-space: false
+    require-explanation: true
+    require-specific: true
+    
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: false
+    
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    confidence: 0.8
+    rules:
+      - name: atomic
+      - name: line-length-limit
+        arguments: [120]
+      - name: argument-limit
+        arguments: [8]
+      - name: cyclomatic
+        arguments: [15]
+      - name: max-public-structs
+        arguments: [20]
+      - name: file-header
+        disabled: true
+      - name: empty-lines
+      - name: cognitive-complexity
+        arguments: [20]
+        
+  staticcheck:
+    checks: ["all"]
+    
+  thelper:
+    test:
+      first: true
+      name: true
+      begin: true
+    benchmark:
+      first: true
+      name: true
+      begin: true
+      
+  tparallel:
+    ignore-missing: false
+    
+  unparam:
+    check-exported: false
+    
+  whitespace:
+    multi-if: false
+    multi-func: false
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - funlen
+        - goconst
+        - gomnd
+        - lll
+        - nestif
+        - gocritic
+        
+    # Exclude some staticcheck messages
+    - linters:
+        - staticcheck
+      text: "SA9003:"
+      
+    # Exclude lll issues for long lines with go:generate
+    - linters:
+        - lll
+      source: "^//go:generate "
+      
+    # Exclude gomnd for test constants
+    - path: _test\.go
+      text: "Magic number"
+      linters:
+        - gomnd
+        
+    # Exclude godot for test function names
+    - path: _test\.go
+      text: "Comment should end in a period"
+      linters:
+        - godot
+
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+
+severity:
+  default-severity: error
+  case-sensitive: false
+  rules:
+    - linters:
+        - revive
+      severity: warning

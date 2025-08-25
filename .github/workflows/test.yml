@@ -1,0 +1,429 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+  POSTGRES_PASSWORD: ploy-test
+  POSTGRES_USER: ploy
+  POSTGRES_DB: ploy_test
+
+jobs:
+  # Unit tests run fast and don't require external services
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.21', '1.22']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/... ./cmd/...
+
+      - name: Check test coverage
+        run: |
+          coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Coverage: $coverage%"
+          if (( $(echo "$coverage < 60" | bc -l) )); then
+            echo "❌ Coverage is below 60% threshold"
+            exit 1
+          fi
+          echo "✅ Coverage meets 60% threshold"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Generate test report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Unit Test Results (${{ matrix.go-version }})
+          path: coverage.out
+          reporter: golang-junit
+
+  # Build verification ensures all code compiles
+  build-verification:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build controller
+        run: |
+          echo "🔨 Building controller..."
+          go build -v -o build/controller ./controller
+
+      - name: Build CLI
+        run: |
+          echo "🔨 Building CLI..."
+          go build -v -o build/ploy ./cmd/ploy
+
+      - name: Build all packages
+        run: |
+          echo "🔨 Building all packages..."
+          go build -v ./...
+
+      - name: Verify binaries
+        run: |
+          echo "✅ Verifying binaries..."
+          ls -la build/
+          ./build/ploy --version || echo "CLI built successfully"
+          echo "Controller built successfully"
+
+  # Integration tests require external services
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: build-verification
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Start Consul
+        run: |
+          echo "🚀 Starting Consul..."
+          docker run -d --name consul \
+            -p 8500:8500 \
+            --health-cmd="consul members" \
+            --health-interval=10s \
+            --health-timeout=5s \
+            --health-retries=5 \
+            hashicorp/consul:1.16 \
+            consul agent -dev -client=0.0.0.0 -bootstrap-expect=1
+
+      - name: Start Nomad
+        run: |
+          echo "🚀 Starting Nomad..."
+          docker run -d --name nomad \
+            -p 4646:4646 \
+            --privileged \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            --health-cmd="nomad status" \
+            --health-interval=15s \
+            --health-timeout=10s \
+            --health-retries=5 \
+            hashicorp/nomad:1.6 \
+            nomad agent -dev -bind=0.0.0.0
+
+      - name: Start SeaweedFS
+        run: |
+          echo "🚀 Starting SeaweedFS..."
+          docker run -d --name seaweedfs-master \
+            -p 9333:9333 \
+            chrislusf/seaweedfs:3.55 \
+            weed master -ip=localhost -port=9333 -mdir=/data
+
+          docker run -d --name seaweedfs-volume \
+            -p 8080:8080 \
+            chrislusf/seaweedfs:3.55 \
+            weed volume -mserver=host.docker.internal:9333 -port=8080 -dir=/data -max=100
+
+          docker run -d --name seaweedfs-filer \
+            -p 8888:8888 \
+            chrislusf/seaweedfs:3.55 \
+            weed filer -master=host.docker.internal:9333 -port=8888
+
+      - name: Wait for services to be ready
+        run: |
+          echo "⏳ Waiting for services to be ready..."
+          
+          # Wait for Consul
+          timeout 60 bash -c 'until curl -f http://localhost:8500/v1/status/leader; do sleep 2; done'
+          echo "✅ Consul is ready"
+          
+          # Wait for Nomad
+          timeout 60 bash -c 'until curl -f http://localhost:4646/v1/status/leader; do sleep 2; done'
+          echo "✅ Nomad is ready"
+          
+          # Wait for SeaweedFS
+          timeout 60 bash -c 'until curl -f http://localhost:9333/dir/status; do sleep 2; done'
+          echo "✅ SeaweedFS is ready"
+          
+          # Verify PostgreSQL
+          timeout 30 bash -c 'until pg_isready -h localhost -p 5432 -U ploy; do sleep 1; done'
+          echo "✅ PostgreSQL is ready"
+          
+          # Verify Redis
+          timeout 30 bash -c 'until redis-cli -h localhost ping; do sleep 1; done'
+          echo "✅ Redis is ready"
+
+      - name: Set up integration test environment
+        run: |
+          echo "🔧 Setting up integration test environment..."
+          export CONSUL_HTTP_ADDR=localhost:8500
+          export NOMAD_ADDR=http://localhost:4646
+          export SEAWEEDFS_MASTER=http://localhost:9333
+          export SEAWEEDFS_FILER=http://localhost:8888
+          export POSTGRES_HOST=localhost
+          export POSTGRES_PORT=5432
+          export REDIS_HOST=localhost
+          export REDIS_PORT=6379
+
+      - name: Run integration tests
+        run: |
+          echo "🧪 Running integration tests..."
+          go test -v -tags=integration \
+            -timeout=10m \
+            -coverprofile=integration-coverage.out \
+            -covermode=atomic \
+            ./tests/integration/...
+        env:
+          CONSUL_HTTP_ADDR: localhost:8500
+          NOMAD_ADDR: http://localhost:4646
+          SEAWEEDFS_MASTER: http://localhost:9333
+          SEAWEEDFS_FILER: http://localhost:8888
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: ploy
+          POSTGRES_PASSWORD: ploy-test
+          POSTGRES_DATABASE: ploy_test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Upload integration coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./integration-coverage.out
+          flags: integrationtests
+          name: codecov-integration
+          fail_ci_if_error: false
+
+      - name: Service logs on failure
+        if: failure()
+        run: |
+          echo "📋 Service logs for debugging..."
+          docker logs consul || true
+          docker logs nomad || true
+          docker logs seaweedfs-master || true
+          docker logs seaweedfs-volume || true
+          docker logs seaweedfs-filer || true
+
+  # Linting and code quality checks
+  lint-and-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m --config=.golangci.yml
+
+      - name: Check Go module tidiness
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Check formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "❌ Code is not properly formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+          echo "✅ Code formatting is correct"
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Check for security vulnerabilities
+        uses: securecodewarrior/github-action-add-sarif@v1
+        with:
+          sarif-file: 'govulncheck.sarif'
+        continue-on-error: true
+
+      - name: Run govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # Security scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run Gosec Security Scanner
+        uses: securecodewarrior/github-action-gosec@master
+        with:
+          args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: gosec.sarif
+
+  # Performance benchmarks
+  performance-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run benchmarks
+        run: |
+          echo "🏃 Running performance benchmarks..."
+          go test -bench=. -benchmem -run=^$ ./... > benchmark.txt
+
+      - name: Download previous benchmark data
+        uses: actions/cache@v3
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-benchmark
+
+      - name: Compare benchmarks
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Go Benchmark
+          tool: 'go'
+          output-file-path: benchmark.txt
+          external-data-json-path: ./cache/benchmark-data.json
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Final status check
+  test-results:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, build-verification, integration-tests, lint-and-quality, security-scan]
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          echo "🎯 Test Results Summary:"
+          echo "Unit Tests: ${{ needs.unit-tests.result }}"
+          echo "Build Verification: ${{ needs.build-verification.result }}"
+          echo "Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "Lint & Quality: ${{ needs.lint-and-quality.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+          
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.build-verification.result }}" != "success" ]] || \
+             [[ "${{ needs.integration-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.lint-and-quality.result }}" != "success" ]]; then
+            echo "❌ Some tests failed"
+            exit 1
+          fi
+          
+          echo "✅ All tests passed successfully!"
+
+      - name: Comment PR
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: number,
+              body: `## 🧪 Test Results
+              
+              ✅ **All tests passed successfully!**
+              
+              - Unit Tests: ${{ needs.unit-tests.result }}
+              - Build Verification: ${{ needs.build-verification.result }}
+              - Integration Tests: ${{ needs.integration-tests.result }}
+              - Lint & Quality: ${{ needs.lint-and-quality.result }}
+              - Security Scan: ${{ needs.security-scan.result }}
+              
+              Your changes are ready for review! 🎉`
+            });
