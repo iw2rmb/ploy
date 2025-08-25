@@ -179,6 +179,9 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 func applyTemplateSubstitutions(template string, data RenderData) string {
 	s := template
 	
+	// DEBUG: Add a marker to see if template processing is happening
+	s = strings.ReplaceAll(s, "# Persistent volume for JVM heap dumps and logs", "# TEMPLATE_PROCESSING_EXECUTED - Persistent volume for JVM heap dumps and logs")
+	
 	// Process conditional blocks first
 	s = processConditionalBlocks(s, data)
 	
@@ -376,6 +379,9 @@ func (r *RenderData) SetDefaults() {
 // processConditionalBlocks handles {{#if CONDITION}} blocks in templates
 func processConditionalBlocks(template string, data RenderData) string {
 	result := template
+	
+	// DEBUG: Add a marker to confirm this function is called
+	result = strings.ReplaceAll(result, "# Consul service mesh integration", "# CONDITIONAL_PROCESSING_EXECUTED - Consul service mesh integration")
 	
 	// Aggressive approach: handle all known conditions with simple string replacements
 	// This bypasses the regex complexity and forces the processing to work
