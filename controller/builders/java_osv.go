@@ -705,7 +705,7 @@ name: ploy/%s
 	
 	// Build with capstan
 	fmt.Println("Building OSv image with capstan...")
-	cmd := exec.Command("capstan", "build", "-p", "qemu", "-f", "qcow2", "-v")
+	cmd := exec.Command("capstan", "build", "-p", "qemu", "-v")
 	cmd.Dir = projectDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
