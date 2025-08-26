@@ -1,0 +1,24 @@
+service:
+  name: "pylint-chttp"
+  port: 8080
+
+executable:
+  path: "pylint"
+  args: ["--output-format=json", "--reports=no"]
+  timeout: "5m"
+
+security:
+  auth_method: "public_key"
+  public_key_path: "/etc/chttp/public.pem"
+  run_as_user: "pylint"
+  max_memory: "512MB"
+  max_cpu: "1.0"
+
+input:
+  formats: ["tar.gz", "tar", "zip"]
+  allowed_extensions: [".py", ".pyw"]
+  max_archive_size: "100MB"
+
+output:
+  format: "json"
+  parser: "pylint_json"
