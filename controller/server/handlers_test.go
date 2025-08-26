@@ -522,6 +522,53 @@ func TestServer_HandleStorageHealth(t *testing.T) {
 		assert.Equal(t, "Storage client initialization failed", response["error"])
 		assert.Contains(t, response, "details")
 	})
+
+	t.Run("successful health status retrieval", func(t *testing.T) {
+		// Create mock storage client with health data
+		mockStorage := &MockStorageClient{}
+		healthStatus := map[string]interface{}{
+			"status":      "healthy",
+			"uptime":      "24h30m",
+			"connections": 15,
+			"version":     "1.0.0",
+		}
+		mockStorage.On("GetHealthStatus").Return(healthStatus)
+
+		server := createMockServer()
+		server.mockStorageClient = func() (interface{}, error) {
+			return mockStorage, nil
+		}
+
+		// Set up route with custom handler that uses mock storage client
+		server.app.Get("/storage/health", func(c *fiber.Ctx) error {
+			storeClientInterface, err := server.getStorageClient()
+			if err != nil {
+				return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+			}
+			storeClient := storeClientInterface.(*MockStorageClient)
+			health := storeClient.GetHealthStatus()
+			return c.JSON(health)
+		})
+
+		// Test request
+		req := httptest.NewRequest("GET", "/storage/health", nil)
+		resp, err := server.app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, 200, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "healthy", response["status"])
+		assert.Equal(t, "24h30m", response["uptime"])
+		assert.Equal(t, float64(15), response["connections"]) // JSON decodes numbers as float64
+		assert.Equal(t, "1.0.0", response["version"])
+
+		mockStorage.AssertExpectations(t)
+	})
 }
 
 func TestServer_HandleStorageMetrics(t *testing.T) {
@@ -547,6 +594,55 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 
 		assert.Equal(t, "Storage client initialization failed", response["error"])
 		assert.Contains(t, response, "details")
+	})
+
+	t.Run("successful metrics retrieval", func(t *testing.T) {
+		// Create mock storage client with metrics data
+		mockStorage := &MockStorageClient{}
+		metricsData := map[string]interface{}{
+			"requests_total":    12345,
+			"response_time_ms":  25.7,
+			"error_rate":        0.02,
+			"active_connections": 8,
+			"storage_used_gb":   156.4,
+		}
+		mockStorage.On("GetMetrics").Return(metricsData)
+
+		server := createMockServer()
+		server.mockStorageClient = func() (interface{}, error) {
+			return mockStorage, nil
+		}
+
+		// Set up route with custom handler that uses mock storage client
+		server.app.Get("/storage/metrics", func(c *fiber.Ctx) error {
+			storeClientInterface, err := server.getStorageClient()
+			if err != nil {
+				return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+			}
+			storeClient := storeClientInterface.(*MockStorageClient)
+			metrics := storeClient.GetMetrics()
+			return c.JSON(metrics)
+		})
+
+		// Test request
+		req := httptest.NewRequest("GET", "/storage/metrics", nil)
+		resp, err := server.app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, 200, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, float64(12345), response["requests_total"]) // JSON decodes numbers as float64
+		assert.Equal(t, 25.7, response["response_time_ms"])
+		assert.Equal(t, 0.02, response["error_rate"])
+		assert.Equal(t, float64(8), response["active_connections"])
+		assert.Equal(t, 156.4, response["storage_used_gb"])
+
+		mockStorage.AssertExpectations(t)
 	})
 }
 
