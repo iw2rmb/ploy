@@ -385,8 +385,11 @@ func TestStorageClient_UploadArtifactBundle(t *testing.T) {
 			keyPrefix:    "artifacts/test-app",
 			artifactPath: "/tmp/test-app.tar.gz",
 			setupMock: func(m *MockStorageProvider) {
+				// Use non-retryable error to prevent timeout in unit tests
+				authErr := NewStorageError("upload_artifact_bundle", errors.New("authentication failed"), ErrorContext{})
+				authErr.ErrorType = ErrorTypeAuthentication // Non-retryable
 				m.On("UploadArtifactBundle", "artifacts/test-app", "/tmp/test-app.tar.gz").
-					Return(errors.New("upload failed"))
+					Return(authErr)
 			},
 			expectError:   true,
 			errorContains: "artifact bundle upload failed",
@@ -398,7 +401,23 @@ func TestStorageClient_UploadArtifactBundle(t *testing.T) {
 			mockProvider := &MockStorageProvider{}
 			tt.setupMock(mockProvider)
 
-			client := NewStorageClient(mockProvider, DefaultClientConfig())
+			// Use fast retry config for unit tests to prevent timeouts
+			config := DefaultClientConfig()
+			config.RetryConfig = &RetryConfig{
+				MaxAttempts:       3,
+				InitialDelay:      1 * time.Millisecond,  // Fast for unit tests
+				MaxDelay:          5 * time.Millisecond,  // Keep very short
+				BackoffMultiplier: 2.0,
+				RetryableErrors: []ErrorType{
+					ErrorTypeNetwork,
+					ErrorTypeTimeout,
+					ErrorTypeServiceUnavailable,
+					ErrorTypeRateLimit,
+					ErrorTypeInternal,
+					ErrorTypeCorruption,
+				},
+			}
+			client := NewStorageClient(mockProvider, config)
 
 			err := client.UploadArtifactBundle(tt.keyPrefix, tt.artifactPath)
 
@@ -436,8 +455,11 @@ func TestStorageClient_VerifyUpload(t *testing.T) {
 			name: "verification failure",
 			key:  "missing-key",
 			setupMock: func(m *MockStorageProvider) {
+				// Use non-retryable error to prevent timeout in unit tests
+				authErr := NewStorageError("verify_upload", errors.New("authentication failed"), ErrorContext{})
+				authErr.ErrorType = ErrorTypeAuthentication // Non-retryable
 				m.On("VerifyUpload", "missing-key").
-					Return(errors.New("verification failed"))
+					Return(authErr)
 			},
 			expectError:   true,
 			errorContains: "upload verification failed",
@@ -449,7 +471,23 @@ func TestStorageClient_VerifyUpload(t *testing.T) {
 			mockProvider := &MockStorageProvider{}
 			tt.setupMock(mockProvider)
 
-			client := NewStorageClient(mockProvider, DefaultClientConfig())
+			// Use fast retry config for unit tests to prevent timeouts
+			config := DefaultClientConfig()
+			config.RetryConfig = &RetryConfig{
+				MaxAttempts:       3,
+				InitialDelay:      1 * time.Millisecond,
+				MaxDelay:          5 * time.Millisecond,
+				BackoffMultiplier: 2.0,
+				RetryableErrors: []ErrorType{
+					ErrorTypeNetwork,
+					ErrorTypeTimeout,
+					ErrorTypeServiceUnavailable,
+					ErrorTypeRateLimit,
+					ErrorTypeInternal,
+					ErrorTypeCorruption,
+				},
+			}
+			client := NewStorageClient(mockProvider, config)
 
 			err := client.VerifyUpload(tt.key)
 
