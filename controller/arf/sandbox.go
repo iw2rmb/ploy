@@ -416,9 +416,9 @@ func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, d
 	
 	// If we have both PORT and PLOY_VERSION, we're running inside the controller
 	if port != "" && ployVersion != "" {
-		// We're inside the controller, use localhost to call ourselves
-		controllerURL := fmt.Sprintf("http://localhost:%s/v1", port)
-		fmt.Printf("Running inside controller (version %s), using self-reference: %s\n", ployVersion, controllerURL)
+		// Even inside the controller, use the public HTTPS endpoint for better reliability
+		controllerURL := "https://api.dev.ployd.app/v1"
+		fmt.Printf("Running inside controller (version %s), using public endpoint for reliability: %s\n", ployVersion, controllerURL)
 		return NewDeploymentSandboxManager(controllerURL, nil)
 	}
 	
