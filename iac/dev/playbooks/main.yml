@@ -34,6 +34,28 @@
         name: "{{ testing_tools }}"
         state: present
       when: ansible_os_family == "Debian"
+      
+    - name: Install essential Ubuntu 24 dependencies
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - htop
+          - net-tools
+          - unzip
+          - jq
+          - ripgrep
+          - fd-find
+          - bat
+          - tree
+          - ncdu
+          - tmux
+          - screen
+          - python3-docker  # Required for Ansible Docker module
+          - python3-requests  # Required for URI module
+        state: present
 
     - name: Install Docker prerequisites
       apt:
@@ -77,6 +99,25 @@
         enabled: true
       when: docker_service_status.stdout != "active"
 
+    - name: Setup Docker Registry for local image management
+      block:
+        - name: Create registry directory
+          file:
+            path: /var/lib/docker-registry
+            state: directory
+            mode: '0755'
+        
+        - name: Run Docker Registry container
+          docker_container:
+            name: registry
+            image: registry:2
+            state: started
+            restart_policy: always
+            ports:
+              - "5000:5000"
+            volumes:
+              - /var/lib/docker-registry:/var/lib/registry
+    
     - name: Install Docker Compose
       block:
         - name: Check if Docker Compose is already installed
@@ -262,6 +303,13 @@
             chmod +x /usr/local/bin/tree-sitter
           when: not tree_sitter_binary.stat.exists
 
+        - name: Install Node.js first for npm commands
+          shell: |
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            apt-get install -y nodejs
+          args:
+            creates: /usr/bin/node
+          
         - name: Install tree-sitter language parsers
           npm:
             name: "{{ item }}"

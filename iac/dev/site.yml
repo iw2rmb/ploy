@@ -1,9 +1,10 @@
 ---
 # Complete Ploy development environment setup
-# Proper service ordering: Basic tools -> SeaweedFS -> HashiCorp -> Controller -> FreeBSD -> Testing
+# Proper service ordering: Basic tools -> SeaweedFS -> HashiCorp -> Traefik -> Controller -> FreeBSD -> Testing
 - import_playbook: playbooks/main.yml
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
+- import_playbook: playbooks/traefik.yml
 - import_playbook: playbooks/controller.yml
 - import_playbook: playbooks/freebsd.yml
 - import_playbook: playbooks/testing.yml

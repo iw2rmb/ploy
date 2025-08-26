@@ -1,0 +1,221 @@
+---
+# Traefik Ingress Controller Setup
+# Handles load balancing, SSL termination, and routing for Ploy apps
+- name: Deploy Traefik Ingress Controller
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/dev-wildcard.yml
+  
+  tasks:
+    - name: Create Traefik directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/traefik
+        - /etc/traefik/dynamic
+        - /var/log/traefik
+        - /opt/ploy/traefik-data
+
+    - name: Create Traefik static configuration
+      copy:
+        content: |
+          # Traefik Static Configuration
+          global:
+            checkNewVersion: false
+            sendAnonymousUsage: false
+
+          api:
+            dashboard: true
+            insecure: true  # For development only
+
+          entryPoints:
+            web:
+              address: ":80"
+              http:
+                redirections:
+                  entrypoint:
+                    to: websecure
+                    scheme: https
+                    permanent: true
+            websecure:
+              address: ":443"
+
+          providers:
+            consul:
+              endpoint:
+                address: 127.0.0.1:8500
+                scheme: http
+              prefix: traefik
+
+            file:
+              directory: /etc/traefik/dynamic
+              watch: true
+
+          certificatesResolvers:
+            letsencrypt:
+              acme:
+                email: {{ ploy_dev_certificate.email | default('admin@ployd.app') }}
+                storage: /opt/ploy/traefik-data/acme.json
+                caServer: https://acme-v02.api.letsencrypt.org/directory
+                dnsChallenge:
+                  provider: namecheap
+                  delayBeforeCheck: 30s
+                  resolvers:
+                    - "1.1.1.1:53"
+                    - "8.8.8.8:53"
+
+          log:
+            level: INFO
+            filePath: /var/log/traefik/traefik.log
+
+          accessLog:
+            filePath: /var/log/traefik/access.log
+
+          metrics:
+            prometheus:
+              entryPoint: metrics
+              addEntryPointsLabels: true
+              addServicesLabels: true
+
+          ping:
+            entryPoint: ping
+
+          serversTransport:
+            insecureSkipVerify: true
+        dest: /etc/traefik/traefik.yml
+        mode: '0644'
+
+    - name: Create Traefik dynamic configuration for controller
+      copy:
+        content: |
+          # Dynamic Configuration for Ploy Controller
+          http:
+            routers:
+              controller-api:
+                rule: "Host(`api.dev.{{ ploy.apps_domain }}`)"
+                service: controller
+                tls:
+                  certResolver: letsencrypt
+                  domains:
+                    - main: "dev.{{ ploy.apps_domain }}"
+                      sans:
+                        - "*.dev.{{ ploy.apps_domain }}"
+                entryPoints:
+                  - websecure
+
+            services:
+              controller:
+                loadBalancer:
+                  servers:
+                    - url: "http://127.0.0.1:8081"
+                  healthCheck:
+                    path: /health
+                    interval: 10s
+                    timeout: 3s
+                    scheme: http
+        dest: /etc/traefik/dynamic/controller.yml
+        mode: '0644'
+
+    - name: Create ACME storage file with proper permissions
+      file:
+        path: /opt/ploy/traefik-data/acme.json
+        state: touch
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Create Traefik systemd service
+      copy:
+        content: |
+          [Unit]
+          Description=Traefik Ingress Controller
+          After=network-online.target consul.service
+          Wants=network-online.target
+          
+          [Service]
+          Type=simple
+          Restart=always
+          RestartSec=5
+          User=root
+          
+          # Environment variables for Namecheap DNS provider
+          Environment="NAMECHEAP_API_USER={{ lookup('env', 'NAMECHEAP_API_USER') | default('iw2rmb') }}"
+          Environment="NAMECHEAP_API_KEY={{ lookup('env', 'NAMECHEAP_API_KEY') }}"
+          Environment="NAMECHEAP_USERNAME={{ lookup('env', 'NAMECHEAP_USERNAME') | default('iw2rmb') }}"
+          Environment="NAMECHEAP_CLIENT_IP={{ ansible_default_ipv4.address }}"
+          Environment="NAMECHEAP_SANDBOX=false"
+          Environment="NAMECHEAP_PROPAGATION_TIMEOUT=900"
+          Environment="NAMECHEAP_TTL=60"
+          
+          ExecStart=/usr/local/bin/traefik --configfile=/etc/traefik/traefik.yml
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=traefik
+          KillMode=mixed
+          KillSignal=SIGTERM
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/traefik.service
+        mode: '0644'
+
+    - name: Download and install Traefik binary
+      block:
+        - name: Check if Traefik is already installed
+          stat:
+            path: /usr/local/bin/traefik
+          register: traefik_binary
+
+        - name: Download Traefik
+          get_url:
+            url: "https://github.com/traefik/traefik/releases/download/v{{ traefik_version | default('3.0.0') }}/traefik_v{{ traefik_version | default('3.0.0') }}_linux_amd64.tar.gz"
+            dest: /tmp/traefik.tar.gz
+          when: not traefik_binary.stat.exists
+
+        - name: Extract Traefik
+          unarchive:
+            src: /tmp/traefik.tar.gz
+            dest: /usr/local/bin
+            remote_src: true
+          when: not traefik_binary.stat.exists
+
+        - name: Make Traefik executable
+          file:
+            path: /usr/local/bin/traefik
+            mode: '0755'
+
+    - name: Start and enable Traefik service
+      systemd:
+        name: traefik
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for Traefik to be ready
+      wait_for:
+        port: 80
+        delay: 5
+        timeout: 30
+
+    - name: Verify Traefik dashboard is accessible
+      uri:
+        url: "http://localhost:8080/api/overview"
+        method: GET
+        status_code: 200
+      register: traefik_health
+      retries: 5
+      delay: 10
+      until: traefik_health.status == 200
+
+    - name: Display Traefik status
+      debug:
+        msg: |
+          Traefik is running successfully!
+          Dashboard: http://{{ ansible_default_ipv4.address }}:8080
+          API endpoint will be available at: https://api.dev.{{ ploy.apps_domain }}
