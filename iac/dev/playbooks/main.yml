@@ -1554,6 +1554,21 @@
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Environment vars"
 
 
+    - name: Configure Git credentials for GitHub access
+      blockinfile:
+        path: /home/ploy/.gitconfig
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0600'
+        block: |
+          [credential "https://github.com"]
+              helper = store
+          [url "https://{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}:{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}@github.com/"]
+              insteadOf = https://github.com/
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Git credentials"
+      when: lookup('env', 'GITHUB_PLOY_DEV_PAT') != ""
+
     - name: Clone Ploy repository
       git:
         repo: https://github.com/iw2rmb/ploy.git
