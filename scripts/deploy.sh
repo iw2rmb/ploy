@@ -415,6 +415,7 @@ job "ploy-controller" {
         # Configuration paths
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         PLOY_CLEANUP_CONFIG = "/etc/ploy/cleanup/config.yaml"
+        PLOY_TEMPLATE_DIR = "/home/ploy/ploy"
         
         # Service configuration
         PLOY_USE_CONSUL_ENV = "true"

@@ -131,9 +131,18 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 	// Try multiple possible locations for platform templates
 	possiblePaths := []string{
 		templatePath,                                    // Relative path (development)
+	}
+	
+	// Add path from environment variable if set
+	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
+		possiblePaths = append(possiblePaths, filepath.Join(templateDir, templatePath))
+	}
+	
+	// Add fallback paths
+	possiblePaths = append(possiblePaths,
 		filepath.Join("/home/ploy/ploy", templatePath), // Absolute path on VPS
 		filepath.Join("/opt/ploy", templatePath),       // Alternative deployment location
-	}
+	)
 
 	for _, path := range possiblePaths {
 		content, err := os.ReadFile(path)
