@@ -89,10 +89,17 @@ func TestManager_ValidateRequest(t *testing.T) {
 	req.Header.Set("X-Client-ID", "test-client")
 	req.Header.Set("X-Signature", signature)
 	
-	resp := httptest.NewRecorder()
-	c := app.AcquireCtx(&fiber.Ctx{})
-	c.Locals("fasthttp", req)
+	// Test using proper Fiber test method
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	
+	// Create context for direct manager testing
+	c := app.AcquireCtx(nil)
 	defer app.ReleaseCtx(c)
+	
+	// Set headers on context manually for manager testing
+	c.Request().Header.Set("X-Client-ID", "test-client")
+	c.Request().Header.Set("X-Signature", signature)
 	
 	// Test valid signature
 	err = manager.ValidateRequest(c, testData)
@@ -117,13 +124,11 @@ func TestManager_ValidateRequest_MissingClientID(t *testing.T) {
 	require.NoError(t, err)
 	
 	app := fiber.New()
-	req := httptest.NewRequest("POST", "/analyze", nil)
-	// Missing X-Client-ID header
-	req.Header.Set("X-Signature", "some-signature")
-	
-	c := app.AcquireCtx(&fiber.Ctx{})
-	c.Locals("fasthttp", req)
+	c := app.AcquireCtx(nil)
 	defer app.ReleaseCtx(c)
+	
+	// Set headers - missing X-Client-ID
+	c.Request().Header.Set("X-Signature", "some-signature")
 	
 	err = manager.ValidateRequest(c, []byte("test data"))
 	assert.Error(t, err)
@@ -148,13 +153,11 @@ func TestManager_ValidateRequest_MissingSignature(t *testing.T) {
 	require.NoError(t, err)
 	
 	app := fiber.New()
-	req := httptest.NewRequest("POST", "/analyze", nil)
-	req.Header.Set("X-Client-ID", "test-client")
-	// Missing X-Signature header
-	
-	c := app.AcquireCtx(&fiber.Ctx{})
-	c.Locals("fasthttp", req)
+	c := app.AcquireCtx(nil)
 	defer app.ReleaseCtx(c)
+	
+	// Set headers - missing X-Signature
+	c.Request().Header.Set("X-Client-ID", "test-client")
 	
 	err = manager.ValidateRequest(c, []byte("test data"))
 	assert.Error(t, err)
@@ -179,13 +182,12 @@ func TestManager_ValidateRequest_InvalidSignature(t *testing.T) {
 	require.NoError(t, err)
 	
 	app := fiber.New()
-	req := httptest.NewRequest("POST", "/analyze", nil)
-	req.Header.Set("X-Client-ID", "test-client")
-	req.Header.Set("X-Signature", "invalid-signature")
-	
-	c := app.AcquireCtx(&fiber.Ctx{})
-	c.Locals("fasthttp", req)
+	c := app.AcquireCtx(nil)
 	defer app.ReleaseCtx(c)
+	
+	// Set headers with invalid signature
+	c.Request().Header.Set("X-Client-ID", "test-client")
+	c.Request().Header.Set("X-Signature", "invalid-signature")
 	
 	err = manager.ValidateRequest(c, []byte("test data"))
 	assert.Error(t, err)
@@ -215,13 +217,12 @@ func TestManager_ValidateRequest_WrongSignature(t *testing.T) {
 	require.NoError(t, err)
 	
 	app := fiber.New()
-	req := httptest.NewRequest("POST", "/analyze", nil)
-	req.Header.Set("X-Client-ID", "test-client")
-	req.Header.Set("X-Signature", signature)
-	
-	c := app.AcquireCtx(&fiber.Ctx{})
-	c.Locals("fasthttp", req)
+	c := app.AcquireCtx(nil)
 	defer app.ReleaseCtx(c)
+	
+	// Set headers with wrong signature
+	c.Request().Header.Set("X-Client-ID", "test-client")
+	c.Request().Header.Set("X-Signature", signature)
 	
 	// Try to validate with different data
 	err = manager.ValidateRequest(c, []byte("correct data"))

@@ -1,6 +1,10 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +17,7 @@ import (
 func TestLoadConfig(t *testing.T) {
 	// Create temporary config file
 	tempDir := t.TempDir()
+	publicKeyPath := createTestPublicKey(t, tempDir)
 	configPath := filepath.Join(tempDir, "test-config.yaml")
 	
 	configContent := `
@@ -27,6 +32,7 @@ executable:
 
 security:
   auth_method: "public_key"
+  public_key_path: "` + publicKeyPath + `"
   run_as_user: "pylint"
   max_memory: "512MB"
   max_cpu: "1.0"
