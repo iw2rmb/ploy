@@ -123,10 +123,11 @@ func TestValidateConfig(t *testing.T) {
 					Timeout: 5 * time.Minute,
 				},
 				Security: SecurityConfig{
-					AuthMethod:  "public_key",
-					RunAsUser:   "pylint",
-					MaxMemory:   "512MB",
-					MaxCPU:      "1.0",
+					AuthMethod:    "public_key",
+					PublicKeyPath: "/tmp/test-public-key.pem", // Will be ignored for validation
+					RunAsUser:     "pylint",
+					MaxMemory:     "512MB",
+					MaxCPU:        "1.0",
 				},
 			},
 			wantErr: false,
@@ -246,4 +247,21 @@ func TestConfig_IsValidFileExtension(t *testing.T) {
 	assert.True(t, config.IsValidFileExtension(".pyw"))
 	assert.False(t, config.IsValidFileExtension(".js"))
 	assert.False(t, config.IsValidFileExtension(""))
+}
+
+// Helper function to create a test public key
+func createTestPublicKey(t *testing.T, tempDir string) string {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	
+	publicKeyPath := filepath.Join(tempDir, "test-public.pem")
+	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PUBLIC KEY",
+		Bytes: x509.MarshalPKCS1PublicKey(&privateKey.PublicKey),
+	})
+	
+	err = os.WriteFile(publicKeyPath, publicKeyPEM, 0644)
+	require.NoError(t, err)
+	
+	return publicKeyPath
 }
