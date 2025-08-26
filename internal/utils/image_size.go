@@ -142,6 +142,11 @@ func parseDockerSize(sizeStr string) (int64, error) {
 		unit = "B"
 	}
 	
+	// Validate that the number is non-negative
+	if num < 0 {
+		return 0, fmt.Errorf("size cannot be negative: %s", sizeStr)
+	}
+	
 	// Convert to bytes
 	switch unit {
 	case "GB":
