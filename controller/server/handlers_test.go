@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -288,84 +287,215 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	assert.Equal(t, true, config.EnableCaching)
 }
 
-func TestServer_HandleStorageHealth_Success(t *testing.T) {
-	// Create mock storage client
-	mockStorage := &MockStorageClient{}
-	expectedHealth := map[string]interface{}{
-		"status":    "healthy",
-		"timestamp": time.Now(),
+func TestServer_HandleStorageConfig(t *testing.T) {
+	tests := []struct {
+		name           string
+		configPath     string
+		expectedStatus int
+		expectError    bool
+	}{
+		{
+			name:           "valid config load",
+			configPath:     "/tmp/valid-config.yaml",
+			expectedStatus: 200,
+			expectError:    false,
+		},
+		{
+			name:           "missing config file",
+			configPath:     "/tmp/nonexistent-config.yaml",
+			expectedStatus: 500,
+			expectError:    true,
+		},
 	}
-	mockStorage.On("GetHealthStatus").Return(expectedHealth)
 
-	// Create server with mock
-	server := createMockServer()
-	
-	// Override getStorageClient to return our mock
-	server.mockStorageClient = func() (interface{}, error) {
-		return mockStorage, nil
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := createMockServer()
+			server.dependencies.StorageConfigPath = tt.configPath
+
+			// Create a temporary config file for the valid test case
+			if !tt.expectError {
+				configContent := `storage:
+  provider: seaweedfs
+  master: "http://localhost:9333"
+  filer: "http://localhost:8888"
+  collection: "ploy"
+  replication: "001"
+  timeout: 30
+  datacenter: "dc1"
+  rack: "rack1"
+  collections:
+    artifacts: "ploy-artifacts"
+    metadata: "ploy-metadata" 
+    debug: "ploy-debug"
+  client:
+    enable_metrics: true
+    enable_health_check: true
+    max_operation_time: "5m"`
+
+				err := os.WriteFile(tt.configPath, []byte(configContent), 0644)
+				require.NoError(t, err)
+				defer os.Remove(tt.configPath)
+			}
+
+			// Set up route using actual handler method
+			server.app.Get("/storage/config", server.handleGetStorageConfig)
+
+			// Test request
+			req := httptest.NewRequest("GET", "/storage/config", nil)
+			resp, err := server.app.Test(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			var response map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&response)
+			require.NoError(t, err)
+
+			if tt.expectError {
+				assert.Contains(t, response, "error")
+			} else {
+				// The response should contain the entire root config structure
+				assert.Contains(t, response, "storage")
+				storage, ok := response["storage"].(map[string]interface{})
+				require.True(t, ok)
+				assert.Equal(t, "seaweedfs", storage["provider"])
+				assert.Equal(t, "http://localhost:9333", storage["master"])
+			}
+		})
 	}
-
-	// Set up route
-	server.app.Get("/storage/health", func(c *fiber.Ctx) error {
-		storeClientInterface, err := server.getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		storeClient := storeClientInterface.(*MockStorageClient)
-		health := storeClient.GetHealthStatus()
-		return c.JSON(health)
-	})
-
-	// Test request
-	req := httptest.NewRequest("GET", "/storage/health", nil)
-	resp, err := server.app.Test(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, 200, resp.StatusCode)
-
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.Equal(t, "healthy", response["status"])
-	assert.NotNil(t, response["timestamp"])
-
-	mockStorage.AssertExpectations(t)
 }
 
-func TestServer_HandleStorageHealth_Error(t *testing.T) {
-	server := createMockServer()
-	
-	// Override getStorageClient to return error
-	server.mockStorageClient = func() (interface{}, error) {
-		return nil, fmt.Errorf("storage initialization failed")
+func TestServer_HandleValidateStorageConfig(t *testing.T) {
+	tests := []struct {
+		name           string
+		configPath     string
+		expectedStatus int
+		expectError    bool
+	}{
+		{
+			name:           "valid config validation",
+			configPath:     "/tmp/valid-config.yaml",
+			expectedStatus: 200,
+			expectError:    false,
+		},
+		{
+			name:           "invalid config validation",
+			configPath:     "/tmp/invalid-config.yaml",
+			expectedStatus: 400,
+			expectError:    true,
+		},
 	}
 
-	// Set up route
-	server.app.Get("/storage/health", func(c *fiber.Ctx) error {
-		_, err := server.getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		// This won't be reached in the error test
-		return c.JSON(map[string]interface{}{"status": "healthy"})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := createMockServer()
+			server.dependencies.StorageConfigPath = tt.configPath
+
+			// Create config files
+			if tt.expectError {
+				// Create invalid config
+				invalidConfig := `invalid yaml content: [`
+				err := os.WriteFile(tt.configPath, []byte(invalidConfig), 0644)
+				require.NoError(t, err)
+				defer os.Remove(tt.configPath)
+			} else {
+				// Create valid config
+				validConfig := `storage:
+  provider: seaweedfs
+  master: "http://localhost:9333"
+  filer: "http://localhost:8888"
+  collection: "ploy"
+  replication: "001"`
+				err := os.WriteFile(tt.configPath, []byte(validConfig), 0644)
+				require.NoError(t, err)
+				defer os.Remove(tt.configPath)
+			}
+
+			// Set up route using actual handler method
+			server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
+
+			// Test request
+			req := httptest.NewRequest("POST", "/storage/config/validate", nil)
+			resp, err := server.app.Test(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
+
+			var response map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&response)
+			require.NoError(t, err)
+
+			if tt.expectError {
+				assert.Contains(t, response, "error")
+			} else {
+				assert.Equal(t, true, response["valid"])
+			}
+		})
+	}
+}
+
+func TestServer_HandleReloadStorageConfig(t *testing.T) {
+	t.Run("successful config reload", func(t *testing.T) {
+		server := createMockServer()
+		configPath := "/tmp/reload-config.yaml"
+		server.dependencies.StorageConfigPath = configPath
+
+		// Create initial config file
+		configContent := `storage:
+  provider: seaweedfs
+  master: "http://localhost:9333"
+  filer: "http://localhost:8888"
+  collection: "ploy"
+  replication: "001"`
+		
+		err := os.WriteFile(configPath, []byte(configContent), 0644)
+		require.NoError(t, err)
+		defer os.Remove(configPath)
+
+		// Set up route using actual handler method
+		server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
+
+		// Test request
+		req := httptest.NewRequest("POST", "/storage/config/reload", nil)
+		resp, err := server.app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, 200, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Contains(t, response, "reloaded")
+		assert.Contains(t, response, "config")
+		assert.Equal(t, "Configuration reload completed", response["message"])
 	})
 
-	// Test request
-	req := httptest.NewRequest("GET", "/storage/health", nil)
-	resp, err := server.app.Test(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
+	t.Run("config reload with missing file", func(t *testing.T) {
+		server := createMockServer()
+		server.dependencies.StorageConfigPath = "/tmp/nonexistent-reload-config.yaml"
 
-	assert.Equal(t, 503, resp.StatusCode)
+		// Set up route using actual handler method
+		server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
 
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	require.NoError(t, err)
+		// Test request
+		req := httptest.NewRequest("POST", "/storage/config/reload", nil)
+		resp, err := server.app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
 
-	assert.Equal(t, "Storage client initialization failed", response["error"])
-	assert.Contains(t, response["details"], "storage initialization failed")
+		assert.Equal(t, 500, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "Failed to reload storage config", response["error"])
+	})
 }
 
 func TestServer_HandleStorageMetrics(t *testing.T) {
@@ -385,16 +515,8 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 		return mockStorage, nil
 	}
 
-	// Set up route
-	server.app.Get("/storage/metrics", func(c *fiber.Ctx) error {
-		storeClientInterface, err := server.getStorageClient()
-		if err != nil {
-			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
-		}
-		storeClient := storeClientInterface.(*MockStorageClient)
-		metrics := storeClient.GetMetrics()
-		return c.JSON(metrics)
-	})
+	// Set up route using actual handler method
+	server.app.Get("/storage/metrics", server.handleStorageMetrics)
 
 	// Test request
 	req := httptest.NewRequest("GET", "/storage/metrics", nil)
@@ -600,144 +722,6 @@ func TestServer_HandleDeleteEnvVar(t *testing.T) {
 	assert.Equal(t, "deleted", response["status"])
 
 	mockEnvStore.AssertExpectations(t)
-}
-
-func TestServer_HandleValidateStorageConfig(t *testing.T) {
-	tests := []struct {
-		name           string
-		configPath     string
-		expectedStatus int
-		expectedValid  bool
-		expectError    bool
-	}{
-		{
-			name:           "valid config path",
-			configPath:     "/test/valid-config.yaml",
-			expectedStatus: 200,
-			expectedValid:  true,
-			expectError:    false,
-		},
-		{
-			name:           "invalid config path",
-			configPath:     "/test/invalid-config.yaml",
-			expectedStatus: 400,
-			expectedValid:  false,
-			expectError:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := createMockServer()
-			server.dependencies.StorageConfigPath = tt.configPath
-
-			// Set up route (simplified version for testing)
-			server.app.Post("/storage/config/validate", func(c *fiber.Ctx) error {
-				// Simulate validation logic
-				if strings.Contains(server.dependencies.StorageConfigPath, "invalid") {
-					return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": "Invalid config format"})
-				}
-				return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
-			})
-
-			// Test request
-			req := httptest.NewRequest("POST", "/storage/config/validate", nil)
-			resp, err := server.app.Test(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
-
-			var response map[string]interface{}
-			err = json.NewDecoder(resp.Body).Decode(&response)
-			require.NoError(t, err)
-
-			if tt.expectError {
-				assert.Equal(t, "Configuration validation failed", response["error"])
-				assert.Contains(t, response["details"], "Invalid config format")
-			} else {
-				assert.Equal(t, tt.expectedValid, response["valid"])
-				assert.Equal(t, "Configuration is valid", response["message"])
-			}
-		})
-	}
-}
-
-func TestServer_HandleGetStorageConfig(t *testing.T) {
-	server := createMockServer()
-
-	// Set up route with mock config
-	server.app.Get("/storage/config", func(c *fiber.Ctx) error {
-		// Mock config data for testing
-		mockConfig := map[string]interface{}{
-			"provider": "seaweedfs",
-			"settings": map[string]interface{}{
-				"master_url":     "http://localhost:9333",
-				"filer_url":      "http://localhost:8888",
-				"artifacts_bucket": "ploy-artifacts",
-			},
-		}
-		return c.JSON(mockConfig)
-	})
-
-	// Test request
-	req := httptest.NewRequest("GET", "/storage/config", nil)
-	resp, err := server.app.Test(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, 200, resp.StatusCode)
-
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.Equal(t, "seaweedfs", response["provider"])
-	
-	settings, ok := response["settings"].(map[string]interface{})
-	require.True(t, ok)
-	assert.Equal(t, "http://localhost:9333", settings["master_url"])
-	assert.Equal(t, "http://localhost:8888", settings["filer_url"])
-	assert.Equal(t, "ploy-artifacts", settings["artifacts_bucket"])
-}
-
-func TestServer_HandleReloadStorageConfig(t *testing.T) {
-	server := createMockServer()
-
-	// Set up route with mock reload logic
-	server.app.Post("/storage/config/reload", func(c *fiber.Ctx) error {
-		// Mock reload result
-		mockConfig := map[string]interface{}{
-			"provider": "seaweedfs",
-			"settings": map[string]interface{}{
-				"master_url": "http://localhost:9333",
-			},
-		}
-
-		reloaded := true // Simulate successful reload
-
-		return c.JSON(fiber.Map{
-			"reloaded": reloaded,
-			"config":   mockConfig,
-			"message":  "Configuration reload completed",
-		})
-	})
-
-	// Test request
-	req := httptest.NewRequest("POST", "/storage/config/reload", nil)
-	resp, err := server.app.Test(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, 200, resp.StatusCode)
-
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.Equal(t, true, response["reloaded"])
-	assert.Equal(t, "Configuration reload completed", response["message"])
-	assert.NotNil(t, response["config"])
 }
 
 // Test edge cases and error scenarios
