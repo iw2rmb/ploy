@@ -4,7 +4,7 @@
 #=============================================================================
 # Stage 1: Go Builder - Build the Go service binary
 #=============================================================================
-FROM golang:1.21-alpine AS go-builder
+FROM golang:1.23-alpine AS go-builder
 
 WORKDIR /build
 
