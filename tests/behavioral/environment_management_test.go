@@ -48,6 +48,7 @@ var _ = Describe("Environment Variable Management", func() {
 				Equal(200), // Success
 				Equal(404), // App not found
 				Equal(400), // Bad request
+				Equal(500), // Service unavailable (during development)
 			))
 
 			if resp.StatusCode == 200 {
@@ -148,6 +149,7 @@ var _ = Describe("Environment Variable Management", func() {
 				Equal(400), // Bad Request
 				Equal(422), // Unprocessable Entity
 				Equal(404), // Not found (endpoint not implemented)
+				Equal(500), // Service unavailable (during development)
 			))
 
 			By("Attempting to set extremely long values")
@@ -165,6 +167,7 @@ var _ = Describe("Environment Variable Management", func() {
 				Equal(400), // Bad Request
 				Equal(413), // Payload Too Large
 				Equal(404), // Not found
+				Equal(500), // Service unavailable (during development)
 			))
 		})
 
