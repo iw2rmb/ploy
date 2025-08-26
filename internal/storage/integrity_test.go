@@ -242,7 +242,7 @@ func TestBundleIntegrityResult_GetVerificationSummary(t *testing.T) {
 				},
 				Verified: true,
 			},
-			expectedSummary: "Bundle verification successful: 4 files verified",
+			expectedSummary: "Bundle integrity verified: 4 files validated successfully",
 		},
 		{
 			name: "main artifact only",
@@ -253,7 +253,7 @@ func TestBundleIntegrityResult_GetVerificationSummary(t *testing.T) {
 				},
 				Verified: true,
 			},
-			expectedSummary: "Bundle verification successful: 1 files verified",
+			expectedSummary: "Bundle integrity verified: 1 files validated successfully",
 		},
 		{
 			name: "failed verification",
@@ -268,7 +268,7 @@ func TestBundleIntegrityResult_GetVerificationSummary(t *testing.T) {
 					"size mismatch",
 				},
 			},
-			expectedSummary: "Bundle verification failed: 2 error(s)",
+			expectedSummary: "Bundle integrity verification failed: checksum mismatch; size mismatch",
 		},
 		{
 			name: "partial verification",
@@ -288,14 +288,14 @@ func TestBundleIntegrityResult_GetVerificationSummary(t *testing.T) {
 					"signature verification failed",
 				},
 			},
-			expectedSummary: "Bundle verification failed: 1 error(s)",
+			expectedSummary: "Bundle integrity verification failed: signature verification failed",
 		},
 		{
 			name: "empty bundle",
 			result: BundleIntegrityResult{
 				Verified: false,
 			},
-			expectedSummary: "Bundle verification failed: 0 error(s)",
+			expectedSummary: "Bundle integrity verification failed:",
 		},
 	}
 

@@ -61,7 +61,7 @@ This roadmap outlines the comprehensive implementation of Test-Driven Developmen
 See [phase-tdd-1-foundation.md](phase-tdd-1-foundation.md) for detailed implementation.
 
 ### Phase 2: Unit Testing Infrastructure
-**Status**: 📋 PLANNED
+**Status**: 🔄 IN PROGRESS
 
 **Objectives**:
 - Implement comprehensive unit tests for core components

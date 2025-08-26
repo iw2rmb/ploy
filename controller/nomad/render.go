@@ -128,12 +128,21 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 		// Note: In production, this could be logged via structured logging
 	}
 
-	// Fall back to platform templates
-	content, err := os.ReadFile(templatePath)
-	if err != nil {
-		return nil, fmt.Errorf("template not found in platform files: %s (consul error: %v)", templatePath, err)
+	// Try multiple possible locations for platform templates
+	possiblePaths := []string{
+		templatePath,                                    // Relative path (development)
+		filepath.Join("/home/ploy/ploy", templatePath), // Absolute path on VPS
+		filepath.Join("/opt/ploy", templatePath),       // Alternative deployment location
 	}
-	return content, nil
+
+	for _, path := range possiblePaths {
+		content, err := os.ReadFile(path)
+		if err == nil {
+			return content, nil
+		}
+	}
+
+	return nil, fmt.Errorf("template not found in any platform locations: %s", templatePath)
 }
 
 func RenderTemplate(lane string, data RenderData) (string, error) {

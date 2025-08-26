@@ -651,6 +651,26 @@ func (m *MockReadCloser) Close() error {
 	return args.Error(0)
 }
 
+// FailingReader implements ReadCloser but fails on first read
+type FailingReader struct {
+	mock.Mock
+	closed bool
+}
+
+func (f *FailingReader) Read(p []byte) (int, error) {
+	if f.closed {
+		return 0, errors.New("reader closed")
+	}
+	// Return a simple error with "connection reset" text to trigger retry
+	return 0, errors.New("connection reset")
+}
+
+func (f *FailingReader) Close() error {
+	args := f.Called()
+	f.closed = true
+	return args.Error(0)
+}
+
 func TestRetryableReadCloser(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -688,38 +708,70 @@ func TestRetryableReadCloser(t *testing.T) {
 				tt.setupMock(mockProvider)
 			}
 
-			// Create initial reader
-			initialReader := NewMockReadCloser(tt.content)
-			initialReader.On("Close").Return(nil)
-
-			retryableReader := &retryableReadCloser{
-				reader: initialReader,
-				client: mockProvider,
-				bucket: "test-bucket",
-				key:    "test-key",
-				config: DefaultRetryConfig(),
+			var retryableReader *retryableReadCloser
+			var expectedReader ReadCloser
+			
+			// Setup different readers based on test scenario
+			if tt.expectRetry {
+				// Use a failing reader that returns a network error
+				failingReader := &FailingReader{}
+				failingReader.On("Close").Return(nil)
+				expectedReader = failingReader
+				
+				retryableReader = &retryableReadCloser{
+					reader: failingReader,
+					client: mockProvider,
+					bucket: "test-bucket",
+					key:    "test-key",
+					config: DefaultRetryConfig(),
+				}
+			} else {
+				// Create normal reader
+				initialReader := NewMockReadCloser(tt.content)
+				initialReader.On("Close").Return(nil)
+				expectedReader = initialReader
+				
+				retryableReader = &retryableReadCloser{
+					reader: initialReader,
+					client: mockProvider,
+					bucket: "test-bucket",
+					key:    "test-key",
+					config: DefaultRetryConfig(),
+				}
 			}
 
-			// Test normal read
-			if !tt.expectRetry {
-				buf := make([]byte, len(tt.content))
-				n, err := retryableReader.Read(buf)
-				
-				if tt.expectError {
-					assert.Error(t, err)
+			// Test read (either normal or retry scenario)
+			bufSize := len(tt.content)
+			if tt.expectRetry {
+				bufSize = len("recovered content") // Make buffer big enough for recovery
+			}
+			buf := make([]byte, bufSize)
+			
+			n, err := retryableReader.Read(buf)
+			
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				if tt.expectRetry {
+					// Should have retried and got "recovered content"
+					assert.Equal(t, "recovered content", string(buf[:n]))
 				} else {
-					assert.NoError(t, err)
 					assert.Equal(t, len(tt.content), n)
 					assert.Equal(t, tt.content, string(buf[:n]))
 				}
 			}
 
 			// Test close
-			err := retryableReader.Close()
-			assert.NoError(t, err)
+			closeErr := retryableReader.Close()
+			assert.NoError(t, closeErr)
 
 			mockProvider.AssertExpectations(t)
-			initialReader.AssertExpectations(t)
+			
+			// Assert expectations on the reader that was actually used
+			if mockReader, ok := expectedReader.(interface{ AssertExpectations(*testing.T) }); ok {
+				mockReader.AssertExpectations(t)
+			}
 		})
 	}
 }

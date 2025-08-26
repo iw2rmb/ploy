@@ -58,12 +58,26 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get all platform templates
-	platformTemplateDir := "platform/nomad"
-	templates, err := os.ReadDir(platformTemplateDir)
-	if err != nil {
+	// Try multiple possible locations for platform templates
+	possibleDirs := []string{
+		"platform/nomad",                              // Relative path (development)
+		"/home/ploy/ploy/platform/nomad",             // Absolute path on VPS
+		"/opt/ploy/platform/nomad",                   // Alternative deployment location
+	}
+
+	var templates []os.DirEntry
+	var platformTemplateDir string
+	for _, dir := range possibleDirs {
+		if t, err := os.ReadDir(dir); err == nil {
+			templates = t
+			platformTemplateDir = dir
+			break
+		}
+	}
+
+	if templates == nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": fmt.Sprintf("Failed to read platform templates: %v", err),
+			"error": "Failed to read platform templates from any location",
 		})
 	}
 
@@ -130,11 +144,26 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 
 // GetTemplateStatus returns the status of templates in both platform files and Consul KV
 func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
-	platformTemplateDir := "platform/nomad"
-	templates, err := os.ReadDir(platformTemplateDir)
-	if err != nil {
+	// Try multiple possible locations for platform templates
+	possibleDirs := []string{
+		"platform/nomad",                              // Relative path (development)
+		"/home/ploy/ploy/platform/nomad",             // Absolute path on VPS
+		"/opt/ploy/platform/nomad",                   // Alternative deployment location
+	}
+
+	var templates []os.DirEntry
+	var platformTemplateDir string
+	for _, dir := range possibleDirs {
+		if t, err := os.ReadDir(dir); err == nil {
+			templates = t
+			platformTemplateDir = dir
+			break
+		}
+	}
+
+	if templates == nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": fmt.Sprintf("Failed to read platform templates: %v", err),
+			"error": "Failed to read platform templates from any location",
 		})
 	}
 
