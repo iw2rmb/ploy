@@ -209,9 +209,9 @@ validate_success_criteria() {
     check_info "Phase 1 Target: No compilation errors post-transformation"
     
     check_passed "Success rate criteria defined (100%)"
-    check_passed "Performance criteria defined (<5min)")
-    check_passed "Diff quality criteria defined (clean diff generation)")
-    check_passed "Build criteria defined (no compilation errors)")
+    check_passed "Performance criteria defined (<5min)"
+    check_passed "Diff quality criteria defined (clean diff generation)"
+    check_passed "Build criteria defined (no compilation errors)"
 }
 
 # Create Phase 1 workspace and verify permissions
