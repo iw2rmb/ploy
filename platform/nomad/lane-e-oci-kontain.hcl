@@ -71,20 +71,20 @@ job "{{APP_NAME}}-lane-e" {
           proxy {
             local_service_port = {{HTTP_PORT}}
             
-            upstreams {
+            upstream {
               destination_name = "database"
               local_bind_port  = 5432
             }
-            upstreams {
+            upstream {
               destination_name = "redis"
               local_bind_port  = 6379
             }
-            upstreams {
+            upstream {
               destination_name = "elasticsearch"
               local_bind_port  = 9200
             }
             {{#if VAULT_ENABLED}}
-            upstreams {
+            upstream {
               destination_name = "vault"
               local_bind_port  = 8200
             }

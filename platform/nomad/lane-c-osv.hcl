@@ -63,15 +63,15 @@ job "{{APP_NAME}}-lane-c" {
       connect {
         sidecar_service {
           proxy {
-            upstreams {
+            upstream {
               destination_name = "database"
               local_bind_port  = 5432
             }
-            upstreams {
+            upstream {
               destination_name = "redis"
               local_bind_port  = 6379
             }
-            upstreams {
+            upstream {
               destination_name = "vault"
               local_bind_port  = 8200
             }
