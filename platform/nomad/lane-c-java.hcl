@@ -44,11 +44,6 @@ job "{{APP_NAME}}-lane-c" {
       port "jmx" {
         to = 9999
       }
-      {{#if DEBUG_ENABLED}}
-      port "debug" {
-        to = 5005
-      }
-      {{/if}}
     }
     
     # Persistent volume for JVM heap dumps and logs
@@ -136,10 +131,6 @@ job "{{APP_NAME}}-lane-c" {
         SERVER_PORT = "{{HTTP_PORT}}"
         METRICS_PORT = "9090"
         JMX_PORT = "9999"
-        {{#if DEBUG_ENABLED}}
-        DEBUG_PORT = "5005"
-        JAVA_TOOL_OPTIONS = "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
-        {{/if}}
         
         # Spring Boot / Micronaut configuration
         MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE = "health,info,metrics,prometheus"
@@ -248,12 +239,6 @@ EOF
           timeout  = "10s"
         }
         
-        {{#if CONNECT_ENABLED}}
-        connect {
-          sidecar_service {}
-        }
-        {{/if}}
-        
         meta {
           version = "{{VERSION}}"
           lane = "C"
@@ -305,9 +290,6 @@ EOF
       resources { 
         cpu = {{CPU_LIMIT}}      # Typically 1000-2000 MHz for JVM
         memory = {{MEMORY_LIMIT}} # Typically 512-2048 MB for JVM
-        {{#if DISK_SIZE}}
-        disk = {{DISK_SIZE}}     # For heap dumps and logs
-        {{/if}}
       }
       
       logs { 
@@ -326,36 +308,6 @@ EOF
       kill_signal = "SIGTERM"
     }
     
-    # Consul Connect sidecar for service mesh
-    {{#if CONNECT_ENABLED}}
-    task "connect-proxy" {
-      driver = "docker"
-      
-      config {
-        image = "envoyproxy/envoy:v1.24.0"
-        args = [
-          "--config-path", "${NOMAD_SECRETS_DIR}/envoy_bootstrap.json",
-          "--log-level", "info",
-          "--component-log-level", "upstream:debug,connection:trace"
-        ]
-      }
-      
-      lifecycle {
-        hook = "prestart"
-        sidecar = true
-      }
-      
-      resources {
-        cpu    = 200
-        memory = 128
-      }
-      
-      logs {
-        max_files = 5
-        max_file_size = 25
-      }
-    }
-    {{/if}}
     
     # JVM-optimized migration
     migrate {
