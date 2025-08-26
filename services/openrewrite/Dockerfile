@@ -29,16 +29,12 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Pre-cache OpenRewrite artifacts for faster transformations
+# Using latest known versions that are available
 RUN mvn dependency:get \
     -DgroupId=org.openrewrite.recipe \
     -DartifactId=rewrite-migrate-java \
-    -Dversion=3.15.0 \
-    -Dtransitive=true && \
-    mvn dependency:get \
-    -DgroupId=org.openrewrite \
-    -DartifactId=rewrite-maven-plugin \
-    -Dversion=5.34.0 \
-    -Dtransitive=true
+    -Dversion=2.25.0 \
+    -Dtransitive=true || true
 
 # Create app directory
 WORKDIR /app

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/api/envstore"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -285,23 +285,75 @@ func (b *RealisticStorageBuilder) ForApp(appName, version string) []TestStorageI
 }
 
 // generateChecksum generates a fake but consistent checksum for testing
-func generateChecksum(appName, itemType string) string {
-	// Simple hash-like string for testing
-	base := appName + itemType
-	hash := ""
-	for i, r := range base {
-		hash += fmt.Sprintf("%02x", int(r)+i)
+func generateChecksum(appName, fileType string) string {
+	// Create a deterministic but fake checksum based on inputs
+	input := appName + "-" + fileType
+	sum := 0
+	for _, c := range input {
+		sum += int(c)
 	}
-	// Pad or truncate to typical SHA256 length
-	for len(hash) < 64 {
-		hash += "0"
-	}
-	return hash[:64]
+	return fmt.Sprintf("%064x", sum)
 }
 
-// MockAssertions provides common assertion patterns for mocks
+// MockFactory provides factory methods for creating configured mocks
+type MockFactory struct{}
 
-// AssertEnvStoreCalled asserts that the env store was called correctly
+// NewMockFactory creates a new mock factory
+func NewMockFactory() *MockFactory {
+	return &MockFactory{}
+}
+
+// CreateSuccessfulEnvStore creates an env store mock configured for success
+func (f *MockFactory) CreateSuccessfulEnvStore(apps map[string]envstore.AppEnvVars) *MockEnvStore {
+	store := NewMockEnvStore()
+	for appName, envVars := range apps {
+		store.WithApp(appName, envVars)
+	}
+	return store
+}
+
+// CreateFailingEnvStore creates an env store mock configured to fail
+func (f *MockFactory) CreateFailingEnvStore(errorMessage string) *MockEnvStore {
+	store := NewMockEnvStore()
+	err := errors.New(errorMessage)
+	store.On("GetAll", mock.Anything).Return(nil, err)
+	store.On("SetAll", mock.Anything, mock.Anything).Return(err)
+	store.On("Set", mock.Anything, mock.Anything, mock.Anything).Return(err)
+	store.On("Delete", mock.Anything, mock.Anything).Return(err)
+	return store
+}
+
+// CreateSuccessfulStorageClient creates a storage client mock configured for success
+func (f *MockFactory) CreateSuccessfulStorageClient(files map[string][]byte) *MockStorageClient {
+	client := NewMockStorageClient()
+	for key, data := range files {
+		client.WithFile(key, data)
+	}
+	return client
+}
+
+// CreateFailingStorageClient creates a storage client mock configured to fail
+func (f *MockFactory) CreateFailingStorageClient(errorMessage string) *MockStorageClient {
+	client := NewMockStorageClient()
+	err := errors.New(errorMessage)
+	client.On("Upload", mock.Anything, mock.Anything, mock.Anything).Return(err)
+	client.On("Download", mock.Anything, mock.Anything).Return(nil, err)
+	client.On("Delete", mock.Anything, mock.Anything).Return(err)
+	client.On("Exists", mock.Anything, mock.Anything).Return(false, err)
+	return client
+}
+
+// CreateTimeoutContext creates a context that times out after duration
+func (f *MockFactory) CreateTimeoutContext(duration time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), duration)
+}
+
+// CreateCanceledContext creates an already canceled context
+func (f *MockFactory) CreateCanceledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return ctx
+}
 func AssertEnvStoreCalled(t mock.TestingT, envStore *MockEnvStore, app string, operations ...string) {
 	for _, op := range operations {
 		switch op {

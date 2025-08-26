@@ -22,6 +22,15 @@
     - ../vars/dev-wildcard.yml
   
   tasks:
+    - name: Create ploy user first
+      user:
+        name: ploy
+        shell: /bin/bash
+        create_home: true
+        home: /home/ploy
+        groups: sudo
+        append: true
+
     - name: Update system packages
       apt:
         update_cache: true
@@ -138,6 +147,39 @@
             dest: /usr/local/bin/docker-compose
             mode: '0755'
           when: not docker_compose_binary.stat.exists or docker_compose_version not in (current_docker_compose_version.stdout | default(''))
+
+    - name: Install Docker Buildx
+      block:
+        - name: Create Docker CLI plugins directory
+          file:
+            path: /usr/local/lib/docker/cli-plugins
+            state: directory
+            mode: '0755'
+
+        - name: Download Docker Buildx plugin
+          get_url:
+            url: "https://github.com/docker/buildx/releases/download/v0.17.1/buildx-v0.17.1.linux-amd64"
+            dest: /usr/local/lib/docker/cli-plugins/docker-buildx
+            mode: '0755'
+
+        - name: Create Docker config directory for ploy user
+          file:
+            path: /home/ploy/.docker
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Configure Docker to use buildx plugin
+          copy:
+            content: |
+              {
+                "cliPluginsExtraDirs": ["/usr/local/lib/docker/cli-plugins"]
+              }
+            dest: /home/ploy/.docker/config.json
+            owner: ploy
+            group: ploy
+            mode: '0644'
 
     - name: Install Go
       block:
@@ -343,6 +385,22 @@
         extra_args: --break-system-packages
       ignore_errors: true  # Ignore conflicts with system packages
 
+    # Static Analysis Phase 2: Python Analysis Tools
+    - name: Install Python static analysis tools
+      pip:
+        name:
+          - pylint>=3.0.0
+          - mypy>=1.5.0
+          - black>=23.0.0
+          - isort>=5.12.0
+          - flake8>=6.0.0
+          - pylint-django>=2.5.0
+          - pylint-flask>=0.6
+        state: present
+        executable: pip3
+        extra_args: --break-system-packages
+      ignore_errors: true  # Ignore conflicts with system packages
+
     # ARF Phase 4: Security & Production Hardening Dependencies
     - name: Install security scanning dependencies
       apt:
@@ -358,21 +416,18 @@
           - pkg-config
         state: present
 
-    - name: Install vulnerability database management tools
+    - name: Install vulnerability database management tools (simplified)
       pip:
         name:
           - cvss>=2.4
-          - python-nvd3>=0.15.0
-          - safety>=2.3.0
           - bandit>=1.7.0
-          - semgrep>=1.0.0
-          - cyclonedx-bom>=3.11.0
           - spdx-tools>=0.8.0
           - packageurl-python>=0.11.0
         state: present
         executable: pip3
         extra_args: --break-system-packages
       ignore_errors: true
+      # Note: Temporarily skipping semgrep, safety, cyclonedx-bom, python-nvd3 due to dependency conflicts
 
     - name: Install SBOM generation and analysis tools
       block:
@@ -715,7 +770,7 @@
             content: |
               #!/bin/bash
               # ARF Phase 3 - {{ item.name }}
-              # This is a development stub - actual implementation will be built by the controller
+              # This is a development stub - actual implementation will be built by the api
               
               echo "ARF Phase 3 {{ item.name }} - Development Environment"
               echo "Arguments: $@"
@@ -735,7 +790,7 @@
               echo "{{ item.name }} completed successfully"
               exit 0
               {% else %}
-              echo "{{ item.name }} simulation - some features require actual controller"
+              echo "{{ item.name }} simulation - some features require actual api"
               exit 1
               {% endif %}
             dest: "/usr/local/bin/{{ item.binary }}"
@@ -1073,12 +1128,21 @@
 
         - name: Setup OSv base image for Capstan
           block:
-            - name: Create capstan repository structure for hashicorp user
+            - name: Create /opt/ploy directory
               file:
-                path: /opt/hashicorp/.capstan/repository/cloudius/osv/mike
+                path: /opt/ploy
                 state: directory
-                owner: hashicorp
-                group: hashicorp
+                owner: ploy
+                group: ploy
+                mode: '0755'
+              become: true
+
+            - name: Create capstan repository structure for ploy user
+              file:
+                path: /opt/ploy/.capstan/repository/cloudius/osv/mike
+                state: directory
+                owner: ploy
+                group: ploy
                 mode: '0755'
               become: true
 
@@ -1092,11 +1156,11 @@
             - name: Compress OSv loader image
               archive:
                 path: /tmp/osv-loader.qemu
-                dest: /opt/hashicorp/.capstan/repository/cloudius/osv/mike/osv-loader.qemu.gz
+                dest: /opt/ploy/.capstan/repository/cloudius/osv/mike/osv-loader.qemu.gz
                 format: gz
                 remove: true
-                owner: hashicorp
-                group: hashicorp
+                owner: ploy
+                group: ploy
                 mode: '0644'
               become: true
 
@@ -1108,9 +1172,9 @@
                   created: "2025-08-25T06:00:00Z"
                   description: "OSv base image for capstan"
                   platform: "x86_64"
-                dest: /opt/hashicorp/.capstan/repository/cloudius/osv/index.yaml
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/repository/cloudius/osv/index.yaml
+                owner: ploy
+                group: ploy
                 mode: '0644'
               become: true
 
@@ -1118,80 +1182,80 @@
           block:
             - name: Create capstan packages directory
               file:
-                path: /opt/hashicorp/.capstan/packages
+                path: /opt/ploy/.capstan/packages
                 state: directory
-                owner: hashicorp
-                group: hashicorp
+                owner: ploy
+                group: ploy
                 mode: '0755'
               become: true
 
             - name: Download osv.bootstrap package from GitHub
               shell: |
-                sudo -u hashicorp capstan package pull osv.bootstrap
+                sudo -u ploy capstan package pull osv.bootstrap
               ignore_errors: true
               become: true
 
             - name: Download openjdk8-zulu-full package from S3
               get_url:
                 url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-full.mpm"
-                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-full.mpm
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-full.mpm
+                owner: ploy
+                group: ploy
                 mode: '0644'
               become: true
 
             - name: Download openjdk8-zulu-full package YAML from S3
               get_url:
                 url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-full.yaml"
-                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-full.yaml
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-full.yaml
+                owner: ploy
+                group: ploy
                 mode: '0644'
               become: true
 
             - name: Download openjdk8-zulu-compact1 package from S3
               get_url:
                 url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-compact1.mpm"
-                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-compact1.mpm
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-compact1.mpm
+                owner: ploy
+                group: ploy
                 mode: '0644'
               become: true
 
             - name: Download openjdk8-zulu-compact1 package YAML from S3
               get_url:
                 url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-compact1.yaml"
-                dest: /opt/hashicorp/.capstan/packages/openjdk8-zulu-compact1.yaml
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-compact1.yaml
+                owner: ploy
+                group: ploy
                 mode: '0644'
+              become: true
+
+            - name: Ensure mike directory structure exists
+              file:
+                path: /opt/ploy/.capstan/repository/mike/osv-loader
+                state: directory
+                owner: ploy
+                group: ploy
+                mode: '0755'
               become: true
 
             - name: Download osv-loader from S3 to mike directory
               get_url:
                 url: "https://mikelangelo-capstan.s3.amazonaws.com/mike/osv-loader/osv-loader.qemu.gz"
-                dest: /opt/hashicorp/.capstan/repository/mike/osv-loader/osv-loader.qemu.gz
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/repository/mike/osv-loader/osv-loader.qemu.gz
+                owner: ploy
+                group: ploy
                 mode: '0644'
               become: true
 
             - name: Download osv-loader index from S3
               get_url:
                 url: "https://mikelangelo-capstan.s3.amazonaws.com/mike/osv-loader/index.yaml"
-                dest: /opt/hashicorp/.capstan/repository/mike/osv-loader/index.yaml
-                owner: hashicorp
-                group: hashicorp
+                dest: /opt/ploy/.capstan/repository/mike/osv-loader/index.yaml
+                owner: ploy
+                group: ploy
                 mode: '0644'
-              become: true
-
-            - name: Ensure mike directory structure exists
-              file:
-                path: /opt/hashicorp/.capstan/repository/mike/osv-loader
-                state: directory
-                owner: hashicorp
-                group: hashicorp
-                mode: '0755'
               become: true
 
         - name: Check if Cosign is already installed
@@ -1424,13 +1488,11 @@
 
     # MinIO has been replaced with SeaweedFS for better scalability and performance
 
-    - name: Create ploy user for testing
+    - name: Add ploy user to docker group
       user:
         name: ploy
         groups: docker
         append: true
-        shell: /bin/bash
-        create_home: true
 
     - name: Clean up conflicting environment variables from /etc/environment
       lineinfile:
@@ -1590,7 +1652,7 @@
         port: "{{ item }}"
       loop:
         - "22"
-        - "{{ ploy.controller_port }}"
+        - "{{ ploy.api_port }}"
         - "4646"  # Nomad
         - "8500"  # Consul
         - "8200"  # Vault
@@ -1696,7 +1758,7 @@
               # Dev environment certificate domains
               export DEV_WILDCARD_DOMAIN="{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}"
               export DEV_BASE_DOMAIN="{{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }}"
-              export DEV_CONTROLLER_DOMAIN="{{ ploy_dev_routing.controller_domain | default('api.dev.ployd.app') }}"
+              export DEV_API_DOMAIN="{{ ploy_dev_routing.api_domain | default('api.dev.ployd.app') }}"
             marker: "# {mark} ANSIBLE MANAGED BLOCK - SSL Certificate vars"
 
     - name: Initialize SSL certificate provisioning for dev environment
@@ -1704,7 +1766,7 @@
         - name: Check if DNS records are properly configured
           shell: |
             DEV_IP=$(dig +short {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} | tail -n1)
-            API_IP=$(dig +short {{ ploy_dev_routing.controller_domain | default('api.dev.ployd.app') }} | tail -n1)
+            API_IP=$(dig +short {{ ploy_dev_routing.api_domain | default('api.dev.ployd.app') }} | tail -n1)
             TARGET_IP="{{ ansible_default_ipv4.address }}"
             
             if [ "$DEV_IP" = "$TARGET_IP" ] && [ "$API_IP" = "$TARGET_IP" ]; then
@@ -1712,7 +1774,7 @@
             else
               echo "DNS_NOT_READY"
               echo "Current: {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} -> $DEV_IP"
-              echo "Current: {{ ploy_dev_routing.controller_domain | default('api.dev.ployd.app') }} -> $API_IP"
+              echo "Current: {{ ploy_dev_routing.api_domain | default('api.dev.ployd.app') }} -> $API_IP"
               echo "Required: $TARGET_IP"
             fi
           register: dns_status
@@ -1750,10 +1812,10 @@
               - Wildcard certificate will cover *.dev.ployd.app
               - No manual intervention required
 
-    # Platform wildcard certificate health check (after controller deployment)
-    - name: Wait for controller health endpoint to be available
+    # Platform wildcard certificate health check (after api deployment)
+    - name: Wait for api health endpoint to be available
       uri:
-        url: "http://localhost:{{ ploy.controller_port }}/health"
+        url: "http://localhost:{{ ploy.api_port }}/health"
         method: GET
         status_code: 200
       register: health_check
@@ -1764,7 +1826,7 @@
 
     - name: Check platform wildcard certificate health
       uri:
-        url: "http://localhost:{{ ploy.controller_port }}/health/platform-certificates"
+        url: "http://localhost:{{ ploy.api_port }}/health/platform-certificates"
         method: GET
         status_code: [200, 503]  # 503 is acceptable during initial provisioning
       register: cert_health_check

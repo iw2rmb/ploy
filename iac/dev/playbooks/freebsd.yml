@@ -377,14 +377,14 @@
         dest: /root/ploy
         force: true
 
-    - name: Build Ploy controller on FreeBSD for testing
+    - name: Build Ploy API on FreeBSD for testing
       shell: |
         cd /root/ploy
-        /usr/local/bin/go build -o controller-freebsd ./controller
+        /usr/local/bin/go build -o bin/api-freebsd ./api
       args:
-        creates: /root/ploy/controller-freebsd
+        creates: /root/ploy/bin/api-freebsd
 
-    - name: Store FreeBSD VM IP for controller configuration
+    - name: Store FreeBSD VM IP for API configuration
       delegate_to: localhost
       copy:
         content: "{{ ansible_host }}"
@@ -400,4 +400,4 @@
           - ARF dependencies installed
           - Ploy repository cloned
           - Ready for ARF sandbox operations
-          - IP saved to /tmp/freebsd_vm_ip for controller deployment
+          - IP saved to /tmp/freebsd_vm_ip for API deployment

@@ -91,12 +91,12 @@ jobs:
       - name: Build controller
         run: |
           echo "🔨 Building controller..."
-          go build -v -o build/controller ./controller
+          go build -v -o bin/controller ./controller
 
       - name: Build CLI
         run: |
           echo "🔨 Building CLI..."
-          go build -v -o build/ploy ./cmd/ploy
+          go build -v -o bin/ploy ./cmd/ploy
 
       - name: Build all packages
         run: |
@@ -106,8 +106,8 @@ jobs:
       - name: Verify binaries
         run: |
           echo "✅ Verifying binaries..."
-          ls -la build/
-          ./build/ploy --version || echo "CLI built successfully"
+          ls -la bin/
+          ./bin/ploy --version || echo "CLI built successfully"
           echo "Controller built successfully"
 
   # Integration tests require external services

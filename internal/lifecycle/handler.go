@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/api/envstore"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 

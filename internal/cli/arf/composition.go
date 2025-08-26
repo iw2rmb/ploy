@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/controller/arf/models"
+	"github.com/iw2rmb/ploy/api/arf/models"
 )
 
 // RecipeComposition represents a composition of multiple recipes

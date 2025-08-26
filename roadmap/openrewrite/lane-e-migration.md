@@ -6,7 +6,7 @@ Direct migration of OpenRewrite from embedded controller code to standalone Lane
 
 **Timeline**: 3 weeks  
 **Service Location**: `services/openrewrite/`  
-**Platform Subdomain**: `openrewrite.<ploy_apps_domain>` (e.g., `openrewrite.dev.ployd.app`)  
+**Platform Domain**: `openrewrite.ployman.app` (prod) or `openrewrite.dev.ployman.app` (dev)  
 **Deployment Method**: Lane E with Dockerfile  
 
 ## Architecture Overview
@@ -238,94 +238,27 @@ EXPOSE 8090
 CMD ["./openrewrite-service"]
 ```
 
-### Day 8-9: Platform Subdomain Support
+### Day 8-9: Platform Domain Support with ployman CLI
 
-Add platform subdomain flag to CLI:
+Platform services now use a separate domain (ployman.app) and are deployed using the `ployman` CLI:
 
-**cmd/ploy/commands/apps.go** (modification):
-```go
-func NewAppsCommand() *cobra.Command {
-    cmd := &cobra.Command{
-        Use:   "apps",
-        Short: "Manage applications",
-    }
-    
-    newCmd := &cobra.Command{
-        Use:   "new",
-        Short: "Create a new application",
-        Run: func(cmd *cobra.Command, args []string) {
-            name, _ := cmd.Flags().GetString("name")
-            platformSubdomain, _ := cmd.Flags().GetString("platform-subdomain")
-            
-            if platformSubdomain != "" {
-                // Platform apps get special subdomain
-                // e.g., openrewrite.dev.ployd.app instead of app-name.ployd.app
-                setPlatformSubdomain(name, platformSubdomain)
-            }
-            
-            createApp(name)
-        },
-    }
-    
-    newCmd.Flags().String("name", "", "Application name")
-    newCmd.Flags().String("platform-subdomain", "", "Platform-specific subdomain (for system services)")
-    
-    cmd.AddCommand(newCmd)
-    return cmd
-}
+**Platform Domain Configuration**:
+- Production: `*.ployman.app` (e.g., `api.ployman.app`, `openrewrite.ployman.app`)
+- Development: `*.dev.ployman.app` (e.g., `api.dev.ployman.app`, `openrewrite.dev.ployman.app`)
+
+**Using ployman CLI**:
+```bash
+# Deploy platform service with ployman
+ployman push -a openrewrite-service
+
+# Create new platform service
+ployman apps new metrics-service
+
+# Set environment variables
+ployman env set -a openrewrite-service WORKER_POOL_SIZE=4
 ```
 
-**controller/apps/platform.go** (new file):
-```go
-package apps
-
-import (
-    "fmt"
-    "github.com/hashicorp/consul/api"
-)
-
-// SetPlatformSubdomain configures a platform-specific subdomain for system services
-func SetPlatformSubdomain(appName, subdomain string) error {
-    client, err := api.NewClient(api.DefaultConfig())
-    if err != nil {
-        return err
-    }
-    
-    // Store platform subdomain mapping
-    key := fmt.Sprintf("ploy/platform-subdomains/%s", subdomain)
-    value := []byte(appName)
-    
-    _, err = client.KV().Put(&api.KVPair{
-        Key:   key,
-        Value: value,
-    }, nil)
-    
-    return err
-}
-
-// GetAppDomain returns the domain for an app (platform or regular)
-func GetAppDomain(appName string) string {
-    ployDomain := os.Getenv("PLOY_APPS_DOMAIN")
-    if ployDomain == "" {
-        ployDomain = "ployd.app"
-    }
-    
-    // Check if this is a platform app
-    client, _ := api.NewClient(api.DefaultConfig())
-    kvPairs, _, _ := client.KV().List("ploy/platform-subdomains/", nil)
-    
-    for _, pair := range kvPairs {
-        if string(pair.Value) == appName {
-            // Extract subdomain from key
-            subdomain := strings.TrimPrefix(string(pair.Key), "ploy/platform-subdomains/")
-            return fmt.Sprintf("%s.%s", subdomain, ployDomain)
-        }
-    }
-    
-    // Regular app domain
-    return fmt.Sprintf("%s.%s", appName, ployDomain)
-}
-```
+The controller automatically detects platform services and routes them to the ployman.app domain.
 
 ### Day 10: Deploy Script
 
@@ -339,8 +272,8 @@ PLATFORM_SUBDOMAIN="openrewrite"
 
 echo "🚀 Deploying OpenRewrite Service to Lane E"
 
-# Create the app with platform subdomain
-ploy apps new --name $APP_NAME --platform-subdomain $PLATFORM_SUBDOMAIN
+# Create the app using ployman CLI for platform services
+ployman apps new --name $APP_NAME
 
 # Set environment variables
 ploy env set --app $APP_NAME CONSUL_ADDRESS=consul.service.consul:8500
@@ -356,11 +289,11 @@ tar -czf /tmp/openrewrite.tar.gz \
     cmd/ \
     internal/
 
-# Deploy via ploy push
-ploy push --app $APP_NAME < /tmp/openrewrite.tar.gz
+# Deploy via ployman push (automatically uses ployman.app domain)
+ployman push --app $APP_NAME < /tmp/openrewrite.tar.gz
 
 echo "✅ OpenRewrite Service deployed"
-echo "🌐 Available at: https://${PLATFORM_SUBDOMAIN}.${PLOY_APPS_DOMAIN}"
+echo "🌐 Available at: https://openrewrite.${PLOY_PLATFORM_DOMAIN:-ployman.app}"
 ```
 
 ## Week 3: Deployment and ARF Integration
@@ -388,12 +321,12 @@ type OpenRewriteClient struct {
 
 func NewOpenRewriteClient() *OpenRewriteClient {
     // Get platform domain
-    ployDomain := os.Getenv("PLOY_APPS_DOMAIN")
-    if ployDomain == "" {
-        ployDomain = "ployd.app"
+    platformDomain := os.Getenv("PLOY_PLATFORM_DOMAIN")
+    if platformDomain == "" {
+        platformDomain = "ployman.app"
     }
     
-    baseURL := fmt.Sprintf("https://openrewrite.%s", ployDomain)
+    baseURL := fmt.Sprintf("https://openrewrite.%s", platformDomain)
     
     // Allow override for development
     if override := os.Getenv("OPENREWRITE_SERVICE_URL"); override != "" {
@@ -552,12 +485,12 @@ cd services/openrewrite
 
 2. **Verify Service Health**:
 ```bash
-curl https://openrewrite.dev.ployd.app/v1/openrewrite/health
+curl https://openrewrite.dev.ployman.app/v1/openrewrite/health
 ```
 
 3. **Update ARF Configuration**:
 ```bash
-ploy env set --app arf OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployd.app
+ploy env set --app arf OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 ```
 
 4. **Remove Old Code** (no backward compatibility):
@@ -594,8 +527,8 @@ MAVEN_OPTS=-Xmx2g -Xms512m
 ### Consul KV Structure
 ```
 ploy/
-├── platform-subdomains/
-│   └── openrewrite → "openrewrite-service"
+├── platform-services/
+│   └── openrewrite-service → "openrewrite.ployman.app"
 ├── apps/
 │   └── openrewrite-service/
 │       └── env/
@@ -647,7 +580,7 @@ ploy arf benchmark run java11to17_migration \
 
 ## Success Criteria
 
-- [ ] Service deployed at `openrewrite.dev.ployd.app`
+- [ ] Service deployed at `openrewrite.dev.ployman.app`
 - [ ] All ARF benchmarks pass
 - [ ] Consul KV integration working
 - [ ] SeaweedFS storage working

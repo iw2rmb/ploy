@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/iw2rmb/ploy/controller/arf"
+	"github.com/iw2rmb/ploy/api/arf"
 )
 
 // Sandbox commands

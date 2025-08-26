@@ -217,7 +217,7 @@ job "{{APP_NAME}}-lane-{LANE}" {
 
 3. **Update Template Selection**:
    ```go
-   // In controller/nomad/render.go
+   // In api/nomad/render.go
    case "newlang":
        return "platform/nomad/lane-c-newlang.hcl"
    ```
@@ -233,7 +233,7 @@ job "{{APP_NAME}}-lane-{LANE}" {
 
 5. **Write Tests**:
    ```go
-   // In controller/nomad/render_test.go
+   // In api/nomad/render_test.go
    {
        name: "Lane C with NewLang",
        lane: "C",
@@ -255,7 +255,7 @@ Before deploying templates:
 
 2. **Unit Tests**:
    ```bash
-   go test -v ./controller/nomad/
+   go test -v ./api/nomad/
    ```
 
 3. **Integration Tests**:
@@ -337,7 +337,7 @@ Error: line 305,27-28: Missing key/value separator
 
 ```bash
 # Check which template is selected
-go test -v ./controller/nomad/ -run TestTemplateForLaneAndLanguage
+go test -v ./api/nomad/ -run TestTemplateForLaneAndLanguage
 
 # Verify template contents  
 consul kv get ploy/templates/lane-c-java.hcl

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/api/envstore"
 )
 
 // Mock environment store for testing
@@ -142,6 +143,45 @@ func TestSetEnvVars(t *testing.T) {
 			expectedStatus: 500,
 			expectedFields: map[string]interface{}{
 				"error": "failed to store environment variables: storage error",
+			},
+			wantErr: true,
+		},
+		{
+			name:    "invalid environment variable name with spaces",
+			appName: "test-app",
+			requestBody: map[string]string{
+				"INVALID VAR": "value",
+			},
+			mockSetup:      func(store *MockEnvStore) {},
+			expectedStatus: 400,
+			expectedFields: map[string]interface{}{
+				"error": "validation failed: invalid environment variable 'INVALID VAR': environment variable name contains invalid character (space)",
+			},
+			wantErr: true,
+		},
+		{
+			name:    "reserved environment variable name",
+			appName: "test-app",
+			requestBody: map[string]string{
+				"PATH": "/custom/path",
+			},
+			mockSetup:      func(store *MockEnvStore) {},
+			expectedStatus: 400,
+			expectedFields: map[string]interface{}{
+				"error": "validation failed: invalid environment variable 'PATH': environment variable name 'PATH' is reserved and cannot be modified",
+			},
+			wantErr: true,
+		},
+		{
+			name:    "environment variable value with null byte",
+			appName: "test-app",
+			requestBody: map[string]string{
+				"VALID_VAR": "value\x00with\x00null",
+			},
+			mockSetup:      func(store *MockEnvStore) {},
+			expectedStatus: 400,
+			expectedFields: map[string]interface{}{
+				"error": "validation failed: invalid value for environment variable 'VALID_VAR': environment variable value contains null byte",
 			},
 			wantErr: true,
 		},
@@ -370,6 +410,42 @@ func TestSetEnvVar(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:        "invalid variable name with special char",
+			appName:     "test-app",
+			keyName:     "INVALID-VAR",
+			requestBody: map[string]string{"value": "value"},
+			mockSetup:   func(store *MockEnvStore) {},
+			expectedStatus: 400,
+			expectedFields: map[string]interface{}{
+				"error": "invalid environment variable name: environment variable name contains invalid character '-'",
+			},
+			wantErr: true,
+		},
+		{
+			name:        "reserved variable name PATH",
+			appName:     "test-app",
+			keyName:     "PATH",
+			requestBody: map[string]string{"value": "/custom/path"},
+			mockSetup:   func(store *MockEnvStore) {},
+			expectedStatus: 400,
+			expectedFields: map[string]interface{}{
+				"error": "invalid environment variable name: environment variable name 'PATH' is reserved and cannot be modified",
+			},
+			wantErr: true,
+		},
+		{
+			name:        "value with null byte",
+			appName:     "test-app",
+			keyName:     "VALID_VAR",
+			requestBody: map[string]string{"value": "value\x00null"},
+			mockSetup:   func(store *MockEnvStore) {},
+			expectedStatus: 400,
+			expectedFields: map[string]interface{}{
+				"error": "invalid environment variable value: environment variable value contains null byte",
+			},
+			wantErr: true,
+		},
+		{
 			name:        "empty value",
 			appName:     "test-app",
 			keyName:     "EMPTY_VAR",
@@ -403,9 +479,9 @@ func TestSetEnvVar(t *testing.T) {
 			// Create test request
 			var req *http.Request
 			if tt.requestBody == "invalid-json" {
-				req = httptest.NewRequest("PUT", "/apps/"+tt.appName+"/env/"+tt.keyName, bytes.NewReader([]byte("invalid-json")))
+				req = httptest.NewRequest("PUT", "/apps/"+tt.appName+"/env/"+url.PathEscape(tt.keyName), bytes.NewReader([]byte("invalid-json")))
 			} else {
-				req = createTestRequest("PUT", "/apps/"+tt.appName+"/env/"+tt.keyName, tt.requestBody)
+				req = createTestRequest("PUT", "/apps/"+tt.appName+"/env/"+url.PathEscape(tt.keyName), tt.requestBody)
 			}
 
 			// Execute request

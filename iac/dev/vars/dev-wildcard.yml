@@ -1,30 +1,25 @@
 # Development Environment Wildcard Certificate Configuration
 # This configuration is for DEV environment ONLY
-# It provisions a wildcard certificate for *.dev.ployd.app
+# It provisions wildcard certificates for both *.dev.ployd.app and *.dev.ployman.app
 
 # Development subdomain configuration
 ploy_dev_subdomain: "dev"
 
-# Full domain for development environment
-# This will create a wildcard certificate for *.dev.ployd.app
+# Full domains for development environment
 ploy_dev_apps_domain: "{{ ploy_dev_subdomain }}.{{ ploy.apps_domain }}"
+ploy_dev_platform_domain: "{{ ploy_dev_subdomain }}.{{ ploy.platform_domain }}"
 
-# Certificate configuration for dev environment
-ploy_dev_certificate:
+# Certificate configuration for user apps domain
+ploy_dev_apps_certificate:
   # Wildcard domain to provision
   wildcard_domain: "*.{{ ploy_dev_apps_domain }}"
   
   # Base domain (needed for DNS challenge)
   base_domain: "{{ ploy_dev_apps_domain }}"
   
-  # Apps will be accessible at:
-  # - api.dev.ployd.app (controller)
-  # - myapp.dev.ployd.app (deployed apps)
-  # - test.dev.ployd.app (test apps)
-  
   # Certificate storage paths
-  cert_path: "/etc/ploy/certs/dev-wildcard.crt"
-  key_path: "/etc/ploy/certs/dev-wildcard.key"
+  cert_path: "/etc/ploy/certs/dev-apps-wildcard.crt"
+  key_path: "/etc/ploy/certs/dev-apps-wildcard.key"
   
   # Let's Encrypt configuration
   staging: false  # Use production Let's Encrypt for valid certs
@@ -34,38 +29,76 @@ ploy_dev_certificate:
   auto_renew: true
   renewal_threshold_days: 30
 
+# Certificate configuration for platform services domain
+ploy_dev_platform_certificate:
+  # Wildcard domain to provision
+  wildcard_domain: "*.{{ ploy_dev_platform_domain }}"
+  
+  # Base domain (needed for DNS challenge)
+  base_domain: "{{ ploy_dev_platform_domain }}"
+  
+  # Platform services will be accessible at:
+  # - api.dev.ployman.app (API service)
+  # - openrewrite.dev.ployman.app (OpenRewrite service)
+  # - metrics.dev.ployman.app (future metrics service)
+  
+  # Certificate storage paths
+  cert_path: "/etc/ploy/certs/dev-platform-wildcard.crt"
+  key_path: "/etc/ploy/certs/dev-platform-wildcard.key"
+  
+  # Let's Encrypt configuration
+  staging: false  # Use production Let's Encrypt for valid certs
+  email: "admin@ployman.app"
+  
+  # Auto-renewal configuration
+  auto_renew: true
+  renewal_threshold_days: 30
+
 # Environment-specific routing
 ploy_dev_routing:
-  # Controller endpoint for dev environment
-  controller_domain: "api.{{ ploy_dev_apps_domain }}"
+  # API endpoint on platform domain
+  api_domain: "api.{{ ploy_dev_platform_domain }}"
   
-  # App pattern for dev environment
+  # User app pattern for dev environment
   app_pattern: "{app}.{{ ploy_dev_apps_domain }}"
   
+  # Platform service pattern for dev environment
+  platform_pattern: "{service}.{{ ploy_dev_platform_domain }}"
+  
   # Examples:
-  # - node-hello.dev.ployd.app
-  # - java-app.dev.ployd.app
-  # - test-app.dev.ployd.app
+  # User apps: node-hello.dev.ployd.app, java-app.dev.ployd.app
+  # Platform services: api.dev.ployman.app, openrewrite.dev.ployman.app
 
-# Traefik configuration for dev wildcard
+# Traefik configuration for dual wildcard certificates
 traefik_dev_config:
-  # Router for dev controller
-  controller_router:
-    rule: "Host(`api.{{ ploy_dev_apps_domain }}`)"
-    service: "ploy-controller"
+  # Router for API on platform domain
+  api_router:
+    rule: "Host(`api.{{ ploy_dev_platform_domain }}`)"
+    service: "ploy-api"
     tls:
-      certResolver: "dev-wildcard"
+      certResolver: "platform-wildcard"
+      domains:
+        - main: "{{ ploy_dev_platform_domain }}"
+          sans:
+            - "*.{{ ploy_dev_platform_domain }}"
+  
+  # Dynamic router for user apps
+  apps_router:
+    rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy_dev_apps_domain }}`)"
+    service: "dynamic-apps"
+    tls:
+      certResolver: "apps-wildcard"
       domains:
         - main: "{{ ploy_dev_apps_domain }}"
           sans:
             - "*.{{ ploy_dev_apps_domain }}"
   
-  # Dynamic router for dev apps
-  apps_router:
-    rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy_dev_apps_domain }}`)"
-    service: "dynamic-apps"
+  # Dynamic router for platform services
+  platform_router:
+    rule: "HostRegexp(`{service:[a-z0-9-]+}.{{ ploy_dev_platform_domain }}`)"
+    service: "dynamic-platform"
     tls:
-      certResolver: "dev-wildcard"
+      certResolver: "platform-wildcard"
 
 # DNS-01 Challenge Configuration
 dns_challenge_config:

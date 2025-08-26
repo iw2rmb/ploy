@@ -3,7 +3,7 @@ package testutil
 import (
 	"time"
 
-	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/api/envstore"
 )
 
 // TestDataRepository provides comprehensive test data

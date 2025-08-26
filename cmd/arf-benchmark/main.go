@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 	
-	"github.com/iw2rmb/ploy/controller/arf"
+	"github.com/iw2rmb/ploy/api/arf"
 	"gopkg.in/yaml.v3"
 )
 

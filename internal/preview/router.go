@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/controller/nomad"
+	"github.com/iw2rmb/ploy/api/nomad"
 )
 
 var previewHostRe = regexp.MustCompile(`^(?P<sha>[a-f0-9]{7,40})\.(?P<app>[a-z0-9-]+)\.ployd\.app(?::\d+)?$`)

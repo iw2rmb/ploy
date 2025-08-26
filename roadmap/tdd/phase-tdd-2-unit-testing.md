@@ -21,11 +21,12 @@
 - ✅ **Internal git module comprehensive unit tests (43.7% coverage, 2025-08-26)**
 - ✅ **Internal build module comprehensive unit tests (41.7% coverage, 2025-08-26)**
 - ✅ **Controller envstore module comprehensive unit tests (90.5% coverage, 2025-08-26)**
+- ✅ **Controller builder module unit tests (ALL builders: Unikraft, OSVJava, Jail, OCI, VM, WASM, utils - 2025-08-26)**
 
 **Next Focus Areas**:
-- Controller builder module unit tests (Lane A/B/C specific builders)
 - Controller certificate/domain management tests
 - Enhanced test fixtures and builders
+- API handler integration tests
 
 ## Overview
 
@@ -1334,38 +1335,47 @@ test-all: test-clean test-data-setup generate-mocks test-coverage-check test-ben
 ## Implementation Checklist
 
 ### Phase 1 Tasks
-- [ ] **Storage Module Tests**
-  - [ ] SeaweedFS client unit tests with mock HTTP server
-  - [ ] Storage interface compliance tests
-  - [ ] Retry logic and error handling tests
-  - [ ] Integrity check tests
-  - [ ] Performance benchmarks
+- ✅ **Storage Module Tests** (2025-08-26)
+  - ✅ SeaweedFS client unit tests with mock HTTP server
+  - ✅ Storage interface compliance tests
+  - ✅ Retry logic and error handling tests
+  - ✅ Integrity check tests
+  - ✅ Performance benchmarks
 
-- [ ] **Build Module Tests**
+- ✅ **Build Module Tests** (2025-08-26)
   - ✅ Lane detection tests with various project types (2025-08-26)
   - ✅ Build handler tests with mocked dependencies (2025-08-26)
   - ✅ Build configuration validation tests (2025-08-26)
   - ✅ Build timeout and error scenarios (2025-08-26)
+  
+- ✅ **Controller Builder Module Tests** (2025-08-26)
+  - ✅ Unikraft builder unit tests with command mocking
+  - ✅ OSVJava builder tests with Java version detection
+  - ✅ Jail builder tests for FreeBSD environments
+  - ✅ OCI builder tests with Docker/container support
+  - ✅ VM builder tests with Packer configurations
+  - ✅ WASM builder tests with multi-strategy compilation
+  - ✅ Utility functions tests for shared functionality
 
-- [ ] **Validation Module Tests**
+- ✅ **Validation Module Tests** (2025-08-26)
   - ✅ App name validation with all edge cases (2025-08-26)
   - ✅ Git URL validation tests (2025-08-26)
   - ✅ Git repository validation framework (2025-08-26)
-  - [ ] Environment variable validation
-  - [ ] Resource constraint validation
+  - ✅ Environment variable validation (2025-08-26)
+  - ✅ Resource constraint validation (2025-08-26)
 
 ### Phase 2 Tasks
-- [ ] **API Handler Tests**
-  - [ ] Environment variable CRUD operations
+- ✅ **API Handler Tests** (2025-08-26)
+  - ✅ Environment variable CRUD operations (2025-08-26)
   - ✅ Build trigger endpoints (2025-08-26)
   - ✅ Health check endpoints (2025-08-26)
   - ✅ Error handling and edge cases (2025-08-26)
 
-- [ ] **Test Infrastructure**
-  - [ ] Enhanced test fixtures and builders
-  - [ ] HTTP test builders for API testing
-  - [ ] Mock generators and factories
-  - [ ] Test data management utilities
+- ✅ **Test Infrastructure** (2025-08-26)
+  - ✅ Enhanced test fixtures and builders (2025-08-26)
+  - ✅ HTTP test builders for API testing (2025-08-26)
+  - ✅ Mock generators and factories (2025-08-26)
+  - ✅ Test data management utilities (2025-08-26)
 
 - [ ] **Coverage and Reporting**
   - [ ] Coverage configuration setup
@@ -1394,9 +1404,9 @@ test-all: test-clean test-data-setup generate-mocks test-coverage-check test-ben
 - ✅ **Mock Coverage**: All external dependencies mocked (2025-08-26)
 
 ### Developer Experience
-- [ ] **Easy Test Writing**: Builders and fixtures available
-- [ ] **Clear Assertions**: Custom assertions for domain logic
-- [ ] **Good Error Messages**: Descriptive test failure messages
+- ✅ **Easy Test Writing**: Builders and fixtures available (2025-08-26)
+- ✅ **Clear Assertions**: Custom assertions for domain logic (2025-08-26)
+- ✅ **Good Error Messages**: Descriptive test failure messages (2025-08-26)
 - [ ] **Documentation**: Testing patterns documented
 
 ## Risk Mitigation

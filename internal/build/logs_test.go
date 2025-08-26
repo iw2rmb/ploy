@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
 	
-	"github.com/iw2rmb/ploy/controller/nomad"
+	"github.com/iw2rmb/ploy/api/nomad"
 )
 
 // MockHealthMonitor provides a mock implementation for testing logs functionality

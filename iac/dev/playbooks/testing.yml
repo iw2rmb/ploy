@@ -66,12 +66,12 @@
             path: "{{ item }}"
           register: ploy_binaries_check
           loop:
-            - /home/ploy/ploy/ploy-controller
+            - /home/ploy/ploy/bin/api
             - /home/ploy/ploy/ploy
             - /home/ploy/ploy/lane-pick
 
-        - name: Build Ploy controller
-          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o ploy-controller ./controller
+        - name: Build Ploy API
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./api
           become_user: ploy
           when: not ploy_binaries_check.results[0].stat.exists or (ansible_date_time.epoch|int - ploy_binaries_check.results[0].stat.mtime) > 3600
 
