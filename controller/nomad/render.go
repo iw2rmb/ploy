@@ -216,12 +216,11 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	if data.JvmCpus > 0 {
 		s = strings.ReplaceAll(s, "{{JVM_CPUS}}", fmt.Sprintf("%d", data.JvmCpus))
 	}
-	if data.MainClass != "" {
-		s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", data.MainClass)
-	}
-	if data.JavaVersion != "" {
-		s = strings.ReplaceAll(s, "{{JAVA_VERSION}}", data.JavaVersion)
-	}
+	
+	// Always replace these variables to prevent unreplaced template vars in HCL output
+	// For non-Java apps, these will be empty strings (valid HCL)
+	s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", data.MainClass)
+	s = strings.ReplaceAll(s, "{{JAVA_VERSION}}", data.JavaVersion)
 	
 	// Domain configuration
 	if data.DomainSuffix != "" {
