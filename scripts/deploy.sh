@@ -227,13 +227,28 @@ generate_checksums() {
 upload_binaries() {
     echo -e "${YELLOW}Uploading binaries to SeaweedFS...${NC}"
     
-    # Upload controller binary with version-specific name
-    ./build/controller-dist -command=upload -version="$VERSION" -binary=./build/controller
+    # Upload controller binary with version-specific name and capture checksum
+    UPLOAD_OUTPUT=$(./build/controller-dist -command=upload -version="$VERSION" -binary=./build/controller)
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to upload controller binary${NC}"
+        echo "$UPLOAD_OUTPUT"
         exit 1
     fi
+    
+    # Extract the uploaded binary's checksum from output
+    UPLOADED_CONTROLLER_CHECKSUM=$(echo "$UPLOAD_OUTPUT" | grep "SHA256:" | cut -d' ' -f2)
+    if [ -z "$UPLOADED_CONTROLLER_CHECKSUM" ]; then
+        echo -e "${RED}Error: Could not extract uploaded binary checksum${NC}"
+        echo "$UPLOAD_OUTPUT"
+        exit 1
+    fi
+    
+    # Update our stored checksum to match the uploaded binary
+    CONTROLLER_CHECKSUM="$UPLOADED_CONTROLLER_CHECKSUM"
+    echo "$CONTROLLER_CHECKSUM" > build/controller.sha256
+    
     echo -e "${GREEN}✓ Controller binary uploaded${NC}"
+    echo -e "${GREEN}Uploaded checksum: $CONTROLLER_CHECKSUM${NC}"
 
     # Note: CLI binary upload not supported by controller-dist tool
     # CLI binaries are built and used locally only
@@ -591,18 +606,49 @@ verify_deployment() {
     while [ $attempt -lt $max_attempts ]; do
         echo -e "${YELLOW}Attempt $((attempt + 1))/$max_attempts: Testing controller health...${NC}"
         
-        # Test local health endpoint
-        if curl -s --max-time 5 "http://localhost:8081/health" > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Controller health check passed${NC}"
+        # Test external HTTPS endpoint (primary)
+        if version_info=$(curl -s --max-time 10 "https://api.dev.ployd.app/v1/controller/version" 2>/dev/null); then
+            echo -e "${GREEN}✓ HTTPS endpoint accessible${NC}"
+            echo -e "${BLUE}Deployed version info:${NC}"
+            echo "$version_info" | python3 -m json.tool 2>/dev/null || echo "$version_info"
             
-            # Test version endpoint
-            if version_info=$(curl -s --max-time 5 "http://localhost:8081/v1/controller/version" 2>/dev/null); then
-                echo -e "${GREEN}✓ Version endpoint accessible${NC}"
-                echo -e "${BLUE}Deployed version info:${NC}"
-                echo "$version_info" | python3 -m json.tool 2>/dev/null || echo "$version_info"
+            # Verify deployed version matches expected
+            deployed_version=$(echo "$version_info" | grep -o '"version":"[^"]*' | cut -d'"' -f4)
+            if [ "$deployed_version" = "$VERSION" ]; then
+                echo -e "${GREEN}✓ Version verification passed: $deployed_version${NC}"
+                
+                # Test health endpoint
+                if curl -s --max-time 5 "https://api.dev.ployd.app/health" > /dev/null 2>&1; then
+                    echo -e "${GREEN}✓ Health check endpoint accessible${NC}"
+                    return 0
+                else
+                    echo -e "${YELLOW}⚠ Health endpoint not ready yet${NC}"
+                fi
+            else
+                echo -e "${YELLOW}⚠ Version mismatch: expected $VERSION, got $deployed_version${NC}"
             fi
+        else
+            echo -e "${YELLOW}HTTPS endpoint not ready, trying local fallback...${NC}"
             
-            return 0
+            # Fallback: Test local health endpoint
+            if curl -s --max-time 5 "http://localhost:8081/health" > /dev/null 2>&1; then
+                echo -e "${GREEN}✓ Local health check passed${NC}"
+                
+                # Test local version endpoint
+                if local_version_info=$(curl -s --max-time 5 "http://localhost:8081/v1/controller/version" 2>/dev/null); then
+                    echo -e "${GREEN}✓ Local version endpoint accessible${NC}"
+                    echo -e "${BLUE}Local version info:${NC}"
+                    echo "$local_version_info" | python3 -m json.tool 2>/dev/null || echo "$local_version_info"
+                    
+                    # Check if local version matches expected
+                    local_deployed_version=$(echo "$local_version_info" | grep -o '"version":"[^"]*' | cut -d'"' -f4)
+                    if [ "$local_deployed_version" = "$VERSION" ]; then
+                        echo -e "${GREEN}✓ Local version verification passed: $local_deployed_version${NC}"
+                        echo -e "${YELLOW}⚠ HTTPS endpoint may still be starting, but deployment appears successful${NC}"
+                        return 0
+                    fi
+                fi
+            fi
         fi
         
         attempt=$((attempt + 1))
@@ -610,6 +656,18 @@ verify_deployment() {
     done
     
     echo -e "${RED}✗ Deployment verification failed after $max_attempts attempts${NC}"
+    
+    # Diagnostic information
+    echo -e "${YELLOW}Running diagnostics...${NC}"
+    echo -e "${BLUE}Nomad job status:${NC}"
+    nomad job status ploy-controller | head -20
+    
+    echo -e "${BLUE}Latest allocation status:${NC}"
+    ALLOC_ID=$(nomad job status ploy-controller | grep "running\|pending\|failed" | head -1 | awk '{print $1}')
+    if [ -n "$ALLOC_ID" ]; then
+        nomad alloc status "$ALLOC_ID" | head -30
+    fi
+    
     return 1
 }
 

@@ -110,7 +110,10 @@ func runUpload(version, binaryPath, platform, arch string) error {
 		return fmt.Errorf("upload failed: %w", err)
 	}
 
+	// Output the calculated hash for verification
 	fmt.Printf("Successfully uploaded controller binary %s\n", version)
+	fmt.Printf("SHA256: %s\n", info.SHA256Hash)
+	fmt.Printf("Size: %d bytes\n", info.Size)
 	return nil
 }
 
