@@ -3,43 +3,13 @@ job "openrewrite-service" {
   type        = "service"
   
   group "openrewrite" {
-    count = 0  # Start with zero instances for auto-scaling
+    count = 1  # Start with 1 instance for testing
     
     # Scaling configuration
     scaling {
       enabled = true
-      min     = 0
-      max     = 10
-      
-      # Scale up policy based on queue depth
-      policy {
-        cooldown            = "30s"
-        evaluation_interval = "10s"
-        
-        check "queue_depth" {
-          source = "prometheus"
-          query  = "ploy_openrewrite_queue_depth"
-          
-          strategy "target-value" {
-            target = 5
-          }
-        }
-      }
-      
-      # Scale down to zero after inactivity
-      policy {
-        cooldown = "10m"
-        
-        check "last_activity" {
-          source = "prometheus"
-          query  = "time() - ploy_openrewrite_last_activity_seconds"
-          
-          strategy "threshold" {
-            upper_bound = 600  # 10 minutes in seconds
-            delta       = -1   # Scale down by 1 instance
-          }
-        }
-      }
+      min     = 1  # Start with 1 instance for testing
+      max     = 3  # Reduce max for testing
     }
     
     # Network configuration
@@ -73,7 +43,7 @@ job "openrewrite-service" {
       driver = "docker"
       
       config {
-        image = "ploy/openrewrite-service:latest"
+        image = "ploy-openrewrite:latest"
         ports = ["http", "metrics"]
         
         # tmpfs mount for transformations
