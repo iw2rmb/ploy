@@ -39,8 +39,19 @@ type Handler struct {
 
 // NewHandler creates a new self-update handler with Git integration
 func NewHandler(storageProvider storage.StorageProvider, consulAddr, currentVersion string) (*Handler, error) {
-	// Initialize binary distributor
-	distributor := distribution.NewBinaryDistributor(storageProvider, "ploy-artifacts", "/tmp/ploy-updates")
+	// Initialize binary distributor with proper cache directory
+	cacheDir := "/var/cache/ploy-controller"
+	
+	// Ensure cache directory exists with proper permissions
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		// Fallback to /tmp if /var/cache is not writable
+		cacheDir = filepath.Join(os.TempDir(), "ploy-controller-cache")
+		if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create cache directory: %w", err)
+		}
+	}
+	
+	distributor := distribution.NewBinaryDistributor(storageProvider, "ploy-artifacts", cacheDir)
 
 	// Initialize Consul client
 	config := api.DefaultConfig()
