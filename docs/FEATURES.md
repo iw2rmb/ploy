@@ -522,11 +522,75 @@ Auto-classified lanes:
 
 ⸻
 
+## 🔄 OpenRewrite Service (Dedicated) ✅ OPERATIONAL Aug 2025
+
+**STATUS: ✅ OPERATIONAL** - Dedicated OpenRewrite transformation service with distributed architecture and production monitoring. Full roadmap in `roadmap/openrewrite/`
+
+### ✅ **Three-Stream Implementation Architecture**
+- ✅ **Stream A: Core Transformation Pipeline** ✅ 2025-08-26
+  - Git repository management with automatic initialization and configuration
+  - OpenRewrite executor supporting Maven and Gradle build systems
+  - Diff generation and transformation result tracking
+  - Local testing integration with real Java projects
+- ✅ **Stream B: Distributed Infrastructure** ✅ 2025-08-26
+  - Consul KV integration for distributed job status tracking
+  - SeaweedFS storage backend for diff and artifact storage
+  - Priority job queue with concurrent processing capabilities
+  - Worker pool management with job cancellation support
+- ✅ **Stream C: Production Readiness** ✅ 2025-08-26
+  - Prometheus metrics collection for comprehensive monitoring
+  - OpenTelemetry distributed tracing with OTLP exporter
+  - Health and readiness endpoints for Kubernetes/Nomad integration
+  - Auto-scaling and resource management capabilities
+
+### ✅ **Java 11→17 Migration Capabilities**
+- ✅ **Complete Migration Pipeline**: End-to-end Java 11→17 transformations with OpenRewrite recipes
+- ✅ **Maven/Gradle Support**: Automatic build system detection and plugin integration
+- ✅ **Diff Generation**: Clean Git-based diff tracking for all transformations
+- ✅ **Lane C Integration**: Seamless deployment to OSv unikernels via existing Lane C pipeline
+- ✅ **Benchmark Testing**: Comprehensive test scenarios across simple, medium, and complex Java projects
+- ✅ **Success Validation**: HTTP endpoint testing and build verification for transformed applications
+
+### ✅ **Distributed Job Processing**
+- ✅ **Async Execution**: Long-running transformations with Consul KV status tracking
+- ✅ **Horizontal Scaling**: Nomad-based auto-scaling based on queue depth and resource utilization
+- ✅ **Auto-shutdown**: Instance termination after 10 minutes of inactivity for cost optimization
+- ✅ **Stateless Design**: All state externalized to Consul and SeaweedFS for zero-SPOF architecture
+- ✅ **Job Queue**: Priority-based processing with concurrent execution and cancellation support
+
+### ✅ **Production Monitoring & Observability**
+- ✅ **Comprehensive Metrics**: Job metrics, transformation metrics, resource metrics, storage metrics
+- ✅ **Distributed Tracing**: OpenTelemetry integration with job tracing, transformation tracing, storage operation tracing
+- ✅ **Health Monitoring**: Multi-component health checks (SeaweedFS, Consul, worker pool utilization)
+- ✅ **Status Classification**: Healthy/degraded/unhealthy status determination with intelligent failure analysis
+- ✅ **Performance Tracking**: Execution time monitoring, success rate tracking, resource utilization analytics
+
+### ✅ **Comprehensive Test Framework**
+- ✅ **Progressive Testing Phases**: 
+  - Phase 1: Baseline OpenRewrite testing (simple projects, 100% success target)
+  - Phase 2: LLM self-healing integration (medium complexity, 80% success target)  
+  - Phase 3: Parallel execution testing (all tiers, 70% success target)
+- ✅ **Real-World Project Testing**: Curated repository selection from GitHub (Baeldung tutorials, Spring Boot, Apache Kafka, Spring PetClinic)
+- ✅ **Automated Test Scripts**: Ready-to-execute bash scripts for each testing phase
+- ✅ **Success Metrics Tracking**: 49 detailed checkboxes for comprehensive progress monitoring
+- ✅ **Repository Classification**: Tier 1 (simple), Tier 2 (medium), Tier 3 (complex) project categorization
+
+### ✅ **API & CLI Integration**
+- ✅ **RESTful API**: Complete `/v1/openrewrite/*` endpoint suite
+  - Job submission, status monitoring, and result retrieval
+  - Health checks and service monitoring endpoints
+  - Metrics collection for Prometheus integration
+- ✅ **CLI Commands**: `ploy arf benchmark` command suite
+  - Java 11→17 migration benchmarks with real repository testing
+  - Parallel execution testing with dependency analysis
+  - Status monitoring and log retrieval for debugging
+- ✅ **Integration Points**: Seamless integration with existing Ploy infrastructure (Nomad, Consul, SeaweedFS)
+
 ## 🧬 Automated Remediation Framework (ARF) ✅ OPERATIONAL
 
-**STATUS: ✅ OPERATIONAL** - Phases 1-4 ✅ COMPLETE (August 2025), Java 11→17 migration pipeline fully functional. Comprehensive roadmap available in `roadmap/arf/`
+**STATUS: ✅ OPERATIONAL** - Phases 1-4 ✅ COMPLETE (August 2025), integrated with dedicated OpenRewrite service. Comprehensive roadmap available in `roadmap/arf/`
 
-ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
+ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. ARF integrates with the dedicated OpenRewrite service for Java transformations while providing LLM-assisted intelligence and multi-language support.
 
 ### ✅ **Recent Achievements: Java 11→17 Migration Success (August 2025)**
 - ✅ **Complete End-to-End Pipeline**: Successfully processing Spring PetClinic Java 11→17 migrations with full deployment validation
@@ -537,6 +601,8 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 
 ### ✅ **Implemented Core Transformation Engine**
 - ✅ **OpenRewrite Integration**: 2,800+ recipes for framework migrations, security patches, and API upgrades
+  - **Dedicated Service Architecture**: Integrates with standalone OpenRewrite service for Java transformations
+  - **Distributed Processing**: Leverages OpenRewrite service's Consul KV and SeaweedFS backends
 - ✅ **AST Cache System**: Memory-mapped file caching with 10x performance improvement
 - ✅ **Recipe Catalog**: Searchable database with confidence scoring and metadata management  
 - ✅ **Single-Repository Workflows**: Complete transformation pipeline for individual repositories
