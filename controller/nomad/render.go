@@ -206,19 +206,11 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 		s = strings.ReplaceAll(s, "{{DISK_SIZE}}", fmt.Sprintf("%d", data.DiskSize))
 	}
 	
-	// JVM-specific configuration
-	if data.JvmOpts != "" {
-		s = strings.ReplaceAll(s, "{{JVM_OPTS}}", data.JvmOpts)
-	}
-	if data.JvmMemory > 0 {
-		s = strings.ReplaceAll(s, "{{JVM_MEMORY}}", fmt.Sprintf("%d", data.JvmMemory))
-	}
-	if data.JvmCpus > 0 {
-		s = strings.ReplaceAll(s, "{{JVM_CPUS}}", fmt.Sprintf("%d", data.JvmCpus))
-	}
-	
-	// Always replace these variables to prevent unreplaced template vars in HCL output
-	// For non-Java apps, these will be empty strings (valid HCL)
+	// JVM-specific configuration - always replace to prevent unreplaced template vars
+	// For non-Java apps, these will be empty/zero values (valid HCL)
+	s = strings.ReplaceAll(s, "{{JVM_OPTS}}", data.JvmOpts)
+	s = strings.ReplaceAll(s, "{{JVM_MEMORY}}", fmt.Sprintf("%d", data.JvmMemory))
+	s = strings.ReplaceAll(s, "{{JVM_CPUS}}", fmt.Sprintf("%d", data.JvmCpus))
 	s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", data.MainClass)
 	s = strings.ReplaceAll(s, "{{JAVA_VERSION}}", data.JavaVersion)
 	
