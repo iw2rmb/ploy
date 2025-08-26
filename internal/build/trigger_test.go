@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -178,6 +179,92 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to open file")
 	})
+
+	t.Run("upload file with retry - success on first attempt", func(t *testing.T) {
+		// Create test file
+		testPath := filepath.Join(tmpDir, "test.txt")
+		testContent := []byte("test content")
+		err := os.WriteFile(testPath, testContent, 0644)
+		require.NoError(t, err)
+
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location",
+			Size:     int64(len(testContent)),
+		}, nil)
+		
+		// Mock successful integrity verification
+		mockProvider.On("VerifyUpload", "test-key").Return(nil)
+		mockProvider.On("GetObject", "test-bucket", "test-key").Return(io.NopCloser(bytes.NewReader(testContent)), nil)
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
+		
+		err = uploadFileWithRetryAndVerification(storeClient, testPath, "test-key", "text/plain")
+		assert.NoError(t, err)
+		
+		mockProvider.AssertExpectations(t)
+	})
+
+	t.Run("upload file with retry - upload failure then success", func(t *testing.T) {
+		// Create test file
+		testPath := filepath.Join(tmpDir, "test2.txt")
+		testContent := []byte("test content 2")
+		err := os.WriteFile(testPath, testContent, 0644)
+		require.NoError(t, err)
+
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// First attempt fails
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(nil, fmt.Errorf("network error")).Once()
+		// Second attempt succeeds
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location",
+			Size:     int64(len(testContent)),
+		}, nil).Once()
+		
+		// Mock successful verification after retry
+		mockProvider.On("VerifyUpload", "test-key").Return(nil)
+		mockProvider.On("GetObject", "test-bucket", "test-key").Return(io.NopCloser(bytes.NewReader(testContent)), nil)
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
+		
+		err = uploadFileWithRetryAndVerification(storeClient, testPath, "test-key", "text/plain")
+		assert.NoError(t, err)
+		
+		// Verify both attempts were made
+		mockProvider.AssertExpectations(t)
+	})
+
+	t.Run("upload file with retry - integration note", func(t *testing.T) {
+		// NOTE: Full retry testing with backoff delays should be done in integration tests on VPS
+		// This test verifies the function exists and handles basic errors correctly
+		
+		// Create test file
+		testPath := filepath.Join(tmpDir, "test3.txt")
+		testContent := []byte("test content 3")
+		err := os.WriteFile(testPath, testContent, 0644)
+		require.NoError(t, err)
+
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// Test immediate failure without real retry delays (unit test scope)
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(nil, fmt.Errorf("immediate failure"))
+		
+		// Use a client with minimal retry config for unit testing
+		config := storage.DefaultClientConfig()
+		storeClient := storage.NewStorageClient(mockProvider, config)
+		
+		err = uploadFileWithRetryAndVerification(storeClient, testPath, "test-key", "text/plain")
+		assert.Error(t, err)
+		
+		// Verify the upload was attempted
+		mockProvider.AssertCalled(t, "PutObject", "test-bucket", "test-key", mock.Anything, "text/plain")
+	})
 }
 
 func TestUploadBytesWithRetryAndVerification(t *testing.T) {
@@ -194,6 +281,125 @@ func TestUploadBytesWithRetryAndVerification(t *testing.T) {
 		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
 		
 		testData := []byte("test data!")
+		
+		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
+		assert.NoError(t, err)
+		
+		mockProvider.AssertExpectations(t)
+	})
+
+	t.Run("upload bytes with retry - size mismatch then success", func(t *testing.T) {
+		testData := []byte("test data for retry!")
+		
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// First attempt has size mismatch
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location",
+			Size:     5, // Wrong size
+		}, nil).Once()
+		
+		// Second attempt succeeds
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location",
+			Size:     int64(len(testData)), // Correct size
+		}, nil).Once()
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
+		
+		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
+		assert.NoError(t, err)
+		
+		mockProvider.AssertExpectations(t)
+	})
+
+	t.Run("upload bytes with retry - upload failures then success", func(t *testing.T) {
+		testData := []byte("retry test data")
+		
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// First two attempts fail
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(nil, fmt.Errorf("connection timeout")).Once()
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(nil, fmt.Errorf("server error")).Once()
+		
+		// Third attempt succeeds
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location",
+			Size:     int64(len(testData)),
+		}, nil).Once()
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
+		
+		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
+		assert.NoError(t, err)
+		
+		mockProvider.AssertExpectations(t)
+	})
+
+	t.Run("upload bytes with retry - all attempts fail", func(t *testing.T) {
+		testData := []byte("failing test data")
+		
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// All attempts fail - use Maybe() to handle nested retry logic
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(nil, fmt.Errorf("persistent network failure")).Maybe()
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
+		
+		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "upload failed after 3 attempts")
+		
+		// Verify at least one call was made
+		mockProvider.AssertCalled(t, "PutObject", "test-bucket", "test-key", mock.Anything, "application/json")
+	})
+
+	t.Run("upload bytes with retry - size mismatch all attempts", func(t *testing.T) {
+		testData := []byte("size mismatch test")
+		
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// All attempts succeed upload but have size mismatch - use Maybe() for nested retries
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location",
+			Size:     5, // Wrong size
+		}, nil).Maybe()
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
+		
+		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "size verification failed after 3 attempts")
+		
+		// Verify at least one call was made
+		mockProvider.AssertCalled(t, "PutObject", "test-bucket", "test-key", mock.Anything, "application/json")
+	})
+
+	t.Run("upload bytes with retry - nil result handling", func(t *testing.T) {
+		testData := []byte("nil result test")
+		
+		mockProvider := &MockStorageClient{}
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
+		
+		// First attempt returns nil result (treated as failure)
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(nil, nil).Once()
+		
+		// Second attempt succeeds
+		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
+			ETag:     "test-etag",
+			Location: "test-location", 
+			Size:     int64(len(testData)),
+		}, nil).Once()
+		
+		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
 		
 		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
 		assert.NoError(t, err)
