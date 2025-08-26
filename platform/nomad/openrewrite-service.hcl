@@ -167,9 +167,9 @@ job "openrewrite-service" {
       
       # Resource allocation
       resources {
-        cpu    = 2000  # 2 CPU cores
-        memory = 4096  # 4GB RAM
-        disk   = 1024  # 1GB disk
+        cpu    = 1000  # 1 CPU core for testing
+        memory = 2048  # 2GB RAM for testing
+        disk   = 2048  # 2GB disk for logs
       }
       
       # Graceful shutdown
@@ -178,8 +178,8 @@ job "openrewrite-service" {
       
       # Log configuration
       logs {
-        max_files     = 5
-        max_file_size = 100  # MB
+        max_files     = 3
+        max_file_size = 50  # MB
       }
     }
     
