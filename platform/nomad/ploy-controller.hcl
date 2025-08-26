@@ -217,6 +217,8 @@ job "ploy-controller" {
     task "ploy-controller" {
       driver = "raw_exec"
       
+      user = "ploy"  # Run as ploy user for proper permissions
+      
       resources {
         cpu = 200
         memory = 256

@@ -43,7 +43,7 @@ job "openrewrite-service" {
       driver = "docker"
       
       config {
-        image = "ploy-openrewrite:latest"  # Use proper image name with tag
+        image = "ab311200d170"  # Use Docker image ID directly
         force_pull = false  # Prevent registry pull, use local image
         ports = ["http", "metrics"]
         
