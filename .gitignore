@@ -45,3 +45,7 @@ __pycache__/
 
 # Logs
 /*.log
+
+# Test artifacts
+apps/
+test-template/
