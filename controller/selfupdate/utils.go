@@ -98,6 +98,50 @@ func parseVersion(version string) []int {
 	version = strings.TrimPrefix(version, "v")
 	version = strings.TrimPrefix(version, "version")
 
+	// Handle Git-based versions with format: branch-commit-timestamp
+	// Example: main-755511a-20250826-103811
+	if strings.Contains(version, "-") {
+		parts := strings.Split(version, "-")
+		if len(parts) >= 3 {
+			// Try to parse timestamp from the last parts
+			// Look for date pattern: YYYYMMDD or YYYYMMDD-HHMMSS
+			for i := len(parts) - 2; i < len(parts); i++ {
+				if i >= 0 && len(parts[i]) >= 8 {
+					dateStr := parts[i]
+					if len(dateStr) == 8 { // YYYYMMDD
+						if year, err := strconv.Atoi(dateStr[:4]); err == nil {
+							if month, err := strconv.Atoi(dateStr[4:6]); err == nil {
+								if day, err := strconv.Atoi(dateStr[6:8]); err == nil {
+									// Valid date format, use timestamp as version
+									timestamp := year*10000 + month*100 + day
+									
+									// If there's a time component, add it
+									timeComponent := 0
+									if i+1 < len(parts) && len(parts[i+1]) == 6 {
+										if timeVal, err := strconv.Atoi(parts[i+1]); err == nil {
+											timeComponent = timeVal
+										}
+									}
+									
+									return []int{timestamp, timeComponent}
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			// Fallback: use commit hash as version for Git-based versions
+			if len(parts) >= 2 && len(parts[1]) >= 6 {
+				// Convert first 6 chars of commit hash to number for comparison
+				commitPrefix := parts[1][:6]
+				if commitVal, err := strconv.ParseInt(commitPrefix, 16, 64); err == nil {
+					return []int{0, int(commitVal)}
+				}
+			}
+		}
+	}
+
 	// Handle special test versions
 	if strings.Contains(version, "test-") {
 		// For test versions, use timestamp comparison
