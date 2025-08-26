@@ -1,9 +1,9 @@
 name: java11to17_migration
-description: Benchmark test for migrating Java 11 applications to Java 17
+description: Phase 1 baseline testing - Java 11 to Java 17 migration using OpenRewrite
 
 # Repository configuration
-repo_url: https://github.com/spring-projects/spring-petclinic.git
-repo_branch: main
+repo_url: https://github.com/eugenp/tutorials.git
+repo_branch: master
 # local_path: /path/to/local/repo  # Optional: use local repository instead
 
 # Task configuration
@@ -11,9 +11,8 @@ task_type: migration
 source_lang: java
 target_spec: "java:17"
 recipe_ids:
-  - org.openrewrite.java.migrate.Java11toJava17
-  - org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0
-  - org.openrewrite.java.spring.boot3.SpringBoot3BestPractices
+  - org.openrewrite.java.migrate.UpgradeToJava17
+  - org.openrewrite.java.migrate.javax.JavaxToJakarta
 
 # LLM configuration for self-healing
 llm_provider: ollama  # Options: openai, ollama, anthropic, azure
@@ -32,7 +31,7 @@ timeout_per_iteration: 5m
 stop_on_success: true
 
 # Output configuration
-output_dir: ./benchmark_results/java11to17
+output_dir: ./benchmark_results/phase1
 capture_full_diffs: true
 capture_partial_diffs: true
 save_intermediate_state: true

@@ -1,7 +1,7 @@
 # Comprehensive ARF Java 11→17 Migration Test Scenario
 
 ## Overall Progress Tracking
-- [x] **Phase 1 Complete**: Baseline OpenRewrite Testing ✅ 2025-08-26
+- [ ] **Phase 1 Complete**: Baseline OpenRewrite Testing
 - [ ] **Phase 2 Complete**: LLM Self-Healing Integration  
 - [ ] **Phase 3 Complete**: Parallel Execution Testing
 - [ ] **All Success Metrics Met**: Production readiness confirmed
@@ -33,17 +33,19 @@ Design a comprehensive test scenario that progressively evaluates ARF features (
 **Projects**: Tier 1 projects (3 repositories)
 
 **Test Steps**:
-- [x] Sequential execution of simple projects ✅ 2025-08-26
-- [x] Basic Java 11→17 migration recipes ✅ 2025-08-26
-- [x] Maven plugin integration verification ✅ 2025-08-26
-- [x] Diff generation and validation ✅ 2025-08-26
-- [x] Build success confirmation ✅ 2025-08-26
+- [ ] Sequential execution of simple projects
+- [ ] Basic Java 11→17 migration recipes  
+- [ ] Maven plugin integration verification
+- [ ] Diff generation and validation
+- [ ] Build success confirmation
 
 **Success Criteria**:
-- [x] 100% success rate on simple projects ✅ 2025-08-26
-- [x] Clean diff generation ✅ 2025-08-26
-- [x] No compilation errors post-transformation ✅ 2025-08-26
-- [x] Execution time < 5 minutes per project ✅ 2025-08-26
+- [ ] 100% success rate on simple projects
+- [ ] Clean diff generation
+- [ ] No compilation errors post-transformation
+- [ ] Execution time < 5 minutes per project
+- [ ] Nomad HCL validation passes
+- [ ] Comprehensive migration reports generated
 
 ### Phase 2: LLM Self-Healing Integration
 **Objective**: Test hybrid OpenRewrite + LLM pipeline  
@@ -61,6 +63,8 @@ Design a comprehensive test scenario that progressively evaluates ARF features (
 - [ ] Error resolution within 3 iterations
 - [ ] Confidence scores > 0.7 for successful transformations
 - [ ] Build success after LLM fixes
+- [ ] Nomad HCL validation passes
+- [ ] Detailed LLM iteration reports generated
 
 ### Phase 3: Parallel Execution Testing
 **Objective**: Validate concurrent multi-repository transformations  
@@ -81,6 +85,8 @@ Design a comprehensive test scenario that progressively evaluates ARF features (
 - [ ] Parallel execution reduces total time by 60%
 - [ ] No resource conflicts or race conditions
 - [ ] Proper dependency ordering maintained
+- [ ] Nomad HCL validation passes for all parallel jobs
+- [ ] Comprehensive parallel execution reports generated
 
 ## Detailed Test Configuration
 
@@ -404,11 +410,13 @@ echo "Phase 3 parallel testing submitted - monitor with 'ploy arf benchmark list
 - [ ] **Performance**: Average execution time per complexity tier
 - [ ] **Scalability**: Time reduction achieved through parallel execution
 - [ ] **Reliability**: Consistency of results across multiple runs
+- [ ] **Report Generation**: 100% report coverage for all executions
 
 ### Qualitative Metrics
 - [ ] **Code Quality**: Manual review of generated diffs
 - [ ] **Build Success**: Post-transformation compilation and test success
 - [ ] **LLM Effectiveness**: Quality of LLM-suggested fixes
 - [ ] **Error Recovery**: System's ability to handle and recover from failures
+- [ ] **Infrastructure Robustness**: Nomad HCL validation success rate
 
 This comprehensive scenario progressively tests all ARF features while providing concrete metrics for evaluating the system's production readiness and scalability.

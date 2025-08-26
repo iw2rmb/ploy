@@ -72,12 +72,12 @@ job "{{APP_NAME}}-{{LANE}}" {
       connect {
         sidecar_service {
           proxy {
-            upstreams {
+            upstream {
               destination_name = "database"
               local_bind_port  = 5432
             }
             {{#if VAULT_ENABLED}}
-            upstreams {
+            upstream {
               destination_name = "vault"
               local_bind_port  = 8200
             }
