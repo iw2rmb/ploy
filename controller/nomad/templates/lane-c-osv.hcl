@@ -315,11 +315,12 @@ EOF
       resources { 
         cpu = 1000      # 1000 MHz for JVM
         memory = 512    # 512 MB for JVM
+        disk = 512      # 512 MB disk allocation
       }
       
       logs { 
-        max_files = 15
-        max_file_size = 100  # Larger logs for JVM applications
+        max_files = 3
+        max_file_size = 10  # Reduced for efficient disk usage
       }
       
       # JVM lifecycle management
@@ -358,8 +359,8 @@ EOF
       }
       
       logs {
-        max_files = 5
-        max_file_size = 25
+        max_files = 2
+        max_file_size = 10
       }
     }
     {{/if}}
