@@ -999,7 +999,7 @@ func TestMockImplementations(t *testing.T) {
 
 	t.Run("mock env store", func(t *testing.T) {
 		mockEnv := &MockEnvStore{}
-		mockEnv.On("GetAll", "testapp").Return(map[string]string{"KEY": "value"}, nil)
+		mockEnv.On("GetAll", "testapp").Return(envstore.AppEnvVars{"KEY": "value"}, nil)
 		mockEnv.On("Set", "testapp", "KEY", "newvalue").Return(nil)
 
 		vars, err := mockEnv.GetAll("testapp")

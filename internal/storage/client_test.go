@@ -593,10 +593,17 @@ func TestStorageClient_GetMetrics(t *testing.T) {
 }
 
 func TestStorageClient_GetHealthStatus(t *testing.T) {
-	mockProvider := &MockStorageProvider{}
-	
 	// Test with health check enabled
 	t.Run("health check enabled", func(t *testing.T) {
+		mockProvider := &MockStorageProvider{}
+		
+		// Set up mock expectations for health check - use mock.Anything for flexible matching
+		mockProvider.On("ListObjects", mock.Anything, mock.Anything).Return([]ObjectInfo{}, nil).Maybe()
+		mockProvider.On("GetProviderType").Return("mock").Maybe()
+		mockProvider.On("GetArtifactsBucket").Return("test-bucket").Maybe()
+		mockProvider.On("PutObject", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&PutObjectResult{Size: 100}, nil).Maybe()
+		mockProvider.On("GetObject", mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("test")), nil).Maybe()
+		
 		config := DefaultClientConfig()
 		config.EnableHealthCheck = true
 		config.EnableMetrics = true // Health check requires metrics
@@ -605,12 +612,14 @@ func TestStorageClient_GetHealthStatus(t *testing.T) {
 		status := client.GetHealthStatus()
 		
 		assert.NotNil(t, status)
-		// Note: Since we can't easily mock the health checker, 
-		// we just verify that we get a response
+		// Health check should return a status
+		assert.Contains(t, []HealthStatus{HealthStatusHealthy, HealthStatusDegraded, HealthStatusUnhealthy, HealthStatusUnknown}, status.Status)
 	})
 	
 	// Test with health check disabled
 	t.Run("health check disabled", func(t *testing.T) {
+		mockProvider := &MockStorageProvider{}
+		
 		config := DefaultClientConfig()
 		config.EnableHealthCheck = false
 		
