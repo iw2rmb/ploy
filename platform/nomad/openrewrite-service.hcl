@@ -43,8 +43,8 @@ job "openrewrite-service" {
       driver = "docker"
       
       config {
-        image = "ab311200d170"  # Use Docker image ID directly
-        force_pull = false  # Prevent registry pull, use local image
+        image = "localhost:5000/ploy-openrewrite:latest"  # Use local registry
+        force_pull = false  # Prevent external registry pull, use local registry
         ports = ["http", "metrics"]
         
         # tmpfs mount for transformations
@@ -67,7 +67,7 @@ job "openrewrite-service" {
       # Environment configuration
       env {
         # Port configuration
-        PORT = "${NOMAD_PORT_http}"
+        OPENREWRITE_PORT = "${NOMAD_PORT_http}"
         METRICS_PORT = "${NOMAD_PORT_metrics}"
         
         # Service discovery
