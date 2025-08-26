@@ -1,7 +1,6 @@
 package nomad
 
 import (
-	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,8 +48,6 @@ type RenderData struct {
 	BuildTime string
 }
 
-//go:embed templates/*.hcl
-var templateFS embed.FS
 
 // ConsulTemplateClient wraps Consul client for template operations
 type ConsulTemplateClient struct {
@@ -67,7 +64,7 @@ func NewConsulTemplateClient() (*ConsulTemplateClient, error) {
 	return &ConsulTemplateClient{client: client}, nil
 }
 
-// GetTemplate retrieves a template from Consul KV with embedded fallback
+// GetTemplate retrieves a template from Consul KV with platform file fallback
 func (c *ConsulTemplateClient) GetTemplate(templatePath string) ([]byte, error) {
 	// Try Consul KV first
 	keyPath := fmt.Sprintf("ploy/templates/%s", filepath.Base(templatePath))
@@ -76,11 +73,10 @@ func (c *ConsulTemplateClient) GetTemplate(templatePath string) ([]byte, error) 
 		return pair.Value, nil
 	}
 
-	// Fall back to embedded templates
-	embeddedPath := fmt.Sprintf("templates/%s", filepath.Base(templatePath))
-	content, err := templateFS.ReadFile(embeddedPath)
+	// Fall back to platform templates
+	content, err := os.ReadFile(templatePath)
 	if err != nil {
-		return nil, fmt.Errorf("template not found in Consul KV or embedded FS: %s", templatePath)
+		return nil, fmt.Errorf("template not found in Consul KV or platform files: %s", templatePath)
 	}
 	return content, nil
 }
@@ -95,10 +91,6 @@ func (c *ConsulTemplateClient) PutTemplate(templatePath string, content []byte) 
 	return err
 }
 
-// GetTemplateFS returns the embedded template filesystem for external access
-func GetTemplateFS() embed.FS {
-	return templateFS
-}
 
 func templateForLane(lane string) string {
 	switch strings.ToUpper(lane) {
@@ -122,7 +114,7 @@ func debugTemplateForLane(lane string) string {
 	}
 }
 
-// loadTemplateContent loads template content using hybrid approach: Consul KV first, then embedded fallback
+// loadTemplateContent loads template content using hybrid approach: Consul KV first, then platform file fallback
 func loadTemplateContent(templatePath string) ([]byte, error) {
 	// Try to create Consul client (fail gracefully if not available)
 	consulClient, err := NewConsulTemplateClient()
@@ -132,16 +124,14 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 		if err == nil {
 			return content, nil
 		}
-		// Log the Consul error but continue to embedded fallback
+		// Log the Consul error but continue to platform file fallback
 		// Note: In production, this could be logged via structured logging
 	}
 
-	// Fall back to embedded templates
-	templateFile := filepath.Base(templatePath)
-	embeddedPath := fmt.Sprintf("templates/%s", templateFile)
-	content, err := templateFS.ReadFile(embeddedPath)
+	// Fall back to platform templates
+	content, err := os.ReadFile(templatePath)
 	if err != nil {
-		return nil, fmt.Errorf("template not found in embedded FS: %s (consul error: %v)", templatePath, err)
+		return nil, fmt.Errorf("template not found in platform files: %s (consul error: %v)", templatePath, err)
 	}
 	return content, nil
 }
