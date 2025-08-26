@@ -114,17 +114,7 @@ func classifyError(err error, context ErrorContext) (ErrorType, bool, time.Durat
 
 	errStr := strings.ToLower(err.Error())
 	
-	// Network-related errors
-	if isNetworkError(err) {
-		return ErrorTypeNetwork, true, 1 * time.Second
-	}
-	
-	// Timeout errors
-	if isTimeoutError(err) {
-		return ErrorTypeTimeout, true, 2 * time.Second
-	}
-	
-	// HTTP status code classification
+	// HTTP status code classification (check first for precise mapping)
 	switch context.HTTPStatus {
 	case http.StatusUnauthorized:
 		return ErrorTypeAuthentication, false, 0
@@ -145,6 +135,16 @@ func classifyError(err error, context ErrorContext) (ErrorType, bool, time.Durat
 		return ErrorTypeInternal, true, 5 * time.Second
 	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		return ErrorTypeServiceUnavailable, true, 5 * time.Second
+	}
+	
+	// Network-related errors (check after HTTP status)
+	if isNetworkError(err) {
+		return ErrorTypeNetwork, true, 1 * time.Second
+	}
+	
+	// Timeout errors (check after HTTP status to avoid override)
+	if isTimeoutError(err) {
+		return ErrorTypeTimeout, true, 2 * time.Second
 	}
 	
 	// Content-based error classification
@@ -206,8 +206,8 @@ func isNetworkError(err error) bool {
 
 // isTimeoutError checks if an error is timeout-related
 func isTimeoutError(err error) bool {
-	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-		return true
+	if netErr, ok := err.(net.Error); ok {
+		return netErr.Timeout()
 	}
 	
 	errStr := strings.ToLower(err.Error())
