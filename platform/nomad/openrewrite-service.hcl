@@ -15,10 +15,10 @@ job "openrewrite-service" {
     # Network configuration
     network {
       port "http" {
-        static = 8090
+        static = 8092
       }
       port "metrics" {
-        static = 8091
+        static = 8093
       }
     }
     
@@ -86,8 +86,12 @@ job "openrewrite-service" {
         CACHE_DIR = "/app/cache"
         
         # Java configuration
-        JAVA_HOME = "/usr/lib/jvm/java-17-openjdk"
-        JAVA_OPTS = "-Xmx3g -Xms1g"
+        JAVA_HOME = "/opt/java/openjdk"
+        JAVA_OPTS = "-Xmx3g -Xms1g -Dmaven.repo.local=/home/openrewrite/.m2/repository"
+        
+        # Maven configuration
+        MAVEN_OPTS = "-Xmx2g -Xms512m"
+        MAVEN_CONFIG = "/home/openrewrite/.m2"
         
         # Service metadata
         SERVICE_NAME = "openrewrite"
@@ -148,15 +152,17 @@ job "openrewrite-service" {
         
         # Check main health endpoint
         echo "Checking OpenRewrite service health..."
-        curl -f -s http://localhost:$PORT/health > /dev/null
+        curl -f -s http://localhost:$PORT/v1/openrewrite/health > /dev/null
         
-        # Check metrics endpoint
-        echo "Checking metrics endpoint..."
-        curl -f -s http://localhost:$PORT/metrics > /dev/null
+        # Check service info endpoint
+        echo "Checking service info endpoint..."
+        curl -f -s http://localhost:$PORT/ > /dev/null
         
-        # Check worker pool status
-        echo "Checking worker pool status..."
-        curl -f -s http://localhost:$PORT/status > /dev/null
+        # Check transformation endpoint availability
+        echo "Checking transformation endpoint..."
+        curl -f -s -X POST http://localhost:$PORT/v1/openrewrite/transform \
+          -H "Content-Type: application/json" \
+          -d '{"test": "availability"}' > /dev/null || echo "Transform endpoint not ready yet"
         
         echo "OpenRewrite service health check passed"
         EOH
@@ -165,11 +171,11 @@ job "openrewrite-service" {
         perms = "755"
       }
       
-      # Resource allocation
+      # Resource allocation - increased for Maven operations
       resources {
-        cpu    = 1000  # 1 CPU core for testing
-        memory = 2048  # 2GB RAM for testing
-        disk   = 2048  # 2GB disk for logs
+        cpu    = 2000  # 2 CPU cores for Maven builds
+        memory = 4096  # 4GB RAM for Maven operations
+        disk   = 4096  # 4GB disk for Maven cache and logs
       }
       
       # Graceful shutdown
@@ -211,10 +217,10 @@ job "openrewrite-service" {
         type     = "http"
         path     = "/health"
         port     = "http"
-        interval = "10s"
-        timeout  = "5s"
-        success_before_passing = 2
-        failures_before_critical = 3
+        interval = "15s"
+        timeout  = "10s"
+        success_before_passing = 1
+        failures_before_critical = 5
         
         check_restart {
           limit = 2

@@ -129,4 +129,41 @@ ARF Migration Report
 4. **Alternative Testing**: Consider smaller, controlled test repositories for initial validation
 
 **Report Generated**: 2025-08-26 09:40:00 UTC  
-**Next Update**: After issue resolution and re-execution
+**Investigation Update**: 2025-08-26 10:02:00 UTC
+
+## Investigation Results ✅
+
+**Enhanced Logging Successfully Implemented**: Complete visibility into ARF execution pipeline
+
+### Root Causes Identified:
+
+1. **OpenRewrite Recipe Application Failures**:
+   - Recipe `org.openrewrite.java.migrate.UpgradeToJava17` fails consistently  
+   - Failure occurs within seconds across all iterations
+   - Likely incorrect recipe name or missing Maven dependencies
+
+2. **Deployment Pipeline HTTP Failures**:
+   - HTTP request failures during `deployTarArchive` stage
+   - Consistent sandbox creation failures
+   - Controller→deployment service connectivity issues
+
+### Enhanced Logging Evidence:
+```
+[10:00:54] [ERROR] [openrewrite_transform] Recipe application failed
+[10:00:58] [ERROR] [deployment] HTTP request failed
+[10:00:58] [ERROR] [sandbox_creation] deployTarArchive failed
+```
+
+### Benchmark Statistics:
+- **Latest Test**: bench-1756202445 (27s duration)
+- **Repository**: Baeldung Tutorials (9s clone success)
+- **Iterations**: 3 complete failure cycles
+- **Success Rate**: 0% (both transformation and deployment)
+
+### Next Steps:
+1. Research correct OpenRewrite recipe names from documentation
+2. Debug HTTP deployment connectivity issues  
+3. Test with controlled Java 11 repositories
+4. Add detailed Maven output logging
+
+**Status**: Investigation complete with clear action items for resolution

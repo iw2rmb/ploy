@@ -34,7 +34,12 @@ func NewDeploymentSandboxManager(controllerURL string, logger func(level, stage,
 	return &DeploymentSandboxManager{
 		controllerURL: controllerURL,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Minute, // Long timeout for builds
+			Timeout: 15 * time.Minute, // Longer timeout for large builds
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost:   10,
+				IdleConnTimeout:       30 * time.Second,
+				DisableKeepAlives:     false,
+			},
 		},
 		logger: logger,
 	}
@@ -570,6 +575,17 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 			d.logger("ERROR", "deployment", "HTTP request failed", fmt.Sprintf("URL: %s, Error: %v", deployURL, err))
 		}
 		fmt.Printf("HTTP Request Error: %v\n", err)
+		
+		// Check if it's a timeout error
+		if os.IsTimeout(err) {
+			return fmt.Errorf("deployment request timed out (check controller availability): %w", err)
+		}
+		
+		// Check if it's a connection error
+		if strings.Contains(err.Error(), "connection refused") {
+			return fmt.Errorf("deployment request failed - controller not reachable at %s: %w", d.controllerURL, err)
+		}
+		
 		return fmt.Errorf("deploy request failed: %w", err)
 	}
 	

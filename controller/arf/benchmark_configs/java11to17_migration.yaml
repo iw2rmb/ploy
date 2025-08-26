@@ -12,6 +12,8 @@ source_lang: java
 target_spec: "java:17"
 recipe_ids:
   - org.openrewrite.java.migrate.UpgradeToJava17
+recipe_artifacts:
+  - org.openrewrite.recipe:rewrite-migrate-java:3.15.0
 
 # LLM configuration for self-healing
 llm_provider: ollama  # Options: openai, ollama, anthropic, azure

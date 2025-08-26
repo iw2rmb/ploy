@@ -43,10 +43,11 @@ type BenchmarkConfig struct {
 	LocalPath    string `json:"local_path" yaml:"local_path"`
 	
 	// Task configuration
-	TaskType     string   `json:"task_type" yaml:"task_type"` // migration, security, cleanup, refactor
-	SourceLang   string   `json:"source_lang" yaml:"source_lang"`
-	TargetSpec   string   `json:"target_spec" yaml:"target_spec"` // e.g., "java:17", "spring-boot:3.0"
-	RecipeIDs    []string `json:"recipe_ids" yaml:"recipe_ids"`
+	TaskType        string   `json:"task_type" yaml:"task_type"` // migration, security, cleanup, refactor
+	SourceLang      string   `json:"source_lang" yaml:"source_lang"`
+	TargetSpec      string   `json:"target_spec" yaml:"target_spec"` // e.g., "java:17", "spring-boot:3.0"
+	RecipeIDs       []string `json:"recipe_ids" yaml:"recipe_ids"`
+	RecipeArtifacts []string `json:"recipe_artifacts" yaml:"recipe_artifacts"`
 	
 	// LLM configuration
 	LLMProvider  string            `json:"llm_provider" yaml:"llm_provider"` // openai, ollama, anthropic, azure
