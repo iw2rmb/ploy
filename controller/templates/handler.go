@@ -2,8 +2,8 @@ package templates
 
 import (
 	"fmt"
-	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
@@ -49,7 +49,7 @@ type TemplateStatus struct {
 	SizeBytes int    `json:"size_bytes,omitempty"`
 }
 
-// SyncTemplates synchronizes embedded templates to Consul KV
+// SyncTemplates synchronizes platform templates to Consul KV
 func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 	var req SyncTemplatesRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -58,12 +58,12 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 		})
 	}
 
-	// Get all embedded templates
-	templateFS := nomad.GetTemplateFS()
-	templates, err := fs.ReadDir(templateFS, "templates")
+	// Get all platform templates
+	platformTemplateDir := "platform/nomad"
+	templates, err := os.ReadDir(platformTemplateDir)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": fmt.Sprintf("Failed to read embedded templates: %v", err),
+			"error": fmt.Sprintf("Failed to read platform templates: %v", err),
 		})
 	}
 
@@ -84,11 +84,11 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 			Name: templateName,
 		}
 
-		// Read template content from embedded FS
-		content, err := fs.ReadFile(templateFS, fmt.Sprintf("templates/%s", templateName))
+		// Read template content from platform files
+		content, err := os.ReadFile(filepath.Join(platformTemplateDir, templateName))
 		if err != nil {
 			status.Status = "error"
-			status.Message = fmt.Sprintf("Failed to read embedded template: %v", err)
+			status.Message = fmt.Sprintf("Failed to read platform template: %v", err)
 			response.Templates = append(response.Templates, status)
 			continue
 		}
@@ -128,13 +128,13 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-// GetTemplateStatus returns the status of templates in both embedded FS and Consul KV
+// GetTemplateStatus returns the status of templates in both platform files and Consul KV
 func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
-	templateFS := nomad.GetTemplateFS()
-	templates, err := fs.ReadDir(templateFS, "templates")
+	platformTemplateDir := "platform/nomad"
+	templates, err := os.ReadDir(platformTemplateDir)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": fmt.Sprintf("Failed to read embedded templates: %v", err),
+			"error": fmt.Sprintf("Failed to read platform templates: %v", err),
 		})
 	}
 
@@ -149,28 +149,28 @@ func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
 			Name: templateName,
 		}
 
-		// Check embedded template
-		embeddedContent, err := fs.ReadFile(templateFS, fmt.Sprintf("templates/%s", templateName))
+		// Check platform template
+		platformContent, err := os.ReadFile(filepath.Join(platformTemplateDir, templateName))
 		if err != nil {
 			status.Status = "error"
-			status.Message = fmt.Sprintf("Embedded template error: %v", err)
+			status.Message = fmt.Sprintf("Platform template error: %v", err)
 		} else {
-			status.SizeBytes = len(embeddedContent)
+			status.SizeBytes = len(platformContent)
 		}
 
 		// Check Consul KV
 		consulContent, err := h.consulClient.GetTemplate(templateName)
 		if err == nil && len(consulContent) > 0 {
-			if len(embeddedContent) == len(consulContent) {
+			if len(platformContent) == len(consulContent) {
 				status.Status = "synced"
-				status.Message = "Available in both embedded FS and Consul KV"
+				status.Message = "Available in both platform files and Consul KV"
 			} else {
 				status.Status = "different"
-				status.Message = fmt.Sprintf("Size mismatch - Embedded: %d bytes, Consul: %d bytes", len(embeddedContent), len(consulContent))
+				status.Message = fmt.Sprintf("Size mismatch - Platform: %d bytes, Consul: %d bytes", len(platformContent), len(consulContent))
 			}
 		} else {
-			status.Status = "embedded_only"
-			status.Message = "Available in embedded FS only"
+			status.Status = "platform_only"
+			status.Message = "Available in platform files only"
 		}
 
 		statuses = append(statuses, status)
