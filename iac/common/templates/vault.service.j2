@@ -7,8 +7,8 @@ ConditionFileNotEmpty=/etc/vault.d/vault.hcl
 
 [Service]
 Type=notify
-User=hashicorp
-Group=hashicorp
+User=ploy
+Group=ploy
 ExecStart=/usr/local/bin/vault server -config=/etc/vault.d/vault.hcl
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process

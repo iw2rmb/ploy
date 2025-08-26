@@ -8,8 +8,8 @@ ConditionFileNotEmpty=/etc/nomad.d/nomad.hcl
 
 [Service]
 Type=notify
-User=hashicorp
-Group=hashicorp
+User=ploy
+Group=ploy
 EnvironmentFile=-/etc/nomad.d/nomad.env
 ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d/nomad.hcl
 ExecReload=/bin/kill -HUP $MAINPID
