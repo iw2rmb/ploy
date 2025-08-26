@@ -387,28 +387,28 @@ func (r *RenderData) SetDefaults() {
 	r.DebugEnabled = false
 }
 
-// processConditionalBlocks handles {{#if CONDITION}} blocks in templates  
+// processConditionalBlocks handles {{#if CONDITION}} blocks in templates using generic Handlebars-style processing
 func processConditionalBlocks(template string, data RenderData) string {
-	result := template
+	// Use regex to find all {{#if CONDITION}}...{{/if}} blocks
+	conditionalRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}`)
 	
-	// Only handle DEBUG_ENABLED blocks since all other features are enabled by default
-	// Debug remains conditional for security reasons
-	
-	if !data.DebugEnabled {
-		// Remove debug port block with surrounding whitespace
-		debugPortRe := regexp.MustCompile(`(?m)^\s*\{\{#if DEBUG_ENABLED\}\}\n.*?port "debug".*?\n.*?\}\n\s*\{\{/if\}\}\n?`)
-		result = debugPortRe.ReplaceAllString(result, "")
+	result := conditionalRegex.ReplaceAllStringFunc(template, func(match string) string {
+		submatch := conditionalRegex.FindStringSubmatch(match)
+		if len(submatch) < 3 {
+			return match // Keep original if can't parse
+		}
 		
-		// Remove debug environment variables
-		debugEnvRe := regexp.MustCompile(`(?s)\s*\{\{#if DEBUG_ENABLED\}\}[\s\S]*?JAVA_TOOL_OPTIONS[\s\S]*?\{\{/if\}\}`)
-		result = debugEnvRe.ReplaceAllString(result, "")
-	} else {
-		// Remove the conditional tags but keep the content
-		result = strings.ReplaceAll(result, "{{#if DEBUG_ENABLED}}", "")
-		result = strings.ReplaceAll(result, "{{/if}}", "")
-	}
+		condition := submatch[1]
+		content := submatch[2]
+		
+		// Evaluate condition using existing evaluateCondition function
+		if evaluateCondition(condition, data) {
+			return content // Include content if condition is true
+		}
+		return "" // Remove entire block if condition is false
+	})
 	
-	// Clean up excessive blank lines
+	// Clean up excessive blank lines that may result from removed blocks
 	result = regexp.MustCompile(`\n\s*\n\s*\n+`).ReplaceAllString(result, "\n\n")
 	
 	return result
