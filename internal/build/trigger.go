@@ -21,8 +21,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/validation"
 )
 
+// BuildDependencies holds the dependencies needed for build operations
+type BuildDependencies struct {
+	StorageClient *storage.StorageClient
+	EnvStore      envstore.EnvStoreInterface
+}
+
 // TriggerBuild handles the build and deployment request for an application
 func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
+	deps := &BuildDependencies{
+		StorageClient: storeClient,
+		EnvStore:      envStore,
+	}
+	return triggerBuildWithDependencies(c, deps)
+}
+
+// triggerBuildWithDependencies is the testable implementation of TriggerBuild
+func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 	appName := c.Params("app")
 	
 	// Validate app name
@@ -50,7 +65,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 	os.MkdirAll(srcDir, 0755)
 	_ = utils.Untar(tarPath, srcDir)
 
-	appEnvVars, err := envStore.GetAll(appName)
+	appEnvVars, err := deps.EnvStore.GetAll(appName)
 	if err != nil {
 		appEnvVars = make(map[string]string)
 	}
@@ -322,12 +337,12 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 	
 	_ = nomad.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
 
-	if storeClient != nil {
+	if deps.StorageClient != nil {
 		keyPrefix := appName + "/" + sha + "/"
 		
 		// Upload artifact bundle with comprehensive error handling and verification
 		if imagePath != "" {
-			if result, err := storeClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
+			if result, err := deps.StorageClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
 				return utils.ErrJSON(c, 500, fmt.Errorf("artifact bundle upload with verification failed: %w", err))
 			} else {
 				fmt.Printf("Artifact bundle integrity verification: %s\n", result.GetVerificationSummary())
@@ -340,7 +355,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 		// Upload source code SBOM with enhanced retry and verification
 		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
 		if _, err := os.Stat(sourceSBOMPath); err == nil {
-			if err := uploadFileWithRetryAndVerification(storeClient, sourceSBOMPath, keyPrefix+"source.sbom.json", "application/json"); err != nil {
+			if err := uploadFileWithRetryAndVerification(deps.StorageClient, sourceSBOMPath, keyPrefix+"source.sbom.json", "application/json"); err != nil {
 				fmt.Printf("Warning: Failed to upload source SBOM after retries: %v\n", err)
 			} else {
 				fmt.Printf("Source SBOM uploaded and verified successfully\n")
@@ -351,7 +366,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 		if dockerImage != "" {
 			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
 			if _, err := os.Stat(containerSBOMPath); err == nil {
-				if err := uploadFileWithRetryAndVerification(storeClient, containerSBOMPath, keyPrefix+"container.sbom.json", "application/json"); err != nil {
+				if err := uploadFileWithRetryAndVerification(deps.StorageClient, containerSBOMPath, keyPrefix+"container.sbom.json", "application/json"); err != nil {
 					fmt.Printf("Warning: Failed to upload container SBOM after retries: %v\n", err)
 				} else {
 					fmt.Printf("Container SBOM uploaded and verified successfully\n")
@@ -369,7 +384,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 			"signed":      fmt.Sprintf("%t", signed),
 		}
 		mb, _ := json.Marshal(meta)
-		if err := uploadBytesWithRetryAndVerification(storeClient, mb, keyPrefix+"meta.json", "application/json"); err != nil {
+		if err := uploadBytesWithRetryAndVerification(deps.StorageClient, mb, keyPrefix+"meta.json", "application/json"); err != nil {
 			fmt.Printf("Warning: Failed to upload metadata after retries: %v\n", err)
 		} else {
 			fmt.Printf("Metadata uploaded and verified successfully\n")
