@@ -374,102 +374,42 @@ func (r *RenderData) SetDefaults() {
 	if r.BuildTime == "" {
 		r.BuildTime = time.Now().Format(time.RFC3339)
 	}
+	
+	// Enable enterprise features by default for production readiness
+	// These provide service mesh, secrets, persistence, and configuration
+	r.ConnectEnabled = true
+	r.VaultEnabled = true
+	r.VolumeEnabled = true
+	r.ConsulConfigEnabled = true
+	
+	// Keep debug disabled by default for security
+	// Can be explicitly enabled when needed
+	r.DebugEnabled = false
 }
 
 // processConditionalBlocks handles {{#if CONDITION}} blocks in templates  
 func processConditionalBlocks(template string, data RenderData) string {
 	result := template
 	
-	// Process each conditional block type based on RenderData values
-	// Use regex to match entire blocks including surrounding whitespace
+	// Only handle DEBUG_ENABLED blocks since all other features are enabled by default
+	// Debug remains conditional for security reasons
 	
-	// Handle DEBUG_ENABLED blocks
 	if !data.DebugEnabled {
 		// Remove debug port block with surrounding whitespace
 		debugPortRe := regexp.MustCompile(`(?m)^\s*\{\{#if DEBUG_ENABLED\}\}\n.*?port "debug".*?\n.*?\}\n\s*\{\{/if\}\}\n?`)
 		result = debugPortRe.ReplaceAllString(result, "")
 		
-		// Remove debug env vars block
-		debugEnvRe := regexp.MustCompile(`(?m)^\s*\{\{#if DEBUG_ENABLED\}\}.*?\{\{/if\}\}\n?`)
+		// Remove debug environment variables
+		debugEnvRe := regexp.MustCompile(`(?s)\s*\{\{#if DEBUG_ENABLED\}\}[\s\S]*?JAVA_TOOL_OPTIONS[\s\S]*?\{\{/if\}\}`)
 		result = debugEnvRe.ReplaceAllString(result, "")
+	} else {
+		// Remove the conditional tags but keep the content
+		result = strings.ReplaceAll(result, "{{#if DEBUG_ENABLED}}", "")
+		result = strings.ReplaceAll(result, "{{/if}}", "")
 	}
 	
-	// Handle VOLUME_ENABLED blocks
-	if !data.VolumeEnabled {
-		// Remove volume definition in group (more specific pattern)
-		volumeRe := regexp.MustCompile(`(?s)\s*\{\{#if VOLUME_ENABLED\}\}[\s\S]*?volume "jvm-data"[\s\S]*?\{\{/if\}\}`)
-		result = volumeRe.ReplaceAllString(result, "")
-		
-		// Remove volume_mount in task (more specific pattern)
-		volumeMountRe := regexp.MustCompile(`(?s)\s*\{\{#if VOLUME_ENABLED\}\}[\s\S]*?volume_mount[\s\S]*?\{\{/if\}\}`)
-		result = volumeMountRe.ReplaceAllString(result, "")
-	}
-	
-	// Handle CONNECT_ENABLED blocks
-	if !data.ConnectEnabled {
-		// Remove group-level service with connect configuration
-		connectServiceRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?service\s*\{[\s\S]*?connect\s*\{[\s\S]*?\}\s*\}[\s\S]*?\{\{/if\}\}`)
-		result = connectServiceRe.ReplaceAllString(result, "")
-		
-		// Remove connect blocks inside services
-		connectBlockRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?connect\s*\{[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
-		result = connectBlockRe.ReplaceAllString(result, "")
-		
-		// Remove connect-proxy task
-		connectProxyRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?task "connect-proxy"[\s\S]*?\{\{/if\}\}`)
-		result = connectProxyRe.ReplaceAllString(result, "")
-		
-		// Remove connect-related environment variables
-		connectEnvRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?DATABASE_HOST[\s\S]*?\{\{/if\}\}`)
-		result = connectEnvRe.ReplaceAllString(result, "")
-	}
-	
-	// Handle VAULT_ENABLED blocks
-	if !data.VaultEnabled {
-		// Remove vault block in task
-		vaultBlockRe := regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}[\s\S]*?vault\s*\{[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
-		result = vaultBlockRe.ReplaceAllString(result, "")
-		
-		// Remove vault template blocks for secrets
-		vaultTemplateRe := regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}[\s\S]*?template\s*\{[\s\S]*?secrets/[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
-		result = vaultTemplateRe.ReplaceAllString(result, "")
-		
-		// Remove vault upstreams from connect config
-		vaultUpstreamRe := regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}[\s\S]*?upstreams\s*\{[\s\S]*?vault[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
-		result = vaultUpstreamRe.ReplaceAllString(result, "")
-	}
-	
-	// Handle CONSUL_CONFIG_ENABLED blocks
-	if !data.ConsulConfigEnabled {
-		consulRe := regexp.MustCompile(`(?ms)^\s*\{\{#if CONSUL_CONFIG_ENABLED\}\}.*?\{\{/if\}\}\n?`)
-		result = consulRe.ReplaceAllString(result, "")
-	}
-	
-	// Handle GRPC_PORT blocks
-	if data.GrpcPort <= 0 {
-		grpcRe := regexp.MustCompile(`(?ms)^\s*\{\{#if GRPC_PORT\}\}.*?\{\{/if\}\}\n?`)
-		result = grpcRe.ReplaceAllString(result, "")
-	}
-	
-	// Handle DISK_SIZE blocks
-	if data.DiskSize <= 0 {
-		diskRe := regexp.MustCompile(`(?ms)^\s*\{\{#if DISK_SIZE\}\}.*?\{\{/if\}\}\n?`)
-		result = diskRe.ReplaceAllString(result, "")
-	}
-	
-	// Generic cleanup: remove any remaining conditional tags (for blocks we kept)
-	result = regexp.MustCompile(`\{\{#if [A-Z_]+\}\}`).ReplaceAllString(result, "")
-	result = regexp.MustCompile(`\{\{/if\}\}`).ReplaceAllString(result, "")
-	
-	// Clean up excessive blank lines (more aggressive cleanup)
-	// First pass: reduce multiple blank lines to single blank lines
+	// Clean up excessive blank lines
 	result = regexp.MustCompile(`\n\s*\n\s*\n+`).ReplaceAllString(result, "\n\n")
-	
-	// Second pass: remove blank lines between closing and opening braces
-	result = regexp.MustCompile(`\}\n\s*\n(\s*[a-z#])`).ReplaceAllString(result, "}\n$1")
-	
-	// Third pass: ensure no blank lines after network block close
-	result = regexp.MustCompile(`(port.*?\n.*?\})\n\s*\}`).ReplaceAllString(result, "$1\n    }")
 	
 	return result
 }

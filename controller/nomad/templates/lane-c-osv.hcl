@@ -31,7 +31,8 @@ job "{{APP_NAME}}" {
       unlimited      = true
     }
     
-    network { 
+    network {
+      mode = "bridge"
       port "http" { 
         to = 8080 
       }
@@ -49,16 +50,13 @@ job "{{APP_NAME}}" {
     }
     
     # Persistent volume for JVM heap dumps and logs
-    {{#if VOLUME_ENABLED}}
     volume "jvm-data" {
       type      = "host"
       source    = "jvm-data"
       read_only = false
     }
-    {{/if}}
     
     # Consul service mesh integration
-    {{#if CONNECT_ENABLED}}
     service {
       name = "{{APP_NAME}}-connect"
       port = "http"
@@ -74,12 +72,10 @@ job "{{APP_NAME}}" {
               destination_name = "redis"
               local_bind_port  = 6379
             }
-            {{#if VAULT_ENABLED}}
             upstreams {
               destination_name = "vault"
               local_bind_port  = 8200
             }
-            {{/if}}
           }
         }
       }
@@ -90,18 +86,16 @@ job "{{APP_NAME}}" {
         runtime = "osv-jvm"
       }
     }
-    {{/if}}
     
     task "osv-jvm" {
       driver = "qemu"
       
       # Vault integration for JVM applications
-      {{#if VAULT_ENABLED}}
       vault {
-        policies = ["{{APP_NAME}}-policy"]
+        policies = ["default"]
         change_mode = "restart"
+        namespace = "default"
       }
-      {{/if}}
       
       artifact {
         source      = "{{IMAGE_PATH}}"
@@ -125,12 +119,11 @@ job "{{APP_NAME}}" {
       }
       
       # Volume mounting for JVM data
-      {{#if VOLUME_ENABLED}}
       volume_mount {
         volume      = "jvm-data"
         destination = "/app/data"
+        read_only   = false
       }
-      {{/if}}
       
       # Comprehensive environment variables for JVM
       env {
@@ -160,12 +153,10 @@ job "{{APP_NAME}}" {
         MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED = "true"
         
         # Database configuration (if using Connect)
-        {{#if CONNECT_ENABLED}}
         DATABASE_HOST = "127.0.0.1"
         DATABASE_PORT = "5432"
         REDIS_HOST = "127.0.0.1"  
         REDIS_PORT = "6379"
-        {{/if}}
         
         # Consul integration
         CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
@@ -179,7 +170,6 @@ job "{{APP_NAME}}" {
       }
       
       # Application configuration from Consul KV
-      {{#if CONSUL_CONFIG_ENABLED}}
       template {
         data = <<EOF
 # Application Configuration from Consul KV
@@ -199,10 +189,8 @@ EOF
         change_mode = "restart"
         perms       = "0644"
       }
-      {{/if}}
       
       # Secrets from Vault
-      {{#if VAULT_ENABLED}}
       template {
         data = <<EOF
 # Database Credentials
@@ -228,7 +216,6 @@ EOF
         change_mode = "restart"
         perms       = "0600"
       }
-      {{/if}}
       
       # Enhanced service registration
       service {
@@ -329,7 +316,6 @@ EOF
     }
     
     # Consul Connect sidecar for service mesh
-    {{#if CONNECT_ENABLED}}
     task "connect-proxy" {
       driver = "docker"
       
@@ -357,7 +343,6 @@ EOF
         max_file_size = 10
       }
     }
-    {{/if}}
     
     # JVM-optimized migration
     migrate {
