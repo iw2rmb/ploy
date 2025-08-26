@@ -1,0 +1,2 @@
+# Initial go.sum file - will be populated by go mod tidy
+# This file contains the expected cryptographic checksums of module dependencies
