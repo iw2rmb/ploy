@@ -33,11 +33,11 @@ Design a comprehensive test scenario that progressively evaluates ARF features (
 **Projects**: Tier 1 projects (3 repositories)
 
 **Test Steps**:
-- [ ] Sequential execution of simple projects
-- [ ] Basic Java 11→17 migration recipes  
-- [ ] Maven plugin integration verification
-- [ ] Diff generation and validation
-- [ ] Build success confirmation
+- [⚠️] Sequential execution of simple projects (3/3 executed, recipe issues found)
+- [❌] Basic Java 11→17 migration recipes (recipe failures identified)
+- [❌] Maven plugin integration verification (not reached due to recipe failures)
+- [❌] Diff generation and validation (blocked by recipe failures)
+- [❌] Build success confirmation (not attempted)
 
 **Success Criteria**:
 - [ ] 100% success rate on simple projects
@@ -189,16 +189,16 @@ llm_options:
 - Build success rate post-transformation
 
 **Expected Results**:
-- [x] Phase 1: 100% success, 3-5 min per project ✅ 2025-08-26
+- [ ] Phase 1: 0% success (OpenRewrite recipe issues identified), 43s-1m+ per project - 2025-08-26
 - [ ] Phase 2: 80% success, 10-15 min per project
 - [ ] Phase 3: 70% overall, 40% time reduction with parallelism
 
 ## Specific Test Repositories
 
 ### Tier 1 Projects (Simple) - Phase 1 Testing
-- [ ] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git`
-- [ ] **Java Tutorial Examples**: `https://github.com/winterbe/java8-tutorial.git` 
-- [ ] **Google Guava**: `https://github.com/google/guava.git` (Java 11 branches)
+- [⚠️] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (bench-1756200935: Recipe failed)
+- [❌] **Java Tutorial Examples**: `https://github.com/winterbe/java8-tutorial.git` (bench-1756201007: 1s failure)
+- [🔄] **Google Guava**: `https://github.com/google/guava.git` (bench-1756201074: In progress)
 
 ```bash
 # Repository URLs for Phase 1 testing

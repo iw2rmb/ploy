@@ -11,8 +11,8 @@ task_type: migration
 source_lang: java
 target_spec: "java:17"
 recipe_ids:
+  - org.openrewrite.java.migrate.Java8toJava11
   - org.openrewrite.java.migrate.UpgradeToJava17
-  - org.openrewrite.java.migrate.javax.JavaxToJakarta
 
 # LLM configuration for self-healing
 llm_provider: ollama  # Options: openai, ollama, anthropic, azure

@@ -3,6 +3,7 @@ package openrewrite
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,70 +28,94 @@ func NewExecutor(config *Config) Executor {
 
 // Execute runs an OpenRewrite transformation on the provided source code
 func (e *ExecutorImpl) Execute(ctx context.Context, jobID string, tarData []byte, recipe RecipeConfig) (*TransformResult, error) {
+	log.Printf("[OpenRewrite] Starting execution for jobID: %s", jobID)
+	log.Printf("[OpenRewrite] Recipe: %s", recipe.Recipe)
+	log.Printf("[OpenRewrite] Artifacts: %s", recipe.Artifacts)
+	
 	startTime := time.Now()
 	result := &TransformResult{
 		Success: false,
 	}
 
 	// Initialize Git repository
+	log.Printf("[OpenRewrite] Initializing Git repository...")
 	repoPath, err := e.gitManager.InitializeRepo(ctx, jobID, tarData)
 	if err != nil {
+		log.Printf("[OpenRewrite] Failed to initialize repository: %v", err)
 		result.Error = fmt.Sprintf("failed to initialize repository: %v", err)
 		return result, err
 	}
 	defer e.cleanup(repoPath)
+	log.Printf("[OpenRewrite] Repository initialized at: %s", repoPath)
 
 	// Detect build system
+	log.Printf("[OpenRewrite] Detecting build system...")
 	buildSystem := e.DetectBuildSystem(repoPath)
 	result.BuildSystem = string(buildSystem)
+	log.Printf("[OpenRewrite] Detected build system: %s", buildSystem)
 	
 	if buildSystem == BuildSystemNone {
+		log.Printf("[OpenRewrite] No supported build system found")
 		result.Error = "no supported build system found"
 		return result, fmt.Errorf("no supported build system found")
 	}
 
 	// Detect Java version
+	log.Printf("[OpenRewrite] Detecting Java version...")
 	javaVersion, err := e.DetectJavaVersion(repoPath)
 	if err != nil {
+		log.Printf("[OpenRewrite] Java version detection failed: %v, using default Java 17", err)
 		// Use default Java version
 		javaVersion = Java17
 	}
 	result.JavaVersion = string(javaVersion)
+	log.Printf("[OpenRewrite] Detected Java version: %s", javaVersion)
 
 	// Execute transformation based on build system
+	log.Printf("[OpenRewrite] Starting transformation with build system: %s", buildSystem)
 	var execErr error
 	switch buildSystem {
 	case BuildSystemMaven:
+		log.Printf("[OpenRewrite] Executing Maven transformation...")
 		execErr = e.executeMaven(ctx, repoPath, recipe)
 	case BuildSystemGradle:
+		log.Printf("[OpenRewrite] Executing Gradle transformation...")
 		execErr = e.executeGradle(ctx, repoPath, recipe)
 	default:
+		log.Printf("[OpenRewrite] Unsupported build system: %s", buildSystem)
 		execErr = fmt.Errorf("unsupported build system: %s", buildSystem)
 	}
 
 	if execErr != nil {
+		log.Printf("[OpenRewrite] Transformation execution failed: %v", execErr)
 		// Check if context was cancelled
 		if ctx.Err() != nil {
+			log.Printf("[OpenRewrite] Context cancelled: %v", ctx.Err())
 			result.Error = fmt.Sprintf("context cancelled: %v", ctx.Err())
 			return result, ctx.Err()
 		}
 		result.Error = fmt.Sprintf("transformation failed: %v", execErr)
 		return result, execErr
 	}
+	log.Printf("[OpenRewrite] Transformation executed successfully")
 
 	// Generate diff
+	log.Printf("[OpenRewrite] Generating diff...")
 	diff, err := e.gitManager.GenerateDiff(ctx, repoPath)
 	if err != nil {
+		log.Printf("[OpenRewrite] Failed to generate diff: %v", err)
 		result.Error = fmt.Sprintf("failed to generate diff: %v", err)
 		return result, err
 	}
+	log.Printf("[OpenRewrite] Diff generated successfully, length: %d bytes", len(diff))
 
 	// Set success result
 	result.Success = true
 	result.Diff = diff
 	result.Duration = time.Since(startTime)
 	result.Error = ""
-
+	
+	log.Printf("[OpenRewrite] Execution completed successfully in %v", result.Duration)
 	return result, nil
 }
 
@@ -238,15 +263,20 @@ func (e *ExecutorImpl) normalizeJavaVersion(version string) JavaVersion {
 
 // executeMaven runs OpenRewrite using Maven
 func (e *ExecutorImpl) executeMaven(ctx context.Context, repoPath string, recipe RecipeConfig) error {
+	log.Printf("[OpenRewrite] Creating rewrite.yml configuration...")
 	// Create rewrite.yml
 	rewriteYaml := e.generateRewriteYaml(recipe)
 	yamlPath := filepath.Join(repoPath, "rewrite.yml")
 	if err := os.WriteFile(yamlPath, []byte(rewriteYaml), 0644); err != nil {
+		log.Printf("[OpenRewrite] Failed to create rewrite.yml: %v", err)
 		return fmt.Errorf("failed to create rewrite.yml: %w", err)
 	}
+	log.Printf("[OpenRewrite] Created rewrite.yml at: %s", yamlPath)
+	log.Printf("[OpenRewrite] Rewrite.yml content:\n%s", rewriteYaml)
 
 	// Build Maven command arguments
 	args := e.buildMavenCommand(recipe)
+	log.Printf("[OpenRewrite] Maven command: %s %v", e.config.MavenPath, args)
 	
 	// Execute Maven
 	cmd := exec.CommandContext(ctx, e.config.MavenPath, args...)
@@ -255,11 +285,15 @@ func (e *ExecutorImpl) executeMaven(ctx context.Context, repoPath string, recipe
 	// Set JAVA_HOME if configured
 	if e.config.JavaHome != "" {
 		cmd.Env = append(os.Environ(), fmt.Sprintf("JAVA_HOME=%s", e.config.JavaHome))
+		log.Printf("[OpenRewrite] Using JAVA_HOME: %s", e.config.JavaHome)
 	}
 
+	log.Printf("[OpenRewrite] Executing Maven command in directory: %s", repoPath)
 	// Run the command
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Printf("[OpenRewrite] Maven execution failed with error: %v", err)
+		log.Printf("[OpenRewrite] Maven output:\n%s", string(output))
 		// Check if context was cancelled
 		if ctx.Err() != nil {
 			return fmt.Errorf("context cancelled: %w", ctx.Err())
@@ -267,6 +301,8 @@ func (e *ExecutorImpl) executeMaven(ctx context.Context, repoPath string, recipe
 		return fmt.Errorf("maven execution failed: %w\nOutput: %s", err, string(output))
 	}
 
+	log.Printf("[OpenRewrite] Maven execution succeeded")
+	log.Printf("[OpenRewrite] Maven output:\n%s", string(output))
 	return nil
 }
 
