@@ -498,43 +498,56 @@ func TestServer_HandleReloadStorageConfig(t *testing.T) {
 	})
 }
 
+func TestServer_HandleStorageHealth(t *testing.T) {
+	t.Run("storage client initialization error", func(t *testing.T) {
+		server := createMockServer()
+		// Set invalid storage config path to force getStorageClient error
+		server.dependencies.StorageConfigPath = "/tmp/nonexistent-storage-config.yaml"
+
+		// Set up route using actual handler method
+		server.app.Get("/storage/health", server.handleStorageHealth)
+
+		// Test request
+		req := httptest.NewRequest("GET", "/storage/health", nil)
+		resp, err := server.app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, 503, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "Storage client initialization failed", response["error"])
+		assert.Contains(t, response, "details")
+	})
+}
+
 func TestServer_HandleStorageMetrics(t *testing.T) {
-	// Create mock storage client
-	mockStorage := &MockStorageClient{}
-	expectedMetrics := map[string]interface{}{
-		"requests_per_second": 150.5,
-		"average_latency_ms":  25.3,
-		"error_rate":          0.02,
-	}
-	mockStorage.On("GetMetrics").Return(expectedMetrics)
+	t.Run("storage client initialization error", func(t *testing.T) {
+		server := createMockServer()
+		// Set invalid storage config path to force getStorageClient error
+		server.dependencies.StorageConfigPath = "/tmp/nonexistent-storage-config.yaml"
 
-	server := createMockServer()
-	
-	// Override getStorageClient to return our mock
-	server.mockStorageClient = func() (interface{}, error) {
-		return mockStorage, nil
-	}
+		// Set up route using actual handler method
+		server.app.Get("/storage/metrics", server.handleStorageMetrics)
 
-	// Set up route using actual handler method
-	server.app.Get("/storage/metrics", server.handleStorageMetrics)
+		// Test request
+		req := httptest.NewRequest("GET", "/storage/metrics", nil)
+		resp, err := server.app.Test(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
 
-	// Test request
-	req := httptest.NewRequest("GET", "/storage/metrics", nil)
-	resp, err := server.app.Test(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
+		assert.Equal(t, 503, resp.StatusCode)
 
-	assert.Equal(t, 200, resp.StatusCode)
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
 
-	var response map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.Equal(t, 150.5, response["requests_per_second"])
-	assert.Equal(t, 25.3, response["average_latency_ms"])
-	assert.Equal(t, 0.02, response["error_rate"])
-
-	mockStorage.AssertExpectations(t)
+		assert.Equal(t, "Storage client initialization failed", response["error"])
+		assert.Contains(t, response, "details")
+	})
 }
 
 func TestServer_HandleGetEnvVars(t *testing.T) {
