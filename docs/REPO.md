@@ -20,6 +20,13 @@ ploy/
     │   ├── phase-arf-3.md      # LLM Integration & Hybrid Intelligence
     │   ├── phase-arf-4.md      # Security & Production Hardening
     │   └── phase-arf-5.md      # Production Features & Scale
+    ├── openrewrite/    # OpenRewrite Service Implementation ✅ Aug 2025
+    │   ├── README.md           # Service roadmap and three-stream approach
+    │   ├── api-specification.md # HTTP API specification
+    │   ├── benchmark-java11.md  # Java 11→17 migration test scenarios
+    │   ├── stream-a-core.md     # Core transformation pipeline
+    │   ├── stream-b-infrastructure.md # Distributed infrastructure
+    │   └── stream-c-production.md # Production readiness features
     └── static-analysis/        # Static Analysis Integration Framework
         ├── README.md           # Framework overview and roadmap
         ├── phase-1.md          # Core Framework & Java Integration
@@ -62,8 +69,13 @@ controller/
 │   └── supply.go        # SBOM generation, signatures
 ├── domains/             # Domain management (new Traefik-based)
 │   └── domains.go       # Traefik service discovery integration
-└── routing/             # Traffic routing management
-    └── routing.go       # Traefik configuration management
+├── routing/             # Traffic routing management
+│   └── routing.go       # Traefik configuration management
+└── openrewrite/         # OpenRewrite service integration ✅ Aug 2025
+    ├── handler.go       # HTTP API endpoints for transformation jobs
+    ├── job_manager.go   # Job queue and status management
+    ├── storage.go       # Consul KV and SeaweedFS integration
+    └── monitoring.go    # Service health and metrics
 ```
 
 ### `/cmd/` - Command Line Applications
@@ -101,7 +113,11 @@ internal/
 │   ├── certs.go         # Certificate management
 │   ├── debug.go         # Debug operations
 │   ├── ui.go            # User interface helpers
-│   └── utils.go         # CLI utilities
+│   ├── utils.go         # CLI utilities
+│   └── arf/             # ARF and OpenRewrite CLI commands ✅ Aug 2025
+│       ├── benchmark.go # Benchmark testing and Java 11→17 migrations
+│       ├── recipes.go   # Recipe management and discovery
+│       └── jobs.go      # Transformation job control
 ├── preview/             # Preview host routing
 │   └── preview.go       # SHA-based preview URL handling
 ├── build/               # Build management
@@ -124,11 +140,16 @@ internal/
 │   ├── repository.go    # Git repository analysis
 │   ├── validator.go     # Repository validation
 │   └── utils.go         # Git utilities
-├── openrewrite/         # OpenRewrite Java transformation service
+├── openrewrite/         # OpenRewrite Java transformation service ✅ Aug 2025
 │   ├── types.go         # Type definitions and interfaces
 │   ├── manager.go       # Git repository manager for transformations
 │   ├── executor.go      # OpenRewrite executor for Maven/Gradle
 │   └── *_test.go        # Comprehensive unit tests
+├── monitoring/          # OpenRewrite service monitoring ✅ Aug 2025
+│   ├── metrics.go       # Prometheus metrics collection
+│   ├── tracing.go       # OpenTelemetry distributed tracing
+│   ├── health.go        # Health & readiness endpoints
+│   └── *_test.go        # Monitoring component tests
 └── utils/               # Shared utilities
     └── utils.go         # Common utility functions
 ```
@@ -380,6 +401,10 @@ vscode-arf-extension/
 - Apps: `/v1/apps/*`
 - Storage: `/v1/storage/*`
 - Domains: `/v1/apps/:app/domains/*`
+- OpenRewrite: `/v1/openrewrite/*` ✅ Aug 2025
+  - Jobs: `/v1/openrewrite/jobs/*` (submit, status, results)
+  - Health: `/v1/openrewrite/health` (service monitoring)
+  - Metrics: `/v1/openrewrite/metrics` (Prometheus integration)
 
 ### Build and Deployment
 - Lane selection: `tools/lane-pick/main.go`
@@ -396,5 +421,12 @@ vscode-arf-extension/
 5. **Infrastructure**: Update `iac/dev/playbooks/` and `platform/`
 6. **Testing**: Add tests to `tests/scripts/` and update `tests/scripts/README.md`
 7. **Documentation**: Update relevant files in `docs/` and `CHANGELOG.md`
+8. **OpenRewrite Service**: ✅ Aug 2025
+   - **Service Development**: Follow `roadmap/openrewrite/README.md` three-stream approach
+   - **Core Pipeline**: Implement Stream A features in `internal/openrewrite/`
+   - **Distributed Infrastructure**: Stream B features with Consul KV and SeaweedFS
+   - **Production Features**: Stream C monitoring, health checks, and auto-scaling
+   - **Benchmark Testing**: Use `roadmap/openrewrite/benchmark-java11.md` scenarios
+   - **CLI Integration**: `internal/cli/arf/` commands for job management
 
 This structure enables efficient navigation and quick location of relevant files for any development task.
