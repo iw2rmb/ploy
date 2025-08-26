@@ -357,11 +357,11 @@ func TestServer_HandleStorageConfig(t *testing.T) {
 				assert.Contains(t, response, "error")
 			} else {
 				// The response should contain the entire root config structure
-				assert.Contains(t, response, "storage")
-				storage, ok := response["storage"].(map[string]interface{})
+				assert.Contains(t, response, "Storage")
+				storage, ok := response["Storage"].(map[string]interface{})
 				require.True(t, ok)
-				assert.Equal(t, "seaweedfs", storage["provider"])
-				assert.Equal(t, "http://localhost:9333", storage["master"])
+				assert.Equal(t, "seaweedfs", storage["Provider"])
+				assert.Equal(t, "http://localhost:9333", storage["Master"])
 			}
 		})
 	}
