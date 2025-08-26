@@ -34,12 +34,18 @@ type RenderData struct {
 	VolumeEnabled       bool
 	DebugEnabled        bool
 	
+	// Language-specific options
+	Language    string // java, node, python, go, etc.
+	
 	// JVM-specific options
 	JvmOpts     string
 	JvmMemory   int
 	JvmCpus     int
 	MainClass   string
 	JavaVersion string
+	
+	// Node.js-specific options
+	NodeVersion string
 	
 	// Domain and TLS
 	DomainSuffix string
@@ -96,12 +102,38 @@ func templateForLane(lane string) string {
 	switch strings.ToUpper(lane) {
 	case "A": return "platform/nomad/lane-a-unikraft.hcl"
 	case "B": return "platform/nomad/lane-b-unikraft-posix.hcl"
-	case "C": return "platform/nomad/lane-c-osv.hcl"
+	case "C": return "platform/nomad/lane-c-osv.hcl"  // Legacy fallback
 	case "D": return "platform/nomad/lane-d-jail.hcl"
 	case "E": return "platform/nomad/lane-e-oci-kontain.hcl"
 	case "F": return "platform/nomad/lane-f-vm.hcl"
 	default: return "platform/nomad/lane-c-osv.hcl"
 	}
+}
+
+// templateForLaneAndLanguage returns language-specific template path
+func templateForLaneAndLanguage(lane, language string) string {
+	laneUpper := strings.ToUpper(lane)
+	languageLower := strings.ToLower(language)
+	
+	// Check for language-specific template first
+	if languageLower != "" {
+		switch laneUpper {
+		case "C":
+			switch languageLower {
+			case "java", "jvm", "kotlin", "scala", "clojure":
+				return "platform/nomad/lane-c-java.hcl"
+			case "node", "nodejs", "javascript", "js", "typescript", "ts":
+				return "platform/nomad/lane-c-node.hcl"
+			case "python", "py":
+				// Future: return "platform/nomad/lane-c-python.hcl" when implemented
+			case "go", "golang":
+				// Future: return "platform/nomad/lane-c-go.hcl" when implemented
+			}
+		}
+	}
+	
+	// Fallback to generic lane template
+	return templateForLane(lane)
 }
 
 func debugTemplateForLane(lane string) string {
@@ -165,8 +197,15 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 		tplPath = debugTemplateForLane(lane)
 		filename = fmt.Sprintf("debug-%s-lane-%s.hcl", data.App, strings.ToLower(lane))
 	} else {
-		tplPath = templateForLane(lane)
-		filename = fmt.Sprintf("%s-lane-%s.hcl", data.App, strings.ToLower(lane))
+		// Use language-specific template selection
+		tplPath = templateForLaneAndLanguage(lane, data.Language)
+		
+		// Include language in filename for clarity
+		if data.Language != "" {
+			filename = fmt.Sprintf("%s-lane-%s-%s.hcl", data.App, strings.ToLower(lane), strings.ToLower(data.Language))
+		} else {
+			filename = fmt.Sprintf("%s-lane-%s.hcl", data.App, strings.ToLower(lane))
+		}
 	}
 	
 	// Use hybrid template loading: Consul KV with embedded fallback
@@ -373,6 +412,22 @@ func (r *RenderData) SetDefaults() {
 	}
 	if r.BuildTime == "" {
 		r.BuildTime = time.Now().Format(time.RFC3339)
+	}
+	
+	// Set language-specific defaults
+	switch strings.ToLower(r.Language) {
+	case "java", "jvm", "kotlin", "scala", "clojure":
+		if r.JavaVersion == "" {
+			r.JavaVersion = "17"
+		}
+	case "node", "nodejs", "javascript", "js", "typescript", "ts":
+		if r.NodeVersion == "" {
+			r.NodeVersion = "18"
+		}
+		// Node.js typically uses less memory than JVM
+		if r.MemoryLimit == 256 { // Only adjust if still default
+			r.MemoryLimit = 512
+		}
 	}
 	
 	// Enable enterprise features by default for production readiness
