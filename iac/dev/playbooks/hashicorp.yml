@@ -6,19 +6,20 @@
     - ../vars/main.yml
   
   tasks:
-    - name: Create hashicorp user
+    - name: Create hashicorp user (alias to ploy for compatibility)
       user:
-        name: hashicorp
-        system: true
-        shell: /bin/false
-        home: /opt/hashicorp
+        name: ploy
+        system: false
+        shell: /bin/bash
+        home: /home/ploy
+        comment: "Ploy service user (also used for HashiCorp stack)"
 
     - name: Create HashiCorp directories
       file:
         path: "{{ item }}"
         state: directory
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0755'
       loop:
         - /opt/hashicorp
@@ -56,8 +57,8 @@
             src: /tmp/nomad.zip
             dest: /opt/hashicorp/bin
             remote_src: true
-            owner: hashicorp
-            group: hashicorp
+            owner: ploy
+            group: ploy
             mode: '0755'
           when: not nomad_binary.stat.exists or nomad_version not in (current_nomad_version.stdout | default(''))
 
@@ -101,8 +102,8 @@
             src: /tmp/consul.zip
             dest: /opt/hashicorp/bin
             remote_src: true
-            owner: hashicorp
-            group: hashicorp
+            owner: ploy
+            group: ploy
           when: not consul_binary.stat.exists or consul_version not in (current_consul_version.stdout | default(''))
 
         - name: Create Consul symlink
@@ -136,8 +137,8 @@
             src: /tmp/vault.zip
             dest: /opt/hashicorp/bin
             remote_src: true
-            owner: hashicorp
-            group: hashicorp
+            owner: ploy
+            group: ploy
           when: not vault_binary.stat.exists or vault_version not in (current_vault_version.stdout | default(''))
 
         - name: Create Vault symlink
@@ -150,24 +151,24 @@
       template:
         src: ../../common/templates/consul-server.hcl.j2
         dest: /etc/consul.d/consul.hcl
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0644'
 
     - name: Create Nomad server configuration
       template:
         src: ../../common/templates/nomad-server.hcl.j2
         dest: /etc/nomad.d/nomad.hcl
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0644'
 
     - name: Create Vault configuration
       template:
         src: ../../common/templates/vault.hcl.j2
         dest: /etc/vault.d/vault.hcl
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0644'
 
     - name: Create systemd service files
@@ -294,8 +295,8 @@
       copy:
         content: "{{ vault_init.json | to_nice_json }}"
         dest: /opt/hashicorp/vault/init.json
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0600'
       when: vault_init.status == 200
 
@@ -303,8 +304,8 @@
       file:
         path: "{{ item }}"
         state: directory
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0755'
       loop:
         - /opt/hashicorp/nomad/jobs
@@ -329,8 +330,8 @@
       file:
         path: /var/log/nomad.log
         state: touch
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0644'
 
     - name: Find Nomad job templates
@@ -345,8 +346,8 @@
       copy:
         src: ../../common/templates/"{{ item.path }}"
         dest: /opt/hashicorp/nomad/jobs/
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0644'
       with_items: "{{ nomad_templates.files }}"
       when: nomad_templates.files | length > 0
@@ -358,8 +359,8 @@
           NOMAD_ADDR=http://localhost:4646
           NOMAD_LOG_LEVEL=INFO
         dest: /etc/nomad.d/nomad.env
-        owner: hashicorp
-        group: hashicorp
+        owner: ploy
+        group: ploy
         mode: '0644'
 
     - name: Set up Nomad CLI access for ploy user
@@ -422,8 +423,8 @@
           copy:
             src: ../../common/templates/"{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
             dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
-            owner: hashicorp
-            group: hashicorp
+            owner: ploy
+            group: ploy
             mode: '0644'
 
         - name: Validate Traefik job syntax
