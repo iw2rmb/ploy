@@ -43,9 +43,8 @@ job "openrewrite-service" {
       driver = "docker"
       
       config {
-        image = "ploy-openrewrite:latest"
+        image = "ab311200d170"  # Use image ID to avoid pull attempts
         ports = ["http", "metrics"]
-        force_pull = false  # Use locally built image
         
         # tmpfs mount for transformations
         mount {
