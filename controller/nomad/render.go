@@ -330,7 +330,8 @@ func renderCustomEnvVars(envVars map[string]string) string {
 		envLines = append(envLines, fmt.Sprintf("        %s = %q", key, value))
 	}
 	
-	return strings.Join(envLines, "\n")
+	// Add newline before custom env vars to maintain formatting
+	return "\n" + strings.Join(envLines, "\n")
 }
 
 func renderLegacyEnvVars(envVars map[string]string) string {

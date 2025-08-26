@@ -164,9 +164,7 @@ job "{{APP_NAME}}" {
         
         # Nomad integration
         NOMAD_ALLOC_ID = "${NOMAD_ALLOC_ID}"
-        NOMAD_TASK_NAME = "${NOMAD_TASK_NAME}"
-        
-        {{CUSTOM_ENV_VARS}}
+        NOMAD_TASK_NAME = "${NOMAD_TASK_NAME}"{{CUSTOM_ENV_VARS}}
       }
       
       # Application configuration from Consul KV
