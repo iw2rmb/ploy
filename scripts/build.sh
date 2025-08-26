@@ -35,7 +35,7 @@ BUILD_DIR="${BUILD_DIR:-build}"
 mkdir -p "$BUILD_DIR"
 
 # Parse arguments
-TARGET="${1:-controller}"
+TARGET="${1:-api}"
 OUTPUT_DIR="${2:-$BUILD_DIR}"
 GOOS="${GOOS:-$(go env GOOS)}"
 GOARCH="${GOARCH:-$(go env GOARCH)}"
@@ -86,19 +86,19 @@ build_with_version() {
 
 # Main build logic
 case "$TARGET" in
-    controller)
-        build_with_version "./controller" "${OUTPUT_DIR}/controller"
+    api)
+        build_with_version "./api" "${OUTPUT_DIR}/api"
         ;;
     cli)
         build_with_version "./cmd/ploy" "${OUTPUT_DIR}/ploy"
         ;;
     all)
-        build_with_version "./controller" "${OUTPUT_DIR}/controller"
+        build_with_version "./api" "${OUTPUT_DIR}/api"
         build_with_version "./cmd/ploy" "${OUTPUT_DIR}/ploy"
         ;;
     *)
         echo -e "${RED}Unknown target: $TARGET${NC}"
-        echo "Usage: $0 [controller|cli|all] [output_dir]"
+        echo "Usage: $0 [api|cli|all] [output_dir]"
         exit 1
         ;;
 esac

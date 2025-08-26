@@ -33,7 +33,7 @@
 - **FreeBSD Jails** — OS-level virtualization for Lane D native apps
 
 ## Build & Packaging Tools
-- **Go** — Primary language for Ploy controller and CLI
+- **Go** — Primary language for Ploy api and CLI
 - **Jib** — Containerless Java/Scala builds for efficient Lane C/E selection
 - **Gradle/Maven** — Java ecosystem build tools with Jib integration
 - **NPM/Node.js** — JavaScript runtime and package management
@@ -65,7 +65,7 @@
 ## Storage & Networking
 - **SeaweedFS** — Distributed object storage optimized for small files (artifacts, SBOMs, signatures)
   - **ARF Recipe Storage** — Recipe persistence with retry logic, caching, and deletion markers
-  - **Binary Artifact Storage** — Controller binaries and deployment artifacts
+  - **Binary Artifact Storage** — API binaries and deployment artifacts
   - **SBOM & Signature Storage** — Distributed storage for security artifacts
 - **Consul** — Service discovery, configuration, and distributed coordination
   - **ARF Recipe Indexing** — Full-text search with relevance scoring for recipe discovery
@@ -78,7 +78,7 @@
 ## Development & CLI
 - **Cobra** — Go CLI framework for `ploy` command structure
 - **Bubble Tea** — Terminal UI framework for interactive CLI experiences
-- **Fiber** — Go web framework for controller REST API
+- **Fiber** — Go web framework for api REST API
 - **Viper** — Configuration management for multi-environment setups
 
 ## CI/CD & Automation

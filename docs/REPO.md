@@ -37,11 +37,11 @@ ploy/
 
 ## Core Application Structure
 
-### `/controller/` - Backend API Server
+### `/api/` - Backend API Server
 Main HTTP API server providing REST endpoints for application deployment and management.
 
 ```
-controller/
+api/
 ├── main.go              # Stateless entry point with dependency injection
 ├── server/              # Stateless server architecture
 │   ├── server.go        # Server struct with dependency injection and graceful shutdown
@@ -88,12 +88,12 @@ cmd/
 ├── ploy-wasm-runner/    # WebAssembly runtime HTTP server
 │   └── main.go          # wazero-based WASM module execution
 └── ployman/             # Infrastructure management CLI  
-    ├── main.go          # Controller and infrastructure management
-    └── controller.go    # Controller binary management commands
+    ├── main.go          # API and infrastructure management
+    └── api.go    # API binary management commands
 ```
 
 ### `/internal/` - Shared Libraries
-Reusable modules used by both controller and CLI.
+Reusable modules used by both api and CLI.
 
 ```
 internal/
@@ -120,7 +120,7 @@ internal/
 │       └── jobs.go      # Transformation job control
 ├── preview/             # Preview host routing
 │   └── preview.go       # SHA-based preview URL handling
-├── build/               # Build management
+├── build/               # Build scripts and management
 │   └── build.go         # Build orchestration and lane selection
 ├── domain/              # Domain management (legacy)
 │   └── domain.go        # Domain configuration
@@ -171,7 +171,7 @@ Ansible playbooks and configuration for deployment environments. Uses unified te
 iac/
 ├── common/                         # Shared infrastructure components
 │   ├── playbooks/                  # Reusable playbooks
-│   │   ├── controller.yml          # Controller deployment logic
+│   │   ├── api.yml          # API deployment logic
 │   │   ├── seaweedfs.yml          # SeaweedFS storage deployment
 │   │   └── hashicorp.yml          # Nomad/Consul/Vault deployment
 │   └── templates/                  # Unified Jinja2 templates
@@ -179,9 +179,9 @@ iac/
 │       ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
 │       ├── nomad-server.hcl.j2    # Linux Nomad server configuration
 │       ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
-│       ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│       ├── nomad-ploy-api.hcl.j2  # API Nomad job
 │       ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
-│       ├── update-controller.sh.j2 # Controller management scripts
+│       ├── update-api.sh.j2 # API management scripts
 │       └── *.j2                    # Platform service templates
 ├── dev/                            # Development environment
 │   ├── site.yml                    # Main orchestration playbook
@@ -190,7 +190,7 @@ iac/
 │   │   ├── main.yml               # Dev system setup with wildcard SSL
 │   │   ├── seaweedfs.yml          # Dev SeaweedFS (mode 000)
 │   │   ├── hashicorp.yml          # Dev HashiCorp stack
-│   │   ├── controller.yml         # Dev controller deployment
+│   │   ├── api.yml         # Dev api deployment
 │   │   ├── testing.yml            # Test environment setup
 │   │   └── freebsd.yml            # FreeBSD VM deployment
 │   └── vars/
@@ -211,8 +211,8 @@ Platform-specific deployment configurations.
 ```
 platform/
 ├── nomad/                          # Nomad job definitions
-│   ├── ploy-controller.hcl         # Production system job for Ploy Controller
-│   ├── ploy-controller-simple.hcl  # Simplified service job for testing
+│   ├── ploy-api.hcl         # Production system job for Ploy API
+│   ├── ploy-api-simple.hcl  # Simplified service job for testing
 │   ├── traefik-simple.hcl          # Basic Traefik configuration
 │   ├── traefik-system.hcl          # System Traefik with Docker
 │   ├── traefik-system-rawexec.hcl  # System Traefik with raw exec
@@ -228,12 +228,12 @@ platform/
 
 ## Development and Testing
 
-### `/build/` - Binary Build Output (Git Ignored)
+### `/bin/` - Binary Build Output (Git Ignored)
 Compiled binaries and build artifacts.
 
 ```
-build/                      # Created during build process
-├── controller              # Controller binary
+bin/                        # Created during build process
+├── api              # API binary
 ├── ploy                    # CLI binary
 └── kraft/                  # Unikraft build tools
     ├── gen_kraft_yaml.sh   # Kraft YAML generator
@@ -391,12 +391,12 @@ vscode-arf-extension/
 - Ansible vars: `iac/dev/vars/main.yml`
 
 ### Health and Monitoring
-- Health endpoints: `controller/health/health.go`
+- Health endpoints: `api/health/health.go`
 - Storage monitoring: `internal/storage/monitoring.go`
-- TTL cleanup: `internal/cleanup/ttl.go`, `controller/coordination/ttl_cleanup.go`
+- TTL cleanup: `internal/cleanup/ttl.go`, `api/coordination/ttl_cleanup.go`
 
 ### API Endpoints
-- Main router: `controller/main.go:35-248`
+- Main router: `api/main.go:35-248`
 - Health: `/health`, `/ready`, `/live`, `/health/metrics`
 - Apps: `/v1/apps/*`
 - Storage: `/v1/storage/*`
@@ -408,14 +408,14 @@ vscode-arf-extension/
 
 ### Build and Deployment
 - Lane selection: `tools/lane-pick/main.go`
-- Build triggers: Handled through controller builders
-- Nomad jobs: `controller/nomad/client.go`, `controller/nomad/submit.go`
+- Build triggers: Handled through api builders
+- Nomad jobs: `api/nomad/client.go`, `api/nomad/submit.go`
 - Storage operations: `internal/storage/client.go`, `internal/storage/seaweedfs.go`
 
 ## Development Workflow File Locations
 
 1. **Feature Implementation**: Start with `roadmap/README.md` to identify requirements
-2. **API Changes**: Update `controller/main.go` and document in `controller/README.md`
+2. **API Changes**: Update `api/main.go` and document in `api/README.md`
 3. **CLI Changes**: Modify `cmd/ploy/main.go` and update `cmd/ploy/README.md`
 4. **Storage Changes**: Edit files in `internal/storage/`
 5. **Infrastructure**: Update `iac/dev/playbooks/` and `platform/`

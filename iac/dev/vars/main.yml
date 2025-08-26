@@ -12,9 +12,9 @@ docker_compose_version: "2.29.2"  # Latest stable Docker Compose
 nodejs_version: "20"  # LTS version for stability
 
 # Nomad/Consul versions
-nomad_version: "1.12.3"  # Latest stable Nomad
-consul_version: "1.21.4"
-vault_version: "1.20.2"
+nomad_version: "1.10.4"  # Latest stable Nomad available
+consul_version: "1.20.2"  # Compatible Consul version
+vault_version: "1.18.3"  # Compatible Vault version
 
 # Traefik version
 traefik_version: "3.5.0"
@@ -47,7 +47,7 @@ ploy_environment: "dev"  # Enables development environment features including wi
 
 # Ploy specific configuration
 ploy:
-  controller_port: 8081
+  api_port: 8081
   storage_backend: "seaweedfs"
   dns:
     provider: "namecheap"  # Use namecheap for dev environment
@@ -56,13 +56,19 @@ ploy:
     ttl: 300
     enable_ipv6: false
   
-  # Platform wildcard certificate configuration
+  # User apps domain configuration
   apps_domain: "{{ lookup('env', 'PLOY_APPS_DOMAIN') | default('ployd.app') }}"
   apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | default('namecheap') }}"
-  api_subdomain: "api"  # Controller will be accessible at api.{apps_domain}
+  
+  # Platform services domain configuration
+  platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('ployman.app') }}"
+  platform_domain_provider: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN_PROVIDER') | default('namecheap') }}"
+  
+  # API accessible at api.{platform_domain}
+  api_subdomain: "api"
 
-# Nomad controller deployment configuration
-nomad_controller:
+# Nomad api deployment configuration
+nomad_api:
   replicas: 2
   resources:
     cpu: 500    # MHz
@@ -102,7 +108,7 @@ seaweedfs:
       name: "ploy-debug"
       replication: "000"  # No replication for ephemeral debug artifacts
 
-# External storage configuration for controller
+# External storage configuration for api
 storage_config:
   seaweedfs:
     master: "localhost:9333"

@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/controller/nomad"
+	"github.com/iw2rmb/ploy/api/nomad"
 	"github.com/iw2rmb/ploy/internal/validation"
 )
 

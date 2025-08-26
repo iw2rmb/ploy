@@ -5,7 +5,7 @@
 GO_VERSION := 1.21
 PROJECT_NAME := ploy
 BINARY_NAME := ploy
-CONTROLLER_BINARY := controller
+API_BINARY := api
 
 # Build information
 GIT_COMMIT := $(shell git rev-parse HEAD)
@@ -14,7 +14,7 @@ BUILD_TIME := $(shell date +%Y-%m-%dT%H:%M:%S%z)
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev-$(shell date +%Y%m%d-%H%M%S)")
 
 # Directories
-BUILD_DIR := build
+BUILD_DIR := bin
 COVERAGE_DIR := coverage
 TEST_RESULTS_DIR := test-results
 DOCS_DIR := docs
@@ -41,7 +41,7 @@ help: ## Display help information
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo
 	@echo "$(YELLOW)Examples:$(NC)"
-	@echo "  make build          # Build CLI and controller binaries"
+	@echo "  make build          # Build CLI and api binaries"
 	@echo "  make test-unit      # Run unit tests"
 	@echo "  make dev-start      # Start local development environment"
 	@echo "  make clean          # Clean build artifacts"
@@ -51,7 +51,7 @@ help: ## Display help information
 # =============================================================================
 
 .PHONY: build
-build: build-cli build-controller ## Build all binaries
+build: build-cli build-api ## Build all binaries
 
 .PHONY: build-cli
 build-cli: ## Build CLI binary
@@ -59,18 +59,18 @@ build-cli: ## Build CLI binary
 	@mkdir -p $(BUILD_DIR)
 	go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/ploy
 
-.PHONY: build-controller
-build-controller: ## Build controller binary
-	@echo "$(BLUE)Building controller binary...$(NC)"
+.PHONY: build-api
+build-api: ## Build api binary
+	@echo "$(BLUE)Building api binary...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(CONTROLLER_BINARY) ./controller
+	go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(API_BINARY) ./api
 
 .PHONY: build-linux
 build-linux: ## Build Linux binaries for deployment
 	@echo "$(BLUE)Building Linux binaries...$(NC)"
 	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux ./cmd/ploy
-	GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(CONTROLLER_BINARY)-linux ./controller
+	GOOS=linux GOARCH=amd64 go build $(BUILD_FLAGS) -o $(BUILD_DIR)/$(API_BINARY)-linux ./api
 
 .PHONY: build-all
 build-all: ## Build binaries for all supported platforms
@@ -126,7 +126,7 @@ test-behavioral: ## Run behavioral (BDD) tests using Ginkgo
 	ginkgo -v -r --timeout=5m ./tests/behavioral/
 
 .PHONY: test-all
-test-all: test-unit test-integration test-e2e ## Run all test suites
+test-all: test-clean test-data-setup generate-mocks test-coverage-threshold test-benchmark ## Run comprehensive test suite with setup and verification
 	@echo "$(GREEN)All test suites completed!$(NC)"
 
 .PHONY: test-coverage
@@ -182,7 +182,7 @@ tdd: test-watch ## Alias for test-watch (TDD mode)
 test-generate: ## Generate test files for packages without tests
 	@echo "$(BLUE)Generating test files...$(NC)"
 	@which gotests > /dev/null || (echo "$(RED)gotests not found. Install with: go install github.com/cweill/gotests/gotests@latest$(NC)" && exit 1)
-	@find . -name "*.go" -not -name "*_test.go" -not -path "./vendor/*" -not -path "./build/*" | \
+	@find . -name "*.go" -not -name "*_test.go" -not -path "./vendor/*" -not -path "./bin/*" | \
 		while read file; do \
 			testfile="$${file%%.go}_test.go"; \
 			if [ ! -f "$$testfile" ]; then \
@@ -196,6 +196,25 @@ test-fuzz: ## Run fuzzing tests (Go 1.18+)
 	@echo "$(BLUE)Running fuzzing tests...$(NC)"
 	@echo "$(YELLOW)Fuzzing for 30 seconds per function...$(NC)"
 	go test -fuzz=. -fuzztime=30s ./...
+
+.PHONY: test-benchmark
+test-benchmark: ## Run benchmark tests
+	@echo "$(BLUE)Running benchmark tests...$(NC)"
+	@mkdir -p $(TEST_RESULTS_DIR)
+	go test -bench=. -benchmem ./...
+
+.PHONY: generate-mocks
+generate-mocks: ## Generate test mocks
+	@echo "$(BLUE)Generating test mocks...$(NC)"
+	go generate ./...
+
+.PHONY: test-data-setup
+test-data-setup: ## Setup test data directories and files
+	@echo "$(BLUE)Setting up test data...$(NC)"
+	@mkdir -p testdata $(COVERAGE_DIR) $(TEST_RESULTS_DIR)
+	@if [ ! -f testdata/sample.json ]; then \
+		echo '{"test": true}' > testdata/sample.json; \
+	fi
 
 # =============================================================================
 # Local Development Environment
@@ -259,21 +278,21 @@ dev-clean: ## Clean up local development environment
 # Controller Management
 # =============================================================================
 
-.PHONY: controller-local
-controller-local: build-controller ## Run controller locally
-	@echo "$(BLUE)Starting controller locally...$(NC)"
+.PHONY: api-local
+api-local: build-api ## Run api locally
+	@echo "$(BLUE)Starting api locally...$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to stop$(NC)"
-	PORT=8081 ./$(BUILD_DIR)/$(CONTROLLER_BINARY)
+	PORT=8081 ./$(BUILD_DIR)/$(API_BINARY)
 
-.PHONY: controller-debug
-controller-debug: build-controller ## Run controller in debug mode
-	@echo "$(BLUE)Starting controller in debug mode...$(NC)"
+.PHONY: api-debug
+api-debug: build-api ## Run api in debug mode
+	@echo "$(BLUE)Starting api in debug mode...$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to stop$(NC)"
-	DEBUG=true PLOY_LOG_LEVEL=debug PORT=8081 ./$(BUILD_DIR)/$(CONTROLLER_BINARY)
+	DEBUG=true PLOY_LOG_LEVEL=debug PORT=8081 ./$(BUILD_DIR)/$(API_BINARY)
 
-.PHONY: controller-deploy
-controller-deploy: ## Deploy controller to VPS
-	@echo "$(BLUE)Deploying controller to VPS...$(NC)"
+.PHONY: api-deploy
+api-deploy: ## Deploy api to VPS
+	@echo "$(BLUE)Deploying api to VPS...$(NC)"
 	@./scripts/deploy.sh $(GIT_BRANCH)
 
 # =============================================================================

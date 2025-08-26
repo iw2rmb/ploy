@@ -97,7 +97,7 @@ Auto-classified lanes:
 - ✅ Per-lane scripts in `build/` directory
 - ✅ Auto SBOM (Syft) + signatures (Cosign)
 - ✅ Deterministic `<app>-<sha>` naming
-- ✅ Standalone or controller invocation
+- ✅ Standalone or api invocation
 - ✅ **Advanced Node.js Build Pipeline** (Aug 2025):
   - Automatic Node.js application detection via package.json
   - Enterprise dependency management with npm ci and integrity verification
@@ -132,6 +132,23 @@ Auto-classified lanes:
   - **Universal .sig Files**: All build scripts generate signature files for every artifact
   - **Debug Variant Support**: Debug builds include signature generation alongside main builds  
   - **Lane-Specific Implementation**: Optimized signature generation per deployment lane
+
+⸻
+
+## 🔐 SSL/TLS Certificates & Domain Management
+- ✅ **Dual Domain Architecture** (Aug 2025):
+  - **User Apps Domain**: `*.ployd.app` for all user-deployed applications
+  - **Platform Services Domain**: `*.ployman.app` for platform services (API, OpenRewrite, metrics)
+  - **Environment Separation**: Development (`*.dev.ployd.app`, `*.dev.ployman.app`) and production environments
+- ✅ **Automatic HTTPS with Traefik** (Aug 2025):
+  - **ACME Integration**: Let's Encrypt automatic certificate provisioning via DNS-01 challenge
+  - **Dual Wildcard Certificates**: Separate wildcard certificates for user apps and platform services
+  - **Certificate Storage**: Secure storage in `/opt/ploy/traefik-data/` with proper permissions
+  - **Automatic Renewal**: Traefik handles certificate renewal before expiration
+- ✅ **Platform CLI Separation** (Aug 2025):
+  - **ploy CLI**: Deploys user apps to `<app-name>.ployd.app`
+  - **ployman CLI**: Deploys platform services to `<service-name>.ployman.app`
+  - **Automatic Routing**: API detects platform services and routes to appropriate domain
 
 ⸻
 
@@ -209,7 +226,7 @@ Auto-classified lanes:
 ## 🚀 Deployment
 - ✅ Nomad templates per lane in `platform/nomad/`
 - ✅ Jobs include health checks, Vault integration, canary rollouts, Consul registration
-- ✅ Controller handles rendering, submission, health polling
+- ✅ API handles rendering, submission, health polling
 - ✅ **Enhanced Health Monitoring** (Aug 2025):
   - **Deployment Progress Tracking**: Real-time monitoring of task group status with healthy/unhealthy allocation counts
   - **Comprehensive Health Checks**: Validates allocation status, deployment health indicators, and Consul service checks
@@ -261,7 +278,7 @@ Auto-classified lanes:
   - ✅ **Minimal Footprint**: ~40MB binary with 50-100MB RAM per instance
   - ✅ **No Single Point of Failure**: Masterless architecture with shared configuration
 
-## 🔍 Static Analysis Framework (Phase 1 Complete - Dec 2024)
+## 🔍 Static Analysis Framework (Phase 2 In Progress - Aug 2025)
 
 ### Core Infrastructure
 - ✅ **Analysis Engine**: Language-agnostic orchestrator with plugin architecture
@@ -271,13 +288,21 @@ Auto-classified lanes:
   - In-memory caching with automatic expiration
   - Parallel analysis execution for performance
 
-### Java Error Prone Integration
-- ✅ **Deep Google Error Prone Integration**: 400+ bug pattern detection
+### Language Support
+- ✅ **Java Error Prone Integration**: 400+ bug pattern detection (Phase 1 - Dec 2024)
   - Maven and Gradle build system auto-detection
   - Custom checker configuration with severity mapping
   - Support for all Error Prone built-in patterns
   - Custom pattern development for Ploy-specific issues
   - Incremental analysis with caching
+
+- 🚧 **Python Pylint Integration**: Comprehensive Python analysis (Phase 2 - Aug 2025)
+  - Full Pylint integration with JSON output parsing
+  - Project type detection (pip, poetry, pipenv, conda, setuptools)
+  - Configurable severity mapping and rule customization
+  - Virtual environment detection and support
+  - ARF recipe mapping for automatic Python issue remediation
+  - Configuration for additional tools (mypy, black, isort, bandit, flake8)
 
 ### ARF Integration
 - ✅ **Automated Remediation**: Direct pipeline to ARF for automatic fixes
@@ -315,39 +340,39 @@ Auto-classified lanes:
 - **Phase 3**: Enterprise features and advanced ARF integration
 - **Phase 4**: CI/CD integration and team collaboration
 
-## 🏗 High Availability Controller Architecture
+## 🏗 High Availability API Architecture
 
-- ✅ **Zero-SPOF Controller Design**
-  - **Nomad-Managed Deployment**: Controller runs as Nomad system job across multiple nodes
+- ✅ **Zero-SPOF API Design**
+  - **Nomad-Managed Deployment**: API runs as Nomad system job across multiple nodes
   - **Stateless Architecture**: All state externalized to Consul KV, SeaweedFS, and Vault
-  - **Load Balancing**: Multiple controller instances behind Traefik with health checking
-  - **Horizontal Scaling**: Scale controller instances based on API load and resource requirements
+  - **Load Balancing**: Multiple api instances behind Traefik with health checking
+  - **Horizontal Scaling**: Scale api instances based on API load and resource requirements
   - ✅ **Enhanced Rolling Updates with Canary Deployment** (Aug 2025): Zero-downtime deployments with canary deployment strategy
     - Nomad update blocks with 1 canary instance and automatic rollback on failures
     - Comprehensive health check integration with stricter validation during updates  
     - Extended health validation timeout (5m) and graceful shutdown coordination (60s)
     - Update progress monitoring with Slack webhook alerts and deployment status tracking
     - Rolling update parallelism control with 30-second stagger delay for stability
-  - ✅ **Controller Binary Distribution System** (Aug 2025): Automated controller deployment and version management
+  - ✅ **API Binary Distribution System** (Aug 2025): Automated api deployment and version management
     - SeaweedFS-based binary distribution with version management and integrity verification
     - Multi-node binary caching with automatic download and SHA256 hash validation
     - Cross-platform build pipeline with metadata tracking and git commit integration
-    - Complete rollback system for controller versions with safety checks and validation
+    - Complete rollback system for api versions with safety checks and validation
     - Nomad artifact downloads with startup scripts for proper binary selection and execution
     - CLI tools for manual binary operations: upload, download, list, build, and rollback
-  - ✅ **Ansible Nomad Controller Integration** (Aug 2025): Infrastructure-as-code deployment automation
-    - Complete Ansible playbook integration for Nomad-based controller deployment
+  - ✅ **Ansible Nomad API Integration** (Aug 2025): Infrastructure-as-code deployment automation
+    - Complete Ansible playbook integration for Nomad-based api deployment
     - Automated migration from manual/systemd deployment to high availability Nomad architecture
-    - Proper service ordering with dependency validation: SeaweedFS → HashiCorp → Controller → Applications
-    - Multi-replica controller deployment (2+ instances) with automatic failover and load balancing
+    - Proper service ordering with dependency validation: SeaweedFS → HashiCorp → API → Applications
+    - Multi-replica api deployment (2+ instances) with automatic failover and load balancing
     - Comprehensive management toolchain: update, rollback, status monitoring, and migration scripts
     - Service discovery integration with Consul registration and Traefik load balancer configuration
     - Health check integration with Nomad service discovery for seamless load balancing
     - Process conflict prevention with clean migration paths and validation tools
-  - ✅ **Controller Self-Update Capability** (Aug 2025): In-place controller updates with coordination and safety
-    - RESTful self-update API endpoints: `/v1/controller/update`, `/update/status`, `/rollback`, `/version`, `/versions`
+  - ✅ **API Self-Update Capability** (Aug 2025): In-place api updates with coordination and safety
+    - RESTful self-update API endpoints: `/v1/api/update`, `/update/status`, `/rollback`, `/version`, `/versions`
     - Multiple update strategies: rolling, blue-green, and emergency update approaches
-    - Consul-based coordination between controller instances during updates with distributed locking
+    - Consul-based coordination between api instances during updates with distributed locking
     - Comprehensive validation: binary integrity (SHA256), platform compatibility, system resource checks
     - Atomic binary replacement to avoid "text file busy" errors with fallback external update scripts
     - Automatic and manual rollback capabilities with last-known-good version detection
@@ -367,12 +392,12 @@ Auto-classified lanes:
   - ✅ **Prometheus Metrics**: Comprehensive metrics collection for leadership, builds, performance, and operational visibility
   - ✅ **TTL Cleanup Coordination**: Leader-only TTL cleanup with automatic task transfer on failover
   - ✅ **Health Monitoring**: `/health/coordination` endpoint for real-time leader election status
-  - ✅ **Metrics Observatory**: `/metrics` endpoint with 15+ controller metrics for operational monitoring
+  - ✅ **Metrics Observatory**: `/metrics` endpoint with 15+ api metrics for operational monitoring
 - ✅ **Operational Excellence**
   - **99.9% Uptime**: Multiple instances with automatic failover and health monitoring
-  - **Self-Healing**: Automatic detection and replacement of unhealthy controller instances
+  - **Self-Healing**: Automatic detection and replacement of unhealthy api instances
   - **Configuration Management**: Template-driven configuration updates without service interruption
-  - **Service Discovery**: Controllers register with Consul for automatic load balancer integration
+  - **Service Discovery**: APIs register with Consul for automatic load balancer integration
   - **Health Endpoints**: `/health` and `/ready` endpoints for Nomad health checks
   - **Zero Downtime**: Sub-100ms API responses with <30 second leader failover
 
@@ -389,7 +414,7 @@ Auto-classified lanes:
   - **Error Resilience**: Graceful handling of Nomad API failures and missing jobs
 - ✅ **Heroku-Style Domain Management** (Aug 2025): Complete domain and certificate automation
   - **Platform Domain Pattern**: Automatic `{app}.ployd.app` subdomain assignment for all apps
-  - **Controller Access Domain**: Controller accessible at `api.ployd.app` via Traefik
+  - **API Access Domain**: API accessible at `api.ployd.app` via Traefik
   - **Domain API Endpoints**: `POST /v1/apps/{app}/domains` for adding custom domains
   - **Automatic Certificate Provisioning**: `certificate: auto` triggers Let's Encrypt provisioning
   - **Custom Certificate Upload**: Support for uploading custom SSL certificates via API
@@ -408,7 +433,7 @@ Auto-classified lanes:
   - **Force Mode**: `--force` flag for automated workflows and CI/CD
   - **Status Reporting**: Detailed operation results with per-resource status
   - **Error Resilience**: Continues cleanup even if individual operations fail
-- ✅ `ploy push` – tar + stream to controller
+- ✅ `ploy push` – tar + stream to api
   - ✅ **Validated Node.js Lane B Testing** (Aug 2025):
     - Successfully tested with tests/apps/node-hello demonstrating automatic Lane B detection
     - Verified build pipeline progression from tar processing to lane validation
@@ -491,7 +516,7 @@ Auto-classified lanes:
 - ✅ **Build-time**: Available during image creation
 - ✅ **Runtime**: Injected into deployment environment
 - ✅ **Storage**: Consul KV backend with automatic fallback to file-based storage
-- ✅ **High Availability**: External state storage eliminates controller SPOF for environment data
+- ✅ **High Availability**: External state storage eliminates api SPOF for environment data
 - ✅ **CLI**: `ploy env set/get/list/delete` commands
 - ✅ **Integration**: All lanes support environment variables in build and deploy phases
 - ✅ **Atomic Operations**: Consul KV provides consistency for concurrent environment variable updates
@@ -643,7 +668,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Monitoring Infrastructure**: Comprehensive metrics, alerting, and distributed tracing for ARF operations
 
 ### ✅ **Implemented High Availability & Performance**
-- ✅ **Distributed Processing**: Consul leader election and state management for multi-controller coordination
+- ✅ **Distributed Processing**: Consul leader election and state management for multi-api coordination
 - ✅ **AST Caching**: Memory-mapped files with 10x performance improvement and cache persistence
 - ✅ **Circuit Breaker Integration**: Distributed coordination across multiple ARF instances
 - ✅ **Resource Management**: Nomad scheduler integration for parallel sandbox execution

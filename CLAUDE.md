@@ -112,7 +112,7 @@ make test-unit                        # Unit tests (GREEN phase)
 make test-coverage-threshold          # Verify 60% minimum coverage
 
 # Build Verification (MANDATORY before VPS testing)
-go build -o build/controller ./controller && go build -o build/ploy ./cmd/ploy && go build ./controller/... ./cmd/...
+go build -o bin/controller ./controller && go build -o bin/ploy ./cmd/ploy && go build ./controller/... ./cmd/...
 
 # Test Development
 make test-generate                    # Generate test files
@@ -134,7 +134,7 @@ curl https://api.dev.ployd.app/v1/controller/version                         # V
 ```
 
 **PROHIBITED (Never):**
-- Execute binaries locally: `./build/controller`, `go run ./controller`
+- Execute binaries locally: `./bin/controller`, `go run ./controller`
 - Run integration tests locally: `./tests/scripts/test-*.sh`
 - Manual controller deployment: `nomad job run platform/nomad/ploy-controller.hcl`
 
@@ -199,14 +199,14 @@ git checkout $CURRENT_BRANCH                 # Return to worktree branch
 **Examples:**
 ```bash
 # ✅ Valid app names
-./build/ploy apps new --name hello-world
-./build/ploy apps new --name my-java-app
-./build/ploy apps new --name test123
+./bin/ploy apps new --name hello-world
+./bin/ploy apps new --name my-java-app
+./bin/ploy apps new --name test123
 
 # ❌ Invalid app names (will be rejected)
-./build/ploy apps new --name api        # Reserved
-./build/ploy apps new --name dev        # Reserved
-./build/ploy apps new --name ploy-test  # Reserved prefix
+./bin/ploy apps new --name api        # Reserved
+./bin/ploy apps new --name dev        # Reserved
+./bin/ploy apps new --name ploy-test  # Reserved prefix
 ```
 
 ## Repository Structure
@@ -214,7 +214,7 @@ git checkout $CURRENT_BRANCH                 # Return to worktree branch
 For detailed folder structure and file locations, see `docs/REPO.md`.
 
 ### Key Build Locations
-- **Binaries**: `build/` folder (git ignored)
+- **Binaries**: `bin/` folder (git ignored)
 - **Build Scripts**: `scripts/build/` by lane type
 - **Lane Detection**: `tools/lane-pick/`
 

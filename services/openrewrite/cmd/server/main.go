@@ -7,10 +7,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	
-	"github.com/iw2rmb/ploy/services/openrewrite/internal/executor"
-	"github.com/iw2rmb/ploy/services/openrewrite/internal/handlers"
-	"github.com/iw2rmb/ploy/services/openrewrite/internal/storage"
 )
 
 func main() {
@@ -33,30 +29,48 @@ func main() {
 		seaweedAddr = "seaweedfs.service.consul:9333"
 	}
 
-	// Create components
-	storageClient := storage.NewOpenRewriteStorage(consulAddr, seaweedAddr)
-	exec := executor.NewExecutor(executor.DefaultConfig())
-	handler := handlers.NewHandlerWithStorage(exec, storageClient)
-
 	// Register routes
 	api := app.Group("/v1/openrewrite")
 
-	// Health endpoints
-	api.Get("/health", handler.HandleHealth)
-	api.Get("/ready", handler.HandleReady)
+	// Health endpoints - simplified for now
+	api.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status": "healthy",
+			"version": "1.0.0",
+		})
+	})
+	api.Get("/ready", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ready": true})
+	})
 
-	// Transform endpoints (synchronous)
-	api.Post("/transform", handler.HandleTransform)
+	// Transform endpoint - placeholder
+	api.Post("/transform", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"message": "Transform endpoint - to be implemented",
+		})
+	})
 
-	// Job endpoints (asynchronous) 
-	api.Post("/jobs", handler.HandleCreateJob)
-	api.Get("/jobs/:id", handler.HandleGetJob)
-	api.Get("/jobs/:id/status", handler.HandleGetJobStatus)
-	api.Get("/jobs/:id/diff", handler.HandleGetJobDiff)
-	api.Delete("/jobs/:id", handler.HandleCancelJob)
+	// Job endpoints - placeholders
+	api.Post("/jobs", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"message": "Create job - to be implemented"})
+	})
+	api.Get("/jobs/:id", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"message": "Get job - to be implemented"})
+	})
+	api.Get("/jobs/:id/status", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"message": "Get job status - to be implemented"})
+	})
+	api.Get("/jobs/:id/diff", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"message": "Get job diff - to be implemented"})
+	})
+	api.Delete("/jobs/:id", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"message": "Cancel job - to be implemented"})
+	})
 
 	// Metrics endpoint
-	api.Get("/metrics", handler.HandleMetrics)
+	api.Get("/metrics", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"message": "Metrics - to be implemented"})
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

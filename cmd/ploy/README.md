@@ -15,7 +15,7 @@ Scaffolds a minimal app with `/healthz` on port 8080.
 ```
 ploy push -a <app> [-lane A|B|C|D|E|F|G] [-main com.example.Main] [-sha <sha>]
 ```
-Streams a tar of the working tree (respects `.gitignore`) to the controller, which lane-picks and builds & deploys.
+Streams a tar of the working tree (respects `.gitignore`) to the api, which lane-picks and builds & deploys.
 
 **Lane G - WebAssembly Support**: Applications with WASM compilation targets are automatically detected and routed to Lane G for WebAssembly deployment with wazero runtime.
 
@@ -83,7 +83,7 @@ ploy env delete myapp DEBUG
 **Features:**
 - Variables available during build process (Gradle, Maven, npm, etc.)
 - Variables injected into runtime environment via Nomad templates
-- Persistent storage across controller restarts
+- Persistent storage across api restarts
 - Full CRUD operations with user-friendly output
 
 ### `ploy arf` (implemented - Phase ARF-1)

@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/controller/builders"
-	"github.com/iw2rmb/ploy/controller/envstore"
-	"github.com/iw2rmb/ploy/controller/nomad"
-	"github.com/iw2rmb/ploy/controller/opa"
+	"github.com/iw2rmb/ploy/api/builders"
+	"github.com/iw2rmb/ploy/api/envstore"
+	"github.com/iw2rmb/ploy/api/nomad"
+	"github.com/iw2rmb/ploy/api/opa"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 

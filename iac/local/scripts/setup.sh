@@ -121,24 +121,24 @@ build_ploy_binaries() {
     echo -e "${BLUE}🔨 Building Ploy binaries...${NC}"
     cd "$PROJECT_ROOT"
     
-    # Create build directory
-    mkdir -p build
+    # Create bin directory
+    mkdir -p bin
     
     # Build controller
     echo -e "${BLUE}   • Building controller...${NC}"
-    go build -o build/controller ./controller
+    go build -o bin/controller ./controller
     
     # Build CLI
     echo -e "${BLUE}   • Building CLI...${NC}"
-    go build -o build/ploy ./cmd/ploy
+    go build -o bin/ploy ./cmd/ploy
     
     # Verify builds
-    if [[ -f "build/controller" && -f "build/ploy" ]]; then
+    if [[ -f "bin/controller" && -f "bin/ploy" ]]; then
         echo -e "${GREEN}✅ Binaries built successfully${NC}"
         
         # Show versions
         echo -e "${BLUE}📋 Binary versions:${NC}"
-        ./build/ploy --version 2>/dev/null || echo "  • CLI: dev build"
+        ./bin/ploy --version 2>/dev/null || echo "  • CLI: dev build"
         echo "  • Controller: dev build"
     else
         echo -e "${RED}❌ Failed to build binaries${NC}"
@@ -212,7 +212,7 @@ create_completion_marker() {
 3. **Start local controller (optional):**
    \`\`\`bash
    cd $PROJECT_ROOT
-   PORT=8081 ./build/controller
+   PORT=8081 ./bin/controller
    \`\`\`
 
 4. **Development commands:**

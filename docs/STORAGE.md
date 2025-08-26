@@ -10,7 +10,7 @@ This document explains how Ploy abstracts storage using an S3-compatible API wit
 See `configs/storage-config.yaml`.
 
 ## Code
-`internal/storage/storage.go` initializes an S3 client. Artifacts are uploaded under `artifacts/<app>/<sha>/` by the controller.
+`internal/storage/storage.go` initializes an S3 client. Artifacts are uploaded under `artifacts/<app>/<sha>/` by the api.
 
 ## Migration
 Mirror buckets with `mc mirror` or `rclone`, flip endpoint when ready.
@@ -288,5 +288,5 @@ See `config.yaml` for a minimal, portable configuration. Key flags:
 
 6) Next Steps
 	•	Commit config.yaml, internal/storage/storage.go, and STORAGE.md.
-	•	Wire the client into build controllers (artifact upload/download) and logs.
+	•	Wire the client into build apis (artifact upload/download) and logs.
 	•	(Optional) Add a --storage-config CLI flag to override the path per environment.

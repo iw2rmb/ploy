@@ -50,7 +50,7 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - **AST Caching** — Memory-mapped files with 10x performance improvement
 - **Monitoring Infrastructure** — Prometheus metrics, distributed tracing, and alerting
 - **Resource Management** — Nomad scheduler integration for parallel execution
-- **Circuit Breaker Coordination** — Distributed failure handling across controller instances
+- **Circuit Breaker Coordination** — Distributed failure handling across api instances
 
 **Integration Points:**
 - Lane C (OSv) for Java build validation and testing
@@ -60,23 +60,23 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 
 **Status:** ✅ **Phases ARF-1 through ARF-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 11→17 migration pipeline successfully validated with Spring PetClinic on production VPS infrastructure.
 
-## High Availability Controller Architecture
+## High Availability API Architecture
 
-Ploy's **controller is designed as a horizontally scalable, stateless application** that eliminates single points of failure through Nomad-managed deployment and external state storage.
+Ploy's **api is designed as a horizontally scalable, stateless application** that eliminates single points of failure through Nomad-managed deployment and external state storage.
 
 **Zero-SPOF Design:**
-- **Nomad-Managed Deployment** — Controller runs as Nomad system job across multiple nodes
+- **Nomad-Managed Deployment** — API runs as Nomad system job across multiple nodes
 - **Stateless Architecture** — All state externalized to Consul KV, SeaweedFS, and Vault
-- **Load Balancing** — Multiple controller instances behind Traefik with health checking
+- **Load Balancing** — Multiple api instances behind Traefik with health checking
 - **Rolling Updates** — Zero-downtime deployments through Nomad's update strategies
 - **Auto-Recovery** — Failed instances automatically restarted by Nomad scheduler
 
 **Operational Benefits:**
 - **99.9% Uptime** — Multiple instances with automatic failover and health monitoring
-- **Horizontal Scaling** — Scale controller instances based on API load and resource requirements
-- **Self-Healing** — Automatic detection and replacement of unhealthy controller instances
+- **Horizontal Scaling** — Scale api instances based on API load and resource requirements
+- **Self-Healing** — Automatic detection and replacement of unhealthy api instances
 - **Configuration Management** — Template-driven configuration updates without service interruption
-- **Service Discovery** — Controllers register with Consul for automatic load balancer integration
+- **Service Discovery** — APIs register with Consul for automatic load balancer integration
 
 **State Management:**
 - **Environment Variables** → Consul KV (`/ploy/apps/{app}/env/*`)
@@ -85,7 +85,7 @@ Ploy's **controller is designed as a horizontally scalable, stateless applicatio
 - **Routing State** → Consul service registry with health checks
 - **Secrets** → Vault integration with dynamic credential management
 
-This architecture makes the controller "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
+This architecture makes the api "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
 
 ## Building and Versioning
 
@@ -93,8 +93,8 @@ Ploy uses **automated version generation** from git metadata, eliminating manual
 
 ### Build System
 ```bash
-# Build controller with automatic versioning
-./scripts/build.sh controller
+# Build api with automatic versioning
+./scripts/build.sh api
 
 # Build CLI
 ./scripts/build.sh cli
@@ -115,7 +115,7 @@ Ploy uses **automated version generation** from git metadata, eliminating manual
 ./build/ploy version
 ./build/ploy version --detailed
 
-# Controller endpoints
+# API endpoints
 curl http://localhost:8081/version
 curl http://localhost:8081/version/detailed
 ```
@@ -126,15 +126,15 @@ curl http://localhost:8081/version/detailed
 ./scripts/deploy.sh
 
 # The script automatically:
-# - Builds controller with version
+# - Builds api with version
 # - Uploads to SeaweedFS
 # - Updates Nomad job with version/checksum
 # - Deploys via Nomad
 # - Verifies deployment
 ```
 
-### Dynamic Controller Endpoint
-The CLI automatically discovers the controller endpoint:
+### Dynamic API Endpoint
+The CLI automatically discovers the api endpoint:
 1. **PLOY_CONTROLLER** environment variable (highest priority)
 2. **PLOY_APPS_DOMAIN** → `https://api.{domain}/v1` (SSL with wildcard cert)
 3. Default → `http://localhost:8081/v1`
@@ -148,7 +148,7 @@ Ploy supports **automatic wildcard certificate provisioning** for development en
 ### DNS Configuration (Required First)
 
 The dev environment uses `*.dev.ployd.app` subdomain pattern:
-- **Controller**: `api.dev.ployd.app` 
+- **API**: `api.dev.ployd.app` 
 - **Apps**: `{app}.dev.ployd.app`
 - **Wildcard Certificate**: `*.dev.ployd.app`
 
@@ -176,15 +176,15 @@ The dev environment uses `*.dev.ployd.app` subdomain pattern:
    export NAMECHEAP_API_KEY="your-api-key" 
    export NAMECHEAP_USERNAME="your-username"
    
-   # Deploy controller with wildcard certificate support
+   # Deploy api with wildcard certificate support
    ./scripts/deploy.sh
    ```
 
 ### Protected App Names
 
 The following app names are **reserved** for platform use:
-- `api` (controller endpoint)
-- `controller`, `admin`, `dashboard`
+- `api` (api endpoint)
+- `api`, `admin`, `dashboard`
 - `metrics`, `health`, `console`
 - `www`, `ploy`, `system`
 - `traefik`, `nomad`, `consul`, `vault`

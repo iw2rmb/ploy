@@ -1,0 +1,551 @@
+job "ploy-api" {
+  datacenters = ["dc1"]
+  type = "service"  # Service type for high availability with load balancing
+  priority = 80     # High priority for core infrastructure service
+  
+  # Constraint to run only on Linux nodes
+  constraint {
+    attribute = "${attr.kernel.name}"
+    value = "linux"
+  }
+  
+  group "api" {
+    count = 3  # Deploy 3 instances for high availability and load distribution
+    
+    # Restart policy for critical infrastructure
+    restart {
+      attempts = 3
+      interval = "5m"
+      delay = "15s"
+      mode = "delay"
+    }
+    
+    # Enhanced update strategy for rolling updates with canary deployment
+    update {
+      max_parallel = 1           # Update one instance at a time
+      min_healthy_time = "30s"   # Extended time to ensure service stability
+      healthy_deadline = "5m"    # Increased deadline for complex health checks
+      progress_deadline = "10m"  # Extended overall timeout
+      auto_revert = true         # Automatically rollback failed updates
+      auto_promote = false       # Require manual promotion for safety
+      canary = 0                 # Disable canary deployment for testing
+      
+      # Stagger updates to prevent issues
+      stagger = "30s"            # 30 second delay between updates
+      
+      # Health checks must pass before promoting canary
+      health_check = "checks"    # Use Consul health checks for validation
+    }
+    
+    # Network configuration - Using dynamic ports for high availability
+    network {
+      port "http" {}       # Dynamic port allocation for api HTTP API
+      port "metrics" {}    # Dynamic port allocation for metrics endpoint
+    }
+    
+    # Enhanced Consul service registration for production
+    service {
+      name = "ploy-api"
+      port = "http"
+      tags = [
+        "ploy",
+        "api",
+        "api",
+        "http",
+        "traefik.enable=true",
+        "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployd.app`) || Host(`api.ployd.app`)",
+        "traefik.http.routers.ploy-api.tls=true",
+        "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard",
+        "traefik.http.routers.ploy-api.tls.domains[0].main=dev.ployd.app",
+        "traefik.http.routers.ploy-api.tls.domains[0].sans=*.dev.ployd.app",
+        "traefik.http.services.ploy-api.loadbalancer.server.scheme=http",
+        "traefik.http.services.ploy-api.loadbalancer.healthcheck.path=/health",
+        "traefik.http.services.ploy-api.loadbalancer.healthcheck.interval=10s",
+        "traefik.http.middlewares.ploy-api-ratelimit.ratelimit.burst=100",
+        "traefik.http.middlewares.ploy-api-secure.headers.sslredirect=true",
+        "traefik.http.routers.ploy-api.middlewares=ploy-api-ratelimit,ploy-api-secure",
+        "service-mesh.connect=true",
+        "service-mesh.protocol=http",
+        "blue-green.deployment=true",
+        "blue-green.weight=100",
+        "${NOMAD_ALLOC_ID}"
+      ]
+      
+      # Enhanced metadata for production environment
+      meta {
+        version = "1.0.0"
+        node = "${attr.unique.hostname}"
+        datacenter = "${node.datacenter}"
+        region = "${node.region}"
+        deployment_id = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
+        service_type = "service"
+        load_balancer = "traefik"
+        health_endpoint = "/health"
+        readiness_endpoint = "/ready"
+        metrics_endpoint = "/health/metrics"
+        api_version = "v1"
+        environment = "production"
+      }
+      
+      # Enhanced primary health check for rolling update validation
+      check {
+        type = "http"
+        path = "/health"
+        port = "http"
+        interval = "10s"
+        timeout = "5s"
+        success_before_passing = 3  # Require 3 consecutive successes for update validation
+        failures_before_critical = 2  # Stricter failure tolerance during updates
+        
+        # Enhanced check restart for rolling updates
+        check_restart {
+          limit = 2                # Reduced restart limit during updates
+          grace = "20s"            # Extended grace period for clean shutdown
+          ignore_warnings = false  # Fail fast on warnings during updates
+        }
+        
+        # Custom headers for update validation
+        header {
+          X-Health-Check = ["rolling-update"]
+          X-Update-Strategy = ["canary-enabled"]
+          X-Service-Mesh = ["ploy-api"]
+        }
+      }
+      
+      # Enhanced readiness check for rolling update dependency validation
+      check {
+        name = "readiness"
+        type = "http"
+        path = "/ready"
+        port = "http"
+        interval = "10s"           # More frequent checks during updates
+        timeout = "10s"            # Extended timeout for dependency checks
+        success_before_passing = 3 # Stricter requirement for readiness
+        failures_before_critical = 2  # Fail faster on readiness issues
+        
+        check_restart {
+          limit = 1              # Single restart attempt for readiness failures
+          grace = "30s"          # Extended grace for dependency cleanup
+        }
+        
+        # Enhanced headers for update validation
+        header {
+          X-Service-Mesh = ["ploy-api"]
+          X-Update-Phase = ["canary-validation"]
+          X-Dependency-Check = ["consul,nomad,seaweedfs,vault"]
+        }
+      }
+      
+      # Liveness check for basic connectivity and automatic deregistration
+      check {
+        name = "liveness"
+        type = "http"
+        path = "/live"
+        port = "http"
+        interval = "30s"
+        timeout = "3s"
+        success_before_passing = 1
+        failures_before_critical = 5  # Allow more failures for liveness
+      }
+      
+      # Rolling update progress monitoring health check
+      check {
+        name = "update-progress"
+        type = "http"
+        path = "/health/update"
+        port = "http"
+        interval = "15s"
+        timeout = "8s"
+        success_before_passing = 2
+        failures_before_critical = 3
+        
+        # Custom headers for update progress tracking
+        header {
+          X-Update-Strategy = ["canary-rollout"]
+          X-Update-Phase = ["${META_UPDATE_PHASE}"]  # Will be set during updates
+          X-Canary-Status = ["${META_CANARY_STATUS}"]
+          X-Rollback-Capability = ["enabled"]
+        }
+      }
+    }
+    
+    # Enhanced metrics service for monitoring integration
+    service {
+      name = "ploy-api-metrics"
+      port = "metrics"
+      tags = [
+        "metrics",
+        "prometheus",
+        "ploy-api",
+        "traefik.enable=true",
+        "traefik.http.routers.ploy-metrics.rule=Host(`metrics.dev.ployd.app`) || Host(`metrics.ployd.app`)",
+        "traefik.http.routers.ploy-metrics.tls=true",
+        "traefik.http.routers.ploy-metrics.tls.certresolver=dev-wildcard",
+        "traefik.http.services.ploy-metrics.loadbalancer.server.scheme=http",
+        "service-mesh.connect=true",
+        "service-mesh.protocol=http",
+        "monitoring.scrape=true",
+        "monitoring.path=/health/metrics"
+      ]
+      
+      # Metrics service metadata
+      meta {
+        service_type = "metrics"
+        scrape_interval = "15s"
+        metrics_format = "prometheus"
+        version = "1.0.0"
+        environment = "production"
+      }
+      
+      # Metrics endpoint health check
+      check {
+        type = "http"
+        path = "/health/metrics"
+        port = "http"  # Use main HTTP port as metrics are served there
+        interval = "30s"
+        timeout = "5s"
+        success_before_passing = 1
+        failures_before_critical = 3
+        header {
+          X-Service-Mesh = ["ploy-api-metrics"]
+          Accept = ["text/plain; version=0.0.4"]
+        }
+      }
+    }
+    
+    # Main api task
+    task "ploy-api" {
+      driver = "raw_exec"
+      
+      user = "ploy"  # Run as ploy user for proper permissions
+      
+      resources {
+        cpu = 200
+        memory = 256
+      }
+      
+      # Enhanced environment variables for production with service mesh
+      env {
+        # Controller configuration
+        PORT = "${NOMAD_PORT_http}"
+        METRICS_PORT = "${NOMAD_PORT_metrics}"
+        
+        # Service discovery addresses (use localhost since Consul/Nomad are on same node)
+        CONSUL_HTTP_ADDR = "127.0.0.1:8500"
+        NOMAD_ADDR = "http://127.0.0.1:4646"
+        
+        # External configuration paths
+        PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
+        PLOY_CLEANUP_CONFIG = "/etc/ploy/cleanup/config.yaml"
+        
+        # Service configuration
+        PLOY_USE_CONSUL_ENV = "true"
+        PLOY_ENV_STORE_PATH = "/var/lib/ploy/env-store"
+        PLOY_CLEANUP_AUTO_START = "true"
+        
+        # Service mesh configuration
+        SERVICE_MESH_ENABLED = "true"
+        SERVICE_MESH_PROTOCOL = "http"
+        SERVICE_MESH_CONNECT = "true"
+        CONSUL_CONNECT_ENABLED = "true"
+        
+        # Blue-green deployment configuration
+        BLUE_GREEN_ENABLED = "true"
+        DEPLOYMENT_COLOR = "blue"
+        DEPLOYMENT_WEIGHT = "100"
+        DEPLOYMENT_ID = "${NOMAD_JOB_ID}-${NOMAD_ALLOC_ID}"
+        
+        # Traefik integration
+        TRAEFIK_ENABLED = "true"
+        TRAEFIK_DOMAIN = "api.ployd.app"
+        TRAEFIK_TLS_ENABLED = "true"
+        TRAEFIK_CERT_RESOLVER = "letsencrypt"
+        
+        # Service discovery and enhanced health checks
+        SERVICE_NAME = "ploy-api"
+        SERVICE_VERSION = "1.0.0"
+        HEALTH_CHECK_INTERVAL = "10s"
+        READINESS_CHECK_INTERVAL = "10s"
+        UPDATE_HEALTH_CHECK_INTERVAL = "15s"
+        
+        # Rolling update configuration
+        ROLLING_UPDATE_ENABLED = "true"
+        CANARY_DEPLOYMENT_ENABLED = "true"
+        AUTO_ROLLBACK_ENABLED = "true"
+        UPDATE_STRATEGY = "rolling-canary"
+        
+        # Update monitoring and alerting
+        UPDATE_MONITORING_ENABLED = "true"
+        UPDATE_ALERT_WEBHOOK = "https://hooks.slack.com/services/ploy-updates"
+        UPDATE_PROGRESS_REPORTING = "true"
+        ROLLBACK_THRESHOLD_FAILURES = "2"
+        
+        # Update timing configuration
+        CANARY_PROMOTION_DELAY = "5m"
+        UPDATE_STAGGER_DELAY = "30s"
+        HEALTH_VALIDATION_TIMEOUT = "5m"
+        
+        # Binary distribution configuration
+        CONTROLLER_VERSION = "arf-phase4-security-hardening-20250823-080000"
+        CONTROLLER_BINARY_SOURCE = "seaweedfs"
+        BINARY_CACHE_DIR = "/var/lib/ploy/cache/binaries"
+        BINARY_INTEGRITY_CHECK = "true"
+        
+        # DNS configuration environment variables
+        PLOY_DNS_PROVIDER = "namecheap"
+        PLOY_DNS_DOMAIN = "ployd.app"
+        PLOY_DNS_TARGET_IP = "45.12.75.241"
+        PLOY_DNS_CONFIG_PATH = "/etc/ploy/dns/config.json"
+        
+        # Namecheap DNS provider configuration
+        NAMECHEAP_API_KEY = "c8615d72b5794eb0a52cbf1cf22fc42f"
+        NAMECHEAP_SANDBOX_API_KEY = "4ecde47766444cc4b464d017c9dc3749"
+        NAMECHEAP_API_USER = "iw2rmb"
+        NAMECHEAP_USERNAME = "iw2rmb"
+        NAMECHEAP_CLIENT_IP = "45.12.75.241"
+        NAMECHEAP_SANDBOX = "false"
+        
+        # Logging configuration
+        LOG_LEVEL = "info"
+        LOG_FORMAT = "json"
+        LOG_SERVICE_MESH = "true"
+        
+        # Nomad integration
+        NOMAD_NODE_ID = "${attr.unique.hostname}"
+        NOMAD_DATACENTER = "${node.datacenter}"
+        NOMAD_REGION = "${node.region}"
+        
+        # Instance identification
+        INSTANCE_ID = "${NOMAD_ALLOC_ID}"
+        NODE_NAME = "${attr.unique.hostname}"
+        CLUSTER_ID = "${node.unique.id}"
+        
+        # Platform wildcard certificate configuration
+        PLOY_APPS_DOMAIN = "ployd.app"
+        PLOY_APPS_DOMAIN_PROVIDER = "namecheap"
+        
+        # ARF Phase 3 - LLM Integration & Learning System
+        ARF_LEARNING_DB_URL = "postgres://ploy:arf_dev_password@localhost/arf_learning?sslmode=disable"
+        ARF_TREE_SITTER_PATH = "/usr/local/bin/tree-sitter"
+        ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
+        ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
+        ARF_SANDBOX_BASE_DIR = "/tmp/arf-sandboxes"
+        ARF_CACHE_DIR = "/tmp/arf-cache"
+        TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
+        JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
+        OPENREWRITE_JAR_PATH = "/usr/local/bin/rewrite.jar"
+      }
+      
+      # Enhanced configuration files with service mesh and rolling updates
+      template {
+        data = <<-EOH
+        # Ploy Controller Instance Configuration
+        # Generated automatically by Nomad with service mesh integration
+        instance_id: {{ env "NOMAD_ALLOC_ID" }}
+        node_name: {{ env "attr.unique.hostname" }}
+        datacenter: {{ env "node.datacenter" }}
+        region: {{ env "node.region" }}
+        cluster_id: {{ env "node.unique.id" }}
+        
+        # Service endpoints
+        consul_addr: {{ env "attr.unique.network.ip-address" }}:8500
+        nomad_addr: http://{{ env "attr.unique.network.ip-address" }}:4646
+        
+        # Service mesh configuration
+        service_mesh:
+          enabled: {{ env "SERVICE_MESH_ENABLED" }}
+          protocol: {{ env "SERVICE_MESH_PROTOCOL" }}
+          connect: {{ env "SERVICE_MESH_CONNECT" }}
+          consul_connect: {{ env "CONSUL_CONNECT_ENABLED" }}
+        
+        # Blue-green deployment configuration
+        deployment:
+          enabled: {{ env "BLUE_GREEN_ENABLED" }}
+          color: {{ env "DEPLOYMENT_COLOR" }}
+          weight: {{ env "DEPLOYMENT_WEIGHT" }}
+          deployment_id: {{ env "DEPLOYMENT_ID" }}
+          version: {{ env "SERVICE_VERSION" }}
+        
+        # Traefik load balancer configuration
+        traefik:
+          enabled: {{ env "TRAEFIK_ENABLED" }}
+          domain: {{ env "TRAEFIK_DOMAIN" }}
+          tls_enabled: {{ env "TRAEFIK_TLS_ENABLED" }}
+          cert_resolver: {{ env "TRAEFIK_CERT_RESOLVER" }}
+        
+        # Enhanced health check configuration for rolling updates
+        health:
+          check_interval: {{ env "HEALTH_CHECK_INTERVAL" }}
+          readiness_interval: {{ env "READINESS_CHECK_INTERVAL" }}
+          update_check_interval: {{ env "UPDATE_HEALTH_CHECK_INTERVAL" }}
+          service_name: {{ env "SERVICE_NAME" }}
+          
+        # Rolling update configuration
+        rolling_update:
+          enabled: {{ env "ROLLING_UPDATE_ENABLED" }}
+          strategy: {{ env "UPDATE_STRATEGY" }}
+          canary_enabled: {{ env "CANARY_DEPLOYMENT_ENABLED" }}
+          auto_rollback: {{ env "AUTO_ROLLBACK_ENABLED" }}
+          promotion_delay: {{ env "CANARY_PROMOTION_DELAY" }}
+          stagger_delay: {{ env "UPDATE_STAGGER_DELAY" }}
+          health_timeout: {{ env "HEALTH_VALIDATION_TIMEOUT" }}
+          rollback_threshold: {{ env "ROLLBACK_THRESHOLD_FAILURES" }}
+          
+        # Update monitoring and alerting
+        monitoring:
+          enabled: {{ env "UPDATE_MONITORING_ENABLED" }}
+          progress_reporting: {{ env "UPDATE_PROGRESS_REPORTING" }}
+          alert_webhook: {{ env "UPDATE_ALERT_WEBHOOK" }}
+          metrics_enabled: true
+        
+        # Resource limits
+        max_concurrent_builds: 3
+        build_timeout: "30m"
+        storage_timeout: "5m"
+        
+        # Service discovery settings
+        service_discovery:
+          auto_deregister: true
+          deregister_after: "60s"
+          health_endpoint: "/health"
+          readiness_endpoint: "/ready"
+          metrics_endpoint: "/health/metrics"
+        EOH
+        
+        destination = "local/api.yaml"
+        change_mode = "restart"
+      }
+      
+      # Enhanced health check script template
+      template {
+        data = <<-EOH
+        #!/bin/bash
+        # Enhanced health check script for Ploy Controller with rolling update support
+        set -e
+        
+        PORT={{ env "NOMAD_PORT_http" }}
+        
+        # Check if api is responding
+        echo "Checking api health..."
+        curl -f -s -H "X-Health-Check: rolling-update" \
+             -H "X-Update-Strategy: canary-enabled" \
+             http://localhost:$PORT/health > /dev/null
+        
+        # Check if ready endpoint is healthy with dependency validation
+        echo "Checking api readiness..."
+        curl -f -s -H "X-Update-Phase: canary-validation" \
+             -H "X-Dependency-Check: consul,nomad,seaweedfs,vault" \
+             http://localhost:$PORT/ready > /dev/null
+        
+        # Check update progress if monitoring is enabled
+        if [ "{{ env "UPDATE_MONITORING_ENABLED" }}" = "true" ]; then
+            echo "Checking update progress..."
+            curl -f -s -H "X-Update-Strategy: canary-rollout" \
+                 http://localhost:$PORT/health/update > /dev/null || echo "Update endpoint not available (normal during steady state)"
+        fi
+        
+        echo "Controller health check passed"
+        EOH
+        
+        destination = "local/health-check.sh"
+        perms = "755"
+      }
+      
+      # Binary selection and integrity verification script
+      template {
+        data = <<-EOH
+        #!/bin/bash
+        # Controller binary selection and integrity verification
+        set -e
+        
+        BINARY_PATH=""
+        
+        # Function to verify binary integrity
+        verify_binary() {
+            local binary_path="$1"
+            local expected_hash_file="$2"
+            
+            if [ ! -f "$binary_path" ]; then
+                echo "Binary not found: $binary_path"
+                return 1
+            fi
+            
+            if [ -f "$expected_hash_file" ]; then
+                local expected_hash=$(cat "$expected_hash_file")
+                local actual_hash=$(sha256sum "$binary_path" | cut -d' ' -f1)
+                
+                if [ "$expected_hash" != "$actual_hash" ]; then
+                    echo "Hash mismatch for $binary_path"
+                    echo "Expected: $expected_hash"
+                    echo "Actual: $actual_hash"
+                    return 1
+                fi
+                echo "Binary integrity verified: $binary_path"
+            else
+                echo "Warning: No hash file found for $binary_path, skipping integrity check"
+            fi
+            
+            # Make binary executable
+            chmod +x "$binary_path"
+            return 0
+        }
+        
+        # Try primary binary from SeaweedFS
+        if verify_binary "local/api" "local/api.sha256"; then
+            BINARY_PATH="local/api"
+            echo "Using primary api binary from SeaweedFS"
+        elif [ -f "local/api-fallback" ] && verify_binary "local/api-fallback" "local/api-fallback.sha256"; then
+            BINARY_PATH="local/api-fallback"
+            echo "Using fallback api binary"
+        else
+            echo "ERROR: No valid api binary found"
+            echo "Available files:"
+            ls -la local/
+            exit 1
+        fi
+        
+        # Execute the selected binary
+        echo "Starting api with binary: $BINARY_PATH"
+        exec "./$BINARY_PATH"
+        EOH
+        
+        destination = "local/start-api.sh"
+        perms = "755"
+      }
+      
+      # Download api binary from SeaweedFS artifact storage
+      artifact {
+        source = "http://45.12.75.241:8080/8,7c7539080801"
+        destination = "local/api"
+        mode = "file"
+        
+        # Use metadata.json for integrity validation
+        options {
+          checksum = "sha256:01b9cce2eb229cf01437e17d90f18ef07f4855db37c338ee95be5d4b4aa9bff6"
+        }
+      }
+      
+      # Binary execution configuration
+      config {
+        command = "local/api"
+        args = []
+      }
+      
+      # Lifecycle hooks for rolling updates
+      lifecycle {
+        hook = "prestart"
+        sidecar = false
+      }
+      
+      # Enhanced graceful shutdown configuration for rolling updates
+      kill_timeout = "60s"      # Extended timeout for rolling updates
+      kill_signal = "SIGTERM"   # Standard graceful shutdown signal
+      
+      # Log configuration
+      logs {
+        max_files = 5
+        max_file_size = 50  # MB
+      }
+    }
+  }
+}

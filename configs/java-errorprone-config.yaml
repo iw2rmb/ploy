@@ -1,0 +1,348 @@
+# Java Error Prone Configuration
+# Detailed configuration for Google Error Prone static analyzer
+
+java:
+  error_prone:
+    # Basic configuration
+    enabled: true
+    version: "2.23.0"
+    
+    # Paths and environment
+    javac_path: "javac"
+    errorprone_path: "/opt/errorprone/error_prone_core.jar"
+    java_home: "${JAVA_HOME}"
+    max_heap_size: "2G"
+    
+    # Bug pattern configuration
+    severity_level: "error"  # error, warning, suggestion
+    enable_all_checks: true
+    treat_warnings_as_errors: false
+    
+    # Performance optimization
+    incremental_check: true
+    parallel_compilation: true
+    cache_analyses: true
+    cache_directory: "/tmp/errorprone-cache"
+    
+    # Custom Ploy-specific bug patterns
+    custom_patterns:
+      - name: "PloyEnvironmentVariableUsage"
+        enabled: true
+        severity: "warning"
+        description: "Environment variables should use Ploy's standardized access patterns"
+        
+      - name: "PloyConfigurationValidation"
+        enabled: true
+        severity: "error"
+        description: "Configuration must be validated before use"
+        
+      - name: "PloySecurityPatterns"
+        enabled: true
+        severity: "error"
+        description: "Security patterns must follow Ploy guidelines"
+        
+      - name: "PloyResourceManagement"
+        enabled: true
+        severity: "warning"
+        description: "Resources must be properly managed and closed"
+        
+      - name: "PloyAPIVersioning"
+        enabled: true
+        severity: "warning"
+        description: "API endpoints must include version information"
+    
+    # Checker configuration with severity levels
+    checkers:
+      # Critical security and correctness checks
+      critical:
+        - "ArrayEquals:ERROR"
+        - "ArrayHashCode:ERROR"
+        - "ArrayToString:ERROR"
+        - "BadInstanceof:ERROR"
+        - "ChainingConstructorIgnoresParameter:ERROR"
+        - "CheckReturnValue:ERROR"
+        - "EqualsIncompatibleType:ERROR"
+        - "FormatString:ERROR"
+        - "GetClassOnClass:ERROR"
+        - "IdentityBinaryExpression:ERROR"
+        - "JUnit3TestNotRun:ERROR"
+        - "JUnit4TestNotRun:ERROR"
+        - "MissingOverride:ERROR"
+        - "MustBeClosedChecker:ERROR"
+        - "NullableConstructor:ERROR"
+        - "NullablePrimitive:ERROR"
+        - "NullableVoid:ERROR"
+        - "ReferenceEquality:ERROR"
+        - "StreamResourceLeak:ERROR"
+        - "StringSplitter:ERROR"
+        - "UnnecessaryParentheses:WARNING"
+      
+      # High priority checks
+      high:
+        - "AlmostJavadoc:WARNING"
+        - "AmbiguousMethodReference:WARNING"
+        - "ArgumentSelectionDefectChecker:WARNING"
+        - "AssertFalse:WARNING"
+        - "AssignmentInOperand:WARNING"
+        - "BadImport:WARNING"
+        - "BugCheckerRefactoringTestHelper:WARNING"
+        - "CatchFail:WARNING"
+        - "ClassCanBeStatic:WARNING"
+        - "ClassNewInstance:WARNING"
+        - "CloseableProvides:WARNING"
+        - "CollectionUndefinedEquality:WARNING"
+        - "CollectorShouldNotUseState:WARNING"
+        - "ComparableAndComparator:WARNING"
+        - "ComplexBooleanConstant:WARNING"
+        - "DateFormatConstant:WARNING"
+        - "DefaultCharset:WARNING"
+        - "DoubleBraceInitialization:WARNING"
+        - "DoubleCheckedLocking:WARNING"
+        - "EqualsGetClass:WARNING"
+        - "EqualsUsingHashCode:WARNING"
+        - "ExtendingJUnitAssert:WARNING"
+        - "Finally:WARNING"
+        - "FloatingPointLiteralPrecision:WARNING"
+        - "FragmentInjection:WARNING"
+        - "FragmentNotInstantiable:WARNING"
+        - "FutureReturnValueIgnored:WARNING"
+        - "HidingField:WARNING"
+      
+      # Medium priority checks
+      medium:
+        - "ImmutableAnnotationChecker:WARN"
+        - "ImmutableEnumChecker:WARN"
+        - "InconsistentCapitalization:WARN"
+        - "IndexOutOfBoundsChecker:WARN"
+        - "InferredNullability:WARN"
+        - "InfiniteRecursion:WARN"
+        - "InjectOnConstructorOfAbstractClass:WARN"
+        - "InputStreamSlowMultibyteRead:WARN"
+        - "InstanceOfAndCastMatchWrongType:WARN"
+        - "IntLongMath:WARN"
+        - "InvalidLink:WARN"
+        - "InvalidPatternSyntax:WARN"
+        - "InvalidTimeZoneID:WARN"
+        - "InvalidURL:WARN"
+        - "InvalidZoneID:WARN"
+        - "IsInstanceIncompatibleType:WARN"
+        - "JUnit3FloatingPointComparisonWithoutDelta:WARN"
+        - "JUnit4ClassUsedInJUnit3:WARN"
+        - "JUnitAmbiguousTestClass:WARN"
+      
+      # Low priority/style checks
+      low:
+        - "LabelledBreakTarget:INFO"
+        - "LockNotBeforeTry:INFO"
+        - "LogicalAssignment:INFO"
+        - "MathAbsoluteRandom:INFO"
+        - "MemberName:INFO"
+        - "MissingCasesInEnumSwitch:INFO"
+        - "MixedMutabilityReturnType:INFO"
+        - "ModifiedButNotUsed:INFO"
+        - "ModifyCollectionInEnhancedForLoop:INFO"
+        - "MultipleParallelOrSequentialCalls:INFO"
+        - "MultipleUnaryOperatorsInMethodCall:INFO"
+        - "MutableConstantField:INFO"
+        - "NarrowingCompoundAssignment:INFO"
+        - "NegativeCharLiteral:INFO"
+        - "NestedInstanceOfConditions:INFO"
+        - "NonAtomicVolatileUpdate:INFO"
+        - "NonOverridingEquals:INFO"
+        - "NullableConstructor:INFO"
+        - "NullablePrimitive:INFO"
+        - "NullableVoid:INFO"
+    
+    # Patterns to explicitly disable
+    disabled_checks:
+      - "AndroidInjectionBeforeSuper"
+      - "AutoFactoryAtInject"
+      - "AvoidNestedBlocks"
+      - "BoxedPrimitiveConstructor"
+      - "CanonicalDuration"
+      - "CatchAndPrintStackTrace"
+      - "ChainedAssertionLosesContext"
+      - "DaggerProvidesNull"
+      - "EmptyTopLevelDeclaration"
+      - "FutureReturnValueIgnored"
+      - "ImmutableEnumChecker"
+      - "InlineMeSuggester"
+      - "JavaLangClash"
+      - "MissingDefault"
+      - "MutablePublicArray"
+      - "NonCanonicalStaticMemberImport"
+      - "NonFinalCompileTimeConstant"
+      - "OptionalMapToOptional"
+      - "OverrideThrowableToString"
+      - "Overrides"
+      - "ParameterName"
+      - "ProtoRedundantSet"
+      - "QualifierOrScopeOnInjectMethod"
+      - "ReachabilityFenceUsage"
+      - "RefersToDaggerCodegen"
+      - "RequiredModifiers"
+      - "ReturnFromVoid"
+      - "SameNameButDifferent"
+      - "StaticAssignmentInConstructor"
+      - "StaticGuardedByInstance"
+      - "SynchronizeOnNonFinalField"
+      - "TestExceptionChecker"
+      - "ThreadJoinLoop"
+      - "ThreadLocalUsage"
+      - "ThreadPriorityCheck"
+      - "TimeUnitConversionChecker"
+      - "ToStringReturnsNull"
+      - "TruthAssertExpected"
+      - "TypeNameShadowing"
+      - "UndefinedEquals"
+      - "UnescapedEntity"
+      - "UnicodeEscape"
+      - "UnnecessaryAssignment"
+      - "UnnecessaryLambda"
+      - "UnnecessaryMethodInvocationInEquals"
+      - "UnnecessaryParentheses"
+      - "UnqualifiedYield"
+      - "UnrecognisedReflectionPattern"
+      - "UnsafeFinalization"
+      - "UnsafeReflectiveConstructionCast"
+      - "UnusedLabel"
+      - "UnusedMethod"
+      - "UnusedNestedClass"
+      - "UnusedTypeParameter"
+      - "UnusedVariable"
+      - "UseCorrectAssertInTests"
+      - "VariableNameSameAsType"
+      - "WaitNotInLoop"
+      - "WildcardImport"
+    
+    # Build system integration
+    maven:
+      enabled: true
+      compiler_plugin_version: "3.11.0"
+      compiler_args:
+        - "-XDcompilePolicy=simple"
+        - "-Xplugin:ErrorProne"
+      annotation_processor_paths:
+        - groupId: "com.google.errorprone"
+          artifactId: "error_prone_core"
+          version: "${error-prone.version}"
+      additional_compiler_args:
+        - "-J-Xmx2g"
+        - "-J-XX:+UseParallelGC"
+      fail_on_error: false
+      fail_on_warning: false
+      show_warnings: true
+      encoding: "UTF-8"
+      source: "11"
+      target: "11"
+    
+    gradle:
+      enabled: true
+      plugin_version: "3.1.0"
+      gradle_plugin_id: "net.ltgt.errorprone"
+      error_prone_javac: "com.google.errorprone:javac:9+181-r4173-1"
+      disable_warnings_in_generated_code: true
+      exclude_paths:
+        - "build/generated"
+        - "build/generated-sources"
+      compile_only_deps:
+        - "com.google.errorprone:error_prone_annotations:2.23.0"
+      annotation_processor_deps:
+        - "com.google.errorprone:error_prone_core:2.23.0"
+      jvm_args:
+        - "-Xmx2g"
+        - "-XX:+UseParallelGC"
+    
+    # Bazel integration (for future use)
+    bazel:
+      enabled: false
+      error_prone_java_version: "11"
+      javac_opts:
+        - "-XepDisableAllChecks"
+        - "-Xep:CollectionIncompatibleType:ERROR"
+        - "-Xep:EqualsIncompatibleType:ERROR"
+        - "-Xep:ArrayEquals:ERROR"
+    
+    # Output and reporting
+    output:
+      format: "text"  # text, json, xml, sarif
+      output_file: "errorprone-report.txt"
+      include_suppressed: false
+      include_warnings: true
+      max_errors: 100
+      max_warnings: 500
+      verbose: false
+      show_error_details: true
+      
+    # Suppression configuration
+    suppressions:
+      annotation: "@SuppressWarnings"
+      suppression_file: ".errorprone-suppressions"
+      ignore_suppression_annotations:
+        - "all"
+        - "deprecation"
+        - "serial"
+      
+    # Custom rules location
+    custom_rules:
+      jar_path: "/opt/ploy/errorprone-extensions.jar"
+      package: "com.ploy.errorprone"
+      auto_scan: true
+    
+    # Integration with Ploy ARF
+    arf_mapping:
+      enabled: true
+      confidence_threshold: 0.8
+      auto_fix_categories:
+        - "unused_code"
+        - "missing_annotation"
+        - "simple_replacement"
+      manual_review_categories:
+        - "security"
+        - "concurrency"
+        - "resource_leak"
+    
+    # Metrics collection
+    metrics:
+      enabled: true
+      collect_timing: true
+      collect_memory_usage: true
+      export_to_prometheus: false
+      export_path: "/metrics/errorprone"
+
+# Error Prone to OpenRewrite recipe mappings
+recipe_mappings:
+  # Null safety
+  "NullAway": "org.openrewrite.java.cleanup.ExplicitInitialization"
+  "NullableConstructor": "org.openrewrite.java.cleanup.ExplicitInitialization"
+  "NullablePrimitive": "org.openrewrite.java.cleanup.PrimitiveWrapperClassConstructorToValueOf"
+  "NullableVoid": "org.openrewrite.java.cleanup.ExplicitInitialization"
+  
+  # Unused code
+  "UnusedVariable": "org.openrewrite.java.cleanup.RemoveUnusedLocalVariables"
+  "UnusedMethod": "org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods"
+  "UnusedNestedClass": "org.openrewrite.java.cleanup.RemoveUnusedPrivateTypes"
+  
+  # Code quality
+  "MissingOverride": "org.openrewrite.java.cleanup.MissingOverrideAnnotation"
+  "DefaultCharset": "org.openrewrite.java.cleanup.DefaultCharset"
+  "EmptyBlock": "org.openrewrite.java.cleanup.EmptyBlock"
+  "UnnecessaryParentheses": "org.openrewrite.java.cleanup.UnnecessaryParentheses"
+  "StringSplitter": "org.openrewrite.java.cleanup.UseStringReplace"
+  
+  # Equals and comparison
+  "EqualsIncompatibleType": "org.openrewrite.java.cleanup.EqualsAvoidsNull"
+  "ReferenceEquality": "org.openrewrite.java.cleanup.CommonStaticAnalysis"
+  "ArrayEquals": "org.openrewrite.java.cleanup.UseArraysEquals"
+  
+  # Collections
+  "CollectionIncompatibleType": "org.openrewrite.java.cleanup.UseCollectionInterfaces"
+  "CollectionUndefinedEquality": "org.openrewrite.java.cleanup.CommonStaticAnalysis"
+  
+  # Security
+  "FragmentInjection": "org.openrewrite.java.security.SecureRandom"
+  "InsecureCryptoUsage": "org.openrewrite.java.security.SecureRandom"
+  
+  # Resource management
+  "MustBeClosedChecker": "org.openrewrite.java.cleanup.UseTryWithResources"
+  "StreamResourceLeak": "org.openrewrite.java.cleanup.UseTryWithResources"

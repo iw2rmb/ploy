@@ -14,6 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// GetEnvOrDefault returns environment variable value or default if not set
+func GetEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
 // CreateTempDir creates a temporary directory for testing
 func CreateTempDir(t testing.TB) string {
 	t.Helper()

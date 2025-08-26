@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/iw2rmb/ploy/controller/config"
+	"github.com/iw2rmb/ploy/api/config"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 

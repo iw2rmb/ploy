@@ -31,7 +31,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/iw2rmb/ploy/controller/runtime"
+	"github.com/iw2rmb/ploy/api/runtime"
 )
 
 func main() {

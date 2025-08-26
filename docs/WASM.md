@@ -355,7 +355,7 @@ This detection system ensures accurate Lane G routing while providing fallback o
 - **Language Context**: Maintains original language context (Rust, Go, C++, etc.) while assigning Lane G
 - **Confidence Scoring**: Advanced scoring system for detection accuracy
 
-#### 2. Build System (`controller/builders/wasm.go`)
+#### 2. Build System (`api/builders/wasm.go`)
 - **Multi-Strategy Builder**: Supports 5 build strategies:
   - `rust-wasm32`: Rust → wasm32-wasi target with cargo
   - `go-js-wasm`: Go → js/wasm with GOOS/GOARCH
@@ -365,7 +365,7 @@ This detection system ensures accurate Lane G routing while providing fallback o
 - **Automatic Strategy Selection**: Intelligent build strategy selection based on project structure
 - **Artifact Generation**: Complete SBOM and signature generation for WASM modules
 
-#### 3. Runtime System (`controller/runtime/wasm.go`)
+#### 3. Runtime System (`api/runtime/wasm.go`)
 - **wazero Integration**: Pure Go WebAssembly runtime with security constraints
 - **WASI Preview 1**: Full WebAssembly System Interface support
 - **Resource Limits**: Memory, execution time, and CPU constraints
@@ -382,7 +382,7 @@ This detection system ensures accurate Lane G routing while providing fallback o
 - **Request Handling**: Per-request WASM module execution with timeout control
 - **Deployment Artifact**: Gets packaged with app.wasm into container images
 
-#### 5. Component Model (`controller/wasm/components.go`)
+#### 5. Component Model (`api/wasm/components.go`)
 - **Multi-Module Support**: WebAssembly Component Model for complex applications
 - **Dependency Management**: Module linking and interface validation
 - **Resource Management**: Per-component resource limits and security policies

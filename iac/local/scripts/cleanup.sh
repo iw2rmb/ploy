@@ -139,11 +139,11 @@ done
 echo -e "${BLUE}🔨 Cleaning build artifacts...${NC}"
 cd "$PROJECT_ROOT"
 
-if [ -d "build" ]; then
-    rm -rf build/*
-    echo -e "${GREEN}✅ Build directory cleaned${NC}"
+if [ -d "bin" ]; then
+    rm -rf bin/*
+    echo -e "${GREEN}✅ Bin directory cleaned${NC}"
 else
-    echo -e "${YELLOW}ℹ️  No build directory found${NC}"
+    echo -e "${YELLOW}ℹ️  No bin directory found${NC}"
 fi
 
 # Remove test artifacts

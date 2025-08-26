@@ -1,0 +1,292 @@
+---
+# Ploy API Deployment via Nomad
+#
+# This playbook handles the API deployment through Nomad instead of systemd:
+# - Builds API binary and distribution tools
+# - Uploads API binary to SeaweedFS storage
+# - Deploys API as Nomad job with high availability
+# - Validates API deployment and health
+# - Implements proper service ordering and dependencies
+#
+- name: Deploy Ploy API via Nomad
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/dev-wildcard.yml
+  
+  tasks:
+    - name: Ensure proper service ordering - verify dependencies are running
+      block:
+        - name: Wait for SeaweedFS services to be healthy
+          wait_for:
+            port: "{{ item }}"
+            delay: 5
+            timeout: 60
+          loop:
+            - "{{ seaweedfs.master_port }}"
+            - "{{ seaweedfs.volume_port }}"
+            - "{{ seaweedfs.filer_port }}"
+
+        - name: Wait for HashiCorp services to be healthy
+          wait_for:
+            port: "{{ item }}"
+            delay: 5
+            timeout: 60
+          loop:
+            - "8500"  # Consul
+            - "4646"  # Nomad
+            - "8200"  # Vault
+
+        - name: Verify Nomad cluster is ready
+          uri:
+            url: "http://localhost:4646/v1/status/leader"
+            method: GET
+            status_code: 200
+          register: nomad_leader_check
+          retries: 6
+          delay: 10
+          until: nomad_leader_check.status == 200
+
+        - name: Display service dependency status
+          debug:
+            msg: "All required services (SeaweedFS, Consul, Nomad, Vault) are healthy and ready"
+
+    - name: Build API binary and distribution tools
+      block:
+        - name: Build API binary
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./api
+          become_user: ploy
+          register: api_build
+          changed_when: api_build.rc == 0
+
+        - name: Build API distribution tool
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api-dist ./tools/api-dist
+          become_user: ploy
+          register: api_dist_build
+          changed_when: api_dist_build.rc == 0
+
+        - name: Build ployman CLI for API management
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/ployman ./cmd/ployman
+          become_user: ploy
+          register: ployman_build
+          changed_when: ployman_build.rc == 0
+
+        - name: Verify binaries were created successfully
+          stat:
+            path: "/home/ploy/ploy/bin/{{ item }}"
+          register: binary_check
+          loop:
+            - api
+            - api-dist
+            - ployman
+
+        - name: Display build results
+          debug:
+            msg: "Successfully built: {{ item.item }} (exists: {{ item.stat.exists }})"
+          loop: "{{ binary_check.results }}"
+
+    - name: Upload API binary to SeaweedFS
+      block:
+        - name: Generate unique API version for this deployment
+          shell: echo "$(date +%Y%m%d-%H%M%S)-$(cd /home/ploy/ploy && git rev-parse --short HEAD)"
+          register: api_version
+          become_user: ploy
+          changed_when: false
+
+        - name: Set API version variable
+          set_fact:
+            current_api_version: "{{ api_version.stdout }}"
+
+        - name: Upload API binary to SeaweedFS
+          shell: |
+            cd /home/ploy/ploy
+            ./bin/api-dist \
+              -command=upload \
+              -version={{ current_api_version }} \
+              -binary=./bin/api \
+              -platform=linux \
+              -arch=amd64
+          become_user: ploy
+          register: api_upload
+          changed_when: api_upload.rc == 0
+
+        - name: Verify API binary upload
+          shell: |
+            cd /home/ploy/ploy
+            ./bin/api-dist -command=list
+          become_user: ploy
+          register: api_list
+          changed_when: false
+
+        - name: Display upload results
+          debug:
+            msg: "API version {{ current_api_version }} uploaded successfully"
+          when: current_api_version in api_list.stdout
+
+    - name: Deploy API Nomad job
+      block:
+        - name: Read FreeBSD VM IP from file (if available)
+          slurp:
+            src: /tmp/freebsd_vm_ip
+          register: freebsd_ip_file
+          ignore_errors: true
+
+        - name: Set FreeBSD VM IP variable
+          set_fact:
+            freebsd_vm_ip: "{{ freebsd_ip_file.content | b64decode | trim if freebsd_ip_file.content is defined else freebsd_vm.ip }}"
+
+        - name: Copy API Nomad job template
+          template:
+            src: ../../common/templates/nomad-ploy-api.hcl.j2
+            dest: /opt/hashicorp/nomad/jobs/ploy-api.hcl
+            owner: ploy
+            group: ploy
+            mode: '0644'
+          vars:
+            api_version: "{{ current_api_version }}"
+            freebsd_vm_dynamic_ip: "{{ freebsd_vm_ip }}"
+
+        - name: Validate API job syntax
+          command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-api.hcl
+          register: api_validate
+          changed_when: false
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+
+        - name: Check if API job is already running
+          uri:
+            url: "http://localhost:4646/v1/job/ploy-api"
+            method: GET
+            status_code: [200, 404]
+          register: api_job_check
+          ignore_errors: true
+
+        - name: Deploy API job to Nomad
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
+          register: api_job_deploy
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          when: api_job_check.status == 404
+
+        - name: Update existing API job (rolling update)
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
+          register: api_job_update
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          when: api_job_check.status == 200
+
+        - name: Wait for API allocation to be running
+          uri:
+            url: "http://localhost:4646/v1/job/ploy-api/allocations"
+            method: GET
+            status_code: 200
+          register: api_allocs
+          until: >
+            api_allocs.json | length > 0 and
+            (api_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
+          retries: 20
+          delay: 15
+
+        - name: Display API deployment status
+          debug:
+            msg: "API job deployed successfully with {{ api_allocs.json | length }} allocation(s)"
+
+    - name: Validate API deployment
+      block:
+        - name: Wait for API health endpoint to be available
+          uri:
+            url: "http://localhost:{{ ploy.api_port }}/health"
+            method: GET
+            status_code: 200
+          register: api_health
+          retries: 12
+          delay: 10
+          until: api_health.status == 200
+
+        - name: Verify API readiness
+          uri:
+            url: "http://localhost:{{ ploy.api_port }}/ready"
+            method: GET
+            status_code: 200
+          register: api_ready
+          retries: 6
+          delay: 10
+          until: api_ready.status == 200
+
+        - name: Test API endpoints
+          uri:
+            url: "http://localhost:{{ ploy.api_port }}/v1/health"
+            method: GET
+            status_code: 200
+          register: api_test
+
+        - name: Display API validation results
+          debug:
+            msg: "API is healthy and ready. API endpoints responding correctly."
+
+        - name: Save current API version for future reference
+          copy:
+            content: "{{ current_api_version }}"
+            dest: /opt/ploy/current-api-version
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+    - name: Configure API management tools
+      block:
+        - name: Create API management scripts directory
+          file:
+            path: /home/ploy/api-scripts
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create API update script
+          template:
+            src: ../../common/templates/update-api.sh.j2
+            dest: /home/ploy/api-scripts/update-api.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create API rollback script
+          template:
+            src: ../../common/templates/rollback-api.sh.j2
+            dest: /home/ploy/api-scripts/rollback-api.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create API status script
+          template:
+            src: ../../common/templates/api-status.sh.j2
+            dest: /home/ploy/api-scripts/api-status.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Create API migration script
+          template:
+            src: ../../common/templates/migrate-api.sh.j2
+            dest: /home/ploy/api-scripts/migrate-api.sh
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+    - name: Set up firewall for API
+      ufw:
+        rule: allow
+        port: "{{ ploy.api_port }}"
+        comment: "Ploy API"
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          API deployment completed successfully:
+          - Version: {{ current_api_version }}
+          - Binary distribution: Enabled via SeaweedFS
+          - Deployment method: Nomad job
+          - Health endpoint: http://localhost:{{ ploy.api_port }}/health
+          - Management tools: Available in /home/ploy/api-scripts/

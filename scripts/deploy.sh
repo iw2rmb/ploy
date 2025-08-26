@@ -99,18 +99,18 @@ get_git_version() {
 
 # Function to clean up existing deployment
 cleanup_deployment() {
-    echo -e "${YELLOW}Cleaning up existing controller deployment...${NC}"
+    echo -e "${YELLOW}Cleaning up existing api deployment...${NC}"
     
-    # Stop existing controller job if running
-    if nomad job status ploy-controller >/dev/null 2>&1; then
-        echo -e "${YELLOW}Stopping existing controller job...${NC}"
-        nomad job stop ploy-controller >/dev/null 2>&1
+    # Stop existing api job if running
+    if nomad job status ploy-api >/dev/null 2>&1; then
+        echo -e "${YELLOW}Stopping existing api job...${NC}"
+        nomad job stop ploy-api >/dev/null 2>&1
         
         # Wait for job to be fully stopped
         local max_wait=30
         local wait_count=0
         while [ $wait_count -lt $max_wait ]; do
-            if nomad job status ploy-controller 2>/dev/null | grep -q "Status.*dead"; then
+            if nomad job status ploy-api 2>/dev/null | grep -q "Status.*dead"; then
                 echo -e "${GREEN}✓ Controller job stopped successfully${NC}"
                 break
             fi
@@ -122,7 +122,7 @@ cleanup_deployment() {
             echo -e "${YELLOW}⚠ Controller job stop timeout, proceeding with deployment${NC}"
         fi
     else
-        echo -e "${GREEN}✓ No existing controller job found${NC}"
+        echo -e "${GREEN}✓ No existing api job found${NC}"
     fi
     echo ""
 }
@@ -171,11 +171,11 @@ pull_branch() {
 build_binaries() {
     echo -e "${YELLOW}Building binaries with version injection...${NC}"
     
-    mkdir -p build
+    mkdir -p bin
     
     # Build CLI
     echo -e "${YELLOW}Building Ploy CLI...${NC}"
-    go build -ldflags "-X main.Version=$VERSION -X main.GitCommit=$GIT_COMMIT -X main.BuildTime=$BUILD_TIMESTAMP" -o build/ploy ./cmd/ploy
+    go build -ldflags "-X main.Version=$VERSION -X main.GitCommit=$GIT_COMMIT -X main.BuildTime=$BUILD_TIMESTAMP" -o bin/ploy ./cmd/ploy
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to build Ploy CLI${NC}"
         exit 1
@@ -185,11 +185,11 @@ build_binaries() {
     # Build controller with comprehensive version injection
     echo -e "${YELLOW}Building Controller...${NC}"
     go build -ldflags "\
-        -X github.com/iw2rmb/ploy/controller/selfupdate.BuildVersion=$VERSION \
-        -X github.com/iw2rmb/ploy/controller/selfupdate.GitCommit=$GIT_COMMIT \
-        -X github.com/iw2rmb/ploy/controller/selfupdate.GitBranch=$GIT_BRANCH \
-        -X github.com/iw2rmb/ploy/controller/selfupdate.BuildTime=$BUILD_TIMESTAMP" \
-        -o build/controller ./controller
+        -X github.com/iw2rmb/ploy/api/selfupdate.BuildVersion=$VERSION \
+        -X github.com/iw2rmb/ploy/api/selfupdate.GitCommit=$GIT_COMMIT \
+        -X github.com/iw2rmb/ploy/api/selfupdate.GitBranch=$GIT_BRANCH \
+        -X github.com/iw2rmb/ploy/api/selfupdate.BuildTime=$BUILD_TIMESTAMP" \
+        -o bin/api ./api
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to build controller${NC}"
         exit 1
@@ -198,9 +198,9 @@ build_binaries() {
 
     # Build controller distribution tool
     echo -e "${YELLOW}Building controller distribution tool...${NC}"
-    go build -o build/controller-dist ./tools/controller-dist
+    go build -o bin/api-dist ./tools/api-dist
     if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to build controller-dist tool${NC}"
+        echo -e "${RED}Error: Failed to build api-dist tool${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ Controller distribution tool built${NC}"
@@ -211,15 +211,15 @@ build_binaries() {
 generate_checksums() {
     echo -e "${YELLOW}Generating checksums...${NC}"
     
-    CONTROLLER_CHECKSUM=$(sha256sum build/controller | cut -d' ' -f1)
-    CLI_CHECKSUM=$(sha256sum build/ploy | cut -d' ' -f1)
+    CONTROLLER_CHECKSUM=$(sha256sum bin/api | cut -d' ' -f1)
+    CLI_CHECKSUM=$(sha256sum bin/ploy | cut -d' ' -f1)
     
     echo -e "${GREEN}Controller checksum: $CONTROLLER_CHECKSUM${NC}"
     echo -e "${GREEN}CLI checksum: $CLI_CHECKSUM${NC}"
     
     # Store checksums for later use
-    echo "$CONTROLLER_CHECKSUM" > build/controller.sha256
-    echo "$CLI_CHECKSUM" > build/ploy.sha256
+    echo "$CONTROLLER_CHECKSUM" > bin/api.sha256
+    echo "$CLI_CHECKSUM" > bin/ploy.sha256
     echo ""
 }
 
@@ -227,10 +227,10 @@ generate_checksums() {
 upload_binaries() {
     echo -e "${YELLOW}Uploading binaries to SeaweedFS...${NC}"
     
-    # Upload controller binary with version-specific name and capture checksum
-    UPLOAD_OUTPUT=$(./build/controller-dist -command=upload -version="$VERSION" -binary=./build/controller)
+    # Upload api binary with version-specific name and capture checksum
+    UPLOAD_OUTPUT=$(./bin/api-dist -command=upload -version="$VERSION" -binary=./bin/api)
     if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to upload controller binary${NC}"
+        echo -e "${RED}Error: Failed to upload api binary${NC}"
         echo "$UPLOAD_OUTPUT"
         exit 1
     fi
@@ -245,18 +245,18 @@ upload_binaries() {
     
     # Update our stored checksum to match the uploaded binary
     CONTROLLER_CHECKSUM="$UPLOADED_CONTROLLER_CHECKSUM"
-    echo "$CONTROLLER_CHECKSUM" > build/controller.sha256
+    echo "$CONTROLLER_CHECKSUM" > bin/api.sha256
     
     echo -e "${GREEN}✓ Controller binary uploaded${NC}"
     echo -e "${GREEN}Uploaded checksum: $CONTROLLER_CHECKSUM${NC}"
 
-    # Note: CLI binary upload not supported by controller-dist tool
+    # Note: CLI binary upload not supported by api-dist tool
     # CLI binaries are built and used locally only
     echo -e "${GREEN}✓ CLI binary available locally (not uploaded to distribution storage)${NC}"
 
     # Verify uploads
     echo -e "${YELLOW}Verifying binary uploads...${NC}"
-    ./build/controller-dist -command=list
+    ./bin/api-dist -command=list
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to verify binary uploads${NC}"
         exit 1
@@ -269,10 +269,10 @@ upload_binaries() {
 create_nomad_job() {
     echo -e "${YELLOW}Creating Nomad job configuration...${NC}"
     
-    local NOMAD_JOB_FILE="$ROOT_DIR/platform/nomad/ploy-controller-dynamic.hcl"
+    local NOMAD_JOB_FILE="$ROOT_DIR/platform/nomad/ploy-api-dynamic.hcl"
     
     cat > "$NOMAD_JOB_FILE" << EOF
-job "ploy-controller" {
+job "ploy-api" {
   datacenters = ["dc1"]
   type = "service"
   priority = 80
@@ -282,7 +282,7 @@ job "ploy-controller" {
     value = "linux"
   }
   
-  group "controller" {
+  group "api" {
     count = 3
     
     restart {
@@ -310,22 +310,22 @@ job "ploy-controller" {
     }
     
     service {
-      name = "ploy-controller"
+      name = "ploy-api"
       port = "http"
       tags = [
         "ploy",
-        "controller",
+        "api",
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-controller-dynamic.rule=Host(\`api.dev.ployd.app\`) || Host(\`api.ployd.app\`)",
-        "traefik.http.routers.ploy-controller-dynamic.tls=true",
-        "traefik.http.routers.ploy-controller-dynamic.tls.certresolver=dev-wildcard",
-        "traefik.http.routers.ploy-controller-dynamic.tls.domains[0].main=dev.ployd.app",
-        "traefik.http.routers.ploy-controller-dynamic.tls.domains[0].sans=*.dev.ployd.app",
-        "traefik.http.services.ploy-controller-dynamic.loadbalancer.server.scheme=http",
-        "traefik.http.services.ploy-controller-dynamic.loadbalancer.healthcheck.path=/health",
-        "traefik.http.services.ploy-controller-dynamic.loadbalancer.healthcheck.interval=15s",
+        "traefik.http.routers.ploy-api-dynamic.rule=Host(\`api.dev.ployd.app\`) || Host(\`api.ployd.app\`)",
+        "traefik.http.routers.ploy-api-dynamic.tls=true",
+        "traefik.http.routers.ploy-api-dynamic.tls.certresolver=dev-wildcard",
+        "traefik.http.routers.ploy-api-dynamic.tls.domains[0].main=dev.ployd.app",
+        "traefik.http.routers.ploy-api-dynamic.tls.domains[0].sans=*.dev.ployd.app",
+        "traefik.http.services.ploy-api-dynamic.loadbalancer.server.scheme=http",
+        "traefik.http.services.ploy-api-dynamic.loadbalancer.healthcheck.path=/health",
+        "traefik.http.services.ploy-api-dynamic.loadbalancer.healthcheck.interval=15s",
         "blue-green.deployment=true",
         "blue-green.weight=100",
         "\${NOMAD_ALLOC_ID}"
@@ -383,12 +383,12 @@ job "ploy-controller" {
     }
     
     service {
-      name = "ploy-controller-metrics"
+      name = "ploy-api-metrics"
       port = "metrics"
       tags = [
         "metrics",
         "prometheus",
-        "ploy-controller",
+        "ploy-api",
         "monitoring.scrape=true",
         "monitoring.path=/health/metrics"
       ]
@@ -404,7 +404,7 @@ job "ploy-controller" {
       }
     }
     
-    task "ploy-controller" {
+    task "ploy-api" {
       driver = "raw_exec"
       
       user = "ploy"  # Run as ploy user for proper permissions
@@ -493,14 +493,14 @@ job "ploy-controller" {
         build_timestamp: "$BUILD_TIMESTAMP"
         
         service:
-          name: "ploy-controller"
+          name: "ploy-api"
           port: {{ env "NOMAD_PORT_http" }}
           metrics_port: {{ env "NOMAD_PORT_metrics" }}
           
         health:
           check_interval: "10s"
           readiness_interval: "10s"
-          service_name: "ploy-controller"
+          service_name: "ploy-api"
           
         deployment:
           version: "$VERSION"
@@ -513,14 +513,14 @@ job "ploy-controller" {
         storage_timeout: "5m"
         EOH
         
-        destination = "local/controller.yaml"
+        destination = "local/api.yaml"
         change_mode = "restart"
       }
       
       # Dynamic binary download from SeaweedFS
       artifact {
-        source = "http://45.12.75.241:8888/ploy-artifacts/controller-binaries/$VERSION/linux/amd64/controller"
-        destination = "local/controller"
+        source = "http://45.12.75.241:8888/ploy-artifacts/api-binaries/$VERSION/linux/amd6./api"
+        destination = "local/api"
         mode = "file"
         
         options {
@@ -530,7 +530,7 @@ job "ploy-controller" {
       
       
       config {
-        command = "local/controller"
+        command = "local/api"
         args = []
       }
       
@@ -559,7 +559,7 @@ EOF
 deploy_nomad() {
     echo -e "${YELLOW}Deploying via Nomad...${NC}"
     
-    local NOMAD_JOB_FILE="$ROOT_DIR/platform/nomad/ploy-controller-dynamic.hcl"
+    local NOMAD_JOB_FILE="$ROOT_DIR/platform/nomad/ploy-api-dynamic.hcl"
     
     # Deploy the job
     nomad job run "$NOMAD_JOB_FILE"
@@ -575,7 +575,7 @@ deploy_nomad() {
     sleep 30
     
     # Get deployment status
-    DEPLOYMENT_ID=$(nomad job status ploy-controller | grep "Latest Deployment" -A 3 | grep "ID" | awk '{print $3}')
+    DEPLOYMENT_ID=$(nomad job status ploy-api | grep "Latest Deployment" -A 3 | grep "ID" | awk '{print $3}')
     
     if [ -n "$DEPLOYMENT_ID" ]; then
         echo -e "${GREEN}Deployment ID: $DEPLOYMENT_ID${NC}"
@@ -584,7 +584,7 @@ deploy_nomad() {
         
         # Show allocation status
         echo -e "${YELLOW}Checking allocation health...${NC}"
-        ALLOC_ID=$(nomad job status ploy-controller | grep "running" | tail -1 | awk '{print $1}')
+        ALLOC_ID=$(nomad job status ploy-api | grep "running" | tail -1 | awk '{print $1}')
         if [ -n "$ALLOC_ID" ]; then
             echo -e "${GREEN}Latest allocation: $ALLOC_ID${NC}"
             nomad alloc status "$ALLOC_ID" | head -20
@@ -606,10 +606,10 @@ verify_deployment() {
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
-        echo -e "${YELLOW}Attempt $((attempt + 1))/$max_attempts: Testing controller health...${NC}"
+        echo -e "${YELLOW}Attempt $((attempt + 1))/$max_attempts: Testing api health...${NC}"
         
         # Test external HTTPS endpoint (primary)
-        if version_info=$(curl -s --max-time 10 "https://api.dev.ployd.app/v1/controller/version" 2>/dev/null); then
+        if version_info=$(curl -s --max-time 10 "https://api.dev.ployd.app/v1/api/version" 2>/dev/null); then
             echo -e "${GREEN}✓ HTTPS endpoint accessible${NC}"
             echo -e "${BLUE}Deployed version info:${NC}"
             echo "$version_info" | python3 -m json.tool 2>/dev/null || echo "$version_info"
@@ -637,7 +637,7 @@ verify_deployment() {
                 echo -e "${GREEN}✓ Local health check passed${NC}"
                 
                 # Test local version endpoint
-                if local_version_info=$(curl -s --max-time 5 "http://localhost:8081/v1/controller/version" 2>/dev/null); then
+                if local_version_info=$(curl -s --max-time 5 "http://localhost:8081/v1/api/version" 2>/dev/null); then
                     echo -e "${GREEN}✓ Local version endpoint accessible${NC}"
                     echo -e "${BLUE}Local version info:${NC}"
                     echo "$local_version_info" | python3 -m json.tool 2>/dev/null || echo "$local_version_info"
@@ -662,10 +662,10 @@ verify_deployment() {
     # Diagnostic information
     echo -e "${YELLOW}Running diagnostics...${NC}"
     echo -e "${BLUE}Nomad job status:${NC}"
-    nomad job status ploy-controller | head -20
+    nomad job status ploy-api | head -20
     
     echo -e "${BLUE}Latest allocation status:${NC}"
-    ALLOC_ID=$(nomad job status ploy-controller | grep "running\|pending\|failed" | head -1 | awk '{print $1}')
+    ALLOC_ID=$(nomad job status ploy-api | grep "running\|pending\|failed" | head -1 | awk '{print $1}')
     if [ -n "$ALLOC_ID" ]; then
         nomad alloc status "$ALLOC_ID" | head -30
     fi
@@ -726,8 +726,8 @@ echo "  Controller Checksum: $CONTROLLER_CHECKSUM"
 echo ""
 echo -e "${YELLOW}Verification Commands:${NC}"
 echo "  Health Check: curl http://localhost:8081/health"
-echo "  Version Info: curl http://localhost:8081/v1/controller/version"
-echo "  Job Status:   nomad job status ploy-controller"
+echo "  Version Info: curl http://localhost:8081/v1/api/version"
+echo "  Job Status:   nomad job status ploy-api"
 echo "  SSL Test:     ./scripts/diagnose-ssl.sh"
 echo ""
 echo -e "${BLUE}No manual file editing required! 🎉${NC}"

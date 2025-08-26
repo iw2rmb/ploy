@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/api/envstore"
 )
 
 // AppTestBuilder provides fluent interface for creating test apps

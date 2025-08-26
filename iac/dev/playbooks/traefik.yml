@@ -58,10 +58,24 @@
               watch: true
 
           certificatesResolvers:
-            letsencrypt:
+            # Certificate resolver for user apps domain (*.dev.ployd.app)
+            apps-wildcard:
               acme:
-                email: {{ ploy_dev_certificate.email | default('admin@ployd.app') }}
-                storage: /opt/ploy/traefik-data/acme.json
+                email: {{ ploy_dev_apps_certificate.email | default('admin@ployd.app') }}
+                storage: /opt/ploy/traefik-data/apps-acme.json
+                caServer: https://acme-v02.api.letsencrypt.org/directory
+                dnsChallenge:
+                  provider: namecheap
+                  delayBeforeCheck: 30s
+                  resolvers:
+                    - "1.1.1.1:53"
+                    - "8.8.8.8:53"
+            
+            # Certificate resolver for platform domain (*.dev.ployman.app)
+            platform-wildcard:
+              acme:
+                email: {{ ploy_dev_platform_certificate.email | default('admin@ployman.app') }}
+                storage: /opt/ploy/traefik-data/platform-acme.json
                 caServer: https://acme-v02.api.letsencrypt.org/directory
                 dnsChallenge:
                   provider: namecheap
@@ -91,17 +105,40 @@
         dest: /etc/traefik/traefik.yml
         mode: '0644'
 
-    - name: Create Traefik dynamic configuration for controller
+    - name: Create Traefik dynamic configuration for API
       copy:
         content: |
-          # Dynamic Configuration for Ploy Controller
+          # Dynamic Configuration for Ploy API
           http:
             routers:
-              controller-api:
-                rule: "Host(`api.dev.{{ ploy.apps_domain }}`)"
-                service: controller
+              # API service on platform domain
+              api-service:
+                rule: "Host(`api.dev.{{ ploy.platform_domain }}`)"
+                service: api
                 tls:
-                  certResolver: letsencrypt
+                  certResolver: platform-wildcard
+                  domains:
+                    - main: "dev.{{ ploy.platform_domain }}"
+                      sans:
+                        - "*.dev.{{ ploy.platform_domain }}"
+                entryPoints:
+                  - websecure
+              
+              # Platform services router
+              platform-services:
+                rule: "HostRegexp(`{service:[a-z0-9-]+}.dev.{{ ploy.platform_domain }}`)"
+                service: dynamic-platform
+                tls:
+                  certResolver: platform-wildcard
+                entryPoints:
+                  - websecure
+              
+              # User apps router
+              user-apps:
+                rule: "HostRegexp(`{app:[a-z0-9-]+}.dev.{{ ploy.apps_domain }}`)"
+                service: dynamic-apps
+                tls:
+                  certResolver: apps-wildcard
                   domains:
                     - main: "dev.{{ ploy.apps_domain }}"
                       sans:
@@ -110,7 +147,7 @@
                   - websecure
 
             services:
-              controller:
+              api:
                 loadBalancer:
                   servers:
                     - url: "http://127.0.0.1:8081"
@@ -119,16 +156,28 @@
                     interval: 10s
                     timeout: 3s
                     scheme: http
-        dest: /etc/traefik/dynamic/controller.yml
+              
+              # Dynamic services will be configured via Consul
+              dynamic-platform:
+                loadBalancer:
+                  servers: []
+              
+              dynamic-apps:
+                loadBalancer:
+                  servers: []
+        dest: /etc/traefik/dynamic/api.yml
         mode: '0644'
 
-    - name: Create ACME storage file with proper permissions
+    - name: Create ACME storage files with proper permissions
       file:
-        path: /opt/ploy/traefik-data/acme.json
+        path: "{{ item }}"
         state: touch
         owner: root
         group: root
         mode: '0600'
+      loop:
+        - /opt/ploy/traefik-data/apps-acme.json
+        - /opt/ploy/traefik-data/platform-acme.json
 
     - name: Create Traefik systemd service
       copy:

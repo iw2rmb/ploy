@@ -105,7 +105,7 @@ cd ~/ploy/tests/scripts
 
 #### Platform Integration
 - `test-versioning-system.sh` - Tests version management system
-- `test-controller-deployment.sh` - Tests controller deployment
+- `test-api-deployment.sh` - Tests api deployment
 - `test-platform-resilience.sh` - Tests platform resilience
 
 ### 8. Helper Scripts
@@ -236,23 +236,23 @@ Each test should:
 
 #### 1.1 Single Instance Leader Election
 - **Test ID**: LE-001
-- **Objective**: Verify single controller instance automatically becomes leader
-- **Prerequisites**: Consul running, single controller instance
+- **Objective**: Verify single api instance automatically becomes leader
+- **Prerequisites**: Consul running, single api instance
 - **Steps**:
-  1. Start single controller instance
+  1. Start single api instance
   2. Check `/health/coordination` endpoint
   3. Verify `is_leader: true` status
   4. Check Consul KV store for leadership lock
-- **Expected Results**: Controller immediately becomes leader
+- **Expected Results**: API immediately becomes leader
 
 #### 1.2 Multi-Instance Leader Election
 - **Test ID**: LE-002
-- **Objective**: Verify leader election with multiple controller instances
-- **Prerequisites**: Consul running, ability to start multiple controller instances
+- **Objective**: Verify leader election with multiple api instances
+- **Prerequisites**: Consul running, ability to start multiple api instances
 - **Steps**:
-  1. Start first controller instance
+  1. Start first api instance
   2. Verify first instance becomes leader
-  3. Start second controller instance
+  3. Start second api instance
   4. Verify second instance becomes follower
   5. Check both instances report correct status
 - **Expected Results**: Only one leader, others are followers
@@ -260,7 +260,7 @@ Each test should:
 #### 1.3 Leader Failover
 - **Test ID**: LE-003
 - **Objective**: Verify automatic leader failover on leader failure
-- **Prerequisites**: Multiple controller instances running
+- **Prerequisites**: Multiple api instances running
 - **Steps**:
   1. Identify current leader instance
   2. Terminate leader process
@@ -272,7 +272,7 @@ Each test should:
 #### 1.4 TTL Cleanup Coordination
 - **Test ID**: LE-004
 - **Objective**: Verify TTL cleanup only runs on leader
-- **Prerequisites**: Multiple controller instances, preview jobs with TTL
+- **Prerequisites**: Multiple api instances, preview jobs with TTL
 - **Steps**:
   1. Deploy preview applications with short TTL (5 minutes)
   2. Monitor TTL cleanup logs on all instances
@@ -285,11 +285,11 @@ Each test should:
 
 #### 2.1 SIGTERM Handling
 - **Test ID**: GS-001
-- **Objective**: Verify controller responds to SIGTERM with graceful shutdown
-- **Prerequisites**: Controller running with active connections
+- **Objective**: Verify api responds to SIGTERM with graceful shutdown
+- **Prerequisites**: API running with active connections
 - **Steps**:
-  1. Start controller and establish HTTP connections
-  2. Send SIGTERM signal to controller process
+  1. Start api and establish HTTP connections
+  2. Send SIGTERM signal to api process
   3. Monitor shutdown logs and timing
   4. Verify connections are drained properly
   5. Verify coordination resources are cleaned up
@@ -298,7 +298,7 @@ Each test should:
 #### 2.2 Connection Draining
 - **Test ID**: GS-002
 - **Objective**: Verify in-flight requests complete before shutdown
-- **Prerequisites**: Controller running
+- **Prerequisites**: API running
 - **Steps**:
   1. Start long-running request (e.g., large file upload)
   2. Send SIGTERM during request processing
@@ -310,9 +310,9 @@ Each test should:
 #### 2.3 Resource Cleanup
 - **Test ID**: GS-003
 - **Objective**: Verify all resources are cleaned up during shutdown
-- **Prerequisites**: Controller running with active coordination
+- **Prerequisites**: API running with active coordination
 - **Steps**:
-  1. Start controller as leader with active TTL cleanup
+  1. Start api as leader with active TTL cleanup
   2. Initiate graceful shutdown
   3. Monitor Consul sessions and locks
   4. Verify coordination sessions are destroyed
@@ -324,7 +324,7 @@ Each test should:
 #### 3.1 Prometheus Metrics Collection
 - **Test ID**: MT-001
 - **Objective**: Verify Prometheus metrics are collected and exposed
-- **Prerequisites**: Controller running
+- **Prerequisites**: API running
 - **Steps**:
   1. Access `/metrics` endpoint
   2. Verify Prometheus format output
@@ -336,13 +336,13 @@ Each test should:
 #### 3.2 Leadership Metrics
 - **Test ID**: MT-002
 - **Objective**: Verify leadership status metrics are accurate
-- **Prerequisites**: Multiple controller instances
+- **Prerequisites**: Multiple api instances
 - **Steps**:
-  1. Start multiple controller instances
-  2. Check `ploy_controller_is_leader` metric on all instances
+  1. Start multiple api instances
+  2. Check `ploy_api_is_leader` metric on all instances
   3. Trigger leadership change
   4. Verify metrics update correctly
-  5. Check `ploy_controller_leadership_changes_total` counter
+  5. Check `ploy_api_leadership_changes_total` counter
 - **Expected Results**: Leadership metrics accurate, changes tracked
 
 #### 3.3 Application Metrics
@@ -351,8 +351,8 @@ Each test should:
 - **Prerequisites**: Sample applications
 - **Steps**:
   1. Deploy application with build tracking
-  2. Check build metrics (`ploy_controller_builds_total`)
-  3. Verify active apps count (`ploy_controller_active_apps`)
+  2. Check build metrics (`ploy_api_builds_total`)
+  3. Verify active apps count (`ploy_api_active_apps`)
   4. Monitor build duration histograms
   5. Test failure scenarios and error metrics
 - **Expected Results**: Application metrics accurate, build tracking works
@@ -362,7 +362,7 @@ Each test should:
 #### 4.1 Health Check Endpoints
 - **Test ID**: API-001
 - **Objective**: Verify all health check endpoints return correct status
-- **Prerequisites**: Controller running
+- **Prerequisites**: API running
 - **Steps**:
   1. Test `/health` endpoint
   2. Test `/ready` endpoint with dependencies
@@ -374,7 +374,7 @@ Each test should:
 #### 4.2 Application Management APIs
 - **Test ID**: API-002
 - **Objective**: Verify application CRUD operations
-- **Prerequisites**: Controller running, sample app code
+- **Prerequisites**: API running, sample app code
 - **Steps**:
   1. Create new application via `POST /v1/apps/:app/builds`
   2. List applications via `GET /v1/apps`
@@ -386,7 +386,7 @@ Each test should:
 #### 4.3 Environment Variable APIs
 - **Test ID**: API-003
 - **Objective**: Verify environment variable management
-- **Prerequisites**: Controller with Consul env store
+- **Prerequisites**: API with Consul env store
 - **Steps**:
   1. Set environment variables via `POST /v1/apps/:app/env`
   2. List environment variables via `GET /v1/apps/:app/env`
@@ -412,7 +412,7 @@ Each test should:
 #### 5.2 Storage Error Handling
 - **Test ID**: ST-002
 - **Objective**: Verify graceful handling of storage failures
-- **Prerequisites**: Controller with storage configuration
+- **Prerequisites**: API with storage configuration
 - **Steps**:
   1. Simulate storage service unavailability
   2. Attempt artifact operations
@@ -514,12 +514,12 @@ Each test should:
   7. Verify rolling update
 - **Expected Results**: Complete deployment workflow functions correctly
 
-#### 9.2 Multi-Instance Controller Coordination
+#### 9.2 Multi-Instance API Coordination
 - **Test ID**: INT-002
-- **Objective**: Verify multiple controller instances work together
-- **Prerequisites**: Multiple controller instances, shared Consul/Nomad
+- **Objective**: Verify multiple api instances work together
+- **Prerequisites**: Multiple api instances, shared Consul/Nomad
 - **Steps**:
-  1. Deploy multiple controller instances
+  1. Deploy multiple api instances
   2. Verify leader election
   3. Submit builds to different instances
   4. Verify coordination of TTL cleanup
@@ -530,7 +530,7 @@ Each test should:
 
 #### 10.1 Concurrent Build Handling
 - **Test ID**: PERF-001
-- **Objective**: Verify controller handles concurrent builds
+- **Objective**: Verify api handles concurrent builds
 - **Prerequisites**: Multiple sample applications
 - **Steps**:
   1. Submit 10 concurrent build requests
@@ -1070,7 +1070,7 @@ Each test should:
 ### ARF-DI-001: ARF Deployment Integration API Verification
 - **Test ID**: ARF-DI-001
 - **Objective**: Verify existing ARF API endpoints function correctly with new DeploymentSandboxManager naming
-- **Prerequisites**: Controller running with updated ARF deployment integration
+- **Prerequisites**: API running with updated ARF deployment integration
 - **Steps**:
   1. Check ARF health endpoint: `GET /v1/arf/health`
   2. Test recipe listing: `GET /v1/arf/recipes`
@@ -1087,7 +1087,7 @@ Each test should:
   1. Create benchmark configuration with Java test repository
   2. Execute benchmark via API: `POST /v1/arf/benchmark/run`
   3. Monitor all pipeline stages: transformation, deployment, application_testing, error_detection, cleanup
-  4. Verify deployment stage creates actual applications using controller APIs
+  4. Verify deployment stage creates actual applications using api APIs
   5. Verify application_testing stage validates HTTP endpoints
   6. Verify cleanup stage removes deployed applications
 - **Expected Results**: Complete pipeline executes successfully with real application deployment
@@ -1095,10 +1095,10 @@ Each test should:
 ### ARF-DI-003: DeploymentSandboxManager Functionality Testing
 - **Test ID**: ARF-DI-003
 - **Objective**: Verify DeploymentSandboxManager integration with core deployment system
-- **Prerequisites**: Controller with deployment integration enabled
+- **Prerequisites**: API with deployment integration enabled
 - **Steps**:
   1. Test sandbox creation via DeploymentSandboxManager
-  2. Verify application deployment using controller build APIs
+  2. Verify application deployment using api build APIs
   3. Test sandbox listing and metadata retrieval
   4. Verify sandbox cleanup and application removal
   5. Test error handling for deployment failures

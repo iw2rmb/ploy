@@ -23,6 +23,9 @@ func (m Model) View() string {
 func Usage() {
 	fmt.Println(`Ploy CLI
 Usage:
+  ploy analyze --app <app> [--fix] [--dry-run]
+  ploy analyze status <analysis-id>
+  ploy analyze results <analysis-id>
   ploy apps new --lang <go|node> --name <app>
   ploy apps destroy --name <app> [--force]
   ploy push -a <app> [-lane A|B|C|D|E|F] [-main com.example.Main] [-sha <sha>]

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/iw2rmb/ploy/controller/arf"
+	"github.com/iw2rmb/ploy/api/arf"
 )
 
 // Transform command

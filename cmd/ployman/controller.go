@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/iw2rmb/ploy/controller/config"
+	"github.com/iw2rmb/ploy/api/config"
 	"github.com/iw2rmb/ploy/internal/distribution"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
@@ -22,11 +22,11 @@ func ControllerCmd(args []string) {
 		fmt.Println("  ployman controller build <version> [options]    Build and distribute")
 		fmt.Println("")
 		fmt.Println("Options:")
-		fmt.Println("  --binary=PATH       Path to controller binary (default: ./build/controller)")
+		fmt.Println("  --binary=PATH       Path to controller binary (default: ./bin/controller)")
 		fmt.Println("  --platform=OS       Target platform (default: current)")
 		fmt.Println("  --arch=ARCH         Target architecture (default: current)")
 		fmt.Println("  --output=PATH       Output path for download (default: ./controller)")
-		fmt.Println("  --build-dir=PATH    Build output directory (default: ./build/dist)")
+		fmt.Println("  --build-dir=PATH    Build output directory (default: ./bin/dist)")
 		fmt.Println("  --no-upload         Build only, don't upload")
 		return
 	}
@@ -58,7 +58,7 @@ func runControllerUpload(args []string) {
 	}
 
 	version := args[0]
-	binaryPath := "./build/controller"
+	binaryPath := "./bin/controller"
 	platform := runtime.GOOS
 	arch := runtime.GOARCH
 	var gitCommit string
@@ -322,7 +322,7 @@ func runControllerBuild(args []string) {
 
 	version := args[0]
 	platforms := []string{"linux/amd64", "linux/arm64"}
-	buildDir := "./build/dist"
+	buildDir := "./bin/dist"
 	upload := true
 
 	// Parse flags

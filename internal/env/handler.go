@@ -5,8 +5,9 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/controller/envstore"
+	"github.com/iw2rmb/ploy/api/envstore"
 	"github.com/iw2rmb/ploy/internal/utils"
+	"github.com/iw2rmb/ploy/internal/validation"
 )
 
 func SetEnvVars(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
@@ -15,6 +16,11 @@ func SetEnvVars(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	var req map[string]string
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	// Validate environment variables
+	if err := validation.ValidateEnvVars(req); err != nil {
+		return utils.ErrJSON(c, 400, fmt.Errorf("validation failed: %w", err))
 	}
 	
 	log.Printf("Setting environment variables for app %s", app)
@@ -56,6 +62,16 @@ func SetEnvVar(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrJSON(c, 400, fmt.Errorf("invalid request body"))
+	}
+	
+	// Validate environment variable name
+	if err := validation.ValidateEnvVarName(key); err != nil {
+		return utils.ErrJSON(c, 400, fmt.Errorf("invalid environment variable name: %w", err))
+	}
+	
+	// Validate environment variable value
+	if err := validation.ValidateEnvVarValue(req.Value); err != nil {
+		return utils.ErrJSON(c, 400, fmt.Errorf("invalid environment variable value: %w", err))
 	}
 	
 	log.Printf("Setting environment variable %s for app %s", key, app)

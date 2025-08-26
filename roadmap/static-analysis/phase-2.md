@@ -1,50 +1,83 @@
-# Phase 2: Multi-Language Support 📋 PLANNED
+# Phase 2: Multi-Language Support & CHTTP Migration 🚧 IN PROGRESS
 
-**Priority**: High (enterprise language coverage)
+**Priority**: High (enterprise language coverage + security architecture)
 **Prerequisites**: Phase 1 core framework completed, analysis engine operational
-**Dependencies**: Core analysis engine, plugin architecture
+**Dependencies**: Core analysis engine, CHTTP server architecture
+**Migration Target**: CHTTP distributed sandboxed execution
 
 ## Overview
 
-Phase 2 expands the static analysis framework beyond Java to support enterprise-critical languages including Python, Go, JavaScript/TypeScript, C#, and Rust. This phase establishes comprehensive multi-language analysis capabilities with parallel execution, advanced caching, and language-specific optimization strategies.
+Phase 2 expands the static analysis framework beyond Java to support enterprise-critical languages while simultaneously migrating from in-process execution to the secure CHTTP (CLI-over-HTTP) distributed architecture. This dual approach addresses immediate security concerns while establishing comprehensive multi-language analysis capabilities.
 
 ## Technical Architecture
 
+### CHTTP Migration Architecture
+- **CHTTP Services**: Sandboxed analyzer services with HTTP APIs (25-35MB containers)
+- **Controller Integration**: CHTTP client library for secure communication
+- **Traefik Load Balancing**: L7 routing and health check integration
+- **Public Key Authentication**: Secure analyzer access with RSA signature validation
+
 ### Core Components
-- **Multi-Language Orchestrator**: Parallel execution coordinator for multiple language analyzers
-- **Language-Specific Analyzers**: Dedicated analyzers for Python, Go, JavaScript/TypeScript, C#, Rust
-- **Performance Optimization Engine**: Caching, parallel execution, and resource management
-- **Configuration Management**: Language-specific settings with global coordination
+- **CHTTP Server Framework**: Generic CLI-to-HTTP wrapper (`roadmap/cli-over-http/server.md`)
+- **Language-Specific CHTTP Services**: Containerized analyzers for Python, Go, JavaScript/TypeScript, C#, Rust  
+- **Pipeline Orchestration Engine**: Unix pipe-style chaining for complex workflows
+- **Migration Compatibility Layer**: Legacy analyzer wrapper for gradual migration
 
 ### Integration Points
-- **Phase 1 Analysis Engine**: Extends existing plugin architecture
-- **Lane-Specific Integration**: Analyzer selection based on Ploy's lane detection
-- **ARF Multi-Language Pipeline**: Extended issue-to-recipe mapping for all languages
-- **Nomad Parallel Execution**: Distributed analysis across multiple nodes
+- **Phase 1 Analysis Engine**: CHTTP adapter pattern for existing plugin architecture
+- **Controller CHTTP Client**: HTTP-based communication replacing in-process execution
+- **ARF Multi-Language Pipeline**: Extended issue-to-recipe mapping via CHTTP services
+- **Distributed Execution**: CHTTP services on dedicated infrastructure for isolation
 
 ## Implementation Tasks
 
-### 1. Python Analysis Integration
+### 1. Python Analysis Integration & CHTTP Migration
 
-**Objective**: Implement comprehensive Python static analysis with security scanning, type checking, and code quality assessment.
+**Objective**: Migrate existing Python analysis to CHTTP architecture while expanding tool coverage.
 
-**Tasks**:
-- ❌ Integrate Pylint for comprehensive code analysis and style checking
-- ❌ Add Bandit for security vulnerability detection in Python code
-- ❌ Implement mypy for static type checking and annotation validation
-- ❌ Create Black and isort integration for code formatting validation
-- ❌ Build Python-specific issue classification and remediation mapping
+**CHTTP Migration Tasks**:
+- 🚧 Create CHTTP server framework (`chttp/` package)
+- 🚧 Convert Pylint analyzer to CHTTP service (`configs/pylint-chttp-config.yaml`)
+- 🚧 Implement CHTTP client library for controller integration
+- 🚧 Deploy Pylint CHTTP service with Traefik integration
+- ❌ Migrate existing ARF integration to CHTTP architecture
 
-**Deliverables**:
+**Language Expansion Tasks**:
+- ✅ Integrate Pylint for comprehensive code analysis and style checking (2025-08-26)
+- ❌ Add Bandit CHTTP service for security vulnerability detection
+- ❌ Implement mypy CHTTP service for static type checking
+- ❌ Create Black and isort CHTTP services for code formatting validation
+- ✅ Build Python-specific issue classification and remediation mapping (2025-08-26)
+
+**CHTTP Service Deliverables**:
+```yaml
+# configs/pylint-chttp-config.yaml
+service:
+  name: "pylint-chttp"
+  port: 8080
+  
+executable:
+  path: "pylint"
+  args: ["--output-format=json", "--reports=no"]
+  timeout: "5m"
+
+security:
+  auth_method: "public_key"
+  run_as_user: "pylint"
+  max_memory: "512MB"
+
+input:
+  formats: ["tar.gz", "tar", "zip"]
+  allowed_extensions: [".py", ".pyw"]
+```
+
+**Legacy Compatibility Layer**:
 ```go
-// controller/analysis/python_analyzer.go
-type PythonAnalyzer struct {
-    config       PythonAnalysisConfig
-    pylintPath   string
-    banditPath   string
-    mypyPath     string
-    blackPath    string
-    isortPath    string
+// api/analysis/chttp_adapter.go
+type CHTPPylintAnalyzer struct {
+    serviceURL string
+    client     *chttp.Client
+    info       AnalyzerInfo
 }
 
 type PythonAnalysisConfig struct {
@@ -168,26 +201,46 @@ python:
 - Parallel execution reduces analysis time by 60% vs sequential execution
 - Integration works with virtualenv and conda environments
 
-### 2. Go Analysis Integration
+### 2. Go Analysis Integration via CHTTP
 
-**Objective**: Implement comprehensive Go static analysis leveraging the rich Go ecosystem of analysis tools.
+**Objective**: Implement comprehensive Go static analysis using CHTTP architecture from the start.
 
-**Tasks**:
-- ❌ Integrate golangci-lint meta-linter with 50+ analyzers
-- ❌ Add gosec for security-focused Go code analysis
-- ❌ Implement go vet integration for built-in static analysis
-- ❌ Create ineffassign and misspell integration for code quality
-- ❌ Build Go module and dependency analysis capabilities
+**CHTTP Service Tasks**:
+- ❌ Create golangci-lint CHTTP service with 50+ analyzers
+- ❌ Add gosec CHTTP service for security-focused analysis
+- ❌ Implement go vet CHTTP service integration
+- ❌ Create Go module analysis CHTTP service
+- ❌ Build Go-specific pipeline for combining multiple tools
 
-**Deliverables**:
+**CHTTP Service Configuration**:
+```yaml
+# configs/golangci-lint-chttp-config.yaml
+service:
+  name: "golangci-lint-chttp"
+  port: 8080
+
+executable:
+  path: "golangci-lint"
+  args: ["run", "--out-format=json"]
+  timeout: "10m"
+
+security:
+  auth_method: "public_key"
+  run_as_user: "golang"
+  max_memory: "1GB"
+
+pipeline:
+  enabled: true
+  next_services: ["gosec.chttp.ployd.app"]
+```
+
+**Controller Integration**:
 ```go
-// controller/analysis/go_analyzer.go
-type GoAnalyzer struct {
-    config           GoAnalysisConfig
-    golangciLintPath string
-    gosecPath        string
-    goVetPath        string
-    goBinaryPath     string
+// api/analysis/chttp_go_analyzer.go
+type CHTTPGoAnalyzer struct {
+    golangciClient *chttp.Client
+    gosecClient    *chttp.Client
+    pipeline       *chttp.Pipeline
 }
 
 type GoAnalysisConfig struct {
@@ -286,16 +339,16 @@ go:
 - Analysis completes within 2 minutes for typical Go projects
 - Integration supports Go 1.19+ module systems
 
-### 3. JavaScript/TypeScript Analysis Integration
+### 3. JavaScript/TypeScript Analysis via CHTTP
 
-**Objective**: Implement comprehensive JavaScript and TypeScript analysis with modern tooling and framework-specific checks.
+**Objective**: Implement modern JavaScript/TypeScript analysis using containerized CHTTP services.
 
-**Tasks**:
-- ❌ Integrate ESLint with comprehensive rule sets and plugins
-- ❌ Add TypeScript compiler integration for type checking
-- ❌ Implement JSHint for additional code quality analysis
-- ❌ Create framework-specific analysis (React, Vue, Angular)
-- ❌ Build package.json dependency and security analysis
+**CHTTP Service Tasks**:
+- ❌ Create ESLint CHTTP service with framework plugins
+- ❌ Add TypeScript compiler CHTTP service for type checking
+- ❌ Implement npm audit CHTTP service for dependency security
+- ❌ Create framework-specific analysis pipelines (React, Vue, Angular)
+- ❌ Build package.json analysis CHTTP service
 
 **Deliverables**:
 ```go
@@ -402,16 +455,16 @@ javascript:
 - Package analysis identifies vulnerable dependencies
 - Analysis supports both CommonJS and ES modules
 
-### 4. C# Analysis Integration
+### 4. C# Analysis via CHTTP
 
-**Objective**: Implement comprehensive C# and .NET ecosystem analysis leveraging Microsoft's Roslyn platform and FxCop analyzers.
+**Objective**: Implement .NET ecosystem analysis using containerized CHTTP services with Roslyn integration.
 
-**Tasks**:
-- ❌ Integrate Roslyn Analyzers for C# code analysis
-- ❌ Add FxCop Analyzers for .NET Framework compliance
-- ❌ Implement StyleCop for C# coding standards
-- ❌ Create SonarAnalyzer.CSharp integration for advanced patterns
-- ❌ Build MSBuild and .csproj integration for build-time analysis
+**CHTTP Service Tasks**:
+- ❌ Create Roslyn Analyzers CHTTP service for C# code analysis
+- ❌ Add FxCop Analyzers CHTTP service for .NET compliance
+- ❌ Implement StyleCop CHTTP service for coding standards
+- ❌ Create SonarAnalyzer.CSharp CHTTP service
+- ❌ Build MSBuild integration CHTTP service for project analysis
 
 **Deliverables**:
 ```go
@@ -512,16 +565,16 @@ csharp:
 - MSBuild integration works with both .csproj and packages.config projects
 - Analysis supports multiple target frameworks in single projects
 
-### 5. Rust Analysis Integration
+### 5. Rust Analysis via CHTTP
 
-**Objective**: Implement Rust-specific static analysis leveraging Clippy and the Rust ecosystem's analysis tools.
+**Objective**: Implement Rust-specific analysis using containerized CHTTP services with Cargo ecosystem integration.
 
-**Tasks**:
-- ❌ Integrate Clippy with comprehensive lint detection (600+ lints)
-- ❌ Add rustfmt for code formatting validation
-- ❌ Implement cargo audit for security vulnerability scanning
-- ❌ Create cargo deny for dependency analysis and licensing
-- ❌ Build Cargo.toml and workspace analysis capabilities
+**CHTTP Service Tasks**:
+- ❌ Create Clippy CHTTP service with 600+ lint detection
+- ❌ Add rustfmt CHTTP service for code formatting validation
+- ❌ Implement cargo audit CHTTP service for security scanning
+- ❌ Create cargo deny CHTTP service for dependency analysis
+- ❌ Build Cargo workspace analysis CHTTP service
 
 **Deliverables**:
 ```go
@@ -619,25 +672,52 @@ rust:
 - rustfmt validation ensures code formatting consistency
 - Integration supports cross-compilation targets and feature flags
 
-### 6. Parallel Execution & Performance Optimization
+### 6. CHTTP Pipeline Orchestration & Performance
 
-**Objective**: Implement sophisticated parallel execution and caching strategies to minimize analysis time while maximizing resource utilization.
+**Objective**: Implement CHTTP pipeline orchestration with Unix pipe-style chaining and horizontal scaling.
 
-**Tasks**:
-- ❌ Create multi-language parallel execution coordinator
-- ❌ Implement intelligent caching with cache invalidation strategies
-- ❌ Build resource usage monitoring and optimization
-- ❌ Create analysis result aggregation and normalization
-- ❌ Add performance profiling and optimization recommendations
+**Pipeline Tasks**:
+- ❌ Create CHTTP pipeline orchestration engine
+- ❌ Implement Unix pipe-style service chaining
+- ❌ Build intelligent load balancing across CHTTP services
+- ❌ Create analysis result aggregation from multiple services
+- ❌ Add CHTTP service monitoring and auto-scaling
 
-**Deliverables**:
+**CHTTP Pipeline Configuration**:
+```yaml
+# configs/analysis-pipeline-config.yaml
+pipeline:
+  services:
+    python:
+      - url: "https://pylint.chttp.ployd.app"
+        timeout: "5m"
+        weight: 1
+      - url: "https://bandit.chttp.ployd.app"  
+        timeout: "3m"
+        weight: 1
+        
+    javascript:
+      - url: "https://eslint.chttp.ployd.app"
+        timeout: "3m"
+        pipeline: ["https://tsc.chttp.ployd.app"]
+
+  orchestration:
+    max_concurrent: 10
+    timeout: "15m"
+    retry_attempts: 3
+    
+  load_balancing:
+    strategy: "round_robin"
+    health_check_interval: "30s"
+```
+
+**Pipeline Engine Implementation**:
 ```go
-// controller/analysis/parallel_executor.go
-type ParallelExecutor struct {
-    config         ParallelConfig
-    cacheManager   CacheManager
-    resourceMonitor ResourceMonitor
-    executorPool   ExecutorPool
+// api/analysis/chttp_pipeline.go
+type CHTTPPipeline struct {
+    services      map[string][]*chttp.Client
+    orchestrator  *PipelineOrchestrator
+    loadBalancer  *LoadBalancer
 }
 
 type ParallelConfig struct {
@@ -723,64 +803,70 @@ parallel_execution:
     performance_recommendations: true
 ```
 
-**Acceptance Criteria**:
-- Parallel execution reduces total analysis time by 70% vs sequential
-- Intelligent caching provides 80% cache hit rate for repeated analyses
-- Resource monitoring prevents system overload during peak usage
-- Analysis coordination handles analyzer failures gracefully
-- Performance optimization recommendations reduce future analysis time
+**CHTTP Pipeline Acceptance Criteria**:
+- CHTTP pipeline orchestration reduces analysis time by 60% vs sequential
+- Unix pipe-style chaining enables complex multi-tool workflows
+- Load balancing distributes requests across CHTTP service instances
+- Service health monitoring automatically routes around failed services
+- Horizontal scaling supports 50+ concurrent analysis requests
 
 ## Testing Strategy
 
-### Unit Tests
-- Individual language analyzer functionality and configuration
-- Parallel execution coordination and error handling
-- Cache management and invalidation strategies
-- Result aggregation and normalization
+### CHTTP Service Tests
+- Individual CHTTP service functionality and security
+- Public key authentication and request signing
+- Container isolation and resource limiting
+- Service health checks and monitoring
 
-### Integration Tests
-- Multi-language analysis workflows with real projects
-- Performance optimization under various load conditions
-- Cache effectiveness across different project types
-- Resource usage monitoring and optimization
+### Integration Tests  
+- Controller to CHTTP service communication
+- Pipeline orchestration with multiple CHTTP services
+- Load balancing and failover scenarios
+- End-to-end analysis workflows via CHTTP
 
 ### Performance Tests
-- Parallel execution scaling with increasing analyzer count
-- Cache performance with various cache sizes and strategies
-- Memory usage optimization across language analyzers
-- Analysis time benchmarks for various project sizes
+- CHTTP service response times under load
+- Pipeline orchestration scaling with multiple services
+- Container resource usage optimization
+- Network latency impact on analysis performance
 
-### Language Compatibility Tests
-- Version compatibility for each language's analysis tools
-- Integration with various project structures and configurations
-- Cross-platform compatibility (Linux, macOS, Windows)
-- Framework-specific analysis accuracy
+### Security Tests
+- CHTTP service sandboxing effectiveness
+- Authentication bypass attempt prevention
+- Resource exhaustion attack mitigation
+- Container escape attempt prevention
 
 ## Success Metrics
 
-- **Language Coverage**: 5+ languages with comprehensive analysis capabilities
-- **Performance**: 70% reduction in analysis time through parallelization
-- **Cache Effectiveness**: 80% cache hit rate for repeated analyses
-- **Resource Efficiency**: <4GB memory usage for typical multi-language projects
-- **Accuracy**: 90%+ issue detection accuracy across all supported languages
-- **Developer Experience**: <3 minutes total analysis time for medium projects
+- **CHTTP Migration**: 100% of existing analyzers migrated to CHTTP architecture
+- **Security**: 100% process isolation with no direct filesystem access from analyzers
+- **Language Coverage**: 5+ languages with comprehensive CHTTP service coverage
+- **Performance**: 60% reduction in analysis time through CHTTP pipeline orchestration
+- **Scalability**: Support for 50+ concurrent analysis requests via horizontal scaling
+- **Container Efficiency**: 25-35MB CHTTP service containers with <1 second startup time
+- **Developer Experience**: <2 minutes total analysis time for medium projects via CHTTP
 
 ## Risk Mitigation
 
+### CHTTP Migration Risks
+- **Service Availability**: Implement fallback to legacy analyzers during migration
+- **Network Latency**: Deploy CHTTP services on same infrastructure as controller
+- **Authentication Failures**: Comprehensive public key management and rotation procedures
+
 ### Technical Risks
-- **Tool Dependencies**: Version management and compatibility testing for all analysis tools
-- **Resource Exhaustion**: Intelligent resource allocation and monitoring
-- **Cache Invalidation**: Robust cache invalidation strategies based on code changes
+- **Container Dependencies**: Version pinning and automated testing for all CHTTP services
+- **Service Orchestration**: Health checks and automatic failover for CHTTP services
+- **Pipeline Complexity**: Simplified Unix pipe-style chaining with clear error handling
 
 ### Operational Risks
-- **Analysis Quality**: Comprehensive validation against known issue databases
-- **Performance Regression**: Continuous performance monitoring and optimization
-- **Configuration Complexity**: Simplified configuration with sensible defaults
+- **Migration Complexity**: Phased rollout with comprehensive compatibility testing
+- **Security Validation**: Regular security audits of CHTTP service isolation
+- **Performance Monitoring**: Continuous monitoring of CHTTP service response times
 
 ## Next Phase Dependencies
 
-Phase 2 enables:
-- **Phase 3**: Advanced ARF integration with multi-language recipe support
-- **Phase 4**: Production pipeline integration with comprehensive language coverage
+Phase 2 CHTTP migration enables:
+- **Phase 3**: Advanced ARF integration via CHTTP services with multi-language recipe support
+- **Phase 4**: Production pipeline integration with distributed CHTTP analyzer services
 
-The comprehensive multi-language support established in Phase 2 provides the foundation for enterprise-wide code quality improvement and automated remediation across diverse technology stacks.
+The CHTTP architecture established in Phase 2 provides a secure, scalable foundation for enterprise-wide code quality improvement with complete process isolation and horizontal scaling capabilities across diverse technology stacks.

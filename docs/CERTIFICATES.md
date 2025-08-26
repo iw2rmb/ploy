@@ -11,7 +11,7 @@ Ploy has two distinct certificate management systems that serve different purpos
 **Purpose**: Automatic HTTPS for all platform subdomains  
 **Scope**: `*.dev.ployd.app` (dev environment) or `*.ployd.app` (production)  
 **Management**: Infrastructure automation (Ansible)  
-**Implementation**: `controller/certificates/wildcard.go`
+**Implementation**: `api/certificates/wildcard.go`
 
 #### Characteristics:
 - ✅ Provisioned automatically during infrastructure setup
@@ -24,14 +24,14 @@ Ploy has two distinct certificate management systems that serve different purpos
 - **Provisioning**: Ansible playbook (`iac/dev/playbooks/main.yml`)
 - **Storage**: File system (`/etc/ploy/certs/`)
 - **Renewal**: Cron job with lego ACME client
-- **Integration**: Controller reads certificates from file system
+- **Integration**: API reads certificates from file system
 
 ### 2. App Domain Certificates (User-Level)
 
 **Purpose**: Custom domains added by users to their deployed apps  
 **Scope**: User-owned domains (`custom-domain.com`, `mysite.org`, etc.)  
 **Management**: CLI commands and API calls  
-**Implementation**: `controller/certificates/manager.go`
+**Implementation**: `api/certificates/manager.go`
 
 #### Characteristics:
 - ✅ Provisioned on-demand via CLI (`ploy domains:add custom-domain.com`)
@@ -43,7 +43,7 @@ Ploy has two distinct certificate management systems that serve different purpos
 #### Implementation:
 - **Provisioning**: CLI commands (`internal/cli/domains/handler.go`)
 - **Storage**: SeaweedFS + Consul metadata
-- **Renewal**: ACME renewal service (`controller/acme/renewal.go`)
+- **Renewal**: ACME renewal service (`api/acme/renewal.go`)
 - **Integration**: Dynamic certificate loading
 
 ## Environment Configuration
@@ -102,10 +102,10 @@ curl https://custom-domain.com                 # ✅ Works with individual cert
 
 ```
 ploy/
-├── controller/certificates/
+├── api/certificates/
 │   ├── wildcard.go         # Platform wildcard certificate manager
 │   └── manager.go          # App domain certificate manager
-├── controller/acme/
+├── api/acme/
 │   ├── client.go           # ACME client for individual certificates
 │   ├── storage.go          # SeaweedFS certificate storage
 │   └── renewal.go          # Automatic renewal service
