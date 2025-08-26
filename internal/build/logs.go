@@ -9,8 +9,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/validation"
 )
 
+// HealthMonitorInterface defines the interface for health monitoring
+type HealthMonitorInterface interface {
+	GetJobStatus(jobID string) (*nomad.JobStatus, error)
+	GetJobAllocations(jobID string) ([]*nomad.AllocationStatus, error)
+}
+
 // GetLogs retrieves logs from the deployed application
 func GetLogs(c *fiber.Ctx) error {
+	return getLogsWithMonitor(c, nomad.NewHealthMonitor())
+}
+
+// getLogsWithMonitor is a testable version of GetLogs that accepts a health monitor
+func getLogsWithMonitor(c *fiber.Ctx, monitor HealthMonitorInterface) error {
 	appName := c.Params("app")
 	
 	// Validate app name
@@ -28,8 +39,6 @@ func GetLogs(c *fiber.Ctx) error {
 	// Find the active job for this app across all lanes
 	lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
 	var activeJobName string
-	
-	monitor := nomad.NewHealthMonitor()
 	
 	for _, lane := range lanes {
 		jobName := appName + "-lane-" + lane

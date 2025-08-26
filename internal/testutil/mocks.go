@@ -404,3 +404,147 @@ func NewMockStorageClientWithErrors() *MockStorageClient {
 	
 	return storageClient
 }
+
+// TestRetryConfig returns retry configuration optimized for fast unit tests
+// Uses minimal delays to prevent test timeouts while preserving retry logic
+func TestRetryConfig() *storage.RetryConfig {
+	return &storage.RetryConfig{
+		MaxAttempts:       3,
+		InitialDelay:      1 * time.Millisecond,  // Minimal delay for unit tests
+		MaxDelay:          5 * time.Millisecond,  // Keep very short
+		BackoffMultiplier: 2.0,
+		RetryableErrors: []storage.ErrorType{
+			storage.ErrorTypeNetwork,
+			storage.ErrorTypeTimeout,
+			storage.ErrorTypeServiceUnavailable,
+			storage.ErrorTypeRateLimit,
+			storage.ErrorTypeInternal,
+			storage.ErrorTypeCorruption,
+		},
+	}
+}
+
+// MockHealthMonitor provides a mock implementation of nomad.HealthMonitor
+type MockHealthMonitor struct {
+	mock.Mock
+}
+
+// NewMockHealthMonitor creates a new mock health monitor
+func NewMockHealthMonitor() *MockHealthMonitor {
+	return &MockHealthMonitor{}
+}
+
+// GetJobStatus mocks the job status retrieval
+func (m *MockHealthMonitor) GetJobStatus(jobID string) (*JobStatus, error) {
+	args := m.Called(jobID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*JobStatus), args.Error(1)
+}
+
+// GetJobAllocations mocks the job allocations retrieval
+func (m *MockHealthMonitor) GetJobAllocations(jobID string) ([]*AllocationStatus, error) {
+	args := m.Called(jobID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*AllocationStatus), args.Error(1)
+}
+
+// JobStatus represents a Nomad job status for testing
+type JobStatus struct {
+	ID          string   `json:"ID"`
+	Name        string   `json:"Name"`
+	Status      string   `json:"Status"`
+	Type        string   `json:"Type"`
+	Datacenters []string `json:"Datacenters"`
+	Stable      bool     `json:"Stable"`
+	Version     int      `json:"Version"`
+}
+
+// AllocationStatus represents a Nomad allocation status for testing
+type AllocationStatus struct {
+	ID                string                     `json:"ID"`
+	ClientStatus      string                     `json:"ClientStatus"`
+	DesiredStatus     string                     `json:"DesiredStatus"`
+	DeploymentStatus  *AllocDeploymentStatus     `json:"DeploymentStatus"`
+	TaskStates        map[string]*TaskState      `json:"TaskStates"`
+}
+
+// AllocDeploymentStatus represents deployment-specific allocation status for testing
+type AllocDeploymentStatus struct {
+	Healthy   *bool  `json:"Healthy"`
+	Timestamp string `json:"Timestamp"`
+}
+
+// TaskState represents the state of a task within an allocation for testing
+type TaskState struct {
+	State      string       `json:"State"`
+	Failed     bool         `json:"Failed"`
+	StartedAt  string       `json:"StartedAt"`
+	FinishedAt string       `json:"FinishedAt"`
+	Events     []*TaskEvent `json:"Events"`
+}
+
+// TaskEvent represents a task event for testing
+type TaskEvent struct {
+	Type        string `json:"Type"`
+	Time        int64  `json:"Time"`
+	Message     string `json:"Message"`
+	DisplayMessage string `json:"DisplayMessage"`
+}
+
+// Helper methods for easier mock setup
+
+// WithJobFound sets up mock to return job when found
+func (m *MockHealthMonitor) WithJobFound(jobID string, status string) *MockHealthMonitor {
+	job := &JobStatus{
+		ID:          jobID,
+		Name:        jobID,
+		Status:      status,
+		Type:        "service",
+		Datacenters: []string{"dc1"},
+		Stable:      true,
+		Version:     1,
+	}
+	m.On("GetJobStatus", jobID).Return(job, nil)
+	return m
+}
+
+// WithJobNotFound sets up mock to return error when job not found
+func (m *MockHealthMonitor) WithJobNotFound(jobID string) *MockHealthMonitor {
+	m.On("GetJobStatus", jobID).Return(nil, fmt.Errorf("job %s not found", jobID))
+	return m
+}
+
+// WithAllocations sets up mock to return allocations for a job
+func (m *MockHealthMonitor) WithAllocations(jobID string, allocCount int) *MockHealthMonitor {
+	allocs := make([]*AllocationStatus, allocCount)
+	for i := 0; i < allocCount; i++ {
+		healthy := true
+		allocs[i] = &AllocationStatus{
+			ID:           fmt.Sprintf("alloc-%d", i+1),
+			ClientStatus: "running",
+			DesiredStatus: "run",
+			DeploymentStatus: &AllocDeploymentStatus{
+				Healthy:   &healthy,
+				Timestamp: time.Now().Format(time.RFC3339),
+			},
+		}
+	}
+	m.On("GetJobAllocations", jobID).Return(allocs, nil)
+	return m
+}
+
+// WithAllocationsError sets up mock to return error when getting allocations
+func (m *MockHealthMonitor) WithAllocationsError(jobID string, err error) *MockHealthMonitor {
+	m.On("GetJobAllocations", jobID).Return(nil, err)
+	return m
+}
+
+// WithNoAllocations sets up mock to return empty allocations list
+func (m *MockHealthMonitor) WithNoAllocations(jobID string) *MockHealthMonitor {
+	m.On("GetJobAllocations", jobID).Return([]*AllocationStatus{}, nil)
+	return m
+}
