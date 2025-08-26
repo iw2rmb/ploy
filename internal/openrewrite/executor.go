@@ -263,18 +263,7 @@ func (e *ExecutorImpl) normalizeJavaVersion(version string) JavaVersion {
 
 // executeMaven runs OpenRewrite using Maven
 func (e *ExecutorImpl) executeMaven(ctx context.Context, repoPath string, recipe RecipeConfig) error {
-	log.Printf("[OpenRewrite] Creating rewrite.yml configuration...")
-	// Create rewrite.yml
-	rewriteYaml := e.generateRewriteYaml(recipe)
-	yamlPath := filepath.Join(repoPath, "rewrite.yml")
-	if err := os.WriteFile(yamlPath, []byte(rewriteYaml), 0644); err != nil {
-		log.Printf("[OpenRewrite] Failed to create rewrite.yml: %v", err)
-		return fmt.Errorf("failed to create rewrite.yml: %w", err)
-	}
-	log.Printf("[OpenRewrite] Created rewrite.yml at: %s", yamlPath)
-	log.Printf("[OpenRewrite] Rewrite.yml content:\n%s", rewriteYaml)
-
-	// Build Maven command arguments
+	// Build Maven command arguments using direct recipe specification
 	args := e.buildMavenCommand(recipe)
 	log.Printf("[OpenRewrite] Maven command: %s %v", e.config.MavenPath, args)
 	
@@ -362,8 +351,8 @@ recipeList:
 // buildMavenCommand builds the Maven command arguments for OpenRewrite
 func (e *ExecutorImpl) buildMavenCommand(recipe RecipeConfig) []string {
 	args := []string{
-		"org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run",
-		"-Drewrite.activeRecipes=PloyTransformation",
+		"org.openrewrite.maven:rewrite-maven-plugin:run",
+		fmt.Sprintf("-Drewrite.recipe=%s", recipe.Recipe),
 	}
 
 	// Add recipe artifacts if specified

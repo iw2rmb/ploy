@@ -55,7 +55,7 @@ RUN cat > pom.xml << 'EOF'
             <plugin>
                 <groupId>org.openrewrite.maven</groupId>
                 <artifactId>rewrite-maven-plugin</artifactId>
-                <version>5.34.0</version>
+                <version>6.16.1</version>
                 <configuration>
                     <activeRecipes>
                         <recipe>org.openrewrite.java.migrate.UpgradeToJava17</recipe>
@@ -65,7 +65,7 @@ RUN cat > pom.xml << 'EOF'
                     <dependency>
                         <groupId>org.openrewrite.recipe</groupId>
                         <artifactId>rewrite-migrate-java</artifactId>
-                        <version>2.18.1</version>
+                        <version>3.15.0</version>
                     </dependency>
                 </dependencies>
             </plugin>
@@ -81,14 +81,20 @@ RUN mvn dependency:resolve-sources dependency:resolve -f pom.xml
 RUN mvn dependency:get \
     -DgroupId=org.openrewrite.recipe \
     -DartifactId=rewrite-migrate-java \
-    -Dversion=2.18.1 \
+    -Dversion=3.15.0 \
     -Dtransitive=true
 
 RUN mvn dependency:get \
     -DgroupId=org.openrewrite.maven \
     -DartifactId=rewrite-maven-plugin \
-    -Dversion=5.34.0 \
+    -Dversion=6.16.1 \
     -Dtransitive=true
+
+# Pre-warm Maven cache with the exact command format we use
+RUN mvn org.openrewrite.maven:rewrite-maven-plugin:run \
+    -Drewrite.recipe=org.openrewrite.java.migrate.UpgradeToJava17 \
+    -Drewrite.recipeArtifactCoordinates=org.openrewrite.recipe:rewrite-migrate-java:3.15.0 \
+    -f pom.xml || true
 
 #=============================================================================
 # Stage 3: Gradle Cache Builder - Pre-download Gradle and OpenRewrite plugin
@@ -113,7 +119,7 @@ rewrite {
 }
 
 dependencies {
-    rewrite("org.openrewrite.recipe:rewrite-migrate-java:2.18.1")
+    rewrite("org.openrewrite.recipe:rewrite-migrate-java:3.15.0")
 }
 
 java {
