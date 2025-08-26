@@ -61,9 +61,18 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 	// Try multiple possible locations for platform templates
 	possibleDirs := []string{
 		"platform/nomad",                              // Relative path (development)
+	}
+	
+	// Add path from environment variable if set
+	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
+		possibleDirs = append(possibleDirs, filepath.Join(templateDir, "platform/nomad"))
+	}
+	
+	// Add fallback paths
+	possibleDirs = append(possibleDirs,
 		"/home/ploy/ploy/platform/nomad",             // Absolute path on VPS
 		"/opt/ploy/platform/nomad",                   // Alternative deployment location
-	}
+	)
 
 	var templates []os.DirEntry
 	var platformTemplateDir string
@@ -147,9 +156,18 @@ func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
 	// Try multiple possible locations for platform templates
 	possibleDirs := []string{
 		"platform/nomad",                              // Relative path (development)
+	}
+	
+	// Add path from environment variable if set
+	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
+		possibleDirs = append(possibleDirs, filepath.Join(templateDir, "platform/nomad"))
+	}
+	
+	// Add fallback paths
+	possibleDirs = append(possibleDirs,
 		"/home/ploy/ploy/platform/nomad",             // Absolute path on VPS
 		"/opt/ploy/platform/nomad",                   // Alternative deployment location
-	}
+	)
 
 	var templates []os.DirEntry
 	var platformTemplateDir string
