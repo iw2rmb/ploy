@@ -124,6 +124,11 @@ internal/
 │   ├── repository.go    # Git repository analysis
 │   ├── validator.go     # Repository validation
 │   └── utils.go         # Git utilities
+├── openrewrite/         # OpenRewrite Java transformation service
+│   ├── types.go         # Type definitions and interfaces
+│   ├── manager.go       # Git repository manager for transformations
+│   ├── executor.go      # OpenRewrite executor for Maven/Gradle
+│   └── *_test.go        # Comprehensive unit tests
 └── utils/               # Shared utilities
     └── utils.go         # Common utility functions
 ```

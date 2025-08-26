@@ -75,6 +75,71 @@
 - `POST /v1/apps/:app/blue-green/rollback` — rollback to blue version (revert traffic to previous version).
   - Returns: `{"status": "success", "message": "Blue-green deployment rolled back successfully"}`
 
+## OpenRewrite Code Transformation Endpoints
+
+### Java Code Transformation
+- `POST /v1/openrewrite/transform` — execute OpenRewrite transformation on Java code.
+  - **Request Body**:
+    ```json
+    {
+      "job_id": "java11to17-001",
+      "tar_archive": "H4sIAAAAAAAA...", // base64-encoded tar.gz archive
+      "recipe_config": {
+        "recipe": "org.openrewrite.java.migrate.UpgradeToJava17",
+        "artifacts": "org.openrewrite.recipe:rewrite-migrate-java:3.15.0",
+        "options": {}
+      },
+      "timeout": "5m" // optional, defaults to 5 minutes
+    }
+    ```
+  - **Response**:
+    ```json
+    {
+      "success": true,
+      "job_id": "java11to17-001",
+      "diff": "LS0tIGEvSGVsbG...", // base64-encoded unified diff
+      "duration_seconds": 45.2,
+      "build_system": "maven",
+      "java_version": "17",
+      "stats": {
+        "files_changed": 3,
+        "lines_added": 12,
+        "lines_removed": 5,
+        "tar_size_bytes": 1024000,
+        "diff_size_bytes": 2048
+      }
+    }
+    ```
+  - **Supported Recipes**:
+    - `org.openrewrite.java.migrate.UpgradeToJava17` — Java 11 → 17 migration
+    - `org.openrewrite.java.migrate.UpgradeToJava21` — Java 17 → 21 migration
+    - `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0` — Spring Boot 3 migration
+  - **Error Response**:
+    ```json
+    {
+      "success": false,
+      "job_id": "java11to17-001",
+      "error": "Maven execution failed: build could not resolve dependencies",
+      "duration_seconds": 12.5,
+      "build_system": "maven"
+    }
+    ```
+
+### Health Check
+- `GET /v1/openrewrite/health` — check OpenRewrite service health and tool versions.
+  - **Response**:
+    ```json
+    {
+      "status": "healthy",
+      "version": "1.0.0",
+      "java_version": "openjdk version \"17.0.7\"",
+      "maven_version": "Apache Maven 3.9.4",
+      "gradle_version": "Gradle 8.2.1",
+      "git_version": "git version 2.39.2",
+      "timestamp": "2025-08-26T10:30:00Z"
+    }
+    ```
+
 ## Environment Variables Endpoints (Implemented)
 - `POST /v1/apps/:app/env` — set multiple environment variables.
   - Body: `{"NODE_ENV": "production", "DATABASE_URL": "postgres://localhost", "DEBUG": "true"}`
