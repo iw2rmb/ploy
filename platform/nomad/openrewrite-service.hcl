@@ -45,6 +45,7 @@ job "openrewrite-service" {
       config {
         image = "ploy-openrewrite:latest"
         ports = ["http", "metrics"]
+        force_pull = false  # Use locally built image
         
         # tmpfs mount for transformations
         mount {
