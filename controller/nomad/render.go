@@ -396,25 +396,47 @@ func processConditionalBlocks(template string, data RenderData) string {
 	
 	// Handle VOLUME_ENABLED blocks
 	if !data.VolumeEnabled {
-		// Remove volume definition block with surrounding whitespace
-		volumeRe := regexp.MustCompile(`(?ms)^\s*\{\{#if VOLUME_ENABLED\}\}.*?volume "jvm-data".*?\{\{/if\}\}\n?`)
+		// Remove volume definition in group (more specific pattern)
+		volumeRe := regexp.MustCompile(`(?s)\s*\{\{#if VOLUME_ENABLED\}\}[\s\S]*?volume "jvm-data"[\s\S]*?\{\{/if\}\}`)
 		result = volumeRe.ReplaceAllString(result, "")
 		
-		// Remove volume mount blocks
-		volumeMountRe := regexp.MustCompile(`(?ms)^\s*\{\{#if VOLUME_ENABLED\}\}.*?source = "jvm-data".*?\{\{/if\}\}\n?`)
+		// Remove volume_mount in task (more specific pattern)
+		volumeMountRe := regexp.MustCompile(`(?s)\s*\{\{#if VOLUME_ENABLED\}\}[\s\S]*?volume_mount[\s\S]*?\{\{/if\}\}`)
 		result = volumeMountRe.ReplaceAllString(result, "")
 	}
 	
 	// Handle CONNECT_ENABLED blocks
 	if !data.ConnectEnabled {
-		connectRe := regexp.MustCompile(`(?ms)^\s*\{\{#if CONNECT_ENABLED\}\}.*?\{\{/if\}\}\n?`)
-		result = connectRe.ReplaceAllString(result, "")
+		// Remove group-level service with connect configuration
+		connectServiceRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?service\s*\{[\s\S]*?connect\s*\{[\s\S]*?\}\s*\}[\s\S]*?\{\{/if\}\}`)
+		result = connectServiceRe.ReplaceAllString(result, "")
+		
+		// Remove connect blocks inside services
+		connectBlockRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?connect\s*\{[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
+		result = connectBlockRe.ReplaceAllString(result, "")
+		
+		// Remove connect-proxy task
+		connectProxyRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?task "connect-proxy"[\s\S]*?\{\{/if\}\}`)
+		result = connectProxyRe.ReplaceAllString(result, "")
+		
+		// Remove connect-related environment variables
+		connectEnvRe := regexp.MustCompile(`(?s)\s*\{\{#if CONNECT_ENABLED\}\}[\s\S]*?DATABASE_HOST[\s\S]*?\{\{/if\}\}`)
+		result = connectEnvRe.ReplaceAllString(result, "")
 	}
 	
 	// Handle VAULT_ENABLED blocks
 	if !data.VaultEnabled {
-		vaultRe := regexp.MustCompile(`(?ms)^\s*\{\{#if VAULT_ENABLED\}\}.*?\{\{/if\}\}\n?`)
-		result = vaultRe.ReplaceAllString(result, "")
+		// Remove vault block in task
+		vaultBlockRe := regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}[\s\S]*?vault\s*\{[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
+		result = vaultBlockRe.ReplaceAllString(result, "")
+		
+		// Remove vault template blocks for secrets
+		vaultTemplateRe := regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}[\s\S]*?template\s*\{[\s\S]*?secrets/[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
+		result = vaultTemplateRe.ReplaceAllString(result, "")
+		
+		// Remove vault upstreams from connect config
+		vaultUpstreamRe := regexp.MustCompile(`(?s)\s*\{\{#if VAULT_ENABLED\}\}[\s\S]*?upstreams\s*\{[\s\S]*?vault[\s\S]*?\}[\s\S]*?\{\{/if\}\}`)
+		result = vaultUpstreamRe.ReplaceAllString(result, "")
 	}
 	
 	// Handle CONSUL_CONFIG_ENABLED blocks

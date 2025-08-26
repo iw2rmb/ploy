@@ -258,12 +258,6 @@ EOF
           }
         }
         
-        {{#if CONNECT_ENABLED}}
-        connect {
-          sidecar_service {}
-        }
-        {{/if}}
-        
         meta {
           version = "{{VERSION}}"
           lane = "C"
