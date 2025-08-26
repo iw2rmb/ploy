@@ -1,5 +1,182 @@
 # CHANGELOG
 
+## [2025-08-26] - OpenRewrite Nomad Deployment Specification (Stream B Phase B3.1)
+
+### Added
+- **✅ Nomad Job Specification**: Complete Nomad HCL file for OpenRewrite service deployment with auto-scaling capabilities
+- **✅ Auto-scaling Policies**: Queue depth-based scaling (target: 5 jobs) and 10-minute inactivity shutdown
+- **✅ Zero-Instance Start**: Service starts with 0 instances and scales up based on demand (0-10 instance range)
+- **✅ Health Checks**: Comprehensive health monitoring with primary health, readiness, and worker status checks
+- **✅ Service Registration**: Consul service discovery integration with Traefik load balancer support
+- **✅ Resource Allocation**: 2 CPU cores, 4GB RAM, 1GB disk with 4GB tmpfs for transformations
+
+### Testing
+- **✅ Specification Validation**: Automated validation script verifying job structure and configuration
+- **✅ HCL Syntax Verification**: Complete syntax checking for all required sections and configurations
+- **✅ Health Check Configuration**: Validation of all health endpoints (/health, /ready, /status)
+- **✅ Scaling Policy Verification**: Confirmation of queue depth and inactivity-based scaling triggers
+- **✅ Docker Integration**: Container configuration with proper mounts and environment variables
+
+### Fixed
+- **✅ Resource Configuration**: Proper CPU, memory, and disk allocation for OpenRewrite transformations
+- **✅ Environment Variables**: Complete service configuration including Consul, SeaweedFS, and worker settings
+- **✅ Template Configuration**: Consul KV integration template for dynamic service configuration
+
+## [2025-08-26] - OpenRewrite Job Cancellation & Advanced Queue Management (Stream B Phase B2.3)
+
+### Added
+- **✅ Job Cancellation System**: Complete job cancellation with status tracking and queue removal functionality
+- **✅ Queue Lifecycle Management**: Start/Stop/Pause/Resume operations for queue maintenance and control
+- **✅ Enhanced Monitoring**: Comprehensive metrics collection for cancelled jobs, queue depth, and worker activity
+- **✅ Worker-Side Cancellation**: Intelligent job cancellation checking before processing to prevent wasted execution
+- **✅ Drain Mode**: Maintenance-friendly queue draining that completes current jobs while preventing new processing
+
+### Testing
+- **✅ Comprehensive Test Coverage**: 87.8% unit test coverage across all queue and worker functionality
+- **✅ Cancellation Testing**: Verification that cancelled jobs are properly skipped and removed from processing
+- **✅ Lifecycle Testing**: Queue Start/Stop/Pause/Resume operations tested with proper state management
+- **✅ Concurrent Processing**: Multi-worker job processing validation with proper synchronization
+- **✅ Mock Integration**: Complete mock expectations for storage operations including GetJobStatus calls
+
+### Fixed
+- **✅ Test Mock Expectations**: Added proper GetJobStatus mock expectations for worker cancellation checking
+- **✅ Thread Safety**: All queue operations properly synchronized with mutex locks for concurrent access
+- **✅ Memory Management**: Proper cleanup of cancelled job tracking and worker resources
+
+## [2025-08-26] - OpenRewrite Docker Container Implementation (Stream A Phase A3)
+
+### Added
+- **✅ Dockerfile.openrewrite**: Multi-stage optimized container build with Java 17, Maven, Gradle, and Git
+- **✅ Dedicated Server**: `/cmd/openrewrite-server/main.go` - Standalone OpenRewrite service with health checks and graceful shutdown
+- **✅ Container Build Script**: `/scripts/build-openrewrite-container.sh` - Automated build, test, and validation workflow
+- **✅ Artifact Pre-caching**: Maven and Gradle dependency pre-download for Java 11→17 migration recipes
+- **✅ Multi-stage Build**: Optimized container layers for Go binary, Maven cache, Gradle cache, and runtime environment
+- **✅ Security Hardening**: Non-root user execution and proper file permissions in container
+- **✅ Health Checks**: Built-in HTTP health endpoint monitoring for container orchestration
+
+### Testing
+- **✅ Container Validation**: Automated testing of health endpoints, system tool detection, and startup performance
+- **✅ Size Optimization**: Multi-stage build targeting <1GB container size with comprehensive toolchain
+- **✅ Performance Validation**: Container startup time testing (<30 seconds target) with health check monitoring
+- **✅ Tool Integration**: Java 17, Maven 3.9, Gradle 8.4, and Git integration verification
+
+### Fixed
+- **✅ Configuration Management**: Proper environment variable handling for Java paths and workspace directories
+- **✅ Binary Building**: Correct targeting of dedicated OpenRewrite server instead of full controller
+
+## [2025-08-26] - OpenRewrite HTTP API Testing Complete (Stream A Phase A2.3)
+
+### Added
+- **✅ API Integration Tests**: Comprehensive HTTP endpoint testing with real OpenRewrite executor integration
+- **✅ Health Check Validation**: System tool detection tests (Java, Maven, Gradle, Git) via health endpoint
+- **✅ Transform Endpoint Testing**: Full end-to-end API testing with base64 tar archives and JSON response validation
+- **✅ Error Handling Coverage**: Malformed requests, invalid base64, missing fields, timeout validation with proper HTTP status codes
+- **✅ Performance Validation**: API response time requirements (<5 minutes, <1 second overhead) verified with real projects
+
+### Testing
+- **✅ Health Endpoint Integration**: Validates `/v1/openrewrite/health` with system tool version detection
+- **✅ Transform API Integration**: Complete request/response cycle testing with Maven project transformation
+- **✅ Error Scenarios Coverage**: 6 comprehensive error handling test cases with proper JSON error responses
+- **✅ Performance Requirements**: API performance validation meeting roadmap success criteria
+- **✅ Build Integration**: Integration tests with `+build integration` tags for proper test separation
+
+### Fixed
+- **✅ Java Version Detection**: Improved detection logic for both OpenJDK and Oracle Java versions
+- **✅ Error Response Consistency**: Standardized error codes and messages across API validation scenarios
+- **✅ Timeout Validation**: Proper timeout format validation with descriptive error messages
+
+## [2025-08-26] - OpenRewrite Service Integration Testing Complete (Stream A Phase A1.3)
+
+### Added
+- **✅ Integration Test Suite**: Comprehensive testing framework with Spring Petclinic, simple Maven, and multi-module Maven projects
+- **✅ Performance Benchmarks**: Performance validation tests ensuring <5 minute transformation times and memory usage compliance
+- **✅ Multi-module Support**: Validated OpenRewrite executor works with complex multi-module Maven reactor projects
+- **✅ Transformation Quality**: Verified Java 11→17 migration produces correct diffs and detects build systems properly
+- **✅ Error Handling Validation**: Confirmed graceful handling of Maven dependency issues and transformation failures
+
+### Testing
+- **✅ Spring Petclinic Integration**: Modified Spring Petclinic main branch from Java 17→11→17 for meaningful migration testing
+- **✅ Performance Metrics**: Transformation time: 6.9s, Build system detection: Maven, Java version detection: 11→17
+- **✅ Multi-module Testing**: Verified reactor build order processing across parent, common, service, and web modules
+- **✅ Benchmark Framework**: Created benchmark tests for measuring transformation performance and resource usage
+- **✅ Integration Test Coverage**: Build tagged integration tests (`// +build integration`) for comprehensive system validation
+
+### Fixed
+- **✅ Spring Petclinic Version Issue**: Resolved Java version mismatch by dynamically modifying pom.xml from 17→11 for testing
+- **✅ Integration Test Build Tags**: Fixed test execution with proper `-tags=integration` flag usage
+- **✅ Multi-module Complexity**: Validated executor handles complex project structures with inter-module dependencies
+
+## [2025-08-26] - OpenRewrite Service HTTP API Implementation (Stream A Phase A2)
+
+### Added
+- **✅ OpenRewrite HTTP API**: Complete REST API implementation with `/v1/openrewrite/transform` and `/v1/openrewrite/health` endpoints
+- **✅ Request/Response Types**: Comprehensive type definitions for transformation requests, responses, and error handling
+- **✅ HTTP Handler**: Full Fiber v2 handler with request validation, base64 tar encoding/decoding, and transformation orchestration
+- **✅ Controller Integration**: Seamless integration with existing controller server architecture and dependency injection
+- **✅ Health Check System**: Health endpoint with system tool detection (Java, Maven, Gradle, Git versions)
+- **✅ Error Handling**: Robust validation and error responses for malformed requests and transformation failures
+
+### Testing
+- **✅ HTTP Handler Unit Tests**: Complete test coverage for all endpoints, validation logic, and error scenarios
+- **✅ Mock Integration**: Proper mocking of OpenRewrite executor for isolated HTTP layer testing
+- **✅ Spring Petclinic Integration Test**: Real-world testing scenario for Java 11→17 migration
+- **✅ TDD Implementation**: Red-Green-Refactor cycle maintained throughout HTTP API development
+- **✅ Build Integration**: Successful compilation and test execution in controller environment
+
+## [2025-08-26] - OpenRewrite Infrastructure Phase B2.1: Priority Job Queue
+
+### Added
+- **✅ Priority Job Queue**: Implemented JobQueue with heap-based priority ordering for OpenRewrite transformations
+- **✅ JobHeap Implementation**: Created thread-safe heap data structure with custom Less() function for priority + timestamp ordering
+- **✅ Mutex Protection**: Added RWMutex for concurrent access safety across multiple goroutines
+- **✅ Queue Operations**: Implemented Enqueue, Dequeue, Peek, Size, Clear, Contains, and RemoveJob methods
+- **✅ Storage Integration**: Connected job queue to storage abstraction layer for status tracking and metrics
+
+### Testing
+- **✅ 73.1% Code Coverage**: Exceeded minimum 60% coverage requirement with comprehensive test suite
+- **✅ Priority Ordering Tests**: Validated higher priority jobs processed before lower priority jobs
+- **✅ Timestamp Ordering Tests**: Verified older jobs processed first when priorities are equal
+- **✅ Concurrent Access Tests**: Tested thread safety with 100 concurrent operations
+- **✅ Edge Case Testing**: Covered empty queue scenarios, duplicate priorities, and error conditions
+
+### Fixed
+- **✅ Thread Safety**: Ensured all queue operations are goroutine-safe with proper mutex usage
+
+## [2025-08-26] - OpenRewrite Infrastructure Phase B1: Storage Backends
+
+### Added
+- **✅ Consul KV Storage Client**: Implemented ConsulStorage for job status tracking with blocking queries
+- **✅ SeaweedFS Storage Client**: Created SeaweedFSStorage for distributed diff file storage
+- **✅ Storage Abstraction Layer**: Built unified JobStorage interface combining Consul and SeaweedFS operations
+- **✅ Composite Storage Adapter**: Implemented CompositeStorage to seamlessly integrate both storage backends
+- **✅ Comprehensive Type System**: Created shared types for JobStatus, RecipeConfig, Job, TransformationResult, and Metrics
+
+### Testing
+- **✅ 100% Code Coverage**: Achieved perfect coverage for storage abstraction layer
+- **✅ 73.3% Consul Coverage**: Comprehensive testing of status operations and metrics storage
+- **✅ 76.6% SeaweedFS Coverage**: Full lifecycle testing of diff upload/download operations
+- **✅ Mock-Based Testing**: Created extensive mocks for both storage backends enabling isolated testing
+- **✅ Integration Test Scenarios**: Validated complete job workflow from creation to completion
+
+### Fixed
+- **✅ Import Cycle Resolution**: Refactored package structure to eliminate circular dependencies between storage packages
+
+## [2025-08-26] - OpenRewrite Service Implementation (Stream A Phase A1)
+
+### Added
+- **✅ OpenRewrite Core Transformation Pipeline**: Implemented foundation for Java code transformation service
+- **✅ Git Repository Management**: Created Git manager for initializing repos from tar archives and generating diffs
+- **✅ OpenRewrite Executor**: Built executor supporting Maven and Gradle build systems with recipe execution
+- **✅ Java Version Detection**: Added automatic detection of Java versions (11, 17, 21) from project files
+- **✅ Build System Detection**: Implemented detection logic for Maven (pom.xml) and Gradle (build.gradle/kts)
+- **✅ Comprehensive Test Suite**: Created unit tests for all components with 61.8% code coverage
+
+### Testing
+- **✅ Git Manager Tests**: Validated repository initialization, diff generation, and cleanup operations
+- **✅ Executor Detection Tests**: Verified build system and Java version detection across multiple scenarios
+- **✅ TDD Compliance**: Followed strict Red-Green-Refactor cycle for all implementations
+- **✅ Build Verification**: Confirmed successful compilation of controller and CLI binaries
+
 ## [2025-08-26] - TDD Phase 2: Lane Detection Unit Testing Implementation
 
 ### Added

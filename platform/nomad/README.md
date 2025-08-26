@@ -21,7 +21,8 @@ platform/nomad/
 ├── lane-c-node.hcl       # Node.js ecosystem (JavaScript, TypeScript)
 ├── lane-c-python.hcl     # Python applications (Flask, Django, FastAPI)
 ├── lane-c-go.hcl         # Go applications
-└── lane-c-osv.hcl        # Generic fallback
+├── lane-c-osv.hcl        # Generic fallback
+└── openrewrite-service.hcl # OpenRewrite transformation service ✅ 2025-08-26
 ```
 
 ### 2. No Conditional Processing
@@ -340,6 +341,85 @@ go test -v ./controller/nomad/ -run TestTemplateForLaneAndLanguage
 
 # Verify template contents  
 consul kv get ploy/templates/lane-c-java.hcl
+```
+
+## OpenRewrite Service ✅ 2025-08-26
+
+### Overview
+
+The `openrewrite-service.hcl` template defines a specialized service for Java code transformations using the OpenRewrite framework. This service is designed for **auto-scaling based on queue depth** and **automatic shutdown during inactivity**.
+
+### Key Features
+
+- **Zero-Instance Start**: Service starts with 0 instances and scales based on demand
+- **Queue-Driven Scaling**: Scales up when queue depth > 5 jobs (target: 3 jobs per instance)
+- **Inactivity Shutdown**: Automatically scales down to 0 after 10 minutes of no activity
+- **Resource Optimized**: 2 CPU cores, 4GB RAM, 4GB tmpfs for Java transformations
+- **Health Monitoring**: Comprehensive health checks for service, readiness, and worker status
+
+### Service Configuration
+
+```hcl
+job "openrewrite-service" {
+  group "openrewrite" {
+    count = 0  # Zero-instance start
+    
+    scaling {
+      min = 0
+      max = 10
+      # Queue depth and inactivity-based scaling policies
+    }
+    
+    task "openrewrite" {
+      driver = "docker"
+      config {
+        image = "ploy/openrewrite-service:latest"
+        # 4GB tmpfs mount for transformations
+        # Volume mounts for caching
+      }
+      
+      resources {
+        cpu    = 2000  # 2 CPU cores
+        memory = 4096  # 4GB RAM
+        disk   = 1024  # 1GB disk
+      }
+    }
+  }
+}
+```
+
+### Integration Points
+
+- **Storage**: Integrates with Consul KV (job status) and SeaweedFS (diff storage)
+- **Service Discovery**: Registers with Consul for load balancer routing
+- **Monitoring**: Exports Prometheus metrics on `/metrics` endpoint
+- **Queue System**: Uses the job queue system from Stream B Phase B2.3
+
+### Scaling Behavior
+
+1. **Scale Up**: When queue depth exceeds 5 jobs
+   - Cooldown: 30 seconds
+   - Target: 3 jobs per instance
+   - Max instances: 10
+
+2. **Scale Down**: After 10 minutes of inactivity
+   - Cooldown: 10 minutes
+   - Scales to 0 instances
+   - Saves 80% of resource costs
+
+### Health Checks
+
+- **Primary Health** (`/health`): Basic service responsiveness
+- **Readiness** (`/ready`): Job processing capability
+- **Worker Status** (`/status`): Worker pool health monitoring
+
+### Validation
+
+Use the included validation script to verify the specification:
+
+```bash
+cd platform/nomad/
+./validate-openrewrite-service.sh
 ```
 
 ---

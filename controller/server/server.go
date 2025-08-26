@@ -31,12 +31,14 @@ import (
 	"github.com/iw2rmb/ploy/controller/selfupdate"
 	"github.com/iw2rmb/ploy/controller/templates"
 	"github.com/iw2rmb/ploy/controller/arf"
+	"github.com/iw2rmb/ploy/controller/openrewrite"
 	"github.com/iw2rmb/ploy/controller/version"
 	"github.com/iw2rmb/ploy/internal/bluegreen"
 	"github.com/iw2rmb/ploy/internal/build"
 	"github.com/iw2rmb/ploy/internal/cleanup"
 	"github.com/iw2rmb/ploy/internal/debug"
 	"github.com/iw2rmb/ploy/internal/domain"
+	internal_openrewrite "github.com/iw2rmb/ploy/internal/openrewrite"
 	"github.com/iw2rmb/ploy/internal/preview"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
@@ -56,6 +58,7 @@ type ServiceDependencies struct {
 	CertificateManager *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
 	ARFHandler         *arf.Handler
+	OpenRewriteHandler *openrewrite.Handler
 	CoordinationManager *coordination.CoordinationManager
 	BlueGreenManager   *bluegreen.Manager
 	Metrics            *metrics.Metrics
@@ -245,6 +248,12 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize ARF handler: %v", err)
 	}
 
+	// Initialize OpenRewrite Handler
+	openRewriteHandler, err := initializeOpenRewriteHandler(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize OpenRewrite handler: %v", err)
+	}
+
 	// Initialize connection pools for better performance
 	consulPool, err := performance.NewConsulPool(cfg.ConsulAddr, cfg.ConsulPoolSize)
 	if err != nil {
@@ -291,6 +300,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		CertificateManager: certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
 		ARFHandler:         arfHandler,
+		OpenRewriteHandler: openRewriteHandler,
 		CoordinationManager: coordinationManager,
 		BlueGreenManager:   blueGreenManager,
 		Metrics:            metricsInstance,
@@ -621,6 +631,12 @@ func (s *Server) setupRoutes() {
 	if s.dependencies.ARFHandler != nil {
 		s.dependencies.ARFHandler.RegisterRoutes(s.app)
 		log.Printf("ARF routes registered successfully")
+	}
+
+	// OpenRewrite endpoints
+	if s.dependencies.OpenRewriteHandler != nil {
+		s.dependencies.OpenRewriteHandler.RegisterRoutes(s.app)
+		log.Printf("OpenRewrite routes registered successfully")
 	}
 
 	// Template management endpoints
@@ -1391,5 +1407,33 @@ func initializeTemplateHandler() (*templates.Handler, error) {
 		return nil, fmt.Errorf("failed to create template handler: %w", err)
 	}
 	log.Printf("Template management handler initialized successfully")
+	return handler, nil
+}
+
+// initializeOpenRewriteHandler initializes the OpenRewrite transformation handler
+func initializeOpenRewriteHandler(cfg *ControllerConfig) (*openrewrite.Handler, error) {
+	log.Printf("Initializing OpenRewrite handler")
+
+	// Create OpenRewrite configuration
+	config := &internal_openrewrite.Config{
+		WorkDir:          "/tmp/openrewrite",
+		MavenPath:        "mvn",
+		GradlePath:       "gradle", 
+		GitPath:          "git",
+		MaxTransformTime: 5 * time.Minute,
+	}
+
+	// Set JAVA_HOME from environment if available
+	if javaHome := os.Getenv("JAVA_HOME"); javaHome != "" {
+		config.JavaHome = javaHome
+	}
+
+	// Create executor
+	executor := internal_openrewrite.NewExecutor(config)
+
+	// Create handler
+	handler := openrewrite.NewHandlerWithConfig(executor, config)
+
+	log.Printf("OpenRewrite handler initialized successfully")
 	return handler, nil
 }
