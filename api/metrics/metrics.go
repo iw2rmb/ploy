@@ -6,43 +6,43 @@ import (
 	"os"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/gofiber/fiber/v2"
 )
 
 // Metrics holds all the Prometheus metrics for the controller
 type Metrics struct {
 	// Request metrics
-	RequestsTotal     *prometheus.CounterVec
-	RequestDuration   *prometheus.HistogramVec
-	
+	RequestsTotal   *prometheus.CounterVec
+	RequestDuration *prometheus.HistogramVec
+
 	// Leadership metrics
 	IsLeader          prometheus.Gauge
 	LeadershipChanges *prometheus.CounterVec
-	
+
 	// Application metrics
-	ActiveApps        prometheus.Gauge
-	BuildsTotal       *prometheus.CounterVec
-	BuildDuration     *prometheus.HistogramVec
-	
+	ActiveApps    prometheus.Gauge
+	BuildsTotal   *prometheus.CounterVec
+	BuildDuration *prometheus.HistogramVec
+
 	// System metrics
-	ControllerUptime  prometheus.Gauge
-	
+	ControllerUptime prometheus.Gauge
+
 	// Coordination metrics
-	TTLCleanupRuns    *prometheus.CounterVec
-	TTLCleanedJobs    prometheus.Counter
-	
+	TTLCleanupRuns *prometheus.CounterVec
+	TTLCleanedJobs prometheus.Counter
+
 	// Storage metrics
 	StorageOperations *prometheus.CounterVec
 	StorageErrors     *prometheus.CounterVec
-	
+
 	// Certificate metrics
 	CertificatesTotal     prometheus.Gauge
 	CertificateOperations *prometheus.CounterVec
 	CertificateExpiry     *prometheus.GaugeVec
-	
+
 	// Performance metrics
 	CacheHitRate        *prometheus.GaugeVec
 	CacheOperations     *prometheus.CounterVec
@@ -50,7 +50,7 @@ type Metrics struct {
 	ConnectionPoolOps   *prometheus.CounterVec
 	ConfigLoadTime      *prometheus.HistogramVec
 	StartupTime         prometheus.Gauge
-	
+
 	registry  *prometheus.Registry
 	startTime time.Time
 	logger    *log.Logger
@@ -60,7 +60,7 @@ type Metrics struct {
 func NewMetrics() *Metrics {
 	logger := log.New(os.Stdout, "[metrics] ", log.LstdFlags|log.Lshortfile)
 	registry := prometheus.NewRegistry()
-	
+
 	m := &Metrics{
 		registry:  registry,
 		startTime: time.Now(),
@@ -69,10 +69,10 @@ func NewMetrics() *Metrics {
 
 	// Initialize metrics
 	m.initializeMetrics()
-	
+
 	// Register metrics with registry
 	m.registerMetrics()
-	
+
 	logger.Println("Prometheus metrics initialized")
 	return m
 }
@@ -82,7 +82,7 @@ func (m *Metrics) initializeMetrics() {
 	// Request metrics
 	m.RequestsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_requests_total",
+			Name: "ploy_api_requests_total",
 			Help: "Total number of HTTP requests processed by the controller",
 		},
 		[]string{"method", "endpoint", "status_code"},
@@ -90,7 +90,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.RequestDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ploy_controller_request_duration_seconds",
+			Name:    "ploy_api_request_duration_seconds",
 			Help:    "Duration of HTTP requests processed by the controller",
 			Buckets: prometheus.DefBuckets,
 		},
@@ -100,14 +100,14 @@ func (m *Metrics) initializeMetrics() {
 	// Leadership metrics
 	m.IsLeader = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_is_leader",
+			Name: "ploy_api_is_leader",
 			Help: "Whether this controller instance is the current leader (1 for leader, 0 for follower)",
 		},
 	)
 
 	m.LeadershipChanges = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_leadership_changes_total",
+			Name: "ploy_api_leadership_changes_total",
 			Help: "Total number of leadership changes",
 		},
 		[]string{"type"}, // gained, lost
@@ -116,14 +116,14 @@ func (m *Metrics) initializeMetrics() {
 	// Application metrics
 	m.ActiveApps = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_active_apps",
+			Name: "ploy_api_active_apps",
 			Help: "Number of active applications",
 		},
 	)
 
 	m.BuildsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_builds_total",
+			Name: "ploy_api_builds_total",
 			Help: "Total number of application builds",
 		},
 		[]string{"app", "lane", "status"}, // success, failure
@@ -131,7 +131,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.BuildDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ploy_controller_build_duration_seconds",
+			Name:    "ploy_api_build_duration_seconds",
 			Help:    "Duration of application builds",
 			Buckets: []float64{10, 30, 60, 120, 300, 600, 1200}, // 10s to 20min
 		},
@@ -141,7 +141,7 @@ func (m *Metrics) initializeMetrics() {
 	// System metrics
 	m.ControllerUptime = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_uptime_seconds",
+			Name: "ploy_api_uptime_seconds",
 			Help: "Controller uptime in seconds",
 		},
 	)
@@ -149,7 +149,7 @@ func (m *Metrics) initializeMetrics() {
 	// Coordination metrics
 	m.TTLCleanupRuns = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_ttl_cleanup_runs_total",
+			Name: "ploy_api_ttl_cleanup_runs_total",
 			Help: "Total number of TTL cleanup runs",
 		},
 		[]string{"status"}, // success, error
@@ -157,7 +157,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.TTLCleanedJobs = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_ttl_cleaned_jobs_total",
+			Name: "ploy_api_ttl_cleaned_jobs_total",
 			Help: "Total number of jobs cleaned up by TTL cleanup",
 		},
 	)
@@ -165,7 +165,7 @@ func (m *Metrics) initializeMetrics() {
 	// Storage metrics
 	m.StorageOperations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_storage_operations_total",
+			Name: "ploy_api_storage_operations_total",
 			Help: "Total number of storage operations",
 		},
 		[]string{"operation", "status"}, // upload, download, delete; success, error
@@ -173,7 +173,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.StorageErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_storage_errors_total",
+			Name: "ploy_api_storage_errors_total",
 			Help: "Total number of storage errors",
 		},
 		[]string{"operation", "error_type"},
@@ -182,14 +182,14 @@ func (m *Metrics) initializeMetrics() {
 	// Certificate metrics
 	m.CertificatesTotal = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_certificates_total",
+			Name: "ploy_api_certificates_total",
 			Help: "Total number of certificates managed",
 		},
 	)
 
 	m.CertificateOperations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_certificate_operations_total",
+			Name: "ploy_api_certificate_operations_total",
 			Help: "Total number of certificate operations",
 		},
 		[]string{"operation", "status"}, // provision, renew, revoke; success, error
@@ -197,7 +197,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.CertificateExpiry = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_certificate_expiry_seconds",
+			Name: "ploy_api_certificate_expiry_seconds",
 			Help: "Time until certificate expiry in seconds",
 		},
 		[]string{"domain", "app"},
@@ -206,7 +206,7 @@ func (m *Metrics) initializeMetrics() {
 	// Performance metrics
 	m.CacheHitRate = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_cache_hit_rate",
+			Name: "ploy_api_cache_hit_rate",
 			Help: "Cache hit rate percentage",
 		},
 		[]string{"cache_type"}, // envstore, config, etc.
@@ -214,7 +214,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.CacheOperations = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_cache_operations_total",
+			Name: "ploy_api_cache_operations_total",
 			Help: "Total number of cache operations",
 		},
 		[]string{"cache_type", "operation"}, // get, set, delete, clear
@@ -222,7 +222,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.ConnectionPoolUsage = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_connection_pool_usage",
+			Name: "ploy_api_connection_pool_usage",
 			Help: "Current connection pool usage",
 		},
 		[]string{"service"}, // consul, nomad, storage
@@ -230,7 +230,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.ConnectionPoolOps = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ploy_controller_connection_pool_operations_total",
+			Name: "ploy_api_connection_pool_operations_total",
 			Help: "Total number of connection pool operations",
 		},
 		[]string{"service", "operation"}, // acquire, release, create
@@ -238,7 +238,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.ConfigLoadTime = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "ploy_controller_config_load_duration_seconds",
+			Name:    "ploy_api_config_load_duration_seconds",
 			Help:    "Time spent loading configuration files",
 			Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1}, // 1ms to 1s
 		},
@@ -247,7 +247,7 @@ func (m *Metrics) initializeMetrics() {
 
 	m.StartupTime = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ploy_controller_startup_duration_seconds",
+			Name: "ploy_api_startup_duration_seconds",
 			Help: "Time taken for controller startup",
 		},
 	)
@@ -364,7 +364,7 @@ func (m *Metrics) Handler() fiber.Handler {
 	promHandler := promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{
 		Registry: m.registry,
 	})
-	
+
 	return adaptor.HTTPHandler(promHandler)
 }
 
@@ -379,21 +379,21 @@ func (m *Metrics) HTTPHandler() http.Handler {
 func (m *Metrics) MetricsMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		start := time.Now()
-		
+
 		// Process request
 		err := c.Next()
-		
+
 		// Record metrics
 		duration := time.Since(start)
 		method := c.Method()
 		path := c.Route().Path
 		statusCode := c.Response().StatusCode()
-		
+
 		// Sanitize path for metrics (remove parameters)
 		endpoint := sanitizeEndpoint(path)
-		
+
 		m.RecordRequest(method, endpoint, string(rune(statusCode)), duration)
-		
+
 		return err
 	}
 }
@@ -404,7 +404,7 @@ func sanitizeEndpoint(path string) string {
 	// Replace common parameter patterns
 	// Examples: /v1/apps/myapp -> /v1/apps/:app
 	//          /v1/apps/myapp/builds/123 -> /v1/apps/:app/builds/:id
-	
+
 	// For now, return the raw path - this can be enhanced later
 	return path
 }
@@ -412,7 +412,7 @@ func sanitizeEndpoint(path string) string {
 // StartUptimeUpdater starts a background goroutine to update uptime metrics
 func (m *Metrics) StartUptimeUpdater() {
 	ticker := time.NewTicker(30 * time.Second)
-	
+
 	go func() {
 		defer ticker.Stop()
 		for {

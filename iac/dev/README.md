@@ -72,7 +72,7 @@ iac/
 │   ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
 │   ├── nomad-server.hcl.j2    # Linux Nomad server configuration
 │   ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
-│   ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│   ├── nomad-ploy-api.hcl.j2  # Controller Nomad job
 │   ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
 │   ├── vault.hcl.j2           # Vault configuration
 │   └── *.j2                   # Management scripts and service templates
@@ -183,12 +183,12 @@ curl localhost:8095/{ping,api/overview,metrics}
 
 ```bash
 # Controller (now managed by Nomad)
-nomad job status ploy-controller
+nomad job status ploy-api
 /home/ploy/controller-scripts/controller-status.sh
 
 # Controller management
-/home/ploy/controller-scripts/update-controller.sh
-/home/ploy/controller-scripts/rollback-controller.sh <version>
+/home/ploy/controller-scripts/update-api.sh
+/home/ploy/controller-scripts/rollback-api.sh <version>
 ./build/ployman controller list
 
 # CLI operations
@@ -210,11 +210,11 @@ ssh freebsd@192.168.100.10
 | **consul-server.hcl.j2** | Consul cluster configuration |
 | **nomad-server.hcl.j2** | Nomad scheduler configuration |
 | **vault.hcl.j2** | Vault secrets management config |
-| **nomad-ploy-controller.hcl.j2** | Controller Nomad job with HA deployment |
-| **update-controller.sh.j2** | Controller rolling update script |
-| **rollback-controller.sh.j2** | Controller rollback script |
+| **nomad-ploy-api.hcl.j2** | Controller Nomad job with HA deployment |
+| **update-api.sh.j2** | Controller rolling update script |
+| **rollback-api.sh.j2** | Controller rollback script |
 | **controller-status.sh.j2** | Controller status monitoring script |
-| **migrate-controller.sh.j2** | Migration assistance script |
+| **migrate-api.sh.j2** | Migration assistance script |
 | **seaweedfs-{master,volume,filer}.service.j2** | SeaweedFS systemd services |
 | **docker-daemon.json.j2** | Docker daemon with Kontain runtime |
 | **node-exporter.service.j2** | Prometheus metrics service |

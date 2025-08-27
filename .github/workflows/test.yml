@@ -91,7 +91,7 @@ jobs:
       - name: Build controller
         run: |
           echo "🔨 Building controller..."
-          go build -v -o bin/controller ./controller
+          go build -v -o bin/api ./controller
 
       - name: Build CLI
         run: |

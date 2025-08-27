@@ -1,0 +1,189 @@
+name: Deploy Platform Services
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'cmd/ployman/**'
+      - 'internal/**'
+      - '.ploy.yaml'
+      - 'services/openrewrite/**'
+    tags:
+      - 'v*'
+  
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Platform service to deploy'
+        required: true
+        type: choice
+        options:
+          - ploy-api
+          - openrewrite
+          - all
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  GO_VERSION: '1.22'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      api-changed: ${{ steps.changes.outputs.api }}
+      openrewrite-changed: ${{ steps.changes.outputs.openrewrite }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'api/**'
+              - 'internal/**'
+              - 'cmd/ployman/**'
+              - '.ploy.yaml'
+            openrewrite:
+              - 'services/openrewrite/**'
+
+  build-ployman:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Build ployman CLI
+        run: |
+          VERSION=${GITHUB_REF_NAME:-main-${GITHUB_SHA:0:7}}
+          go build -ldflags "-X main.Version=${VERSION}" -o bin/ployman ./cmd/ployman
+          chmod +x bin/ployman
+      
+      - name: Upload ployman artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ployman
+          path: bin/ployman
+
+  deploy-api:
+    runs-on: ubuntu-latest
+    needs: build-ployman
+    if: |
+      needs.detect-changes.outputs.api-changed == 'true' || 
+      github.event.inputs.service == 'ploy-api' || 
+      github.event.inputs.service == 'all'
+    
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download ployman
+        uses: actions/download-artifact@v4
+        with:
+          name: ployman
+          path: bin/
+      
+      - name: Make ployman executable
+        run: chmod +x bin/ployman
+      
+      - name: Deploy API Controller
+        env:
+          PLOY_CONTROLLER: ${{ secrets.PLOY_CONTROLLER_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          echo "Deploying API to ${ENV} environment..."
+          
+          ./bin/ployman push -a ploy-api -env ${ENV}
+      
+      - name: Verify Deployment
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          if [ "$ENV" = "prod" ]; then
+            URL="https://api.ployman.app/health"
+          else
+            URL="https://api.${ENV}.ployman.app/health"
+          fi
+          
+          echo "Checking health at ${URL}..."
+          for i in {1..30}; do
+            if curl -sf "${URL}" > /dev/null; then
+              echo "✅ API is healthy"
+              exit 0
+            fi
+            echo "Attempt $i/30: Waiting for API..."
+            sleep 10
+          done
+          echo "❌ Health check failed"
+          exit 1
+
+  deploy-openrewrite:
+    runs-on: ubuntu-latest
+    needs: build-ployman
+    if: |
+      needs.detect-changes.outputs.openrewrite-changed == 'true' || 
+      github.event.inputs.service == 'openrewrite' || 
+      github.event.inputs.service == 'all'
+    
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download ployman
+        uses: actions/download-artifact@v4
+        with:
+          name: ployman
+          path: bin/
+      
+      - name: Make ployman executable
+        run: chmod +x bin/ployman
+      
+      - name: Deploy OpenRewrite Service
+        env:
+          PLOY_CONTROLLER: ${{ secrets.PLOY_CONTROLLER_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          cd services/openrewrite
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          echo "Deploying OpenRewrite to ${ENV} environment..."
+          
+          ../../bin/ployman push -a openrewrite -env ${ENV}
+      
+      - name: Verify Deployment
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          if [ "$ENV" = "prod" ]; then
+            URL="https://openrewrite.ployman.app/health"
+          else
+            URL="https://openrewrite.${ENV}.ployman.app/health"
+          fi
+          
+          echo "Checking health at ${URL}..."
+          for i in {1..30}; do
+            if curl -sf "${URL}" > /dev/null; then
+              echo "✅ OpenRewrite is healthy"
+              exit 0
+            fi
+            echo "Attempt $i/30: Waiting for OpenRewrite..."
+            sleep 10
+          done
+          echo "❌ Health check failed"
+          exit 1

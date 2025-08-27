@@ -45,7 +45,7 @@ traefik_prod_config:
   # Router for production controller
   controller_router:
     rule: "Host(`api.{{ ploy.apps_domain }}`)"
-    service: "ploy-controller"
+    service: "ploy-api"
     tls:
       certResolver: "prod-wildcard"
       domains:

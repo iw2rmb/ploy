@@ -5,7 +5,7 @@ http:
   # Middleware definitions for API protection
   middlewares:
     # Rate limiting middleware - protects API from abuse
-    ploy-controller-ratelimit:
+    ploy-api-ratelimit:
       rateLimit:
         burst: 100
         period: "1m"
@@ -15,7 +15,7 @@ http:
           requestHost: true
     
     # Security headers middleware
-    ploy-controller-security:
+    ploy-api-security:
       headers:
         sslRedirect: true
         forceSTSHeader: true
@@ -35,7 +35,7 @@ http:
         frameOptions: "DENY"
     
     # Authentication middleware for admin endpoints
-    ploy-controller-auth:
+    ploy-api-auth:
       basicAuth:
         users:
           # admin:$2y$10$... (bcrypt hash of password)
@@ -43,7 +43,7 @@ http:
           - "admin:$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"
     
     # Circuit breaker middleware for fault tolerance
-    ploy-controller-circuit-breaker:
+    ploy-api-circuit-breaker:
       circuitBreaker:
         expression: "NetworkErrorRatio() > 0.30 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
         checkPeriod: "10s"
@@ -51,20 +51,20 @@ http:
         recoveryDuration: "60s"
     
     # Retry middleware for resilience
-    ploy-controller-retry:
+    ploy-api-retry:
       retry:
         attempts: 3
         initialInterval: "100ms"
     
     # Compression middleware
-    ploy-controller-compress:
+    ploy-api-compress:
       compress:
         excludedContentTypes:
           - "text/event-stream"
         minResponseBodyBytes: 1024
     
     # Request/Response size limits
-    ploy-controller-limits:
+    ploy-api-limits:
       buffering:
         maxRequestBodyBytes: 10485760  # 10MB
         memRequestBodyBytes: 2097152   # 2MB
@@ -72,7 +72,7 @@ http:
         memResponseBodyBytes: 4194304  # 4MB
     
     # CORS middleware for API access
-    ploy-controller-cors:
+    ploy-api-cors:
       headers:
         accessControlAllowOriginList:
           - "https://*.ployd.app"
@@ -96,7 +96,7 @@ http:
 
   # Service definitions with load balancing and health checks
   services:
-    ploy-controller-api:
+    ploy-api-api:
       loadBalancer:
         # Load balancing strategy
         strategy: "weighted_round_robin"
@@ -135,10 +135,10 @@ http:
           flushInterval: "100ms"
         
         # Server transport configuration
-        serversTransport: "ploy-controller-transport"
+        serversTransport: "ploy-api-transport"
     
     # Separate service for metrics endpoint
-    ploy-controller-metrics:
+    ploy-api-metrics:
       loadBalancer:
         strategy: "round_robin"
         
@@ -155,69 +155,69 @@ http:
             weight: 100
         
         passHostHeader: true
-        serversTransport: "ploy-controller-transport"
+        serversTransport: "ploy-api-transport"
 
   # Router definitions for different endpoints
   routers:
     # Main API router with full security stack
-    ploy-controller-api:
+    ploy-api-api:
       rule: "Host(`api.ployd.app`) && PathPrefix(`/v1`)"
       entryPoints:
         - "websecure"
-      service: "ploy-controller-api"
+      service: "ploy-api-api"
       middlewares:
-        - "ploy-controller-ratelimit"
-        - "ploy-controller-security" 
-        - "ploy-controller-circuit-breaker"
-        - "ploy-controller-retry"
-        - "ploy-controller-compress"
-        - "ploy-controller-limits"
-        - "ploy-controller-cors"
+        - "ploy-api-ratelimit"
+        - "ploy-api-security" 
+        - "ploy-api-circuit-breaker"
+        - "ploy-api-retry"
+        - "ploy-api-compress"
+        - "ploy-api-limits"
+        - "ploy-api-cors"
       tls:
         certResolver: "letsencrypt"
         options: "ploy-tls-options"
       priority: 100
     
     # Health check router (less restrictive for monitoring)
-    ploy-controller-health:
+    ploy-api-health:
       rule: "Host(`api.ployd.app`) && (PathPrefix(`/health`) || PathPrefix(`/ready`) || PathPrefix(`/live`))"
       entryPoints:
         - "websecure"
-      service: "ploy-controller-api"
+      service: "ploy-api-api"
       middlewares:
-        - "ploy-controller-security"
-        - "ploy-controller-compress"
+        - "ploy-api-security"
+        - "ploy-api-compress"
       tls:
         certResolver: "letsencrypt"
         options: "ploy-tls-options"
       priority: 200
     
     # Admin/Debug router with authentication
-    ploy-controller-admin:
+    ploy-api-admin:
       rule: "Host(`admin.ployd.app`)"
       entryPoints:
         - "websecure"
-      service: "ploy-controller-api"
+      service: "ploy-api-api"
       middlewares:
-        - "ploy-controller-auth"
-        - "ploy-controller-security"
-        - "ploy-controller-ratelimit"
-        - "ploy-controller-compress"
+        - "ploy-api-auth"
+        - "ploy-api-security"
+        - "ploy-api-ratelimit"
+        - "ploy-api-compress"
       tls:
         certResolver: "letsencrypt"
         options: "ploy-tls-options"
       priority: 150
     
     # Metrics router with authentication and specific rate limits
-    ploy-controller-metrics:
+    ploy-api-metrics:
       rule: "Host(`metrics.ployd.app`) || (Host(`api.ployd.app`) && PathPrefix(`/health/metrics`))"
       entryPoints:
         - "websecure"
-      service: "ploy-controller-metrics"
+      service: "ploy-api-metrics"
       middlewares:
-        - "ploy-controller-auth"
-        - "ploy-controller-security"
-        - "ploy-controller-compress"
+        - "ploy-api-auth"
+        - "ploy-api-security"
+        - "ploy-api-compress"
       tls:
         certResolver: "letsencrypt"
         options: "ploy-tls-options"
@@ -225,8 +225,8 @@ http:
 
   # Server transports configuration
   serversTransports:
-    ploy-controller-transport:
-      serverName: "ploy-controller"
+    ploy-api-transport:
+      serverName: "ploy-api"
       insecureSkipVerify: false
       maxIdleConnsPerHost: 10
       forwardingTimeouts:

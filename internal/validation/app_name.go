@@ -8,22 +8,7 @@ import (
 
 // Reserved app names that cannot be used by users
 var reservedAppNames = map[string]bool{
-	"api":        true,  // Reserved for controller API endpoint
-	"dev":        true,  // Reserved for dev environment subdomain
-	"controller": true,  // Reserved for controller service
-	"admin":      true,  // Reserved for admin interface
-	"dashboard":  true,  // Reserved for dashboard
-	"metrics":    true,  // Reserved for metrics endpoint
-	"health":     true,  // Reserved for health checks
-	"console":    true,  // Reserved for web console
-	"www":        true,  // Reserved for main website
-	"ploy":       true,  // Reserved for platform services
-	"system":     true,  // Reserved for system services
-	"traefik":    true,  // Reserved for traefik proxy
-	"nomad":      true,  // Reserved for nomad
-	"consul":     true,  // Reserved for consul
-	"vault":      true,  // Reserved for vault
-	"seaweedfs":  true,  // Reserved for storage
+	"dev": true, // Reserved for dev environment subdomain
 }
 
 // AppNamePattern defines valid app name format
@@ -62,11 +47,6 @@ func ValidateAppName(appName string) error {
 	// Check for double hyphens
 	if strings.Contains(appName, "--") {
 		return fmt.Errorf("app name cannot contain consecutive hyphens")
-	}
-	
-	// Check for platform prefixes
-	if strings.HasPrefix(appName, "ploy-") || strings.HasPrefix(appName, "system-") {
-		return fmt.Errorf("app name cannot start with reserved prefixes: ploy-, system-")
 	}
 	
 	return nil

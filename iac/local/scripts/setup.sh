@@ -126,14 +126,14 @@ build_ploy_binaries() {
     
     # Build controller
     echo -e "${BLUE}   • Building controller...${NC}"
-    go build -o bin/controller ./controller
+    go build -o bin/api ./controller
     
     # Build CLI
     echo -e "${BLUE}   • Building CLI...${NC}"
     go build -o bin/ploy ./cmd/ploy
     
     # Verify builds
-    if [[ -f "bin/controller" && -f "bin/ploy" ]]; then
+    if [[ -f "bin/api" && -f "bin/ploy" ]]; then
         echo -e "${GREEN}✅ Binaries built successfully${NC}"
         
         # Show versions
@@ -212,7 +212,7 @@ create_completion_marker() {
 3. **Start local controller (optional):**
    \`\`\`bash
    cd $PROJECT_ROOT
-   PORT=8081 ./bin/controller
+   PORT=8081 ./bin/api
    \`\`\`
 
 4. **Development commands:**

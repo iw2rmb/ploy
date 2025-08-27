@@ -75,8 +75,8 @@ run_test "Vault" "curl -f -s http://localhost:8200/v1/sys/health"
 # Test 568: Ansible playbook deploys controller via Nomad job
 echo "🚀 Testing controller deployment..."
 
-run_test "Controller job exists in Nomad" "curl -f -s http://localhost:4646/v1/job/ploy-controller"
-run_test "Controller allocations running" "nomad job status ploy-controller | grep -q running"
+run_test "Controller job exists in Nomad" "curl -f -s http://localhost:4646/v1/job/ploy-api"
+run_test "Controller allocations running" "nomad job status ploy-api | grep -q running"
 
 # Test 569: Controller binary distributed via SeaweedFS
 echo "📦 Testing binary distribution..."
@@ -88,7 +88,7 @@ run_test "controller-dist tool available" "test -x ./build/controller-dist"
 # Test 570: High availability deployment
 echo "🏃 Testing high availability..."
 
-ALLOC_COUNT=$(nomad job status ploy-controller | grep -c "running" || echo "0")
+ALLOC_COUNT=$(nomad job status ploy-api | grep -c "running" || echo "0")
 if [ "$ALLOC_COUNT" -ge 2 ]; then
     echo -e "HA deployment: ${GREEN}PASS${NC} ($ALLOC_COUNT replicas)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -103,7 +103,7 @@ echo "🏥 Testing health checks..."
 
 run_test "Controller health endpoint" "curl -f -s https://api.dev.ployman.app/health"
 run_test "Controller readiness endpoint" "curl -f -s https://api.dev.ployman.app/ready"
-run_test "Consul service registration" "curl -f -s http://localhost:8500/v1/health/service/ploy-controller"
+run_test "Consul service registration" "curl -f -s http://localhost:8500/v1/health/service/ploy-api"
 
 # Test 575-579: ployman CLI commands
 echo "🛠️ Testing ployman CLI commands..."
@@ -112,8 +112,8 @@ echo "🛠️ Testing ployman CLI commands..."
 run_test "ployman controller list" "./build/ployman controller list"
 
 # Test current version info
-if [ -f "/opt/ploy/current-controller-version" ]; then
-    CURRENT_VERSION=$(cat /opt/ploy/current-controller-version)
+if [ -f "/opt/ploy/current-api-version" ]; then
+    CURRENT_VERSION=$(cat /opt/ploy/current-api-version)
     echo "Current controller version: $CURRENT_VERSION"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -132,10 +132,10 @@ run_test "Controller status script runs" "/home/ploy/controller-scripts/controll
 echo "📁 Testing management scripts..."
 
 MANAGEMENT_SCRIPTS=(
-    "update-controller.sh"
-    "rollback-controller.sh" 
+    "update-api.sh"
+    "rollback-api.sh" 
     "controller-status.sh"
-    "migrate-controller.sh"
+    "migrate-api.sh"
 )
 
 for script in "${MANAGEMENT_SCRIPTS[@]}"; do
@@ -174,7 +174,7 @@ done
 # Test service discovery tags
 echo "🔍 Testing service discovery..."
 
-run_test "Traefik service tags" "curl -s http://localhost:8500/v1/health/service/ploy-controller | jq -r '.[0].Service.Tags[]' | grep -q traefik.enable=true"
+run_test "Traefik service tags" "curl -s http://localhost:8500/v1/health/service/ploy-api | jq -r '.[0].Service.Tags[]' | grep -q traefik.enable=true"
 
 # Summary
 echo ""

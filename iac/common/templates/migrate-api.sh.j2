@@ -24,12 +24,12 @@ fi
 
 # Check for systemd service
 echo "🔍 Checking for existing systemd service..."
-if systemctl is-active --quiet ploy-controller 2>/dev/null; then
-    echo "❌ Found active ploy-controller systemd service"
+if systemctl is-active --quiet ploy-api 2>/dev/null; then
+    echo "❌ Found active ploy-api systemd service"
     echo "Please stop and disable the systemd service:"
-    echo "  sudo systemctl stop ploy-controller"
-    echo "  sudo systemctl disable ploy-controller"
-    echo "  sudo rm /etc/systemd/system/ploy-controller.service"
+    echo "  sudo systemctl stop ploy-api"
+    echo "  sudo systemctl disable ploy-api"
+    echo "  sudo rm /etc/systemd/system/ploy-api.service"
     echo "  sudo systemctl daemon-reload"
     echo ""
     echo "Then re-run this migration script."
@@ -87,16 +87,16 @@ fi
 
 # Test Nomad job validation
 echo "🔍 Validating Nomad job template..."
-if [[ -f "/opt/hashicorp/nomad/jobs/ploy-controller.hcl" ]]; then
+if [[ -f "/opt/hashicorp/nomad/jobs/ploy-api.hcl" ]]; then
     export NOMAD_ADDR="http://localhost:4646"
-    if nomad job validate /opt/hashicorp/nomad/jobs/ploy-controller.hcl; then
+    if nomad job validate /opt/hashicorp/nomad/jobs/ploy-api.hcl; then
         echo "✅ Nomad job template is valid"
     else
         echo "❌ Nomad job template validation failed"
         exit 1
     fi
 else
-    echo "❌ Nomad job template not found at /opt/hashicorp/nomad/jobs/ploy-controller.hcl"
+    echo "❌ Nomad job template not found at /opt/hashicorp/nomad/jobs/ploy-api.hcl"
     echo "Please run the Ansible playbook first to generate the template"
     exit 1
 fi
@@ -115,7 +115,7 @@ echo "🚀 Migration is ready to proceed!"
 echo ""
 echo "Next steps:"
 echo "1. Deploy controller via Ansible: ansible-playbook -i inventory/hosts.yml playbooks/controller.yml"
-echo "2. Or run controller update script: /home/ploy/controller-scripts/update-controller.sh"
+echo "2. Or run controller update script: /home/ploy/controller-scripts/update-api.sh"
 echo "3. Verify deployment: /home/ploy/controller-scripts/controller-status.sh"
 
 echo ""

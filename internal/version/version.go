@@ -10,19 +10,19 @@ import (
 var (
 	// Version is the semantic version (set at build time)
 	Version = "dev"
-	
+
 	// GitCommit is the git commit hash (set at build time)
 	GitCommit = "unknown"
-	
+
 	// GitBranch is the git branch (set at build time)
 	GitBranch = "unknown"
-	
+
 	// BuildTime is the build timestamp (set at build time)
 	BuildTime = "unknown"
-	
+
 	// GoVersion is the Go version used to build
 	GoVersion = runtime.Version()
-	
+
 	// Platform is the target platform
 	Platform = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 )
@@ -55,7 +55,7 @@ func Get() Info {
 
 // String returns a formatted version string
 func String() string {
-	return fmt.Sprintf("ploy-controller %s (commit: %s, branch: %s, built: %s)",
+	return fmt.Sprintf("ploy-api %s (commit: %s, branch: %s, built: %s)",
 		Version, GitCommit, GitBranch, BuildTime)
 }
 

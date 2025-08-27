@@ -757,12 +757,6 @@
           poll: 10    # Check every 10 seconds
           ignore_errors: true  # Don't fail if model download times out
 
-        - name: Download Llama2 model for general text processing (7B parameter model)
-          become_user: ploy
-          command: /usr/local/bin/ollama pull llama2:7b
-          async: 300  # 5 minutes timeout
-          poll: 10    # Check every 10 seconds
-          ignore_errors: true  # Don't fail if model download times out
 
     - name: Create ARF Phase 3 executables and tools
       block:
@@ -922,7 +916,7 @@
                       echo "✅ Ollama service: running"
                       
                       # Check if models are available
-                      model_count=$(ollama list 2>/dev/null | grep -c "codellama\|llama2" || echo "0")
+                      model_count=$(ollama list 2>/dev/null | grep -c "codellama" || echo "0")
                       if [ "$model_count" -gt 0 ]; then
                           echo "✅ Ollama models: $model_count available"
                       else
@@ -1035,7 +1029,7 @@
           export OLLAMA_MODELS_DIR="/home/ploy/.ollama/models"
           export ARF_OLLAMA_ENDPOINT="http://127.0.0.1:11434"
           export ARF_OLLAMA_CODE_MODEL="codellama:7b"
-          export ARF_OLLAMA_TEXT_MODEL="llama2:7b"
+          export ARF_OLLAMA_TEXT_MODEL="codellama:7b"
           export ARF_OLLAMA_TIMEOUT="120s"
           export ARF_OLLAMA_MAX_RETRIES="3"
           

@@ -40,17 +40,17 @@ type Handler struct {
 // NewHandler creates a new self-update handler with Git integration
 func NewHandler(storageProvider storage.StorageProvider, consulAddr, currentVersion string) (*Handler, error) {
 	// Initialize binary distributor with proper cache directory
-	cacheDir := "/var/cache/ploy-controller"
-	
+	cacheDir := "/var/cache/ploy-api"
+
 	// Ensure cache directory exists with proper permissions
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		// Fallback to /tmp if /var/cache is not writable
-		cacheDir = filepath.Join(os.TempDir(), "ploy-controller-cache")
+		cacheDir = filepath.Join(os.TempDir(), "ploy-api-cache")
 		if err := os.MkdirAll(cacheDir, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create cache directory: %w", err)
 		}
 	}
-	
+
 	distributor := distribution.NewBinaryDistributor(storageProvider, "ploy-artifacts", cacheDir)
 
 	// Initialize Consul client
@@ -84,9 +84,9 @@ func NewHandler(storageProvider storage.StorageProvider, consulAddr, currentVers
 		gitCommit:      gitCommit,
 		gitBranch:      gitBranch,
 		buildTime:      buildTime,
-		platform:       "linux",    // TODO: detect from runtime
-		architecture:   "amd64",    // TODO: detect from runtime
-		leaderPrefix:   "ploy/controller/update-coordination",
+		platform:       "linux", // TODO: detect from runtime
+		architecture:   "amd64", // TODO: detect from runtime
+		leaderPrefix:   "ploy/api/update-coordination",
 		sessionTTL:     30 * time.Second,
 	}, nil
 }
@@ -229,8 +229,8 @@ func (h *Handler) HandleValidateUpdate(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"valid":          true,
-		"target_version": request.TargetVersion,
+		"valid":           true,
+		"target_version":  request.TargetVersion,
 		"current_version": h.currentVersion,
 	})
 }
@@ -450,23 +450,23 @@ func (h *Handler) validateClusterHealth() error {
 
 // GitUpdateRequest represents a Git-based update request
 type GitUpdateRequest struct {
-	Branch    string            `json:"branch,omitempty"`
-	Tag       string            `json:"tag,omitempty"`
-	Commit    string            `json:"commit,omitempty"`
-	Force     bool              `json:"force,omitempty"`
-	Strategy  UpdateStrategy    `json:"strategy,omitempty"`
-	Metadata  map[string]string `json:"metadata,omitempty"`
+	Branch   string            `json:"branch,omitempty"`
+	Tag      string            `json:"tag,omitempty"`
+	Commit   string            `json:"commit,omitempty"`
+	Force    bool              `json:"force,omitempty"`
+	Strategy UpdateStrategy    `json:"strategy,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // GitVersionInfo represents version information with Git metadata
 type GitVersionInfo struct {
-	Version       string `json:"version"`
-	GitCommit     string `json:"git_commit"`
-	GitBranch     string `json:"git_branch"`
-	BuildTime     string `json:"build_time"`
-	Available     bool   `json:"available"`
-	ArtifactURL   string `json:"artifact_url,omitempty"`
-	Checksum      string `json:"checksum,omitempty"`
+	Version     string `json:"version"`
+	GitCommit   string `json:"git_commit"`
+	GitBranch   string `json:"git_branch"`
+	BuildTime   string `json:"build_time"`
+	Available   bool   `json:"available"`
+	ArtifactURL string `json:"artifact_url,omitempty"`
+	Checksum    string `json:"checksum,omitempty"`
 }
 
 // HandleUpdateToLatest updates controller to latest Git tag
@@ -505,9 +505,9 @@ func (h *Handler) HandleUpdateToLatest(c *fiber.Ctx) error {
 		Force:         request.Force,
 		Strategy:      request.Strategy,
 		Metadata: map[string]string{
-			"update_type": "git_latest",
+			"update_type":   "git_latest",
 			"requested_via": "api_latest_endpoint",
-			"timestamp": time.Now().Format(time.RFC3339),
+			"timestamp":     time.Now().Format(time.RFC3339),
 		},
 	}
 
@@ -533,10 +533,10 @@ func (h *Handler) HandleUpdateToLatest(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(fiber.Map{
-		"message": "Update to latest version initiated",
+		"message":        "Update to latest version initiated",
 		"target_version": latestVersion,
-		"strategy": request.Strategy,
-		"update_type": "git_latest",
+		"strategy":       request.Strategy,
+		"update_type":    "git_latest",
 	})
 }
 
@@ -592,10 +592,10 @@ func (h *Handler) HandleUpdateToBranch(c *fiber.Ctx) error {
 		Force:         request.Force,
 		Strategy:      request.Strategy,
 		Metadata: map[string]string{
-			"update_type": "git_branch",
+			"update_type":   "git_branch",
 			"target_branch": branch,
 			"requested_via": "api_branch_endpoint",
-			"timestamp": time.Now().Format(time.RFC3339),
+			"timestamp":     time.Now().Format(time.RFC3339),
 		},
 	}
 
@@ -621,11 +621,11 @@ func (h *Handler) HandleUpdateToBranch(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(fiber.Map{
-		"message": "Update to branch HEAD initiated",
-		"target_branch": branch,
+		"message":        "Update to branch HEAD initiated",
+		"target_branch":  branch,
 		"target_version": targetVersion,
-		"strategy": request.Strategy,
-		"update_type": "git_branch",
+		"strategy":       request.Strategy,
+		"update_type":    "git_branch",
 	})
 }
 
@@ -750,9 +750,9 @@ func (h *Handler) HandleGitDeploy(c *fiber.Ctx) error {
 		Force:         request.Force,
 		Strategy:      request.Strategy,
 		Metadata: map[string]string{
-			"update_type": updateType,
-			"requested_via": "api_git_deploy_endpoint",
-			"timestamp": time.Now().Format(time.RFC3339),
+			"update_type":        updateType,
+			"requested_via":      "api_git_deploy_endpoint",
+			"timestamp":          time.Now().Format(time.RFC3339),
 			"deployment_trigger": "api",
 		},
 	}
@@ -776,7 +776,7 @@ func (h *Handler) HandleGitDeploy(c *fiber.Ctx) error {
 	// Validate and start deployment
 	if err := h.ValidateUpdate(updateRequest.TargetVersion); err != nil && !request.Force {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": fmt.Sprintf("Deployment validation failed: %v", err),
+			"error":          fmt.Sprintf("Deployment validation failed: %v", err),
 			"target_version": targetVersion,
 		})
 	}
@@ -790,10 +790,10 @@ func (h *Handler) HandleGitDeploy(c *fiber.Ctx) error {
 	}()
 
 	return c.JSON(fiber.Map{
-		"message": "Git-based deployment initiated",
+		"message":        "Git-based deployment initiated",
 		"target_version": targetVersion,
-		"update_type": updateType,
-		"strategy": request.Strategy,
-		"deployment_id": fmt.Sprintf("%s-%d", updateType, time.Now().Unix()),
+		"update_type":    updateType,
+		"strategy":       request.Strategy,
+		"deployment_id":  fmt.Sprintf("%s-%d", updateType, time.Now().Unix()),
 	})
 }

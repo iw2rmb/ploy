@@ -18,7 +18,7 @@ func (h *Handler) createUpdateSession(ctx context.Context, request UpdateRequest
 
 	// Create session for coordination
 	sessionEntry := &api.SessionEntry{
-		Name:      "ploy-controller-update",
+		Name:      "ploy-api-update",
 		TTL:       h.sessionTTL.String(),
 		Behavior:  api.SessionBehaviorRelease,
 		LockDelay: 5 * time.Second,
@@ -184,18 +184,18 @@ func (h *Handler) emergencyDeploy(ctx context.Context, binaryPath string, info *
 func (h *Handler) atomicBinaryReplacement(newBinaryPath, targetPath, backupPath string) error {
 	// Strategy 1: Use rename-based atomic replacement
 	tempPath := targetPath + ".new." + fmt.Sprintf("%d", time.Now().Unix())
-	
+
 	// Copy new binary to temporary location
 	if err := copyFile(newBinaryPath, tempPath); err != nil {
 		return fmt.Errorf("failed to create temporary binary: %w", err)
 	}
-	
+
 	// Make temporary binary executable
 	if err := os.Chmod(tempPath, 0755); err != nil {
 		os.Remove(tempPath)
 		return fmt.Errorf("failed to make temporary binary executable: %w", err)
 	}
-	
+
 	// Attempt atomic rename (this should work even if the target is in use)
 	if err := os.Rename(tempPath, targetPath); err != nil {
 		// If rename fails, try alternative strategies
@@ -203,7 +203,7 @@ func (h *Handler) atomicBinaryReplacement(newBinaryPath, targetPath, backupPath 
 		os.Remove(tempPath)
 		return h.fallbackBinaryReplacement(newBinaryPath, targetPath, backupPath)
 	}
-	
+
 	log.Printf("Atomic binary replacement successful via rename")
 	return nil
 }
@@ -217,7 +217,7 @@ func (h *Handler) fallbackBinaryReplacement(newBinaryPath, targetPath, backupPat
 // createUpdateScript creates an external update script to handle the replacement
 func (h *Handler) createUpdateScript(newBinaryPath, targetPath, backupPath string) error {
 	scriptPath := targetPath + ".update.sh"
-	
+
 	// Create update script content
 	scriptContent := fmt.Sprintf(`#!/bin/bash
 set -e
@@ -250,20 +250,20 @@ rm -f "$0"  # Remove this script
 	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0755); err != nil {
 		return fmt.Errorf("failed to create update script: %w", err)
 	}
-	
+
 	// Launch update script in background
 	go func() {
 		time.Sleep(1 * time.Second) // Give some time for response to be sent
 		log.Printf("Executing external update script: %s", scriptPath)
-		
+
 		// Execute the script
 		exec.Command("/bin/bash", scriptPath).Start()
-		
+
 		// Exit current process to allow script to replace binary
 		time.Sleep(2 * time.Second)
 		os.Exit(0)
 	}()
-	
+
 	log.Printf("Update script created and scheduled: %s", scriptPath)
 	return nil
 }

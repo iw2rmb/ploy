@@ -165,7 +165,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 
 **Phase no-SPOF-2: Nomad Job Creation**
 1. ✅ **COMPLETED (2025-08-21)** **Create Nomad System Job Definition**:
-   - Create `platform/nomad/ploy-controller.hcl` with system job configuration
+   - Create `platform/nomad/ploy-api.hcl` with system job configuration
    - Configure multi-instance deployment with proper resource allocation
    - Add restart policies, update strategies, and failure handling
    - Implement rolling update configuration with health check integration

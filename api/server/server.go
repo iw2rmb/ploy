@@ -1526,7 +1526,7 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (
 		// Register CHTTP Python analyzer
 		if chttpEnabled := utils.Getenv("PLOY_CHTTP_PYTHON_ENABLED", "true") == "true"; chttpEnabled {
 			pylintServiceURL := utils.Getenv("PLOY_CHTTP_PYLINT_URL", "https://pylint.chttp.dev.ployd.app")
-			clientID := utils.Getenv("PLOY_CHTTP_CLIENT_ID", "ploy-controller")
+			clientID := utils.Getenv("PLOY_CHTTP_CLIENT_ID", "ploy-api")
 			privateKeyPath := utils.Getenv("PLOY_CHTTP_PRIVATE_KEY", "/etc/ploy/chttp-private-key.pem")
 
 			privateKey, err := loadCHTTPPrivateKey(privateKeyPath)

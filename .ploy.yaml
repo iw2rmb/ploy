@@ -1,0 +1,80 @@
+name: ploy-api
+type: platform
+lang: go
+lane: E  # Containerized deployment
+
+build:
+  dockerfile: |
+    FROM golang:1.22-alpine AS builder
+    WORKDIR /app
+    COPY . .
+    ARG VERSION=dev
+    ARG GIT_COMMIT=unknown
+    ARG BUILD_TIME
+    RUN go build -ldflags "\
+        -X github.com/iw2rmb/ploy/api/selfupdate.BuildVersion=${VERSION} \
+        -X github.com/iw2rmb/ploy/api/selfupdate.GitCommit=${GIT_COMMIT} \
+        -X github.com/iw2rmb/ploy/api/selfupdate.BuildTime=${BUILD_TIME}" \
+        -o api ./api
+    
+    FROM alpine:latest
+    RUN apk --no-cache add ca-certificates
+    WORKDIR /root/
+    COPY --from=builder /app/api .
+    EXPOSE 8080
+    CMD ["./api"]
+
+deploy:
+  instances: 3
+  memory: 256
+  cpu: 200
+  
+  health_checks:
+    http:
+      path: /health
+      interval: 15s
+      timeout: 10s
+    readiness:
+      path: /ready
+      interval: 20s
+      timeout: 15s
+    liveness:
+      path: /live
+      interval: 30s
+      timeout: 5s
+  
+  domains:
+    dev:
+      - api.dev.ployman.app
+    prod:
+      - api.ployman.app
+      - api.ployd.app  # Legacy support
+  
+  env:
+    # Core configuration
+    CONSUL_HTTP_ADDR: "127.0.0.1:8500"
+    NOMAD_ADDR: "http://127.0.0.1:4646"
+    
+    # Storage configuration
+    PLOY_STORAGE_CONFIG: "/etc/ploy/storage/config.yaml"
+    PLOY_CLEANUP_CONFIG: "/etc/ploy/cleanup/config.yaml"
+    
+    # Service configuration
+    PLOY_USE_CONSUL_ENV: "true"
+    PLOY_ENV_STORE_PATH: "/var/lib/ploy/env-store"
+    PLOY_CLEANUP_AUTO_START: "true"
+    
+    # DNS configuration
+    PLOY_DNS_PROVIDER: "namecheap"
+    PLOY_DNS_DOMAIN: "ployd.app"
+    
+    # Logging
+    LOG_LEVEL: "info"
+    LOG_FORMAT: "json"
+
+update_strategy:
+  type: rolling
+  max_parallel: 1
+  min_healthy_time: 60s
+  auto_revert: true
+  canary: 0

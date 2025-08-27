@@ -664,6 +664,10 @@ func TestValidateAppName(t *testing.T) {
         {"valid mixed", "my-app-v2", false, ""},
         {"minimum length", "ab", false, ""},
         {"maximum length", "a" + strings.Repeat("b", 61), false, ""},
+        {"previously restricted - api", "api", false, ""},
+        {"previously restricted - controller", "controller", false, ""},
+        {"previously restricted - admin", "admin", false, ""},
+        {"previously restricted - ploy", "ploy", false, ""},
         
         // Invalid names
         {"empty name", "", true, "name cannot be empty"},
@@ -677,12 +681,7 @@ func TestValidateAppName(t *testing.T) {
         {"spaces", "my app", true, "name can only contain letters, numbers, and hyphens"},
         
         // Reserved names
-        {"reserved api", "api", true, "name 'api' is reserved"},
         {"reserved dev", "dev", true, "name 'dev' is reserved"},
-        {"reserved controller", "controller", true, "name 'controller' is reserved"},
-        {"reserved ploy", "ploy", true, "name 'ploy' is reserved"},
-        {"reserved with prefix", "ploy-test", true, "name cannot start with reserved prefix 'ploy-'"},
-        {"reserved system prefix", "system-app", true, "name cannot start with reserved prefix 'system-'"},
     }
 
     for _, tt := range tests {

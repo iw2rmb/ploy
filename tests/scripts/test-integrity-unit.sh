@@ -37,12 +37,12 @@ test_compilation() {
     test_info "Test 1: Verify integrity verification module compiles"
     
     cd "$PROJECT_ROOT"
-    if go build -o /tmp/test-controller ./controller > /dev/null 2>&1; then
+    if go build -o /tmp/test-api ./controller > /dev/null 2>&1; then
         test_passed "Integrity verification module compiles successfully"
     else
         test_failed "Compilation failed for integrity verification module"
     fi
-    rm -f /tmp/test-controller
+    rm -f /tmp/test-api
 }
 
 # Test 2: Check integrity verification files exist

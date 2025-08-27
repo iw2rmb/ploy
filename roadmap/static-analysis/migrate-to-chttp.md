@@ -413,7 +413,7 @@ static_analysis:
           timeout: "10m"
     
     authentication:
-      client_id: "ploy-controller"
+      client_id: "ploy-api"
       private_key_path: "/etc/ploy/chttp-private-key.pem"
     
     retry:
@@ -478,7 +478,7 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 30s
 
-  - job_name: 'ploy-controller'
+  - job_name: 'ploy-api'
     static_configs:
       - targets: ['api.dev.ployman.app:8081']
     metrics_path: '/metrics'

@@ -22,6 +22,7 @@ func ApiCmd(args []string) {
 		fmt.Println("Environment variables:")
 		fmt.Println("  PLOY_CONTROLLER    API endpoint (default: https://api.dev.ployman.app/v1)")
 		fmt.Println("  TARGET_HOST        VPS host for SSH fallback")
+		fmt.Println("  DEPLOY_BRANCH      Git branch to deploy (default: current branch or 'main')")
 		return
 	}
 
@@ -164,16 +165,39 @@ func runSSHFallback() {
 		return
 	}
 	
-	// Get current branch
-	cmd := exec.Command("git", "branch", "--show-current")
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Printf("Error getting current branch: %v\n", err)
-		return
+	// Determine which branch to deploy
+	var branch string
+	
+	// First check if DEPLOY_BRANCH is explicitly set
+	branch = os.Getenv("DEPLOY_BRANCH")
+	
+	if branch == "" {
+		// Check if we're in a git repository
+		cmd := exec.Command("git", "rev-parse", "--git-dir")
+		cmd.Stderr = nil // Suppress error output
+		if err := cmd.Run(); err == nil {
+			// We're in a git repo, try to get the current branch
+			cmd = exec.Command("git", "branch", "--show-current")
+			output, err := cmd.Output()
+			if err == nil {
+				branch = strings.TrimSpace(string(output))
+			}
+			if branch == "" {
+				// Might be in detached HEAD state, try to get commit hash
+				cmd = exec.Command("git", "rev-parse", "--short", "HEAD")
+				if output, err := cmd.Output(); err == nil {
+					branch = strings.TrimSpace(string(output))
+					fmt.Printf("Note: In detached HEAD state, using commit %s\n", branch)
+				}
+			}
+		}
 	}
-	branch := strings.TrimSpace(string(output))
+	
+	// Default to main if no branch determined
 	if branch == "" {
 		branch = "main"
+		fmt.Println("Note: Not in a git repository, defaulting to 'main' branch")
+		fmt.Println("Tip: Set DEPLOY_BRANCH environment variable to deploy a specific branch")
 	}
 	
 	fmt.Printf("Deploying branch '%s' to %s via SSH...\n", branch, targetHost)

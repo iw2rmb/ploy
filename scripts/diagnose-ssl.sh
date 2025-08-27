@@ -233,11 +233,11 @@ check_traefik() {
                 echo -e "${RED}    ✗ $API_DOMAIN not found in Traefik configuration${NC}"
             fi
             
-            # Check for ploy-controller service
-            if echo "$traefik_config" | grep -q "ploy-controller"; then
-                echo -e "${GREEN}    ✓ ploy-controller service found${NC}"
+            # Check for ploy-api service
+            if echo "$traefik_config" | grep -q "ploy-api"; then
+                echo -e "${GREEN}    ✓ ploy-api service found${NC}"
             else
-                echo -e "${RED}    ✗ ploy-controller service not found${NC}"
+                echo -e "${RED}    ✗ ploy-api service not found${NC}"
             fi
             
             return 0
@@ -250,10 +250,10 @@ check_traefik() {
 
 # Function to check Nomad service
 check_nomad_service() {
-    echo -e "${YELLOW}Checking Nomad ploy-controller service...${NC}"
+    echo -e "${YELLOW}Checking Nomad ploy-api service...${NC}"
     
     # Try to get Nomad job status
-    local nomad_endpoints=("http://$TARGET_IP:4646/v1/job/ploy-controller")
+    local nomad_endpoints=("http://$TARGET_IP:4646/v1/job/ploy-api")
     
     for endpoint in "${nomad_endpoints[@]}"; do
         echo -e "${YELLOW}  Checking Nomad at $endpoint...${NC}"
@@ -262,9 +262,9 @@ check_nomad_service() {
             
             # Check job status
             if echo "$nomad_status" | grep -q '"Status":"running"'; then
-                echo -e "${GREEN}    ✓ ploy-controller job is running${NC}"
+                echo -e "${GREEN}    ✓ ploy-api job is running${NC}"
             else
-                echo -e "${RED}    ✗ ploy-controller job not running${NC}"
+                echo -e "${RED}    ✗ ploy-api job not running${NC}"
             fi
             
             return 0
@@ -321,7 +321,7 @@ generate_recommendations() {
         issues_found=true
         echo -e "${RED}Service Configuration Issues:${NC}"
         echo "  1. Verify Traefik is properly configured with SSL"
-        echo "  2. Check ploy-controller Nomad job status"
+        echo "  2. Check ploy-api Nomad job status"
         echo "  3. Ensure Consul service registration is working"
         echo "  4. Verify Traefik routing rules match domain pattern"
         echo ""
