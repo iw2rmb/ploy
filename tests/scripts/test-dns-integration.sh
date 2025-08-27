@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app}"
 TEST_DOMAIN="${PLOY_TEST_DOMAIN:-ployd.app}"
 TEST_IP="${PLOY_TEST_IP:-192.168.1.100}"
 

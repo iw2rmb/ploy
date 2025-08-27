@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEST_APP_NAME="test-enhanced-upload-$$"
 TEST_DIR="/tmp/ploy-enhanced-upload-test-$$"
 
@@ -307,7 +307,7 @@ check_controller_availability() {
     
     if ! curl -s "${CONTROLLER_URL}/status" >/dev/null; then
         error "Controller not available at $CONTROLLER_URL"
-        log "Please ensure the controller is running: ./build/controller"
+        log "Please ensure the controller is running: ./bin/api"
         exit 1
     fi
     

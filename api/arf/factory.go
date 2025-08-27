@@ -20,6 +20,10 @@ type Phase3Config struct {
 	LLMTemperature float64 `yaml:"llm_temperature"`
 	LLMBaseURL     string `yaml:"llm_base_url"`     // For Ollama and custom endpoints
 	
+	// OpenRewrite Configuration
+	OpenRewriteMode   string `yaml:"openrewrite_mode"` // embedded, service, auto
+	OpenRewriteURL    string `yaml:"openrewrite_url"`  // Service URL override
+	
 	// Learning System Configuration
 	LearningDBURL     string        `yaml:"learning_db_url"`
 	PatternMinSamples int           `yaml:"pattern_min_samples"`
@@ -45,6 +49,9 @@ func DefaultPhase3Config() *Phase3Config {
 		LLMProvider:    "openai",
 		LLMModel:       "gpt-4",
 		LLMTemperature: 0.1,
+		
+		OpenRewriteMode:   "embedded", // Default to embedded for backward compatibility
+		OpenRewriteURL:    "",         // Will use default service URL if mode is service
 		
 		PatternMinSamples: 10,
 		PatternTimeWindow: 30 * 24 * time.Hour, // 30 days
@@ -86,6 +93,19 @@ func LoadPhase3ConfigFromEnv() *Phase3Config {
 	}
 	if treeSitter := os.Getenv("ARF_TREE_SITTER_PATH"); treeSitter != "" {
 		config.TreeSitterPath = treeSitter
+	}
+	
+	// OpenRewrite configuration
+	if mode := os.Getenv("ARF_OPENREWRITE_MODE"); mode != "" {
+		config.OpenRewriteMode = mode
+	}
+	if url := os.Getenv("OPENREWRITE_SERVICE_URL"); url != "" {
+		config.OpenRewriteURL = url
+	}
+	
+	// Auto-detect service mode if service URL is set
+	if config.OpenRewriteURL != "" && config.OpenRewriteMode == "embedded" {
+		config.OpenRewriteMode = "auto"
 	}
 	
 	return config
@@ -229,6 +249,42 @@ func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe *models.Re
 	optimized := recipe
 	optimized.Metadata.Version = "1.1.0"
 	return optimized, nil
+}
+
+// CreateOpenRewriteEngine creates appropriate OpenRewrite engine based on configuration
+func CreateOpenRewriteEngine(config *Phase3Config) interface{} {
+	switch config.OpenRewriteMode {
+	case "service":
+		client := NewOpenRewriteClient()
+		if config.OpenRewriteURL != "" {
+			// Set custom URL if provided
+			client.baseURL = config.OpenRewriteURL
+		}
+		return client
+		
+	case "auto":
+		// Try service first, fallback to embedded
+		client := NewOpenRewriteClient()
+		if config.OpenRewriteURL != "" {
+			client.baseURL = config.OpenRewriteURL
+		}
+		
+		// Test service health
+		if err := client.Health(); err == nil {
+			return client
+		}
+		
+		// Fallback to embedded engine
+		fmt.Printf("OpenRewrite service not available, falling back to embedded engine\n")
+		return NewOpenRewriteEngine()
+		
+	case "embedded":
+	default:
+		// Default to embedded engine
+		return NewOpenRewriteEngine()
+	}
+	
+	return NewOpenRewriteEngine()
 }
 
 // CreateHandlerWithPhase3 creates a handler with all Phase 3 components initialized

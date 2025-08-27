@@ -182,7 +182,7 @@ validate_executor_integration() {
     fi
     
     # Check if HTTP handler integration exists
-    if [[ -f "$PROJECT_ROOT/controller/openrewrite/handler.go" ]]; then
+    if [[ -f "$PROJECT_ROOT/api/openrewrite/handler.go" ]]; then
         check_passed "OpenRewrite HTTP handler exists"
     else
         check_failed "OpenRewrite HTTP handler not found"
@@ -190,7 +190,7 @@ validate_executor_integration() {
     fi
     
     # Check if integration tests exist
-    if [[ -f "$PROJECT_ROOT/controller/openrewrite/handler_integration_test.go" ]]; then
+    if [[ -f "$PROJECT_ROOT/api/openrewrite/handler_integration_test.go" ]]; then
         check_passed "OpenRewrite integration tests exist"
     else
         check_failed "OpenRewrite integration tests not found"

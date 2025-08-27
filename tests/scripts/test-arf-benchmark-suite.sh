@@ -12,8 +12,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-CONTROLLER_BASE="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
-BENCHMARK_CONFIG="${1:-controller/arf/benchmark_configs/java11to17_migration.yaml}"
+CONTROLLER_BASE="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
+BENCHMARK_CONFIG="${1:-api/arf/benchmark_configs/java11to17_migration.yaml}"
 OUTPUT_DIR="${2:-./benchmark_results}"
 
 echo -e "${GREEN}ARF Benchmark Test Suite${NC}"

@@ -135,7 +135,7 @@ if [ "$DNS_READY" = true ] && [ "$SSL_ENV_CHECK" = true ]; then
     echo ""
     echo "Expected results:"
     echo "  - Wildcard certificate: *.dev.ployd.app"
-    echo "  - Controller HTTPS: https://api.dev.ployd.app"
+    echo "  - Controller HTTPS: https://api.dev.ployman.app"
     echo "  - App HTTPS pattern: https://{app}.dev.ployd.app"
 else
     echo -e "${YELLOW}⚠ Prerequisites need attention:${NC}"

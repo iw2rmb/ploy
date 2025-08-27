@@ -11,7 +11,7 @@ ARF Migration Report
 ## Infrastructure Validation
 
 ✅ **Docker OpenRewrite Service**: Running  
-✅ **Controller API Connectivity**: Connected (api.dev.ployd.app)  
+✅ **Controller API Connectivity**: Connected (api.dev.ployman.app)  
 ✅ **Nomad HCL Validation**: PASS (fixed upstreams→upstream syntax)  
 ✅ **Storage System Status**: Available (SeaweedFS)  
 

@@ -22,29 +22,29 @@ type SandboxManager interface {
 
 // Sandbox represents an isolated environment for transformations
 type Sandbox struct {
-	ID          string            `json:"id"`
-	JailName    string            `json:"jail_name"`
-	RootPath    string            `json:"root_path"`
-	WorkingDir  string            `json:"working_dir"`
-	CreatedAt   time.Time         `json:"created_at"`
-	ExpiresAt   time.Time         `json:"expires_at"`
-	Status      SandboxStatus     `json:"status"`
-	Config      SandboxConfig     `json:"config"`
-	Metadata    map[string]string `json:"metadata"`
+	ID         string            `json:"id"`
+	JailName   string            `json:"jail_name"`
+	RootPath   string            `json:"root_path"`
+	WorkingDir string            `json:"working_dir"`
+	CreatedAt  time.Time         `json:"created_at"`
+	ExpiresAt  time.Time         `json:"expires_at"`
+	Status     SandboxStatus     `json:"status"`
+	Config     SandboxConfig     `json:"config"`
+	Metadata   map[string]string `json:"metadata"`
 }
 
 // SandboxConfig defines sandbox creation parameters
 type SandboxConfig struct {
 	Repository    string        `json:"repository"`
 	Branch        string        `json:"branch"`
-	LocalPath     string        `json:"local_path"`     // Path to transformed code (if already cloned/modified)
+	LocalPath     string        `json:"local_path"` // Path to transformed code (if already cloned/modified)
 	Language      string        `json:"language"`
 	BuildTool     string        `json:"build_tool"`
 	TTL           time.Duration `json:"ttl"`
-	MemoryLimit   string        `json:"memory_limit"`   // e.g., "2G"
-	CPULimit      string        `json:"cpu_limit"`      // e.g., "2"
+	MemoryLimit   string        `json:"memory_limit"` // e.g., "2G"
+	CPULimit      string        `json:"cpu_limit"`    // e.g., "2"
 	NetworkAccess bool          `json:"network_access"`
-	TempSpace     string        `json:"temp_space"`     // e.g., "1G"
+	TempSpace     string        `json:"temp_space"` // e.g., "1G"
 }
 
 // SandboxStatus represents the current state of a sandbox
@@ -99,7 +99,7 @@ func (m *FreeBSDJailManager) CreateSandbox(ctx context.Context, config SandboxCo
 	// Generate unique sandbox ID
 	sandboxID := fmt.Sprintf("arf-%d", time.Now().UnixNano())
 	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:14]) // Use last 10 chars
-	
+
 	// Set default TTL if not specified
 	ttl := config.TTL
 	if ttl == 0 {
@@ -213,7 +213,7 @@ func (m *FreeBSDJailManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, 
 
 	var sandboxes []SandboxInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	for i, line := range lines {
 		if i == 0 || strings.TrimSpace(line) == "" {
 			continue // Skip header and empty lines
@@ -229,7 +229,7 @@ func (m *FreeBSDJailManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, 
 			sandboxes = append(sandboxes, SandboxInfo{
 				ID:        sandboxID,
 				JailName:  fields[1],
-				Status:    SandboxStatusReady, // Would query actual status
+				Status:    SandboxStatusReady,  // Would query actual status
 				CreatedAt: now.Add(-time.Hour), // Placeholder
 				ExpiresAt: now.Add(time.Hour),  // Placeholder
 			})
@@ -329,7 +329,7 @@ func NewMockSandboxManager() *MockSandboxManager {
 // CreateSandbox creates a mock sandbox for testing
 func (m *MockSandboxManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {
 	sandboxID := fmt.Sprintf("mock-%d", time.Now().UnixNano())
-	
+
 	ttl := config.TTL
 	if ttl == 0 {
 		ttl = 30 * time.Minute
@@ -365,13 +365,13 @@ func (m *MockSandboxManager) DestroySandbox(ctx context.Context, sandboxID strin
 	if !exists {
 		return fmt.Errorf("sandbox %s not found", sandboxID)
 	}
-	
+
 	// Clean up mock sandbox directory
 	if err := os.RemoveAll(sandbox.RootPath); err != nil {
 		// Log error but don't fail - this is a mock sandbox
 		fmt.Printf("Warning: Failed to clean up mock sandbox directory %s: %v\n", sandbox.RootPath, err)
 	}
-	
+
 	delete(m.sandboxes, sandboxID)
 	return nil
 }
@@ -379,7 +379,7 @@ func (m *MockSandboxManager) DestroySandbox(ctx context.Context, sandboxID strin
 // ListSandboxes returns all mock sandboxes
 func (m *MockSandboxManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {
 	var sandboxes []SandboxInfo
-	
+
 	for _, sb := range m.sandboxes {
 		sandboxes = append(sandboxes, SandboxInfo{
 			ID:         sb.ID,
@@ -390,20 +390,20 @@ func (m *MockSandboxManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, 
 			Repository: sb.Config.Repository,
 		})
 	}
-	
+
 	return sandboxes, nil
 }
 
 // CleanupExpiredSandboxes removes expired mock sandboxes
 func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error {
 	now := time.Now()
-	
+
 	for id, sandbox := range m.sandboxes {
 		if now.After(sandbox.ExpiresAt) {
 			delete(m.sandboxes, id)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -413,41 +413,41 @@ func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, d
 	// The controller sets PORT environment variable and also has PLOY_VERSION set by Nomad
 	port := os.Getenv("PORT")
 	ployVersion := os.Getenv("PLOY_VERSION")
-	
+
 	// If we have both PORT and PLOY_VERSION, we're running inside the controller
 	if port != "" && ployVersion != "" {
 		// Even inside the controller, use the public HTTPS endpoint for better reliability
-		controllerURL := "https://api.dev.ployd.app/v1"
+		controllerURL := "https://api.dev.ployman.app/v1"
 		fmt.Printf("Running inside controller (version %s), using public endpoint for reliability: %s\n", ployVersion, controllerURL)
 		return NewDeploymentSandboxManager(controllerURL, nil)
 	}
-	
+
 	// Check if we have a controller URL configured (for external clients)
 	if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {
 		fmt.Printf("Using deployment sandbox manager with controller: %s\n", controllerURL)
 		return NewDeploymentSandboxManager(controllerURL, nil)
 	}
-	
+
 	// Check for default environment (ploy CLI available)
 	if _, err := exec.LookPath("ploy"); err == nil {
 		fmt.Println("Using deployment sandbox manager with default controller")
 		// Use default controller URL
-		return NewDeploymentSandboxManager("https://api.dev.ployd.app/v1", nil)
+		return NewDeploymentSandboxManager("https://api.dev.ployman.app/v1", nil)
 	}
-	
+
 	// Check for remote FreeBSD jail host configuration
 	freebsdHost := os.Getenv("ARF_FREEBSD_HOST")
 	if freebsdHost != "" {
 		return NewRemoteFreeBSDJailManager(freebsdHost, jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
 	}
-	
+
 	if runtime.GOOS == "freebsd" {
 		// Check if jail command is available
 		if _, err := exec.LookPath("jail"); err == nil {
 			return NewFreeBSDJailManager(jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
 		}
 	}
-	
+
 	// Fallback to mock sandbox manager for development/testing
 	fmt.Println("Warning: Using mock sandbox manager. Set PLOY_CONTROLLER env var for deployment integration.")
 	return NewMockSandboxManager()
@@ -464,19 +464,19 @@ type RemoteFreeBSDJailManager struct {
 // NewRemoteFreeBSDJailManager creates a new remote FreeBSD jail manager
 func NewRemoteFreeBSDJailManager(host, jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) *RemoteFreeBSDJailManager {
 	baseMgr := NewFreeBSDJailManager(jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
-	
+
 	user := os.Getenv("ARF_FREEBSD_USER")
 	if user == "" {
 		user = "root"
 	}
-	
+
 	port := 22
 	if portStr := os.Getenv("ARF_FREEBSD_PORT"); portStr != "" {
 		if p, err := strconv.Atoi(portStr); err == nil {
 			port = p
 		}
 	}
-	
+
 	return &RemoteFreeBSDJailManager{
 		FreeBSDJailManager: baseMgr,
 		host:               host,
@@ -509,7 +509,7 @@ func (m *RemoteFreeBSDJailManager) ListSandboxes(ctx context.Context) ([]Sandbox
 
 	var sandboxes []SandboxInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	for i, line := range lines {
 		if i == 0 || strings.TrimSpace(line) == "" {
 			continue // Skip header and empty lines
@@ -525,7 +525,7 @@ func (m *RemoteFreeBSDJailManager) ListSandboxes(ctx context.Context) ([]Sandbox
 			sandboxes = append(sandboxes, SandboxInfo{
 				ID:        sandboxID,
 				JailName:  fields[1],
-				Status:    SandboxStatusReady, // Would query actual status
+				Status:    SandboxStatusReady,  // Would query actual status
 				CreatedAt: now.Add(-time.Hour), // Placeholder
 				ExpiresAt: now.Add(time.Hour),  // Placeholder
 			})

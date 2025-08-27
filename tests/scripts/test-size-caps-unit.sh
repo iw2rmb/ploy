@@ -56,7 +56,7 @@ test_files_exist() {
     fi
     
     # Check that OPA module was updated
-    if grep -q "ImageSizeMB" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "ImageSizeMB" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "OPA policy updated with size information"
     else
         test_failed "OPA policy not updated with size information"
@@ -120,7 +120,7 @@ test_size_measurement_functions() {
 test_opa_enforcement_integration() {
     test_info "Test 5: Verify OPA enforcement integration"
     
-    OPA_FILE="$PROJECT_ROOT/controller/opa/verify.go"
+    OPA_FILE="$PROJECT_ROOT/api/opa/verify.go"
     
     if grep -q "enforceSizeCaps" "$OPA_FILE"; then
         test_passed "Size cap enforcement function implemented in OPA"
@@ -197,7 +197,7 @@ test_scenarios_documented() {
 test_error_handling() {
     test_info "Test 8: Check error handling and logging"
     
-    OPA_FILE="$PROJECT_ROOT/controller/opa/verify.go"
+    OPA_FILE="$PROJECT_ROOT/api/opa/verify.go"
     
     if grep -q "Size Cap Enforcement.*PASSED" "$OPA_FILE"; then
         test_passed "Size cap enforcement success logging implemented"

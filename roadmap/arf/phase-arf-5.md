@@ -34,7 +34,7 @@ The generic recipe management system enables organizations to create, share, and
 #### Core Data Structures
 
 ```go
-// controller/arf/recipe.go
+// api/arf/recipe.go
 type Recipe struct {
     Metadata    RecipeMetadata     `json:"metadata" yaml:"metadata"`
     Recipes     []RecipeStep       `json:"recipes" yaml:"recipes"`
@@ -75,7 +75,7 @@ type ExecutionConfig struct {
 #### Recipe Storage Interface
 
 ```go
-// controller/arf/recipe_store.go
+// api/arf/recipe_store.go
 type RecipeStore interface {
     // CRUD Operations
     CreateRecipe(ctx context.Context, recipe *Recipe) error
@@ -109,7 +109,7 @@ type RecipeFilters struct {
 #### File-Based Storage Implementation
 
 ```go
-// controller/arf/file_recipe_store.go
+// api/arf/file_recipe_store.go
 type FileRecipeStore struct {
     basePath    string
     indexCache  map[string]*Recipe
@@ -139,7 +139,7 @@ func NewFileRecipeStore(basePath string) (*FileRecipeStore, error) {
 #### Recipe Validation System
 
 ```go
-// controller/arf/recipe_validator.go
+// api/arf/recipe_validator.go
 type RecipeValidator struct {
     supportedTypes map[string]bool
     supportedLangs map[string]bool
@@ -279,7 +279,7 @@ func runBenchmark(c *cli.Context) error {
 #### Generic Recipe Executor Interface
 
 ```go
-// controller/arf/recipe_executor.go
+// api/arf/recipe_executor.go
 type RecipeExecutor interface {
     ExecuteRecipe(ctx context.Context, recipe *RecipeStep, repoPath string) (*TransformationResult, error)
     ValidateRecipe(recipe *RecipeStep) error
@@ -343,7 +343,7 @@ func (e *GenericRecipeEngine) ExecuteUserRecipes(ctx context.Context, recipeIDs 
 #### OpenRewrite Executor Implementation
 
 ```go
-// controller/arf/openrewrite_executor.go
+// api/arf/openrewrite_executor.go
 type OpenRewriteExecutor struct {
     tempDir     string
     javaHome    string
@@ -393,7 +393,7 @@ func (e *OpenRewriteExecutor) executeMavenRecipe(ctx context.Context, recipe *Re
 #### Script Executor Implementation
 
 ```go
-// controller/arf/script_executor.go
+// api/arf/script_executor.go
 type ScriptExecutor struct {
     sandboxManager SandboxManager
     allowedShells  map[string]bool
@@ -435,7 +435,7 @@ func (e *ScriptExecutor) ExecuteRecipe(ctx context.Context, recipe *RecipeStep, 
 #### Advanced Search Implementation
 
 ```go
-// controller/arf/recipe_search.go
+// api/arf/recipe_search.go
 type RecipeSearchEngine struct {
     store       RecipeStore
     indexer     *SearchIndexer
@@ -482,7 +482,7 @@ func (s *RecipeSearchEngine) Search(ctx context.Context, query SearchQuery) (*Se
 #### Built-in Recipe Catalog
 
 ```go
-// controller/arf/builtin_recipes.go
+// api/arf/builtin_recipes.go
 type BuiltinRecipeCatalog struct {
     recipes map[string]*Recipe
 }
@@ -530,7 +530,7 @@ func (c *BuiltinRecipeCatalog) loadJavaRecipes() {
 #### Recipe Recommendation System
 
 ```go
-// controller/arf/recipe_recommender.go
+// api/arf/recipe_recommender.go
 type RecipeRecommender struct {
     catalog         *BuiltinRecipeCatalog
     projectAnalyzer *ProjectAnalyzer

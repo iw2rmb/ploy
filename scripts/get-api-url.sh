@@ -51,7 +51,7 @@ else
         echo "  domain: base domain (default: ployd.app)"
         echo ""
         echo "Examples:"
-        echo "  $0                    # https://api.dev.ployd.app/v1"
+        echo "  $0                    # https://api.dev.ployman.app/v1"
         echo "  $0 prod               # https://api.ployd.app/v1"
         echo "  $0 dev example.com    # https://api.dev.example.com/v1"
         exit 1

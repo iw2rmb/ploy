@@ -51,6 +51,7 @@
           - wget
           - git
           - vim
+          - snapd
           - htop
           - net-tools
           - unzip
@@ -94,6 +95,12 @@
           - containerd.io
           - docker-buildx-plugin
         state: present
+
+    - name: Add ploy user to docker group
+      user:
+        name: ploy
+        groups: docker
+        append: true
 
     - name: Check Docker service status
       command: systemctl is-active docker
@@ -953,9 +960,9 @@
           export PLOY_APPS_DOMAIN={{ ploy.apps_domain | default('ployd.app') }}
           export PLOY_ENVIRONMENT={{ ploy_environment | default('dev') }}
           {% if ploy_environment == 'dev' %}
-          export PLOY_CONTROLLER=https://api.dev.{{ ploy.apps_domain | default('ployd.app') }}/v1
+          export PLOY_CONTROLLER=https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/v1
           {% else %}
-          export PLOY_CONTROLLER=https://api.{{ ploy.apps_domain | default('ployd.app') }}/v1
+          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain | default('ployman.app') }}/v1
           {% endif %}
           
           # ARF (Automated Remediation Framework) environment variables
@@ -1773,7 +1780,7 @@
               # Dev environment certificate domains
               export DEV_WILDCARD_DOMAIN="{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}"
               export DEV_BASE_DOMAIN="{{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }}"
-              export DEV_API_DOMAIN="{{ ploy_dev_routing.api_domain | default('api.dev.ployd.app') }}"
+              export DEV_API_DOMAIN="{{ ploy_dev_routing.api_domain | default('api.dev.ployman.app') }}"
             marker: "# {mark} ANSIBLE MANAGED BLOCK - SSL Certificate vars"
 
     - name: Initialize SSL certificate provisioning for dev environment
@@ -1781,7 +1788,7 @@
         - name: Check if DNS records are properly configured
           shell: |
             DEV_IP=$(dig +short {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} | tail -n1)
-            API_IP=$(dig +short {{ ploy_dev_routing.api_domain | default('api.dev.ployd.app') }} | tail -n1)
+            API_IP=$(dig +short {{ ploy_dev_routing.api_domain | default('api.dev.ployman.app') }} | tail -n1)
             TARGET_IP="{{ ansible_default_ipv4.address }}"
             
             if [ "$DEV_IP" = "$TARGET_IP" ] && [ "$API_IP" = "$TARGET_IP" ]; then
@@ -1789,7 +1796,7 @@
             else
               echo "DNS_NOT_READY"
               echo "Current: {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} -> $DEV_IP"
-              echo "Current: {{ ploy_dev_routing.api_domain | default('api.dev.ployd.app') }} -> $API_IP"
+              echo "Current: {{ ploy_dev_routing.api_domain | default('api.dev.ployman.app') }} -> $API_IP"
               echo "Required: $TARGET_IP"
             fi
           register: dns_status
@@ -1815,7 +1822,7 @@
               - Wildcard certificate for {{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}
               - Automatic certificate renewal
               
-              Certificate will be available at: https://api.dev.ployd.app
+              Certificate will be available at: https://api.dev.ployman.app
           when: ploy_environment is defined and ploy_environment == 'dev'
 
         - name: Display certificate provisioning approach

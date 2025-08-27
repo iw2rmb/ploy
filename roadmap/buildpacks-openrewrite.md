@@ -48,7 +48,7 @@ With Buildpacks:
 
 #### Week 1: Core Integration
 - [ ] Install Pack CLI binary on controller
-- [ ] Add `controller/builders/buildpack.go`
+- [ ] Add `api/builders/buildpack.go`
 - [ ] Implement builder selection logic
 - [ ] Add `--buildpack` flag to CLI
 
@@ -67,7 +67,7 @@ With Buildpacks:
 ### Technical Design
 
 ```go
-// controller/builders/buildpack.go
+// api/builders/buildpack.go
 package builders
 
 import (

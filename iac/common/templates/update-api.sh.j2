@@ -23,7 +23,7 @@ echo "New controller version: $NEW_VERSION"
 
 # Build controller binary
 echo "Building controller binary..."
-go build -o build/controller ./controller
+go build -o bin/api ./controller
 
 # Build distribution tool
 echo "Building distribution tool..."
@@ -34,7 +34,7 @@ echo "Uploading controller binary to SeaweedFS..."
 ./build/controller-dist \
     -command=upload \
     -version="$NEW_VERSION" \
-    -binary=./build/controller \
+    -binary=./bin/api \
     -platform=linux \
     -arch=amd64
 

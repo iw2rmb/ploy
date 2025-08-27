@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SSL Certificate Testing Script for Ploy Platform
-# Tests HTTPS access to api.dev.ployd.app and validates certificate
+# Tests HTTPS access to api.dev.ployman.app and validates certificate
 
 set -e
 
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-API_DOMAIN="${API_DOMAIN:-api.dev.ployd.app}"
+API_DOMAIN="${API_DOMAIN:-api.dev.ployman.app}"
 TIMEOUT=30
 
 echo -e "${BLUE}Ploy SSL Certificate Test${NC}"

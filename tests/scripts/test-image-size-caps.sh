@@ -35,7 +35,7 @@ test_info() {
 # Check if controller is running
 check_controller() {
     test_info "Checking if controller is running..."
-    if ! curl -s https://api.dev.ployd.app/v1/apps > /dev/null; then
+    if ! curl -s https://api.dev.ployman.app/v1/apps > /dev/null; then
         test_failed "Controller not running on port 8081. Start it first."
     fi
     test_passed "Controller is running"
@@ -104,13 +104,13 @@ test_opa_size_integration() {
     test_info "Test 4: OPA policy integration with size enforcement"
     
     # Verify OPA module includes size cap enforcement
-    if grep -q "enforceSizeCaps" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "enforceSizeCaps" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "OPA size cap enforcement function implemented"
     else
         test_failed "OPA size cap enforcement function missing"
     fi
     
-    if grep -q "ImageSizeMB" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "ImageSizeMB" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "OPA ArtifactInput includes size information"
     else
         test_failed "OPA ArtifactInput missing size information"
@@ -176,7 +176,7 @@ EOF
     
     # Test deployment on Lane A - should pass size cap (small Go app)
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
+        "https://api.dev.ployman.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -231,7 +231,7 @@ EOF
     
     # Test deployment with break-glass override
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=prod&break_glass=true" \
+        "https://api.dev.ployman.app/v1/apps/$TEST_APP/builds?lane=A&env=prod&break_glass=true" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -250,13 +250,13 @@ test_size_logging() {
     test_info "Test 8: Size measurement logging and audit trail"
     
     # Check for size-related logging in OPA enforcement
-    if grep -q "size.*MB" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "size.*MB" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "Size information included in OPA logging"
     else
         test_failed "Size information missing from OPA logging"
     fi
     
-    if grep -q "Size Cap Enforcement" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "Size Cap Enforcement" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "Size cap enforcement logging implemented"
     else
         test_failed "Size cap enforcement logging missing"
@@ -268,13 +268,13 @@ test_size_violation_messages() {
     test_info "Test 9: Clear error messages for size cap violations"
     
     # Check that error messages include size information
-    if grep -q "exceeds.*limit.*MB" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "exceeds.*limit.*MB" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "Size violation error messages include specific limits"
     else
         test_failed "Size violation error messages missing detailed information"
     fi
     
-    if grep -q "Actual.*Limit" "$PROJECT_ROOT/controller/opa/verify.go"; then
+    if grep -q "Actual.*Limit" "$PROJECT_ROOT/api/opa/verify.go"; then
         test_passed "Size violation error messages include actual vs limit comparison"
     else
         test_failed "Size violation error messages missing comparison details"

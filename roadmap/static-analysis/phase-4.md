@@ -37,7 +37,7 @@ Phase 4 completes the static analysis framework transformation into a production
 
 **Deliverables**:
 ```go
-// controller/analysis/pipeline_integration.go
+// api/analysis/pipeline_integration.go
 type PipelineIntegration struct {
     laneIntegrator    LaneIntegrator
     cicdIntegrator    CICDIntegrator
@@ -204,7 +204,7 @@ jobs:
 
 **Deliverables**:
 ```go
-// controller/analysis/quality_gates.go
+// api/analysis/quality_gates.go
 type QualityGateSystem struct {
     policyEngine     PolicyEngine
     enforcementEngine EnforcementEngine
@@ -385,7 +385,7 @@ type BypassRequest struct {
 
 **Deliverables**:
 ```go
-// controller/analysis/team_collaboration.go
+// api/analysis/team_collaboration.go
 type TeamCollaboration struct {
     codeReviewIntegrator CodeReviewIntegrator
     teamMetrics         TeamMetricsEngine
@@ -592,7 +592,7 @@ type LearningPath struct {
 
 **Deliverables**:
 ```go
-// controller/analysis/compliance_audit.go
+// api/analysis/compliance_audit.go
 type ComplianceAuditSystem struct {
     auditTrailManager AuditTrailManager
     complianceReporter ComplianceReporter

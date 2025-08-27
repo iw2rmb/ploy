@@ -31,22 +31,22 @@ Phase ARF-1 establishes the foundational infrastructure for the Automated Remedi
 
 **Tasks**:
 - Install and configure OpenRewrite dependencies in controller module
-- Create `controller/arf/` directory structure for ARF components
+- Create `api/arf/` directory structure for ARF components
 - Implement `ARFEngine` interface with basic OpenRewrite recipe execution
 - Add OpenRewrite Maven dependencies to Java build pipeline
 - Create AST cache system using memory-mapped files + LRU cache
-- Integrate with existing `controller/builders/java_osv.go` for Lane C validation
+- Integrate with existing `api/builders/java_osv.go` for Lane C validation
 
 **Deliverables**:
 ```go
-// controller/arf/engine.go
+// api/arf/engine.go
 type ARFEngine interface {
     ExecuteRecipe(ctx context.Context, recipe Recipe, codebase Codebase) (*TransformationResult, error)
     ValidateRecipe(recipe Recipe) error
     ListAvailableRecipes() ([]Recipe, error)
 }
 
-// controller/arf/cache.go
+// api/arf/cache.go
 type ASTCache interface {
     Get(key string) (*AST, bool)
     Put(key string, ast *AST)
@@ -74,7 +74,7 @@ type ASTCache interface {
 
 **Deliverables**:
 ```go
-// controller/arf/sandbox.go
+// api/arf/sandbox.go
 type SandboxManager interface {
     CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error)
     DestroySandbox(ctx context.Context, sandboxID string) error
@@ -109,7 +109,7 @@ job "arf-sandbox-{{ sandbox_id }}" {
 
 **Deliverables**:
 ```go
-// controller/arf/recipes.go
+// api/arf/recipes.go
 type RecipeManager interface {
     SearchRecipes(query RecipeQuery) ([]Recipe, error)
     GetRecipe(recipeID string) (*Recipe, error)
@@ -154,7 +154,7 @@ type Recipe struct {
 
 **Deliverables**:
 ```go
-// controller/arf/transformer.go
+// api/arf/transformer.go
 type TransformationEngine interface {
     Transform(ctx context.Context, req TransformationRequest) (*TransformationResult, error)
     GetTransformationStatus(transformationID string) (*TransformationStatus, error)
@@ -200,7 +200,7 @@ type TransformationResult struct {
 
 **Deliverables**:
 ```go
-// controller/arf/cost_model.go
+// api/arf/cost_model.go
 type CostModel interface {
     TrackResourceUsage(ctx context.Context, transformation TransformationID) (*ResourceUsage, error)
     CalculateCost(ctx context.Context, usage ResourceUsage) (*CostBreakdown, error)
@@ -249,7 +249,7 @@ type CostBreakdown struct {
 
 **Deliverables**:
 ```go
-// controller/arf/disaster_recovery.go
+// api/arf/disaster_recovery.go
 type DisasterRecovery interface {
     CreateSnapshot(ctx context.Context, repository Repository) (*Snapshot, error)
     RollbackTransformation(ctx context.Context, transformationID string) error

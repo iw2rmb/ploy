@@ -33,9 +33,9 @@ Design and implement automated wildcard certificate provisioning during Ansible 
 ## Current State Analysis
 
 ### Existing Components ✅
-- **ACME Client**: `controller/acme/client.go` - Full Let's Encrypt integration with DNS-01 challenge support
-- **Certificate Manager**: `controller/certificates/manager.go` - Heroku-style certificate management
-- **DNS Provider Support**: `controller/dns/` - Cloudflare and Namecheap integration  
+- **ACME Client**: `api/acme/client.go` - Full Let's Encrypt integration with DNS-01 challenge support
+- **Certificate Manager**: `api/certificates/manager.go` - Heroku-style certificate management
+- **DNS Provider Support**: `api/dns/` - Cloudflare and Namecheap integration  
 - **Certificate Storage**: ACME certificate storage using Consul KV + SeaweedFS
 - **Renewal Service**: Automated certificate renewal with configurable thresholds
 - **Ansible Infrastructure**: `iac/dev/playbooks/main.yml` - Complete VPS setup with DNS environment variables
@@ -116,7 +116,7 @@ Ready for App Deployment:
 ### 3. Implementation Steps
 
 #### Phase 1: Platform Wildcard Certificate Manager
-1. **Platform Wildcard Certificate Manager** (`controller/certificates/wildcard.go`)
+1. **Platform Wildcard Certificate Manager** (`api/certificates/wildcard.go`)
    - Create dedicated platform wildcard certificate manager (separate from individual certificates)
    - Integrate with existing ACME client and certificate storage
    - Add certificate existence check via Consul KV + SeaweedFS query
@@ -125,7 +125,7 @@ Ready for App Deployment:
    - Keep individual certificate features completely intact
 
 #### Phase 2: Controller Startup Integration
-2. **Controller Startup Enhancement** (`controller/server/server.go`)
+2. **Controller Startup Enhancement** (`api/server/server.go`)
    - Integrate wildcard certificate manager into startup process
    - Add `PLOY_APPS_DOMAIN` environment variable handling
    - Add health check endpoints for certificate status
@@ -144,12 +144,12 @@ Ready for App Deployment:
    - Configure Traefik to route all deployed apps to {app}.{PLOY_APPS_DOMAIN} pattern
 
 #### Phase 4: Certificate Storage & Renewal Integration
-5. **Storage Integration Enhancement** (`controller/acme/storage.go`)
+5. **Storage Integration Enhancement** (`api/acme/storage.go`)
    - Ensure wildcard certificates are properly stored in SeaweedFS
    - Add cross-instance accessibility validation
    - Implement certificate metadata consistency across instances
 
-6. **Domain Management Enhancement** (`controller/certificates/manager.go`)
+6. **Domain Management Enhancement** (`api/certificates/manager.go`)
    - Add certificate selection logic: wildcard for platform subdomains, individual for external domains
    - Add platform subdomain detection logic  
    - Integrate platform wildcard certificate availability checks
@@ -172,7 +172,7 @@ Ready for App Deployment:
 
 ### 1. Wildcard Certificate Manager
 
-**File**: `controller/certificates/wildcard.go` (NEW)
+**File**: `api/certificates/wildcard.go` (NEW)
 
 ```go
 package certificates
@@ -185,8 +185,8 @@ import (
     "strings"
     "time"
 
-    "github.com/ploy/ploy/controller/acme"
-    "github.com/ploy/ploy/controller/dns"
+    "github.com/ploy/ploy/api/acme"
+    "github.com/ploy/ploy/api/dns"
     "github.com/ploy/ploy/internal/storage"
 )
 
@@ -295,7 +295,7 @@ func (wcm *WildcardCertificateManager) GetCertificateForDomain(ctx context.Conte
 
 ### 2. Controller Server Integration
 
-**File**: `controller/server/server.go` (modifications)
+**File**: `api/server/server.go` (modifications)
 
 ```go
 // Add to ServiceDependencies struct
@@ -415,7 +415,7 @@ ploy_apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | defa
 
 ### 4. Controller Integration Enhancement
 
-**File**: `controller/certificates/manager.go` (additions)
+**File**: `api/certificates/manager.go` (additions)
 
 ```go
 // LoadWildcardCertificate loads a pre-provisioned wildcard certificate

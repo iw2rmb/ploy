@@ -352,7 +352,7 @@ go:
 
 **Deliverables**:
 ```go
-// controller/analysis/javascript_analyzer.go
+// api/analysis/javascript_analyzer.go
 type JavaScriptAnalyzer struct {
     config       JavaScriptAnalysisConfig
     eslintPath   string
@@ -468,7 +468,7 @@ javascript:
 
 **Deliverables**:
 ```go
-// controller/analysis/csharp_analyzer.go
+// api/analysis/csharp_analyzer.go
 type CSharpAnalyzer struct {
     config          CSharpAnalysisConfig
     dotnetPath      string
@@ -578,7 +578,7 @@ csharp:
 
 **Deliverables**:
 ```go
-// controller/analysis/rust_analyzer.go
+// api/analysis/rust_analyzer.go
 type RustAnalyzer struct {
     config      RustAnalysisConfig
     cargoPath   string

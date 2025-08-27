@@ -101,8 +101,8 @@ TOTAL_TESTS=$((TOTAL_TESTS + 1))
 # Test 572: Health checks integrated with Nomad
 echo "🏥 Testing health checks..."
 
-run_test "Controller health endpoint" "curl -f -s https://api.dev.ployd.app/health"
-run_test "Controller readiness endpoint" "curl -f -s https://api.dev.ployd.app/ready"
+run_test "Controller health endpoint" "curl -f -s https://api.dev.ployman.app/health"
+run_test "Controller readiness endpoint" "curl -f -s https://api.dev.ployman.app/ready"
 run_test "Consul service registration" "curl -f -s http://localhost:8500/v1/health/service/ploy-controller"
 
 # Test 575-579: ployman CLI commands
@@ -168,7 +168,7 @@ API_ENDPOINTS=(
 for endpoint_status in "${API_ENDPOINTS[@]}"; do
     endpoint="${endpoint_status%:*}"
     expected_status="${endpoint_status#*:}"
-    run_test "API endpoint $endpoint" "curl -f -s -o /dev/null -w '%{http_code}' https://api.dev.ployd.app$endpoint | grep -q $expected_status"
+    run_test "API endpoint $endpoint" "curl -f -s -o /dev/null -w '%{http_code}' https://api.dev.ployman.app$endpoint | grep -q $expected_status"
 done
 
 # Test service discovery tags

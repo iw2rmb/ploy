@@ -8,7 +8,7 @@ SCRIPT_DIR=$(dirname "$0")
 ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 
 # Configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEMP_DIR="/tmp/arf-comprehensive-test"
 MASTER_RESULTS_FILE="$TEMP_DIR/comprehensive-results.json"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -65,7 +65,7 @@ setup_comprehensive_test() {
     log_info "Controller is accessible at $CONTROLLER_URL"
     
     # Get controller version and environment info
-    local controller_info=$(curl -s "$CONTROLLER_URL/controller/version" 2>/dev/null || echo '{}')
+    local controller_info=$(curl -s "$CONTROLLER_URL/api/version" 2>/dev/null || echo '{}')
     local git_branch=$(echo "$controller_info" | jq -r '.git_branch // "unknown"')
     local git_commit=$(echo "$controller_info" | jq -r '.git_commit // "unknown"')
     local build_timestamp=$(echo "$controller_info" | jq -r '.build_timestamp // "unknown"')

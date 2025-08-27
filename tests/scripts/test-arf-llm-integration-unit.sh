@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 # Test configuration
 TEST_DIR="/tmp/arf-llm-unit-tests"
-CONTROLLER_URL=${PLOY_CONTROLLER:-"https://api.dev.ployd.app/v1"}
+CONTROLLER_URL=${PLOY_CONTROLLER:-"https://api.dev.ployman.app/v1"}
 
 # Create test directory
 mkdir -p "$TEST_DIR"

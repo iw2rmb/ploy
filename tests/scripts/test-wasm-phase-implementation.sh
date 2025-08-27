@@ -100,8 +100,8 @@ test_wasm_runtime() {
     
     # Test basic WASM module loading
     echo "Testing WASM module loading..."
-    if [ -f "controller/runtime/wasm.go" ]; then
-        if go build ./controller/runtime >/dev/null 2>&1; then
+    if [ -f "api/runtime/wasm.go" ]; then
+        if go build ./api/runtime >/dev/null 2>&1; then
             print_success "✓ WASM runtime module compiles successfully"
         else
             print_error "✗ WASM runtime module compilation failed"
@@ -113,8 +113,8 @@ test_wasm_runtime() {
     
     # Test WASI support (integrated into wasm.go)
     echo "Testing WASI support..."
-    if [ -f "controller/runtime/wasm.go" ]; then
-        if grep -q "wasi_snapshot_preview1" controller/runtime/wasm.go; then
+    if [ -f "api/runtime/wasm.go" ]; then
+        if grep -q "wasi_snapshot_preview1" api/runtime/wasm.go; then
             print_success "✓ WASI Preview 1 support integrated in WASM runtime"
         else
             print_warning "⚠ WASI support not found in WASM runtime"
@@ -131,9 +131,9 @@ test_wasm_builder() {
     print_test_header "WASM Builder Implementation Tests"
     
     # Check WASM builder module
-    if [ -f "controller/builders/wasm.go" ]; then
+    if [ -f "api/builders/wasm.go" ]; then
         echo "Testing WASM builder compilation..."
-        if go build ./controller/builders >/dev/null 2>&1; then
+        if go build ./api/builders >/dev/null 2>&1; then
             print_success "✓ WASM builder compiles successfully"
         else
             print_error "✗ WASM builder compilation failed"
@@ -255,9 +255,9 @@ test_opa_policies() {
 test_component_model() {
     print_test_header "WASM Component Model Tests"
     
-    if [ -f "controller/wasm/components.go" ]; then
+    if [ -f "api/wasm/components.go" ]; then
         echo "Testing WASM component model..."
-        if go build ./controller/wasm >/dev/null 2>&1; then
+        if go build ./api/wasm >/dev/null 2>&1; then
             print_success "✓ WASM component model compiles successfully"
         else
             print_error "✗ WASM component model compilation failed"

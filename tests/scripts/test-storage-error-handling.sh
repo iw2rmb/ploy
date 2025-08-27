@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -208,16 +208,16 @@ test_storage_health_endpoints() {
     cd "$PROJECT_DIR"
     
     # Kill any existing controller
-    pkill -f "./build/controller" || true
+    pkill -f "./bin/api" || true
     sleep 2
     
     # Build and start controller
-    if ! go build -o build/controller ./controller; then
+    if ! go build -o bin/api ./controller; then
         echo "Error: Failed to build controller"
         return 1
     fi
     
-    ./build/controller > /tmp/controller.log 2>&1 &
+    ./bin/api > /tmp/controller.log 2>&1 &
     CONTROLLER_PID=$!
     
     # Wait for controller to start
@@ -607,11 +607,11 @@ EOF
     cd "$PROJECT_DIR"
     
     # Kill any existing controller
-    pkill -f "./build/controller" || true
+    pkill -f "./bin/api" || true
     sleep 2
     
     # Start controller
-    ./build/controller > /tmp/controller-build-test.log 2>&1 &
+    ./bin/api > /tmp/controller-build-test.log 2>&1 &
     CONTROLLER_PID=$!
     
     # Wait for controller to start
@@ -668,7 +668,7 @@ run_test "Retry logic and backoff" "test_retry_logic"
 run_test "Build with enhanced storage" "test_build_with_enhanced_storage"
 
 # Clean up any leftover processes
-pkill -f "./build/controller" || true
+pkill -f "./bin/api" || true
 
 # Summary
 echo -e "${BLUE}=== Storage Error Handling Test Summary ===${NC}"

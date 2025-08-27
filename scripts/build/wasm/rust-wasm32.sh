@@ -1,6 +1,6 @@
 #!/bin/bash
 # Rust WebAssembly build script for wasm32-wasi target
-# This script is used as a reference - actual builds use the integrated builder in controller/builders/wasm.go
+# This script is used as a reference - actual builds use the integrated builder in api/builders/wasm.go
 
 set -euo pipefail
 

@@ -4,7 +4,7 @@ set -euo pipefail
 echo "=== Testing App Destroy Command ==="
 
 # Configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 CLI_BINARY="${CLI_BINARY:-./ploy}"
 TEST_APP="test-destroy-app"
 

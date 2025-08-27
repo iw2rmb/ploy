@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [2025-08-27] - CHTTP Performance Benchmarking Implementation
+
+### Added
+- **Performance Benchmarking Framework**: Comprehensive CHTTP vs legacy static analysis performance testing
+  - Bash-based benchmarking script with cross-platform support (macOS/Linux)
+  - Go-based resource monitoring utilities for memory and CPU tracking
+  - JSON performance metrics collection and reporting
+  - Test data generation for small/medium/large Python projects with realistic Pylint issues
+  - Integration with existing Go performance testing framework
+  - Resource usage validation against roadmap targets (<100MB memory, <5s response time)
+- **Cross-platform Resource Monitor**: Go CLI utility for monitoring CHTTP service resource usage
+  - Platform-aware memory monitoring (Linux /proc, macOS ps commands)
+  - Load average tracking with Unix uptime parsing
+  - JSON output format compatible with benchmarking framework
+  - Configurable sampling intervals and monitoring duration
+
+### Testing
+- **Local Performance Validation**: Framework tested and validated locally
+  - Resource monitoring produces accurate JSON metrics
+  - Test data generation creates realistic Python projects
+  - Bash script integration with Go performance tests
+  - Error handling for missing dependencies (jq-optional design)
+
 ## [2025-08-26] - TDD Phase 2: Complete Test Infrastructure
 
 ### Added
@@ -29,7 +52,7 @@
 
 ### Changed
 - **Renamed Controller to API**: Complete refactoring of "controller" to "api" throughout codebase
-  - Renamed `/controller/` directory to `/api/`
+  - Renamed `/api/` directory to `/api/`
   - Updated all Go import statements from `github.com/iw2rmb/ploy/controller` to `github.com/iw2rmb/ploy/api`
   - Renamed Makefile targets from `controller-*` to `api-*`
   - Updated Ansible playbooks and configuration variables
@@ -817,9 +840,9 @@
 
 ### Technical Implementation
 - **Lane Detection** (`tools/lane-pick/main.go`): Priority WASM detection with multi-strategy analysis and language context preservation
-- **Build System** (`controller/builders/wasm.go`): Multi-strategy builder with automatic selection and complete artifact generation
-- **Runtime System** (`controller/runtime/wasm.go`): wazero integration with security constraints and WASI Preview 1 support
-- **Component Model** (`controller/wasm/components.go`): Multi-module support with dependency management and interface validation
+- **Build System** (`api/builders/wasm.go`): Multi-strategy builder with automatic selection and complete artifact generation
+- **Runtime System** (`api/runtime/wasm.go`): wazero integration with security constraints and WASI Preview 1 support
+- **Component Model** (`api/wasm/components.go`): Multi-module support with dependency management and interface validation
 - **Security Policies** (`policies/wasm.rego`): Environment-specific OPA policies with resource constraints and WASI security validation
 - **Deployment Templates** (`platform/nomad/templates/wasm-app.hcl.j2`): Production-ready Nomad job templates with comprehensive configuration
 
@@ -852,7 +875,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 ## [2025-08-21] - Controller Self-Update Capability (Phase no-SPOF-3 Step 3)
 
 ### Added
-- **Self-Update API Endpoints**: New REST API endpoints for controller self-update operations (`/v1/controller/update`, `/update/status`, `/rollback`, `/version`, `/versions`)
+- **Self-Update API Endpoints**: New REST API endpoints for controller self-update operations (`/v1/api/update`, `/update/status`, `/rollback`, `/version`, `/versions`)
 - **Update Strategy Support**: Multiple update strategies including rolling, blue-green, and emergency update approaches
 - **Consul-Based Coordination**: Inter-controller instance coordination during updates using Consul sessions and distributed locks
 - **Binary Validation System**: Comprehensive validation including checksum verification, platform compatibility, and system resource checks
@@ -1091,7 +1114,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 ### Added
 - **Stateless Controller Architecture**
   - Complete elimination of global state variables and singleton patterns
-  - New `controller/server/` package with modular server architecture
+  - New `api/server/` package with modular server architecture
   - Request-scoped dependency injection for all external services (Consul, Nomad, storage clients)
   - Configuration-driven initialization through `ControllerConfig` struct loaded from environment
   - `ServiceDependencies` struct containing all injected external service instances
@@ -1180,7 +1203,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
   - Enhanced environment variable management with custom and legacy compatibility modes
 
 - **Template System Architecture**
-  - `controller/nomad/render.go` enhanced with conditional block processing functions
+  - `api/nomad/render.go` enhanced with conditional block processing functions
   - Regular expression-based template substitution for complex conditional logic
   - Comprehensive RenderData structure with feature flags and resource allocation fields
   - Lane-specific template selection with enhanced configurations for all deployment types
@@ -1210,7 +1233,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 
 ### Added
 - **External Storage Configuration Management**
-  - `controller/config` package with external YAML configuration support
+  - `api/config` package with external YAML configuration support
   - Configuration path priority: `PLOY_STORAGE_CONFIG` env var → `/etc/ploy/storage/config.yaml` → embedded `configs/storage-config.yaml`
   - Per-request storage client initialization replacing singleton pattern for stateless operation
   - Configuration validation with comprehensive error reporting and type checking
@@ -1342,8 +1365,8 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
   - Docker integration with host networking for optimal performance
 
 - **Domain Management API Infrastructure** 
-  - Complete Traefik router module (`controller/routing/traefik.go`) with Consul integration
-  - Full REST API for domain management (`controller/domains/handler.go`) with validation
+  - Complete Traefik router module (`api/routing/traefik.go`) with Consul integration
+  - Full REST API for domain management (`api/domains/handler.go`) with validation
   - Automatic service registration with Traefik labels for zero-configuration routing
   - Domain mapping persistence in Consul KV store for recovery and consistency
   - Health checking system with routing statistics and monitoring endpoints
@@ -1610,7 +1633,7 @@ The TTL cleanup system provides automatic, configurable cleanup of preview alloc
 
 ### Enhanced
 - **Controller Integration**
-  - Enhanced storage client initialization alongside basic storage client in controller/main.go
+  - Enhanced storage client initialization alongside basic storage client in api/main.go
   - New API endpoints `/storage/health` and `/storage/metrics` for monitoring and diagnostics
   - Build handler integration using enhanced client for all artifact upload operations with fallback
 
@@ -2410,7 +2433,7 @@ The debug system now provides developers with fully-featured debugging environme
 
 ### Technical Details
 - **Nomad Integration**
-  - New `controller/nomad/client.go` with allocation health checking functions
+  - New `api/nomad/client.go` with allocation health checking functions
   - `GetAllocationByName()` function for retrieving allocation details by job name
   - `IsAllocationHealthy()` function for comprehensive health validation
   - Integration with existing preview system through enhanced router logic

@@ -236,7 +236,7 @@ type SecurityRuleSet struct {
 ## File Structure Changes
 
 ```
-controller/arf/
+api/arf/
 ├── storage/
 │   ├── recipe_storage.go           # RecipeStorage interface and implementations
 │   ├── seaweedfs_storage.go        # SeaweedFS-based recipe storage

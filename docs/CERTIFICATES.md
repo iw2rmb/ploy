@@ -15,7 +15,7 @@ Ploy has two distinct certificate management systems that serve different purpos
 
 #### Characteristics:
 - ✅ Provisioned automatically during infrastructure setup
-- ✅ Covers all platform subdomains (`api.dev.ployd.app`, `myapp.dev.ployd.app`, etc.)
+- ✅ Covers all platform subdomains (`api.dev.ployman.app`, `myapp.dev.ployd.app`, etc.)
 - ✅ Uses DNS-01 challenge with Namecheap API
 - ✅ Renewed automatically via cron job
 - ✅ Managed by platform administrators, not users
@@ -78,7 +78,7 @@ export CERT_EMAIL="admin@ployd.app"
 
 ```bash
 # Deployed via Ansible - no user action required
-curl https://api.dev.ployd.app/health          # ✅ Works automatically
+curl https://api.dev.ployman.app/health          # ✅ Works automatically
 curl https://myapp.dev.ployd.app               # ✅ Works automatically
 ./build/ploy push -a testapp                   # ✅ HTTPS enabled automatically
 curl https://testapp.dev.ployd.app             # ✅ Works automatically
@@ -126,20 +126,20 @@ ploy/
 
 ### Platform Certificate Health
 ```bash
-curl https://api.dev.ployd.app/health/platform-certificates
+curl https://api.dev.ployman.app/health/platform-certificates
 ```
 
 ### App Domain Certificate Management
 ```bash
 # List app domain certificates
-curl -X GET https://api.dev.ployd.app/v1/apps/myapp/domains
+curl -X GET https://api.dev.ployman.app/v1/apps/myapp/domains
 
 # Add custom domain (triggers certificate provisioning)
-curl -X POST https://api.dev.ployd.app/v1/apps/myapp/domains \
+curl -X POST https://api.dev.ployman.app/v1/apps/myapp/domains \
   -d '{"domain": "custom-domain.com"}'
 
 # Remove custom domain and certificate
-curl -X DELETE https://api.dev.ployd.app/v1/apps/myapp/domains/custom-domain.com
+curl -X DELETE https://api.dev.ployman.app/v1/apps/myapp/domains/custom-domain.com
 ```
 
 ## Migration Notes

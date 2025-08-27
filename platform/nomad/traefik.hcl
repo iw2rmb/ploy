@@ -114,7 +114,8 @@ job "traefik-system" {
           "--providers.consulcatalog.exposedByDefault=false",
           "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
-          "--providers.file.directory=/etc/traefik/dynamic",
+          "--providers.file.filename=/etc/traefik/dynamic-configs/dynamic-config.yml",
+          "--providers.file.watch=true",
           "--metrics.prometheus=true",
           "--metrics.prometheus.addEntryPointsLabels=true",
           "--metrics.prometheus.addRoutersLabels=true",
@@ -126,24 +127,24 @@ job "traefik-system" {
           "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Dev environment wildcard certificate resolver
+          # Dev environment wildcard certificate resolver for ployman.app
           "--certificatesresolvers.dev-wildcard.acme.dnschallenge=true",
           "--certificatesresolvers.dev-wildcard.acme.dnschallenge.provider=namecheap",
           "--certificatesresolvers.dev-wildcard.acme.email=admin@ployd.app",
           "--certificatesresolvers.dev-wildcard.acme.storage=/data/dev-wildcard-acme.json",
           "--certificatesresolvers.dev-wildcard.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.dev-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          # Apps wildcard certificate resolver for ployd.app
+          "--certificatesresolvers.apps-wildcard.acme.dnschallenge=true",
+          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.provider=namecheap",
+          "--certificatesresolvers.apps-wildcard.acme.email=admin@ployd.app",
+          "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-wildcard-acme.json",
+          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
+          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
           # HTTP to HTTPS redirect
           "--entrypoints.web.http.redirections.entrypoint.to=websecure",
           "--entrypoints.web.http.redirections.entrypoint.scheme=https"
         ]
-        
-        mount {
-          type = "bind"
-          source = "local/dynamic"
-          target = "/etc/traefik/dynamic"
-          readonly = true
-        }
         
         # Host mount for Let's Encrypt certificates
         mount {
@@ -151,74 +152,17 @@ job "traefik-system" {
           source = "/opt/ploy/traefik-data"
           target = "/data"
         }
+        
+        # Host mount for dynamic configuration directory
+        mount {
+          type = "bind"
+          source = "/opt/ploy/traefik-data"
+          target = "/etc/traefik/dynamic-configs"
+          readonly = true
+        }
       }
       
-      # Basic dynamic configuration directory
-      template {
-        data = <<EOF
-# Basic dynamic configuration placeholder
-# This file will be populated by the Ploy controller
-# when applications register their routing rules
-http:
-  routers: {}
-  services: {}
-  middlewares: {}
-EOF
-        destination = "local/dynamic/apps.yml"
-        perms = "644"
-      }
-      
-      # Dev environment wildcard certificate configuration
-      template {
-        data = <<EOF
-# Dev environment SSL certificate configuration
-# Wildcard certificate for *.dev.ployd.app
-tls:
-  options:
-    default:
-      sslStrategies:
-        - "tls.SniStrict"
-      minVersion: "VersionTLS12"
-      cipherSuites:
-        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
-        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
-        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-        - "TLS_RSA_WITH_AES_256_GCM_SHA384"
-        - "TLS_RSA_WITH_AES_128_GCM_SHA256"
-
-http:
-  middlewares:
-    https-redirect:
-      redirectScheme:
-        scheme: https
-        permanent: true
-    
-    secure-headers:
-      headers:
-        accessControlAllowMethods:
-          - GET
-          - OPTIONS
-          - PUT
-          - POST
-          - DELETE
-        accessControlMaxAge: 100
-        hostsProxyHeaders:
-          - "X-Forwarded-Host"
-        referrerPolicy: "same-origin"
-        sslRedirect: true
-        sslHost: ""
-        sslForceHost: false
-        stsSeconds: 31536000
-        stsIncludeSubdomains: true
-        stsPreload: true
-        forceSTSHeader: true
-        contentTypeNosniff: true
-        browserXssFilter: true
-        customFrameOptionsValue: "SAMEORIGIN"
-EOF
-        destination = "local/dynamic/ssl-config.yml"
-        perms = "644"
-      }
+      # Configuration now loaded from external file provider at /etc/traefik/dynamic-configs/dynamic-config.yml
       
       # Environment variables for Traefik
       env {
@@ -226,14 +170,14 @@ EOF
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
         
         # Namecheap DNS provider for Let's Encrypt ACME challenges
-        NAMECHEAP_API_USER = "iw2rmb"
-        NAMECHEAP_API_KEY = "c8615d72b5794eb0a52cbf1cf22fc42f"
-        NAMECHEAP_SANDBOX = "false"
+        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default('') }}"
+        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default('') }}"
+        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default('false') }}"
         
         # DNS challenge configuration
         ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
-        NAMECHEAP_CLIENT_IP = "45.12.75.241"
-        NAMECHEAP_USERNAME = "iw2rmb"
+        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address']) }}"
+        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default('') }}"
       }
       
       resources {

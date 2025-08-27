@@ -47,7 +47,7 @@ Auto-selects optimal lane from project structure unless overridden.
   - REPO.md — comprehensive repository structure guide for efficient file navigation.
   - STACK.md — technology stack and framework dependencies.
   - cmd/ploy/README.md — CLI reference.
-  - controller/README.md — REST API routes.
+  - api/README.md — REST API routes.
   - STORAGE.md — storage abstraction (SeaweedFS).
   - iac/README.md — bare-metal setup.
   - FEATURES.md — feature list.
@@ -112,7 +112,7 @@ make test-unit                        # Unit tests (GREEN phase)
 make test-coverage-threshold          # Verify 60% minimum coverage
 
 # Build Verification (MANDATORY before VPS testing)
-go build -o bin/controller ./controller && go build -o bin/ploy ./cmd/ploy && go build ./controller/... ./cmd/...
+go build -o bin/controller ./controller && go build -o bin/ploy ./cmd/ploy && go build ./api/... ./cmd/...
 
 # Test Development
 make test-generate                    # Generate test files
@@ -129,8 +129,8 @@ git checkout main && git merge <current-branch> && git push origin main && git c
 ssh root@$TARGET_HOST "su - ploy -c './tests/scripts/test-*.sh'"  # Test execution
 
 # Controller Management  
-curl -X POST https://api.dev.ployd.app/v1/controller/update/latest           # Self-update
-curl https://api.dev.ployd.app/v1/controller/version                         # Version check
+curl -X POST https://api.dev.ployman.app/v1/update/latest           # Self-update
+curl https://api.dev.ployman.app/v1/version                         # Version check
 ```
 
 **PROHIBITED (Never):**
@@ -176,7 +176,7 @@ git checkout $CURRENT_BRANCH                 # Return to worktree branch
 - **Return to Work**: Always return to worktree branch after completion
 
 ### Controller Deployment Priority Order
-1. **Self-Update Endpoint** (Primary): `curl -X POST https://api.dev.ployd.app/v1/controller/update/latest`
+1. **Self-Update Endpoint** (Primary): `curl -X POST https://api.dev.ployman.app/v1/update/latest`
 2. **Deploy Script** (Fallback): `./scripts/deploy.sh <branch>` 
 3. **Investigation Required** if both methods fail
 
@@ -184,7 +184,7 @@ git checkout $CURRENT_BRANCH                 # Return to worktree branch
 
 **Reserved App Names:** The following names are reserved for platform use and cannot be used when deploying apps:
 
-- `api` - Reserved for controller API endpoint (api.dev.ployd.app, api.ployd.app)
+- `api` - Reserved for controller API endpoint (api.dev.ployman.app, api.ployd.app)
 - `dev` - Reserved for dev environment subdomain (dev.ployd.app)
 - `controller`, `admin`, `dashboard`, `metrics`, `health`, `console`, `www`
 - `ploy`, `system`, `traefik`, `nomad`, `consul`, `vault`, `seaweedfs`
@@ -223,7 +223,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 **Core Workflow**: CLI tar → Controller lane-pick → Build → Nomad deployment
 
 **Key Components** (see `docs/REPO.md` for detailed structure):
-- `controller/`: REST API server with lane-specific builders
+- `api/`: REST API server with lane-specific builders
 - `cmd/ploy/`: CLI client 
 - `internal/`: Shared libraries (storage, build, lifecycle, etc.)
 - `tools/lane-pick/`: Automated lane selection
@@ -277,7 +277,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - **Execute VPS Commands**: Use deployment and testing commands from Command Reference above
     - **TDD REFACTOR Phase**: After tests pass, refactor code for maintainability while keeping tests green
     - **Testing Hierarchy**: Execute 20% integration + 10% E2E tests per Testing Framework
-    - **Deployment Verification**: Confirm success via `curl https://api.dev.ployd.app/v1/controller/version`
+    - **Deployment Verification**: Confirm success via `curl https://api.dev.ployman.app/v1/version`
     - **Full Stack Validation**: Run comprehensive test suites from `tests/scripts/` directory
 
 8. **Error Resolution**: IF any VPS tests fail:
@@ -293,7 +293,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
     - **FEATURES.md Synchronization**: Add new feature entries or modify existing ones to accurately reflect current system capabilities
     - **STACK.md Dependencies**: Update technology stack documentation when adding or modifying frameworks, tools, or dependencies
     - **REPO.md Structure**: Update repository structure documentation if new files, folders, or architectural changes were made
-    - **controller/README.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
+    - **api/README.md Documentation**: Update API endpoint documentation if REST API routes were added, modified, or removed
     - **iac/dev/README.md Infrastructure**: Update infrastructure documentation when Ansible playbooks, templates, configurations, or deployment procedures are modified
     - **Final Commit**: `git add . && git commit -m "Complete documentation updates for <feature>"`
     - **Version Verification**: Use controller version check commands from Command Reference above to confirm deployment success

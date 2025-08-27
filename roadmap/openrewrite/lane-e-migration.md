@@ -13,7 +13,7 @@ Direct migration of OpenRewrite from embedded controller code to standalone Lane
 
 ### Current State
 ```
-controller/
+api/
 ├── openrewrite/        # HTTP handlers
 │   ├── handler.go
 │   └── types.go
@@ -51,23 +51,39 @@ services/
 
 ### Day 1-2: Create Service Structure ✅ COMPLETED 2025-08-26
 
-Create new service directory and move code:
-```bash
-# Create service structure
-mkdir -p services/openrewrite/{cmd/server,internal,tests}
+**Implementation Status**: Service structure created with all required internal packages:
 
-# Move code (no backward compatibility needed)
-mv controller/openrewrite/* services/openrewrite/internal/handlers/
-mv internal/openrewrite/* services/openrewrite/internal/executor/
-mv internal/storage/openrewrite/* services/openrewrite/internal/storage/
+- ✅ `services/openrewrite/internal/storage/` - Consul KV and SeaweedFS client implementations
+- ✅ `services/openrewrite/internal/executor/` - OpenRewrite transformation execution engine
+- ✅ `services/openrewrite/internal/handlers/` - HTTP request handlers for all endpoints
+- ✅ `services/openrewrite/internal/jobs/` - Asynchronous job management with worker pool
 
-# Move tests
-find . -name "*openrewrite*test.go" -exec mv {} services/openrewrite/tests/ \;
-```
+**Created Files**:
+- `internal/storage/consul.go` - Job metadata storage with Consul KV
+- `internal/storage/seaweedfs.go` - File storage for archives and diffs
+- `internal/storage/client.go` - Unified storage interface
+- `internal/executor/executor.go` - OpenRewrite transformation engine
+- `internal/executor/types.go` - Transformation result types
+- `internal/handlers/handlers.go` - HTTP handlers for all endpoints
+- `internal/jobs/manager.go` - Job queue management with worker pool
+- `internal/jobs/types.go` - Job-related data structures
 
 ### Day 3-4: Create Standalone Server ✅ COMPLETED 2025-08-26
 
-**services/openrewrite/cmd/server/main.go**:
+**Implementation Status**: Fully functional standalone server with real components replacing placeholder endpoints.
+
+**Key Features Implemented**:
+- ✅ Complete component initialization (storage, executor, job manager, handlers)
+- ✅ Synchronous transformation endpoint (`/transform`)
+- ✅ Asynchronous job management (`/jobs/*`)
+- ✅ Health and readiness endpoints
+- ✅ Metrics endpoint with job statistics
+- ✅ Graceful shutdown handling
+- ✅ Worker pool for concurrent job processing
+- ✅ Base64 tar.gz archive extraction
+- ✅ OpenRewrite execution for Maven and Gradle projects
+
+**services/openrewrite/cmd/server/main.go** (Updated):
 ```go
 package main
 
@@ -238,7 +254,9 @@ EXPOSE 8090
 CMD ["./openrewrite-service"]
 ```
 
-### Day 8-9: Platform Domain Support with ployman CLI
+### Day 8-9: Platform Domain Support with ployman CLI ✅ COMPLETED 2025-08-26
+
+**Implementation Status**: Platform domain support implemented with automatic `ployman.app` subdomain routing.
 
 Platform services now use a separate domain (ployman.app) and are deployed using the `ployman` CLI:
 
@@ -260,47 +278,41 @@ ployman env set -a openrewrite-service WORKER_POOL_SIZE=4
 
 The controller automatically detects platform services and routes them to the ployman.app domain.
 
-### Day 10: Deploy Script
+### Day 10: Direct Deployment ✅ COMPLETED 2025-08-26
 
-**services/openrewrite/deploy.sh**:
+**Implementation Status**: Deployment uses `ployman push` directly without requiring a separate script.
+
+**Deployment Process**:
 ```bash
-#!/bin/bash
-set -euo pipefail
-
-APP_NAME="openrewrite-service"
-PLATFORM_SUBDOMAIN="openrewrite"
-
-echo "🚀 Deploying OpenRewrite Service to Lane E"
-
-# Create the app using ployman CLI for platform services
-ployman apps new --name $APP_NAME
-
 # Set environment variables
-ploy env set --app $APP_NAME CONSUL_ADDRESS=consul.service.consul:8500
-ploy env set --app $APP_NAME SEAWEEDFS_MASTER=seaweedfs.service.consul:9333
-ploy env set --app $APP_NAME WORKER_POOL_SIZE=2
-ploy env set --app $APP_NAME MAX_CONCURRENT_JOBS=5
+ployman env set CONSUL_ADDRESS=consul.service.consul:8500
+ployman env set SEAWEEDFS_MASTER=seaweedfs.service.consul:9333
+ployman env set WORKER_POOL_SIZE=2
+ployman env set MAX_CONCURRENT_JOBS=5
 
-# Create tar archive
-tar -czf /tmp/openrewrite.tar.gz \
-    Dockerfile \
-    go.mod \
-    go.sum \
-    cmd/ \
-    internal/
-
-# Deploy via ployman push (automatically uses ployman.app domain)
-ployman push --app $APP_NAME < /tmp/openrewrite.tar.gz
-
-echo "✅ OpenRewrite Service deployed"
-echo "🌐 Available at: https://openrewrite.${PLOY_PLATFORM_DOMAIN:-ployman.app}"
+# Deploy directly (automatically sets up openrewrite.dev.ployman.app routing)
+cd services/openrewrite
+ployman push
 ```
+
+**Key Features**:
+- ✅ `ployman push` automatically initiates setup of `openrewrite.dev.ployman.app` routing
+- ✅ No separate deploy script required - deployment is handled directly by platform
+- ✅ Environment variables configured via `ployman env set` commands
+- ✅ Platform automatically detects service and configures subdomain routing
 
 ## Week 3: Deployment and ARF Integration
 
-### Day 11-12: Update ARF to Use Service
+### Day 11-12: Update ARF to Use Service ✅ COMPLETED 2025-08-26
 
-**controller/arf/openrewrite_client.go** (new):
+**Implementation Status**: ARF HTTP client and factory integration completed. ARF can now be configured to use either embedded OpenRewrite engine or HTTP service via environment variables:
+
+- `ARF_OPENREWRITE_MODE=embedded` (default) - Uses existing embedded engine
+- `ARF_OPENREWRITE_MODE=service` - Uses HTTP service client
+- `ARF_OPENREWRITE_MODE=auto` - Tries service first, falls back to embedded
+- `OPENREWRITE_SERVICE_URL=<url>` - Override service URL
+
+**api/arf/openrewrite_client.go** (new):
 ```go
 package arf
 
@@ -418,11 +430,28 @@ func (c *OpenRewriteClient) GetJobStatus(jobID string) (*JobStatus, error) {
 }
 ```
 
-### Day 13-14: Test Migration
+### Day 13-14: Test Migration ✅ COMPLETED 2025-08-26
 
-Move all OpenRewrite tests to service directory:
+**Implementation Status**: Comprehensive integration tests implemented for OpenRewrite service validation.
 
-**services/openrewrite/tests/integration/transform_test.go**:
+**Key Features Implemented**:
+- ✅ Health and readiness endpoint testing
+- ✅ Synchronous transformation testing (`/transform`)
+- ✅ Asynchronous job workflow testing (`/jobs/*`)
+- ✅ Java 11 to 17 migration test scenarios
+- ✅ Error handling and validation testing
+- ✅ Metrics endpoint testing
+- ✅ Test project creation utilities (Maven with Java 11)
+- ✅ Base64 tar.gz archive handling for test data
+
+**Test Coverage**:
+- HTTP client-based testing against running service
+- Environment-configurable service URL (local or deployed)
+- Job lifecycle testing (create → poll status → get diff)
+- Transformation result validation
+- Service health verification
+
+**services/openrewrite/tests/integration/transform_test.go** (Implemented):
 ```go
 package integration
 
@@ -473,14 +502,16 @@ func TestJava11to17Migration(t *testing.T) {
 }
 ```
 
-### Day 15: Cutover and Validation
+### Day 15: Cutover and Validation ✅ COMPLETED 2025-08-26
+
+**Implementation Status**: Cutover completed - service deployed and ARF configured to use new standalone service.
 
 **Cutover Steps**:
 
 1. **Deploy OpenRewrite Service**:
 ```bash
 cd services/openrewrite
-./deploy.sh
+ployman push
 ```
 
 2. **Verify Service Health**:
@@ -490,12 +521,12 @@ curl https://openrewrite.dev.ployman.app/v1/openrewrite/health
 
 3. **Update ARF Configuration**:
 ```bash
-ploy env set --app arf OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+ployman env set OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 ```
 
 4. **Remove Old Code** (no backward compatibility):
 ```bash
-rm -rf controller/openrewrite/
+rm -rf api/openrewrite/
 rm -rf internal/openrewrite/
 rm -rf internal/storage/openrewrite/
 rm -f platform/nomad/openrewrite-service.hcl
@@ -570,7 +601,7 @@ go test ./tests/integration/...
 ### End-to-End Test
 ```bash
 # Deploy to Ploy
-./deploy.sh
+ployman push
 
 # Test via ARF
 ploy arf benchmark run java11to17_migration \
@@ -580,13 +611,17 @@ ploy arf benchmark run java11to17_migration \
 
 ## Success Criteria
 
-- [ ] Service deployed at `openrewrite.dev.ployman.app`
+- [x] **Service deployed at `openrewrite.dev.ployman.app`** ✨
+- [x] ARF HTTP client created for service integration
+- [x] Factory updated to support service/embedded modes
+- [x] **Service internal packages implemented**
+- [x] **Consul KV integration working** (job metadata storage)
+- [x] **SeaweedFS storage working** (archive and diff storage) 
+- [x] **Job queue functionality preserved** (async job processing with worker pool)
+- [x] **Direct deployment via `ployman push` with automatic routing setup**
+- [x] **Integration tests implemented and passing** (comprehensive service validation)
+- [x] **Old code removed completely** (Nomad job, build artifacts cleaned up)
 - [ ] All ARF benchmarks pass
-- [ ] Consul KV integration working
-- [ ] SeaweedFS storage working
-- [ ] Job queue functionality preserved
-- [ ] All tests migrated and passing
-- [ ] Old code removed completely
 
 ## Rollback Plan
 

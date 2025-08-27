@@ -736,7 +736,7 @@ func BenchmarkValidateAppName(b *testing.B) {
 }
 ```
 
-### 4. API Handler Unit Tests (`controller/server/`)
+### 4. API Handler Unit Tests (`api/server/`)
 
 #### 4.1 Environment Variable Handler Tests (`env_handlers_test.go`)
 ```go

@@ -1,0 +1,216 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+// ApiCmd handles API management commands
+func ApiCmd(args []string) {
+	if len(args) == 0 {
+		fmt.Println("API management commands:")
+		fmt.Println("  ployman api deploy              Deploy latest API version")
+		fmt.Println("  ployman api rollback <version>  Rollback to specific version")
+		fmt.Println("")
+		fmt.Println("Environment variables:")
+		fmt.Println("  PLOY_CONTROLLER    API endpoint (default: https://api.dev.ployman.app/v1)")
+		fmt.Println("  TARGET_HOST        VPS host for SSH fallback")
+		return
+	}
+
+	subcommand := args[0]
+	subArgs := args[1:]
+
+	switch subcommand {
+	case "deploy":
+		runApiDeploy(subArgs)
+	case "rollback":
+		runApiRollback(subArgs)
+	default:
+		fmt.Printf("Unknown api command: %s\n", subcommand)
+		fmt.Println("Run 'ployman api' for usage information")
+	}
+}
+
+func runApiDeploy(args []string) {
+	fmt.Println("Deploying latest API version...")
+	
+	// Get controller URL
+	controllerURL := getControllerURL()
+	
+	// Try self-update endpoint first
+	updateURL := fmt.Sprintf("%s/update/latest", controllerURL)
+	
+	fmt.Printf("Attempting self-update via %s...\n", updateURL)
+	
+	req, err := http.NewRequest("POST", updateURL, nil)
+	if err != nil {
+		fmt.Printf("Error creating request: %v\n", err)
+		runSSHFallback()
+		return
+	}
+	
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Self-update failed: %v\n", err)
+		runSSHFallback()
+		return
+	}
+	defer resp.Body.Close()
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response: %v\n", err)
+		runSSHFallback()
+		return
+	}
+	
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Self-update failed with status %d: %s\n", resp.StatusCode, string(body))
+		runSSHFallback()
+		return
+	}
+	
+	// Parse response
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		fmt.Printf("Error parsing response: %v\n", err)
+		runSSHFallback()
+		return
+	}
+	
+	fmt.Println("Self-update successful!")
+	if version, ok := result["version"].(string); ok {
+		fmt.Printf("Deployed version: %s\n", version)
+	}
+	if gitCommit, ok := result["git_commit"].(string); ok && gitCommit != "" {
+		fmt.Printf("Git commit: %s\n", gitCommit)
+	}
+	
+	// Check deployment status
+	time.Sleep(2 * time.Second)
+	checkDeploymentStatus(controllerURL)
+}
+
+func runApiRollback(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: ployman api rollback <version>")
+		return
+	}
+	
+	targetVersion := args[0]
+	controllerURL := getControllerURL()
+	
+	// Call rollback endpoint
+	rollbackURL := fmt.Sprintf("%s/rollback", controllerURL)
+	
+	payload := map[string]string{
+		"version": targetVersion,
+		"reason":  "Manual rollback via ployman CLI",
+	}
+	
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Printf("Error: failed to create request: %v\n", err)
+		return
+	}
+	
+	req, err := http.NewRequest("POST", rollbackURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Printf("Error creating request: %v\n", err)
+		return
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Rollback failed: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response: %v\n", err)
+		return
+	}
+	
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("Rollback failed with status %d: %s\n", resp.StatusCode, string(body))
+		return
+	}
+	
+	fmt.Printf("Successfully rolled back to version %s\n", targetVersion)
+}
+
+func runSSHFallback() {
+	fmt.Println("\nFalling back to SSH deployment...")
+	
+	// Get target host from environment
+	targetHost := os.Getenv("TARGET_HOST")
+	if targetHost == "" {
+		fmt.Println("Error: TARGET_HOST environment variable not set")
+		fmt.Println("Please set TARGET_HOST to your VPS IP address")
+		return
+	}
+	
+	// Get current branch
+	cmd := exec.Command("git", "branch", "--show-current")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Error getting current branch: %v\n", err)
+		return
+	}
+	branch := strings.TrimSpace(string(output))
+	if branch == "" {
+		branch = "main"
+	}
+	
+	fmt.Printf("Deploying branch '%s' to %s via SSH...\n", branch, targetHost)
+	
+	// Execute deployment script via SSH
+	sshCmd := exec.Command("ssh", 
+		fmt.Sprintf("root@%s", targetHost),
+		fmt.Sprintf("cd /home/ploy && sudo -u ploy git fetch origin %s && sudo -u ploy git checkout %s && sudo -u ploy git pull && sudo -u ploy ./scripts/deploy.sh %s", branch, branch, branch),
+	)
+	
+	sshCmd.Stdout = os.Stdout
+	sshCmd.Stderr = os.Stderr
+	
+	if err := sshCmd.Run(); err != nil {
+		fmt.Printf("SSH deployment failed: %v\n", err)
+		return
+	}
+	
+	fmt.Println("SSH deployment completed successfully!")
+}
+
+func checkDeploymentStatus(controllerURL string) {
+	versionURL := fmt.Sprintf("%s/version", controllerURL)
+	
+	req, err := http.NewRequest("GET", versionURL, nil)
+	if err != nil {
+		return
+	}
+	
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode == http.StatusOK {
+		fmt.Println("API is responding normally")
+	}
+}

@@ -148,7 +148,7 @@ Ploy supports **automatic wildcard certificate provisioning** for development en
 ### DNS Configuration (Required First)
 
 The dev environment uses `*.dev.ployd.app` subdomain pattern:
-- **API**: `api.dev.ployd.app` 
+- **API**: `api.dev.ployman.app` 
 - **Apps**: `{app}.dev.ployd.app`
 - **Wildcard Certificate**: `*.dev.ployd.app`
 

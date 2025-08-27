@@ -43,12 +43,12 @@ test_java_osv_builder_compilation() {
     run_test "Java OSV builder compilation"
     
     # Test that the Java OSV builder compiles without errors
-    if go build -o /tmp/test-java-osv ./controller/builders/java_osv.go 2>/dev/null; then
+    if go build -o /tmp/test-java-osv ./api/builders/java_osv.go 2>/dev/null; then
         success "Java OSV builder compiles successfully"
     else
         error "Java OSV builder failed to compile"
         # Show compilation errors
-        go build -o /tmp/test-java-osv ./controller/builders/java_osv.go 2>&1 || true
+        go build -o /tmp/test-java-osv ./api/builders/java_osv.go 2>&1 || true
     fi
     
     # Clean up test binary
@@ -59,11 +59,11 @@ test_java_osv_builder_syntax() {
     run_test "Java OSV builder syntax validation"
     
     # Use go vet to check for potential issues
-    if go vet ./controller/builders/java_osv.go 2>/dev/null; then
+    if go vet ./api/builders/java_osv.go 2>/dev/null; then
         success "Java OSV builder passes go vet checks"
     else
         warning "Java OSV builder has potential issues detected by go vet"
-        go vet ./controller/builders/java_osv.go 2>&1 || true
+        go vet ./api/builders/java_osv.go 2>&1 || true
     fi
 }
 
@@ -71,19 +71,19 @@ test_java_version_detection_function_signatures() {
     run_test "Java version detection function signatures"
     
     # Check that the version detection functions have correct signatures
-    if grep -q "func detectJavaVersion.*string.*error" controller/builders/java_osv.go; then
+    if grep -q "func detectJavaVersion.*string.*error" api/builders/java_osv.go; then
         success "detectJavaVersion function signature is correct"
     else
         error "detectJavaVersion function signature is missing or incorrect"
     fi
     
-    if grep -q "func detectJavaVersionFromGradle.*string" controller/builders/java_osv.go; then
+    if grep -q "func detectJavaVersionFromGradle.*string" api/builders/java_osv.go; then
         success "detectJavaVersionFromGradle function signature is correct"
     else
         error "detectJavaVersionFromGradle function signature is missing or incorrect"
     fi
     
-    if grep -q "func detectJavaVersionFromMaven.*string" controller/builders/java_osv.go; then
+    if grep -q "func detectJavaVersionFromMaven.*string" api/builders/java_osv.go; then
         success "detectJavaVersionFromMaven function signature is correct"
     else
         error "detectJavaVersionFromMaven function signature is missing or incorrect"
@@ -94,25 +94,25 @@ test_java_version_patterns() {
     run_test "Java version regex patterns"
     
     # Check that comprehensive regex patterns are present
-    if grep -q "JavaLanguageVersion\\\\\.of" controller/builders/java_osv.go; then
+    if grep -q "JavaLanguageVersion\\\\\.of" api/builders/java_osv.go; then
         success "JavaLanguageVersion.of pattern is present"
     else
         error "JavaLanguageVersion.of pattern is missing"
     fi
     
-    if grep -q "sourceCompatibility" controller/builders/java_osv.go; then
+    if grep -q "sourceCompatibility" api/builders/java_osv.go; then
         success "sourceCompatibility pattern is present"
     else
         error "sourceCompatibility pattern is missing"
     fi
     
-    if grep -q "maven\\\\.compiler\\\\.source" controller/builders/java_osv.go; then
+    if grep -q "maven\\\\.compiler\\\\.source" api/builders/java_osv.go; then
         success "maven.compiler.source pattern is present"
     else
         error "maven.compiler.source pattern is missing"
     fi
     
-    if grep -q "java\\\\.version" controller/builders/java_osv.go; then
+    if grep -q "java\\\\.version" api/builders/java_osv.go; then
         success "java.version pattern is present"
     else
         error "java.version pattern is missing"
@@ -123,13 +123,13 @@ test_java_version_fallback() {
     run_test "Java version fallback mechanism"
     
     # Check that default version is properly set
-    if grep -q 'javaVersion = "21"' controller/builders/java_osv.go; then
+    if grep -q 'javaVersion = "21"' api/builders/java_osv.go; then
         success "Default Java version (21) fallback is present"
     else
         error "Default Java version fallback is missing or incorrect"
     fi
     
-    if grep -q "Java version detection failed, using default" controller/builders/java_osv.go; then
+    if grep -q "Java version detection failed, using default" api/builders/java_osv.go; then
         success "Fallback logging message is present"
     else
         warning "Fallback logging message may be missing"
@@ -139,13 +139,13 @@ test_java_version_fallback() {
 test_java_osv_request_structure() {
     run_test "JavaOSVRequest structure includes JavaVersion field"
     
-    if grep -q "JavaVersion.*string" controller/builders/java_osv.go; then
+    if grep -q "JavaVersion.*string" api/builders/java_osv.go; then
         success "JavaVersion field is present in JavaOSVRequest struct"
     else
         error "JavaVersion field is missing from JavaOSVRequest struct"
     fi
     
-    if grep -q "detected Java version" controller/builders/java_osv.go; then
+    if grep -q "detected Java version" api/builders/java_osv.go; then
         success "Java version detection comment is present"
     else
         warning "Java version detection comment may be missing"
@@ -156,13 +156,13 @@ test_build_script_integration() {
     run_test "Build script integration with Java version"
     
     # Check that Java version is passed to build script
-    if grep -q -- "--java-version.*javaVersion" controller/builders/java_osv.go; then
+    if grep -q -- "--java-version.*javaVersion" api/builders/java_osv.go; then
         success "Java version is passed to build script"
     else
         error "Java version parameter is not passed to build script"
     fi
     
-    if grep -q "Detected Java version:" controller/builders/java_osv.go; then
+    if grep -q "Detected Java version:" api/builders/java_osv.go; then
         success "Java version detection logging is present"
     else
         warning "Java version detection logging may be missing"
@@ -211,19 +211,19 @@ test_error_handling_patterns() {
     run_test "Error handling patterns in Java version detection"
     
     # Check for proper error handling
-    if grep -q "Java version not detected" controller/builders/java_osv.go; then
+    if grep -q "Java version not detected" api/builders/java_osv.go; then
         success "Java version detection error message is present"
     else
         warning "Java version detection error message may be missing"
     fi
     
-    if grep -q "reasonable range" controller/builders/java_osv.go; then
+    if grep -q "reasonable range" api/builders/java_osv.go; then
         success "Java version validation range check is present"
     else
         warning "Java version validation range check may be missing"
     fi
     
-    if grep -q "majorVersion >= 8 && majorVersion <= 25" controller/builders/java_osv.go; then
+    if grep -q "majorVersion >= 8 && majorVersion <= 25" api/builders/java_osv.go; then
         success "Java version range validation (8-25) is correct"
     else
         warning "Java version range validation may be incorrect"
@@ -256,8 +256,8 @@ test_existing_sample_app_compatibility() {
 }
 
 check_java_osv_builder_exists() {
-    if [[ ! -f "controller/builders/java_osv.go" ]]; then
-        error "Java OSV builder file not found at controller/builders/java_osv.go"
+    if [[ ! -f "api/builders/java_osv.go" ]]; then
+        error "Java OSV builder file not found at api/builders/java_osv.go"
         exit 1
     fi
     

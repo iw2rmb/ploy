@@ -35,7 +35,7 @@ test_info() {
 # Check if controller is running
 check_controller() {
     test_info "Checking if controller is running..."
-    if ! curl -s https://api.dev.ployd.app/v1/apps > /dev/null; then
+    if ! curl -s https://api.dev.ployman.app/v1/apps > /dev/null; then
         test_failed "Controller not running on port 8081. Start it first."
     fi
     test_passed "Controller is running"
@@ -83,7 +83,7 @@ EOF
     
     # Test deployment (should pass with valid signature/SBOM)
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
+        "https://api.dev.ployman.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -154,7 +154,7 @@ test_production_ssh_policy() {
     
     # Test debug build in production environment
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/test-app/debug?env=prod&break_glass=false" \
+        "https://api.dev.ployman.app/v1/apps/test-app/debug?env=prod&break_glass=false" \
         -H "Content-Type: application/json" \
         -d '{"ssh_enabled": true}')
     

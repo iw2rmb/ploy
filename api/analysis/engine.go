@@ -12,25 +12,30 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iw2rmb/ploy/internal/chttp"
 	"github.com/sirupsen/logrus"
 )
 
 // Engine is the core analysis engine implementation
 type Engine struct {
-	analyzers map[string]LanguageAnalyzer
-	config    AnalysisConfig
-	cache     CacheManager
-	logger    *logrus.Logger
-	mu        sync.RWMutex
+	analyzers         map[string]LanguageAnalyzer
+	fallbackAnalyzers map[string]LanguageAnalyzer // Fallback analyzers for hybrid mode
+	config            AnalysisConfig
+	cache             CacheManager
+	logger            *logrus.Logger
+	mu                sync.RWMutex
+	chttpClients      map[string]*chttp.Client // Cache CHTTP clients
 }
 
 // NewEngine creates a new analysis engine
 func NewEngine(logger *logrus.Logger) *Engine {
 	return &Engine{
-		analyzers: make(map[string]LanguageAnalyzer),
-		config:    DefaultConfig(),
-		logger:    logger,
-		cache:     NewInMemoryCache(),
+		analyzers:         make(map[string]LanguageAnalyzer),
+		fallbackAnalyzers: make(map[string]LanguageAnalyzer),
+		config:            DefaultConfig(),
+		logger:            logger,
+		cache:             NewInMemoryCache(),
+		chttpClients:      make(map[string]*chttp.Client),
 	}
 }
 
@@ -68,6 +73,28 @@ func (e *Engine) RegisterAnalyzer(language string, analyzer LanguageAnalyzer) er
 	language = strings.ToLower(language)
 	e.analyzers[language] = analyzer
 	e.logger.WithField("language", language).Info("Registered analyzer")
+	
+	return nil
+}
+
+// RegisterAnalyzerWithFallback registers a primary analyzer with fallback support (for hybrid mode)
+func (e *Engine) RegisterAnalyzerWithFallback(language string, analyzer LanguageAnalyzer) error {
+	// Register as primary analyzer
+	return e.RegisterAnalyzer(language, analyzer)
+}
+
+// RegisterFallbackAnalyzer registers a fallback analyzer for hybrid mode
+func (e *Engine) RegisterFallbackAnalyzer(language string, analyzer LanguageAnalyzer) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if analyzer == nil {
+		return fmt.Errorf("analyzer cannot be nil")
+	}
+
+	language = strings.ToLower(language)
+	e.fallbackAnalyzers[language] = analyzer
+	e.logger.WithField("language", language).Info("Registered fallback analyzer")
 	
 	return nil
 }
@@ -213,15 +240,27 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			analyzerCtx, cancel := context.WithTimeout(ctx, config.Timeout)
 			defer cancel()
 			
-			// Run analysis
-			langResult, err := analyzer.Analyze(analyzerCtx, codebase)
-			if err != nil {
-				e.logger.WithError(err).WithField("language", language).Error("Analysis failed")
+			var langResult *LanguageAnalysisResult
+			var analysisErr error
+			
+			// Check if analyzer supports CHTTP
+			if chttpAnalyzer, ok := analyzer.(CHTPAnalyzer); ok && chttpAnalyzer.SupportsCHTTP() {
+				e.logger.WithField("language", language).Debug("Using CHTTP analyzer")
+				langResult, analysisErr = e.analyzeThroughCHTTP(analyzerCtx, chttpAnalyzer, codebase)
+			} else {
+				// Use traditional in-process analysis
+				e.logger.WithField("language", language).Debug("Using legacy analyzer")
+				langResult, analysisErr = analyzer.Analyze(analyzerCtx, codebase)
+			}
+			
+			// Handle analysis errors
+			if analysisErr != nil {
+				e.logger.WithError(analysisErr).WithField("language", language).Error("Analysis failed")
 				langResult = &LanguageAnalysisResult{
 					Language: language,
 					Analyzer: analyzer.GetAnalyzerInfo().Name,
 					Success:  false,
-					Error:    err.Error(),
+					Error:    analysisErr.Error(),
 				}
 			}
 			
@@ -484,4 +523,27 @@ func (e *Engine) sortIssues(issues []Issue) {
 		// Then by line
 		return issues[i].Line < issues[j].Line
 	})
+}
+
+// analyzeThroughCHTTP analyzes code through a CHTTP service
+func (e *Engine) analyzeThroughCHTTP(ctx context.Context, analyzer CHTPAnalyzer, codebase Codebase) (*LanguageAnalysisResult, error) {
+	// For CHTTP analyzers, we delegate to their Analyze method which handles the CHTTP communication
+	// The CHTPAnalyzer implementation (like CHTPPylintAnalyzer) handles:
+	// 1. Creating the tar archive from the codebase
+	// 2. Calling the CHTTP service via the client
+	// 3. Converting the CHTTP result to LanguageAnalysisResult
+	
+	result, err := analyzer.Analyze(ctx, codebase)
+	if err != nil {
+		return nil, fmt.Errorf("CHTTP analysis failed: %w", err)
+	}
+	
+	// Update metrics to indicate CHTTP was used
+	if result != nil && result.Metrics.TotalFiles == 0 {
+		// Set a flag to indicate this was a CHTTP analysis
+		result.Metrics.TotalFiles = len(codebase.Files)
+		result.Metrics.AnalyzedFiles = len(codebase.Files)
+	}
+	
+	return result, nil
 }

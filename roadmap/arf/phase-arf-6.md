@@ -72,7 +72,7 @@ Current manual resolution requires:
 #### 1. Dependency Graph Analysis System
 
 ```go
-// controller/arf/dependency_resolver.go
+// api/arf/dependency_resolver.go
 type DependencyResolver interface {
     AnalyzeDependencyGraph(ctx context.Context, project Project) (*DependencyGraph, error)
     DetectConflicts(ctx context.Context, graph *DependencyGraph) ([]DependencyConflict, error)
@@ -99,7 +99,7 @@ type DependencyConflict struct {
 #### 2. Minimal Reproduction Generator
 
 ```go
-// controller/arf/minimal_repro.go
+// api/arf/minimal_repro.go
 type MinimalReproGenerator interface {
     ExtractRelevantCode(ctx context.Context, issue DependencyIssue) (*CodeSubset, error)
     CreateMinimalProject(ctx context.Context, subset *CodeSubset) (*MinimalProject, error)
@@ -127,7 +127,7 @@ type MinimalProject struct {
 #### 1. Web Search Integration
 
 ```go
-// controller/arf/web_intelligence.go
+// api/arf/web_intelligence.go
 type WebIntelligence interface {
     SearchStackOverflow(ctx context.Context, error DependencyError) ([]Solution, error)
     SearchGitHubIssues(ctx context.Context, error DependencyError) ([]IssueResolution, error)
@@ -148,7 +148,7 @@ type Solution struct {
 #### 2. Knowledge Base Implementation
 
 ```go
-// controller/arf/dependency_knowledge_base.go
+// api/arf/dependency_knowledge_base.go
 type DependencyKnowledgeBase interface {
     StoreResolution(ctx context.Context, resolution ResolutionRecord) error
     FindSimilarIssues(ctx context.Context, issue DependencyIssue) ([]ResolutionRecord, error)
@@ -178,7 +178,7 @@ type ResolutionRecord struct {
 #### 1. Iterative Version Resolver
 
 ```go
-// controller/arf/version_resolver.go
+// api/arf/version_resolver.go
 type VersionResolver interface {
     BinarySearchVersion(ctx context.Context, dep Dependency, validator Validator) (*Version, error)
     ParallelTestStrategies(ctx context.Context, strategies []ResolutionStrategy) (*BestStrategy, error)
@@ -199,7 +199,7 @@ type ResolutionStrategy struct {
 #### 2. A/B Testing Framework
 
 ```go
-// controller/arf/dependency_ab_testing.go
+// api/arf/dependency_ab_testing.go
 type DependencyABTester interface {
     CreateTestVariants(ctx context.Context, base MinimalProject, strategies []ResolutionStrategy) ([]TestVariant, error)
     ExecuteParallelTests(ctx context.Context, variants []TestVariant) ([]TestResult, error)

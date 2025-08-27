@@ -17,15 +17,25 @@ Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu V
 **Prerequisites:** Ubuntu 20.04+, 8GB RAM, 4 CPU, 80GB storage, SSH access, Ansible 2.9+
 
 ```bash
-# Configure and deploy
+# 1. Set required environment variables (CRITICAL)
+export NAMECHEAP_API_KEY="your-api-key"
+export NAMECHEAP_API_USER="your-username"
+export NAMECHEAP_USERNAME="your-username"  
+export NAMECHEAP_CLIENT_IP="your-vps-ip"
 export TARGET_HOST=your-vps-ip
+
+# 2. Validate prerequisites (RECOMMENDED)
 cd iac/dev
+./scripts/validate-deployment.sh
+
+# 3. Deploy infrastructure (FULLY AUTOMATED)
 ansible-playbook site.yml -e target_host=$TARGET_HOST
 
-# Test deployment
-ssh root@$TARGET_HOST
-su - ploy -c "./tests/scripts/test-traefik-integration.sh"
+# 4. Verify deployment
+ssh root@$TARGET_HOST "curl -s http://localhost:8081/health | jq .status"
 ```
+
+⚠️ **IMPORTANT**: Run `./scripts/validate-deployment.sh` to check all prerequisites before deployment.
 
 ## Architecture
 
@@ -99,18 +109,23 @@ iac/
 export PLOY_APPS_DOMAIN="ployd.app"              # Your platform domain
 export PLOY_APPS_DOMAIN_PROVIDER="namecheap"     # DNS provider (namecheap or cloudflare)
 
-# Namecheap configuration
-export NAMECHEAP_API_KEY="your-api-key"          # Production API key
-export NAMECHEAP_SANDBOX_API_KEY="sandbox-key"   # Sandbox API key for testing
-export NAMECHEAP_API_USER="your-username"        # Namecheap username
-export NAMECHEAP_USERNAME="your-username"        # Same as API user
-export NAMECHEAP_CLIENT_IP="vps-ip-address"      # Your VPS IP address
-export NAMECHEAP_SANDBOX="true"                  # Use sandbox for testing
+# REQUIRED: Namecheap configuration for SSL certificate automation
+export NAMECHEAP_API_KEY="your-api-key"          # Production API key (REQUIRED)
+export NAMECHEAP_API_USER="your-username"        # Namecheap username (REQUIRED)
+export NAMECHEAP_USERNAME="your-username"        # Same as API user (REQUIRED)
+export NAMECHEAP_CLIENT_IP="vps-ip-address"      # Your VPS IP address (REQUIRED)
+export NAMECHEAP_SANDBOX="false"                 # Use sandbox for testing (set to "true" for testing)
 
-# CloudFlare configuration (alternative)
+# Optional: GitHub credentials for private repository access
+export GITHUB_PLOY_DEV_USERNAME="your-github-username"
+export GITHUB_PLOY_DEV_PAT="your-github-token"
+
+# CloudFlare configuration (alternative to Namecheap)
 export CLOUDFLARE_API_TOKEN="your-token"
 export CLOUDFLARE_ZONE_ID="your-zone-id"
 ```
+
+⚠️ **CRITICAL**: The Namecheap environment variables are REQUIRED for SSL certificate automation. The playbook will fail if they are not set.
 
 ### Platform Certificate Features
 

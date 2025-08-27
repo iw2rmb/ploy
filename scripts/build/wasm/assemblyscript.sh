@@ -1,6 +1,6 @@
 #!/bin/bash
 # AssemblyScript WebAssembly build script
-# This script is used as a reference - actual builds use the integrated builder in controller/builders/wasm.go
+# This script is used as a reference - actual builds use the integrated builder in api/builders/wasm.go
 
 set -euo pipefail
 

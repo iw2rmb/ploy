@@ -70,7 +70,7 @@ Manual testing requires:
 #### 1. Benchmark Suite Engine
 
 ```go
-// controller/arf/benchmark_suite.go
+// api/arf/benchmark_suite.go
 package arf
 
 import (
@@ -156,7 +156,7 @@ type TestResult struct {
 #### 2. Self-Healing Iteration Tracker
 
 ```go
-// controller/arf/iteration_tracker.go
+// api/arf/iteration_tracker.go
 type IterationTracker interface {
     StartIteration(ctx context.Context, iteration int) (*IterationContext, error)
     RecordStage(ctx context.Context, stage StageMetrics) error
@@ -181,7 +181,7 @@ type SelfHealingContext struct {
 #### 1. LLM Provider Interface
 
 ```go
-// controller/arf/llm_provider.go
+// api/arf/llm_provider.go
 type LLMProvider interface {
     GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error)
     ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*ValidationResult, error)
@@ -218,7 +218,7 @@ type CostEstimate struct {
 #### 2. Ollama Provider Implementation
 
 ```go
-// controller/arf/ollama_provider.go
+// api/arf/ollama_provider.go
 type OllamaProvider struct {
     baseURL         string
     model           string
@@ -288,7 +288,7 @@ func (o *OllamaProvider) EstimateCost(tokens TokenUsage) CostEstimate {
 #### 3. Provider Factory
 
 ```go
-// controller/arf/llm_provider_factory.go
+// api/arf/llm_provider_factory.go
 type LLMProviderFactory struct {
     configs map[string]ProviderConfig
 }
@@ -314,7 +314,7 @@ func (f *LLMProviderFactory) CreateProvider(providerType string, config map[stri
 #### 4. Auto Model Management
 
 ```go
-// controller/arf/model_manager.go
+// api/arf/model_manager.go
 type ModelManager interface {
     EnsureModelAvailable(ctx context.Context, provider, model string) error
     DownloadModel(ctx context.Context, provider, model string) error
@@ -440,7 +440,7 @@ func (s *BenchmarkSuite) runIteration(ctx context.Context, config *BenchmarkConf
 #### 1. Benchmark Report Generator
 
 ```go
-// controller/arf/benchmark_report.go
+// api/arf/benchmark_report.go
 type BenchmarkReportGenerator interface {
     GenerateReport(ctx context.Context, result TestResult, format ReportFormat) (*Report, error)
     GenerateComparison(ctx context.Context, results []TestResult, format ReportFormat) (*ComparisonReport, error)
@@ -498,7 +498,7 @@ type PerformanceMetrics struct {
 #### 2. HTML Report Template
 
 ```go
-// controller/arf/report_templates.go
+// api/arf/report_templates.go
 const htmlReportTemplate = `
 <!DOCTYPE html>
 <html>

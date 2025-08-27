@@ -37,7 +37,7 @@ Project           Algorithm      Generation      (Nomad Job)
 
 ### Component Breakdown
 1. **Detection Engine**: `tools/lane-pick/` WASM detection logic
-2. **Build Pipeline**: `controller/builders/wasm.go` with multi-language support
+2. **Build Pipeline**: `api/builders/wasm.go` with multi-language support
 3. **Runtime Integration**: wazero-based execution environment
 4. **Deployment**: Nomad job templates with WASI support
 5. **Security**: OPA policies for WASM-specific constraints
@@ -100,11 +100,11 @@ func detectWASM(root string) (bool, []string) {
 ---
 
 ### Task 1.2: wazero Runtime Integration
-**Files**: `controller/runtime/wasm.go` (new), `go.mod`
+**Files**: `api/runtime/wasm.go` (new), `go.mod`
 
 **Implementation Approach**:
 ```go
-// controller/runtime/wasm.go
+// api/runtime/wasm.go
 package runtime
 
 import (
@@ -180,11 +180,11 @@ func (w *WASMRuntime) ExecuteModule(ctx context.Context, wasmBytes []byte, args 
 ---
 
 ### Task 1.3: WASM Builder Implementation
-**Files**: `controller/builders/wasm.go` (new)
+**Files**: `api/builders/wasm.go` (new)
 
 **Architecture**:
 ```go
-// controller/builders/wasm.go
+// api/builders/wasm.go
 package builders
 
 import (
@@ -554,7 +554,7 @@ import (
     "os"
     "time"
     
-    "github.com/iw2rmb/ploy/controller/runtime"
+    "github.com/iw2rmb/ploy/api/runtime"
 )
 
 func main() {
@@ -613,11 +613,11 @@ func main() {
 ---
 
 ### Task 2.2: WASI Support Implementation
-**Files**: `controller/runtime/wasi.go` (new)
+**Files**: `api/runtime/wasi.go` (new)
 
 **WASI Preview 1 Implementation**:
 ```go
-// controller/runtime/wasi.go
+// api/runtime/wasi.go
 package runtime
 
 import (
@@ -809,7 +809,7 @@ basic_wasm_validation if {
 }
 ```
 
-**Policy Integration** in `controller/policies/enforcer.go`:
+**Policy Integration** in `api/policies/enforcer.go`:
 ```go
 func (e *PolicyEnforcer) ValidateWASMDeployment(req *DeploymentRequest) error {
     if req.Lane != "G" {
@@ -850,11 +850,11 @@ func (e *PolicyEnforcer) ValidateWASMDeployment(req *DeploymentRequest) error {
 ---
 
 ### Task 2.4: Component Model Integration
-**Files**: `controller/wasm/components.go` (new)
+**Files**: `api/wasm/components.go` (new)
 
 **WebAssembly Component Model Support**:
 ```go
-// controller/wasm/components.go
+// api/wasm/components.go
 package wasm
 
 import (
@@ -1220,7 +1220,7 @@ echo "All WASM detection tests passed!"
 ## Testing & Validation Strategy
 
 ### Unit Testing
-**Files**: `controller/runtime/wasm_test.go`, `controller/builders/wasm_test.go`
+**Files**: `api/runtime/wasm_test.go`, `api/builders/wasm_test.go`
 
 **Test Coverage**:
 - WASM module loading and validation

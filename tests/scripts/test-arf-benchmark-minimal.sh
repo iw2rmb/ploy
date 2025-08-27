@@ -88,7 +88,7 @@ mkdir -p benchmark_results/minimal_test
 
 # Run the test
 ./build/arf-benchmark \
-    -config controller/arf/benchmark_configs/minimal_test.yaml \
+    -config api/arf/benchmark_configs/minimal_test.yaml \
     -output benchmark_results/minimal_test \
     -verbose
 

@@ -249,7 +249,7 @@ ansible-playbook site.yml -i inventory/hosts.yml
 **Platform Health**:
 ```bash
 # Controller API endpoints
-curl -s https://api.dev.ployd.app/health | jq .
+curl -s https://api.dev.ployman.app/health | jq .
 curl -s https://api.ployd.app/health | jq .
 
 # Storage cluster status
@@ -263,7 +263,7 @@ consul members
 **Certificate Monitoring**:
 ```bash
 # Certificate expiration tracking
-curl -s https://api.dev.ployd.app/health/platform-certificates | jq .
+curl -s https://api.dev.ployman.app/health/platform-certificates | jq .
 
 # Manual certificate renewal
 lego --dns=namecheap --domains='*.dev.ployd.app' renew
