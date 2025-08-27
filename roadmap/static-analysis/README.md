@@ -205,4 +205,4 @@ static_analysis:
 - [ARF Roadmap](../arf/) - Automated Remediation Framework integration
 - [FEATURES.md](../docs/FEATURES.md) - Current platform capabilities
 - [STACK.md](../docs/STACK.md) - Technology stack and dependencies
-- [controller/README.md](../controller/README.md) - REST API integration points
+- [api/README.md](../api/README.md) - REST API integration points

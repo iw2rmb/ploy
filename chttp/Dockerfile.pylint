@@ -1,0 +1,61 @@
+# Multi-stage build for Pylint CHTTP Service
+# Target: 25-35MB container footprint with security isolation
+
+# Stage 1: Build Pylint and CHTTP binary
+FROM python:3.11-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    linux-headers \
+    git
+
+# Install Pylint with specific version for consistency
+RUN pip install --user --no-cache-dir \
+    pylint==3.0.0 \
+    setuptools \
+    wheel
+
+# Build CHTTP binary
+WORKDIR /build
+COPY go.mod go.sum ./
+COPY cmd/ cmd/
+COPY internal/ internal/
+COPY configs/ configs/
+
+# Install Go and build the binary
+RUN apk add --no-cache go
+ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+RUN go mod download
+RUN go build -ldflags="-w -s" -o pylint-chttp ./cmd/pylint-chttp
+
+# Stage 2: Runtime container with minimal footprint
+FROM gcr.io/distroless/python3-debian11
+
+# Copy Pylint installation from builder
+COPY --from=builder /root/.local /usr/local
+
+# Copy CHTTP binary and configuration
+COPY --from=builder /build/pylint-chttp /usr/local/bin/pylint-chttp
+COPY --from=builder /build/configs/pylint-chttp-config.yaml /etc/chttp/config.yaml
+
+# Create non-root user directories
+USER 1000:1000
+WORKDIR /tmp
+
+# Health check for container orchestration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD ["/usr/local/bin/pylint-chttp", "--health-check"] || exit 1
+
+# Expose service port
+EXPOSE 8080
+
+# Set environment variables
+ENV CHTTP_CONFIG_PATH=/etc/chttp/config.yaml
+ENV CHTTP_SERVICE_NAME=pylint-chttp
+ENV CHTTP_LOG_LEVEL=info
+
+# Run Pylint CHTTP service
+ENTRYPOINT ["/usr/local/bin/pylint-chttp"]
+CMD ["--config", "/etc/chttp/config.yaml"]

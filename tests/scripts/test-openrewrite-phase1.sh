@@ -25,7 +25,7 @@ NC='\033[0m' # No Color
 OPENREWRITE_IMAGE="openrewrite-service:mvp"
 OPENREWRITE_PORT="8090"
 OPENREWRITE_CONTAINER="openrewrite-phase1-test"
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 PHASE1_TIMEOUT=300  # 5 minutes per project
 TEST_START_TIME=$(date +%s)
 

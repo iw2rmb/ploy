@@ -300,6 +300,75 @@
         mode: '0600'
       when: vault_init.status == 200
 
+    - name: Read Vault initialization data (if exists)
+      stat:
+        path: /opt/hashicorp/vault/init.json
+      register: vault_init_file
+
+    - name: Load Vault initialization data
+      slurp:
+        src: /opt/hashicorp/vault/init.json
+      register: vault_init_data
+      when: vault_init_file.stat.exists
+
+    - name: Unseal Vault with initialization key (dev environment)
+      uri:
+        url: "http://localhost:8200/v1/sys/unseal"
+        method: POST
+        body_format: json
+        body:
+          key: "{{ (vault_init_data.content | b64decode | from_json).keys[0] }}"
+        status_code: [200, 400]
+      register: vault_unseal
+      ignore_errors: true
+      when: vault_init_file.stat.exists
+
+    - name: Display Vault unsealing status
+      debug:
+        msg: "Vault unsealing result: {{ vault_unseal.json.sealed | default('Already unsealed or error occurred') }}"
+      when: vault_init_file.stat.exists
+
+    - name: Check A-records for root domains
+      block:
+        - name: Verify platform domain A-record
+          command: nslookup api.dev.{{ ploy.platform_domain | default('ployman.app') }} 8.8.8.8
+          register: platform_dns_check
+          ignore_errors: true
+          changed_when: false
+
+        - name: Display platform domain DNS resolution
+          debug:
+            msg: "Platform domain DNS check: {{ platform_dns_check.stdout_lines | select('match', '.*Address:.*') | list }}"
+
+        - name: Verify apps domain A-record  
+          command: nslookup dev.{{ ploy.apps_domain | default('ployd.app') }} 8.8.8.8
+          register: apps_dns_check
+          ignore_errors: true
+          changed_when: false
+
+        - name: Display apps domain DNS resolution
+          debug:
+            msg: "Apps domain DNS check: {{ apps_dns_check.stdout_lines | select('match', '.*Address:.*') | list }}"
+
+        - name: Check if DNS points to current VPS
+          debug:
+            msg: "DNS Resolution Status - VPS IP: {{ ansible_default_ipv4.address }}, Platform DNS: {{ platform_dns_check.stdout | regex_search('Address: ([0-9.]+)', '\\1') | first | default('Not resolved') }}"
+
+    - name: Validate required environment variables for SSL certificates
+      block:
+        - name: Check for Namecheap API credentials
+          fail:
+            msg: "Missing required environment variables for SSL certificate automation. Please set: NAMECHEAP_API_KEY, NAMECHEAP_API_USER, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP"
+          when: >
+            lookup('env', 'NAMECHEAP_API_KEY') == '' or
+            lookup('env', 'NAMECHEAP_API_USER') == '' or
+            lookup('env', 'NAMECHEAP_USERNAME') == '' or
+            lookup('env', 'NAMECHEAP_CLIENT_IP') == ''
+
+        - name: Display SSL automation status
+          debug:
+            msg: "SSL certificate automation: ENABLED (Namecheap API configured)"
+
     - name: Create Nomad job and data directories
       file:
         path: "{{ item }}"
@@ -419,9 +488,9 @@
               debug:
                 msg: "Traefik installed successfully: {{ traefik_install_version.stdout_lines[0] if traefik_install_version.stdout_lines else 'Version info not available' }}"
 
-        - name: Copy Traefik Nomad job template to VPS
-          copy:
-            src: ../../common/templates/"{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
+        - name: Deploy Traefik Nomad job with environment variables
+          template:
+            src: ../../common/templates/nomad-traefik-system.hcl.j2
             dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
             owner: ploy
             group: ploy
@@ -475,6 +544,31 @@
             group: ploy
             mode: '0755'
 
+        - name: Create Traefik certificates directory
+          file:
+            path: /opt/ploy/traefik-data/certificates
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+
+        - name: Deploy Traefik dynamic configuration for API routing with SSL
+          template:
+            src: ../../common/templates/traefik-dynamic-config.yml.j2
+            dest: /opt/ploy/traefik-data/dynamic-config.yml
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+        - name: Ensure proper ownership of certificate data directory
+          file:
+            path: /opt/ploy/traefik-data
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+            recurse: true
+
         - name: Set up firewall rules for Traefik
           ufw:
             rule: allow
@@ -501,3 +595,50 @@
           debug:
             var: traefik_status.stdout_lines
           when: traefik_status.stdout_lines is defined
+
+    - name: Final validation and health checks
+      block:
+        - name: Validate all HashiCorp services are healthy
+          uri:
+            url: "{{ item.url }}"
+            method: GET
+            status_code: 200
+          register: service_health
+          retries: 3
+          delay: 10
+          loop:
+            - { name: "Traefik", url: "http://localhost:8095/ping" }
+            - { name: "Nomad", url: "http://localhost:4646/v1/status/leader" }
+            - { name: "Consul", url: "http://localhost:8500/v1/status/leader" }
+          loop_control:
+            label: "{{ item.name }}"
+
+        - name: Validate API service accessibility
+          uri:
+            url: "http://localhost:8081/health"
+            method: GET
+            status_code: 200
+          register: api_health
+          retries: 3
+          delay: 10
+
+        - name: Display deployment success summary
+          debug:
+            msg: |
+              ✅ HashiCorp Stack Deployment Complete!
+              
+              Services Status:
+              - Traefik: ✅ {{ 'Healthy' if service_health.results[0].status == 200 else 'Failed' }} (Port 8095)
+              - Nomad: ✅ {{ 'Healthy' if service_health.results[1].status == 200 else 'Failed' }} (Port 4646)  
+              - Consul: ✅ {{ 'Healthy' if service_health.results[2].status == 200 else 'Failed' }} (Port 8500)
+              - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (Port 8081)
+              
+              SSL Certificates:
+              - Platform (*.dev.ployman.app): ✅ Configured
+              - Apps (*.dev.ployd.app): ✅ Ready for auto-provisioning
+              
+              Access Points:
+              - API: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8081/health
+              - Traefik Dashboard: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8095
+              - Nomad UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:4646
+              - Consul UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8500

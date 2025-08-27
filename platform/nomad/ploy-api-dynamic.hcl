@@ -44,7 +44,7 @@ job "ploy-api" {
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-api-dynamic.rule=Host(`api.dev.ployd.app`) || Host(`api.ployd.app`)",
+        "traefik.http.routers.ploy-api-dynamic.rule=Host(`api.dev.ployman.app`) || Host(`api.ployd.app`)",
         "traefik.http.routers.ploy-api-dynamic.tls=true",
         "traefik.http.routers.ploy-api-dynamic.tls.certresolver=dev-wildcard",
         "traefik.http.routers.ploy-api-dynamic.tls.domains[0].main=dev.ployd.app",

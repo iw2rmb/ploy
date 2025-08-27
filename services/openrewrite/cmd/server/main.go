@@ -3,10 +3,16 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/iw2rmb/ploy/services/openrewrite/internal/executor"
+	"github.com/iw2rmb/ploy/services/openrewrite/internal/handlers"
+	"github.com/iw2rmb/ploy/services/openrewrite/internal/jobs"
+	"github.com/iw2rmb/ploy/services/openrewrite/internal/storage"
 )
 
 func main() {
@@ -18,7 +24,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(recover.New())
 
-	// Initialize storage clients
+	// Get configuration from environment
 	consulAddr := os.Getenv("CONSUL_ADDRESS")
 	if consulAddr == "" {
 		consulAddr = "consul.service.consul:8500"
@@ -29,48 +35,53 @@ func main() {
 		seaweedAddr = "seaweedfs.service.consul:9333"
 	}
 
+	// Initialize components
+	log.Printf("Initializing storage clients...")
+	storageClient, err := storage.NewStorageClient(consulAddr, seaweedAddr)
+	if err != nil {
+		log.Fatalf("Failed to create storage client: %v", err)
+	}
+
+	log.Printf("Initializing executor...")
+	exec := executor.New()
+
+	log.Printf("Initializing job manager...")
+	jobManager := jobs.NewManager(exec, storageClient)
+
+	log.Printf("Initializing HTTP handlers...")
+	handler := handlers.New(exec, jobManager, storageClient)
+
 	// Register routes
 	api := app.Group("/v1/openrewrite")
 
-	// Health endpoints - simplified for now
-	api.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status": "healthy",
-			"version": "1.0.0",
-		})
-	})
-	api.Get("/ready", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"ready": true})
-	})
+	// Health endpoints
+	api.Get("/health", handler.Health)
+	api.Get("/ready", handler.Ready)
 
-	// Transform endpoint - placeholder
-	api.Post("/transform", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "Transform endpoint - to be implemented",
-		})
-	})
+	// Transform endpoint (synchronous)
+	api.Post("/transform", handler.Transform)
 
-	// Job endpoints - placeholders
-	api.Post("/jobs", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Create job - to be implemented"})
-	})
-	api.Get("/jobs/:id", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Get job - to be implemented"})
-	})
-	api.Get("/jobs/:id/status", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Get job status - to be implemented"})
-	})
-	api.Get("/jobs/:id/diff", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Get job diff - to be implemented"})
-	})
-	api.Delete("/jobs/:id", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Cancel job - to be implemented"})
-	})
+	// Job endpoints (asynchronous)
+	api.Post("/jobs", handler.CreateJob)
+	api.Get("/jobs/:id", handler.GetJob)
+	api.Get("/jobs/:id/status", handler.GetJobStatus)
+	api.Get("/jobs/:id/diff", handler.GetJobDiff)
+	api.Delete("/jobs/:id", handler.CancelJob)
 
 	// Metrics endpoint
-	api.Get("/metrics", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "Metrics - to be implemented"})
-	})
+	api.Get("/metrics", handler.Metrics)
+
+	// Setup graceful shutdown
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-c
+		log.Printf("Shutting down OpenRewrite Service...")
+		jobManager.Shutdown()
+		app.Shutdown()
+		os.Exit(0)
+	}()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -79,5 +90,9 @@ func main() {
 
 	log.Printf("OpenRewrite Service starting on port %s", port)
 	log.Printf("Consul: %s, SeaweedFS: %s", consulAddr, seaweedAddr)
-	log.Fatal(app.Listen(":" + port))
+	log.Printf("All components initialized successfully")
+	
+	if err := app.Listen(":" + port); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

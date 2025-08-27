@@ -6,7 +6,7 @@
 set -e
 
 echo "=== Testing Traefik Advanced Load Balancing Integration ==="
-echo "Base URL: ${PLOY_CONTROLLER:-https://api.dev.ployd.app}"
+echo "Base URL: ${PLOY_CONTROLLER:-https://api.dev.ployman.app}"
 echo
 
 # Test 1: Check Nomad has Traefik job
@@ -147,26 +147,26 @@ echo
 
 # Test 10: Check enhanced routing logic
 echo "📋 Test 10: Verify enhanced routing logic implementation"
-if [[ -f "controller/routing/traefik.go" ]]; then
+if [[ -f "api/routing/traefik.go" ]]; then
     echo "✅ PASS: Enhanced Traefik routing implementation exists"
     
-    if grep -q "ControllerRouteConfig" controller/routing/traefik.go; then
+    if grep -q "ControllerRouteConfig" api/routing/traefik.go; then
         echo "✅ PASS: ControllerRouteConfig method implemented"
     fi
     
-    if grep -q "RegisterController" controller/routing/traefik.go; then
+    if grep -q "RegisterController" api/routing/traefik.go; then
         echo "✅ PASS: RegisterController method implemented"
     fi
     
-    if grep -q "CircuitBreaker.*bool" controller/routing/traefik.go; then
+    if grep -q "CircuitBreaker.*bool" api/routing/traefik.go; then
         echo "✅ PASS: Circuit breaker support in RouteConfig"
     fi
     
-    if grep -q "StickySession.*bool" controller/routing/traefik.go; then
+    if grep -q "StickySession.*bool" api/routing/traefik.go; then
         echo "✅ PASS: Sticky session support in RouteConfig"
     fi
     
-    if grep -q "HealthCheckInterval" controller/routing/traefik.go; then
+    if grep -q "HealthCheckInterval" api/routing/traefik.go; then
         echo "✅ PASS: Configurable health check intervals"
     fi
 else

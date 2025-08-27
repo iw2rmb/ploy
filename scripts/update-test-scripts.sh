@@ -47,8 +47,8 @@ for script_path in "${scripts_to_update[@]}"; do
         s|CONTROLLER_URL=\${CONTROLLER_URL:-http://localhost:8081/v1}|# Dynamic controller endpoint based on environment\nPLOY_APPS_DOMAIN=\${PLOY_APPS_DOMAIN:-"ployd.app"}\nPLOY_ENVIRONMENT=\${PLOY_ENVIRONMENT:-"dev"}\n\nif [ "$PLOY_ENVIRONMENT" = "dev" ]; then\n    CONTROLLER_URL="\${CONTROLLER_URL:-https://api.dev.\${PLOY_APPS_DOMAIN}/v1}"\nelse\n    CONTROLLER_URL="\${CONTROLLER_URL:-https://api.\${PLOY_APPS_DOMAIN}/v1}"\nfi|g
         
         # Pattern 4: Simple localhost:8081 references (more complex, manual review recommended)
-        s|http://localhost:8081|https://api.dev.ployd.app|g
-        s|http://127\.0\.0\.1:8081|https://api.dev.ployd.app|g
+        s|http://localhost:8081|https://api.dev.ployman.app|g
+        s|http://127\.0\.0\.1:8081|https://api.dev.ployman.app|g
     ' "$script_path"
     
     # Remove the .tmp file created by sed -i

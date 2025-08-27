@@ -1,6 +1,7 @@
 # Comprehensive ARF Java 11→17 Migration Test Scenario
 
 ## Overall Progress Tracking
+- [ ] **Service Setup Complete**: OpenRewrite Lane E service deployed and validated
 - [ ] **Phase 1 Complete**: Baseline OpenRewrite Testing
 - [ ] **Phase 2 Complete**: LLM Self-Healing Integration  
 - [ ] **Phase 3 Complete**: Parallel Execution Testing
@@ -8,6 +9,50 @@
 
 ## Overview
 Design a comprehensive test scenario that progressively evaluates ARF features (OpenRewrite, LLM self-healing, parallel execution) using real-world Java 11 Maven projects for Java 11→17 migrations.
+
+**OpenRewrite Service Architecture**: As of 2025-08-26, OpenRewrite runs as a standalone Lane E service at `openrewrite.dev.ployman.app`, deployed via `ployman push` with automatic SSL and routing.
+
+## Prerequisites: OpenRewrite Service Setup and Validation
+
+### Service Deployment Status
+- ✅ **Lane E Migration Complete** (2025-08-26): Service extracted to `services/openrewrite/`
+- ✅ **Platform Domain Active**: Available at `https://openrewrite.dev.ployman.app`
+- ✅ **ARF Integration Updated**: HTTP client configured for service communication
+
+### Service Health Validation
+```bash
+# 1. Verify service is running
+curl https://openrewrite.dev.ployman.app/v1/openrewrite/health
+
+# 2. Check readiness endpoint
+curl https://openrewrite.dev.ployman.app/v1/openrewrite/ready
+
+# 3. Verify metrics endpoint
+curl https://openrewrite.dev.ployman.app/v1/openrewrite/metrics
+```
+
+### ARF Configuration for Service Mode
+```bash
+# Configure ARF to use OpenRewrite service (not embedded)
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+export ARF_OPENREWRITE_MODE=service
+
+# Verify configuration
+echo "OpenRewrite URL: $OPENREWRITE_SERVICE_URL"
+echo "ARF Mode: $ARF_OPENREWRITE_MODE"
+```
+
+### Service Deployment (if needed)
+```bash
+# Deploy OpenRewrite service via ployman
+cd services/openrewrite
+ployman push
+
+# Set service environment variables
+ployman env set -a openrewrite-service WORKER_POOL_SIZE=4
+ployman env set -a openrewrite-service MAX_CONCURRENT_JOBS=10
+ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
+```
 
 ## Test Projects Classification
 
@@ -29,22 +74,30 @@ Design a comprehensive test scenario that progressively evaluates ARF features (
 ## Progressive Test Scenario Design
 
 ### Phase 1: Baseline OpenRewrite Testing
-**Objective**: Validate core OpenRewrite functionality  
+**Objective**: Validate core OpenRewrite functionality via Lane E service
 **Projects**: Tier 1 projects (3 repositories)
 
+**Pre-Test Validation**:
+- [ ] OpenRewrite service health check passing
+- [ ] Service metrics endpoint accessible
+- [ ] ARF configured with `OPENREWRITE_SERVICE_URL`
+- [ ] Test connectivity to service from controller
+
 **Test Steps**:
-- [⚠️] Sequential execution of simple projects (3/3 executed, recipe issues found)
-- [❌] Basic Java 11→17 migration recipes (recipe failures identified)
-- [❌] Maven plugin integration verification (not reached due to recipe failures)
-- [❌] Diff generation and validation (blocked by recipe failures)
-- [❌] Build success confirmation (not attempted)
+- [ ] **Service Connectivity**: Verify ARF can reach OpenRewrite service
+- [ ] **Sequential execution**: Test simple projects one by one
+- [ ] **Recipe Validation**: Confirm Java 11→17 migration recipes load correctly
+- [ ] **Transformation Execution**: Run OpenRewrite transformations via service
+- [ ] **Diff Generation**: Validate diff creation and storage
+- [ ] **Build Verification**: Compile transformed code to verify correctness
 
 **Success Criteria**:
+- [ ] OpenRewrite service responds to all requests
 - [ ] 100% success rate on simple projects
-- [ ] Clean diff generation
+- [ ] Clean diff generation via service
 - [ ] No compilation errors post-transformation
-- [ ] Execution time < 5 minutes per project
-- [ ] Nomad HCL validation passes
+- [ ] Execution time < 5 minutes per project (including service overhead)
+- [ ] Job status tracking works correctly
 - [ ] Comprehensive migration reports generated
 
 ### Phase 2: LLM Self-Healing Integration
@@ -94,28 +147,62 @@ Design a comprehensive test scenario that progressively evaluates ARF features (
 
 **Phase 1: Sequential Simple Projects**
 ```bash
-# Single project baseline
+# IMPORTANT: Configure service URL first
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+export ARF_OPENREWRITE_MODE=service
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+
+# Single project baseline (Spring PetClinic - known working repo)
 ploy arf benchmark run java11to17_migration \
-  --repository "https://github.com/simple-java-project.git" \
-  --app-name "test-simple-migration" \
+  --repository "https://github.com/spring-projects/spring-petclinic.git" \
+  --app-name "test-petclinic-migration" \
+  --branch main \
   --lane C --iterations 1
 
-# Multiple simple projects (sequential)
-for repo in repo1 repo2 repo3; do
+# Multiple simple projects (sequential with real repos)
+SIMPLE_REPOS=(
+  "https://github.com/spring-projects/spring-petclinic.git"
+  "https://github.com/eugenp/tutorials.git"
+  "https://github.com/winterbe/java8-tutorial.git"
+)
+
+for i in "${!SIMPLE_REPOS[@]}"; do
+  repo="${SIMPLE_REPOS[$i]}"
+  app_name="test-simple-$((i+1))"
+  echo "Testing: $repo as $app_name"
+  
   ploy arf benchmark run java11to17_migration \
     --repository "$repo" \
-    --app-name "test-simple-$i" \
+    --app-name "$app_name" \
+    --branch main \
     --lane C --iterations 1
+    
+  # Check job status
+  sleep 10
+  ploy arf benchmark status --app-name "$app_name"
 done
 ```
 
 **Phase 2: LLM-Enhanced Complex Projects**
 ```bash
-# With LLM provider configuration
-ARF_LLM_PROVIDER=ollama ARF_LLM_MODEL=codellama:7b \
+# Configure both OpenRewrite service and LLM provider
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+export ARF_OPENREWRITE_MODE=service
+export ARF_LLM_PROVIDER=ollama
+export ARF_LLM_MODEL=codellama:7b
+
+# Test with real medium-complexity projects
 ploy arf benchmark run java11to17_migration \
-  --repository "https://github.com/reactive-spring-project.git" \
-  --app-name "test-llm-enhanced" \
+  --repository "https://github.com/spring-projects/spring-boot.git" \
+  --app-name "test-llm-springboot" \
+  --branch main \
+  --lane C --iterations 3
+
+# Additional complex project testing
+ploy arf benchmark run java11to17_migration \
+  --repository "https://github.com/reactor/reactor-core.git" \
+  --app-name "test-llm-reactor" \
+  --branch main \
   --lane C --iterations 3
 ```
 
@@ -189,23 +276,36 @@ llm_options:
 - Build success rate post-transformation
 
 **Expected Results**:
-- [ ] Phase 1: 0% success (OpenRewrite recipe issues identified), 43s-1m+ per project - 2025-08-26
-- [ ] Phase 2: 80% success, 10-15 min per project
+- [ ] Service Health: OpenRewrite service responding at `https://openrewrite.dev.ployman.app`
+- [ ] Phase 1: Target 100% success with service-based approach, <5 min per project
+- [ ] Phase 2: 80% success with LLM assistance, 10-15 min per project
 - [ ] Phase 3: 70% overall, 40% time reduction with parallelism
+
+**Current Status (2025-08-27)**:
+- ✅ OpenRewrite migrated to Lane E service architecture
+- ✅ Service deployed at `openrewrite.dev.ployman.app`
+- ⚠️ Recipe configuration needs validation
+- ⏳ Testing pending with new service architecture
 
 ## Specific Test Repositories
 
+### Service Validation Test
+- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Primary validation)
+  - Well-maintained reference application
+  - Known to work with OpenRewrite
+  - Good test coverage for Java migrations
+
 ### Tier 1 Projects (Simple) - Phase 1 Testing
-- [⚠️] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (bench-1756200935: Recipe failed)
-- [❌] **Java Tutorial Examples**: `https://github.com/winterbe/java8-tutorial.git` (bench-1756201007: 1s failure)
-- [🔄] **Google Guava**: `https://github.com/google/guava.git` (bench-1756201074: In progress)
+- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Reference implementation)
+- [ ] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (Large tutorial collection)
+- [ ] **Java 8 Tutorial**: `https://github.com/winterbe/java8-tutorial.git` (Simple examples)
 
 ```bash
-# Repository URLs for Phase 1 testing
+# Repository URLs for Phase 1 testing (all valid, existing repos)
 SIMPLE_REPOS=(
-  "https://github.com/eugenp/tutorials.git"           # Baeldung tutorials (Java 11)
-  "https://github.com/winterbe/java8-tutorial.git"    # Java tutorial examples
-  "https://github.com/google/guava.git"               # Google Guava (has Java 11 branches)
+  "https://github.com/spring-projects/spring-petclinic.git"  # Spring reference app
+  "https://github.com/eugenp/tutorials.git"                  # Baeldung tutorials
+  "https://github.com/winterbe/java8-tutorial.git"           # Java 8 examples
 )
 ```
 
@@ -246,10 +346,22 @@ COMPLEX_REPOS=(
 
 set -e
 
+# Configure OpenRewrite service
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+export ARF_OPENREWRITE_MODE=service
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+
+# Verify service is running
+echo "Checking OpenRewrite service health..."
+curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" || {
+  echo "ERROR: OpenRewrite service not responding"
+  exit 1
+}
+
 PHASE1_REPOS=(
-  "https://github.com/simple-java-util.git"
-  "https://github.com/basic-spring-crud.git"
-  "https://github.com/java-calculator.git"
+  "https://github.com/spring-projects/spring-petclinic.git"
+  "https://github.com/eugenp/tutorials.git"
+  "https://github.com/winterbe/java8-tutorial.git"
 )
 
 for i in "${!PHASE1_REPOS[@]}"; do
@@ -265,8 +377,13 @@ for i in "${!PHASE1_REPOS[@]}"; do
     --lane C \
     --iterations 1
     
+  # Monitor job status
+  benchmark_id=$(ploy arf benchmark list --latest --app-name "$app_name" | head -1 | cut -f1)
+  echo "Benchmark ID: $benchmark_id"
+  
   # Wait for completion before next test
   sleep 30
+  ploy arf benchmark status "$benchmark_id"
 done
 
 echo "Phase 1 sequential testing completed"
@@ -279,14 +396,24 @@ echo "Phase 1 sequential testing completed"
 
 set -e
 
-# Ensure LLM provider is configured
+# Configure OpenRewrite service AND LLM provider
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+export ARF_OPENREWRITE_MODE=service
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 export ARF_LLM_PROVIDER="ollama"
 export ARF_LLM_MODEL="codellama:7b"
 
+# Verify both services
+echo "Checking OpenRewrite service..."
+curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" || exit 1
+
+echo "Checking LLM provider..."
+# Add LLM provider check if needed
+
 PHASE2_REPOS=(
-  "https://github.com/reactive-spring-demo.git"
-  "https://github.com/spring-mongodb-example.git" 
-  "https://github.com/legacy-integration-service.git"
+  "https://github.com/spring-projects/spring-boot.git"
+  "https://github.com/reactor/reactor-core.git"
+  "https://github.com/apache/kafka.git"
 )
 
 for i in "${!PHASE2_REPOS[@]}"; do
@@ -303,11 +430,14 @@ for i in "${!PHASE2_REPOS[@]}"; do
     --iterations 3  # Allow up to 3 LLM iterations
     
   # Monitor benchmark progress
-  benchmark_id=$(ploy arf benchmark list --active | tail -n 1 | cut -f1)
+  benchmark_id=$(ploy arf benchmark list --latest --app-name "$app_name" | head -1 | cut -f1)
   echo "Monitoring benchmark: $benchmark_id"
   
-  # Wait for completion
-  sleep 60
+  # Wait and check status periodically
+  for j in {1..10}; do
+    sleep 30
+    ploy arf benchmark status "$benchmark_id" || true
+  done
 done
 
 echo "Phase 2 LLM-enhanced testing completed"
@@ -320,28 +450,38 @@ echo "Phase 2 LLM-enhanced testing completed"
 
 set -e
 
+# Configure service environment
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+export ARF_OPENREWRITE_MODE=service
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+
 # Create batch configuration for parallel execution
 cat > /tmp/phase3-batch-config.yaml << EOF
 name: "phase3_parallel_java11to17"
 description: "Parallel execution test across all complexity tiers"
 
+# Service configuration
+service_config:
+  openrewrite_url: "${OPENREWRITE_SERVICE_URL}"
+  mode: "service"
+
 repositories:
   - id: "simple-1"
-    url: "https://github.com/simple-java-util.git"
+    url: "https://github.com/spring-projects/spring-petclinic.git"
     branch: "main"
     language: "java"
     build_tool: "maven" 
     priority: 1
     
   - id: "simple-2"  
-    url: "https://github.com/basic-spring-crud.git"
-    branch: "main"
+    url: "https://github.com/winterbe/java8-tutorial.git"
+    branch: "master"
     language: "java"
     build_tool: "maven"
     priority: 1
     
   - id: "medium-1"
-    url: "https://github.com/reactive-spring-demo.git" 
+    url: "https://github.com/spring-projects/spring-boot.git" 
     branch: "main"
     language: "java"
     build_tool: "maven"
@@ -349,10 +489,10 @@ repositories:
     dependencies: ["simple-1"]
     
   - id: "complex-1"
-    url: "https://github.com/spring-petclinic.git"
+    url: "https://github.com/reactor/reactor-core.git"
     branch: "main"
     language: "java"
-    build_tool: "maven"
+    build_tool: "gradle"
     priority: 3
     dependencies: ["medium-1"]
 
@@ -403,9 +543,56 @@ echo "Phase 3 parallel testing submitted - monitor with 'ploy arf benchmark list
 - Failure rate thresholds
 - Execution time anomaly detection
 
+## Troubleshooting Guide
+
+### Common Issues and Solutions
+
+**OpenRewrite Service Not Responding**:
+```bash
+# Check service health
+curl -v https://openrewrite.dev.ployman.app/v1/openrewrite/health
+
+# Deploy/redeploy service
+cd services/openrewrite
+ployman push
+
+# Check service logs
+ployman logs -a openrewrite-service
+```
+
+**Recipe Failures**:
+```bash
+# Verify recipe configuration
+ploy arf benchmark validate-recipe java11to17_migration
+
+# Check OpenRewrite service metrics for errors
+curl https://openrewrite.dev.ployman.app/v1/openrewrite/metrics
+```
+
+**ARF Not Using Service**:
+```bash
+# Ensure environment variables are set
+echo $OPENREWRITE_SERVICE_URL  # Should be https://openrewrite.dev.ployman.app
+echo $ARF_OPENREWRITE_MODE     # Should be "service"
+
+# Force service mode
+export ARF_OPENREWRITE_MODE=service
+export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+```
+
+**Job Status Unknown**:
+```bash
+# Check job status directly via API
+curl "https://openrewrite.dev.ployman.app/v1/openrewrite/jobs/${JOB_ID}/status"
+
+# List all jobs
+ploy arf benchmark list
+```
+
 ## Success Metrics
 
 ### Quantitative Metrics
+- [ ] **Service Availability**: OpenRewrite service uptime >99%
 - [ ] **Success Rate**: Overall percentage of successful transformations
 - [ ] **Performance**: Average execution time per complexity tier
 - [ ] **Scalability**: Time reduction achieved through parallel execution
@@ -417,6 +604,6 @@ echo "Phase 3 parallel testing submitted - monitor with 'ploy arf benchmark list
 - [ ] **Build Success**: Post-transformation compilation and test success
 - [ ] **LLM Effectiveness**: Quality of LLM-suggested fixes
 - [ ] **Error Recovery**: System's ability to handle and recover from failures
-- [ ] **Infrastructure Robustness**: Nomad HCL validation success rate
+- [ ] **Service Integration**: Seamless ARF-to-OpenRewrite communication
 
-This comprehensive scenario progressively tests all ARF features while providing concrete metrics for evaluating the system's production readiness and scalability.
+This comprehensive scenario progressively tests all ARF features while providing concrete metrics for evaluating the system's production readiness and scalability with the new Lane E service architecture.

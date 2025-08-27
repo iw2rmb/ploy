@@ -37,7 +37,7 @@ Phase 1 establishes the foundational infrastructure for static analysis integrat
 
 **Deliverables**:
 ```go
-// controller/analysis/engine.go
+// api/analysis/engine.go
 type AnalysisEngine interface {
     AnalyzeRepository(ctx context.Context, repo Repository) (*AnalysisResult, error)
     RegisterAnalyzer(language string, analyzer LanguageAnalyzer) error
@@ -98,7 +98,7 @@ type Issue struct {
 
 **Deliverables**:
 ```go
-// controller/analysis/java_errorprone.go
+// api/analysis/java_errorprone.go
 type ErrorProneAnalyzer struct {
     config         ErrorProneConfig
     mavenPath      string
@@ -229,7 +229,7 @@ public class PloyEnvironmentVariableCheck extends BugChecker implements MethodIn
 
 **Deliverables**:
 ```go
-// controller/analysis/arf_integration.go
+// api/analysis/arf_integration.go
 type ARFIntegration interface {
     ProcessIssues(ctx context.Context, issues []Issue) (*ARFProcessingResult, error)
     MapIssueToRecipe(ctx context.Context, issue Issue) (*ARFRecipe, error)

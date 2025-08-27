@@ -552,7 +552,7 @@ dependencies {
 ## File Structure Changes
 
 ```
-controller/arf/
+api/arf/
 ├── execution/
 │   ├── executor.go                 # Main RecipeExecutor implementation
 │   ├── orchestrator.go             # Multi-step execution orchestration

@@ -21,7 +21,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEST_TIMEOUT=300  # 5 minutes
 ARF_TEST_REPO="https://github.com/spring-projects/spring-petclinic.git"
 TEST_APP_NAME="arf-test-$(date +%s)"

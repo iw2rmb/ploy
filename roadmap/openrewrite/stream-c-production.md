@@ -618,7 +618,7 @@ func (r *ResourceManager) monitorMemory() {
 ### C4.1: ARF Client Implementation
 
 ```go
-// controller/arf/openrewrite_client.go
+// api/arf/openrewrite_client.go
 package arf
 
 import (
@@ -741,7 +741,7 @@ func (c *OpenRewriteClient) waitForCompletion(ctx context.Context, jobID, status
 ### C4.2: ARF Engine Updates
 
 ```go
-// controller/arf/engine.go updates
+// api/arf/engine.go updates
 func (e *Engine) ApplyJavaTransformation(ctx context.Context, params TransformParams) error {
     // Create tar archive from repository
     tarData, err := e.createTarArchive(params.RepoPath)
@@ -779,7 +779,7 @@ func (e *Engine) ApplyJavaTransformation(ctx context.Context, params TransformPa
 ### C4.3: Batch Processing
 
 ```go
-// controller/arf/batch.go
+// api/arf/batch.go
 package arf
 
 type BatchProcessor struct {

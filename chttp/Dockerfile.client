@@ -1,0 +1,27 @@
+# Dockerfile for CHTTP client testing container
+FROM alpine:3.18
+
+# Install curl, wget, and tar for testing
+RUN apk add --no-cache \
+    curl \
+    wget \
+    tar \
+    gzip \
+    jq \
+    bash
+
+# Create test user
+RUN adduser -D -u 1000 testuser
+
+# Create directories
+RUN mkdir -p /testdata /keys /scripts
+RUN chown testuser:testuser /testdata /keys /scripts
+
+# Copy test scripts
+COPY scripts/test-chttp-client.sh /scripts/
+RUN chmod +x /scripts/test-chttp-client.sh
+
+USER testuser
+WORKDIR /testdata
+
+ENTRYPOINT ["/scripts/test-chttp-client.sh"]

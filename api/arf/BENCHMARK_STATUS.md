@@ -38,7 +38,7 @@
 
 ```bash
 # 1. Build the components
-go build -o build/controller ./controller
+go build -o bin/api ./controller
 go build -o build/ploy ./cmd/ploy
 
 # 2. Run minimal test
@@ -180,7 +180,7 @@ save_intermediate_state: true
 - Phase 8 Specification: `roadmap/arf/phase-arf-8.md`
 - Implementation Plan: `roadmap/arf/phase-arf-7.md`
 - Test Scripts: `tests/scripts/test-arf-benchmark-*.sh`
-- Configuration: `controller/arf/benchmark_configs/`
+- Configuration: `api/arf/benchmark_configs/`
 
 ## ✨ Summary
 

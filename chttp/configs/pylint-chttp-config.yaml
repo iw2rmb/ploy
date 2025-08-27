@@ -1,24 +1,36 @@
 service:
   name: "pylint-chttp"
   port: 8080
+  listen_addr: "0.0.0.0:8080"
 
 executable:
   path: "pylint"
-  args: ["--output-format=json", "--reports=no"]
+  args: ["--output-format=json", "--reports=no", "--score=no", "--msg-template={path}:{line}:{column}: {msg_id}: {msg} ({symbol})"]
   timeout: "5m"
+  working_dir: "/tmp/pylint-analysis"
 
 security:
-  auth_method: "public_key"
+  auth_method: "public_key" 
   public_key_path: "/etc/chttp/public.pem"
   run_as_user: "pylint"
   max_memory: "512MB"
   max_cpu: "1.0"
+  sandbox_enabled: true
+  temp_dir: "/tmp"
 
 input:
   formats: ["tar.gz", "tar", "zip"]
-  allowed_extensions: [".py", ".pyw"]
+  allowed_extensions: [".py", ".pyw", ".py3"]
   max_archive_size: "100MB"
+  max_files: 1000
+  excluded_paths: ["__pycache__", ".git", ".pytest_cache", "*.pyc"]
 
 output:
-  format: "json"
+  format: "json" 
   parser: "pylint_json"
+  include_stats: false
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"

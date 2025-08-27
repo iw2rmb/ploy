@@ -8,7 +8,7 @@ SCRIPT_DIR=$(dirname "$0")
 ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 
 # Configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEMP_DIR="/tmp/arf-config-test"
 RESULTS_FILE="$TEMP_DIR/config-results.json"
 
@@ -81,7 +81,7 @@ test_environment_detection() {
     log_test "Test 1: Verifying environment detection..."
     
     # Get controller version info which should include environment details
-    response=$(curl -s "$CONTROLLER_URL/controller/version")
+    response=$(curl -s "$CONTROLLER_URL/api/version")
     
     if echo "$response" | jq -e '.git_branch' > /dev/null 2>&1; then
         local branch=$(echo "$response" | jq -r '.git_branch // "unknown"')

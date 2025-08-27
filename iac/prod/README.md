@@ -235,7 +235,7 @@ To add more nodes:
 To update Ploy:
 ```bash
 # Update controller
-./controller/deploy.sh main
+./api/deploy.sh main
 
 # Update infrastructure
 ansible-playbook site.yml -i inventory/hosts.yml --tags=update

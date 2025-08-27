@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -14,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/google/uuid"
 
+	"github.com/iw2rmb/ploy/chttp/internal/analyzers"
 	"github.com/iw2rmb/ploy/chttp/internal/auth"
 	"github.com/iw2rmb/ploy/chttp/internal/config"
 	"github.com/iw2rmb/ploy/chttp/internal/sandbox"
@@ -251,7 +251,7 @@ func (s *Server) parseAnalysisOutput(stdout, stderr string, exitCode int) ([]Iss
 
 	switch s.config.Output.Parser {
 	case "pylint_json":
-		return s.parsePylintJSON(stdout)
+		return s.parsePylintJSON(stdout, stderr, exitCode)
 	case "test", "test_parser":
 		// Test parser for unit tests - creates mock issues
 		if stdout != "" {
@@ -281,52 +281,28 @@ func (s *Server) parseAnalysisOutput(stdout, stderr string, exitCode int) ([]Iss
 	return issues, nil
 }
 
-// parsePylintJSON parses Pylint JSON output
-func (s *Server) parsePylintJSON(output string) ([]Issue, error) {
-	if output == "" {
-		return []Issue{}, nil
+// parsePylintJSON parses Pylint JSON output using the dedicated Pylint parser
+func (s *Server) parsePylintJSON(stdout, stderr string, exitCode int) ([]Issue, error) {
+	parser := analyzers.NewPylintParser()
+	issues, err := parser.ParseOutput(stdout, stderr, exitCode)
+	if err != nil {
+		return nil, err
 	}
-
-	// Pylint JSON output is an array of issue objects
-	var pylintIssues []struct {
-		Type      string  `json:"type"`
-		Module    string  `json:"module"`
-		Obj       string  `json:"obj"`
-		Line      int     `json:"line"`
-		Column    int     `json:"column"`
-		Path      string  `json:"path"`
-		Symbol    string  `json:"symbol"`
-		Message   string  `json:"message"`
-		MessageID string  `json:"message-id"`
-	}
-
-	if err := json.Unmarshal([]byte(output), &pylintIssues); err != nil {
-		return nil, fmt.Errorf("failed to parse Pylint JSON: %w", err)
-	}
-
-	var issues []Issue
-	for _, pylintIssue := range pylintIssues {
-		severity := "info"
-		switch pylintIssue.Type {
-		case "fatal", "error":
-			severity = "error"
-		case "warning":
-			severity = "warning"
-		case "convention", "refactor":
-			severity = "info"
-		}
-
-		issues = append(issues, Issue{
-			File:     pylintIssue.Path,
-			Line:     pylintIssue.Line,
-			Column:   pylintIssue.Column,
-			Severity: severity,
-			Rule:     pylintIssue.MessageID,
-			Message:  pylintIssue.Message,
+	
+	// Convert analyzer issues to server issues
+	var serverIssues []Issue
+	for _, issue := range issues {
+		serverIssues = append(serverIssues, Issue{
+			File:     issue.File,
+			Line:     issue.Line,
+			Column:   issue.Column,
+			Severity: issue.Severity,
+			Rule:     issue.Rule,
+			Message:  issue.Message,
 		})
 	}
-
-	return issues, nil
+	
+	return serverIssues, nil
 }
 
 // Helper function for tests and main to create auth manager

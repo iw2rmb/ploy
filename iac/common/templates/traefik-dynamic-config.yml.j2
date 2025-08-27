@@ -1,0 +1,107 @@
+# Dynamic Traefik configuration for Ploy API with wildcard SSL certificates
+# This template generates routing rules for the Ploy API service
+
+http:
+  routers:
+    # API service router with wildcard SSL certificate
+    api-service:
+      rule: "Host(`api.dev.ployman.app`)"
+      service: api-service
+      tls:
+        certResolver: "dev-wildcard"
+        domains:
+          - main: "*.dev.ployman.app"
+      middlewares:
+        - secure-headers
+    
+    # API service insecure router (HTTP - will redirect to HTTPS)
+    api-service-insecure:
+      rule: "Host(`api.dev.ployman.app`)"
+      service: api-service
+      entryPoints:
+        - web
+      middlewares:
+        - https-redirect
+    
+    # Health check endpoint router (allow insecure for monitoring)
+    api-health:
+      rule: "Host(`api.dev.ployman.app`) && Path(`/health`)"
+      service: api-service
+      priority: 100
+      tls:
+        certResolver: "dev-wildcard"
+    
+    # Wildcard certificate request for apps domain (*.dev.ployd.app)
+    apps-wildcard-cert:
+      rule: "Host(`dev.ployd.app`)"
+      service: noop-service
+      tls:
+        certResolver: "apps-wildcard"
+        domains:
+          - main: "*.dev.ployd.app"
+      priority: 1
+
+  services:
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8081"
+        healthCheck:
+          path: "/health"
+          interval: "30s"
+          timeout: "5s"
+          scheme: "http"
+    
+    # Noop service for certificate provisioning only
+    noop-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:65535"
+
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+    
+    secure-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - OPTIONS  
+          - PUT
+          - POST
+          - DELETE
+        accessControlMaxAge: 100
+        hostsProxyHeaders:
+          - "X-Forwarded-Host"
+        referrerPolicy: "same-origin"
+        sslRedirect: true
+        sslHost: ""
+        sslForceHost: false
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        customFrameOptionsValue: "SAMEORIGIN"
+
+# TLS configuration for wildcard certificates
+tls:
+  options:
+    default:
+      minVersion: "VersionTLS12"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_RSA_WITH_AES_128_GCM_SHA256"
+
+  certificates:
+    # Wildcard certificate for *.dev.ployman.app  
+    - certFile: "/data/certificates/dev-ployman-app.crt"
+      keyFile: "/data/certificates/dev-ployman-app.key"
+      stores:
+        - default

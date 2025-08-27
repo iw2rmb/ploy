@@ -13,7 +13,7 @@ Phase ARF-7 replaces all mock implementations from earlier phases with productio
 ### From Phase 4: Security & Production Hardening
 
 #### 1. Security Engine Components
-**Current State**: `controller/arf/security_engine.go`
+**Current State**: `api/arf/security_engine.go`
 ```go
 // Current mock initialization
 cveDatabase:  nil, // Would be initialized with real implementation
@@ -29,7 +29,7 @@ sbomAnalyzer: nil, // Would be initialized with real implementation
 - SBOM analyzer with real Syft/Grype integration
 
 #### 2. Human Workflow Services
-**Current State**: `controller/arf/handler.go`
+**Current State**: `api/arf/handler.go`
 ```go
 // Current mock initialization
 workflowEngine: NewHumanWorkflowEngine(nil, nil, nil, nil, nil)
@@ -84,7 +84,7 @@ Diff:           "Mock diff: Removed unnecessary parentheses",
 #### 1. CVE Database Integration
 
 ```go
-// controller/arf/cve_database_impl.go
+// api/arf/cve_database_impl.go
 type NVDDatabase struct {
     apiKey      string
     cache       *CVECache
@@ -129,7 +129,7 @@ func (g *GitHubAdvisoryDB) SearchAdvisories(ctx context.Context, pkg Package) ([
 #### 2. Vulnerability Remediator
 
 ```go
-// controller/arf/vulnerability_remediator_impl.go
+// api/arf/vulnerability_remediator_impl.go
 type OpenRewriteRemediator struct {
     engine      *OpenRewriteEngine
     catalog     *RecipeCatalog
@@ -169,7 +169,7 @@ func (r *OpenRewriteRemediator) GenerateRemediationPlan(
 #### 3. SBOM Analyzer with Syft
 
 ```go
-// controller/arf/sbom_analyzer_impl.go
+// api/arf/sbom_analyzer_impl.go
 type SyftSBOMAnalyzer struct {
     syftPath    string
     grypePath   string
@@ -210,7 +210,7 @@ func (s *SyftSBOMAnalyzer) ScanSBOM(ctx context.Context, sbom *SBOM) (*Vulnerabi
 #### 1. Approval Service Implementation
 
 ```go
-// controller/arf/approval_service_impl.go
+// api/arf/approval_service_impl.go
 type MultiProviderApprovalService struct {
     github      *GitHubApprovalProvider
     jira        *JiraApprovalProvider
@@ -253,7 +253,7 @@ func (g *GitHubApprovalProvider) CreateApprovalRequest(
 #### 2. Notification Service
 
 ```go
-// controller/arf/notification_service_impl.go
+// api/arf/notification_service_impl.go
 type NotificationService struct {
     slack       *SlackNotifier
     email       *EmailNotifier
@@ -291,7 +291,7 @@ func (s *SlackNotifier) SendNotification(
 #### 3. Workflow Store
 
 ```go
-// controller/arf/workflow_store_impl.go
+// api/arf/workflow_store_impl.go
 type PostgreSQLWorkflowStore struct {
     db          *pgxpool.Pool
     cache       *redis.Client
@@ -333,7 +333,7 @@ func (p *PostgreSQLWorkflowStore) CreateWorkflow(
 #### 1. FreeBSD Jail Sandbox Manager
 
 ```go
-// controller/arf/sandbox_freebsd.go
+// api/arf/sandbox_freebsd.go
 type FreeBSDSandboxManager struct {
     jailPath    string
     zfsDataset  string
@@ -410,7 +410,7 @@ func (f *FreeBSDSandboxManager) RollbackSandbox(
 #### 2. Real OpenRewrite Execution
 
 ```go
-// controller/arf/openrewrite_executor.go
+// api/arf/openrewrite_executor.go
 type OpenRewriteExecutor struct {
     mavenPath   string
     gradlePath  string

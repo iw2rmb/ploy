@@ -38,7 +38,7 @@ Phase ARF-2 transforms the basic transformation engine into a resilient, self-he
 
 **Deliverables**:
 ```go
-// controller/arf/circuit_breaker.go
+// api/arf/circuit_breaker.go
 type CircuitBreaker interface {
     Execute(ctx context.Context, operation func() error) error
     GetState() CircuitState
@@ -82,7 +82,7 @@ type CircuitConfig struct {
 
 **Deliverables**:
 ```go
-// controller/arf/recipe_evolution.go
+// api/arf/recipe_evolution.go
 type RecipeEvolution interface {
     AnalyzeFailure(ctx context.Context, failure TransformationFailure) (*FailureAnalysis, error)
     EvolveRecipe(ctx context.Context, recipe Recipe, analysis FailureAnalysis) (*Recipe, error)
@@ -126,7 +126,7 @@ type RecipeModification struct {
 
 **Deliverables**:
 ```go
-// controller/arf/parallel_resolver.go
+// api/arf/parallel_resolver.go
 type ParallelResolver interface {
     ResolveError(ctx context.Context, error TransformationError) (*Resolution, error)
     ForkSolutions(ctx context.Context, strategies []ResolutionStrategy) <-chan ResolutionResult
@@ -176,7 +176,7 @@ type ResolutionResult struct {
 
 **Deliverables**:
 ```go
-// controller/arf/orchestration.go
+// api/arf/orchestration.go
 type MultiRepoOrchestrator interface {
     PlanTransformation(ctx context.Context, repos []Repository, recipe Recipe) (*ExecutionPlan, error)
     ExecutePlan(ctx context.Context, plan ExecutionPlan) (*OrchestrationResult, error)
@@ -224,7 +224,7 @@ type RepositoryBatch struct {
 
 **Deliverables**:
 ```go
-// controller/arf/ha_integration.go
+// api/arf/ha_integration.go
 type HAIntegration interface {
     ElectLeader(ctx context.Context, campaign CampaignID) (*LeaderInfo, error)
     AcquireLock(ctx context.Context, resource string) (*DistributedLock, error)
@@ -277,7 +277,7 @@ type Distribution struct {
 
 **Deliverables**:
 ```go
-// controller/arf/monitoring.go
+// api/arf/monitoring.go
 type MonitoringSystem interface {
     RecordMetric(ctx context.Context, metric Metric) error
     CheckSLO(ctx context.Context, slo SLO) (*SLOStatus, error)
@@ -345,7 +345,7 @@ arf_resource_usage{resource_type, component}
 
 **Deliverables**:
 ```go
-// controller/arf/error_pattern_db.go
+// api/arf/error_pattern_db.go
 type ErrorPatternDB interface {
     StorePattern(ctx context.Context, pattern ErrorPattern) error
     FindSimilarPatterns(ctx context.Context, error TransformationError, threshold float64) ([]ErrorPattern, error)

@@ -157,7 +157,7 @@ if (require.main === module) {
     const testCases = [
         {
             task: "Add certificate management to domain API endpoints",
-            files: ["controller/server/server.go", "internal/cli/domains/handler.go"],
+            files: ["api/server/server.go", "internal/cli/domains/handler.go"],
             keywords: ["ACME", "SSL"]
         },
         {

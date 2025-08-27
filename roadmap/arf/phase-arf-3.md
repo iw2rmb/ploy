@@ -44,7 +44,7 @@ Phase ARF-3 represents the revolutionary integration of Large Language Models wi
 
 **Deliverables**:
 ```go
-// controller/arf/llm_integration.go
+// api/arf/llm_integration.go
 type LLMRecipeGenerator interface {
     GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error)
     ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*ValidationResult, error)
@@ -162,7 +162,7 @@ type PromptMetrics struct {
 
 **Deliverables**:
 ```go
-// controller/arf/multi_language.go
+// api/arf/multi_language.go
 type MultiLanguageEngine interface {
     ParseAST(ctx context.Context, code string, language string) (*UniversalAST, error)
     GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error)
@@ -238,7 +238,7 @@ type WASMRecipe struct {
 
 **Deliverables**:
 ```go
-// controller/arf/hybrid_pipeline.go
+// api/arf/hybrid_pipeline.go
 type HybridPipeline interface {
     ExecuteHybridTransformation(ctx context.Context, request HybridRequest) (*HybridResult, error)
     SelectOptimalStrategy(ctx context.Context, analysis ComplexityAnalysis) (*TransformationStrategy, error)
@@ -304,7 +304,7 @@ type ConfidenceThresholds struct {
 
 **Deliverables**:
 ```go
-// controller/arf/learning_system.go
+// api/arf/learning_system.go
 type LearningSystem interface {
     RecordTransformationOutcome(ctx context.Context, outcome TransformationOutcome) error
     ExtractPatterns(ctx context.Context, timeWindow time.Duration) (*PatternAnalysis, error)
@@ -523,7 +523,7 @@ type ABExperiment struct {
 
 **Deliverables**:
 ```go
-// controller/arf/strategy_selector.go
+// api/arf/strategy_selector.go
 type StrategySelector interface {
     SelectStrategy(ctx context.Context, request StrategyRequest) (*SelectedStrategy, error)
     EvaluateComplexity(ctx context.Context, repository Repository) (*ComplexityAnalysis, error)
@@ -578,7 +578,7 @@ type ComplexityAnalysis struct {
 
 **Deliverables**:
 ```go
-// controller/arf/developer_tools.go
+// api/arf/developer_tools.go
 type DeveloperTools interface {
     PreviewTransformation(ctx context.Context, code string, recipe Recipe) (*PreviewResult, error)
     DryRun(ctx context.Context, repository Repository, recipe Recipe) (*DryRunResult, error)

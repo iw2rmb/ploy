@@ -36,7 +36,7 @@ fi
 
 # Build the binaries
 echo "Building ploy binaries..."
-go build -o build/controller ./controller
+go build -o bin/api ./controller
 go build -o build/ploy ./cmd/ploy
 
 # Test 301: Job validation before submission
@@ -124,7 +124,7 @@ cd - > /dev/null
 if ! curl -s "$PLOY_CONTROLLER/status" > /dev/null 2>&1; then
     echo "Starting controller..."
     export NOMAD_ADDR=${NOMAD_ADDR:-http://localhost:4646}
-    ./build/controller > controller.log 2>&1 &
+    ./bin/api > controller.log 2>&1 &
     CONTROLLER_PID=$!
     sleep 3
 fi
@@ -213,8 +213,8 @@ echo "--------------------------------------------------"
 echo "Testing retry mechanism (simulated transient failure)..."
 # This would be tested by temporarily disrupting Nomad connectivity
 # For now, we'll just verify the retry logic exists
-if grep -q "RobustSubmit" controller/nomad/submit_enhanced.go && \
-   grep -q "maxRetries" controller/nomad/submit_enhanced.go; then
+if grep -q "RobustSubmit" api/nomad/submit_enhanced.go && \
+   grep -q "maxRetries" api/nomad/submit_enhanced.go; then
     echo "✓ Retry logic implemented in RobustSubmit"
 else
     echo "✗ Retry logic not found"
@@ -225,8 +225,8 @@ echo ""
 echo "Test 312: Job validation before submission"
 echo "------------------------------------------"
 
-if grep -q "ValidateJob" controller/nomad/submit_enhanced.go && \
-   grep -q "nomad.*job.*validate" controller/nomad/submit_enhanced.go; then
+if grep -q "ValidateJob" api/nomad/submit_enhanced.go && \
+   grep -q "nomad.*job.*validate" api/nomad/submit_enhanced.go; then
     echo "✓ Job validation implemented"
 else
     echo "✗ Job validation not found"
@@ -237,8 +237,8 @@ echo ""
 echo "Test 314: Log streaming capability"
 echo "----------------------------------"
 
-if grep -q "StreamJobLogs" controller/nomad/submit_enhanced.go && \
-   grep -q "alloc.*logs" controller/nomad/submit_enhanced.go; then
+if grep -q "StreamJobLogs" api/nomad/submit_enhanced.go && \
+   grep -q "alloc.*logs" api/nomad/submit_enhanced.go; then
     echo "✓ Log streaming capability implemented"
 else
     echo "✗ Log streaming not found"
@@ -249,9 +249,9 @@ echo ""
 echo "Test 316-317: Multiple allocation monitoring"
 echo "--------------------------------------------"
 
-if grep -q "expectedCount" controller/nomad/submit_enhanced.go && \
-   grep -q "WaitForHealthyAllocations" controller/nomad/health.go && \
-   grep -q "minHealthy" controller/nomad/health.go; then
+if grep -q "expectedCount" api/nomad/submit_enhanced.go && \
+   grep -q "WaitForHealthyAllocations" api/nomad/health.go && \
+   grep -q "minHealthy" api/nomad/health.go; then
     echo "✓ Multiple allocation monitoring implemented"
     echo "✓ Concurrent monitoring channels found"
 else
@@ -263,8 +263,8 @@ echo ""
 echo "Test 318: Detailed status reporting"
 echo "-----------------------------------"
 
-if grep -q "fmt.Printf.*Task Group.*healthy.*unhealthy" controller/nomad/health.go && \
-   grep -q "logAllocationFailure" controller/nomad/health.go; then
+if grep -q "fmt.Printf.*Task Group.*healthy.*unhealthy" api/nomad/health.go && \
+   grep -q "logAllocationFailure" api/nomad/health.go; then
     echo "✓ Detailed status reporting implemented"
 else
     echo "✗ Status reporting needs improvement"
@@ -275,9 +275,9 @@ echo ""
 echo "Test 319-320: Network error handling and messages"
 echo "-------------------------------------------------"
 
-if grep -q "isRetryableError" controller/nomad/submit_enhanced.go && \
-   grep -q "connection refused" controller/nomad/submit_enhanced.go && \
-   grep -q "Details:" controller/nomad/health.go; then
+if grep -q "isRetryableError" api/nomad/submit_enhanced.go && \
+   grep -q "connection refused" api/nomad/submit_enhanced.go && \
+   grep -q "Details:" api/nomad/health.go; then
     echo "✓ Comprehensive error handling implemented"
     echo "✓ Actionable error messages included"
 else

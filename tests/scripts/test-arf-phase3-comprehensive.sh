@@ -15,7 +15,7 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL=${PLOY_CONTROLLER:-"https://api.dev.ployd.app/v1"}
+CONTROLLER_URL=${PLOY_CONTROLLER:-"https://api.dev.ployman.app/v1"}
 TEST_RESULTS_DIR="/tmp/arf-phase3-comprehensive-results"
 TEST_STARTED=$(date '+%Y-%m-%d %H:%M:%S')
 LLM_API_KEY=${ARF_LLM_API_KEY:-""}

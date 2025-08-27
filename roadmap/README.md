@@ -70,7 +70,7 @@ Next steps to implement:
 
 **Implementation Tasks:**
 1. ✅ **COMPLETED (2025-08-21)** **WASM Runtime Integration**: Integrated wazero v1.5.0 pure Go WebAssembly runtime for Lane G deployment with security constraints and WASI Preview 1 support.
-2. ✅ **COMPLETED (2025-08-21)** **Lane G Builder Implementation**: Created `controller/builders/wasm.go` with comprehensive multi-strategy WASM building supporting 5 compilation approaches.
+2. ✅ **COMPLETED (2025-08-21)** **Lane G Builder Implementation**: Created `api/builders/wasm.go` with comprehensive multi-strategy WASM building supporting 5 compilation approaches.
 3. ✅ **COMPLETED (2025-08-21)** **WASM Detection Logic**: Implemented comprehensive automatic detection of WASM compilation targets in lane picker with 95%+ accuracy:
    - Direct `.wasm` and `.wat` file detection with magic byte validation
    - Rust `wasm32-wasi` target detection in Cargo.toml with wasm-bindgen dependencies
@@ -81,7 +81,7 @@ Next steps to implement:
 4. ✅ **COMPLETED (2025-08-21)** **WASM Build Pipeline**: Implemented multi-strategy build system with automatic strategy selection instead of separate scripts.
 5. ✅ **COMPLETED (2025-08-21)** **Nomad WASM Driver**: Created production-ready Nomad job template `platform/nomad/templates/wasm-app.hcl.j2` with resource limits, health checks, and Traefik routing.
 6. ✅ **COMPLETED (2025-08-21)** **WASI Support**: Implemented WASI Preview 1 filesystem and environment interfaces with controlled sandbox access in wazero runtime.
-7. ✅ **COMPLETED (2025-08-21)** **Component Model Integration**: Added complete WebAssembly Component Model support in `controller/wasm/components.go` for multi-module WASM applications.
+7. ✅ **COMPLETED (2025-08-21)** **Component Model Integration**: Added complete WebAssembly Component Model support in `api/wasm/components.go` for multi-module WASM applications.
 8. ✅ **COMPLETED (2025-08-21)** **WASM Security Policies**: Created comprehensive OPA policies in `policies/wasm.rego` with environment-specific validation and WASM-specific constraints.
 9. ✅ **COMPLETED (2025-08-21)** **WASM Testing**: Created working sample WASM applications: `apps/wasm-rust-hello/`, `apps/wasm-go-hello/`, `apps/wasm-assemblyscript-hello/`, `apps/wasm-cpp-hello/`.
 10. ✅ **COMPLETED (2025-08-21)** **Lane G Documentation**: Completed comprehensive WASM implementation guide in `docs/WASM.md` with usage examples, architecture details, and operational procedures.
@@ -259,7 +259,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 The performance optimization implementation delivers significant improvements for multi-instance coordination:
 
 **📦 Core Components Added:**
-- `controller/performance/` package with caching, connection pooling, and load balancing
+- `api/performance/` package with caching, connection pooling, and load balancing
 - Enhanced Consul KV operations with 5-minute TTL caching and connection pool (size: 10)
 - Configuration management with intelligent file modification tracking
 - Connection pools for external services (Consul: 10, Nomad: 8 connections)

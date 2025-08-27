@@ -49,11 +49,11 @@ fi
 
 # Test 4: Test controller version endpoint
 echo -e "${YELLOW}Test 4: Testing controller version endpoint...${NC}"
-./build/controller &
+./bin/api &
 CONTROLLER_PID=$!
 sleep 3
 
-RESPONSE=$(curl -s https://api.dev.ployd.app/version)
+RESPONSE=$(curl -s https://api.dev.ployman.app/version)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Version endpoint working:${NC}"
     echo "$RESPONSE" | jq .
@@ -65,7 +65,7 @@ fi
 
 # Test 5: Test detailed version endpoint
 echo -e "${YELLOW}Test 5: Testing detailed version endpoint...${NC}"
-DETAILED=$(curl -s https://api.dev.ployd.app/version/detailed)
+DETAILED=$(curl -s https://api.dev.ployman.app/version/detailed)
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Detailed version endpoint working:${NC}"
     echo "$DETAILED" | jq .

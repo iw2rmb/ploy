@@ -58,7 +58,7 @@ Phase ARF-4 transforms ARF into a production-ready, security-focused transformat
 
 **Deliverables**:
 ```go
-// controller/arf/security_remediation.go
+// api/arf/security_remediation.go
 type SecurityRemediationEngine interface {
     AnalyzeVulnerabilities(ctx context.Context, repository Repository) (*VulnerabilityAnalysis, error)
     GenerateSecurityRecipe(ctx context.Context, cve CVEDetails) (*SecurityRecipe, error)
@@ -145,7 +145,7 @@ type ZeroDayThreat struct {
 
 **Deliverables**:
 ```go
-// controller/arf/sbom_integration.go
+// api/arf/sbom_integration.go
 type SBOMIntegration interface {
     GenerateTransformationSBOM(ctx context.Context, transformation TransformationResult) (*SBOM, error)
     ValidateSupplyChainSecurity(ctx context.Context, sbom SBOM) (*SupplyChainValidation, error)
@@ -210,7 +210,7 @@ type TransformationRecord struct {
 
 **Deliverables**:
 ```go
-// controller/arf/human_loop.go
+// api/arf/human_loop.go
 type HumanLoopOrchestrator interface {
     RequestApproval(ctx context.Context, request ApprovalRequest) (*ApprovalResponse, error)
     ConfigureWorkflow(ctx context.Context, workflow ApprovalWorkflow) error
@@ -342,7 +342,7 @@ type ReviewDiff struct {
 
 **Deliverables**:
 ```go
-// controller/arf/performance_optimizer.go
+// api/arf/performance_optimizer.go
 type PerformanceOptimizer interface {
     OptimizeJVMConfiguration(ctx context.Context, workload WorkloadProfile) (*JVMConfig, error)
     ConfigureDistributedProcessing(ctx context.Context, cluster ClusterConfig) error
@@ -400,7 +400,7 @@ type CacheOptimization struct {
 
 **Deliverables**:
 ```go
-// controller/arf/observability.go
+// api/arf/observability.go
 type ObservabilitySystem interface {
     LogLLMOperation(ctx context.Context, operation LLMOperation) error
     StartTrace(ctx context.Context, name string) (*Trace, error)
@@ -642,7 +642,7 @@ observability:
 
 **Deliverables**:
 ```go
-// controller/arf/data_governance.go
+// api/arf/data_governance.go
 type DataGovernance interface {
     SetRetentionPolicy(ctx context.Context, policy RetentionPolicy) error
     ApplyGDPRRequest(ctx context.Context, request GDPRRequest) (*GDPRResponse, error)

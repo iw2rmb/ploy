@@ -318,7 +318,7 @@ job "ploy-api" {
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-api-dynamic.rule=Host(\`api.dev.ployd.app\`) || Host(\`api.ployd.app\`)",
+        "traefik.http.routers.ploy-api-dynamic.rule=Host(\`api.dev.ployman.app\`) || Host(\`api.ployd.app\`)",
         "traefik.http.routers.ploy-api-dynamic.tls=true",
         "traefik.http.routers.ploy-api-dynamic.tls.certresolver=dev-wildcard",
         "traefik.http.routers.ploy-api-dynamic.tls.domains[0].main=dev.ployd.app",
@@ -609,7 +609,7 @@ verify_deployment() {
         echo -e "${YELLOW}Attempt $((attempt + 1))/$max_attempts: Testing api health...${NC}"
         
         # Test external HTTPS endpoint (primary)
-        if version_info=$(curl -s --max-time 10 "https://api.dev.ployd.app/v1/api/version" 2>/dev/null); then
+        if version_info=$(curl -s --max-time 10 "https://api.dev.ployman.app/v1/version" 2>/dev/null); then
             echo -e "${GREEN}✓ HTTPS endpoint accessible${NC}"
             echo -e "${BLUE}Deployed version info:${NC}"
             echo "$version_info" | python3 -m json.tool 2>/dev/null || echo "$version_info"
@@ -620,7 +620,7 @@ verify_deployment() {
                 echo -e "${GREEN}✓ Version verification passed: $deployed_version${NC}"
                 
                 # Test health endpoint
-                if curl -s --max-time 5 "https://api.dev.ployd.app/health" > /dev/null 2>&1; then
+                if curl -s --max-time 5 "https://api.dev.ployman.app/health" > /dev/null 2>&1; then
                     echo -e "${GREEN}✓ Health check endpoint accessible${NC}"
                     return 0
                 else
@@ -637,7 +637,7 @@ verify_deployment() {
                 echo -e "${GREEN}✓ Local health check passed${NC}"
                 
                 # Test local version endpoint
-                if local_version_info=$(curl -s --max-time 5 "http://localhost:8081/v1/api/version" 2>/dev/null); then
+                if local_version_info=$(curl -s --max-time 5 "http://localhost:8081/v1/version" 2>/dev/null); then
                     echo -e "${GREEN}✓ Local version endpoint accessible${NC}"
                     echo -e "${BLUE}Local version info:${NC}"
                     echo "$local_version_info" | python3 -m json.tool 2>/dev/null || echo "$local_version_info"
@@ -726,7 +726,7 @@ echo "  Controller Checksum: $CONTROLLER_CHECKSUM"
 echo ""
 echo -e "${YELLOW}Verification Commands:${NC}"
 echo "  Health Check: curl http://localhost:8081/health"
-echo "  Version Info: curl http://localhost:8081/v1/api/version"
+echo "  Version Info: curl http://localhost:8081/v1/version"
 echo "  Job Status:   nomad job status ploy-api"
 echo "  SSL Test:     ./scripts/diagnose-ssl.sh"
 echo ""

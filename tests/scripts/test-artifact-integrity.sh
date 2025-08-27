@@ -35,7 +35,7 @@ test_info() {
 # Check if controller is running
 check_controller() {
     test_info "Checking if controller is running..."
-    if ! curl -s https://api.dev.ployd.app/v1/apps > /dev/null; then
+    if ! curl -s https://api.dev.ployman.app/v1/apps > /dev/null; then
         test_failed "Controller not running on port 8081. Start it first."
     fi
     test_passed "Controller is running"
@@ -83,7 +83,7 @@ EOF
     
     # Test deployment with integrity verification
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
+        "https://api.dev.ployman.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -158,7 +158,7 @@ EOF
     
     # Test deployment - SBOM validation should occur automatically
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
+        "https://api.dev.ployman.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     
@@ -221,7 +221,7 @@ EOF
     
     # Test deployment - signature verification should occur automatically
     RESPONSE=$(curl -s -X POST \
-        "https://api.dev.ployd.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
+        "https://api.dev.ployman.app/v1/apps/$TEST_APP/builds?lane=A&env=dev" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$TEST_APP.tar")
     

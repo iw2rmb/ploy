@@ -132,7 +132,7 @@ type RollbackRequest struct {
 
 // SetupRoutes configures self-update routes
 func SetupRoutes(app *fiber.App, handler *Handler) {
-	api := app.Group("/v1/controller")
+	api := app.Group("/v1")
 
 	// Self-update endpoints
 	api.Post("/update", handler.HandleUpdate)

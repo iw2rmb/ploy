@@ -37,7 +37,7 @@ Phase 3 transforms the static analysis framework into an enterprise-grade system
 
 **Deliverables**:
 ```go
-// controller/analysis/arf_deep_integration.go
+// api/analysis/arf_deep_integration.go
 type ARFDeepIntegration struct {
     arfClient       ARFClient
     confidenceEngine ConfidenceEngine
@@ -168,7 +168,7 @@ advanced_arf_mapping:
 
 **Deliverables**:
 ```go
-// controller/analysis/custom_patterns.go
+// api/analysis/custom_patterns.go
 type CustomPatternPlatform struct {
     ruleEngine      RuleEngine
     testEnvironment TestEnvironment
@@ -358,7 +358,7 @@ module.exports = {
 
 **Deliverables**:
 ```go
-// controller/analysis/analytics_dashboard.go
+// api/analysis/analytics_dashboard.go
 type AnalyticsDashboard struct {
     metricsCollector MetricsCollector
     dashboard        DashboardEngine
@@ -526,7 +526,7 @@ const remediationEffectivenessWidget: QualityDashboardWidget = {
 
 **Deliverables**:
 ```go
-// controller/analysis/enterprise_security.go
+// api/analysis/enterprise_security.go
 type EnterpriseSecurityScanner struct {
     vulnerabilityScanner VulnerabilityScanner
     complianceValidator  ComplianceValidator

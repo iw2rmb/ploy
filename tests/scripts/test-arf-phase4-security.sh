@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-CONTROLLER_URL="${CONTROLLER_URL:-https://api.dev.ployd.app}"
+CONTROLLER_URL="${CONTROLLER_URL:-https://api.dev.ployman.app}"
 API_BASE="${CONTROLLER_URL}/v1/arf"
 TEST_RESULTS_DIR="test-results/arf-phase4"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)

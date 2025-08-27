@@ -53,7 +53,7 @@ job "ploy-api" {
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployd.app`) || Host(`api.ployd.app`)",
+        "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployman.app`) || Host(`api.ployd.app`)",
         "traefik.http.routers.ploy-api.tls=true",
         "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard",
         "traefik.http.routers.ploy-api.tls.domains[0].main=dev.ployd.app",

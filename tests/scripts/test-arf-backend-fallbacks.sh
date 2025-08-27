@@ -8,7 +8,7 @@ SCRIPT_DIR=$(dirname "$0")
 ROOT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 
 # Configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEMP_DIR="/tmp/arf-fallback-test"
 RESULTS_FILE="$TEMP_DIR/fallback-results.json"
 

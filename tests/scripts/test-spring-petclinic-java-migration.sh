@@ -22,7 +22,7 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployd.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEST_TIMEOUT=600  # 10 minutes
 PETCLINIC_REPO="https://github.com/spring-projects/spring-petclinic.git"
 TEST_APP_NAME="petclinic-java17-$(date +%s)"

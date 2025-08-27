@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
@@ -21,7 +24,8 @@ import (
 	"github.com/iw2rmb/ploy/api/acme"
 	"github.com/iw2rmb/ploy/api/analysis"
 	javaanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/java"
-	pythonanalyzer "github.com/iw2rmb/ploy/controller/analysis/analyzers/python"
+	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
+	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/config"
 	"github.com/iw2rmb/ploy/api/consul_envstore"
@@ -34,7 +38,7 @@ import (
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/api/selfupdate"
 	"github.com/iw2rmb/ploy/api/templates"
-	"github.com/iw2rmb/ploy/api/arf"
+
 	// "github.com/iw2rmb/ploy/api/openrewrite"
 	"github.com/iw2rmb/ploy/api/version"
 	"github.com/iw2rmb/ploy/internal/bluegreen"
@@ -42,53 +46,54 @@ import (
 	"github.com/iw2rmb/ploy/internal/cleanup"
 	"github.com/iw2rmb/ploy/internal/debug"
 	"github.com/iw2rmb/ploy/internal/domain"
+
 	// internal_openrewrite "github.com/iw2rmb/ploy/internal/openrewrite"
+	"github.com/iw2rmb/ploy/api/performance"
 	"github.com/iw2rmb/ploy/internal/preview"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
-	"github.com/iw2rmb/ploy/api/performance"
 )
 
 // ServiceDependencies holds all external service dependencies
 type ServiceDependencies struct {
-	EnvStore           envstore.EnvStoreInterface
-	TraefikRouter      *routing.TraefikRouter
-	HealthChecker      *health.HealthChecker
-	CleanupHandler     *cleanup.CleanupHandler
-	TTLCleanupService  *cleanup.TTLCleanupService
-	SelfUpdateHandler  *selfupdate.Handler
-	DNSHandler         *dns.Handler
-	ACMEHandler        *acme.Handler
-	CertificateManager *certificates.CertificateManager
+	EnvStore                envstore.EnvStoreInterface
+	TraefikRouter           *routing.TraefikRouter
+	HealthChecker           *health.HealthChecker
+	CleanupHandler          *cleanup.CleanupHandler
+	TTLCleanupService       *cleanup.TTLCleanupService
+	SelfUpdateHandler       *selfupdate.Handler
+	DNSHandler              *dns.Handler
+	ACMEHandler             *acme.Handler
+	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
-	ARFHandler         *arf.Handler
+	ARFHandler              *arf.Handler
 	// OpenRewriteHandler *openrewrite.Handler
-	AnalysisHandler    *analysis.Handler
+	AnalysisHandler     *analysis.Handler
 	CoordinationManager *coordination.CoordinationManager
-	BlueGreenManager   *bluegreen.Manager
-	Metrics            *metrics.Metrics
-	StorageConfigPath  string
+	BlueGreenManager    *bluegreen.Manager
+	Metrics             *metrics.Metrics
+	StorageConfigPath   string
 	// Performance optimizations
-	ConsulPool         *performance.ConsulPool
-	NomadPool          *performance.NomadPool
-	StorageFactory     *config.OptimizedStorageClientFactory
+	ConsulPool     *performance.ConsulPool
+	NomadPool      *performance.NomadPool
+	StorageFactory *config.OptimizedStorageClientFactory
 }
 
 // ControllerConfig holds configuration for controller initialization
 type ControllerConfig struct {
-	Port                string
-	ConsulAddr          string
-	NomadAddr           string
-	StorageConfigPath   string
-	CleanupConfigPath   string
-	UseConsulEnv        bool
-	EnvStorePath        string
-	CleanupAutoStart    bool
-	ShutdownTimeout     time.Duration
+	Port              string
+	ConsulAddr        string
+	NomadAddr         string
+	StorageConfigPath string
+	CleanupConfigPath string
+	UseConsulEnv      bool
+	EnvStorePath      string
+	CleanupAutoStart  bool
+	ShutdownTimeout   time.Duration
 	// Performance settings
-	ConsulPoolSize      int
-	NomadPoolSize       int
-	EnableCaching       bool
+	ConsulPoolSize int
+	NomadPoolSize  int
+	EnableCaching  bool
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -114,26 +119,26 @@ func LoadConfigFromEnv() *ControllerConfig {
 		CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
 		ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
 		// Performance settings
-		ConsulPoolSize:    parseIntEnv("PLOY_CONSUL_POOL_SIZE", 10),
-		NomadPoolSize:     parseIntEnv("PLOY_NOMAD_POOL_SIZE", 8),
-		EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
+		ConsulPoolSize: parseIntEnv("PLOY_CONSUL_POOL_SIZE", 10),
+		NomadPoolSize:  parseIntEnv("PLOY_NOMAD_POOL_SIZE", 8),
+		EnableCaching:  utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
 	}
 }
 
 // Server represents the stateless controller server
 type Server struct {
-	app            *fiber.App
-	config         *ControllerConfig
-	dependencies   *ServiceDependencies
-	shutdownChan   chan os.Signal
-	coordinationCtx context.Context
+	app                *fiber.App
+	config             *ControllerConfig
+	dependencies       *ServiceDependencies
+	shutdownChan       chan os.Signal
+	coordinationCtx    context.Context
 	coordinationCancel context.CancelFunc
 }
 
 // NewServer creates a new controller server with dependency injection
 func NewServer(config *ControllerConfig) (*Server, error) {
 	log.Printf("Initializing Ploy Controller with configuration-driven setup")
-	
+
 	// Initialize dependencies
 	deps, err := initializeDependencies(config)
 	if err != nil {
@@ -156,13 +161,13 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${method} ${path} - ${latency}\n",
 	}))
-	
+
 	// Add metrics middleware if metrics are available
 	if deps.Metrics != nil {
 		app.Use(deps.Metrics.MetricsMiddleware())
 		deps.Metrics.StartUptimeUpdater()
 	}
-	
+
 	app.Use(preview.Router)
 
 	// Create coordination context
@@ -274,7 +279,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 	} else {
 		log.Printf("Consul connection pool initialized (size: %d)", cfg.ConsulPoolSize)
 	}
-	
+
 	nomadPool, err := performance.NewNomadPool(cfg.NomadAddr, cfg.NomadPoolSize)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize Nomad pool: %v", err)
@@ -282,46 +287,46 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 	} else {
 		log.Printf("Nomad connection pool initialized (size: %d)", cfg.NomadPoolSize)
 	}
-	
+
 	// Initialize optimized storage factory
 	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
-	
+
 	// Initialize Metrics
 	metricsInstance := metrics.NewMetrics()
-	
+
 	// Initialize Coordination Manager with metrics
 	coordinationManager, err := initializeCoordinationManagerWithMetrics(cfg, metricsInstance)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize coordination manager: %v", err)
 	}
-	
+
 	// Initialize Blue-Green Manager
 	blueGreenManager, err := initializeBlueGreenManager(cfg)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize blue-green manager: %v", err)
 	}
-	
+
 	deps := &ServiceDependencies{
-		EnvStore:           envStore,
-		TraefikRouter:      traefikRouter,
-		HealthChecker:      healthChecker,
-		CleanupHandler:     cleanupHandler,
-		TTLCleanupService:  ttlService,
-		SelfUpdateHandler:  selfUpdateHandler,
-		DNSHandler:         dnsHandler,
-		CertificateManager: certificateManager,
+		EnvStore:                envStore,
+		TraefikRouter:           traefikRouter,
+		HealthChecker:           healthChecker,
+		CleanupHandler:          cleanupHandler,
+		TTLCleanupService:       ttlService,
+		SelfUpdateHandler:       selfUpdateHandler,
+		DNSHandler:              dnsHandler,
+		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
-		ARFHandler:         arfHandler,
+		ARFHandler:              arfHandler,
 		// OpenRewriteHandler: openRewriteHandler,
-		AnalysisHandler:    analysisHandler,
+		AnalysisHandler:     analysisHandler,
 		CoordinationManager: coordinationManager,
-		BlueGreenManager:   blueGreenManager,
-		Metrics:            metricsInstance,
-		StorageConfigPath:  cfg.StorageConfigPath,
+		BlueGreenManager:    blueGreenManager,
+		Metrics:             metricsInstance,
+		StorageConfigPath:   cfg.StorageConfigPath,
 		// Performance components
-		ConsulPool:         consulPool,
-		NomadPool:          nomadPool,
-		StorageFactory:     storageFactory,
+		ConsulPool:     consulPool,
+		NomadPool:      nomadPool,
+		StorageFactory: storageFactory,
 	}
 
 	// Record startup time and initial pool metrics
@@ -335,8 +340,8 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 			metricsInstance.UpdateConnectionPoolUsage("nomad", float64(nomadPool.Size()))
 		}
 	}
-	
-	log.Printf("Service dependencies initialized successfully in %v (caching: %v, pools: consul=%d, nomad=%d)", 
+
+	log.Printf("Service dependencies initialized successfully in %v (caching: %v, pools: consul=%d, nomad=%d)",
 		startupDuration, cfg.EnableCaching, cfg.ConsulPoolSize, cfg.NomadPoolSize)
 	return deps, nil
 }
@@ -356,7 +361,7 @@ func initializeEnvStore(cfg *ControllerConfig) (envstore.EnvStoreInterface, erro
 			log.Printf("Failed to initialize Consul env store, falling back to file-based store: %v", err)
 		}
 	}
-	
+
 	// Fallback to file-based store
 	fileEnvStore := envstore.New(cfg.EnvStorePath)
 	log.Printf("Using file-based environment store at %s", cfg.EnvStorePath)
@@ -376,14 +381,14 @@ func initializeTraefikRouter(consulAddr string) (*routing.TraefikRouter, error) 
 // initializeCleanupService initializes TTL cleanup service
 func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *cleanup.TTLCleanupService, error) {
 	configManager := cleanup.NewConfigManager(cfg.CleanupConfigPath)
-	
+
 	// Load or create cleanup configuration
 	cleanupConfig, err := configManager.LoadConfig()
 	if err != nil {
 		log.Printf("Warning: Failed to load cleanup configuration, using defaults: %v", err)
 		cleanupConfig = cleanup.DefaultTTLConfig()
 	}
-	
+
 	// Override with environment variables if present
 	envConfig := cleanup.LoadConfigFromEnv()
 	if envConfig.PreviewTTL != cleanupConfig.PreviewTTL {
@@ -401,17 +406,17 @@ func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *
 	if envConfig.NomadAddr != cleanupConfig.NomadAddr {
 		cleanupConfig.NomadAddr = envConfig.NomadAddr
 	}
-	
+
 	// Create TTL cleanup service
 	ttlCleanupService := cleanup.NewTTLCleanupService(cleanupConfig)
 	cleanupHandler := cleanup.NewCleanupHandler(ttlCleanupService, configManager)
-	
+
 	// Start TTL cleanup service if enabled
 	if cfg.CleanupAutoStart {
 		if err := ttlCleanupService.Start(); err != nil {
 			log.Printf("Warning: Failed to start TTL cleanup service: %v", err)
 		} else {
-			log.Printf("TTL cleanup service started (interval: %v, preview TTL: %v)", 
+			log.Printf("TTL cleanup service started (interval: %v, preview TTL: %v)",
 				cleanupConfig.CleanupInterval, cleanupConfig.PreviewTTL)
 		}
 	}
@@ -495,9 +500,9 @@ func initializeDNSProvider() (dns.Provider, error) {
 		log.Printf("PLOY_APPS_DOMAIN_PROVIDER not set, DNS provider disabled")
 		return nil, nil
 	}
-	
+
 	log.Printf("Initializing DNS provider: %s", providerType)
-	
+
 	switch strings.ToLower(providerType) {
 	case "namecheap":
 		return initializeNamecheapProvider()
@@ -513,7 +518,7 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 	if apiKey == "" {
 		apiKey = os.Getenv("NAMECHEAP_SANDBOX_API_KEY")
 	}
-	
+
 	config := dns.NamecheapConfig{
 		APIUser:  os.Getenv("NAMECHEAP_API_USER"),
 		APIKey:   apiKey,
@@ -521,19 +526,19 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 		ClientIP: os.Getenv("NAMECHEAP_CLIENT_IP"),
 		Sandbox:  os.Getenv("NAMECHEAP_SANDBOX") == "true",
 	}
-	
+
 	// Validate required configuration
 	if config.APIUser == "" || config.APIKey == "" || config.Username == "" || config.ClientIP == "" {
 		return nil, fmt.Errorf("Namecheap DNS provider requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY (or NAMECHEAP_SANDBOX_API_KEY), NAMECHEAP_USERNAME, and NAMECHEAP_CLIENT_IP environment variables")
 	}
-	
+
 	log.Printf("Creating Namecheap DNS provider (sandbox: %v, user: %s, client_ip: %s)", config.Sandbox, config.APIUser, config.ClientIP)
-	
+
 	provider, err := dns.NewNamecheapProvider(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Namecheap provider: %w", err)
 	}
-	
+
 	// Note: In production, validate configuration by making API call
 	// For demonstration, we skip validation if using placeholder credentials
 	if !strings.Contains(config.APIKey, "placeholder") {
@@ -544,7 +549,7 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 	} else {
 		log.Printf("Namecheap DNS provider created with placeholder credentials (validation skipped)")
 	}
-	
+
 	log.Printf("Namecheap DNS provider initialized successfully")
 	return provider, nil
 }
@@ -560,7 +565,7 @@ func (s *Server) getStorageClient() (*storage.StorageClient, error) {
 		}
 		return client, err
 	}
-	
+
 	// Fallback to direct creation
 	start := time.Now()
 	client, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
@@ -581,7 +586,7 @@ func (s *Server) setupRoutes() {
 	s.app.Get("/health/update", s.dependencies.HealthChecker.UpdateStatusHandler)
 	s.app.Get("/health/platform-certificates", s.handlePlatformCertificateHealth)
 	s.app.Get("/health/coordination", s.handleCoordinationHealth)
-	
+
 	// Prometheus metrics endpoint
 	if s.dependencies.Metrics != nil {
 		s.app.Get("/metrics", s.dependencies.Metrics.Handler())
@@ -589,37 +594,37 @@ func (s *Server) setupRoutes() {
 	}
 
 	api := s.app.Group("/v1")
-	
+
 	// Application build endpoints with request-scoped storage
 	api.Post("/apps/:app/builds", s.handleTriggerBuild)
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)
-	
+
 	// Domain management with dependency injection
 	s.setupDomainRoutes(api)
-	
+
 	// Certificate management (Heroku-style)
 	s.setupCertificateRoutes(api)
-	
+
 	// Environment variables management with injected env store
 	api.Post("/apps/:app/env", s.handleSetEnvVars)
 	api.Get("/apps/:app/env", s.handleGetEnvVars)
 	api.Put("/apps/:app/env/:key", s.handleSetEnvVar)
 	api.Delete("/apps/:app/env/:key", s.handleDeleteEnvVar)
-	
+
 	// Debug, rollback, and destroy with dependency injection
 	api.Post("/apps/:app/debug", s.handleDebugApp)
 	api.Post("/apps/:app/rollback", debug.RollbackApp)
 	api.Delete("/apps/:app", s.handleDestroyApp)
-	
+
 	// Blue-Green deployment endpoints
 	s.setupBlueGreenRoutes(api)
-	
+
 	// Storage endpoints with request-scoped clients
 	api.Get("/storage/health", s.handleStorageHealth)
 	api.Get("/storage/metrics", s.handleStorageMetrics)
-	
+
 	// Configuration management endpoints
 	api.Get("/storage/config", s.handleGetStorageConfig)
 	api.Post("/storage/config/reload", s.handleReloadStorageConfig)
@@ -706,7 +711,7 @@ func (s *Server) setupCertificateRoutes(api fiber.Router) {
 		api.Post("/apps/:app/certificates/:domain/provision", s.handleProvisionCertificate)
 		api.Post("/apps/:app/certificates/:domain/upload", s.handleUploadCertificate)
 		api.Delete("/apps/:app/certificates/:domain", s.handleRemoveCertificate)
-		
+
 		log.Printf("Certificate management routes configured")
 	} else {
 		log.Printf("Certificate management routes skipped - certificate manager not available")
@@ -723,7 +728,7 @@ func (s *Server) setupBlueGreenRoutes(api fiber.Router) {
 		api.Post("/apps/:app/blue-green/auto-shift", s.handleAutoShiftTraffic)
 		api.Post("/apps/:app/blue-green/complete", s.handleCompleteBlueGreenDeployment)
 		api.Post("/apps/:app/blue-green/rollback", s.handleRollbackBlueGreenDeployment)
-		
+
 		log.Printf("Blue-Green deployment routes configured")
 	} else {
 		log.Printf("Blue-Green deployment routes skipped - blue-green manager not available")
@@ -747,10 +752,10 @@ func (s *Server) handleListAppCertificates(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status": "success",
-		"app": appName,
+		"status":       "success",
+		"app":          appName,
 		"certificates": certificates,
-		"count": len(certificates),
+		"count":        len(certificates),
 	})
 }
 
@@ -758,7 +763,7 @@ func (s *Server) handleListAppCertificates(c *fiber.Ctx) error {
 func (s *Server) handleGetDomainCertificate(c *fiber.Ctx) error {
 	appName := c.Params("app")
 	domain := c.Params("domain")
-	
+
 	if appName == "" || domain == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
 	}
@@ -779,7 +784,7 @@ func (s *Server) handleGetDomainCertificate(c *fiber.Ctx) error {
 func (s *Server) handleProvisionCertificate(c *fiber.Ctx) error {
 	appName := c.Params("app")
 	domain := c.Params("domain")
-	
+
 	if appName == "" || domain == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
 	}
@@ -795,9 +800,9 @@ func (s *Server) handleProvisionCertificate(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status": "provisioned",
-		"app": appName,
-		"domain": domain,
+		"status":      "provisioned",
+		"app":         appName,
+		"domain":      domain,
 		"certificate": certificate,
 	})
 }
@@ -806,7 +811,7 @@ func (s *Server) handleProvisionCertificate(c *fiber.Ctx) error {
 func (s *Server) handleRemoveCertificate(c *fiber.Ctx) error {
 	appName := c.Params("app")
 	domain := c.Params("domain")
-	
+
 	if appName == "" || domain == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
 	}
@@ -822,7 +827,7 @@ func (s *Server) handleRemoveCertificate(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"status": "removed",
-		"app": appName,
+		"app":    appName,
 		"domain": domain,
 	})
 }
@@ -831,7 +836,7 @@ func (s *Server) handleRemoveCertificate(c *fiber.Ctx) error {
 func (s *Server) handleUploadCertificate(c *fiber.Ctx) error {
 	appName := c.Params("app")
 	domain := c.Params("domain")
-	
+
 	if appName == "" || domain == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "App name and domain are required"})
 	}
@@ -875,11 +880,11 @@ func (s *Server) handleUploadCertificate(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status": "uploaded",
-		"app": appName,
-		"domain": domain,
+		"status":      "uploaded",
+		"app":         appName,
+		"domain":      domain,
 		"certificate": domainCert,
-		"message": "Custom certificate uploaded successfully",
+		"message":     "Custom certificate uploaded successfully",
 	})
 }
 
@@ -935,7 +940,7 @@ func (s *Server) Shutdown() error {
 	if s.coordinationCancel != nil {
 		log.Printf("Stopping coordination manager")
 		s.coordinationCancel()
-		
+
 		// Give coordination manager time to clean up
 		time.Sleep(2 * time.Second)
 	}
@@ -996,7 +1001,7 @@ func (s *Server) ensurePlatformWildcardCertificate() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	log.Printf("Ensuring platform wildcard certificate for domain: %s", 
+	log.Printf("Ensuring platform wildcard certificate for domain: %s",
 		s.dependencies.PlatformWildcardManager.GetPlatformDomain())
 
 	// Provision platform wildcard certificate if needed
@@ -1014,16 +1019,16 @@ func (s *Server) registerControllerWithTraefik() error {
 		log.Printf("Traefik router not available, skipping controller registration")
 		return nil
 	}
-	
+
 	// Get Nomad allocation information from environment
 	allocID := os.Getenv("NOMAD_ALLOC_ID")
 	allocIP := os.Getenv("NOMAD_IP_http")
-	
+
 	if allocID == "" || allocIP == "" {
 		log.Printf("Nomad allocation information not available (NOMAD_ALLOC_ID=%s, NOMAD_IP_http=%s), skipping Traefik registration", allocID, allocIP)
 		return nil
 	}
-	
+
 	// Parse port from server configuration
 	port := 8081 // Default port
 	if s.config.Port != "" {
@@ -1031,12 +1036,12 @@ func (s *Server) registerControllerWithTraefik() error {
 			port = parsedPort
 		}
 	}
-	
+
 	// Register controller with Traefik
 	if err := s.dependencies.TraefikRouter.RegisterController(allocID, allocIP, port); err != nil {
 		return fmt.Errorf("failed to register controller with Traefik: %w", err)
 	}
-	
+
 	controllerDomain := s.dependencies.TraefikRouter.GenerateControllerDomain()
 	log.Printf("Controller registered with Traefik, accessible at: https://%s", controllerDomain)
 	return nil
@@ -1062,7 +1067,7 @@ func (s *Server) handlePlatformCertificateHealth(c *fiber.Ctx) error {
 	}
 
 	daysUntilExpiry := int(time.Until(cert.ExpiresAt).Hours() / 24)
-	
+
 	// Determine health status based on expiry
 	status := "healthy"
 	if daysUntilExpiry <= 7 {
@@ -1088,13 +1093,13 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 
 	// Load ARF configuration from environment
 	arfConfig := arf.LoadConfigFromEnv()
-	
+
 	// Validate configuration
 	if err := arfConfig.Validate(); err != nil {
 		return nil, fmt.Errorf("ARF configuration validation failed: %w", err)
 	}
-	
-	log.Printf("ARF configuration loaded: storage=%s, index=%s, validation=%v", 
+
+	log.Printf("ARF configuration loaded: storage=%s, index=%s, validation=%v",
 		arfConfig.Storage.Backend, arfConfig.Index.Backend, arfConfig.Validation.Enabled)
 
 	// Initialize sandbox manager
@@ -1149,7 +1154,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create recipe catalog: %w", err)
 		}
-		
+
 		handler = arf.NewHandler(engine, catalog, sandboxMgr, benchmarkMgr)
 		log.Printf("ARF handler initialized with catalog fallback")
 	}
@@ -1253,11 +1258,11 @@ func (s *Server) handleStartBlueGreenDeployment(c *fiber.Ctx) error {
 	var req struct {
 		Version string `json:"version"`
 	}
-	
+
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
-	
+
 	if req.Version == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Version is required"})
 	}
@@ -1319,11 +1324,11 @@ func (s *Server) handleShiftTraffic(c *fiber.Ctx) error {
 	var req struct {
 		TargetWeight int `json:"target_weight"`
 	}
-	
+
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
 	}
-	
+
 	if req.TargetWeight < 0 || req.TargetWeight > 100 {
 		return c.Status(400).JSON(fiber.Map{"error": "Target weight must be between 0 and 100"})
 	}
@@ -1413,7 +1418,7 @@ func (s *Server) handleRollbackBlueGreenDeployment(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status":  "success", 
+		"status":  "success",
 		"message": "Blue-green deployment rolled back successfully",
 	})
 }
@@ -1437,7 +1442,7 @@ func initializeTemplateHandler() (*templates.Handler, error) {
 // 	config := &internal_openrewrite.Config{
 // 		WorkDir:          "/tmp/openrewrite",
 // 		MavenPath:        "mvn",
-// 		GradlePath:       "gradle", 
+// 		GradlePath:       "gradle",
 // 		GitPath:          "git",
 // 		MaxTransformTime: 5 * time.Minute,
 // 	}
@@ -1457,6 +1462,44 @@ func initializeTemplateHandler() (*templates.Handler, error) {
 // 	return handler, nil
 // }
 
+// loadCHTTPPrivateKey loads an RSA private key from a PEM file
+func loadCHTTPPrivateKey(path string) (*rsa.PrivateKey, error) {
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, fmt.Errorf("private key file not found: %s", path)
+	}
+
+	// Read the private key file
+	keyData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
+
+	// Parse the PEM block
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return nil, fmt.Errorf("failed to parse PEM block from private key")
+	}
+
+	// Parse the RSA private key
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		// Try PKCS8 format
+		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+
+		var ok bool
+		privateKey, ok = key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("private key is not an RSA key")
+		}
+	}
+
+	return privateKey, nil
+}
+
 // initializeAnalysisHandler initializes the static analysis handler
 func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (*analysis.Handler, error) {
 	log.Printf("Initializing Static Analysis handler")
@@ -1468,16 +1511,46 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (
 	// Create the analysis engine
 	engine := analysis.NewEngine(logger)
 
-	// Register Java analyzer with Error Prone
+	// Check analysis mode from environment (legacy or chttp)
+	analysisMode := utils.Getenv("PLOY_ANALYSIS_MODE", "chttp")
+	log.Printf("Static analysis mode: %s", analysisMode)
+
+	// Register Java analyzer with Error Prone (legacy only for now)
 	javaAnalyzer := javaanalyzer.NewErrorProneAnalyzer(logger)
 	if err := engine.RegisterAnalyzer("java", javaAnalyzer); err != nil {
 		return nil, fmt.Errorf("failed to register Java analyzer: %w", err)
 	}
 
-	// Register Python analyzer with Pylint
-	pythonAnalyzer := pythonanalyzer.NewPylintAnalyzer(logger)
-	if err := engine.RegisterAnalyzer("python", pythonAnalyzer); err != nil {
-		return nil, fmt.Errorf("failed to register Python analyzer: %w", err)
+	// Register Python analyzer based on mode
+	if analysisMode == "chttp" {
+		// Register CHTTP Python analyzer
+		if chttpEnabled := utils.Getenv("PLOY_CHTTP_PYTHON_ENABLED", "true") == "true"; chttpEnabled {
+			pylintServiceURL := utils.Getenv("PLOY_CHTTP_PYLINT_URL", "https://pylint.chttp.dev.ployd.app")
+			clientID := utils.Getenv("PLOY_CHTTP_CLIENT_ID", "ploy-controller")
+			privateKeyPath := utils.Getenv("PLOY_CHTTP_PRIVATE_KEY", "/etc/ploy/chttp-private-key.pem")
+
+			privateKey, err := loadCHTTPPrivateKey(privateKeyPath)
+			if err != nil {
+				log.Printf("Warning: Failed to load CHTTP private key from %s: %v", privateKeyPath, err)
+				return nil, fmt.Errorf("CHTTP mode requires valid private key: %w", err)
+			}
+
+			// Register CHTTP Pylint analyzer
+			chttpPylintAnalyzer := analysis.NewCHTTPPylintAnalyzer(pylintServiceURL, clientID, privateKey)
+			if err := engine.RegisterAnalyzer("python", chttpPylintAnalyzer); err != nil {
+				return nil, fmt.Errorf("failed to register CHTTP Python analyzer: %w", err)
+			}
+			log.Printf("Registered CHTTP Pylint analyzer at %s", pylintServiceURL)
+		}
+	} else if analysisMode == "legacy" {
+		// Register legacy Python analyzer
+		pythonAnalyzer := pythonanalyzer.NewPylintAnalyzer(logger)
+		if err := engine.RegisterAnalyzer("python", pythonAnalyzer); err != nil {
+			return nil, fmt.Errorf("failed to register Python analyzer: %w", err)
+		}
+		log.Printf("Registered legacy Pylint analyzer")
+	} else {
+		return nil, fmt.Errorf("invalid analysis mode: %s (must be 'chttp' or 'legacy')", analysisMode)
 	}
 
 	// TODO: Register additional language analyzers as they are implemented
@@ -1486,6 +1559,7 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (
 	// Create the handler
 	handler := analysis.NewHandler(engine, arfHandler, logger)
 
-	log.Printf("Static Analysis handler initialized with %d language analyzers", len(engine.GetSupportedLanguages()))
+	log.Printf("Static Analysis handler initialized with %d language analyzers (mode: %s)",
+		len(engine.GetSupportedLanguages()), analysisMode)
 	return handler, nil
 }

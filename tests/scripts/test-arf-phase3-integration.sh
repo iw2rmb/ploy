@@ -10,7 +10,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL=${PLOY_CONTROLLER:-"https://api.dev.ployd.app/v1"}
+CONTROLLER_URL=${PLOY_CONTROLLER:-"https://api.dev.ployman.app/v1"}
 TEST_RESULTS_DIR="/tmp/arf-phase3-test-results"
 TEST_STARTED=$(date '+%Y-%m-%d %H:%M:%S')
 

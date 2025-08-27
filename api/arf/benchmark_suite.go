@@ -21,14 +21,14 @@ func getControllerURLForBenchmark() string {
 	if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {
 		return controllerURL
 	}
-	
+
 	// Priority 2: Self-reference if running inside controller (check for PORT)
 	if port := os.Getenv("PORT"); port != "" {
 		return fmt.Sprintf("http://localhost:%s/v1", port)
 	}
-	
+
 	// Priority 3: Default development endpoint
-	return "https://api.dev.ployd.app/v1"
+	return "https://api.dev.ployman.app/v1"
 }
 
 // BenchmarkConfig defines configuration for a benchmark test run
@@ -36,51 +36,51 @@ type BenchmarkConfig struct {
 	// Test identification
 	Name        string `json:"name" yaml:"name"`
 	Description string `json:"description" yaml:"description"`
-	
+
 	// Repository configuration
-	RepoURL      string `json:"repo_url" yaml:"repo_url"`
-	RepoBranch   string `json:"repo_branch" yaml:"repo_branch"`
-	LocalPath    string `json:"local_path" yaml:"local_path"`
-	
+	RepoURL    string `json:"repo_url" yaml:"repo_url"`
+	RepoBranch string `json:"repo_branch" yaml:"repo_branch"`
+	LocalPath  string `json:"local_path" yaml:"local_path"`
+
 	// Task configuration
 	TaskType        string   `json:"task_type" yaml:"task_type"` // migration, security, cleanup, refactor
 	SourceLang      string   `json:"source_lang" yaml:"source_lang"`
 	TargetSpec      string   `json:"target_spec" yaml:"target_spec"` // e.g., "java:17", "spring-boot:3.0"
 	RecipeIDs       []string `json:"recipe_ids" yaml:"recipe_ids"`
 	RecipeArtifacts []string `json:"recipe_artifacts" yaml:"recipe_artifacts"`
-	
+
 	// LLM configuration
-	LLMProvider  string            `json:"llm_provider" yaml:"llm_provider"` // openai, ollama, anthropic, azure
-	LLMModel     string            `json:"llm_model" yaml:"llm_model"`
-	LLMOptions   map[string]string `json:"llm_options" yaml:"llm_options"`
-	
+	LLMProvider string            `json:"llm_provider" yaml:"llm_provider"` // openai, ollama, anthropic, azure
+	LLMModel    string            `json:"llm_model" yaml:"llm_model"`
+	LLMOptions  map[string]string `json:"llm_options" yaml:"llm_options"`
+
 	// Iteration control
-	MaxIterations      int           `json:"max_iterations" yaml:"max_iterations"`
+	MaxIterations       int           `json:"max_iterations" yaml:"max_iterations"`
 	TimeoutPerIteration time.Duration `json:"timeout_per_iteration" yaml:"timeout_per_iteration"`
-	StopOnSuccess      bool          `json:"stop_on_success" yaml:"stop_on_success"`
-	
+	StopOnSuccess       bool          `json:"stop_on_success" yaml:"stop_on_success"`
+
 	// Output configuration
-	OutputDir          string `json:"output_dir" yaml:"output_dir"`
-	CaptureFullDiffs   bool   `json:"capture_full_diffs" yaml:"capture_full_diffs"`
-	CapturePartialDiffs bool   `json:"capture_partial_diffs" yaml:"capture_partial_diffs"`
-	SaveIntermediateState bool `json:"save_intermediate_state" yaml:"save_intermediate_state"`
-	
+	OutputDir             string `json:"output_dir" yaml:"output_dir"`
+	CaptureFullDiffs      bool   `json:"capture_full_diffs" yaml:"capture_full_diffs"`
+	CapturePartialDiffs   bool   `json:"capture_partial_diffs" yaml:"capture_partial_diffs"`
+	SaveIntermediateState bool   `json:"save_intermediate_state" yaml:"save_intermediate_state"`
+
 	// Deployment configuration
-	DeploymentConfig   map[string]interface{} `json:"deployment_config,omitempty" yaml:"deployment_config,omitempty"`
+	DeploymentConfig map[string]interface{} `json:"deployment_config,omitempty" yaml:"deployment_config,omitempty"`
 }
 
 // BenchmarkIteration represents a single iteration in the benchmark
 type BenchmarkIteration struct {
-	Number      int                    `json:"number"`
-	StartTime   time.Time              `json:"start_time"`
-	EndTime     time.Time              `json:"end_time"`
-	Duration    time.Duration          `json:"duration"`
-	Status      string                 `json:"status"` // success, partial, failed, timeout
-	Stages      []BenchmarkStage       `json:"stages"`
-	Diffs       []DiffCapture          `json:"diffs"`
-	Errors      []ErrorCapture         `json:"errors"`
-	Metrics     IterationMetrics       `json:"metrics"`
-	LLMCalls    []LLMCallMetrics       `json:"llm_calls"`
+	Number    int              `json:"number"`
+	StartTime time.Time        `json:"start_time"`
+	EndTime   time.Time        `json:"end_time"`
+	Duration  time.Duration    `json:"duration"`
+	Status    string           `json:"status"` // success, partial, failed, timeout
+	Stages    []BenchmarkStage `json:"stages"`
+	Diffs     []DiffCapture    `json:"diffs"`
+	Errors    []ErrorCapture   `json:"errors"`
+	Metrics   IterationMetrics `json:"metrics"`
+	LLMCalls  []LLMCallMetrics `json:"llm_calls"`
 }
 
 // BenchmarkStage represents a stage within an iteration
@@ -107,25 +107,25 @@ type DiffCapture struct {
 
 // ErrorCapture captures errors during execution
 type ErrorCapture struct {
-	Stage     string    `json:"stage"`
-	Type      string    `json:"type"` // compile, test, validation, runtime
-	Message   string    `json:"message"`
-	Details   string    `json:"details,omitempty"`
-	StackTrace string   `json:"stack_trace,omitempty"`
-	Timestamp time.Time `json:"timestamp"`
+	Stage      string    `json:"stage"`
+	Type       string    `json:"type"` // compile, test, validation, runtime
+	Message    string    `json:"message"`
+	Details    string    `json:"details,omitempty"`
+	StackTrace string    `json:"stack_trace,omitempty"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // IterationMetrics captures metrics for an iteration
 type IterationMetrics struct {
-	FilesAnalyzed     int     `json:"files_analyzed"`
-	FilesModified     int     `json:"files_modified"`
-	LinesAdded        int     `json:"lines_added"`
-	LinesRemoved      int     `json:"lines_removed"`
-	CompileSuccess    bool    `json:"compile_success"`
-	TestsRun          int     `json:"tests_run"`
-	TestsPassed       int     `json:"tests_passed"`
-	CoveragePercent   float64 `json:"coverage_percent,omitempty"`
-	ComplexityDelta   int     `json:"complexity_delta,omitempty"`
+	FilesAnalyzed   int     `json:"files_analyzed"`
+	FilesModified   int     `json:"files_modified"`
+	LinesAdded      int     `json:"lines_added"`
+	LinesRemoved    int     `json:"lines_removed"`
+	CompileSuccess  bool    `json:"compile_success"`
+	TestsRun        int     `json:"tests_run"`
+	TestsPassed     int     `json:"tests_passed"`
+	CoveragePercent float64 `json:"coverage_percent,omitempty"`
+	ComplexityDelta int     `json:"complexity_delta,omitempty"`
 }
 
 // LLMCallMetrics tracks LLM usage
@@ -142,38 +142,38 @@ type LLMCallMetrics struct {
 
 // BenchmarkResult represents the complete result of a benchmark run
 type BenchmarkResult struct {
-	Config       BenchmarkConfig      `json:"config"`
-	StartTime    time.Time           `json:"start_time"`
-	EndTime      time.Time           `json:"end_time"`
-	TotalDuration time.Duration       `json:"total_duration"`
-	Iterations   []BenchmarkIteration `json:"iterations"`
-	Summary      BenchmarkSummary     `json:"summary"`
-	Comparison   *ComparisonResult    `json:"comparison,omitempty"`
+	Config        BenchmarkConfig      `json:"config"`
+	StartTime     time.Time            `json:"start_time"`
+	EndTime       time.Time            `json:"end_time"`
+	TotalDuration time.Duration        `json:"total_duration"`
+	Iterations    []BenchmarkIteration `json:"iterations"`
+	Summary       BenchmarkSummary     `json:"summary"`
+	Comparison    *ComparisonResult    `json:"comparison,omitempty"`
 }
 
 // BenchmarkSummary provides high-level metrics
 type BenchmarkSummary struct {
-	TotalIterations    int           `json:"total_iterations"`
-	SuccessfulIterations int         `json:"successful_iterations"`
-	PartialIterations  int           `json:"partial_iterations"`
-	FailedIterations   int           `json:"failed_iterations"`
+	TotalIterations      int           `json:"total_iterations"`
+	SuccessfulIterations int           `json:"successful_iterations"`
+	PartialIterations    int           `json:"partial_iterations"`
+	FailedIterations     int           `json:"failed_iterations"`
 	AverageIterationTime time.Duration `json:"average_iteration_time"`
-	TotalLLMCalls      int           `json:"total_llm_calls"`
-	TotalLLMTokens     int           `json:"total_llm_tokens"`
-	TotalLLMCost       float64       `json:"total_llm_cost"`
-	FinalCompileStatus bool          `json:"final_compile_status"`
-	FinalTestStatus    bool          `json:"final_test_status"`
-	TotalFilesModified int           `json:"total_files_modified"`
-	TotalLinesChanged  int           `json:"total_lines_changed"`
+	TotalLLMCalls        int           `json:"total_llm_calls"`
+	TotalLLMTokens       int           `json:"total_llm_tokens"`
+	TotalLLMCost         float64       `json:"total_llm_cost"`
+	FinalCompileStatus   bool          `json:"final_compile_status"`
+	FinalTestStatus      bool          `json:"final_test_status"`
+	TotalFilesModified   int           `json:"total_files_modified"`
+	TotalLinesChanged    int           `json:"total_lines_changed"`
 }
 
 // ComparisonResult compares multiple benchmark runs
 type ComparisonResult struct {
-	BaselineRun   string                 `json:"baseline_run"`
-	ComparedRuns  []string               `json:"compared_runs"`
-	Metrics       map[string]interface{} `json:"metrics"`
-	Winner        string                 `json:"winner"`
-	Analysis      string                 `json:"analysis"`
+	BaselineRun  string                 `json:"baseline_run"`
+	ComparedRuns []string               `json:"compared_runs"`
+	Metrics      map[string]interface{} `json:"metrics"`
+	Winner       string                 `json:"winner"`
+	Analysis     string                 `json:"analysis"`
 }
 
 // BenchmarkSuite manages benchmark test execution
@@ -197,15 +197,15 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 	// Create LLM generator based on provider
 	var llmGen LLMRecipeGenerator
 	var err error
-	
+
 	switch config.LLMProvider {
 	case "ollama":
 		// Extract Ollama configuration from config
 		model := config.LLMModel
 		baseURL := "http://localhost:11434" // default
-		temperature := 0.1 // default
-		contextLength := 4096 // default
-		
+		temperature := 0.1                  // default
+		contextLength := 4096               // default
+
 		// Override with options if provided
 		if config.LLMOptions != nil {
 			if url, ok := config.LLMOptions["base_url"]; ok && url != "" {
@@ -222,7 +222,7 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 				}
 			}
 		}
-		
+
 		llmGen, err = NewOllamaLLMGeneratorWithConfig(model, baseURL, temperature, contextLength)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Ollama generator: %w", err)
@@ -241,11 +241,11 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", config.LLMProvider)
 	}
-	
+
 	// Determine if we need multi-language engine or can use OpenRewrite directly
 	var multiLang MultiLanguageEngine
 	needsTreeSitter := false
-	
+
 	// Check if all recipes are OpenRewrite-based
 	for _, recipeID := range config.RecipeIDs {
 		if !strings.HasPrefix(recipeID, "org.openrewrite.") {
@@ -253,7 +253,7 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 			break
 		}
 	}
-	
+
 	if needsTreeSitter {
 		// Only create Tree-sitter engine if we have non-OpenRewrite recipes
 		multiLang, err = NewTreeSitterMultiLanguageEngine()
@@ -266,22 +266,22 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 		}
 	}
 	// For OpenRewrite-only recipes, multiLang will be nil and we'll use RecipeExecutor directly
-	
+
 	// Create output directory if needed
 	if config.OutputDir != "" {
 		if err := os.MkdirAll(config.OutputDir, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create output directory: %w", err)
 		}
 	}
-	
+
 	// Create deployment sandbox manager with controller URL detection
 	controllerURL := getControllerURLForBenchmark()
 	sandboxMgr := NewDeploymentSandboxManager(controllerURL, logger)
-	
+
 	// Create a simple in-memory recipe storage for now
 	// In production, this would use SeaweedFS storage
 	recipeStorage := NewInMemoryRecipeStorage()
-	
+
 	return &BenchmarkSuite{
 		config:          config,
 		llmGenerator:    llmGen,
@@ -289,8 +289,8 @@ func NewBenchmarkSuite(config *BenchmarkConfig, logger LogFunction) (*BenchmarkS
 		gitOps:          NewGitOperations(config.OutputDir),
 		buildOps:        NewBuildOperations(config.TimeoutPerIteration),
 		recipeExecutor:  NewRecipeExecutor(recipeStorage, sandboxMgr),
-		sandboxMgr:     sandboxMgr,
-		logger:         logger,
+		sandboxMgr:      sandboxMgr,
+		logger:          logger,
 	}, nil
 }
 
@@ -299,12 +299,12 @@ func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
 	if bs.logger != nil {
 		bs.logger("INFO", "repository_preparation", "Starting repository preparation", fmt.Sprintf("Repository: %s, Branch: %s", bs.config.RepoURL, bs.config.RepoBranch))
 	}
-	
+
 	result := &BenchmarkResult{
 		Config:    *bs.config,
 		StartTime: time.Now(),
 	}
-	
+
 	// Clone or prepare repository
 	repoPath, err := bs.prepareRepository()
 	if err != nil {
@@ -313,34 +313,34 @@ func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
 		}
 		return nil, fmt.Errorf("failed to prepare repository: %w", err)
 	}
-	
+
 	if bs.logger != nil {
 		bs.logger("INFO", "repository_preparation", "Repository prepared successfully", fmt.Sprintf("Local path: %s", repoPath))
 	}
-	
+
 	// Run iterations
 	if bs.logger != nil {
 		bs.logger("INFO", "iteration_execution", "Starting iterations", fmt.Sprintf("Maximum iterations: %d", bs.config.MaxIterations))
 	}
-	
+
 	for i := 0; i < bs.config.MaxIterations; i++ {
 		if bs.logger != nil {
 			bs.logger("INFO", "iteration_execution", fmt.Sprintf("Starting iteration %d", i+1), "")
 		}
-		
+
 		iteration, err := bs.runIteration(ctx, i+1, repoPath)
 		if err != nil {
 			if bs.logger != nil {
 				bs.logger("ERROR", "iteration_execution", fmt.Sprintf("Iteration %d failed", i+1), fmt.Sprintf("Error: %v", err))
 			}
 		}
-		
+
 		result.Iterations = append(result.Iterations, *iteration)
-		
+
 		if bs.logger != nil {
 			bs.logger("INFO", "iteration_execution", fmt.Sprintf("Iteration %d completed", i+1), fmt.Sprintf("Status: %s", iteration.Status))
 		}
-		
+
 		// Check if we should stop
 		if bs.config.StopOnSuccess && iteration.Status == "success" {
 			if bs.logger != nil {
@@ -348,22 +348,22 @@ func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
 			}
 			break
 		}
-		
+
 		// Save intermediate state if configured
 		if bs.config.SaveIntermediateState {
 			bs.saveIntermediateState(i+1, repoPath, iteration)
 		}
 	}
-	
+
 	// Generate summary
 	result.EndTime = time.Now()
 	result.TotalDuration = result.EndTime.Sub(result.StartTime)
 	result.Summary = bs.generateSummary(result)
-	
+
 	if bs.logger != nil {
 		bs.logger("INFO", "summary_generation", "Generated benchmark summary", fmt.Sprintf("Total iterations: %d, Total duration: %s", len(result.Iterations), result.TotalDuration))
 	}
-	
+
 	// Save final result
 	if err := bs.saveResult(result); err != nil {
 		if bs.logger != nil {
@@ -372,7 +372,7 @@ func (bs *BenchmarkSuite) Run(ctx context.Context) (*BenchmarkResult, error) {
 	} else if bs.logger != nil {
 		bs.logger("INFO", "result_saving", "Benchmark result saved successfully", "")
 	}
-	
+
 	return result, nil
 }
 
@@ -382,12 +382,12 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 		Number:    number,
 		StartTime: time.Now(),
 	}
-	
+
 	// Stage 1: OpenRewrite transformation
 	if bs.logger != nil {
 		bs.logger("INFO", "openrewrite_transform", "Starting OpenRewrite transformation stage", fmt.Sprintf("Applying %d recipes", len(bs.config.RecipeIDs)))
 	}
-	
+
 	stage1 := bs.runStage("openrewrite_transform", func() error {
 		// Apply OpenRewrite recipes
 		for i, recipeID := range bs.config.RecipeIDs {
@@ -407,17 +407,17 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 		return nil
 	})
 	iteration.Stages = append(iteration.Stages, stage1)
-	
+
 	if bs.logger != nil {
 		bs.logger("INFO", "openrewrite_transform", "OpenRewrite stage completed", fmt.Sprintf("Status: %s", stage1.Status))
 	}
-	
+
 	// Stage 2: Application Deployment
 	var sandbox *Sandbox
 	if bs.logger != nil {
 		bs.logger("INFO", "deployment", "Starting application deployment stage", fmt.Sprintf("Repository path: %s", repoPath))
 	}
-	
+
 	stage2 := bs.runStage("deployment", func() error {
 		if bs.logger != nil {
 			bs.logger("INFO", "deployment", "Calling deployApplication method", "")
@@ -440,11 +440,11 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 		return err
 	})
 	iteration.Stages = append(iteration.Stages, stage2)
-	
+
 	if bs.logger != nil {
 		bs.logger("INFO", "deployment", "Deployment stage completed", fmt.Sprintf("Status: %s", stage2.Status))
 	}
-	
+
 	// Stage 3: Application Testing
 	stage3 := bs.runStage("application_testing", func() error {
 		if sandbox == nil {
@@ -453,7 +453,7 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 		return bs.testDeployedApp(ctx, sandbox)
 	})
 	iteration.Stages = append(iteration.Stages, stage3)
-	
+
 	// Stage 4: Error detection and self-healing (if deployment/tests failed)
 	if stage2.Status != "success" || stage3.Status != "success" {
 		stage4 := bs.runStage("error_detection", func() error {
@@ -464,20 +464,20 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 			return nil
 		})
 		iteration.Stages = append(iteration.Stages, stage4)
-		
+
 		// Stage 5: LLM self-healing
 		if len(iteration.Errors) > 0 {
 			stage5 := bs.runStage("llm_self_healing", func() error {
 				return bs.performSelfHealing(ctx, repoPath, iteration.Errors)
 			})
 			iteration.Stages = append(iteration.Stages, stage5)
-			
+
 			// Capture diffs after self-healing
 			diffs := bs.captureDiffs(repoPath)
 			iteration.Diffs = append(iteration.Diffs, diffs...)
 		}
 	}
-	
+
 	// Stage 6: Cleanup
 	stage6 := bs.runStage("cleanup", func() error {
 		if sandbox != nil {
@@ -486,15 +486,15 @@ func (bs *BenchmarkSuite) runIteration(ctx context.Context, number int, repoPath
 		return nil
 	})
 	iteration.Stages = append(iteration.Stages, stage6)
-	
+
 	// Collect metrics
 	iteration.Metrics = bs.collectMetrics(repoPath)
-	
+
 	// Determine final status
 	iteration.EndTime = time.Now()
 	iteration.Duration = iteration.EndTime.Sub(iteration.StartTime)
 	iteration.Status = bs.determineIterationStatus(iteration)
-	
+
 	return iteration, nil
 }
 
@@ -504,10 +504,10 @@ func (bs *BenchmarkSuite) prepareRepository() (string, error) {
 	if bs.config.LocalPath != "" {
 		return bs.config.LocalPath, nil
 	}
-	
+
 	// Determine base directory with proper fallback chain
 	var baseDir string
-	
+
 	// Priority 1: Use Nomad allocation directory if available (always writable)
 	allocDir := os.Getenv("NOMAD_ALLOC_DIR")
 	if allocDir != "" {
@@ -522,22 +522,22 @@ func (bs *BenchmarkSuite) prepareRepository() (string, error) {
 		baseDir = filepath.Join(os.TempDir(), "arf-benchmark")
 		fmt.Printf("Using system temp directory: %s\n", baseDir)
 	}
-	
+
 	// Ensure base directory exists with proper permissions
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
 	}
-	
+
 	// Create unique directory for this benchmark run
 	timestamp := time.Now().Unix()
 	tempDir := filepath.Join(baseDir, fmt.Sprintf("%s-%d", bs.config.Name, timestamp))
-	
+
 	// Clone the repository
 	ctx := context.Background()
 	if err := bs.gitOps.CloneRepository(ctx, bs.config.RepoURL, bs.config.RepoBranch, tempDir); err != nil {
 		return "", fmt.Errorf("failed to clone repository: %w", err)
 	}
-	
+
 	fmt.Printf("Repository cloned successfully to: %s\n", tempDir)
 	return tempDir, nil
 }
@@ -547,18 +547,18 @@ func (bs *BenchmarkSuite) runStage(name string, fn func() error) BenchmarkStage 
 		Name:      name,
 		StartTime: time.Now(),
 	}
-	
+
 	err := fn()
 	stage.EndTime = time.Now()
 	stage.Duration = stage.EndTime.Sub(stage.StartTime)
-	
+
 	if err != nil {
 		stage.Status = "failed"
 		stage.Details = err.Error()
 	} else {
 		stage.Status = "success"
 	}
-	
+
 	return stage
 }
 
@@ -567,7 +567,7 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 	if bs.logger != nil {
 		bs.logger("INFO", "deployment", "deployApplication method called", fmt.Sprintf("repoPath: %s", repoPath))
 	}
-	
+
 	// Check if we have a deployment-integrated sandbox manager
 	deploySandbox, ok := bs.sandboxMgr.(*DeploymentSandboxManager)
 	if !ok {
@@ -576,7 +576,7 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 		}
 		return nil, fmt.Errorf("Application deployment requires DeploymentSandboxManager - this should not happen with the new initialization")
 	}
-	
+
 	if bs.logger != nil {
 		bs.logger("INFO", "deployment", "DeploymentSandboxManager confirmed", "")
 	}
@@ -604,7 +604,7 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 	config := SandboxConfig{
 		Repository:    bs.config.RepoURL,    // Original repository URL for metadata
 		Branch:        bs.config.RepoBranch, // Original branch
-		LocalPath:     repoPath,              // Path to transformed code
+		LocalPath:     repoPath,             // Path to transformed code
 		Language:      language,
 		BuildTool:     buildSystem,
 		TTL:           bs.config.TimeoutPerIteration * 2, // Double timeout for deployment
@@ -613,7 +613,7 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 		NetworkAccess: true, // Required for health checks
 		TempSpace:     "2G",
 	}
-	
+
 	if bs.logger != nil {
 		bs.logger("INFO", "deployment", "Created sandbox configuration", fmt.Sprintf("Language: %s, BuildTool: %s, LocalPath: %s", language, buildSystem, repoPath))
 		bs.logger("INFO", "deployment", "About to call CreateSandbox", "This should trigger DeploymentSandboxManager.CreateSandbox")
@@ -639,7 +639,7 @@ func (bs *BenchmarkSuite) deployApplication(ctx context.Context, repoPath string
 			bs.logger("WARN", "deployment", "CreateSandbox returned nil sandbox", "")
 		}
 	}
-	
+
 	return sandbox, nil
 }
 
@@ -658,21 +658,21 @@ func (bs *BenchmarkSuite) testDeployedApp(ctx context.Context, sandbox *Sandbox)
 
 	// Determine endpoints to test based on application type
 	testEndpoints := []string{"/healthz", "/health", "/"}
-	
+
 	// Add Spring Boot specific endpoints if it's a Java app
 	if sandbox.Config.Language == "java" {
-		testEndpoints = append(testEndpoints, 
+		testEndpoints = append(testEndpoints,
 			"/actuator/health",
 			"/actuator/info",
 		)
 	}
-	
+
 	// Test multiple endpoints
 	successfulEndpoints := 0
 	for _, endpoint := range testEndpoints {
 		testURL := appURL + endpoint
 		fmt.Printf("Testing endpoint: %s\n", testURL)
-		
+
 		if err := bs.testEndpointWithRetry(ctx, testURL); err != nil {
 			fmt.Printf("Endpoint %s failed: %v\n", endpoint, err)
 			// Continue testing other endpoints instead of failing immediately
@@ -681,15 +681,15 @@ func (bs *BenchmarkSuite) testDeployedApp(ctx context.Context, sandbox *Sandbox)
 			successfulEndpoints++
 		}
 	}
-	
+
 	// Require at least one endpoint to be successful
 	if successfulEndpoints == 0 {
 		return fmt.Errorf("all endpoints failed testing")
 	}
-	
-	fmt.Printf("Application testing completed: %d/%d endpoints successful\n", 
+
+	fmt.Printf("Application testing completed: %d/%d endpoints successful\n",
 		successfulEndpoints, len(testEndpoints))
-	
+
 	// Performance validation is optional
 	fmt.Printf("Running performance validation\n")
 	if err := bs.validatePerformance(ctx, appURL); err != nil {
@@ -703,17 +703,17 @@ func (bs *BenchmarkSuite) testDeployedApp(ctx context.Context, sandbox *Sandbox)
 func (bs *BenchmarkSuite) testEndpointWithRetry(ctx context.Context, endpointURL string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	maxRetries := 3
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			time.Sleep(time.Duration(attempt) * 2 * time.Second)
 		}
-		
+
 		req, err := http.NewRequestWithContext(ctx, "GET", endpointURL, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
-		
+
 		resp, err := client.Do(req)
 		if err != nil {
 			if attempt < maxRetries-1 {
@@ -722,18 +722,18 @@ func (bs *BenchmarkSuite) testEndpointWithRetry(ctx context.Context, endpointURL
 			return fmt.Errorf("request failed: %w", err)
 		}
 		defer resp.Body.Close()
-		
+
 		// Accept any 2xx or 3xx status as success
 		if resp.StatusCode < 400 {
 			return nil
 		}
-		
+
 		// For 404, don't retry - endpoint doesn't exist
 		if resp.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("endpoint not found (404)")
 		}
 	}
-	
+
 	return fmt.Errorf("endpoint test failed after %d attempts", maxRetries)
 }
 
@@ -770,10 +770,10 @@ func (bs *BenchmarkSuite) detectDeploymentErrors(ctx context.Context, repoPath s
 
 func (bs *BenchmarkSuite) applyOpenRewriteRecipe(ctx context.Context, repoPath string, recipeID string) error {
 	// Try to load recipe from examples directory first
-	recipePath := filepath.Join("controller/arf/examples", recipeID + ".yaml")
+	recipePath := filepath.Join("controller/arf/examples", recipeID+".yaml")
 	var recipe *models.Recipe
 	var err error
-	
+
 	if _, statErr := os.Stat(recipePath); statErr == nil {
 		// Load from file
 		recipe, err = LoadRecipeFromFile(recipePath)
@@ -786,42 +786,42 @@ func (bs *BenchmarkSuite) applyOpenRewriteRecipe(ctx context.Context, repoPath s
 		if err != nil {
 			return fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 		}
-		
+
 		if !result.Success {
 			return fmt.Errorf("recipe %s failed", recipeID)
 		}
-		
-		fmt.Printf("Applied recipe %s: %d changes in %d files\n", 
+
+		fmt.Printf("Applied recipe %s: %d changes in %d files\n",
 			recipeID, result.ChangesApplied, len(result.FilesModified))
-		
+
 		// Commit the changes to track them
 		if result.ChangesApplied > 0 {
 			commitMsg := fmt.Sprintf("Applied recipe: %s", recipeID)
 			bs.gitOps.CommitChanges(ctx, repoPath, commitMsg)
 		}
-		
+
 		return nil
 	}
-	
+
 	// Execute the loaded recipe
 	result, err := bs.recipeExecutor.ExecuteRecipeObject(ctx, recipe, repoPath)
 	if err != nil {
 		return fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 	}
-	
+
 	if !result.Success {
 		return fmt.Errorf("recipe %s failed", recipeID)
 	}
-	
-	fmt.Printf("Applied recipe %s: %d changes in %d files\n", 
+
+	fmt.Printf("Applied recipe %s: %d changes in %d files\n",
 		recipeID, result.ChangesApplied, len(result.FilesModified))
-	
+
 	// Commit the changes to track them
 	if result.ChangesApplied > 0 {
 		commitMsg := fmt.Sprintf("Applied recipe: %s", recipeID)
 		bs.gitOps.CommitChanges(ctx, repoPath, commitMsg)
 	}
-	
+
 	return nil
 }
 
@@ -832,23 +832,23 @@ func (bs *BenchmarkSuite) validateBuild(ctx context.Context, repoPath string) er
 		fmt.Printf("Warning: Unknown build system for %s\n", repoPath)
 		return nil // Don't fail on unknown build systems
 	}
-	
+
 	fmt.Printf("Detected build system: %s\n", buildSystem)
 	if err := bs.buildOps.ValidateBuild(ctx, repoPath, buildSystem); err != nil {
 		return fmt.Errorf("build validation failed: %w", err)
 	}
-	
+
 	return nil
 }
 
 func (bs *BenchmarkSuite) detectErrors(ctx context.Context, repoPath string) []ErrorCapture {
 	// Try to run build and capture errors
 	buildSystem := bs.buildOps.DetectBuildSystem(repoPath)
-	
+
 	// Create a context with timeout for build
 	buildCtx, cancel := context.WithTimeout(ctx, bs.config.TimeoutPerIteration)
 	defer cancel()
-	
+
 	// Run build and capture output
 	err := bs.buildOps.ValidateBuild(buildCtx, repoPath, buildSystem)
 	if err != nil {
@@ -861,7 +861,7 @@ func (bs *BenchmarkSuite) detectErrors(ctx context.Context, repoPath string) []E
 				Timestamp: time.Now(),
 			}}
 		}
-		
+
 		// Generic error
 		return []ErrorCapture{{
 			Type:      "build",
@@ -869,7 +869,7 @@ func (bs *BenchmarkSuite) detectErrors(ctx context.Context, repoPath string) []E
 			Timestamp: time.Now(),
 		}}
 	}
-	
+
 	return []ErrorCapture{}
 }
 
@@ -878,46 +878,46 @@ func (bs *BenchmarkSuite) performSelfHealing(ctx context.Context, repoPath strin
 	for _, err := range errors {
 		request := RecipeGenerationRequest{
 			ErrorContext: ErrorContext{
-				ErrorType:    err.Type,
-				ErrorMessage: err.Message,
-				SourceFile:   "", // TODO: Extract from error
+				ErrorType:      err.Type,
+				ErrorMessage:   err.Message,
+				SourceFile:     "", // TODO: Extract from error
 				CompilerOutput: err.Details,
 			},
 			CodebaseContext: CodebaseContext{
-				Language:    bs.config.SourceLang,
-				Framework:   bs.config.TargetSpec,
+				Language:  bs.config.SourceLang,
+				Framework: bs.config.TargetSpec,
 			},
 			Language: bs.config.SourceLang,
 		}
-		
+
 		recipe, llmErr := bs.llmGenerator.GenerateRecipe(ctx, request)
 		if llmErr != nil {
 			return fmt.Errorf("LLM generation failed: %w", llmErr)
 		}
-		
+
 		// Apply the generated fix
 		// TODO: Implement fix application
 		_ = recipe
 	}
-	
+
 	return nil
 }
 
 func (bs *BenchmarkSuite) captureDiffs(repoPath string) []DiffCapture {
 	ctx := context.Background()
-	
+
 	// Check if we should capture full diffs based on configuration
 	if !bs.config.CaptureFullDiffs && !bs.config.CapturePartialDiffs {
 		fmt.Printf("Diff capture disabled by configuration\n")
 		return []DiffCapture{}
 	}
-	
+
 	diffs, err := bs.gitOps.GetDiff(ctx, repoPath)
 	if err != nil {
 		fmt.Printf("Warning: failed to capture diffs: %v\n", err)
 		return []DiffCapture{}
 	}
-	
+
 	// Enhance diff information
 	for i := range diffs {
 		// Count lines added/removed from unified diff
@@ -931,7 +931,7 @@ func (bs *BenchmarkSuite) captureDiffs(repoPath string) []DiffCapture {
 				}
 			}
 		}
-		
+
 		// If partial diffs only, truncate large diffs
 		if bs.config.CapturePartialDiffs && !bs.config.CaptureFullDiffs {
 			if len(diffs[i].UnifiedDiff) > 5000 {
@@ -939,12 +939,12 @@ func (bs *BenchmarkSuite) captureDiffs(repoPath string) []DiffCapture {
 			}
 		}
 	}
-	
-	fmt.Printf("Captured %d file diffs (%d lines added, %d removed)\n", 
-		len(diffs), 
-		sumLinesAdded(diffs), 
+
+	fmt.Printf("Captured %d file diffs (%d lines added, %d removed)\n",
+		len(diffs),
+		sumLinesAdded(diffs),
 		sumLinesRemoved(diffs))
-	
+
 	return diffs
 }
 
@@ -971,41 +971,41 @@ func (bs *BenchmarkSuite) runTests(ctx context.Context, repoPath string) error {
 		fmt.Printf("Warning: Unknown build system, skipping tests\n")
 		return nil
 	}
-	
+
 	fmt.Printf("Running tests with %s\n", buildSystem)
 	results, err := bs.buildOps.RunTests(ctx, repoPath, buildSystem)
 	if err != nil {
 		return fmt.Errorf("test execution failed: %w", err)
 	}
-	
-	fmt.Printf("Test results: %d passed, %d failed (total: %d)\n", 
+
+	fmt.Printf("Test results: %d passed, %d failed (total: %d)\n",
 		results.Passed, results.Failed, results.Total)
-	
+
 	if !results.Success && results.Failed > 0 {
 		return fmt.Errorf("tests failed: %d failures", results.Failed)
 	}
-	
+
 	return nil
 }
 
 func (bs *BenchmarkSuite) collectMetrics(repoPath string) IterationMetrics {
 	ctx := context.Background()
 	metrics := IterationMetrics{}
-	
+
 	// Count changed files
 	if count, err := bs.gitOps.CountChangedFiles(ctx, repoPath); err == nil {
 		metrics.FilesModified = count
 	}
-	
+
 	// Get line changes
 	if added, removed, err := bs.gitOps.GetLineChanges(ctx, repoPath); err == nil {
 		metrics.LinesAdded = added
 		metrics.LinesRemoved = removed
 	}
-	
+
 	// TODO: Get compile and test results from build/test execution
 	// For now, these will be set by the validateBuild and runTests functions
-	
+
 	return metrics
 }
 
@@ -1027,15 +1027,15 @@ func (bs *BenchmarkSuite) saveIntermediateState(iterationNum int, repoPath strin
 	filename := filepath.Join(bs.config.OutputDir, fmt.Sprintf("iteration_%d.json", iterationNum))
 	data, _ := json.MarshalIndent(iteration, "", "  ")
 	os.WriteFile(filename, data, 0644)
-	
+
 	// TODO: Save repository state (git commit or archive)
 }
 
 func (bs *BenchmarkSuite) generateSummary(result *BenchmarkResult) BenchmarkSummary {
 	summary := BenchmarkSummary{}
-	
+
 	summary.TotalIterations = len(result.Iterations)
-	
+
 	var totalDuration time.Duration
 	for _, iter := range result.Iterations {
 		switch iter.Status {
@@ -1046,44 +1046,44 @@ func (bs *BenchmarkSuite) generateSummary(result *BenchmarkResult) BenchmarkSumm
 		case "failed":
 			summary.FailedIterations++
 		}
-		
+
 		totalDuration += iter.Duration
 		summary.TotalLLMCalls += len(iter.LLMCalls)
-		
+
 		for _, call := range iter.LLMCalls {
 			summary.TotalLLMTokens += call.InputTokens + call.OutputTokens
 			summary.TotalLLMCost += call.Cost
 		}
-		
+
 		summary.TotalFilesModified += iter.Metrics.FilesModified
 		summary.TotalLinesChanged += iter.Metrics.LinesAdded + iter.Metrics.LinesRemoved
 	}
-	
+
 	if summary.TotalIterations > 0 {
 		summary.AverageIterationTime = totalDuration / time.Duration(summary.TotalIterations)
-		
+
 		lastIter := result.Iterations[len(result.Iterations)-1]
 		summary.FinalCompileStatus = lastIter.Metrics.CompileSuccess
 		summary.FinalTestStatus = lastIter.Metrics.TestsPassed == lastIter.Metrics.TestsRun
 	}
-	
+
 	return summary
 }
 
 func (bs *BenchmarkSuite) saveResult(result *BenchmarkResult) error {
 	// Save comprehensive JSON result
-	filename := filepath.Join(bs.config.OutputDir, fmt.Sprintf("benchmark_%s_%d.json", 
+	filename := filepath.Join(bs.config.OutputDir, fmt.Sprintf("benchmark_%s_%d.json",
 		bs.config.Name, time.Now().Unix()))
-	
+
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return err
 	}
-	
+
 	// Generate Markdown report
 	markdownFile := strings.Replace(filename, ".json", ".md", 1)
 	return bs.generateMarkdownReport(result, markdownFile)
@@ -1091,7 +1091,7 @@ func (bs *BenchmarkSuite) saveResult(result *BenchmarkResult) error {
 
 func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filename string) error {
 	var report strings.Builder
-	
+
 	// Report Header
 	report.WriteString(fmt.Sprintf("# ARF Benchmark Report: %s\n\n", result.Config.Name))
 	report.WriteString(fmt.Sprintf("**Generated:** %s  \n", time.Now().Format("2006-01-02 15:04:05 UTC")))
@@ -1101,12 +1101,12 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 		report.WriteString(fmt.Sprintf("**Branch:** %s  \n", result.Config.RepoBranch))
 	}
 	report.WriteString("\n---\n\n")
-	
+
 	// Executive Summary
 	report.WriteString("## 📊 Executive Summary\n\n")
 	summary := result.Summary
 	report.WriteString(fmt.Sprintf("- **Total Iterations:** %d\n", summary.TotalIterations))
-	report.WriteString(fmt.Sprintf("- **Successful:** %d (%.1f%%)\n", summary.SuccessfulIterations, 
+	report.WriteString(fmt.Sprintf("- **Successful:** %d (%.1f%%)\n", summary.SuccessfulIterations,
 		float64(summary.SuccessfulIterations)/float64(summary.TotalIterations)*100))
 	report.WriteString(fmt.Sprintf("- **Partial Success:** %d\n", summary.PartialIterations))
 	report.WriteString(fmt.Sprintf("- **Failed:** %d\n", summary.FailedIterations))
@@ -1115,7 +1115,7 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 	report.WriteString(fmt.Sprintf("- **Total Lines Changed:** %d\n", summary.TotalLinesChanged))
 	report.WriteString(fmt.Sprintf("- **Final Compile Status:** %t\n", summary.FinalCompileStatus))
 	report.WriteString(fmt.Sprintf("- **Final Test Status:** %t\n", summary.FinalTestStatus))
-	
+
 	// LLM Analytics
 	if summary.TotalLLMCalls > 0 {
 		report.WriteString(fmt.Sprintf("- **LLM Calls:** %d\n", summary.TotalLLMCalls))
@@ -1125,7 +1125,7 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 		}
 	}
 	report.WriteString("\n")
-	
+
 	// Configuration Details
 	report.WriteString("## ⚙️ Configuration\n\n")
 	report.WriteString("| Setting | Value |\n")
@@ -1140,7 +1140,7 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 		report.WriteString(fmt.Sprintf("| LLM Provider | %s |\n", result.Config.LLMProvider))
 		report.WriteString(fmt.Sprintf("| LLM Model | %s |\n", result.Config.LLMModel))
 	}
-	
+
 	// Recipe Information
 	if len(result.Config.RecipeIDs) > 0 {
 		report.WriteString(fmt.Sprintf("| Applied Recipes | %d |\n", len(result.Config.RecipeIDs)))
@@ -1150,14 +1150,14 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 		}
 	}
 	report.WriteString("\n")
-	
+
 	// Iteration Details
 	report.WriteString("## 🔄 Iteration Details\n\n")
 	for i, iteration := range result.Iterations {
 		report.WriteString(fmt.Sprintf("### Iteration %d - %s\n\n", iteration.Number, strings.ToUpper(iteration.Status)))
 		report.WriteString(fmt.Sprintf("**Duration:** %s  \n", iteration.Duration.Round(time.Millisecond)))
 		report.WriteString(fmt.Sprintf("**Started:** %s  \n", iteration.StartTime.Format("15:04:05")))
-		
+
 		// Stage Breakdown
 		if len(iteration.Stages) > 0 {
 			report.WriteString("\n**Stage Breakdown:**\n")
@@ -1168,11 +1168,11 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 				if stage.Status != "success" {
 					status = "❌"
 				}
-				report.WriteString(fmt.Sprintf("| %s | %s %s | %s |\n", 
+				report.WriteString(fmt.Sprintf("| %s | %s %s | %s |\n",
 					stage.Name, status, stage.Status, stage.Duration.Round(time.Millisecond)))
 			}
 		}
-		
+
 		// Metrics
 		if iteration.Metrics.FilesModified > 0 || iteration.Metrics.LinesAdded > 0 || iteration.Metrics.LinesRemoved > 0 {
 			report.WriteString("\n**Metrics:**\n")
@@ -1189,23 +1189,23 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 				report.WriteString(fmt.Sprintf("- Lines Removed: %d\n", iteration.Metrics.LinesRemoved))
 			}
 			if iteration.Metrics.TestsRun > 0 {
-				report.WriteString(fmt.Sprintf("- Tests Run: %d (Passed: %d)\n", 
+				report.WriteString(fmt.Sprintf("- Tests Run: %d (Passed: %d)\n",
 					iteration.Metrics.TestsRun, iteration.Metrics.TestsPassed))
 			}
 		}
-		
+
 		// Errors
 		if len(iteration.Errors) > 0 {
 			report.WriteString("\n**Errors:**\n")
 			for j, err := range iteration.Errors {
-				report.WriteString(fmt.Sprintf("%d. **%s** (%s): %s\n", 
+				report.WriteString(fmt.Sprintf("%d. **%s** (%s): %s\n",
 					j+1, err.Type, err.Stage, err.Message))
 				if err.Details != "" && len(err.Details) < 200 {
 					report.WriteString(fmt.Sprintf("   ```\n   %s\n   ```\n", err.Details))
 				}
 			}
 		}
-		
+
 		// LLM Calls
 		if len(iteration.LLMCalls) > 0 {
 			report.WriteString("\n**LLM Calls:**\n")
@@ -1214,8 +1214,8 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 				if !call.Success {
 					status = "❌"
 				}
-				report.WriteString(fmt.Sprintf("%d. %s **%s** (%s) - %d in + %d out tokens, %s", 
-					j+1, status, call.Purpose, call.Model, 
+				report.WriteString(fmt.Sprintf("%d. %s **%s** (%s) - %d in + %d out tokens, %s",
+					j+1, status, call.Purpose, call.Model,
 					call.InputTokens, call.OutputTokens, call.Duration.Round(time.Millisecond)))
 				if call.Cost > 0 {
 					report.WriteString(fmt.Sprintf(" - $%.4f", call.Cost))
@@ -1223,34 +1223,34 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 				report.WriteString("\n")
 			}
 		}
-		
+
 		if i < len(result.Iterations)-1 {
 			report.WriteString("\n---\n\n")
 		} else {
 			report.WriteString("\n")
 		}
 	}
-	
+
 	// Code Changes (Diffs)
 	allDiffs := []DiffCapture{}
 	for _, iteration := range result.Iterations {
 		allDiffs = append(allDiffs, iteration.Diffs...)
 	}
-	
+
 	if len(allDiffs) > 0 {
 		report.WriteString("## 🔧 Code Changes\n\n")
 		report.WriteString(fmt.Sprintf("Total files with changes: %d\n\n", len(allDiffs)))
-		
+
 		for i, diff := range allDiffs {
 			if i >= 10 { // Limit to first 10 diffs to avoid huge reports
 				report.WriteString(fmt.Sprintf("... and %d more files\n", len(allDiffs)-10))
 				break
 			}
-			
+
 			report.WriteString(fmt.Sprintf("### %s `%s`\n\n", strings.Title(diff.Type), diff.File))
 			report.WriteString(fmt.Sprintf("**Lines:** +%d -%d  \n", diff.LinesAdded, diff.LinesRemoved))
 			report.WriteString(fmt.Sprintf("**Timestamp:** %s  \n", diff.Timestamp.Format("15:04:05")))
-			
+
 			if diff.UnifiedDiff != "" && len(diff.UnifiedDiff) < 2000 {
 				report.WriteString("\n```diff\n")
 				report.WriteString(diff.UnifiedDiff)
@@ -1260,11 +1260,11 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 			}
 		}
 	}
-	
+
 	// Performance Analysis
 	if len(result.Iterations) > 1 {
 		report.WriteString("## 📈 Performance Analysis\n\n")
-		
+
 		// Timing trends
 		report.WriteString("**Iteration Timing:**\n")
 		report.WriteString("| Iteration | Duration | Status |\n")
@@ -1276,18 +1276,18 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 			} else if iteration.Status == "partial" {
 				status = "⚠️"
 			}
-			report.WriteString(fmt.Sprintf("| %d | %s | %s %s |\n", 
-				iteration.Number, iteration.Duration.Round(time.Millisecond), 
+			report.WriteString(fmt.Sprintf("| %d | %s | %s %s |\n",
+				iteration.Number, iteration.Duration.Round(time.Millisecond),
 				status, iteration.Status))
 		}
 		report.WriteString("\n")
 	}
-	
+
 	// Footer
 	report.WriteString("---\n\n")
 	report.WriteString("*Generated by Ploy ARF Benchmark Suite*  \n")
 	report.WriteString(fmt.Sprintf("*Report created: %s*\n", time.Now().Format("2006-01-02 15:04:05 UTC")))
-	
+
 	// Write the report
 	return os.WriteFile(filename, []byte(report.String()), 0644)
 }
@@ -1295,11 +1295,11 @@ func (bs *BenchmarkSuite) generateMarkdownReport(result *BenchmarkResult, filena
 // testHealthEndpoint tests the /healthz endpoint of the deployed application with retries
 func (bs *BenchmarkSuite) testHealthEndpoint(ctx context.Context, healthURL string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
-	
+
 	// Retry logic with exponential backoff
 	maxRetries := 5
 	baseDelay := 5 * time.Second
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			// Exponential backoff: 5s, 10s, 20s, 40s
@@ -1311,99 +1311,99 @@ func (bs *BenchmarkSuite) testHealthEndpoint(ctx context.Context, healthURL stri
 				return ctx.Err()
 			}
 		}
-		
+
 		req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create health check request: %w", err)
 		}
-		
+
 		resp, err := client.Do(req)
 		if err != nil {
 			fmt.Printf("Health check attempt %d failed: %v\n", attempt+1, err)
 			continue // Retry on network errors
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode == http.StatusOK {
 			fmt.Printf("Health check successful on attempt %d\n", attempt+1)
 			return nil
 		}
-		
+
 		// Log non-200 responses but continue retrying
 		body, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Health check attempt %d returned status %d: %s\n", attempt+1, resp.StatusCode, string(body))
 	}
-	
+
 	return fmt.Errorf("health check failed after %d attempts", maxRetries)
 }
 
 // testApplicationEndpoints tests basic application functionality
 func (bs *BenchmarkSuite) testApplicationEndpoints(ctx context.Context, appURL string) error {
 	client := &http.Client{Timeout: 30 * time.Second}
-	
+
 	// Test root endpoint
 	req, err := http.NewRequestWithContext(ctx, "GET", appURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create app test request: %w", err)
 	}
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("app test request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// Accept various success codes
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("app test failed with status %d: %s", resp.StatusCode, string(body))
 	}
-	
+
 	return nil
 }
 
 // validatePerformance performs basic performance validation
 func (bs *BenchmarkSuite) validatePerformance(ctx context.Context, appURL string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
-	
+
 	start := time.Now()
 	req, err := http.NewRequestWithContext(ctx, "GET", appURL+"/healthz", nil)
 	if err != nil {
 		return fmt.Errorf("performance test request creation failed: %w", err)
 	}
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("performance test failed: %w", err)
 	}
 	resp.Body.Close()
-	
+
 	responseTime := time.Since(start)
-	
+
 	// Warning if response time > 5 seconds
 	if responseTime > 5*time.Second {
 		return fmt.Errorf("slow response time: %v (warning only)", responseTime)
 	}
-	
+
 	return nil
 }
 
 // parseDeploymentLogs analyzes deployment logs for common error patterns
 func (bs *BenchmarkSuite) parseDeploymentLogs(logs string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	lines := strings.Split(logs, "\n")
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		// Look for common error patterns
 		if strings.Contains(strings.ToLower(line), "error") ||
-		   strings.Contains(strings.ToLower(line), "failed") ||
-		   strings.Contains(strings.ToLower(line), "exception") {
-			
+			strings.Contains(strings.ToLower(line), "failed") ||
+			strings.Contains(strings.ToLower(line), "exception") {
+
 			errors = append(errors, ErrorCapture{
 				Type:      "deployment",
 				Message:   line,
@@ -1412,14 +1412,14 @@ func (bs *BenchmarkSuite) parseDeploymentLogs(logs string) []ErrorCapture {
 			})
 		}
 	}
-	
+
 	return errors
 }
 
 // analyzeBuildErrors detects build system errors
 func (bs *BenchmarkSuite) analyzeBuildErrors(repoPath string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	buildSystem := bs.buildOps.DetectBuildSystem(repoPath)
 	if buildSystem == "unknown" {
 		errors = append(errors, ErrorCapture{
@@ -1430,7 +1430,7 @@ func (bs *BenchmarkSuite) analyzeBuildErrors(repoPath string) []ErrorCapture {
 		})
 		return errors
 	}
-	
+
 	// Try to detect common build issues
 	ctx := context.Background()
 	if err := bs.buildOps.ValidateBuild(ctx, repoPath, buildSystem); err != nil {
@@ -1441,20 +1441,20 @@ func (bs *BenchmarkSuite) analyzeBuildErrors(repoPath string) []ErrorCapture {
 			Timestamp: time.Now(),
 		})
 	}
-	
+
 	return errors
 }
 
 // detectConfigurationErrors analyzes configuration files for issues
 func (bs *BenchmarkSuite) detectConfigurationErrors(repoPath string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	// Check common configuration files
 	configFiles := []string{
-		"pom.xml", "build.gradle", "package.json", "go.mod", 
+		"pom.xml", "build.gradle", "package.json", "go.mod",
 		"requirements.txt", "Dockerfile", "application.properties",
 	}
-	
+
 	for _, configFile := range configFiles {
 		configPath := filepath.Join(repoPath, configFile)
 		if _, err := os.Stat(configPath); err == nil {
@@ -1464,19 +1464,19 @@ func (bs *BenchmarkSuite) detectConfigurationErrors(repoPath string) []ErrorCapt
 			}
 		}
 	}
-	
+
 	return errors
 }
 
 // analyzeDependencies checks for dependency and compatibility issues
 func (bs *BenchmarkSuite) analyzeDependencies(repoPath string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	buildSystem := bs.buildOps.DetectBuildSystem(repoPath)
 	if buildSystem == "unknown" {
 		return errors // Skip if we can't detect build system
 	}
-	
+
 	// Check for known dependency conflicts or version issues
 	switch buildSystem {
 	case "maven":
@@ -1492,7 +1492,7 @@ func (bs *BenchmarkSuite) analyzeDependencies(repoPath string) []ErrorCapture {
 			errors = append(errors, depErrors...)
 		}
 	}
-	
+
 	return errors
 }
 
@@ -1506,14 +1506,14 @@ func (bs *BenchmarkSuite) getLogContext(lines []string, errorIndex int) string {
 	if end >= len(lines) {
 		end = len(lines)
 	}
-	
+
 	context := lines[start:end]
 	return strings.Join(context, "\n")
 }
 
 func (bs *BenchmarkSuite) validateConfigFile(configPath, configType string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	// Basic file readability check
 	content, err := os.ReadFile(configPath)
 	if err != nil {
@@ -1525,7 +1525,7 @@ func (bs *BenchmarkSuite) validateConfigFile(configPath, configType string) []Er
 		})
 		return errors
 	}
-	
+
 	// Check for common syntax issues (very basic)
 	contentStr := string(content)
 	if strings.Contains(configType, "xml") && !strings.Contains(contentStr, "<?xml") {
@@ -1536,18 +1536,18 @@ func (bs *BenchmarkSuite) validateConfigFile(configPath, configType string) []Er
 			Timestamp: time.Now(),
 		})
 	}
-	
+
 	return errors
 }
 
 func (bs *BenchmarkSuite) analyzeMavenDependencies(repoPath string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	pomPath := filepath.Join(repoPath, "pom.xml")
 	if _, err := os.Stat(pomPath); err != nil {
 		return errors
 	}
-	
+
 	// TODO: Parse pom.xml and check for known version conflicts
 	// For now, just check if file is readable
 	if _, err := os.ReadFile(pomPath); err != nil {
@@ -1558,18 +1558,18 @@ func (bs *BenchmarkSuite) analyzeMavenDependencies(repoPath string) []ErrorCaptu
 			Timestamp: time.Now(),
 		})
 	}
-	
+
 	return errors
 }
 
 func (bs *BenchmarkSuite) analyzeGradleDependencies(repoPath string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	gradlePath := filepath.Join(repoPath, "build.gradle")
 	if _, err := os.Stat(gradlePath); err != nil {
 		return errors
 	}
-	
+
 	// TODO: Parse build.gradle and check for known issues
 	if _, err := os.ReadFile(gradlePath); err != nil {
 		errors = append(errors, ErrorCapture{
@@ -1579,18 +1579,18 @@ func (bs *BenchmarkSuite) analyzeGradleDependencies(repoPath string) []ErrorCapt
 			Timestamp: time.Now(),
 		})
 	}
-	
+
 	return errors
 }
 
 func (bs *BenchmarkSuite) analyzeNodeDependencies(repoPath string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	packagePath := filepath.Join(repoPath, "package.json")
 	if _, err := os.Stat(packagePath); err != nil {
 		return errors
 	}
-	
+
 	// TODO: Parse package.json and check for known security issues or conflicts
 	if _, err := os.ReadFile(packagePath); err != nil {
 		errors = append(errors, ErrorCapture{
@@ -1600,7 +1600,7 @@ func (bs *BenchmarkSuite) analyzeNodeDependencies(repoPath string) []ErrorCaptur
 			Timestamp: time.Now(),
 		})
 	}
-	
+
 	return errors
 }
 
@@ -1609,27 +1609,27 @@ func CompareBenchmarks(results []*BenchmarkResult) *ComparisonResult {
 	if len(results) < 2 {
 		return nil
 	}
-	
+
 	comparison := &ComparisonResult{
 		BaselineRun:  results[0].Config.Name,
 		ComparedRuns: []string{},
 		Metrics:      make(map[string]interface{}),
 	}
-	
+
 	for i := 1; i < len(results); i++ {
 		comparison.ComparedRuns = append(comparison.ComparedRuns, results[i].Config.Name)
 	}
-	
+
 	// Compare key metrics
 	comparison.Metrics["success_rate"] = compareSuccessRates(results)
 	comparison.Metrics["average_time"] = compareAverageTimes(results)
 	comparison.Metrics["llm_cost"] = compareLLMCosts(results)
 	comparison.Metrics["total_iterations"] = compareTotalIterations(results)
-	
+
 	// Determine winner based on success rate and time
 	comparison.Winner = determineWinner(results)
 	comparison.Analysis = generateAnalysis(results)
-	
+
 	return comparison
 }
 
@@ -1672,20 +1672,20 @@ func compareTotalIterations(results []*BenchmarkResult) map[string]int {
 func determineWinner(results []*BenchmarkResult) string {
 	var bestName string
 	var bestScore float64
-	
+
 	for _, r := range results {
 		// Score based on success rate (70%) and speed (30%)
 		successRate := float64(r.Summary.SuccessfulIterations) / float64(r.Summary.TotalIterations)
 		speedScore := 1.0 / r.Summary.AverageIterationTime.Seconds()
-		
+
 		score := (successRate * 0.7) + (speedScore * 0.3)
-		
+
 		if score > bestScore {
 			bestScore = score
 			bestName = r.Config.Name
 		}
 	}
-	
+
 	return bestName
 }
 

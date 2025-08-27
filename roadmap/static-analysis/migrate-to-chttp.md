@@ -79,7 +79,7 @@ go get github.com/sirupsen/logrus
 **Goal**: Convert existing Pylint analyzer to CHTTP service
 
 **Current Pylint Implementation:**
-- Location: `controller/analysis/analyzers/python/pylint.go`
+- Location: `api/analysis/analyzers/python/pylint.go`
 - Features: JSON output parsing, ARF recipe generation, configuration management
 - Test Coverage: Comprehensive test suite in `pylint_test.go`
 
@@ -342,7 +342,7 @@ cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST -e deploy_ch
 
 # Test Python analysis via CHTTP
 echo "Testing Python analysis through CHTTP..."
-curl -X POST https://api.dev.ployd.app/v1/analysis/analyze \
+curl -X POST https://api.dev.ployman.app/v1/analysis/analyze \
   -H "Content-Type: application/json" \
   -d '{
     "repository": {
@@ -380,11 +380,11 @@ for size in "small" "medium" "large"; do
     echo "Testing $size project..."
     
     # Legacy analysis
-    time curl -X POST https://api.dev.ployd.app/v1/analysis/analyze \
+    time curl -X POST https://api.dev.ployman.app/v1/analysis/analyze \
         -d @test-data/python-$size-project.json
     
     # CHTTP analysis  
-    time curl -X POST https://api.dev.ployd.app/v1/analysis/analyze \
+    time curl -X POST https://api.dev.ployman.app/v1/analysis/analyze \
         -d @test-data/python-$size-project-chttp.json
 done
 
@@ -480,7 +480,7 @@ scrape_configs:
 
   - job_name: 'ploy-controller'
     static_configs:
-      - targets: ['api.dev.ployd.app:8081']
+      - targets: ['api.dev.ployman.app:8081']
     metrics_path: '/metrics'
 ```
 
@@ -488,7 +488,7 @@ scrape_configs:
 
 #### 5.1 Remove In-Process Analyzers
 **After successful CHTTP migration:**
-- Remove legacy `controller/analysis/analyzers/python/pylint.go`
+- Remove legacy `api/analysis/analyzers/python/pylint.go`
 - Update import statements
 - Remove unused dependencies
 - Clean up test files
@@ -496,7 +496,7 @@ scrape_configs:
 #### 5.2 Documentation Updates
 **Update all relevant documentation:**
 - `docs/STACK.md` - Add CHTTP services
-- `controller/README.md` - Update API documentation
+- `api/README.md` - Update API documentation
 - `docs/FEATURES.md` - Reflect CHTTP architecture
 - `roadmap/static-analysis/README.md` - Mark migration complete
 
@@ -534,21 +534,21 @@ scrape_configs:
 ## Migration Timeline
 
 ### Week 1: Foundation
-- ❌ Core CHTTP server implementation (still needed)
-- ❌ Pylint CHTTP service development (still needed)
-- ❌ Docker containerization (still needed)
+- ✅ Core CHTTP server implementation (2025-08-26)
+- ✅ Pylint CHTTP service development (2025-08-26)
+- ✅ Docker containerization (2025-08-26)
 - ✅ Basic testing and validation (2025-08-26)
 
 ### Week 2: Integration  
 - ✅ Controller CHTTP client integration (2025-08-26)
 - ✅ Legacy analyzer wrapper (2025-08-26)
-- 🚧 Configuration management
-- 🚧 Authentication setup
+- ✅ Configuration management (2025-08-26)
+- ✅ Authentication setup (2025-08-26)
 
 ### Week 3: Testing
-- ❌ Comprehensive unit testing
-- ❌ VPS integration testing
-- ❌ Performance benchmarking
+- ✅ Comprehensive unit testing (2025-08-26)
+- ✅ VPS integration testing (2025-08-26)
+- ✅ Performance benchmarking (2025-08-26)
 - ❌ Security validation
 
 ### Week 4: Deployment

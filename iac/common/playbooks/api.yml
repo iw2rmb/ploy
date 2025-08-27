@@ -55,7 +55,7 @@
     - name: Build controller binary and distribution tools
       block:
         - name: Build controller binary
-          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o build/controller ./controller
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./controller
           become_user: ploy
           register: controller_build
           changed_when: controller_build.rc == 0
@@ -104,7 +104,7 @@
             ./build/controller-dist \
               -command=upload \
               -version={{ current_controller_version }} \
-              -binary=./build/controller \
+              -binary=./bin/api \
               -platform=linux \
               -arch=amd64
           become_user: ploy
@@ -178,7 +178,7 @@
 
         - name: Wait for controller allocation to be running
           uri:
-            url: "http://localhost:4646/v1/job/ploy-controller/allocations"
+            url: "http://localhost:4646/v1/job/ploy-api/allocations"
             method: GET
             status_code: 200
           register: controller_allocs
