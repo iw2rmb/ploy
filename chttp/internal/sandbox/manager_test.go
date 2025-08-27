@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -246,6 +247,145 @@ func TestManager_CreateWorkingDirectory(t *testing.T) {
 	// Verify cleanup function works
 	cleanup()
 	assert.NoDirExists(t, workDir)
+}
+
+// Streaming extraction tests
+
+func TestManager_ExtractStreamingArchive(t *testing.T) {
+	tempDir := t.TempDir()
+	manager := NewManager(tempDir, "testuser", "512MB", "1.0")
+	
+	// Create test archive as a reader
+	archiveData := createTestTarGzArchive(t, map[string]string{
+		"test.py":         "print('Hello World')",
+		"subdir/test2.py": "import os",
+		"data.txt":        strings.Repeat("test data ", 1000), // Large file
+	})
+	
+	reader := bytes.NewReader(archiveData)
+	
+	// Test streaming extraction
+	extractPath, cleanup, err := manager.ExtractStreamingArchive(context.Background(), reader)
+	require.NoError(t, err)
+	defer cleanup()
+	
+	// Verify extracted files
+	assert.FileExists(t, filepath.Join(extractPath, "test.py"))
+	assert.FileExists(t, filepath.Join(extractPath, "subdir", "test2.py"))
+	assert.FileExists(t, filepath.Join(extractPath, "data.txt"))
+	
+	// Verify file contents
+	content, err := os.ReadFile(filepath.Join(extractPath, "test.py"))
+	require.NoError(t, err)
+	assert.Equal(t, "print('Hello World')", string(content))
+}
+
+func TestManager_ExtractStreamingArchive_LargeFile(t *testing.T) {
+	tempDir := t.TempDir()
+	manager := NewManager(tempDir, "testuser", "512MB", "1.0")
+	
+	// Create archive with a large file (1MB)
+	largeContent := make([]byte, 1024*1024)
+	for i := range largeContent {
+		largeContent[i] = byte(i % 256)
+	}
+	
+	files := map[string]string{
+		"large.dat": string(largeContent),
+	}
+	
+	archiveData := createTestTarGzArchive(t, files)
+	reader := bytes.NewReader(archiveData)
+	
+	// Extract and verify
+	extractPath, cleanup, err := manager.ExtractStreamingArchive(context.Background(), reader)
+	require.NoError(t, err)
+	defer cleanup()
+	
+	// Verify large file was extracted correctly
+	content, err := os.ReadFile(filepath.Join(extractPath, "large.dat"))
+	require.NoError(t, err)
+	assert.Equal(t, largeContent, content)
+}
+
+func TestManager_ExtractStreamingArchive_Concurrent(t *testing.T) {
+	tempDir := t.TempDir()
+	manager := NewManager(tempDir, "testuser", "512MB", "1.0")
+	
+	// Test concurrent streaming extractions
+	numConcurrent := 5
+	errors := make(chan error, numConcurrent)
+	
+	for i := 0; i < numConcurrent; i++ {
+		go func(id int) {
+			archiveData := createTestTarGzArchive(t, map[string]string{
+				fmt.Sprintf("test_%d.py", id): fmt.Sprintf("print('%d')", id),
+			})
+			
+			reader := bytes.NewReader(archiveData)
+			extractPath, cleanup, err := manager.ExtractStreamingArchive(context.Background(), reader)
+			
+			if err != nil {
+				errors <- err
+				return
+			}
+			defer cleanup()
+			
+			// Verify extraction
+			if !fileExists(filepath.Join(extractPath, fmt.Sprintf("test_%d.py", id))) {
+				errors <- fmt.Errorf("file not found for extraction %d", id)
+			}
+		}(i)
+	}
+	
+	// Wait and check for errors
+	time.Sleep(2 * time.Second)
+	close(errors)
+	
+	for err := range errors {
+		assert.NoError(t, err)
+	}
+}
+
+func TestManager_ExtractStreamingArchive_ContextCancellation(t *testing.T) {
+	tempDir := t.TempDir()
+	manager := NewManager(tempDir, "testuser", "512MB", "1.0")
+	
+	// Create a large archive that takes time to process
+	files := make(map[string]string)
+	for i := 0; i < 100; i++ {
+		files[fmt.Sprintf("file_%d.txt", i)] = strings.Repeat("data ", 1000)
+	}
+	archiveData := createTestTarGzArchive(t, files)
+	
+	// Create a context that will be cancelled
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	// Start extraction in goroutine
+	done := make(chan error, 1)
+	go func() {
+		reader := bytes.NewReader(archiveData)
+		_, cleanup, err := manager.ExtractStreamingArchive(ctx, reader)
+		if cleanup != nil {
+			defer cleanup()
+		}
+		done <- err
+	}()
+	
+	// Cancel context after short delay
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+	
+	// Check that extraction was cancelled
+	err := <-done
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context canceled")
+}
+
+// Helper function to check if file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Helper function to create test tar.gz archives

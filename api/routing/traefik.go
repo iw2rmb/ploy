@@ -13,8 +13,8 @@ import (
 
 // TraefikRouter handles app routing via Traefik and Consul integration
 type TraefikRouter struct {
-	consul              *consulapi.Client
-	platformAppsDomain  string
+	consul             *consulapi.Client
+	platformAppsDomain string
 }
 
 // NewTraefikRouter creates a new Traefik router instance
@@ -23,19 +23,19 @@ func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
 	if consulAddr != "" {
 		config.Address = consulAddr
 	}
-	
+
 	client, err := consulapi.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	// Get platform apps domain from environment
 	platformAppsDomain := os.Getenv("PLOY_APPS_DOMAIN")
 	if platformAppsDomain == "" {
 		platformAppsDomain = "ployd.app" // Default fallback
 		log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
 	}
-	
+
 	return &TraefikRouter{
 		consul:             client,
 		platformAppsDomain: platformAppsDomain,
@@ -65,20 +65,20 @@ func (tr *TraefikRouter) GenerateControllerDomain() string {
 // IsPlatformSubdomain checks if a domain is a platform subdomain
 func (tr *TraefikRouter) IsPlatformSubdomain(domain string) bool {
 	return strings.HasSuffix(domain, "."+tr.platformAppsDomain) &&
-		   strings.Count(domain, ".") == strings.Count(tr.platformAppsDomain, ".")+1
+		strings.Count(domain, ".") == strings.Count(tr.platformAppsDomain, ".")+1
 }
 
 // AppRoute represents a routed application configuration
 type AppRoute struct {
-	App         string   `json:"app"`
-	Domain      string   `json:"domain"`
-	Port        int      `json:"port"`
-	AllocID     string   `json:"alloc_id"`
-	AllocIP     string   `json:"alloc_ip"`
-	HealthPath  string   `json:"health_path"`
-	Aliases     []string `json:"aliases,omitempty"`
-	TLSEnabled  bool     `json:"tls_enabled"`
-	CreatedAt   time.Time `json:"created_at"`
+	App        string    `json:"app"`
+	Domain     string    `json:"domain"`
+	Port       int       `json:"port"`
+	AllocID    string    `json:"alloc_id"`
+	AllocIP    string    `json:"alloc_ip"`
+	HealthPath string    `json:"health_path"`
+	Aliases    []string  `json:"aliases,omitempty"`
+	TLSEnabled bool      `json:"tls_enabled"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // RouteConfig holds configuration for app routing
@@ -127,11 +127,11 @@ func PlatformAppRouteConfig() *RouteConfig {
 		StickySession:       false,
 		Middlewares:         []string{"platform-security-headers"},
 		HealthCheckInterval: "10s",
-		HealthCheckTimeout:  "3s",  // Faster health checks for platform apps
+		HealthCheckTimeout:  "3s", // Faster health checks for platform apps
 		HealthCheckRetries:  3,
 		CircuitBreaker:      true,
-		RetryAttempts:       2,     // Fewer retries for platform apps
-		RateLimit:           100,   // Higher rate limit for platform apps
+		RetryAttempts:       2,   // Fewer retries for platform apps
+		RateLimit:           100, // Higher rate limit for platform apps
 		SecurityHeaders:     true,
 	}
 }
@@ -141,24 +141,24 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 	if config == nil {
 		config = DefaultRouteConfig()
 	}
-	
+
 	// Generate unique service ID
 	serviceID := fmt.Sprintf("%s-%s", route.App, route.AllocID)
-	
+
 	// Validate route before registration
 	if err := tr.validateRoute(route); err != nil {
 		return fmt.Errorf("invalid route configuration: %w", err)
 	}
-	
+
 	// Build Traefik tags for routing configuration
 	tags := tr.buildTraefikTags(route, config)
-	
+
 	// Register service in Consul with Traefik tags
 	registration := &consulapi.AgentServiceRegistration{
-		ID:   serviceID,
-		Name: route.App,
-		Port: route.Port,
-		Tags: tags,
+		ID:      serviceID,
+		Name:    route.App,
+		Port:    route.Port,
+		Tags:    tags,
 		Address: route.AllocIP,
 		Check: &consulapi.AgentServiceCheck{
 			HTTP:     fmt.Sprintf("http://%s:%d%s", route.AllocIP, route.Port, config.HealthPath),
@@ -166,26 +166,26 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 			Timeout:  "3s",
 		},
 		Meta: map[string]string{
-			"app":         route.App,
-			"domain":      route.Domain,
-			"alloc_id":    route.AllocID,
-			"created_at":  route.CreatedAt.Format(time.RFC3339),
-			"managed_by":  "ploy",
+			"app":        route.App,
+			"domain":     route.Domain,
+			"alloc_id":   route.AllocID,
+			"created_at": route.CreatedAt.Format(time.RFC3339),
+			"managed_by": "ploy",
 		},
 	}
-	
-	log.Printf("Registering Traefik route for app %s: %s -> %s:%d", 
+
+	log.Printf("Registering Traefik route for app %s: %s -> %s:%d",
 		route.App, route.Domain, route.AllocIP, route.Port)
-	
+
 	if err := tr.consul.Agent().ServiceRegister(registration); err != nil {
 		return fmt.Errorf("failed to register service with Consul: %w", err)
 	}
-	
+
 	// Store domain mapping for persistence
 	if err := tr.storeDomainMapping(route); err != nil {
 		log.Printf("Warning: failed to store domain mapping for %s: %v", route.App, err)
 	}
-	
+
 	return nil
 }
 
@@ -197,7 +197,7 @@ func ControllerRouteConfig() *RouteConfig {
 		HealthPath:          "/health",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
-		Middlewares:         []string{"ploy-controller-cors"}, // Use global middleware
+		Middlewares:         []string{"ploy-api-cors"}, // Use global middleware
 		HealthCheckInterval: "10s",
 		HealthCheckTimeout:  "5s",
 		HealthCheckRetries:  3,
@@ -211,9 +211,9 @@ func ControllerRouteConfig() *RouteConfig {
 // RegisterController registers the Ploy Controller with enhanced load balancing
 func (tr *TraefikRouter) RegisterController(allocID, allocIP string, port int) error {
 	controllerDomain := tr.GenerateControllerDomain()
-	
+
 	route := &AppRoute{
-		App:        "ploy-controller",
+		App:        "ploy-api",
 		Domain:     controllerDomain,
 		Port:       port,
 		AllocID:    allocID,
@@ -222,35 +222,35 @@ func (tr *TraefikRouter) RegisterController(allocID, allocIP string, port int) e
 		TLSEnabled: true,
 		CreatedAt:  time.Now(),
 	}
-	
+
 	config := ControllerRouteConfig()
-	
+
 	log.Printf("Registering Ploy Controller at: %s (platform domain: %s)", controllerDomain, tr.platformAppsDomain)
-	
+
 	return tr.RegisterApp(route, config)
 }
 
 // RegisterAppWithPlatformDomain registers an app with automatically generated platform subdomain
 func (tr *TraefikRouter) RegisterAppWithPlatformDomain(appName, allocID, allocIP string, port int, config *RouteConfig) error {
 	appDomain := tr.GenerateAppDomain(appName)
-	
+
 	route := &AppRoute{
 		App:        appName,
 		Domain:     appDomain,
 		Port:       port,
 		AllocID:    allocID,
 		AllocIP:    allocIP,
-		HealthPath: "/healthz",  // Standard health check path for apps
+		HealthPath: "/healthz", // Standard health check path for apps
 		TLSEnabled: true,       // Always enable TLS for platform subdomains
 		CreatedAt:  time.Now(),
 	}
-	
+
 	if config == nil {
 		config = PlatformAppRouteConfig() // Use optimized config for platform apps
 	}
-	
+
 	log.Printf("Registering app %s at platform subdomain: %s", appName, appDomain)
-	
+
 	return tr.RegisterApp(route, config)
 }
 
@@ -259,19 +259,19 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 	tags := []string{
 		"traefik.enable=true",
 	}
-	
+
 	// Router configuration
 	routerName := fmt.Sprintf("%s-router", route.App)
 	tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", routerName, route.Domain))
 	tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.entrypoints=websecure", routerName))
-	
+
 	// Add domain aliases if provided
 	if len(route.Aliases) > 0 {
 		domains := append([]string{route.Domain}, route.Aliases...)
 		hostsRule := fmt.Sprintf("Host(`%s`)", strings.Join(domains, "`,`"))
 		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.rule=%s", routerName, hostsRule))
 	}
-	
+
 	// TLS configuration
 	if config.EnableTLS {
 		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.tls=true", routerName))
@@ -279,11 +279,11 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 			tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=%s", routerName, config.CertResolver))
 		}
 	}
-	
+
 	// Service configuration
 	serviceName := fmt.Sprintf("%s-service", route.App)
 	tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%d", serviceName, route.Port))
-	
+
 	// Advanced health check configuration
 	if config.HealthPath != "" {
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.path=%s", serviceName, config.HealthPath))
@@ -293,22 +293,22 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.scheme=http", serviceName))
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.headers.X-Health-Check=traefik", serviceName))
 	}
-	
+
 	// Load balancing configuration
 	if config.LoadBalanceMode != "" {
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.strategy=%s", serviceName, config.LoadBalanceMode))
 	}
-	
+
 	// Sticky sessions
 	if config.StickySession {
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.sticky.cookie=true", serviceName))
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.sticky.cookie.name=%s-session", serviceName, route.App))
 	}
-	
+
 	// Build dynamic middleware chain
 	middlewares := make([]string, 0, len(config.Middlewares)+5)
 	middlewares = append(middlewares, config.Middlewares...)
-	
+
 	// Add rate limiting if configured
 	if config.RateLimit > 0 {
 		rateLimitName := fmt.Sprintf("%s-ratelimit", route.App)
@@ -317,7 +317,7 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.period=1m", rateLimitName))
 		middlewares = append(middlewares, rateLimitName)
 	}
-	
+
 	// Add security headers if enabled
 	if config.SecurityHeaders {
 		securityName := fmt.Sprintf("%s-security", route.App)
@@ -329,7 +329,7 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.customresponseheaders.X-Frame-Options=DENY", securityName))
 		middlewares = append(middlewares, securityName)
 	}
-	
+
 	// Add circuit breaker if enabled
 	if config.CircuitBreaker {
 		circuitBreakerName := fmt.Sprintf("%s-circuitbreaker", route.App)
@@ -338,7 +338,7 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.fallbackduration=30s", circuitBreakerName))
 		middlewares = append(middlewares, circuitBreakerName)
 	}
-	
+
 	// Add retry middleware if configured
 	if config.RetryAttempts > 0 {
 		retryName := fmt.Sprintf("%s-retry", route.App)
@@ -346,26 +346,26 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.retry.initialinterval=100ms", retryName))
 		middlewares = append(middlewares, retryName)
 	}
-	
+
 	// Apply middleware chain to router
 	if len(middlewares) > 0 {
 		middlewareChain := strings.Join(middlewares, ",")
 		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, middlewareChain))
 	}
-	
+
 	return tags
 }
 
 // UnregisterApp removes app routing from Traefik
 func (tr *TraefikRouter) UnregisterApp(appName, allocID string) error {
 	serviceID := fmt.Sprintf("%s-%s", appName, allocID)
-	
+
 	log.Printf("Unregistering Traefik route for app %s (alloc: %s)", appName, allocID)
-	
+
 	if err := tr.consul.Agent().ServiceDeregister(serviceID); err != nil {
 		return fmt.Errorf("failed to deregister service from Consul: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -375,13 +375,13 @@ func (tr *TraefikRouter) GetAppRoutes(appName string) ([]*AppRoute, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Consul catalog: %w", err)
 	}
-	
+
 	var routes []*AppRoute
 	for _, service := range services {
 		if managedBy, ok := service.ServiceMeta["managed_by"]; !ok || managedBy != "ploy" {
 			continue
 		}
-		
+
 		route := &AppRoute{
 			App:     service.ServiceName,
 			Domain:  service.ServiceMeta["domain"],
@@ -389,69 +389,69 @@ func (tr *TraefikRouter) GetAppRoutes(appName string) ([]*AppRoute, error) {
 			AllocID: service.ServiceMeta["alloc_id"],
 			AllocIP: service.ServiceAddress,
 		}
-		
+
 		if createdAtStr, ok := service.ServiceMeta["created_at"]; ok {
 			if createdAt, err := time.Parse(time.RFC3339, createdAtStr); err == nil {
 				route.CreatedAt = createdAt
 			}
 		}
-		
+
 		routes = append(routes, route)
 	}
-	
+
 	return routes, nil
 }
 
 // storeDomainMapping stores domain mapping in Consul KV for persistence
 func (tr *TraefikRouter) storeDomainMapping(route *AppRoute) error {
 	key := fmt.Sprintf("ploy/domains/%s", route.App)
-	
+
 	// Get existing mappings
 	existing, err := tr.getDomainMappings(route.App)
 	if err != nil {
 		existing = make(map[string]*AppRoute)
 	}
-	
+
 	// Add/update current route
 	existing[route.Domain] = route
-	
+
 	// Store updated mappings
 	data, err := json.Marshal(existing)
 	if err != nil {
 		return fmt.Errorf("failed to marshal domain mappings: %w", err)
 	}
-	
+
 	pair := &consulapi.KVPair{
 		Key:   key,
 		Value: data,
 	}
-	
+
 	_, err = tr.consul.KV().Put(pair, nil)
 	if err != nil {
 		return fmt.Errorf("failed to store domain mapping in Consul KV: %w", err)
 	}
-	
+
 	return nil
 }
 
 // getDomainMappings retrieves domain mappings from Consul KV
 func (tr *TraefikRouter) getDomainMappings(appName string) (map[string]*AppRoute, error) {
 	key := fmt.Sprintf("ploy/domains/%s", appName)
-	
+
 	pair, _, err := tr.consul.KV().Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get domain mappings: %w", err)
 	}
-	
+
 	if pair == nil {
 		return make(map[string]*AppRoute), nil
 	}
-	
+
 	var mappings map[string]*AppRoute
 	if err := json.Unmarshal(pair.Value, &mappings); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal domain mappings: %w", err)
 	}
-	
+
 	return mappings, nil
 }
 
@@ -462,21 +462,21 @@ func (tr *TraefikRouter) HealthCheck() error {
 	if err != nil {
 		return fmt.Errorf("failed to query Traefik service: %w", err)
 	}
-	
+
 	if len(services) == 0 {
 		return fmt.Errorf("no Traefik service found in Consul catalog")
 	}
-	
+
 	// Check service health
 	health, _, err := tr.consul.Health().Service("traefik", "", true, nil)
 	if err != nil {
 		return fmt.Errorf("failed to check Traefik health: %w", err)
 	}
-	
+
 	if len(health) == 0 {
 		return fmt.Errorf("no healthy Traefik instances found")
 	}
-	
+
 	log.Printf("Traefik health check passed: %d healthy instances", len(health))
 	return nil
 }
@@ -486,35 +486,35 @@ func (tr *TraefikRouter) validateRoute(route *AppRoute) error {
 	if route.App == "" {
 		return fmt.Errorf("app name cannot be empty")
 	}
-	
+
 	if route.Domain == "" {
 		return fmt.Errorf("domain cannot be empty")
 	}
-	
+
 	if route.Port <= 0 || route.Port > 65535 {
 		return fmt.Errorf("invalid port: %d", route.Port)
 	}
-	
+
 	if route.AllocID == "" {
 		return fmt.Errorf("allocation ID cannot be empty")
 	}
-	
+
 	if route.AllocIP == "" {
 		return fmt.Errorf("allocation IP cannot be empty")
 	}
-	
+
 	// Validate domain format
 	if err := validateDomainName(route.Domain); err != nil {
 		return fmt.Errorf("invalid domain %s: %w", route.Domain, err)
 	}
-	
+
 	// Validate aliases
 	for _, alias := range route.Aliases {
 		if err := validateDomainName(alias); err != nil {
 			return fmt.Errorf("invalid alias domain %s: %w", alias, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -523,22 +523,22 @@ func validateDomainName(domain string) error {
 	if domain == "" {
 		return fmt.Errorf("domain cannot be empty")
 	}
-	
+
 	if strings.Contains(domain, " ") {
 		return fmt.Errorf("domain cannot contain spaces")
 	}
-	
+
 	if !strings.Contains(domain, ".") {
 		return fmt.Errorf("domain must contain at least one dot")
 	}
-	
+
 	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
 		return fmt.Errorf("domain cannot start or end with a dot")
 	}
-	
+
 	if len(domain) > 253 {
 		return fmt.Errorf("domain too long (max 253 characters)")
 	}
-	
+
 	return nil
 }

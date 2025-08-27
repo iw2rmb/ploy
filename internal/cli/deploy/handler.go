@@ -3,60 +3,65 @@ package deploy
 import (
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"path/filepath"
-	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 func PushCmd(args []string, controllerURL string) {
 	fs := flag.NewFlagSet("push", flag.ExitOnError)
 	app := fs.String("a", filepath.Base(utils.MustGetwd()), "app name")
-	lane := fs.String("lane", "", "lane override (A..F)")
-	main := fs.String("main", "com.ploy.ordersvc.Main", "Java main class for lane C")
+	lane := fs.String("lane", "", "lane override (A..G)")
+	main := fs.String("main", "", "Java main class for lane C")
 	sha := fs.String("sha", "", "git sha to annotate")
 	bluegreen := fs.Bool("blue-green", false, "use blue-green deployment")
+	env := fs.String("env", "dev", "target environment (dev, staging, prod)")
 	fs.Parse(args)
-
-	if *sha == "" {
-		if v := utils.GitSHA(); v != "" {
-			*sha = v
-		} else {
-			*sha = time.Now().Format("20060102-150405")
-		}
-	}
 
 	// Check if blue-green deployment is requested
 	if *bluegreen {
 		fmt.Printf("🔄 Starting blue-green deployment for %s...\n", *app)
 		fmt.Println("Blue-green deployments are handled via the bluegreen command")
-		fmt.Printf("Use: ploy bluegreen deploy %s %s\n", *app, *sha)
+		fmt.Printf("Use: ploy bluegreen deploy %s\n", *app)
 		return
 	}
 
-	ign, _ := utils.ReadGitignore(".")
-	pr, pw := io.Pipe()
-	go func() {
-		defer pw.Close()
-		_ = utils.TarDir(".", pw, ign)
-	}()
-
-	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s&main=%s", controllerURL, *app, *sha, utils.URLQueryEsc(*main))
-	if *lane != "" {
-		url += "&lane=" + *lane
+	// Build configuration for shared deployment
+	config := common.DeployConfig{
+		App:           *app,
+		Lane:          *lane,
+		MainClass:     *main,
+		SHA:           *sha,
+		IsPlatform:    false, // User application
+		BlueGreen:     *bluegreen,
+		Environment:   *env,
+		ControllerURL: controllerURL,
 	}
-	req, _ := http.NewRequest("POST", url, pr)
-	req.Header.Set("Content-Type", "application/x-tar")
-	resp, err := http.DefaultClient.Do(req)
+
+	// Display deployment info
+	targetDomain := "ployd.app"
+	if *env == "dev" {
+		targetDomain = "dev.ployd.app"
+	}
+	fmt.Printf("🚀 Deploying %s to %s.%s...\n", *app, *app, targetDomain)
+
+	// Use shared deployment logic
+	result, err := common.SharedPush(config)
 	if err != nil {
-		fmt.Println("push error:", err)
+		fmt.Printf("❌ Deployment failed: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
-	io.Copy(os.Stdout, resp.Body)
+
+	// Display result
+	if result.Success {
+		fmt.Printf("✅ Successfully deployed to %s\n", result.URL)
+		if result.DeploymentID != "" {
+			fmt.Printf("📋 Deployment ID: %s\n", result.DeploymentID)
+		}
+	} else {
+		fmt.Printf("❌ %s\n", result.Message)
+	}
 }
 
 func OpenCmd(args []string) {

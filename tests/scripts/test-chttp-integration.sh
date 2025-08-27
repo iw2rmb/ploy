@@ -113,7 +113,7 @@ deploy_chttp_services() {
 }
 
 # Deploy updated controller with CHTTP support
-deploy_controller() {
+deploy_api() {
     log "Deploying updated controller with CHTTP integration..."
     
     local scripts_dir
@@ -463,7 +463,7 @@ main() {
         exit 1
     fi
     
-    if ! deploy_controller; then
+    if ! deploy_api; then
         error "Controller deployment failed"
         exit 1
     fi

@@ -174,7 +174,7 @@ jobs:
       - name: Run Ploy Analysis
         uses: ploy/static-analysis-action@v1
         with:
-          ploy-controller: ${{ secrets.PLOY_CONTROLLER_URL }}
+          ploy-api: ${{ secrets.PLOY_CONTROLLER_URL }}
           api-key: ${{ secrets.PLOY_API_KEY }}
           fail-on-critical: true
           report-format: "sarif"
@@ -472,13 +472,13 @@ code_review_integration:
   platforms:
     github:
       enabled: true
-      webhook_url: "https://ploy-controller.company.com/webhooks/github"
+      webhook_url: "https://ploy-api.company.com/webhooks/github"
       comment_style: "inline"
       status_checks: true
       
     gitlab:
       enabled: true
-      webhook_url: "https://ploy-controller.company.com/webhooks/gitlab"
+      webhook_url: "https://ploy-api.company.com/webhooks/gitlab"
       merge_request_notes: true
       
   comment_configuration:

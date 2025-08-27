@@ -81,7 +81,7 @@ iac/
 │       ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
 │       ├── nomad-server.hcl.j2    # Linux Nomad server configuration
 │       ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
-│       ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│       ├── nomad-ploy-api.hcl.j2  # Controller Nomad job
 │       └── *.j2                    # Service and management templates
 ├── dev/                       # Development environment
 └── prod/                      # Production environment (this directory)
@@ -234,8 +234,11 @@ To add more nodes:
 ### Updates
 To update Ploy:
 ```bash
-# Update controller
-./api/deploy.sh main
+# Update controller via self-update endpoint
+curl -X POST https://api.ployman.app/v1/update/latest
+
+# Alternative: deploy via unified system
+ployman push -a ploy-api -env prod
 
 # Update infrastructure
 ansible-playbook site.yml -i inventory/hosts.yml --tags=update
@@ -277,7 +280,7 @@ ansible-playbook site.yml -i inventory/hosts.yml --tags=update
 - Check DNS propagation
 
 **Controller unreachable**:
-- Verify Nomad deployment: `nomad job status ploy-controller`
+- Verify Nomad deployment: `nomad job status ploy-api`
 - Check service health: `nomad alloc status <alloc-id>`
 - Verify Traefik routing
 

@@ -18,7 +18,7 @@ cd "$PLOY_DIR"
 
 # Current version
 echo "🔍 Current Version:"
-CURRENT_VERSION=$(cat /opt/ploy/current-controller-version 2>/dev/null || echo "unknown")
+CURRENT_VERSION=$(cat /opt/ploy/current-api-version 2>/dev/null || echo "unknown")
 echo "  Version: $CURRENT_VERSION"
 
 # Nomad job status
@@ -26,18 +26,18 @@ echo ""
 echo "🎯 Nomad Job Status:"
 export NOMAD_ADDR="http://localhost:4646"
 
-if nomad job status ploy-controller >/dev/null 2>&1; then
-    echo "  Job Status: $(nomad job status -short ploy-controller | grep Status | awk '{print $3}')"
+if nomad job status ploy-api >/dev/null 2>&1; then
+    echo "  Job Status: $(nomad job status -short ploy-api | grep Status | awk '{print $3}')"
     
     # Allocation details
     echo ""
     echo "📦 Allocations:"
-    nomad job allocs ploy-controller | head -10
+    nomad job allocs ploy-api | head -10
     
     # Health check status
     echo ""
     echo "🏥 Service Health:"
-    ALLOC_ID=$(nomad job allocs -short ploy-controller | grep running | head -1 | awk '{print $1}')
+    ALLOC_ID=$(nomad job allocs -short ploy-api | grep running | head -1 | awk '{print $1}')
     if [[ -n "$ALLOC_ID" ]]; then
         echo "  Allocation ID: $ALLOC_ID"
         echo "  Node: $(nomad alloc status $ALLOC_ID | grep 'Node Name' | awk '{print $3}')"
@@ -78,8 +78,8 @@ fi
 # Service discovery
 echo ""
 echo "🔍 Service Discovery:"
-if curl -s "http://localhost:8500/v1/health/service/ploy-controller" >/dev/null 2>&1; then
-    CONSUL_SERVICES=$(curl -s "http://localhost:8500/v1/health/service/ploy-controller" | jq -r '.[].Service.Address + ":" + (.[].Service.Port | tostring)' | sort | uniq)
+if curl -s "http://localhost:8500/v1/health/service/ploy-api" >/dev/null 2>&1; then
+    CONSUL_SERVICES=$(curl -s "http://localhost:8500/v1/health/service/ploy-api" | jq -r '.[].Service.Address + ":" + (.[].Service.Port | tostring)' | sort | uniq)
     echo "  Consul Services:"
     echo "$CONSUL_SERVICES" | sed 's/^/    /'
 else

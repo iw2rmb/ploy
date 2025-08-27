@@ -1,5 +1,252 @@
 # CHANGELOG
 
+## [2025-08-27] - Relaxed App Naming Restrictions
+
+### Added
+- **Platform-specific Domains**: Apps can now use previously restricted names like `api`, `controller`, `admin`, etc.
+  - Platform services use separate domains, eliminating naming conflicts
+  - Only `dev` remains reserved for the development environment subdomain
+  - Simplified app naming rules with fewer restrictions
+
+### Fixed
+- **App Name Validation**: Updated validation logic to only restrict `dev` subdomain
+  - Removed 15 previously reserved app names from validation
+  - Removed reserved prefix restrictions (`ploy-`, `system-`)
+  - Updated validation tests to reflect new allowed names
+  - Documentation updated to show new examples
+
+### Testing
+- **Validation Test Updates**: Comprehensive test suite updates for relaxed naming policy
+  - Added tests for previously restricted names now allowed
+  - Updated benchmark tests to use current reserved names
+  - Removed obsolete reserved name tests
+  - TDD documentation examples updated to reflect changes
+
+### Infrastructure
+- **LLM Model Optimization**: Reduced infrastructure requirements by removing redundant model
+  - Removed Llama2:7b model download from Ansible playbooks (3.8GB saved)
+  - CodeLlama:7b retained for code-specific processing tasks
+  - Updated environment configuration to use CodeLlama for both code and text processing
+  - Simplified model monitoring to check only for CodeLlama availability
+
+## [2025-08-27] - CHTTP Comprehensive Error Handling
+
+### Added
+- **Comprehensive Error Framework**: Structured error handling system with classification and context
+  - Custom error types (validation, authentication, execution, resource, security, etc.)
+  - Error severity levels (info, warning, error, critical) with appropriate HTTP status mapping
+  - Fluent API for error building with fields, context, and correlation IDs
+  - Error wrapping and unwrapping with proper error chain support
+  - Stack trace capture and structured error responses
+
+- **Centralized Error Middleware**: Advanced error handling middleware for Fiber
+  - Panic recovery with structured error responses instead of crashes
+  - Automatic correlation ID generation and propagation
+  - Structured JSON error responses with configurable detail levels
+  - Error logging with configurable severity filtering and JSON format
+  - Sensitive data filtering for production security
+
+- **Error Resilience & Recovery**: Circuit breaker and retry mechanisms
+  - Circuit breaker pattern for failing operations with configurable thresholds
+  - Retry logic with exponential backoff and context cancellation support
+  - Graceful degradation when resources are exhausted
+  - Health check integration with error state monitoring
+
+- **Error Monitoring & Observability**: Comprehensive error tracking and metrics
+  - Error metrics collection by type and severity with thread-safe counters
+  - Health checker with component-level status reporting
+  - Error correlation and request tracing for debugging
+  - Performance impact tracking and error rate monitoring
+
+### Enhanced
+- **Server Integration**: Complete integration of error handling throughout CHTTP server
+  - Replaced basic Fiber error responses with structured CHTTP errors
+  - Enhanced health endpoint with component status and error metrics
+  - Rate limiting errors with proper classification and retry hints
+  - Archive validation and processing errors with detailed context
+
+### Configuration
+- **Error Handling Configuration**: Comprehensive error middleware configuration
+  - Stack trace inclusion control for debugging vs production
+  - Configurable logging levels and output formats
+  - Sensitive field filtering for security compliance
+  - Error response detail level control
+
+### Testing
+- **Complete Error Handling Tests**: TDD implementation with comprehensive coverage
+  - Error classification and severity mapping tests
+  - Middleware integration tests with panic recovery validation
+  - Circuit breaker and retry mechanism tests with real failure scenarios
+  - Error metrics and health check integration tests
+  - Cross-platform error handling compatibility tests
+
+## [2025-08-27] - Unified Deployment System & Tool Cleanup
+
+### Added
+- **Phase 5 Tool Cleanup**: Removed obsolete deployment tools
+  - Deleted `tools/api-dist` legacy binary upload tool
+  - Removed `scripts/deploy.sh` legacy deployment script
+  - Updated documentation to reference unified deployment system
+  - Created cleanup verification tests
+
+### Fixed  
+- **Documentation Updates**: Replaced deprecated tool references
+  - Updated README.md deployment instructions to use `ployman push`
+  - Updated CLAUDE.md deployment commands and priority order
+  - Updated iac/prod/README.md deployment procedures
+  - Removed references to obsolete api-dist and deploy.sh tools
+
+### Testing
+- **Environment Deployment Tests**: Comprehensive integration test coverage for unified deployment
+  - Created tests/integration/test-dev-deployment.sh for dev environment validation
+  - Created tests/integration/test-prod-deployment.sh for production deployment testing
+  - Added production safety confirmations and infrastructure validation (DNS, SSL)
+  - Comprehensive domain routing tests: *.dev.ployd.app, *.ployd.app, *.dev.ployman.app, *.ployman.app
+  - All integration tests following CLAUDE.md VPS testing protocol
+
+- **Cleanup Verification Tests**: Comprehensive test coverage for Phase 5 cleanup
+  - Added tests/unit/cleanup_test.go with removal verification
+  - Validated obsolete tool removal and documented replacement rationale
+  - All tests passing with proper cleanup confirmation
+
+---
+
+## [2025-08-27] - CHTTP Resource Limiting & Security
+
+### Added
+- **Resource Limiting System**: Comprehensive process constraint enforcement
+  - CPU usage limits with cgroup support on Linux
+  - Memory limits using ulimit and cgroup controls  
+  - File descriptor limits to prevent resource exhaustion
+  - Process timeout with configurable durations
+  - Resource limiter with cross-platform ulimit integration
+
+- **Rate Limiting Framework**: API request throttling and abuse prevention
+  - Per-client rate limiting with token bucket algorithm
+  - Global rate limiting for shared resource protection
+  - Configurable burst sizes and refill rates
+  - Automatic client identification by IP address
+
+- **Security Validation**: Path traversal prevention and archive safety
+  - Path sanitizer with symlink resolution and validation
+  - Archive metadata validation (size, file count, extensions)
+  - Blocked path detection and dangerous file filtering
+  - Directory traversal attack prevention
+
+### Configuration
+- **Extended Security Configuration**: Comprehensive security controls
+  - `rate_limit_per_sec`: Requests per second limit
+  - `rate_limit_burst`: Burst size for rate limiting  
+  - `max_open_files`: File descriptor limits
+  - Enhanced resource limit parsing for memory strings (KB/MB/GB)
+
+### Testing
+- **Comprehensive Security Tests**: TDD implementation with full coverage
+  - Resource limiter tests for CPU, memory, and file constraints
+  - Rate limiter tests for per-client and global scenarios
+  - Path sanitization tests preventing traversal attacks
+  - Archive validation tests with security rule enforcement
+  - Cross-platform compatibility testing (Linux cgroups, Unix ulimits)
+
+## [2025-08-27] - CHTTP Output Parsing Framework
+
+### Added
+- **Comprehensive Output Parsing Framework**: Flexible system for parsing various tool outputs
+  - Parser interface and registry for managing multiple parsers
+  - Built-in parsers: Pylint, Bandit (security), ESLint, Generic JSON
+  - Regex parser with configurable patterns for custom formats
+  - Auto-detection of output format (JSON, XML, plain text)
+  - Composite parser support for combining multiple parsers
+
+### Configuration
+- **Extended Output Configuration**: Rich parser configuration options
+  - Custom regex patterns with named/positional groups
+  - Generic JSON parser with field mapping support
+  - Parser-specific options via `parser_options`
+  - Support for `auto` parser selection based on output
+
+### Testing
+- **Complete Parser Test Coverage**: TDD implementation with comprehensive tests
+  - Parser registry and auto-detection tests
+  - Regex pattern matching with multiple severities
+  - JSON parsing with configurable field mappings
+  - All parsers tested with real-world output formats
+  - 100% test coverage for new parser framework
+
+## [2025-08-27] - CHTTP Streaming Archive Processing
+
+### Added
+- **Streaming Archive Processing**: Memory-efficient streaming for large codebases
+  - New `streamingAnalyzeHandler` in server.go with io.Pipe for zero-copy streaming
+  - Buffer pool implementation to reduce memory allocations
+  - Concurrent stream limiting with semaphore pattern
+  - Context-aware cancellation support for long-running extractions
+  - Streaming extraction in sandbox manager with per-file streaming
+
+### Configuration
+- **Streaming Configuration Options**: Added to InputConfig
+  - `streaming_enabled`: Toggle streaming support on/off
+  - `buffer_size`: Configurable buffer size for streaming operations (default 32KB)
+  - `buffer_pool_size`: Number of reusable buffers in pool (default 10)
+  - `max_concurrent_streams`: Limit concurrent streaming requests (default 5)
+
+### Testing  
+- **Comprehensive Streaming Tests**: Full TDD coverage for streaming functionality
+  - Memory usage validation tests (verifying <50MB usage for 500MB archives)
+  - Concurrent streaming request tests with rate limiting
+  - Context cancellation tests for graceful shutdown
+  - Buffer pool efficiency tests
+  - Large file streaming tests (1MB+ files)
+  - All tests passing locally with proper memory constraints
+
+## [2025-08-27] - Unified Deployment System Phase 1-4 Complete
+
+### Added
+- **Phase 1 - Shared Deployment Library**: Created unified deployment mechanism for ploy and ployman
+  - `internal/cli/common/deploy.go` with SharedPush function for both user apps and platform services
+  - DeployConfig struct for unified configuration across both CLIs
+  - Domain-aware routing (ployd.app vs ployman.app) based on IsPlatform flag
+  - Environment support (dev, staging, prod) with proper subdomain handling
+  - Blue-green deployment support with configuration flag
+  - Automatic SHA generation from git or timestamp fallback
+
+- **Phase 2 - CLI Refactoring**: Refactored both ploy and ployman to use shared library
+  - Updated `internal/cli/deploy/handler.go` to use SharedPush function
+  - Updated `internal/cli/platform/handler.go` to use SharedPush function
+  - Added --env flag to both commands for environment selection
+  - Removed ~100 lines of duplicate code between handlers
+  - Consistent deployment experience across both CLIs
+  - Platform services now require explicit app name (-a flag)
+
+- **Phase 3 - Platform Service Configurations**: Added .ploy.yaml configurations for platform services
+  - Created `.ploy.yaml` for API Controller with full deployment configuration
+  - Created `services/openrewrite/.ploy.yaml` for OpenRewrite service
+  - Configured health checks (http, readiness, liveness) for both services
+  - Set up domain routing for dev and prod environments
+  - Defined environment variables for service configuration
+  - Specified rolling update strategy with auto-revert capability
+  - Both services configured for Lane E (containerized deployments)
+
+- **Phase 4 - GitHub Actions Integration**: Automated CI/CD pipeline for platform services
+  - Created `.github/workflows/deploy-platform.yml` workflow
+  - Implemented change detection using dorny/paths-filter action
+  - Automated builds of ployman CLI with artifact management
+  - Deploy jobs for ploy-api and openrewrite services
+  - Health check verification after deployments
+  - Support for automatic triggers on push to main branch
+  - Manual deployment via workflow_dispatch with service/environment selection
+  - Environment protection with GitHub environments (dev, staging, prod)
+
+### Testing
+- **Comprehensive Unit Tests**: Full test coverage for all components
+  - Tests for shared deployment library (common/deploy_test.go)
+  - Tests for refactored ploy push handler (deploy/handler_test.go)
+  - Tests for refactored ployman push handler (platform/handler_test.go)
+  - Environment-based domain routing validation
+  - Configuration validation with error handling
+  - All tests passing locally with 100% coverage of new code
+  - Build compilation verified for both ploy and ployman binaries
+
 ## [2025-08-27] - CHTTP Performance Benchmarking Implementation
 
 ### Added
@@ -56,9 +303,9 @@
   - Updated all Go import statements from `github.com/iw2rmb/ploy/controller` to `github.com/iw2rmb/ploy/api`
   - Renamed Makefile targets from `controller-*` to `api-*`
   - Updated Ansible playbooks and configuration variables
-  - Renamed Nomad job files from `ploy-controller.hcl` to `ploy-api.hcl`
+  - Renamed Nomad job files from `ploy-api.hcl` to `ploy-api.hcl`
   - Updated all documentation references
-  - Renamed scripts from `get-controller-url.sh` to `get-api-url.sh`
+  - Renamed scripts from `get-api-url.sh` to `get-api-url.sh`
   - Renamed `tools/controller-dist` to `tools/api-dist`
   - Note: PLOY_CONTROLLER environment variable kept for backward compatibility
 
@@ -877,7 +1124,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 ### Added
 - **Self-Update API Endpoints**: New REST API endpoints for controller self-update operations (`/v1/api/update`, `/update/status`, `/rollback`, `/version`, `/versions`)
 - **Update Strategy Support**: Multiple update strategies including rolling, blue-green, and emergency update approaches
-- **Consul-Based Coordination**: Inter-controller instance coordination during updates using Consul sessions and distributed locks
+- **Consul-Based Coordination**: Inter-api instance coordination during updates using Consul sessions and distributed locks
 - **Binary Validation System**: Comprehensive validation including checksum verification, platform compatibility, and system resource checks
 - **Rollback Mechanisms**: Automatic and manual rollback capabilities with last-known-good version detection
 - **Update Orchestration**: Proper sequencing and safety checks for coordinated controller updates across multiple instances
@@ -889,7 +1136,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 
 ### Testing
 - **Self-Update Validation**: Comprehensive testing of self-update capability including API endpoints, validation logic, and error scenarios
-- **Coordination Testing**: Verification of inter-controller coordination and distributed locking mechanisms during updates
+- **Coordination Testing**: Verification of inter-api coordination and distributed locking mechanisms during updates
 - **Rollback Testing**: Validation of rollback mechanisms and emergency update procedures
 
 ## [2025-08-21] - Ansible Nomad Controller Integration (Phase no-SPOF-3 Step 2)
@@ -910,7 +1157,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 
 ### Testing
 - **Comprehensive Test Coverage**: Added test scenarios 568-587 for controller Nomad deployment validation
-- **Deployment Validation**: Created `test-controller-nomad-deployment.sh` script for end-to-end testing of controller deployment
+- **Deployment Validation**: Created `test-api-nomad-deployment.sh` script for end-to-end testing of controller deployment
 - **Management Script Testing**: Validation of all controller management tools including update, rollback, and status monitoring capabilities
 
 ## [2025-08-21] - Controller Binary Distribution System (Phase no-SPOF-3 Step 1)
@@ -1064,7 +1311,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 
 ### Added
 - **Production Nomad System Job Configuration**
-  - `platform/nomad/ploy-controller.hcl` with comprehensive system job definition
+  - `platform/nomad/ploy-api.hcl` with comprehensive system job definition
   - Multi-instance deployment configuration with proper resource allocation (200 MHz CPU, 256 MB RAM)
   - System job type for deployment on every Nomad client node ensuring high availability
   - Linux-only constraint with minimum memory requirements (1GB) for stable operation
@@ -1076,9 +1323,9 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
   - Progress deadline and healthy deadline configuration for reliable deployments
 
 - **Consul Service Registration**
-  - Primary service registration as "ploy-controller" with allocation ID tagging
+  - Primary service registration as "ploy-api" with allocation ID tagging
   - Multiple health checks: `/health` (10s), `/ready` (15s), `/live` (30s) endpoints
-  - Metrics service registration as "ploy-controller-metrics" with Prometheus compatibility
+  - Metrics service registration as "ploy-api-metrics" with Prometheus compatibility
   - Service metadata including version, node, and datacenter information for discovery
 
 - **Environment and Configuration Management**
@@ -1093,7 +1340,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
   - Proper read/write permissions and path specifications for production deployment
 
 - **Testing Configuration**
-  - `platform/nomad/ploy-controller-simple.hcl` simplified service job for validation
+  - `platform/nomad/ploy-api-simple.hcl` simplified service job for validation
   - Service type deployment with 2 instances for high availability testing
   - Reduced complexity configuration for development and testing environments
 

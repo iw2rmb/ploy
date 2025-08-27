@@ -177,7 +177,7 @@ monitoring:
 ```json
 {
   "keys": {
-    "ploy-controller": {
+    "ploy-api": {
       "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
       "permissions": ["analyze", "health"],
       "rate_limit": "100/minute",
@@ -205,7 +205,7 @@ monitoring:
 POST /analyze HTTP/1.1
 Host: pylint.chttp.ployd.app
 Content-Type: application/gzip
-X-Client-ID: ploy-controller  
+X-Client-ID: ploy-api  
 X-Signature: <RSA-SHA256-signature>
 X-Request-ID: uuid-v4
 
@@ -272,7 +272,7 @@ X-Request-ID: uuid-v4
 POST /pipeline HTTP/1.1
 Host: analysis.chttp.ployd.app
 Content-Type: application/json
-X-Client-ID: ploy-controller
+X-Client-ID: ploy-api
 
 {
   "steps": [
@@ -1365,10 +1365,10 @@ func generateCacheKey(config *config.Config, inputHash string) string {
 - ✅ Health checks and metrics
 
 ### Phase 2: Advanced Features (Weeks 3-4)
-- 🚧 Streaming archive processing
-- 🚧 Output parsing framework
-- 🚧 Resource limiting and security
-- 🚧 Comprehensive error handling
+- ✅ Streaming archive processing (2025-08-27)
+- ✅ Output parsing framework (2025-08-27)
+- ✅ Resource limiting and security (2025-08-27)
+- ✅ Comprehensive error handling (2025-08-27)
 - 🚧 Integration testing suite
 
 ### Phase 3: Pipeline System (Weeks 5-6)

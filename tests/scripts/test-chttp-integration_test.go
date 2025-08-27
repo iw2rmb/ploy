@@ -38,7 +38,7 @@ func TestCHTTPIntegrationScript(t *testing.T) {
 	requiredFunctions := []string{
 		"validate_environment",
 		"deploy_chttp_services",
-		"deploy_controller",
+		"deploy_api",
 		"wait_for_service",
 		"test_chttp_health",
 		"test_python_analysis",

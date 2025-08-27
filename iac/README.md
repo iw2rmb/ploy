@@ -34,7 +34,7 @@ iac/
 │       ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
 │       ├── nomad-server.hcl.j2    # Linux Nomad server configuration
 │       ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
-│       ├── nomad-ploy-controller.hcl.j2  # Controller Nomad job
+│       ├── nomad-ploy-api.hcl.j2  # Controller Nomad job
 │       ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
 │       └── *.j2                    # Additional service templates
 ├── dev/                            # Development environment
@@ -158,8 +158,8 @@ All environments use shared templates from `iac/common/templates/` for consisten
 - `seaweedfs-*.service.j2` - SeaweedFS storage services
 
 **Management Scripts**:
-- `update-controller.sh.j2` - Controller update automation
-- `rollback-controller.sh.j2` - Controller rollback procedures
+- `update-api.sh.j2` - Controller update automation
+- `rollback-api.sh.j2` - Controller rollback procedures
 - `controller-status.sh.j2` - Controller health monitoring
 
 ## SSL Certificate Management
@@ -325,7 +325,7 @@ ansible-playbook site.yml --syntax-check
 ansible-playbook site.yml --check
 
 # Service health checks
-nomad job status ploy-controller
+nomad job status ploy-api
 consul members
 vault status
 ```
@@ -335,11 +335,11 @@ vault status
 **Controller Issues**:
 ```bash
 # Check controller status
-nomad job status ploy-controller
+nomad job status ploy-api
 nomad alloc status <alloc-id>
 
 # Restart controller
-nomad job restart ploy-controller
+nomad job restart ploy-api
 ```
 
 **Certificate Issues**:

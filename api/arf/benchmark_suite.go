@@ -770,7 +770,7 @@ func (bs *BenchmarkSuite) detectDeploymentErrors(ctx context.Context, repoPath s
 
 func (bs *BenchmarkSuite) applyOpenRewriteRecipe(ctx context.Context, repoPath string, recipeID string) error {
 	// Try to load recipe from examples directory first
-	recipePath := filepath.Join("controller/arf/examples", recipeID+".yaml")
+	recipePath := filepath.Join("api/arf/examples", recipeID+".yaml")
 	var recipe *models.Recipe
 	var err error
 

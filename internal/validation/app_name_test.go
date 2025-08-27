@@ -47,6 +47,22 @@ func TestValidateAppName(t *testing.T) {
 			name:    "valid uppercase converted to lowercase",
 			appName: "MyApp",
 		},
+		{
+			name:    "valid previously restricted - api",
+			appName: "api",
+		},
+		{
+			name:    "valid previously restricted - controller",
+			appName: "controller",
+		},
+		{
+			name:    "valid previously restricted - admin",
+			appName: "admin",
+		},
+		{
+			name:    "valid previously restricted - ploy",
+			appName: "ploy",
+		},
 
 		// Invalid app names - empty and length
 		{
@@ -67,89 +83,14 @@ func TestValidateAppName(t *testing.T) {
 
 		// Invalid app names - reserved names
 		{
-			name:          "reserved api",
-			appName:       "api",
-			expectedError: "app name 'api' is reserved for platform use",
-		},
-		{
 			name:          "reserved dev",
 			appName:       "dev",
 			expectedError: "app name 'dev' is reserved for platform use",
 		},
 		{
-			name:          "reserved controller",
-			appName:       "controller",
-			expectedError: "app name 'controller' is reserved for platform use",
-		},
-		{
-			name:          "reserved admin",
-			appName:       "admin",
-			expectedError: "app name 'admin' is reserved for platform use",
-		},
-		{
-			name:          "reserved dashboard",
-			appName:       "dashboard",
-			expectedError: "app name 'dashboard' is reserved for platform use",
-		},
-		{
-			name:          "reserved metrics",
-			appName:       "metrics",
-			expectedError: "app name 'metrics' is reserved for platform use",
-		},
-		{
-			name:          "reserved health",
-			appName:       "health",
-			expectedError: "app name 'health' is reserved for platform use",
-		},
-		{
-			name:          "reserved console",
-			appName:       "console",
-			expectedError: "app name 'console' is reserved for platform use",
-		},
-		{
-			name:          "reserved www",
-			appName:       "www",
-			expectedError: "app name 'www' is reserved for platform use",
-		},
-		{
-			name:          "reserved ploy",
-			appName:       "ploy",
-			expectedError: "app name 'ploy' is reserved for platform use",
-		},
-		{
-			name:          "reserved system",
-			appName:       "system",
-			expectedError: "app name 'system' is reserved for platform use",
-		},
-		{
-			name:          "reserved traefik",
-			appName:       "traefik",
-			expectedError: "app name 'traefik' is reserved for platform use",
-		},
-		{
-			name:          "reserved nomad",
-			appName:       "nomad",
-			expectedError: "app name 'nomad' is reserved for platform use",
-		},
-		{
-			name:          "reserved consul",
-			appName:       "consul",
-			expectedError: "app name 'consul' is reserved for platform use",
-		},
-		{
-			name:          "reserved vault",
-			appName:       "vault",
-			expectedError: "app name 'vault' is reserved for platform use",
-		},
-		{
-			name:          "reserved seaweedfs",
-			appName:       "seaweedfs",
-			expectedError: "app name 'seaweedfs' is reserved for platform use",
-		},
-		{
 			name:          "reserved name case insensitive",
-			appName:       "API",
-			expectedError: "app name 'api' is reserved for platform use",
+			appName:       "DEV",
+			expectedError: "app name 'dev' is reserved for platform use",
 		},
 
 		// Invalid app names - pattern violations
@@ -206,27 +147,6 @@ func TestValidateAppName(t *testing.T) {
 			expectedError: "app name cannot contain consecutive hyphens",
 		},
 
-		// Invalid app names - reserved prefixes
-		{
-			name:          "ploy prefix",
-			appName:       "ploy-test",
-			expectedError: "app name cannot start with reserved prefixes: ploy-, system-",
-		},
-		{
-			name:          "system prefix",
-			appName:       "system-app",
-			expectedError: "app name cannot start with reserved prefixes: ploy-, system-",
-		},
-		{
-			name:          "ploy prefix case insensitive",
-			appName:       "PLOY-test",
-			expectedError: "app name cannot start with reserved prefixes: ploy-, system-",
-		},
-		{
-			name:          "system prefix case insensitive",
-			appName:       "System-App",
-			expectedError: "app name cannot start with reserved prefixes: ploy-, system-",
-		},
 	}
 
 	for _, tt := range tests {
@@ -300,45 +220,13 @@ func TestIsReservedAppName(t *testing.T) {
 	}{
 		// Reserved names
 		{
-			name:     "api is reserved",
-			appName:  "api",
-			expected: true,
-		},
-		{
 			name:     "dev is reserved",
 			appName:  "dev",
 			expected: true,
 		},
 		{
-			name:     "controller is reserved",
-			appName:  "controller",
-			expected: true,
-		},
-		{
-			name:     "ploy is reserved",
-			appName:  "ploy",
-			expected: true,
-		},
-		{
-			name:     "nomad is reserved",
-			appName:  "nomad",
-			expected: true,
-		},
-
-		// Case insensitive reserved names
-		{
-			name:     "API is reserved (case insensitive)",
-			appName:  "API",
-			expected: true,
-		},
-		{
-			name:     "Controller is reserved (case insensitive)",
-			appName:  "Controller",
-			expected: true,
-		},
-		{
-			name:     "PLOY is reserved (case insensitive)",
-			appName:  "PLOY",
+			name:     "DEV is reserved (case insensitive)",
+			appName:  "DEV",
 			expected: true,
 		},
 
@@ -356,6 +244,26 @@ func TestIsReservedAppName(t *testing.T) {
 		{
 			name:     "hello-world is not reserved",
 			appName:  "hello-world",
+			expected: false,
+		},
+		{
+			name:     "api is now allowed",
+			appName:  "api",
+			expected: false,
+		},
+		{
+			name:     "controller is now allowed",
+			appName:  "controller",
+			expected: false,
+		},
+		{
+			name:     "admin is now allowed",
+			appName:  "admin",
+			expected: false,
+		},
+		{
+			name:     "ploy is now allowed",
+			appName:  "ploy",
 			expected: false,
 		},
 		{
@@ -400,9 +308,7 @@ func TestGetReservedAppNames(t *testing.T) {
 		
 		// Check that all expected names are present
 		expectedNames := []string{
-			"api", "dev", "controller", "admin", "dashboard", 
-			"metrics", "health", "console", "www", "ploy", 
-			"system", "traefik", "nomad", "consul", "vault", "seaweedfs",
+			"dev",
 		}
 		
 		for _, expected := range expectedNames {
@@ -552,7 +458,7 @@ func BenchmarkValidateAppName(b *testing.B) {
 	testNames := []string{
 		"myapp",
 		"my-complex-app-name-v123",
-		"api", // reserved
+		"dev", // reserved
 		"invalid--name",
 	}
 	
@@ -566,9 +472,9 @@ func BenchmarkValidateAppName(b *testing.B) {
 
 func BenchmarkIsReservedAppName(b *testing.B) {
 	testNames := []string{
-		"api",
+		"dev",
 		"myapp", 
-		"controller",
+		"api",
 		"test-app",
 	}
 	
@@ -601,7 +507,7 @@ func TestValidateAppName_Properties(t *testing.T) {
 	t.Run("idempotency - validating twice gives same result", func(t *testing.T) {
 		testCases := []string{
 			"myapp",
-			"api", // reserved
+			"dev", // reserved
 			"invalid--name",
 			"123invalid",
 		}
@@ -627,7 +533,7 @@ func TestValidateAppName_Properties(t *testing.T) {
 			{"myapp", "MYAPP"},
 			{"my-app", "MY-APP"}, 
 			{"test123", "TEST123"},
-			{"api", "API"}, // reserved
+			{"dev", "DEV"}, // reserved
 		}
 		
 		for _, pair := range testPairs {

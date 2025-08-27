@@ -36,7 +36,7 @@ if [[ -z "$TARGET_VERSION" ]]; then
 fi
 
 # Get current version
-CURRENT_VERSION=$(cat /opt/ploy/current-controller-version 2>/dev/null || echo "unknown")
+CURRENT_VERSION=$(cat /opt/ploy/current-api-version 2>/dev/null || echo "unknown")
 echo "Current version: $CURRENT_VERSION"
 echo "Target version: $TARGET_VERSION"
 
@@ -54,12 +54,12 @@ echo "Initiating rollback using ployman..."
 # Update Nomad job template with rollback version
 echo "Updating Nomad job configuration for rollback..."
 sudo sed -i "s/controller_version: \".*\"/controller_version: \"$TARGET_VERSION\"/" \
-    /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+    /opt/hashicorp/nomad/jobs/ploy-api.hcl
 
 # Trigger rolling update to rollback version
 echo "Triggering Nomad rolling update to rollback version..."
 export NOMAD_ADDR="http://localhost:4646"
-nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
 
 # Monitor rollback deployment
 echo "Monitoring rollback progress..."
@@ -74,9 +74,9 @@ while true; do
     fi
 
     # Check allocation status
-    ALLOCS=$(nomad job allocs -json ploy-controller | jq -r '.[].ClientStatus' | sort | uniq -c)
+    ALLOCS=$(nomad job allocs -json ploy-api | jq -r '.[].ClientStatus' | sort | uniq -c)
     RUNNING_COUNT=$(echo "$ALLOCS" | grep -c "running" || echo "0")
-    TOTAL_COUNT=$(nomad job allocs -json ploy-controller | jq '. | length')
+    TOTAL_COUNT=$(nomad job allocs -json ploy-api | jq '. | length')
 
     echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
 
@@ -95,7 +95,7 @@ sleep 30  # Allow time for startup
 if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" > /dev/null; then
     echo "✅ Controller rollback health check passed"
     # Update current version file
-    echo "$TARGET_VERSION" | sudo tee /opt/ploy/current-controller-version > /dev/null
+    echo "$TARGET_VERSION" | sudo tee /opt/ploy/current-api-version > /dev/null
     echo "✅ Rollback completed successfully to version $TARGET_VERSION"
 else
     echo "❌ Controller health check failed after rollback"

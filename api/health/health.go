@@ -17,45 +17,45 @@ import (
 
 // HealthStatus represents the overall health status of the service
 type HealthStatus struct {
-	Status       string                    `json:"status"`
-	Timestamp    time.Time                `json:"timestamp"`
-	Version      string                   `json:"version,omitempty"`
+	Status       string                      `json:"status"`
+	Timestamp    time.Time                   `json:"timestamp"`
+	Version      string                      `json:"version,omitempty"`
 	Dependencies map[string]DependencyHealth `json:"dependencies"`
 }
 
 // DependencyHealth represents the health status of a dependency
 type DependencyHealth struct {
-	Status    string        `json:"status"`
-	Latency   time.Duration `json:"latency_ms"`
-	Error     string        `json:"error,omitempty"`
-	Details   interface{}   `json:"details,omitempty"`
+	Status  string        `json:"status"`
+	Latency time.Duration `json:"latency_ms"`
+	Error   string        `json:"error,omitempty"`
+	Details interface{}   `json:"details,omitempty"`
 }
 
 // ReadinessStatus represents the readiness status with more detailed checks
 type ReadinessStatus struct {
-	Ready        bool                     `json:"ready"`
-	Timestamp    time.Time                `json:"timestamp"`
-	Dependencies map[string]DependencyHealth `json:"dependencies"`
-	CriticalDependencies []string         `json:"critical_dependencies"`
+	Ready                bool                        `json:"ready"`
+	Timestamp            time.Time                   `json:"timestamp"`
+	Dependencies         map[string]DependencyHealth `json:"dependencies"`
+	CriticalDependencies []string                    `json:"critical_dependencies"`
 }
 
 // HealthMetrics tracks health check metrics for operational monitoring
 type HealthMetrics struct {
-	TotalHealthChecks     int64                    `json:"total_health_checks"`
-	TotalReadinessChecks  int64                    `json:"total_readiness_checks"`
-	HealthyResponses      int64                    `json:"healthy_responses"`
-	UnhealthyResponses    int64                    `json:"unhealthy_responses"`
-	ReadyResponses        int64                    `json:"ready_responses"`
-	NotReadyResponses     int64                    `json:"not_ready_responses"`
-	DependencyFailures    map[string]int64         `json:"dependency_failures"`
-	LastHealthCheck       time.Time                `json:"last_health_check"`
-	LastReadinessCheck    time.Time                `json:"last_readiness_check"`
-	AverageResponseTime   map[string]time.Duration `json:"average_response_time_ms"`
+	TotalHealthChecks    int64                    `json:"total_health_checks"`
+	TotalReadinessChecks int64                    `json:"total_readiness_checks"`
+	HealthyResponses     int64                    `json:"healthy_responses"`
+	UnhealthyResponses   int64                    `json:"unhealthy_responses"`
+	ReadyResponses       int64                    `json:"ready_responses"`
+	NotReadyResponses    int64                    `json:"not_ready_responses"`
+	DependencyFailures   map[string]int64         `json:"dependency_failures"`
+	LastHealthCheck      time.Time                `json:"last_health_check"`
+	LastReadinessCheck   time.Time                `json:"last_readiness_check"`
+	AverageResponseTime  map[string]time.Duration `json:"average_response_time_ms"`
 }
 
 // DeploymentStatus represents blue-green deployment status and service mesh connectivity
 type DeploymentStatus struct {
-	Status               string                 `json:"status"`
+	Status              string                 `json:"status"`
 	Timestamp           time.Time              `json:"timestamp"`
 	DeploymentColor     string                 `json:"deployment_color"`
 	DeploymentWeight    int                    `json:"deployment_weight"`
@@ -81,7 +81,7 @@ func NewHealthChecker(storageConfigPath, consulAddr, nomadAddr string) *HealthCh
 		nomadAddr = utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
 	}
 	vaultAddr := utils.Getenv("VAULT_ADDR", "http://127.0.0.1:8200")
-	
+
 	return &HealthChecker{
 		storageConfigPath: storageConfigPath,
 		consulAddr:        consulAddr,
@@ -110,16 +110,16 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 
 	// Check storage configuration
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
-	
+
 	// Check Consul (non-critical)
 	status.Dependencies["consul"] = h.checkConsul()
-	
+
 	// Check Nomad (non-critical for basic health)
 	status.Dependencies["nomad"] = h.checkNomad()
-	
+
 	// Check Vault (non-critical for basic health)
 	status.Dependencies["vault"] = h.checkVault()
-	
+
 	// Check SeaweedFS via storage client (non-critical)
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
 
@@ -141,7 +141,7 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 	// Log health check result
 	duration := time.Since(startTime)
 	log.Printf("Health check completed in %v, status: %s", duration, status.Status)
-	
+
 	return status
 }
 
@@ -149,9 +149,9 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 	startTime := time.Now()
 	status := ReadinessStatus{
-		Ready:        true,
-		Timestamp:    time.Now(),
-		Dependencies: make(map[string]DependencyHealth),
+		Ready:                true,
+		Timestamp:            time.Now(),
+		Dependencies:         make(map[string]DependencyHealth),
 		CriticalDependencies: []string{"storage_config", "consul", "nomad"},
 	}
 
@@ -165,7 +165,7 @@ func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 	status.Dependencies["nomad"] = h.checkNomad()
 	status.Dependencies["vault"] = h.checkVault()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
-	
+
 	// Check environment store functionality
 	status.Dependencies["env_store"] = h.checkEnvStore()
 
@@ -298,14 +298,14 @@ func (h *HealthChecker) checkVault() DependencyHealth {
 	// Create Vault client
 	config := vault.DefaultConfig()
 	config.Address = h.vaultAddr
-	
+
 	// Allow insecure TLS for development/testing
 	if utils.Getenv("VAULT_SKIP_VERIFY", "false") == "true" {
 		config.ConfigureTLS(&vault.TLSConfig{
 			Insecure: true,
 		})
 	}
-	
+
 	client, err := vault.NewClient(config)
 	if err != nil {
 		dep.Status = "unhealthy"
@@ -327,12 +327,12 @@ func (h *HealthChecker) checkVault() DependencyHealth {
 			dep.Details = health
 		} else {
 			dep.Details = map[string]interface{}{
-				"initialized": health.Initialized,
-				"sealed":      health.Sealed,
-				"standby":     health.Standby,
-				"version":     health.Version,
+				"initialized":  health.Initialized,
+				"sealed":       health.Sealed,
+				"standby":      health.Standby,
+				"version":      health.Version,
 				"cluster_name": health.ClusterName,
-				"address":     h.vaultAddr,
+				"address":      h.vaultAddr,
 			}
 		}
 	}
@@ -395,7 +395,7 @@ func (h *HealthChecker) checkEnvStore() DependencyHealth {
 				dep.Error = fmt.Sprintf("Consul env store health check failed: %v", err)
 			} else {
 				dep.Details = map[string]interface{}{
-					"type": "consul",
+					"type":    "consul",
 					"address": h.consulAddr,
 				}
 			}
@@ -415,31 +415,31 @@ func (h *HealthChecker) checkEnvStore() DependencyHealth {
 // HealthHandler handles HTTP health check requests
 func (h *HealthChecker) HealthHandler(c *fiber.Ctx) error {
 	health := h.GetHealthStatus()
-	
+
 	statusCode := 200
 	if health.Status == "unhealthy" {
 		statusCode = 503
 	}
-	
+
 	return c.Status(statusCode).JSON(health)
 }
 
 // ReadinessHandler handles HTTP readiness check requests
 func (h *HealthChecker) ReadinessHandler(c *fiber.Ctx) error {
 	readiness := h.GetReadinessStatus()
-	
+
 	statusCode := 200
 	if !readiness.Ready {
 		statusCode = 503
 	}
-	
+
 	return c.Status(statusCode).JSON(readiness)
 }
 
 // LivenessHandler handles HTTP liveness check requests (simple)
 func (h *HealthChecker) LivenessHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
-		"status": "alive",
+		"status":    "alive",
 		"timestamp": time.Now(),
 	})
 }
@@ -454,7 +454,7 @@ func (h *HealthChecker) MetricsHandler(c *fiber.Ctx) error {
 			h.metricsCollector.AverageResponseTime[depName] = 0
 		}
 	}
-	
+
 	return c.JSON(h.metricsCollector)
 }
 
@@ -466,14 +466,14 @@ func (h *HealthChecker) GetMetrics() *HealthMetrics {
 // GetDeploymentStatus returns blue-green deployment and service mesh status
 func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
 	status := DeploymentStatus{
-		Status:    "healthy",
-		Timestamp: time.Now(),
-		DeploymentColor:    utils.Getenv("DEPLOYMENT_COLOR", "blue"),
-		DeploymentWeight:   utils.ParseIntEnv("DEPLOYMENT_WEIGHT", 100),
-		DeploymentID:       utils.Getenv("DEPLOYMENT_ID", "unknown"),
-		ServiceMeshEnabled: utils.Getenv("SERVICE_MESH_ENABLED", "false") == "true",
-		ServiceMeshConnect: utils.Getenv("SERVICE_MESH_CONNECT", "false") == "true",
-		TraefikEnabled:     utils.Getenv("TRAEFIK_ENABLED", "false") == "true",
+		Status:              "healthy",
+		Timestamp:           time.Now(),
+		DeploymentColor:     utils.Getenv("DEPLOYMENT_COLOR", "blue"),
+		DeploymentWeight:    utils.ParseIntEnv("DEPLOYMENT_WEIGHT", 100),
+		DeploymentID:        utils.Getenv("DEPLOYMENT_ID", "unknown"),
+		ServiceMeshEnabled:  utils.Getenv("SERVICE_MESH_ENABLED", "false") == "true",
+		ServiceMeshConnect:  utils.Getenv("SERVICE_MESH_CONNECT", "false") == "true",
+		TraefikEnabled:      utils.Getenv("TRAEFIK_ENABLED", "false") == "true",
 		ServiceRegistration: make(map[string]interface{}),
 	}
 
@@ -481,16 +481,16 @@ func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
 	consulHealth := h.checkConsul()
 	if consulHealth.Status == "healthy" {
 		status.ServiceRegistration["consul"] = map[string]interface{}{
-			"status": "registered",
-			"service_name": utils.Getenv("SERVICE_NAME", "ploy-controller"),
+			"status":          "registered",
+			"service_name":    utils.Getenv("SERVICE_NAME", "ploy-api"),
 			"service_version": utils.Getenv("SERVICE_VERSION", "1.0.0"),
-			"instance_id": utils.Getenv("INSTANCE_ID", "unknown"),
+			"instance_id":     utils.Getenv("INSTANCE_ID", "unknown"),
 		}
 	} else {
 		status.Status = "degraded"
 		status.ServiceRegistration["consul"] = map[string]interface{}{
 			"status": "failed",
-			"error": consulHealth.Error,
+			"error":  consulHealth.Error,
 		}
 	}
 
@@ -501,11 +501,11 @@ func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
 			status.Status = "degraded"
 			status.ServiceRegistration["service_mesh"] = map[string]interface{}{
 				"status": "misconfigured",
-				"error": "Service mesh enabled but connect disabled",
+				"error":  "Service mesh enabled but connect disabled",
 			}
 		} else {
 			status.ServiceRegistration["service_mesh"] = map[string]interface{}{
-				"status": "connected",
+				"status":   "connected",
 				"protocol": utils.Getenv("SERVICE_MESH_PROTOCOL", "http"),
 			}
 		}
@@ -514,8 +514,8 @@ func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
 	// Check Traefik integration if enabled
 	if status.TraefikEnabled {
 		status.ServiceRegistration["traefik"] = map[string]interface{}{
-			"status": "enabled",
-			"domain": utils.Getenv("TRAEFIK_DOMAIN", "api.ployd.app"),
+			"status":      "enabled",
+			"domain":      utils.Getenv("TRAEFIK_DOMAIN", "api.ployd.app"),
 			"tls_enabled": utils.Getenv("TRAEFIK_TLS_ENABLED", "false") == "true",
 		}
 	}
@@ -526,26 +526,26 @@ func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
 // DeploymentStatusHandler handles HTTP deployment status requests for blue-green deployments
 func (h *HealthChecker) DeploymentStatusHandler(c *fiber.Ctx) error {
 	deployment := h.GetDeploymentStatus()
-	
+
 	statusCode := 200
 	if deployment.Status == "unhealthy" {
 		statusCode = 503
 	} else if deployment.Status == "degraded" {
 		statusCode = 200 // Still healthy, but with warnings
 	}
-	
+
 	return c.Status(statusCode).JSON(deployment)
 }
 
 // UpdateStatusHandler handles rolling update progress monitoring
 func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
 	h.metricsCollector.TotalHealthChecks++
-	
+
 	// Check if we're currently in an update process
 	// This is a simplified implementation - in production this would track actual update state
 	updatePhase := c.Get("X-Update-Phase", "stable")
 	canaryStatus := c.Get("X-Canary-Status", "none")
-	
+
 	status := map[string]interface{}{
 		"status":           "stable",
 		"timestamp":        time.Now(),
@@ -555,14 +555,14 @@ func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
 		"health_summary": map[string]interface{}{
 			"overall": "healthy",
 			"dependencies": map[string]string{
-				"consul":    "healthy", 
+				"consul":    "healthy",
 				"nomad":     "healthy",
 				"seaweedfs": "healthy",
 				"vault":     "healthy",
 			},
 		},
 	}
-	
+
 	// If we detect we're in an update, adjust the response
 	if updatePhase != "stable" {
 		status["status"] = "updating"
@@ -572,7 +572,7 @@ func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
 			"started_at": time.Now().Add(-5 * time.Minute), // Mock start time
 		}
 	}
-	
+
 	h.metricsCollector.HealthyResponses++
 	return c.Status(200).JSON(status)
 }

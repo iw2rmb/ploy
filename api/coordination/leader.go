@@ -62,7 +62,7 @@ func (le *LeaderElection) Run(ctx context.Context) error {
 	// Create session with TTL
 	session := le.client.Session()
 	sessionOpts := &api.SessionEntry{
-		Name:      fmt.Sprintf("ploy-controller-%s", getHostname()),
+		Name:      fmt.Sprintf("ploy-api-%s", getHostname()),
 		TTL:       le.ttl,
 		Behavior:  api.SessionBehaviorDelete,
 		LockDelay: 5 * time.Second,
@@ -125,7 +125,7 @@ func (le *LeaderElection) attemptLeadership(ctx context.Context, kv *api.KV) {
 		// We just became the leader
 		le.logger.Printf("Acquired leadership")
 		le.setLeader(true)
-		
+
 		if le.callbacks.OnStartedLeading != nil {
 			go func() {
 				if err := le.callbacks.OnStartedLeading(ctx); err != nil {
@@ -137,7 +137,7 @@ func (le *LeaderElection) attemptLeadership(ctx context.Context, kv *api.KV) {
 		// We lost leadership
 		le.logger.Printf("Lost leadership")
 		le.setLeader(false)
-		
+
 		if le.callbacks.OnStoppedLeading != nil {
 			go le.callbacks.OnStoppedLeading()
 		}
@@ -184,7 +184,7 @@ func (le *LeaderElection) handleSessionExpiry(ctx context.Context, session *api.
 
 	// Try to recreate session
 	sessionOpts := &api.SessionEntry{
-		Name:      fmt.Sprintf("ploy-controller-%s", getHostname()),
+		Name:      fmt.Sprintf("ploy-api-%s", getHostname()),
 		TTL:       le.ttl,
 		Behavior:  api.SessionBehaviorDelete,
 		LockDelay: 5 * time.Second,
@@ -212,7 +212,7 @@ func (le *LeaderElection) setLeader(isLeader bool) {
 	le.mu.Lock()
 	defer le.mu.Unlock()
 	le.isLeader = isLeader
-	
+
 	// Non-blocking send to leadership channel
 	select {
 	case le.leadershipCh <- isLeader:
@@ -228,7 +228,7 @@ func (le *LeaderElection) LeadershipChannel() <-chan bool {
 // Stop stops the leader election
 func (le *LeaderElection) Stop() {
 	close(le.stopCh)
-	
+
 	// Release leadership if we have it
 	if le.IsLeader() {
 		le.setLeader(false)
@@ -281,7 +281,7 @@ func NewCoordinationManager(consulAddr string) (*CoordinationManager, error) {
 // NewCoordinationManagerWithMetrics creates a new coordination manager with metrics
 func NewCoordinationManagerWithMetrics(consulAddr string, metrics MetricsRecorder) (*CoordinationManager, error) {
 	logger := log.New(os.Stdout, "[coordination] ", log.LstdFlags|log.Lshortfile)
-	
+
 	cm := &CoordinationManager{
 		logger:  logger,
 		metrics: metrics,
@@ -313,7 +313,7 @@ func NewCoordinationManagerWithMetrics(consulAddr string, metrics MetricsRecorde
 	// Create leader election
 	leader, err := NewLeaderElection(
 		consulAddr,
-		"ploy/controller/leader",
+		"ploy/api/leader",
 		"15s",
 		callbacks,
 	)

@@ -95,6 +95,70 @@ func (m *Manager) ExtractArchive(ctx context.Context, archiveData []byte) (extra
 	return workDir, cleanupDir, nil
 }
 
+// ExtractStreamingArchive extracts a gzipped tar archive from a reader stream
+func (m *Manager) ExtractStreamingArchive(ctx context.Context, reader io.Reader) (extractPath string, cleanup func(), err error) {
+	// Create working directory
+	workDir, cleanupDir, err := m.CreateWorkingDirectory()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to create working directory: %w", err)
+	}
+	
+	// Create gzip reader from stream
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		cleanupDir()
+		return "", nil, fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzReader.Close()
+	
+	// Create tar reader
+	tarReader := tar.NewReader(gzReader)
+	
+	// Extract files streaming
+	for {
+		select {
+		case <-ctx.Done():
+			cleanupDir()
+			return "", nil, fmt.Errorf("extraction cancelled: %w", ctx.Err())
+		default:
+			// Continue processing
+		}
+		
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of archive
+		}
+		if err != nil {
+			cleanupDir()
+			return "", nil, fmt.Errorf("failed to read tar header: %w", err)
+		}
+		
+		// Validate and sanitize file path
+		targetPath, err := m.sanitizePath(workDir, header.Name)
+		if err != nil {
+			cleanupDir()
+			return "", nil, fmt.Errorf("invalid file path: %w", err)
+		}
+		
+		switch header.Typeflag {
+		case tar.TypeReg:
+			// Regular file - stream directly to disk
+			if err := m.extractFileStreaming(tarReader, targetPath, header.Mode); err != nil {
+				cleanupDir()
+				return "", nil, fmt.Errorf("failed to extract file %s: %w", header.Name, err)
+			}
+		case tar.TypeDir:
+			// Directory
+			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+				cleanupDir()
+				return "", nil, fmt.Errorf("failed to create directory %s: %w", header.Name, err)
+			}
+		}
+	}
+	
+	return workDir, cleanupDir, nil
+}
+
 // ExecuteCommand executes a command in the sandbox
 func (m *Manager) ExecuteCommand(ctx context.Context, command string, args []string, workingDir string) (*ExecutionResult, error) {
 	// Create command with context
@@ -241,6 +305,31 @@ func (m *Manager) extractFile(reader io.Reader, targetPath string, mode int64) e
 	
 	// Copy data
 	if _, err := io.Copy(file, reader); err != nil {
+		return fmt.Errorf("failed to write file data: %w", err)
+	}
+	
+	return nil
+}
+
+// extractFileStreaming extracts a file from a tar reader using streaming with a buffer
+func (m *Manager) extractFileStreaming(reader io.Reader, targetPath string, mode int64) error {
+	// Create directory if needed
+	dir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	
+	// Create file
+	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(mode))
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+	
+	// Use a buffer for streaming copy
+	buf := make([]byte, 32*1024) // 32KB buffer
+	_, err = io.CopyBuffer(file, reader, buf)
+	if err != nil {
 		return fmt.Errorf("failed to write file data: %w", err)
 	}
 	

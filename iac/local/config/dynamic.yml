@@ -7,7 +7,7 @@ http:
     # API router for development controller access
     ploy-api:
       rule: "Host(`api.local.dev`) || Host(`localhost`) && PathPrefix(`/v1`)"
-      service: ploy-controller
+      service: ploy-api
       entryPoints:
         - web
       middlewares:
@@ -51,7 +51,7 @@ http:
   # Services configuration
   services:
     # Ploy Controller service (when running locally)
-    ploy-controller:
+    ploy-api:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:8081"

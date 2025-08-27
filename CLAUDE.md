@@ -112,7 +112,7 @@ make test-unit                        # Unit tests (GREEN phase)
 make test-coverage-threshold          # Verify 60% minimum coverage
 
 # Build Verification (MANDATORY before VPS testing)
-go build -o bin/controller ./controller && go build -o bin/ploy ./cmd/ploy && go build ./api/... ./cmd/...
+go build -o bin/api ./controller && go build -o bin/ploy ./cmd/ploy && go build ./api/... ./cmd/...
 
 # Test Development
 make test-generate                    # Generate test files
@@ -125,7 +125,7 @@ git checkout main && git merge <current-branch> && git push origin main && git c
 **VPS (Integration/Functional):**
 ```bash
 # Deployment
-./scripts/deploy.sh <branch>          # Automated deployment
+ployman push -a ploy-api              # Unified deployment system
 ssh root@$TARGET_HOST "su - ploy -c './tests/scripts/test-*.sh'"  # Test execution
 
 # Controller Management  
@@ -134,9 +134,9 @@ curl https://api.dev.ployman.app/v1/version                         # Version ch
 ```
 
 **PROHIBITED (Never):**
-- Execute binaries locally: `./bin/controller`, `go run ./controller`
+- Execute binaries locally: `./bin/api`, `go run ./controller`
 - Run integration tests locally: `./tests/scripts/test-*.sh`
-- Manual controller deployment: `nomad job run platform/nomad/ploy-controller.hcl`
+- Manual controller deployment: `nomad job run platform/nomad/ploy-api.hcl`
 
 ### Git Current Branch Workflow
 
@@ -177,36 +177,31 @@ git checkout $CURRENT_BRANCH                 # Return to worktree branch
 
 ### Controller Deployment Priority Order
 1. **Self-Update Endpoint** (Primary): `curl -X POST https://api.dev.ployman.app/v1/update/latest`
-2. **Deploy Script** (Fallback): `./scripts/deploy.sh <branch>` 
+2. **Unified Deployment** (Alternative): `ployman push -a ploy-api`
 3. **Investigation Required** if both methods fail
 
 ## App Naming Restrictions
 
-**Reserved App Names:** The following names are reserved for platform use and cannot be used when deploying apps:
-
-- `api` - Reserved for controller API endpoint (api.dev.ployman.app, api.ployd.app)
-- `dev` - Reserved for dev environment subdomain (dev.ployd.app)
-- `controller`, `admin`, `dashboard`, `metrics`, `health`, `console`, `www`
-- `ploy`, `system`, `traefik`, `nomad`, `consul`, `vault`, `seaweedfs`
+**Reserved App Name:** Only `dev` is reserved for the development environment subdomain (dev.ployd.app).
 
 **App Name Validation Rules:**
 - 2-63 characters long
 - Start with a letter, end with letter or number
 - Contain only lowercase letters, numbers, and hyphens
 - Cannot contain consecutive hyphens (`--`)
-- Cannot start with reserved prefixes: `ploy-`, `system-`
 
 **Examples:**
 ```bash
-# ✅ Valid app names
+# ✅ Valid app names (including previously restricted names)
 ./bin/ploy apps new --name hello-world
-./bin/ploy apps new --name my-java-app
-./bin/ploy apps new --name test123
+./bin/ploy apps new --name api
+./bin/ploy apps new --name controller
+./bin/ploy apps new --name admin
 
 # ❌ Invalid app names (will be rejected)
-./bin/ploy apps new --name api        # Reserved
-./bin/ploy apps new --name dev        # Reserved
-./bin/ploy apps new --name ploy-test  # Reserved prefix
+./bin/ploy apps new --name dev         # Reserved for dev environment
+./bin/ploy apps new --name app--name   # Consecutive hyphens
+./bin/ploy apps new --name -invalid    # Cannot start with hyphen
 ```
 
 ## Repository Structure

@@ -138,8 +138,8 @@
 
         - name: Copy controller Nomad job template
           template:
-            src: ../templates/nomad-ploy-controller.hcl.j2
-            dest: /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+            src: ../templates/nomad-ploy-api.hcl.j2
+            dest: /opt/hashicorp/nomad/jobs/ploy-api.hcl
             owner: hashicorp
             group: hashicorp
             mode: '0644'
@@ -148,7 +148,7 @@
             freebsd_vm_dynamic_ip: "{{ freebsd_vm_ip }}"
 
         - name: Validate controller job syntax
-          command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+          command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-api.hcl
           register: controller_validate
           changed_when: false
           environment:
@@ -156,21 +156,21 @@
 
         - name: Check if controller job is already running
           uri:
-            url: "http://localhost:4646/v1/job/ploy-controller"
+            url: "http://localhost:4646/v1/job/ploy-api"
             method: GET
             status_code: [200, 404]
           register: controller_job_check
           ignore_errors: true
 
         - name: Deploy controller job to Nomad
-          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
           register: controller_job_deploy
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           when: controller_job_check.status == 404
 
         - name: Update existing controller job (rolling update)
-          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
           register: controller_job_update
           environment:
             NOMAD_ADDR: "http://localhost:4646"
@@ -228,7 +228,7 @@
         - name: Save current controller version for future reference
           copy:
             content: "{{ current_controller_version }}"
-            dest: /opt/ploy/current-controller-version
+            dest: /opt/ploy/current-api-version
             owner: ploy
             group: ploy
             mode: '0644'
@@ -245,16 +245,16 @@
 
         - name: Create controller update script
           template:
-            src: ../templates/update-controller.sh.j2
-            dest: /home/ploy/controller-scripts/update-controller.sh
+            src: ../templates/update-api.sh.j2
+            dest: /home/ploy/controller-scripts/update-api.sh
             owner: ploy
             group: ploy
             mode: '0755'
 
         - name: Create controller rollback script
           template:
-            src: ../templates/rollback-controller.sh.j2
-            dest: /home/ploy/controller-scripts/rollback-controller.sh
+            src: ../templates/rollback-api.sh.j2
+            dest: /home/ploy/controller-scripts/rollback-api.sh
             owner: ploy
             group: ploy
             mode: '0755'
@@ -269,8 +269,8 @@
 
         - name: Create controller migration script
           template:
-            src: ../templates/migrate-controller.sh.j2
-            dest: /home/ploy/controller-scripts/migrate-controller.sh
+            src: ../templates/migrate-api.sh.j2
+            dest: /home/ploy/controller-scripts/migrate-api.sh
             owner: ploy
             group: ploy
             mode: '0755'

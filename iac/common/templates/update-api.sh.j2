@@ -41,12 +41,12 @@ echo "Uploading controller binary to SeaweedFS..."
 # Update Nomad job template with new version
 echo "Updating Nomad job configuration..."
 sudo sed -i "s/controller_version: \".*\"/controller_version: \"$NEW_VERSION\"/" \
-    /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+    /opt/hashicorp/nomad/jobs/ploy-api.hcl
 
 # Trigger rolling update
 echo "Triggering Nomad rolling update..."
 export NOMAD_ADDR="http://localhost:4646"
-nomad job run /opt/hashicorp/nomad/jobs/ploy-controller.hcl
+nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
 
 # Monitor deployment
 echo "Monitoring deployment progress..."
@@ -61,9 +61,9 @@ while true; do
     fi
 
     # Check allocation status
-    ALLOCS=$(nomad job allocs -json ploy-controller | jq -r '.[].ClientStatus' | sort | uniq -c)
+    ALLOCS=$(nomad job allocs -json ploy-api | jq -r '.[].ClientStatus' | sort | uniq -c)
     RUNNING_COUNT=$(echo "$ALLOCS" | grep -c "running" || echo "0")
-    TOTAL_COUNT=$(nomad job allocs -json ploy-controller | jq '. | length')
+    TOTAL_COUNT=$(nomad job allocs -json ploy-api | jq '. | length')
 
     echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
 
@@ -84,12 +84,12 @@ if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" > /dev/null; 
 else
     echo "❌ Controller health check failed"
     echo "Rolling back to previous version..."
-    "$CONTROLLER_DIR/rollback-controller.sh"
+    "$CONTROLLER_DIR/rollback-api.sh"
     exit 1
 fi
 
 # Save current version
-echo "$NEW_VERSION" | sudo tee /opt/ploy/current-controller-version > /dev/null
+echo "$NEW_VERSION" | sudo tee /opt/ploy/current-api-version > /dev/null
 
 echo "✅ Controller updated successfully to version $NEW_VERSION"
 echo "API endpoint: http://localhost:{{ ploy.controller_port }}/health"

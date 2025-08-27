@@ -122,15 +122,15 @@ curl http://localhost:8081/version/detailed
 
 ### Deployment
 ```bash
-# Deploy to Nomad with automatic version discovery
-./scripts/deploy.sh
+# Deploy API controller using unified deployment system
+ployman push -a ploy-api
 
-# The script automatically:
-# - Builds api with version
-# - Uploads to SeaweedFS
-# - Updates Nomad job with version/checksum
-# - Deploys via Nomad
-# - Verifies deployment
+# The deployment automatically:
+# - Builds from source with version
+# - Creates deployment package
+# - Deploys via controller API
+# - Updates Nomad job
+# - Verifies deployment health
 ```
 
 ### Dynamic API Endpoint
@@ -177,7 +177,7 @@ The dev environment uses `*.dev.ployd.app` subdomain pattern:
    export NAMECHEAP_USERNAME="your-username"
    
    # Deploy api with wildcard certificate support
-   ./scripts/deploy.sh
+   ployman push -a ploy-api
    ```
 
 ### Protected App Names

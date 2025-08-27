@@ -3,60 +3,63 @@ package platform
 import (
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"path/filepath"
-	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 // PushCmd handles platform service deployment to ployman.app domain
 func PushCmd(args []string, controllerURL string) {
 	fs := flag.NewFlagSet("push", flag.ExitOnError)
-	app := fs.String("a", filepath.Base(utils.MustGetwd()), "app name")
-	lane := fs.String("lane", "", "lane override (A..F)")
-	main := fs.String("main", "com.ploy.ordersvc.Main", "Java main class for lane C")
+	app := fs.String("a", "", "platform service name")
+	lane := fs.String("lane", "E", "lane override (default: E for containers)")
+	main := fs.String("main", "", "Java main class for lane C")
 	sha := fs.String("sha", "", "git sha to annotate")
+	env := fs.String("env", "dev", "target environment (dev, staging, prod)")
 	fs.Parse(args)
 
-	if *sha == "" {
-		if v := utils.GitSHA(); v != "" {
-			*sha = v
-		} else {
-			*sha = time.Now().Format("20060102-150405")
-		}
-	}
-
-	// Mark this as a platform service push
-	fmt.Printf("🚀 Deploying platform service %s to ployman.app...\n", *app)
-
-	ign, _ := utils.ReadGitignore(".")
-	pr, pw := io.Pipe()
-	go func() {
-		defer pw.Close()
-		_ = utils.TarDir(".", pw, ign)
-	}()
-
-	// Add platform flag to indicate this should use ployman.app domain
-	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s&main=%s&platform=true", 
-		controllerURL, *app, *sha, utils.URLQueryEsc(*main))
-	if *lane != "" {
-		url += "&lane=" + *lane
-	}
-	
-	req, _ := http.NewRequest("POST", url, pr)
-	req.Header.Set("Content-Type", "application/x-tar")
-	req.Header.Set("X-Platform-Service", "true") // Header to indicate platform service
-	
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		fmt.Println("push error:", err)
+	// Platform services require explicit app name
+	if *app == "" {
+		fmt.Println("Error: platform service name required (-a flag)")
+		fmt.Println("Example: ployman push -a ploy-api")
 		return
 	}
-	defer resp.Body.Close()
-	io.Copy(os.Stdout, resp.Body)
+
+	// Build configuration for shared deployment
+	config := common.DeployConfig{
+		App:           *app,
+		Lane:          *lane,
+		MainClass:     *main,
+		SHA:           *sha,
+		IsPlatform:    true, // Platform service
+		Environment:   *env,
+		ControllerURL: controllerURL,
+	}
+
+	// Display deployment info
+	targetDomain := "ployman.app"
+	if *env == "dev" {
+		targetDomain = "dev.ployman.app"
+	}
+	fmt.Printf("🚀 Deploying platform service %s to %s.%s...\n", *app, *app, targetDomain)
+
+	// Use shared deployment logic
+	result, err := common.SharedPush(config)
+	if err != nil {
+		fmt.Printf("❌ Deployment failed: %v\n", err)
+		return
+	}
+
+	// Display result
+	if result.Success {
+		fmt.Printf("✅ Successfully deployed to %s\n", result.URL)
+		if result.DeploymentID != "" {
+			fmt.Printf("📋 Deployment ID: %s\n", result.DeploymentID)
+		}
+	} else {
+		fmt.Printf("❌ %s\n", result.Message)
+	}
 }
 
 // OpenCmd opens a platform service in the browser

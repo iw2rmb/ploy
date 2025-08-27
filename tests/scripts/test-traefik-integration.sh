@@ -112,15 +112,15 @@ echo "Next steps: Deploy multiple controller instances, test load balancing"
 # Test 8: Check advanced load balancing configuration
 echo "📋 Test 8: Verify advanced load balancing configuration"
 echo "Checking controller load balancer config..."
-if [[ -f "platform/traefik/controller-load-balancer.yml" ]]; then
+if [[ -f "platform/traefik/api-load-balancer.yml" ]]; then
     echo "✅ PASS: Controller load balancer configuration exists"
-    if grep -q "circuit-breaker" platform/traefik/controller-load-balancer.yml; then
+    if grep -q "circuit-breaker" platform/traefik/api-load-balancer.yml; then
         echo "✅ PASS: Circuit breaker middleware configured"
     fi
-    if grep -q "sticky" platform/traefik/controller-load-balancer.yml; then
+    if grep -q "sticky" platform/traefik/api-load-balancer.yml; then
         echo "✅ PASS: Sticky sessions configured"
     fi
-    if grep -q "healthCheck" platform/traefik/controller-load-balancer.yml; then
+    if grep -q "healthCheck" platform/traefik/api-load-balancer.yml; then
         echo "✅ PASS: Health check configuration found"
     fi
 else

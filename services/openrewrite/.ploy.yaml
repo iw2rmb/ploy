@@ -1,0 +1,60 @@
+name: openrewrite
+type: platform
+lang: go  # OpenRewrite service is actually Go-based in this codebase
+lane: E   # Containerized deployment
+
+build:
+  dockerfile: |
+    FROM golang:1.22-alpine AS builder
+    WORKDIR /app
+    COPY . .
+    RUN go build -o openrewrite ./cmd/openrewrite
+    
+    FROM alpine:latest
+    RUN apk --no-cache add ca-certificates
+    WORKDIR /root/
+    COPY --from=builder /app/openrewrite .
+    EXPOSE 8080
+    CMD ["./openrewrite"]
+
+deploy:
+  instances: 2
+  memory: 512
+  cpu: 300
+  
+  health_checks:
+    http:
+      path: /health
+      interval: 15s
+      timeout: 10s
+    readiness:
+      path: /ready
+      interval: 20s
+      timeout: 15s
+  
+  domains:
+    dev:
+      - openrewrite.dev.ployman.app
+    prod:
+      - openrewrite.ployman.app
+  
+  env:
+    # Service configuration
+    PORT: "8080"
+    LOG_LEVEL: "info"
+    
+    # OpenRewrite specific settings
+    OPENREWRITE_CACHE_DIR: "/var/cache/openrewrite"
+    OPENREWRITE_TEMP_DIR: "/tmp/openrewrite"
+    OPENREWRITE_MAX_WORKERS: "4"
+    
+    # Resource limits
+    MAX_REQUEST_SIZE: "100MB"
+    REQUEST_TIMEOUT: "300s"
+    
+update_strategy:
+  type: rolling
+  max_parallel: 1
+  min_healthy_time: 30s
+  auto_revert: true
+  canary: 0
