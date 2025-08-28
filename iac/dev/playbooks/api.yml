@@ -145,6 +145,12 @@
 
     - name: Deploy API using unified deployment approach
       block:
+        - name: Debug deployment version variables
+          debug:
+            msg: |
+              deployment_version object: {{ deployment_version }}
+              current_deployment_version: {{ current_deployment_version }}
+        
         - name: Create bootstrap Nomad job for initial deployment
           template:
             src: ../../common/templates/nomad-ploy-api-bootstrap.hcl.j2
