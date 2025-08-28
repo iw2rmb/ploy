@@ -215,7 +215,7 @@ job "ploy-api" {
     
     # Main api task
     task "ploy-api" {
-      driver = "raw_exec"
+      driver = "exec"
       
       user = "ploy"  # Run as ploy user for proper permissions
       
@@ -518,7 +518,7 @@ job "ploy-api" {
       
       # Binary execution configuration
       config {
-        command = "/usr/local/bin/ploy-api"
+        command = "/home/ploy/ploy-api"
         args = []
       }
       
