@@ -58,7 +58,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Println(`Ployman - Platform Services Management
+	fmt.Print(`Ployman - Platform Services Management
 
 Usage:
   ployman <command> [options]
