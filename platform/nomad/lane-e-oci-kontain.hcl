@@ -116,8 +116,8 @@ job "{{APP_NAME}}-lane-e" {
       config {
         image = "{{DOCKER_IMAGE}}"
         
-        # Kontain runtime for VM-level isolation
-        runtime = "io.kontain"
+        # Standard runtime (Kontain not available)
+        # runtime = "io.kontain"
         
         # Port mapping
         ports = ["http", "metrics"{{#if GRPC_PORT}}, "grpc"{{/if}}]
@@ -325,8 +325,8 @@ EOF
           "version-{{VERSION}}",
           "container",
           "traefik.enable=true",
-          "traefik.http.routers.{{APP_NAME}}-e.rule=Host(`{{APP_NAME}}-e.{{DOMAIN_SUFFIX}}`)",
-          "traefik.http.routers.{{APP_NAME}}-e.tls.certresolver=letsencrypt",
+          "traefik.http.routers.{{APP_NAME}}-e.rule=Host(`{{APP_NAME}}.dev.{{DOMAIN_SUFFIX}}`)",
+          "traefik.http.routers.{{APP_NAME}}-e.tls.certresolver=dev-wildcard",
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.healthcheck.path=/healthz",
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.healthcheck.interval=10s",
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.sticky.cookie=true"
