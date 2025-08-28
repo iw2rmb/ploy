@@ -49,7 +49,7 @@ func main() {
 
 	// Upload to simple path
 	bucket := cfg.Storage.Collections.Artifacts
-	key := "controller-binaries/test/controller"
+	key := "api-binaries/test/api"
 
 	fmt.Printf("Uploading %s to %s/%s...\n", binaryPath, bucket, key)
 	result, err := client.PutObject(bucket, key, file, "application/octet-stream")
