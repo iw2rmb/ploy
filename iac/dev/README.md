@@ -64,7 +64,7 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 
 ## Architecture
 
-**Stack:** Nomad v1.10.4, Consul v1.21.4, Vault v1.20.2, Traefik v3.5.0, SeaweedFS v3.96, Docker, Go
+**Stack:** Nomad v1.10.4, Consul v1.21.4, Vault v1.20.2, Traefik v3.5.0, SeaweedFS v3.96, Docker Registry v2, Docker, Go
 
 **Lanes:** A/B (Unikraft), C (OSv/Hermit), D (FreeBSD jails), E (OCI containers), F (VMs)
 
@@ -76,7 +76,9 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 | **main.yml** | Base VPS setup, Docker, Go, build tools | ✅ Optimized |
 | **seaweedfs.yml** | Distributed storage with collections | ✅ Optimized |
 | **hashicorp.yml** | Nomad, Consul, Vault, Traefik deployment | ✅ Optimized |
-| **controller.yml** | Nomad-based controller deployment with HA | 🚀 New (Aug 2025) |
+| **traefik.yml** | Reverse proxy with SSL termination | ✅ Optimized |
+| **docker-registry.yml** | Docker Registry v2 container storage | 🚀 New (Aug 2025) |
+| **api.yml** | Ploy API deployment via Nomad | ✅ Optimized |
 | **testing.yml** | Test environment and Ploy binaries | 🚀 Newly optimized (60-80% faster) |
 | **freebsd.yml** | FreeBSD VM with jails support | 🚀 Newly optimized |
 
@@ -187,7 +189,13 @@ curl -X POST http://$TARGET_HOST:8081/v1/apps/myapp/domains \
 
 ## Services After Setup
 
-**Services:** Ploy Controller via Nomad (8081), Traefik (8080), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Vault (8200), Metrics (9100)
+**Services:** Ploy Controller via Nomad (8081), Traefik (8080), Docker Registry v2 (5000), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Vault (8200), Metrics (9100)
+
+**Container Registry:** Docker Registry v2 at `registry.dev.ployman.app` (lightweight alternative to Harbor)
+- **Storage**: Local filesystem persistence
+- **Authentication**: Anonymous access enabled for development
+- **Integration**: Automatic Traefik routing with SSL termination
+- **Benefits**: 90% less memory usage vs Harbor (~256MB vs ~2GB)
 
 ## Testing
 
@@ -196,12 +204,20 @@ curl -X POST http://$TARGET_HOST:8081/v1/apps/myapp/domains \
 su - ploy -c "./test-traefik-integration.sh"
 curl localhost:{4646,8500,8200}/v1/status/leader
 
+# Docker Registry
+curl https://registry.dev.ployman.app/v2/
+curl https://registry.dev.ployman.app/v2/_catalog
+
 # Lane detection and API
 ./tests/scripts/test-{lane-detection,build-pipeline,api}.sh
 
 # Storage and routing
 curl localhost:9333/{vol/status,cluster/status}
 curl localhost:8095/{ping,api/overview,metrics}
+
+# Container registry
+curl https://registry.dev.ployman.app/v2/
+nomad job status docker-registry
 ```
 
 ## Usage

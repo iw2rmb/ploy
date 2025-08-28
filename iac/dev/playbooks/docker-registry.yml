@@ -1,0 +1,176 @@
+---
+# Docker Registry v2 Deployment for Ploy
+#
+# This playbook deploys Docker Registry v2 as a Nomad service for container image storage:
+# - Lightweight alternative to Harbor enterprise registry
+# - Nomad-native deployment with service discovery
+# - Traefik integration for SSL termination and load balancing
+# - Filesystem storage with persistence
+# - Anonymous access enabled (no authentication required)
+#
+- name: Deploy Docker Registry v2
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Ensure Docker Registry prerequisites
+      block:
+        - name: Verify Nomad is running
+          systemd:
+            name: nomad
+            state: started
+            enabled: true
+          
+        - name: Verify Consul is running
+          systemd:
+            name: consul
+            state: started
+            enabled: true
+          
+        - name: Verify Traefik is running
+          systemd:
+            name: traefik
+            state: started
+            enabled: true
+
+    - name: Create Docker Registry storage directory
+      block:
+        - name: Create registry data directory
+          file:
+            path: /opt/nomad/volumes/registry-data
+            state: directory
+            mode: '0755'
+            owner: root
+            group: root
+        
+        - name: Set proper permissions for registry storage
+          file:
+            path: /opt/nomad/volumes/registry-data
+            mode: '0755'
+            recurse: true
+
+    - name: Deploy Docker Registry via Nomad
+      block:
+        - name: Copy Docker Registry Nomad job file
+          copy:
+            src: "{{ ansible_env.HOME }}/ploy/platform/nomad/docker-registry.hcl"
+            dest: /home/ploy/ploy/platform/nomad/docker-registry.hcl
+            owner: ploy
+            group: ploy
+            mode: '0644'
+          become_user: ploy
+        
+        - name: Validate Docker Registry job syntax
+          command: nomad job validate platform/nomad/docker-registry.hcl
+          args:
+            chdir: /home/ploy/ploy
+          become_user: ploy
+          register: nomad_validate
+          
+        - name: Display job validation results
+          debug:
+            msg: "Docker Registry job validation: {{ nomad_validate.stdout }}"
+        
+        - name: Deploy Docker Registry job
+          command: nomad job run platform/nomad/docker-registry.hcl
+          args:
+            chdir: /home/ploy/ploy
+          become_user: ploy
+          register: nomad_deploy
+          
+        - name: Display deployment results
+          debug:
+            msg: "Docker Registry deployment: {{ nomad_deploy.stdout }}"
+
+    - name: Wait for Docker Registry to be ready
+      block:
+        - name: Wait for Docker Registry service to be registered in Consul
+          uri:
+            url: "http://localhost:8500/v1/health/service/docker-registry?passing"
+            method: GET
+            status_code: 200
+          register: registry_consul_health
+          until: registry_consul_health.json | length > 0
+          retries: 30
+          delay: 10
+          
+        - name: Wait for Docker Registry API to respond
+          uri:
+            url: "https://registry.{{ ploy_domain | default('dev.ployman.app') }}/v2/"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: registry_api_health
+          until: registry_api_health.status == 200
+          retries: 20
+          delay: 15
+
+    - name: Validate Docker Registry deployment
+      block:
+        - name: Test Docker Registry v2 API
+          uri:
+            url: "https://registry.{{ ploy_domain | default('dev.ployman.app') }}/v2/"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: registry_v2_test
+          
+        - name: Test Docker Registry catalog endpoint
+          uri:
+            url: "https://registry.{{ ploy_domain | default('dev.ployman.app') }}/v2/_catalog"
+            method: GET
+            status_code: 200
+            validate_certs: false
+          register: registry_catalog_test
+          
+        - name: Display registry test results
+          debug:
+            msg: |
+              Docker Registry v2 validation results:
+              - API endpoint: {{ registry_v2_test.status }} ({{ registry_v2_test.json if registry_v2_test.json is defined else 'OK' }})
+              - Catalog endpoint: {{ registry_catalog_test.status }} ({{ registry_catalog_test.json }})
+
+    - name: Check Docker Registry job status
+      block:
+        - name: Get Docker Registry job status
+          command: nomad job status docker-registry
+          args:
+            chdir: /home/ploy/ploy
+          become_user: ploy
+          register: registry_job_status
+          
+        - name: Display Docker Registry job status
+          debug:
+            msg: "{{ registry_job_status.stdout_lines }}"
+
+    - name: Display Docker Registry deployment summary
+      debug:
+        msg: |
+          Docker Registry v2 Deployment Complete:
+          =========================================
+          
+          Registry Endpoint: https://registry.{{ ploy_domain | default('dev.ployman.app') }}
+          Registry Type: Docker Registry v2 (lightweight, standards-compliant)
+          Authentication: Anonymous access enabled (no login required)
+          
+          Storage: Local filesystem (/opt/nomad/volumes/registry-data)
+          Deployment: Nomad service with Consul service discovery
+          Load Balancer: Traefik with automatic SSL termination
+          
+          API Endpoints:
+          - Registry API: https://registry.{{ ploy_domain | default('dev.ployman.app') }}/v2/
+          - Image Catalog: https://registry.{{ ploy_domain | default('dev.ployman.app') }}/v2/_catalog
+          
+          Benefits vs Harbor:
+          - 90% less memory usage (~256MB vs ~2GB)
+          - Cloud-native Nomad deployment
+          - No complex RBAC or project namespacing
+          - Standards-compliant Docker Registry v2 API
+          - Anonymous push/pull access for development
+          
+          Next Steps:
+          1. Registry is ready for Ploy container builds
+          2. Test image push/pull with: docker tag/push registry.{{ ploy_domain | default('dev.ployman.app') }}/test:latest
+          3. Ploy will automatically use this registry for all lanes

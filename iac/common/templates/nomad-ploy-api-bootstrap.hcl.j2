@@ -106,9 +106,9 @@ EOF
           "ploy-api",
           "bootstrap",
           "traefik.enable=true",
-          "traefik.http.routers.api.rule=PathPrefix(`/v1`)",
-          "traefik.http.routers.api.entrypoints=web",
-          "traefik.http.services.api.loadbalancer.server.port={{ ploy.api_port }}"
+          "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployman.app`)",
+          "traefik.http.routers.ploy-api.tls=true",
+          "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard"
         ]
 
         # Health check endpoint
