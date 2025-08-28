@@ -150,7 +150,7 @@ The `ployman api deploy` command provides a robust deployment solution:
 
 **Environment Variables for Deployment:**
 ```bash
-export TARGET_HOST=45.12.75.241              # VPS IP address (required for SSH fallback)
+export TARGET_HOST=45.12.75.241              # VPS IP address (required for Ansible fallback)
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1  # API endpoint (default: dev)
 export DEPLOY_BRANCH=main                    # Git branch to deploy (auto-detected if not set)
 

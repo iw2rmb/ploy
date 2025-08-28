@@ -627,6 +627,9 @@ func (s *Server) setupRoutes() {
 	// Blue-Green deployment endpoints
 	s.setupBlueGreenRoutes(api)
 
+	// Platform service routes (separate from regular apps to avoid conflicts)
+	s.setupPlatformRoutes(api)
+
 	// Storage endpoints with request-scoped clients
 	api.Get("/storage/health", s.handleStorageHealth)
 	api.Get("/storage/metrics", s.handleStorageMetrics)
@@ -739,6 +742,21 @@ func (s *Server) setupBlueGreenRoutes(api fiber.Router) {
 	} else {
 		log.Printf("Blue-Green deployment routes skipped - blue-green manager not available")
 	}
+}
+
+// setupPlatformRoutes configures platform service routes
+func (s *Server) setupPlatformRoutes(api fiber.Router) {
+	// Platform services use separate routes to avoid conflicts with regular apps
+	platformAPI := api.Group("/platform")
+	
+	// Platform deployment endpoints
+	platformAPI.Post("/:service/deploy", s.handlePlatformDeploy)
+	platformAPI.Get("/:service/status", s.handlePlatformStatus)
+	platformAPI.Post("/:service/rollback", s.handlePlatformRollback)
+	platformAPI.Delete("/:service", s.handlePlatformRemove)
+	platformAPI.Get("/:service/logs", s.handlePlatformLogs)
+	
+	log.Printf("Platform service routes configured at /v1/platform/*")
 }
 
 // handleListAppCertificates lists certificates for an app

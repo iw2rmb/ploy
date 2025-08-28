@@ -76,7 +76,7 @@ API Commands:
 
 Environment Variables:
   PLOY_CONTROLLER    API endpoint (default: https://api.dev.ployman.app/v1)
-  TARGET_HOST        VPS host for SSH fallback (for api deploy)
+  TARGET_HOST        VPS host for Ansible fallback (for api deploy)
 
 Examples:
   ployman api deploy               # Deploy latest API

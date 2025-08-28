@@ -21,7 +21,7 @@ func ApiCmd(args []string) {
 		fmt.Println("")
 		fmt.Println("Environment variables:")
 		fmt.Println("  PLOY_CONTROLLER    API endpoint (default: https://api.dev.ployman.app/v1)")
-		fmt.Println("  TARGET_HOST        VPS host for SSH fallback")
+		fmt.Println("  TARGET_HOST        VPS host for Ansible fallback")
 		fmt.Println("  DEPLOY_BRANCH      Git branch to deploy (default: current branch or 'main')")
 		return
 	}
