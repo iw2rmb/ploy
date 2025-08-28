@@ -39,10 +39,14 @@ EOF
         perms = "755"
       }
 
-      # Resource allocation
+      # Resource allocation with dynamic port allocation
       resources {
         cpu = {{ nomad_api.resources.cpu | default(500) }}
         memory = {{ nomad_api.resources.memory | default(512) }}
+        
+        network {
+          port "http" {}
+        }
       }
 
       # Environment configuration
@@ -129,12 +133,6 @@ EOF
         }
       }
 
-      # Dynamic port allocation
-      resources {
-        network {
-          port "http" {}
-        }
-      }
 
       # Graceful shutdown
       kill_timeout = "30s"
