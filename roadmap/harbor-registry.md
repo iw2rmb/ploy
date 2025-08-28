@@ -75,9 +75,9 @@ harbor.ployman.app/
 - **apps/** - Write access for user deployments (ploy)
 - Both projects have separate RBAC policies and quotas
 
-### 1.1 Harbor Component Installation
+### ✅ 1.1 Harbor Component Installation (Completed 2025-08-28)
 
-**File**: `iac/dev/playbooks/harbor.yml`
+**File**: `iac/dev/playbooks/harbor.yml` ✅
 ```yaml
 ---
 - name: Deploy Harbor Registry
@@ -271,7 +271,7 @@ harbor.ployman.app/
             validate_certs: no
 ```
 
-**File**: `iac/dev/vars/harbor.yml`
+**File**: `iac/dev/vars/harbor.yml` ✅
 ```yaml
 ---
 # Harbor configuration variables
@@ -312,9 +312,9 @@ harbor:
     workers: 1
 ```
 
-### 1.2 Harbor Configuration Template
+### ✅ 1.2 Harbor Configuration Template (Completed 2025-08-28)
 
-**File**: `iac/common/templates/harbor.yml.j2`
+**File**: `iac/common/templates/harbor.yml.j2` ✅
 ```yaml
 # Harbor configuration file
 hostname: {{ harbor.hostname }}
@@ -448,26 +448,20 @@ func GetRegistryConfig() *RegistryConfig {
     }
 }
 
-// DetermineAppType determines if an app is platform or user based on naming/context
-func DetermineAppType(appName string, isPlatformContext bool) AppType {
-    // Platform services have specific naming patterns
-    platformServices := []string{
-        "ploy-api", "openrewrite", "harbor", "monitoring",
-        "traefik", "consul", "nomad", "vault", "seaweedfs",
-    }
-    
-    for _, svc := range platformServices {
-        if strings.HasPrefix(appName, svc) {
-            return PlatformApp
-        }
-    }
-    
-    // Check if explicitly called from platform context (ployman)
-    if isPlatformContext {
+// DetermineAppType determines if an app is platform or user based on API context
+// This is deterministic based on which API endpoint was called
+func DetermineAppType(context string) AppType {
+    switch context {
+    case "platform":
+        // Called from /v1/platform/:service/* endpoints
         return PlatformApp
+    case "apps", "user":
+        // Called from /v1/apps/:app/* endpoints
+        return UserApp
+    default:
+        // Default to user app for safety (less restrictive)
+        return UserApp
     }
-    
-    return UserApp
 }
 
 // GetImageTag returns Harbor-formatted image tag with correct namespace
@@ -499,7 +493,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 }
 ```
 
-### 2.2 Update Build Trigger
+### 2.2 Update Build Trigger with Context-Aware Namespacing
 
 **File**: `internal/build/trigger.go` (complete replacement)
 ```go
@@ -507,41 +501,135 @@ import (
     "github.com/iw2rmb/ploy/internal/config"
 )
 
+// BuildRequest now includes API context to determine namespace
+type BuildRequest struct {
+    App         string
+    SHA         string
+    Lane        string
+    APIContext  string  // "platform" or "apps" based on endpoint
+    // ... other fields
+}
+
 func TriggerBuild(ctx context.Context, req *BuildRequest) (*BuildResult, error) {
     registry := config.GetRegistryConfig()
     
     // Harbor authentication is mandatory
     registry.MustAuthenticate()
     
+    // Determine app type from API context (deterministic)
+    appType := config.DetermineAppType(req.APIContext)
+    
     // ... existing code ...
     
-    // All images go to Harbor
-    imageTag := registry.GetImageTag(req.App, sha)
+    // Route to correct Harbor namespace based on API endpoint
+    imageTag := registry.GetImageTag(req.App, sha, appType)
     
-    // Build and push to Harbor
+    // Build and push to Harbor (correct namespace)
     if err := buildAndPush(ctx, req, imageTag); err != nil {
         return nil, fmt.Errorf("build failed: %w", err)
     }
     
-    // Mandatory vulnerability scan
+    // Mandatory vulnerability scan with context-specific thresholds
     harborClient := harbor.NewClient(registry.Endpoint, registry.Username, registry.Password)
     if err := harborClient.TriggerScan(req.App, sha); err != nil {
         return nil, fmt.Errorf("vulnerability scan failed: %w", err)
     }
     
-    // Wait for scan and check results
+    // Apply security policies based on app type
     scanner := security.NewVulnerabilityScanner(harborClient)
+    if appType == config.PlatformApp {
+        scanner.SetSeverityThreshold("HIGH") // Strict for platform
+    } else {
+        scanner.SetSeverityThreshold("CRITICAL") // Relaxed for user apps
+    }
+    
     if err := scanner.ScanAndValidate(req.App, sha); err != nil {
         // Delete image if it fails security scan
-        harborClient.DeleteRepository(fmt.Sprintf("%s:%s", req.App, sha))
+        project := registry.UserProject
+        if appType == config.PlatformApp {
+            project = registry.PlatformProject
+        }
+        harborClient.DeleteRepository(fmt.Sprintf("%s/%s:%s", project, req.App, sha))
         return nil, fmt.Errorf("image failed security validation: %w", err)
     }
     
     // ... rest of build logic ...
 }
+
+// Called from platform endpoint handler
+func TriggerPlatformBuild(ctx context.Context, service, sha string) (*BuildResult, error) {
+    req := &BuildRequest{
+        App:        service,
+        SHA:        sha,
+        APIContext: "platform", // Deterministic context
+    }
+    return TriggerBuild(ctx, req)
+}
+
+// Called from apps endpoint handler
+func TriggerAppBuild(ctx context.Context, app, sha string) (*BuildResult, error) {
+    req := &BuildRequest{
+        App:        app,
+        SHA:        sha,
+        APIContext: "apps", // Deterministic context
+    }
+    return TriggerBuild(ctx, req)
+}
 ```
 
-### 2.3 Harbor Client Library
+### 2.3 API Handler Integration
+
+**File**: `api/handlers/platform.go` (example)
+```go
+// POST /v1/platform/:service/deploy
+func DeployPlatformService(c *fiber.Ctx) error {
+    service := c.Params("service")
+    sha := c.Query("sha")
+    
+    // Context is deterministic from endpoint
+    result, err := build.TriggerPlatformBuild(c.Context(), service, sha)
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{
+            "error": "Platform service deployment failed",
+            "details": err.Error(),
+        })
+    }
+    
+    return c.JSON(fiber.Map{
+        "status": "deployed",
+        "service": service,
+        "image": result.ImageTag, // harbor.ployman.app/platform/service:sha
+        "namespace": "platform",
+    })
+}
+```
+
+**File**: `api/handlers/apps.go` (example)
+```go
+// POST /v1/apps/:app/builds
+func BuildUserApp(c *fiber.Ctx) error {
+    app := c.Params("app")
+    sha := c.Query("sha")
+    
+    // Context is deterministic from endpoint
+    result, err := build.TriggerAppBuild(c.Context(), app, sha)
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{
+            "error": "Application build failed",
+            "details": err.Error(),
+        })
+    }
+    
+    return c.JSON(fiber.Map{
+        "status": "built",
+        "app": app,
+        "image": result.ImageTag, // harbor.ployman.app/apps/app:sha
+        "namespace": "apps",
+    })
+}
+```
+
+### 2.4 Harbor Client Library
 
 **File**: `internal/harbor/client.go`
 ```go
@@ -1019,9 +1107,6 @@ echo "$HARBOR_PASSWORD" | docker login "$HARBOR_ENDPOINT" -u "$HARBOR_USERNAME" 
 echo "Migrating images with namespace separation..."
 IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^$OLD_REGISTRY" || true)
 
-# Define platform services
-PLATFORM_SERVICES="ploy-api|openrewrite|monitoring|traefik|consul|nomad|vault|seaweedfs"
-
 if [ -z "$IMAGES" ]; then
     echo "No images to migrate"
 else
@@ -1029,14 +1114,26 @@ else
         APP_NAME=$(echo "$IMAGE" | sed "s|$OLD_REGISTRY/||" | cut -d: -f1)
         TAG=$(echo "$IMAGE" | cut -d: -f2)
         
-        # Determine target namespace
-        if echo "$APP_NAME" | grep -qE "^($PLATFORM_SERVICES)"; then
-            PROJECT="platform"
-            echo "Platform service detected: $APP_NAME"
-        else
-            PROJECT="apps"
-            echo "User application detected: $APP_NAME"
-        fi
+        # Manual classification during migration (unavoidable legacy step)
+        echo "Classifying image: $APP_NAME"
+        echo "1) Platform service (ploy-api, openrewrite, etc.)"
+        echo "2) User application"
+        read -p "Select type for $APP_NAME [1/2]: " CHOICE
+        
+        case $CHOICE in
+            1)
+                PROJECT="platform"
+                echo "Migrating as platform service: $APP_NAME"
+                ;;
+            2)
+                PROJECT="apps"
+                echo "Migrating as user application: $APP_NAME"
+                ;;
+            *)
+                PROJECT="apps"
+                echo "Defaulting to user application: $APP_NAME"
+                ;;
+        esac
         
         NEW_IMAGE="$HARBOR_ENDPOINT/$PROJECT/$APP_NAME:$TAG"
         
@@ -1053,6 +1150,11 @@ else
         docker rmi "$IMAGE" || true
     done
 fi
+
+echo ""
+echo "NOTE: Future builds will automatically route to correct namespace"
+echo "  - /v1/platform/* → harbor/platform/"
+echo "  - /v1/apps/* → harbor/apps/"
 
 # Remove old registry container and data
 echo "Decommissioning old Docker registry..."

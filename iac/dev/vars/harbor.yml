@@ -1,0 +1,135 @@
+---
+# Harbor Registry Configuration Variables
+# Used by iac/dev/playbooks/harbor.yml for Harbor deployment
+
+harbor:
+  # Harbor version and checksums
+  version: "2.11.1"
+  checksum: "sha256:e2bc2aeb94d1e379f66d6e4debc2ad2c86e8e8e82b8076cebe5b8b7e4b7e3b4b"
+  
+  # Admin credentials
+  admin_password: "{{ vault_harbor_admin_password | default('Harbor12345') }}"
+  
+  # Database configuration
+  database:
+    password: "{{ vault_harbor_db_password | default('changeit') }}"
+    max_idle_conns: 100
+    max_open_conns: 900
+  
+  # Redis configuration
+  redis:
+    password: "{{ vault_harbor_redis_password | default('') }}"
+  
+  # Storage configuration - SeaweedFS S3 backend
+  storage:
+    s3:
+      region: "us-east-1"
+      endpoint: "http://{{ target_host }}:{{ seaweedfs.s3_port }}"
+      access_key: "{{ seaweedfs.s3_access_key }}"
+      secret_key: "{{ seaweedfs.s3_secret_key }}"
+      bucket: "harbor-registry"
+      secure: false
+      v4auth: true
+      chunksize: 5242880  # 5MB
+      rootdirectory: /
+      storageclass: STANDARD
+      multipartcopychunksize: 33554432  # 32MB
+      multipartcopymaxconcurrency: 100
+      multipartcopythresholdsize: 33554432  # 32MB
+
+  # Notification webhook (optional)
+  webhook:
+    job_service_url: "http://harbor-jobservice:8080"
+
+  # Core service configuration  
+  core:
+    url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}"
+    secret: "{{ vault_harbor_core_secret | default('not-a-secure-secret') }}"
+    
+  # Job service configuration
+  jobservice:
+    secret: "{{ vault_harbor_jobservice_secret | default('not-a-secure-secret') }}"
+    
+  # Registry configuration
+  registry:
+    username: "harbor_registry_user"
+    password: "{{ vault_harbor_registry_password | default('registry_password') }}"
+    
+  # LDAP configuration (disabled by default)
+  ldap:
+    enabled: false
+    
+  # Email configuration (disabled by default)
+  email:
+    enabled: false
+    
+  # External URL configuration
+  external_url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}"
+  
+  # Harbor logging configuration
+  log:
+    level: "info"
+    local:
+      rotate_count: 50
+      rotate_size: "200M"
+      location: "/var/log/harbor"
+      
+  # Trivy scanner configuration
+  trivy:
+    ignore_unfixed: false
+    skip_update: false
+    offline_scan: false
+    security_check: "vuln,config,secret"
+    insecure: false
+    github_token: ""
+    
+  # Harbor project configurations for namespace separation
+  projects:
+    platform:
+      name: "platform"
+      public: false
+      enable_content_trust: true
+      auto_scan: true
+      severity: "high"
+      storage_limit: 107374182400  # 100GB
+      
+    apps:
+      name: "apps" 
+      public: false
+      enable_content_trust: false
+      auto_scan: true
+      severity: "medium"
+      storage_limit: 536870912000  # 500GB
+      
+  # Robot account configurations
+  robots:
+    platform_pusher:
+      name: "platform-pusher"
+      level: "project"
+      duration: -1  # Never expires
+      
+    apps_pusher:
+      name: "apps-pusher"
+      level: "project"
+      duration: -1  # Never expires
+
+# Harbor service ports
+harbor_ports:
+  http: 80
+  https: 443
+  
+# Harbor Docker Compose override settings
+harbor_compose:
+  # Additional environment variables for harbor-core
+  core_env:
+    CORE_URL: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}"
+    TOKEN_SERVICE_URL: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/service/token"
+    
+  # Additional environment variables for harbor-jobservice  
+  jobservice_env:
+    REGISTRY_URL: "http://registry:5000"
+    
+  # Additional environment variables for registry
+  registry_env:
+    REGISTRY_STORAGE_S3_REGION: "{{ harbor.storage.s3.region }}"
+    REGISTRY_STORAGE_S3_BUCKET: "{{ harbor.storage.s3.bucket }}"
