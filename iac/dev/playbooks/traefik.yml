@@ -50,10 +50,13 @@
               address: ":443"
 
           providers:
-            consul:
-              endpoints:
-                - "127.0.0.1:8500"
-              rootKey: traefik
+            consulCatalog:
+              endpoint:
+                address: "127.0.0.1:8500"
+                scheme: http
+              exposedByDefault: false
+              prefix: traefik
+              watch: true
 
             file:
               directory: /etc/traefik/dynamic
@@ -93,6 +96,19 @@
                   resolvers:
                     - "1.1.1.1:53"
                     - "8.8.8.8:53"
+            
+            # Alias for dev-wildcard (used by services)
+            dev-wildcard:
+              acme:
+                email: {{ ploy_dev_platform_certificate.email | default('admin@ployman.app') }}
+                storage: /opt/ploy/traefik-data/dev-wildcard-acme.json
+                caServer: https://acme-v02.api.letsencrypt.org/directory
+                dnsChallenge:
+                  provider: namecheap
+                  delayBeforeCheck: 30s
+                  resolvers:
+                    - "1.1.1.1:53"
+                    - "8.8.8.8:53"
 
           log:
             level: INFO
@@ -115,16 +131,17 @@
         dest: /etc/traefik/traefik.yml
         mode: '0644'
 
-    - name: Create Traefik dynamic configuration for API
+    - name: Create Traefik dynamic configuration for wildcard certificates
       copy:
         content: |
-          # Dynamic Configuration for Ploy API
+          # Dynamic Configuration for wildcard certificates only
+          # Services are discovered via Consul Catalog
           http:
             routers:
-              # API service on platform domain
-              api-service:
-                rule: "Host(`api.dev.{{ ploy.platform_domain }}`)"
-                service: api
+              # Default router for platform services without Consul tags
+              platform-default:
+                rule: "HostRegexp(`{service:[a-z0-9-]+}.dev.{{ ploy.platform_domain }}`)"
+                service: noop@internal
                 tls:
                   certResolver: platform-wildcard
                   domains:
@@ -134,19 +151,10 @@
                 entryPoints:
                   - websecure
               
-              # Platform services router
-              platform-services:
-                rule: "HostRegexp(`{service:[a-z0-9-]+}.dev.{{ ploy.platform_domain }}`)"
-                service: dynamic-platform
-                tls:
-                  certResolver: platform-wildcard
-                entryPoints:
-                  - websecure
-              
-              # User apps router
-              user-apps:
+              # Default router for user apps without Consul tags
+              apps-default:
                 rule: "HostRegexp(`{app:[a-z0-9-]+}.dev.{{ ploy.apps_domain }}`)"
-                service: dynamic-apps
+                service: noop@internal
                 tls:
                   certResolver: apps-wildcard
                   domains:
@@ -155,27 +163,7 @@
                         - "*.dev.{{ ploy.apps_domain }}"
                 entryPoints:
                   - websecure
-
-            services:
-              api:
-                loadBalancer:
-                  # Dynamic port allocation via Consul service discovery
-                  servers: []
-                  healthCheck:
-                    path: /health
-                    interval: 10s
-                    timeout: 3s
-                    scheme: http
-              
-              # Dynamic services will be configured via Consul
-              dynamic-platform:
-                loadBalancer:
-                  servers: []
-              
-              dynamic-apps:
-                loadBalancer:
-                  servers: []
-        dest: /etc/traefik/dynamic/api.yml
+        dest: /etc/traefik/dynamic/wildcards.yml
         mode: '0644'
 
     - name: Create ACME storage files with proper permissions
@@ -188,6 +176,7 @@
       loop:
         - /opt/ploy/traefik-data/apps-acme.json
         - /opt/ploy/traefik-data/platform-acme.json
+        - /opt/ploy/traefik-data/dev-wildcard-acme.json
         - /etc/traefik/acme/acme.json
 
     - name: Create Traefik systemd service
