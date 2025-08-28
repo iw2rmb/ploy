@@ -42,6 +42,23 @@ logging:
   format: "json"          # json, text
   output: "stdout"        # stdout, stderr, file path
 
+# Storage Configuration
+storage:
+  # Use existing Ploy storage infrastructure
+  use_existing_ploy_storage: true
+  model_bucket: "cllm-models"
+  
+  # Local model caching
+  local_cache:
+    enabled: true
+    max_size_gb: 10
+    max_models: 3
+    cache_dir: "/tmp/cllm-cache"
+    eviction_policy: "lru"  # lru, lfu, size
+    
+  # Storage provider (when not using existing Ploy storage)
+  provider: "seaweedfs"
+
 # Security Configuration
 security:
   max_request_size: "50MB"

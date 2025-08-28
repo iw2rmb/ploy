@@ -17,6 +17,7 @@ type Config struct {
 	Server      ServerConfig    `yaml:"server" mapstructure:"server"`
 	Sandbox     SandboxConfig   `yaml:"sandbox" mapstructure:"sandbox"`
 	Providers   ProvidersConfig `yaml:"providers" mapstructure:"providers"`
+	Storage     StorageConfig   `yaml:"storage" mapstructure:"storage"`
 	Logging     LoggingConfig   `yaml:"logging" mapstructure:"logging"`
 	Security    SecurityConfig  `yaml:"security" mapstructure:"security"`
 	Environment string          `yaml:"environment" mapstructure:"environment"`
@@ -80,6 +81,29 @@ type SecurityConfig struct {
 	RateLimit      string   `yaml:"rate_limit" mapstructure:"rate_limit"`
 	CORSOrigins    []string `yaml:"cors_origins" mapstructure:"cors_origins"`
 	APIKeysEnv     string   `yaml:"api_keys_env" mapstructure:"api_keys_env"`
+}
+
+// StorageConfig holds storage-related configuration for model management
+type StorageConfig struct {
+	// Integration with existing Ploy storage infrastructure
+	UseExistingPloyStorage bool   `yaml:"use_existing_ploy_storage" mapstructure:"use_existing_ploy_storage"`
+	ModelBucket           string `yaml:"model_bucket" mapstructure:"model_bucket"`
+	
+	// Local cache configuration
+	LocalCache LocalCacheConfig `yaml:"local_cache" mapstructure:"local_cache"`
+	
+	// Optional: Direct storage provider configuration (if not using existing Ploy storage)
+	Provider string                 `yaml:"provider" mapstructure:"provider"`
+	Config   map[string]interface{} `yaml:"config" mapstructure:"config"`
+}
+
+// LocalCacheConfig holds configuration for local model caching
+type LocalCacheConfig struct {
+	Enabled     bool   `yaml:"enabled" mapstructure:"enabled"`
+	MaxSizeGB   int    `yaml:"max_size_gb" mapstructure:"max_size_gb"`
+	MaxModels   int    `yaml:"max_models" mapstructure:"max_models"`
+	CacheDir    string `yaml:"cache_dir" mapstructure:"cache_dir"`
+	EvictionPolicy string `yaml:"eviction_policy" mapstructure:"eviction_policy"`
 }
 
 // Load loads configuration with defaults, environment variables, and config files
@@ -230,6 +254,18 @@ func getDefaultConfig() *Config {
 			Level:  "info",
 			Format: "json",
 			Output: "stdout",
+		},
+		Storage: StorageConfig{
+			UseExistingPloyStorage: true,
+			ModelBucket:           "cllm-models",
+			LocalCache: LocalCacheConfig{
+				Enabled:        true,
+				MaxSizeGB:      10,
+				MaxModels:      3,
+				CacheDir:       "/tmp/cllm-cache",
+				EvictionPolicy: "lru",
+			},
+			Provider: "seaweedfs",
 		},
 		Security: SecurityConfig{
 			MaxRequestSize: "50MB",
