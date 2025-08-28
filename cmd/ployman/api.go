@@ -155,7 +155,7 @@ func runApiRollback(args []string) {
 }
 
 func runSSHFallback() {
-	fmt.Println("\nFalling back to SSH deployment...")
+	fmt.Println("\nFalling back to Ansible deployment via SSH...")
 	
 	// Get target host from environment
 	targetHost := os.Getenv("TARGET_HOST")
@@ -200,23 +200,25 @@ func runSSHFallback() {
 		fmt.Println("Tip: Set DEPLOY_BRANCH environment variable to deploy a specific branch")
 	}
 	
-	fmt.Printf("Deploying branch '%s' to %s via SSH...\n", branch, targetHost)
+	fmt.Printf("Deploying branch '%s' to %s via Ansible...\n", branch, targetHost)
 	
-	// Execute deployment script via SSH
+	// Execute Ansible playbook via SSH
+	// First update the code, then run the Ansible playbook
 	sshCmd := exec.Command("ssh", 
 		fmt.Sprintf("root@%s", targetHost),
-		fmt.Sprintf("cd /home/ploy && sudo -u ploy git fetch origin %s && sudo -u ploy git checkout %s && sudo -u ploy git pull && sudo -u ploy ./scripts/deploy.sh %s", branch, branch, branch),
+		fmt.Sprintf("cd /home/ploy/ploy && sudo -u ploy git fetch origin %s && sudo -u ploy git checkout %s && sudo -u ploy git pull origin %s && ansible-playbook /home/ploy/ploy/iac/dev/playbooks/api.yml -e target_host=localhost -e deploy_branch=%s", branch, branch, branch, branch),
 	)
 	
 	sshCmd.Stdout = os.Stdout
 	sshCmd.Stderr = os.Stderr
 	
 	if err := sshCmd.Run(); err != nil {
-		fmt.Printf("SSH deployment failed: %v\n", err)
+		fmt.Printf("SSH Ansible deployment failed: %v\n", err)
+		fmt.Println("Tip: Ensure Ansible is installed and the playbook exists at /home/ploy/ploy/iac/dev/playbooks/api.yml")
 		return
 	}
 	
-	fmt.Println("SSH deployment completed successfully!")
+	fmt.Println("Ansible deployment completed successfully!")
 }
 
 func checkDeploymentStatus(controllerURL string) {

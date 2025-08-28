@@ -116,8 +116,9 @@ job "{{APP_NAME}}-lane-e" {
       config {
         image = "{{DOCKER_IMAGE}}"
         
-        # Kontain runtime for VM-level isolation
-        runtime = "io.kontain"
+        # Note: Kontain runtime requires KVM which is not available on this VPS
+        # Using standard Docker runtime instead
+        # runtime = "io.kontain"
         
         # Port mapping
         ports = ["http", "metrics"{{#if GRPC_PORT}}, "grpc"{{/if}}]
