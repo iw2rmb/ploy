@@ -53,11 +53,11 @@ job "ploy-api" {
         "api",
         "http",
         "traefik.enable=true",
-        "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployman.app`) || Host(`api.ployd.app`)",
+        "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployman.app`)",
         "traefik.http.routers.ploy-api.tls=true",
         "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard",
-        "traefik.http.routers.ploy-api.tls.domains[0].main=dev.ployd.app",
-        "traefik.http.routers.ploy-api.tls.domains[0].sans=*.dev.ployd.app",
+        "traefik.http.routers.ploy-api.tls.domains[0].main=dev.ployman.app",
+        "traefik.http.routers.ploy-api.tls.domains[0].sans=*.dev.ployman.app",
         "traefik.http.services.ploy-api.loadbalancer.server.scheme=http",
         "traefik.http.services.ploy-api.loadbalancer.healthcheck.path=/health",
         "traefik.http.services.ploy-api.loadbalancer.healthcheck.interval=10s",
@@ -257,9 +257,9 @@ job "ploy-api" {
         
         # Traefik integration
         TRAEFIK_ENABLED = "true"
-        TRAEFIK_DOMAIN = "api.ployd.app"
+        TRAEFIK_DOMAIN = "api.dev.ployman.app"
         TRAEFIK_TLS_ENABLED = "true"
-        TRAEFIK_CERT_RESOLVER = "letsencrypt"
+        TRAEFIK_CERT_RESOLVER = "dev-wildcard"
         
         # Service discovery and enhanced health checks
         SERVICE_NAME = "ploy-api"
@@ -293,7 +293,7 @@ job "ploy-api" {
         
         # DNS configuration environment variables
         PLOY_DNS_PROVIDER = "namecheap"
-        PLOY_DNS_DOMAIN = "ployd.app"
+        PLOY_DNS_DOMAIN = "ployman.app"
         PLOY_DNS_TARGET_IP = "45.12.75.241"
         PLOY_DNS_CONFIG_PATH = "/etc/ploy/dns/config.json"
         

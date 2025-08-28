@@ -48,7 +48,6 @@ deploy:
       - api.dev.ployman.app
     prod:
       - api.ployman.app
-      - api.ployd.app  # Legacy support
   
   env:
     # Core configuration
