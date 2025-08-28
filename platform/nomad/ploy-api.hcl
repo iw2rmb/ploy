@@ -215,7 +215,7 @@ job "ploy-api" {
     
     # Main api task
     task "ploy-api" {
-      driver = "exec"
+      driver = "raw_exec"
       
       user = "ploy"  # Run as ploy user for proper permissions
       
@@ -516,10 +516,10 @@ job "ploy-api" {
       # Use locally built API binary (no artifact download needed)
       # Binary is built directly on VPS in /home/ploy/ploy/bin/api
       
-      # Binary execution configuration
+      # Binary execution configuration  
       config {
-        command = "/home/ploy/ploy-api"
-        args = []
+        command = "/bin/bash"
+        args = ["-c", "cd /home/ploy && exec ./ploy-api"]
       }
       
       # Lifecycle hooks for rolling updates
