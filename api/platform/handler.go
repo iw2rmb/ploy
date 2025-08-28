@@ -98,20 +98,16 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 		})
 	}
 
-	// Store build metadata in storage backend
-	metadata := map[string]interface{}{
-		"service":      serviceName,
-		"sha":          sha,
-		"lane":         lane,
-		"environment":  environment,
-		"docker_image": dockerImage,
-		"platform":     true,
-		"build_time":   fmt.Sprintf("%d", time.Now().Unix()),
-	}
+	// Generate build timestamp
+	buildTime := time.Now().Unix()
 
 	// Store metadata in storage for tracking
-	metadataKey := fmt.Sprintf("platform/%s/%s/metadata", serviceName, sha)
-	if err := h.storageClient.Store(metadataKey, metadata); err != nil {
+	metadataKey := fmt.Sprintf("platform/%s/%s/metadata.json", serviceName, sha)
+	metadataJSON := fmt.Sprintf(`{"service":"%s","sha":"%s","lane":"%s","environment":"%s","docker_image":"%s","platform":true,"build_time":"%d"}`,
+		serviceName, sha, lane, environment, dockerImage, buildTime)
+	
+	bucket := h.storageClient.GetArtifactsBucket()
+	if _, err := h.storageClient.PutObject(bucket, metadataKey, strings.NewReader(metadataJSON), "application/json"); err != nil {
 		// Log warning but don't fail deployment
 		fmt.Printf("Warning: Failed to store platform metadata: %v\n", err)
 	}
@@ -313,8 +309,8 @@ func (h *Handler) generatePlatformNomadJob(serviceName, dockerImage, environment
 						},
 						Services: []*api.Service{
 							{
-								Name: fmt.Sprintf("platform-%s", serviceName),
-								Port: "http",
+								Name:      fmt.Sprintf("platform-%s", serviceName),
+								PortLabel: "http",
 								Tags: []string{
 									"platform",
 									fmt.Sprintf("platform-%s", serviceName),
@@ -323,19 +319,19 @@ func (h *Handler) generatePlatformNomadJob(serviceName, dockerImage, environment
 									fmt.Sprintf("traefik.http.routers.platform-%s.tls=true", serviceName),
 									fmt.Sprintf("traefik.http.routers.platform-%s.tls.certresolver=dev-wildcard", serviceName),
 								},
-								Checks: []*api.ServiceCheck{
+								Checks: []api.ServiceCheck{
 									{
 										Type:     "http",
 										Path:     "/health",
-										Interval: durationPtr("15s"),
-										Timeout:  durationPtr("10s"),
+										Interval: time.Second * 15,
+										Timeout:  time.Second * 10,
 									},
 									{
 										Name:     "readiness",
 										Type:     "http",
 										Path:     "/ready",
-										Interval: durationPtr("20s"),
-										Timeout:  durationPtr("15s"),
+										Interval: time.Second * 20,
+										Timeout:  time.Second * 15,
 									},
 								},
 							},
