@@ -142,10 +142,11 @@ curl https://api.dev.ployman.app/v1/version
 **API Deployment Workflow:**
 The `ployman api deploy` command provides a robust deployment solution:
 1. **Primary**: Attempts self-update via `/v1/update/latest` endpoint (fastest when API is running)
-2. **Fallback**: SSH to VPS and runs Ansible playbook if API is unreachable (handles cold start)
-   - Updates code from git repository
-   - Builds binaries from source
-   - Deploys via Nomad job
+2. **Fallback**: Runs Ansible playbook locally if API is unreachable (handles cold start)
+   - Ansible runs from your local machine (requires local Ansible installation)
+   - Updates code from git repository on VPS
+   - Builds binaries from source on VPS
+   - Deploys via Nomad job on VPS
 
 **Environment Variables for Deployment:**
 ```bash

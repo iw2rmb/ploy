@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2025-08-28] - Local Ansible Deployment Support
+
+### Added
+- **Local Ansible Execution**: Modified `ployman api deploy` fallback to run Ansible locally instead of via SSH
+  - Ansible playbooks now execute from developer's machine for better control
+  - Automatic detection of repository root and iac/dev directory location
+  - Better debugging with direct Ansible output (no SSH intermediary)
+  - Cleaner separation between control plane (local) and data plane (VPS)
+
+### Fixed
+- **Deployment Security**: No longer requires Ansible to be installed on production servers
+- **Path Discovery**: Intelligent path detection for finding Ansible playbooks from various execution contexts
+
 ## [2025-08-28] - CHTTP Static Analysis Documentation Completion
 
 ### Added

@@ -155,13 +155,20 @@ func runApiRollback(args []string) {
 }
 
 func runSSHFallback() {
-	fmt.Println("\nFalling back to Ansible deployment via SSH...")
+	fmt.Println("\nFalling back to Ansible deployment (running locally)...")
 	
 	// Get target host from environment
 	targetHost := os.Getenv("TARGET_HOST")
 	if targetHost == "" {
 		fmt.Println("Error: TARGET_HOST environment variable not set")
 		fmt.Println("Please set TARGET_HOST to your VPS IP address")
+		return
+	}
+	
+	// Check if Ansible is installed locally
+	if _, err := exec.LookPath("ansible-playbook"); err != nil {
+		fmt.Println("Error: ansible-playbook not found in PATH")
+		fmt.Println("Please install Ansible locally: brew install ansible")
 		return
 	}
 	
@@ -200,21 +207,54 @@ func runSSHFallback() {
 		fmt.Println("Tip: Set DEPLOY_BRANCH environment variable to deploy a specific branch")
 	}
 	
-	fmt.Printf("Deploying branch '%s' to %s via Ansible...\n", branch, targetHost)
+	fmt.Printf("Deploying branch '%s' to %s via local Ansible...\n", branch, targetHost)
 	
-	// Execute Ansible playbook via SSH
-	// First update the code, then run the Ansible playbook
-	sshCmd := exec.Command("ssh", 
-		fmt.Sprintf("root@%s", targetHost),
-		fmt.Sprintf("cd /home/ploy/ploy && sudo -u ploy git fetch origin %s && sudo -u ploy git checkout %s && sudo -u ploy git pull origin %s && ansible-playbook /home/ploy/ploy/iac/dev/playbooks/api.yml -e target_host=localhost -e deploy_branch=%s", branch, branch, branch, branch),
+	// Find the repository root (where iac/dev directory should be)
+	// First try to find it relative to the current working directory
+	var iacPath string
+	
+	// Try common paths relative to where ployman might be run from
+	possiblePaths := []string{
+		"iac/dev",                                    // Running from repo root
+		"../iac/dev",                                 // Running from cmd/ployman or bin
+		"../../iac/dev",                              // Running from deeper directory
+		"/Users/vk/@iw2rmb/ploy/iac/dev",            // Absolute fallback path
+	}
+	
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path + "/playbooks/api.yml"); err == nil {
+			iacPath = path
+			break
+		}
+	}
+	
+	if iacPath == "" {
+		fmt.Println("Error: Could not find iac/dev/playbooks/api.yml")
+		fmt.Println("Please run this command from the ploy repository root or set up the correct path")
+		return
+	}
+	
+	fmt.Printf("Using Ansible playbooks from: %s\n", iacPath)
+	
+	// Execute Ansible playbook locally
+	ansibleCmd := exec.Command("ansible-playbook",
+		"playbooks/api.yml",
+		"-e", fmt.Sprintf("target_host=%s", targetHost),
+		"-e", fmt.Sprintf("deploy_branch=%s", branch),
 	)
 	
-	sshCmd.Stdout = os.Stdout
-	sshCmd.Stderr = os.Stderr
+	// Set working directory to iac/dev
+	ansibleCmd.Dir = iacPath
+	ansibleCmd.Stdout = os.Stdout
+	ansibleCmd.Stderr = os.Stderr
 	
-	if err := sshCmd.Run(); err != nil {
-		fmt.Printf("SSH Ansible deployment failed: %v\n", err)
-		fmt.Println("Tip: Ensure Ansible is installed and the playbook exists at /home/ploy/ploy/iac/dev/playbooks/api.yml")
+	// Set environment variables that might be needed
+	ansibleCmd.Env = os.Environ()
+	
+	fmt.Println("Running Ansible playbook...")
+	if err := ansibleCmd.Run(); err != nil {
+		fmt.Printf("Ansible deployment failed: %v\n", err)
+		fmt.Println("Tip: Ensure you have SSH access to the target host and all required Ansible dependencies")
 		return
 	}
 	
