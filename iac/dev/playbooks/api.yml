@@ -153,7 +153,7 @@
             group: ploy
             mode: '0644'
           vars:
-            deployment_version: "{{ deployment_version.stdout }}"
+            deployment_version: "{{ current_deployment_version }}"
 
         - name: Validate bootstrap job syntax
           command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-api-bootstrap.hcl

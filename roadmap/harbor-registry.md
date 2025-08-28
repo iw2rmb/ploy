@@ -52,6 +52,29 @@ Replace the basic Docker Registry v2 with Harbor as the exclusive enterprise-gra
 
 ## Phase 1: Infrastructure Foundation (Week 1)
 
+### 1.0 Harbor Project Structure
+
+Harbor will use **separate projects** to isolate platform services from user applications:
+
+**Project Structure**:
+```
+harbor.ployman.app/
+├── platform/           # Platform services (restricted access)
+│   ├── ploy-api/      # Ploy API controller
+│   ├── openrewrite/   # OpenRewrite service
+│   ├── monitoring/    # Monitoring stack
+│   └── ...           # Other platform services
+└── apps/              # User applications (standard access)
+    ├── myapp/         # User application
+    ├── webapp/        # Another user app
+    └── ...           # All user-deployed apps
+```
+
+**Access Control**:
+- **platform/** - Write access only for platform deployments (ployman)
+- **apps/** - Write access for user deployments (ploy)
+- Both projects have separate RBAC policies and quotas
+
 ### 1.1 Harbor Component Installation
 
 **File**: `iac/dev/playbooks/harbor.yml`
@@ -143,6 +166,109 @@ Replace the basic Docker Registry v2 with Harbor as the exclusive enterprise-gra
         cd /opt/harbor/harbor && ./install.sh --with-trivy --with-chartmuseum
       args:
         creates: /opt/harbor/harbor/docker-compose.yml
+        
+    - name: Wait for Harbor to be ready
+      uri:
+        url: "https://{{ harbor.hostname }}/api/v2.0/health"
+        method: GET
+        status_code: 200
+        validate_certs: no
+      register: harbor_health
+      until: harbor_health.status == 200
+      retries: 30
+      delay: 10
+      
+    - name: Create Harbor projects for namespace separation
+      block:
+        - name: Create platform project
+          uri:
+            url: "https://{{ harbor.hostname }}/api/v2.0/projects"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              project_name: "platform"
+              metadata:
+                public: "false"
+                enable_content_trust: "true"
+                auto_scan: "true"
+                severity: "high"
+                reuse_sys_cve_whitelist: "false"
+              storage_limit: 107374182400  # 100GB for platform services
+            status_code: [201, 409]  # 409 if already exists
+            validate_certs: no
+            
+        - name: Create apps project
+          uri:
+            url: "https://{{ harbor.hostname }}/api/v2.0/projects"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              project_name: "apps"
+              metadata:
+                public: "false"
+                enable_content_trust: "false"  # Optional for user apps
+                auto_scan: "true"
+                severity: "medium"  # Less strict for user apps
+                reuse_sys_cve_whitelist: "false"
+              storage_limit: 536870912000  # 500GB for user apps
+            status_code: [201, 409]
+            validate_certs: no
+            
+        - name: Create platform service account
+          uri:
+            url: "https://{{ harbor.hostname }}/api/v2.0/robots"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              name: "platform-pusher"
+              level: "project"
+              permissions:
+                - namespace: "platform"
+                  kind: "project"
+                  access:
+                    - resource: "repository"
+                      action: "push"
+                    - resource: "repository"
+                      action: "pull"
+                    - resource: "artifact"
+                      action: "read"
+                    - resource: "scan"
+                      action: "create"
+              duration: -1  # Never expires
+            status_code: [201, 409]
+            validate_certs: no
+            
+        - name: Create user apps service account
+          uri:
+            url: "https://{{ harbor.hostname }}/api/v2.0/robots"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              name: "apps-pusher"
+              level: "project"
+              permissions:
+                - namespace: "apps"
+                  kind: "project"
+                  access:
+                    - resource: "repository"
+                      action: "push"
+                    - resource: "repository"
+                      action: "pull"
+                    - resource: "artifact"
+                      action: "read"
+                    - resource: "scan"
+                      action: "create"
+              duration: -1
+            status_code: [201, 409]
+            validate_certs: no
 ```
 
 **File**: `iac/dev/vars/harbor.yml`
@@ -282,7 +408,7 @@ external_redis:
 
 ## Phase 2: Ploy Integration (Week 2)
 
-### 2.1 Registry Configuration (Harbor Only)
+### 2.1 Registry Configuration with Namespace Separation
 
 **File**: `internal/config/registry.go`
 ```go
@@ -291,30 +417,66 @@ package config
 import (
     "fmt"
     "os"
+    "strings"
 )
 
 type RegistryConfig struct {
-    Endpoint string
-    Username string
-    Password string
-    Project  string // Harbor project name
-    Insecure bool   // Allow insecure registry
+    Endpoint        string
+    Username        string
+    Password        string
+    PlatformProject string // Harbor project for platform services
+    UserProject     string // Harbor project for user applications
+    Insecure        bool   // Allow insecure registry
 }
 
-// GetRegistryConfig returns Harbor configuration only - no fallback
+type AppType string
+
+const (
+    PlatformApp AppType = "platform"
+    UserApp     AppType = "user"
+)
+
+// GetRegistryConfig returns Harbor configuration with namespace separation
 func GetRegistryConfig() *RegistryConfig {
     return &RegistryConfig{
-        Endpoint: getEnvOrDefault("HARBOR_ENDPOINT", "harbor.dev.ployman.app"),
-        Username: getEnvOrDefault("HARBOR_USERNAME", "admin"),
-        Password: getEnvOrDefault("HARBOR_PASSWORD", "Harbor12345"),
-        Project:  getEnvOrDefault("HARBOR_PROJECT", "ploy"),
-        Insecure: getEnvOrDefault("HARBOR_INSECURE", "false") == "true",
+        Endpoint:        getEnvOrDefault("HARBOR_ENDPOINT", "harbor.dev.ployman.app"),
+        Username:        getEnvOrDefault("HARBOR_USERNAME", "admin"),
+        Password:        getEnvOrDefault("HARBOR_PASSWORD", "Harbor12345"),
+        PlatformProject: getEnvOrDefault("HARBOR_PLATFORM_PROJECT", "platform"),
+        UserProject:     getEnvOrDefault("HARBOR_USER_PROJECT", "apps"),
+        Insecure:        getEnvOrDefault("HARBOR_INSECURE", "false") == "true",
     }
 }
 
-// GetImageTag returns Harbor-formatted image tag
-func (r *RegistryConfig) GetImageTag(app, sha string) string {
-    return fmt.Sprintf("%s/%s/%s:%s", r.Endpoint, r.Project, app, sha)
+// DetermineAppType determines if an app is platform or user based on naming/context
+func DetermineAppType(appName string, isPlatformContext bool) AppType {
+    // Platform services have specific naming patterns
+    platformServices := []string{
+        "ploy-api", "openrewrite", "harbor", "monitoring",
+        "traefik", "consul", "nomad", "vault", "seaweedfs",
+    }
+    
+    for _, svc := range platformServices {
+        if strings.HasPrefix(appName, svc) {
+            return PlatformApp
+        }
+    }
+    
+    // Check if explicitly called from platform context (ployman)
+    if isPlatformContext {
+        return PlatformApp
+    }
+    
+    return UserApp
+}
+
+// GetImageTag returns Harbor-formatted image tag with correct namespace
+func (r *RegistryConfig) GetImageTag(app, sha string, appType AppType) string {
+    project := r.UserProject
+    if appType == PlatformApp {
+        project = r.PlatformProject
+    }
+    return fmt.Sprintf("%s/%s/%s:%s", r.Endpoint, project, app, sha)
 }
 
 // MustAuthenticate ensures Harbor authentication or panics
@@ -785,9 +947,8 @@ set -e
 HARBOR_ENDPOINT="${HARBOR_ENDPOINT:-harbor.dev.ployman.app}"
 HARBOR_USERNAME="${HARBOR_USERNAME:-admin}"
 HARBOR_PASSWORD="${HARBOR_PASSWORD:-Harbor12345}"
-HARBOR_PROJECT="${HARBOR_PROJECT:-ploy}"
 
-echo "Validating Harbor readiness for cutover..."
+echo "Validating Harbor readiness for cutover with namespace separation..."
 
 # Check Harbor health
 if ! curl -sf -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" "https://$HARBOR_ENDPOINT/api/v2.0/health"; then
@@ -795,14 +956,15 @@ if ! curl -sf -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" "https://$HARBOR_ENDPOINT/a
     exit 1
 fi
 
-# Check project exists
-if ! curl -sf -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" "https://$HARBOR_ENDPOINT/api/v2.0/projects/$HARBOR_PROJECT"; then
-    echo "Creating Harbor project: $HARBOR_PROJECT"
-    curl -X POST -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
-        -H "Content-Type: application/json" \
-        -d "{\"project_name\":\"$HARBOR_PROJECT\",\"public\":false}" \
-        "https://$HARBOR_ENDPOINT/api/v2.0/projects"
-fi
+# Check both projects exist
+for PROJECT in platform apps; do
+    echo "Checking project: $PROJECT"
+    if ! curl -sf -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" "https://$HARBOR_ENDPOINT/api/v2.0/projects/$PROJECT"; then
+        echo "ERROR: Harbor project '$PROJECT' does not exist"
+        echo "Run the Harbor Ansible playbook to create projects"
+        exit 1
+    fi
+done
 
 # Test authentication
 if ! echo "$HARBOR_PASSWORD" | docker login "$HARBOR_ENDPOINT" -u "$HARBOR_USERNAME" --password-stdin; then
@@ -810,7 +972,9 @@ if ! echo "$HARBOR_PASSWORD" | docker login "$HARBOR_ENDPOINT" -u "$HARBOR_USERN
     exit 1
 fi
 
-echo "✓ Harbor is ready for migration"
+echo "✓ Harbor is ready for migration with namespace separation"
+echo "  - Platform project: harbor.ployman.app/platform/"
+echo "  - User apps project: harbor.ployman.app/apps/"
 ```
 
 ### 4.2 Cutover Migration Script
@@ -851,9 +1015,12 @@ done
 # Login to Harbor
 echo "$HARBOR_PASSWORD" | docker login "$HARBOR_ENDPOINT" -u "$HARBOR_USERNAME" --password-stdin
 
-# Migrate all images
-echo "Migrating images..."
+# Migrate all images with namespace separation
+echo "Migrating images with namespace separation..."
 IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^$OLD_REGISTRY" || true)
+
+# Define platform services
+PLATFORM_SERVICES="ploy-api|openrewrite|monitoring|traefik|consul|nomad|vault|seaweedfs"
 
 if [ -z "$IMAGES" ]; then
     echo "No images to migrate"
@@ -861,7 +1028,17 @@ else
     for IMAGE in $IMAGES; do
         APP_NAME=$(echo "$IMAGE" | sed "s|$OLD_REGISTRY/||" | cut -d: -f1)
         TAG=$(echo "$IMAGE" | cut -d: -f2)
-        NEW_IMAGE="$HARBOR_ENDPOINT/$HARBOR_PROJECT/$APP_NAME:$TAG"
+        
+        # Determine target namespace
+        if echo "$APP_NAME" | grep -qE "^($PLATFORM_SERVICES)"; then
+            PROJECT="platform"
+            echo "Platform service detected: $APP_NAME"
+        else
+            PROJECT="apps"
+            echo "User application detected: $APP_NAME"
+        fi
+        
+        NEW_IMAGE="$HARBOR_ENDPOINT/$PROJECT/$APP_NAME:$TAG"
         
         echo "Migrating $IMAGE to $NEW_IMAGE"
         docker tag "$IMAGE" "$NEW_IMAGE"
@@ -870,7 +1047,7 @@ else
         # Mandatory scan - migration fails if scan fails
         echo "Scanning $NEW_IMAGE for vulnerabilities..."
         curl -X POST -u "$HARBOR_USERNAME:$HARBOR_PASSWORD" \
-            "https://$HARBOR_ENDPOINT/api/v2.0/projects/$HARBOR_PROJECT/repositories/$APP_NAME/artifacts/$TAG/scan"
+            "https://$HARBOR_ENDPOINT/api/v2.0/projects/$PROJECT/repositories/$APP_NAME/artifacts/$TAG/scan"
         
         # Delete old image immediately
         docker rmi "$IMAGE" || true
@@ -883,22 +1060,27 @@ docker stop registry || true
 docker rm registry || true
 rm -rf /var/lib/docker-registry
 
-# Update all configurations to use Harbor
-echo "Updating system configuration..."
+# Update all configurations to use Harbor with namespaces
+echo "Updating system configuration with namespace separation..."
 cat > /etc/ploy/registry.conf << EOF
-# Harbor is the ONLY registry - no fallback
+# Harbor is the ONLY registry - with namespace separation
 HARBOR_ENDPOINT=$HARBOR_ENDPOINT
 HARBOR_USERNAME=$HARBOR_USERNAME
-HARBOR_PROJECT=$HARBOR_PROJECT
+HARBOR_PLATFORM_PROJECT=platform
+HARBOR_USER_PROJECT=apps
 HARBOR_INSECURE=false
+
+# Platform services use 'platform' namespace
+# User applications use 'apps' namespace
 EOF
 
 # Restart Ploy API with Harbor configuration
-echo "Restarting Ploy API with Harbor..."
+echo "Restarting Ploy API with Harbor and namespace separation..."
 export HARBOR_ENDPOINT="$HARBOR_ENDPOINT"
 export HARBOR_USERNAME="$HARBOR_USERNAME"
 export HARBOR_PASSWORD="$HARBOR_PASSWORD"
-export HARBOR_PROJECT="$HARBOR_PROJECT"
+export HARBOR_PLATFORM_PROJECT="platform"
+export HARBOR_USER_PROJECT="apps"
 
 nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
 
@@ -1125,23 +1307,32 @@ curl http://test-app.dev.ployd.app/health
 
 ### Environment Variables
 ```bash
-# Development (Harbor ONLY - no registry type selection)
+# Development (Harbor with namespace separation)
 export HARBOR_ENDPOINT="harbor.dev.ployman.app"
 export HARBOR_USERNAME="admin"
 export HARBOR_PASSWORD="Harbor12345"
-export HARBOR_PROJECT="ploy"
+export HARBOR_PLATFORM_PROJECT="platform"  # Platform services
+export HARBOR_USER_PROJECT="apps"         # User applications
 export HARBOR_INSECURE="false"
 
-# Production (Harbor ONLY - no fallback)
+# Production (Harbor with namespace separation)
 export HARBOR_ENDPOINT="harbor.ployman.app"
 export HARBOR_USERNAME="ploy-service"
 export HARBOR_PASSWORD="${VAULT_HARBOR_PASSWORD}"
-export HARBOR_PROJECT="production"
+export HARBOR_PLATFORM_PROJECT="platform"
+export HARBOR_USER_PROJECT="apps"
 export HARBOR_INSECURE="false"
+
+# Service-specific credentials (optional)
+export HARBOR_PLATFORM_USERNAME="platform-pusher"
+export HARBOR_PLATFORM_PASSWORD="${VAULT_PLATFORM_TOKEN}"
+export HARBOR_APPS_USERNAME="apps-pusher"
+export HARBOR_APPS_PASSWORD="${VAULT_APPS_TOKEN}"
 
 # Legacy variables (REMOVED - will cause errors if set)
 # PLOY_REGISTRY_TYPE - REMOVED, Harbor is the only type
 # DOCKER_REGISTRY - REMOVED, localhost:5000 no longer exists
+# HARBOR_PROJECT - REPLACED by HARBOR_PLATFORM_PROJECT and HARBOR_USER_PROJECT
 ```
 
 ## Security Considerations
@@ -1151,20 +1342,30 @@ export HARBOR_INSECURE="false"
    - Internal communication over private network
    - Firewall rules restricting Harbor ports
 
-2. **Access Control**
+2. **Namespace Isolation**
+   - **Platform namespace**: Restricted to infrastructure services
+   - **Apps namespace**: User applications only
+   - No cross-namespace image pulls without explicit permission
+   - Different vulnerability thresholds per namespace
+
+3. **Access Control**
    - RBAC with principle of least privilege
-   - Service accounts for automation
+   - Separate service accounts for platform vs apps
+   - Platform deployments require elevated credentials
    - Regular password rotation
 
-3. **Image Security**
+4. **Image Security**
    - Mandatory vulnerability scanning
-   - Image signing with Cosign
+   - **Platform**: Block on HIGH/CRITICAL vulnerabilities
+   - **Apps**: Block on CRITICAL vulnerabilities only
+   - Image signing with Cosign (mandatory for platform)
    - Scan results gate deployments
 
-4. **Data Protection**
+5. **Data Protection**
    - Encrypted storage backend (SeaweedFS)
    - Regular backups of Harbor database
    - Audit logs for compliance
+   - Separate quotas per namespace
 
 ## No Rollback Strategy
 
@@ -1186,7 +1387,10 @@ Once migrated to Harbor:
 - **Availability**: 99.9% uptime for registry operations
 - **Performance**: < 5s image pull time for 100MB images
 - **Security**: 100% of images scanned before deployment
-- **Compliance**: Full audit trail of image operations
+- **Namespace Isolation**: Zero cross-namespace security incidents
+- **Platform Protection**: 100% of platform images signed and verified
+- **User App Flexibility**: < 30s deployment time for user apps
+- **Compliance**: Full audit trail with namespace attribution
 - **Automation**: Zero manual intervention for standard workflows
 
 ## Documentation Updates Required
