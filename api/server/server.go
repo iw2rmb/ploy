@@ -609,7 +609,6 @@ func (s *Server) setupRoutes() {
 	
 	// Platform service endpoints with Harbor platform namespace
 	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)
-	api.Post("/platform/:service/deploy", s.handleTriggerPlatformBuild)  // Alias for builds
 	
 	// Legacy build endpoint (backward compatibility - defaults to apps namespace)
 	api.Post("/builds/:app", s.handleTriggerBuild)
