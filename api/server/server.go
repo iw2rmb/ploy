@@ -108,8 +108,14 @@ func parseIntEnv(envVar string, defaultVal int) int {
 
 // LoadConfigFromEnv loads controller configuration from environment variables
 func LoadConfigFromEnv() *ControllerConfig {
+	// Prioritize NOMAD_PORT_http for dynamic port allocation, fall back to PORT, then default
+	port := os.Getenv("NOMAD_PORT_http")
+	if port == "" {
+		port = utils.Getenv("PORT", "8081")
+	}
+	
 	return &ControllerConfig{
-		Port:              utils.Getenv("PORT", "8081"),
+		Port:              port,
 		ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
 		NomadAddr:         utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
 		StorageConfigPath: config.GetStorageConfigPath(),
