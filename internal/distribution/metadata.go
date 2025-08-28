@@ -56,12 +56,12 @@ func (bi *BinaryInfo) IsNewer(other *BinaryInfo) bool {
 
 // GetStorageKey returns the storage key for this binary
 func (bi *BinaryInfo) GetStorageKey() string {
-	return "controller-binaries/" + bi.Version + "/" + bi.Platform + "/" + bi.Architecture + "/controller"
+	return "api-binaries/" + bi.Version + "/" + bi.Platform + "/" + bi.Architecture + "/api"
 }
 
 // GetMetadataKey returns the metadata storage key for this binary
 func (bi *BinaryInfo) GetMetadataKey() string {
-	return "controller-binaries/" + bi.Version + "/" + bi.Platform + "/" + bi.Architecture + "/metadata.json"
+	return "api-binaries/" + bi.Version + "/" + bi.Platform + "/" + bi.Architecture + "/metadata.json"
 }
 
 // Validate checks if the binary info is valid

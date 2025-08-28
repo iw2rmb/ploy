@@ -56,7 +56,7 @@ func (bd *BinaryDistributor) UploadBinary(binaryPath string, info BinaryInfo) er
 	info.BuildTime = time.Now()
 	
 	// Create storage key
-	storageKey := fmt.Sprintf("controller-binaries/%s/%s/%s/controller", 
+	storageKey := fmt.Sprintf("api-binaries/%s/%s/%s/api", 
 		info.Version, info.Platform, info.Architecture)
 	
 	// Upload binary
@@ -72,7 +72,7 @@ func (bd *BinaryDistributor) UploadBinary(binaryPath string, info BinaryInfo) er
 	}
 	
 	// Upload metadata
-	metadataKey := fmt.Sprintf("controller-binaries/%s/%s/%s/metadata.json", 
+	metadataKey := fmt.Sprintf("api-binaries/%s/%s/%s/metadata.json", 
 		info.Version, info.Platform, info.Architecture)
 	
 	metadataBytes, err := info.ToJSON()
@@ -101,7 +101,7 @@ func (bd *BinaryDistributor) DownloadBinary(version, platform, architecture stri
 	}
 	
 	// Download from storage
-	storageKey := fmt.Sprintf("controller-binaries/%s/%s/%s/controller", 
+	storageKey := fmt.Sprintf("api-binaries/%s/%s/%s/api", 
 		version, platform, architecture)
 	
 	reader, err := bd.storage.GetObject(bd.collection, storageKey)
@@ -149,7 +149,7 @@ func (bd *BinaryDistributor) DownloadBinary(version, platform, architecture stri
 
 // ListVersions lists available controller binary versions
 func (bd *BinaryDistributor) ListVersions() ([]string, error) {
-	objects, err := bd.storage.ListObjects(bd.collection, "controller-binaries/")
+	objects, err := bd.storage.ListObjects(bd.collection, "api-binaries/")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list versions: %w", err)
 	}
@@ -175,7 +175,7 @@ func (bd *BinaryDistributor) ListVersions() ([]string, error) {
 func (bd *BinaryDistributor) CleanupOldVersions() error {
 	cutoffTime := time.Now().AddDate(0, 0, -bd.retentionDays)
 	
-	objects, err := bd.storage.ListObjects(bd.collection, "controller-binaries/")
+	objects, err := bd.storage.ListObjects(bd.collection, "api-binaries/")
 	if err != nil {
 		return fmt.Errorf("failed to list objects for cleanup: %w", err)
 	}
@@ -272,7 +272,7 @@ func (bd *BinaryDistributor) getCachedMetadata(version, platform, architecture s
 
 // downloadMetadata downloads and caches metadata
 func (bd *BinaryDistributor) downloadMetadata(version, platform, architecture string) (*BinaryInfo, error) {
-	metadataKey := fmt.Sprintf("controller-binaries/%s/%s/%s/metadata.json", 
+	metadataKey := fmt.Sprintf("api-binaries/%s/%s/%s/metadata.json", 
 		version, platform, architecture)
 	
 	reader, err := bd.storage.GetObject(bd.collection, metadataKey)
