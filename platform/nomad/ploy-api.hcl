@@ -513,18 +513,12 @@ job "ploy-api" {
         perms = "755"
       }
       
-      # Download api binary from SeaweedFS artifact storage
-      artifact {
-        source = "http://45.12.75.241:8080/7,3cd0892a3afc"
-        destination = "local/api"
-        mode = "file"
-        
-        # Binary will be verified during download
-      }
+      # Use locally built API binary (no artifact download needed)
+      # Binary is built directly on VPS in /home/ploy/ploy/bin/api
       
       # Binary execution configuration
       config {
-        command = "local/api"
+        command = "/home/ploy/ploy/bin/api"
         args = []
       }
       
