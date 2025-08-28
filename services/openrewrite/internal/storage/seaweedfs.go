@@ -210,7 +210,7 @@ func (c *SeaweedFSClient) DeleteFile(key string) error {
 // Health checks SeaweedFS connection
 func (c *SeaweedFSClient) Health() error {
 	// Check master health
-	resp, err := c.httpClient.Get(c.masterURL + "/status")
+	resp, err := c.httpClient.Get(c.masterURL + "/cluster/status")
 	if err != nil {
 		return fmt.Errorf("master health check failed: %w", err)
 	}
