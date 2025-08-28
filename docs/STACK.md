@@ -82,7 +82,7 @@
 - **Viper** — Configuration management for multi-environment setups
 
 ## CI/CD & Automation
-- **GitHub Actions** — CI/CD pipelines for automated testing and deployment
+- **GitHub Actions** — CI/CD pipelines for automated testing (deployment via ployman CLI)
 - **GitLab CI** — Alternative CI/CD platform integration
 - **Ansible** — Infrastructure automation and VPS provisioning
 - **Packer** — VM image building for Lane F full virtualization

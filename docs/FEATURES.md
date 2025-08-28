@@ -12,7 +12,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Custom Assertions**: 20+ specialized assertions for JSON, async operations, file validation, error handling
 - **Mock Infrastructure**: Complete mock implementations for Nomad, Consul, Storage with realistic behavior
 - **Test Utilities**: Builder patterns, fixtures for Go/Node.js/Java/WASM apps, database testing framework
-- **CI/CD Pipeline**: GitHub Actions with unit, integration, security, and performance testing stages
+- **CI/CD Pipeline**: GitHub Actions for testing; deployment via `ployman api deploy` (no GitHub Actions dependency)
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
