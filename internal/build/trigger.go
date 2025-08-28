@@ -118,6 +118,15 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 			return utils.ErrJSON(c, 500, err)
 		}
 		imagePath = img
+	case "G":
+		// For now, Lane G WASM applications should use OCI containers as fallback
+		// TODO: Implement proper WASM runtime integration
+		tag := fmt.Sprintf("harbor.local/ploy/%s:%s", appName, sha)
+		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
+		if err != nil {
+			return utils.ErrJSON(c, 500, err)
+		}
+		dockerImage = img
 	default:
 		lane = "C"
 		img, err := builders.BuildOSVJava(builders.JavaOSVRequest{
