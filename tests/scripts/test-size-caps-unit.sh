@@ -37,7 +37,7 @@ test_compilation() {
     test_info "Test 1: Verify image size caps implementation compiles"
     
     cd "$PROJECT_ROOT"
-    if go build -o /tmp/test-api ./controller > /dev/null 2>&1; then
+    if go build -o /tmp/test-api ./api > /dev/null 2>&1; then
         test_passed "Image size caps implementation compiles successfully"
     else
         test_failed "Compilation failed for image size caps implementation"

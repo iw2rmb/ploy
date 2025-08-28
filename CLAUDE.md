@@ -112,7 +112,7 @@ make test-unit                        # Unit tests (GREEN phase)
 make test-coverage-threshold          # Verify 60% minimum coverage
 
 # Build Verification (MANDATORY before VPS testing)
-go build -o bin/api ./controller && go build -o bin/ploy ./cmd/ploy && go build ./api/... ./cmd/...
+go build -o bin/api ./api && go build -o bin/ploy ./cmd/ploy && go build ./api/... ./cmd/...
 
 # Test Development
 make test-generate                    # Generate test files

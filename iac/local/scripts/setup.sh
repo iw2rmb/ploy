@@ -126,7 +126,7 @@ build_ploy_binaries() {
     
     # Build controller
     echo -e "${BLUE}   • Building controller...${NC}"
-    go build -o bin/api ./controller
+    go build -o bin/api ./api
     
     # Build CLI
     echo -e "${BLUE}   • Building CLI...${NC}"
