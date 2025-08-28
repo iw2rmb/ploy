@@ -37,6 +37,31 @@ ssh root@$TARGET_HOST "curl -s http://localhost:8081/health | jq .status"
 
 ⚠️ **IMPORTANT**: Run `./scripts/validate-deployment.sh` to check all prerequisites before deployment.
 
+## API Deployment Options
+
+The Ploy API can be deployed in two ways:
+
+### Option 1: Using ployman (Recommended)
+```bash
+export TARGET_HOST=your-vps-ip
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+ployman api deploy
+```
+
+This command:
+1. **Primary**: Attempts self-update via API `/v1/update/latest` endpoint (fastest for running API)
+2. **Fallback**: Runs Ansible playbook locally if API is unreachable (for cold start scenarios)
+   - Ansible executes from your local machine (requires local Ansible installation)
+   - Provides direct output and better debugging visibility
+   - No Ansible installation needed on production servers
+   - Cleaner separation between control plane (local) and data plane (VPS)
+
+### Option 2: Direct Ansible
+```bash
+cd iac/dev
+ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=main
+```
+
 ## Architecture
 
 **Stack:** Nomad v1.10.4, Consul v1.21.4, Vault v1.20.2, Traefik v3.5.0, SeaweedFS v3.96, Docker, Go

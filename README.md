@@ -123,15 +123,21 @@ curl http://localhost:8081/version/detailed
 
 ### Deployment
 ```bash
-# Deploy API controller using unified deployment system
+# Deploy API controller (Recommended - includes local Ansible fallback)
+ployman api deploy
+
+# OR use direct unified deployment
 ployman push -a ploy-api
 
 # The deployment automatically:
+# - Attempts self-update via API (if running)
+# - Falls back to local Ansible execution (if API unavailable)
 # - Builds from source with version
-# - Creates deployment package
-# - Deploys via controller API
-# - Updates Nomad job
+# - Updates Nomad job via rolling deployment
 # - Verifies deployment health
+
+# Note: ployman api deploy runs Ansible locally on fallback,
+# providing better control and debugging visibility
 ```
 
 ### Dynamic API Endpoint

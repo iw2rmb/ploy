@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
@@ -16,7 +15,6 @@ func PushCmd(args []string, controllerURL string) {
 	main := fs.String("main", "", "Java main class for lane C")
 	sha := fs.String("sha", "", "git sha to annotate")
 	bluegreen := fs.Bool("blue-green", false, "use blue-green deployment")
-	env := fs.String("env", "dev", "target environment (dev, staging, prod)")
 	fs.Parse(args)
 
 	// Check if blue-green deployment is requested
@@ -27,27 +25,11 @@ func PushCmd(args []string, controllerURL string) {
 		return
 	}
 
-	// Build configuration for shared deployment
-	config := common.DeployConfig{
-		App:           *app,
-		Lane:          *lane,
-		MainClass:     *main,
-		SHA:           *sha,
-		IsPlatform:    false, // User application
-		BlueGreen:     *bluegreen,
-		Environment:   *env,
-		ControllerURL: controllerURL,
-	}
-
 	// Display deployment info
-	targetDomain := "ployd.app"
-	if *env == "dev" {
-		targetDomain = "dev.ployd.app"
-	}
-	fmt.Printf("🚀 Deploying %s to %s.%s...\n", *app, *app, targetDomain)
+	fmt.Printf("🚀 Deploying %s to %s.ployd.app...\n", *app, *app)
 
-	// Use shared deployment logic
-	result, err := common.SharedPush(config)
+	// Use app-specific deployment (no platform logic, simplified)
+	result, err := DeployApp(*app, *lane, *main, *sha, false)
 	if err != nil {
 		fmt.Printf("❌ Deployment failed: %v\n", err)
 		return
