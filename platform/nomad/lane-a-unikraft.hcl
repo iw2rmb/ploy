@@ -94,8 +94,7 @@ job "{{APP_NAME}}-lane-a" {
         NOMAD_TASK_NAME = "${NOMAD_TASK_NAME}"
         SERVICE_NAME = "{{APP_NAME}}-lane-a"
         
-        # Consul integration (if supported by unikernel)
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
+        # Service registration (Consul service discovery only)
         
         {{CUSTOM_ENV_VARS}}
       }

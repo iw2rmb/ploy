@@ -1,392 +1,205 @@
 # CHTTP Server Architecture
 
-**Project**: Generic CLI-to-HTTP Wrapper Service  
+**Project**: Simple CLI-to-HTTP Bridge Service  
 **Status**: Design Phase  
-**Target**: Production-ready microservice foundation for Ploy static analysis migration  
+**Target**: Lightweight CLI wrapper for deployment via Ploy  
 
 ## Executive Summary
 
-CHTTP (CLI-over-HTTP) is a generic wrapper service that converts any command-line tool into a secure, scalable HTTP microservice. Built for Ploy's static analysis migration, CHTTP provides sandboxed execution, streaming file processing, and Unix pipe-style composability.
+CHTTP (CLI-over-HTTP) is a minimal service that provides HTTP access to command-line tools. Designed as a simple bridge, CHTTP focuses solely on HTTP-to-CLI translation while relying on Ploy for deployment, security, monitoring, and infrastructure management.
 
 **Core Value Proposition:**
-- Convert any CLI tool to HTTP microservice in minutes
-- Production-ready security with public key authentication  
-- Container-native with 25-35MB footprint
-- Streaming support for large codebases
-- Unix pipe-style chaining for complex workflows
+- Convert CLI tools to HTTP endpoints quickly
+- Simple HTTP request/response model
+- Minimal footprint and dependencies
+- Deployed and managed by Ploy's platform
+- Focus on CLI execution reliability
+- Basic security and logging
 
-## Architecture Overview
+## Simplified Architecture
 
-### System Components
+### Core Components
 
 ```
-┌─────────────────────────────────────────────┐
-│               CHTTP Service                 │
-├─────────────────────────────────────────────┤
-│ HTTP API Layer                              │
-│ ├── Authentication (Public Key)             │
-│ ├── Request Validation                      │
-│ ├── Rate Limiting                           │
-│ └── Middleware Stack                        │
-├─────────────────────────────────────────────┤
-│ Stream Processing Engine                    │
-│ ├── Tar/Zip Extraction                     │
-│ ├── File Streaming                         │
-│ ├── Output Capture                         │
-│ └── Result Serialization                   │
-├─────────────────────────────────────────────┤
-│ Execution Sandbox                           │
-│ ├── Process Isolation                      │
-│ ├── Resource Limits                        │
-│ ├── Filesystem Jail                        │
-│ └── Security Context                       │
-├─────────────────────────────────────────────┤
-│ CLI Tool Integration                        │
-│ ├── Executable Wrapper                     │
-│ ├── Argument Management                     │
-│ ├── Environment Control                     │
-│ └── Output Parsing                         │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────┐
+│         CHTTP Service           │
+├─────────────────────────────────┤
+│ HTTP Handler                    │
+│ ├── Basic Authentication        │
+│ ├── Request Parsing             │
+│ └── Response Formatting         │
+├─────────────────────────────────┤
+│ CLI Executor                    │
+│ ├── Command Execution           │
+│ ├── Output Capture              │
+│ └── Error Handling              │
+├─────────────────────────────────┤
+│ Basic Logging                   │
+│ ├── Request Logging             │
+│ └── Execution Logging           │
+└─────────────────────────────────┘
 ```
 
-### Service Architecture Pattern
+**Managed by Ploy Platform:**
+- Deployment & Scaling
+- Load Balancing (Traefik)
+- Security & TLS
+- Monitoring & Alerting
+- Infrastructure Management
+
+### Simple Processing Flow
 
 ```go
-// Core service structure
+// Minimal service structure
 type CHTPService struct {
-    config     *Config
-    auth       *AuthenticationManager
-    sandbox    *SandboxManager
-    pipeline   *PipelineEngine
-    monitoring *MetricsCollector
+    config  *Config
+    logger  *Logger
+    health  *HealthChecker
 }
 
-// Request processing pipeline
-HTTP Request → Auth → Validation → Extraction → Execution → Response
-     ↓             ↓         ↓           ↓           ↓         ↓
-   TLS/JWT    Public Key   Schema    Streaming    Sandbox   JSON/Stream
+// Basic request processing
+HTTP Request → Parse → Execute CLI → Format Response
+     ↓           ↓         ↓              ↓
+   JSON       Command   Process        JSON
 ```
 
-## Configuration System
+## Simple Configuration
 
-### Primary Configuration (YAML)
+### Basic Configuration (YAML)
 
 ```yaml
 # chttp-config.yaml
-service:
-  name: "pylint-chttp"
-  version: "1.0.0" 
+server:
   port: 8080
   host: "0.0.0.0"
-  
-  # Health and monitoring
-  health_check_path: "/health"
-  metrics_path: "/metrics"
-  log_level: "info"
-
-executable:
-  # Primary executable configuration
-  path: "pylint"
-  args: ["--output-format=json", "--reports=no"]
-  timeout: "5m"
-  working_dir: ""
-  
-  # Input/Output configuration
-  stdin_enabled: false
-  capture_stdout: true
-  capture_stderr: true
-  exit_code_success: [0]
 
 security:
-  # Authentication method
-  auth_method: "public_key"  # public_key, jwt, none (dev only)
-  public_keys_file: "/etc/chttp/keys.json"
-  require_signature: true
-  
-  # Process security
-  run_as_user: "chttp"
-  run_as_group: "chttp"
-  disable_network: false
-  readonly_filesystem: false
-  
-  # Resource limits
-  max_memory: "512MB"
-  max_cpu: "1.0"
-  max_execution_time: "10m"
-  max_file_size: "100MB"
-  temp_dir_size: "1GB"
+  api_key: "your-secret-api-key"
 
-input:
-  # Supported input formats
-  formats: ["tar.gz", "tar", "zip", "raw"]
-  max_archive_size: "500MB"
-  max_files_count: 10000
-  
-  # File filtering
-  allowed_extensions: [".py", ".pyw"]
-  excluded_patterns:
-    - "__pycache__/**"
-    - "*.pyc"
-    - ".git/**"
-    - "node_modules/**"
-    - "*.log"
-  
-  # Extraction settings
-  extract_to_temp: true
-  preserve_permissions: false
-  follow_symlinks: false
+commands:
+  # Allowed CLI commands
+  allowed:
+    - "ls"
+    - "cat"
+    - "grep"
+    - "find"
+    - "echo"
 
-output:
-  # Output processing
-  format: "json"           # json, text, stream
-  parser: "pylint_json"    # Built-in parsers
-  streaming: true          # Enable streaming responses
-  compression: "gzip"      # Response compression
-  
-  # Custom parsing (if parser: "custom")
-  custom_parser:
-    type: "regex"
-    patterns:
-      error: "ERROR: (.*)"
-      warning: "WARNING: (.*)"
+logging:
+  level: "info"      # info, warn, error
+  format: "json"     # json, text
 
-pipeline:
-  # Unix pipe-style chaining
+health:
   enabled: true
-  next_services: []
-  
-  # Pipeline configuration
-  pass_through_headers: ["X-Client-ID", "X-Request-ID"]
-  aggregate_results: false
-  fail_fast: true
-
-monitoring:
-  # Observability
-  enabled: true
-  prometheus_metrics: true
-  request_logging: true
-  performance_tracking: true
-  
-  # Health checks
-  health_check_interval: "30s"
-  ready_check_command: ["pylint", "--version"]
+  endpoint: "/health"
 ```
 
-### Security Keys Configuration
+## API Endpoints
 
-```json
-{
-  "keys": {
-    "ploy-api": {
-      "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
-      "permissions": ["analyze", "health"],
-      "rate_limit": "100/minute",
-      "expires": "2025-12-31T23:59:59Z"
-    },
-    "ci-system": {
-      "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
-      "permissions": ["analyze"],
-      "rate_limit": "50/minute",
-      "expires": "2025-06-30T23:59:59Z"
-    }
-  },
-  "default_permissions": ["health"],
-  "signature_algorithm": "RS256"
-}
+### Execute CLI Command
+
+**POST** `/api/v1/execute`
 ```
 
-## API Specification
-
-### Core Endpoints
-
-#### 1. Analysis Endpoint
-
+**Request:**
 ```http
-POST /analyze HTTP/1.1
-Host: pylint.chttp.ployd.app
-Content-Type: application/gzip
-X-Client-ID: ploy-api  
-X-Signature: <RSA-SHA256-signature>
-X-Request-ID: uuid-v4
+POST /api/v1/execute HTTP/1.1
+Content-Type: application/json
+X-API-Key: your-secret-api-key
 
-[gzipped tar archive of codebase]
+{
+  "command": "ls",
+  "args": ["-la", "/tmp"],
+  "timeout": "30s"
+}
 ```
 
 **Response:**
 ```json
 {
-  "id": "analysis-uuid",
-  "timestamp": "2025-08-26T10:30:00Z",
-  "status": "success",
-  "executable": {
-    "path": "pylint",
-    "version": "3.0.0",
-    "args": ["--output-format=json", "--reports=no"],
-    "exit_code": 0,
-    "execution_time": "2.5s"
-  },
-  "input": {
-    "format": "tar.gz",
-    "size_bytes": 52428800,
-    "files_processed": 247,
-    "files_skipped": 15
-  },
-  "output": {
-    "format": "json",
-    "size_bytes": 15420,
-    "compression": "gzip",
-    "streaming": true
-  },
-  "result": {
-    "issues": [
-      {
-        "file": "src/main.py",
-        "line": 10,
-        "column": 4,
-        "severity": "error",
-        "rule": "syntax-error",
-        "message": "invalid syntax",
-        "suggestion": "Check syntax around line 10"
-      }
-    ],
-    "summary": {
-      "total_issues": 23,
-      "by_severity": {
-        "error": 2,
-        "warning": 8,
-        "info": 13
-      }
-    }
-  },
-  "metrics": {
-    "execution_time": "2.5s",
-    "memory_used": "45MB",
-    "cpu_time": "1.2s"
-  }
+  "success": true,
+  "stdout": "total 8\ndrwxr-xr-x  3 user  staff  96 Jan 15 10:30 .\n...",
+  "stderr": "",
+  "exit_code": 0,
+  "duration": "15ms"
 }
 ```
 
-#### 2. Pipeline Chaining Endpoint
+### Health Check
 
-```http
-POST /pipeline HTTP/1.1
-Host: analysis.chttp.ployd.app
-Content-Type: application/json
-X-Client-ID: ploy-api
+**GET** `/health`
 
-{
-  "steps": [
-    {
-      "service": "pylint.chttp.ployd.app",
-      "config": {"min_score": 8.0}
-    },
-    {
-      "service": "bandit.chttp.ployd.app", 
-      "config": {"severity": "medium"}
-    },
-    {
-      "service": "formatter.chttp.ployd.app",
-      "config": {"format": "sarif"}
-    }
-  ],
-  "input": {
-    "format": "tar.gz",
-    "source": "inline"
-  },
-  "data": "<base64-encoded-archive>"
-}
-```
-
-#### 3. Health and Status
-
-```http
-GET /health HTTP/1.1
-Host: pylint.chttp.ployd.app
-
-# Response
+**Response:**
+```json
 {
   "status": "healthy",
-  "version": "1.0.0",
-  "executable": {
-    "available": true,
-    "path": "/usr/local/bin/pylint",
-    "version": "3.0.0"
-  },
-  "resources": {
-    "memory_used": "25MB",
-    "cpu_load": "0.1",
-    "disk_used": "120MB"
-  },
-  "uptime": "5h32m15s"
+  "timestamp": "2025-01-15T10:30:00Z",
+  "uptime": "2h30m15s",
+  "version": "1.0.0"
 }
 ```
 
-#### 4. Capabilities Discovery
+## Deployment with Ploy
 
-```http
-GET /capabilities HTTP/1.1
-Host: pylint.chttp.ployd.app
+CHTTP services are deployed and managed by Ploy's platform:
 
-# Response
-{
-  "service": "pylint-chttp",
-  "version": "1.0.0",
-  "executable": {
-    "name": "pylint",
-    "version": "3.0.0",
-    "supported_formats": ["python"]
-  },
-  "input_formats": ["tar.gz", "tar", "zip"],
-  "output_formats": ["json", "text", "sarif"],
-  "pipeline_compatible": true,
-  "streaming_support": true,
-  "security_features": ["public_key_auth", "process_isolation", "resource_limits"],
-  "supported_extensions": [".py", ".pyw"]
-}
+```yaml
+# ploy-app.yaml
+name: my-chttp-service
+lane: C  # Java/Node.js lane for HTTP services
+config:
+  port: 8080
+  command_allowlist: ["ls", "cat", "grep"]
+scaling:
+  min_instances: 1
+  max_instances: 5
+security:
+  tls: true
+  api_keys: true
 ```
 
-## Implementation Architecture
+Ploy handles all the complex infrastructure concerns:
+- **Load Balancing**: Traefik automatically load balances requests
+- **Security**: TLS termination, authentication, rate limiting
+- **Monitoring**: Metrics collection, alerting, health checks  
+- **Scaling**: Automatic scaling based on demand
+- **Deployment**: Blue-green, canary, rolling deployments
+```
 
-### Core Server Implementation
+## Implementation Phases
 
-```go
-// cmd/chttp/main.go
-package main
+### Phase 1-4: Core HTTP-CLI Bridge ✅
+- Basic HTTP server and CLI execution
+- External service orchestration
+- Resilient HTTP client with circuit breakers
 
-import (
-    "context"
-    "flag"
-    "log"
-    "os"
-    "os/signal"
-    "syscall"
+### Phase 5: Basic Logging & Health Monitoring 📋
+- Simple structured logging
+- HTTP health check endpoint  
+- Request/response logging
 
-    "github.com/ployd/chttp/internal/server"
-    "github.com/ployd/chttp/internal/config"
-)
+### Phase 6: Documentation & Developer Tools 📋
+- Basic API documentation
+- Usage guides and examples
+- Simple testing utilities
 
-func main() {
-    var configFile = flag.String("config", "/etc/chttp/config.yaml", "Configuration file path")
-    flag.Parse()
+### ~~Removed Phases~~
+- ~~Phase 7-8~~: Advanced observability, deployment, security → **Handled by Ploy**
 
-    // Load configuration
-    cfg, err := config.LoadConfig(*configFile)
-    if err != nil {
-        log.Fatalf("Failed to load config: %v", err)
-    }
+## Architecture Benefits
 
-    // Create server
-    srv := server.NewCHTTPServer(cfg)
+**CHTTP Focus:**
+- Lightweight CLI-to-HTTP bridge
+- Simple, reliable command execution
+- Minimal dependencies and footprint
 
-    // Graceful shutdown
-    ctx, cancel := signal.NotifyContext(context.Background(), 
-        syscall.SIGINT, syscall.SIGTERM)
-    defer cancel()
+**Ploy Platform Advantages:**
+- Enterprise-grade deployment automation
+- Comprehensive security and monitoring
+- Production-ready infrastructure management
+- Multi-environment support and scaling
 
-    if err := srv.Run(ctx); err != nil {
-        log.Fatalf("Server error: %v", err)
-    }
-}
+This separation ensures each tool excels in its domain while providing a cohesive development and deployment experience.
 ```
 
 ### Server Core Structure
@@ -1356,7 +1169,7 @@ func generateCacheKey(config *config.Config, inputHash string) string {
 
 ## Implementation Roadmap
 
-### Phase 1: Core Server (Weeks 1-2)
+### Phase 1: Core Server ✅ **COMPLETED** 
 - ✅ Basic HTTP server with Fiber
 - ✅ Configuration system (YAML)
 - ✅ Public key authentication
@@ -1364,26 +1177,50 @@ func generateCacheKey(config *config.Config, inputHash string) string {
 - ✅ Docker containerization
 - ✅ Health checks and metrics
 
-### Phase 2: Advanced Features (Weeks 3-4)
+### Phase 2: Advanced Features ✅ **COMPLETED** 
 - ✅ Streaming archive processing (2025-08-27)
 - ✅ Output parsing framework (2025-08-27)
 - ✅ Resource limiting and security (2025-08-27)
 - ✅ Comprehensive error handling (2025-08-27)
-- 🚧 Integration testing suite
+- ✅ Integration testing suite (2025-08-27)
+- ✅ Unix pipe-style chaining (2025-08-27)
 
-### Phase 3: Pipeline System (Weeks 5-6)
-- ❌ Unix pipe-style chaining
-- ❌ Pipeline orchestration engine
-- ❌ Service discovery integration
-- ❌ Load balancing optimization
-- ❌ Advanced monitoring
+### Phase 3: Pipeline Orchestration ✅ **COMPLETED** 
+**[Detailed Plan: phase-3-orchestration.md](./phase-3-orchestration.md)**
+- ✅ **Parallel pipeline execution engine** (2025-08-27)
+- ✅ **Dependency resolution with topological sorting** (2025-08-27)
+- ✅ **Concurrent execution with semaphore control** (2025-08-27)
+- ✅ **Advanced error propagation and fail-fast support** (2025-08-27)
+- 🚧 Advanced orchestration and resource management
 
-### Phase 4: Production Ready (Weeks 7-8)
-- ❌ Kubernetes deployment manifests
-- ❌ Traefik integration
-- ❌ Performance benchmarking
-- ❌ Security audit and hardening
-- ❌ Documentation completion
+### Phase 4: Service Discovery & External Service Orchestration ✅ **COMPLETED**
+**[Detailed Plan: phase-4-discovery-balancing.md](./phase-4-discovery-balancing.md)**
+- ✅ **Service discovery interface foundation** (2025-08-27)
+- ✅ **Consul integration with service registration** (2025-08-27) 
+- ✅ **Configuration system extended for service discovery** (2025-08-27)
+- ✅ **Architectural simplification - Traefik handles all load balancing** (2025-08-28)
+- ✅ **Resilient HTTP client with circuit breakers and retry logic** (2025-08-28)
+- ✅ **Comprehensive test coverage achieving >60% coverage requirement** (2025-08-28)
+
+### Phase 5: Advanced Monitoring & Observability 📋 **PLANNED**
+**[Detailed Plan: phase-5-observability.md](./phase-5-observability.md)**
+- Distributed tracing and advanced metrics
+- Performance profiling and alerting
+
+### Phase 6: Production Deployment 📋 **PLANNED**
+**[Detailed Plan: phase-6-deployment.md](./phase-6-deployment.md)**
+- Kubernetes manifests and Helm charts
+- Infrastructure as Code and GitOps deployment
+
+### Phase 7: Security & Performance 📋 **PLANNED**
+**[Detailed Plan: phase-7-security-performance.md](./phase-7-security-performance.md)**
+- Security auditing and performance benchmarking
+- Load testing and optimization
+
+### Phase 8: Documentation & Developer Experience 📋 **PLANNED**
+**[Detailed Plan: phase-8-documentation.md](./phase-8-documentation.md)**
+- Comprehensive documentation and guides
+- Developer tooling and examples
 
 ## Migration Path for Ploy
 
@@ -1395,7 +1232,7 @@ func generateCacheKey(config *config.Config, inputHash string) string {
 ### 2. Static Analysis Integration
 - Modify Ploy controller to use CHTTP endpoints
 - Update analysis engine to use HTTP calls
-- Maintain backward compatibility
+- **Clean migration approach - no backward compatibility**
 
 ### 3. Pipeline Enhancement
 - Add pipeline orchestration
@@ -1404,11 +1241,21 @@ func generateCacheKey(config *config.Config, inputHash string) string {
 
 ### 4. Complete Migration
 - Migrate all analyzers to CHTTP
-- Remove legacy analysis code
+- **Replace legacy analysis code entirely**
 - Update documentation and APIs
 
 ## Conclusion
 
-CHTTP provides a robust, scalable foundation for converting CLI tools into production-ready microservices. With its focus on security, performance, and Unix-philosophy composability, CHTTP enables Ploy to migrate from in-process static analysis to a distributed, sandboxed architecture while maintaining simplicity and reliability.
+CHTTP provides a robust, scalable foundation for converting CLI tools into production-ready microservices. With its focus on security, performance, and external service orchestration, CHTTP enables Ploy to migrate from in-process static analysis to a distributed, federated architecture while maintaining simplicity and reliability.
 
-The server architecture supports immediate deployment for Ploy's static analysis migration while offering potential as a standalone product for the broader developer community seeking to modernize CLI tools for cloud-native environments.
+**Key Achievements**: 
+- **Phase 3**: Parallel pipeline execution engine with dependency resolution and advanced error handling
+- **Phase 4**: Simplified architecture leveraging Traefik for all load balancing, focusing on resilient HTTP client for external service orchestration
+
+**Architectural Benefits**:
+- **Simplified Design**: Traefik handles all load balancing at service endpoints
+- **Federation Ready**: Orchestrate pipelines across different organizations and infrastructure
+- **Resilient Communication**: HTTP client with circuit breakers, retries, and per-service configuration
+- **Production Ready**: Reduced complexity while maintaining enterprise-grade reliability
+
+The server architecture supports immediate deployment for Ploy's static analysis migration while enabling federation across multiple CHTTP deployments, making it ideal for distributed teams and multi-organization collaborations.

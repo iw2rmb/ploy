@@ -209,7 +209,7 @@
         owner: ploy
         group: ploy
         mode: '0644'
-      when: "'ploy' in ansible_facts.user_list or true"
+      # Always create config since ploy user exists by design
 
     - name: Set up firewall for SeaweedFS
       ufw:

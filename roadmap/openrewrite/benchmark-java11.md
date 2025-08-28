@@ -152,10 +152,10 @@ export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 export ARF_OPENREWRITE_MODE=service
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-# Single project baseline (Spring PetClinic - known working repo)
-ploy arf benchmark run java11to17_migration \
+# Single project baseline (Spring PetClinic - Java 17 deployment test)
+ploy arf benchmark run java17_deployment_test \
   --repository "https://github.com/spring-projects/spring-petclinic.git" \
-  --app-name "test-petclinic-migration" \
+  --app-name "test-petclinic-deployment" \
   --branch main \
   --lane C --iterations 1
 
@@ -289,16 +289,16 @@ llm_options:
 
 ## Specific Test Repositories
 
-### Service Validation Test
+### Service Validation Test  
 - [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Primary validation)
-  - Well-maintained reference application
-  - Known to work with OpenRewrite
-  - Good test coverage for Java migrations
+  - Well-maintained reference application (Java 17)
+  - **NOTE**: Already uses Java 17 - use for deployment testing, not migration
+  - Good test coverage and known-working build system
 
-### Tier 1 Projects (Simple) - Phase 1 Testing
-- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Reference implementation)
-- [ ] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (Large tutorial collection)
-- [ ] **Java 8 Tutorial**: `https://github.com/winterbe/java8-tutorial.git` (Simple examples)
+### Tier 1 Projects (Simple) - Phase 1 Testing  
+- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Deployment test - Java 17 already)
+- [ ] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (Large tutorial collection - Java 8→17 migration)
+- [ ] **Java 8 Tutorial**: `https://github.com/winterbe/java8-tutorial.git` (Simple examples - Java 8→17 migration)
 
 ```bash
 # Repository URLs for Phase 1 testing (all valid, existing repos)

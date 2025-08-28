@@ -133,8 +133,7 @@ job "{{APP_NAME}}-{{LANE}}" {
         GRPC_PORT = "${NOMAD_PORT_grpc}"
         {{/if}}
         
-        # Consul integration
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
+        # Service registration (Consul service discovery only)
         SERVICE_NAME = "{{APP_NAME}}-{{LANE}}"
         
         {{CUSTOM_ENV_VARS}}

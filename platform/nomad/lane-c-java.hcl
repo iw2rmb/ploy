@@ -143,8 +143,7 @@ job "{{APP_NAME}}-lane-c" {
         REDIS_HOST = "127.0.0.1"  
         REDIS_PORT = "6379"
         
-        # Consul integration
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
+        # Service registration (Consul service discovery only)
         SERVICE_NAME = "{{APP_NAME}}-lane-c"
         
         # Nomad integration

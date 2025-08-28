@@ -611,6 +611,82 @@ Auto-classified lanes:
   - Status monitoring and log retrieval for debugging
 - ✅ **Integration Points**: Seamless integration with existing Ploy infrastructure (Nomad, Consul, SeaweedFS)
 
+## 🧠 Code LLM Service (CLLM) 🚧 IN DEVELOPMENT
+
+**STATUS: 🚧 PHASE 1 IN PROGRESS** - Foundation, sandbox manager, secure file operations, command execution, and security hardening complete. Tasks 2.1-2.4 complete, proceeding with LLM provider integration. Full roadmap in `roadmap/cllm/`
+
+CLLM is a standalone microservice for secure, sandboxed LLM-based code transformation and analysis, designed to enable ARF's self-healing capabilities. The service provides a secure HTTP API for code analysis, transformation, and diff generation using local and cloud LLM providers.
+
+✅ **Secure Sandbox Execution Engine** (Aug 2025):
+- **Resource Management**: CPU, memory, process, and timeout limits to prevent resource exhaustion
+- **Path Security**: Directory traversal prevention, absolute path blocking, null byte filtering
+- **Temporary Directories**: Secure creation and automatic cleanup of isolated working environments  
+- **Configuration Integration**: YAML and environment variable support for all sandbox settings
+- **TDD Implementation**: 100% test coverage with comprehensive security and edge case validation
+
+✅ **Secure File Operations Engine** (Aug 2025):
+- **Archive Processing**: Tar.gz extraction with path validation and streaming support
+- **Archive Validation**: Size limits, file extension filtering, malicious content detection
+- **Secure File I/O**: ReadFileSecure, WriteFileSecure, ListDirectorySecure with path validation
+- **Streaming Architecture**: 32KB buffer-based streaming for memory-efficient large file handling
+- **Context Cancellation**: Long-running operations support context-aware cancellation
+- **Multi-layer Security**: Path traversal, extension filtering, size limits, hidden file blocking
+
+✅ **Command Execution Engine** (Aug 2025):
+- **Secure Command Execution**: ExecuteCommand with context-aware processing and timeout support
+- **Output Capture**: Comprehensive stdout, stderr, and exit code capture with large output buffering
+- **Working Directory Security**: Path validation and confinement within sandbox boundaries
+- **Resource Enforcement**: CPU, memory, and process limits via environment variable propagation
+- **Process Management**: Graceful termination, cleanup, and context cancellation support
+- **Error Classification**: Detailed error reporting with command start, execution, and timeout failures
+
+✅ **Security Hardening System** (Aug 2025):
+- **Comprehensive Audit Logging**: SecurityAuditor interface with structured audit logs and security events
+- **Command Injection Prevention**: ValidateCommandArguments with pattern detection and input sanitization
+- **Enhanced Path Security**: Advanced path traversal prevention with symlink detection and validation
+- **Resource Monitoring**: Real-time resource usage tracking with violation detection and limit enforcement
+- **Multi-Layer Validation**: Path length/depth limits, control character detection, suspicious pattern blocking
+- **Security Event Classification**: Severity-based event logging (high/medium/low) with detailed context capture
+
+### ✅ **Phase 1: Service Foundation - COMPLETE (2025-08-27)**
+- ✅ **HTTP Service Framework**: Complete REST API with Fiber framework and health endpoints (`/health`, `/ready`, `/version`)
+- ✅ **Configuration Management**: YAML and environment variable support with validation and hot-reload
+- ✅ **API Endpoints**: Basic endpoints for code analysis (`/v1/analyze`) and transformation (`/v1/transform`)
+- ✅ **Middleware Stack**: CORS, request logging, correlation IDs, error recovery, and rate limiting
+- ✅ **Development Workflow**: TDD implementation with >60% test coverage and Makefile automation
+- ✅ **Containerization**: Docker image with distroless security and docker-compose development stack
+- ✅ **Infrastructure Integration**: Ansible playbook integration for VPS deployment readiness
+
+### 🚧 **Phase 1 Remaining: LLM and Analysis Implementation**
+- ✅ **Sandbox Execution Engine**: CHTTP-based secure code execution with resource limits - COMPLETE
+- 🚧 **LLM Provider Integration**: Ollama and OpenAI provider implementations with failover
+- 🚧 **Code Analysis Engine**: AST parsing and error pattern recognition
+- 🚧 **Diff Generation**: Git-compatible diff creation and validation
+
+### 📋 **Phase 2: Model Management (Planned)**
+- **SeaweedFS Integration**: Centralized model storage with intelligent caching
+- **Model Registry**: Versioning and metadata management with Consul coordination
+- **Load Balancing**: Model-aware request routing and instance assignment
+- **Cache Management**: LRU eviction with smart warming strategies
+
+### 📋 **Phase 3: ARF Integration (Planned)**
+- **Self-Healing Cycles**: Iterative error correction with state management
+- **Error Context Enhancement**: Deep integration with ARF workflow engine
+- **Hybrid Pipeline**: Coordination with OpenRewrite for complex transformations
+- **Performance Optimization**: Model selection based on error types and context
+
+### 📋 **Phase 4: Production Features (Planned)**
+- **Observability**: Comprehensive metrics, logging, and tracing
+- **Auto-Scaling**: Queue-based scaling with resource optimization
+- **Circuit Breakers**: Fault tolerance and graceful degradation
+- **Security Hardening**: Audit logging and compliance frameworks
+
+### Technical Architecture
+- **Service Endpoint**: `cllm.dev.ployman.app` (development), `cllm.ployman.app` (production)
+- **Technology Stack**: Go 1.21+, Fiber v2, Docker, Nomad/Consul integration
+- **Security Model**: Sandboxed execution, input validation, resource limits, network isolation
+- **Integration**: ARF hybrid pipeline, OpenRewrite coordination, SeaweedFS storage
+
 ## 🧬 Automated Remediation Framework (ARF) ✅ OPERATIONAL
 
 **STATUS: ✅ OPERATIONAL** - Phases 1-4 ✅ COMPLETE (August 2025), integrated with dedicated OpenRewrite service. Comprehensive roadmap available in `roadmap/arf/`

@@ -1,6 +1,23 @@
 ---
 # Complete Ploy development environment setup
 # Proper service ordering: Basic tools -> SeaweedFS -> HashiCorp -> Traefik -> API -> CHTTP -> FreeBSD -> Testing
+
+# Global connection resilience settings
+- hosts: all
+  gather_facts: false
+  vars:
+    ansible_ssh_retries: 3
+    ansible_ssh_timeout: 30
+    # Connection health check before starting
+  tasks:
+    - name: Wait for connection to be ready
+      wait_for_connection:
+        connect_timeout: 30
+        sleep: 5
+        delay: 5
+        timeout: 300
+      tags: always
+
 - import_playbook: playbooks/main.yml
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
@@ -10,3 +27,4 @@
   when: deploy_chttp is defined and deploy_chttp | bool
 - import_playbook: playbooks/freebsd.yml
 - import_playbook: playbooks/testing.yml
+- import_playbook: playbooks/validation.yml

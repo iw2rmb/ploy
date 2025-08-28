@@ -19,6 +19,7 @@
       loop:
         - /etc/traefik
         - /etc/traefik/dynamic
+        - /etc/traefik/acme
         - /var/log/traefik
         - /opt/ploy/traefik-data
 
@@ -35,6 +36,8 @@
             insecure: true  # For development only
 
           entryPoints:
+            traefik:
+              address: ":8090"  # Dashboard on separate port to avoid SeaweedFS conflict
             web:
               address: ":80"
               http:
@@ -48,10 +51,9 @@
 
           providers:
             consul:
-              endpoint:
-                address: 127.0.0.1:8500
-                scheme: http
-              prefix: traefik
+              endpoints:
+                - "127.0.0.1:8500"
+              rootKey: traefik
 
             file:
               directory: /etc/traefik/dynamic
@@ -70,6 +72,14 @@
                   resolvers:
                     - "1.1.1.1:53"
                     - "8.8.8.8:53"
+            
+            # HTTP challenge resolver as fallback
+            letsencrypt:
+              acme:
+                email: {{ ploy_dev_apps_certificate.email | default('admin@ployd.app') }}
+                storage: /etc/traefik/acme/acme.json
+                httpChallenge:
+                  entryPoint: web
             
             # Certificate resolver for platform domain (*.dev.ployman.app)
             platform-wildcard:
@@ -149,8 +159,8 @@
             services:
               api:
                 loadBalancer:
-                  servers:
-                    - url: "http://127.0.0.1:8081"
+                  # Dynamic port allocation via Consul service discovery
+                  servers: []
                   healthCheck:
                     path: /health
                     interval: 10s
@@ -178,6 +188,7 @@
       loop:
         - /opt/ploy/traefik-data/apps-acme.json
         - /opt/ploy/traefik-data/platform-acme.json
+        - /etc/traefik/acme/acme.json
 
     - name: Create Traefik systemd service
       copy:
@@ -254,7 +265,7 @@
 
     - name: Verify Traefik dashboard is accessible
       uri:
-        url: "http://localhost:8080/api/overview"
+        url: "http://localhost:8090/api/overview"
         method: GET
         status_code: 200
       register: traefik_health
@@ -266,5 +277,5 @@
       debug:
         msg: |
           Traefik is running successfully!
-          Dashboard: http://{{ ansible_default_ipv4.address }}:8080
+          Dashboard: http://{{ ansible_default_ipv4.address }}:8090
           API endpoint will be available at: https://api.dev.{{ ploy.apps_domain }}
