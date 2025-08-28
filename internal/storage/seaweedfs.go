@@ -174,6 +174,10 @@ func (c *SeaweedFSClient) ListObjects(bucket, prefix string) ([]ObjectInfo, erro
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		// Directory doesn't exist yet, return empty list
+		return []ObjectInfo{}, nil
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to list objects: %s", resp.Status)
 	}

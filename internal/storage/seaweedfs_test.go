@@ -564,6 +564,23 @@ func TestSeaweedFSClient_ListObjects(t *testing.T) {
 			wantErr:     true,
 			errContains: "network unreachable",
 		},
+		{
+			name:   "directory not found returns empty list",
+			bucket: "test-bucket",
+			prefix: "non-existent/",
+			setupMock: func() *mockRoundTripper {
+				return &mockRoundTripper{
+					responses: []mockResponse{
+						{
+							statusCode: http.StatusNotFound,
+							body:       "Not Found",
+						},
+					},
+				}
+			},
+			wantErr:     false,
+			wantObjects: []ObjectInfo{},
+		},
 	}
 	
 	for _, tt := range tests {
