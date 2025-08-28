@@ -160,7 +160,11 @@ func (e *Executor) extractArchive(encodedArchive string, destPath string) error 
 		
 		// Clean and validate path
 		targetPath := filepath.Join(destPath, header.Name)
-		if !strings.HasPrefix(targetPath, filepath.Clean(destPath)+string(os.PathSeparator)) {
+		cleanDest := filepath.Clean(destPath)
+		cleanTarget := filepath.Clean(targetPath)
+		
+		// Allow the destination directory itself or files within it
+		if cleanTarget != cleanDest && !strings.HasPrefix(cleanTarget, cleanDest+string(os.PathSeparator)) {
 			return fmt.Errorf("invalid file path: %s", header.Name)
 		}
 		
