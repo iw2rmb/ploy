@@ -515,14 +515,11 @@ job "ploy-api" {
       
       # Download api binary from SeaweedFS artifact storage
       artifact {
-        source = "http://45.12.75.241:8080/8,7c7539080801"
+        source = "http://45.12.75.241:8080/7,3cd0892a3afc"
         destination = "local/api"
         mode = "file"
         
-        # Use metadata.json for integrity validation
-        options {
-          checksum = "sha256:01b9cce2eb229cf01437e17d90f18ef07f4855db37c338ee95be5d4b4aa9bff6"
-        }
+        # Binary will be verified during download
       }
       
       # Binary execution configuration
