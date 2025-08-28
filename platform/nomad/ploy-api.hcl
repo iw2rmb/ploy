@@ -518,7 +518,7 @@ job "ploy-api" {
       
       # Binary execution configuration
       config {
-        command = "/home/ploy/ploy/bin/api"
+        command = "/usr/local/bin/ploy-api"
         args = []
       }
       
