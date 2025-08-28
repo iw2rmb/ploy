@@ -61,6 +61,32 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 
 **Status:** ✅ **Phases ARF-1 through ARF-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 11→17 migration pipeline successfully validated with Spring PetClinic on production VPS infrastructure.
 
+## Platform Services vs User Applications
+
+Ploy maintains **clear separation between platform services and user applications** through distinct routing and deployment mechanisms:
+
+**Platform Services** (Infrastructure):
+- **Examples**: ploy-api, openrewrite, monitoring services
+- **Deployment**: `ployman push -a service-name`
+- **API Routes**: `/v1/platform/:service/*`
+- **Domain**: `*.ployman.app` (e.g., api.ployman.app)
+- **Priority**: Higher Nomad priority (80+)
+- **Resources**: Guaranteed CPU/memory allocations
+
+**User Applications** (Your apps):
+- **Examples**: Your web apps, APIs, microservices
+- **Deployment**: `ploy push -a app-name`
+- **API Routes**: `/v1/apps/:app/*`
+- **Domain**: `*.ployd.app` (e.g., myapp.ployd.app)
+- **Priority**: Standard Nomad priority (50)
+- **Resources**: Best-effort allocations
+
+**Benefits of Separation**:
+- **No Naming Conflicts**: Can have user app "api" and platform service "api"
+- **Independent Scaling**: Platform services scale separately from user apps
+- **Security Boundaries**: Different permission models for platform vs user deployments
+- **Clear Monitoring**: Easy to distinguish platform health from application health
+
 ## High Availability API Architecture
 
 Ploy's **api is designed as a horizontally scalable, stateless application** that eliminates single points of failure through Nomad-managed deployment and external state storage.
@@ -122,23 +148,31 @@ curl http://localhost:8081/version/detailed
 ```
 
 ### Deployment
+
+**Platform Services** (using ployman):
 ```bash
 # Deploy API controller (Recommended - includes local Ansible fallback)
 ployman api deploy
 
-# OR use direct unified deployment
-ployman push -a ploy-api
+# OR deploy any platform service directly
+ployman push -a ploy-api        # Deploy API service
+ployman push -a openrewrite     # Deploy OpenRewrite service
 
-# The deployment automatically:
-# - Attempts self-update via API (if running)
-# - Falls back to local Ansible execution (if API unavailable)
-# - Builds from source with version
-# - Updates Nomad job via rolling deployment
-# - Verifies deployment health
-
-# Note: ployman api deploy runs Ansible locally on fallback,
-# providing better control and debugging visibility
+# Platform services deploy to ployman.app domain
+# Routes: /v1/platform/:service/*
 ```
+
+**User Applications** (using ploy):
+```bash
+# Deploy your application
+ploy push -a myapp              # Auto-detects lane
+ploy push -a myapp -lane E      # Force container deployment
+
+# Applications deploy to ployd.app domain
+# Routes: /v1/apps/:app/*
+```
+
+**Note**: The separation ensures platform services and user apps never conflict, even with identical names.
 
 ### Dynamic API Endpoint
 The CLI automatically discovers the api endpoint:

@@ -15,12 +15,30 @@
   - Returns counts, failure rates, and timing information
 - **Versioned Access**: All health endpoints also available at `/v1/health`, `/v1/ready`, `/v1/live`, `/v1/health/metrics`
 
-## Core Application Endpoints
-- `POST /v1/apps/:app/builds?sha=<sha>&lane=<A..G>&main=<MainClass>` — build & deploy; lane auto-picked if omitted.
+## Core Application Endpoints (User Apps)
+- `POST /v1/apps/:app/builds?sha=<sha>&lane=<A..G>&main=<MainClass>` — build & deploy user application; lane auto-picked if omitted.
   - **Lane G Support**: WebAssembly applications automatically detected and routed to wazero runtime
-- `GET /v1/apps` — list all applications.
-- `GET /v1/status/:app` — get application deployment status.
+  - **Domain**: Deploys to `{app}.ployd.app`
+- `GET /v1/apps` — list all user applications.
+- `GET /v1/apps/:app/status` — get application deployment status.
 - `DELETE /v1/apps/:app` — destroy application and all associated resources.
+
+## Platform Service Endpoints (Infrastructure Services)
+- `POST /v1/platform/:service/deploy?sha=<sha>&lane=<E>&env=<dev|staging|prod>` — deploy platform service.
+  - **Lane**: Platform services typically use Lane E (containers)
+  - **Domain**: Deploys to `{service}.ployman.app` (prod) or `{service}.{env}.ployman.app`
+  - **Priority**: Higher Nomad priority (80+) with guaranteed resources
+  - **Examples**: ploy-api, openrewrite, monitoring services
+- `GET /v1/platform/:service/status` — get platform service status.
+  - Returns service health, deployment status, and version information
+- `POST /v1/platform/:service/rollback?version=<version>` — rollback platform service to specific version.
+  - Safer rollback with canary deployments for critical infrastructure
+- `DELETE /v1/platform/:service` — remove platform service (requires confirmation).
+  - Cleans up Nomad job, storage artifacts, DNS entries, and certificates
+- `GET /v1/platform/:service/logs?lines=<100>&follow=<false>` — stream platform service logs.
+  - Real-time log streaming from Nomad allocations
+
+**Note**: The separation between `/v1/apps/*` and `/v1/platform/*` prevents naming conflicts. You can have both a user app named "api" and a platform service named "api" without collision.
 
 ## Domain Management Endpoints (Heroku-style with Automatic Certificate Provisioning)
 - `POST /v1/apps/:app/domains` — add domain to app with automatic certificate provisioning.
