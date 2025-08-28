@@ -124,13 +124,38 @@ git checkout main && git merge <current-branch> && git push origin main && git c
 
 **VPS (Integration/Functional):**
 ```bash
-# Deployment
-ployman push -a ploy-api              # Unified deployment system
-ssh root@$TARGET_HOST "su - ploy -c './tests/scripts/test-*.sh'"  # Test execution
+# API Deployment (Preferred Method - handles both cold start and hot reload)
+export TARGET_HOST=45.12.75.241       # Your VPS IP
+ployman api deploy                    # Deploys API (auto-fallback to Ansible if needed)
 
-# Controller Management  
-curl -X POST https://api.dev.ployman.app/v1/update/latest           # Self-update
-curl https://api.dev.ployman.app/v1/version                         # Version check
+# Alternative deployment methods
+ployman push -a ploy-api              # Unified deployment (requires API running)
+curl -X POST https://api.dev.ployman.app/v1/update/latest  # Self-update (requires API running)
+
+# Test execution
+ssh root@$TARGET_HOST "su - ploy -c './tests/scripts/test-*.sh'"
+
+# Version check
+curl https://api.dev.ployman.app/v1/version
+```
+
+**API Deployment Workflow:**
+The `ployman api deploy` command provides a robust deployment solution:
+1. **Primary**: Attempts self-update via `/v1/update/latest` endpoint (fastest when API is running)
+2. **Fallback**: SSH to VPS and runs Ansible playbook if API is unreachable (handles cold start)
+   - Updates code from git repository
+   - Builds binaries from source
+   - Deploys via Nomad job
+
+**Environment Variables for Deployment:**
+```bash
+export TARGET_HOST=45.12.75.241              # VPS IP address (required for SSH fallback)
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1  # API endpoint (default: dev)
+export DEPLOY_BRANCH=main                    # Git branch to deploy (auto-detected if not set)
+
+# For production deployment:
+export PLOY_CONTROLLER=https://api.prod.ployman.app/v1
+ployman api deploy
 ```
 
 **PROHIBITED (Never):**

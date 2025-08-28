@@ -52,8 +52,39 @@
           debug:
             msg: "All required services (SeaweedFS, Consul, Nomad, Vault) are healthy and ready"
 
-    - name: Build required binaries for unified deployment
+    - name: Update code and build binaries
       block:
+        - name: Check if repository already exists
+          stat:
+            path: /home/ploy/ploy/.git
+          register: git_repo_exists
+          
+        - name: Stash any local changes if repository exists
+          shell: cd /home/ploy/ploy && git stash push -m "Ansible deployment stash $(date +%Y%m%d-%H%M%S)"
+          become_user: ploy
+          when: git_repo_exists.stat.exists
+          register: git_stash
+          failed_when: false  # Don't fail if nothing to stash
+          
+        - name: Display stash status
+          debug:
+            msg: "Local changes stashed: {{ git_stash.stdout }}"
+          when: git_repo_exists.stat.exists and git_stash.rc == 0 and 'No local changes to save' not in git_stash.stdout
+        
+        - name: Pull latest code from git repository
+          git:
+            repo: https://github.com/iw2rmb/ploy.git
+            dest: /home/ploy/ploy
+            version: "{{ deploy_branch | default('main') }}"
+            force: yes
+          become_user: ploy
+          register: git_update
+          
+        - name: Display git update status
+          debug:
+            msg: "Git repository updated to {{ git_update.after[:8] }} on branch {{ deploy_branch | default('main') }}"
+          when: git_update.changed
+        
         - name: Build API binary
           shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./api
           become_user: ploy

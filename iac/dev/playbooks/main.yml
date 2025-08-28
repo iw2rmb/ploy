@@ -204,27 +204,21 @@
             mode: '0755'
           when: not docker_compose_binary.stat.exists or docker_compose_version not in (current_docker_compose_version.stdout | default(''))
 
-    - name: Install Kontain Runtime for VM-level Container Isolation
+    - name: Install Kontain Runtime for VM-level Container Isolation (Optional - Requires KVM)
       block:
-        - name: Add Kontain APT repository key
-          apt_key:
-            url: https://kontain-release.s3.us-west-1.amazonaws.com/linux_amd64/repo/kontain.key
-            state: present
+        - name: Check if KVM is available
+          stat:
+            path: /dev/kvm
+          register: kvm_device
 
-        - name: Add Kontain APT repository
-          apt_repository:
-            repo: "deb [arch=amd64] https://kontain-release.s3.us-west-1.amazonaws.com/linux_amd64/repo/ stable main"
-            state: present
-            filename: kontain
+        - name: Install Kontain using official script (if KVM available)
+          shell: |
+            curl -s https://raw.githubusercontent.com/kontainapp/km/current/km-releases/kontain-install.sh | bash
+          when: kvm_device.stat.exists
+          args:
+            creates: /opt/kontain/bin/krun
 
-        - name: Install Kontain packages
-          apt:
-            name:
-              - kontain
-            state: present
-            update_cache: true
-
-        - name: Configure Docker daemon for Kontain runtime
+        - name: Configure Docker daemon for Kontain runtime (if KVM available)
           copy:
             content: |
               {
@@ -239,30 +233,33 @@
                 "log-opts": {
                   "max-size": "10m",
                   "max-file": "3"
-                }
+                },
+                "insecure-registries": ["localhost:5000"]
               }
             dest: /etc/docker/daemon.json
             backup: true
           notify: restart docker
+          when: kvm_device.stat.exists
 
-        - name: Create Kontain configuration directory
-          file:
-            path: /etc/kontain
-            state: directory
-            mode: '0755'
-
-        - name: Configure Kontain settings
+        - name: Configure Docker daemon without Kontain (if KVM not available)
           copy:
             content: |
-              # Kontain configuration
-              # Enable VM-level isolation for containers
-              KONTAIN_ENABLE_VM_ISOLATION=1
-              KONTAIN_LOG_LEVEL=info
-              KONTAIN_MAX_VM_MEMORY=4096
-            dest: /etc/kontain/kontain.conf
-            mode: '0644'
+              {
+                "default-runtime": "runc",
+                "storage-driver": "overlay2",
+                "log-driver": "json-file",
+                "log-opts": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                },
+                "insecure-registries": ["localhost:5000"]
+              }
+            dest: /etc/docker/daemon.json
+            backup: true
+          notify: restart docker
+          when: not kvm_device.stat.exists
 
-        - name: Restart Docker to apply Kontain runtime
+        - name: Restart Docker to apply configuration
           systemd:
             name: docker
             state: restarted
