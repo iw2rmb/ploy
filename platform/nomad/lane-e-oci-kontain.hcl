@@ -213,8 +213,7 @@ job "{{APP_NAME}}-lane-e" {
         POD_NAME = "{{APP_NAME}}-${NOMAD_ALLOC_INDEX}"
         POD_NAMESPACE = "ploy"
         
-        # Service discovery
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
+        # Service registration (Consul service discovery only)
         SERVICE_NAME = "{{APP_NAME}}-lane-e"
         
         # Nomad integration

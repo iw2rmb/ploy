@@ -224,6 +224,20 @@
       ignore_errors: true
       changed_when: false
 
+    # Validate Nomad prerequisites before starting
+    - name: Validate Nomad volume directories exist
+      stat:
+        path: "{{ item }}"
+      register: nomad_volume_dirs
+      loop:
+        - "/opt/ploy/artifacts"
+        - "/opt/ploy/logs"
+        - "/opt/ploy/metadata"
+        - "/opt/ploy/debug"
+        - "/opt/ploy/cache"
+        - "/opt/ploy/temp"
+      failed_when: not nomad_volume_dirs.results[0].stat.exists
+
     - name: Start and enable Nomad (if not running)
       systemd:
         name: nomad
@@ -231,6 +245,34 @@
         enabled: true
         daemon_reload: true
       when: nomad_service_status.stdout != "active"
+      register: nomad_start_result
+      retries: 3
+      delay: 5
+      until: nomad_start_result is succeeded
+
+    - name: Check Nomad service status after start
+      systemd:
+        name: nomad
+      register: nomad_post_start_status
+      when: nomad_service_status.stdout != "active"
+
+    - name: Display Nomad startup logs on failure
+      command: journalctl -u nomad.service --no-pager -n 20
+      register: nomad_startup_logs
+      when: 
+        - nomad_service_status.stdout != "active"
+        - nomad_post_start_status.status.ActiveState != "active"
+      failed_when: false
+
+    - name: Fail if Nomad didn't start successfully
+      fail:
+        msg: |
+          Nomad failed to start. Recent logs:
+          {{ nomad_startup_logs.stdout if nomad_startup_logs is defined else 'No logs available' }}
+      when:
+        - nomad_service_status.stdout != "active"
+        - nomad_post_start_status is defined
+        - nomad_post_start_status.status.ActiveState != "active"
 
     - name: Wait for Nomad to be ready
       wait_for:
@@ -383,17 +425,7 @@
         - /opt/hashicorp/nomad/client
         - /opt/hashicorp/nomad/plugins
 
-    - name: Create Ploy host volume directories for Nomad
-      file:
-        path: "{{ item.path }}"
-        state: directory
-        owner: "{{ item.owner }}"
-        group: "{{ item.group }}"
-        mode: "{{ item.mode }}"
-      loop:
-        - { path: "/opt/ploy", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/opt/ploy/artifacts", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/opt/ploy/logs", owner: "ploy", group: "ploy", mode: "0755" }
+    # Ploy directories already created in main.yml comprehensive structure
 
     - name: Create Nomad log file with proper permissions
       file:
@@ -536,21 +568,7 @@
           debug:
             msg: "Traefik system job deployed successfully and is healthy"
 
-        - name: Create Traefik data directory for SSL certificates
-          file:
-            path: /opt/ploy/traefik-data
-            state: directory
-            owner: ploy
-            group: ploy
-            mode: '0755'
-
-        - name: Create Traefik certificates directory
-          file:
-            path: /opt/ploy/traefik-data/certificates
-            state: directory
-            owner: ploy
-            group: ploy
-            mode: '0755'
+        # Traefik directories already created in main.yml comprehensive structure
 
         - name: Deploy Traefik dynamic configuration for API routing with SSL
           template:

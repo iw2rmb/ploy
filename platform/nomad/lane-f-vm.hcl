@@ -144,8 +144,7 @@ job "{{APP_NAME}}-lane-f" {
         NOMAD_TASK_NAME = "${NOMAD_TASK_NAME}"
         SERVICE_NAME = "{{APP_NAME}}-lane-f"
         
-        # Consul integration
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
+        # Service registration (Consul service discovery only)
         
         # System configuration
         HOSTNAME = "{{APP_NAME}}-${NOMAD_ALLOC_INDEX}"

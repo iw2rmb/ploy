@@ -31,11 +31,60 @@
         groups: sudo
         append: true
 
+    # CRITICAL: Create all Ploy directories early to prevent service startup failures
+    - name: Create comprehensive Ploy directory structure
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: "/opt/ploy", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/artifacts", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/metadata", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/debug", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/logs", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/cache", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/temp", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/traefik-data", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/traefik-data/certificates", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/home/ploy/ploy", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/home/ploy/ploy/configs", owner: "ploy", group: "ploy", mode: "0755" }
+
     - name: Update system packages
-      apt:
-        update_cache: true
-        upgrade: dist
-        cache_valid_time: 3600
+      block:
+        - name: Check if apt is locked
+          shell: lsof /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null | wc -l
+          register: apt_locked
+          changed_when: false
+
+        - name: Wait for apt locks to be released
+          wait_for:
+            path: /var/lib/dpkg/lock-frontend
+            state: absent
+            timeout: 300
+          when: apt_locked.stdout|int > 0
+
+        - name: Update package cache
+          apt:
+            update_cache: true
+            cache_valid_time: 3600
+          retries: 3
+          delay: 10
+
+        - name: Upgrade system packages
+          apt:
+            upgrade: dist
+            force_apt_get: true
+          async: 1200  # 20 minutes max
+          poll: 30     # Check every 30 seconds
+          retries: 2
+          delay: 30
+      rescue:
+        - name: Handle package update failure
+          debug:
+            msg: "Package update failed but continuing with deployment. Check system later."
       when: ansible_os_family == "Debian"
 
     - name: Install basic development tools
@@ -376,21 +425,46 @@
             - tree-sitter-cpp
 
     - name: Install LLM API dependencies
-      pip:
-        name:
-          - openai>=1.0.0
-          - anthropic>=0.7.0
-          - requests>=2.28.0
-          - tiktoken>=0.5.0
-          - redis>=4.5.0
-          - sqlalchemy>=2.0.0
-          - psycopg2-binary>=2.9.0
-          - numpy>=1.24.0
-          - scipy>=1.10.0
-        state: present
-        executable: pip3
-        extra_args: --break-system-packages
-      ignore_errors: true  # Ignore conflicts with system packages
+      block:
+        - name: Install critical LLM packages
+          pip:
+            name:
+              - openai>=1.0.0
+              - anthropic>=0.7.0
+              - requests>=2.28.0
+              - tiktoken>=0.5.0
+            state: present
+            executable: pip3
+            extra_args: --break-system-packages
+          async: 300  # 5 minutes max
+          poll: 15    # Check every 15 seconds
+
+        - name: Install database packages
+          pip:
+            name:
+              - redis>=4.5.0
+              - sqlalchemy>=2.0.0
+              - psycopg2-binary>=2.9.0
+            state: present
+            executable: pip3
+            extra_args: --break-system-packages
+          async: 300
+          poll: 15
+
+        - name: Install scientific packages
+          pip:
+            name:
+              - numpy>=1.24.0
+              - scipy>=1.10.0
+            state: present
+            executable: pip3
+            extra_args: --break-system-packages
+          async: 600  # 10 minutes for scientific packages
+          poll: 30
+      rescue:
+        - name: Handle pip installation failure
+          debug:
+            msg: "Some Python packages failed to install. ARF functionality may be limited."
 
     # Static Analysis Phase 2: Python Analysis Tools
     - name: Install Python static analysis tools
@@ -756,6 +830,92 @@
           async: 300  # 5 minutes timeout
           poll: 10    # Check every 10 seconds
           ignore_errors: true  # Don't fail if model download times out
+
+    - name: Install CLLM service dependencies
+      block:
+        - name: Create CLLM service directories
+          file:
+            path: "{{ item }}"
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+          loop:
+            - /opt/ploy/cllm
+            - /opt/ploy/cllm/sandbox
+            - /opt/ploy/cllm/logs
+            - /opt/ploy/cllm/configs
+            - /var/log/ploy/cllm
+            - /etc/ploy/cllm
+
+        - name: Create CLLM configuration file
+          copy:
+            content: |
+              # CLLM Service Configuration for VPS Environment
+              server:
+                host: "0.0.0.0"
+                port: 8082
+                read_timeout: "30s"
+                write_timeout: "30s"
+                shutdown_timeout: "10s"
+
+              sandbox:
+                work_dir: "/opt/ploy/cllm/sandbox"
+                max_memory: "2GB"
+                max_cpu_time: "300s"
+                max_processes: 20
+                cleanup_timeout: "30s"
+
+              providers:
+                default: "ollama"
+                ollama:
+                  base_url: "http://127.0.0.1:11434"
+                  model: "codellama:7b"
+                  timeout: "120s"
+                  max_context: 4096
+
+              logging:
+                level: "info"
+                format: "json"
+                output: "/var/log/ploy/cllm/cllm.log"
+
+              security:
+                max_request_size: "50MB"
+                rate_limit: "100/min"
+                cors_origins: 
+                  - "https://api.dev.ployman.app"
+                  - "https://dev.ployman.app"
+                  - "http://localhost:*"
+            dest: /etc/ploy/cllm/config.yaml
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+        - name: Add CLLM environment variables to ploy user profile
+          blockinfile:
+            path: /home/ploy/.bashrc
+            create: true
+            owner: ploy
+            group: ploy
+            mode: '0644'
+            block: |
+              # CLLM Service Environment Variables
+              export CLLM_SERVER_HOST="0.0.0.0"
+              export CLLM_SERVER_PORT="8082"
+              export CLLM_SANDBOX_WORK_DIR="/opt/ploy/cllm/sandbox"
+              export CLLM_SANDBOX_MAX_MEMORY="2GB"
+              export CLLM_SANDBOX_MAX_CPU_TIME="300s"
+              export CLLM_OLLAMA_URL="http://127.0.0.1:11434"
+              export CLLM_OLLAMA_MODEL="codellama:7b"
+              export CLLM_CONFIG_FILE="/etc/ploy/cllm/config.yaml"
+              export CLLM_LOG_DIR="/var/log/ploy/cllm"
+              
+              # ARF-CLLM Integration Variables
+              export ARF_CLLM_ENDPOINT="http://localhost:8082"
+              export ARF_CLLM_TIMEOUT="120s"
+              export ARF_CLLM_MAX_RETRIES="3"
+              export ARF_CLLM_ENABLED="true"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - CLLM vars"
 
 
     - name: Create ARF Phase 3 executables and tools
@@ -1129,14 +1289,7 @@
 
         - name: Setup OSv base image for Capstan
           block:
-            - name: Create /opt/ploy directory
-              file:
-                path: /opt/ploy
-                state: directory
-                owner: ploy
-                group: ploy
-                mode: '0755'
-              become: true
+            # /opt/ploy directory already created in comprehensive structure above
 
             - name: Create capstan repository structure for ploy user
               file:

@@ -321,13 +321,13 @@ func (h *HealthChecker) CheckHealth() HealthStatus {
 			}
 		} else {
 			status.Components[name] = ComponentStatus{
-				Status: "healthy",
+				Status: "ok",
 			}
 		}
 	}
 	
 	if overallHealthy {
-		status.Status = "healthy"
+		status.Status = "ok"
 	} else {
 		status.Status = "degraded"
 	}

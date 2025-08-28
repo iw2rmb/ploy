@@ -691,8 +691,23 @@ func buildOSvWithCapstan(jibTar, mainClass, app, sha, outputPath, javaVersion st
 		}
 	}
 	
-	// Determine which Java package to use
+	// Determine which Java package to use based on detected Java version
+	// NOTE: Currently only Java 8 packages are available in OSv
 	javaPackage := "openjdk8-zulu-full" // Default for Java 8
+	
+	// Log warning if project requires newer Java version
+	switch javaVersion {
+	case "21", "20", "19", "18", "17":
+		fmt.Printf("WARNING: Project requires Java %s but OSv only supports Java 8. Using openjdk8-zulu-full (may cause compatibility issues)\n", javaVersion)
+		javaPackage = "openjdk8-zulu-full" // Fallback to Java 8
+	case "11", "12", "13", "14", "15", "16":
+		fmt.Printf("WARNING: Project requires Java %s but OSv only supports Java 8. Using openjdk8-zulu-full (may cause compatibility issues)\n", javaVersion)
+		javaPackage = "openjdk8-zulu-full" // Fallback to Java 8
+	default:
+		// For Java 8 or unknown versions, use the default
+		fmt.Printf("Using Java 8 package: %s\n", javaPackage)
+		javaPackage = "openjdk8-zulu-full"
+	}
 	
 	// Create package.yaml
 	packageYaml := fmt.Sprintf(`name: %s
@@ -733,7 +748,8 @@ config_set_default: default
 	// Compose the package into an OSv image
 	fmt.Println("Composing OSv image with capstan package...")
 	imageName := fmt.Sprintf("ploy-%s", app)
-	composeCmd := exec.Command("capstan", "package", "compose", "--pull-missing", imageName)
+	// Remove --pull-missing to use local packages installed by Ansible
+	composeCmd := exec.Command("capstan", "package", "compose", imageName)
 	composeCmd.Dir = projectDir
 	
 	// Capture stderr for debugging

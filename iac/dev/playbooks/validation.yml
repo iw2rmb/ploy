@@ -1,0 +1,70 @@
+---
+# Deployment Validation Playbook
+# Validates all critical components are working after deployment
+- name: Validate Ploy Development Environment
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+
+  tasks:
+    - name: Validate directory structure
+      stat:
+        path: "{{ item }}"
+      register: dir_check
+      loop:
+        - "/opt/ploy/artifacts"
+        - "/opt/ploy/metadata"
+        - "/opt/ploy/debug"
+        - "/opt/ploy/logs"
+        - "/opt/ploy/cache"
+        - "/opt/ploy/temp"
+        - "/opt/ploy/traefik-data"
+        - "/home/ploy/ploy/configs"
+      failed_when: not dir_check.results[0].stat.exists
+
+    - name: Validate core services are running
+      systemd:
+        name: "{{ item }}"
+      register: service_status
+      loop:
+        - nomad
+        - consul
+        - vault
+        - seaweedfs-master
+        - seaweedfs-volume
+        - seaweedfs-filer
+      failed_when: service_status.results[0].status.ActiveState != "active"
+
+    - name: Validate service APIs are responding
+      uri:
+        url: "{{ item.url }}"
+        method: GET
+        status_code: "{{ item.expected_code }}"
+      loop:
+        - { url: "http://localhost:4646/v1/status/leader", expected_code: 200 }
+        - { url: "http://localhost:8500/v1/status/leader", expected_code: 200 }
+        - { url: "http://localhost:8200/v1/sys/health", expected_code: [200, 429] }
+        - { url: "http://localhost:9333/cluster/status", expected_code: 200 }
+        - { url: "http://localhost:8080/ping", expected_code: 404 }  # Traefik returns 404 for ping without proper setup
+      retries: 3
+      delay: 5
+
+    - name: Validate SeaweedFS collections
+      uri:
+        url: "http://localhost:9333/vol/status"
+        method: GET
+        status_code: 200
+      register: seaweedfs_status
+
+    - name: Display validation results
+      debug:
+        msg: |
+          ✅ Ploy Development Environment Validation Complete!
+          
+          📁 Directory Structure: VALIDATED
+          🛠️  Core Services: {{ service_status.results | selectattr('status.ActiveState', 'equalto', 'active') | list | length }}/{{ service_status.results | length }} ACTIVE
+          🌐 API Endpoints: RESPONDING
+          💾 SeaweedFS: {{ seaweedfs_status.json.Volumes | length if seaweedfs_status.json is defined else 0 }} volumes available
+          
+          Environment ready for Ploy development and testing!

@@ -20,6 +20,7 @@ import (
 	"github.com/iw2rmb/ploy/chttp/internal/config"
 	"github.com/iw2rmb/ploy/chttp/internal/errors"
 	"github.com/iw2rmb/ploy/chttp/internal/parsers"
+	"github.com/iw2rmb/ploy/chttp/internal/pipeline"
 	"github.com/iw2rmb/ploy/chttp/internal/sandbox"
 	"github.com/iw2rmb/ploy/chttp/internal/security"
 )
@@ -98,9 +99,31 @@ func NewServer(configPath string) (*Server, error) {
 	errorMetrics := errors.NewErrorMetrics()
 	healthChecker := errors.NewHealthChecker()
 	
-	// Create Fiber app with streaming support (no custom error handler - will use middleware)
+	// Create Fiber app with streaming support and custom error handler
 	fiberConfig := fiber.Config{
 		DisableStartupMessage: false,
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			// Handle CHTTP errors properly
+			if cErr, ok := err.(*errors.CHTTPError); ok {
+				response := cErr.ToResponse()
+				c.Set("Content-Type", "application/json")
+				return c.Status(cErr.HTTPStatus()).JSON(response)
+			}
+			
+			// Handle Fiber errors
+			if fErr, ok := err.(*fiber.Error); ok {
+				cErr := errors.NewError(errors.ErrorTypeValidation, fErr.Message, fErr)
+				response := cErr.ToResponse()
+				c.Set("Content-Type", "application/json")
+				return c.Status(fErr.Code).JSON(response)
+			}
+			
+			// Handle other errors
+			cErr := errors.NewError(errors.ErrorTypeInternal, "Internal server error", err)
+			response := cErr.ToResponse()
+			c.Set("Content-Type", "application/json")
+			return c.Status(500).JSON(response)
+		},
 	}
 	
 	// Enable streaming if configured
@@ -228,6 +251,160 @@ func (s *Server) setupRoutes() {
 	} else {
 		s.app.Post("/analyze", s.analyzeHandler)
 	}
+
+	// Pipeline endpoint if enabled
+	if s.config.Pipeline.Enabled {
+		s.app.Post("/pipeline", s.pipelineHandler)
+		s.app.Post("/pipeline/parallel", s.parallelPipelineHandler)
+	}
+}
+
+// pipelineHandler handles pipeline execution requests
+func (s *Server) pipelineHandler(c *fiber.Ctx) error {
+	// Check if pipeline is enabled
+	if !s.config.Pipeline.Enabled {
+		s.errorMetrics.RecordError(errors.ErrorTypeValidation, "warning")
+		return errors.NewError(errors.ErrorTypeValidation, "Pipeline functionality is not enabled", nil).
+			WithField("endpoint", "/pipeline")
+	}
+
+	// Validate content type
+	contentType := c.Get("Content-Type")
+	if contentType != "application/json" {
+		s.errorMetrics.RecordError(errors.ErrorTypeValidation, "warning")
+		return errors.NewError(errors.ErrorTypeValidation, "Invalid content type", nil).
+			WithField("expected", "application/json").
+			WithField("received", contentType)
+	}
+
+	// Parse request body
+	var pipelineReq pipeline.Request
+	if err := c.BodyParser(&pipelineReq); err != nil {
+		s.errorMetrics.RecordError(errors.ErrorTypeValidation, "warning")
+		return errors.NewError(errors.ErrorTypeValidation, "Failed to parse pipeline request", err).
+			WithContext("operation", "parse_json")
+	}
+
+	// Extract pass-through headers
+	headers := make(map[string]string)
+	for _, headerName := range s.config.Pipeline.PassThroughHeaders {
+		if value := c.Get(headerName); value != "" {
+			headers[headerName] = value
+		}
+	}
+
+	// Create execution context
+	execCtx := &pipeline.ExecutionContext{
+		RequestID:     uuid.New().String(),
+		ClientID:      c.Get("X-Client-ID"),
+		Headers:       headers,
+		Timeout:       s.config.Pipeline.DefaultTimeout,
+		FailFast:      pipelineReq.Options.FailFast,
+		AllowLoopback: s.config.Pipeline.AllowLoopback,
+	}
+
+	// Create pipeline executor with timeout
+	executor := pipeline.NewExecutor(s.config.Pipeline.DefaultTimeout)
+
+	// Execute pipeline
+	ctx, cancel := context.WithTimeout(c.Context(), s.config.Pipeline.DefaultTimeout)
+	defer cancel()
+
+	response, err := executor.Execute(ctx, &pipelineReq, execCtx)
+	if err != nil {
+		s.errorMetrics.RecordError(errors.ErrorTypeExecution, "error")
+		// Check if this is a validation or timeout error and preserve the original message
+		if customErr, ok := err.(*errors.CHTTPError); ok && (customErr.Type() == errors.ErrorTypeValidation || customErr.Type() == errors.ErrorTypeTimeout) {
+			return customErr.
+				WithField("request_id", execCtx.RequestID).
+				WithField("client_id", execCtx.ClientID).
+				WithContext("operation", "execute_pipeline")
+		}
+		return errors.NewError(errors.ErrorTypeExecution, "Pipeline execution failed", err).
+			WithField("request_id", execCtx.RequestID).
+			WithField("client_id", execCtx.ClientID).
+			WithContext("operation", "execute_pipeline")
+	}
+
+	// Return response
+	return c.JSON(response)
+}
+
+// parallelPipelineHandler handles parallel pipeline execution requests
+func (s *Server) parallelPipelineHandler(c *fiber.Ctx) error {
+	// Check if pipeline is enabled
+	if !s.config.Pipeline.Enabled {
+		s.errorMetrics.RecordError(errors.ErrorTypeValidation, "warning")
+		return errors.NewError(errors.ErrorTypeValidation, "Pipeline functionality is not enabled", nil).
+			WithField("endpoint", "/pipeline/parallel")
+	}
+
+	// Validate content type
+	contentType := c.Get("Content-Type")
+	if contentType != "application/json" {
+		s.errorMetrics.RecordError(errors.ErrorTypeValidation, "warning")
+		return errors.NewError(errors.ErrorTypeValidation, "Invalid content type", nil).
+			WithField("expected", "application/json").
+			WithField("received", contentType)
+	}
+
+	// Parse request body
+	var orchReq pipeline.OrchestrationRequest
+	if err := c.BodyParser(&orchReq); err != nil {
+		s.errorMetrics.RecordError(errors.ErrorTypeValidation, "warning")
+		return errors.NewError(errors.ErrorTypeValidation, "Failed to parse parallel pipeline request", err).
+			WithContext("operation", "parse_json")
+	}
+
+	// Extract pass-through headers
+	headers := make(map[string]string)
+	for _, headerName := range s.config.Pipeline.PassThroughHeaders {
+		if value := c.Get(headerName); value != "" {
+			headers[headerName] = value
+		}
+	}
+
+	// Create execution context
+	execCtx := &pipeline.ExecutionContext{
+		RequestID:     uuid.New().String(),
+		ClientID:      c.Get("X-Client-ID"),
+		Headers:       headers,
+		Timeout:       s.config.Pipeline.DefaultTimeout,
+		FailFast:      orchReq.Options.FailFast,
+		AllowLoopback: s.config.Pipeline.AllowLoopback,
+	}
+
+	// Determine max concurrency from config or request
+	maxConcurrent := s.config.Pipeline.MaxConcurrentSteps
+	if maxConcurrent <= 0 {
+		maxConcurrent = 3 // Default
+	}
+
+	// Create orchestration engine
+	orchestrationEngine := pipeline.NewOrchestrationEngine(s.config.Pipeline.DefaultTimeout, maxConcurrent)
+
+	// Execute parallel pipeline
+	ctx, cancel := context.WithTimeout(c.Context(), s.config.Pipeline.DefaultTimeout)
+	defer cancel()
+
+	response, err := orchestrationEngine.Execute(ctx, &orchReq, execCtx)
+	if err != nil {
+		s.errorMetrics.RecordError(errors.ErrorTypeExecution, "error")
+		// Check if this is a validation or timeout error and preserve the original message
+		if customErr, ok := err.(*errors.CHTTPError); ok && (customErr.Type() == errors.ErrorTypeValidation || customErr.Type() == errors.ErrorTypeTimeout) {
+			return customErr.
+				WithField("request_id", execCtx.RequestID).
+				WithField("client_id", execCtx.ClientID).
+				WithContext("operation", "execute_parallel_pipeline")
+		}
+		return errors.NewError(errors.ErrorTypeExecution, "Parallel pipeline execution failed", err).
+			WithField("request_id", execCtx.RequestID).
+			WithField("client_id", execCtx.ClientID).
+			WithContext("operation", "execute_parallel_pipeline")
+	}
+
+	// Return response
+	return c.JSON(response)
 }
 
 // Start starts the CHTTP server

@@ -132,8 +132,7 @@ job "{{APP_NAME}}-lane-d" {
         NOMAD_TASK_NAME = "${NOMAD_TASK_NAME}"
         SERVICE_NAME = "{{APP_NAME}}-lane-d"
         
-        # Consul integration
-        CONSUL_HTTP_ADDR = "${attr.unique.network.ip-address}:8500"
+        # Service registration (Consul service discovery only)
         
         # FreeBSD jail resource limits
         RLIMIT_DATA = "{{MEMORY_LIMIT}}M"
