@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -11,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/google/uuid"
 	
+	"github.com/iw2rmb/ploy/services/cllm/internal/arf"
 	"github.com/iw2rmb/ploy/services/cllm/internal/diff"
 	"github.com/iw2rmb/ploy/services/cllm/internal/providers"
 	"github.com/iw2rmb/ploy/services/cllm/internal/sandbox"
@@ -24,10 +26,19 @@ type Handlers struct {
 	diffParser      *diff.Parser
 	diffApplier     *diff.Applier
 	diffFormatter   *diff.Formatter
+	arfHandler      *arf.Handler
+	logger          *slog.Logger
 }
 
 // NewHandlers creates a new handlers instance
-func NewHandlers(providerManager *providers.ProviderManager, sandboxManager *sandbox.Manager) *Handlers {
+func NewHandlers(providerManager *providers.ProviderManager, sandboxManager *sandbox.Manager, logger *slog.Logger) *Handlers {
+	// Get the default LLM provider for ARF handler
+	defaultProvider, err := providerManager.GetDefaultProvider()
+	if err != nil {
+		logger.Warn("Failed to get default LLM provider for ARF handler", "error", err)
+		defaultProvider = nil
+	}
+
 	return &Handlers{
 		providerManager: providerManager,
 		sandboxManager:  sandboxManager,
@@ -35,6 +46,8 @@ func NewHandlers(providerManager *providers.ProviderManager, sandboxManager *san
 		diffParser:      diff.NewParser(),
 		diffApplier:     diff.NewApplier(),
 		diffFormatter:   diff.NewFormatter(),
+		arfHandler:      arf.NewHandler(defaultProvider, sandboxManager, logger),
+		logger:          logger,
 	}
 }
 
@@ -553,4 +566,9 @@ func SetupRoutes(app *fiber.App, handlers *Handlers) {
 	v1.Post("/diff", handlers.Diff)
 	v1.Post("/diff/parse", handlers.Parse)
 	v1.Post("/diff/apply", handlers.Apply)
+	
+	// ARF-specific routes
+	arfGroup := v1.Group("/arf")
+	arfGroup.Post("/analyze", handlers.arfHandler.AnalyzeErrors)
+	arfGroup.Get("/health", handlers.arfHandler.Health)
 }

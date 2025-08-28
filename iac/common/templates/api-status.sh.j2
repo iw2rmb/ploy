@@ -1,12 +1,12 @@
 #!/bin/bash
-# Controller Status Script
-# Shows comprehensive status of Ploy controller deployment
+# API Status Script
+# Shows comprehensive status of Ploy API deployment via unified deployment system
 
 set -e
 
 PLOY_DIR="/home/ploy/ploy"
 
-echo "=== Ploy Controller Status ==="
+echo "=== Ploy API Status (Unified Deployment System) ==="
 
 # Check if we're in the right directory
 if [[ ! -d "$PLOY_DIR" ]]; then
@@ -16,10 +16,27 @@ fi
 
 cd "$PLOY_DIR"
 
-# Current version
-echo "🔍 Current Version:"
+# Current version and deployment method
+echo "🔍 Current Deployment:"
 CURRENT_VERSION=$(cat /opt/ploy/current-api-version 2>/dev/null || echo "unknown")
+DEPLOYMENT_METHOD=$(cat /opt/ploy/deployment-method 2>/dev/null || echo "unknown")
 echo "  Version: $CURRENT_VERSION"
+echo "  Method: $DEPLOYMENT_METHOD"
+
+# Git commit information
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    CURRENT_COMMIT=$(git rev-parse --short HEAD)
+    CURRENT_BRANCH=$(git branch --show-current)
+    echo "  Git commit: $CURRENT_COMMIT"
+    echo "  Git branch: $CURRENT_BRANCH"
+fi
+
+# Bootstrap status check
+if [[ -f "/opt/ploy/bootstrap-status" ]]; then
+    echo ""
+    echo "🚀 Bootstrap Status:"
+    cat /opt/ploy/bootstrap-status | head -5
+fi
 
 # Nomad job status
 echo ""
@@ -27,7 +44,8 @@ echo "🎯 Nomad Job Status:"
 export NOMAD_ADDR="http://localhost:4646"
 
 if nomad job status ploy-api >/dev/null 2>&1; then
-    echo "  Job Status: $(nomad job status -short ploy-api | grep Status | awk '{print $3}')"
+    JOB_STATUS=$(nomad job status -short ploy-api | grep Status | awk '{print $3}')
+    echo "  Job Status: $JOB_STATUS"
     
     # Allocation details
     echo ""
@@ -40,57 +58,107 @@ if nomad job status ploy-api >/dev/null 2>&1; then
     ALLOC_ID=$(nomad job allocs -short ploy-api | grep running | head -1 | awk '{print $1}')
     if [[ -n "$ALLOC_ID" ]]; then
         echo "  Allocation ID: $ALLOC_ID"
-        echo "  Node: $(nomad alloc status $ALLOC_ID | grep 'Node Name' | awk '{print $3}')"
+        NODE_NAME=$(nomad alloc status "$ALLOC_ID" | grep 'Node Name' | awk '{print $3}')
+        echo "  Node: $NODE_NAME"
+        
+        # Get dynamic port
+        DYNAMIC_PORT=$(nomad alloc status "$ALLOC_ID" | grep "http:" | awk -F: '{print $2}')
+        if [[ -n "$DYNAMIC_PORT" ]]; then
+            echo "  Dynamic Port: $DYNAMIC_PORT"
+        fi
     fi
 else
-    echo "  ❌ No controller job found in Nomad"
+    echo "  ❌ No API job found in Nomad"
 fi
 
-# API health check
+# API health check via multiple endpoints
 echo ""
 echo "🌐 API Health:"
-if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" >/dev/null; then
-    echo "  ✅ Health endpoint: http://localhost:{{ ploy.controller_port }}/health"
+
+# Local endpoint (direct port)
+if curl -f -s "http://localhost:{{ ploy.api_port }}/health" >/dev/null 2>&1; then
+    echo "  ✅ Local health: http://localhost:{{ ploy.api_port }}/health"
     
     # Try to get detailed health info
-    HEALTH_RESPONSE=$(curl -s "http://localhost:{{ ploy.controller_port }}/health" | jq . 2>/dev/null || echo "Unable to parse health response")
-    echo "  Health Details: $HEALTH_RESPONSE"
+    if HEALTH_RESPONSE=$(curl -s "http://localhost:{{ ploy.api_port }}/health" 2>/dev/null); then
+        if PARSED_HEALTH=$(echo "$HEALTH_RESPONSE" | jq -r '.status // "unparseable"' 2>/dev/null); then
+            echo "  Status: $PARSED_HEALTH"
+        fi
+    fi
 else
-    echo "  ❌ Health endpoint unreachable: http://localhost:{{ ploy.controller_port }}/health"
+    echo "  ❌ Local health unreachable: http://localhost:{{ ploy.api_port }}/health"
+fi
+
+# External endpoint (via Traefik)
+if curl -f -s "https://api.dev.ployman.app/health" >/dev/null 2>&1; then
+    echo "  ✅ External health: https://api.dev.ployman.app/health"
+else
+    echo "  ❌ External health unreachable: https://api.dev.ployman.app/health"
 fi
 
 # Readiness check
-if curl -f -s "http://localhost:{{ ploy.controller_port }}/ready" >/dev/null; then
-    echo "  ✅ Readiness endpoint: http://localhost:{{ ploy.controller_port }}/ready"
+if curl -f -s "http://localhost:{{ ploy.api_port }}/ready" >/dev/null 2>&1; then
+    echo "  ✅ Readiness: http://localhost:{{ ploy.api_port }}/ready"
 else
-    echo "  ❌ Readiness endpoint unreachable: http://localhost:{{ ploy.controller_port }}/ready"
+    echo "  ❌ Readiness unreachable: http://localhost:{{ ploy.api_port }}/ready"
 fi
 
-# Available versions in storage
+# Version endpoint
 echo ""
-echo "📚 Available Versions in Storage:"
-if [[ -f "./build/controller-dist" ]]; then
-    ./build/controller-dist -command=list | head -10
-else
-    echo "  ⚠️  controller-dist tool not found"
-fi
+echo "📊 API Version Info:"
+for endpoint in "http://localhost:{{ ploy.api_port }}/v1/version" "https://api.dev.ployman.app/v1/version"; do
+    if VERSION_INFO=$(curl -s "$endpoint" 2>/dev/null); then
+        echo "  ✅ Version endpoint: $endpoint"
+        if PARSED_VERSION=$(echo "$VERSION_INFO" | jq -r '.version // "unknown"' 2>/dev/null); then
+            echo "     Version: $PARSED_VERSION"
+        fi
+        if PARSED_COMMIT=$(echo "$VERSION_INFO" | jq -r '.git_commit // "unknown"' 2>/dev/null); then
+            echo "     Commit: $PARSED_COMMIT"
+        fi
+        break
+    else
+        echo "  ❌ Version endpoint unreachable: $endpoint"
+    fi
+done
 
 # Service discovery
 echo ""
 echo "🔍 Service Discovery:"
 if curl -s "http://localhost:8500/v1/health/service/ploy-api" >/dev/null 2>&1; then
-    CONSUL_SERVICES=$(curl -s "http://localhost:8500/v1/health/service/ploy-api" | jq -r '.[].Service.Address + ":" + (.[].Service.Port | tostring)' | sort | uniq)
-    echo "  Consul Services:"
-    echo "$CONSUL_SERVICES" | sed 's/^/    /'
+    CONSUL_SERVICES=$(curl -s "http://localhost:8500/v1/health/service/ploy-api" | jq -r '.[] | select(.Service.Tags[] | contains("bootstrap")) | .Service.Address + ":" + (.Service.Port | tostring)' | sort | uniq)
+    if [[ -n "$CONSUL_SERVICES" ]]; then
+        echo "  Consul Services (bootstrap):"
+        echo "$CONSUL_SERVICES" | sed 's/^/    /'
+    else
+        ALL_SERVICES=$(curl -s "http://localhost:8500/v1/health/service/ploy-api" | jq -r '.[].Service.Address + ":" + (.[].Service.Port | tostring)' | sort | uniq)
+        echo "  Consul Services (all):"
+        echo "$ALL_SERVICES" | sed 's/^/    /'
+    fi
 else
     echo "  ⚠️  Unable to query Consul service discovery"
+fi
+
+# Unified deployment system status
+echo ""
+echo "🔧 Unified Deployment System:"
+if [[ -x "./bin/ployman" ]]; then
+    echo "  ✅ ployman CLI available"
+    
+    # Try to get system status if API is accessible
+    if curl -f -s "http://localhost:{{ ploy.api_port }}/health" >/dev/null 2>&1; then
+        echo "  ✅ API accessible for deployments"
+    else
+        echo "  ❌ API not accessible for deployments"
+    fi
+else
+    echo "  ⚠️  ployman CLI not found (will be built on demand)"
 fi
 
 # Recent logs (if accessible)
 echo ""
 echo "📋 Recent Logs:"
 if [[ -n "$ALLOC_ID" ]]; then
-    echo "  Last 10 log lines:"
+    echo "  Last 10 log lines from allocation $ALLOC_ID:"
     nomad alloc logs -tail -n 10 "$ALLOC_ID" 2>/dev/null | sed 's/^/    /' || echo "    Unable to fetch logs"
 else
     echo "  ⚠️  No running allocation found"
@@ -105,3 +173,9 @@ fi
 
 echo ""
 echo "=== Status Check Complete ==="
+echo ""
+echo "🌐 Quick Access URLs:"
+echo "  - Local Health: http://localhost:{{ ploy.api_port }}/health"
+echo "  - External Health: https://api.dev.ployman.app/health"
+echo "  - API Version: https://api.dev.ployman.app/v1/version"
+echo "  - Nomad UI: http://127.0.0.1:4646/ui/jobs/ploy-api@default"

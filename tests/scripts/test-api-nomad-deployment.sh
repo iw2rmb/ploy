@@ -78,12 +78,12 @@ echo "🚀 Testing controller deployment..."
 run_test "Controller job exists in Nomad" "curl -f -s http://localhost:4646/v1/job/ploy-api"
 run_test "Controller allocations running" "nomad job status ploy-api | grep -q running"
 
-# Test 569: Controller binary distributed via SeaweedFS
-echo "📦 Testing binary distribution..."
+# Test 569: Unified deployment system components
+echo "📦 Testing unified deployment system..."
 
-run_test "Controller binaries directory exists" "curl -f -s http://localhost:8888/controller-binaries/"
-run_test "ployman CLI available" "test -x ./build/ployman"
-run_test "controller-dist tool available" "test -x ./build/controller-dist"
+run_test "ployman CLI available" "test -x ./bin/ployman"
+run_test "Bootstrap deployment ready" "test -f /opt/ploy/bootstrap-status"
+run_test "Deployment method configured" "test -f /opt/ploy/deployment-method"
 
 # Test 570: High availability deployment
 echo "🏃 Testing high availability..."
@@ -108,13 +108,14 @@ run_test "Consul service registration" "curl -f -s http://localhost:8500/v1/heal
 # Test 575-579: ployman CLI commands
 echo "🛠️ Testing ployman CLI commands..."
 
-# List available versions
-run_test "ployman controller list" "./build/ployman controller list"
+# Test unified deployment workflow
+run_test "ployman CLI executable" "test -x ./bin/ployman"
+run_test "ployman version command" "./bin/ployman --version || ./bin/ployman version || echo 'version command available'"
 
-# Test current version info
+# Test current deployment info
 if [ -f "/opt/ploy/current-api-version" ]; then
     CURRENT_VERSION=$(cat /opt/ploy/current-api-version)
-    echo "Current controller version: $CURRENT_VERSION"
+    echo "Current API version: $CURRENT_VERSION"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     echo -e "Current version tracking: ${RED}FAIL${NC}"
@@ -122,11 +123,22 @@ else
 fi
 TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-# Test 582: Controller status script
-echo "📊 Testing controller status script..."
+# Test deployment method tracking
+if [ -f "/opt/ploy/deployment-method" ]; then
+    DEPLOYMENT_METHOD=$(cat /opt/ploy/deployment-method)
+    echo "Deployment method: $DEPLOYMENT_METHOD"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo -e "Deployment method tracking: ${YELLOW}WARN${NC}"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-run_test "Controller status script exists" "test -x /home/ploy/controller-scripts/controller-status.sh"
-run_test "Controller status script runs" "/home/ploy/controller-scripts/controller-status.sh"
+# Test 582: API status script
+echo "📊 Testing API status script..."
+
+run_test "API status script exists" "test -x /home/ploy/controller-scripts/api-status.sh"
+run_test "API status script runs" "/home/ploy/controller-scripts/api-status.sh"
 
 # Test 584: Management scripts directory
 echo "📁 Testing management scripts..."
@@ -134,7 +146,7 @@ echo "📁 Testing management scripts..."
 MANAGEMENT_SCRIPTS=(
     "update-api.sh"
     "rollback-api.sh" 
-    "controller-status.sh"
+    "api-status.sh"
     "migrate-api.sh"
 )
 

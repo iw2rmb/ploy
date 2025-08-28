@@ -1,0 +1,150 @@
+# Ploy API Bootstrap - Initial Deployment Nomad Job
+# 
+# This job deploys the Ploy API for initial bootstrap using local binary:
+# - Single instance for initial deployment
+# - Local binary (no artifact download)
+# - Simplified configuration for bootstrap
+# - Service discovery integration for transition to unified deployment
+
+job "ploy-api" {
+  datacenters = ["dc1"]
+  type = "service"
+  priority = 80
+
+  # Bootstrap configuration - single instance
+  group "api" {
+    count = 1
+
+    # Restart policy
+    restart {
+      attempts = 3
+      interval = "10m"
+      delay = "30s"
+      mode = "fail"
+    }
+
+    task "api" {
+      driver = "raw_exec"
+
+      # Copy local binary instead of artifact download
+      template {
+        data = <<EOF
+#!/bin/bash
+# Copy bootstrap binary
+cp /tmp/ploy-api-bootstrap local/api
+chmod +x local/api
+exec local/api
+EOF
+        destination = "local/start-api.sh"
+        perms = "755"
+      }
+
+      # Resource allocation
+      resources {
+        cpu = {{ nomad_api.resources.cpu | default(500) }}
+        memory = {{ nomad_api.resources.memory | default(512) }}
+      }
+
+      # Environment configuration
+      env {
+        # API configuration - using dynamic port
+        PORT = "${NOMAD_PORT_http}"
+        PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
+        
+        # HashiCorp service addresses
+        CONSUL_ADDR = "http://localhost:8500"
+        NOMAD_ADDR = "http://localhost:4646"
+        VAULT_ADDR = "http://localhost:8200"
+
+        # SeaweedFS configuration
+        SEAWEEDFS_MASTER = "localhost:{{ seaweedfs.master_port }}"
+        SEAWEEDFS_FILER = "localhost:{{ seaweedfs.filer_port }}"
+
+        # Platform wildcard certificate configuration
+        PLOY_APPS_DOMAIN = "{{ ploy.apps_domain }}"
+        PLOY_APPS_DOMAIN_PROVIDER = "{{ ploy.apps_domain_provider }}"
+        
+        # Development environment wildcard certificate (*.dev.ployd.app)
+        {% if ploy_environment is defined and ploy_environment == 'dev' %}
+        PLOY_DEV_SUBDOMAIN = "dev"
+        PLOY_DEV_APPS_DOMAIN = "dev.{{ ploy.apps_domain }}"
+        PLOY_WILDCARD_DOMAIN = "*.dev.{{ ploy.apps_domain }}"
+        PLOY_API_DOMAIN = "api.dev.{{ ploy.apps_domain }}"
+        PLOY_ENVIRONMENT = "dev"
+        {% endif %}
+        
+        # DNS provider credentials (from Vault in production)
+        {% if ploy.apps_domain_provider == 'namecheap' %}
+        NAMECHEAP_API_USER = "{{ vault_namecheap_api_user | default('') }}"
+        NAMECHEAP_API_KEY = "{{ vault_namecheap_api_key | default('') }}"
+        {% elif ploy.apps_domain_provider == 'cloudflare' %}
+        CLOUDFLARE_API_TOKEN = "{{ vault_cloudflare_api_token | default('') }}"
+        {% endif %}
+        
+        # Deployment metadata
+        PLOY_DEPLOYMENT_METHOD = "bootstrap"
+        PLOY_NODE_ID = "${node.unique.name}"
+        PLOY_DEPLOYMENT_VERSION = "{{ deployment_version }}"
+      }
+
+      config {
+        command = "/bin/bash"
+        args = ["local/start-api.sh"]
+      }
+
+      # Health checks
+      service {
+        name = "ploy-api"
+        port = "http"
+        tags = [
+          "api",
+          "ploy-api",
+          "bootstrap",
+          "traefik.enable=true",
+          "traefik.http.routers.api.rule=PathPrefix(`/v1`)",
+          "traefik.http.routers.api.entrypoints=web",
+          "traefik.http.services.api.loadbalancer.server.port={{ ploy.api_port }}"
+        ]
+
+        # Health check endpoint
+        check {
+          type = "http"
+          path = "/health"
+          interval = "10s"
+          timeout = "3s"
+          check_restart {
+            limit = 3
+            grace = "10s"
+            ignore_warnings = false
+          }
+        }
+
+        # Readiness check
+        check {
+          name = "readiness"
+          type = "http"
+          path = "/ready"
+          interval = "15s"
+          timeout = "5s"
+        }
+      }
+
+      # Dynamic port allocation
+      resources {
+        network {
+          port "http" {}
+        }
+      }
+
+      # Graceful shutdown
+      kill_timeout = "30s"
+      kill_signal = "SIGTERM"
+
+      # Logging configuration
+      logs {
+        max_files = 10
+        max_file_size = 10
+      }
+    }
+  }
+}
