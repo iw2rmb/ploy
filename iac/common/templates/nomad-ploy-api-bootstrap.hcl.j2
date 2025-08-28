@@ -53,6 +53,7 @@ EOF
       env {
         # API configuration - using dynamic port
         PORT = "${NOMAD_PORT_http}"
+        PLOY_CONTROLLER = "https://api.dev.ployman.app/v1"
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         
         # HashiCorp service addresses

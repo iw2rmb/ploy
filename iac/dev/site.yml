@@ -22,6 +22,7 @@
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
 - import_playbook: playbooks/traefik.yml
+- import_playbook: playbooks/harbor.yml
 - import_playbook: playbooks/api.yml
 - import_playbook: playbooks/chttp.yml
   when: deploy_chttp is defined and deploy_chttp | bool

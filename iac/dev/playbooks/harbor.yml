@@ -1,0 +1,359 @@
+---
+# Ploy Harbor Registry Deployment
+#
+# This playbook deploys Harbor as the enterprise container registry for Ploy:
+# - Replaces basic Docker Registry v2 with full-featured Harbor
+# - Implements namespace separation (platform vs apps projects)
+# - Integrates with SeaweedFS for S3-compatible storage backend
+# - Configures vulnerability scanning with Trivy
+# - Sets up RBAC and service accounts
+#
+- name: Deploy Harbor Registry
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/harbor.yml
+  
+  tasks:
+    - name: Ensure Harbor prerequisites
+      block:
+        - name: Install required packages for Harbor
+          apt:
+            name:
+              - docker-ce
+              - docker-compose
+              - openssl
+              - pwgen
+              - curl
+              - jq
+            state: present
+            
+        - name: Create Harbor directories
+          file:
+            path: "{{ item }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+          loop:
+            - /opt/harbor
+            - /opt/harbor/data
+            - /opt/harbor/certs
+            - /opt/harbor/config
+            - /opt/harbor/logs
+
+    - name: Generate Harbor SSL certificates
+      block:
+        - name: Check if Harbor certificates already exist
+          stat:
+            path: /opt/harbor/certs/harbor.crt
+          register: harbor_cert_exists
+
+        - name: Generate Harbor CA certificate
+          command: |
+            openssl req -x509 -nodes -days 365 -newkey rsa:4096 \
+            -keyout /opt/harbor/certs/harbor-ca.key \
+            -out /opt/harbor/certs/harbor-ca.crt \
+            -subj "/C=US/ST=State/L=City/O=Ploy/CN=harbor.{{ ploy_domain | default('dev.ployman.app') }}"
+          when: not harbor_cert_exists.stat.exists
+          
+        - name: Generate Harbor server certificate request
+          command: |
+            openssl req -nodes -newkey rsa:4096 \
+            -keyout /opt/harbor/certs/harbor.key \
+            -out /opt/harbor/certs/harbor.csr \
+            -subj "/C=US/ST=State/L=City/O=Ploy/CN=harbor.{{ ploy_domain | default('dev.ployman.app') }}"
+          when: not harbor_cert_exists.stat.exists
+          
+        - name: Sign Harbor certificate
+          command: |
+            openssl x509 -req -days 365 \
+            -in /opt/harbor/certs/harbor.csr \
+            -CA /opt/harbor/certs/harbor-ca.crt \
+            -CAkey /opt/harbor/certs/harbor-ca.key \
+            -CAcreateserial \
+            -out /opt/harbor/certs/harbor.crt \
+            -extensions v3_req -extfile <(echo -e "subjectAltName=DNS:harbor.{{ ploy_domain | default('dev.ployman.app') }}")
+          args:
+            executable: /bin/bash
+          when: not harbor_cert_exists.stat.exists
+
+        - name: Set proper permissions on certificates
+          file:
+            path: "{{ item }}"
+            mode: '0600'
+            owner: root
+            group: root
+          loop:
+            - /opt/harbor/certs/harbor.key
+            - /opt/harbor/certs/harbor-ca.key
+          when: not harbor_cert_exists.stat.exists
+
+    - name: Download and install Harbor
+      block:
+        - name: Check if Harbor is already downloaded
+          stat:
+            path: /opt/harbor/harbor-offline-installer-v{{ harbor_version }}.tgz
+          register: harbor_download
+
+        - name: Download Harbor offline installer
+          get_url:
+            url: "https://github.com/goharbor/harbor/releases/download/v{{ harbor_version }}/harbor-offline-installer-v{{ harbor_version }}.tgz"
+            dest: /opt/harbor/harbor-offline-installer-v{{ harbor_version }}.tgz
+            checksum: "sha256:{{ harbor_checksum }}"
+            timeout: 300
+          when: not harbor_download.stat.exists
+          
+        - name: Check if Harbor is already extracted
+          stat:
+            path: /opt/harbor/harbor
+          register: harbor_extracted
+
+        - name: Extract Harbor installer
+          unarchive:
+            src: /opt/harbor/harbor-offline-installer-v{{ harbor_version }}.tgz
+            dest: /opt/harbor
+            remote_src: yes
+            owner: root
+            group: root
+          when: not harbor_extracted.stat.exists
+
+    - name: Configure Harbor
+      block:
+        - name: Generate Harbor configuration from template
+          template:
+            src: ../../common/templates/harbor.yml.j2
+            dest: /opt/harbor/harbor/harbor.yml
+            owner: root
+            group: root
+            mode: '0600'
+          register: harbor_config
+          
+        - name: Install Harbor with Trivy scanner
+          command: |
+            cd /opt/harbor/harbor && ./install.sh --with-trivy --with-chartmuseum
+          args:
+            creates: /opt/harbor/harbor/docker-compose.yml
+
+    - name: Wait for Harbor to be ready
+      block:
+        - name: Wait for Harbor services to start
+          wait_for:
+            port: "{{ item }}"
+            delay: 10
+            timeout: 300
+          loop:
+            - 80
+            - 443
+
+        - name: Wait for Harbor health endpoint
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/api/v2.0/health"
+            method: GET
+            status_code: 200
+            validate_certs: no
+          register: harbor_health
+          until: harbor_health.status == 200
+          retries: 30
+          delay: 10
+
+    - name: Create Harbor projects for namespace separation
+      block:
+        - name: Create platform project for infrastructure services
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/api/v2.0/projects"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              project_name: "platform"
+              metadata:
+                public: "false"
+                enable_content_trust: "true"
+                auto_scan: "true"
+                severity: "high"
+                reuse_sys_cve_whitelist: "false"
+              storage_limit: 107374182400  # 100GB for platform services
+            status_code: [201, 409]  # 409 if already exists
+            validate_certs: no
+          register: platform_project_result
+
+        - name: Create apps project for user applications
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/api/v2.0/projects"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              project_name: "apps"
+              metadata:
+                public: "false"
+                enable_content_trust: "false"  # Optional for user apps
+                auto_scan: "true"
+                severity: "medium"  # Less strict for user apps
+                reuse_sys_cve_whitelist: "false"
+              storage_limit: 536870912000  # 500GB for user apps
+            status_code: [201, 409]
+            validate_certs: no
+          register: apps_project_result
+
+        - name: Display project creation results
+          debug:
+            msg: |
+              Harbor projects created:
+              - Platform project: {{ platform_project_result.status }}
+              - Apps project: {{ apps_project_result.status }}
+
+    - name: Create Harbor service accounts
+      block:
+        - name: Create platform service account for automated deployments
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/api/v2.0/robots"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              name: "platform-pusher"
+              level: "project"
+              permissions:
+                - kind: "project"
+                  namespace: "platform"
+                  access:
+                    - resource: "repository"
+                      action: "push"
+                    - resource: "repository"
+                      action: "pull"
+                    - resource: "artifact"
+                      action: "read"
+                    - resource: "scan"
+                      action: "create"
+              duration: -1  # Never expires
+            status_code: [201, 409]
+            validate_certs: no
+          register: platform_robot
+          ignore_errors: true  # Robot accounts may already exist
+
+        - name: Create user apps service account
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/api/v2.0/robots"
+            method: POST
+            user: admin
+            password: "{{ harbor.admin_password }}"
+            body_format: json
+            body:
+              name: "apps-pusher"
+              level: "project"
+              permissions:
+                - kind: "project"
+                  namespace: "apps"
+                  access:
+                    - resource: "repository"
+                      action: "push"
+                    - resource: "repository"
+                      action: "pull"
+                    - resource: "artifact"
+                      action: "read"
+                    - resource: "scan"
+                      action: "create"
+              duration: -1
+            status_code: [201, 409]
+            validate_certs: no
+          register: apps_robot
+          ignore_errors: true
+
+    - name: Configure Harbor integration with Traefik
+      block:
+        - name: Create Harbor Traefik configuration
+          copy:
+            content: |
+              # Harbor registry routing
+              http:
+                routers:
+                  harbor:
+                    rule: "Host(`harbor.{{ ploy_domain | default('dev.ployman.app') }}`)"
+                    service: harbor
+                    tls:
+                      certResolver: "letsencrypt"
+                services:
+                  harbor:
+                    loadBalancer:
+                      servers:
+                        - url: "https://localhost:443"
+            dest: /opt/traefik/dynamic/harbor.yml
+            owner: root
+            group: root
+            mode: '0644'
+          notify: reload traefik
+
+    - name: Set up firewall rules for Harbor
+      block:
+        - name: Allow Harbor HTTP port
+          ufw:
+            rule: allow
+            port: "80"
+            comment: "Harbor HTTP"
+
+        - name: Allow Harbor HTTPS port
+          ufw:
+            rule: allow
+            port: "443"
+            comment: "Harbor HTTPS"
+
+    - name: Validate Harbor deployment
+      block:
+        - name: Test Harbor API health
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}/api/v2.0/health"
+            method: GET
+            status_code: 200
+            validate_certs: no
+          register: final_health_check
+
+        - name: Test Harbor web interface
+          uri:
+            url: "https://harbor.{{ ploy_domain | default('dev.ployman.app') }}"
+            method: GET
+            status_code: 200
+            validate_certs: no
+
+        - name: Test Docker login to Harbor
+          command: |
+            echo "{{ harbor.admin_password }}" | docker login harbor.{{ ploy_domain | default('dev.ployman.app') }} -u admin --password-stdin
+          register: docker_login_test
+          changed_when: false
+
+    - name: Display Harbor deployment summary
+      debug:
+        msg: |
+          Harbor Registry Deployment Complete:
+          ================================
+          
+          Harbor Endpoint: https://harbor.{{ ploy_domain | default('dev.ployman.app') }}
+          Admin User: admin
+          Admin Password: {{ harbor.admin_password }}
+          
+          Projects Created:
+          - platform/ (Platform services - 100GB limit)
+          - apps/ (User applications - 500GB limit)
+          
+          Storage Backend: SeaweedFS S3 ({{ harbor.storage.s3.endpoint }})
+          Vulnerability Scanner: Trivy (enabled)
+          Content Trust: Enabled for platform/ project
+          
+          Next Steps:
+          1. Update Ploy API to use Harbor registry
+          2. Migrate existing images from localhost:5000
+          3. Configure Nomad jobs for Harbor authentication
+          
+          Access Harbor UI: https://harbor.{{ ploy_domain | default('dev.ployman.app') }}
+
+  handlers:
+    - name: reload traefik
+      systemd:
+        name: traefik
+        state: reloaded
+      ignore_errors: true
