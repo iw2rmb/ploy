@@ -106,7 +106,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 		}
 		imagePath = img
 	case "E":
-		tag := fmt.Sprintf("harbor.local/ploy/%s:%s", appName, sha)
+		tag := fmt.Sprintf("localhost:5000/%s:%s", appName, sha)
 		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
@@ -121,7 +121,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 	case "G":
 		// For now, Lane G WASM applications should use OCI containers as fallback
 		// TODO: Implement proper WASM runtime integration
-		tag := fmt.Sprintf("harbor.local/ploy/%s:%s", appName, sha)
+		tag := fmt.Sprintf("localhost:5000/%s:%s", appName, sha)
 		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
