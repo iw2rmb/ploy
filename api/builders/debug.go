@@ -88,7 +88,15 @@ func BuildDebugInstance(app, lane, srcDir, sha, outDir string, envVars map[strin
 func buildUnikraftDebug(app, lane, srcDir, sha, outDir string, envVars map[string]string, sshEnabled bool) (string, error) {
 	// Use debug-enabled Unikraft build script
 	args := []string{"--app", app, "--app-dir", srcDir, "--lane", lane, "--sha", sha, "--out-dir", outDir, "--debug", "--ssh-enabled=" + fmt.Sprintf("%t", sshEnabled)}
-	cmd := exec.Command("./scripts/build/kraft/build_unikraft_debug.sh", args...)
+	// Use absolute path to the build script in the ploy repository
+	scriptPath := "/home/ploy/ploy/scripts/build/kraft/build_unikraft_debug.sh"
+	
+	// Fall back to relative path if absolute doesn't exist (for local development)
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		scriptPath = "./scripts/build/kraft/build_unikraft_debug.sh"
+	}
+	
+	cmd := exec.Command(scriptPath, args...)
 	
 	env := os.Environ()
 	for k, v := range envVars {
@@ -105,7 +113,15 @@ func buildUnikraftDebug(app, lane, srcDir, sha, outDir string, envVars map[strin
 
 func buildOSVDebug(app, srcDir, sha, outDir string, envVars map[string]string, sshEnabled bool) (string, error) {
 	args := []string{"--app", app, "--src", srcDir, "--sha", sha, "--out-dir", outDir, "--debug", "--ssh-enabled=" + fmt.Sprintf("%t", sshEnabled)}
-	cmd := exec.Command("./scripts/build/osv/build_osv_debug.sh", args...)
+	// Use absolute path to the build script in the ploy repository
+	scriptPath := "/home/ploy/ploy/scripts/build/osv/build_osv_debug.sh"
+	
+	// Fall back to relative path if absolute doesn't exist (for local development)
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		scriptPath = "./scripts/build/osv/build_osv_debug.sh"
+	}
+	
+	cmd := exec.Command(scriptPath, args...)
 	
 	env := os.Environ()
 	for k, v := range envVars {
@@ -122,7 +138,15 @@ func buildOSVDebug(app, srcDir, sha, outDir string, envVars map[string]string, s
 
 func buildJailDebug(app, srcDir, sha, outDir string, envVars map[string]string, sshEnabled bool) (string, error) {
 	args := []string{"--app", app, "--src", srcDir, "--sha", sha, "--out-dir", outDir, "--debug", "--ssh-enabled=" + fmt.Sprintf("%t", sshEnabled)}
-	cmd := exec.Command("./scripts/build/jail/build_jail_debug.sh", args...)
+	// Use absolute path to the build script in the ploy repository
+	scriptPath := "/home/ploy/ploy/scripts/build/jail/build_jail_debug.sh"
+	
+	// Fall back to relative path if absolute doesn't exist (for local development)
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		scriptPath = "./scripts/build/jail/build_jail_debug.sh"
+	}
+	
+	cmd := exec.Command(scriptPath, args...)
 	
 	env := os.Environ()
 	for k, v := range envVars {
@@ -140,7 +164,15 @@ func buildJailDebug(app, srcDir, sha, outDir string, envVars map[string]string, 
 func buildOCIDebug(app, srcDir, sha string, envVars map[string]string, sshEnabled bool) (string, error) {
 	debugTag := fmt.Sprintf("harbor.local/ploy/%s-debug:%s", app, sha)
 	args := []string{"--app", app, "--src", srcDir, "--tag", debugTag, "--debug", "--ssh-enabled=" + fmt.Sprintf("%t", sshEnabled)}
-	cmd := exec.Command("./scripts/build/oci/build_oci_debug.sh", args...)
+	// Use absolute path to the build script in the ploy repository
+	scriptPath := "/home/ploy/ploy/scripts/build/oci/build_oci_debug.sh"
+	
+	// Fall back to relative path if absolute doesn't exist (for local development)
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		scriptPath = "./scripts/build/oci/build_oci_debug.sh"
+	}
+	
+	cmd := exec.Command(scriptPath, args...)
 	
 	env := os.Environ()
 	for k, v := range envVars {

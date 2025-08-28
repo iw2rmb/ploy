@@ -97,7 +97,22 @@ func Untar(tarPath, dst string) error {
 }
 
 func RunLanePick(path string) (LanePickResult, error) {
-	cmd := exec.Command("go", "run", "./tools/lane-pick", "--path", path)
+	// Try to run pre-built lane-pick binary first
+	lanePickBinary := "/home/ploy/ploy/bin/lane-pick"
+	
+	var cmd *exec.Cmd
+	if _, err := os.Stat(lanePickBinary); err == nil {
+		// Use pre-built binary if it exists
+		cmd = exec.Command(lanePickBinary, "--path", path)
+	} else {
+		// Fall back to go run with absolute path
+		lanePickPath := "/home/ploy/ploy/tools/lane-pick"
+		if _, err := os.Stat(lanePickPath); os.IsNotExist(err) {
+			// Fall back to relative path for local development
+			lanePickPath = "./tools/lane-pick"
+		}
+		cmd = exec.Command("go", "run", lanePickPath, "--path", path)
+	}
 	b, err := cmd.Output()
 	if err != nil {
 		return LanePickResult{}, err
