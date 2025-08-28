@@ -518,8 +518,8 @@ job "ploy-api" {
       
       # Binary execution configuration  
       config {
-        command = "/bin/bash"
-        args = ["-c", "cd /home/ploy && exec ./ploy-api"]
+        command = "/home/ploy/ploy/bin/api"
+        args = []
       }
       
       # Lifecycle hooks for rolling updates
