@@ -70,7 +70,7 @@ test_storage_modules_exist() {
     
     # Test compilation
     cd "$PROJECT_DIR"
-    if ! go build -o /tmp/test-api ./controller; then
+    if ! go build -o /tmp/test-api ./api; then
         echo "Error: Controller compilation failed with enhanced storage modules"
         return 1
     fi
@@ -212,7 +212,7 @@ test_storage_health_endpoints() {
     sleep 2
     
     # Build and start controller
-    if ! go build -o bin/api ./controller; then
+    if ! go build -o bin/api ./api; then
         echo "Error: Failed to build controller"
         return 1
     fi

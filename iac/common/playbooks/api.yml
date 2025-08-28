@@ -55,7 +55,7 @@
     - name: Build required binaries for unified deployment
       block:
         - name: Build controller API binary
-          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./controller
+          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./api
           become_user: ploy
           register: controller_build
           changed_when: controller_build.rc == 0

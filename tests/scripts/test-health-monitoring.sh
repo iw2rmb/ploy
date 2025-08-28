@@ -36,7 +36,7 @@ fi
 
 # Build the binaries
 echo "Building ploy binaries..."
-go build -o bin/api ./controller
+go build -o bin/api ./api
 go build -o build/ploy ./cmd/ploy
 
 # Test 301: Job validation before submission
