@@ -227,6 +227,7 @@ job "ploy-api" {
         # Controller configuration
         PORT = "${NOMAD_PORT_http}"
         METRICS_PORT = "${NOMAD_PORT_metrics}"
+        PLOY_CONTROLLER = "https://api.dev.ployman.app/v1"
         
         # Service discovery addresses (use localhost since Consul/Nomad are on same node)
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
