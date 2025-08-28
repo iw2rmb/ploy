@@ -722,15 +722,15 @@
   - Specified rolling update strategy with auto-revert capability
   - Both services configured for Lane E (containerized deployments)
 
-- **Phase 4 - GitHub Actions Integration**: Automated CI/CD pipeline for platform services
-  - Created `.github/workflows/deploy-platform.yml` workflow
-  - Implemented change detection using dorny/paths-filter action
-  - Automated builds of ployman CLI with artifact management
-  - Deploy jobs for ploy-api and openrewrite services
-  - Health check verification after deployments
-  - Support for automatic triggers on push to main branch
-  - Manual deployment via workflow_dispatch with service/environment selection
-  - Environment protection with GitHub environments (dev, staging, prod)
+- **Phase 4 - Deployment Automation**: Simplified deployment without GitHub Actions dependency
+  - Implemented `ployman api deploy` with automatic fallback mechanism
+  - Primary path uses self-update endpoint when API is running
+  - Fallback path uses Ansible playbook for cold start scenarios
+  - Git repository management with automatic stashing of local changes
+  - Branch detection and deployment support
+  - Removed GitHub Actions workflow in favor of direct deployment
+  - Single command handles all deployment scenarios
+  - Environment-based configuration via PLOY_CONTROLLER and TARGET_HOST
 
 ### Testing
 - **Comprehensive Unit Tests**: Full test coverage for all components
@@ -1190,7 +1190,7 @@
 - **✅ Database Testing Framework**: Full PostgreSQL integration with migration support, test data seeding, and transaction isolation
 - **✅ Builder Pattern Test Objects**: Fluent API builders for applications, deployments, services, and jobs with chaining support
 - **✅ Application Fixtures**: Comprehensive test fixtures for Go, Node.js, Java, and WebAssembly applications with realistic structure
-- **✅ GitHub Actions CI/CD Pipeline**: Multi-stage testing pipeline with unit, integration, security, and performance tests
+- **✅ GitHub Actions Testing Pipeline**: Multi-stage testing pipeline with unit, integration, security, and performance tests (deployment via ployman)
 - **✅ golangci-lint Configuration**: 40+ linters configured for comprehensive code quality checks with project-specific rules
 - **✅ Enhanced Makefile**: TDD-focused build automation with test generation, fuzzing, coverage thresholds, and watch mode
 

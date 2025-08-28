@@ -485,7 +485,7 @@ go test -tags integration ./...
 
 ### GitHub Actions
 
-The project uses GitHub Actions for continuous testing:
+The project uses GitHub Actions for continuous testing (deployment is handled via `ployman api deploy`):
 
 ```yaml
 # .github/workflows/test.yml
