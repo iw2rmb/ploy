@@ -1,13 +1,13 @@
 #!/bin/bash
-# Controller Rollback Script
-# Rolls back Ploy controller to a previous version
+# API Rollback Script
+# Rolls back Ploy API using unified deployment system
 
 set -e
 
 PLOY_DIR="/home/ploy/ploy"
-CONTROLLER_DIR="/home/ploy/controller-scripts"
+CONTROLLER_SCRIPTS_DIR="/home/ploy/controller-scripts"
 
-echo "=== Ploy Controller Rollback ==="
+echo "=== Ploy API Rollback via Unified Deployment System ==="
 
 # Check if we're in the right directory
 if [[ ! -d "$PLOY_DIR" ]]; then
@@ -17,15 +17,29 @@ fi
 
 cd "$PLOY_DIR"
 
-# List available versions
-echo "Available controller versions:"
-./build/controller-dist -command=list
+# Check if ployman CLI is available
+if [[ ! -x "./bin/ployman" ]]; then
+    echo "Building ployman CLI..."
+    go build -o bin/ployman ./cmd/ployman
+    
+    if [[ ! -x "./bin/ployman" ]]; then
+        echo "Error: Failed to build ployman CLI"
+        exit 1
+    fi
+fi
 
 # Get target version
+TARGET_VERSION=""
 if [[ $# -eq 0 ]]; then
-    echo "Usage: $0 <target-version>"
+    echo "Usage: $0 <target-git-commit-hash>"
     echo "Or run interactively:"
-    read -p "Enter target version to rollback to: " TARGET_VERSION
+    
+    # Show recent git commits for selection
+    echo "Recent commits available for rollback:"
+    git log --oneline -10
+    echo ""
+    
+    read -p "Enter target git commit hash to rollback to: " TARGET_VERSION
 else
     TARGET_VERSION="$1"
 fi
@@ -35,10 +49,16 @@ if [[ -z "$TARGET_VERSION" ]]; then
     exit 1
 fi
 
+# Validate git commit exists
+if ! git cat-file -e "$TARGET_VERSION" 2>/dev/null; then
+    echo "Error: Git commit '$TARGET_VERSION' does not exist"
+    exit 1
+fi
+
 # Get current version
 CURRENT_VERSION=$(cat /opt/ploy/current-api-version 2>/dev/null || echo "unknown")
 echo "Current version: $CURRENT_VERSION"
-echo "Target version: $TARGET_VERSION"
+echo "Target git commit: $TARGET_VERSION"
 
 # Confirm rollback
 read -p "Are you sure you want to rollback? (y/N): " CONFIRM
@@ -47,19 +67,47 @@ if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
     exit 0
 fi
 
-# Use ployman CLI for rollback
-echo "Initiating rollback using ployman..."
-./build/ployman controller rollback "$TARGET_VERSION"
+# Checkout target commit
+echo "Checking out target commit..."
+ORIGINAL_COMMIT=$(git rev-parse HEAD)
+git checkout "$TARGET_VERSION"
 
-# Update Nomad job template with rollback version
-echo "Updating Nomad job configuration for rollback..."
-sudo sed -i "s/controller_version: \".*\"/controller_version: \"$TARGET_VERSION\"/" \
-    /opt/hashicorp/nomad/jobs/ploy-api.hcl
+# Build API binary from target commit
+echo "Building API binary from target commit..."
+if ! go build -o bin/api ./api; then
+    echo "Error: Failed to build API from target commit"
+    git checkout "$ORIGINAL_COMMIT"
+    exit 1
+fi
 
-# Trigger rolling update to rollback version
-echo "Triggering Nomad rolling update to rollback version..."
-export NOMAD_ADDR="http://localhost:4646"
-nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
+# Generate rollback version identifier
+ROLLBACK_VERSION="rollback-$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+echo "Rollback version: $ROLLBACK_VERSION"
+
+# Try unified deployment first
+echo "Initiating rollback using unified deployment system..."
+export PLOY_CONTROLLER="https://api.dev.ployman.app/v1"
+
+# Deploy using ployman push
+if ./bin/ployman push -a ploy-api; then
+    echo "✅ Rollback initiated successfully via ployman"
+else
+    echo "⚠️  Unified deployment failed, using fallback bootstrap method..."
+    
+    # Fallback: direct bootstrap deployment
+    cp bin/api /tmp/ploy-api-bootstrap
+    chmod +x /tmp/ploy-api-bootstrap
+    
+    # Use existing bootstrap job
+    export NOMAD_ADDR="http://localhost:4646"
+    if nomad job run /opt/hashicorp/nomad/jobs/ploy-api-bootstrap.hcl; then
+        echo "✅ Fallback bootstrap rollback successful"
+    else
+        echo "❌ Fallback rollback also failed"
+        git checkout "$ORIGINAL_COMMIT"
+        exit 1
+    fi
+fi
 
 # Monitor rollback deployment
 echo "Monitoring rollback progress..."
@@ -70,37 +118,64 @@ while true; do
     CURRENT_TIME=$(date +%s)
     if (( CURRENT_TIME - START_TIME > TIMEOUT )); then
         echo "Error: Rollback timeout after 5 minutes"
+        git checkout "$ORIGINAL_COMMIT"
         exit 1
     fi
 
     # Check allocation status
-    ALLOCS=$(nomad job allocs -json ploy-api | jq -r '.[].ClientStatus' | sort | uniq -c)
-    RUNNING_COUNT=$(echo "$ALLOCS" | grep -c "running" || echo "0")
-    TOTAL_COUNT=$(nomad job allocs -json ploy-api | jq '. | length')
+    if ALLOCS=$(nomad job allocs -json ploy-api 2>/dev/null); then
+        RUNNING_COUNT=$(echo "$ALLOCS" | jq -r '.[].ClientStatus' | grep -c "running" || echo "0")
+        TOTAL_COUNT=$(echo "$ALLOCS" | jq '. | length')
 
-    echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
+        echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
 
-    if [[ "$RUNNING_COUNT" == "$TOTAL_COUNT" ]] && [[ "$RUNNING_COUNT" -gt "0" ]]; then
-        echo "All allocations are running!"
-        break
+        if [[ "$RUNNING_COUNT" == "$TOTAL_COUNT" ]] && [[ "$RUNNING_COUNT" -gt "0" ]]; then
+            echo "All allocations are running!"
+            break
+        fi
+    else
+        echo "Waiting for job allocations..."
     fi
 
     sleep 10
 done
 
 # Verify rollback health
-echo "Verifying controller health after rollback..."
+echo "Verifying API health after rollback..."
 sleep 30  # Allow time for startup
 
-if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" > /dev/null; then
-    echo "✅ Controller rollback health check passed"
-    # Update current version file
-    echo "$TARGET_VERSION" | sudo tee /opt/ploy/current-api-version > /dev/null
-    echo "✅ Rollback completed successfully to version $TARGET_VERSION"
-else
-    echo "❌ Controller health check failed after rollback"
+HEALTH_ENDPOINTS=(
+    "http://localhost:{{ ploy.api_port }}/health"
+    "https://api.dev.ployman.app/health"
+)
+
+SUCCESS_COUNT=0
+for endpoint in "${HEALTH_ENDPOINTS[@]}"; do
+    if curl -f -s "$endpoint" > /dev/null 2>&1; then
+        echo "✅ Health check passed: $endpoint"
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    else
+        echo "⚠️  Health check failed: $endpoint"
+    fi
+done
+
+if [[ "$SUCCESS_COUNT" -eq 0 ]]; then
+    echo "❌ All health checks failed after rollback"
     echo "Manual intervention required"
+    git checkout "$ORIGINAL_COMMIT"
     exit 1
+else
+    echo "✅ Rollback health check passed"
+    
+    # Update current version file
+    echo "$ROLLBACK_VERSION" | sudo tee /opt/ploy/current-api-version > /dev/null
+    echo "✅ Rollback completed successfully to commit $TARGET_VERSION"
+    echo "Rollback version: $ROLLBACK_VERSION"
 fi
 
-echo "API endpoint: http://localhost:{{ ploy.controller_port }}/health"
+# Stay on the rollback commit
+echo "Repository is now on rollback commit: $TARGET_VERSION"
+echo "API endpoints:"
+echo "  - Local: http://localhost:{{ ploy.api_port }}/health"
+echo "  - External: https://api.dev.ployman.app/health"
+echo "  - API version: https://api.dev.ployman.app/v1/version"

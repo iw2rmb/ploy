@@ -1,13 +1,13 @@
 #!/bin/bash
-# Controller Update Script
-# Updates Ploy controller to latest version via Nomad rolling deployment
+# API Update Script
+# Updates Ploy API via unified deployment system using ployman
 
 set -e
 
 PLOY_DIR="/home/ploy/ploy"
-CONTROLLER_DIR="/home/ploy/controller-scripts"
+CONTROLLER_SCRIPTS_DIR="/home/ploy/controller-scripts"
 
-echo "=== Ploy Controller Update ==="
+echo "=== Ploy API Update via Unified Deployment System ==="
 
 # Check if we're in the right directory
 if [[ ! -d "$PLOY_DIR" ]]; then
@@ -17,38 +17,61 @@ fi
 
 cd "$PLOY_DIR"
 
-# Generate new version
+# Check if ployman CLI is available
+if [[ ! -x "./bin/ployman" ]]; then
+    echo "Building ployman CLI..."
+    go build -o bin/ployman ./cmd/ployman
+    
+    if [[ ! -x "./bin/ployman" ]]; then
+        echo "Error: Failed to build ployman CLI"
+        exit 1
+    fi
+fi
+
+# Generate new version identifier
 NEW_VERSION="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
-echo "New controller version: $NEW_VERSION"
+echo "Deployment version: $NEW_VERSION"
 
-# Build controller binary
-echo "Building controller binary..."
-go build -o bin/api ./controller
+# Get current version for rollback reference
+CURRENT_VERSION=$(cat /opt/ploy/current-api-version 2>/dev/null || echo "unknown")
+echo "Current version: $CURRENT_VERSION"
 
-# Build distribution tool
-echo "Building distribution tool..."
-go build -o build/controller-dist ./tools/controller-dist
+# Build API binary
+echo "Building API binary..."
+go build -o bin/api ./api
 
-# Upload new controller version
-echo "Uploading controller binary to SeaweedFS..."
-./build/controller-dist \
-    -command=upload \
-    -version="$NEW_VERSION" \
-    -binary=./bin/api \
-    -platform=linux \
-    -arch=amd64
+# Verify binary was created
+if [[ ! -x "./bin/api" ]]; then
+    echo "Error: Failed to build API binary"
+    exit 1
+fi
 
-# Update Nomad job template with new version
-echo "Updating Nomad job configuration..."
-sudo sed -i "s/controller_version: \".*\"/controller_version: \"$NEW_VERSION\"/" \
-    /opt/hashicorp/nomad/jobs/ploy-api.hcl
+# Use unified deployment system via ployman
+echo "Deploying via unified deployment system..."
+export PLOY_CONTROLLER="https://api.dev.ployman.app/v1"
 
-# Trigger rolling update
-echo "Triggering Nomad rolling update..."
-export NOMAD_ADDR="http://localhost:4646"
-nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
+# Deploy using ployman push
+if ./bin/ployman push -a ploy-api; then
+    echo "✅ Deployment initiated successfully via ployman"
+else
+    echo "❌ Deployment failed via ployman"
+    echo "Attempting fallback bootstrap deployment..."
+    
+    # Fallback: direct bootstrap deployment
+    cp bin/api /tmp/ploy-api-bootstrap
+    chmod +x /tmp/ploy-api-bootstrap
+    
+    # Use existing bootstrap job
+    export NOMAD_ADDR="http://localhost:4646"
+    if nomad job run /opt/hashicorp/nomad/jobs/ploy-api-bootstrap.hcl; then
+        echo "✅ Fallback bootstrap deployment successful"
+    else
+        echo "❌ Fallback deployment also failed"
+        exit 1
+    fi
+fi
 
-# Monitor deployment
+# Monitor deployment progress
 echo "Monitoring deployment progress..."
 TIMEOUT=300  # 5 minutes
 START_TIME=$(date +%s)
@@ -57,39 +80,66 @@ while true; do
     CURRENT_TIME=$(date +%s)
     if (( CURRENT_TIME - START_TIME > TIMEOUT )); then
         echo "Error: Deployment timeout after 5 minutes"
+        echo "Rolling back to previous version..."
+        "$CONTROLLER_SCRIPTS_DIR/rollback-api.sh" "$CURRENT_VERSION"
         exit 1
     fi
 
     # Check allocation status
-    ALLOCS=$(nomad job allocs -json ploy-api | jq -r '.[].ClientStatus' | sort | uniq -c)
-    RUNNING_COUNT=$(echo "$ALLOCS" | grep -c "running" || echo "0")
-    TOTAL_COUNT=$(nomad job allocs -json ploy-api | jq '. | length')
+    if ALLOCS=$(nomad job allocs -json ploy-api 2>/dev/null); then
+        RUNNING_COUNT=$(echo "$ALLOCS" | jq -r '.[].ClientStatus' | grep -c "running" || echo "0")
+        TOTAL_COUNT=$(echo "$ALLOCS" | jq '. | length')
 
-    echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
+        echo "Allocation status: $RUNNING_COUNT/$TOTAL_COUNT running"
 
-    if [[ "$RUNNING_COUNT" == "$TOTAL_COUNT" ]] && [[ "$RUNNING_COUNT" -gt "0" ]]; then
-        echo "All allocations are running!"
-        break
+        if [[ "$RUNNING_COUNT" == "$TOTAL_COUNT" ]] && [[ "$RUNNING_COUNT" -gt "0" ]]; then
+            echo "All allocations are running!"
+            break
+        fi
+    else
+        echo "Waiting for job allocations..."
     fi
 
     sleep 10
 done
 
-# Verify health
-echo "Verifying controller health..."
+# Verify health via multiple endpoints
+echo "Verifying API health..."
 sleep 30  # Allow time for startup
 
-if curl -f -s "http://localhost:{{ ploy.controller_port }}/health" > /dev/null; then
-    echo "✅ Controller health check passed"
-else
-    echo "❌ Controller health check failed"
-    echo "Rolling back to previous version..."
-    "$CONTROLLER_DIR/rollback-api.sh"
+HEALTH_ENDPOINTS=(
+    "http://localhost:{{ ploy.api_port }}/health"
+    "https://api.dev.ployman.app/health"
+)
+
+SUCCESS_COUNT=0
+for endpoint in "${HEALTH_ENDPOINTS[@]}"; do
+    if curl -f -s "$endpoint" > /dev/null 2>&1; then
+        echo "✅ Health check passed: $endpoint"
+        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    else
+        echo "⚠️  Health check failed: $endpoint"
+    fi
+done
+
+if [[ "$SUCCESS_COUNT" -eq 0 ]]; then
+    echo "❌ All health checks failed - rolling back"
+    "$CONTROLLER_SCRIPTS_DIR/rollback-api.sh" "$CURRENT_VERSION"
     exit 1
+elif [[ "$SUCCESS_COUNT" -lt 2 ]]; then
+    echo "⚠️  Partial health check success - deployment may need attention"
+else
+    echo "✅ All health checks passed"
 fi
 
 # Save current version
 echo "$NEW_VERSION" | sudo tee /opt/ploy/current-api-version > /dev/null
 
-echo "✅ Controller updated successfully to version $NEW_VERSION"
-echo "API endpoint: http://localhost:{{ ploy.controller_port }}/health"
+# Update deployment method marker
+echo "unified-deployment-active" | sudo tee /opt/ploy/deployment-method > /dev/null
+
+echo "✅ API updated successfully to version $NEW_VERSION"
+echo "API endpoints:"
+echo "  - Local: http://localhost:{{ ploy.api_port }}/health"
+echo "  - External: https://api.dev.ployman.app/health"
+echo "  - API version: https://api.dev.ployman.app/v1/version"

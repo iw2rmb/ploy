@@ -1,305 +1,243 @@
-# CHTTP - CLI-over-HTTP Microservices
+# CHTTP - Simple CLI-to-HTTP Bridge
 
-CHTTP provides a secure, distributed architecture for running static analysis tools as containerized microservices. This replaces the previous in-process analysis system with sandboxed, scalable services.
-
-## Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Controller    │───▶│  CHTTP Client   │───▶│  Pylint CHTTP   │
-│   (API Server)  │    │   (HTTP Client) │    │   (Service)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                        │
-                                ▼                        ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │ Public Key Auth │    │ Sandboxed Exec  │
-                       │   (Security)    │    │   (Isolation)   │
-                       └─────────────────┘    └─────────────────┘
-```
+CHTTP is a lightweight service that provides HTTP access to command-line tools. It serves as a simple bridge between HTTP requests and CLI command execution, designed to be deployed and managed by Ploy's comprehensive platform.
 
 ## Features
 
-- **Security**: Sandboxed execution with process isolation
-- **Scalability**: Independent service scaling and load balancing
-- **Container-Native**: 25-35MB Docker images with distroless base
-- **Authentication**: Public key cryptography for service access
-- **Resource Limits**: CPU/memory constraints and filesystem restrictions
-- **Health Monitoring**: Built-in health checks and metrics
+- **Simple HTTP-to-CLI Bridge**: Execute command-line tools via HTTP requests
+- **Basic Security**: API key authentication and command allow-listing  
+- **Structured Logging**: JSON-formatted logging for operations tracking
+- **Health Monitoring**: Basic health check endpoint
+- **Lightweight**: Minimal dependencies and resource footprint
+- **Ploy Integration**: Designed for deployment via Ploy's platform
 
-## Services
+## Quick Start
 
-### Pylint CHTTP Service
+### 1. Configuration
 
-Python static analysis service using Pylint with JSON output formatting.
+Create a `config.yaml` file:
 
-**Configuration**: `configs/pylint-chttp-config.yaml`
 ```yaml
-service:
-  name: "pylint-chttp"
+server:
+  host: "0.0.0.0"
   port: 8080
 
-executable:
-  path: "pylint"
-  args: ["--output-format=json", "--reports=no"]
-  timeout: "5m"
-
 security:
-  auth_method: "public_key"
-  run_as_user: "pylint"
-  max_memory: "512MB"
-  max_cpu: "1.0"
+  api_key: "your-secret-api-key"
+
+commands:
+  allowed:
+    - "echo"
+    - "ls" 
+    - "cat"
+    - "grep"
+    - "find"
+  default_timeout: "30s"
+
+logging:
+  level: "info"      # info, warn, error
+  format: "json"     # json, text
+
+health:
+  enabled: true
+  endpoint: "/health"
+```
+
+### 2. Start the Server
+
+```bash
+go build -o chttp ./cmd/chttp
+./chttp -config config.yaml
+```
+
+### 3. Make Requests
+
+```bash
+# Execute a command
+curl -X POST http://localhost:8080/api/v1/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-api-key" \
+  -d '{
+    "command": "echo",
+    "args": ["Hello, World!"],
+    "timeout": "10s"
+  }'
+
+# Check health
+curl http://localhost:8080/health
+```
+
+## API Reference
+
+### Execute CLI Command
+
+**POST** `/api/v1/execute`
+
+Execute a CLI command and return the result.
+
+**Headers:**
+- `Content-Type: application/json`
+- `X-API-Key: <your-api-key>` or `Authorization: Bearer <your-api-key>`
+
+**Request Body:**
+```json
+{
+  "command": "ls",
+  "args": ["-la", "/tmp"],
+  "timeout": "30s"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "stdout": "total 8\ndrwxr-xr-x  3 user  staff  96 Jan 15 10:30 .\n...",
+  "stderr": "",
+  "exit_code": 0,
+  "duration": "15ms"
+}
+```
+
+### Health Check
+
+**GET** `/health`
+
+Check service health status.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-15T10:30:00Z",
+  "uptime": "2h30m15s",
+  "version": "1.0.0",
+  "config": {
+    "allowed_commands": 5,
+    "log_level": "info",
+    "port": 8080
+  }
+}
+```
+
+## Configuration Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `server.host` | string | Server bind address (default: "0.0.0.0") |
+| `server.port` | int | Server port (default: 8080) |
+| `security.api_key` | string | API key for authentication (required) |
+| `commands.allowed` | []string | List of allowed CLI commands |
+| `commands.default_timeout` | duration | Default command timeout (default: "30s") |
+| `logging.level` | string | Log level: info, warn, error (default: "info") |
+| `logging.format` | string | Log format: json, text (default: "json") |
+| `health.enabled` | bool | Enable health endpoint (default: true) |
+| `health.endpoint` | string | Health endpoint path (default: "/health") |
+
+## Security
+
+- **Command Allow-listing**: Only commands in `commands.allowed` can be executed
+- **API Key Authentication**: Requests must include valid API key in header
+- **Input Validation**: Request parameters are validated before execution
+- **Timeout Protection**: Commands are terminated if they exceed timeout limits
+
+## Deployment with Ploy
+
+CHTTP is designed to be deployed via Ploy's platform, which provides:
+
+- **Infrastructure Management**: Scaling, load balancing, service discovery
+- **Advanced Security**: TLS termination, network policies, authentication
+- **Monitoring & Alerting**: Metrics collection, distributed tracing, alerting
+- **Deployment Automation**: Blue-green, canary, rolling deployments
+
+Example Ploy deployment:
+
+```yaml
+# ploy-app.yaml
+name: my-chttp-service
+lane: C  # Java/Node.js lane for HTTP services
+config:
+  port: 8080
+  command_allowlist: ["ls", "cat", "grep"]
+scaling:
+  min_instances: 1
+  max_instances: 5
+security:
+  tls: true
+  api_keys: true
 ```
 
 ## Development
 
-### Prerequisites
+### Project Structure
 
-- Docker and Docker Compose
-- Go 1.24+
-- Python 3.11+ (for Pylint)
+```
+chttp/
+├── cmd/chttp/              # Main application entry point
+├── internal/
+│   ├── config/             # Configuration management
+│   ├── executor/           # CLI command execution
+│   ├── handler/            # HTTP request handlers
+│   ├── health/             # Health checking
+│   ├── logging/            # Structured logging
+│   └── server/             # HTTP server setup
+├── configs/                # Example configurations
+├── tests/                  # Basic integration tests
+└── README.md
+```
 
 ### Building
 
 ```bash
-# Build all components locally
-go build -o build/pylint-chttp ./cmd/pylint-chttp
+# Build the server
+go build -o chttp ./cmd/chttp
 
-# Build Docker image
-./scripts/build-docker.sh
+# Run tests
+go test ./...
 
-# Build with specific version
-./scripts/build-docker.sh v1.0.0
-```
-
-### Development Environment
-
-```bash
-# Start development stack
-docker-compose up -d
-
-# Generate test data
-docker-compose --profile testing up test-generator
-
-# Run integration tests
-docker-compose --profile testing run chttp-client
-
-# View logs
-docker-compose logs -f pylint-chttp
+# Build for production
+CGO_ENABLED=0 GOOS=linux go build -o chttp-linux ./cmd/chttp
 ```
 
 ### Testing
 
 ```bash
-# Unit tests
-go test ./...
+# Run unit tests
+go test -v ./internal/...
 
-# Integration tests with Docker
-docker-compose --profile testing up --abort-on-container-exit
+# Run integration tests
+go test -v ./tests/...
 
-# Manual testing
-curl http://localhost:8080/health
-
-# Test analysis (development mode)
-echo 'import os\nprint("hello")' | tar -czf test.tar.gz -T-
-curl -X POST -H "Content-Type: application/gzip" \
-  --data-binary @test.tar.gz \
-  http://localhost:8080/analyze
+# Test with actual server
+./chttp -config configs/config.yaml &
+curl -X POST http://localhost:8080/api/v1/execute \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-api-key" \
+  -d '{"command": "echo", "args": ["test"]}'
 ```
 
-## Production Deployment
+## Architecture Principles
 
-### Container Registry
+CHTTP follows these design principles:
 
-```bash
-# Tag for registry
-docker tag ploy/pylint-chttp:latest registry.example.com/ploy/pylint-chttp:v1.0.0
+1. **Simplicity**: Focus solely on CLI-to-HTTP translation
+2. **Security**: Command allow-listing and API key authentication
+3. **Reliability**: Basic error handling and timeout protection
+4. **Observability**: Structured logging for operations tracking
+5. **Ploy Integration**: Designed for Ploy platform deployment
 
-# Push to registry
-docker push registry.example.com/ploy/pylint-chttp:v1.0.0
-```
+## Limitations
 
-### Kubernetes Deployment
+CHTTP is intentionally simple and does **not** include:
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: pylint-chttp
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: pylint-chttp
-  template:
-    spec:
-      containers:
-      - name: pylint-chttp
-        image: registry.example.com/ploy/pylint-chttp:v1.0.0
-        ports:
-        - containerPort: 8080
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 30
-```
+- Complex pipeline orchestration (use external orchestration tools)
+- Advanced observability features (handled by Ploy platform)
+- Load balancing or service discovery (handled by Ploy/Traefik)
+- File upload/streaming (commands work with local filesystem only)
+- Process sandboxing (relies on container/deployment security)
 
-### Docker Swarm/Nomad
-
-```bash
-# Deploy with Docker Swarm
-docker service create \
-  --name pylint-chttp \
-  --replicas 3 \
-  --publish 8080:8080 \
-  --constraint 'node.role==worker' \
-  ploy/pylint-chttp:latest
-
-# Deploy with Nomad (see platform/nomad/pylint-chttp.hcl)
-nomad job run platform/nomad/pylint-chttp.hcl
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CHTTP_CONFIG_PATH` | Path to YAML config file | `/etc/chttp/config.yaml` |
-| `CHTTP_SERVICE_NAME` | Service identifier | `pylint-chttp` |
-| `CHTTP_LOG_LEVEL` | Logging level | `info` |
-| `CHTTP_AUTH_DISABLED` | Disable auth (dev only) | `false` |
-
-### Security Configuration
-
-```yaml
-security:
-  auth_method: "public_key"
-  public_key_path: "/etc/chttp/public.pem"
-  run_as_user: "pylint"
-  max_memory: "512MB"
-  max_cpu: "1.0"
-  sandbox_enabled: true
-  temp_dir: "/tmp"
-```
-
-## API Reference
-
-### Health Check
-
-```
-GET /health
-```
-
-Response:
-```json
-{
-  "status": "ok",
-  "timestamp": "2025-08-26T10:30:00Z",
-  "service": "pylint-chttp"
-}
-```
-
-### Analysis
-
-```
-POST /analyze
-Content-Type: application/gzip
-Authorization: Bearer <signed-token>
-
-[tar.gz archive of source code]
-```
-
-Response:
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "success",
-  "timestamp": "2025-08-26T10:30:00Z",
-  "result": {
-    "issues": [
-      {
-        "file": "main.py",
-        "line": 10,
-        "column": 1,
-        "severity": "warning",
-        "rule": "unused-import",
-        "message": "Unused import 'os'"
-      }
-    ]
-  }
-}
-```
-
-## Monitoring
-
-### Metrics
-
-CHTTP services expose Prometheus metrics on `/metrics`:
-
-- `chttp_requests_total{method,status}` - Request count by method/status
-- `chttp_request_duration_seconds` - Request duration histogram
-- `chttp_analysis_duration_seconds` - Analysis execution time
-- `chttp_active_analyses` - Currently running analyses
-
-### Logging
-
-Structured JSON logging with configurable levels:
-
-```json
-{
-  "timestamp": "2025-08-26T10:30:00Z",
-  "level": "info",
-  "service": "pylint-chttp",
-  "message": "Analysis completed",
-  "analysis_id": "550e8400-e29b-41d4-a716-446655440000",
-  "duration_ms": 1250,
-  "files_processed": 15,
-  "issues_found": 3
-}
-```
-
-## Security
-
-### Process Isolation
-
-- Non-root user execution (UID 1000)
-- Read-only container filesystem
-- Temporary filesystem for analysis (`tmpfs`)
-- Dropped capabilities except essential ones
-- No new privileges allowed
-
-### Network Security
-
-- TLS encryption for all communications
-- Public key authentication
-- IP-based access controls
-- Request rate limiting
-
-### Data Protection
-
-- No persistent storage of analyzed code
-- Automatic cleanup after analysis
-- Memory limits to prevent resource exhaustion
-- Timeout protection against long-running analyses
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Write tests for new functionality
-4. Ensure all tests pass: `go test ./...`
-5. Build and test Docker image: `./scripts/build-docker.sh`
-6. Submit a pull request
+For enterprise features like advanced monitoring, deployment automation, and infrastructure management, deploy CHTTP services via the Ploy platform.
 
 ## License
 
-See [LICENSE](../LICENSE) file for details.
+MIT License - See LICENSE file for details.

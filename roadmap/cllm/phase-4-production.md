@@ -1,11 +1,50 @@
-# Phase 4: Production Integration with Ploy Infrastructure
+# ⚠️  DEPRECATED: Phase 4: Production Integration with Ploy Infrastructure
 
-**Status**: Planning  
-**Dependencies**: Phases 1-3 completion, existing Ploy production infrastructure
+**Status**: DEPRECATED - Functionality moved to [phase-2-integration.md](phase-2-integration.md)  
+**Reason**: Production integration consolidated into single phase for faster delivery
 
-## Overview
+> **⚠️ This document is kept for reference only. Active development follows the consolidated Phase 2: Production Integration approach.**
 
-Phase 4 integrates CLLM with existing Ploy production infrastructure rather than building custom solutions. This phase leverages established Ploy patterns for observability, scaling, security, and operations to achieve production readiness efficiently.
+---
+
+# Original Phase 4: Production Integration with Ploy Infrastructure (ARCHIVED)
+
+**Original Status**: Planning  
+**Original Dependencies**: Phases 1-3 completion, existing Ploy production infrastructure
+
+## Overview (ARCHIVED)
+
+This phase originally integrated CLLM with existing Ploy production infrastructure rather than building custom solutions. The core insight about leveraging existing Ploy patterns was correct and has been incorporated into the consolidated approach.
+
+## Why This Approach Was Consolidated
+
+1. **Production Features Should Not Be Delayed**: Production readiness should be built in from the start, not added later
+2. **Infrastructure Reuse Is Essential**: Using existing Ploy patterns should be immediate, not a separate phase
+3. **Deployment Simplification**: Production deployment can happen immediately after basic service completion
+4. **Operational Efficiency**: Leveraging existing infrastructure is a design principle, not a later addition
+
+## Functionality Moved To
+
+The production integration functionality has been moved to **Phase 2: Production Integration**:
+
+- ✅ **Ploy Observability Integration**: Use existing Prometheus/Grafana/monitoring stack
+- ✅ **Nomad-based Deployment**: Standard Nomad job definition using existing patterns
+- ✅ **Existing Security Patterns**: Use established Vault, Consul, and security controls
+- ✅ **Service Discovery Integration**: Use existing Consul service registration patterns
+- ✅ **Monitoring Extension**: Extend existing monitoring vs. creating custom systems
+
+## Key Principles Preserved
+
+The important operational insights from this phase are maintained in the consolidated approach:
+
+- **No Custom Infrastructure**: All production systems use existing Ploy infrastructure
+- **Operational Consistency**: Same deployment and maintenance patterns as other Ploy services
+- **Proven Reliability**: Build on existing high-availability patterns
+- **Zero Additional Overhead**: No new infrastructure to maintain and operate
+
+---
+
+# Original Content (ARCHIVED)
 
 ## Goals
 
@@ -148,33 +187,34 @@ services/cllm/
 
 ## Implementation Tasks
 
-### Task 1: Comprehensive Observability Stack
+### Task 1: Integration with Existing Ploy Observability
+**Estimated Time**: 2 days (REDUCED by leveraging existing infrastructure)
 **Priority**: Critical
 
 #### Subtasks
-- [ ] **1.1 Metrics and Monitoring**
-  - Prometheus metrics integration with custom business metrics
-  - Grafana dashboards for all service components
-  - SLI/SLO definition and monitoring
-  - Alert rules and escalation policies
+- [ ] **1.1 Extend Existing Monitoring**
+  - Add CLLM-specific metrics to existing Prometheus setup
+  - Create CLLM dashboards using existing Grafana patterns
+  - Integrate with existing SLI/SLO monitoring framework
+  - Use existing alert rules and escalation procedures
 
-- [ ] **1.2 Structured Logging**
-  - Production-grade structured logging with correlation IDs
-  - Log aggregation and centralized collection
-  - Log sampling and rate limiting for high volume
-  - Security audit logging and compliance
+- [ ] **1.2 Leverage Existing Logging Infrastructure**
+  - Use existing structured logging patterns from `internal/monitoring/`
+  - Integrate with existing log aggregation and correlation systems
+  - Follow existing security audit logging patterns
+  - Use existing log sampling and rate limiting configurations
 
-- [ ] **1.3 Distributed Tracing**
-  - OpenTelemetry integration with full request tracing
-  - Trace correlation across all service components
-  - Performance bottleneck identification and analysis
-  - Trace sampling and storage optimization
+- [ ] **1.3 Integrate with Existing Tracing**
+  - Use existing tracing infrastructure and patterns
+  - Extend existing trace correlation to include CLLM requests
+  - Leverage existing performance monitoring and bottleneck identification
+  - Use existing trace sampling and storage configurations
 
-- [ ] **1.4 Alerting and Incident Response**
-  - Comprehensive alerting rules and thresholds
-  - Integration with PagerDuty/OpsGenie for incident management
-  - Runbook automation and response procedures
-  - Post-incident analysis and improvement processes
+- [ ] **1.4 Use Existing Alerting Infrastructure**
+  - Add CLLM-specific alerts to existing alerting system
+  - Use existing incident management integration
+  - Follow existing runbook and response procedure patterns
+  - Integrate with existing post-incident analysis processes
 
 #### Key Metrics and SLIs
 ```yaml

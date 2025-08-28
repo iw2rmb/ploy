@@ -45,6 +45,7 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - **✅ Comprehensive API & CLI** — Complete `/v1/arf/*` endpoints and `ploy arf` command suite
 - **✅ Lane C OSv Integration** — End-to-end Java→OSv unikernel deployment with 60-80MB image optimization
 - **✅ Benchmark System** — Comprehensive Java 11→17 migration testing with diff capture and timing analysis
+- **✅ CHTTP Static Analysis** — Production-ready Python Pylint integration with distributed architecture and ARF workflow compatibility
 
 **✅ Production Features:**
 - **AST Caching** — Memory-mapped files with 10x performance improvement

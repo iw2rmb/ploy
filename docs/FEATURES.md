@@ -278,7 +278,7 @@ Auto-classified lanes:
   - ✅ **Minimal Footprint**: ~40MB binary with 50-100MB RAM per instance
   - ✅ **No Single Point of Failure**: Masterless architecture with shared configuration
 
-## 🔍 Static Analysis Framework (Phase 2 In Progress - Aug 2025)
+## 🔍 Static Analysis Framework (Phase 2 Complete - Aug 2025)
 
 ### Core Infrastructure
 - ✅ **Analysis Engine**: Language-agnostic orchestrator with plugin architecture
@@ -296,13 +296,16 @@ Auto-classified lanes:
   - Custom pattern development for Ploy-specific issues
   - Incremental analysis with caching
 
-- 🚧 **Python Pylint Integration**: Comprehensive Python analysis (Phase 2 - Aug 2025)
-  - Full Pylint integration with JSON output parsing
-  - Project type detection (pip, poetry, pipenv, conda, setuptools)
-  - Configurable severity mapping and rule customization
-  - Virtual environment detection and support
-  - ARF recipe mapping for automatic Python issue remediation
-  - Configuration for additional tools (mypy, black, isort, bandit, flake8)
+- ✅ **Python Pylint Integration**: Comprehensive Python analysis via CHTTP service (Phase 2 - Aug 2025)
+  - ✅ CHTTP service architecture for secure, distributed analysis
+  - ✅ Full Pylint integration with JSON output parsing
+  - ✅ Secure sandboxed execution with resource limits
+  - ✅ Archive-based code transmission with gzip compression
+  - ✅ Project type detection (pip, poetry, pipenv, conda, setuptools)
+  - ✅ Configurable severity mapping and rule customization
+  - ✅ ARF recipe mapping for automatic Python issue remediation
+  - ✅ Comprehensive test coverage with integration tests
+  - ✅ Ansible deployment automation for VPS environments
 
 ### ARF Integration
 - ✅ **Automated Remediation**: Direct pipeline to ARF for automatic fixes
@@ -326,6 +329,23 @@ Auto-classified lanes:
   - `ploy analyze languages` - List supported languages
   - `ploy analyze config` - Manage configuration
   - `ploy analyze results` - View analysis history
+
+### CHTTP Services (CLI-over-HTTP)
+- ✅ **CHTTP Server Framework**: Simple CLI-to-HTTP bridge architecture (Aug 2025)
+  - ✅ HTTP API for remote CLI tool execution
+  - ✅ API key authentication for secure access
+  - ✅ Command allow-listing for security restrictions
+  - ✅ JSON request/response format with structured error handling
+  - ✅ Health monitoring and service discovery integration
+  - ✅ Basic logging with JSON and text formats
+
+- ✅ **Pylint CHTTP Service**: Dedicated Python static analysis service (Aug 2025)
+  - ✅ Specialized `/analyze` endpoint for Python code archives
+  - ✅ Gzipped tar archive processing with automatic file filtering
+  - ✅ Secure sandboxed execution environment (512MB memory limit)
+  - ✅ Comprehensive issue reporting with ARF-compatible output
+  - ✅ Integration with Ploy deployment platform via Ansible
+  - ✅ Traefik integration for load balancing and SSL termination
 
 ### Configuration
 - ✅ **Flexible Configuration**: YAML-based configuration system
@@ -353,13 +373,13 @@ Auto-classified lanes:
     - Extended health validation timeout (5m) and graceful shutdown coordination (60s)
     - Update progress monitoring with Slack webhook alerts and deployment status tracking
     - Rolling update parallelism control with 30-second stagger delay for stability
-  - ✅ **API Binary Distribution System** (Aug 2025): Automated api deployment and version management
-    - SeaweedFS-based binary distribution with version management and integrity verification
-    - Multi-node binary caching with automatic download and SHA256 hash validation
+  - ✅ **Unified Deployment System** (Aug 2025): Modern API deployment and version management
+    - Bootstrap deployment via Nomad using local binaries for initial setup
+    - Unified deployment system using `ployman push` for all updates and deployments
     - Cross-platform build pipeline with metadata tracking and git commit integration
-    - Complete rollback system for api versions with safety checks and validation
-    - Nomad artifact downloads with startup scripts for proper binary selection and execution
-    - CLI tools for manual binary operations: upload, download, list, build, and rollback
+    - Complete rollback system for API versions with safety checks and validation
+    - Git-based version management with commit hash tracking
+    - Management CLI tools: ployman for deployment, update, rollback, and status operations
   - ✅ **Ansible Nomad API Integration** (Aug 2025): Infrastructure-as-code deployment automation
     - Complete Ansible playbook integration for Nomad-based api deployment
     - Automated migration from manual/systemd deployment to high availability Nomad architecture

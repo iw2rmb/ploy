@@ -1,29 +1,108 @@
 # CHANGELOG
 
-## [2025-08-28] - CHTTP Roadmap Simplification
+## [2025-08-28] - CHTTP Static Analysis Documentation Completion
+
+### Added
+- **Documentation Status Updates**: Updated all documentation to reflect completion of CHTTP static analysis integration
+  - Updated FEATURES.md section header from "Phase 2 In Progress" to "Phase 2 Complete" 
+  - Updated static analysis roadmap Phase 2 status from "IN PROGRESS" to "COMPLETED" (2025-08-28)
+  - Added CHTTP static analysis feature overview to main README.md
+  - Added CHTTP integration references to ARF roadmap documentation
+  - Enhanced Related Documentation sections with CHTTP and Static Analysis roadmap links
+
+### Fixed
+- **Documentation Alignment**: All documentation now accurately reflects the completed state of CHTTP static analysis integration
+- **Status Consistency**: Phase 2 completion status is now consistently reflected across all documentation files
+- **Feature Visibility**: CHTTP static analysis capabilities are now properly highlighted in main project documentation
+
+## [2025-08-28] - Unified Deployment System Cleanup
+
+### Added
+- **Complete Obsolete Tool Cleanup**: Removed all references to non-existent distribution tools
+  - Updated Ansible playbooks to use unified deployment system exclusively
+  - Rewrote management scripts to use `ployman push` instead of artifact uploads
+  - Modernized test scripts to validate unified deployment workflow
+  - Eliminated all `controller-dist` and `api-dist` tool references
+  
+### Fixed
+- **Ansible Playbook Alignment**: Both dev and common playbooks now use bootstrap → unified deployment approach
+- **Management Script Modernization**: Update, rollback, and status scripts now use unified deployment system
+- **Test Script Updates**: Removed obsolete tool availability tests, added unified deployment validation
+- **Documentation Consistency**: All infrastructure documentation reflects implemented unified deployment
+
+### Testing
+- **Unified Deployment Tests**: Updated test scripts to validate bootstrap → ployman push workflow
+- **Management Script Testing**: Verified all management scripts work with unified deployment system
+- **Bootstrap Validation**: Added tests for bootstrap status and deployment method tracking
+
+## [2025-08-28] - CHTTP Static Analysis Integration
+
+### Added
+- **CHTTP Static Analysis Framework**: Complete integration of CHTTP services for distributed static analysis
+  - **Pylint CHTTP Service**: Dedicated Python static analysis service with secure sandboxed execution
+  - **Archive Processing**: Gzipped tar archive transmission for secure code analysis
+  - **ARF Integration**: Full ARF recipe mapping for automatic Python issue remediation
+  - **CHTTP Adapter**: `CHTPPylintAnalyzer` integration with existing static analysis engine
+  - **Specialized Server**: `PylintServer` with `/analyze` endpoint for Python code archives
+  - **Client Library**: RSA-signed HTTP client for secure CHTTP service communication
+  - **Ansible Automation**: Complete VPS deployment automation via `iac/dev/playbooks/chttp.yml`
+  - **Traefik Integration**: Load balancing and SSL termination for CHTTP services
+
+### Testing
+- **Comprehensive Test Suite**: 60+ unit tests for CHTTP adapter functionality
+  - Archive creation and validation tests
+  - Mock CHTTP server integration tests  
+  - Error handling and resilience tests
+  - ARF compatibility and recipe generation tests
+  - Performance benchmarks for archive processing
+- **Integration Tests**: VPS testing scripts for end-to-end CHTTP workflow validation
+  - `test-chttp-integration.sh` for basic CHTTP service testing
+  - `test-arf-chttp-integration.sh` for ARF workflow integration testing
+- **Build Verification**: All code compiles successfully with passing test suite
+
+### Fixed
+- **Archive Creation**: Implemented proper tar.gz archive creation for Python codebase transmission
+- **CHTTP Client**: Complete client-server communication with RSA signature validation
+- **Service Configuration**: Ansible templates for production-ready CHTTP service deployment
+
+## [2025-08-28] - CHTTP Complete Simplification & Implementation
 
 ### Changed
-- **CHTTP Architecture**: Simplified CHTTP roadmap to focus on core CLI-to-HTTP bridge functionality
-  - Removed enterprise observability features (Phase 5) - handled by Ploy
-  - Eliminated deployment automation features (Phase 6) - core Ploy functionality
-  - Removed infrastructure security and performance features (Phase 7-8) - Ploy domain
-  - Focused Phase 5 on basic logging and health monitoring only
-  - Condensed documentation into Phase 6 with simple developer tools
-  - Updated main roadmap README with simplified architecture
+- **CHTTP Architecture**: Completely transformed CHTTP from over-engineered enterprise system to simple CLI-to-HTTP bridge
+  - **Roadmap Simplification**: Removed enterprise observability, deployment, and infrastructure features (handled by Ploy)
+  - **Codebase Refactoring**: Replaced complex implementation with lightweight, focused architecture
+  - **Configuration Simplification**: Reduced config from 100+ lines to simple 20-line YAML structure
+  - **API Design**: Simple `/api/v1/execute` endpoint with basic JSON request/response
+  - **Security Model**: Basic API key authentication and command allow-listing
+  - **Project Structure**: Streamlined from ~50 files to ~10 focused components
+
+### Added
+- **Simple CLI Executor**: Clean command execution with timeout and validation (`internal/executor/`)
+- **Basic HTTP Handlers**: Request parsing, authentication, and response formatting (`internal/handler/`)
+- **Structured Logging**: JSON-formatted operation logging with configurable levels (`internal/logging/`)
+- **Health Monitoring**: Basic health check endpoint with uptime and configuration summary (`internal/health/`)
+- **Configuration Management**: Simple YAML-based config with validation (`internal/config/`)
+- **Integration Tests**: Basic test coverage for core functionality (`tests/`)
+- **Documentation**: Complete API reference and deployment guide in README
+
+### Removed
+- **Over-Engineered Components**: Eliminated service discovery, load balancing, pipeline orchestration, sandboxing, advanced security
+- **Enterprise Features**: Removed distributed tracing, metrics collection, complex parsing, archive processing
+- **Tool-Specific Logic**: Removed pylint-specific analyzers and parsers for generic CLI execution
+- **Complex Configurations**: Eliminated Docker compositions, service discovery configs, load balancing strategies
 
 ### Fixed
 - **Feature Duplication**: Eliminated overlap between CHTTP and Ploy capabilities
-  - CHTTP now serves as lightweight CLI wrapper only
-  - Ploy handles all deployment, security, monitoring, and infrastructure concerns
-  - Clear separation of concerns between HTTP-CLI bridge and platform management
+  - CHTTP: Simple CLI-to-HTTP bridge only
+  - Ploy: All deployment, security, monitoring, and infrastructure management
+  - Clear separation of concerns with defined integration patterns
 
 ### Testing
-- **Architectural Validation**: Confirmed CHTTP roadmap alignment with Ploy's comprehensive platform
-  - Validated that simplified CHTTP can be deployed via Ploy's lanes
-  - Verified no feature conflicts between CLI wrapper and deployment platform
-  - Ensured proper integration patterns for CHTTP services within Ploy ecosystem
+- **Unit Testing**: Configuration validation, CLI execution, command allow-listing
+- **Integration Testing**: HTTP request handling, authentication, error responses
+- **Architectural Validation**: Confirmed alignment with simplified roadmap and Ploy integration patterns
 
-## [2025-08-28] - CLLM Diff Generation System (Previous Entry)
+## [2025-08-28] - CLLM Diff Generation System
 
 ### Added
 - **Diff Generator**: Git-compatible unified diff generation from code changes

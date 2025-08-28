@@ -1,11 +1,40 @@
-# Phase 2: Model Management System
+# ⚠️  DEPRECATED: Phase 2: Model Management System
 
-**Status**: Planning  
-**Dependencies**: Phase 1 completion, SeaweedFS integration, Consul coordination
+**Status**: DEPRECATED - Functionality moved to [phase-2-integration.md](phase-2-integration.md)  
+**Reason**: Over-engineered for current needs - consolidated into simplified integration approach
 
-## Overview
+> **⚠️ This document is kept for reference only. Active development follows the consolidated Phase 2: Production Integration approach.**
 
-Phase 2 implements a sophisticated model management system that enables efficient distribution, caching, and load balancing of LLM models across multiple CLLM service instances. This phase solves the core challenge of local model storage and sharing.
+---
+
+# Original Phase 2: Model Management System (ARCHIVED)
+
+**Original Status**: Planning  
+**Original Dependencies**: Phase 1 completion, SeaweedFS integration, Consul coordination
+
+## Overview (ARCHIVED)
+
+This phase originally planned a sophisticated model management system that enables efficient distribution, caching, and load balancing of LLM models across multiple CLLM service instances. However, this approach was determined to be over-engineered for the current requirements.
+
+## Why This Approach Was Deprecated
+
+1. **Over-Engineering**: Complex model distribution system not needed for current ARF integration requirements
+2. **Infrastructure Duplication**: Custom load balancing and service discovery duplicate existing Ploy capabilities
+3. **Implementation Time**: 4-week implementation vs. 1-2 weeks for simplified approach
+4. **Maintenance Overhead**: Custom infrastructure systems require ongoing maintenance vs. leveraging existing Ploy systems
+
+## Functionality Moved To
+
+The essential functionality from this phase has been consolidated into the new **Phase 2: Production Integration**:
+
+- ✅ **Essential Model Management**: Simple local LRU caching instead of complex distribution
+- ✅ **Storage Integration**: Use existing Ploy SeaweedFS infrastructure instead of custom integration
+- ✅ **Load Balancing**: Extend existing Traefik middleware instead of custom load balancer
+- ✅ **Service Discovery**: Use existing Consul patterns instead of custom coordination
+
+---
+
+# Original Content (ARCHIVED)
 
 ## Goals
 

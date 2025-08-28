@@ -5,17 +5,17 @@ lane: E   # Containerized deployment
 
 build:
   dockerfile: |
-    FROM golang:1.22-alpine AS builder
+    FROM golang:1.23-alpine AS builder
     WORKDIR /app
     COPY . .
-    RUN go build -o openrewrite ./cmd/openrewrite
+    RUN go build -o openrewrite-service ./cmd/server
     
     FROM alpine:latest
     RUN apk --no-cache add ca-certificates
     WORKDIR /root/
-    COPY --from=builder /app/openrewrite .
+    COPY --from=builder /app/openrewrite-service .
     EXPOSE 8080
-    CMD ["./openrewrite"]
+    CMD ["./openrewrite-service"]
 
 deploy:
   instances: 2

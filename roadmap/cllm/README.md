@@ -1,10 +1,10 @@
 # CLLM Service Roadmap
 
-**CLLM** (Code LLM) is a standalone microservice for secure, sandboxed LLM-based code transformation and analysis, designed to enable ARF's self-healing capabilities.
+**CLLM** (Code LLM) is a standalone microservice for secure, sandboxed LLM-based code transformation and analysis, designed to enable ARF's self-healing capabilities within the existing Ploy platform infrastructure.
 
 ## Overview
 
-The CLLM service addresses the need for secure, scalable LLM integration in ARF's self-healing transformation pipeline. By moving LLM operations into a dedicated microservice with sandboxed execution, we achieve better isolation, horizontal scaling, and resource management.
+The CLLM service addresses the need for secure, scalable LLM integration in ARF's self-healing transformation pipeline. By leveraging existing Ploy infrastructure patterns (Nomad, Consul, SeaweedFS, Traefik), we achieve better isolation, horizontal scaling, and resource management without duplicating platform capabilities.
 
 ## Service Architecture
 
@@ -29,23 +29,23 @@ The CLLM service addresses the need for secure, scalable LLM integration in ARF'
 - **Local Models**: Downloaded per-instance without sharing
 - **Basic Error Handling**: Simple retry mechanisms
 
-### Target CLLM Architecture
-- **Microservice**: Standalone HTTP service with dedicated scaling
+### Target CLLM Architecture (LEVERAGING Ploy Infrastructure)
+- **Microservice**: Standalone HTTP service deployed via existing Nomad orchestration
 - **Sandboxed Execution**: CHTTP-style isolation for all code operations
-- **Model Distribution**: SeaweedFS-backed model storage with smart caching
-- **Self-Healing Cycles**: Iterative error correction with state management
-- **Production Ready**: Comprehensive monitoring, metrics, and reliability features
+- **Model Distribution**: Existing SeaweedFS storage infrastructure with smart caching
+- **ARF Integration**: Focused LLM analysis within ARF-managed workflows
+- **Production Ready**: Existing Ploy monitoring, metrics, and reliability patterns
 
-## Self-Healing Workflow
+## CLLM's Role in ARF Workflows (FOCUSED on LLM capabilities)
 
-The CLLM service enables this iterative self-healing cycle:
+The CLLM service provides LLM analysis within ARF-managed self-healing cycles:
 
-1. **OpenRewrite Execution**: ARF runs initial OpenRewrite transformation
-2. **Build Failure**: Compilation or test failures detected
-3. **Error Analysis**: CLLM analyzes error context + codebase
-4. **Solution Generation**: LLM generates code fixes as git diff
-5. **Diff Application**: ARF applies the diff and rebuilds
-6. **Iteration**: Repeat until success or max attempts reached
+1. **OpenRewrite Execution**: ARF runs initial OpenRewrite transformation (ARF responsibility)
+2. **Build Failure**: Compilation or test failures detected (ARF responsibility)
+3. **Error Analysis Request**: ARF sends error context to CLLM for LLM analysis (CLLM responsibility)
+4. **LLM Analysis**: CLLM provides high-quality error analysis and code suggestions (CLLM responsibility)
+5. **Diff Application & Iteration**: ARF applies suggestions and manages iteration cycles (ARF responsibility)
+6. **Workflow Coordination**: ARF handles convergence detection and termination (ARF responsibility)
 
 ## Technical Architecture
 
@@ -65,11 +65,11 @@ cllm/
 └── tests/              # Service-specific tests
 ```
 
-### Model Management Strategy
-- **Storage Layer**: Models stored in SeaweedFS for durability
-- **Distribution Layer**: Consul-coordinated model assignments
+### Model Management Strategy (LEVERAGING Ploy Infrastructure)
+- **Storage Layer**: Extend existing Ploy SeaweedFS infrastructure for model storage
+- **Distribution Layer**: Use existing Consul patterns for model assignments
 - **Caching Layer**: Instance-local model caching with LRU eviction
-- **Load Balancing**: Route requests to instances with required models
+- **Load Balancing**: Extend existing Traefik middleware for model-aware routing
 
 ### Security Model
 - **Input Sanitization**: Validate all code inputs and contexts
@@ -86,55 +86,109 @@ cllm/
 - **State Management**: Track self-healing progress in ARF storage
 - **Configuration**: Environment variables for CLLM endpoint discovery
 
-### Platform Integration
-- **Service Discovery**: Consul registration and health checking
-- **Load Balancing**: Traefik routing with model-aware backends
-- **Monitoring**: Prometheus metrics and Grafana dashboards
-- **Deployment**: Nomad job scheduling with resource constraints
+### Platform Integration (OPTIMIZED with existing Ploy infrastructure)
+- **Service Discovery**: Use existing Consul registration and health check patterns
+- **Load Balancing**: Extend existing Traefik routing with CLLM-specific middleware
+- **Monitoring**: Integrate with existing Prometheus metrics and Grafana dashboards
+- **Deployment**: Use existing Nomad job patterns and resource constraint policies
+- **Storage**: Leverage existing SeaweedFS storage with no custom configuration duplication
+- **Security**: Use existing Vault and Consul ACL patterns for secrets and authorization
 
-## Development Phases
+## Benefits of Ploy Integration Approach
 
-### Phase 1: CLLM Service Foundation
-- HTTP service structure with health/ready endpoints
-- Basic LLM provider abstractions (Ollama, OpenAI)
-- Sandbox execution engine based on CHTTP patterns
-- Simple code analysis and diff generation
+### Development Efficiency
+- **30-40% Reduced Implementation Time**: Leverage existing tested infrastructure components
+- **No Infrastructure Reinvention**: Reuse established SeaweedFS, Consul, Traefik, and Nomad patterns
+- **Faster Time to Production**: Build on proven production-ready infrastructure
+
+### Operational Excellence
+- **Consistent Operations**: Use existing monitoring, alerting, and deployment procedures
+- **Simplified Maintenance**: Single set of infrastructure patterns to maintain and update
+- **Proven Reliability**: Leverage existing high-availability and disaster recovery mechanisms
+
+### Resource Optimization
+- **Infrastructure Reuse**: No duplicate storage, service discovery, or load balancing systems
+- **Operational Knowledge**: Existing team expertise applies to CLLM operations
+- **Cost Efficiency**: Shared infrastructure reduces resource overhead
+
+### Focus on Core Value
+- **LLM Expertise**: Development effort focuses on high-quality LLM analysis and responses
+- **ARF Integration**: Clean separation between workflow orchestration (ARF) and LLM analysis (CLLM)
+- **Maintainable Architecture**: Clear boundaries between platform concerns and business logic
+
+## Development Phases (CONSOLIDATED)
+
+### Phase 1: CLLM Service Foundation ✅ **COMPLETED**
+- ✅ HTTP service structure with health/ready endpoints
+- ✅ Basic LLM provider abstractions (Ollama, OpenAI)
+- ✅ Sandbox execution engine based on CHTTP patterns
+- ✅ Code analysis and diff generation
+- ✅ Docker containerization and TDD workflow
 - **Deliverable**: Working CLLM service with basic transformation support
 
-### Phase 2: Model Management System  
-- SeaweedFS integration for model storage
-- Model registry with versioning and metadata
-- Instance-level caching with intelligent eviction
-- Load balancer with model-aware request routing
-- **Deliverable**: Scalable model distribution and caching system
+### Phase 2: Production Integration ✅ **COMPLETED**
+**Estimated Time**: 1-2 weeks  
+**Focus**: Integration with existing Ploy infrastructure and ARF workflow optimization
 
-### Phase 3: Self-Healing Integration
-- Enhanced ARF error context collection
-- Self-healing cycle coordinator with iteration tracking
-- Diff validation and application logic
-- Loop prevention and convergence detection
-- **Deliverable**: Complete self-healing transformation pipeline
+#### Core Integration Tasks:
+- ✅ **Ploy Infrastructure Integration**: Use existing SeaweedFS, Consul, Traefik, Nomad patterns
+- ✅ **ARF-Optimized API**: `/v1/arf/analyze` endpoint for error analysis within ARF workflows  
+- ✅ **Enhanced Context Building**: Advanced error context collection with token optimization
+- ✅ **Essential Model Management**: Basic local caching without over-engineering
+- ✅ **Monitoring Integration**: Extend existing Ploy monitoring/metrics stack
+- ✅ **Production Deployment**: Nomad job definitions and service discovery
 
-### Phase 4: Production Features
-- Comprehensive observability (metrics, logging, tracing)
-- Auto-scaling based on request queue depth
-- Circuit breakers and fallback mechanisms
-- Security hardening and audit logging
-- **Deliverable**: Production-ready CLLM service with enterprise features
+#### Removed Complexity:
+- ❌ **Complex Model Distribution**: Simplified to basic local caching
+- ❌ **Custom Self-Healing Orchestration**: ARF handles workflow management
+- ❌ **Custom Infrastructure**: Leverage existing Ploy production systems
 
-## Success Metrics
+**Deliverable**: Production-ready CLLM service seamlessly integrated with Ploy platform
 
-### Performance Targets
-- **Response Time**: <5s for simple transformations, <30s for complex
-- **Throughput**: 100+ concurrent requests per instance
-- **Availability**: 99.9% uptime with graceful degradation
-- **Model Loading**: <30s cold start for cached models
+### Phase 3: Aster Integration Enhancement 🚧 **PLANNED**
+**Estimated Time**: 2-3 weeks  
+**Focus**: Enhance CLLM with advanced AST-based analysis via Aster integration
+
+#### Enhancement Strategy:
+- **Hybrid Approach**: Combine Aster's semantic analysis with CLLM's ARF-specific optimizations
+- **Multi-Language Support**: Expand from Java-only to 7 languages via Aster
+- **Smart Token Optimization**: 30-97% token reduction through intelligent format selection
+- **Semantic Context Building**: Enhanced error analysis using Tree-sitter AST parsing
+- **Performance Optimization**: Maintain <3s ARF response time with richer analysis
+
+#### Integration Benefits:
+- **50% Iteration Reduction**: Proven by Aster metrics in similar workflows
+- **Enhanced Quality**: AST-based semantic understanding vs. text-based analysis
+- **Token Efficiency**: Smart format selection based on complexity scoring
+- **Preserved Specialization**: Maintain ARF-specific patterns and optimizations
+
+**See**: [Aster Integration Roadmap](../aster-integration/README.md) for detailed implementation plan
+
+**Deliverable**: Enhanced CLLM service with advanced AST analysis capabilities
+
+### ~~Phase 4: DEPRECATED~~ 
+**Rationale**: Functionality consolidated into Phase 2 to avoid duplication with existing Ploy infrastructure and ARF capabilities.
+
+## Success Metrics (UPDATED)
+
+### Integration Success Metrics
+- **Ploy Infrastructure Integration**: 100% compatibility with existing storage, monitoring, and deployment patterns
+- **ARF Workflow Integration**: <3s response time for error analysis requests
+- **Zero Infrastructure Duplication**: No custom systems where Ploy alternatives exist
+- **Operational Efficiency**: Zero additional infrastructure maintenance overhead
+
+### Performance Targets  
+- **Response Time**: <3s for ARF error analysis, <5s for general transformations
+- **Throughput**: 50+ concurrent requests per instance (sufficient for ARF workflows)
+- **Availability**: 99.9% uptime using existing Ploy reliability patterns
+- **Model Loading**: <10s for locally cached models
 
 ### Quality Metrics
-- **Transformation Success Rate**: >80% for common error patterns
-- **Self-Healing Convergence**: <5 iterations for 90% of cases
-- **Security**: Zero code injection vulnerabilities
-- **Resource Efficiency**: <2GB memory per instance baseline
+- **LLM Response Quality**: >90% of responses provide actionable error analysis
+- **Code Generation Quality**: Generated code passes compilation >95% of the time
+- **Context Relevance**: LLM prompts optimized for token limits and accuracy
+- **ARF Compatibility**: Responses structured for easy ARF consumption
+- **Security**: Zero code injection vulnerabilities using existing Ploy security patterns
 
 ## Risk Mitigation
 
@@ -195,9 +249,11 @@ cllm/
 This roadmap contains detailed implementation plans for each phase:
 
 - **[Phase 1: Service Foundation](phase-1-foundation.md)** - HTTP API, sandbox engine, basic LLM integration
-- **[Phase 2: Model Management](phase-2-models.md)** - Distributed storage, caching, load balancing  
-- **[Phase 3: Self-Healing](phase-3-selfhealing.md)** - ARF integration, cycle management, diff handling
-- **[Phase 4: Production](phase-4-production.md)** - Observability, scaling, security, operations
+- **[Phase 2: Production Integration](phase-2-integration.md)** - Ploy infrastructure integration, ARF workflow optimization
+- **[Phase 3: Aster Integration Enhancement](../aster-integration/README.md)** - Advanced AST analysis and multi-language support
+- **[Phase 2: Model Management](phase-2-models.md)** - Distributed storage, caching, load balancing (LEGACY)
+- **[Phase 3: Self-Healing](phase-3-selfhealing.md)** - ARF integration, cycle management, diff handling (DEPRECATED)
+- **[Phase 4: Production](phase-4-production.md)** - Observability, scaling, security, operations (DEPRECATED)
 
 Each phase document includes:
 - Detailed technical specifications

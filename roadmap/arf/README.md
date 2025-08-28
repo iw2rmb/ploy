@@ -48,6 +48,7 @@ The ARF implementation is structured in 8 progressive phases:
 - ✅ Multi-language AST support with tree-sitter
 - ✅ Ollama provider integration for local LLM execution
 - ✅ Strategy selector with confidence scoring
+- ✅ CLLM service integration for enhanced error analysis
 
 ### [Phase ARF-4: Security & Production Hardening](./phase-arf-4.md) ✅ COMPLETED
 **Security & Governance** - Vulnerability remediation, SBOM integration, human-in-the-loop workflows, and production optimization.
@@ -120,6 +121,9 @@ ARF leverages Ploy's existing infrastructure:
 - **Consul Coordination**: Service discovery and leader election
 - **FreeBSD Jails**: Secure transformation sandbox environments
 - **ZFS Snapshots**: Instant rollback and isolation capabilities
+- **CHTTP Services**: Distributed static analysis integration for Python Pylint and multi-language support
+- **CLLM Service**: Enhanced LLM-based error analysis and code transformation
+- **Aster Integration**: Advanced AST-based semantic analysis for enhanced context building
 
 ## Getting Started
 
@@ -130,6 +134,10 @@ ARF leverages Ploy's existing infrastructure:
 
 ## Related Documentation
 
+- [CHTTP Roadmap](../cli-over-http/README.md) - CLI-over-HTTP services for static analysis integration
+- [CLLM Roadmap](../cllm/README.md) - Code LLM service for enhanced error analysis and transformation
+- [Aster Integration Roadmap](../aster-integration/README.md) - Advanced AST-based analysis integration
+- [Static Analysis Roadmap](../static-analysis/README.md) - Multi-language static analysis framework
 - [WASM.md](../docs/WASM.md) - WebAssembly runtime implementation
 - [README.md](../README.md) - Overall Ploy development roadmap
 - [FEATURES.md](../docs/FEATURES.md) - Current platform capabilities

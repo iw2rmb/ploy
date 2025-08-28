@@ -1,9 +1,16 @@
 package analysis
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/iw2rmb/ploy/internal/chttp"
 )
@@ -127,9 +134,88 @@ func (p *CHTPPylintAnalyzer) SupportsCHTTP() bool {
 
 // createCodebaseArchive creates a gzipped tar archive of Python files from the codebase
 func (p *CHTPPylintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, error) {
-	// TODO: Implement tar archive creation
-	// For now, return placeholder data to make tests pass
-	return []byte("placeholder-archive-data"), nil
+	// Create a buffer to write archive data to
+	var buf bytes.Buffer
+	
+	// Create gzip writer
+	gzWriter := gzip.NewWriter(&buf)
+	defer gzWriter.Close()
+	
+	// Create tar writer
+	tarWriter := tar.NewWriter(gzWriter)
+	defer tarWriter.Close()
+	
+	// Filter files to include only Python files
+	pythonFiles := make([]string, 0)
+	supportedExts := p.GetSupportedFileTypes()
+	
+	for _, file := range codebase.Files {
+		for _, ext := range supportedExts {
+			if strings.HasSuffix(file, ext) {
+				pythonFiles = append(pythonFiles, file)
+				break
+			}
+		}
+	}
+	
+	if len(pythonFiles) == 0 {
+		return nil, fmt.Errorf("no Python files found in codebase")
+	}
+	
+	// Add each Python file to the archive
+	for _, file := range pythonFiles {
+		// Get full file path
+		fullPath := filepath.Join(codebase.RootPath, file)
+		
+		// Get file info
+		fileInfo, err := os.Stat(fullPath)
+		if err != nil {
+			// Skip files that can't be accessed
+			continue
+		}
+		
+		// Skip directories
+		if fileInfo.IsDir() {
+			continue
+		}
+		
+		// Create tar header
+		header := &tar.Header{
+			Name:    file, // Use relative path in archive
+			Mode:    int64(fileInfo.Mode()),
+			Size:    fileInfo.Size(),
+			ModTime: fileInfo.ModTime(),
+		}
+		
+		// Write header
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return nil, fmt.Errorf("failed to write tar header for %s: %w", file, err)
+		}
+		
+		// Read and write file contents
+		fileReader, err := os.Open(fullPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file %s: %w", fullPath, err)
+		}
+		
+		_, err = io.Copy(tarWriter, fileReader)
+		fileReader.Close()
+		
+		if err != nil {
+			return nil, fmt.Errorf("failed to write file contents for %s: %w", file, err)
+		}
+	}
+	
+	// Close writers to flush data
+	if err := tarWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close tar writer: %w", err)
+	}
+	
+	if err := gzWriter.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+	
+	return buf.Bytes(), nil
 }
 
 // convertCHTTPResult converts CHTTP service result to LanguageAnalysisResult

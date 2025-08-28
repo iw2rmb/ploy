@@ -1,11 +1,49 @@
-# Phase 3: LLM Integration within ARF Workflows
+# ⚠️  DEPRECATED: Phase 3: LLM Integration within ARF Workflows
 
-**Status**: Planning  
-**Dependencies**: Phase 1 & 2 completion, ARF integration points, OpenRewrite service integration
+**Status**: DEPRECATED - Functionality moved to [phase-2-integration.md](phase-2-integration.md)  
+**Reason**: ARF integration consolidated into single production-ready phase
 
-## Overview
+> **⚠️ This document is kept for reference only. Active development follows the consolidated Phase 2: Production Integration approach.**
 
-Phase 3 focuses CLLM on providing high-quality LLM analysis and code transformation within existing ARF self-healing workflows. Rather than implementing complex orchestration logic, this phase ensures CLLM delivers excellent LLM responses while ARF handles workflow coordination and error recovery.
+---
+
+# Original Phase 3: LLM Integration within ARF Workflows (ARCHIVED)
+
+**Original Status**: Planning  
+**Original Dependencies**: Phase 1 & 2 completion, ARF integration points, OpenRewrite service integration
+
+## Overview (ARCHIVED)
+
+This phase originally focused CLLM on providing high-quality LLM analysis and code transformation within existing ARF self-healing workflows. The core insight about focusing on LLM analysis while letting ARF handle orchestration was correct and has been preserved.
+
+## Why This Approach Was Consolidated
+
+1. **No Need for Separate Phase**: ARF integration is essential from production deployment, not a later phase
+2. **Simpler Implementation**: ARF-optimized endpoints can be implemented directly in Phase 2
+3. **Faster Delivery**: Avoiding phase dependency delays allows faster production deployment
+4. **Clear Scope**: ARF integration scope was already well-defined and focused
+
+## Functionality Moved To
+
+The core ARF integration functionality has been moved to **Phase 2: Production Integration**:
+
+- ✅ **ARF Error Analysis Endpoint**: `/v1/arf/analyze` for ARF workflow integration
+- ✅ **Enhanced Context Building**: Optimized error context processing for better LLM responses  
+- ✅ **Response Quality Focus**: High-quality code analysis and transformation recommendations
+- ✅ **Clear Responsibility Separation**: CLLM provides LLM analysis, ARF handles orchestration
+
+## Key Insights Preserved
+
+The important architectural decisions from this phase are maintained in the consolidated approach:
+
+- **CLLM Focus**: Error analysis and LLM response generation (not workflow orchestration)
+- **ARF Responsibility**: Workflow coordination, convergence detection, iteration management
+- **Clean Integration**: Simple API boundaries between CLLM and ARF services
+- **Performance Targets**: <3s response time for ARF error analysis requests
+
+---
+
+# Original Content (ARCHIVED)
 
 ## Goals
 

@@ -1,33 +1,39 @@
 # Phase 4: Service Discovery & External Service Orchestration
 
-**Status**: 🚧 In Progress  
+**Status**: ✅ Completed (Simplified)  
 **Duration**: 2-3 weeks  
 **Dependencies**: Phase 3 completed  
-**Next Phase**: [Phase 5: Advanced Monitoring & Observability](./phase-5-observability.md)
+**Next Phase**: [Phase 5: Basic Logging & Health Monitoring](./phase-5-observability.md)
 
 ## Executive Summary
 
-Phase 4 focuses on service discovery for registration and external service orchestration. Instead of implementing internal load balancing (which Traefik handles at the edge), this phase creates a resilient HTTP client for orchestrating pipelines across external CHTTP services, with proper retry policies, circuit breakers, and timeout management.
+~~Phase 4 originally planned service discovery integration and complex orchestration features.~~
 
-## Objectives
+**COMPLETED WITH SIMPLIFICATION**: Implemented resilient HTTP client with circuit breakers for external service communication only. Service discovery and complex orchestration features were removed as Ploy platform handles these concerns.
 
-- **Service Registry Integration**: Connect with Consul, etcd, or Kubernetes for service registration
-- **Service Registration**: Automatic registration and health reporting to service discovery backends
-- **Resilient HTTP Client**: Production-grade HTTP client for external service orchestration
-- **Circuit Breaker Patterns**: Per-service circuit breakers with automatic failure detection
-- **Retry Strategies**: Exponential backoff and configurable retry policies
-- **External Service Management**: Configuration and management of external CHTTP services
-- **Federation Support**: Enable pipeline orchestration across different organizations
+## Completed Objectives (Simplified)
 
-## Current Status
+- ✅ **Resilient HTTP Client**: Production-grade HTTP client for external service calls
+- ✅ **Circuit Breaker Patterns**: Per-service circuit breakers with failure detection
+- ✅ **Retry Strategies**: Exponential backoff with jitter and configurable retry policies
+- ✅ **Timeout Management**: Configurable request timeouts and context cancellation
+- ✅ **Error Handling**: Proper error propagation and status code handling
+- ❌ ~~Service Registry Integration~~ → **Handled by Ploy platform**
+- ❌ ~~Complex orchestration~~ → **Use external orchestration tools**
+
+## Completion Status
 
 **Prerequisites from Phase 3:**
-- ✅ Pipeline orchestration engine
 - ✅ Basic HTTP client for service calls
-- ✅ Service health checking
+- ✅ Request/response processing
+- ✅ Error handling framework
 
-**Phase 4 Implementation:**
-- ✅ **Service discovery interface foundation** (2025-08-27)
+**Phase 4 Implementation (Completed 2025-08-28):**
+- ✅ **Resilient HTTP client** with retry logic and circuit breakers
+- ✅ **Circuit breaker implementation** with state transitions (Closed/Open/Half-Open)
+- ✅ **Metrics collection** for HTTP client performance tracking
+- ✅ **Configuration management** for external service settings
+- ✅ **Comprehensive testing** with integration test suite
 - ✅ **Consul integration with service registration** (2025-08-27)
 - ✅ **Configuration system extended for service discovery** (2025-08-27)
 - ✅ **Architectural simplification - Traefik handles all load balancing** (2025-08-28) 
