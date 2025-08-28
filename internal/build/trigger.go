@@ -15,7 +15,10 @@ import (
 	"github.com/iw2rmb/ploy/api/nomad"
 	"github.com/iw2rmb/ploy/api/opa"
 	"github.com/iw2rmb/ploy/api/supply"
+	"github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/git"
+	"github.com/iw2rmb/ploy/internal/harbor"
+	"github.com/iw2rmb/ploy/internal/security"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
 	"github.com/iw2rmb/ploy/internal/validation"
@@ -27,17 +30,51 @@ type BuildDependencies struct {
 	EnvStore      envstore.EnvStoreInterface
 }
 
-// TriggerBuild handles the build and deployment request for an application
+// BuildContext represents the build context for Harbor namespace routing
+type BuildContext struct {
+	APIContext string // "platform" or "apps" based on endpoint
+	AppType    config.AppType
+}
+
+// TriggerBuild handles the build and deployment request for an application (legacy interface)
 func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
 	deps := &BuildDependencies{
 		StorageClient: storeClient,
 		EnvStore:      envStore,
 	}
-	return triggerBuildWithDependencies(c, deps)
+	// Default to user app context for legacy compatibility
+	buildCtx := &BuildContext{
+		APIContext: "apps",
+		AppType:    config.UserApp,
+	}
+	return triggerBuildWithDependencies(c, deps, buildCtx)
+}
+
+// TriggerBuildWithContext handles context-aware build requests for Harbor namespace routing
+func TriggerBuildWithContext(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface, apiContext string) error {
+	deps := &BuildDependencies{
+		StorageClient: storeClient,
+		EnvStore:      envStore,
+	}
+	buildCtx := &BuildContext{
+		APIContext: apiContext,
+		AppType:    config.DetermineAppType(apiContext),
+	}
+	return triggerBuildWithDependencies(c, deps, buildCtx)
+}
+
+// TriggerPlatformBuild handles platform service builds with platform namespace
+func TriggerPlatformBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
+	return TriggerBuildWithContext(c, storeClient, envStore, "platform")
+}
+
+// TriggerAppBuild handles user application builds with apps namespace
+func TriggerAppBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface) error {
+	return TriggerBuildWithContext(c, storeClient, envStore, "apps")
 }
 
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
-func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
+func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext) error {
 	appName := c.Params("app")
 	
 	// Validate app name
@@ -106,7 +143,9 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 		}
 		imagePath = img
 	case "E":
-		tag := fmt.Sprintf("localhost:5000/%s:%s", appName, sha)
+		// Use Harbor registry with namespace-aware routing and RBAC credentials
+		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
@@ -121,7 +160,9 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 	case "G":
 		// For now, Lane G WASM applications should use OCI containers as fallback
 		// TODO: Implement proper WASM runtime integration
-		tag := fmt.Sprintf("localhost:5000/%s:%s", appName, sha)
+		// Use Harbor registry with namespace-aware routing and RBAC credentials
+		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
@@ -245,6 +286,66 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 		fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
 	}
 
+	// Harbor authentication and vulnerability scanning with RBAC credentials
+	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+	vulnScanPassed := false
+	var scanResult *security.ScanResult
+	var scanner *security.VulnerabilityScanner
+	
+	// Only perform Harbor integration for container images (Lane E, G)
+	if dockerImage != "" {
+		// Harbor authentication is mandatory for container images
+		if err := registry.MustAuthenticate(); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("Harbor authentication failed: %w", err))
+		}
+		
+		// Harbor vulnerability scanning with context-specific thresholds
+		harborClient := harbor.NewClient(registry.GetFullEndpoint(), registry.Username, registry.Password)
+		scanner = security.NewVulnerabilityScanner(harborClient)
+		
+		// Extract repository name from Docker image tag
+		parts := strings.Split(dockerImage, "/")
+		if len(parts) >= 2 {
+			projectName := registry.GetProject(buildCtx.AppType)
+			repository := parts[len(parts)-1] // Get the image:tag part
+			repoParts := strings.Split(repository, ":")
+			if len(repoParts) >= 2 {
+				repoName := repoParts[0]
+				tag := repoParts[1]
+				
+				// Apply context-specific vulnerability thresholds
+				var err error
+				if buildCtx.AppType == config.PlatformApp {
+					scanResult, err = scanner.ValidateForPlatform(projectName, repoName, tag)
+				} else {
+					scanResult, err = scanner.ValidateForUserApps(projectName, repoName, tag)
+				}
+				
+				if err != nil {
+					// For non-production environments, log warning but don't fail
+					env := c.Query("env", "dev")
+					if env == "prod" || env == "staging" {
+						return utils.ErrJSON(c, 500, fmt.Errorf("Harbor vulnerability scan failed: %w", err))
+					} else {
+						fmt.Printf("Warning: Harbor vulnerability scan failed (non-prod environment): %v\n", err)
+					}
+				} else {
+					vulnScanPassed = scanResult.Passed
+					fmt.Printf("Harbor vulnerability scan: %s\n", scanner.GetVulnerabilitySummary(scanResult))
+					
+					// Log scan results for monitoring
+					if scanResult.HighSeverity {
+						fmt.Printf("WARNING: Image contains high severity vulnerabilities (%d critical, %d high)\n", 
+							scanResult.CriticalCount, scanResult.HighCount)
+					}
+				}
+			}
+		}
+	} else {
+		// For non-container images, use legacy vulnerability scanning
+		vulnScanPassed = performVulnerabilityScanning(imagePath, dockerImage, c.Query("env", "dev"))
+	}
+
 	// Enhanced OPA policy enforcement with comprehensive context including size
 	env := c.Query("env", "dev")
 	breakGlass := c.Query("break_glass", "false") == "true"
@@ -252,9 +353,6 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 	
 	// Determine signing method based on environment and available signatures
 	signingMethod := determineSigningMethod(imagePath, dockerImage, env)
-	
-	// Perform vulnerability scanning for production and staging environments
-	vulnScanPassed := performVulnerabilityScanning(imagePath, dockerImage, env)
 	
 	// Get source repository information and perform Git validation if available
 	sourceRepo := extractSourceRepository(srcDir)
@@ -400,7 +498,37 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies) error {
 		}
 	}
 
-	return c.JSON(fiber.Map{"status": "deployed", "lane": lane, "image": imagePath, "dockerImage": dockerImage})
+	// Include Harbor namespace information in response
+	response := fiber.Map{
+		"status":      "deployed",
+		"lane":        lane,
+		"image":       imagePath,
+		"dockerImage": dockerImage,
+		"namespace":   buildCtx.APIContext,
+		"appType":     string(buildCtx.AppType),
+	}
+	
+	// Add Harbor registry information for container images
+	if dockerImage != "" {
+		response["harbor"] = fiber.Map{
+			"endpoint": registry.Endpoint,
+			"project":  registry.GetProject(buildCtx.AppType),
+			"imageTag": dockerImage,
+		}
+	}
+	
+	// Add vulnerability scan results if available
+	if scanResult != nil && scanner != nil {
+		response["security"] = fiber.Map{
+			"vulnScanPassed":    scanResult.Passed,
+			"vulnerabilityCount": scanResult.VulnCount,
+			"criticalCount":     scanResult.CriticalCount,
+			"highCount":         scanResult.HighCount,
+			"severityThreshold": scanner.GetSeverityThreshold(),
+		}
+	}
+	
+	return c.JSON(response)
 }
 
 // copyFile copies a file from src to dst

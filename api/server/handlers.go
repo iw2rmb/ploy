@@ -9,13 +9,31 @@ import (
 	"github.com/iw2rmb/ploy/internal/lifecycle"
 )
 
-// handleTriggerBuild handles build trigger requests with request-scoped storage
+// handleTriggerBuild handles build trigger requests with request-scoped storage (legacy)
 func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
 	storeClient, err := s.getStorageClient()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
 	return build.TriggerBuild(c, storeClient, s.dependencies.EnvStore)
+}
+
+// handleTriggerPlatformBuild handles platform service builds with Harbor platform namespace
+func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
+	storeClient, err := s.getStorageClient()
+	if err != nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+	}
+	return build.TriggerPlatformBuild(c, storeClient, s.dependencies.EnvStore)
+}
+
+// handleTriggerAppBuild handles user application builds with Harbor apps namespace
+func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
+	storeClient, err := s.getStorageClient()
+	if err != nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+	}
+	return build.TriggerAppBuild(c, storeClient, s.dependencies.EnvStore)
 }
 
 // handleDestroyApp handles app destruction with request-scoped storage

@@ -602,10 +602,17 @@ func (s *Server) setupRoutes() {
 	api := s.app.Group("/v1")
 
 	// Application build endpoints with request-scoped storage
-	api.Post("/apps/:app/builds", s.handleTriggerBuild)
+	api.Post("/apps/:app/builds", s.handleTriggerAppBuild)     // Harbor apps namespace
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)
+	
+	// Platform service endpoints with Harbor platform namespace
+	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)
+	api.Post("/platform/:service/deploy", s.handleTriggerPlatformBuild)  // Alias for builds
+	
+	// Legacy build endpoint (backward compatibility - defaults to apps namespace)
+	api.Post("/builds/:app", s.handleTriggerBuild)
 
 	// Domain management with dependency injection
 	s.setupDomainRoutes(api)

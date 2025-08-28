@@ -62,6 +62,15 @@
 - **Cosign** — Container image signing and verification with keyless OIDC
 - **Open Policy Agent (OPA)** — Policy enforcement for deployment security
 
+## Container Registry & Storage
+- **Docker Registry v2** — Lightweight, standards-compliant container image storage
+  - **Filesystem Storage** — Local persistence for development environments
+  - **Anonymous Access** — No authentication required for development workflows
+  - **Traefik Integration** — Automatic SSL termination and reverse proxy routing
+  - **Memory Efficiency** — 90% less memory usage vs Harbor (~256MB vs ~2GB)
+  - **Nomad Deployment** — Cloud-native deployment with service discovery
+  - **Benefits** — Standards-compliant Docker Registry v2 API, simplified RBAC-free access
+
 ## Storage & Networking
 - **SeaweedFS** — Distributed object storage optimized for small files (artifacts, SBOMs, signatures)
   - **ARF Recipe Storage** — Recipe persistence with retry logic, caching, and deletion markers

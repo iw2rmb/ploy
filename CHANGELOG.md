@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [2025-08-28] - Docker Registry Infrastructure Updates
+
+### Added
+- **Docker Registry Deployment Playbook**: Created comprehensive `docker-registry.yml` playbook for Docker Registry v2 deployment
+  - Full automation including prerequisites, deployment, validation, and status reporting
+  - Replaces Harbor enterprise registry with lightweight Docker Registry v2
+  - Nomad-native deployment with Consul service discovery integration
+  - Traefik routing with SSL termination for registry.dev.ployman.app
+  - Filesystem storage with proper directory permissions and persistence
+  - Anonymous access enabled for development workflows (no authentication required)
+  - Extensive health checks and API validation (v2 API, catalog endpoints)
+- **Infrastructure Documentation Updates**: Updated README.md and STACK.md to reflect Docker Registry architecture
+  - Added Docker Registry v2 to service stack and playbook documentation
+  - Updated service descriptions with Docker Registry endpoints and benefits
+  - Added registry testing commands for development and deployment validation
+
+### Fixed
+- **Ansible Playbook Service Ordering**: Updated `site.yml` to import `docker-registry.yml` instead of Harbor
+  - Maintained proper service dependency order: Basic tools → SeaweedFS → HashiCorp → Traefik → Docker Registry → API
+  - Removed obsolete Harbor playbook references throughout infrastructure
+- **Registry Architecture Transition**: Completed transition from Harbor to Docker Registry v2
+  - 90% memory usage reduction (~256MB vs ~2GB) for development environments
+  - Simplified RBAC-free container registry for development workflows
+  - Standards-compliant Docker Registry v2 API with anonymous push/pull access
+
+### Testing
+- **Docker Registry Validation**: Added comprehensive registry testing to infrastructure playbooks
+  - Registry v2 API endpoint validation at https://registry.dev.ployman.app/v2/
+  - Catalog endpoint testing for image repository listing
+  - Consul service discovery health checks for registry service registration
+  - Nomad job status monitoring and allocation health validation
+
 ## [2025-08-28] - Local Ansible Deployment Support
 
 ### Added
