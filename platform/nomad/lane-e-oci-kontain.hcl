@@ -116,8 +116,8 @@ job "{{APP_NAME}}-lane-e" {
       config {
         image = "{{DOCKER_IMAGE}}"
         
-        # Standard runtime (Kontain not available)
-        # runtime = "io.kontain"
+        # Kontain runtime for VM-level isolation
+        runtime = "io.kontain"
         
         # Port mapping
         ports = ["http", "metrics"{{#if GRPC_PORT}}, "grpc"{{/if}}]

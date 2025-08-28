@@ -204,6 +204,70 @@
             mode: '0755'
           when: not docker_compose_binary.stat.exists or docker_compose_version not in (current_docker_compose_version.stdout | default(''))
 
+    - name: Install Kontain Runtime for VM-level Container Isolation
+      block:
+        - name: Add Kontain APT repository key
+          apt_key:
+            url: https://kontain-release.s3.us-west-1.amazonaws.com/linux_amd64/repo/kontain.key
+            state: present
+
+        - name: Add Kontain APT repository
+          apt_repository:
+            repo: "deb [arch=amd64] https://kontain-release.s3.us-west-1.amazonaws.com/linux_amd64/repo/ stable main"
+            state: present
+            filename: kontain
+
+        - name: Install Kontain packages
+          apt:
+            name:
+              - kontain
+            state: present
+            update_cache: true
+
+        - name: Configure Docker daemon for Kontain runtime
+          copy:
+            content: |
+              {
+                "runtimes": {
+                  "io.kontain": {
+                    "path": "/opt/kontain/bin/krun"
+                  }
+                },
+                "default-runtime": "runc",
+                "storage-driver": "overlay2",
+                "log-driver": "json-file",
+                "log-opts": {
+                  "max-size": "10m",
+                  "max-file": "3"
+                }
+              }
+            dest: /etc/docker/daemon.json
+            backup: true
+          notify: restart docker
+
+        - name: Create Kontain configuration directory
+          file:
+            path: /etc/kontain
+            state: directory
+            mode: '0755'
+
+        - name: Configure Kontain settings
+          copy:
+            content: |
+              # Kontain configuration
+              # Enable VM-level isolation for containers
+              KONTAIN_ENABLE_VM_ISOLATION=1
+              KONTAIN_LOG_LEVEL=info
+              KONTAIN_MAX_VM_MEMORY=4096
+            dest: /etc/kontain/kontain.conf
+            mode: '0644'
+
+        - name: Restart Docker to apply Kontain runtime
+          systemd:
+            name: docker
+            state: restarted
+            daemon_reload: true
+
     - name: Install Docker Buildx
       block:
         - name: Create Docker CLI plugins directory
@@ -2018,3 +2082,10 @@
       when: 
         - ploy.apps_domain is defined and ploy.apps_domain != ""
         - cert_health_check is defined
+
+  handlers:
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: true
