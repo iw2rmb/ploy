@@ -11,6 +11,7 @@ type Handler struct {
 	recipeStorage    storage.RecipeStorage
 	recipeIndex      storage.RecipeIndexStore
 	recipeValidator  storage.RecipeValidator
+	recipeRegistry   *RecipeRegistry // Unified recipe registry
 	catalog          RecipeCatalog
 	sandboxMgr       SandboxManager
 	llmGenerator     LLMRecipeGenerator
@@ -126,6 +127,16 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// Recipe metadata and stats
 	arf.Get("/recipes/:id/metadata", h.GetRecipeMetadata)
 	arf.Get("/recipes/:id/stats", h.GetRecipeStats)
+	
+	// Recipe registration from OpenRewrite JVM runner
+	arf.Post("/recipes/register", h.RegisterRecipeFromRunner)
+
+	// Model registry management
+	arf.Get("/models", h.GetModels)
+	arf.Post("/models", h.AddModel)
+	arf.Put("/models", h.ImportModels)
+	arf.Delete("/models/:name", h.RemoveModel)
+	arf.Post("/models/:name/set-default", h.SetDefaultModel)
 
 	// Transformation execution
 	arf.Post("/transform", h.ExecuteTransformation)

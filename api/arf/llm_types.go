@@ -3,6 +3,10 @@ package arf
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"time"
 )
 
@@ -100,85 +104,96 @@ type CodebaseContext struct {
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
-// NomadLLMGenerator implements LLMRecipeGenerator using Nomad dispatcher
-type NomadLLMGenerator struct {
-	dispatcher *LLMDispatcher
-	provider   string
-	model      string
+// HTTPLLMGenerator implements LLMRecipeGenerator using external HTTP APIs
+type HTTPLLMGenerator struct {
+	modelConfig *ModelConfig
 }
 
-// NewNomadLLMGenerator creates a new Nomad-based LLM generator
-func NewNomadLLMGenerator(provider, model string) (*NomadLLMGenerator, error) {
-	dispatcher, err := GetOrCreateLLMDispatcher()
-	if err != nil {
-		return nil, err
+// NewHTTPLLMGenerator creates a new HTTP-based LLM generator using model registry
+func NewHTTPLLMGenerator(modelName string) (*HTTPLLMGenerator, error) {
+	ctx := context.Background()
+	
+	var config *ModelConfig
+	var err error
+	
+	if modelName != "" {
+		config, err = GetModelByName(ctx, modelName)
+	} else {
+		config, err = GetDefaultModel(ctx)
 	}
 	
-	return &NomadLLMGenerator{
-		dispatcher: dispatcher,
-		provider:   provider,
-		model:      model,
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model configuration: %w", err)
+	}
+	
+	return &HTTPLLMGenerator{
+		modelConfig: config,
 	}, nil
 }
 
-// GenerateRecipe generates a recipe using Nomad batch jobs
-func (g *NomadLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
-	// Create prompt from request
+// GenerateRecipe generates a recipe using external HTTP API
+func (g *HTTPLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
 	prompt := g.buildPrompt(request)
 	
-	// Create workspace archive (simplified for now)
-	archiveData := []byte("placeholder archive")
-	
-	// Submit job to Nomad
-	params := map[string]interface{}{
-		"language":    request.Language,
-		"framework":   request.Framework,
-		"temperature": 0.1,
-		"max_tokens":  4096,
-	}
-	
-	job, err := g.dispatcher.SubmitLLMTransformation(ctx, g.provider, g.model, prompt, bytes.NewReader(archiveData), params)
+	// Make HTTP request to LLM API
+	response, err := g.callLLMAPI(ctx, prompt, g.modelConfig.MaxTokens, g.modelConfig.Temperature)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to call LLM API: %w", err)
 	}
 	
-	// Wait for completion
-	completedJob, err := g.dispatcher.WaitForCompletion(ctx, job.ID, 5*time.Minute)
-	if err != nil {
-		return nil, err
-	}
+	// Parse response into recipe
+	recipe := make(map[string]interface{})
+	recipe["content"] = response
+	recipe["model"] = g.modelConfig.Model
+	recipe["provider"] = g.modelConfig.Provider
 	
-	// Create generated recipe from result
 	return &GeneratedRecipe{
-		ID:          job.ID,
+		ID:          fmt.Sprintf("recipe-%d", time.Now().Unix()),
 		Name:        "LLM Generated Recipe",
 		Description: prompt,
 		Language:    request.Language,
-		Recipe:      completedJob.Result,
+		Recipe:      recipe,
 		Confidence:  0.8,
+		LLMMetadata: map[string]interface{}{
+			"model":       g.modelConfig.Model,
+			"provider":    g.modelConfig.Provider,
+			"temperature": g.modelConfig.Temperature,
+			"max_tokens":  g.modelConfig.MaxTokens,
+		},
 		CreatedAt:   time.Now(),
 	}, nil
 }
 
 // GetCapabilities returns the capabilities of the LLM generator
-func (g *NomadLLMGenerator) GetCapabilities() LLMCapabilities {
+func (g *HTTPLLMGenerator) GetCapabilities() LLMCapabilities {
 	return LLMCapabilities{
 		SupportedLanguages: []string{"java", "python", "javascript", "go", "csharp", "rust"},
-		MaxContextLength:   8192,
+		MaxContextLength:   g.modelConfig.MaxTokens,
 		SupportsStreaming:  false,
 		SupportsFineTuning: false,
 	}
 }
 
 // IsAvailable checks if the LLM service is available
-func (g *NomadLLMGenerator) IsAvailable(ctx context.Context) bool {
-	// Check if Nomad is reachable
-	// Simplified implementation
-	return true
+func (g *HTTPLLMGenerator) IsAvailable(ctx context.Context) bool {
+	// Make a simple health check request
+	client := &http.Client{Timeout: 5 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, "GET", g.modelConfig.Endpoint, nil)
+	if err != nil {
+		return false
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	
+	return resp.StatusCode < 500
 }
 
 // ValidateGenerated validates a generated recipe
-func (g *NomadLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
+func (g *HTTPLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
 	return &EvolutionValidationResult{
 		Valid:          true,
 		SafetyScore:    recipe.Confidence,
@@ -189,14 +204,21 @@ func (g *NomadLLMGenerator) ValidateGenerated(ctx context.Context, recipe Genera
 }
 
 // OptimizeRecipe optimizes a recipe based on feedback
-func (g *NomadLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error) {
-	// For now, return the recipe as-is
-	// In a real implementation, would use LLM to optimize based on feedback
-	return recipe, nil
+func (g *HTTPLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error) {
+	// Generate optimization prompt
+	prompt := fmt.Sprintf("Optimize the following recipe based on feedback:\n\nRecipe: %v\n\nFeedback:\n- Success: %v\n- Error: %s\n\nProvide an optimized version.",
+		recipe, feedback.Success, feedback.ErrorMessage)
+	
+	response, err := g.callLLMAPI(ctx, prompt, g.modelConfig.MaxTokens, g.modelConfig.Temperature)
+	if err != nil {
+		return recipe, err // Return original on error
+	}
+	
+	return response, nil
 }
 
 // buildPrompt builds a prompt from the recipe generation request
-func (g *NomadLLMGenerator) buildPrompt(request RecipeGenerationRequest) string {
+func (g *HTTPLLMGenerator) buildPrompt(request RecipeGenerationRequest) string {
 	prompt := "Generate a code transformation for the following:\n\n"
 	
 	if request.ErrorContext.ErrorMessage != "" {
@@ -220,14 +242,112 @@ func (g *NomadLLMGenerator) buildPrompt(request RecipeGenerationRequest) string 
 	return prompt
 }
 
-// Helper functions for backward compatibility
-
-// NewOllamaLLMGeneratorWithConfig creates an Ollama-based LLM generator
-func NewOllamaLLMGeneratorWithConfig(model, baseURL string, temperature float64, maxTokens int) (LLMRecipeGenerator, error) {
-	return NewNomadLLMGenerator("ollama", model)
+// callLLMAPI makes an HTTP request to the configured LLM API
+func (g *HTTPLLMGenerator) callLLMAPI(ctx context.Context, prompt string, maxTokens int, temperature float64) (string, error) {
+	// Build request based on provider
+	var reqBody []byte
+	var err error
+	
+	switch g.modelConfig.Provider {
+	case "openai":
+		reqBody, err = json.Marshal(map[string]interface{}{
+			"model":       g.modelConfig.Model,
+			"messages":    []map[string]string{{"role": "user", "content": prompt}},
+			"max_tokens":  maxTokens,
+			"temperature": temperature,
+		})
+	case "anthropic":
+		reqBody, err = json.Marshal(map[string]interface{}{
+			"model":       g.modelConfig.Model,
+			"prompt":      prompt,
+			"max_tokens":  maxTokens,
+			"temperature": temperature,
+		})
+	default:
+		// Generic format for custom providers
+		reqBody, err = json.Marshal(map[string]interface{}{
+			"prompt":      prompt,
+			"max_tokens":  maxTokens,
+			"temperature": temperature,
+			"model":       g.modelConfig.Model,
+		})
+	}
+	
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+	
+	req, err := http.NewRequestWithContext(ctx, "POST", g.modelConfig.Endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	if g.modelConfig.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+g.modelConfig.APIKey)
+	}
+	
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("LLM API returned status %d: %s", resp.StatusCode, string(body))
+	}
+	
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode response: %w", err)
+	}
+	
+	// Extract response based on provider format
+	switch g.modelConfig.Provider {
+	case "openai":
+		if choices, ok := result["choices"].([]interface{}); ok && len(choices) > 0 {
+			if choice, ok := choices[0].(map[string]interface{}); ok {
+				if message, ok := choice["message"].(map[string]interface{}); ok {
+					if content, ok := message["content"].(string); ok {
+						return content, nil
+					}
+				}
+			}
+		}
+	case "anthropic":
+		if completion, ok := result["completion"].(string); ok {
+			return completion, nil
+		}
+	default:
+		// Try common response formats
+		if content, ok := result["content"].(string); ok {
+			return content, nil
+		}
+		if response, ok := result["response"].(string); ok {
+			return response, nil
+		}
+		if text, ok := result["text"].(string); ok {
+			return text, nil
+		}
+	}
+	
+	return "", fmt.Errorf("could not extract response from LLM API result")
 }
 
-// NewOpenAILLMGenerator creates an OpenAI-based LLM generator
+// Helper functions for backward compatibility
+
+// NewOllamaLLMGeneratorWithConfig creates an external LLM generator (backward compatibility)
+// Deprecated: Use NewHTTPLLMGenerator with model registry instead
+func NewOllamaLLMGeneratorWithConfig(model, baseURL string, temperature float64, maxTokens int) (LLMRecipeGenerator, error) {
+	// Try to find a matching model in the registry
+	return NewHTTPLLMGenerator("")
+}
+
+// NewOpenAILLMGenerator creates an OpenAI-based LLM generator (backward compatibility)
+// Deprecated: Use NewHTTPLLMGenerator with model registry instead
 func NewOpenAILLMGenerator() (LLMRecipeGenerator, error) {
-	return NewNomadLLMGenerator("openai", "gpt-4")
+	// Try to find an OpenAI model in the registry
+	return NewHTTPLLMGenerator("")
 }

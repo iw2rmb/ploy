@@ -800,86 +800,7 @@
         state: started
         enabled: true
 
-    - name: Install Ollama for local LLM inference
-      block:
-        - name: Check if Ollama is already installed
-          stat:
-            path: /usr/local/bin/ollama
-          register: ollama_binary
-
-        - name: Download Ollama installer
-          get_url:
-            url: https://ollama.com/install.sh
-            dest: /tmp/ollama-install.sh
-            mode: '0755'
-          when: not ollama_binary.stat.exists
-
-        - name: Install Ollama
-          shell: /tmp/ollama-install.sh
-          when: not ollama_binary.stat.exists
-
-        - name: Create systemd service for Ollama
-          copy:
-            content: |
-              [Unit]
-              Description=Ollama Server
-              After=network-online.target
-
-              [Service]
-              ExecStart=/usr/local/bin/ollama serve
-              User=ploy
-              Group=ploy
-              Restart=always
-              RestartSec=3
-              Environment="OLLAMA_HOST=127.0.0.1:11434"
-              Environment="OLLAMA_MODELS=/home/ploy/.ollama/models"
-              Environment="OLLAMA_MAX_LOADED_MODELS=2"
-              Environment="OLLAMA_NUM_PARALLEL=1"
-
-              [Install]
-              WantedBy=default.target
-            dest: /etc/systemd/system/ollama.service
-            mode: '0644'
-
-        - name: Create Ollama models directory
-          file:
-            path: /home/ploy/.ollama/models
-            state: directory
-            owner: ploy
-            group: ploy
-            mode: '0755'
-
-        - name: Reload systemd daemon
-          systemd:
-            daemon_reload: true
-
-        - name: Start and enable Ollama service
-          systemd:
-            name: ollama
-            state: started
-            enabled: true
-
-        - name: Wait for Ollama service to start
-          wait_for:
-            host: 127.0.0.1
-            port: 11434
-            delay: 5
-            timeout: 30
-
-        - name: Check if CodeLlama model already exists
-          become_user: ploy
-          command: /usr/local/bin/ollama list
-          register: ollama_models
-          changed_when: false
-          ignore_errors: true
-
-        - name: Download CodeLlama model for ARF (7B parameter model for code)
-          become_user: ploy
-          command: /usr/local/bin/ollama pull codellama:7b
-          async: 300  # 5 minutes timeout
-          poll: 10    # Check every 10 seconds
-          ignore_errors: true  # Don't fail if model download times out
-          when: "'codellama:7b' not in (ollama_models.stdout | default(''))"
+    # Ollama removed - using external LLM APIs via model registry instead
 
     - name: Install CLLM service dependencies
       block:
@@ -917,11 +838,8 @@
                 cleanup_timeout: "30s"
 
               providers:
-                default: "ollama"
-                ollama:
-                  base_url: "http://127.0.0.1:11434"
-                  model: "codellama:7b"
-                  timeout: "120s"
+                default: "external"
+                # Models configured via ploy arf models command
                   max_context: 4096
 
               logging:
@@ -955,8 +873,7 @@
               export CLLM_SANDBOX_WORK_DIR="/opt/ploy/cllm/sandbox"
               export CLLM_SANDBOX_MAX_MEMORY="2GB"
               export CLLM_SANDBOX_MAX_CPU_TIME="300s"
-              export CLLM_OLLAMA_URL="http://127.0.0.1:11434"
-              export CLLM_OLLAMA_MODEL="codellama:7b"
+              # LLM models configured via model registry
               export CLLM_CONFIG_FILE="/etc/ploy/cllm/config.yaml"
               export CLLM_LOG_DIR="/var/log/ploy/cllm"
               
@@ -1116,27 +1033,13 @@
               done
               echo "✅ Python LLM deps: $python_deps/5 available"
               
-              # Check Ollama installation and service
-              echo "Checking Ollama installation..."
-              if command -v ollama >/dev/null 2>&1; then
-                  echo "✅ Ollama: $(ollama --version 2>/dev/null || echo 'installed')"
-                  
-                  # Check if Ollama service is running
-                  if systemctl is-active ollama >/dev/null 2>&1; then
-                      echo "✅ Ollama service: running"
-                      
-                      # Check if models are available
-                      model_count=$(ollama list 2>/dev/null | grep -c "codellama" || echo "0")
-                      if [ "$model_count" -gt 0 ]; then
-                          echo "✅ Ollama models: $model_count available"
-                      else
-                          echo "⚠️  Ollama models: downloading in background"
-                      fi
-                  else
-                      echo "❌ Ollama service: not running"
-                  fi
+              # Check LLM model registry
+              echo "Checking LLM model registry..."
+              if consul kv get ploy/arf/models >/dev/null 2>&1; then
+                  model_count=$(consul kv get -recurse ploy/arf/models | grep -c "config" || echo "0")
+                  echo "✅ LLM models registered: $model_count"
               else
-                  echo "❌ Ollama: not installed"
+                  echo "⚠️  No LLM models registered (use: ploy arf models add)"
               fi
               
               echo ""
@@ -1226,22 +1129,19 @@
           export ARF_REDIS_METRICS_DB=4
           
           # LLM Configuration
-          export ARF_LLM_PROVIDER="${ARF_LLM_PROVIDER:-ollama}"
-          export ARF_LLM_MODEL="${ARF_LLM_MODEL:-codellama:7b}"
+          export ARF_LLM_PROVIDER="${ARF_LLM_PROVIDER:-external}"
+          export ARF_LLM_MODEL="${ARF_LLM_MODEL:-default}"
           export ARF_LLM_TEMPERATURE="${ARF_LLM_TEMPERATURE:-0.1}"
           export ARF_LLM_MAX_TOKENS="${ARF_LLM_MAX_TOKENS:-2048}"
           export ARF_LLM_TIMEOUT="${ARF_LLM_TIMEOUT:-30s}"
           export ARF_LLM_CACHE_ENABLED="${ARF_LLM_CACHE_ENABLED:-true}"
           export ARF_LLM_CACHE_TTL="${ARF_LLM_CACHE_TTL:-24h}"
           
-          # Ollama Configuration
-          export OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
-          export OLLAMA_MODELS_DIR="/home/ploy/.ollama/models"
-          export ARF_OLLAMA_ENDPOINT="http://127.0.0.1:11434"
-          export ARF_OLLAMA_CODE_MODEL="codellama:7b"
-          export ARF_OLLAMA_TEXT_MODEL="codellama:7b"
-          export ARF_OLLAMA_TIMEOUT="120s"
-          export ARF_OLLAMA_MAX_RETRIES="3"
+          # LLM Model Registry Configuration
+          export ARF_MODEL_REGISTRY="consul"
+          export ARF_MODEL_REGISTRY_PATH="ploy/arf/models"
+          export ARF_LLM_TIMEOUT="120s"
+          export ARF_LLM_MAX_RETRIES="3"
           
           # Hybrid Pipeline Configuration
           export ARF_HYBRID_DEFAULT_STRATEGY="${ARF_HYBRID_DEFAULT_STRATEGY:-sequential}"
@@ -1817,6 +1717,67 @@
         force: true
       become_user: ploy
       become: true
+
+    # Clean up Ollama if it was previously installed
+    - name: Remove Ollama and cleanup models
+      block:
+        - name: Check if Ollama service exists
+          stat:
+            path: /etc/systemd/system/ollama.service
+          register: ollama_service_file
+
+        - name: Stop and disable Ollama service if running
+          systemd:
+            name: ollama
+            state: stopped
+            enabled: false
+          when: ollama_service_file.stat.exists
+          ignore_errors: true
+
+        - name: Remove Ollama binary
+          file:
+            path: /usr/local/bin/ollama
+            state: absent
+          ignore_errors: true
+
+        - name: Remove Ollama models directory for ploy user
+          file:
+            path: /home/ploy/.ollama
+            state: absent
+          ignore_errors: true
+
+        - name: Remove root Ollama models directory
+          file:
+            path: /root/.ollama
+            state: absent
+          ignore_errors: true
+
+        - name: Remove Ollama models directory in /usr/share
+          file:
+            path: /usr/share/ollama
+            state: absent
+          ignore_errors: true
+
+        - name: Remove Ollama systemd service file
+          file:
+            path: /etc/systemd/system/ollama.service
+            state: absent
+          when: ollama_service_file.stat.exists
+
+        - name: Reload systemd daemon after removing Ollama service
+          systemd:
+            daemon_reload: yes
+          when: ollama_service_file.stat.exists
+
+        - name: Display Ollama cleanup status
+          debug:
+            msg: |
+              Ollama cleanup completed:
+              - Service stopped and disabled
+              - Binary removed from /usr/local/bin
+              - Model directories cleaned up
+              - Systemd service file removed
+              System now configured for external LLM APIs via model registry
 
     - name: Create external storage configuration directory
       file:
