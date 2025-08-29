@@ -7,16 +7,13 @@ set -e
 echo "⚡ Starting ARF OpenRewrite Phase 3 Parallel Execution Testing"
 echo "=============================================================="
 
-# Configure batch job environment
-export ARF_OPENREWRITE_MODE=embedded
+# Configure environment (batch jobs are the only mode)
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 echo "📋 Configuration:"
-echo "  ARF Mode: $ARF_OPENREWRITE_MODE (using batch job dispatcher)"
 echo "  Controller: $PLOY_CONTROLLER"
+echo "  OpenRewrite: Using batch job dispatcher (parallel execution)"
 echo
-
-echo "🔧 Using ARF batch job dispatcher for parallel OpenRewrite transformations"
 
 # Create batch configuration for parallel execution
 BATCH_CONFIG="/tmp/phase3-batch-config.yaml"
@@ -26,10 +23,10 @@ cat > "$BATCH_CONFIG" << EOF
 name: "phase3_parallel_java11to17"
 description: "Phase 3 parallel execution test across all complexity tiers"
 
-# Service configuration
-service_config:
-  openrewrite_url: "${OPENREWRITE_SERVICE_URL}"
-  mode: "service"
+# Batch job configuration
+execution_config:
+  mode: "batch"
+  dispatcher: "nomad"
 
 repositories:
   - id: "simple-1"

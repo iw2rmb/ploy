@@ -1,8 +1,12 @@
 # OpenRewrite Service Migration to Lane E
 
+> **⚠️ DEPRECATED**: This roadmap document is obsolete. ARF now uses Nomad batch jobs for OpenRewrite transformations instead of persistent services. See the current implementation in `api/arf/openrewrite_dispatcher.go`.
+
 ## Executive Summary
 
-Direct migration of OpenRewrite from embedded controller code to standalone Lane E application deployed via Dockerfile. No backward compatibility required - fast, clean cutover.
+~~Direct migration of OpenRewrite from embedded controller code to standalone Lane E application deployed via Dockerfile. No backward compatibility required - fast, clean cutover.~~
+
+**Current Implementation**: ARF uses ephemeral Nomad batch jobs for OpenRewrite transformations, providing better resource efficiency and scalability than persistent services.
 
 **Timeline**: 3 weeks  
 **Service Location**: `services/openrewrite/`  

@@ -7,20 +7,17 @@ set -e
 echo "🧠 Starting ARF OpenRewrite Phase 2 LLM-Enhanced Testing"
 echo "======================================================="
 
-# Configure OpenRewrite (batch jobs) AND LLM provider
-export ARF_OPENREWRITE_MODE=embedded
+# Configure LLM provider (batch jobs are the only OpenRewrite mode)
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 export ARF_LLM_PROVIDER="ollama"
 export ARF_LLM_MODEL="codellama:7b"
 
 echo "📋 Configuration:"
-echo "  ARF Mode: $ARF_OPENREWRITE_MODE (using batch job dispatcher)"
 echo "  Controller: $PLOY_CONTROLLER"
+echo "  OpenRewrite: Using batch job dispatcher"
 echo "  LLM Provider: $ARF_LLM_PROVIDER"
 echo "  LLM Model: $ARF_LLM_MODEL"
 echo
-
-echo "🔧 Using ARF batch job dispatcher for OpenRewrite transformations"
 
 echo "🧠 Checking LLM provider..."
 if curl -f "http://localhost:11434/api/tags" >/dev/null 2>&1; then

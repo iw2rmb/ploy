@@ -7,16 +7,13 @@ set -e
 echo "🔬 Starting ARF OpenRewrite Phase 1 Sequential Testing"
 echo "=================================================="
 
-# Configure OpenRewrite (using batch job dispatcher)
-export ARF_OPENREWRITE_MODE=embedded
+# Configure environment (batch job dispatcher is the only mode)
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 echo "📋 Configuration:"
-echo "  ARF Mode: $ARF_OPENREWRITE_MODE (using batch job dispatcher)"
 echo "  Controller: $PLOY_CONTROLLER"
+echo "  OpenRewrite: Using batch job dispatcher"
 echo
-
-echo "🔧 Using ARF batch job dispatcher for OpenRewrite transformations"
 
 echo
 
