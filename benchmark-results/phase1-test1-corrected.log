@@ -1,0 +1,14 @@
+═══════════════════════════════════════════════════════════
+ ARF Robust Transformation Engine
+═══════════════════════════════════════════════════════════
+
+📋 Configuration:
+  • Repository: https://github.com/winterbe/java8-tutorial.git (branch: master)
+  • Recipes: org.openrewrite.java.migrate.Java8toJava17
+  • Max Iterations: 3
+  • Parallel Tries: 3
+  • Output Format: archive
+  • Report Level: standard
+
+🚀 Starting transformation...
+Error: transformation failed: Post "http://localhost:8081/v1/arf/transform": dial tcp [::1]:8081: connect: connection refused
