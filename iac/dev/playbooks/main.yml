@@ -1649,6 +1649,18 @@
         owner: ploy
         group: ploy
 
+    - name: Validate GitHub credentials are available locally
+      fail:
+        msg: |
+          GitHub credentials not set in local environment.
+          Please set the following environment variables before running Ansible:
+          export GITHUB_PLOY_DEV_USERNAME="your-github-username"
+          export GITHUB_PLOY_DEV_PAT="your-github-personal-access-token"
+          
+          Then run the playbook again:
+          cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST
+      when: lookup('env', 'GITHUB_PLOY_DEV_USERNAME') == '' or lookup('env', 'GITHUB_PLOY_DEV_PAT') == ''
+
     - name: Set GitHub environment variables for ploy user
       blockinfile:
         path: /home/ploy/.bashrc
@@ -1699,19 +1711,45 @@
 
 
     - name: Configure Git credentials for GitHub access
-      blockinfile:
-        path: /home/ploy/.gitconfig
-        create: true
-        owner: ploy
-        group: ploy
-        mode: '0600'
-        block: |
-          [credential "https://github.com"]
-              helper = store
-          [url "https://{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}:{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}@github.com/"]
-              insteadOf = https://github.com/
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - Git credentials"
-      when: lookup('env', 'GITHUB_PLOY_DEV_PAT') != ""
+      block:
+        - name: Create Git credential store file with GitHub token
+          copy:
+            content: "https://{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}:{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}@github.com"
+            dest: /home/ploy/.git-credentials
+            owner: ploy
+            group: ploy
+            mode: '0600'
+            
+        - name: Configure Git to use credential store
+          blockinfile:
+            path: /home/ploy/.gitconfig
+            create: true
+            owner: ploy
+            group: ploy
+            mode: '0644'
+            block: |
+              [credential]
+                  helper = store
+              [user]
+                  name = "{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
+                  email = "{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}@users.noreply.github.com"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - Git credentials"
+            
+        - name: Test Git authentication
+          shell: |
+            # Export credentials for this session
+            export GITHUB_PLOY_DEV_USERNAME="{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
+            export GITHUB_PLOY_DEV_PAT="{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
+            
+            # Test Git authentication by fetching repository info
+            git ls-remote https://github.com/iw2rmb/ploy.git HEAD > /dev/null 2>&1
+          register: git_auth_test
+          become_user: ploy
+          failed_when: git_auth_test.rc != 0
+          
+        - name: Display Git authentication status
+          debug:
+            msg: "Git authentication test: {{ 'PASSED' if git_auth_test.rc == 0 else 'FAILED' }}"
 
     - name: Clone Ploy repository
       git:

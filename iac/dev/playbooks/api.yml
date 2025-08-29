@@ -71,6 +71,26 @@
             msg: "Local changes stashed: {{ git_stash.stdout }}"
           when: git_repo_exists.stat.exists and git_stash.rc == 0 and 'No local changes to save' not in git_stash.stdout
         
+        - name: Ensure GitHub environment variables are available for Git operations
+          shell: |
+            # Source the bashrc to get environment variables
+            source /home/ploy/.bashrc
+            
+            # Verify Git authentication works
+            if ! git ls-remote https://github.com/iw2rmb/ploy.git HEAD > /dev/null 2>&1; then
+              echo "ERROR: Git authentication failed. Please ensure GitHub credentials are properly configured."
+              echo "Check that GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT are set in the local environment."
+              exit 1
+            fi
+          become_user: ploy
+          register: git_auth_check
+          failed_when: git_auth_check.rc != 0
+          
+        - name: Display Git authentication status
+          debug:
+            msg: "Git authentication verified successfully for repository access"
+          when: git_auth_check.rc == 0
+          
         - name: Pull latest code from git repository
           git:
             repo: https://github.com/iw2rmb/ploy.git
@@ -79,6 +99,8 @@
             force: yes
           become_user: ploy
           register: git_update
+          environment:
+            HOME: /home/ploy
           
         - name: Display git update status
           debug:
