@@ -160,8 +160,16 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 		},
 	})
 
-	// Add middleware
-	app.Use(recover.New())
+	// Add middleware with detailed panic recovery
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: true,
+		StackTraceHandler: func(c *fiber.Ctx, err interface{}) {
+			log.Printf("PANIC RECOVERED: %v", err)
+			log.Printf("Request: %s %s", c.Method(), c.OriginalURL())
+			log.Printf("Headers: %v", c.GetReqHeaders())
+			log.Printf("Body: %s", string(c.Body()))
+		},
+	}))
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${method} ${path} - ${latency}\n",
 	}))

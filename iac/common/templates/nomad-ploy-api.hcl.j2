@@ -29,7 +29,7 @@ job "ploy-api" {
     # Rolling update configuration
     update {
       max_parallel = 1
-      min_healthy_time = "30s"
+      min_healthy_time = "10s"
       healthy_deadline = "5m"
       progress_deadline = "10m"
       auto_revert = true
@@ -212,11 +212,11 @@ EOF
         check {
           type = "http"
           path = "/health"
-          interval = "10s"
+          interval = "5s"
           timeout = "3s"
           check_restart {
             limit = 3
-            grace = "10s"
+            grace = "5s"
             ignore_warnings = false
           }
         }
@@ -226,7 +226,7 @@ EOF
           name = "readiness"
           type = "http"
           path = "/ready"
-          interval = "15s"
+          interval = "10s"
           timeout = "5s"
         }
       }

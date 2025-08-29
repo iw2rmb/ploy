@@ -782,7 +782,7 @@ monitor_resource_usage() {
     log "Monitoring resource usage for ${test_type} (${duration}s)"
     
     # Build resource monitor if not available
-    local monitor_binary="./build/resource-monitor"
+    local monitor_binary="./bin/resource-monitor"
     if [[ ! -f "$monitor_binary" ]]; then
         debug "Building resource monitor binary..."
         if ! go build -o "$monitor_binary" ./cmd/resource-monitor 2>/dev/null; then
