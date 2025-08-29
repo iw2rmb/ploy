@@ -162,6 +162,7 @@
         owner: ploy
         group: ploy
         mode: '0644'
+      register: nomad_config
 
     - name: Create Vault configuration
       template:
@@ -238,13 +239,26 @@
         - "/opt/ploy/temp"
       failed_when: not nomad_volume_dirs.results[0].stat.exists
 
+    - name: Restart Nomad if configuration changed
+      systemd:
+        name: nomad
+        state: restarted
+        daemon_reload: true
+      when: nomad_config.changed
+      register: nomad_restart_result
+      retries: 3
+      delay: 5
+      until: nomad_restart_result is succeeded
+
     - name: Start and enable Nomad (if not running)
       systemd:
         name: nomad
         state: started
         enabled: true
         daemon_reload: true
-      when: nomad_service_status.stdout != "active"
+      when: 
+        - nomad_service_status.stdout != "active"
+        - not (nomad_config.changed | default(false))
       register: nomad_start_result
       retries: 3
       delay: 5

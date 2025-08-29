@@ -112,3 +112,12 @@ addresses {
   rpc = "0.0.0.0"
   serf = "0.0.0.0"
 }
+
+# Rate limiting configuration to prevent 429 errors
+limits {
+  https_handshake_timeout = "10s"
+  http_max_conns_per_client = 500
+  rpc_handshake_timeout = "10s"
+  rpc_rate = 10000
+  rpc_max_burst = 5000
+}
