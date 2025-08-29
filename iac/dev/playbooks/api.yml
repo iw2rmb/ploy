@@ -281,15 +281,17 @@
           uri:
             url: "http://localhost:4646/v1/job/ploy-api/allocations"
             method: GET
-            status_code: 200
+            status_code: [200, 429]
             return_content: yes
           register: bootstrap_allocs
           until: >
+            bootstrap_allocs.status == 200 and
             bootstrap_allocs.json is defined and
             bootstrap_allocs.json | length > 0 and
             (bootstrap_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
-          retries: 20
-          delay: 15
+          retries: 30
+          delay: 20
+          failed_when: false
 
         - name: Display bootstrap deployment status
           debug:

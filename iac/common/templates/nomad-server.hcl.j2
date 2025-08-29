@@ -116,8 +116,10 @@ addresses {
 # Rate limiting configuration to prevent 429 errors
 limits {
   https_handshake_timeout = "10s"
-  http_max_conns_per_client = 500
+  http_max_conns_per_client = 2000
   rpc_handshake_timeout = "10s"
-  rpc_rate = 10000
-  rpc_max_burst = 5000
+  rpc_rate = 50000
+  rpc_max_burst = 10000
+  # Additional limits to prevent 429 errors
+  http_max_conns_per_client_by_ip = 2000
 }

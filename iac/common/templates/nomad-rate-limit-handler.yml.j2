@@ -1,0 +1,18 @@
+# Ansible template for handling Nomad 429 rate limit errors
+# Include this in playbooks that make Nomad API calls
+
+- name: Query Nomad with rate limit handling
+  uri:
+    url: "{{ nomad_url }}"
+    method: "{{ nomad_method | default('GET') }}"
+    status_code: "{{ expected_status | default([200, 429]) }}"
+    return_content: yes
+    headers:
+      X-Nomad-Token: "{{ nomad_token | default(omit) }}"
+  register: nomad_response
+  until: nomad_response.status != 429
+  retries: "{{ nomad_retries | default(10) }}"
+  delay: "{{ nomad_delay | default(5) }}"
+  failed_when: >
+    nomad_response.status not in (expected_status | default([200, 429])) and
+    nomad_response.status != 429
