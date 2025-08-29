@@ -1,6 +1,7 @@
 package arf
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -9,12 +10,32 @@ import (
 
 // ExecuteTransformation executes a transformation with robust self-healing capabilities
 func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
+	// Debug: log the raw body first
+	fmt.Printf("[DEBUG] Raw request body: %s\n", string(c.Body()))
+	
 	// Check if this is the new robust transformation request format
 	var robustReq RobustTransformRequest
 	if err := c.BodyParser(&robustReq); err == nil && 
 		(len(robustReq.Transformations.RecipeIDs) > 0 || len(robustReq.Transformations.LLMPrompts) > 0) {
-		// New robust transformation format
-		return h.ExecuteRobustTransformation(c)
+		// New robust transformation format - need to execute directly since body is already consumed
+		fmt.Printf("[DEBUG] Detected robust transformation format - Repository: '%s', Archive: '%s', RecipeIDs: %v\n", 
+			robustReq.InputSource.Repository, robustReq.InputSource.Archive, robustReq.Transformations.RecipeIDs)
+		
+		// Logger function for tracking progress
+		logger := func(level, stage, message, details string) {
+			c.Context().Logger().Printf("[%s] %s: %s %s", level, stage, message, details)
+		}
+		
+		// Execute the robust transformation directly with the already parsed request
+		result, err := ExecuteRobustTransformation(c.Context(), &robustReq, logger)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "Transformation failed",
+				"details": err.Error(),
+			})
+		}
+		
+		return c.JSON(result)
 	}
 	
 	// Legacy transformation request format
@@ -69,6 +90,10 @@ func (h *Handler) ExecuteRobustTransformation(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
+	
+	// Debug: log the parsed request
+	fmt.Printf("[DEBUG] Parsed request - Repository: '%s', Archive: '%s', RecipeIDs: %v\n", 
+		req.InputSource.Repository, req.InputSource.Archive, req.Transformations.RecipeIDs)
 	
 	// Logger function for tracking progress
 	logger := func(level, stage, message, details string) {
