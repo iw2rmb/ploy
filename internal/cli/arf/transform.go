@@ -785,6 +785,21 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 		outputData = data
 	}
 	
+	// Check if output is base64 encoded (for archive format)
+	if format == "archive" {
+		if encoding, ok := result["encoding"].(string); ok && encoding == "base64" {
+			if outputStr, ok := result["output"].(string); ok {
+				decodedData, err := base64.StdEncoding.DecodeString(outputStr)
+				if err == nil {
+					outputData = decodedData
+					fmt.Printf("  • Decoded base64 archive: %d bytes\n", len(outputData))
+				} else {
+					fmt.Printf("  ⚠️  Failed to decode base64: %v\n", err)
+				}
+			}
+		}
+	}
+	
 	// Log what we're about to write
 	fmt.Printf("\n💾 Writing output:\n")
 	fmt.Printf("  • File: %s\n", outputPath)

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iw2rmb/ploy/internal/chttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,7 +23,7 @@ type Engine struct {
 	cache             CacheManager
 	logger            *logrus.Logger
 	mu                sync.RWMutex
-	chttpClients      map[string]*chttp.Client // Cache CHTTP clients
+	dispatcher        *AnalysisDispatcher // Nomad dispatcher for distributed analysis
 }
 
 // NewEngine creates a new analysis engine
@@ -35,8 +34,20 @@ func NewEngine(logger *logrus.Logger) *Engine {
 		config:            DefaultConfig(),
 		logger:            logger,
 		cache:             NewInMemoryCache(),
-		chttpClients:      make(map[string]*chttp.Client),
 	}
+}
+
+// NewEngineWithDispatcher creates a new analysis engine with Nomad dispatcher
+func NewEngineWithDispatcher(logger *logrus.Logger, dispatcher *AnalysisDispatcher) *Engine {
+	engine := NewEngine(logger)
+	engine.dispatcher = dispatcher
+	
+	// Register Nomad-based analyzers
+	engine.RegisterAnalyzer("python", NewNomadPylintAnalyzer(dispatcher))
+	engine.RegisterAnalyzer("javascript", NewNomadESLintAnalyzer(dispatcher))
+	engine.RegisterAnalyzer("go", NewNomadGolangCIAnalyzer(dispatcher))
+	
+	return engine
 }
 
 // DefaultConfig returns the default analysis configuration
