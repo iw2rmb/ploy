@@ -488,21 +488,85 @@ func executeRobustTransformation(req *TransformRequest) error {
 		return fmt.Errorf("failed to serialize request: %w", err)
 	}
 	
+	// Log request details
+	if req.ReportLevel == "detailed" {
+		fmt.Printf("\n📤 API Request Details:\n")
+		fmt.Printf("  • Endpoint: %s/arf/transform\n", arfControllerURL)
+		fmt.Printf("  • Request Size: %d bytes\n", len(data))
+		fmt.Printf("  • Timeout: 30 minutes\n")
+		
+		// Log request body structure (without full data)
+		fmt.Printf("  • Request Structure:\n")
+		if req.Repository != "" {
+			fmt.Printf("    - Repository: %s\n", req.Repository)
+		}
+		if req.ArchivePath != "" {
+			fmt.Printf("    - Archive: %s\n", req.ArchivePath)
+		}
+		fmt.Printf("    - Recipes: %d\n", len(req.RecipeIDs))
+		fmt.Printf("    - LLM Prompts: %d\n", len(req.LLMPrompts))
+		fmt.Printf("    - Max Iterations: %d\n", req.MaxIterations)
+		fmt.Printf("    - Parallel Tries: %d\n", req.ParallelTries)
+	}
+	
 	// Call the transformation endpoint
 	url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
 	
-	fmt.Printf("\n🚀 Starting transformation...\n\n")
+	fmt.Printf("\n🚀 Starting transformation...\n")
+	
+	// Log the actual request being sent
+	if req.ReportLevel == "detailed" {
+		fmt.Printf("\n🔍 Sending request to: %s\n", url)
+		fmt.Printf("📊 Request payload preview (first 500 chars):\n")
+		preview := string(data)
+		if len(preview) > 500 {
+			preview = preview[:500] + "..."
+		}
+		fmt.Printf("%s\n", preview)
+	}
 	
 	// Make API request with longer timeout for complex transformations
+	startTime := time.Now()
 	response, err := makeAPIRequestWithContext(ctx, "POST", url, data, 30*time.Minute)
+	elapsed := time.Since(startTime)
+	
+	if req.ReportLevel == "detailed" {
+		fmt.Printf("\n⏱️  API call completed in: %v\n", elapsed)
+	}
+	
 	if err != nil {
+		if req.ReportLevel == "detailed" {
+			fmt.Printf("❌ API Error Details: %v\n", err)
+		}
 		return fmt.Errorf("transformation failed: %w", err)
+	}
+	
+	// Log response details
+	if req.ReportLevel == "detailed" {
+		fmt.Printf("📥 Response received: %d bytes\n", len(response))
+		fmt.Printf("🔍 Response preview (first 500 chars):\n")
+		preview := string(response)
+		if len(preview) > 500 {
+			preview = preview[:500] + "..."
+		}
+		fmt.Printf("%s\n", preview)
 	}
 	
 	// Parse the response
 	var result map[string]interface{}
 	if err := json.Unmarshal(response, &result); err != nil {
+		if req.ReportLevel == "detailed" {
+			fmt.Printf("❌ Failed to parse JSON response. Raw response:\n%s\n", string(response))
+		}
 		return fmt.Errorf("failed to parse response: %w", err)
+	}
+	
+	// Log parsed result structure
+	if req.ReportLevel == "detailed" {
+		fmt.Printf("\n📋 Parsed Response Structure:\n")
+		for key := range result {
+			fmt.Printf("  • %s\n", key)
+		}
 	}
 	
 	// Display results
@@ -526,6 +590,29 @@ func displayTransformationResults(result map[string]interface{}) {
 	fmt.Println(" Transformation Results")
 	fmt.Println("═══════════════════════════════════════════════════════════")
 	
+	// Log all result keys for debugging
+	fmt.Printf("\n🔍 Result contains %d keys:\n", len(result))
+	for key, value := range result {
+		switch v := value.(type) {
+		case string:
+			if len(v) > 100 {
+				fmt.Printf("  • %s: (string, %d chars)\n", key, len(v))
+			} else {
+				fmt.Printf("  • %s: %s\n", key, v)
+			}
+		case bool:
+			fmt.Printf("  • %s: %v\n", key, v)
+		case float64:
+			fmt.Printf("  • %s: %.2f\n", key, v)
+		case map[string]interface{}:
+			fmt.Printf("  • %s: (map with %d keys)\n", key, len(v))
+		case []interface{}:
+			fmt.Printf("  • %s: (array with %d items)\n", key, len(v))
+		default:
+			fmt.Printf("  • %s: (%T)\n", key, v)
+		}
+	}
+	
 	// Success status
 	if success, ok := result["success"].(bool); ok {
 		if success {
@@ -533,6 +620,18 @@ func displayTransformationResults(result map[string]interface{}) {
 		} else {
 			fmt.Printf("\n❌ Status: FAILED\n")
 		}
+	} else {
+		fmt.Printf("\n⚠️  Status: UNKNOWN (no 'success' field in response)\n")
+	}
+	
+	// Check for error field
+	if errMsg, ok := result["error"].(string); ok {
+		fmt.Printf("\n❌ Error: %s\n", errMsg)
+	}
+	
+	// Check for message field
+	if msg, ok := result["message"].(string); ok {
+		fmt.Printf("\n📝 Message: %s\n", msg)
 	}
 	
 	// Report summary
@@ -615,6 +714,8 @@ func displayTransformationResults(result map[string]interface{}) {
 
 // saveTransformationOutput saves the transformation output to a file
 func saveTransformationOutput(result map[string]interface{}, outputPath, format string) error {
+	fmt.Printf("\n📁 Attempting to save output as %s format to %s\n", format, outputPath)
+	
 	// Create output directory if needed
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
@@ -627,28 +728,45 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 	switch format {
 	case "archive":
 		// Save tar archive if provided
+		fmt.Printf("🔍 Looking for archive data in response...\n")
 		if output, ok := result["output"].(map[string]interface{}); ok {
+			fmt.Printf("  • Found 'output' field with %d keys\n", len(output))
 			if archive, ok := output["archive"].(string); ok {
+				fmt.Printf("  • Found archive data: %d chars\n", len(archive))
 				// Base64 decode if needed
 				outputData = []byte(archive)
+			} else {
+				fmt.Printf("  • No 'archive' field in output\n")
 			}
+		} else {
+			fmt.Printf("  • No 'output' field in result\n")
 		}
 		
 	case "diff":
 		// Generate unified diff from changes
+		fmt.Printf("🔍 Looking for diff data in response...\n")
 		if report, ok := result["report"].(map[string]interface{}); ok {
+			fmt.Printf("  • Found 'report' field\n")
 			if changes, ok := report["changes"].([]interface{}); ok {
+				fmt.Printf("  • Found %d changes\n", len(changes))
 				var diff strings.Builder
+				diffCount := 0
 				for _, change := range changes {
 					if c, ok := change.(map[string]interface{}); ok {
 						if unifiedDiff, ok := c["unified_diff"].(string); ok {
 							diff.WriteString(unifiedDiff)
 							diff.WriteString("\n")
+							diffCount++
 						}
 					}
 				}
+				fmt.Printf("  • Generated diff from %d changes\n", diffCount)
 				outputData = []byte(diff.String())
+			} else {
+				fmt.Printf("  • No 'changes' array in report\n")
 			}
+		} else {
+			fmt.Printf("  • No 'report' field in result\n")
 		}
 		
 	case "mr":
@@ -667,10 +785,20 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 		outputData = data
 	}
 	
+	// Log what we're about to write
+	fmt.Printf("\n💾 Writing output:\n")
+	fmt.Printf("  • File: %s\n", outputPath)
+	fmt.Printf("  • Size: %d bytes\n", len(outputData))
+	if len(outputData) == 0 {
+		fmt.Printf("  ⚠️  WARNING: Output data is empty!\n")
+	}
+	
 	// Write to file
 	if err := os.WriteFile(outputPath, outputData, 0644); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
+	
+	fmt.Printf("  ✅ File written successfully\n")
 	
 	return nil
 }
