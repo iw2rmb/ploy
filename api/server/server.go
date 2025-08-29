@@ -46,7 +46,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain"
 
 	// internal_openrewrite "github.com/iw2rmb/ploy/internal/openrewrite"
-	"github.com/iw2rmb/ploy/api/performance"
 	"github.com/iw2rmb/ploy/internal/preview"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
@@ -71,9 +70,6 @@ type ServiceDependencies struct {
 	BlueGreenManager    *bluegreen.Manager
 	Metrics             *metrics.Metrics
 	StorageConfigPath   string
-	// Performance optimizations
-	ConsulPool     *performance.ConsulPool
-	NomadPool      *performance.NomadPool
 	StorageFactory *config.OptimizedStorageClientFactory
 }
 
@@ -88,9 +84,6 @@ type ControllerConfig struct {
 	EnvStorePath      string
 	CleanupAutoStart  bool
 	ShutdownTimeout   time.Duration
-	// Performance settings
-	ConsulPoolSize int
-	NomadPoolSize  int
 	EnableCaching  bool
 }
 
@@ -122,9 +115,6 @@ func LoadConfigFromEnv() *ControllerConfig {
 		EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
 		CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
 		ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
-		// Performance settings
-		ConsulPoolSize: parseIntEnv("PLOY_CONSUL_POOL_SIZE", 10),
-		NomadPoolSize:  parseIntEnv("PLOY_NOMAD_POOL_SIZE", 8),
 		EnableCaching:  utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
 	}
 }
@@ -200,10 +190,10 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	return server, nil
 }
 
-// initializeDependencies initializes all external service dependencies with performance optimizations
+// initializeDependencies initializes all external service dependencies
 func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error) {
 	startTime := time.Now()
-	log.Printf("Initializing service dependencies with performance optimizations (caching: %v)", cfg.EnableCaching)
+	log.Printf("Initializing service dependencies (caching: %v)", cfg.EnableCaching)
 
 	// Validate storage configuration at startup
 	if _, err := config.Load(cfg.StorageConfigPath); err != nil {
@@ -282,22 +272,6 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize analysis handler: %v", err)
 	}
 
-	// Initialize connection pools for better performance
-	consulPool, err := performance.NewConsulPool(cfg.ConsulAddr, cfg.ConsulPoolSize)
-	if err != nil {
-		log.Printf("Warning: Failed to initialize Consul pool: %v", err)
-		consulPool = nil
-	} else {
-		log.Printf("Consul connection pool initialized (size: %d)", cfg.ConsulPoolSize)
-	}
-
-	nomadPool, err := performance.NewNomadPool(cfg.NomadAddr, cfg.NomadPoolSize)
-	if err != nil {
-		log.Printf("Warning: Failed to initialize Nomad pool: %v", err)
-		nomadPool = nil
-	} else {
-		log.Printf("Nomad connection pool initialized (size: %d)", cfg.NomadPoolSize)
-	}
 
 	// Initialize optimized storage factory
 	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
@@ -334,26 +308,17 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		BlueGreenManager:    blueGreenManager,
 		Metrics:             metricsInstance,
 		StorageConfigPath:   cfg.StorageConfigPath,
-		// Performance components
-		ConsulPool:     consulPool,
-		NomadPool:      nomadPool,
 		StorageFactory: storageFactory,
 	}
 
-	// Record startup time and initial pool metrics
+	// Record startup time
 	startupDuration := time.Since(startTime)
 	if metricsInstance != nil {
 		metricsInstance.RecordStartupTime(startupDuration)
-		if consulPool != nil {
-			metricsInstance.UpdateConnectionPoolUsage("consul", float64(consulPool.Size()))
-		}
-		if nomadPool != nil {
-			metricsInstance.UpdateConnectionPoolUsage("nomad", float64(nomadPool.Size()))
-		}
 	}
 
-	log.Printf("Service dependencies initialized successfully in %v (caching: %v, pools: consul=%d, nomad=%d)",
-		startupDuration, cfg.EnableCaching, cfg.ConsulPoolSize, cfg.NomadPoolSize)
+	log.Printf("Service dependencies initialized successfully in %v (caching: %v)",
+		startupDuration, cfg.EnableCaching)
 	return deps, nil
 }
 
@@ -695,8 +660,6 @@ func (s *Server) setupRoutes() {
 	// Version endpoints
 	version.RegisterRoutes(s.app)
 
-	// Performance monitoring endpoints
-	s.setupPerformanceRoutes(api)
 
 	// Health endpoints in API group for versioned access
 	api.Get("/health", s.dependencies.HealthChecker.HealthHandler)
@@ -705,7 +668,7 @@ func (s *Server) setupRoutes() {
 	api.Get("/health/metrics", s.dependencies.HealthChecker.MetricsHandler)
 	api.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
 
-	log.Printf("API routes configured with dependency injection and performance monitoring")
+	log.Printf("API routes configured with dependency injection")
 }
 
 // setupDomainRoutes configures domain management routes

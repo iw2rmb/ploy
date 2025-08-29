@@ -105,12 +105,6 @@
 - `GET /v1/dns/config` — get DNS configuration
 - `POST /v1/dns/config/validate` — validate DNS provider configuration
 
-## Performance Monitoring System
-- `GET /v1/performance/stats` — get comprehensive performance statistics
-- `GET /v1/performance/cache` — get cache performance information
-- `POST /v1/performance/cache` — manage cache operations
-- `GET /v1/performance/pools` — get connection pool statistics
-- `GET /v1/performance/metrics` — get JSON performance metrics
 
 ## System Management
 

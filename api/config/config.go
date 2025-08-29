@@ -9,8 +9,115 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/iw2rmb/ploy/internal/storage"
-	"github.com/iw2rmb/ploy/api/performance"
 )
+
+// ConfigCacheEntry represents a cached configuration with expiration
+type ConfigCacheEntry struct {
+	Key       string
+	Config    interface{}
+	ExpiresAt time.Time
+}
+
+// ConfigCache provides simple caching for configuration
+type ConfigCache struct {
+	entries map[string]*ConfigCacheEntry
+	ttl     time.Duration
+	mu      sync.RWMutex
+	hits    int64
+	misses  int64
+}
+
+// NewConfigCache creates a new config cache
+func NewConfigCache(ttl time.Duration) *ConfigCache {
+	return &ConfigCache{
+		entries: make(map[string]*ConfigCacheEntry),
+		ttl:     ttl,
+	}
+}
+
+// Get retrieves cached config if still valid
+func (c *ConfigCache) Get(key string) (interface{}, bool) {
+	if c == nil {
+		return nil, false
+	}
+	
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	entry, exists := c.entries[key]
+	if !exists || time.Now().After(entry.ExpiresAt) {
+		c.misses++
+		return nil, false
+	}
+	
+	c.hits++
+	return entry.Config, true
+}
+
+// Set stores config in cache
+func (c *ConfigCache) Set(key string, config interface{}) {
+	if c == nil {
+		return
+	}
+	
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.entries[key] = &ConfigCacheEntry{
+		Key:       key,
+		Config:    config,
+		ExpiresAt: time.Now().Add(c.ttl),
+	}
+}
+
+// GetStats returns cache statistics
+func (c *ConfigCache) GetStats() map[string]interface{} {
+	if c == nil {
+		return map[string]interface{}{
+			"size": 0,
+			"hits": int64(0),
+			"misses": int64(0),
+			"hit_rate": 0.0,
+		}
+	}
+	
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	total := c.hits + c.misses
+	var hitRate float64
+	if total > 0 {
+		hitRate = float64(c.hits) / float64(total)
+	}
+	
+	// Count valid entries
+	validEntries := 0
+	now := time.Now()
+	for _, entry := range c.entries {
+		if now.Before(entry.ExpiresAt) {
+			validEntries++
+		}
+	}
+	
+	return map[string]interface{}{
+		"size": validEntries,
+		"hits": c.hits,
+		"misses": c.misses,
+		"hit_rate": hitRate,
+	}
+}
+
+// Clear clears the cache
+func (c *ConfigCache) Clear() {
+	if c == nil {
+		return
+	}
+	
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.entries = make(map[string]*ConfigCacheEntry)
+}
 
 // StorageConfig represents the complete storage configuration
 type StorageConfig struct {
@@ -67,7 +174,7 @@ type ConfigManager struct {
 	configPath   string
 	lastModTime  time.Time
 	mu           sync.RWMutex
-	cache        *performance.StatefulCache
+	cache        *ConfigCache
 	cacheEnabled bool
 }
 
@@ -75,16 +182,16 @@ type ConfigManager struct {
 func NewConfigManager(configPath string) *ConfigManager {
 	return &ConfigManager{
 		configPath:   configPath,
-		cache:        performance.NewStatefulCache(10 * time.Minute), // 10-minute cache
+		cache:        NewConfigCache(10 * time.Minute), // 10-minute cache
 		cacheEnabled: true,
 	}
 }
 
 // NewConfigManagerWithCache creates a config manager with configurable caching
 func NewConfigManagerWithCache(configPath string, cacheTTL time.Duration, enableCache bool) *ConfigManager {
-	var cache *performance.StatefulCache
+	var cache *ConfigCache
 	if enableCache && cacheTTL > 0 {
-		cache = performance.NewStatefulCache(cacheTTL)
+		cache = NewConfigCache(cacheTTL)
 	}
 	return &ConfigManager{
 		configPath:   configPath,
@@ -360,11 +467,16 @@ func (cm *ConfigManager) ClearCache() {
 }
 
 // GetCacheStats returns cache performance statistics
-func (cm *ConfigManager) GetCacheStats() performance.CacheStats {
+func (cm *ConfigManager) GetCacheStats() map[string]interface{} {
 	if cm.cache != nil {
-		return cm.cache.Stats()
+		return cm.cache.GetStats()
 	}
-	return performance.CacheStats{}
+	return map[string]interface{}{
+		"size": 0,
+		"hits": int64(0),
+		"misses": int64(0),
+		"hit_rate": 0.0,
+	}
 }
 
 // OptimizedStorageClientFactory creates storage clients with connection pooling

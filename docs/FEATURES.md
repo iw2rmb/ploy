@@ -330,7 +330,7 @@ Auto-classified lanes:
   - `ploy analyze config` - Manage configuration
   - `ploy analyze results` - View analysis history
 
-### Nomad-Based Analysis Services (Migrated from CHTTP - Aug 2025)
+### Nomad-Based Analysis Services
 - ✅ **Nomad Analysis Dispatcher**: Distributed code analysis via batch jobs (Aug 2025)
   - ✅ Job submission and monitoring through Nomad API
   - ✅ Consul KV for job status tracking and result storage

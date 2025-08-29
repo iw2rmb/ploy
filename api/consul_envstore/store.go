@@ -10,15 +10,134 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/iw2rmb/ploy/api/envstore"
-	"github.com/iw2rmb/ploy/api/performance"
 )
+
+// CacheEntry represents a cached value with expiration
+type CacheEntry struct {
+	Value     interface{}
+	ExpiresAt time.Time
+}
+
+// SimpleCache provides a thread-safe in-memory cache with TTL
+type SimpleCache struct {
+	entries map[string]*CacheEntry
+	mu      sync.RWMutex
+	ttl     time.Duration
+	hits    int64
+	misses  int64
+}
+
+// NewSimpleCache creates a new cache with the specified TTL
+func NewSimpleCache(ttl time.Duration) *SimpleCache {
+	cache := &SimpleCache{
+		entries: make(map[string]*CacheEntry),
+		ttl:     ttl,
+	}
+	
+	// Start cleanup goroutine
+	go cache.cleanup()
+	
+	return cache
+}
+
+// Get retrieves a value from the cache
+func (c *SimpleCache) Get(key string) (interface{}, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	entry, exists := c.entries[key]
+	if !exists {
+		c.misses++
+		return nil, false
+	}
+	
+	// Check if entry has expired
+	if time.Now().After(entry.ExpiresAt) {
+		delete(c.entries, key)
+		c.misses++
+		return nil, false
+	}
+	
+	c.hits++
+	return entry.Value, true
+}
+
+// Set stores a value in the cache with TTL
+func (c *SimpleCache) Set(key string, value interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.entries[key] = &CacheEntry{
+		Value:     value,
+		ExpiresAt: time.Now().Add(c.ttl),
+	}
+}
+
+// Delete removes a key from the cache
+func (c *SimpleCache) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	delete(c.entries, key)
+}
+
+// Clear removes all entries from the cache
+func (c *SimpleCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	c.entries = make(map[string]*CacheEntry)
+}
+
+// cleanup periodically removes expired entries
+func (c *SimpleCache) cleanup() {
+	ticker := time.NewTicker(c.ttl / 2) // Cleanup at half the TTL interval
+	defer ticker.Stop()
+	
+	for range ticker.C {
+		c.mu.Lock()
+		now := time.Now()
+		for key, entry := range c.entries {
+			if now.After(entry.ExpiresAt) {
+				delete(c.entries, key)
+			}
+		}
+		c.mu.Unlock()
+	}
+}
+
+// CacheStats represents cache statistics
+type CacheStats struct {
+	Size    int
+	Hits    int64
+	Misses  int64
+	HitRate float64
+}
+
+// GetCacheStats returns cache statistics
+func (c *SimpleCache) GetCacheStats() CacheStats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	
+	total := c.hits + c.misses
+	var hitRate float64
+	if total > 0 {
+		hitRate = float64(c.hits) / float64(total)
+	}
+	
+	return CacheStats{
+		Size:    len(c.entries),
+		Hits:    c.hits,
+		Misses:  c.misses,
+		HitRate: hitRate,
+	}
+}
 
 type ConsulEnvStore struct {
 	client     *api.Client
 	keyPrefix  string
 	mu         sync.RWMutex
-	cache      *performance.StatefulCache
-	consulPool *performance.ConsulPool
+	cache      *SimpleCache
 	batchSize  int
 }
 
@@ -40,21 +159,13 @@ func New(consulAddr, keyPrefix string) (*ConsulEnvStore, error) {
 		keyPrefix = "ploy/apps"
 	}
 	
-	// Create connection pool for better performance
-	consulPool, err := performance.NewConsulPool(consulAddr, 10) // Pool size of 10
-	if err != nil {
-		log.Printf("Warning: Failed to create Consul pool, using single client: %v", err)
-		consulPool = nil
-	}
-	
 	// Create cache with 5-minute TTL for environment variables
-	cache := performance.NewStatefulCache(5 * time.Minute)
+	cache := NewSimpleCache(5 * time.Minute)
 	
 	return &ConsulEnvStore{
 		client:     client,
 		keyPrefix:  keyPrefix,
 		cache:      cache,
-		consulPool: consulPool,
 		batchSize:  10,
 	}, nil
 }
@@ -77,42 +188,7 @@ func (s *ConsulEnvStore) GetAll(app string) (envstore.AppEnvVars, error) {
 	
 	key := s.appEnvKey(app)
 	
-	// Use pooled client if available
-	if s.consulPool != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		
-		var envVars envstore.AppEnvVars
-		err := s.consulPool.WithClient(ctx, func(client *api.Client) error {
-			kv := client.KV()
-			pair, _, err := kv.Get(key, nil)
-			if err != nil {
-				return fmt.Errorf("failed to get from Consul: %w", err)
-			}
-			
-			if pair == nil {
-				envVars = envstore.AppEnvVars{}
-				return nil
-			}
-			
-			if err := json.Unmarshal(pair.Value, &envVars); err != nil {
-				return fmt.Errorf("failed to unmarshal environment variables: %w", err)
-			}
-			
-			return nil
-		})
-		
-		if err != nil {
-			return nil, err
-		}
-		
-		// Cache the result
-		s.cache.Set(cacheKey, envVars)
-		log.Printf("[ConsulEnvStore] Retrieved and cached %d environment variables for app %s", len(envVars), app)
-		return envVars, nil
-	}
-	
-	// Fallback to direct client
+	// Use direct client
 	kv := s.client.KV()
 	pair, _, err := kv.Get(key, nil)
 	if err != nil {
@@ -267,19 +343,16 @@ func (s *ConsulEnvStore) HealthCheck() error {
 }
 
 // GetCacheStats returns cache performance statistics
-func (s *ConsulEnvStore) GetCacheStats() performance.CacheStats {
+func (s *ConsulEnvStore) GetCacheStats() CacheStats {
 	if s.cache != nil {
-		return s.cache.Stats()
+		return s.cache.GetCacheStats()
 	}
-	return performance.CacheStats{}
+	return CacheStats{}
 }
 
-// GetPoolStats returns connection pool statistics
+// GetPoolStats returns cache statistics (pool functionality removed)
 func (s *ConsulEnvStore) GetPoolStats() map[string]interface{} {
 	stats := make(map[string]interface{})
-	if s.consulPool != nil {
-		stats["pool_size"] = s.consulPool.Size()
-	}
 	stats["cache_stats"] = s.GetCacheStats()
 	return stats
 }
