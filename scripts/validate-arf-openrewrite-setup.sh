@@ -1,6 +1,7 @@
 #!/bin/bash
 # validate-arf-openrewrite-setup.sh
 # Validates ARF OpenRewrite migration setup and prerequisites
+# Note: OpenRewrite runs via Nomad batch jobs (the only supported mode)
 
 set -e
 
@@ -37,22 +38,8 @@ info_check() {
 echo "🔧 Environment Configuration"
 echo "=============================="
 
-# Required environment variables
+# Required environment variables  
 echo "Environment Variables:"
-if [ -n "$OPENREWRITE_SERVICE_URL" ]; then
-  info_check "OPENREWRITE_SERVICE_URL" "$OPENREWRITE_SERVICE_URL"
-else
-  echo -e "${YELLOW}⚠️  OPENREWRITE_SERVICE_URL not set, using default${NC}"
-  export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-fi
-
-if [ -n "$ARF_OPENREWRITE_MODE" ]; then
-  info_check "ARF_OPENREWRITE_MODE" "$ARF_OPENREWRITE_MODE"
-else
-  echo -e "${YELLOW}⚠️  ARF_OPENREWRITE_MODE not set, using service mode${NC}"
-  export ARF_OPENREWRITE_MODE=service
-fi
-
 if [ -n "$PLOY_CONTROLLER" ]; then
   info_check "PLOY_CONTROLLER" "$PLOY_CONTROLLER"
 else
@@ -140,13 +127,7 @@ else
   validate_check "Controller API accessible" "1"
 fi
 
-# Check OpenRewrite service  
-if timeout 10 curl -s -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" >/dev/null 2>&1; then
-  validate_check "OpenRewrite service accessible" "0"
-else
-  validate_check "OpenRewrite service accessible" "1"
-  echo -e "${YELLOW}   Service will fall back to embedded mode${NC}"
-fi
+# OpenRewrite transformations use Nomad batch jobs (the only mode)
 
 echo
 
@@ -216,8 +197,6 @@ if [ "$VALIDATION_FAILED" = true ]; then
   echo "  ollama pull codellama:7b"
   echo
   echo "  # Set environment variables:"
-  echo "  export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app"
-  echo "  export ARF_OPENREWRITE_MODE=service"  
   echo "  export PLOY_CONTROLLER=https://api.dev.ployman.app/v1"
   exit 1
 else

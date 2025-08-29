@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## [2025-08-29] - OpenRewrite Service Cleanup & Simplification
+
+### Removed
+- **Obsolete OpenRewrite Service**: Removed unnecessary `platform-openrewrite` Nomad service
+  - Stopped and removed persistent service that was consuming resources unnecessarily
+  - ARF already uses ephemeral batch jobs via `openrewrite_dispatcher.go`
+  
+### Changed
+- **Configuration Simplification**: Removed ARF_OPENREWRITE_MODE environment variable
+  - Batch jobs are now the only mode - no configuration needed
+  - Removed mode checks from validation scripts
+  - Updated all test scripts to remove mode references
+  - Simplified ARF factory by removing OpenRewriteMode and OpenRewriteURL fields
+  
+### Fixed
+- **Documentation Updates**: Updated all docs to reflect batch-job-only architecture
+  - Updated `ARF_OPENREWRITE_MIGRATION_GUIDE.md` with batch job architecture details
+  - Added deprecation notices to obsolete roadmap documents
+  - Removed all references to `openrewrite.dev.ployman.app` service endpoint
+  - Updated troubleshooting guides for batch job monitoring
+
+### Testing
+- Validated batch job dispatcher works without service mode configuration
+- Confirmed all scripts run without ARF_OPENREWRITE_MODE
+- Build verification passes with simplified factory configuration
+
 ## [2025-08-29] - LLM Service Migration to Nomad
 
 ### Added

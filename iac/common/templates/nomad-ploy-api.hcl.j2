@@ -152,35 +152,39 @@ job "ploy-api" {
 #!/bin/bash
 set -e
 
-# Install required system dependencies
+# Install required system dependencies in container
 echo "[SETUP] Installing system dependencies..."
-export DEBIAN_FRONTEND=noninteractive
 
-# Update package list
-apt-get update -qq
-
-# Install git and essential tools for ARF transformations
-apt-get install -y -qq \
-  git \
-  curl \
-  wget \
-  openssh-client \
-  ca-certificates \
-  unzip
-
-# Install Java 17 for OpenRewrite operations
-if ! command -v java &> /dev/null; then
-  echo "[SETUP] Installing Java 17..."
-  apt-get install -y -qq openjdk-17-jdk
+# Update package list and install git if missing
+if ! command -v git &> /dev/null; then
+  echo "[SETUP] Installing git..."
+  apt-get update -qq
+  apt-get install -y git
 fi
 
-# Verify installations
-echo "[SETUP] Verifying installations..."
-git --version
-java -version
-curl --version
+# Verify git installation
+if command -v git &> /dev/null; then
+  echo "[SETUP] ✓ git: $(git --version)"
+else
+  echo "[SETUP] ✗ git: INSTALLATION FAILED - ARF transformations will fail"
+  exit 1
+fi
 
-echo "[SETUP] System dependencies installed successfully"
+# Verify Java (should be pre-installed by Ansible on host)
+if command -v java &> /dev/null; then
+  echo "[SETUP] ✓ java: $(java -version 2>&1 | head -n1)"
+else
+  echo "[SETUP] ✗ java: NOT AVAILABLE - OpenRewrite operations may fail"  
+fi
+
+# Verify curl
+if command -v curl &> /dev/null; then
+  echo "[SETUP] ✓ curl: $(curl --version | head -n1)"
+else
+  echo "[SETUP] ✗ curl: NOT AVAILABLE - HTTP operations may fail"
+fi
+
+echo "[SETUP] System dependency setup completed"
 
 # Make binary executable and start API
 chmod +x local/api

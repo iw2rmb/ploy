@@ -1,10 +1,13 @@
 # Stream C: Production Readiness
 
+> **⚠️ DEPRECATED**: This roadmap document is obsolete. ARF uses batch jobs instead of persistent OpenRewrite services. Current monitoring focuses on Nomad job execution and batch job performance.
+
 ## Overview
-**Goal**: Make the OpenRewrite service production-ready  
+~~**Goal**: Make the OpenRewrite service production-ready~~  
+**Current Status**: OpenRewrite transformations run via Nomad batch jobs - no persistent service needed  
 **Timeline**: Days 2-5  
 **Dependencies**: Builds upon Stream A and B outputs  
-**Deliverable**: Monitoring, security, performance optimization, and ARF integration
+**Deliverable**: ~~Monitoring, security, performance optimization, and ARF integration~~
 
 ## Phase C1: Monitoring & Observability
 

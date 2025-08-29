@@ -19,10 +19,6 @@ type Phase3Config struct {
 	LLMTemperature float64 `yaml:"llm_temperature"`
 	LLMBaseURL     string `yaml:"llm_base_url"`     // For Ollama and custom endpoints
 	
-	// OpenRewrite Configuration
-	OpenRewriteMode   string `yaml:"openrewrite_mode"` // embedded, service, auto
-	OpenRewriteURL    string `yaml:"openrewrite_url"`  // Service URL override
-	
 	// Learning System Configuration
 	LearningDBURL     string        `yaml:"learning_db_url"`
 	PatternMinSamples int           `yaml:"pattern_min_samples"`
@@ -48,9 +44,6 @@ func DefaultPhase3Config() *Phase3Config {
 		LLMProvider:    "openai",
 		LLMModel:       "gpt-4",
 		LLMTemperature: 0.1,
-		
-		OpenRewriteMode:   "embedded", // Default to embedded for backward compatibility
-		OpenRewriteURL:    "",         // Will use default service URL if mode is service
 		
 		PatternMinSamples: 10,
 		PatternTimeWindow: 30 * 24 * time.Hour, // 30 days
@@ -94,18 +87,7 @@ func LoadPhase3ConfigFromEnv() *Phase3Config {
 		config.TreeSitterPath = treeSitter
 	}
 	
-	// OpenRewrite configuration
-	if mode := os.Getenv("ARF_OPENREWRITE_MODE"); mode != "" {
-		config.OpenRewriteMode = mode
-	}
-	if url := os.Getenv("OPENREWRITE_SERVICE_URL"); url != "" {
-		config.OpenRewriteURL = url
-	}
-	
-	// Auto-detect service mode if service URL is set
-	if config.OpenRewriteURL != "" && config.OpenRewriteMode == "embedded" {
-		config.OpenRewriteMode = "auto"
-	}
+	// OpenRewrite always uses batch job dispatcher - no configuration needed
 	
 	return config
 }
@@ -256,33 +238,10 @@ func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{
 	return recipe, nil
 }
 
-// CreateOpenRewriteEngine creates appropriate OpenRewrite engine based on configuration
+// CreateOpenRewriteEngine creates OpenRewrite engine using batch job dispatcher
 func CreateOpenRewriteEngine(config *Phase3Config) interface{} {
-	switch config.OpenRewriteMode {
-	case "service":
-		client := NewOpenRewriteClient()
-		// URL configuration now handled internally
-		return client
-		
-	case "auto":
-		// Try service first, fallback to embedded
-		client := NewOpenRewriteClient()
-		
-		// Test service health
-		if err := client.Health(); err == nil {
-			return client
-		}
-		
-		// Fallback to embedded engine
-		fmt.Printf("OpenRewrite service not available, falling back to embedded engine\n")
-		return NewOpenRewriteEngine()
-		
-	case "embedded":
-	default:
-		// Default to embedded engine
-		return NewOpenRewriteEngine()
-	}
-	
+	// Always use embedded mode with batch job dispatcher
+	// Service mode has been deprecated in favor of batch jobs
 	return NewOpenRewriteEngine()
 }
 

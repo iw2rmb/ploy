@@ -2,13 +2,13 @@
 
 ## Overview
 
-The ARF (Automated Refactoring Framework) OpenRewrite migration system provides automated Java 11→17 migrations using OpenRewrite recipes with optional LLM self-healing capabilities. This system implements the comprehensive testing approach described in `roadmap/openrewrite/benchmark-java11.md`.
+The ARF (Automated Refactoring Framework) OpenRewrite migration system provides automated Java 11→17 migrations using OpenRewrite recipes via Nomad batch jobs, with optional LLM self-healing capabilities. This system implements the comprehensive testing approach described in `roadmap/openrewrite/benchmark-java11.md`.
 
 ## Architecture
 
-### Service-Based Architecture
-- **OpenRewrite Service**: Deployed as Lane E service at `https://openrewrite.dev.ployman.app`
-- **ARF Integration**: HTTP client for service communication (`api/arf/openrewrite_client.go`)
+### Batch Job Architecture
+- **Nomad Batch Jobs**: OpenRewrite transformations run as ephemeral batch jobs via dispatcher
+- **ARF Integration**: Batch job dispatcher for job submission and monitoring (`api/arf/openrewrite_dispatcher.go`)
 - **Benchmark System**: CLI commands and configuration management
 - **LLM Enhancement**: Ollama integration with CodeLlama 7B for self-healing
 
@@ -17,19 +17,15 @@ The ARF (Automated Refactoring Framework) OpenRewrite migration system provides 
 ```
 ploy/
 ├── api/arf/
-│   ├── openrewrite_engine.go          # Core OpenRewrite execution
-│   ├── openrewrite_client.go          # HTTP client for service mode
+│   ├── openrewrite_engine.go          # Core OpenRewrite execution engine
+│   ├── openrewrite_dispatcher.go      # Nomad batch job dispatcher
+│   ├── openrewrite_client.go          # Batch job client wrapper
 │   ├── benchmark_configs/
 │   │   └── java11to17_migration.yaml  # Migration configuration
 │   └── examples/
 │       └── java11to17.yaml            # Example recipes
-├── services/openrewrite/              # Lane E service implementation
-│   ├── cmd/server/main.go
-│   ├── internal/
-│   │   ├── executor/
-│   │   ├── handlers/
-│   │   └── storage/
-│   └── .ploy.yaml                     # Service deployment config
+├── platform/nomad/
+│   └── openrewrite-batch.hcl         # Nomad batch job template
 ├── scripts/                           # Testing scripts
 │   ├── run-phase1-sequential.sh       # Sequential baseline testing
 │   ├── run-phase2-llm.sh             # LLM-enhanced testing
@@ -59,8 +55,6 @@ ploy/
 
 3. **Environment Variables**:
    ```bash
-   export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-   export ARF_OPENREWRITE_MODE=service  # or 'embedded'
    export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
    export ARF_LLM_PROVIDER=ollama
    export ARF_LLM_MODEL=codellama:7b
@@ -226,11 +220,11 @@ ploy arf benchmark stop <benchmark-id>
 ### Health Checks
 
 ```bash
-# OpenRewrite service health
-curl https://openrewrite.dev.ployman.app/v1/openrewrite/health
-
-# Controller health
+# Controller health (manages batch jobs)
 curl https://api.dev.ployman.app/v1/version
+
+# Nomad cluster health (for batch job execution)
+nomad node status
 
 # Ollama LLM provider
 curl http://localhost:11434/api/tags
@@ -264,54 +258,56 @@ timeout_per_iteration: 5m
 stop_on_success: true
 ```
 
-## Service Deployment
+## Batch Job Architecture
 
-### OpenRewrite Service
+### OpenRewrite Batch Jobs
 
-Deploy the OpenRewrite service as a Lane E containerized application:
+ARF uses Nomad batch jobs for OpenRewrite transformations instead of persistent services. This provides:
+
+- **Resource Efficiency**: Jobs run only when needed, consuming zero resources when idle
+- **Scalability**: Batch jobs can scale horizontally across Nomad cluster nodes
+- **Isolation**: Each transformation runs in a clean, isolated environment
+- **Fault Tolerance**: Failed jobs can be automatically retried or rescheduled
+
+Configuration:
+- **Job Type**: Nomad batch job (ephemeral)
+- **Memory**: 256MB per job
+- **CPU**: 500MHz per job  
+- **Storage**: Ephemeral disk (1GB)
+- **Image**: `registry.dev.ployman.app/openrewrite-native:latest`
+
+### Batch Job Variables
 
 ```bash
-cd services/openrewrite
-ploy push -a openrewrite
-```
+# Batch job configuration (set by dispatcher)
+JOB_ID=<unique-job-id>
+RECIPE=<openrewrite-recipe-name>
+INPUT_URL=<storage-url-for-input-tar>
+OUTPUT_URL=<storage-url-for-output-tar>
+CONSUL_HTTP_ADDR=<consul-url-for-status-updates>
 
-Service configuration (`.ploy.yaml`):
-- **Instances**: 2
-- **Memory**: 512MB
-- **CPU**: 300MHz
-- **Health Checks**: `/health`, `/ready`
-- **Domain**: `openrewrite.dev.ployman.app`
-
-### Environment Variables
-
-```bash
-# Service configuration
-PORT=8080
-LOG_LEVEL=info
-
-# OpenRewrite specific
-OPENREWRITE_CACHE_DIR=/var/cache/openrewrite
-OPENREWRITE_TEMP_DIR=/tmp/openrewrite
-OPENREWRITE_MAX_WORKERS=4
-
-# Resource limits
-MAX_REQUEST_SIZE=100MB
-REQUEST_TIMEOUT=300s
+# OpenRewrite batch execution
+OPENREWRITE_TEMP_DIR=/workspace
+OPENREWRITE_MAX_MEMORY=256m
+OPENREWRITE_TIMEOUT=300s
 ```
 
 ## Troubleshooting
 
-### Service Issues
+### Batch Job Issues
 
 ```bash
-# Check service deployment
-curl -v https://openrewrite.dev.ployman.app/v1/openrewrite/health
+# Check running/recent batch jobs
+nomad job status | grep openrewrite
 
-# Redeploy service
-cd services/openrewrite && ploy push -a openrewrite
+# View specific batch job details
+nomad job status openrewrite-<job-id>
 
-# Check service logs
-ploy logs -a openrewrite
+# Check batch job logs
+nomad logs <allocation-id>
+
+# Monitor job queue in Consul
+consul kv get -recurse ploy/openrewrite/jobs/
 ```
 
 ### LLM Provider Issues
