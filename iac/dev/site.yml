@@ -24,6 +24,7 @@
 - import_playbook: playbooks/arf-openrewrite-recipes.yml
 - import_playbook: playbooks/traefik.yml
 - import_playbook: playbooks/docker-registry.yml
+- import_playbook: playbooks/openrewrite-native.yml
 - import_playbook: playbooks/api.yml
 - import_playbook: playbooks/chttp.yml
   when: deploy_chttp is defined and deploy_chttp | bool

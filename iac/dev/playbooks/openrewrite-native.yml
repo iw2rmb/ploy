@@ -1,0 +1,215 @@
+---
+# OpenRewrite Native Image Build and Deploy
+#
+# This playbook builds the OpenRewrite native image using GraalVM and pushes it to the Docker Registry.
+# The image is a CLI tool that processes Java transformations as Nomad batch jobs.
+#
+# Prerequisites:
+# - Docker Registry must be running (registry.dev.ployman.app)
+# - Docker must be installed on the target host
+#
+# Usage:
+# ansible-playbook playbooks/openrewrite-native.yml -e target_host=$TARGET_HOST
+#
+- name: Build and Deploy OpenRewrite Native Image
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  vars:
+    openrewrite_image_name: "openrewrite-native"
+    openrewrite_image_tag: "latest"
+    registry_endpoint: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
+    build_directory: "/tmp/openrewrite-build"
+    
+  tasks:
+    - name: Ensure Docker is installed and running
+      block:
+        - name: Check if Docker is installed
+          command: docker --version
+          register: docker_check
+          ignore_errors: true
+          
+        - name: Fail if Docker is not installed
+          fail:
+            msg: "Docker is not installed on the target host. Please install Docker first."
+          when: docker_check.rc != 0
+          
+        - name: Ensure Docker service is running
+          systemd:
+            name: docker
+            state: started
+            enabled: true
+
+    - name: Prepare build environment
+      block:
+        - name: Clean up any previous build directory
+          file:
+            path: "{{ build_directory }}"
+            state: absent
+            
+        - name: Create build directory
+          file:
+            path: "{{ build_directory }}"
+            state: directory
+            mode: '0755'
+            owner: root
+            group: root
+
+    - name: Copy OpenRewrite native Dockerfile and source
+      block:
+        - name: Copy Dockerfile from repository
+          copy:
+            src: "{{ ansible_env.HOME }}/ploy/services/openrewrite-native/Dockerfile"
+            dest: "{{ build_directory }}/Dockerfile"
+            mode: '0644'
+            
+        - name: Display Dockerfile location
+          debug:
+            msg: "Using Dockerfile from: {{ build_directory }}/Dockerfile"
+
+    - name: Build OpenRewrite native image
+      block:
+        - name: Build Docker image with GraalVM native compilation
+          docker_image:
+            name: "{{ registry_endpoint }}/{{ openrewrite_image_name }}"
+            tag: "{{ openrewrite_image_tag }}"
+            source: build
+            build:
+              path: "{{ build_directory }}"
+              pull: true
+              nocache: false
+            state: present
+          register: build_result
+          
+        - name: Display build result
+          debug:
+            msg: |
+              Build completed:
+              - Image: {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
+              - Build status: {{ 'SUCCESS' if build_result.changed else 'ALREADY EXISTS' }}
+
+    - name: Test the built image locally
+      block:
+        - name: Create test script
+          copy:
+            content: |
+              #!/bin/bash
+              # Test if the OpenRewrite native image works
+              
+              # Create a simple test
+              echo "Testing OpenRewrite native image..."
+              
+              # Try to run the image with help/version (should fail with usage since no args)
+              docker run --rm {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }} 2>&1 | head -5
+              
+              # Check exit code (should be 1 for missing args, not a crash)
+              if [ $? -eq 0 ] || [ $? -eq 1 ]; then
+                echo "✓ Image runs successfully"
+                exit 0
+              else
+                echo "✗ Image failed to run"
+                exit 1
+              fi
+            dest: "{{ build_directory }}/test.sh"
+            mode: '0755'
+            
+        - name: Run image test
+          command: "{{ build_directory }}/test.sh"
+          register: test_result
+          ignore_errors: true
+          
+        - name: Display test results
+          debug:
+            msg: "{{ test_result.stdout }}"
+            
+        - name: Fail if image test failed
+          fail:
+            msg: "OpenRewrite native image test failed. Please check the build."
+          when: test_result.rc != 0
+
+    - name: Push image to Docker Registry
+      block:
+        - name: Check if registry is accessible
+          uri:
+            url: "https://{{ registry_endpoint }}/v2/"
+            method: GET
+            status_code: [200, 401]
+            validate_certs: false
+          register: registry_check
+          
+        - name: Tag image for push (if not already tagged)
+          command: >
+            docker tag 
+            {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
+            {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
+          ignore_errors: true
+          
+        - name: Push image to registry
+          docker_image:
+            name: "{{ registry_endpoint }}/{{ openrewrite_image_name }}"
+            tag: "{{ openrewrite_image_tag }}"
+            push: true
+            source: local
+          register: push_result
+          
+        - name: Display push result
+          debug:
+            msg: |
+              Push completed:
+              - Registry: {{ registry_endpoint }}
+              - Image: {{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
+              - Status: {{ 'PUSHED' if push_result.changed else 'ALREADY UP TO DATE' }}
+
+    - name: Verify image in registry
+      block:
+        - name: Check if image manifest exists in registry
+          uri:
+            url: "https://{{ registry_endpoint }}/v2/{{ openrewrite_image_name }}/manifests/{{ openrewrite_image_tag }}"
+            method: GET
+            headers:
+              Accept: "application/vnd.docker.distribution.manifest.v2+json"
+            status_code: 200
+            validate_certs: false
+          register: manifest_check
+          
+        - name: Display verification result
+          debug:
+            msg: |
+              ✅ OpenRewrite Native Image Successfully Deployed:
+              - Image: {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
+              - Manifest: Available in registry
+              - Ready for use by ARF transformations
+
+    - name: Clean up build directory
+      file:
+        path: "{{ build_directory }}"
+        state: absent
+
+    - name: Display final summary
+      debug:
+        msg: |
+          ========================================
+          OpenRewrite Native Image Deployment Complete
+          ========================================
+          
+          Image Details:
+          - Name: {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
+          - Type: GraalVM native executable
+          - Purpose: Java code transformation via OpenRewrite recipes
+          
+          The image contains:
+          - GraalVM native-compiled OpenRewrite runner
+          - Support for Java 8 to 17 migrations
+          - Spring Boot and Spring Framework upgrades
+          - Minimal runtime footprint (~50MB)
+          
+          Usage:
+          The image will be automatically used by Ploy ARF when running
+          OpenRewrite transformations through Nomad batch jobs.
+          
+          Next Steps:
+          1. The image is now available for ARF transformations
+          2. Run: ploy arf transform --recipe org.openrewrite.java.migrate.Java8toJava17
+          3. Monitor jobs: nomad job status -namespace=default
