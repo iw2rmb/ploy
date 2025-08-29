@@ -62,7 +62,7 @@ func NewOpenRewriteDispatcher(nomadAddr, consulAddr string, storageClient *stora
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
 
-	// Load job template
+	// Load job template for JVM-based OpenRewrite with SeaweedFS caching
 	jobTemplateContent := `
 job "openrewrite-{{.JobID}}" {
   datacenters = ["dc1"]
@@ -73,47 +73,77 @@ job "openrewrite-{{.JobID}}" {
     count = 1
     
     ephemeral_disk {
-      size = 1024
+      size = 2048  # Increased for Maven cache
     }
     
     task "openrewrite" {
       driver = "docker"
       
       config {
-        image = "registry.dev.ployman.app/openrewrite-native:latest"
+        image = "registry.dev.ployman.app/openrewrite-jvm:latest"
         volumes = ["local:/workspace"]
-        readonly_rootfs = true
       }
       
       env {
         JOB_ID = "{{.JobID}}"
-        RECIPE = "{{.Recipe}}"
+        RECIPE = "{{.RecipeClass}}"
+        RECIPE_GROUP = "{{.RecipeGroup}}"
+        RECIPE_ARTIFACT = "{{.RecipeArtifact}}"
+        RECIPE_VERSION = "{{.RecipeVersion}}"
         INPUT_URL = "{{.InputURL}}"
         OUTPUT_URL = "{{.OutputURL}}"
         CONSUL_HTTP_ADDR = "{{.ConsulAddr}}"
+        SEAWEEDFS_URL = "http://seaweedfs.service.consul:8888"
+        MAVEN_CACHE_PATH = "maven-repository"
       }
       
       template {
         data = <<EOF
-#!/bin/sh
+#!/bin/bash
 set -e
 
-# Download input
-wget -q -O /workspace/input.tar "$INPUT_URL"
+echo "[Job] Starting OpenRewrite transformation job {{.JobID}}"
+echo "[Job] Recipe: {{.RecipeClass}}"
 
-# Run transformation
-/openrewrite /workspace/input.tar /workspace/output.tar "$RECIPE"
+# Download input from SeaweedFS
+echo "[Job] Downloading input from {{.InputURL}}..."
+wget -q -O /workspace/input.tar "{{.InputURL}}" || {
+  echo "[Job] Failed to download input"
+  consul kv put "ploy/openrewrite/jobs/{{.JobID}}/status" "failed"
+  consul kv put "ploy/openrewrite/jobs/{{.JobID}}/error" "Failed to download input archive"
+  exit 1
+}
 
-# Upload output
-curl -X PUT "$OUTPUT_URL" --data-binary @/workspace/output.tar
+# Run OpenRewrite transformation with SeaweedFS caching
+echo "[Job] Running transformation..."
+/usr/local/bin/openrewrite /workspace/input.tar /workspace/output.tar "{{.RecipeClass}}"
+TRANSFORM_EXIT=$?
 
-# Update job status in Consul
-consul kv put "ploy/openrewrite/jobs/$JOB_ID/status" "completed"
-consul kv put "ploy/openrewrite/jobs/$JOB_ID/completed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-# Store result metadata
-if [ -f /workspace/output.json ]; then
-  consul kv put "ploy/openrewrite/jobs/$JOB_ID/result" "$(cat /workspace/output.json)"
+if [ $TRANSFORM_EXIT -eq 0 ]; then
+  # Upload output to SeaweedFS
+  echo "[Job] Uploading output to {{.OutputURL}}..."
+  curl -X PUT "{{.OutputURL}}" --data-binary @/workspace/output.tar || {
+    echo "[Job] Failed to upload output"
+    consul kv put "ploy/openrewrite/jobs/{{.JobID}}/status" "failed"
+    consul kv put "ploy/openrewrite/jobs/{{.JobID}}/error" "Failed to upload output archive"
+    exit 1
+  }
+  
+  # Update job status in Consul
+  consul kv put "ploy/openrewrite/jobs/{{.JobID}}/status" "completed"
+  consul kv put "ploy/openrewrite/jobs/{{.JobID}}/completed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  
+  # Store transformation report if available
+  if [ -f /workspace/transformation-report.json ]; then
+    consul kv put "ploy/openrewrite/jobs/{{.JobID}}/result" "$(cat /workspace/transformation-report.json)"
+  fi
+  
+  echo "[Job] Transformation completed successfully"
+else
+  consul kv put "ploy/openrewrite/jobs/{{.JobID}}/status" "failed"
+  consul kv put "ploy/openrewrite/jobs/{{.JobID}}/error" "Transformation failed with exit code $TRANSFORM_EXIT"
+  echo "[Job] Transformation failed"
+  exit $TRANSFORM_EXIT
 fi
 EOF
         destination = "local/run.sh"
@@ -121,7 +151,7 @@ EOF
       }
       
       config {
-        command = "/bin/sh"
+        command = "/bin/bash"
         args = ["local/run.sh"]
       }
       
@@ -348,6 +378,64 @@ func (d *OpenRewriteDispatcher) submitToNomad(job *OpenRewriteJob) error {
 		return err
 	}
 	
+	// Parse recipe information
+	recipeClass := job.Recipe
+	recipeGroup := "org.openrewrite.recipe"
+	recipeArtifact := "rewrite-migrate-java"
+	recipeVersion := "2.11.0"
+	
+	// Map common recipe names to their coordinates
+	recipeMap := map[string]struct{
+		group    string
+		artifact string
+		version  string
+		class    string
+	}{
+		"java11to17": {
+			group:    "org.openrewrite.recipe",
+			artifact: "rewrite-migrate-java",
+			version:  "2.11.0",
+			class:    "org.openrewrite.java.migrate.Java11toJava17",
+		},
+		"java8to11": {
+			group:    "org.openrewrite.recipe",
+			artifact: "rewrite-migrate-java",
+			version:  "2.11.0",
+			class:    "org.openrewrite.java.migrate.Java8toJava11",
+		},
+		"spring-boot-3": {
+			group:    "org.openrewrite.recipe",
+			artifact: "rewrite-spring",
+			version:  "5.7.0",
+			class:    "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2",
+		},
+		"junit5": {
+			group:    "org.openrewrite.recipe",
+			artifact: "rewrite-testing-frameworks",
+			version:  "2.6.0",
+			class:    "org.openrewrite.java.testing.junit5.JUnit4to5Migration",
+		},
+	}
+	
+	// Check if we have a mapping for this recipe
+	if mapping, ok := recipeMap[job.Recipe]; ok {
+		recipeGroup = mapping.group
+		recipeArtifact = mapping.artifact
+		recipeVersion = mapping.version
+		recipeClass = mapping.class
+	} else if strings.Contains(job.Recipe, ".") {
+		// It's already a full class name
+		recipeClass = job.Recipe
+		// Try to guess the artifact from the class name
+		if strings.Contains(recipeClass, "spring") {
+			recipeArtifact = "rewrite-spring"
+			recipeVersion = "5.7.0"
+		} else if strings.Contains(recipeClass, "testing") || strings.Contains(recipeClass, "junit") {
+			recipeArtifact = "rewrite-testing-frameworks"
+			recipeVersion = "2.6.0"
+		}
+	}
+	
 	// Generate HCL from template
 	var buf bytes.Buffer
 	
@@ -358,11 +446,14 @@ func (d *OpenRewriteDispatcher) submitToNomad(job *OpenRewriteJob) error {
 	}
 	
 	err := d.jobTemplate.Execute(&buf, map[string]string{
-		"JobID":      job.ID,
-		"Recipe":     job.Recipe,
-		"InputURL":   job.InputURL,
-		"OutputURL":  job.OutputURL,
-		"ConsulAddr": consulAddr,
+		"JobID":         job.ID,
+		"RecipeClass":   recipeClass,
+		"RecipeGroup":   recipeGroup,
+		"RecipeArtifact": recipeArtifact,
+		"RecipeVersion": recipeVersion,
+		"InputURL":      job.InputURL,
+		"OutputURL":     job.OutputURL,
+		"ConsulAddr":    consulAddr,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to generate job HCL: %w", err)
