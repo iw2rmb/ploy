@@ -15,6 +15,7 @@ MAVEN_CACHE_PATH="${MAVEN_CACHE_PATH:-maven-repository}"
 RECIPE_GROUP="${RECIPE_GROUP:-org.openrewrite.recipe}"
 RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-rewrite-migrate-java}"
 RECIPE_VERSION="${RECIPE_VERSION:-2.11.0}"
+PLOY_API_URL="${PLOY_API_URL:-http://api.service.consul:8081}"
 
 # Build full recipe coordinates
 RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
@@ -101,6 +102,10 @@ if download_from_cache "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}
    download_from_cache "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "pom"; then
     CACHE_HIT=true
     echo "[OpenRewrite] Recipe artifacts found in cache"
+    
+    # Register recipe metadata even for cached recipes (idempotent operation)
+    JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
+    register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
 else
     echo "[OpenRewrite] Recipe not in cache, downloading from Maven Central..."
     
@@ -132,6 +137,10 @@ else
                  -s -o /dev/null 2>/dev/null && \
             echo "[Cache] Uploaded ${relative_path}"
          }; upload_to_cache "$1"' _ {} \;
+    
+    # Register the main recipe metadata with Ploy API
+    JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
+    register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
 fi
 
 # Step 4: Run OpenRewrite transformation
@@ -222,6 +231,39 @@ EOF
 echo "[OpenRewrite] Transformation completed successfully"
 echo "[OpenRewrite] Output: ${OUTPUT_TAR}"
 echo "[OpenRewrite] Cache status: $([ "$CACHE_HIT" = true ] && echo "HIT" || echo "MISS")"
+
+# Function to register recipe metadata with Ploy API
+register_recipe_metadata() {
+    local recipe_class=$1
+    local group=$2
+    local artifact=$3
+    local version=$4
+    local jar_path=$5
+    
+    # Only register if we have the API endpoint configured
+    if [ -n "${PLOY_API_URL}" ]; then
+        echo "[Recipe] Registering recipe metadata with Ploy API..."
+        
+        # Create JSON payload for recipe registration
+        cat > /tmp/recipe-registration.json << EOJSON
+{
+  "recipe_class": "${recipe_class}",
+  "maven_coords": "${group}:${artifact}:${version}",
+  "jar_path": "${jar_path}",
+  "source": "openrewrite-jvm",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOJSON
+        
+        # Register with Ploy API
+        curl -X POST "${PLOY_API_URL}/v1/arf/recipes/register" \
+             -H "Content-Type: application/json" \
+             -d @/tmp/recipe-registration.json \
+             -s -o /dev/null 2>/dev/null && \
+        echo "[Recipe] Recipe metadata registered successfully" || \
+        echo "[Recipe] Failed to register recipe metadata (non-critical)"
+    fi
+}
 
 # Export the upload function for use in exec calls
 export -f upload_to_cache
