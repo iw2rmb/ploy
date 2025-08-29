@@ -140,17 +140,27 @@
 
 Based on `/api/README.md`, the following OpenRewrite endpoints are available:
 
-### Dedicated OpenRewrite Endpoints (Recommended)
-- `POST /v1/arf/openrewrite/validate` — validate recipes  
-- `GET /v1/arf/openrewrite/recipes` — list available recipes
+### OpenRewrite Integration (Lines 76-80)
 - `POST /v1/arf/openrewrite/transform` — execute transformation
 - `GET /v1/arf/openrewrite/status/:jobId` — get transformation job status
 
-### General ARF Endpoints (Alternative)
-- `GET /v1/arf/recipes` — list available transformation recipes (more general)
-- `POST /v1/arf/transform` — execute code transformation (more general)
+**Note**: OpenRewrite recipes are managed through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
-**Note**: Using dedicated OpenRewrite endpoints (`/v1/arf/openrewrite/*`) provides better compatibility with available components since they bypass advanced ARF features that may be unavailable.
+### General ARF Recipe Management (Lines 137-148)
+- `GET /v1/arf/recipes` — list available transformation recipes
+- `GET /v1/arf/recipes/:id` — get detailed recipe information
+- `POST /v1/arf/recipes` — create new transformation recipe
+- `PUT /v1/arf/recipes/:id` — update existing recipe
+- `DELETE /v1/arf/recipes/:id` — delete recipe from catalog
+- `GET /v1/arf/recipes/search` — search recipes by name or tags
+- `POST /v1/arf/recipes/upload` — upload recipe
+- `POST /v1/arf/recipes/validate` — validate recipe
+- `GET /v1/arf/recipes/:id/download` — download recipe
+- `GET /v1/arf/recipes/:id/metadata` — get recipe metadata
+- `GET /v1/arf/recipes/:id/stats` — get recipe usage statistics
+- `POST /v1/arf/recipes/register` — register recipe from runner
+
+**Important**: The API documentation shows that OpenRewrite uses a unified recipe management system through `/v1/arf/recipes/*` endpoints with `type: "openrewrite"` parameter, rather than dedicated OpenRewrite recipe endpoints.
 
 ## Test Execution Commands
 
@@ -186,21 +196,22 @@ timeout 3600 bash -c '
 
 ### Step 3: Verify Recipe Caching
 ```bash
-# Check if recipes are now cached using dedicated endpoint
-curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/openrewrite/recipes" | jq '.recipes | length'
+# Check if recipes are now cached using unified ARF recipe system
+curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes" | jq '.recipes | length'
 # Should show recipes downloaded during transformation
 
-# Alternative: Check general ARF recipe catalog
-curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes" | jq '.recipes | length'
+# Filter for OpenRewrite recipes specifically
+curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes" | jq '.recipes[] | select(.type == "openrewrite")'
 ```
 
 ### Recipe Validation (Optional)
 ```bash
-# Validate recipe before transformation
-curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/openrewrite/validate" \
+# Validate recipe before transformation using unified ARF recipe system
+curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/recipes/validate" \
   -H "Content-Type: application/json" \
   -d '{
-    "recipes": ["org.openrewrite.java.migrate.Java8toJava11"]
+    "recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
+    "type": "openrewrite"
   }'
 ```
 
