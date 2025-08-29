@@ -286,9 +286,9 @@ func (p *DefaultHybridPipeline) EnhanceWithLLM(ctx context.Context, baseResult T
 		ConfidenceImprovement: confidenceImprovement,
 		EnhancementTime:       time.Since(startTime),
 		EnhancementMetadata: map[string]interface{}{
-			"llm_model":           generatedRecipe.LLMMetadata.Model,
-			"prompt_tokens":       generatedRecipe.LLMMetadata.PromptTokens,
-			"response_tokens":     generatedRecipe.LLMMetadata.ResponseTokens,
+			"llm_model":           generatedRecipe.LLMMetadata["model"],
+			"prompt_tokens":       generatedRecipe.LLMMetadata["prompt_tokens"],
+			"response_tokens":     generatedRecipe.LLMMetadata["response_tokens"],
 			"enhancement_reason":  generatedRecipe.Explanation,
 		},
 	}
@@ -342,7 +342,7 @@ func (p *DefaultHybridPipeline) executeLLMOnly(ctx context.Context, request Hybr
 		ChangesApplied:    1,
 		FilesModified:     []string{"example.java"},
 		ValidationScore:   generatedRecipe.Confidence,
-		RecipeID:          generatedRecipe.Recipe.ID,
+		RecipeID:          generatedRecipe.ID,
 		Metadata: map[string]interface{}{
 			"llm_generated": true,
 			"confidence":    generatedRecipe.Confidence,
@@ -509,13 +509,7 @@ func (p *DefaultHybridPipeline) buildEnhancementRequest(baseResult Transformatio
 		CodebaseContext: CodebaseContext{
 			Language: "java", // Default, should be extracted from baseResult
 		},
-		Constraints: []RecipeConstraint{
-			{
-				Type:        "improve_confidence",
-				Description: "Enhance the existing transformation result",
-				Required:    true,
-			},
-		},
+		Constraints: []string{"improve_confidence"},
 	}
 }
 
@@ -555,13 +549,7 @@ func (p *DefaultHybridPipeline) buildLLMRequestFromHybridRequest(request HybridR
 			Framework:   request.Repository.Metadata["framework"],
 			BuildTool:   request.Repository.BuildTool,
 		},
-		Constraints: []RecipeConstraint{
-			{
-				Type:        "hybrid_request",
-				Description: "Generate recipe for hybrid transformation",
-				Required:    true,
-			},
-		},
+		Constraints: []string{"hybrid_request"},
 	}
 }
 

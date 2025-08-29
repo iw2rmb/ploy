@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 	
-	"github.com/iw2rmb/ploy/api/arf/models"
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
 )
 
@@ -219,20 +218,27 @@ type mockLLMGenerator struct{}
 
 func (m *mockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
 	return &GeneratedRecipe{
-		Recipe: &models.Recipe{
-			ID: fmt.Sprintf("mock-%d", time.Now().Unix()),
-			Metadata: models.RecipeMetadata{
-				Name:        "Mock Generated Recipe",
-				Description: "This is a mock generated recipe",
-				Languages:   []string{request.Language},
-				Categories:  []string{"cleanup"},
-				Version:     "1.0.0",
-			},
-			Steps: []models.RecipeStep{},
-		},
+		ID:          fmt.Sprintf("mock-%d", time.Now().Unix()),
+		Name:        "Mock Generated Recipe",
+		Description: "This is a mock generated recipe",
+		Language:    request.Language,
+		Recipe:      map[string]interface{}{"mock": true},
 		Confidence:  0.5,
-		Explanation: "Mock generation - no LLM configured",
+		CreatedAt:   time.Now(),
 	}, nil
+}
+
+func (m *mockLLMGenerator) GetCapabilities() LLMCapabilities {
+	return LLMCapabilities{
+		SupportedLanguages: []string{"java", "python", "javascript", "go"},
+		MaxContextLength:   8192,
+		SupportsStreaming:  false,
+		SupportsFineTuning: false,
+	}
+}
+
+func (m *mockLLMGenerator) IsAvailable(ctx context.Context) bool {
+	return true
 }
 
 func (m *mockLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
@@ -245,10 +251,9 @@ func (m *mockLLMGenerator) ValidateGenerated(ctx context.Context, recipe Generat
 	}, nil
 }
 
-func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe *models.Recipe, feedback TransformationFeedback) (*models.Recipe, error) {
-	optimized := recipe
-	optimized.Metadata.Version = "1.1.0"
-	return optimized, nil
+func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error) {
+	// For mock, just return the recipe as-is
+	return recipe, nil
 }
 
 // CreateOpenRewriteEngine creates appropriate OpenRewrite engine based on configuration

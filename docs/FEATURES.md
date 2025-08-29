@@ -631,11 +631,11 @@ Auto-classified lanes:
   - Status monitoring and log retrieval for debugging
 - ✅ **Integration Points**: Seamless integration with existing Ploy infrastructure (Nomad, Consul, SeaweedFS)
 
-## 🧠 Code LLM Service (CLLM) 🚧 IN DEVELOPMENT
+## 🧠 LLM Transformation Service ✅ MIGRATED TO NOMAD
 
-**STATUS: 🚧 PHASE 1 IN PROGRESS** - Foundation, sandbox manager, secure file operations, command execution, and security hardening complete. Tasks 2.1-2.4 complete, proceeding with LLM provider integration. Full roadmap in `roadmap/cllm/`
+**STATUS: ✅ MIGRATED TO NOMAD ARCHITECTURE** - Former CLLM service migrated to distributed Nomad batch jobs for improved scalability and consistency (August 2025). Original CLLM roadmap deprecated; functionality now integrated into ARF via Nomad dispatcher pattern.
 
-CLLM is a standalone microservice for secure, sandboxed LLM-based code transformation and analysis, designed to enable ARF's self-healing capabilities. The service provides a secure HTTP API for code analysis, transformation, and diff generation using local and cloud LLM providers.
+LLM transformations now execute as distributed Nomad batch jobs, providing secure, sandboxed LLM-based code transformation and analysis capabilities. The system follows the same architecture as OpenRewrite and analysis services for consistency across the platform.
 
 ✅ **Secure Sandbox Execution Engine** (Aug 2025):
 - **Resource Management**: CPU, memory, process, and timeout limits to prevent resource exhaustion
@@ -668,44 +668,35 @@ CLLM is a standalone microservice for secure, sandboxed LLM-based code transform
 - **Multi-Layer Validation**: Path length/depth limits, control character detection, suspicious pattern blocking
 - **Security Event Classification**: Severity-based event logging (high/medium/low) with detailed context capture
 
-### ✅ **Phase 1: Service Foundation - COMPLETE (2025-08-27)**
-- ✅ **HTTP Service Framework**: Complete REST API with Fiber framework and health endpoints (`/health`, `/ready`, `/version`)
-- ✅ **Configuration Management**: YAML and environment variable support with validation and hot-reload
-- ✅ **API Endpoints**: Basic endpoints for code analysis (`/v1/analyze`) and transformation (`/v1/transform`)
-- ✅ **Middleware Stack**: CORS, request logging, correlation IDs, error recovery, and rate limiting
-- ✅ **Development Workflow**: TDD implementation with >60% test coverage and Makefile automation
-- ✅ **Containerization**: Docker image with distroless security and docker-compose development stack
-- ✅ **Infrastructure Integration**: Ansible playbook integration for VPS deployment readiness
+### ✅ **Nomad-Based LLM Transformations (August 2025)**
+- ✅ **LLM Dispatcher**: Distributed LLM transformation management via Nomad batch jobs
+- ✅ **Multi-Provider Support**: Ollama and OpenAI integrations with Docker-based execution
+- ✅ **Job Templates**: Production-ready Nomad job templates for both Ollama and OpenAI providers
+- ✅ **Consul Integration**: Job status tracking and result storage using Consul KV
+- ✅ **SeaweedFS Storage**: Input/output artifact management with distributed file storage
+- ✅ **Automatic Retry**: Exponential backoff and failure handling for robust execution
+- ✅ **Resource Management**: CPU, memory, and timeout limits enforced by Nomad scheduler
 
-### 🚧 **Phase 1 Remaining: LLM and Analysis Implementation**
-- ✅ **Sandbox Execution Engine**: Nomad-based secure code execution with resource limits - COMPLETE
-- 🚧 **LLM Provider Integration**: Ollama and OpenAI provider implementations with failover
-- 🚧 **Code Analysis Engine**: AST parsing and error pattern recognition
-- 🚧 **Diff Generation**: Git-compatible diff creation and validation
+### ✅ **ARF Integration Complete (August 2025)**
+- ✅ **Hybrid Pipeline Integration**: LLM transformations seamlessly integrated into ARF workflows
+- ✅ **Self-Healing Capabilities**: Automatic error correction using LLM-generated solutions
+- ✅ **Context-Aware Processing**: Error context and codebase analysis for targeted transformations
+- ✅ **Multi-Language Support**: Java, Python, JavaScript, Go, and other language transformations
+- ✅ **Recipe Generation**: Dynamic recipe creation based on error patterns and code analysis
+- ✅ **Performance Optimization**: Efficient execution through distributed Nomad architecture
 
-### 📋 **Phase 2: Model Management (Planned)**
-- **SeaweedFS Integration**: Centralized model storage with intelligent caching
-- **Model Registry**: Versioning and metadata management with Consul coordination
-- **Load Balancing**: Model-aware request routing and instance assignment
-- **Cache Management**: LRU eviction with smart warming strategies
+### ✅ **Production Features Active**
+- ✅ **Observability**: Comprehensive job monitoring and status tracking via Consul
+- ✅ **Auto-Scaling**: Nomad-based scaling with resource optimization and queue management
+- ✅ **Security Model**: Sandboxed Docker execution with input validation and resource limits
+- ✅ **Error Handling**: Robust failure detection, retry mechanisms, and graceful degradation
 
-### 📋 **Phase 3: ARF Integration (Planned)**
-- **Self-Healing Cycles**: Iterative error correction with state management
-- **Error Context Enhancement**: Deep integration with ARF workflow engine
-- **Hybrid Pipeline**: Coordination with OpenRewrite for complex transformations
-- **Performance Optimization**: Model selection based on error types and context
-
-### 📋 **Phase 4: Production Features (Planned)**
-- **Observability**: Comprehensive metrics, logging, and tracing
-- **Auto-Scaling**: Queue-based scaling with resource optimization
-- **Circuit Breakers**: Fault tolerance and graceful degradation
-- **Security Hardening**: Audit logging and compliance frameworks
-
-### Technical Architecture
-- **Service Endpoint**: `cllm.dev.ployman.app` (development), `cllm.ployman.app` (production)
-- **Technology Stack**: Go 1.21+, Fiber v2, Docker, Nomad/Consul integration
-- **Security Model**: Sandboxed execution, input validation, resource limits, network isolation
-- **Integration**: ARF hybrid pipeline, OpenRewrite coordination, SeaweedFS storage
+### Technical Architecture  
+- **Dispatcher**: `api/arf/llm_dispatcher.go` - Nomad job management and coordination
+- **Job Templates**: `platform/nomad/llm-*-batch.hcl` - Docker-based LLM execution environments
+- **Technology Stack**: Nomad, Consul KV, SeaweedFS, Docker (Ollama/Python+OpenAI)
+- **Security Model**: Docker sandboxing, input validation, resource limits, network isolation
+- **Integration**: ARF robust transform, OpenRewrite coordination, distributed storage
 
 ## 🧬 Automated Remediation Framework (ARF) ✅ OPERATIONAL
 
@@ -760,7 +751,8 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Sandbox Management**: TTL cleanup, resource monitoring, and automatic environment cleanup
 
 ### ✅ **Implemented Intelligence & Learning (ARF Phase 3) - COMPLETE**
-- ✅ **LLM Recipe Generation**: OpenAI integration for dynamic recipe creation based on context
+- ✅ **LLM Recipe Generation**: Distributed LLM integration via Nomad batch jobs (migrated from CLLM service, August 2025)
+- ✅ **Multi-Provider LLM Support**: Ollama and OpenAI providers with Docker-based sandboxed execution
 - ✅ **Hybrid Transformation Pipeline**: Intelligent combination of OpenRewrite and LLM approaches
 - ✅ **Multi-Language AST Support**: Tree-sitter integration for universal language parsing (Java, JavaScript, TypeScript, Python, Go, Rust)
 - ✅ **A/B Testing Framework**: Statistical validation of recipe improvements with confidence intervals
