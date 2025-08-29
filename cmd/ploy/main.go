@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/iw2rmb/ploy/internal/cli/analyze"
+	"github.com/iw2rmb/ploy/internal/cli/analysis"
 	"github.com/iw2rmb/ploy/internal/cli/apps"
 	"github.com/iw2rmb/ploy/internal/cli/arf"
 	"github.com/iw2rmb/ploy/internal/cli/bluegreen"
@@ -40,7 +40,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "analyze":
-			analyze.AnalyzeCmd(os.Args[2:], controllerURL)
+			analysis.AnalyzeCmd(os.Args[2:], controllerURL)
 		case "apps":
 			apps.AppsCmd(os.Args[2:], controllerURL)
 		case "push":
