@@ -484,15 +484,15 @@ func (hs *HelpSystem) showCommandHelp(cmdHelp CommandHelp) error {
 			}
 
 			fmt.Printf("%s %s", flagStr, flag.Description)
-			
+
 			if flag.Default != "" && flag.Default != "false" {
 				fmt.Printf(" (default: %s)", flag.Default)
 			}
-			
+
 			if flag.Required {
 				fmt.Printf(" [required]")
 			}
-			
+
 			fmt.Println()
 		}
 		fmt.Println()
@@ -536,7 +536,7 @@ func (hs *HelpSystem) ShowExamples() error {
 				"# List all available recipes",
 				"ploy arf recipe list",
 				"",
-				"# Search for Spring Boot recipes", 
+				"# Search for Spring Boot recipes",
 				"ploy arf recipe search 'spring boot'",
 				"",
 				"# Show details of a specific recipe",
@@ -642,10 +642,10 @@ func (hs *HelpSystem) ShowExamples() error {
 		if i > 0 {
 			fmt.Println()
 		}
-		
+
 		fmt.Printf("%d. %s\n", i+1, example.Title)
 		fmt.Printf("   %s\n\n", example.Description)
-		
+
 		for _, cmd := range example.Commands {
 			if cmd == "" {
 				fmt.Println()
@@ -684,7 +684,7 @@ func (hs *HelpSystem) ShowQuickStart() error {
 			Command:     "ploy arf recipe search 'java spring'",
 		},
 		{
-			Step:        "3. Examine Recipe Details", 
+			Step:        "3. Examine Recipe Details",
 			Description: "Review what a recipe does before running it",
 			Command:     "ploy arf recipe show java11to17-migration",
 		},
@@ -712,9 +712,9 @@ func (hs *HelpSystem) ShowQuickStart() error {
 	}
 
 	fmt.Printf("Next Steps:\n")
-	fmt.Printf("  • Read the recipe format guide: https://docs.ployd.app/arf/recipes\n") 
+	fmt.Printf("  • Read the recipe format guide: https://docs.ployd.app/arf/recipes\n")
 	fmt.Printf("  • Browse example recipes: https://docs.ployd.app/arf/examples\n")
-	fmt.Printf("  • Join the community: https://github.com/ploy/recipes\n")
+	fmt.Printf("  • Join the community: https://github.com/iw2rmb/recipes\n")
 
 	return nil
 }

@@ -77,7 +77,7 @@ test_import_dependencies() {
         "os"
         "path/filepath" 
         "time"
-        "github.com/ploy/ploy/internal/storage"
+        "github.com/iw2rmb/ploy/internal/storage"
     )
     
     local missing_imports=0

@@ -234,7 +234,17 @@ func ExecuteRobustTransformation(ctx context.Context, req *RobustTransformReques
 }
 
 // prepareWorkspace creates and prepares the working directory
-func prepareWorkspace(ctx context.Context, req *RobustTransformRequest, logger func(level, stage, message, details string)) (*Workspace, error) {
+func prepareWorkspace(ctx context.Context, req *RobustTransformRequest, logger func(level, stage, message, details string)) (workspace *Workspace, err error) {
+	// Add panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			if logger != nil {
+				logger("ERROR", "workspace_prep", "Panic during workspace preparation", fmt.Sprintf("Panic: %v", r))
+			}
+			err = fmt.Errorf("workspace preparation panic: %v", r)
+			workspace = nil
+		}
+	}()
 	workspaceID := uuid.New().String()[:8]
 	
 	// Determine base directory
@@ -248,7 +258,7 @@ func prepareWorkspace(ctx context.Context, req *RobustTransformRequest, logger f
 		return nil, fmt.Errorf("failed to create workspace: %w", err)
 	}
 
-	workspace := &Workspace{
+	workspace = &Workspace{
 		ID:           workspaceID,
 		Path:         workspacePath,
 		OriginalPath: workspacePath + "-original",
@@ -259,13 +269,38 @@ func prepareWorkspace(ctx context.Context, req *RobustTransformRequest, logger f
 
 	// Clone repository or extract archive
 	if req.InputSource.Repository != "" {
+		if logger != nil {
+			logger("INFO", "workspace_prep", "Starting repository clone", fmt.Sprintf("URL: %s, Branch: %s", req.InputSource.Repository, req.InputSource.Branch))
+		}
+		
 		gitOps := NewGitOperations("")
+		if gitOps == nil {
+			return nil, fmt.Errorf("failed to create git operations")
+		}
+		
+		if logger != nil {
+			logger("INFO", "workspace_prep", "Cloning main repository", workspacePath)
+		}
 		if err := gitOps.CloneRepository(ctx, req.InputSource.Repository, req.InputSource.Branch, workspacePath); err != nil {
+			if logger != nil {
+				logger("ERROR", "workspace_prep", "Failed to clone repository", err.Error())
+			}
 			return nil, fmt.Errorf("failed to clone repository: %w", err)
+		}
+		
+		if logger != nil {
+			logger("INFO", "workspace_prep", "Cloning original repository for comparison", workspace.OriginalPath)
 		}
 		// Also clone to original for comparison
 		if err := gitOps.CloneRepository(ctx, req.InputSource.Repository, req.InputSource.Branch, workspace.OriginalPath); err != nil {
+			if logger != nil {
+				logger("ERROR", "workspace_prep", "Failed to clone original repository", err.Error())
+			}
 			return nil, fmt.Errorf("failed to clone original repository: %w", err)
+		}
+		
+		if logger != nil {
+			logger("INFO", "workspace_prep", "Repository cloning completed", "Both main and original cloned successfully")
 		}
 	} else if req.InputSource.Archive != "" {
 		// Extract archive
