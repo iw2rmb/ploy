@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"text/template"
 	"time"
@@ -340,6 +341,13 @@ func (d *OpenRewriteDispatcher) storeJob(job *OpenRewriteJob) error {
 
 // submitToNomad submits the job to Nomad
 func (d *OpenRewriteDispatcher) submitToNomad(job *OpenRewriteJob) error {
+	// Check if Docker image exists before submitting job
+	if err := d.checkImageExists(); err != nil {
+		// Log the specific registry URL being checked for debugging
+		fmt.Printf("[OpenRewrite] Image check failed: %v\n", err)
+		return err
+	}
+	
 	// Generate HCL from template
 	var buf bytes.Buffer
 	
@@ -459,4 +467,52 @@ func (d *OpenRewriteDispatcher) CleanupOldJobs(ctx context.Context, maxAge time.
 	}
 	
 	return nil
+}
+
+// checkImageExists verifies if the OpenRewrite Docker image exists in the registry
+func (d *OpenRewriteDispatcher) checkImageExists() error {
+	registryURL := "https://registry.dev.ployman.app"
+	imageName := "openrewrite-native"
+	tag := "latest"
+	
+	// Docker Registry v2 API endpoint to check if manifest exists
+	manifestURL := fmt.Sprintf("%s/v2/%s/manifests/%s", registryURL, imageName, tag)
+	
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	
+	// Create request
+	req, err := http.NewRequest("GET", manifestURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	// Docker Registry v2 requires Accept header for manifest
+	req.Header.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
+	
+	// Make request
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to check image: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	// Check response status
+	switch resp.StatusCode {
+	case http.StatusOK:
+		// Image exists
+		return nil
+	case http.StatusNotFound:
+		// Image doesn't exist
+		return fmt.Errorf("OpenRewrite Docker image not found at %s/%s:%s. Please deploy the image first by running: ansible-playbook playbooks/openrewrite-native.yml -e target_host=$TARGET_HOST", 
+			registryURL, imageName, tag)
+	case http.StatusUnauthorized:
+		// Registry requires authentication (shouldn't happen for our anonymous registry)
+		return fmt.Errorf("registry authentication required")
+	default:
+		// Other error
+		return fmt.Errorf("unexpected registry response: %d", resp.StatusCode)
+	}
 }

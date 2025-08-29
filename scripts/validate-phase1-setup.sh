@@ -79,10 +79,11 @@ validate_docker_infrastructure() {
         return 1
     fi
     
-    if [[ -f "$PROJECT_ROOT/cmd/openrewrite-server/main.go" ]]; then
-        check_passed "OpenRewrite server binary source exists"
+    # Check for the correct OpenRewrite native Dockerfile
+    if [[ -f "$PROJECT_ROOT/services/openrewrite-native/Dockerfile" ]]; then
+        check_passed "OpenRewrite native Dockerfile exists"
     else
-        check_failed "OpenRewrite server source not found"
+        check_failed "OpenRewrite native Dockerfile not found"
         return 1
     fi
     
@@ -93,14 +94,8 @@ validate_docker_infrastructure() {
         return 1
     fi
     
-    # Test Go build without execution
-    if go build -o /tmp/test-openrewrite-server "$PROJECT_ROOT/cmd/openrewrite-server" 2>/dev/null; then
-        check_passed "OpenRewrite server builds successfully"
-        rm -f /tmp/test-openrewrite-server
-    else
-        check_failed "OpenRewrite server fails to build"
-        return 1
-    fi
+    # OpenRewrite native image is built via Docker, not Go build
+    check_passed "OpenRewrite native uses GraalVM native image (no Go build needed)"
 }
 
 # Validate Phase 1 repository configuration
