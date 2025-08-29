@@ -23,7 +23,6 @@ type Handler struct {
 	// Phase 4 components
 	securityEngine      *SecurityEngine
 	sbomAnalyzer        *SyftSBOMAnalyzer
-	productionOptimizer *ProductionOptimizer
 	// Phase 8 components
 	benchmarkManager    *BenchmarkManager
 }
@@ -37,10 +36,6 @@ func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr Sand
 		// Initialize Phase 4 components
 		securityEngine:      NewSecurityEngine(),
 		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
-			EnableCircuitBreaker: true,
-			EnableCaching:        true,
-		}),
 		// Phase 8 components
 		benchmarkManager:    benchmarkMgr,
 	}
@@ -65,10 +60,6 @@ func NewHandlerWithStorage(
 		// Initialize Phase 4 components
 		securityEngine:      NewSecurityEngine(),
 		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
-			EnableCircuitBreaker: true,
-			EnableCaching:        true,
-		}),
 		// Phase 8 components
 		benchmarkManager: benchmarkMgr,
 	}
@@ -100,10 +91,6 @@ func NewHandlerWithPhase3(
 		// Initialize Phase 4 components
 		securityEngine:      NewSecurityEngine(),
 		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
-			EnableCircuitBreaker: true,
-			EnableCaching:        true,
-		}),
 		// Phase 8 components
 		benchmarkManager:    benchmarkMgr,
 	}
@@ -180,7 +167,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 
 	// Phase 3: LLM and Hybrid Intelligence
 	arf.Post("/recipes/generate", h.GenerateLLMRecipe)
-	arf.Post("/recipes/optimize", h.OptimizeRecipe)
 	arf.Post("/transform/hybrid", h.ExecuteHybridTransformation)
 	arf.Post("/strategy/select", h.SelectTransformationStrategy)
 	arf.Post("/complexity/analyze", h.AnalyzeComplexity)
@@ -211,18 +197,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 
 	// Phase 4: Workflow removed - functionality integrated into transform command
 
-	// Phase 4: Production Optimization
-	arf.Post("/optimize/execution", h.OptimizeExecution)
-	arf.Post("/optimize/system", h.OptimizeSystemPerformance)
-	arf.Get("/optimize/metrics", h.GetPerformanceMetrics)
-	arf.Get("/optimize/report", h.GetOptimizationReport)
-	arf.Get("/optimize/resources", h.GetResourceUtilization)
-	arf.Get("/optimize/cost", h.GetCostAnalysis)
-	arf.Post("/optimize/benchmark", h.RunBenchmark)
-	arf.Get("/optimize/benchmark/:id", h.GetBenchmarkResults)
-	
-	// Phase 4: Production Metrics (additional endpoint for test compatibility)
-	arf.Get("/production/metrics", h.GetProductionMetrics)
 	
 	// Phase 8: RESTful Benchmark Test Suite API
 	arf.Post("/benchmarks", h.RunBenchmarkSuite)                    // Create new benchmark
