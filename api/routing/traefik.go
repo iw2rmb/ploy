@@ -289,7 +289,7 @@ func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) 
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.path=%s", serviceName, config.HealthPath))
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.interval=%s", serviceName, config.HealthCheckInterval))
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.timeout=%s", serviceName, config.HealthCheckTimeout))
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.retries=%d", serviceName, config.HealthCheckRetries))
+		// Note: Traefik doesn't have a 'retries' field for health checks - removed invalid configuration
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.scheme=http", serviceName))
 		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.headers.X-Health-Check=traefik", serviceName))
 	}

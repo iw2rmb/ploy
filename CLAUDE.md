@@ -89,6 +89,18 @@ Example: feature changes must update FEATURES.md.
 ### Access Pattern
 **SSH Connection**: `ssh root@$TARGET_HOST` → `su - ploy` (always use ploy user for operations)
 
+### CRITICAL: Nomad Operations
+**MANDATORY**: Always use `/opt/hashicorp/bin/nomad-job-manager.sh` instead of calling `nomad` directly to avoid 429 rate limiting errors.
+
+**Wrapper Commands**:
+- `/opt/hashicorp/bin/nomad-job-manager.sh status <job-name>` (instead of `nomad job status`)
+- `/opt/hashicorp/bin/nomad-job-manager.sh run <job-name> <job-file>` (instead of `nomad job run`)
+- `/opt/hashicorp/bin/nomad-job-manager.sh stop <job-name>` (instead of `nomad job stop`)
+- `/opt/hashicorp/bin/nomad-job-manager.sh logs <alloc-id> <task> <lines>` (for log retrieval)
+- `/opt/hashicorp/bin/nomad-job-manager.sh running-alloc <job-name>` (get running allocation ID)
+
+**PROHIBITED**: Direct `nomad` command usage will result in 429 errors and failed operations.
+
 ### Required Test Categories by Change Type
 - **Lane detection**: Lane-detection tests on VPS
 - **API changes**: API and build-pipeline tests on VPS  

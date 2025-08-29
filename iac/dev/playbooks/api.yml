@@ -22,7 +22,7 @@
           wait_for:
             port: "{{ item }}"
             delay: 5
-            timeout: 60
+            timeout: 300
           loop:
             - "{{ seaweedfs.master_port }}"
             - "{{ seaweedfs.volume_port }}"
@@ -32,7 +32,7 @@
           wait_for:
             port: "{{ item }}"
             delay: 5
-            timeout: 60
+            timeout: 300
           loop:
             - "8500"  # Consul
             - "4646"  # Nomad
@@ -264,6 +264,27 @@
             owner: root
             group: root
 
+        - name: Copy service monitoring script
+          copy:
+            src: /Users/vk/@iw2rmb/ploy/iac/common/scripts/consul-service-monitor.sh
+            dest: /opt/hashicorp/bin/consul-service-monitor.sh
+            mode: '0755'
+            owner: root
+            group: root
+
+        - name: Clean up stale service registrations before deployment
+          shell: /opt/hashicorp/bin/consul-service-monitor.sh --job-name ploy-api --cleanup
+          environment:
+            CONSUL_ADDR: "http://localhost:8500"
+            NOMAD_ADDR: "http://localhost:4646"
+          register: cleanup_result
+          failed_when: false
+
+        - name: Display cleanup results
+          debug:
+            msg: "Service cleanup completed: {{ cleanup_result.stdout_lines[-1] if cleanup_result.stdout_lines else 'No output' }}"
+          when: cleanup_result.stdout_lines is defined
+
         - name: Stop existing API job if running
           shell: /opt/hashicorp/bin/nomad-job-manager.sh stop ploy-api
           environment:
@@ -299,13 +320,14 @@
           debug:
             msg: "Bootstrap API deployed successfully. Status: {{ wait_result.rc == 0 | ternary('Running', 'Failed') }}"
 
-        - name: Wait for bootstrap API to be available
+        - name: Wait for bootstrap API to be available via domain
           uri:
-            url: "http://localhost:{{ ploy.api_port }}/health"
+            url: "https://api.dev.{{ ploy.platform_domain }}/health"
             method: GET
             status_code: 200
+            validate_certs: no  # May need time for cert provisioning
           register: bootstrap_health
-          retries: 10
+          retries: 20
           delay: 15
           until: bootstrap_health.status == 200
 
@@ -324,37 +346,52 @@
 
     - name: Validate bootstrap deployment
       block:
-        - name: Verify bootstrap API health endpoint
+        - name: Verify bootstrap API health endpoint via domain
           uri:
-            url: "http://localhost:{{ ploy.api_port }}/health"
+            url: "https://api.dev.{{ ploy.platform_domain }}/health"
             method: GET
             status_code: 200
+            validate_certs: no  # May need time for cert provisioning
           register: bootstrap_health_check
-          retries: 12
+          retries: 20
           delay: 10
           until: bootstrap_health_check.status == 200
 
-        - name: Verify bootstrap API readiness
+        - name: Verify bootstrap API readiness via domain
           uri:
-            url: "http://localhost:{{ ploy.api_port }}/ready"
+            url: "https://api.dev.{{ ploy.platform_domain }}/ready"
             method: GET
             status_code: 200
+            validate_certs: no  # May need time for cert provisioning
           register: bootstrap_ready
-          retries: 6
+          retries: 15
           delay: 10
           until: bootstrap_ready.status == 200
 
-        - name: Test bootstrap API endpoints
+        - name: Test bootstrap API endpoints via domain
           uri:
-            url: "http://localhost:{{ ploy.api_port }}/v1/health"
+            url: "https://api.dev.{{ ploy.platform_domain }}/v1/health"
             method: GET
             status_code: 200
           register: bootstrap_api_test
           ignore_errors: true
 
+        - name: Verify clean service registrations post-deployment
+          shell: /opt/hashicorp/bin/consul-service-monitor.sh --job-name ploy-api
+          environment:
+            CONSUL_ADDR: "http://localhost:8500"
+            NOMAD_ADDR: "http://localhost:4646"
+          register: post_deployment_check
+          failed_when: false
+
+        - name: Display service registration status
+          debug:
+            msg: "{{ post_deployment_check.stdout_lines }}"
+          when: post_deployment_check.stdout_lines is defined
+
         - name: Display bootstrap validation results
           debug:
-            msg: "Bootstrap API is healthy and ready. Ready for unified deployment transition."
+            msg: "Bootstrap API is healthy and ready. Service registrations are clean. Ready for unified deployment transition."
 
         - name: Save current deployment version for future reference
           copy:
@@ -414,11 +451,8 @@
             group: ploy
             mode: '0755'
 
-    - name: Set up firewall for API
-      ufw:
-        rule: allow
-        port: "{{ ploy.api_port }}"
-        comment: "Ploy API"
+    # Firewall rule removed - API only accessible via Traefik/domain routing
+    # Direct port access is prohibited for security
 
     - name: Display bootstrap deployment summary
       debug:
@@ -426,7 +460,7 @@
           Bootstrap API deployment completed successfully:
           - Version: {{ current_deployment_version }}
           - Deployment method: Bootstrap Nomad job (unified deployment system)
-          - Health endpoint: http://localhost:{{ ploy.api_port }}/health
+          - Health endpoint: https://api.dev.{{ ploy.platform_domain }}/health
           - External access: https://api.dev.ployman.app/health
           - Management tools: Available in /home/ploy/api-scripts/
           

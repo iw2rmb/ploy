@@ -13,8 +13,19 @@ NC='\033[0m' # No Color
 
 # Configuration
 CONTROLLER_BASE="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
-BENCHMARK_CONFIG="${1:-api/arf/benchmark_configs/java11to17_migration.yaml}"
+BENCHMARK_CONFIG="${1}"  # Config file must be provided as argument
 OUTPUT_DIR="${2:-./benchmark_results}"
+
+if [ -z "$BENCHMARK_CONFIG" ]; then
+    echo -e "${RED}Error: Benchmark config file must be provided as first argument${NC}"
+    echo "Usage: $0 <config-file> [output-dir]"
+    exit 1
+fi
+
+if [ ! -f "$BENCHMARK_CONFIG" ]; then
+    echo -e "${RED}Error: Config file not found: $BENCHMARK_CONFIG${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}ARF Benchmark Test Suite${NC}"
 echo "=================================="

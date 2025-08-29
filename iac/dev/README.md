@@ -32,7 +32,7 @@ cd iac/dev
 ansible-playbook site.yml -e target_host=$TARGET_HOST
 
 # 4. Verify deployment
-ssh root@$TARGET_HOST "curl -s http://localhost:8081/health | jq .status"
+curl -s https://api.dev.ployman.app/health | jq .status
 ```
 
 ⚠️ **IMPORTANT**: Run `./scripts/validate-deployment.sh` to check all prerequisites before deployment.
@@ -170,10 +170,10 @@ export CLOUDFLARE_ZONE_ID="your-zone-id"
 ansible-playbook site.yml -e target_host=$TARGET_HOST
 
 # Verify platform certificate status
-curl http://$TARGET_HOST:8081/health/platform-certificates
+curl https://api.dev.ployman.app/health/platform-certificates
 
 # Add domain to app (automatic certificate provisioning)
-curl -X POST http://$TARGET_HOST:8081/v1/apps/myapp/domains \
+curl -X POST https://api.dev.ployman.app/v1/apps/myapp/domains \
   -H "Content-Type: application/json" \
   -d '{"domain":"myapp.ployd.app","certificate":"auto"}'
 ```
@@ -189,7 +189,7 @@ curl -X POST http://$TARGET_HOST:8081/v1/apps/myapp/domains \
 
 ## Services After Setup
 
-**Services:** Ploy Controller via Nomad (8081), Traefik (8080), Docker Registry v2 (5000), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Vault (8200), Metrics (9100)
+**Services:** Ploy Controller via Nomad (dynamic port, accessed via https://api.dev.ployman.app), Traefik (8080), Docker Registry v2 (5000), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Vault (8200), Metrics (9100)
 
 **Container Registry:** Docker Registry v2 at `registry.dev.ployman.app` (lightweight alternative to Harbor)
 - **Storage**: Local filesystem persistence

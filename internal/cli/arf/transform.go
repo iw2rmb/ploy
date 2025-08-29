@@ -77,8 +77,8 @@ func handleARFTransformCommand(args []string) error {
 func parseTransformArgs(args []string) *TransformRequest {
 	req := &TransformRequest{
 		Branch:         "main",
-		PlanModel:      "ollama/codellama:7b",
-		ExecModel:      "ollama/codellama:7b",
+		PlanModel:      "", // Must be set explicitly - no Ollama fallback
+		ExecModel:      "", // Must be set explicitly - no Ollama fallback
 		MaxIterations:  3,
 		ParallelTries:  3,
 		OutputFormat:   "diff",
@@ -219,8 +219,8 @@ func printTransformUsage() {
 	fmt.Println("  --prompt <prompt>      Single LLM prompt (can be repeated)")
 	fmt.Println()
 	fmt.Println("LLM Configuration:")
-	fmt.Println("  --plan-model <model>   LLM for planning (default: ollama/codellama:7b)")
-	fmt.Println("  --exec-model <model>   LLM for execution (default: ollama/codellama:7b)")
+	fmt.Println("  --plan-model <model>   LLM for planning (required for prompts)")
+	fmt.Println("  --exec-model <model>   LLM for execution (required for prompts)")
 	fmt.Println()
 	fmt.Println("Execution Parameters:")
 	fmt.Println("  --max-iterations <n>   Max retries per error (default: 3)")

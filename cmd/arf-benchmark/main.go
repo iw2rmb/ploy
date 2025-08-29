@@ -20,10 +20,16 @@ func main() {
 	var outputDir string
 	var verbose bool
 
-	flag.StringVar(&configFile, "config", "api/arf/benchmark_configs/minimal_test.yaml", "Benchmark configuration file")
+	flag.StringVar(&configFile, "config", "", "Benchmark configuration file (required)")
 	flag.StringVar(&outputDir, "output", "./benchmark_results", "Output directory for results")
 	flag.BoolVar(&verbose, "verbose", true, "Enable verbose output")
 	flag.Parse()
+
+	if configFile == "" {
+		fmt.Fprintf(os.Stderr, "Error: config file is required\n")
+		flag.Usage()
+		os.Exit(1)
+	}
 
 	fmt.Println("ARF Benchmark Test Runner")
 	fmt.Println("=========================")
