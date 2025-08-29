@@ -23,17 +23,28 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		
 		// Logger function for tracking progress
 		logger := func(level, stage, message, details string) {
-			c.Context().Logger().Printf("[%s] %s: %s %s", level, stage, message, details)
+			if ctx := c.Context(); ctx != nil {
+				if ctxLogger := ctx.Logger(); ctxLogger != nil {
+					ctxLogger.Printf("[%s] %s: %s %s", level, stage, message, details)
+				} else {
+					fmt.Printf("[%s] %s: %s %s\n", level, stage, message, details)
+				}
+			} else {
+				fmt.Printf("[%s] %s: %s %s\n", level, stage, message, details)
+			}
 		}
 		
 		// Execute the robust transformation directly with the already parsed request
+		fmt.Printf("[DEBUG] About to call ExecuteRobustTransformation\n")
 		result, err := ExecuteRobustTransformation(c.Context(), &robustReq, logger)
 		if err != nil {
+			fmt.Printf("[DEBUG] ExecuteRobustTransformation failed: %v\n", err)
 			return c.Status(500).JSON(fiber.Map{
 				"error":   "Transformation failed",
 				"details": err.Error(),
 			})
 		}
+		fmt.Printf("[DEBUG] ExecuteRobustTransformation succeeded\n")
 		
 		return c.JSON(result)
 	}
@@ -67,7 +78,15 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 	// Execute robust transformation
 	logger := func(level, stage, message, details string) {
 		// Log to Fiber context logger if available
-		c.Context().Logger().Printf("[%s] %s: %s %s", level, stage, message, details)
+		if ctx := c.Context(); ctx != nil {
+			if ctxLogger := ctx.Logger(); ctxLogger != nil {
+				ctxLogger.Printf("[%s] %s: %s %s", level, stage, message, details)
+			} else {
+				fmt.Printf("[%s] %s: %s %s\n", level, stage, message, details)
+			}
+		} else {
+			fmt.Printf("[%s] %s: %s %s\n", level, stage, message, details)
+		}
 	}
 	
 	result, err := ExecuteRobustTransformation(c.Context(), &robustReq, logger)
@@ -97,7 +116,15 @@ func (h *Handler) ExecuteRobustTransformation(c *fiber.Ctx) error {
 	
 	// Logger function for tracking progress
 	logger := func(level, stage, message, details string) {
-		c.Context().Logger().Printf("[%s] %s: %s %s", level, stage, message, details)
+		if ctx := c.Context(); ctx != nil {
+			if ctxLogger := ctx.Logger(); ctxLogger != nil {
+				ctxLogger.Printf("[%s] %s: %s %s", level, stage, message, details)
+			} else {
+				fmt.Printf("[%s] %s: %s %s\n", level, stage, message, details)
+			}
+		} else {
+			fmt.Printf("[%s] %s: %s %s\n", level, stage, message, details)
+		}
 	}
 	
 	// Execute the robust transformation

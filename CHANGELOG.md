@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [2025-08-29] - CLLM/CHTTP Artifact Cleanup
+
+### Removed
+- **CHTTP Infrastructure Files**: Removed all remaining CHTTP artifacts
+  - Deleted `iac/dev/playbooks/chttp.yml` Ansible playbook
+  - Removed 4 template files: `chttp-service.service.j2`, `chttp-logrotate.j2`, `pylint-chttp-config.yaml.j2`, `traefik-chttp.yml.j2`
+  - Deleted `tests/integration/performance/chttp_performance_test.go`
+  - Removed backup file `chttp-backup-20250828-054054.tar.gz`
+
+### Changed
+- **Documentation Updates**: Added deprecation notices to obsolete roadmaps
+  - Updated `roadmap/cllm/README.md` - noted LLM uses Nomad batch jobs (migrated 2025-08-29)
+  - Updated `roadmap/cli-over-http/README.md` - noted CHTTP was completely removed
+  - Both services replaced by Nomad batch job architecture
+
+### Testing
+- Verified no CLLM or CHTTP services running on VPS
+- Confirmed all infrastructure files removed
+- Build verification passes without CHTTP/CLLM dependencies
+
 ## [2025-08-29] - OpenRewrite Service Cleanup & Simplification
 
 ### Removed

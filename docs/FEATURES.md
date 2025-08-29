@@ -296,8 +296,8 @@ Auto-classified lanes:
   - Custom pattern development for Ploy-specific issues
   - Incremental analysis with caching
 
-- ✅ **Python Pylint Integration**: Comprehensive Python analysis via CHTTP service (Phase 2 - Aug 2025)
-  - ✅ CHTTP service architecture for secure, distributed analysis
+- ✅ **Python Pylint Integration**: Comprehensive Python analysis via Nomad batch jobs (migrated Aug 2025)
+  - ✅ Nomad batch job architecture for secure, distributed analysis
   - ✅ Full Pylint integration with JSON output parsing
   - ✅ Secure sandboxed execution with resource limits
   - ✅ Archive-based code transmission with gzip compression

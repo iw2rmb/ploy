@@ -129,6 +129,7 @@ func ExecuteRobustTransformation(ctx context.Context, req *RobustTransformReques
 	// Add comprehensive panic recovery
 	defer func() {
 		if r := recover(); r != nil {
+			fmt.Printf("[DEBUG] PANIC in ExecuteRobustTransformation: %v\n", r)
 			if logger != nil {
 				logger("ERROR", "transform_panic", "Panic during robust transformation", fmt.Sprintf("Panic: %v", r))
 			}
@@ -137,12 +138,21 @@ func ExecuteRobustTransformation(ctx context.Context, req *RobustTransformReques
 		}
 	}()
 	
+	fmt.Printf("[DEBUG] ExecuteRobustTransformation started\n")
 	startTime := time.Now()
 	
 	// Defensive nil checks
 	if req == nil {
+		fmt.Printf("[DEBUG] Request is nil\n")
 		return nil, fmt.Errorf("request is nil")
 	}
+	
+	if ctx == nil {
+		fmt.Printf("[DEBUG] Context is nil\n") 
+		return nil, fmt.Errorf("context is nil")
+	}
+	
+	fmt.Printf("[DEBUG] Request and context validated\n")
 	
 	if logger != nil {
 		recipeCount := 0
