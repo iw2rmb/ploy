@@ -609,7 +609,7 @@ ployman push
 
 # Test via ARF
 ploy arf benchmark run java11to17_migration \
-  --repository https://github.com/spring-projects/spring-petclinic \
+  --repository https://github.com/winterbe/java8-tutorial \
   --app test-migration
 ```
 

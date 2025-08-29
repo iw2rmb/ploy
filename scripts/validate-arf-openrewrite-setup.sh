@@ -159,9 +159,9 @@ echo "=============================="
 
 # Test repository access
 test_repos=(
-  "https://github.com/spring-projects/spring-petclinic.git"
-  "https://github.com/eugenp/tutorials.git"
   "https://github.com/winterbe/java8-tutorial.git"
+  "https://github.com/eugenp/tutorials.git"
+  "https://github.com/iluwatar/java-design-patterns.git"
 )
 
 for repo in "${test_repos[@]}"; do

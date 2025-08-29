@@ -23,7 +23,7 @@ NC='\033[0m' # No Color
 # Test configuration
 CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEST_TIMEOUT=300  # 5 minutes
-ARF_TEST_REPO="https://github.com/spring-projects/spring-petclinic.git"
+ARF_TEST_REPO="https://github.com/winterbe/java8-tutorial.git"
 TEST_APP_NAME="arf-test-$(date +%s)"
 
 # Test functions

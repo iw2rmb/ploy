@@ -29,13 +29,13 @@ PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 ## Test Execution Results
 
-### Test 1: Spring PetClinic Repository
+### Test 1: Java 8 Tutorial Repository
 
 **Repository Details:**
-- URL: `https://github.com/spring-projects/spring-petclinic.git`
+- URL: `https://github.com/winterbe/java8-tutorial.git`
 - Branch: main
 - Build Tool: Maven (pom.xml detected)
-- Current Java Version: 17 (already migrated)
+- Current Java Version: 8 (needs migration)
 
 **Stage Results:**
 
@@ -57,8 +57,8 @@ PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 #### 3. Transformation Stage ✅
 - **Duration**: < 1 second
 - **Status**: No changes needed
-- Spring PetClinic already uses Java 17
-- No transformation required
+- Java 8 Tutorial uses Java 8
+- Transformation from Java 8 to 17 required
 
 #### 4. Build Validation ⏱️
 - **Duration**: Timeout after 2 minutes
@@ -94,8 +94,8 @@ Per `roadmap/openrewrite/benchmark-java11.md`:
    - Cannot execute full benchmark pipeline
 
 2. **Test Repository Selection**
-   - Spring PetClinic already uses Java 17
-   - Need repositories with Java 11 for meaningful migration tests
+   - Java 8 Tutorial uses Java 8
+   - Provides meaningful migration testing from Java 8 to 17
 
 3. **Local Environment Limitations**
    - Maven compilation slow/timing out
@@ -109,9 +109,9 @@ Per `roadmap/openrewrite/benchmark-java11.md`:
    - Check network connectivity to `*.ployman.app` domains
 
 2. **Test Repository Updates**
-   - Find repositories still using Java 11
-   - Consider using specific tags/branches with older Java versions
-   - Example: Spring PetClinic tag from 2020-2021 period
+   - Java 8 Tutorial provides good baseline for testing
+   - Consider additional repositories with different Java versions
+   - Example: repositories with Java 11 for intermediate testing
 
 3. **Local Testing Approach**
    - Create lightweight benchmark simulation
@@ -151,8 +151,8 @@ OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app \
 ARF_OPENREWRITE_MODE=embedded \
 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 \
 ./bin/ploy arf benchmark run java11to17_migration \
-  --repository "https://github.com/spring-projects/spring-petclinic.git" \
-  --app-name "test-petclinic-phase1" \
+  --repository "https://github.com/winterbe/java8-tutorial.git" \
+  --app-name "test-java8-tutorial-phase1" \
   --branch main \
   --lane C --iterations 1
 
