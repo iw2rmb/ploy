@@ -16,13 +16,13 @@ import (
 func ApiCmd(args []string) {
 	if len(args) == 0 {
 		fmt.Println("API management commands:")
-		fmt.Println("  ployman api deploy              Deploy latest API version")
+		fmt.Println("  ployman api deploy              Deploy latest code changes via full build")
 		fmt.Println("  ployman api rollback <version>  Rollback to specific version")
 		fmt.Println("")
 		fmt.Println("Environment variables:")
-		fmt.Println("  PLOY_CONTROLLER    API endpoint (default: https://api.dev.ployman.app/v1)")
-		fmt.Println("  TARGET_HOST        VPS host for Ansible fallback")
+		fmt.Println("  TARGET_HOST        VPS host for deployment (required)")
 		fmt.Println("  DEPLOY_BRANCH      Git branch to deploy (default: current branch or 'main')")
+		fmt.Println("  PLOY_CONTROLLER    API endpoint for rollback (default: https://api.dev.ployman.app/v1)")
 		return
 	}
 
@@ -43,62 +43,10 @@ func ApiCmd(args []string) {
 func runApiDeploy(args []string) {
 	fmt.Println("Deploying latest API version...")
 	
-	// Get controller URL
-	controllerURL := getControllerURL()
-	
-	// Try self-update endpoint first
-	updateURL := fmt.Sprintf("%s/update/latest", controllerURL)
-	
-	fmt.Printf("Attempting self-update via %s...\n", updateURL)
-	
-	req, err := http.NewRequest("POST", updateURL, nil)
-	if err != nil {
-		fmt.Printf("Error creating request: %v\n", err)
-		runSSHFallback()
-		return
-	}
-	
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("Self-update failed: %v\n", err)
-		runSSHFallback()
-		return
-	}
-	defer resp.Body.Close()
-	
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading response: %v\n", err)
-		runSSHFallback()
-		return
-	}
-	
-	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("Self-update failed with status %d: %s\n", resp.StatusCode, string(body))
-		runSSHFallback()
-		return
-	}
-	
-	// Parse response
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		fmt.Printf("Error parsing response: %v\n", err)
-		runSSHFallback()
-		return
-	}
-	
-	fmt.Println("Self-update successful!")
-	if version, ok := result["version"].(string); ok {
-		fmt.Printf("Deployed version: %s\n", version)
-	}
-	if gitCommit, ok := result["git_commit"].(string); ok && gitCommit != "" {
-		fmt.Printf("Git commit: %s\n", gitCommit)
-	}
-	
-	// Check deployment status
-	time.Sleep(2 * time.Second)
-	checkDeploymentStatus(controllerURL)
+	// Always run full deployment to ensure latest code changes are deployed
+	// This includes: git pull, build, upload to SeaweedFS, and Nomad deployment
+	fmt.Println("Running full deployment to ensure latest code changes...")
+	runAnsibleDeployment()
 }
 
 func runApiRollback(args []string) {
@@ -154,8 +102,8 @@ func runApiRollback(args []string) {
 	fmt.Printf("Successfully rolled back to version %s\n", targetVersion)
 }
 
-func runSSHFallback() {
-	fmt.Println("\nFalling back to Ansible deployment (running locally)...")
+func runAnsibleDeployment() {
+	fmt.Println("Running Ansible deployment to build and deploy latest code...")
 	
 	// Get target host from environment
 	targetHost := os.Getenv("TARGET_HOST")
@@ -207,7 +155,7 @@ func runSSHFallback() {
 		fmt.Println("Tip: Set DEPLOY_BRANCH environment variable to deploy a specific branch")
 	}
 	
-	fmt.Printf("Deploying branch '%s' to %s via local Ansible...\n", branch, targetHost)
+	fmt.Printf("Deploying branch '%s' to %s via Ansible...\n", branch, targetHost)
 	
 	// Find the repository root (where iac/dev directory should be)
 	// First try to find it relative to the current working directory
