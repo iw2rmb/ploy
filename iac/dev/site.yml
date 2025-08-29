@@ -24,7 +24,7 @@
 - import_playbook: playbooks/arf-openrewrite-recipes.yml
 - import_playbook: playbooks/traefik.yml
 - import_playbook: playbooks/docker-registry.yml
-- import_playbook: playbooks/openrewrite-native.yml
+- import_playbook: playbooks/openrewrite-jvm.yml
 - import_playbook: playbooks/api.yml
 - import_playbook: playbooks/freebsd.yml
 - import_playbook: playbooks/testing.yml

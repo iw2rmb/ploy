@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -563,7 +564,7 @@ func (d *OpenRewriteDispatcher) CleanupOldJobs(ctx context.Context, maxAge time.
 // checkImageExists verifies if the OpenRewrite Docker image exists in the registry
 func (d *OpenRewriteDispatcher) checkImageExists() error {
 	registryURL := "https://registry.dev.ployman.app"
-	imageName := "openrewrite-native"
+	imageName := "openrewrite-jvm"
 	tag := "latest"
 	
 	// Docker Registry v2 API endpoint to check if manifest exists
@@ -597,7 +598,7 @@ func (d *OpenRewriteDispatcher) checkImageExists() error {
 		return nil
 	case http.StatusNotFound:
 		// Image doesn't exist
-		return fmt.Errorf("OpenRewrite Docker image not found at %s/%s:%s. Please deploy the image first by running: ansible-playbook playbooks/openrewrite-native.yml -e target_host=$TARGET_HOST", 
+		return fmt.Errorf("OpenRewrite Docker image not found at %s/%s:%s. Please deploy the image first by running: ansible-playbook playbooks/openrewrite-jvm.yml -e target_host=$TARGET_HOST", 
 			registryURL, imageName, tag)
 	case http.StatusUnauthorized:
 		// Registry requires authentication (shouldn't happen for our anonymous registry)
