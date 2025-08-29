@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2025-08-29] - LLM Service Migration to Nomad
+
+### Added
+- **Nomad-Based LLM Transformations**: Migrated CLLM service to Nomad batch jobs for distributed execution
+  - Created `api/arf/llm_dispatcher.go` for managing LLM transformation jobs via Nomad
+  - Added Nomad job template `platform/nomad/llm-ollama-batch.hcl` for Ollama-based transformations
+  - Added Nomad job template `platform/nomad/llm-openai-batch.hcl` for OpenAI-based transformations
+  - Integrated LLM dispatcher with Consul for job tracking and SeaweedFS for artifact storage
+  - Support for multiple LLM providers (Ollama, OpenAI) with automatic model management
+  - Base64 encoding for prompt safety in Nomad job templates
+  - Comprehensive error handling and retry mechanisms
+
+### Changed
+- **LLM Integration Update**: Modified ARF robust transform to use Nomad dispatcher instead of direct HTTP calls
+  - Updated `api/arf/robust_transform.go` to use LLM dispatcher pattern
+  - Created comprehensive type system in `api/arf/llm_types.go` for LLM operations
+  - Enhanced `api/arf/factory.go` with LLM generator initialization using Nomad jobs
+  - Fixed hybrid pipeline to use new LLM metadata format (map[string]interface{})
+
+### Removed
+- **CLLM Service Infrastructure**: Completely removed standalone CLLM HTTP service (no backward compatibility required)
+  - Deleted entire `services/cllm/` directory and all components
+  - Removed direct LLM provider implementations (Ollama, OpenAI HTTP clients)
+  - Cleaned up unused imports and CLLM-specific interfaces
+
+### Testing
+- Verified all components build successfully without CLLM dependencies
+- Confirmed LLM Nomad job templates are properly structured for distributed execution
+- Validated LLM dispatcher follows same pattern as OpenRewrite for consistency
+
 ## [2025-08-29] - Code Analysis Migration to Nomad
 
 ### Added

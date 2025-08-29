@@ -989,13 +989,16 @@ func GetOrCreateLLMDispatcher() (*LLMDispatcher, error) {
 		}
 		
 		// Create storage client
-		storageClient, err := storage.NewStorageClient(storage.StorageConfig{
-			Type: "seaweedfs",
-			Config: map[string]interface{}{
-				"master_url": os.Getenv("SEAWEEDFS_MASTER_URL"),
-				"filer_url":  os.Getenv("SEAWEEDFS_FILER_URL"),
-			},
+		seaweedProvider, err := storage.NewSeaweedFSClient(storage.SeaweedFSConfig{
+			Master: os.Getenv("SEAWEEDFS_MASTER_URL"),
+			Filer:  os.Getenv("SEAWEEDFS_FILER_URL"),
 		})
+		if err != nil {
+			llmDispatcherErr = fmt.Errorf("failed to create SeaweedFS provider: %w", err)
+			return
+		}
+		
+		storageClient := storage.NewStorageClient(seaweedProvider, storage.DefaultClientConfig())
 		if err != nil {
 			llmDispatcherErr = fmt.Errorf("failed to create storage client: %w", err)
 			return
