@@ -1,24 +1,30 @@
 # CHANGELOG
 
-## [2025-08-29] - CLLM/CHTTP Artifact Cleanup
+## [2025-08-29] - Performance Monitoring System and cHTTP Infrastructure Removal
 
 ### Removed
-- **CHTTP Infrastructure Files**: Removed all remaining CHTTP artifacts
-  - Deleted `iac/dev/playbooks/chttp.yml` Ansible playbook
-  - Removed 4 template files: `chttp-service.service.j2`, `chttp-logrotate.j2`, `pylint-chttp-config.yaml.j2`, `traefik-chttp.yml.j2`
-  - Deleted `tests/integration/performance/chttp_performance_test.go`
-  - Removed backup file `chttp-backup-20250828-054054.tar.gz`
+- **Performance Monitoring System**: Complete removal of performance monitoring infrastructure
+  - Deleted `/api/performance/` directory with connection pooling, caching, and load balancing
+  - Removed performance monitoring HTTP endpoints from REST API: `/v1/performance/*`
+  - Removed performance-related configuration and pool management from server initialization
+- **cHTTP Infrastructure**: Complete removal of cHTTP implementation
+  - Removed all cHTTP-related test files, benchmarking scripts, and integration tests
+  - Deleted `/cmd/resource-monitor/` command and utility files
+  - Removed cHTTP documentation and research files
 
 ### Changed
-- **Documentation Updates**: Added deprecation notices to obsolete roadmaps
-  - Updated `roadmap/cllm/README.md` - noted LLM uses Nomad batch jobs (migrated 2025-08-29)
-  - Updated `roadmap/cli-over-http/README.md` - noted CHTTP was completely removed
-  - Both services replaced by Nomad batch job architecture
+- **Architecture Simplification**: Refactored to use direct client connections throughout
+  - Updated consul_envstore to use direct Consul client instead of connection pools
+  - Replaced performance package caching with simple inline cache implementations
+  - Simplified configuration management by removing performance monitoring dependencies
+- **Documentation Updates**: Updated all documentation to reflect simplified architecture
+  - Removed performance monitoring feature references from main documentation
+  - Cleaned up cHTTP references from changelog and roadmap documents
 
 ### Testing
-- Verified no CLLM or CHTTP services running on VPS
-- Confirmed all infrastructure files removed
-- Build verification passes without CHTTP/CLLM dependencies
+- Build verification passes without performance monitoring or cHTTP dependencies
+- Verified system functionality with direct client connections
+- All components work correctly without performance optimization layer
 
 ## [2025-08-29] - OpenRewrite Service Cleanup & Simplification
 

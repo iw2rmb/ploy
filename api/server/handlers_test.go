@@ -216,8 +216,6 @@ func TestLoadConfigFromEnv(t *testing.T) {
 		"PLOY_USE_CONSUL_ENV":     "false",
 		"PLOY_ENV_STORE_PATH":     "/custom/env/path",
 		"PLOY_CLEANUP_AUTO_START": "false",
-		"PLOY_CONSUL_POOL_SIZE":   "15",
-		"PLOY_NOMAD_POOL_SIZE":    "12",
 		"PLOY_ENABLE_CACHING":     "false",
 	}
 
@@ -246,8 +244,6 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	assert.Equal(t, false, config.UseConsulEnv)
 	assert.Equal(t, "/custom/env/path", config.EnvStorePath)
 	assert.Equal(t, false, config.CleanupAutoStart)
-	assert.Equal(t, 15, config.ConsulPoolSize)
-	assert.Equal(t, 12, config.NomadPoolSize)
 	assert.Equal(t, false, config.EnableCaching)
 	assert.Equal(t, 30*time.Second, config.ShutdownTimeout)
 }
@@ -256,8 +252,7 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	// Clear relevant environment variables to test defaults
 	envVarsToUnset := []string{
 		"PORT", "CONSUL_HTTP_ADDR", "NOMAD_ADDR", "PLOY_USE_CONSUL_ENV",
-		"PLOY_ENV_STORE_PATH", "PLOY_CLEANUP_AUTO_START", "PLOY_CONSUL_POOL_SIZE",
-		"PLOY_NOMAD_POOL_SIZE", "PLOY_ENABLE_CACHING",
+		"PLOY_ENV_STORE_PATH", "PLOY_CLEANUP_AUTO_START", "PLOY_ENABLE_CACHING",
 	}
 
 	originalValues := make(map[string]string)
@@ -283,8 +278,6 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	assert.Equal(t, true, config.UseConsulEnv)
 	assert.Equal(t, "/tmp/ploy-env-store", config.EnvStorePath)
 	assert.Equal(t, true, config.CleanupAutoStart)
-	assert.Equal(t, 10, config.ConsulPoolSize)
-	assert.Equal(t, 8, config.NomadPoolSize)
 	assert.Equal(t, true, config.EnableCaching)
 }
 
@@ -1327,8 +1320,6 @@ func TestServer_LifecycleManagement(t *testing.T) {
 			StorageConfigPath: "/test/config",
 			UseConsulEnv:      false,
 			EnvStorePath:      "/tmp/test-env",
-			ConsulPoolSize:    5,
-			NomadPoolSize:     3,
 			EnableCaching:     true,
 		}
 
