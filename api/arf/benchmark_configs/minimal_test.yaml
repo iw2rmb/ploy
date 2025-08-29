@@ -22,7 +22,7 @@ llm_options:
 
 # Minimal iteration control
 max_iterations: 2
-timeout_per_iteration: 2m
+timeout_per_iteration: 5m
 stop_on_success: true
 
 # Output configuration

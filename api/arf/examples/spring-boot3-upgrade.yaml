@@ -81,7 +81,7 @@ steps:
       file_pattern: "**/application*.{properties,yml,yaml}"
       description: Update deprecated configuration properties
     on_error: continue
-    timeout: 1m
+    timeout: 5m
 
   - name: Remove Unnecessary Annotations
     type: openrewrite
@@ -89,7 +89,7 @@ steps:
       recipe: org.openrewrite.java.spring.boot3.RemoveUnnecessaryAnnotations
       description: Remove annotations that are no longer needed in Spring Boot 3
     on_error: continue
-    timeout: 2m
+    timeout: 5m
 
   - name: Update Test Annotations
     type: openrewrite
@@ -109,7 +109,7 @@ steps:
       options:
         style: AOSP
     on_error: continue
-    timeout: 2m
+    timeout: 5m
 
 execution:
   parallelism: 1  # Sequential execution for safety

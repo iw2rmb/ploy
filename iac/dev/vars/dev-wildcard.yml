@@ -106,7 +106,7 @@ dns_challenge_config:
   provider: "{{ ploy.apps_domain_provider }}"
   
   # DNS propagation check
-  propagation_timeout: 120
+  propagation_timeout: 300
   polling_interval: 10
   
   # TTL for challenge records

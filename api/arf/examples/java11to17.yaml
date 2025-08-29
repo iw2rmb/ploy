@@ -106,7 +106,7 @@ steps:
     config:
       recipe: org.openrewrite.java.cleanup.RemoveUnusedImports
     on_error: continue
-    timeout: 2m
+    timeout: 5m
 
 # Execution configuration
 execution:
