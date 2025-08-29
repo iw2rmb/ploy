@@ -1,9 +1,14 @@
 package arf
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 // RobustTransformRequest represents the request for robust transformation
@@ -448,56 +454,73 @@ func applyRecipeWithRetry(ctx context.Context, workspace *Workspace, recipeID st
 	}
 }
 
-// applyLLMPromptWithRetry applies an LLM prompt with retry logic
+// applyLLMPromptWithRetry applies an LLM prompt with retry logic using Nomad dispatcher
 func applyLLMPromptWithRetry(ctx context.Context, workspace *Workspace, prompt string, req *RobustTransformRequest, logger func(level, stage, message, details string)) *TransformResult {
 	// Parse LLM model configuration
 	provider, model := parseLLMModel(req.Execution.ExecModel)
 	
-	// Create LLM generator
-	var llmGen LLMRecipeGenerator
-	var err error
-	
-	switch provider {
-	case "ollama":
-		llmGen, err = NewOllamaLLMGeneratorWithConfig(model, "http://localhost:11434", 0.1, 4096)
-	case "openai":
-		llmGen, err = NewOpenAILLMGenerator()
-	default:
-		return &TransformResult{
-			Success: false,
-			Error:   fmt.Errorf("unsupported LLM provider: %s", provider),
-		}
-	}
-	
+	// Create LLM dispatcher if not already initialized
+	llmDispatcher, err := GetOrCreateLLMDispatcher()
 	if err != nil {
 		return &TransformResult{
 			Success: false,
-			Error:   fmt.Errorf("failed to create LLM generator: %w", err),
+			Error:   fmt.Errorf("failed to create LLM dispatcher: %w", err),
 		}
 	}
 	
-	// Generate and apply transformation
-	request := RecipeGenerationRequest{
-		Language: workspace.Language,
-		CodebaseContext: CodebaseContext{
-			Language:  workspace.Language,
-			Framework: workspace.Framework,
-		},
-		ErrorContext: ErrorContext{
-			ErrorMessage: prompt, // Use prompt as the transformation request
-		},
-	}
-	
-	_, err = llmGen.GenerateRecipe(ctx, request)
+	// Create tar archive of workspace
+	archiveData, err := createWorkspaceArchive(workspace)
 	if err != nil {
 		return &TransformResult{
 			Success: false,
-			Error:   fmt.Errorf("LLM generation failed: %w", err),
+			Error:   fmt.Errorf("failed to create workspace archive: %w", err),
 		}
 	}
 	
-	// Apply the generated recipe
-	// TODO: Apply the transformation to the workspace
+	// Prepare parameters for LLM job
+	params := map[string]interface{}{
+		"language":    workspace.Language,
+		"framework":   workspace.Framework,
+		"temperature": 0.1,
+		"max_tokens":  4096,
+	}
+	
+	// Submit LLM transformation job
+	job, err := llmDispatcher.SubmitLLMTransformation(ctx, provider, model, prompt, bytes.NewReader(archiveData), params)
+	if err != nil {
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("failed to submit LLM job: %w", err),
+		}
+	}
+	
+	logger("info", "llm-transformation", fmt.Sprintf("Submitted LLM job %s", job.ID), "")
+	
+	// Wait for job completion (with timeout)
+	timeout := 5 * time.Minute
+	completedJob, err := llmDispatcher.WaitForCompletion(ctx, job.ID, timeout)
+	if err != nil {
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("LLM job failed or timed out: %w", err),
+		}
+	}
+	
+	// Check job status
+	if completedJob.Status == "failed" {
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("LLM transformation failed: %s", completedJob.Error),
+		}
+	}
+	
+	// Download and apply the transformation result
+	if err := applyLLMResult(workspace, completedJob.OutputURL); err != nil {
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("failed to apply LLM result: %w", err),
+		}
+	}
 	
 	return &TransformResult{
 		Success: true,
@@ -943,4 +966,173 @@ func countSuccessfulStages(timeline []StageExecution, prefix string) int {
 
 func generateMRDescription(workspace *Workspace) string {
 	return fmt.Sprintf("ARF Transformation with %d files modified", len(workspace.Changes))
+}
+
+// Global LLM dispatcher instance
+var (
+	llmDispatcher     *LLMDispatcher
+	llmDispatcherOnce sync.Once
+	llmDispatcherErr  error
+)
+
+// GetOrCreateLLMDispatcher returns a singleton LLM dispatcher instance
+func GetOrCreateLLMDispatcher() (*LLMDispatcher, error) {
+	llmDispatcherOnce.Do(func() {
+		nomadAddr := os.Getenv("NOMAD_ADDR")
+		if nomadAddr == "" {
+			nomadAddr = "http://127.0.0.1:4646"
+		}
+		
+		consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+		if consulAddr == "" {
+			consulAddr = "127.0.0.1:8500"
+		}
+		
+		// Create storage client
+		storageClient, err := storage.NewStorageClient(storage.StorageConfig{
+			Type: "seaweedfs",
+			Config: map[string]interface{}{
+				"master_url": os.Getenv("SEAWEEDFS_MASTER_URL"),
+				"filer_url":  os.Getenv("SEAWEEDFS_FILER_URL"),
+			},
+		})
+		if err != nil {
+			llmDispatcherErr = fmt.Errorf("failed to create storage client: %w", err)
+			return
+		}
+		
+		llmDispatcher, llmDispatcherErr = NewLLMDispatcher(nomadAddr, consulAddr, storageClient)
+	})
+	
+	return llmDispatcher, llmDispatcherErr
+}
+
+// createWorkspaceArchive creates a tar.gz archive of the workspace
+func createWorkspaceArchive(workspace *Workspace) ([]byte, error) {
+	var buf bytes.Buffer
+	
+	// Create gzip writer
+	gzWriter := gzip.NewWriter(&buf)
+	defer gzWriter.Close()
+	
+	// Create tar writer
+	tarWriter := tar.NewWriter(gzWriter)
+	defer tarWriter.Close()
+	
+	// Walk through workspace directory
+	err := filepath.Walk(workspace.Path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+		
+		// Get relative path
+		relPath, err := filepath.Rel(workspace.Path, path)
+		if err != nil {
+			return err
+		}
+		
+		// Create tar header
+		header := &tar.Header{
+			Name:    relPath,
+			Mode:    int64(info.Mode()),
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+		}
+		
+		// Write header
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return err
+		}
+		
+		// Open file
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		
+		// Copy file content
+		_, err = io.Copy(tarWriter, file)
+		return err
+	})
+	
+	if err != nil {
+		return nil, fmt.Errorf("failed to create archive: %w", err)
+	}
+	
+	// Close writers
+	if err := tarWriter.Close(); err != nil {
+		return nil, err
+	}
+	if err := gzWriter.Close(); err != nil {
+		return nil, err
+	}
+	
+	return buf.Bytes(), nil
+}
+
+// applyLLMResult downloads and applies the LLM transformation result
+func applyLLMResult(workspace *Workspace, outputURL string) error {
+	// Download the result
+	resp, err := http.Get(outputURL)
+	if err != nil {
+		return fmt.Errorf("failed to download LLM result: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download LLM result: status %d", resp.StatusCode)
+	}
+	
+	// Create gzip reader
+	gzReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzReader.Close()
+	
+	// Create tar reader
+	tarReader := tar.NewReader(gzReader)
+	
+	// Extract files
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar header: %w", err)
+		}
+		
+		// Skip directories
+		if header.Typeflag == tar.TypeDir {
+			continue
+		}
+		
+		// Read transformed content
+		if header.Name == "transformed.txt" {
+			content, err := io.ReadAll(tarReader)
+			if err != nil {
+				return fmt.Errorf("failed to read transformed content: %w", err)
+			}
+			
+			// Apply the transformation (simplified - in reality would parse and apply diffs)
+			workspace.Changes = append(workspace.Changes, FileChange{
+				File:        "llm-transformation",
+				Type:        "modified",
+				LinesAdded:  len(strings.Split(string(content), "\n")),
+				UnifiedDiff: string(content),
+				Timestamp:   time.Now(),
+			})
+			
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("transformed.txt not found in result archive")
 }

@@ -32,18 +32,6 @@ job "ploy-api" {
       canary = 1
     }
 
-    # Host volumes for api artifacts and logs
-    volume "ploy-artifacts" {
-      type      = "host"
-      source    = "ploy-artifacts"
-      read_only = false
-    }
-
-    volume "ploy-logs" {
-      type      = "host"
-      source    = "ploy-logs" 
-      read_only = false
-    }
 
     # Restart policy
     restart {
@@ -63,18 +51,11 @@ job "ploy-api" {
         mode = "file"
       }
 
-      # Mount volumes
-      volume_mount {
-        volume      = "ploy-artifacts"
-        destination = "/opt/ploy/artifacts"
-        read_only   = false
+      # Configuration for raw_exec driver
+      config {
+        command = "local/api"
       }
 
-      volume_mount {
-        volume      = "ploy-logs"
-        destination = "/opt/ploy/logs"
-        read_only   = false
-      }
 
       # Resource allocation
       resources {
