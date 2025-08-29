@@ -56,14 +56,11 @@ job "ploy-api" {
     task "api" {
       driver = "raw_exec"
 
-      # Binary distribution via artifact download
+      # Binary distribution via artifact download from SeaweedFS
       artifact {
-        source = "http://localhost:{{ seaweedfs.filer_port }}/api-binaries/{{ api_version }}/linux/amd64/api"
+        source = "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
         destination = "local/api"
         mode = "file"
-        options {
-          checksum = "file:http://localhost:{{ seaweedfs.filer_port }}/api-binaries/{{ api_version }}/linux/amd64/api.sha256"
-        }
       }
 
       # Mount volumes

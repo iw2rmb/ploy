@@ -225,19 +225,9 @@
           set_fact:
             current_deployment_version: "{{ deployment_version.stdout }}"
 
-        - name: Bootstrap API using local binary deployment
-          shell: |
-            cd /home/ploy/ploy
-            # Create a bootstrap binary for initial deployment
-            cp /home/ploy/ploy/bin/api /tmp/ploy-api-bootstrap
-            chmod +x /tmp/ploy-api-bootstrap
-          become_user: ploy
-          register: bootstrap_prepare
-          changed_when: bootstrap_prepare.rc == 0
-
-        - name: Display bootstrap preparation results
+        - name: Display deployment version
           debug:
-            msg: "Bootstrap binary prepared for deployment version {{ current_deployment_version }}"
+            msg: "Deploying API version {{ binary_version.stdout }} with deployment ID {{ current_deployment_version }}"
 
     - name: Deploy API using unified deployment approach
       block:
@@ -246,19 +236,21 @@
             msg: |
               deployment_version object: {{ deployment_version }}
               current_deployment_version: {{ current_deployment_version }}
+              api_version: {{ binary_version.stdout }}
         
-        - name: Create bootstrap Nomad job for initial deployment
+        - name: Create Nomad job for API deployment
           template:
-            src: ../../common/templates/nomad-ploy-api-bootstrap.hcl.j2
-            dest: /opt/hashicorp/nomad/jobs/ploy-api-bootstrap.hcl
+            src: ../../common/templates/nomad-ploy-api.hcl.j2
+            dest: /opt/hashicorp/nomad/jobs/ploy-api.hcl
             owner: ploy
             group: ploy
             mode: '0644'
           vars:
+            api_version: "{{ binary_version.stdout }}"
             version_string: "{{ current_deployment_version }}"
 
-        - name: Validate bootstrap job syntax
-          command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-api-bootstrap.hcl
+        - name: Validate job syntax
+          command: nomad job validate /opt/hashicorp/nomad/jobs/ploy-api.hcl
           register: bootstrap_validate
           changed_when: false
           environment:
@@ -279,8 +271,8 @@
           when: api_job_check.status == 200
           ignore_errors: true
 
-        - name: Deploy bootstrap API job
-          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api-bootstrap.hcl
+        - name: Deploy API job
+          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
           register: bootstrap_deploy
           environment:
             NOMAD_ADDR: "http://localhost:4646"
