@@ -12,6 +12,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Detect Go binary location
+if command -v go >/dev/null 2>&1; then
+    GO_CMD="go"
+elif [ -x "/usr/local/go/bin/go" ]; then
+    GO_CMD="/usr/local/go/bin/go"
+else
+    echo -e "${RED}Error: Go binary not found${NC}"
+    exit 1
+fi
+
 # Get git information
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
@@ -37,8 +47,8 @@ mkdir -p "$BUILD_DIR"
 # Parse arguments
 TARGET="${1:-api}"
 OUTPUT_DIR="${2:-$BUILD_DIR}"
-GOOS="${GOOS:-$(go env GOOS)}"
-GOARCH="${GOARCH:-$(go env GOARCH)}"
+GOOS="${GOOS:-$($GO_CMD env GOOS)}"
+GOARCH="${GOARCH:-$($GO_CMD env GOARCH)}"
 
 echo -e "${BLUE}Ploy Build Script${NC}"
 echo "=================="
@@ -57,7 +67,7 @@ build_with_version() {
     echo -e "${YELLOW}Building ${package}...${NC}"
     
     # Build with version information injected via ldflags
-    CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build \
+    CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" $GO_CMD build \
         -ldflags "-X github.com/iw2rmb/ploy/internal/version.Version=${VERSION} \
                   -X github.com/iw2rmb/ploy/internal/version.GitCommit=${GIT_COMMIT}${GIT_DIRTY} \
                   -X github.com/iw2rmb/ploy/internal/version.GitBranch=${GIT_BRANCH} \
