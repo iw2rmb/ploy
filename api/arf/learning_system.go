@@ -137,7 +137,6 @@ type TemplateVariable struct {
 type PostgreSQLLearningSystem struct {
 	db              *sql.DB
 	learningDB      *db.LearningDB
-	abTestFramework ABTestFramework
 	patternMatcher  PatternMatcher
 	strategyWeights map[StrategyType]float64
 }
@@ -161,7 +160,6 @@ func NewPostgreSQLLearningSystem() (*PostgreSQLLearningSystem, error) {
 
 	system := &PostgreSQLLearningSystem{
 		db:              db,
-		abTestFramework: NewDefaultABTestFramework(db),
 		patternMatcher:  NewDefaultPatternMatcher(),
 		strategyWeights: make(map[StrategyType]float64),
 	}

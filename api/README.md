@@ -159,11 +159,6 @@
 - `POST /v1/arf/learning/outcome` — record transformation outcome
 - `GET /v1/arf/learning/patterns` — extract learning patterns
 
-### A/B Testing & Optimization
-- `POST /v1/arf/ab-test` — create A/B test
-- `GET /v1/arf/ab-test/:id/results` — get A/B test results
-- `POST /v1/arf/ab-test/:id/graduate` — graduate A/B test
-
 ### Security & SBOM Analysis
 - `POST /v1/arf/security/scan` — security scan
 - `POST /v1/arf/security/remediation` — generate remediation plan
