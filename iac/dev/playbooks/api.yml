@@ -322,7 +322,7 @@
 
         - name: Wait for bootstrap API to be available via domain
           uri:
-            url: "https://api.dev.{{ ploy.platform_domain }}/health"
+            url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health"
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
@@ -348,7 +348,7 @@
       block:
         - name: Verify bootstrap API health endpoint via domain
           uri:
-            url: "https://api.dev.{{ ploy.platform_domain }}/health"
+            url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health"
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
@@ -359,7 +359,7 @@
 
         - name: Verify bootstrap API readiness via domain
           uri:
-            url: "https://api.dev.{{ ploy.platform_domain }}/ready"
+            url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/ready"
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
@@ -370,7 +370,7 @@
 
         - name: Test bootstrap API endpoints via domain
           uri:
-            url: "https://api.dev.{{ ploy.platform_domain }}/v1/health"
+            url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/v1/health"
             method: GET
             status_code: 200
           register: bootstrap_api_test
@@ -460,7 +460,7 @@
           Bootstrap API deployment completed successfully:
           - Version: {{ current_deployment_version }}
           - Deployment method: Bootstrap Nomad job (unified deployment system)
-          - Health endpoint: https://api.dev.{{ ploy.platform_domain }}/health
+          - Health endpoint: https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health
           - External access: https://api.dev.ployman.app/health
           - Management tools: Available in /home/ploy/api-scripts/
           

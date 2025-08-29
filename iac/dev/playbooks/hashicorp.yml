@@ -651,7 +651,7 @@
 
         - name: Validate API service accessibility via domain
           uri:
-            url: "https://api.dev.{{ ploy.platform_domain }}/health"
+            url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health"
             method: GET
             status_code: 200
             validate_certs: no
@@ -668,14 +668,14 @@
               - Traefik: ✅ {{ 'Healthy' if service_health.results[0].status == 200 else 'Failed' }} (Port 8095)
               - Nomad: ✅ {{ 'Healthy' if service_health.results[1].status == 200 else 'Failed' }} (Port 4646)  
               - Consul: ✅ {{ 'Healthy' if service_health.results[2].status == 200 else 'Failed' }} (Port 8500)
-              - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (via https://api.dev.{{ ploy.platform_domain }})
+              - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (via https://api.dev.{{ ploy.platform_domain | default('ployman.app') }})
               
               SSL Certificates:
               - Platform (*.dev.ployman.app): ✅ Configured
               - Apps (*.dev.ployd.app): ✅ Ready for auto-provisioning
               
               Access Points:
-              - API: https://api.dev.{{ ploy.platform_domain }}/health
+              - API: https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health
               - Traefik Dashboard: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8095
               - Nomad UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:4646
               - Consul UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8500

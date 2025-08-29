@@ -275,7 +275,7 @@
           Traefik is running successfully!
           Dashboard: http://{{ ansible_default_ipv4.address }}:8090
           API endpoints will be available at:
-          - https://api.dev.{{ ploy.platform_domain }}
+          - https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}
           - https://api.dev.{{ ploy.apps_domain }}
 
   handlers:
