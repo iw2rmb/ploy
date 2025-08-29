@@ -29,7 +29,7 @@ steps:
       shell: "/bin/bash"
       working_dir: "."
     on_error: "fail"
-    timeout: "2m"
+    timeout: "5m"
 
   - name: "Backup Current State"
     type: "shell"
@@ -97,7 +97,7 @@ steps:
         - "find . -name '*.bak' -type f | wc -l"
       shell: "/bin/bash"
     on_error: "continue"
-    timeout: "2m"
+    timeout: "5m"
 
   - name: "Cleanup"
     type: "shell"
@@ -108,7 +108,7 @@ steps:
         - "echo 'Transformation completed successfully'"
       shell: "/bin/bash"
     on_error: "continue"
-    timeout: "2m"
+    timeout: "5m"
 
 execution:
   parallel: false

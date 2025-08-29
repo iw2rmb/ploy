@@ -49,7 +49,7 @@
           get_url:
             url: "https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_linux_amd64.zip"
             dest: /tmp/nomad.zip
-            timeout: 120
+            timeout: 300
           when: not nomad_binary.stat.exists or nomad_version not in (current_nomad_version.stdout | default(''))
 
         - name: Extract Nomad
@@ -522,7 +522,7 @@
               get_url:
                 url: "https://github.com/traefik/traefik/releases/download/v{{ traefik_version }}/traefik_v{{ traefik_version }}_linux_amd64.tar.gz"
                 dest: /tmp/traefik.tar.gz
-                timeout: 120
+                timeout: 300
               when: not traefik_binary.stat.exists or traefik_version not in (current_traefik_version.stdout | default(''))
 
             - name: Extract Traefik

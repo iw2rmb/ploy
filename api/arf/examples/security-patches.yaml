@@ -85,7 +85,7 @@ steps:
       file_pattern: "**/*.java"
       description: Prevent path traversal attacks
     on_error: continue
-    timeout: 2m
+    timeout: 5m
 
   - name: Disable XML External Entities
     type: openrewrite
@@ -111,7 +111,7 @@ steps:
       - type: framework
         value: spring-boot
     on_error: continue
-    timeout: 2m
+    timeout: 5m
 
   - name: Fix Insecure Deserialization
     type: openrewrite
@@ -152,7 +152,7 @@ steps:
         git diff --stat >> security-report.md
       description: Generate report of security patches applied
     on_error: continue
-    timeout: 1m
+    timeout: 5m
 
 execution:
   parallelism: 1  # Sequential for security patches

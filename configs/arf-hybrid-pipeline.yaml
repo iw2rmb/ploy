@@ -41,7 +41,7 @@ hybrid_pipeline:
   execution:
     parallel_processing: true      # Enable parallel execution
     max_concurrent_jobs: 5        # Maximum concurrent transformations
-    timeout_per_file: "2m"        # Timeout per file transformation
+    timeout_per_file: "5m"        # Timeout per file transformation
     batch_size: 10               # Files to process in batch
     
   # Validation pipeline
