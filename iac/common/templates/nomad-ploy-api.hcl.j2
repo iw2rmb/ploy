@@ -147,6 +147,10 @@ job "ploy-api" {
         CLOUDFLARE_API_TOKEN = "{{ vault_cloudflare_api_token | default('') }}"
         {% endif %}
         
+        # GitHub credentials for repository access
+        GITHUB_PLOY_DEV_USERNAME = "{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
+        GITHUB_PLOY_DEV_PAT = "{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
+        
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"
