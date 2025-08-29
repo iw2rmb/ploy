@@ -32,6 +32,10 @@ job "ploy-api" {
       canary = 1
     }
 
+    # Network configuration (moved from task level to group level)
+    network {
+      port "http" {}  # Dynamic port allocation
+    }
 
     # Restart policy
     restart {
@@ -62,11 +66,6 @@ job "ploy-api" {
       resources {
         cpu = {{ nomad_api.resources.cpu | default(500) }}
         memory = {{ nomad_api.resources.memory | default(512) }}
-        
-        # Dynamic port allocation for high availability
-        network {
-          port "http" {}  # Dynamic port allocation
-        }
       }
 
       # Environment configuration
