@@ -159,6 +159,21 @@ func (b *OpenRewriteImageBuilder) ValidateRecipes(recipes []string) ([]OpenRewri
 	return validated, nil
 }
 
+// sanitizeRecipeName converts recipe class names to Docker-compatible names
+func sanitizeRecipeName(recipeName string) string {
+	// Extract the last part after the last dot (e.g., "Java8toJava11" from "org.openrewrite.java.migrate.Java8toJava11")
+	parts := strings.Split(recipeName, ".")
+	lastPart := parts[len(parts)-1]
+	
+	// Convert to lowercase and replace invalid characters
+	sanitized := strings.ToLower(lastPart)
+	// Docker image names can only contain lowercase letters, digits, and separators (. _ -)
+	// Replace any remaining invalid characters with hyphens
+	sanitized = strings.ReplaceAll(sanitized, "_", "-")
+	
+	return sanitized
+}
+
 // GenerateImageName creates a deterministic image name based on recipes
 func (b *OpenRewriteImageBuilder) GenerateImageName(recipes []string, packageManager string) string {
 	// Sort recipes for deterministic naming
@@ -175,17 +190,19 @@ func (b *OpenRewriteImageBuilder) GenerateImageName(recipes []string, packageMan
 	// Create readable name with hash
 	prefix := "openrewrite"
 	if len(recipes) == 1 {
-		// Single recipe: use its name
-		return fmt.Sprintf("%s-%s-%s", prefix, recipes[0], packageManager)
+		// Single recipe: use its sanitized name
+		sanitizedName := sanitizeRecipeName(recipes[0])
+		return fmt.Sprintf("%s-%s-%s", prefix, sanitizedName, packageManager)
 	} else if len(recipes) <= 3 {
-		// Few recipes: concatenate names
+		// Few recipes: concatenate sanitized names
 		names := make([]string, len(recipes))
 		for i, r := range recipes {
+			sanitized := sanitizeRecipeName(r)
 			// Shorten long names
-			if len(r) > 10 {
-				names[i] = r[:10]
+			if len(sanitized) > 10 {
+				names[i] = sanitized[:10]
 			} else {
-				names[i] = r
+				names[i] = sanitized
 			}
 		}
 		return fmt.Sprintf("%s-%s-%s-%s", prefix, strings.Join(names, "-"), packageManager, hash)
