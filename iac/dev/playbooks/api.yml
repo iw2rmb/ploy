@@ -85,14 +85,14 @@
             msg: "Git repository updated to {{ git_update.after[:8] }} on branch {{ deploy_branch | default('main') }}"
           when: git_update.changed
         
-        - name: Build API binary
-          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/api ./api
+        - name: Build API binary with version information
+          shell: cd /home/ploy/ploy && ./scripts/build.sh api
           become_user: ploy
           register: api_build
           changed_when: api_build.rc == 0
 
-        - name: Build CLI (ploy) binary  
-          shell: cd /home/ploy/ploy && /usr/local/go/bin/go build -o bin/ploy ./cmd/ploy
+        - name: Build CLI (ploy) binary with version information  
+          shell: cd /home/ploy/ploy && ./scripts/build.sh cli
           become_user: ploy
           register: ploy_build
           changed_when: ploy_build.rc == 0
