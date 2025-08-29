@@ -1677,6 +1677,9 @@
           
           # DNS configuration environment variables
           export PLOY_DNS_PROVIDER="{{ lookup('env', 'PLOY_DNS_PROVIDER') | default('namecheap') }}"
+          
+          # Platform domain configuration
+          export PLOY_PLATFORM_DOMAIN="{{ ploy.platform_domain | default('ployman.app') }}"
           export PLOY_DNS_DOMAIN="{{ lookup('env', 'PLOY_DNS_DOMAIN') | default('ployd.app') }}"
           export PLOY_DNS_TARGET_IP="{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
           
@@ -2072,6 +2075,8 @@
         validate_certs: no
         method: GET
         status_code: 200
+      environment:
+        PLOY_PLATFORM_DOMAIN: "ployman.app"
       register: health_check
       retries: 30
       delay: 5
@@ -2084,6 +2089,8 @@
         validate_certs: no
         method: GET
         status_code: [200, 503]  # 503 is acceptable during initial provisioning
+      environment:
+        PLOY_PLATFORM_DOMAIN: "ployman.app"
       register: cert_health_check
       retries: 60  # More retries for certificate provisioning
       delay: 15
