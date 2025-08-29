@@ -11,11 +11,19 @@ This document has been updated to use the new unified `ploy arf transform` comma
 - **Real-time Reporting**: Three levels (`minimal`, `standard`, `detailed`) for monitoring progress
 
 ## Overall Progress Tracking
-- [ ] **Service Setup Complete**: OpenRewrite Lane E service deployed and validated
-- [ ] **Phase 1 Complete**: Baseline recipe-based transformations
-- [ ] **Phase 2 Complete**: LLM self-healing with parallel solution attempts
-- [ ] **Phase 3 Complete**: Parallel execution of multiple repositories
-- [ ] **All Success Metrics Met**: Production readiness confirmed
+- [❌] **Service Setup Complete**: OpenRewrite service NOT OPERATIONAL (2025-08-29)
+  - Controller accessible but ARF transform API unresponsive
+  - Critical components missing (catalog, learning_system, llm_generator)
+  - Service status: DEGRADED with timeout issues
+- [❌] **Phase 1 Complete**: Baseline recipe-based transformations FAILED
+  - 0% success rate on simple repository transformations
+  - Transform API calls timeout indefinitely
+  - No output generated from test executions
+- [❌] **Phase 2 Complete**: LLM self-healing NOT TESTED (blocked by Phase 1)
+- [❌] **Phase 3 Complete**: Parallel execution NOT TESTED (blocked by Phase 1)
+- [❌] **All Success Metrics Met**: PRODUCTION NOT READY - Core functionality unavailable
+
+**CRITICAL BLOCKER (2025-08-29)**: ARF transform functionality requires service restoration before any testing can proceed.
 
 ## Overview
 Design a comprehensive test scenario that progressively evaluates ARF's enhanced transformation capabilities (OpenRewrite recipes, LLM self-healing, parallel solution attempts) using real-world Java 11 Maven projects for Java 11→17 migrations.
@@ -61,30 +69,30 @@ The standalone OpenRewrite service at `openrewrite.dev.ployman.app` is no longer
 ## Progressive Test Scenario Design
 
 ### Phase 1: Baseline OpenRewrite Testing
-**Objective**: Validate core OpenRewrite functionality via Lane E service
+**Objective**: Validate core OpenRewrite functionality via embedded implementation
 **Projects**: Tier 1 projects (3 repositories)
 
 **Pre-Test Validation**:
-- [ ] Controller endpoint accessible at `https://api.dev.ployman.app/v1`
-- [ ] Transform command available and functional
-- [ ] Test connectivity to controller
+- [x] Controller endpoint accessible at `https://api.dev.ployman.app/v1`
+- [x] Transform command available and functional
+- [x] Test connectivity to controller
 
 **Test Steps**:
-- [ ] **Controller Connectivity**: Verify transform command can reach controller
-- [ ] **Sequential execution**: Test simple projects one by one
-- [ ] **Recipe Validation**: Confirm Java 11→17 migration recipes load correctly
-- [ ] **Transformation Execution**: Run OpenRewrite transformations via service
-- [ ] **Diff Generation**: Validate diff creation and storage
-- [ ] **Build Verification**: Compile transformed code to verify correctness
+- [x] **Controller Connectivity**: Verify transform command can reach controller
+- [❌] **Sequential execution**: Test simple projects one by one - BLOCKED
+- [❌] **Recipe Validation**: Confirm Java 11→17 migration recipes load correctly - BLOCKED
+- [❌] **Transformation Execution**: Run OpenRewrite transformations via service - BLOCKED
+- [❌] **Diff Generation**: Validate diff creation and storage - BLOCKED
+- [❌] **Build Verification**: Compile transformed code to verify correctness - BLOCKED
 
 **Success Criteria**:
-- [ ] Transform command executes successfully
-- [ ] 100% success rate on simple projects
-- [ ] Clean diff generation via service
-- [ ] No compilation errors post-transformation
-- [ ] Execution time < 5 minutes per project (including service overhead)
-- [ ] Job status tracking works correctly
-- [ ] Comprehensive migration reports generated
+- [❌] Transform command executes successfully - TIMEOUT ERROR
+- [❌] 100% success rate on simple projects - 0% SUCCESS RATE
+- [❌] Clean diff generation via service - NO OUTPUT GENERATED
+- [❌] No compilation errors post-transformation - NO TRANSFORMATIONS
+- [❌] Execution time < 5 minutes per project - INDEFINITE TIMEOUT
+- [❌] Job status tracking works correctly - API UNRESPONSIVE
+- [❌] Comprehensive migration reports generated - NO REPORTS
 
 ### Phase 2: LLM Self-Healing Integration
 **Objective**: Test hybrid OpenRewrite + LLM pipeline  
@@ -306,9 +314,16 @@ llm_options:
 
 **Current Status (2025-08-29)**:
 - ✅ OpenRewrite integrated into `ploy arf transform` command
-- ✅ No external service dependency required
+- ❌ External service dependency still required (API calls hang)
 - ✅ Simplified configuration with only controller endpoint needed
-- ⏳ Testing pending with new embedded architecture
+- ❌ **TESTING FAILED**: ARF transform functionality not operational
+
+**Critical Issues Identified**:
+- ❌ **ARF Service Status**: DEGRADED (missing components)
+- ❌ **Missing Components**: catalog, learning_system, llm_generator, hybrid_pipeline
+- ❌ **API Responsiveness**: Transform endpoint unresponsive (timeouts)
+- ❌ **Recipe Registry**: Not available (catalog: false)
+- ⚠️ **Implementation Gap**: Embedded OpenRewrite not fully operational despite documentation claims
 
 ## Specific Test Repositories
 
