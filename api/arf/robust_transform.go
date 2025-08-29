@@ -2,6 +2,7 @@ package arf
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -294,12 +295,126 @@ func applyOpenRewriteRecipe(ctx context.Context, workspace *Workspace, recipeID 
 		logger("INFO", "openrewrite", "Applying OpenRewrite recipe", recipeID)
 	}
 	
-	// TODO: Use OpenRewrite dispatcher when service is deployed
-	// For now, return a mock result to demonstrate the flow
+	// Create OpenRewrite client
+	client := NewOpenRewriteClient()
+	if client == nil || client.dispatcher == nil {
+		if logger != nil {
+			logger("WARNING", "openrewrite", "OpenRewrite dispatcher not available, using mock", "")
+		}
+		// Return mock result when dispatcher not available
+		return &TransformResult{
+			Success:        true,
+			ChangesApplied: 5,
+			FilesModified:  []string{"pom.xml", "src/main/java/App.java"},
+		}
+	}
+	
+	// Create tar archive of workspace
+	archivePath := workspace.Path + ".tar.gz"
+	if err := createArchive(workspace.Path, archivePath); err != nil {
+		if logger != nil {
+			logger("ERROR", "openrewrite", "Failed to create archive", err.Error())
+		}
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("failed to create archive: %w", err),
+		}
+	}
+	defer os.Remove(archivePath)
+	
+	// Read archive for submission
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		if logger != nil {
+			logger("ERROR", "openrewrite", "Failed to open archive", err.Error())
+		}
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("failed to open archive: %w", err),
+		}
+	}
+	defer archiveFile.Close()
+	
+	// Submit job to dispatcher
+	job, err := client.dispatcher.SubmitJob(ctx, recipeID, archiveFile)
+	if err != nil {
+		if logger != nil {
+			logger("ERROR", "openrewrite", "Failed to submit job", err.Error())
+		}
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("failed to submit OpenRewrite job: %w", err),
+		}
+	}
+	
+	// Poll for job completion
+	timeout := 10 * time.Minute
+	if req.Execution.Timeout != "" {
+		timeout, _ = time.ParseDuration(req.Execution.Timeout)
+	}
+	
+	deadline := time.Now().Add(timeout)
+	var result *OpenRewriteJob
+	
+	for time.Now().Before(deadline) {
+		result, err = client.dispatcher.GetJob(ctx, job.ID)
+		if err != nil {
+			if logger != nil {
+				logger("ERROR", "openrewrite", "Failed to get job status", err.Error())
+			}
+			return &TransformResult{
+				Success: false,
+				Error:   fmt.Errorf("failed to get job status: %w", err),
+			}
+		}
+		
+		if result.Status == "completed" {
+			break
+		} else if result.Status == "failed" {
+			return &TransformResult{
+				Success: false,
+				Error:   fmt.Errorf("OpenRewrite job failed: %s", result.Error),
+			}
+		}
+		
+		time.Sleep(5 * time.Second)
+	}
+	
+	if result.Status != "completed" {
+		return &TransformResult{
+			Success: false,
+			Error:   fmt.Errorf("OpenRewrite job timed out after %v", timeout),
+		}
+	}
+	
+	// Download and extract output
+	if result.OutputURL != "" {
+		// TODO: Download output from storage and extract to workspace
+		if logger != nil {
+			logger("INFO", "openrewrite", "Job completed", fmt.Sprintf("Output: %s", result.OutputURL))
+		}
+	}
+	
+	// Parse result metadata
+	changesApplied := 0
+	filesModified := []string{}
+	if result.Result != nil {
+		if changes, ok := result.Result["changes_applied"].(float64); ok {
+			changesApplied = int(changes)
+		}
+		if files, ok := result.Result["files_modified"].([]interface{}); ok {
+			for _, f := range files {
+				if file, ok := f.(string); ok {
+					filesModified = append(filesModified, file)
+				}
+			}
+		}
+	}
+	
 	return &TransformResult{
 		Success:        true,
-		ChangesApplied: 5,
-		FilesModified:  []string{"pom.xml", "src/main/java/App.java"},
+		ChangesApplied: changesApplied,
+		FilesModified:  filesModified,
 	}
 }
 
@@ -628,8 +743,20 @@ func generateOutput(workspace *Workspace, format string, logger func(level, stag
 		// Create tar archive of final workspace
 		archivePath := workspace.Path + ".tar.gz"
 		if err := createArchive(workspace.Path, archivePath); err == nil {
-			output["archive"] = archivePath
-			output["location"] = archivePath
+			// Read the archive file contents
+			if archiveData, err := os.ReadFile(archivePath); err == nil {
+				// Encode as base64 for JSON transport
+				output["output"] = base64.StdEncoding.EncodeToString(archiveData)
+				output["format"] = "archive"
+				output["encoding"] = "base64"
+			} else {
+				if logger != nil {
+					logger("ERROR", "output", "Failed to read archive", err.Error())
+				}
+				output["location"] = archivePath
+			}
+			// Clean up the temporary archive file
+			os.Remove(archivePath)
 		}
 		
 	case "diff":
