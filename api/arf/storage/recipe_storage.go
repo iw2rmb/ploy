@@ -117,6 +117,15 @@ type RecipeValidator interface {
 	GetSchemaVersion() string
 }
 
+// StorageService provides generic storage operations for OpenRewrite dispatcher
+type StorageService interface {
+	// Basic storage operations
+	Put(ctx context.Context, key string, data []byte) error
+	Get(ctx context.Context, key string) ([]byte, error)
+	Delete(ctx context.Context, key string) error
+	Exists(ctx context.Context, key string) (bool, error)
+}
+
 // SecurityRuleSet defines security constraints
 type SecurityRuleSet struct {
 	AllowedCommands      []string
