@@ -30,22 +30,22 @@ func TestSBOMAnalyzer_AnalyzeSBOM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			analysis, err := analyzer.AnalyzeSBOM(tt.sbomPath)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AnalyzeSBOM() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && analysis != nil {
 				// Validate analysis structure
 				if len(analysis.Dependencies) == 0 {
 					t.Error("Expected at least one dependency in analysis")
 				}
-				
+
 				if analysis.SecurityMetrics.TotalDependencies == 0 {
 					t.Error("Expected total dependencies to be greater than 0")
 				}
-				
+
 				if analysis.AnalyzedAt.IsZero() {
 					t.Error("Expected AnalyzedAt to be set")
 				}
@@ -56,7 +56,7 @@ func TestSBOMAnalyzer_AnalyzeSBOM(t *testing.T) {
 
 func TestSBOMAnalyzer_ExtractDependencies(t *testing.T) {
 	analyzer := &MockSBOMAnalyzer{}
-	
+
 	sbomData := map[string]interface{}{
 		"artifacts": []interface{}{
 			map[string]interface{}{
@@ -100,7 +100,7 @@ func TestSBOMAnalyzer_ExtractDependencies(t *testing.T) {
 
 func TestSBOMAnalyzer_CorrelateVulnerabilities(t *testing.T) {
 	analyzer := &MockSBOMAnalyzer{}
-	
+
 	dependencies := []Dependency{
 		{
 			Name:      "lodash",
@@ -245,7 +245,7 @@ func (m *MockSBOMAnalyzer) AnalyzeSBOM(sbomPath string) (*SBOMSecurityAnalysis, 
 
 func (m *MockSBOMAnalyzer) ExtractDependencies(sbomData map[string]interface{}) ([]Dependency, error) {
 	var dependencies []Dependency
-	
+
 	artifacts, ok := sbomData["artifacts"].([]interface{})
 	if !ok {
 		return dependencies, nil
@@ -272,7 +272,7 @@ func (m *MockSBOMAnalyzer) ExtractDependencies(sbomData map[string]interface{}) 
 
 func (m *MockSBOMAnalyzer) CorrelateVulnerabilities(deps []Dependency) ([]VulnerabilityMatch, error) {
 	var matches []VulnerabilityMatch
-	
+
 	// Mock correlation - return a match for known vulnerable packages
 	for _, dep := range deps {
 		if dep.Name == "lodash" && dep.Version == "4.17.20" {

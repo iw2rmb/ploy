@@ -39,26 +39,26 @@ func TestSecurityEngine_ScanForVulnerabilities(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			report, err := engine.ScanForVulnerabilities(ctx, tt.target, tt.scanType)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ScanForVulnerabilities() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && report != nil {
 				// Validate report structure
 				if report.Summary.TotalVulnerabilities == 0 {
 					t.Log("No vulnerabilities found - this may be expected")
 				}
-				
+
 				if report.GeneratedAt.IsZero() {
 					t.Error("Expected GeneratedAt to be set")
 				}
-				
+
 				if report.Summary.Status == "" {
 					t.Error("Expected status to be set")
 				}
-				
+
 				if report.Summary.RiskScore < 0 {
 					t.Error("Expected risk score to be non-negative")
 				}
@@ -294,7 +294,7 @@ func BenchmarkSecurityEngine_PrioritizeVulnerabilities(b *testing.B) {
 		vulns[i] = VulnerabilityInfo{
 			CVE:      CVEInfo{ID: fmt.Sprintf("CVE-2024-%04d", i), Severity: "medium"},
 			Severity: "MEDIUM",
-			CVSS:     float64(4.0 + (i%5)),
+			CVSS:     float64(4.0 + (i % 5)),
 			Package:  Dependency{Name: fmt.Sprintf("lib-%d", i), Version: "1.0.0"},
 		}
 	}

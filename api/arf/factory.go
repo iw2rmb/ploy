@@ -6,32 +6,32 @@ import (
 	"fmt"
 	"os"
 	"time"
-	
+
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
 )
 
 // Phase3Config contains configuration for ARF Phase 3 components
 type Phase3Config struct {
 	// LLM Configuration
-	LLMProvider    string `yaml:"llm_provider"`    // openai, anthropic, azure, ollama, cohere
-	LLMAPIKey      string `yaml:"llm_api_key"`
-	LLMModel       string `yaml:"llm_model"`
+	LLMProvider    string  `yaml:"llm_provider"` // openai, anthropic, azure, ollama, cohere
+	LLMAPIKey      string  `yaml:"llm_api_key"`
+	LLMModel       string  `yaml:"llm_model"`
 	LLMTemperature float64 `yaml:"llm_temperature"`
-	LLMBaseURL     string `yaml:"llm_base_url"`     // For Ollama and custom endpoints
-	
+	LLMBaseURL     string  `yaml:"llm_base_url"` // For Ollama and custom endpoints
+
 	// Learning System Configuration
 	LearningDBURL     string        `yaml:"learning_db_url"`
 	PatternMinSamples int           `yaml:"pattern_min_samples"`
 	PatternTimeWindow time.Duration `yaml:"pattern_time_window"`
-	
+
 	// Hybrid Pipeline Configuration
 	ConfidenceThresholds ConfidenceThresholds `yaml:"confidence_thresholds"`
 	EnhancementMode      EnhancementMode      `yaml:"enhancement_mode"`
-	
+
 	// Multi-Language Configuration
 	TreeSitterPath string   `yaml:"tree_sitter_path"`
 	SupportedLangs []string `yaml:"supported_languages"`
-	
+
 	// A/B Testing Configuration
 	ABTestMinSamples   int     `yaml:"ab_test_min_samples"`
 	ABTestConfidence   float64 `yaml:"ab_test_confidence"`
@@ -46,22 +46,22 @@ func DefaultPhase3Config() *Phase3Config {
 		LLMProvider:    "", // Must be set explicitly
 		LLMModel:       "", // Must be set explicitly
 		LLMTemperature: 0.1,
-		
+
 		PatternMinSamples: 10,
 		PatternTimeWindow: 30 * 24 * time.Hour, // 30 days
-		
+
 		ConfidenceThresholds: ConfidenceThresholds{
 			MinOpenRewrite: 0.6,
 			MinLLM:         0.7,
 			MinHybrid:      0.8,
 			RequiredBuild:  0.9,
 		},
-		
+
 		EnhancementMode: PostProcessing,
-		
+
 		TreeSitterPath: "/usr/local/bin/tree-sitter",
 		SupportedLangs: []string{"java", "javascript", "python", "go", "rust"},
-		
+
 		ABTestMinSamples:   100,
 		ABTestConfidence:   0.95,
 		ABTestTrafficSplit: 0.5,
@@ -71,7 +71,7 @@ func DefaultPhase3Config() *Phase3Config {
 // LoadPhase3ConfigFromEnv loads configuration from environment variables
 func LoadPhase3ConfigFromEnv() *Phase3Config {
 	config := DefaultPhase3Config()
-	
+
 	// Load from environment
 	if provider := os.Getenv("ARF_LLM_PROVIDER"); provider != "" {
 		config.LLMProvider = provider
@@ -88,9 +88,9 @@ func LoadPhase3ConfigFromEnv() *Phase3Config {
 	if treeSitter := os.Getenv("ARF_TREE_SITTER_PATH"); treeSitter != "" {
 		config.TreeSitterPath = treeSitter
 	}
-	
+
 	// OpenRewrite always uses batch job dispatcher - no configuration needed
-	
+
 	return config
 }
 
@@ -98,12 +98,12 @@ func LoadPhase3ConfigFromEnv() *Phase3Config {
 func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error) {
 	var components Phase3Components
 	var err error
-	
+
 	// Initialize LLM Generator - external model required
 	if config.LLMAPIKey == "" || config.LLMProvider == "" {
 		return nil, fmt.Errorf("external LLM configuration required: provider and API key must be set")
 	}
-	
+
 	switch config.LLMProvider {
 	case "openai":
 		llmGen, err := NewOpenAILLMGenerator()
@@ -121,7 +121,7 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s (only external models supported)", config.LLMProvider)
 	}
-	
+
 	// Initialize Learning System
 	if config.LearningDBURL != "" {
 		components.LearningSystem, err = initializeLearningSystem(config.LearningDBURL)
@@ -130,7 +130,7 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 			fmt.Printf("Warning: Failed to initialize learning system: %v\n", err)
 		}
 	}
-	
+
 	// Initialize Multi-Language Engine
 	multiLang, err := NewTreeSitterMultiLanguageEngine()
 	if err != nil {
@@ -139,7 +139,7 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 		multiLang = &TreeSitterMultiLanguageEngine{}
 	}
 	components.MultiLangEngine = multiLang
-	
+
 	// Initialize Hybrid Pipeline
 	// Note: We need a proper RecipeExecutor, using nil for now
 	components.HybridPipeline = NewDefaultHybridPipeline(
@@ -147,15 +147,15 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 		components.LLMGenerator,
 		components.MultiLangEngine,
 	)
-	
+
 	// Initialize A/B Test Framework
 	if components.LearningSystem != nil {
 		components.ABTestFramework = NewDefaultABTestFramework(getDBFromLearningSystem(components.LearningSystem))
 	}
-	
+
 	// Initialize Strategy Selector
 	components.StrategySelector = NewDefaultStrategySelector()
-	
+
 	return &components, nil
 }
 
@@ -175,15 +175,15 @@ func initializeLearningSystem(dbURL string) (LearningSystem, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to learning database: %w", err)
 	}
-	
+
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping learning database: %w", err)
 	}
-	
+
 	// Create PostgreSQL learning system
 	return NewPostgreSQLLearningSystem()
 }
@@ -201,11 +201,11 @@ func getDBFromLearningSystem(ls LearningSystem) *sql.DB {
 
 // mockLLMGenerator is a mock implementation for testing
 type mockLLMGenerator struct {
-	generateRecipeFn   func(context.Context, RecipeGenerationRequest) (*GeneratedRecipe, error)
-	getCapabilitiesFn  func() LLMCapabilities
-	isAvailableFn      func(context.Context) bool
-	validateFn         func(context.Context, GeneratedRecipe) (*EvolutionValidationResult, error)
-	optimizeFn         func(context.Context, interface{}, TransformationFeedback) (interface{}, error)
+	generateRecipeFn  func(context.Context, RecipeGenerationRequest) (*GeneratedRecipe, error)
+	getCapabilitiesFn func() LLMCapabilities
+	isAvailableFn     func(context.Context) bool
+	validateFn        func(context.Context, GeneratedRecipe) (*EvolutionValidationResult, error)
+	optimizeFn        func(context.Context, interface{}, TransformationFeedback) (interface{}, error)
 }
 
 func (m *mockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
@@ -259,15 +259,12 @@ func CreateOpenRewriteEngine(config *Phase3Config) interface{} {
 func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) (*Handler, error) {
 	// Load configuration
 	config := LoadPhase3ConfigFromEnv()
-	
+
 	// Initialize Phase 3 components
 	components, err := InitializePhase3Components(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize Phase 3 components: %w", err)
 	}
-	
-	// Create shared benchmark manager
-	benchmarkMgr := NewBenchmarkManager("./benchmark_results")
 
 	// Create handler with Phase 3 components
 	return NewHandlerWithPhase3(
@@ -280,6 +277,5 @@ func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sa
 		components.MultiLangEngine,
 		components.ABTestFramework,
 		components.StrategySelector,
-		benchmarkMgr,
 	), nil
 }

@@ -151,28 +151,7 @@
 - `POST /v1/arf/sandboxes` — create new sandbox
 - `DELETE /v1/arf/sandboxes/:id` — destroy sandbox
 
-### System Health & Performance
-- `GET /v1/arf/health` — comprehensive system health check
-- `GET /v1/arf/stats/cache` — get cache statistics
-- `DELETE /v1/arf/cache` — clear cache
-- `GET /v1/arf/circuit-breaker/stats` — get circuit breaker stats
-- `POST /v1/arf/circuit-breaker/reset` — reset circuit breaker
-- `GET /v1/arf/circuit-breaker/state` — get circuit breaker state
-
-### Advanced Features
-- `GET /v1/arf/parallel-resolver/stats` — get parallel resolver stats
-- `PUT /v1/arf/parallel-resolver/config` — set parallel resolver config
-- `GET /v1/arf/orchestration/stats` — get multi-repo orchestration stats
-- `POST /v1/arf/orchestration/batch` — orchestrate batch transformation
-- `GET /v1/arf/orchestration/:id/status` — get orchestration status
-- `GET /v1/arf/ha/stats` — get high availability stats
-- `GET /v1/arf/ha/nodes` — get HA nodes
-- `GET /v1/arf/monitoring/metrics` — get monitoring metrics
-- `GET /v1/arf/monitoring/alerts` — get active alerts
-
 ### Pattern Learning & LLM Integration
-- `GET /v1/arf/patterns/stats` — get pattern learning stats
-- `GET /v1/arf/patterns/recommendations` — get pattern recommendations
 - `POST /v1/arf/recipes/generate` — generate LLM recipe
 - `POST /v1/arf/transform/hybrid` — execute hybrid transformation
 - `POST /v1/arf/strategy/select` — select transformation strategy
@@ -198,17 +177,6 @@
 - `GET /v1/arf/sbom/:id` — get SBOM by ID
 
 
-### Benchmark & Testing Pipeline
-- `POST /v1/arf/benchmarks` — create and execute benchmark
-- `GET /v1/arf/benchmarks` — list all benchmarks  
-- `GET /v1/arf/benchmarks/:id` — get benchmark details
-- `GET /v1/arf/benchmarks/:id/status` — get benchmark status
-- `GET /v1/arf/benchmarks/:id/logs` — get benchmark logs
-- `GET /v1/arf/benchmarks/:id/results` — get benchmark results
-- `GET /v1/arf/benchmarks/:id/errors` — get benchmark errors
-- `POST /v1/arf/benchmarks/:id/stop` — stop benchmark
-- `POST /v1/arf/benchmarks/:id/reports` — generate benchmark report
-- `POST /v1/arf/benchmarks/compare` — compare benchmarks
 
 **Note**: ARF provides comprehensive code transformation, analysis, and remediation capabilities with advanced LLM integration, security scanning, and deployment testing.
 

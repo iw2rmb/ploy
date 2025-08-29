@@ -48,7 +48,7 @@ public class TestApp {
 
 	// Create engine (this will fail in RED phase)
 	engine := NewOpenRewriteEngine()
-	
+
 	// Create recipe step
 	step := &models.RecipeStep{
 		Name: "java-migration",
@@ -63,14 +63,14 @@ public class TestApp {
 	defer cancel()
 
 	result, err := engine.Execute(ctx, step, repoPath)
-	
+
 	// Assertions for GREEN phase
 	require.NoError(t, err, "OpenRewrite execution should not error")
 	assert.NotNil(t, result, "Result should not be nil")
 	assert.True(t, result.Success, "Execution should be successful")
 	assert.Greater(t, result.ChangesApplied, 0, "Should have applied changes")
 	assert.NotEqual(t, "MockFile.java", result.FilesModified[0], "Should not return mock file")
-	
+
 	// Verify pom.xml was updated to Java 17
 	pomBytes, err := os.ReadFile(filepath.Join(repoPath, "pom.xml"))
 	require.NoError(t, err)
@@ -112,7 +112,7 @@ public class TestApp {
 
 	// Create engine
 	engine := NewOpenRewriteEngine()
-	
+
 	// Create recipe step
 	step := &models.RecipeStep{
 		Name: "java-migration",
@@ -127,13 +127,13 @@ public class TestApp {
 	defer cancel()
 
 	result, err := engine.Execute(ctx, step, repoPath)
-	
+
 	// Assertions
 	require.NoError(t, err, "OpenRewrite execution should not error")
 	assert.NotNil(t, result, "Result should not be nil")
 	assert.True(t, result.Success, "Execution should be successful")
 	assert.Greater(t, result.ChangesApplied, 0, "Should have applied changes")
-	
+
 	// Verify build.gradle was updated
 	buildBytes, err := os.ReadFile(filepath.Join(repoPath, "build.gradle"))
 	require.NoError(t, err)
@@ -269,7 +269,7 @@ public class TestApp {
 		Name: "java-11-to-17-migration",
 		Type: models.StepTypeOpenRewrite,
 		Config: map[string]interface{}{
-			"recipe": "org.openrewrite.java.migrate.Java11toJava17",
+			"recipe":          "org.openrewrite.java.migrate.Java11toJava17",
 			"recipeArtifacts": "org.openrewrite.recipe:rewrite-migrate-java:2.5.0",
 		},
 	}
@@ -279,13 +279,13 @@ public class TestApp {
 	defer cancel()
 
 	result, err := engine.Execute(ctx, step, repoPath)
-	
+
 	// Detailed assertions
 	require.NoError(t, err, "Java migration should not error")
 	assert.NotNil(t, result, "Result should not be nil")
 	assert.True(t, result.Success, "Migration should be successful")
 	assert.GreaterOrEqual(t, result.ChangesApplied, 2, "Should have at least 2 changes (pom.xml and Java file)")
-	
+
 	// Verify pom.xml changes
 	pomBytes, err := os.ReadFile(filepath.Join(repoPath, "pom.xml"))
 	require.NoError(t, err)
@@ -293,10 +293,10 @@ public class TestApp {
 	assert.Contains(t, pomStr, "<java.version>17</java.version>", "Java version property updated")
 	assert.Contains(t, pomStr, "<maven.compiler.source>17</maven.compiler.source>", "Compiler source updated")
 	assert.Contains(t, pomStr, "<maven.compiler.target>17</maven.compiler.target>", "Compiler target updated")
-	
+
 	// Check for javax to jakarta migration
 	assert.Contains(t, pomStr, "jakarta.annotation", "javax dependencies should be migrated to jakarta")
-	
+
 	// Verify Java file changes
 	javaBytes, err := os.ReadFile(filepath.Join(srcDir, "TestApp.java"))
 	require.NoError(t, err)
@@ -309,17 +309,17 @@ public class TestApp {
 func TestRecipeExecutor_RealOpenRewriteExecution(t *testing.T) {
 	// Create a mock storage
 	storage := &mockRecipeStorage{}
-	
+
 	// Create sandbox manager
 	sandboxMgr := NewMockSandboxManager()
-	
+
 	// Create recipe executor
 	executor := NewRecipeExecutor(storage, sandboxMgr)
-	
+
 	// Create test repository path
 	repoPath := testutils.CreateTempDir(t, "executor-test")
 	defer os.RemoveAll(repoPath)
-	
+
 	// Create pom.xml to ensure it's a Java project
 	pomContent := `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -329,23 +329,23 @@ func TestRecipeExecutor_RealOpenRewriteExecution(t *testing.T) {
     <version>1.0.0</version>
 </project>`
 	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "pom.xml"), []byte(pomContent), 0644))
-	
+
 	// Execute with OpenRewrite step
 	ctx := context.Background()
 	result, err := executor.ExecuteRecipeByID(ctx, "test-recipe", repoPath)
-	
+
 	// This should NOT return mock results
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-	
+
 	// Key assertion: We should NOT get MockFile.java
 	if len(result.FilesModified) > 0 {
-		assert.NotEqual(t, "MockFile.java", result.FilesModified[0], 
+		assert.NotEqual(t, "MockFile.java", result.FilesModified[0],
 			"Should use real OpenRewrite engine, not mock")
 	}
-	
+
 	// The result should reflect real execution
-	assert.NotContains(t, result.Diff, "mock transformation", 
+	assert.NotContains(t, result.Diff, "mock transformation",
 		"Should not contain mock transformation text")
 }
 

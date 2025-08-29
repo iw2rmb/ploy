@@ -28,14 +28,14 @@ func NewOpenRewriteEngine() *OpenRewriteEngine {
 	// Find Maven and Gradle paths
 	mavenPath, _ := exec.LookPath("mvn")
 	gradlePath, _ := exec.LookPath("gradle")
-	
+
 	// Use default versions for OpenRewrite
 	return &OpenRewriteEngine{
 		mavenPath:      mavenPath,
 		gradlePath:     gradlePath,
 		javaHome:       os.Getenv("JAVA_HOME"),
-		rewriteVersion: "5.34.0",        // Latest stable OpenRewrite version
-		pluginVersion:  "5.34.0",        // Maven plugin version
+		rewriteVersion: "5.34.0", // Latest stable OpenRewrite version
+		pluginVersion:  "5.34.0", // Maven plugin version
 		tempDir:        "/tmp/openrewrite",
 	}
 }
@@ -53,13 +53,13 @@ func (e *OpenRewriteEngine) Execute(ctx context.Context, step *models.RecipeStep
 	if !ok {
 		return nil, fmt.Errorf("OpenRewrite step missing recipe configuration")
 	}
-	
+
 	// Detect build system
 	buildSystem := e.detectBuildSystem(repoPath)
 	if buildSystem == "unknown" {
 		return nil, fmt.Errorf("no supported build system found (Maven or Gradle required)")
 	}
-	
+
 	// Execute based on build system
 	switch buildSystem {
 	case "maven":
@@ -77,7 +77,7 @@ func (e *OpenRewriteEngine) detectBuildSystem(basePath string) string {
 	if _, err := os.Stat(filepath.Join(basePath, "pom.xml")); err == nil {
 		return "maven"
 	}
-	
+
 	// Check for Gradle
 	if _, err := os.Stat(filepath.Join(basePath, "build.gradle")); err == nil {
 		return "gradle"
@@ -85,7 +85,7 @@ func (e *OpenRewriteEngine) detectBuildSystem(basePath string) string {
 	if _, err := os.Stat(filepath.Join(basePath, "build.gradle.kts")); err == nil {
 		return "gradle"
 	}
-	
+
 	return "unknown"
 }
 
@@ -94,9 +94,9 @@ func (e *OpenRewriteEngine) executeMavenRewrite(ctx context.Context, recipe stri
 	if e.mavenPath == "" {
 		return nil, fmt.Errorf("Maven not found in PATH")
 	}
-	
+
 	startTime := time.Now()
-	
+
 	// Create rewrite.yml configuration file
 	rewriteConfig := fmt.Sprintf(`---
 type: specs.openrewrite.org/v1beta/recipe
@@ -105,16 +105,16 @@ displayName: ARF Transformation Recipe
 recipeList:
   - %s
 `, recipe)
-	
+
 	rewriteYamlPath := filepath.Join(repoPath, "rewrite.yml")
 	if err := os.WriteFile(rewriteYamlPath, []byte(rewriteConfig), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write rewrite.yml: %w", err)
 	}
 	defer os.Remove(rewriteYamlPath)
-	
+
 	// Determine recipe artifacts based on the recipe name
 	recipeArtifacts := e.getRecipeArtifacts(recipe)
-	
+
 	// Build Maven command with OpenRewrite plugin
 	args := []string{
 		"org.openrewrite.maven:rewrite-maven-plugin:" + e.pluginVersion + ":run",
@@ -122,19 +122,19 @@ recipeList:
 		"-Drewrite.activeRecipes=ARFTransformation",
 		"-Drewrite.exportDatatables=true",
 	}
-	
+
 	cmd := exec.CommandContext(ctx, e.mavenPath, args...)
 	cmd.Dir = repoPath
 	cmd.Env = e.buildEnvironment()
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	// Execute Maven OpenRewrite
 	err := cmd.Run()
 	duration := time.Since(startTime)
-	
+
 	// Parse results
 	result := &TransformationResult{
 		RecipeID:       recipe,
@@ -143,13 +143,13 @@ recipeList:
 		ChangesApplied: 0,
 		FilesModified:  []string{},
 	}
-	
+
 	// Extract changes from output
 	if err == nil {
 		changes := e.parseMavenOutput(stdout.String())
 		result.ChangesApplied = len(changes)
 		result.FilesModified = changes
-		
+
 		// Generate diff
 		result.Diff = e.generateDiff(repoPath)
 	} else {
@@ -162,7 +162,7 @@ recipeList:
 			},
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -178,26 +178,26 @@ func (e *OpenRewriteEngine) executeGradleRewrite(ctx context.Context, recipe str
 			return nil, fmt.Errorf("Gradle not found")
 		}
 	}
-	
+
 	startTime := time.Now()
-	
+
 	// Add OpenRewrite plugin to build.gradle if not present
 	if err := e.ensureGradlePlugin(repoPath, recipe); err != nil {
 		return nil, fmt.Errorf("failed to configure Gradle plugin: %w", err)
 	}
-	
+
 	// Run rewriteRun task
 	cmd := exec.CommandContext(ctx, gradleCmd, "rewriteRun")
 	cmd.Dir = repoPath
 	cmd.Env = e.buildEnvironment()
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	err := cmd.Run()
 	duration := time.Since(startTime)
-	
+
 	result := &TransformationResult{
 		RecipeID:       recipe,
 		Success:        err == nil,
@@ -205,7 +205,7 @@ func (e *OpenRewriteEngine) executeGradleRewrite(ctx context.Context, recipe str
 		ChangesApplied: 0,
 		FilesModified:  []string{},
 	}
-	
+
 	if err == nil {
 		changes := e.parseGradleOutput(stdout.String())
 		result.ChangesApplied = len(changes)
@@ -220,7 +220,7 @@ func (e *OpenRewriteEngine) executeGradleRewrite(ctx context.Context, recipe str
 			},
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -228,16 +228,16 @@ func (e *OpenRewriteEngine) executeGradleRewrite(ctx context.Context, recipe str
 func (e *OpenRewriteEngine) getRecipeArtifacts(recipe string) string {
 	// Map common recipes to their artifacts
 	recipeMap := map[string]string{
-		"org.openrewrite.java.migrate.Java11toJava17": "org.openrewrite.recipe:rewrite-migrate-java:2.5.0",
-		"org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0": "org.openrewrite.recipe:rewrite-spring:5.7.0",
+		"org.openrewrite.java.migrate.Java11toJava17":                "org.openrewrite.recipe:rewrite-migrate-java:2.5.0",
+		"org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0":    "org.openrewrite.recipe:rewrite-spring:5.7.0",
 		"org.openrewrite.java.spring.boot3.SpringBoot3BestPractices": "org.openrewrite.recipe:rewrite-spring:5.7.0",
-		"org.openrewrite.java.cleanup.UnnecessaryThrows": "org.openrewrite:rewrite-java:8.21.0",
+		"org.openrewrite.java.cleanup.UnnecessaryThrows":             "org.openrewrite:rewrite-java:8.21.0",
 	}
-	
+
 	if artifacts, ok := recipeMap[recipe]; ok {
 		return artifacts
 	}
-	
+
 	// Default to core Java recipes
 	return "org.openrewrite:rewrite-java:8.21.0"
 }
@@ -249,12 +249,12 @@ func (e *OpenRewriteEngine) ensureGradlePlugin(basePath string, recipe string) e
 	if err != nil {
 		return err
 	}
-	
+
 	// Check if plugin is already present
 	if strings.Contains(string(content), "org.openrewrite.rewrite") {
 		return nil // Already configured
 	}
-	
+
 	// Add plugin and configuration
 	pluginBlock := fmt.Sprintf(`
 plugins {
@@ -273,7 +273,7 @@ dependencies {
     rewrite('org.openrewrite.recipe:rewrite-migrate-java:2.5.0')
 }
 `, e.rewriteVersion, recipe)
-	
+
 	// Prepend to existing content
 	newContent := pluginBlock + "\n" + string(content)
 	return os.WriteFile(buildFile, []byte(newContent), 0644)
@@ -282,16 +282,16 @@ dependencies {
 // buildEnvironment creates environment variables for execution
 func (e *OpenRewriteEngine) buildEnvironment() []string {
 	env := os.Environ()
-	
+
 	// Add Java home if set
 	if e.javaHome != "" {
 		env = append(env, "JAVA_HOME="+e.javaHome)
 	}
-	
+
 	// Add Maven/Gradle options for better output
 	env = append(env, "MAVEN_OPTS=-Xmx2G")
 	env = append(env, "GRADLE_OPTS=-Xmx2G")
-	
+
 	return env
 }
 
@@ -299,7 +299,7 @@ func (e *OpenRewriteEngine) buildEnvironment() []string {
 func (e *OpenRewriteEngine) parseMavenOutput(output string) []string {
 	files := []string{}
 	lines := strings.Split(output, "\n")
-	
+
 	for _, line := range lines {
 		// Look for file change indicators
 		if strings.Contains(line, "Changes have been made to") ||
@@ -314,12 +314,12 @@ func (e *OpenRewriteEngine) parseMavenOutput(output string) []string {
 			}
 		}
 	}
-	
+
 	// If no specific files found, but execution succeeded, assume pom.xml was modified
 	if len(files) == 0 && strings.Contains(output, "BUILD SUCCESS") {
 		files = append(files, "pom.xml")
 	}
-	
+
 	return files
 }
 
@@ -327,7 +327,7 @@ func (e *OpenRewriteEngine) parseMavenOutput(output string) []string {
 func (e *OpenRewriteEngine) parseGradleOutput(output string) []string {
 	files := []string{}
 	lines := strings.Split(output, "\n")
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "Fixed") || strings.Contains(line, "Modified") {
 			parts := strings.Fields(line)
@@ -338,12 +338,12 @@ func (e *OpenRewriteEngine) parseGradleOutput(output string) []string {
 			}
 		}
 	}
-	
+
 	// Default to build.gradle if no files detected but task succeeded
 	if len(files) == 0 && strings.Contains(output, "BUILD SUCCESSFUL") {
 		files = append(files, "build.gradle")
 	}
-	
+
 	return files
 }
 
@@ -352,16 +352,15 @@ func (e *OpenRewriteEngine) generateDiff(basePath string) string {
 	// Run git diff if available
 	cmd := exec.Command("git", "diff", "--no-index", "--no-prefix")
 	cmd.Dir = basePath
-	
+
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
-	
+
 	if err := cmd.Run(); err == nil {
 		return out.String()
 	}
-	
+
 	// Fallback to simple message
 	return "OpenRewrite transformation applied successfully"
 }
-

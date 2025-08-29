@@ -18,8 +18,7 @@ import (
 func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 	// Setup test environment
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Create test SBOM file
@@ -28,9 +27,9 @@ func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 	sbomData := map[string]interface{}{
 		"artifacts": []interface{}{
 			map[string]interface{}{
-				"name":    "vulnerable-package",
-				"version": "1.0.0",
-				"type":    "npm",
+				"name":     "vulnerable-package",
+				"version":  "1.0.0",
+				"type":     "npm",
 				"language": "javascript",
 			},
 		},
@@ -44,7 +43,7 @@ func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 		"scan_type": "sbom",
 	}
 	scanBody, _ := json.Marshal(scanReq)
-	
+
 	req := httptest.NewRequest("POST", "/api/v1/arf/phase4/security/scan", bytes.NewReader(scanBody))
 	req.Header.Set("Content-Type", "application/json")
 	resp, _ := app.Test(req)
@@ -99,10 +98,10 @@ func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 
 	// Test 3: Create approval workflow for critical vulnerability
 	approvalReq := map[string]interface{}{
-		"type":        "critical_remediation",
-		"title":       "Critical Security Update Required",
-		"description": "Fix CVE-2024-0001 in vulnerable-package",
-		"priority":    "critical",
+		"type":         "critical_remediation",
+		"title":        "Critical Security Update Required",
+		"description":  "Fix CVE-2024-0001 in vulnerable-package",
+		"priority":     "critical",
 		"requested_by": "security-scanner",
 	}
 	approvalBody, _ := json.Marshal(approvalReq)
@@ -150,27 +149,26 @@ func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 // TestPhase4Integration_SBOMAnalysisWorkflow tests complete SBOM analysis workflow
 func TestPhase4Integration_SBOMAnalysisWorkflow(t *testing.T) {
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Create test SBOM with multiple formats
 	tempDir := t.TempDir()
-	
+
 	// Test Syft format
 	syftPath := filepath.Join(tempDir, "syft.sbom.json")
 	syftData := map[string]interface{}{
 		"artifacts": []interface{}{
 			map[string]interface{}{
-				"name":    "express",
-				"version": "4.18.0",
-				"type":    "npm",
+				"name":     "express",
+				"version":  "4.18.0",
+				"type":     "npm",
 				"licenses": []string{"MIT"},
 			},
 			map[string]interface{}{
-				"name":    "lodash",
-				"version": "4.17.20",
-				"type":    "npm",
+				"name":     "lodash",
+				"version":  "4.17.20",
+				"type":     "npm",
 				"licenses": []string{"MIT"},
 			},
 		},
@@ -231,8 +229,7 @@ func TestPhase4Integration_SBOMAnalysisWorkflow(t *testing.T) {
 // TestPhase4Integration_ProductionOptimizationWorkflow tests production optimization
 func TestPhase4Integration_ProductionOptimizationWorkflow(t *testing.T) {
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Test 1: Configure circuit breaker
@@ -352,8 +349,7 @@ func TestPhase4Integration_ProductionOptimizationWorkflow(t *testing.T) {
 // TestPhase4Integration_HumanWorkflowWithEscalation tests workflow escalation
 func TestPhase4Integration_HumanWorkflowWithEscalation(t *testing.T) {
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Set escalation rules
@@ -432,8 +428,7 @@ func TestPhase4Integration_HumanWorkflowWithEscalation(t *testing.T) {
 // TestPhase4Integration_ComplianceAssessment tests compliance checking
 func TestPhase4Integration_ComplianceAssessment(t *testing.T) {
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Create vulnerability list with OWASP and CWE mappings
@@ -498,8 +493,7 @@ func TestPhase4Integration_ComplianceAssessment(t *testing.T) {
 // TestPhase4Integration_ErrorHandling tests error handling across Phase 4
 func TestPhase4Integration_ErrorHandling(t *testing.T) {
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	tests := []struct {
@@ -569,8 +563,7 @@ func TestPhase4Integration_ErrorHandling(t *testing.T) {
 // BenchmarkPhase4Integration_FullWorkflow benchmarks complete Phase 4 workflow
 func BenchmarkPhase4Integration_FullWorkflow(b *testing.B) {
 	app := fiber.New()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(nil, nil, nil, benchmarkMgr)
+	handler := NewHandler(nil, nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Prepare test data

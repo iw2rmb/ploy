@@ -15,16 +15,16 @@ import (
 type LLMRecipeGenerator interface {
 	// GenerateRecipe generates a transformation recipe using LLM
 	GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error)
-	
+
 	// GetCapabilities returns the capabilities of the LLM generator
 	GetCapabilities() LLMCapabilities
-	
+
 	// IsAvailable checks if the LLM service is available
 	IsAvailable(ctx context.Context) bool
-	
+
 	// ValidateGenerated validates a generated recipe
 	ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error)
-	
+
 	// OptimizeRecipe optimizes a recipe based on feedback
 	OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error)
 }
@@ -51,24 +51,23 @@ type ErrorContext struct {
 
 // TransformationFeedback represents feedback from a transformation attempt
 type TransformationFeedback struct {
-	Success        bool              `json:"success"`
-	ErrorMessage   string            `json:"error_message,omitempty"`
-	BuildSuccess   bool              `json:"build_success"`
-	TestResults    map[string]bool   `json:"test_results,omitempty"`
+	Success            bool               `json:"success"`
+	ErrorMessage       string             `json:"error_message,omitempty"`
+	BuildSuccess       bool               `json:"build_success"`
+	TestResults        map[string]bool    `json:"test_results,omitempty"`
 	PerformanceMetrics map[string]float64 `json:"performance_metrics,omitempty"`
-	UserRating     int               `json:"user_rating,omitempty"`
-	Comments       string            `json:"comments,omitempty"`
+	UserRating         int                `json:"user_rating,omitempty"`
+	Comments           string             `json:"comments,omitempty"`
 }
-
 
 // RecipeGenerationRequest represents a request to generate a transformation recipe
 type RecipeGenerationRequest struct {
-	Language        string           `json:"language"`
-	Framework       string           `json:"framework,omitempty"`
-	ErrorContext    ErrorContext     `json:"error_context"`
-	CodebaseContext CodebaseContext  `json:"codebase_context"`
-	Constraints     []string         `json:"constraints,omitempty"`
-	MaxIterations   int              `json:"max_iterations,omitempty"`
+	Language        string          `json:"language"`
+	Framework       string          `json:"framework,omitempty"`
+	ErrorContext    ErrorContext    `json:"error_context"`
+	CodebaseContext CodebaseContext `json:"codebase_context"`
+	Constraints     []string        `json:"constraints,omitempty"`
+	MaxIterations   int             `json:"max_iterations,omitempty"`
 }
 
 // GeneratedRecipe represents a generated transformation recipe
@@ -95,13 +94,13 @@ type LLMCapabilities struct {
 
 // CodebaseContext provides context about the codebase
 type CodebaseContext struct {
-	Language    string            `json:"language"`
-	Framework   string            `json:"framework,omitempty"`
-	BuildTool   string            `json:"build_tool,omitempty"`
-	Version     string            `json:"version,omitempty"`
-	Imports     []string          `json:"imports,omitempty"`
-	Symbols     []string          `json:"symbols,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
+	Language  string            `json:"language"`
+	Framework string            `json:"framework,omitempty"`
+	BuildTool string            `json:"build_tool,omitempty"`
+	Version   string            `json:"version,omitempty"`
+	Imports   []string          `json:"imports,omitempty"`
+	Symbols   []string          `json:"symbols,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
 }
 
 // HTTPLLMGenerator implements LLMRecipeGenerator using external HTTP APIs
@@ -112,20 +111,20 @@ type HTTPLLMGenerator struct {
 // NewHTTPLLMGenerator creates a new HTTP-based LLM generator using model registry
 func NewHTTPLLMGenerator(modelName string) (*HTTPLLMGenerator, error) {
 	ctx := context.Background()
-	
+
 	var config *ModelConfig
 	var err error
-	
+
 	if modelName != "" {
 		config, err = GetModelByName(ctx, modelName)
 	} else {
 		config, err = GetDefaultModel(ctx)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model configuration: %w", err)
 	}
-	
+
 	return &HTTPLLMGenerator{
 		modelConfig: config,
 	}, nil
@@ -134,19 +133,19 @@ func NewHTTPLLMGenerator(modelName string) (*HTTPLLMGenerator, error) {
 // GenerateRecipe generates a recipe using external HTTP API
 func (g *HTTPLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
 	prompt := g.buildPrompt(request)
-	
+
 	// Make HTTP request to LLM API
 	response, err := g.callLLMAPI(ctx, prompt, g.modelConfig.MaxTokens, g.modelConfig.Temperature)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call LLM API: %w", err)
 	}
-	
+
 	// Parse response into recipe
 	recipe := make(map[string]interface{})
 	recipe["content"] = response
 	recipe["model"] = g.modelConfig.Model
 	recipe["provider"] = g.modelConfig.Provider
-	
+
 	return &GeneratedRecipe{
 		ID:          fmt.Sprintf("recipe-%d", time.Now().Unix()),
 		Name:        "LLM Generated Recipe",
@@ -160,7 +159,7 @@ func (g *HTTPLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGen
 			"temperature": g.modelConfig.Temperature,
 			"max_tokens":  g.modelConfig.MaxTokens,
 		},
-		CreatedAt:   time.Now(),
+		CreatedAt: time.Now(),
 	}, nil
 }
 
@@ -182,13 +181,13 @@ func (g *HTTPLLMGenerator) IsAvailable(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return false
 	}
 	defer resp.Body.Close()
-	
+
 	return resp.StatusCode < 500
 }
 
@@ -208,37 +207,37 @@ func (g *HTTPLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{
 	// Generate optimization prompt
 	prompt := fmt.Sprintf("Optimize the following recipe based on feedback:\n\nRecipe: %v\n\nFeedback:\n- Success: %v\n- Error: %s\n\nProvide an optimized version.",
 		recipe, feedback.Success, feedback.ErrorMessage)
-	
+
 	response, err := g.callLLMAPI(ctx, prompt, g.modelConfig.MaxTokens, g.modelConfig.Temperature)
 	if err != nil {
 		return recipe, err // Return original on error
 	}
-	
+
 	return response, nil
 }
 
 // buildPrompt builds a prompt from the recipe generation request
 func (g *HTTPLLMGenerator) buildPrompt(request RecipeGenerationRequest) string {
 	prompt := "Generate a code transformation for the following:\n\n"
-	
+
 	if request.ErrorContext.ErrorMessage != "" {
 		prompt += "Error to fix:\n" + request.ErrorContext.ErrorMessage + "\n\n"
 	}
-	
+
 	prompt += "Language: " + request.Language + "\n"
 	if request.Framework != "" {
 		prompt += "Framework: " + request.Framework + "\n"
 	}
-	
+
 	if len(request.Constraints) > 0 {
 		prompt += "\nConstraints:\n"
 		for _, constraint := range request.Constraints {
 			prompt += "- " + constraint + "\n"
 		}
 	}
-	
+
 	prompt += "\nProvide a working code transformation that addresses the issue."
-	
+
 	return prompt
 }
 
@@ -247,7 +246,7 @@ func (g *HTTPLLMGenerator) callLLMAPI(ctx context.Context, prompt string, maxTok
 	// Build request based on provider
 	var reqBody []byte
 	var err error
-	
+
 	switch g.modelConfig.Provider {
 	case "openai":
 		reqBody, err = json.Marshal(map[string]interface{}{
@@ -272,38 +271,38 @@ func (g *HTTPLLMGenerator) callLLMAPI(ctx context.Context, prompt string, maxTok
 			"model":       g.modelConfig.Model,
 		})
 	}
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", g.modelConfig.Endpoint, bytes.NewReader(reqBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
 	if g.modelConfig.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+g.modelConfig.APIKey)
 	}
-	
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("LLM API returned status %d: %s", resp.StatusCode, string(body))
 	}
-	
+
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
-	
+
 	// Extract response based on provider format
 	switch g.modelConfig.Provider {
 	case "openai":
@@ -332,7 +331,7 @@ func (g *HTTPLLMGenerator) callLLMAPI(ctx context.Context, prompt string, maxTok
 			return text, nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("could not extract response from LLM API result")
 }
 

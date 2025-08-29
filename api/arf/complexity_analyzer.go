@@ -28,12 +28,12 @@ type CodeComplexityMetrics struct {
 
 // DifficultyPrediction predicts transformation difficulty
 type DifficultyPrediction struct {
-	OverallDifficulty    float64              `json:"overall_difficulty"`
-	ConfidenceLevel      float64              `json:"confidence_level"`
-	KeyChallenges        []string             `json:"key_challenges"`
-	EstimatedEffort      time.Duration        `json:"estimated_effort"`
-	SuccessProbability   float64              `json:"success_probability"`
-	RecommendedApproach  []TransformationType `json:"recommended_approach"`
+	OverallDifficulty   float64              `json:"overall_difficulty"`
+	ConfidenceLevel     float64              `json:"confidence_level"`
+	KeyChallenges       []string             `json:"key_challenges"`
+	EstimatedEffort     time.Duration        `json:"estimated_effort"`
+	SuccessProbability  float64              `json:"success_probability"`
+	RecommendedApproach []TransformationType `json:"recommended_approach"`
 }
 
 // DefaultComplexityAnalyzer implements complexity analysis
@@ -260,19 +260,19 @@ func (c *DefaultComplexityAnalyzer) calculateSizeComplexity(repository Repositor
 	// Get repository size from metadata or use defaults
 	repoSize := 1000 // Default size in lines of code
 	fileCount := 50  // Default file count
-	
+
 	if sizeStr, exists := repository.Metadata["size"]; exists {
 		if size, err := fmt.Sscanf(sizeStr, "%d", &repoSize); err == nil && size == 1 {
 			// Successfully parsed repository size
 		}
 	}
-	
+
 	if fileCountStr, exists := repository.Metadata["file_count"]; exists {
 		if count, err := fmt.Sscanf(fileCountStr, "%d", &fileCount); err == nil && count == 1 {
 			// Successfully parsed file count
 		}
 	}
-	
+
 	sizeBytes := float64(repoSize)
 	fileCountFloat := float64(fileCount)
 
@@ -310,12 +310,12 @@ func (c *DefaultComplexityAnalyzer) getDependencyComplexity(dependency string) f
 	complexDeps := map[string]float64{
 		"spring-security": 0.8,
 		"hibernate":       0.7,
-		"react":          0.4,
-		"angular":        0.6,
-		"tensorflow":     0.9,
-		"pytorch":        0.9,
-		"kubernetes":     0.9,
-		"docker":         0.3,
+		"react":           0.4,
+		"angular":         0.6,
+		"tensorflow":      0.9,
+		"pytorch":         0.9,
+		"kubernetes":      0.9,
+		"docker":          0.3,
 	}
 
 	depName := strings.ToLower(dependency)
@@ -342,8 +342,8 @@ func (c *DefaultComplexityAnalyzer) calculateBuildComplexity(buildTool, language
 			"rollup":  0.4,
 		},
 		"python": {
-			"pip":      0.2,
-			"poetry":   0.3,
+			"pip":        0.2,
+			"poetry":     0.3,
 			"setuptools": 0.4,
 		},
 		"go": {
@@ -548,10 +548,10 @@ func (c *DefaultComplexityAnalyzer) calculateCyclomaticComplexity(code string, l
 	// Simplified cyclomatic complexity
 	// Count decision points: if, while, for, switch, catch
 	decisionKeywords := []string{"if", "while", "for", "switch", "catch", "elif", "else if"}
-	
+
 	complexity := 1 // Base complexity
 	codeLowar := strings.ToLower(code)
-	
+
 	for _, keyword := range decisionKeywords {
 		complexity += strings.Count(codeLowar, keyword)
 	}
@@ -564,7 +564,7 @@ func (c *DefaultComplexityAnalyzer) calculateCognitiveComplexity(code string, la
 	// Similar to cyclomatic but with nesting penalties
 	complexity := c.calculateCyclomaticComplexity(code, language)
 	nestingDepth := c.calculateNestingDepth(code, language)
-	
+
 	// Add penalty for deep nesting
 	return complexity + nestingDepth
 }
@@ -579,10 +579,10 @@ func (c *DefaultComplexityAnalyzer) calculateMaintainabilityIndex(metrics *CodeC
 	// Approximate calculation
 	complexity := float64(metrics.CyclomaticComplexity)
 	loc := float64(metrics.LinesOfCode)
-	
+
 	// Higher complexity and more lines = lower maintainability
 	maintainability := 100.0 - (complexity * 5) - (loc / 10)
-	
+
 	if maintainability < 0 {
 		maintainability = 0
 	}
@@ -599,7 +599,7 @@ func (c *DefaultComplexityAnalyzer) extractMetricsFromAST(ast *UniversalAST, met
 		// More accurate function count from symbols
 		functionSymbols := 0
 		classSymbols := 0
-		
+
 		for _, symbol := range ast.Symbols {
 			switch symbol.Type {
 			case "function", "method":
@@ -643,10 +643,10 @@ func (c *DefaultComplexityAnalyzer) getBaseDifficulty(transformation Transformat
 func (c *DefaultComplexityAnalyzer) adjustDifficultyForRepository(baseDifficulty float64, analysis *ComplexityAnalysis, repository Repository) float64 {
 	// Adjust base difficulty based on repository characteristics
 	repoFactor := analysis.OverallComplexity
-	
+
 	// Weighted combination
 	adjusted := 0.7*baseDifficulty + 0.3*repoFactor
-	
+
 	// Ensure within bounds
 	if adjusted > 1.0 {
 		adjusted = 1.0
@@ -672,7 +672,7 @@ func (c *DefaultComplexityAnalyzer) calculateSuccessProbability(difficulty float
 	}
 
 	success := baseSuccess + transformationBonus
-	
+
 	// Ensure within bounds
 	if success > 1.0 {
 		success = 1.0
@@ -754,7 +754,7 @@ func (c *DefaultComplexityAnalyzer) recommendTransformationApproach(transformati
 func (c *DefaultComplexityAnalyzer) calculateConfidenceLevel(analysis *ComplexityAnalysis) float64 {
 	// Confidence decreases with complexity and number of predicted challenges
 	baseConfidence := 0.9
-	
+
 	complexityPenalty := analysis.OverallComplexity * 0.3
 	challengesPenalty := float64(len(analysis.PredictedChallenges)) * 0.05
 

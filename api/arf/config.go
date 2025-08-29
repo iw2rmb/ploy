@@ -20,13 +20,13 @@ type Config struct {
 
 // StorageConfig configures recipe storage backend
 type StorageConfig struct {
-	Backend      string        `yaml:"backend" json:"backend"`           // "seaweedfs", "memory"
-	SeaweedFS    SeaweedFSConfig `yaml:"seaweedfs" json:"seaweedfs"`
-	BucketName   string        `yaml:"bucket_name" json:"bucket_name"`
-	KeyPrefix    string        `yaml:"key_prefix" json:"key_prefix"`
-	CacheTTL     time.Duration `yaml:"cache_ttl" json:"cache_ttl"`
-	Timeout      time.Duration `yaml:"timeout" json:"timeout"`
-	MaxRetries   int           `yaml:"max_retries" json:"max_retries"`
+	Backend    string          `yaml:"backend" json:"backend"` // "seaweedfs", "memory"
+	SeaweedFS  SeaweedFSConfig `yaml:"seaweedfs" json:"seaweedfs"`
+	BucketName string          `yaml:"bucket_name" json:"bucket_name"`
+	KeyPrefix  string          `yaml:"key_prefix" json:"key_prefix"`
+	CacheTTL   time.Duration   `yaml:"cache_ttl" json:"cache_ttl"`
+	Timeout    time.Duration   `yaml:"timeout" json:"timeout"`
+	MaxRetries int             `yaml:"max_retries" json:"max_retries"`
 }
 
 // SeaweedFSConfig configures SeaweedFS connection
@@ -37,36 +37,36 @@ type SeaweedFSConfig struct {
 
 // IndexConfig configures recipe indexing backend
 type IndexConfig struct {
-	Backend     string        `yaml:"backend" json:"backend"`        // "consul", "memory"
-	ConsulAddr  string        `yaml:"consul_addr" json:"consul_addr"`
-	KeyPrefix   string        `yaml:"key_prefix" json:"key_prefix"`
-	BuildOnStartup bool       `yaml:"build_on_startup" json:"build_on_startup"`
+	Backend         string        `yaml:"backend" json:"backend"` // "consul", "memory"
+	ConsulAddr      string        `yaml:"consul_addr" json:"consul_addr"`
+	KeyPrefix       string        `yaml:"key_prefix" json:"key_prefix"`
+	BuildOnStartup  bool          `yaml:"build_on_startup" json:"build_on_startup"`
 	RefreshInterval time.Duration `yaml:"refresh_interval" json:"refresh_interval"`
 }
 
 // ValidationConfig configures recipe validation
 type ValidationConfig struct {
-	Enabled       bool                  `yaml:"enabled" json:"enabled"`
-	SecurityRules SecurityRulesConfig   `yaml:"security_rules" json:"security_rules"`
-	SchemaStrict  bool                  `yaml:"schema_strict" json:"schema_strict"`
+	Enabled       bool                `yaml:"enabled" json:"enabled"`
+	SecurityRules SecurityRulesConfig `yaml:"security_rules" json:"security_rules"`
+	SchemaStrict  bool                `yaml:"schema_strict" json:"schema_strict"`
 }
 
 // SecurityRulesConfig configures security validation rules
 type SecurityRulesConfig struct {
-	AllowedCommands        []string      `yaml:"allowed_commands" json:"allowed_commands"`
-	ForbiddenCommands      []string      `yaml:"forbidden_commands" json:"forbidden_commands"`
-	MaxExecutionTime       time.Duration `yaml:"max_execution_time" json:"max_execution_time"`
-	AllowNetworkAccess     bool          `yaml:"allow_network_access" json:"allow_network_access"`
-	AllowFileSystemWrite   bool          `yaml:"allow_file_system_write" json:"allow_file_system_write"`
-	SandboxRequired        bool          `yaml:"sandbox_required" json:"sandbox_required"`
-	MaxMemoryUsageMB       int64         `yaml:"max_memory_usage_mb" json:"max_memory_usage_mb"`
-	MaxCPUUsagePercent     float64       `yaml:"max_cpu_usage_percent" json:"max_cpu_usage_percent"`
+	AllowedCommands      []string      `yaml:"allowed_commands" json:"allowed_commands"`
+	ForbiddenCommands    []string      `yaml:"forbidden_commands" json:"forbidden_commands"`
+	MaxExecutionTime     time.Duration `yaml:"max_execution_time" json:"max_execution_time"`
+	AllowNetworkAccess   bool          `yaml:"allow_network_access" json:"allow_network_access"`
+	AllowFileSystemWrite bool          `yaml:"allow_file_system_write" json:"allow_file_system_write"`
+	SandboxRequired      bool          `yaml:"sandbox_required" json:"sandbox_required"`
+	MaxMemoryUsageMB     int64         `yaml:"max_memory_usage_mb" json:"max_memory_usage_mb"`
+	MaxCPUUsagePercent   float64       `yaml:"max_cpu_usage_percent" json:"max_cpu_usage_percent"`
 }
 
 // SecurityConfig configures general security settings
 type SecurityConfig struct {
-	EnableEncryption bool `yaml:"enable_encryption" json:"enable_encryption"`
-	EnableAuditLog   bool `yaml:"enable_audit_log" json:"enable_audit_log"`
+	EnableEncryption bool   `yaml:"enable_encryption" json:"enable_encryption"`
+	EnableAuditLog   bool   `yaml:"enable_audit_log" json:"enable_audit_log"`
 	AuditLogPath     string `yaml:"audit_log_path" json:"audit_log_path"`
 }
 
@@ -74,12 +74,12 @@ type SecurityConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Storage: StorageConfig{
-			Backend:      "memory", // Safe default
-			BucketName:   "ploy-recipes",
-			KeyPrefix:    "recipes",
-			CacheTTL:     5 * time.Minute,
-			Timeout:      30 * time.Second,
-			MaxRetries:   3,
+			Backend:    "memory", // Safe default
+			BucketName: "ploy-recipes",
+			KeyPrefix:  "recipes",
+			CacheTTL:   5 * time.Minute,
+			Timeout:    30 * time.Second,
+			MaxRetries: 3,
 			SeaweedFS: SeaweedFSConfig{
 				MasterURL: "http://localhost:9333",
 				FilerURL:  "http://localhost:8888",
@@ -106,12 +106,12 @@ func DefaultConfig() *Config {
 					"rm -rf", "sudo", "su", "chmod 777",
 					"curl", "wget", "ssh", "scp",
 				},
-				MaxExecutionTime:       15 * time.Minute,
-				AllowNetworkAccess:     false,
-				AllowFileSystemWrite:   true,
-				SandboxRequired:        true,
-				MaxMemoryUsageMB:       2048,
-				MaxCPUUsagePercent:     80.0,
+				MaxExecutionTime:     15 * time.Minute,
+				AllowNetworkAccess:   false,
+				AllowFileSystemWrite: true,
+				SandboxRequired:      true,
+				MaxMemoryUsageMB:     2048,
+				MaxCPUUsagePercent:   80.0,
 			},
 		},
 		Security: SecurityConfig{
@@ -125,21 +125,21 @@ func DefaultConfig() *Config {
 // ProductionConfig returns a production-ready ARF configuration
 func ProductionConfig() *Config {
 	config := DefaultConfig()
-	
+
 	// Use SeaweedFS + Consul in production
 	config.Storage.Backend = "seaweedfs"
 	config.Index.Backend = "consul"
-	
+
 	// Stricter validation in production
 	config.Validation.SchemaStrict = true
 	config.Validation.SecurityRules.AllowNetworkAccess = false
 	config.Validation.SecurityRules.MaxExecutionTime = 10 * time.Minute
 	config.Validation.SecurityRules.MaxMemoryUsageMB = 1024
-	
+
 	// Enable security features
 	config.Security.EnableEncryption = true
 	config.Security.EnableAuditLog = true
-	
+
 	return config
 }
 
@@ -149,7 +149,7 @@ func (c *Config) Validate() error {
 	if c.Storage.Backend == "" {
 		return fmt.Errorf("storage backend is required")
 	}
-	
+
 	if c.Storage.Backend == "seaweedfs" {
 		if c.Storage.SeaweedFS.MasterURL == "" {
 			return fmt.Errorf("SeaweedFS master URL is required")
@@ -158,29 +158,29 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("SeaweedFS filer URL is required")
 		}
 	}
-	
+
 	// Validate index config
 	if c.Index.Backend == "" {
 		return fmt.Errorf("index backend is required")
 	}
-	
+
 	if c.Index.Backend == "consul" && c.Index.ConsulAddr == "" {
 		return fmt.Errorf("Consul address is required")
 	}
-	
+
 	// Validate validation config
 	if c.Validation.SecurityRules.MaxExecutionTime <= 0 {
 		return fmt.Errorf("max execution time must be positive")
 	}
-	
+
 	if c.Validation.SecurityRules.MaxMemoryUsageMB <= 0 {
 		return fmt.Errorf("max memory usage must be positive")
 	}
-	
+
 	if c.Validation.SecurityRules.MaxCPUUsagePercent <= 0 || c.Validation.SecurityRules.MaxCPUUsagePercent > 100 {
 		return fmt.Errorf("max CPU usage must be between 0 and 100")
 	}
-	
+
 	return nil
 }
 
@@ -196,12 +196,12 @@ func (c *Config) InitializeStorage() (storage.RecipeStorage, error) {
 			Replication: "001",
 			Timeout:     int(c.Storage.Timeout.Seconds()),
 		}
-		
+
 		client, err := internalstorage.New(storageConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create SeaweedFS client: %w", err)
 		}
-		
+
 		// Create index if configured
 		var indexStore storage.RecipeIndexStore
 		if c.Index.Backend == "consul" {
@@ -210,19 +210,19 @@ func (c *Config) InitializeStorage() (storage.RecipeStorage, error) {
 				return nil, fmt.Errorf("failed to create Consul index: %w", err)
 			}
 		}
-		
+
 		// Create validator if enabled
 		var validator storage.RecipeValidator
 		if c.Validation.Enabled {
 			securityRules := c.createSecurityRules()
 			validator = validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)
 		}
-		
+
 		return storage.NewSeaweedFSRecipeStorage(client, indexStore, validator), nil
-		
+
 	case "memory":
 		return NewInMemoryRecipeStorage(), nil
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported storage backend: %s", c.Storage.Backend)
 	}
@@ -246,7 +246,7 @@ func (c *Config) InitializeValidator() storage.RecipeValidator {
 	if !c.Validation.Enabled {
 		return nil
 	}
-	
+
 	securityRules := c.createSecurityRules()
 	return validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)
 }
@@ -261,7 +261,7 @@ func (c *Config) createSecurityRules() *storage.SecurityRuleSet {
 		AllowFileSystemWrite: c.Validation.SecurityRules.AllowFileSystemWrite,
 		SandboxRequired:      c.Validation.SecurityRules.SandboxRequired,
 		MaxMemoryUsage:       c.Validation.SecurityRules.MaxMemoryUsageMB * 1024 * 1024, // Convert MB to bytes
-		MaxCPUUsage:          c.Validation.SecurityRules.MaxCPUUsagePercent / 100.0,      // Convert percentage to decimal
+		MaxCPUUsage:          c.Validation.SecurityRules.MaxCPUUsagePercent / 100.0,     // Convert percentage to decimal
 	}
 }
 
@@ -270,7 +270,7 @@ func LoadConfigFromEnv() *Config {
 	// Use production config in production environment
 	if os.Getenv("PLOY_ENVIRONMENT") == "production" {
 		config := ProductionConfig()
-		
+
 		// Override with environment-specific values
 		if seaweedfsURL := os.Getenv("ARF_SEAWEEDFS_MASTER_URL"); seaweedfsURL != "" {
 			config.Storage.SeaweedFS.MasterURL = seaweedfsURL
@@ -284,13 +284,13 @@ func LoadConfigFromEnv() *Config {
 		if keyPrefix := os.Getenv("ARF_CONSUL_PREFIX"); keyPrefix != "" {
 			config.Index.KeyPrefix = keyPrefix
 		}
-		
+
 		return config
 	}
-	
+
 	// Use default config with environment overrides for development/test
 	config := DefaultConfig()
-	
+
 	// Storage backend selection
 	if backend := os.Getenv("ARF_STORAGE_BACKEND"); backend != "" {
 		config.Storage.Backend = backend
@@ -298,7 +298,7 @@ func LoadConfigFromEnv() *Config {
 	if backend := os.Getenv("ARF_INDEX_BACKEND"); backend != "" {
 		config.Index.Backend = backend
 	}
-	
+
 	// SeaweedFS configuration
 	if seaweedfsURL := os.Getenv("ARF_SEAWEEDFS_MASTER_URL"); seaweedfsURL != "" {
 		config.Storage.SeaweedFS.MasterURL = seaweedfsURL
@@ -306,15 +306,15 @@ func LoadConfigFromEnv() *Config {
 	if seaweedfsURL := os.Getenv("ARF_SEAWEEDFS_FILER_URL"); seaweedfsURL != "" {
 		config.Storage.SeaweedFS.FilerURL = seaweedfsURL
 	}
-	
-	// Consul configuration 
+
+	// Consul configuration
 	if consulAddr := os.Getenv("ARF_CONSUL_ADDR"); consulAddr != "" {
 		config.Index.ConsulAddr = consulAddr
 	}
 	if keyPrefix := os.Getenv("ARF_CONSUL_PREFIX"); keyPrefix != "" {
 		config.Index.KeyPrefix = keyPrefix
 	}
-	
+
 	// Validation configuration
 	if enabled := os.Getenv("ARF_VALIDATION_ENABLED"); enabled != "" {
 		config.Validation.Enabled = enabled == "true"
@@ -322,7 +322,7 @@ func LoadConfigFromEnv() *Config {
 	if strict := os.Getenv("ARF_VALIDATION_STRICT"); strict != "" {
 		config.Validation.SchemaStrict = strict == "true"
 	}
-	
+
 	// Security configuration
 	if encryption := os.Getenv("ARF_ENABLE_ENCRYPTION"); encryption != "" {
 		config.Security.EnableEncryption = encryption == "true"
@@ -333,6 +333,6 @@ func LoadConfigFromEnv() *Config {
 	if auditPath := os.Getenv("ARF_AUDIT_LOG_PATH"); auditPath != "" {
 		config.Security.AuditLogPath = auditPath
 	}
-	
+
 	return config
 }

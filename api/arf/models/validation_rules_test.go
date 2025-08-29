@@ -905,15 +905,15 @@ func TestValidationRules_Properties(t *testing.T) {
 
 	t.Run("set defaults is idempotent", func(t *testing.T) {
 		rules := ValidationRules{}
-		
+
 		rules.SetDefaults()
 		maxRepoSize1 := rules.MaxRepoSize
 		minConfidence1 := rules.LanguageDetection.MinConfidence
-		
+
 		rules.SetDefaults()
 		maxRepoSize2 := rules.MaxRepoSize
 		minConfidence2 := rules.LanguageDetection.MinConfidence
-		
+
 		assert.Equal(t, maxRepoSize1, maxRepoSize2)
 		assert.Equal(t, minConfidence1, minConfidence2)
 	})
@@ -939,7 +939,7 @@ func TestCustomRule_AllValidTypes(t *testing.T) {
 				Type:  ruleType,
 				Value: "test_value",
 			}
-			
+
 			err := rule.Validate()
 			assert.NoError(t, err, "type %s should be valid", ruleType)
 		})
@@ -963,7 +963,7 @@ func TestLanguageDetection_EdgeCases(t *testing.T) {
 			detection := LanguageDetection{
 				MinConfidence: tc.confidence,
 			}
-			
+
 			err := detection.Validate()
 			if tc.shouldBeValid {
 				assert.NoError(t, err, "confidence %f should be valid", tc.confidence)
@@ -978,19 +978,19 @@ func TestLanguageDetection_EdgeCases(t *testing.T) {
 			language      string
 			shouldBeValid bool
 		}{
-			{"JavaScript", true},  // Mixed case
-			{"PYTHON", true},      // Uppercase
-			{"go", true},          // Lowercase
-			{"Go", true},          // Capitalized
-			{"typescript", true},  // Lowercase
-			{"TypeScript", true},  // Mixed case
+			{"JavaScript", true}, // Mixed case
+			{"PYTHON", true},     // Uppercase
+			{"go", true},         // Lowercase
+			{"Go", true},         // Capitalized
+			{"typescript", true}, // Lowercase
+			{"TypeScript", true}, // Mixed case
 		}
 
 		for _, tc := range testCases {
 			detection := LanguageDetection{
 				Primary: tc.language,
 			}
-			
+
 			err := detection.Validate()
 			if tc.shouldBeValid {
 				assert.NoError(t, err, "language %s should be valid", tc.language)

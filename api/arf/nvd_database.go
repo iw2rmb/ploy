@@ -19,9 +19,9 @@ type NVDDatabase struct {
 
 // NVDResponse represents the NVD API response structure
 type NVDResponse struct {
-	ResultsPerPage  int `json:"resultsPerPage"`
-	StartIndex      int `json:"startIndex"`
-	TotalResults    int `json:"totalResults"`
+	ResultsPerPage  int    `json:"resultsPerPage"`
+	StartIndex      int    `json:"startIndex"`
+	TotalResults    int    `json:"totalResults"`
 	Format          string `json:"format"`
 	Version         string `json:"version"`
 	Timestamp       string `json:"timestamp"`
@@ -53,20 +53,20 @@ type NVDResponse struct {
 					Source   string `json:"source"`
 					Type     string `json:"type"`
 					CvssData struct {
-						Version                    string  `json:"version"`
-						VectorString               string  `json:"vectorString"`
-						AttackVector               string  `json:"attackVector"`
-						AttackComplexity           string  `json:"attackComplexity"`
-						PrivilegesRequired         string  `json:"privilegesRequired"`
-						UserInteraction            string  `json:"userInteraction"`
-						Scope                      string  `json:"scope"`
-						ConfidentialityImpact      string  `json:"confidentialityImpact"`
-						IntegrityImpact            string  `json:"integrityImpact"`
-						AvailabilityImpact         string  `json:"availabilityImpact"`
-						BaseScore                  float64 `json:"baseScore"`
-						BaseSeverity               string  `json:"baseSeverity"`
-						ExploitabilityScore        float64 `json:"exploitabilityScore"`
-						ImpactScore                float64 `json:"impactScore"`
+						Version               string  `json:"version"`
+						VectorString          string  `json:"vectorString"`
+						AttackVector          string  `json:"attackVector"`
+						AttackComplexity      string  `json:"attackComplexity"`
+						PrivilegesRequired    string  `json:"privilegesRequired"`
+						UserInteraction       string  `json:"userInteraction"`
+						Scope                 string  `json:"scope"`
+						ConfidentialityImpact string  `json:"confidentialityImpact"`
+						IntegrityImpact       string  `json:"integrityImpact"`
+						AvailabilityImpact    string  `json:"availabilityImpact"`
+						BaseScore             float64 `json:"baseScore"`
+						BaseSeverity          string  `json:"baseSeverity"`
+						ExploitabilityScore   float64 `json:"exploitabilityScore"`
+						ImpactScore           float64 `json:"impactScore"`
 					} `json:"cvssData"`
 					ExploitabilityScore float64 `json:"exploitabilityScore"`
 					ImpactScore         float64 `json:"impactScore"`
@@ -75,20 +75,20 @@ type NVDResponse struct {
 					Source   string `json:"source"`
 					Type     string `json:"type"`
 					CvssData struct {
-						Version                    string  `json:"version"`
-						VectorString               string  `json:"vectorString"`
-						AttackVector               string  `json:"attackVector"`
-						AttackComplexity           string  `json:"attackComplexity"`
-						PrivilegesRequired         string  `json:"privilegesRequired"`
-						UserInteraction            string  `json:"userInteraction"`
-						Scope                      string  `json:"scope"`
-						ConfidentialityImpact      string  `json:"confidentialityImpact"`
-						IntegrityImpact            string  `json:"integrityImpact"`
-						AvailabilityImpact         string  `json:"availabilityImpact"`
-						BaseScore                  float64 `json:"baseScore"`
-						BaseSeverity               string  `json:"baseSeverity"`
-						ExploitabilityScore        float64 `json:"exploitabilityScore"`
-						ImpactScore                float64 `json:"impactScore"`
+						Version               string  `json:"version"`
+						VectorString          string  `json:"vectorString"`
+						AttackVector          string  `json:"attackVector"`
+						AttackComplexity      string  `json:"attackComplexity"`
+						PrivilegesRequired    string  `json:"privilegesRequired"`
+						UserInteraction       string  `json:"userInteraction"`
+						Scope                 string  `json:"scope"`
+						ConfidentialityImpact string  `json:"confidentialityImpact"`
+						IntegrityImpact       string  `json:"integrityImpact"`
+						AvailabilityImpact    string  `json:"availabilityImpact"`
+						BaseScore             float64 `json:"baseScore"`
+						BaseSeverity          string  `json:"baseSeverity"`
+						ExploitabilityScore   float64 `json:"exploitabilityScore"`
+						ImpactScore           float64 `json:"impactScore"`
 					} `json:"cvssData"`
 					ExploitabilityScore float64 `json:"exploitabilityScore"`
 					ImpactScore         float64 `json:"impactScore"`
@@ -107,14 +107,14 @@ type NVDResponse struct {
 						AvailabilityImpact    string  `json:"availabilityImpact"`
 						BaseScore             float64 `json:"baseScore"`
 					} `json:"cvssData"`
-					BaseSeverity        string  `json:"baseSeverity"`
-					ExploitabilityScore float64 `json:"exploitabilityScore"`
-					ImpactScore         float64 `json:"impactScore"`
-					AcInsufInfo         bool    `json:"acInsufInfo"`
-					ObtainAllPrivilege  bool    `json:"obtainAllPrivilege"`
-					ObtainUserPrivilege bool    `json:"obtainUserPrivilege"`
-					ObtainOtherPrivilege bool   `json:"obtainOtherPrivilege"`
-					UserInteractionRequired bool `json:"userInteractionRequired"`
+					BaseSeverity            string  `json:"baseSeverity"`
+					ExploitabilityScore     float64 `json:"exploitabilityScore"`
+					ImpactScore             float64 `json:"impactScore"`
+					AcInsufInfo             bool    `json:"acInsufInfo"`
+					ObtainAllPrivilege      bool    `json:"obtainAllPrivilege"`
+					ObtainUserPrivilege     bool    `json:"obtainUserPrivilege"`
+					ObtainOtherPrivilege    bool    `json:"obtainOtherPrivilege"`
+					UserInteractionRequired bool    `json:"userInteractionRequired"`
 				} `json:"cvssMetricV2"`
 			} `json:"metrics"`
 			Weaknesses []struct {
@@ -130,13 +130,13 @@ type NVDResponse struct {
 					Operator string `json:"operator"`
 					Negate   bool   `json:"negate"`
 					CpeMatch []struct {
-						Vulnerable                bool   `json:"vulnerable"`
-						Criteria                  string `json:"criteria"`
-						VersionStartIncluding     string `json:"versionStartIncluding,omitempty"`
-						VersionStartExcluding     string `json:"versionStartExcluding,omitempty"`
-						VersionEndIncluding       string `json:"versionEndIncluding,omitempty"`
-						VersionEndExcluding       string `json:"versionEndExcluding,omitempty"`
-						MatchCriteriaId           string `json:"matchCriteriaId"`
+						Vulnerable            bool   `json:"vulnerable"`
+						Criteria              string `json:"criteria"`
+						VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+						VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+						VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+						VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+						MatchCriteriaId       string `json:"matchCriteriaId"`
 					} `json:"cpeMatch"`
 				} `json:"nodes"`
 			} `json:"configurations"`
@@ -171,50 +171,50 @@ func (n *NVDDatabase) LookupCVE(cveID string) (*CVEInfo, error) {
 	if cached, exists := n.cache[cveID]; exists {
 		return cached, nil
 	}
-	
+
 	// Build request URL
 	url := fmt.Sprintf("%s?cveId=%s", n.baseURL, cveID)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	// Add API key if available
 	if n.apiKey != "" {
 		req.Header.Set("apiKey", n.apiKey)
 	}
-	
+
 	// Make request
 	resp, err := n.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("NVD API request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("NVD API returned status %d", resp.StatusCode)
 	}
-	
+
 	// Parse response
 	var nvdResp NVDResponse
 	if err := json.NewDecoder(resp.Body).Decode(&nvdResp); err != nil {
 		return nil, fmt.Errorf("failed to decode NVD response: %w", err)
 	}
-	
+
 	if len(nvdResp.Vulnerabilities) == 0 {
 		return nil, fmt.Errorf("CVE %s not found", cveID)
 	}
-	
+
 	// Convert to CVEInfo
 	cveInfo, err := n.convertToCVEInfo(nvdResp.Vulnerabilities[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert CVE data: %w", err)
 	}
-	
+
 	// Cache result
 	n.cache[cveID] = cveInfo
-	
+
 	return cveInfo, nil
 }
 
@@ -222,23 +222,23 @@ func (n *NVDDatabase) LookupCVE(cveID string) (*CVEInfo, error) {
 func (n *NVDDatabase) QueryVulnerabilities(criteria VulnerabilityQuery) ([]VulnerabilityInfo, error) {
 	// Build query parameters
 	params := make(map[string]string)
-	
+
 	if criteria.PackageName != "" {
 		params["keywordSearch"] = criteria.PackageName
 	}
-	
+
 	if !criteria.DateRange.From.IsZero() {
 		params["pubStartDate"] = criteria.DateRange.From.Format("2006-01-02T15:04:05.000Z")
 	}
-	
+
 	if !criteria.DateRange.To.IsZero() {
 		params["pubEndDate"] = criteria.DateRange.To.Format("2006-01-02T15:04:05.000Z")
 	}
-	
+
 	if criteria.CVSS.Min > 0 {
 		params["cvssV3Severity"] = n.mapCVSSToSeverity(criteria.CVSS.Min)
 	}
-	
+
 	// Build URL with parameters
 	url := n.baseURL
 	if len(params) > 0 {
@@ -249,31 +249,31 @@ func (n *NVDDatabase) QueryVulnerabilities(criteria VulnerabilityQuery) ([]Vulne
 		}
 		url += strings.Join(paramPairs, "&")
 	}
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	if n.apiKey != "" {
 		req.Header.Set("apiKey", n.apiKey)
 	}
-	
+
 	resp, err := n.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("NVD API request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("NVD API returned status %d", resp.StatusCode)
 	}
-	
+
 	var nvdResp NVDResponse
 	if err := json.NewDecoder(resp.Body).Decode(&nvdResp); err != nil {
 		return nil, fmt.Errorf("failed to decode NVD response: %w", err)
 	}
-	
+
 	// Convert to VulnerabilityInfo
 	vulns := make([]VulnerabilityInfo, 0, len(nvdResp.Vulnerabilities))
 	for _, nvdVuln := range nvdResp.Vulnerabilities {
@@ -281,7 +281,7 @@ func (n *NVDDatabase) QueryVulnerabilities(criteria VulnerabilityQuery) ([]Vulne
 		if err != nil {
 			continue // Skip problematic entries
 		}
-		
+
 		vuln := VulnerabilityInfo{
 			CVE:      *cveInfo,
 			Severity: cveInfo.Severity,
@@ -294,10 +294,10 @@ func (n *NVDDatabase) QueryVulnerabilities(criteria VulnerabilityQuery) ([]Vulne
 				Source:     "NVD",
 			},
 		}
-		
+
 		vulns = append(vulns, vuln)
 	}
-	
+
 	return vulns, nil
 }
 
@@ -337,20 +337,20 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 				Source   string `json:"source"`
 				Type     string `json:"type"`
 				CvssData struct {
-					Version                    string  `json:"version"`
-					VectorString               string  `json:"vectorString"`
-					AttackVector               string  `json:"attackVector"`
-					AttackComplexity           string  `json:"attackComplexity"`
-					PrivilegesRequired         string  `json:"privilegesRequired"`
-					UserInteraction            string  `json:"userInteraction"`
-					Scope                      string  `json:"scope"`
-					ConfidentialityImpact      string  `json:"confidentialityImpact"`
-					IntegrityImpact            string  `json:"integrityImpact"`
-					AvailabilityImpact         string  `json:"availabilityImpact"`
-					BaseScore                  float64 `json:"baseScore"`
-					BaseSeverity               string  `json:"baseSeverity"`
-					ExploitabilityScore        float64 `json:"exploitabilityScore"`
-					ImpactScore                float64 `json:"impactScore"`
+					Version               string  `json:"version"`
+					VectorString          string  `json:"vectorString"`
+					AttackVector          string  `json:"attackVector"`
+					AttackComplexity      string  `json:"attackComplexity"`
+					PrivilegesRequired    string  `json:"privilegesRequired"`
+					UserInteraction       string  `json:"userInteraction"`
+					Scope                 string  `json:"scope"`
+					ConfidentialityImpact string  `json:"confidentialityImpact"`
+					IntegrityImpact       string  `json:"integrityImpact"`
+					AvailabilityImpact    string  `json:"availabilityImpact"`
+					BaseScore             float64 `json:"baseScore"`
+					BaseSeverity          string  `json:"baseSeverity"`
+					ExploitabilityScore   float64 `json:"exploitabilityScore"`
+					ImpactScore           float64 `json:"impactScore"`
 				} `json:"cvssData"`
 				ExploitabilityScore float64 `json:"exploitabilityScore"`
 				ImpactScore         float64 `json:"impactScore"`
@@ -359,20 +359,20 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 				Source   string `json:"source"`
 				Type     string `json:"type"`
 				CvssData struct {
-					Version                    string  `json:"version"`
-					VectorString               string  `json:"vectorString"`
-					AttackVector               string  `json:"attackVector"`
-					AttackComplexity           string  `json:"attackComplexity"`
-					PrivilegesRequired         string  `json:"privilegesRequired"`
-					UserInteraction            string  `json:"userInteraction"`
-					Scope                      string  `json:"scope"`
-					ConfidentialityImpact      string  `json:"confidentialityImpact"`
-					IntegrityImpact            string  `json:"integrityImpact"`
-					AvailabilityImpact         string  `json:"availabilityImpact"`
-					BaseScore                  float64 `json:"baseScore"`
-					BaseSeverity               string  `json:"baseSeverity"`
-					ExploitabilityScore        float64 `json:"exploitabilityScore"`
-					ImpactScore                float64 `json:"impactScore"`
+					Version               string  `json:"version"`
+					VectorString          string  `json:"vectorString"`
+					AttackVector          string  `json:"attackVector"`
+					AttackComplexity      string  `json:"attackComplexity"`
+					PrivilegesRequired    string  `json:"privilegesRequired"`
+					UserInteraction       string  `json:"userInteraction"`
+					Scope                 string  `json:"scope"`
+					ConfidentialityImpact string  `json:"confidentialityImpact"`
+					IntegrityImpact       string  `json:"integrityImpact"`
+					AvailabilityImpact    string  `json:"availabilityImpact"`
+					BaseScore             float64 `json:"baseScore"`
+					BaseSeverity          string  `json:"baseSeverity"`
+					ExploitabilityScore   float64 `json:"exploitabilityScore"`
+					ImpactScore           float64 `json:"impactScore"`
 				} `json:"cvssData"`
 				ExploitabilityScore float64 `json:"exploitabilityScore"`
 				ImpactScore         float64 `json:"impactScore"`
@@ -391,14 +391,14 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 					AvailabilityImpact    string  `json:"availabilityImpact"`
 					BaseScore             float64 `json:"baseScore"`
 				} `json:"cvssData"`
-				BaseSeverity        string  `json:"baseSeverity"`
-				ExploitabilityScore float64 `json:"exploitabilityScore"`
-				ImpactScore         float64 `json:"impactScore"`
-				AcInsufInfo         bool    `json:"acInsufInfo"`
-				ObtainAllPrivilege  bool    `json:"obtainAllPrivilege"`
-				ObtainUserPrivilege bool    `json:"obtainUserPrivilege"`
-				ObtainOtherPrivilege bool   `json:"obtainOtherPrivilege"`
-				UserInteractionRequired bool `json:"userInteractionRequired"`
+				BaseSeverity            string  `json:"baseSeverity"`
+				ExploitabilityScore     float64 `json:"exploitabilityScore"`
+				ImpactScore             float64 `json:"impactScore"`
+				AcInsufInfo             bool    `json:"acInsufInfo"`
+				ObtainAllPrivilege      bool    `json:"obtainAllPrivilege"`
+				ObtainUserPrivilege     bool    `json:"obtainUserPrivilege"`
+				ObtainOtherPrivilege    bool    `json:"obtainOtherPrivilege"`
+				UserInteractionRequired bool    `json:"userInteractionRequired"`
 			} `json:"cvssMetricV2"`
 		} `json:"metrics"`
 		Weaknesses []struct {
@@ -414,13 +414,13 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 				Operator string `json:"operator"`
 				Negate   bool   `json:"negate"`
 				CpeMatch []struct {
-					Vulnerable                bool   `json:"vulnerable"`
-					Criteria                  string `json:"criteria"`
-					VersionStartIncluding     string `json:"versionStartIncluding,omitempty"`
-					VersionStartExcluding     string `json:"versionStartExcluding,omitempty"`
-					VersionEndIncluding       string `json:"versionEndIncluding,omitempty"`
-					VersionEndExcluding       string `json:"versionEndExcluding,omitempty"`
-					MatchCriteriaId           string `json:"matchCriteriaId"`
+					Vulnerable            bool   `json:"vulnerable"`
+					Criteria              string `json:"criteria"`
+					VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+					VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+					VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+					VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+					MatchCriteriaId       string `json:"matchCriteriaId"`
 				} `json:"cpeMatch"`
 			} `json:"nodes"`
 		} `json:"configurations"`
@@ -432,7 +432,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 	} `json:"cve"`
 }) (*CVEInfo, error) {
 	cve := nvdVuln.CVE
-	
+
 	// Parse description
 	var description string
 	for _, desc := range cve.Descriptions {
@@ -444,7 +444,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 	if description == "" && len(cve.Descriptions) > 0 {
 		description = cve.Descriptions[0].Value
 	}
-	
+
 	// Parse references
 	refs := make([]CVEReference, len(cve.References))
 	for i, ref := range cve.References {
@@ -454,14 +454,14 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 			Tags: ref.Tags,
 		}
 	}
-	
+
 	// Parse published date
 	publishedDate, _ := time.Parse("2006-01-02T15:04:05.000Z", cve.Published)
-	
+
 	// Determine CVSS score and version
 	var cvssScore CVSSScore
 	var severity string
-	
+
 	// Prefer CVSS v3.1, then v3.0, then v2
 	if len(cve.Metrics.CvssMetricV31) > 0 {
 		cvss := cve.Metrics.CvssMetricV31[0]
@@ -494,7 +494,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 		}
 		severity = cvss.BaseSeverity
 	}
-	
+
 	// Parse affected packages from configurations
 	var affectedPackages []AffectedPackage
 	for _, config := range cve.Configurations {
@@ -509,36 +509,36 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
 			}
 		}
 	}
-	
+
 	// Determine exploitability
 	hasExploit := cve.CISAExploitAdd != ""
 	exploitability := ExploitabilityInfo{
-		HasExploit:      hasExploit,
-		ExploitMaturity: "unknown",
-		AttackVector:    "network",
+		HasExploit:       hasExploit,
+		ExploitMaturity:  "unknown",
+		AttackVector:     "network",
 		AttackComplexity: "low",
 	}
-	
+
 	// Generate remediation guidance
 	remediation := n.generateRemediationGuidance(cve, affectedPackages)
-	
+
 	cveInfo := &CVEInfo{
 		ID:               cve.ID,
 		Description:      description,
-		CVSS:            cvssScore,
+		CVSS:             cvssScore,
 		AffectedPackages: affectedPackages,
-		References:      refs,
-		PublishedDate:   publishedDate,
-		Severity:        severity,
-		Remediation:     remediation,
-		Exploitability:  exploitability,
+		References:       refs,
+		PublishedDate:    publishedDate,
+		Severity:         severity,
+		Remediation:      remediation,
+		Exploitability:   exploitability,
 		Metadata: map[string]interface{}{
 			"source_identifier": cve.SourceIdentifier,
 			"vuln_status":       cve.VulnStatus,
 			"last_modified":     cve.LastModified,
 		},
 	}
-	
+
 	return cveInfo, nil
 }
 
@@ -550,14 +550,14 @@ func (n *NVDDatabase) parseCPEToPackage(cpe string) *AffectedPackage {
 	if len(parts) < 5 {
 		return nil
 	}
-	
+
 	vendor := parts[3]
 	product := parts[4]
 	version := "*"
 	if len(parts) > 5 && parts[5] != "*" {
 		version = parts[5]
 	}
-	
+
 	return &AffectedPackage{
 		Name:             fmt.Sprintf("%s/%s", vendor, product),
 		Ecosystem:        "generic",
@@ -595,20 +595,20 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 			Source   string `json:"source"`
 			Type     string `json:"type"`
 			CvssData struct {
-				Version                    string  `json:"version"`
-				VectorString               string  `json:"vectorString"`
-				AttackVector               string  `json:"attackVector"`
-				AttackComplexity           string  `json:"attackComplexity"`
-				PrivilegesRequired         string  `json:"privilegesRequired"`
-				UserInteraction            string  `json:"userInteraction"`
-				Scope                      string  `json:"scope"`
-				ConfidentialityImpact      string  `json:"confidentialityImpact"`
-				IntegrityImpact            string  `json:"integrityImpact"`
-				AvailabilityImpact         string  `json:"availabilityImpact"`
-				BaseScore                  float64 `json:"baseScore"`
-				BaseSeverity               string  `json:"baseSeverity"`
-				ExploitabilityScore        float64 `json:"exploitabilityScore"`
-				ImpactScore                float64 `json:"impactScore"`
+				Version               string  `json:"version"`
+				VectorString          string  `json:"vectorString"`
+				AttackVector          string  `json:"attackVector"`
+				AttackComplexity      string  `json:"attackComplexity"`
+				PrivilegesRequired    string  `json:"privilegesRequired"`
+				UserInteraction       string  `json:"userInteraction"`
+				Scope                 string  `json:"scope"`
+				ConfidentialityImpact string  `json:"confidentialityImpact"`
+				IntegrityImpact       string  `json:"integrityImpact"`
+				AvailabilityImpact    string  `json:"availabilityImpact"`
+				BaseScore             float64 `json:"baseScore"`
+				BaseSeverity          string  `json:"baseSeverity"`
+				ExploitabilityScore   float64 `json:"exploitabilityScore"`
+				ImpactScore           float64 `json:"impactScore"`
 			} `json:"cvssData"`
 			ExploitabilityScore float64 `json:"exploitabilityScore"`
 			ImpactScore         float64 `json:"impactScore"`
@@ -617,20 +617,20 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 			Source   string `json:"source"`
 			Type     string `json:"type"`
 			CvssData struct {
-				Version                    string  `json:"version"`
-				VectorString               string  `json:"vectorString"`
-				AttackVector               string  `json:"attackVector"`
-				AttackComplexity           string  `json:"attackComplexity"`
-				PrivilegesRequired         string  `json:"privilegesRequired"`
-				UserInteraction            string  `json:"userInteraction"`
-				Scope                      string  `json:"scope"`
-				ConfidentialityImpact      string  `json:"confidentialityImpact"`
-				IntegrityImpact            string  `json:"integrityImpact"`
-				AvailabilityImpact         string  `json:"availabilityImpact"`
-				BaseScore                  float64 `json:"baseScore"`
-				BaseSeverity               string  `json:"baseSeverity"`
-				ExploitabilityScore        float64 `json:"exploitabilityScore"`
-				ImpactScore                float64 `json:"impactScore"`
+				Version               string  `json:"version"`
+				VectorString          string  `json:"vectorString"`
+				AttackVector          string  `json:"attackVector"`
+				AttackComplexity      string  `json:"attackComplexity"`
+				PrivilegesRequired    string  `json:"privilegesRequired"`
+				UserInteraction       string  `json:"userInteraction"`
+				Scope                 string  `json:"scope"`
+				ConfidentialityImpact string  `json:"confidentialityImpact"`
+				IntegrityImpact       string  `json:"integrityImpact"`
+				AvailabilityImpact    string  `json:"availabilityImpact"`
+				BaseScore             float64 `json:"baseScore"`
+				BaseSeverity          string  `json:"baseSeverity"`
+				ExploitabilityScore   float64 `json:"exploitabilityScore"`
+				ImpactScore           float64 `json:"impactScore"`
 			} `json:"cvssData"`
 			ExploitabilityScore float64 `json:"exploitabilityScore"`
 			ImpactScore         float64 `json:"impactScore"`
@@ -649,14 +649,14 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 				AvailabilityImpact    string  `json:"availabilityImpact"`
 				BaseScore             float64 `json:"baseScore"`
 			} `json:"cvssData"`
-			BaseSeverity        string  `json:"baseSeverity"`
-			ExploitabilityScore float64 `json:"exploitabilityScore"`
-			ImpactScore         float64 `json:"impactScore"`
-			AcInsufInfo         bool    `json:"acInsufInfo"`
-			ObtainAllPrivilege  bool    `json:"obtainAllPrivilege"`
-			ObtainUserPrivilege bool    `json:"obtainUserPrivilege"`
-			ObtainOtherPrivilege bool   `json:"obtainOtherPrivilege"`
-			UserInteractionRequired bool `json:"userInteractionRequired"`
+			BaseSeverity            string  `json:"baseSeverity"`
+			ExploitabilityScore     float64 `json:"exploitabilityScore"`
+			ImpactScore             float64 `json:"impactScore"`
+			AcInsufInfo             bool    `json:"acInsufInfo"`
+			ObtainAllPrivilege      bool    `json:"obtainAllPrivilege"`
+			ObtainUserPrivilege     bool    `json:"obtainUserPrivilege"`
+			ObtainOtherPrivilege    bool    `json:"obtainOtherPrivilege"`
+			UserInteractionRequired bool    `json:"userInteractionRequired"`
 		} `json:"cvssMetricV2"`
 	} `json:"metrics"`
 	Weaknesses []struct {
@@ -672,13 +672,13 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 			Operator string `json:"operator"`
 			Negate   bool   `json:"negate"`
 			CpeMatch []struct {
-				Vulnerable                bool   `json:"vulnerable"`
-				Criteria                  string `json:"criteria"`
-				VersionStartIncluding     string `json:"versionStartIncluding,omitempty"`
-				VersionStartExcluding     string `json:"versionStartExcluding,omitempty"`
-				VersionEndIncluding       string `json:"versionEndIncluding,omitempty"`
-				VersionEndExcluding       string `json:"versionEndExcluding,omitempty"`
-				MatchCriteriaId           string `json:"matchCriteriaId"`
+				Vulnerable            bool   `json:"vulnerable"`
+				Criteria              string `json:"criteria"`
+				VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+				VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+				VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+				VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+				MatchCriteriaId       string `json:"matchCriteriaId"`
 			} `json:"cpeMatch"`
 		} `json:"nodes"`
 	} `json:"configurations"`
@@ -692,19 +692,19 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 	instructions := "Update affected components to latest secure versions"
 	autoApplicable := true
 	confidence := 0.7
-	
+
 	// Use evaluator solution if available
 	if cve.EvaluatorSolution != "" {
 		instructions = cve.EvaluatorSolution
 		confidence = 0.9
 	}
-	
+
 	// Use CISA required action if available
 	if cve.CISARequiredAction != "" {
 		instructions = cve.CISARequiredAction
 		confidence = 1.0
 	}
-	
+
 	// Determine if auto-applicable based on references and tags
 	for _, ref := range cve.References {
 		for _, tag := range ref.Tags {
@@ -715,7 +715,7 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 			}
 		}
 	}
-	
+
 	// Estimate effort based on CVSS score and complexity
 	effort := EstimatedEffort{
 		Level:       "medium",
@@ -724,14 +724,14 @@ func (n *NVDDatabase) generateRemediationGuidance(cve struct {
 		Risk:        "medium",
 		Resources:   []string{"development", "testing"},
 	}
-	
+
 	if len(cve.Metrics.CvssMetricV31) > 0 && cve.Metrics.CvssMetricV31[0].CvssData.BaseScore >= 7.0 {
 		effort.Level = "high"
 		effort.TimeMinutes = 120
 		effort.Complexity = 7
 		effort.Risk = "high"
 	}
-	
+
 	return RemediationGuidance{
 		Type:           remediationType,
 		Instructions:   instructions,

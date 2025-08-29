@@ -9,12 +9,12 @@ import (
 
 // SecurityEngine handles vulnerability remediation and security analysis
 type SecurityEngine struct {
-	grypePath      string
-	cveDatabase    CVEDatabase
-	remediator     VulnerabilityRemediator
-	riskAnalyzer   RiskAnalyzer
-	sbomAnalyzer   SBOMSecurityAnalyzer
-	httpClient     *http.Client
+	grypePath    string
+	cveDatabase  CVEDatabase
+	remediator   VulnerabilityRemediator
+	riskAnalyzer RiskAnalyzer
+	sbomAnalyzer SBOMSecurityAnalyzer
+	httpClient   *http.Client
 }
 
 // NewSecurityEngine creates a new security engine instance
@@ -70,7 +70,7 @@ func (s *SecurityEngine) ScanForVulnerabilities(ctx context.Context, target stri
 		},
 		GeneratedAt: time.Now(),
 	}
-	
+
 	return report, nil
 }
 
@@ -78,13 +78,13 @@ func (s *SecurityEngine) ScanForVulnerabilities(ctx context.Context, target stri
 func (s *SecurityEngine) GenerateRemediationPlan(ctx context.Context, vulns []VulnerabilityInfo, codebase Codebase) (*RemediationPlan, error) {
 	// Create prioritized vulnerabilities
 	priorities := s.prioritizeVulnerabilities(vulns)
-	
+
 	// Create remediation timeline
 	timeline := s.createRemediationTimeline(priorities)
-	
+
 	// Calculate estimated effort
 	effort := s.calculateEffort(vulns)
-	
+
 	plan := &RemediationPlan{
 		ID:              generateID(),
 		Vulnerabilities: vulns,
@@ -97,7 +97,7 @@ func (s *SecurityEngine) GenerateRemediationPlan(ctx context.Context, vulns []Vu
 			"language": codebase.Language,
 		},
 	}
-	
+
 	return plan, nil
 }
 
@@ -108,7 +108,7 @@ func (s *SecurityEngine) prioritizeVulnerabilities(vulns []VulnerabilityInfo) []
 	for i, vuln := range vulns {
 		priority := 1
 		urgency := "medium"
-		
+
 		if vuln.CVSS >= 9.0 {
 			priority = 1
 			urgency = "critical"
@@ -122,7 +122,7 @@ func (s *SecurityEngine) prioritizeVulnerabilities(vulns []VulnerabilityInfo) []
 			priority = 4
 			urgency = "low"
 		}
-		
+
 		priorities[i] = VulnerabilityPriority{
 			Vulnerability: vuln,
 			Priority:      priority,
@@ -131,7 +131,7 @@ func (s *SecurityEngine) prioritizeVulnerabilities(vulns []VulnerabilityInfo) []
 			EstimatedFix:  s.estimateFixTime(vuln),
 		}
 	}
-	
+
 	return priorities
 }
 
@@ -142,7 +142,7 @@ func (s *SecurityEngine) createRemediationTimeline(priorities []VulnerabilityPri
 		Medium:    []string{},
 		Long:      []string{},
 	}
-	
+
 	for _, priority := range priorities {
 		cveID := priority.Vulnerability.CVE.ID
 		switch priority.Urgency {
@@ -156,14 +156,14 @@ func (s *SecurityEngine) createRemediationTimeline(priorities []VulnerabilityPri
 			timeline.Long = append(timeline.Long, cveID)
 		}
 	}
-	
+
 	return timeline
 }
 
 func (s *SecurityEngine) calculateEffort(vulns []VulnerabilityInfo) EstimatedEffort {
 	totalTime := 0
 	complexity := 1
-	
+
 	for _, vuln := range vulns {
 		if vuln.HasFix {
 			totalTime += 30 // 30 minutes per fixable vulnerability
@@ -172,14 +172,14 @@ func (s *SecurityEngine) calculateEffort(vulns []VulnerabilityInfo) EstimatedEff
 			complexity = 5   // Higher complexity for manual fixes
 		}
 	}
-	
+
 	level := "low"
 	if totalTime > 240 { // > 4 hours
 		level = "high"
 	} else if totalTime > 120 { // > 2 hours
 		level = "medium"
 	}
-	
+
 	return EstimatedEffort{
 		Level:       level,
 		TimeMinutes: totalTime,

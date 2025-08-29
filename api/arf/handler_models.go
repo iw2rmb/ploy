@@ -46,7 +46,7 @@ func (h *Handler) GetModels(c *fiber.Ctx) error {
 	client, err := getConsulClient()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to connect to Consul",
+			"error":   "Failed to connect to Consul",
 			"details": err.Error(),
 		})
 	}
@@ -55,7 +55,7 @@ func (h *Handler) GetModels(c *fiber.Ctx) error {
 	pair, _, err := kv.Get(consulKVPath, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch models from Consul",
+			"error":   "Failed to fetch models from Consul",
 			"details": err.Error(),
 		})
 	}
@@ -64,7 +64,7 @@ func (h *Handler) GetModels(c *fiber.Ctx) error {
 	if pair != nil && pair.Value != nil {
 		if err := json.Unmarshal(pair.Value, &registry); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to parse model registry",
+				"error":   "Failed to parse model registry",
 				"details": err.Error(),
 			})
 		}
@@ -78,7 +78,7 @@ func (h *Handler) AddModel(c *fiber.Ctx) error {
 	var newModel ModelConfig
 	if err := c.BodyParser(&newModel); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
@@ -86,7 +86,7 @@ func (h *Handler) AddModel(c *fiber.Ctx) error {
 	// Validate required fields
 	if newModel.Name == "" || newModel.Provider == "" || newModel.Endpoint == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing required fields",
+			"error":   "Missing required fields",
 			"details": "name, provider, and endpoint are required",
 		})
 	}
@@ -104,18 +104,18 @@ func (h *Handler) AddModel(c *fiber.Ctx) error {
 	client, err := getConsulClient()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to connect to Consul",
+			"error":   "Failed to connect to Consul",
 			"details": err.Error(),
 		})
 	}
 
 	kv := client.KV()
-	
+
 	// Get existing registry
 	pair, _, err := kv.Get(consulKVPath, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch existing models",
+			"error":   "Failed to fetch existing models",
 			"details": err.Error(),
 		})
 	}
@@ -124,7 +124,7 @@ func (h *Handler) AddModel(c *fiber.Ctx) error {
 	if pair != nil && pair.Value != nil {
 		if err := json.Unmarshal(pair.Value, &registry); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to parse existing registry",
+				"error":   "Failed to parse existing registry",
 				"details": err.Error(),
 			})
 		}
@@ -157,7 +157,7 @@ save:
 	data, err := json.Marshal(registry)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to marshal registry",
+			"error":   "Failed to marshal registry",
 			"details": err.Error(),
 		})
 	}
@@ -166,14 +166,14 @@ save:
 	_, err = kv.Put(p, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to save model registry",
+			"error":   "Failed to save model registry",
 			"details": err.Error(),
 		})
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": fmt.Sprintf("Model '%s' added successfully", newModel.Name),
-		"model": newModel,
+		"model":   newModel,
 	})
 }
 
@@ -189,18 +189,18 @@ func (h *Handler) RemoveModel(c *fiber.Ctx) error {
 	client, err := getConsulClient()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to connect to Consul",
+			"error":   "Failed to connect to Consul",
 			"details": err.Error(),
 		})
 	}
 
 	kv := client.KV()
-	
+
 	// Get existing registry
 	pair, _, err := kv.Get(consulKVPath, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch existing models",
+			"error":   "Failed to fetch existing models",
 			"details": err.Error(),
 		})
 	}
@@ -214,7 +214,7 @@ func (h *Handler) RemoveModel(c *fiber.Ctx) error {
 	registry := ModelRegistry{Models: []ModelConfig{}}
 	if err := json.Unmarshal(pair.Value, &registry); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to parse existing registry",
+			"error":   "Failed to parse existing registry",
 			"details": err.Error(),
 		})
 	}
@@ -242,7 +242,7 @@ func (h *Handler) RemoveModel(c *fiber.Ctx) error {
 	data, err := json.Marshal(registry)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to marshal registry",
+			"error":   "Failed to marshal registry",
 			"details": err.Error(),
 		})
 	}
@@ -251,7 +251,7 @@ func (h *Handler) RemoveModel(c *fiber.Ctx) error {
 	_, err = kv.Put(p, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to save model registry",
+			"error":   "Failed to save model registry",
 			"details": err.Error(),
 		})
 	}
@@ -273,18 +273,18 @@ func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {
 	client, err := getConsulClient()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to connect to Consul",
+			"error":   "Failed to connect to Consul",
 			"details": err.Error(),
 		})
 	}
 
 	kv := client.KV()
-	
+
 	// Get existing registry
 	pair, _, err := kv.Get(consulKVPath, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to fetch existing models",
+			"error":   "Failed to fetch existing models",
 			"details": err.Error(),
 		})
 	}
@@ -298,7 +298,7 @@ func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {
 	registry := ModelRegistry{Models: []ModelConfig{}}
 	if err := json.Unmarshal(pair.Value, &registry); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to parse existing registry",
+			"error":   "Failed to parse existing registry",
 			"details": err.Error(),
 		})
 	}
@@ -325,7 +325,7 @@ func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {
 	data, err := json.Marshal(registry)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to marshal registry",
+			"error":   "Failed to marshal registry",
 			"details": err.Error(),
 		})
 	}
@@ -334,7 +334,7 @@ func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {
 	_, err = kv.Put(p, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to save model registry",
+			"error":   "Failed to save model registry",
 			"details": err.Error(),
 		})
 	}
@@ -349,7 +349,7 @@ func (h *Handler) ImportModels(c *fiber.Ctx) error {
 	var registry ModelRegistry
 	if err := c.BodyParser(&registry); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
+			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
@@ -359,7 +359,7 @@ func (h *Handler) ImportModels(c *fiber.Ctx) error {
 	for i := range registry.Models {
 		if registry.Models[i].Name == "" || registry.Models[i].Provider == "" || registry.Models[i].Endpoint == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": fmt.Sprintf("Model at index %d missing required fields", i),
+				"error":   fmt.Sprintf("Model at index %d missing required fields", i),
 				"details": "name, provider, and endpoint are required",
 			})
 		}
@@ -376,7 +376,7 @@ func (h *Handler) ImportModels(c *fiber.Ctx) error {
 	client, err := getConsulClient()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to connect to Consul",
+			"error":   "Failed to connect to Consul",
 			"details": err.Error(),
 		})
 	}
@@ -385,7 +385,7 @@ func (h *Handler) ImportModels(c *fiber.Ctx) error {
 	data, err := json.Marshal(registry)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to marshal registry",
+			"error":   "Failed to marshal registry",
 			"details": err.Error(),
 		})
 	}
@@ -395,14 +395,14 @@ func (h *Handler) ImportModels(c *fiber.Ctx) error {
 	_, err = kv.Put(p, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to save model registry",
+			"error":   "Failed to save model registry",
 			"details": err.Error(),
 		})
 	}
 
 	return c.JSON(fiber.Map{
 		"message": fmt.Sprintf("Imported %d models successfully", len(registry.Models)),
-		"models": registry.Models,
+		"models":  registry.Models,
 	})
 }
 
@@ -477,7 +477,7 @@ func GetModelByName(ctx context.Context, name string) (*ModelConfig, error) {
 // RegisterModelRoutes registers all model management routes
 func RegisterModelRoutes(app *fiber.App, handler *Handler) {
 	models := app.Group("/v1/arf/models")
-	
+
 	models.Get("/", handler.GetModels)
 	models.Post("/", handler.AddModel)
 	models.Put("/", handler.ImportModels)

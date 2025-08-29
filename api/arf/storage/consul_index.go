@@ -501,7 +501,7 @@ func normalizeKey(s string) string {
 	s = strings.ReplaceAll(s, "/", "-")
 	s = strings.ReplaceAll(s, ".", "-")
 	s = strings.ReplaceAll(s, "_", "-")
-	
+
 	// Remove any non-alphanumeric characters except hyphens
 	result := strings.Builder{}
 	for _, r := range s {
@@ -509,6 +509,6 @@ func normalizeKey(s string) string {
 			result.WriteRune(r)
 		}
 	}
-	
+
 	return result.String()
 }

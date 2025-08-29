@@ -18,42 +18,42 @@ type HybridPipeline interface {
 
 // HybridRequest contains all information needed for hybrid transformation
 type HybridRequest struct {
-	Repository      Repository              `json:"repository"`
-	PrimaryRecipe   *models.Recipe          `json:"primary_recipe"`
-	Context         TransformationContext   `json:"context"`
-	EnhancementMode EnhancementMode         `json:"enhancement_mode"`
-	Confidence      ConfidenceThresholds    `json:"confidence"`
+	Repository      Repository            `json:"repository"`
+	PrimaryRecipe   *models.Recipe        `json:"primary_recipe"`
+	Context         TransformationContext `json:"context"`
+	EnhancementMode EnhancementMode       `json:"enhancement_mode"`
+	Confidence      ConfidenceThresholds  `json:"confidence"`
 }
 
 // HybridResult contains the results of hybrid transformation
 type HybridResult struct {
 	TransformationResult
-	PrimaryResult   *TransformationResult `json:"primary_result"`
-	EnhancedResult  *EnhancedResult       `json:"enhanced_result"`
+	PrimaryResult   *TransformationResult  `json:"primary_result"`
+	EnhancedResult  *EnhancedResult        `json:"enhanced_result"`
 	Strategy        TransformationStrategy `json:"strategy"`
-	TotalTime       time.Duration         `json:"total_time"`
-	ConfidenceScore float64               `json:"confidence_score"`
+	TotalTime       time.Duration          `json:"total_time"`
+	ConfidenceScore float64                `json:"confidence_score"`
 }
 
 // TransformationStrategy defines the approach for transformation
 type TransformationStrategy struct {
-	Primary     StrategyType    `json:"primary"`
-	Enhancement StrategyType    `json:"enhancement"`
-	Confidence  float64         `json:"confidence"`
-	Reasoning   string          `json:"reasoning"`
-	Fallbacks   []StrategyType  `json:"fallbacks"`
+	Primary     StrategyType   `json:"primary"`
+	Enhancement StrategyType   `json:"enhancement"`
+	Confidence  float64        `json:"confidence"`
+	Reasoning   string         `json:"reasoning"`
+	Fallbacks   []StrategyType `json:"fallbacks"`
 }
 
 // StrategyType defines different transformation strategies
 type StrategyType string
 
 const (
-	StrategyOpenRewriteOnly StrategyType = "openrewrite_only"
-	StrategyLLMOnly         StrategyType = "llm_only"
+	StrategyOpenRewriteOnly  StrategyType = "openrewrite_only"
+	StrategyLLMOnly          StrategyType = "llm_only"
 	StrategyHybridSequential StrategyType = "hybrid_sequential"
-	StrategyHybridParallel  StrategyType = "hybrid_parallel"
-	StrategyTreeSitter      StrategyType = "tree_sitter"
-	StrategyManualReview    StrategyType = "manual_review"
+	StrategyHybridParallel   StrategyType = "hybrid_parallel"
+	StrategyTreeSitter       StrategyType = "tree_sitter"
+	StrategyManualReview     StrategyType = "manual_review"
 )
 
 // EnhancementMode defines how LLM enhancement is applied
@@ -76,11 +76,11 @@ type ConfidenceThresholds struct {
 
 // TransformationContext provides context for transformation decisions
 type TransformationContext struct {
-	ErrorHistory        []ErrorContext        `json:"error_history"`
+	ErrorHistory        []ErrorContext         `json:"error_history"`
 	PreviousAttempts    []TransformationResult `json:"previous_attempts"`
-	TimeConstraints     TimeConstraints       `json:"time_constraints"`
-	ResourceConstraints ResourceConstraints   `json:"resource_constraints"`
-	QualityRequirements QualityRequirements   `json:"quality_requirements"`
+	TimeConstraints     TimeConstraints        `json:"time_constraints"`
+	ResourceConstraints ResourceConstraints    `json:"resource_constraints"`
+	QualityRequirements QualityRequirements    `json:"quality_requirements"`
 }
 
 // TimeConstraints define time limits for transformations
@@ -91,10 +91,10 @@ type TimeConstraints struct {
 
 // ResourceConstraints define resource limits
 type ResourceConstraints struct {
-	MaxMemory     int64 `json:"max_memory"`
-	MaxCPU        int   `json:"max_cpu"`
-	MaxTokens     int   `json:"max_tokens"`
-	CostBudget    float64 `json:"cost_budget"`
+	MaxMemory  int64   `json:"max_memory"`
+	MaxCPU     int     `json:"max_cpu"`
+	MaxTokens  int     `json:"max_tokens"`
+	CostBudget float64 `json:"cost_budget"`
 }
 
 // QualityRequirements define quality expectations
@@ -107,29 +107,29 @@ type QualityRequirements struct {
 
 // EnhancedResult contains LLM-enhanced transformation results
 type EnhancedResult struct {
-	OriginalResult      TransformationResult  `json:"original_result"`
-	EnhancedChanges     []CodeChange          `json:"enhanced_changes"`
-	LLMSuggestions      []LLMSuggestion       `json:"llm_suggestions"`
-	ConfidenceImprovement float64             `json:"confidence_improvement"`
-	EnhancementTime     time.Duration         `json:"enhancement_time"`
-	EnhancementMetadata map[string]interface{} `json:"enhancement_metadata"`
+	OriginalResult        TransformationResult   `json:"original_result"`
+	EnhancedChanges       []CodeChange           `json:"enhanced_changes"`
+	LLMSuggestions        []LLMSuggestion        `json:"llm_suggestions"`
+	ConfidenceImprovement float64                `json:"confidence_improvement"`
+	EnhancementTime       time.Duration          `json:"enhancement_time"`
+	EnhancementMetadata   map[string]interface{} `json:"enhancement_metadata"`
 }
 
 // LLMSuggestion represents an LLM-provided improvement suggestion
 type LLMSuggestion struct {
-	Type        string  `json:"type"`
-	Confidence  float64 `json:"confidence"`
-	Description string  `json:"description"`
+	Type        string     `json:"type"`
+	Confidence  float64    `json:"confidence"`
+	Description string     `json:"description"`
 	CodeChange  CodeChange `json:"code_change"`
-	Reasoning   string  `json:"reasoning"`
+	Reasoning   string     `json:"reasoning"`
 }
 
 // ComplexityAnalysis contains analysis of transformation complexity
 type ComplexityAnalysis struct {
-	OverallComplexity    float64                    `json:"overall_complexity"`
-	FactorBreakdown     map[string]float64         `json:"factor_breakdown"`
-	PredictedChallenges []PredictedChallenge       `json:"predicted_challenges"`
-	RecommendedApproach RecommendedApproach        `json:"recommended_approach"`
+	OverallComplexity   float64              `json:"overall_complexity"`
+	FactorBreakdown     map[string]float64   `json:"factor_breakdown"`
+	PredictedChallenges []PredictedChallenge `json:"predicted_challenges"`
+	RecommendedApproach RecommendedApproach  `json:"recommended_approach"`
 }
 
 // PredictedChallenge represents a potential difficulty in transformation
@@ -142,21 +142,21 @@ type PredictedChallenge struct {
 
 // RecommendedApproach suggests the best transformation strategy
 type RecommendedApproach struct {
-	Strategy    StrategyType `json:"strategy"`
-	Confidence  float64      `json:"confidence"`
-	Reasoning   string       `json:"reasoning"`
+	Strategy     StrategyType   `json:"strategy"`
+	Confidence   float64        `json:"confidence"`
+	Reasoning    string         `json:"reasoning"`
 	Alternatives []StrategyType `json:"alternatives"`
 }
 
 // DefaultHybridPipeline implements the hybrid transformation pipeline
 type DefaultHybridPipeline struct {
-	recipeExecutor      *RecipeExecutor
-	llmGenerator        LLMRecipeGenerator
-	multiLangEngine     MultiLanguageEngine
-	strategySelector    StrategySelector
-	complexityAnalyzer  ComplexityAnalyzer
+	recipeExecutor       *RecipeExecutor
+	llmGenerator         LLMRecipeGenerator
+	multiLangEngine      MultiLanguageEngine
+	strategySelector     StrategySelector
+	complexityAnalyzer   ComplexityAnalyzer
 	confidenceThresholds ConfidenceThresholds
-	mu                  sync.RWMutex
+	mu                   sync.RWMutex
 }
 
 // NewDefaultHybridPipeline creates a new hybrid pipeline
@@ -166,10 +166,10 @@ func NewDefaultHybridPipeline(
 	multiLangEngine MultiLanguageEngine,
 ) *DefaultHybridPipeline {
 	return &DefaultHybridPipeline{
-		recipeExecutor: recipeExecutor,
-		llmGenerator:     llmGenerator,
-		multiLangEngine:  multiLangEngine,
-		strategySelector: NewDefaultStrategySelector(),
+		recipeExecutor:     recipeExecutor,
+		llmGenerator:       llmGenerator,
+		multiLangEngine:    multiLangEngine,
+		strategySelector:   NewDefaultStrategySelector(),
 		complexityAnalyzer: NewDefaultComplexityAnalyzer(),
 		confidenceThresholds: ConfidenceThresholds{
 			MinOpenRewrite: 0.6,
@@ -221,7 +221,7 @@ func (p *DefaultHybridPipeline) ExecuteHybridTransformation(ctx context.Context,
 				break
 			}
 		}
-		
+
 		if result == nil {
 			return nil, fmt.Errorf("all strategies failed: %w", err)
 		}
@@ -229,7 +229,7 @@ func (p *DefaultHybridPipeline) ExecuteHybridTransformation(ctx context.Context,
 
 	result.Strategy = *strategy
 	result.TotalTime = time.Since(startTime)
-	
+
 	// Calculate overall confidence score
 	result.ConfidenceScore = p.calculateOverallConfidence(result)
 
@@ -243,7 +243,7 @@ func (p *DefaultHybridPipeline) SelectOptimalStrategy(ctx context.Context, analy
 		TransformationType: TransformationType(analysis.RecommendedApproach.Strategy),
 		ResourceConstraints: ResourceConstraints{
 			MaxMemory: 4 * 1024 * 1024 * 1024, // 4GB default
-			MaxCPU:    4,                       // 4 cores default
+			MaxCPU:    4,                      // 4 cores default
 		},
 		TimeConstraints: TimeConstraints{
 			MaxDuration: 30 * time.Minute,
@@ -286,10 +286,10 @@ func (p *DefaultHybridPipeline) EnhanceWithLLM(ctx context.Context, baseResult T
 		ConfidenceImprovement: confidenceImprovement,
 		EnhancementTime:       time.Since(startTime),
 		EnhancementMetadata: map[string]interface{}{
-			"llm_model":           generatedRecipe.LLMMetadata["model"],
-			"prompt_tokens":       generatedRecipe.LLMMetadata["prompt_tokens"],
-			"response_tokens":     generatedRecipe.LLMMetadata["response_tokens"],
-			"enhancement_reason":  generatedRecipe.Explanation,
+			"llm_model":          generatedRecipe.LLMMetadata["model"],
+			"prompt_tokens":      generatedRecipe.LLMMetadata["prompt_tokens"],
+			"response_tokens":    generatedRecipe.LLMMetadata["response_tokens"],
+			"enhancement_reason": generatedRecipe.Explanation,
 		},
 	}
 
@@ -304,7 +304,7 @@ func (p *DefaultHybridPipeline) executeOpenRewriteOnly(ctx context.Context, requ
 	// For now, use the repository URL as the path (in real implementation this would be a local checkout)
 	// For now, use the repository URL as path - in real implementation this would be a cloned local path
 	result, err := p.recipeExecutor.ExecuteRecipeObject(ctx, request.PrimaryRecipe, request.Repository.URL)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("OpenRewrite execution failed: %w", err)
 	}
@@ -319,7 +319,7 @@ func (p *DefaultHybridPipeline) executeOpenRewriteOnly(ctx context.Context, requ
 func (p *DefaultHybridPipeline) executeLLMOnly(ctx context.Context, request HybridRequest, strategy TransformationStrategy) (*HybridResult, error) {
 	// Generate recipe using LLM and execute
 	llmRequest := p.buildLLMRequestFromHybridRequest(request)
-	
+
 	generatedRecipe, err := p.llmGenerator.GenerateRecipe(ctx, llmRequest)
 	if err != nil {
 		return nil, fmt.Errorf("LLM recipe generation failed: %w", err)
@@ -337,12 +337,12 @@ func (p *DefaultHybridPipeline) executeLLMOnly(ctx context.Context, request Hybr
 
 	// Execute generated recipe (simulate for now)
 	result := &TransformationResult{
-		Success:           true,
-		ExecutionTime:     time.Second * 30, // Simulated
-		ChangesApplied:    1,
-		FilesModified:     []string{"example.java"},
-		ValidationScore:   generatedRecipe.Confidence,
-		RecipeID:          generatedRecipe.ID,
+		Success:         true,
+		ExecutionTime:   time.Second * 30, // Simulated
+		ChangesApplied:  1,
+		FilesModified:   []string{"example.java"},
+		ValidationScore: generatedRecipe.Confidence,
+		RecipeID:        generatedRecipe.ID,
 		Metadata: map[string]interface{}{
 			"llm_generated": true,
 			"confidence":    generatedRecipe.Confidence,
@@ -389,7 +389,7 @@ func (p *DefaultHybridPipeline) executeHybridParallel(ctx context.Context, reque
 	}
 
 	results := make(chan parallelResult, 2)
-	
+
 	// OpenRewrite execution
 	go func() {
 		result, err := p.executeOpenRewriteOnly(ctx, request, strategy)
@@ -412,7 +412,7 @@ func (p *DefaultHybridPipeline) executeHybridParallel(ctx context.Context, reque
 			errs = append(errs, result.err)
 			continue
 		}
-		
+
 		if result.openRewriteResult != nil {
 			openRewriteResult = result.openRewriteResult
 		}
@@ -545,9 +545,9 @@ func (p *DefaultHybridPipeline) buildLLMRequestFromHybridRequest(request HybridR
 	return RecipeGenerationRequest{
 		Language: request.Repository.Language,
 		CodebaseContext: CodebaseContext{
-			Language:    request.Repository.Language,
-			Framework:   request.Repository.Metadata["framework"],
-			BuildTool:   request.Repository.BuildTool,
+			Language:  request.Repository.Language,
+			Framework: request.Repository.Metadata["framework"],
+			BuildTool: request.Repository.BuildTool,
 		},
 		Constraints: []string{"hybrid_request"},
 	}
@@ -555,10 +555,10 @@ func (p *DefaultHybridPipeline) buildLLMRequestFromHybridRequest(request HybridR
 
 func (p *DefaultHybridPipeline) combineResults(primary TransformationResult, enhanced EnhancedResult) *TransformationResult {
 	combined := primary
-	
+
 	// Merge changes
 	combined.ChangesApplied += len(enhanced.EnhancedChanges)
-	
+
 	// Improve confidence
 	if enhanced.ConfidenceImprovement > 0 {
 		combined.ValidationScore += enhanced.ConfidenceImprovement
@@ -611,7 +611,7 @@ func (p *DefaultHybridPipeline) getFileExtension(language string) string {
 		"go":         "go",
 		"rust":       "rs",
 	}
-	
+
 	if ext, exists := extensions[language]; exists {
 		return ext
 	}

@@ -48,14 +48,14 @@ type ExecutionCondition struct {
 type ConditionType string
 
 const (
-	ConditionFileExists      ConditionType = "file_exists"
-	ConditionFileNotExists   ConditionType = "file_not_exists"
-	ConditionLanguage        ConditionType = "language"
-	ConditionMinJavaVersion  ConditionType = "min_java_version"
-	ConditionMaxJavaVersion  ConditionType = "max_java_version"
-	ConditionFramework       ConditionType = "framework"
-	ConditionEnvVar          ConditionType = "env_var"
-	ConditionCustom          ConditionType = "custom"
+	ConditionFileExists     ConditionType = "file_exists"
+	ConditionFileNotExists  ConditionType = "file_not_exists"
+	ConditionLanguage       ConditionType = "language"
+	ConditionMinJavaVersion ConditionType = "min_java_version"
+	ConditionMaxJavaVersion ConditionType = "max_java_version"
+	ConditionFramework      ConditionType = "framework"
+	ConditionEnvVar         ConditionType = "env_var"
+	ConditionCustom         ConditionType = "custom"
 )
 
 // Duration wraps time.Duration to provide custom YAML marshaling
@@ -74,12 +74,12 @@ func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
-	
+
 	duration, err := time.ParseDuration(s)
 	if err != nil {
 		return err
 	}
-	
+
 	d.Duration = duration
 	return nil
 }
@@ -95,12 +95,12 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
-	
+
 	duration, err := time.ParseDuration(s)
 	if err != nil {
 		return err
 	}
-	
+
 	d.Duration = duration
 	return nil
 }
@@ -181,7 +181,7 @@ func (s *RecipeStep) validateFileOperationConfig() error {
 	if !ok || operation == "" {
 		return fmt.Errorf("file_op step requires 'operation' in config")
 	}
-	
+
 	validOps := []string{"create", "delete", "copy", "move", "chmod"}
 	valid := false
 	for _, op := range validOps {
@@ -193,7 +193,7 @@ func (s *RecipeStep) validateFileOperationConfig() error {
 	if !valid {
 		return fmt.Errorf("invalid file operation: %s", operation)
 	}
-	
+
 	return nil
 }
 
@@ -202,12 +202,12 @@ func (s *RecipeStep) validateRegexConfig() error {
 	if !ok || pattern == "" {
 		return fmt.Errorf("regex step requires 'pattern' in config")
 	}
-	
+
 	_, ok = s.Config["replacement"].(string)
 	if !ok {
 		return fmt.Errorf("regex step requires 'replacement' in config")
 	}
-	
+
 	return nil
 }
 
@@ -216,12 +216,12 @@ func (s *RecipeStep) validateASTConfig() error {
 	if !ok || language == "" {
 		return fmt.Errorf("ast_transform step requires 'language' in config")
 	}
-	
+
 	transform, ok := s.Config["transform"].(string)
 	if !ok || transform == "" {
 		return fmt.Errorf("ast_transform step requires 'transform' in config")
 	}
-	
+
 	return nil
 }
 
@@ -243,7 +243,7 @@ func (t RecipeStepType) IsValid() bool {
 		StepTypeASTTransform,
 		StepTypeComposite,
 	}
-	
+
 	for _, valid := range validTypes {
 		if t == valid {
 			return true
@@ -259,7 +259,7 @@ func (a ErrorHandlingAction) IsValid() bool {
 		ErrorActionRollback,
 		ErrorActionFail,
 	}
-	
+
 	for _, valid := range validActions {
 		if a == valid {
 			return true
@@ -313,7 +313,7 @@ func (t ConditionType) IsValid() bool {
 		ConditionEnvVar,
 		ConditionCustom,
 	}
-	
+
 	for _, valid := range validTypes {
 		if t == valid {
 			return true

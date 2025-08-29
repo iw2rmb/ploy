@@ -92,13 +92,13 @@ type RecipeIndexStore interface {
 
 // IndexStats represents index statistics
 type IndexStats struct {
-	TotalRecipes   int
-	TotalTags      int
+	TotalRecipes    int
+	TotalTags       int
 	TotalCategories int
-	TotalLanguages int
-	TotalAuthors   int
-	LastUpdated    time.Time
-	IndexSize      int64
+	TotalLanguages  int
+	TotalAuthors    int
+	LastUpdated     time.Time
+	IndexSize       int64
 }
 
 // RecipeValidator ensures recipe safety and correctness
@@ -107,11 +107,11 @@ type RecipeValidator interface {
 	ValidateRecipe(recipe *models.Recipe) error
 	ValidateRecipeYAML(yamlContent []byte) (*models.Recipe, error)
 	ValidateRecipeJSON(jsonContent []byte) (*models.Recipe, error)
-	
+
 	// Security validation
 	ValidateSecurityRules(recipe *models.Recipe) error
 	ValidateStepSecurity(step *models.RecipeStep) error
-	
+
 	// Schema validation
 	ValidateSchema(recipe *models.Recipe) error
 	GetSchemaVersion() string
@@ -132,15 +132,15 @@ type SecurityRuleSet struct {
 // RecipeStorageConfig holds configuration for recipe storage
 type RecipeStorageConfig struct {
 	// Storage backend configuration
-	StorageType    string // "seaweedfs", "s3", "local"
-	StorageURL     string
-	StorageBucket  string
-	StoragePrefix  string
+	StorageType   string // "seaweedfs", "s3", "local"
+	StorageURL    string
+	StorageBucket string
+	StoragePrefix string
 
-	// Index backend configuration  
-	IndexType      string // "consul", "etcd", "memory"
-	IndexURL       string
-	IndexPrefix    string
+	// Index backend configuration
+	IndexType   string // "consul", "etcd", "memory"
+	IndexURL    string
+	IndexPrefix string
 
 	// Validation configuration
 	EnableValidation     bool
@@ -148,13 +148,13 @@ type RecipeStorageConfig struct {
 	SecurityRules        *SecurityRuleSet
 
 	// Cache configuration
-	EnableCache      bool
-	CacheTTL         time.Duration
-	MaxCacheSize     int64
+	EnableCache  bool
+	CacheTTL     time.Duration
+	MaxCacheSize int64
 
 	// Performance configuration
-	MaxConcurrent    int
-	RequestTimeout   time.Duration
-	RetryAttempts    int
-	RetryBackoff     time.Duration
+	MaxConcurrent  int
+	RequestTimeout time.Duration
+	RetryAttempts  int
+	RetryBackoff   time.Duration
 }

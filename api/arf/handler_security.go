@@ -48,12 +48,12 @@ func (h *Handler) SecurityScan(c *fiber.Ctx) error {
 
 	// Generate a scan ID for tracking
 	scanID := fmt.Sprintf("sec-%d", time.Now().Unix())
-	
+
 	// Mock implementation as fallback with proper structure for tests
 	report := fiber.Map{
-		"id":     scanID,
-		"status": "completed",
-		"target": req.Target,
+		"id":        scanID,
+		"status":    "completed",
+		"target":    req.Target,
 		"scan_type": req.ScanType,
 		"summary": fiber.Map{
 			"total_vulnerabilities": 1,
@@ -74,10 +74,10 @@ func (h *Handler) SecurityScan(c *fiber.Ctx) error {
 					"version":   "1.0.0",
 					"ecosystem": "npm",
 				},
-				"severity":     "HIGH",
-				"cvss_score":   7.5,
-				"fix_version":  "1.0.1",
-				"has_fix":      true,
+				"severity":    "HIGH",
+				"cvss_score":  7.5,
+				"fix_version": "1.0.1",
+				"has_fix":     true,
 			},
 		},
 		"risk_assessment": fiber.Map{
@@ -111,37 +111,37 @@ func (h *Handler) GenerateRemediationPlan(c *fiber.Ctx) error {
 
 	// Mock remediation plan
 	planID := fmt.Sprintf("plan-%d", time.Now().Unix())
-	
+
 	plan := fiber.Map{
 		"id":         planID,
 		"created_at": time.Now(),
 		"steps": []fiber.Map{
 			{
-				"step_id":     "step-1",
-				"action":      "upgrade",
-				"target":      "example-package",
-				"from_version": "1.0.0",
-				"to_version":   "1.0.1",
-				"priority":     "high",
+				"step_id":        "step-1",
+				"action":         "upgrade",
+				"target":         "example-package",
+				"from_version":   "1.0.0",
+				"to_version":     "1.0.1",
+				"priority":       "high",
 				"estimated_time": "30m",
 			},
 			{
-				"step_id":     "step-2",
-				"action":      "test",
-				"target":      "regression-tests",
-				"description": "Run regression tests after upgrade",
-				"priority":     "medium",
+				"step_id":        "step-2",
+				"action":         "test",
+				"target":         "regression-tests",
+				"description":    "Run regression tests after upgrade",
+				"priority":       "medium",
 				"estimated_time": "45m",
 			},
 		},
 		"vulnerabilities": []fiber.Map{
 			{
-				"cve_id":       "CVE-2024-0001",
-				"package":      "example-package",
-				"version":      "1.0.0",
-				"severity":     "HIGH",
-				"cvss_score":   7.5,
-				"fix_version":  "1.0.1",
+				"cve_id":      "CVE-2024-0001",
+				"package":     "example-package",
+				"version":     "1.0.0",
+				"severity":    "HIGH",
+				"cvss_score":  7.5,
+				"fix_version": "1.0.1",
 			},
 		},
 		"timeline": fiber.Map{
@@ -151,11 +151,11 @@ func (h *Handler) GenerateRemediationPlan(c *fiber.Ctx) error {
 			"long_term":   []string{},
 		},
 		"estimated_effort": fiber.Map{
-			"level":         "low",
-			"time_minutes":  120,
-			"complexity":    3,
-			"risk_level":    "minimal",
-			"resources":     []string{"developer"},
+			"level":        "low",
+			"time_minutes": 120,
+			"complexity":   3,
+			"risk_level":   "minimal",
+			"resources":    []string{"developer"},
 		},
 	}
 
@@ -168,10 +168,10 @@ func (h *Handler) GetSecurityReport(c *fiber.Ctx) error {
 	if reportID == "" {
 		reportID = c.Query("report_id")
 	}
-	
+
 	// Mock security report
 	report := fiber.Map{
-		"report_id":   reportID,
+		"report_id":    reportID,
 		"generated_at": time.Now(),
 		"summary": fiber.Map{
 			"total_vulnerabilities": 25,
@@ -211,7 +211,7 @@ func (h *Handler) GetSecurityReport(c *fiber.Ctx) error {
 func (h *Handler) GetComplianceStatus(c *fiber.Ctx) error {
 	repoID := c.Query("repo_id")
 	framework := c.Query("framework", "all")
-	
+
 	// Mock compliance status with framework-specific scores
 	status := fiber.Map{
 		"repository_id": repoID,
@@ -220,22 +220,22 @@ func (h *Handler) GetComplianceStatus(c *fiber.Ctx) error {
 		"score":         0.75,
 		"frameworks": fiber.Map{
 			"OWASP": fiber.Map{
-				"score":       85.5,
-				"status":      "good",
-				"last_check":  time.Now().Add(-24 * time.Hour),
-				"violations":  2,
+				"score":      85.5,
+				"status":     "good",
+				"last_check": time.Now().Add(-24 * time.Hour),
+				"violations": 2,
 			},
 			"NIST": fiber.Map{
-				"score":       78.2,
-				"status":      "acceptable",
-				"last_check":  time.Now().Add(-24 * time.Hour),
-				"violations":  4,
+				"score":      78.2,
+				"status":     "acceptable",
+				"last_check": time.Now().Add(-24 * time.Hour),
+				"violations": 4,
 			},
 			"CIS": fiber.Map{
-				"score":       92.1,
-				"status":      "excellent",
-				"last_check":  time.Now().Add(-12 * time.Hour),
-				"violations":  1,
+				"score":      92.1,
+				"status":     "excellent",
+				"last_check": time.Now().Add(-12 * time.Hour),
+				"violations": 1,
 			},
 		},
 		"violations": []fiber.Map{
@@ -253,7 +253,7 @@ func (h *Handler) GetComplianceStatus(c *fiber.Ctx) error {
 			"Enable dependency vulnerability scanning",
 			"Implement security headers",
 		},
-		"last_audit": time.Now().Add(-7 * 24 * time.Hour),
+		"last_audit":    time.Now().Add(-7 * 24 * time.Hour),
 		"overall_score": 85.3,
 	}
 
@@ -281,7 +281,7 @@ func (h *Handler) GenerateSBOM(c *fiber.Ctx) error {
 	// Mock SBOM generation
 	sbomID := fmt.Sprintf("sbom-%d", time.Now().Unix())
 	sbomPath := fmt.Sprintf("/tmp/sbom/%s.json", sbomID)
-	
+
 	sbom := fiber.Map{
 		"id":           sbomID,
 		"format":       req.Format,
@@ -353,9 +353,9 @@ func (h *Handler) AnalyzeSBOM(c *fiber.Ctx) error {
 			},
 		},
 		"compliance": fiber.Map{
-			"license_compliance": "partial",
+			"license_compliance":  "partial",
 			"security_compliance": "good",
-			"policy_violations": 2,
+			"policy_violations":   2,
 		},
 	}
 
@@ -387,10 +387,10 @@ func (h *Handler) GetSBOMCompliance(c *fiber.Ctx) error {
 			"Update outdated dependencies",
 		},
 		"details": fiber.Map{
-			"total_components": 150,
+			"total_components":     150,
 			"compliant_components": 135,
-			"violation_count": 15,
-			"last_checked": time.Now(),
+			"violation_count":      15,
+			"last_checked":         time.Now(),
 		},
 	}
 
@@ -404,11 +404,11 @@ func (h *Handler) GetSBOMReport(c *fiber.Ctx) error {
 		sbomID = c.Query("sbom_id")
 	}
 	format := c.Query("format", "json")
-	
+
 	// Mock SBOM report
 	report := fiber.Map{
-		"sbom_id":     sbomID,
-		"format":      format,
+		"sbom_id":      sbomID,
+		"format":       format,
 		"generated_at": time.Now(),
 		"summary": fiber.Map{
 			"total_components":    150,
@@ -419,27 +419,27 @@ func (h *Handler) GetSBOMReport(c *fiber.Ctx) error {
 		},
 		"packages": []fiber.Map{
 			{
-				"name":        "express",
-				"version":     "4.18.2",
-				"ecosystem":   "npm",
-				"license":     "MIT",
-				"direct":      true,
+				"name":            "express",
+				"version":         "4.18.2",
+				"ecosystem":       "npm",
+				"license":         "MIT",
+				"direct":          true,
 				"vulnerabilities": 0,
 			},
 			{
-				"name":        "lodash",
-				"version":     "4.17.15",
-				"ecosystem":   "npm",
-				"license":     "MIT",
-				"direct":      false,
+				"name":            "lodash",
+				"version":         "4.17.15",
+				"ecosystem":       "npm",
+				"license":         "MIT",
+				"direct":          false,
 				"vulnerabilities": 1,
 			},
 			{
-				"name":        "react",
-				"version":     "17.0.2",
-				"ecosystem":   "npm",
-				"license":     "MIT",
-				"direct":      true,
+				"name":            "react",
+				"version":         "17.0.2",
+				"ecosystem":       "npm",
+				"license":         "MIT",
+				"direct":          true,
 				"vulnerabilities": 0,
 			},
 		},

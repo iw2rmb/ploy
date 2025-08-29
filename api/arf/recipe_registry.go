@@ -17,7 +17,7 @@ import (
 
 // UnifiedRecipeMetadata represents the unified format for all recipes
 type UnifiedRecipeMetadata struct {
-	Metadata RecipeInfo           `json:"metadata" yaml:"metadata"`
+	Metadata RecipeInfo          `json:"metadata" yaml:"metadata"`
 	Maven    *MavenInfo          `json:"maven,omitempty" yaml:"maven,omitempty"`
 	Steps    []models.RecipeStep `json:"steps,omitempty" yaml:"steps,omitempty"`
 	Cache    *CacheInfo          `json:"cache,omitempty" yaml:"cache,omitempty"`
@@ -45,10 +45,10 @@ type MavenInfo struct {
 
 // CacheInfo contains cache-related metadata
 type CacheInfo struct {
-	StoredAt   time.Time `json:"stored_at" yaml:"stored_at"`
-	JarPath    string    `json:"jar_path,omitempty" yaml:"jar_path,omitempty"`
-	SizeBytes  int64     `json:"size_bytes" yaml:"size_bytes"`
-	Hash       string    `json:"hash" yaml:"hash"`
+	StoredAt  time.Time `json:"stored_at" yaml:"stored_at"`
+	JarPath   string    `json:"jar_path,omitempty" yaml:"jar_path,omitempty"`
+	SizeBytes int64     `json:"size_bytes" yaml:"size_bytes"`
+	Hash      string    `json:"hash" yaml:"hash"`
 }
 
 // RecipeRegistry manages unified recipe storage for both Maven and custom recipes
@@ -76,7 +76,7 @@ func (r *RecipeRegistry) RegisterMavenRecipe(ctx context.Context, coords, jarPat
 
 	// Generate recipe ID from class name
 	recipeID := generateRecipeID(recipeClass)
-	
+
 	// Create unified metadata
 	metadata := &UnifiedRecipeMetadata{
 		Metadata: RecipeInfo{
@@ -149,14 +149,14 @@ func (r *RecipeRegistry) RegisterCustomRecipe(ctx context.Context, recipe *model
 func (r *RecipeRegistry) GetRecipe(ctx context.Context, id string) (*UnifiedRecipeMetadata, error) {
 	// Construct registry path
 	key := fmt.Sprintf("registry/%s.yaml", id)
-	
+
 	// Get from storage
 	dataReader, err := r.storage.GetObject(r.bucket, key)
 	if err != nil {
 		return nil, fmt.Errorf("recipe not found: %s", id)
 	}
 	defer dataReader.Close()
-	
+
 	// Read data
 	data, err := io.ReadAll(dataReader)
 	if err != nil {
@@ -192,7 +192,7 @@ func (r *RecipeRegistry) ListAllRecipes(ctx context.Context) ([]*UnifiedRecipeMe
 		if err != nil {
 			continue // Skip failed reads
 		}
-		
+
 		// Read data
 		data, err := io.ReadAll(dataReader)
 		dataReader.Close()
@@ -238,7 +238,7 @@ func (r *RecipeRegistry) ExtractRecipeFromJAR(ctx context.Context, jarPath strin
 		return nil, fmt.Errorf("failed to read JAR: %w", err)
 	}
 	defer jarReader.Close()
-	
+
 	// Read JAR data
 	jarData, err := io.ReadAll(jarReader)
 	if err != nil {
@@ -381,7 +381,7 @@ func generateRecipeName(recipeClass string) string {
 func generateTags(recipeClass string) []string {
 	tags := []string{}
 	lower := strings.ToLower(recipeClass)
-	
+
 	if strings.Contains(lower, "java") {
 		tags = append(tags, "java")
 	}
@@ -406,18 +406,18 @@ func generateTags(recipeClass string) []string {
 	if strings.Contains(lower, "junit") {
 		tags = append(tags, "testing", "junit")
 	}
-	
+
 	if len(tags) == 0 {
 		tags = append(tags, "openrewrite")
 	}
-	
+
 	return tags
 }
 
 func generateCategories(recipeClass string) []string {
 	categories := []string{}
 	lower := strings.ToLower(recipeClass)
-	
+
 	if strings.Contains(lower, "java") && (strings.Contains(lower, "migrate") || strings.Contains(lower, "upgrade")) {
 		categories = append(categories, "java-migration")
 	}
@@ -433,11 +433,11 @@ func generateCategories(recipeClass string) []string {
 	if strings.Contains(lower, "log") {
 		categories = append(categories, "logging")
 	}
-	
+
 	if len(categories) == 0 {
 		categories = append(categories, "transformation")
 	}
-	
+
 	return categories
 }
 

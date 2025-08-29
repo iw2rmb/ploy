@@ -22,24 +22,24 @@ type MultiLanguageEngine interface {
 
 // UniversalAST represents a parsed Abstract Syntax Tree for any supported language
 type UniversalAST struct {
-	Language    string                 `json:"language"`
-	Parser      string                 `json:"parser"`
-	RootNode    *ASTNode               `json:"root_node"`
-	Symbols     []Symbol               `json:"symbols"`
-	Imports     []Import               `json:"imports"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Language string                 `json:"language"`
+	Parser   string                 `json:"parser"`
+	RootNode *ASTNode               `json:"root_node"`
+	Symbols  []Symbol               `json:"symbols"`
+	Imports  []Import               `json:"imports"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // ASTNode represents a node in the Abstract Syntax Tree
 type ASTNode struct {
-	Type         string                 `json:"type"`
-	Text         string                 `json:"text"`
-	StartByte    int                    `json:"start_byte"`
-	EndByte      int                    `json:"end_byte"`
-	StartPoint   Point                  `json:"start_point"`
-	EndPoint     Point                  `json:"end_point"`
-	Children     []*ASTNode             `json:"children"`
-	Metadata     map[string]interface{} `json:"metadata"`
+	Type       string                 `json:"type"`
+	Text       string                 `json:"text"`
+	StartByte  int                    `json:"start_byte"`
+	EndByte    int                    `json:"end_byte"`
+	StartPoint Point                  `json:"start_point"`
+	EndPoint   Point                  `json:"end_point"`
+	Children   []*ASTNode             `json:"children"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 // Point represents a position in source code
@@ -59,42 +59,42 @@ type Symbol struct {
 
 // Import represents an import/include statement
 type Import struct {
-	Module     string `json:"module"`
-	Alias      string `json:"alias"`
+	Module     string   `json:"module"`
+	Alias      string   `json:"alias"`
 	Items      []string `json:"items"`
-	StartPoint Point  `json:"start_point"`
-	EndPoint   Point  `json:"end_point"`
+	StartPoint Point    `json:"start_point"`
+	EndPoint   Point    `json:"end_point"`
 }
 
 // LanguageCapabilities describes what transformations are available for a language
 type LanguageCapabilities struct {
-	Language        string              `json:"language"`
-	Parsers         []string            `json:"parsers"`
+	Language        string               `json:"language"`
+	Parsers         []string             `json:"parsers"`
 	Transformations []TransformationType `json:"transformations"`
-	Frameworks      []string            `json:"frameworks"`
-	LaneSupport     []string            `json:"lane_support"`
+	Frameworks      []string             `json:"frameworks"`
+	LaneSupport     []string             `json:"lane_support"`
 }
 
 // TransformationType defines types of transformations available
 type TransformationType string
 
 const (
-	TransformationTypeCleanup     TransformationType = "cleanup"
-	TransformationTypeModernize   TransformationType = "modernize" 
-	TransformationTypeMigration   TransformationType = "migration"
-	TransformationTypeSecurity    TransformationType = "security"
-	TransformationTypeRefactor    TransformationType = "refactor"
-	TransformationTypeOptimize    TransformationType = "optimize"
-	TransformationTypeWASM        TransformationType = "wasm"
+	TransformationTypeCleanup   TransformationType = "cleanup"
+	TransformationTypeModernize TransformationType = "modernize"
+	TransformationTypeMigration TransformationType = "migration"
+	TransformationTypeSecurity  TransformationType = "security"
+	TransformationTypeRefactor  TransformationType = "refactor"
+	TransformationTypeOptimize  TransformationType = "optimize"
+	TransformationTypeWASM      TransformationType = "wasm"
 )
 
 // Transformation represents a code transformation operation
 type Transformation struct {
-	ID          string                 `json:"id"`
-	Type        TransformationType     `json:"type"`
-	Language    string                 `json:"language"`
-	Changes     []CodeChange           `json:"changes"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	ID       string                 `json:"id"`
+	Type     TransformationType     `json:"type"`
+	Language string                 `json:"language"`
+	Changes  []CodeChange           `json:"changes"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // CodeChange represents a specific change to be made to code
@@ -112,25 +112,25 @@ type CodeChange struct {
 // NodeJSRecipe represents Node.js specific transformation recipes
 type NodeJSRecipe struct {
 	*models.Recipe
-	PackageUpdates  map[string]string      `json:"package_updates"`
-	ESLintRules     map[string]interface{} `json:"eslint_rules"`
-	TypeScript      bool                   `json:"typescript"`
+	PackageUpdates map[string]string      `json:"package_updates"`
+	ESLintRules    map[string]interface{} `json:"eslint_rules"`
+	TypeScript     bool                   `json:"typescript"`
 }
 
-// PythonRecipe represents Python specific transformation recipes  
+// PythonRecipe represents Python specific transformation recipes
 type PythonRecipe struct {
 	*models.Recipe
-	PipUpdates      map[string]string      `json:"pip_updates"`
-	PyUpgrade       string                 `json:"pyupgrade_target"`
-	BlackConfig     map[string]interface{} `json:"black_config"`
+	PipUpdates  map[string]string      `json:"pip_updates"`
+	PyUpgrade   string                 `json:"pyupgrade_target"`
+	BlackConfig map[string]interface{} `json:"black_config"`
 }
 
 // GoRecipe represents Go specific transformation recipes
 type GoRecipe struct {
 	*models.Recipe
-	GoModUpdates    map[string]string `json:"go_mod_updates"`
-	GofmtOptions    []string          `json:"gofmt_options"`
-	StaticCheck     []string          `json:"staticcheck_rules"`
+	GoModUpdates map[string]string `json:"go_mod_updates"`
+	GofmtOptions []string          `json:"gofmt_options"`
+	StaticCheck  []string          `json:"staticcheck_rules"`
 }
 
 // WASMRecipe represents WebAssembly specific transformation recipes
@@ -289,7 +289,7 @@ func (e *TreeSitterMultiLanguageEngine) initializeCapabilities() error {
 				TransformationTypeSecurity,
 				TransformationTypeRefactor,
 			},
-			Frameworks: []string{"spring", "spring-boot", "junit", "maven", "gradle"},
+			Frameworks:  []string{"spring", "spring-boot", "junit", "maven", "gradle"},
 			LaneSupport: []string{"C"}, // Lane C (OSv)
 		},
 		"javascript": {
@@ -302,7 +302,7 @@ func (e *TreeSitterMultiLanguageEngine) initializeCapabilities() error {
 				TransformationTypeOptimize,
 				TransformationTypeWASM,
 			},
-			Frameworks: []string{"react", "vue", "angular", "node", "express"},
+			Frameworks:  []string{"react", "vue", "angular", "node", "express"},
 			LaneSupport: []string{"B", "E", "G"}, // Lane B (Unikraft), E (OCI), G (WASM)
 		},
 		"typescript": {
@@ -315,7 +315,7 @@ func (e *TreeSitterMultiLanguageEngine) initializeCapabilities() error {
 				TransformationTypeOptimize,
 				TransformationTypeWASM,
 			},
-			Frameworks: []string{"react", "vue", "angular", "node", "express", "nest"},
+			Frameworks:  []string{"react", "vue", "angular", "node", "express", "nest"},
 			LaneSupport: []string{"B", "E", "G"}, // Lane B (Unikraft), E (OCI), G (WASM)
 		},
 		"python": {
@@ -327,7 +327,7 @@ func (e *TreeSitterMultiLanguageEngine) initializeCapabilities() error {
 				TransformationTypeSecurity,
 				TransformationTypeRefactor,
 			},
-			Frameworks: []string{"django", "flask", "fastapi", "pytest", "pip"},
+			Frameworks:  []string{"django", "flask", "fastapi", "pytest", "pip"},
 			LaneSupport: []string{"C", "E"}, // Lane C (OSv), E (OCI)
 		},
 		"go": {
@@ -340,7 +340,7 @@ func (e *TreeSitterMultiLanguageEngine) initializeCapabilities() error {
 				TransformationTypeOptimize,
 				TransformationTypeWASM,
 			},
-			Frameworks: []string{"gin", "echo", "gorilla", "gorm", "go-mod"},
+			Frameworks:  []string{"gin", "echo", "gorilla", "gorm", "go-mod"},
 			LaneSupport: []string{"A", "E", "G"}, // Lane A (Unikraft), E (OCI), G (WASM)
 		},
 		"rust": {
@@ -353,7 +353,7 @@ func (e *TreeSitterMultiLanguageEngine) initializeCapabilities() error {
 				TransformationTypeOptimize,
 				TransformationTypeWASM,
 			},
-			Frameworks: []string{"tokio", "serde", "cargo", "wasm-bindgen"},
+			Frameworks:  []string{"tokio", "serde", "cargo", "wasm-bindgen"},
 			LaneSupport: []string{"A", "E", "G"}, // Lane A (Unikraft), E (OCI), G (WASM)
 		},
 	}
@@ -532,18 +532,18 @@ func (e *TreeSitterMultiLanguageEngine) extractImports(ast *UniversalAST, langua
 
 func (e *TreeSitterMultiLanguageEngine) extractJavaSymbols(node *ASTNode) []Symbol {
 	var symbols []Symbol
-	
+
 	// Look for class, method, and field declarations
 	if node.Type == "class_declaration" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "class",
+			Name:       e.extractNameFromNode(node),
+			Type:       "class",
 			Visibility: e.extractVisibilityFromNode(node),
 		})
 	} else if node.Type == "method_declaration" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "method",
+			Name:       e.extractNameFromNode(node),
+			Type:       "method",
 			Visibility: e.extractVisibilityFromNode(node),
 		})
 	}
@@ -562,14 +562,14 @@ func (e *TreeSitterMultiLanguageEngine) extractJavaScriptSymbols(node *ASTNode) 
 	// Look for function, class, and variable declarations
 	if node.Type == "function_declaration" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "function",
+			Name:       e.extractNameFromNode(node),
+			Type:       "function",
 			Visibility: "public", // JavaScript defaults
 		})
 	} else if node.Type == "class_declaration" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "class",
+			Name:       e.extractNameFromNode(node),
+			Type:       "class",
 			Visibility: "public",
 		})
 	}
@@ -588,14 +588,14 @@ func (e *TreeSitterMultiLanguageEngine) extractPythonSymbols(node *ASTNode) []Sy
 	// Look for function and class definitions
 	if node.Type == "function_definition" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "function",
+			Name:       e.extractNameFromNode(node),
+			Type:       "function",
 			Visibility: e.extractPythonVisibility(node),
 		})
 	} else if node.Type == "class_definition" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "class",
+			Name:       e.extractNameFromNode(node),
+			Type:       "class",
 			Visibility: "public", // Python default
 		})
 	}
@@ -614,14 +614,14 @@ func (e *TreeSitterMultiLanguageEngine) extractGoSymbols(node *ASTNode) []Symbol
 	// Look for function, type, and variable declarations
 	if node.Type == "function_declaration" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "function",
+			Name:       e.extractNameFromNode(node),
+			Type:       "function",
 			Visibility: e.extractGoVisibility(node),
 		})
 	} else if node.Type == "type_declaration" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "type",
+			Name:       e.extractNameFromNode(node),
+			Type:       "type",
 			Visibility: e.extractGoVisibility(node),
 		})
 	}
@@ -640,14 +640,14 @@ func (e *TreeSitterMultiLanguageEngine) extractRustSymbols(node *ASTNode) []Symb
 	// Look for function, struct, enum, and trait declarations
 	if node.Type == "function_item" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "function",
+			Name:       e.extractNameFromNode(node),
+			Type:       "function",
 			Visibility: e.extractRustVisibility(node),
 		})
 	} else if node.Type == "struct_item" {
 		symbols = append(symbols, Symbol{
-			Name: e.extractNameFromNode(node),
-			Type: "struct",
+			Name:       e.extractNameFromNode(node),
+			Type:       "struct",
 			Visibility: e.extractRustVisibility(node),
 		})
 	}
@@ -722,7 +722,7 @@ func (e *TreeSitterMultiLanguageEngine) extractGoImports(node *ASTNode) []Import
 		})
 	}
 
-	// Recursively process children  
+	// Recursively process children
 	for _, child := range node.Children {
 		imports = append(imports, e.extractGoImports(child)...)
 	}
@@ -922,13 +922,13 @@ func (m *MockMultiLanguageEngine) ParseAST(ctx context.Context, code string, lan
 		Language: language,
 		Parser:   "mock-parser",
 		RootNode: &ASTNode{
-			Type:  "program",
-			Text:  "mock-program",
+			Type: "program",
+			Text: "mock-program",
 		},
-		Symbols:  []Symbol{},
-		Imports:  []Import{},
+		Symbols: []Symbol{},
+		Imports: []Import{},
 		Metadata: map[string]interface{}{
-			"mock": true,
+			"mock":   true,
 			"length": len(code),
 		},
 	}, nil
@@ -964,7 +964,7 @@ func (m *MockMultiLanguageEngine) GetLanguageCapabilities(language string) (*Lan
 	if supported, _ := m.ValidateLanguageSupport(language); !supported {
 		return nil, fmt.Errorf("language %s not supported", language)
 	}
-	
+
 	return &LanguageCapabilities{
 		Language: language,
 		Parsers:  []string{"mock-parser"},
