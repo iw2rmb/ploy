@@ -26,8 +26,6 @@
 - import_playbook: playbooks/docker-registry.yml
 - import_playbook: playbooks/openrewrite-native.yml
 - import_playbook: playbooks/api.yml
-- import_playbook: playbooks/chttp.yml
-  when: deploy_chttp is defined and deploy_chttp | bool
 - import_playbook: playbooks/freebsd.yml
 - import_playbook: playbooks/testing.yml
 - import_playbook: playbooks/validation.yml
