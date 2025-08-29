@@ -23,8 +23,23 @@ func NewGitOperations(workDir string) *GitOperations {
 	}
 }
 
+// checkGitAvailable verifies that git is installed and accessible
+func (g *GitOperations) checkGitAvailable() error {
+	ctx := context.Background()
+	cmd := exec.CommandContext(ctx, "git", "--version")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git is not installed or not accessible: %w - Please ensure git is installed on the system", err)
+	}
+	return nil
+}
+
 // CloneRepository clones a Git repository to the specified path
 func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, targetPath string) error {
+	// Check if git is available
+	if err := g.checkGitAvailable(); err != nil {
+		return fmt.Errorf("git dependency check failed: %w", err)
+	}
+	
 	// Create parent directory if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return fmt.Errorf("failed to create parent directory: %w", err)

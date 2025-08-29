@@ -150,7 +150,41 @@ job "ploy-api" {
       template {
         data = <<EOF
 #!/bin/bash
+set -e
+
+# Install required system dependencies
+echo "[SETUP] Installing system dependencies..."
+export DEBIAN_FRONTEND=noninteractive
+
+# Update package list
+apt-get update -qq
+
+# Install git and essential tools for ARF transformations
+apt-get install -y -qq \
+  git \
+  curl \
+  wget \
+  openssh-client \
+  ca-certificates \
+  unzip
+
+# Install Java 17 for OpenRewrite operations
+if ! command -v java &> /dev/null; then
+  echo "[SETUP] Installing Java 17..."
+  apt-get install -y -qq openjdk-17-jdk
+fi
+
+# Verify installations
+echo "[SETUP] Verifying installations..."
+git --version
+java -version
+curl --version
+
+echo "[SETUP] System dependencies installed successfully"
+
+# Make binary executable and start API
 chmod +x local/api
+echo "[SETUP] Starting Ploy API..."
 exec local/api
 EOF
         destination = "local/start-api.sh"
