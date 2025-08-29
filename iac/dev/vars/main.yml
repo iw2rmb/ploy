@@ -47,7 +47,6 @@ ploy_environment: "dev"  # Enables development environment features including wi
 
 # Ploy specific configuration
 ploy:
-  api_port: 8081
   storage_backend: "seaweedfs"
   dns:
     provider: "namecheap"  # Use namecheap for dev environment

@@ -150,12 +150,7 @@ for script in "${test_scripts[@]}"; do
   fi
 done
 
-# Check benchmark config
-if [ -f "/Users/vk/@iw2rmb/ploy/api/arf/benchmark_configs/java11to17_migration.yaml" ]; then
-  validate_check "Java 11→17 migration config" "0"
-else
-  validate_check "Java 11→17 migration config" "1"
-fi
+# Note: benchmark_configs removed - configs now provided explicitly
 
 echo
 

@@ -39,10 +39,12 @@ type Phase3Config struct {
 }
 
 // DefaultPhase3Config returns default configuration for Phase 3
+// Note: External model configuration is required - no defaults provided
 func DefaultPhase3Config() *Phase3Config {
 	return &Phase3Config{
-		LLMProvider:    "openai",
-		LLMModel:       "gpt-4",
+		// LLM configuration must be provided via environment or API
+		LLMProvider:    "", // Must be set explicitly
+		LLMModel:       "", // Must be set explicitly
 		LLMTemperature: 0.1,
 		
 		PatternMinSamples: 10,
@@ -97,23 +99,27 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 	var components Phase3Components
 	var err error
 	
-	// Initialize LLM Generator
-	if config.LLMAPIKey != "" {
-		switch config.LLMProvider {
-		case "openai":
-			llmGen, err := NewOpenAILLMGenerator()
-			if err != nil {
-				fmt.Printf("Warning: Failed to initialize OpenAI LLM: %v\n", err)
-				components.LLMGenerator = NewMockLLMGenerator()
-			} else {
-				components.LLMGenerator = llmGen
-			}
-		default:
-			// Use mock if provider not supported
-			components.LLMGenerator = NewMockLLMGenerator()
+	// Initialize LLM Generator - external model required
+	if config.LLMAPIKey == "" || config.LLMProvider == "" {
+		return nil, fmt.Errorf("external LLM configuration required: provider and API key must be set")
+	}
+	
+	switch config.LLMProvider {
+	case "openai":
+		llmGen, err := NewOpenAILLMGenerator()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize OpenAI LLM: %w", err)
 		}
-	} else {
-		components.LLMGenerator = NewMockLLMGenerator()
+		components.LLMGenerator = llmGen
+	case "anthropic", "azure", "cohere":
+		// Use HTTP LLM generator for other external providers
+		llmGen, err := NewHTTPLLMGenerator("")
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize %s LLM: %w", config.LLMProvider, err)
+		}
+		components.LLMGenerator = llmGen
+	default:
+		return nil, fmt.Errorf("unsupported LLM provider: %s (only external models supported)", config.LLMProvider)
 	}
 	
 	// Initialize Learning System
@@ -191,12 +197,16 @@ func getDBFromLearningSystem(ls LearningSystem) *sql.DB {
 	return nil
 }
 
-// NewMockLLMGenerator creates a mock LLM generator for testing
-func NewMockLLMGenerator() LLMRecipeGenerator {
-	return &mockLLMGenerator{}
-}
+// Note: Mock LLM generator removed - only external models are supported
 
-type mockLLMGenerator struct{}
+// mockLLMGenerator is a mock implementation for testing
+type mockLLMGenerator struct {
+	generateRecipeFn   func(context.Context, RecipeGenerationRequest) (*GeneratedRecipe, error)
+	getCapabilitiesFn  func() LLMCapabilities
+	isAvailableFn      func(context.Context) bool
+	validateFn         func(context.Context, GeneratedRecipe) (*EvolutionValidationResult, error)
+	optimizeFn         func(context.Context, interface{}, TransformationFeedback) (interface{}, error)
+}
 
 func (m *mockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {
 	return &GeneratedRecipe{

@@ -115,6 +115,17 @@ run_job() {
         cp "$job_file" "$json_file"
     fi
     
+    # Extract job name from JSON for cleanup
+    local job_name=""
+    if [ -f "$json_file" ]; then
+        job_name=$(jq -r '.Job.ID // .ID // empty' "$json_file" 2>/dev/null)
+    fi
+    
+    # Clean up stale services before deployment
+    if [ -n "$job_name" ]; then
+        cleanup_stale_services "$job_name"
+    fi
+    
     # Submit job
     if http_request "POST" "$NOMAD_ADDR/v1/jobs" "$json_file" "200"; then
         log "Job submitted successfully"
@@ -136,6 +147,49 @@ get_job_status() {
     else
         log "Failed to get job status"
         return 1
+    fi
+}
+
+cleanup_stale_services() {
+    local job_name=$1
+    log "Cleaning up stale service registrations for job: $job_name"
+    
+    # Get currently running allocation IDs
+    local running_allocs=""
+    if allocations=$(get_job_status "$job_name" 2>/dev/null); then
+        running_allocs=$(echo "$allocations" | jq -r '.[] | select(.ClientStatus == "running") | .ID' 2>/dev/null | tr '\n' '|' | sed 's/|$//')
+    fi
+    
+    if [ -z "$running_allocs" ]; then
+        log "No running allocations found, skipping service cleanup"
+        return 0
+    fi
+    
+    log "Active allocations: $running_allocs"
+    
+    # Query Consul for service registrations
+    local consul_url="http://127.0.0.1:8500/v1/catalog/service/$job_name"
+    
+    if ! curl -sf "$consul_url" >/dev/null 2>&1; then
+        log "Consul not accessible or no services found for $job_name"
+        return 0
+    fi
+    
+    # Get all service IDs and deregister stale ones
+    local cleanup_count=0
+    curl -s "$consul_url" | jq -r '.[].ServiceID' 2>/dev/null | while read -r service_id; do
+        if [ -n "$service_id" ] && [[ ! "$service_id" =~ ($running_allocs) ]]; then
+            log "Deregistering stale service: $service_id"
+            if curl -X PUT "http://127.0.0.1:8500/v1/agent/service/deregister/$service_id" >/dev/null 2>&1; then
+                cleanup_count=$((cleanup_count + 1))
+            fi
+        fi
+    done
+    
+    if [ $cleanup_count -gt 0 ]; then
+        log "Cleaned up $cleanup_count stale service registrations"
+    else
+        log "No stale services found to clean up"
     fi
 }
 
@@ -231,31 +285,21 @@ get_allocation_logs() {
     
     # Build URL with query parameters
     local url="$NOMAD_ADDR/v1/client/fs/logs/$alloc_id"
-    local query_params=""
+    local query_params="type=stdout&plain=true"  # Always include type and plain parameters
     
     if [ -n "$task" ]; then
-        query_params="task=$task"
+        query_params="$query_params&task=$task"
     fi
     
     if [ "$lines" != "10" ]; then
-        if [ -n "$query_params" ]; then
-            query_params="$query_params&offset=-$lines"
-        else
-            query_params="offset=-$lines"
-        fi
+        query_params="$query_params&offset=-$lines"
     fi
     
     if [ "$follow" = "true" ]; then
-        if [ -n "$query_params" ]; then
-            query_params="$query_params&follow=true"
-        else
-            query_params="follow=true"
-        fi
+        query_params="$query_params&follow=true"
     fi
     
-    if [ -n "$query_params" ]; then
-        url="$url?$query_params"
-    fi
+    url="$url?$query_params"
     
     if http_request "GET" "$url" "" "200"; then
         return 0
@@ -332,8 +376,16 @@ case "$ACTION" in
         get_allocation_logs "$JOB_NAME" "$JOB_FILE" "${3:-10}"
         ;;
     
+    "cleanup")
+        if [ -z "$JOB_NAME" ]; then
+            echo "Usage: $0 cleanup <job-name>" >&2
+            exit 1
+        fi
+        cleanup_stale_services "$JOB_NAME"
+        ;;
+    
     *)
-        echo "Usage: $0 {stop|run|status|wait|allocs|alloc-status|running-alloc|logs} <job-name> [job-file|format|alloc-id]" >&2
+        echo "Usage: $0 {stop|run|status|wait|allocs|alloc-status|running-alloc|logs|cleanup} <job-name> [job-file|format|alloc-id]" >&2
         echo "Actions:"
         echo "  stop <job-name>               - Stop a running job"
         echo "  run <job-name> <job-file>     - Submit and run a job"
@@ -343,6 +395,7 @@ case "$ACTION" in
         echo "  alloc-status <alloc-id>       - Get allocation status"
         echo "  running-alloc <job-name>      - Get running allocation ID"
         echo "  logs <alloc-id> [task] [lines] - Get allocation logs"
+        echo "  cleanup <job-name>            - Clean up stale service registrations"
         exit 1
         ;;
 esac

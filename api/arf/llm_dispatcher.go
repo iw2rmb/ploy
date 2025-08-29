@@ -90,102 +90,9 @@ func NewLLMDispatcher(nomadAddr, consulAddr string, storageClient *storage.Stora
 	return dispatcher, nil
 }
 
-// loadJobTemplates loads Nomad job templates for different LLM providers
+// loadJobTemplates loads Nomad job templates for external LLM providers only
 func (d *LLMDispatcher) loadJobTemplates() error {
-	// Ollama template
-	ollamaTemplate := `
-job "llm-ollama-{{.JobID}}" {
-  datacenters = ["dc1"]
-  type = "batch"
-  priority = 75
-  
-  group "transform" {
-    count = 1
-    
-    ephemeral_disk {
-      size = 2048
-    }
-    
-    task "ollama-transform" {
-      driver = "docker"
-      
-      config {
-        image = "ollama/ollama:latest"
-        volumes = ["local:/workspace"]
-        network_mode = "host"
-      }
-      
-      env {
-        JOB_ID = "{{.JobID}}"
-        MODEL = "{{.Model}}"
-        PROMPT = "{{.PromptBase64}}"
-        INPUT_URL = "{{.InputURL}}"
-        OUTPUT_URL = "{{.OutputURL}}"
-        CONSUL_HTTP_ADDR = "{{.ConsulAddr}}"
-        TEMPERATURE = "{{.Temperature}}"
-        MAX_TOKENS = "{{.MaxTokens}}"
-      }
-      
-      template {
-        data = <<EOF
-#!/bin/sh
-set -e
-
-# Download input code
-wget -q -O /workspace/input.tar.gz "$INPUT_URL"
-cd /workspace
-tar -xzf input.tar.gz
-
-# Decode prompt
-DECODED_PROMPT=$(echo "$PROMPT" | base64 -d)
-
-# Prepare code context
-CODE_CONTEXT=$(find . -type f \( -name "*.{{.Language}}" \) -exec cat {} \; | head -c 8000)
-
-# Create full prompt with code context
-FULL_PROMPT="$DECODED_PROMPT
-
-Code to transform:
-$CODE_CONTEXT"
-
-# Run Ollama transformation
-ollama run $MODEL "$FULL_PROMPT" --temperature $TEMPERATURE > /workspace/transformed.txt
-
-# Package result
-tar -czf output.tar.gz transformed.txt
-curl -X PUT "$OUTPUT_URL" --data-binary @output.tar.gz
-
-# Update job status in Consul
-consul kv put "ploy/llm/jobs/$JOB_ID/status" "completed"
-consul kv put "ploy/llm/jobs/$JOB_ID/completed_at" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-EOF
-        destination = "local/run.sh"
-        perms = "0755"
-      }
-      
-      config {
-        command = "/bin/sh"
-        args = ["local/run.sh"]
-      }
-      
-      resources {
-        cpu = 1000
-        memory = 2048
-      }
-      
-      kill_timeout = "60s"
-    }
-  }
-  
-  reschedule {
-    attempts = 2
-    interval = "5m"
-    delay = "30s"
-    unlimited = false
-  }
-}
-`
-
+	// Only external API templates are supported
 	// OpenAI template
 	openaiTemplate := `
 job "llm-openai-{{.JobID}}" {
@@ -317,10 +224,10 @@ EOF
 }
 `
 
-	// Parse templates
+	// Parse templates - only external API providers
 	templates := map[string]string{
-		"ollama": ollamaTemplate,
 		"openai": openaiTemplate,
+		// Additional external providers can be added here
 	}
 
 	for name, content := range templates {

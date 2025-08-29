@@ -7,12 +7,12 @@
   gather_facts: false
   vars:
     ansible_ssh_retries: 3
-    ansible_ssh_timeout: 30
+    ansible_ssh_timeout: 300
     # Connection health check before starting
   tasks:
     - name: Wait for connection to be ready
       wait_for_connection:
-        connect_timeout: 30
+        connect_timeout: 300
         sleep: 5
         delay: 5
         timeout: 300

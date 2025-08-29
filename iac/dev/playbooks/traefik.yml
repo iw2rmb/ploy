@@ -57,6 +57,9 @@
               exposedByDefault: false
               prefix: traefik
               watch: true
+              refreshInterval: 30s
+              stale: true
+              cache: true
 
             file:
               directory: /etc/traefik/dynamic
@@ -166,6 +169,10 @@
         dest: /etc/traefik/dynamic/wildcards.yml
         mode: '0644'
 
+    # API routing is handled automatically via Consul service discovery
+    # The ploy-api service registers with Consul and includes Traefik tags
+    # No manual route configuration needed - this is more secure
+
     - name: Create ACME storage files with proper permissions
       file:
         path: "{{ item }}"
@@ -267,4 +274,12 @@
         msg: |
           Traefik is running successfully!
           Dashboard: http://{{ ansible_default_ipv4.address }}:8090
-          API endpoint will be available at: https://api.dev.{{ ploy.apps_domain }}
+          API endpoints will be available at:
+          - https://api.dev.{{ ploy.platform_domain }}
+          - https://api.dev.{{ ploy.apps_domain }}
+
+  handlers:
+    - name: reload traefik
+      systemd:
+        name: traefik
+        state: restarted

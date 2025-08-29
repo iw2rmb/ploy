@@ -179,8 +179,8 @@ ploy arf transform \
   --prompt "Also update deprecated APIs and fix any compilation errors" \
   --repository "https://github.com/spring-projects/spring-boot.git" \
   --branch main \
-  --plan-model codellama:13b \
-  --exec-model codellama:7b \
+  --plan-model gpt-4 \
+  --exec-model gpt-4 \
   --max-iterations 3 \
   --parallel-tries 2 \
   --output diff \
@@ -193,8 +193,8 @@ ploy arf transform \
   --prompt "Ensure all tests pass after migration" \
   --repository "https://github.com/reactor/reactor-core.git" \
   --branch main \
-  --plan-model codellama:13b \
-  --exec-model codellama:7b \
+  --plan-model gpt-4 \
+  --exec-model gpt-4 \
   --max-iterations 5 \
   --parallel-tries 3 \
   --output mr \
@@ -211,7 +211,7 @@ ploy arf transform \
 # Start parallel transformations
 ploy arf transform \
   --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
-  --repository "https://github.com/spring-projects/spring-petclinic.git" \
+  --repository "https://github.com/winterbe/java8-tutorial.git" \
   --max-iterations 3 \
   --parallel-tries 2 \
   --output archive \
@@ -280,10 +280,10 @@ options:
   create_pull_request: true
 
 # LLM configuration for self-healing
-llm_provider: "ollama"
-llm_model: "codellama:7b"
+llm_provider: "openai"
+llm_model: "gpt-4"
 llm_options:
-  base_url: "http://localhost:11434"
+  api_key: "${OPENAI_API_KEY}"  # Set via environment variable
   temperature: "0.1"
   max_tokens: "4096"
 ```
@@ -313,22 +313,22 @@ llm_options:
 ## Specific Test Repositories
 
 ### Service Validation Test  
-- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Primary validation)
-  - Well-maintained reference application (Java 17)
-  - **NOTE**: Already uses Java 17 - use for deployment testing, not migration
-  - Good test coverage and known-working build system
+- [ ] **Java 8 Tutorial**: `https://github.com/winterbe/java8-tutorial.git` (Primary validation)
+  - Simple Java 8 examples requiring migration
+  - Good for testing basic transformation capabilities
+  - Lightweight project for quick validation
 
 ### Tier 1 Projects (Simple) - Phase 1 Testing  
-- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Deployment test - Java 17 already)
-- [ ] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (Large tutorial collection - Java 8→17 migration)
 - [ ] **Java 8 Tutorial**: `https://github.com/winterbe/java8-tutorial.git` (Simple examples - Java 8→17 migration)
+- [ ] **Baeldung Tutorials**: `https://github.com/eugenp/tutorials.git` (Large tutorial collection - Java 8→17 migration)
+- [ ] **Java Design Patterns**: `https://github.com/iluwatar/java-design-patterns.git` (Design patterns - Java 11→17 migration)
 
 ```bash
 # Repository URLs for Phase 1 testing (all valid, existing repos)
 SIMPLE_REPOS=(
-  "https://github.com/spring-projects/spring-petclinic.git"  # Spring reference app
-  "https://github.com/eugenp/tutorials.git"                  # Baeldung tutorials
   "https://github.com/winterbe/java8-tutorial.git"           # Java 8 examples
+  "https://github.com/eugenp/tutorials.git"                  # Baeldung tutorials
+  "https://github.com/iluwatar/java-design-patterns.git"     # Design patterns
 )
 ```
 
@@ -347,14 +347,14 @@ MEDIUM_REPOS=(
 ```
 
 ### Tier 3 Projects (Complex) - Phase 3 Testing
-- [ ] **Spring PetClinic**: `https://github.com/spring-projects/spring-petclinic.git` (Reference)
+- [ ] **Apache Commons Lang**: `https://github.com/apache/commons-lang.git` (Utility library)
 - [ ] **Spring Cloud Alibaba**: `https://github.com/alibaba/spring-cloud-alibaba.git` (Microservices)
 - [ ] **Netflix Eureka**: `https://github.com/Netflix/eureka.git` (Service discovery)
 
 ```bash
 # Repository URLs for Phase 3 testing
 COMPLEX_REPOS=(
-  "https://github.com/spring-projects/spring-petclinic.git" # Reference implementation
+  "https://github.com/apache/commons-lang.git"              # Apache Commons utilities
   "https://github.com/alibaba/spring-cloud-alibaba.git"     # Microservices framework
   "https://github.com/Netflix/eureka.git"                   # Service discovery
 )

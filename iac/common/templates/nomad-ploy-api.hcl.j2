@@ -226,8 +226,20 @@ EOF
           name = "readiness"
           type = "http"
           path = "/ready"
-          interval = "1s"
+          interval = "10s"
           timeout = "5s"
+        }
+        
+        # Automatic service deregistration for stale services
+        # Deregister services that fail health checks for more than 30s
+        check_restart {
+          limit = 3
+          grace = "10s"
+        }
+        
+        # Configure Consul to automatically deregister failed services
+        meta {
+          deregister_critical_service_after = "30s"
         }
       }
 
