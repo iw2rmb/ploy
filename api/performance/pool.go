@@ -3,6 +3,7 @@ package performance
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -82,9 +83,10 @@ func (p *ConsulPool) Size() int {
 
 // NomadPool manages a pool of Nomad clients
 type NomadPool struct {
-	clients chan *nomadapi.Client
-	config  *nomadapi.Config
-	mu      sync.RWMutex
+	clients     chan *nomadapi.Client
+	config      *nomadapi.Config
+	mu          sync.RWMutex
+	rateLimiter chan struct{} // Simple rate limiter
 }
 
 // NewNomadPool creates a new Nomad client pool
@@ -94,9 +96,23 @@ func NewNomadPool(nomadAddr string, poolSize int) (*NomadPool, error) {
 		config.Address = nomadAddr
 	}
 	
+	// Configure HTTP client with connection pooling and timeouts
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        poolSize,
+			MaxIdleConnsPerHost: poolSize,
+			MaxConnsPerHost:     poolSize,
+			IdleConnTimeout:     90 * time.Second,
+			DisableKeepAlives:   false,
+		},
+	}
+	config.HttpClient = httpClient
+	
 	pool := &NomadPool{
-		clients: make(chan *nomadapi.Client, poolSize),
-		config:  config,
+		clients:     make(chan *nomadapi.Client, poolSize),
+		config:      config,
+		rateLimiter: make(chan struct{}, poolSize*2), // Allow 2x pool size concurrent operations
 	}
 	
 	// Pre-populate the pool
@@ -111,21 +127,45 @@ func NewNomadPool(nomadAddr string, poolSize int) (*NomadPool, error) {
 	return pool, nil
 }
 
-// GetClient retrieves a client from the pool
+// GetClient retrieves a client from the pool with rate limiting
 func (p *NomadPool) GetClient(ctx context.Context) (*nomadapi.Client, error) {
+	// Acquire rate limiter token
+	select {
+	case p.rateLimiter <- struct{}{}:
+		// Token acquired
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("rate limit timeout")
+	}
+	
 	select {
 	case client := <-p.clients:
 		return client, nil
 	case <-ctx.Done():
+		<-p.rateLimiter // Release token
 		return nil, ctx.Err()
 	case <-time.After(5 * time.Second):
 		// If pool is empty, create a new client
-		return nomadapi.NewClient(p.config)
+		client, err := nomadapi.NewClient(p.config)
+		if err != nil {
+			<-p.rateLimiter // Release token on error
+			return nil, err
+		}
+		return client, nil
 	}
 }
 
-// PutClient returns a client to the pool
+// PutClient returns a client to the pool and releases rate limiter
 func (p *NomadPool) PutClient(client *nomadapi.Client) {
+	// Release rate limiter token
+	select {
+	case <-p.rateLimiter:
+		// Token released
+	default:
+		// No token to release (shouldn't happen)
+	}
+	
 	select {
 	case p.clients <- client:
 		// Successfully returned to pool
