@@ -1,24 +1,25 @@
 ---
-# OpenRewrite Native Image Build and Deploy
+# OpenRewrite JVM Image Build and Deploy
 #
-# This playbook builds the OpenRewrite native image using GraalVM and pushes it to the Docker Registry.
-# The image is a CLI tool that processes Java transformations as Nomad batch jobs.
+# This playbook builds the OpenRewrite JVM-based image with Maven/Gradle and pushes it to the Docker Registry.
+# The image runs OpenRewrite transformations with dynamic recipe loading and SeaweedFS caching.
 #
 # Prerequisites:
 # - Docker Registry must be running (registry.dev.ployman.app)
 # - Docker must be installed on the target host
+# - SeaweedFS must be running for Maven repository caching
 #
 # Usage:
-# ansible-playbook playbooks/openrewrite-native.yml -e target_host=$TARGET_HOST
+# ansible-playbook playbooks/openrewrite-jvm.yml -e target_host=$TARGET_HOST
 #
-- name: Build and Deploy OpenRewrite Native Image
+- name: Build and Deploy OpenRewrite JVM Image
   hosts: linux_hosts
   become: true
   vars_files:
     - ../vars/main.yml
   
   vars:
-    openrewrite_image_name: "openrewrite-native"
+    openrewrite_image_name: "openrewrite-jvm"
     openrewrite_image_tag: "latest"
     registry_endpoint: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
     build_directory: "/tmp/openrewrite-build"
@@ -57,21 +58,29 @@
             owner: root
             group: root
 
-    - name: Copy OpenRewrite native Dockerfile and source
+    - name: Copy OpenRewrite JVM Dockerfile and runner script
       block:
         - name: Copy Dockerfile from repository
           copy:
-            src: "{{ ansible_env.HOME }}/ploy/services/openrewrite-native/Dockerfile"
+            src: "{{ ansible_env.HOME }}/ploy/services/openrewrite-jvm/Dockerfile"
             dest: "{{ build_directory }}/Dockerfile"
             mode: '0644'
             
-        - name: Display Dockerfile location
+        - name: Copy runner script from repository
+          copy:
+            src: "{{ ansible_env.HOME }}/ploy/services/openrewrite-jvm/runner.sh"
+            dest: "{{ build_directory }}/runner.sh"
+            mode: '0755'
+            
+        - name: Display build files location
           debug:
-            msg: "Using Dockerfile from: {{ build_directory }}/Dockerfile"
+            msg: |
+              Using Dockerfile from: {{ build_directory }}/Dockerfile
+              Using runner script from: {{ build_directory }}/runner.sh
 
-    - name: Build OpenRewrite native image
+    - name: Build OpenRewrite JVM image
       block:
-        - name: Build Docker image with GraalVM native compilation
+        - name: Build Docker image with JVM and Maven/Gradle
           docker_image:
             name: "{{ registry_endpoint }}/{{ openrewrite_image_name }}"
             tag: "{{ openrewrite_image_tag }}"
@@ -96,13 +105,13 @@
           copy:
             content: |
               #!/bin/bash
-              # Test if the OpenRewrite native image works
+              # Test if the OpenRewrite JVM image works
               
               # Create a simple test
-              echo "Testing OpenRewrite native image..."
+              echo "Testing OpenRewrite JVM image..."
               
-              # Try to run the image with help/version (should fail with usage since no args)
-              docker run --rm {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }} 2>&1 | head -5
+              # Try to run the image with no args (should show usage)
+              docker run --rm {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }} 2>&1 | head -10
               
               # Check exit code (should be 1 for missing args, not a crash)
               if [ $? -eq 0 ] || [ $? -eq 1 ]; then
@@ -191,19 +200,19 @@
       debug:
         msg: |
           ========================================
-          OpenRewrite Native Image Deployment Complete
+          OpenRewrite JVM Image Deployment Complete
           ========================================
           
           Image Details:
           - Name: {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
-          - Type: GraalVM native executable
-          - Purpose: Java code transformation via OpenRewrite recipes
+          - Type: JVM-based with Maven/Gradle
+          - Purpose: Java code transformation via OpenRewrite recipes with dynamic loading
           
           The image contains:
-          - GraalVM native-compiled OpenRewrite runner
-          - Support for Java 8 to 17 migrations
-          - Spring Boot and Spring Framework upgrades
-          - Minimal runtime footprint (~50MB)
+          - Eclipse Temurin JRE 17
+          - Maven 3.9+ and Gradle 8.5
+          - OpenRewrite runner script with SeaweedFS caching
+          - Dynamic recipe loading from Maven Central
           
           Usage:
           The image will be automatically used by Ploy ARF when running
