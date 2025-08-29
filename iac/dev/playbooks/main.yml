@@ -2068,7 +2068,7 @@
     # Platform wildcard certificate health check (after api deployment)
     - name: Wait for api health endpoint to be available
       uri:
-        url: "https://api.dev.{{ ploy.platform_domain }}/health"
+        url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health"
         validate_certs: no
         method: GET
         status_code: 200
@@ -2080,7 +2080,7 @@
 
     - name: Check platform wildcard certificate health
       uri:
-        url: "https://api.dev.{{ ploy.platform_domain }}/health/platform-certificates"
+        url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health/platform-certificates"
         validate_certs: no
         method: GET
         status_code: [200, 503]  # 503 is acceptable during initial provisioning
