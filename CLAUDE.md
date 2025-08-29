@@ -251,7 +251,7 @@ For detailed folder structure and file locations, see `docs/REPO.md`.
 
 **Configuration**:
 - Storage: `configs/storage-config.yaml` or `/etc/ploy/storage/config.yaml`
-- Controller endpoint: `PLOY_CONTROLLER` env var (default: `http://localhost:8081/v1`)
+- Controller endpoint: `PLOY_CONTROLLER` env var (default: `https://api.dev.ployman.app/v1`)
 
 ## Mandatory Update Protocol
 

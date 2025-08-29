@@ -58,7 +58,7 @@ func DefaultTestConfig() *TestConfig {
 		NomadEndpoint:      "http://localhost:4646",
 		SeaweedFSMaster:    "http://localhost:9333",
 		SeaweedFSFiler:     "http://localhost:8888",
-		ControllerEndpoint: "http://localhost:8081/v1",
+		ControllerEndpoint: "https://api.dev.ployman.app/v1",
 
 		TempDir:     filepath.Join(os.TempDir(), "ploy-test"),
 		FixturesDir: "internal/testutils/fixtures",

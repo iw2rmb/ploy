@@ -1,6 +1,8 @@
 # Ploy CLI
 
-- Env `PLOY_CONTROLLER` — base URL (`http://localhost:8081/v1` by default).
+- Env `PLOY_CONTROLLER` — base URL (`https://api.dev.ployman.app/v1` by default).
+- Env `PLOY_ENVIRONMENT` — environment (dev/prod) affects API endpoint subdomain.
+- Env `PLOY_APPS_DOMAIN` — custom domain for API endpoints.
 
 ## Commands
 ### `ploy apps new`
