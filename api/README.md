@@ -74,14 +74,10 @@
 - `GET /v1/analysis/health` — check analysis service health
 
 ## OpenRewrite Integration
-- `POST /v1/arf/openrewrite/build` — build OpenRewrite container image
-- `POST /v1/arf/openrewrite/validate` — validate recipes
-- `POST /v1/arf/openrewrite/generate-name` — generate image name
-- `GET /v1/arf/openrewrite/recipes` — list available recipes
 - `POST /v1/arf/openrewrite/transform` — execute transformation
 - `GET /v1/arf/openrewrite/status/:jobId` — get transformation job status
 
-**Note**: OpenRewrite transformations are integrated into the ARF system for Java code migrations.
+**Note**: OpenRewrite recipes are managed through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
 ## Storage Management
 - `GET /v1/storage/health` — get comprehensive storage system health status

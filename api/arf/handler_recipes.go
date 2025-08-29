@@ -421,6 +421,16 @@ func (h *Handler) ValidateRecipe(c *fiber.Ctx) error {
 		if step.Timeout.Duration == 0 {
 			warnings = append(warnings, "Step "+strconv.Itoa(i+1)+" ("+step.Name+") has no timeout specified")
 		}
+		
+		// OpenRewrite-specific validation
+		if step.Type == models.StepTypeOpenRewrite {
+			if recipe, ok := step.Config["recipe"].(string); !ok || recipe == "" {
+				warnings = append(warnings, "Step "+strconv.Itoa(i+1)+" ("+step.Name+") is OpenRewrite type but missing 'recipe' config")
+			}
+			if len(recipe.Metadata.Languages) == 0 || (recipe.Metadata.Languages[0] != "java" && recipe.Metadata.Languages[0] != "kotlin") {
+				warnings = append(warnings, "OpenRewrite recipe should specify 'java' or 'kotlin' as language")
+			}
+		}
 	}
 	
 	response := fiber.Map{
