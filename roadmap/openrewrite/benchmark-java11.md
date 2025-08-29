@@ -20,49 +20,26 @@ This document has been updated to use the new unified `ploy arf transform` comma
 ## Overview
 Design a comprehensive test scenario that progressively evaluates ARF's enhanced transformation capabilities (OpenRewrite recipes, LLM self-healing, parallel solution attempts) using real-world Java 11 Maven projects for Java 11→17 migrations.
 
-**OpenRewrite Service Architecture**: As of 2025-08-26, OpenRewrite runs as a standalone Lane E service at `openrewrite.dev.ployman.app`, deployed via `ployman push` with automatic SSL and routing.
+**OpenRewrite Integration Update**: As of 2025-08-29, OpenRewrite functionality is now embedded directly in the `ploy arf transform` command, eliminating the need for a separate service.
 
-## Prerequisites: OpenRewrite Service Setup and Validation
+## Prerequisites: Updated for New Transform Command Implementation
 
-### Service Deployment Status
-- ✅ **Lane E Migration Complete** (2025-08-26): Service extracted to `services/openrewrite/`
-- ✅ **Platform Domain Active**: Available at `https://openrewrite.dev.ployman.app`
-- ✅ **ARF Integration Updated**: HTTP client configured for service communication
+### Service Architecture Update (2025-08-29)
+- ✅ **Integrated OpenRewrite**: New `ploy arf transform` command handles OpenRewrite internally
+- ✅ **No External Service Required**: OpenRewrite functionality is now embedded in the transform command
+- ✅ **Simplified Configuration**: No need for `OPENREWRITE_SERVICE_URL` or `ARF_OPENREWRITE_MODE` environment variables
 
-### Service Health Validation
+### ARF Configuration
 ```bash
-# 1. Verify service is running
-curl https://openrewrite.dev.ployman.app/v1/openrewrite/health
-
-# 2. Check readiness endpoint
-curl https://openrewrite.dev.ployman.app/v1/openrewrite/ready
-
-# 3. Verify metrics endpoint
-curl https://openrewrite.dev.ployman.app/v1/openrewrite/metrics
-```
-
-### ARF Configuration for Service Mode
-```bash
-# Configure ARF to use OpenRewrite service (not embedded)
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Only the controller endpoint is required
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 # Verify configuration
-echo "OpenRewrite URL: $OPENREWRITE_SERVICE_URL"
-echo "ARF Mode: $ARF_OPENREWRITE_MODE"
+echo "Controller: $PLOY_CONTROLLER"
 ```
 
-### Service Deployment (if needed)
-```bash
-# Deploy OpenRewrite service via ployman
-cd services/openrewrite
-ployman push
-
-# Set service environment variables
-ployman env set -a openrewrite-service WORKER_POOL_SIZE=4
-ployman env set -a openrewrite-service MAX_CONCURRENT_JOBS=10
-ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
-```
+### Legacy Service Information (Deprecated)
+The standalone OpenRewrite service at `openrewrite.dev.ployman.app` is no longer required. The `ploy arf transform` command now handles all OpenRewrite recipe execution internally through an embedded implementation.
 
 ## Test Projects Classification
 
@@ -88,13 +65,12 @@ ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
 **Projects**: Tier 1 projects (3 repositories)
 
 **Pre-Test Validation**:
-- [ ] OpenRewrite service health check passing
-- [ ] Service metrics endpoint accessible
-- [ ] ARF configured with `OPENREWRITE_SERVICE_URL`
-- [ ] Test connectivity to service from controller
+- [ ] Controller endpoint accessible at `https://api.dev.ployman.app/v1`
+- [ ] Transform command available and functional
+- [ ] Test connectivity to controller
 
 **Test Steps**:
-- [ ] **Service Connectivity**: Verify ARF can reach OpenRewrite service
+- [ ] **Controller Connectivity**: Verify transform command can reach controller
 - [ ] **Sequential execution**: Test simple projects one by one
 - [ ] **Recipe Validation**: Confirm Java 11→17 migration recipes load correctly
 - [ ] **Transformation Execution**: Run OpenRewrite transformations via service
@@ -102,7 +78,7 @@ ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
 - [ ] **Build Verification**: Compile transformed code to verify correctness
 
 **Success Criteria**:
-- [ ] OpenRewrite service responds to all requests
+- [ ] Transform command executes successfully
 - [ ] 100% success rate on simple projects
 - [ ] Clean diff generation via service
 - [ ] No compilation errors post-transformation
@@ -157,9 +133,7 @@ ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
 
 **Phase 1: Sequential Simple Projects (Recipe-based)**
 ```bash
-# IMPORTANT: Configure service URL first
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Configure controller endpoint
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 # Single project baseline (Java 8 Tutorial - actual migration test)
@@ -196,9 +170,8 @@ done
 
 **Phase 2: LLM-Enhanced Self-Healing**
 ```bash
-# Configure both OpenRewrite service and LLM provider
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Configure controller endpoint and LLM provider
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 # Test with self-healing capabilities
 ploy arf transform \
@@ -326,16 +299,16 @@ llm_options:
 - Build success rate post-transformation
 
 **Expected Results**:
-- [ ] Service Health: OpenRewrite service responding at `https://openrewrite.dev.ployman.app`
-- [ ] Phase 1: Target 100% success with service-based approach, <5 min per project
+- [ ] Controller Health: Controller responding at `https://api.dev.ployman.app/v1`
+- [ ] Phase 1: Target 100% success with embedded OpenRewrite, <5 min per project
 - [ ] Phase 2: 80% success with LLM assistance, 10-15 min per project
 - [ ] Phase 3: 70% overall, 40% time reduction with parallelism
 
-**Current Status (2025-08-27)**:
-- ✅ OpenRewrite migrated to Lane E service architecture
-- ✅ Service deployed at `openrewrite.dev.ployman.app`
-- ⚠️ Recipe configuration needs validation
-- ⏳ Testing pending with new service architecture
+**Current Status (2025-08-29)**:
+- ✅ OpenRewrite integrated into `ploy arf transform` command
+- ✅ No external service dependency required
+- ✅ Simplified configuration with only controller endpoint needed
+- ⏳ Testing pending with new embedded architecture
 
 ## Specific Test Repositories
 
@@ -396,15 +369,13 @@ COMPLEX_REPOS=(
 
 set -e
 
-# Configure OpenRewrite service
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Configure controller endpoint
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-# Verify service is running
-echo "Checking OpenRewrite service health..."
-curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" || {
-  echo "ERROR: OpenRewrite service not responding"
+# Verify controller is accessible
+echo "Checking controller health..."
+curl -f "${PLOY_CONTROLLER}/version" || {
+  echo "ERROR: Controller not responding"
   exit 1
 }
 
@@ -451,14 +422,12 @@ echo "Phase 1 sequential testing completed"
 
 set -e
 
-# Configure OpenRewrite service AND LLM provider
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Configure controller endpoint
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-# Verify OpenRewrite service
-echo "Checking OpenRewrite service..."
-curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" || exit 1
+# Verify controller is accessible
+echo "Checking controller health..."
+curl -f "${PLOY_CONTROLLER}/version" || exit 1
 
 PHASE2_REPOS=(
   "https://github.com/spring-projects/spring-boot.git"
@@ -510,9 +479,7 @@ echo "Phase 2 LLM-enhanced testing completed"
 
 set -e
 
-# Configure service environment
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Configure controller endpoint
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 echo "Starting Phase 3 parallel execution test"
@@ -598,26 +565,19 @@ echo "Phase 3 parallel testing completed"
 
 ### Common Issues and Solutions
 
-**OpenRewrite Service Not Responding**:
+**Controller Not Responding**:
 ```bash
-# Check service health
-curl -v https://openrewrite.dev.ployman.app/v1/openrewrite/health
+# Check controller health
+curl -v ${PLOY_CONTROLLER}/version
 
-# Deploy/redeploy service
-cd services/openrewrite
-ployman push
-
-# Check service logs
-ployman logs -a openrewrite-service
+# Verify controller endpoint is set
+echo $PLOY_CONTROLLER  # Should be https://api.dev.ployman.app/v1
 ```
 
 **Recipe Failures**:
 ```bash
-# Verify recipe is available
-ploy arf recipes search "JavaVersion11to17"
-
-# Check OpenRewrite service metrics for errors
-curl https://openrewrite.dev.ployman.app/v1/openrewrite/metrics
+# Verify recipe is available (built into transform command)
+ploy arf recipes list | grep JavaVersion11to17
 
 # Try with different output format for debugging
 ploy arf transform \
@@ -627,15 +587,13 @@ ploy arf transform \
   --report detailed
 ```
 
-**ARF Not Using Service**:
+**Transform Command Issues**:
 ```bash
-# Ensure environment variables are set
-echo $OPENREWRITE_SERVICE_URL  # Should be https://openrewrite.dev.ployman.app
-echo $ARF_OPENREWRITE_MODE     # Should be "service"
+# Ensure controller endpoint is set
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-# Force service mode
-export ARF_OPENREWRITE_MODE=service
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
+# Check transform command help for latest options
+ploy arf transform --help
 ```
 
 **Transformation Status Unknown**:
@@ -653,7 +611,7 @@ ploy arf transform \
 ## Success Metrics
 
 ### Quantitative Metrics
-- [ ] **Service Availability**: OpenRewrite service uptime >99%
+- [ ] **Controller Availability**: Controller uptime >99%
 - [ ] **Success Rate**: Overall percentage of successful transformations
 - [ ] **Performance**: Average execution time per complexity tier
 - [ ] **Scalability**: Time reduction achieved through parallel execution
@@ -665,6 +623,6 @@ ploy arf transform \
 - [ ] **Build Success**: Post-transformation compilation and test success
 - [ ] **LLM Effectiveness**: Quality of LLM-suggested fixes
 - [ ] **Error Recovery**: System's ability to handle and recover from failures
-- [ ] **Service Integration**: Seamless ARF-to-OpenRewrite communication
+- [ ] **Transform Integration**: Seamless recipe execution within transform command
 
-This comprehensive scenario progressively tests all ARF features while providing concrete metrics for evaluating the system's production readiness and scalability with the new Lane E service architecture.
+This comprehensive scenario progressively tests all ARF features while providing concrete metrics for evaluating the system's production readiness and scalability with the new embedded OpenRewrite implementation.

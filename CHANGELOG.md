@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [2025-08-29] - Code Analysis Migration to Nomad
+
+### Added
+- **Nomad-Based Code Analysis**: Migrated code analysis from CHTTP to Nomad batch jobs for consistency
+  - Created `api/analysis/nomad_dispatcher.go` for managing analysis jobs via Nomad
+  - Added `api/analysis/nomad_analyzer.go` with Nomad-based implementations for Pylint, ESLint, and GolangCI
+  - Created Nomad job template `platform/nomad/analysis-pylint-batch.hcl` for Python analysis
+  - Integrated analysis dispatcher with Consul for job tracking and status updates
+  - Support for distributed execution with automatic retry and failure handling
+
+### Changed
+- **Analysis Engine Update**: Modified engine to use Nomad dispatcher instead of CHTTP clients
+  - Updated `api/server/server.go` to initialize analysis with Nomad mode by default
+  - Changed default analysis mode from "chttp" to "nomad" (configurable via PLOY_ANALYSIS_MODE)
+  - Simplified engine by removing CHTTP-specific code paths
+
+### Removed
+- **CHTTP Infrastructure**: Completely removed CHTTP implementation (no backward compatibility required)
+  - Deleted `api/analysis/chttp_adapter.go` and test files
+  - Removed entire `chttp/` and `internal/chttp/` directories
+  - Deleted CHTTP configuration files: `pylint-chttp-service.yaml`, `openrewrite-chttp-service.yaml`
+  - Removed `loadCHTTPPrivateKey` function and related RSA key handling from server
+  - Cleaned up unused imports and CHTTP-specific interfaces
+
+### Testing
+- Verified all components build successfully without CHTTP dependencies
+- Confirmed Nomad job templates are properly structured for batch execution
+- Validated analysis dispatcher follows same pattern as OpenRewrite for consistency
+
 ## [2025-08-29] - ARF Transform Command Consolidation
 
 ### Added

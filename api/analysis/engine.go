@@ -252,17 +252,9 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			defer cancel()
 			
 			var langResult *LanguageAnalysisResult
-			var analysisErr error
-			
-			// Check if analyzer supports CHTTP
-			if chttpAnalyzer, ok := analyzer.(CHTPAnalyzer); ok && chttpAnalyzer.SupportsCHTTP() {
-				e.logger.WithField("language", language).Debug("Using CHTTP analyzer")
-				langResult, analysisErr = e.analyzeThroughCHTTP(analyzerCtx, chttpAnalyzer, codebase)
-			} else {
-				// Use traditional in-process analysis
-				e.logger.WithField("language", language).Debug("Using legacy analyzer")
-				langResult, analysisErr = analyzer.Analyze(analyzerCtx, codebase)
-			}
+			// Perform analysis using the registered analyzer
+			e.logger.WithField("language", language).Debug("Starting analysis")
+			langResult, analysisErr := analyzer.Analyze(analyzerCtx, codebase)
 			
 			// Handle analysis errors
 			if analysisErr != nil {
@@ -536,25 +528,3 @@ func (e *Engine) sortIssues(issues []Issue) {
 	})
 }
 
-// analyzeThroughCHTTP analyzes code through a CHTTP service
-func (e *Engine) analyzeThroughCHTTP(ctx context.Context, analyzer CHTPAnalyzer, codebase Codebase) (*LanguageAnalysisResult, error) {
-	// For CHTTP analyzers, we delegate to their Analyze method which handles the CHTTP communication
-	// The CHTPAnalyzer implementation (like CHTPPylintAnalyzer) handles:
-	// 1. Creating the tar archive from the codebase
-	// 2. Calling the CHTTP service via the client
-	// 3. Converting the CHTTP result to LanguageAnalysisResult
-	
-	result, err := analyzer.Analyze(ctx, codebase)
-	if err != nil {
-		return nil, fmt.Errorf("CHTTP analysis failed: %w", err)
-	}
-	
-	// Update metrics to indicate CHTTP was used
-	if result != nil && result.Metrics.TotalFiles == 0 {
-		// Set a flag to indicate this was a CHTTP analysis
-		result.Metrics.TotalFiles = len(codebase.Files)
-		result.Metrics.AnalyzedFiles = len(codebase.Files)
-	}
-	
-	return result, nil
-}

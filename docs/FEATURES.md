@@ -330,22 +330,22 @@ Auto-classified lanes:
   - `ploy analyze config` - Manage configuration
   - `ploy analyze results` - View analysis history
 
-### CHTTP Services (CLI-over-HTTP)
-- ✅ **CHTTP Server Framework**: Simple CLI-to-HTTP bridge architecture (Aug 2025)
-  - ✅ HTTP API for remote CLI tool execution
-  - ✅ API key authentication for secure access
-  - ✅ Command allow-listing for security restrictions
-  - ✅ JSON request/response format with structured error handling
-  - ✅ Health monitoring and service discovery integration
-  - ✅ Basic logging with JSON and text formats
+### Nomad-Based Analysis Services (Migrated from CHTTP - Aug 2025)
+- ✅ **Nomad Analysis Dispatcher**: Distributed code analysis via batch jobs (Aug 2025)
+  - ✅ Job submission and monitoring through Nomad API
+  - ✅ Consul KV for job status tracking and result storage
+  - ✅ SeaweedFS integration for input/output artifact management
+  - ✅ Automatic retry with exponential backoff for failed jobs
+  - ✅ Support for multiple concurrent analysis jobs
+  - ✅ Cleanup of completed jobs after configurable TTL
 
-- ✅ **Pylint CHTTP Service**: Dedicated Python static analysis service (Aug 2025)
-  - ✅ Specialized `/analyze` endpoint for Python code archives
-  - ✅ Gzipped tar archive processing with automatic file filtering
-  - ✅ Secure sandboxed execution environment (512MB memory limit)
-  - ✅ Comprehensive issue reporting with ARF-compatible output
-  - ✅ Integration with Ploy deployment platform via Ansible
-  - ✅ Traefik integration for load balancing and SSL termination
+- ✅ **Multi-Language Analysis Support**: Nomad job templates for various analyzers (Aug 2025)
+  - ✅ Python analysis with Pylint in Docker containers
+  - ✅ JavaScript/TypeScript analysis with ESLint
+  - ✅ Go analysis with GolangCI-Lint
+  - ✅ Unified output format across all analyzers
+  - ✅ Resource limits and isolation per analysis job
+  - ✅ ARF integration for automatic remediation
 
 ### Configuration
 - ✅ **Flexible Configuration**: YAML-based configuration system
@@ -678,7 +678,7 @@ CLLM is a standalone microservice for secure, sandboxed LLM-based code transform
 - ✅ **Infrastructure Integration**: Ansible playbook integration for VPS deployment readiness
 
 ### 🚧 **Phase 1 Remaining: LLM and Analysis Implementation**
-- ✅ **Sandbox Execution Engine**: CHTTP-based secure code execution with resource limits - COMPLETE
+- ✅ **Sandbox Execution Engine**: Nomad-based secure code execution with resource limits - COMPLETE
 - 🚧 **LLM Provider Integration**: Ollama and OpenAI provider implementations with failover
 - 🚧 **Code Analysis Engine**: AST parsing and error pattern recognition
 - 🚧 **Diff Generation**: Git-compatible diff creation and validation
