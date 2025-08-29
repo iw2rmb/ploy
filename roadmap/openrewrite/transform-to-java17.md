@@ -1,8 +1,8 @@
 # OpenRewrite Java 17 Transformation Test Plan
 
-## Alternative Approach: Direct OpenRewrite Endpoints
+## Unified ARF System Approach
 
-**Strategy**: Bypass the advanced ARF components (learning_system, llm_generator, hybrid_pipeline, catalog) and use dedicated OpenRewrite endpoints that work with available components (recipe_executor: true, sandbox_mgr: true).
+**Strategy**: Use the unified ARF (Automated Remediation Framework) system with OpenRewrite integration through standard ARF endpoints and recipe management.
 
 **Key Assumptions**:
 1. **Recipe Auto-Download**: If recipe is not available locally, the openrewrite-jvm image will automatically download and store it during transformation
@@ -10,8 +10,8 @@
 
 ## Phase 1: Direct OpenRewrite Transformation Testing
 
-### Step 1: Execute Direct OpenRewrite Transformation
-1. **Transform Request**: Use `/v1/arf/openrewrite/transform` endpoint directly
+### Step 1: Execute ARF Transformation with OpenRewrite
+1. **Transform Request**: Use `/v1/arf/transform` endpoint with OpenRewrite recipe
    - **Timeout**: 30 minutes (generous time for repository cloning, recipe download, and transformation)
    - **Extended Processing Time**: Allow for recipe download if not cached
 2. **Target Repository**: https://github.com/winterbe/java8-tutorial.git
@@ -19,18 +19,22 @@
 4. **Request Format**:
    ```json
    {
-     "project_url": "https://github.com/winterbe/java8-tutorial.git",
-     "recipes": ["org.openrewrite.java.migrate.Java11toJava17"],
-     "package_manager": "maven",
-     "base_jdk": "17",
-     "branch": "master"
+     "repository_url": "https://github.com/winterbe/java8-tutorial.git",
+     "recipe_id": "java8-to-java17",
+     "recipe_type": "openrewrite",
+     "branch": "master",
+     "configuration": {
+       "target_recipes": ["org.openrewrite.java.migrate.Java8toJava17"],
+       "package_manager": "maven",
+       "target_jdk": "17"
+     }
    }
    ```
 
-### Step 2: Monitor Job Execution with Extended Timeouts
-1. **Job Submission**: Receive job_id from transform request
+### Step 2: Monitor Transformation Execution
+1. **Job Submission**: Receive transformation_id from transform request
    - **Initial Response Timeout**: 2 minutes
-2. **Status Monitoring**: Poll `/v1/arf/openrewrite/status/{job_id}` endpoint
+2. **Status Monitoring**: Poll `/v1/arf/transforms/{transformation_id}` endpoint
    - **Polling Interval**: 30 seconds
    - **Maximum Wait Time**: 45 minutes total (allows for recipe download + transformation)
    - **Status Check Timeout**: 10 seconds per poll
@@ -39,8 +43,8 @@
 4. **Result Retrieval**: Get transformation output/diff when available
 
 ### Step 3: Post-Transformation Recipe Verification
-1. **Recipe Storage Check**: After successful transformation, verify that recipes are now cached
-   - **Endpoint**: `/v1/arf/openrewrite/recipes` (should now show downloaded recipes)
+1. **Recipe Storage Check**: After successful transformation, verify that recipes are available
+   - **Endpoint**: `/v1/arf/recipes?type=openrewrite` (should show OpenRewrite recipes)
    - **Expected**: Recipe cache populated with `org.openrewrite.java.migrate.Java11toJava17`
 2. **Cache Verification**: Confirm that subsequent transformations are faster due to cached recipes
 3. **Performance Comparison**: Second transformation should be significantly faster (no recipe download)
@@ -56,8 +60,8 @@
 ## Timeout Configuration Strategy
 
 ### API Endpoint Timeouts:
-- **Recipe List/Validate**: 60 seconds (allow recipe download)
-- **Transform Submission**: 2 minutes (job creation and validation)
+- **Recipe List/Validate**: 60 seconds (recipe resolution)
+- **Transform Submission**: 2 minutes (transformation job creation and validation)
 - **Status Polling**: 10 seconds per request
 - **Total Job Wait**: 60 minutes maximum per transformation
 
@@ -76,10 +80,10 @@
 ## Expected Outcomes
 
 ### Success Criteria:
-- ✅ Recipe listing works (empty initially, populated after first use)
-- ✅ Recipe validation succeeds for Java migration recipes  
-- ✅ Transform job submission returns job_id within 2 minutes
-- ✅ Job status tracking provides progress updates every 30 seconds
+- ✅ Recipe listing works via `/v1/arf/recipes?type=openrewrite`
+- ✅ Recipe validation succeeds for Java migration recipes via `/v1/arf/recipes/validate`
+- ✅ Transform job submission returns transformation_id within 2 minutes
+- ✅ Transformation status tracking provides progress updates every 30 seconds
 - ✅ At least one repository transformation completes successfully within 60 minutes
 - ✅ **Recipe Caching**: Recipes are downloaded and stored after first transformation
 - ✅ **Performance Improvement**: Subsequent transformations are 50%+ faster with cached recipes
@@ -97,8 +101,8 @@
 ## Recipe Management Validation
 
 ### Pre-Transformation State:
-- **Recipe Catalog**: May be empty or minimal
-- **Expected Behavior**: OpenRewrite will download required recipes on first use
+- **Recipe Catalog**: Managed through unified ARF recipe system
+- **Expected Behavior**: OpenRewrite recipes are available via ARF recipe endpoints
 
 ### During Transformation:
 - **Recipe Download Phase**: Monitor job logs for Maven artifact downloads
@@ -108,8 +112,8 @@
   - Recipe metadata and configuration
 
 ### Post-Transformation State:
-- **Recipe Catalog**: Should now contain downloaded recipes
-- **Verification Method**: Call `/v1/arf/openrewrite/recipes` to confirm cache population
+- **Recipe Catalog**: Contains OpenRewrite recipes accessible via ARF endpoints
+- **Verification Method**: Call `/v1/arf/recipes?type=openrewrite` to confirm available recipes
 - **Storage Location**: Recipes stored in openrewrite-jvm image or persistent volume
 - **Performance Impact**: Second transformation should skip download phase
 
@@ -138,13 +142,13 @@
 
 ## API Endpoint Reference
 
-Based on `/api/README.md`, the following OpenRewrite endpoints are available:
+Based on `/api/README.md`, OpenRewrite integration uses the unified ARF system:
 
-### OpenRewrite Integration (Lines 76-80)
-- `POST /v1/arf/openrewrite/transform` — execute transformation
-- `GET /v1/arf/openrewrite/status/:jobId` — get transformation job status
+### Unified ARF System for OpenRewrite
+- `POST /v1/arf/transform` — execute transformation (including OpenRewrite recipes)
+- `GET /v1/arf/transforms/:id` — get transformation result
 
-**Note**: OpenRewrite recipes are managed through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
+**Note**: OpenRewrite recipes are managed exclusively through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
 ### General ARF Recipe Management (Lines 137-148)
 - `GET /v1/arf/recipes` — list available transformation recipes
@@ -164,28 +168,32 @@ Based on `/api/README.md`, the following OpenRewrite endpoints are available:
 
 ## Test Execution Commands
 
-### Step 1: Execute Transformation with Extended Timeout
+### Step 1: Execute Transformation via Unified ARF
 ```bash
-# Using dedicated OpenRewrite endpoint (recommended)
-curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/openrewrite/transform" \
+# Using unified ARF endpoint
+curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
   -H "Content-Type: application/json" \
   -d '{
-    "project_url": "https://github.com/winterbe/java8-tutorial.git",
-    "recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
-    "package_manager": "maven",
-    "base_jdk": "11",
-    "branch": "master"
+    "repository_url": "https://github.com/winterbe/java8-tutorial.git",
+    "recipe_id": "java8-to-java11",
+    "recipe_type": "openrewrite",
+    "branch": "master",
+    "configuration": {
+      "target_recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
+      "package_manager": "maven",
+      "target_jdk": "11"
+    }
   }' \
-  --max-time 120  # 2 minute timeout for job submission
+  --max-time 120  # 2 minute timeout for transformation submission
 ```
 
-### Step 2: Monitor Job Status (with 60-minute maximum wait)
+### Step 2: Monitor Transformation Status (with 60-minute maximum wait)
 ```bash
-JOB_ID="<job_id_from_step_1>"
+TRANSFORM_ID="<transformation_id_from_step_1>"
 timeout 3600 bash -c '
   while true; do
-    STATUS=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/openrewrite/status/'$JOB_ID'" | jq -r ".status")
-    echo "$(date): Job status: $STATUS"
+    STATUS=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/transforms/'$TRANSFORM_ID'" | jq -r ".status")
+    echo "$(date): Transformation status: $STATUS"
     if [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]]; then
       break
     fi
@@ -194,24 +202,28 @@ timeout 3600 bash -c '
 '
 ```
 
-### Step 3: Verify Recipe Caching
+### Step 3: Verify Recipe Availability
 ```bash
-# Check if recipes are now cached using unified ARF recipe system
-curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes" | jq '.recipes | length'
-# Should show recipes downloaded during transformation
+# Check OpenRewrite recipes using unified ARF recipe system
+curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes?type=openrewrite" | jq '.recipes | length'
+# Should show available OpenRewrite recipes
 
-# Filter for OpenRewrite recipes specifically
-curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes" | jq '.recipes[] | select(.type == "openrewrite")'
+# List all OpenRewrite recipes with details
+curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes?type=openrewrite" | jq '.recipes[]'
 ```
 
 ### Recipe Validation (Optional)
 ```bash
-# Validate recipe before transformation using unified ARF recipe system
+# Validate OpenRewrite recipe before transformation
 curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/recipes/validate" \
   -H "Content-Type: application/json" \
   -d '{
-    "recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
-    "type": "openrewrite"
+    "recipe_id": "java8-to-java11",
+    "type": "openrewrite",
+    "configuration": {
+      "target_recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
+      "package_manager": "maven"
+    }
   }'
 ```
 
