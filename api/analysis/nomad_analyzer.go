@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 	"time"
@@ -446,7 +445,8 @@ func (a *NomadGolangCIAnalyzer) GenerateFixSuggestions(issue Issue) ([]FixSugges
 	if issue.RuleName == "gofmt" || issue.RuleName == "goimports" {
 		suggestions = append(suggestions, FixSuggestion{
 			Description: "Run gofmt -w or goimports -w to fix formatting",
-			Command:     "gofmt -w " + issue.File,
+			Diff:        "Use gofmt -w " + issue.File + " to auto-format",
+			Confidence:  0.9,
 		})
 	}
 	

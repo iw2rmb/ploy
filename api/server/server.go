@@ -2,9 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"log"
 	"os"
@@ -1493,42 +1490,6 @@ func initializeTemplateHandler() (*templates.Handler, error) {
 // }
 
 // loadCHTTPPrivateKey loads an RSA private key from a PEM file
-func loadCHTTPPrivateKey(path string) (*rsa.PrivateKey, error) {
-	// Check if file exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("private key file not found: %s", path)
-	}
-
-	// Read the private key file
-	keyData, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file: %w", err)
-	}
-
-	// Parse the PEM block
-	block, _ := pem.Decode(keyData)
-	if block == nil {
-		return nil, fmt.Errorf("failed to parse PEM block from private key")
-	}
-
-	// Parse the RSA private key
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		// Try PKCS8 format
-		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
-		}
-
-		var ok bool
-		privateKey, ok = key.(*rsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("private key is not an RSA key")
-		}
-	}
-
-	return privateKey, nil
-}
 
 // initializeAnalysisHandler initializes the static analysis handler
 func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (*analysis.Handler, error) {
@@ -1538,49 +1499,55 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 
-	// Create the analysis engine
-	engine := analysis.NewEngine(logger)
-
-	// Check analysis mode from environment (legacy or chttp)
-	analysisMode := utils.Getenv("PLOY_ANALYSIS_MODE", "chttp")
+	// Check analysis mode from environment (nomad, legacy, or disabled)
+	analysisMode := utils.Getenv("PLOY_ANALYSIS_MODE", "nomad")
 	log.Printf("Static analysis mode: %s", analysisMode)
 
-	// Register Java analyzer with Error Prone (legacy only for now)
-	javaAnalyzer := javaanalyzer.NewErrorProneAnalyzer(logger)
-	if err := engine.RegisterAnalyzer("java", javaAnalyzer); err != nil {
-		return nil, fmt.Errorf("failed to register Java analyzer: %w", err)
-	}
+	var engine *analysis.Engine
 
-	// Register Python analyzer based on mode
-	if analysisMode == "chttp" {
-		// Register CHTTP Python analyzer
-		if chttpEnabled := utils.Getenv("PLOY_CHTTP_PYTHON_ENABLED", "true") == "true"; chttpEnabled {
-			pylintServiceURL := utils.Getenv("PLOY_CHTTP_PYLINT_URL", "https://pylint.chttp.dev.ployd.app")
-			clientID := utils.Getenv("PLOY_CHTTP_CLIENT_ID", "ploy-api")
-			privateKeyPath := utils.Getenv("PLOY_CHTTP_PRIVATE_KEY", "/etc/ploy/chttp-private-key.pem")
-
-			privateKey, err := loadCHTTPPrivateKey(privateKeyPath)
-			if err != nil {
-				log.Printf("Warning: Failed to load CHTTP private key from %s: %v", privateKeyPath, err)
-				return nil, fmt.Errorf("CHTTP mode requires valid private key: %w", err)
-			}
-
-			// Register CHTTP Pylint analyzer
-			chttpPylintAnalyzer := analysis.NewCHTTPPylintAnalyzer(pylintServiceURL, clientID, privateKey)
-			if err := engine.RegisterAnalyzer("python", chttpPylintAnalyzer); err != nil {
-				return nil, fmt.Errorf("failed to register CHTTP Python analyzer: %w", err)
-			}
-			log.Printf("Registered CHTTP Pylint analyzer at %s", pylintServiceURL)
+	if analysisMode == "nomad" {
+		// Create Nomad-based analysis dispatcher
+		storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create storage client for analysis: %w", err)
 		}
+
+		nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
+		consulAddr := utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500")
+
+		dispatcher, err := analysis.NewAnalysisDispatcher(nomadAddr, consulAddr, storageClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create analysis dispatcher: %w", err)
+		}
+
+		// Create engine with Nomad dispatcher
+		engine = analysis.NewEngineWithDispatcher(logger, dispatcher)
+		log.Printf("Initialized Nomad-based analysis engine with distributed execution")
+
 	} else if analysisMode == "legacy" {
+		// Create legacy engine with local analyzers
+		engine = analysis.NewEngine(logger)
+
+		// Register Java analyzer with Error Prone
+		javaAnalyzer := javaanalyzer.NewErrorProneAnalyzer(logger)
+		if err := engine.RegisterAnalyzer("java", javaAnalyzer); err != nil {
+			return nil, fmt.Errorf("failed to register Java analyzer: %w", err)
+		}
+
 		// Register legacy Python analyzer
 		pythonAnalyzer := pythonanalyzer.NewPylintAnalyzer(logger)
 		if err := engine.RegisterAnalyzer("python", pythonAnalyzer); err != nil {
 			return nil, fmt.Errorf("failed to register Python analyzer: %w", err)
 		}
-		log.Printf("Registered legacy Pylint analyzer")
+		log.Printf("Registered legacy local analyzers")
+
+	} else if analysisMode == "disabled" {
+		// Create minimal engine with no analyzers
+		engine = analysis.NewEngine(logger)
+		log.Printf("Analysis engine disabled - no analyzers registered")
+
 	} else {
-		return nil, fmt.Errorf("invalid analysis mode: %s (must be 'chttp' or 'legacy')", analysisMode)
+		return nil, fmt.Errorf("invalid analysis mode: %s (must be 'nomad', 'legacy', or 'disabled')", analysisMode)
 	}
 
 	// TODO: Register additional language analyzers as they are implemented
