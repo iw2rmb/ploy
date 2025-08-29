@@ -326,6 +326,8 @@
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
+          environment:
+            PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_health
           retries: 20
           delay: 15
@@ -352,6 +354,8 @@
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
+          environment:
+            PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_health_check
           retries: 20
           delay: 10
@@ -363,6 +367,8 @@
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
+          environment:
+            PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_ready
           retries: 15
           delay: 10
@@ -373,6 +379,8 @@
             url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/v1/health"
             method: GET
             status_code: 200
+          environment:
+            PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_api_test
           ignore_errors: true
 

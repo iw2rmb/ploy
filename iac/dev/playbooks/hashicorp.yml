@@ -655,6 +655,8 @@
             method: GET
             status_code: 200
             validate_certs: no
+          environment:
+            PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: api_health
           retries: 3
           delay: 10
