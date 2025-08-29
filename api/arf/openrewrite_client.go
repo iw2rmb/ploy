@@ -43,7 +43,11 @@ func NewOpenRewriteClient() *OpenRewriteClient {
 	var storageClient *storage.StorageClient
 	if err == nil && seaweedClient != nil {
 		// Wrap SeaweedFS client in StorageClient with default config
-		storageClient = storage.NewStorageClient(seaweedClient, nil)
+		config := &storage.ClientConfig{
+			RetryAttempts: 3,
+			Timeout:       30,
+		}
+		storageClient = storage.NewStorageClient(seaweedClient, config)
 		fmt.Printf("[OpenRewrite] Storage client created successfully\n")
 	} else {
 		fmt.Printf("[OpenRewrite] Storage client creation failed: %v\n", err)
