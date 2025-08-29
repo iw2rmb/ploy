@@ -23,6 +23,7 @@ import (
 	javaanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/java"
 	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
 	"github.com/iw2rmb/ploy/api/arf"
+	arfStorage "github.com/iw2rmb/ploy/api/arf/storage"
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/config"
 	"github.com/iw2rmb/ploy/api/consul_envstore"
@@ -46,7 +47,7 @@ import (
 
 	// internal_openrewrite "github.com/iw2rmb/ploy/internal/openrewrite"
 	"github.com/iw2rmb/ploy/internal/preview"
-	"github.com/iw2rmb/ploy/internal/storage"
+	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -523,7 +524,7 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 }
 
 // getStorageClient creates a new storage client for each request (stateless with caching)
-func (s *Server) getStorageClient() (*storage.StorageClient, error) {
+func (s *Server) getStorageClient() (*internalStorage.StorageClient, error) {
 	if s.dependencies.StorageFactory != nil {
 		// Use optimized factory with caching
 		start := time.Now()
@@ -1113,8 +1114,58 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	// Initialize validator
 	recipeValidator := arfConfig.InitializeValidator()
 
-	// Initialize recipe executor
-	engine := arf.NewRecipeExecutor(recipeStorage, sandboxMgr)
+	// Initialize OpenRewrite dispatcher for dynamic recipe downloading
+	var openRewriteDispatcher *arf.OpenRewriteDispatcher
+	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://nomad.service.consul:4646")
+	registryURL := utils.Getenv("PLOY_REGISTRY_URL", "registry.dev.ployman.app")
+	seaweedfsURL := utils.Getenv("SEAWEEDFS_URL", "http://seaweedfs.service.consul:8888")
+	apiURL := utils.Getenv("PLOY_API_URL", "http://api.service.consul:8081")
+	
+	// Create storage provider for OpenRewrite dispatcher
+	var storageProvider internalStorage.StorageProvider
+	seaweedConfig := internalStorage.SeaweedFSConfig{
+		Master:      seaweedfsURL,
+		Filer:       seaweedfsURL,
+		Collection:  "artifacts",
+		Replication: "000",
+		Timeout:     30,
+	}
+	seaweedClient, err := internalStorage.NewSeaweedFSClient(seaweedConfig)
+	if err != nil {
+		log.Printf("Warning: Failed to create SeaweedFS client for OpenRewrite dispatcher: %v", err)
+		storageProvider = nil
+	} else {
+		// Use the raw client as provider
+		storageProvider = seaweedClient
+	}
+	
+	if storageProvider != nil {
+		// Adapt internal storage to ARF storage interface
+		arfStorageService := arfStorage.NewInternalStorageAdapter(storageProvider)
+		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
+			nomadAddr,
+			registryURL,
+			seaweedfsURL,
+			apiURL,
+			arfStorageService,
+		)
+		if err != nil {
+			log.Printf("Warning: Failed to create OpenRewrite dispatcher: %v", err)
+			openRewriteDispatcher = nil
+		} else {
+			log.Printf("OpenRewrite dispatcher initialized for dynamic recipe downloading")
+		}
+	}
+	
+	// Initialize recipe executor with dispatcher if available
+	var engine *arf.RecipeExecutor
+	if openRewriteDispatcher != nil {
+		engine = arf.NewRecipeExecutorWithDispatcher(recipeStorage, sandboxMgr, openRewriteDispatcher)
+		log.Printf("Recipe executor initialized with OpenRewrite dispatcher for fallback")
+	} else {
+		engine = arf.NewRecipeExecutor(recipeStorage, sandboxMgr)
+		log.Printf("Recipe executor initialized without OpenRewrite dispatcher")
+	}
 
 	// Create ARF handler based on available backends
 	var handler *arf.Handler

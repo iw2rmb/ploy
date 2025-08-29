@@ -14,9 +14,10 @@ import (
 
 // RecipeExecutor executes transformation recipes
 type RecipeExecutor struct {
-	storage           storage.RecipeStorage
-	sandboxMgr        SandboxManager
-	openRewriteEngine *OpenRewriteEngine
+	storage              storage.RecipeStorage
+	sandboxMgr           SandboxManager
+	openRewriteEngine    *OpenRewriteEngine
+	openRewriteDispatcher *OpenRewriteDispatcher
 }
 
 // NewRecipeExecutor creates a new recipe executor
@@ -28,15 +29,108 @@ func NewRecipeExecutor(storage storage.RecipeStorage, sandboxMgr SandboxManager)
 	}
 }
 
+// NewRecipeExecutorWithDispatcher creates a new recipe executor with OpenRewrite dispatcher
+func NewRecipeExecutorWithDispatcher(
+	storage storage.RecipeStorage,
+	sandboxMgr SandboxManager,
+	dispatcher *OpenRewriteDispatcher,
+) *RecipeExecutor {
+	return &RecipeExecutor{
+		storage:              storage,
+		sandboxMgr:           sandboxMgr,
+		openRewriteEngine:    NewOpenRewriteEngine(),
+		openRewriteDispatcher: dispatcher,
+	}
+}
+
 // ExecuteRecipeByID executes a recipe by ID against a repository
 func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string, repoPath string) (*TransformationResult, error) {
-	// Load recipe from storage
+	// Try to load recipe from storage
 	recipe, err := e.storage.GetRecipe(ctx, recipeID)
 	if err != nil {
+		// Check if this is an OpenRewrite recipe and we have a dispatcher
+		if e.isOpenRewriteRecipe(recipeID) && e.openRewriteDispatcher != nil {
+			// Parse OpenRewrite recipe ID to get Maven coordinates
+			req, parseErr := ParseOpenRewriteRecipeID(recipeID)
+			if parseErr != nil {
+				return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
+			}
+			
+			// Set the repository path
+			req.RepoPath = repoPath
+			
+			// Dispatch to Nomad for dynamic download and execution
+			result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(ctx, req)
+			if execErr != nil {
+				return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
+			}
+			
+			// Recipe was successfully downloaded and executed, optionally cache it
+			// Note: The runner.sh script already registers the recipe with the API
+			// so it will be available in storage for future use
+			
+			return result, nil
+		}
+		
+		// Not an OpenRewrite recipe or no dispatcher available
 		return nil, fmt.Errorf("failed to load recipe %s: %w", recipeID, err)
 	}
 
 	return e.ExecuteRecipeObject(ctx, recipe, repoPath)
+}
+
+// isOpenRewriteRecipe checks if a recipe ID is an OpenRewrite recipe
+func (e *RecipeExecutor) isOpenRewriteRecipe(recipeID string) bool {
+	// OpenRewrite recipes typically start with "org.openrewrite"
+	// or are in the standard Java migration format
+	return len(recipeID) > 0 && 
+		(recipeID[:min(len(recipeID), 15)] == "org.openrewrite" ||
+		 recipeID[:min(len(recipeID), 8)] == "rewrite." ||
+		 // Also check for common OpenRewrite recipe patterns
+		 containsOpenRewritePattern(recipeID))
+}
+
+// containsOpenRewritePattern checks for common OpenRewrite patterns
+func containsOpenRewritePattern(recipeID string) bool {
+	patterns := []string{
+		"Java", "Spring", "Junit", "Maven", "Gradle",
+		"migrate", "upgrade", "modernize", "refactor",
+	}
+	for _, pattern := range patterns {
+		if containsIgnoreCase(recipeID, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// containsIgnoreCase checks if a string contains a substring ignoring case
+func containsIgnoreCase(s, substr string) bool {
+	// Simple case-insensitive contains check
+	for i := 0; i <= len(s)-len(substr); i++ {
+		match := true
+		for j := 0; j < len(substr); j++ {
+			if i+j >= len(s) {
+				return false
+			}
+			if s[i+j] != substr[j] && s[i+j] != substr[j]+32 && s[i+j] != substr[j]-32 {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // ExecuteRecipeObject executes a recipe object against a repository
