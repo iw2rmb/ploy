@@ -153,8 +153,8 @@ func (h *Handler) getRecipeStatsWithStorage(ctx context.Context, recipeID string
 	}, nil
 }
 
-// ListRecipes returns a list of available recipes
-func (h *Handler) ListRecipes(c *fiber.Ctx) error {
+// ListRecipesLegacy returns a list of available recipes (old implementation)
+func (h *Handler) ListRecipesLegacy(c *fiber.Ctx) error {
 	// Parse query parameters
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
@@ -188,8 +188,8 @@ func (h *Handler) ListRecipes(c *fiber.Ctx) error {
 	})
 }
 
-// GetRecipe returns a specific recipe by ID
-func (h *Handler) GetRecipe(c *fiber.Ctx) error {
+// GetRecipeLegacy returns a specific recipe by ID (old implementation)
+func (h *Handler) GetRecipeLegacy(c *fiber.Ctx) error {
 	recipeID := c.Params("id")
 
 	recipe, err := h.getRecipeWithStorage(c.Context(), recipeID)
@@ -203,8 +203,8 @@ func (h *Handler) GetRecipe(c *fiber.Ctx) error {
 	return c.JSON(recipe)
 }
 
-// CreateRecipe creates a new recipe
-func (h *Handler) CreateRecipe(c *fiber.Ctx) error {
+// CreateRecipeLegacy creates a new recipe (old implementation)
+func (h *Handler) CreateRecipeLegacy(c *fiber.Ctx) error {
 	var recipe models.Recipe
 	if err := c.BodyParser(&recipe); err != nil {
 		return c.Status(400).JSON(fiber.Map{
@@ -227,8 +227,8 @@ func (h *Handler) CreateRecipe(c *fiber.Ctx) error {
 	return c.Status(201).JSON(recipe)
 }
 
-// UpdateRecipe updates an existing recipe
-func (h *Handler) UpdateRecipe(c *fiber.Ctx) error {
+// UpdateRecipeLegacy updates an existing recipe (old implementation)
+func (h *Handler) UpdateRecipeLegacy(c *fiber.Ctx) error {
 	recipeID := c.Params("id")
 
 	var recipe models.Recipe
@@ -254,8 +254,8 @@ func (h *Handler) UpdateRecipe(c *fiber.Ctx) error {
 	return c.JSON(recipe)
 }
 
-// DeleteRecipe deletes a recipe
-func (h *Handler) DeleteRecipe(c *fiber.Ctx) error {
+// DeleteRecipeLegacy deletes a recipe (old implementation)
+func (h *Handler) DeleteRecipeLegacy(c *fiber.Ctx) error {
 	recipeID := c.Params("id")
 
 	if err := h.deleteRecipeWithStorage(c.Context(), recipeID); err != nil {
@@ -270,8 +270,8 @@ func (h *Handler) DeleteRecipe(c *fiber.Ctx) error {
 	})
 }
 
-// SearchRecipes searches for recipes based on criteria
-func (h *Handler) SearchRecipes(c *fiber.Ctx) error {
+// SearchRecipesLegacy searches for recipes based on criteria (old implementation)
+func (h *Handler) SearchRecipesLegacy(c *fiber.Ctx) error {
 	query := c.Query("q")
 	
 	recipes, err := h.searchRecipesWithStorage(c.Context(), query)

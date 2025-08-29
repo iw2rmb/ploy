@@ -24,9 +24,9 @@ func TestPatternRecording(t *testing.T) {
 		Language:     "java",
 		Context: ErrorContext{
 			SourceFile:   "src/main/java/Main.java",
-			LineNumber:   42,
 			Metadata: map[string]interface{}{
-				"build_tool":    "maven",
+				"line_number":  42,
+				"build_tool":   "maven",
 				"dependencies": []string{"junit", "mockito"},
 			},
 		},
