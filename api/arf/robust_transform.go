@@ -1011,18 +1011,203 @@ func detectLanguage(path string) string {
 }
 
 func extractArchive(archivePath, targetPath string) error {
-	// TODO: Implement archive extraction
-	return fmt.Errorf("archive extraction not yet implemented")
+	// Open archive file
+	archiveFile, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
+	}
+	defer archiveFile.Close()
+
+	// Create gzip reader
+	gzipReader, err := gzip.NewReader(archiveFile)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzipReader.Close()
+
+	// Create tar reader
+	tarReader := tar.NewReader(gzipReader)
+
+	// Ensure target directory exists
+	if err := os.MkdirAll(targetPath, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Extract files
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar header: %w", err)
+		}
+
+		// Create full path
+		fullPath := filepath.Join(targetPath, header.Name)
+
+		// Ensure the path is within target directory (security check)
+		if !strings.HasPrefix(fullPath, filepath.Clean(targetPath)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid path in archive: %s", header.Name)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			// Create directory
+			if err := os.MkdirAll(fullPath, header.FileInfo().Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", fullPath, err)
+			}
+		case tar.TypeReg:
+			// Extract file
+			// Ensure parent directory exists
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory: %w", err)
+			}
+
+			// Create file
+			file, err := os.Create(fullPath)
+			if err != nil {
+				return fmt.Errorf("failed to create file %s: %w", fullPath, err)
+			}
+
+			// Copy content
+			if _, err := io.Copy(file, tarReader); err != nil {
+				file.Close()
+				return fmt.Errorf("failed to extract file content: %w", err)
+			}
+			file.Close()
+
+			// Set permissions
+			if err := os.Chmod(fullPath, header.FileInfo().Mode()); err != nil {
+				return fmt.Errorf("failed to set file permissions: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func copyDirectory(src, dst string) error {
-	// TODO: Implement directory copying
-	return fmt.Errorf("directory copying not yet implemented")
+	// Create destination directory
+	if err := os.MkdirAll(dst, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Walk through source directory
+	return filepath.Walk(src, func(srcPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error walking source path %s: %w", srcPath, err)
+		}
+
+		// Get relative path from source root
+		relPath, err := filepath.Rel(src, srcPath)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		// Skip the root directory itself
+		if relPath == "." {
+			return nil
+		}
+
+		// Create destination path
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			// Create directory
+			if err := os.MkdirAll(dstPath, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", dstPath, err)
+			}
+		} else {
+			// Copy file
+			srcFile, err := os.Open(srcPath)
+			if err != nil {
+				return fmt.Errorf("failed to open source file %s: %w", srcPath, err)
+			}
+			defer srcFile.Close()
+
+			dstFile, err := os.Create(dstPath)
+			if err != nil {
+				return fmt.Errorf("failed to create destination file %s: %w", dstPath, err)
+			}
+			defer dstFile.Close()
+
+			if _, err := io.Copy(dstFile, srcFile); err != nil {
+				return fmt.Errorf("failed to copy file content: %w", err)
+			}
+
+			// Copy file permissions
+			if err := os.Chmod(dstPath, info.Mode()); err != nil {
+				return fmt.Errorf("failed to set file permissions: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func createArchive(sourcePath, archivePath string) error {
-	// TODO: Implement archive creation
-	return fmt.Errorf("archive creation not yet implemented")
+	// Create output file
+	archiveFile, err := os.Create(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to create archive file: %w", err)
+	}
+	defer archiveFile.Close()
+
+	// Create gzip writer
+	gzipWriter := gzip.NewWriter(archiveFile)
+	defer gzipWriter.Close()
+
+	// Create tar writer
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
+
+	// Walk through source directory and add files to tar
+	return filepath.Walk(sourcePath, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("error walking path %s: %w", filePath, err)
+		}
+
+		// Get relative path from source root
+		relPath, err := filepath.Rel(sourcePath, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		// Skip the root directory itself
+		if relPath == "." {
+			return nil
+		}
+
+		// Create tar header
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return fmt.Errorf("failed to create tar header: %w", err)
+		}
+
+		// Set the name in the header to the relative path
+		header.Name = relPath
+
+		// Write header
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return fmt.Errorf("failed to write tar header: %w", err)
+		}
+
+		// Write file content if it's a regular file
+		if info.Mode().IsRegular() {
+			file, err := os.Open(filePath)
+			if err != nil {
+				return fmt.Errorf("failed to open file %s: %w", filePath, err)
+			}
+			defer file.Close()
+
+			if _, err := io.Copy(tarWriter, file); err != nil {
+				return fmt.Errorf("failed to write file content: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func calculateLinesChanged(changes []FileChange) int {

@@ -32,4 +32,9 @@ performance {
   raft_multiplier = 1
 }
 
+# Rate limiting configuration to prevent 429 errors
+limits {
+  http_max_conns_per_client = 300
+}
+
 retry_join = ["{{ ansible_default_ipv4.address | default('127.0.0.1') }}"]

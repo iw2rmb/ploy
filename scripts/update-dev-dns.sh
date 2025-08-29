@@ -28,7 +28,7 @@ echo "  VPS IP: $VPS_IP"
 echo ""
 
 # Get controller endpoint
-CONTROLLER_PORT=$(ssh root@$VPS_IP "nomad alloc status \$(nomad job allocs ploy-api | grep running | head -1 | awk '{print \$1}') | grep 'http.*yes' | awk '{print \$3}' | cut -d: -f2" 2>/dev/null || echo "")
+CONTROLLER_PORT=$(ssh root@$VPS_IP "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && /opt/hashicorp/bin/nomad-job-manager.sh alloc-status \"\$ALLOC_ID\" 2>/dev/null | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == \"http\") | .Value // empty'" 2>/dev/null || echo "")
 
 if [ -z "$CONTROLLER_PORT" ]; then
     echo -e "${RED}✗ Could not find running controller${NC}"
