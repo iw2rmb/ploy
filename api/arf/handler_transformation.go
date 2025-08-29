@@ -233,18 +233,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 	
 	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath)
 	if err != nil {
-		// Check if this is a "recipe not found" error
-		if isNotFoundError(err) {
-			iteration.Stages = append(iteration.Stages, TransformationStage{
-				Name:      "recipe_execution",
-				StartTime: stageStart,
-				EndTime:   time.Now(),
-				Duration:  time.Since(stageStart),
-				Status:    "failed",
-				Details:   "recipe not found",
-			})
-			return nil, &NotFoundError{Message: fmt.Sprintf("recipe not found: %s", req.RecipeID)}
-		}
+		// Let RecipeExecutor handle fallback logic internally before treating as error
 		iteration.Stages = append(iteration.Stages, TransformationStage{
 			Name:      "recipe_execution",
 			StartTime: stageStart,
@@ -255,7 +244,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		})
 		iteration.Errors = append(iteration.Errors, ErrorCapture{
 			Stage:     "recipe_execution",
-			Type:      "runtime",
+			Type:      "runtime", 
 			Message:   "Recipe execution failed",
 			Details:   err.Error(),
 			Timestamp: time.Now(),
