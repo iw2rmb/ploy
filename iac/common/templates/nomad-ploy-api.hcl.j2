@@ -13,14 +13,18 @@ job "ploy-api" {
   priority = 80
 
   # High availability configuration
-  # Run multiple instances across different nodes
+  # Run multiple instances across different nodes (production) or single instance (dev)
   group "api" {
+    {% if ploy_environment is defined and ploy_environment == 'dev' %}
+    count = {{ nomad_api.replicas | default(1) }}
+    {% else %}
     count = {{ nomad_api.replicas | default(2) }}
 
-    # Spread across different nodes for availability
+    # Spread across different nodes for availability (production only)
     constraint {
       distinct_hosts = true
     }
+    {% endif %}
 
     # Rolling update configuration
     update {
