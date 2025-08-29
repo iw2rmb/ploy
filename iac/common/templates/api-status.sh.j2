@@ -50,21 +50,24 @@ if nomad job status ploy-api >/dev/null 2>&1; then
     # Allocation details
     echo ""
     echo "📦 Allocations:"
-    nomad job allocs ploy-api | head -10
+    /opt/hashicorp/bin/nomad-job-manager.sh allocs ploy-api | head -10
     
     # Health check status
     echo ""
     echo "🏥 Service Health:"
-    ALLOC_ID=$(nomad job allocs -short ploy-api | grep running | head -1 | awk '{print $1}')
+    ALLOC_ID=$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api)
     if [[ -n "$ALLOC_ID" ]]; then
         echo "  Allocation ID: $ALLOC_ID"
-        NODE_NAME=$(nomad alloc status "$ALLOC_ID" | grep 'Node Name' | awk '{print $3}')
-        echo "  Node: $NODE_NAME"
-        
-        # Get dynamic port
-        DYNAMIC_PORT=$(nomad alloc status "$ALLOC_ID" | grep "http:" | awk -F: '{print $2}')
-        if [[ -n "$DYNAMIC_PORT" ]]; then
-            echo "  Dynamic Port: $DYNAMIC_PORT"
+        # Get allocation status via HTTP API
+        if ALLOC_STATUS=$(/opt/hashicorp/bin/nomad-job-manager.sh alloc-status "$ALLOC_ID" 2>/dev/null); then
+            NODE_NAME=$(echo "$ALLOC_STATUS" | jq -r '.NodeName // "unknown"')
+            echo "  Node: $NODE_NAME"
+            
+            # Get dynamic port from task resources
+            DYNAMIC_PORT=$(echo "$ALLOC_STATUS" | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == "http") | .Value // empty')
+            if [[ -n "$DYNAMIC_PORT" ]]; then
+                echo "  Dynamic Port: $DYNAMIC_PORT"
+            fi
         fi
     fi
 else
@@ -159,7 +162,7 @@ echo ""
 echo "📋 Recent Logs:"
 if [[ -n "$ALLOC_ID" ]]; then
     echo "  Last 10 log lines from allocation $ALLOC_ID:"
-    nomad alloc logs -tail -n 10 "$ALLOC_ID" 2>/dev/null | sed 's/^/    /' || echo "    Unable to fetch logs"
+    /opt/hashicorp/bin/nomad-job-manager.sh logs "$ALLOC_ID" "" 10 2>/dev/null | sed 's/^/    /' || echo "    Unable to fetch logs"
 else
     echo "  ⚠️  No running allocation found"
 fi
@@ -167,8 +170,10 @@ fi
 # Resource usage
 echo ""
 echo "💾 Resource Usage:"
-if [[ -n "$ALLOC_ID" ]]; then
-    nomad alloc status "$ALLOC_ID" | grep -A 5 "Resource Usage" | sed 's/^/  /'
+if [[ -n "$ALLOC_ID" ]] && [[ -n "$ALLOC_STATUS" ]]; then
+    echo "  CPU: $(echo "$ALLOC_STATUS" | jq -r '.Resources.CPU // "N/A"') MHz"
+    echo "  Memory: $(echo "$ALLOC_STATUS" | jq -r '.Resources.MemoryMB // "N/A"') MB"
+    echo "  Disk: $(echo "$ALLOC_STATUS" | jq -r '.Resources.DiskMB // "N/A"') MB"
 fi
 
 echo ""

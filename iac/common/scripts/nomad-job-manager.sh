@@ -165,6 +165,106 @@ wait_for_job_running() {
     return 1
 }
 
+get_job_allocations() {
+    local job_name=$1
+    local format=${2:-""}  # "" for human readable, "json" for JSON, "short" for short format
+    
+    log "Getting allocations for job: $job_name (format: ${format:-human})"
+    
+    if [ "$format" = "json" ]; then
+        if http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"; then
+            return 0
+        fi
+    elif [ "$format" = "short" ]; then
+        if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"); then
+            # Parse JSON and format as short table
+            echo "$allocations" | jq -r '.[] | [.ID[0:8], .Name, .ClientStatus, .DesiredStatus, .NodeName] | @tsv' | \
+                awk 'BEGIN{print "ID       Name    ClientStatus DesiredStatus Node"} {printf "%-8s %-7s %-12s %-13s %s\n", $1, $2, $3, $4, $5}'
+            return 0
+        fi
+    else
+        # Human readable format
+        if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"); then
+            echo "$allocations" | jq -r '.[] | [.ID[0:8], .Name, .ClientStatus, .DesiredStatus, .NodeName, .CreateTime] | @tsv' | \
+                awk 'BEGIN{print "ID       Name    Status       Desired      Node                    Created"} {printf "%-8s %-7s %-12s %-12s %-23s %s\n", $1, $2, $3, $4, $5, strftime("%Y-%m-%d %H:%M:%S", $6/1000000000)}'
+            return 0
+        fi
+    fi
+    
+    log "Failed to get job allocations"
+    return 1
+}
+
+get_allocation_status() {
+    local alloc_id=$1
+    log "Getting status for allocation: $alloc_id"
+    
+    if http_request "GET" "$NOMAD_ADDR/v1/allocation/$alloc_id" "" "200"; then
+        return 0
+    else
+        log "Failed to get allocation status"
+        return 1
+    fi
+}
+
+get_running_allocation() {
+    local job_name=$1
+    log "Getting running allocation ID for job: $job_name"
+    
+    if allocations=$(get_job_allocations "$job_name" "json" 2>/dev/null); then
+        # Extract first running allocation ID
+        echo "$allocations" | jq -r '.[] | select(.ClientStatus == "running") | .ID' | head -1
+        return 0
+    else
+        log "Failed to get running allocation"
+        return 1
+    fi
+}
+
+get_allocation_logs() {
+    local alloc_id=$1
+    local task=${2:-""}
+    local lines=${3:-10}
+    local follow=${4:-false}
+    
+    log "Getting logs for allocation: $alloc_id (task: ${task:-auto}, lines: $lines)"
+    
+    # Build URL with query parameters
+    local url="$NOMAD_ADDR/v1/client/fs/logs/$alloc_id"
+    local query_params=""
+    
+    if [ -n "$task" ]; then
+        query_params="task=$task"
+    fi
+    
+    if [ "$lines" != "10" ]; then
+        if [ -n "$query_params" ]; then
+            query_params="$query_params&offset=-$lines"
+        else
+            query_params="offset=-$lines"
+        fi
+    fi
+    
+    if [ "$follow" = "true" ]; then
+        if [ -n "$query_params" ]; then
+            query_params="$query_params&follow=true"
+        else
+            query_params="follow=true"
+        fi
+    fi
+    
+    if [ -n "$query_params" ]; then
+        url="$url?$query_params"
+    fi
+    
+    if http_request "GET" "$url" "" "200"; then
+        return 0
+    else
+        log "Failed to get allocation logs"
+        return 1
+    fi
+}
+
 # Main logic
 case "$ACTION" in
     "stop")
@@ -199,13 +299,50 @@ case "$ACTION" in
         wait_for_job_running "$JOB_NAME" "$JOB_FILE"
         ;;
     
+    "allocs")
+        if [ -z "$JOB_NAME" ]; then
+            echo "Usage: $0 allocs <job-name> [format]" >&2
+            echo "Format: json, short, or human (default)" >&2
+            exit 1
+        fi
+        get_job_allocations "$JOB_NAME" "$JOB_FILE"
+        ;;
+    
+    "alloc-status")
+        if [ -z "$JOB_NAME" ]; then
+            echo "Usage: $0 alloc-status <allocation-id>" >&2
+            exit 1
+        fi
+        get_allocation_status "$JOB_NAME"
+        ;;
+    
+    "running-alloc")
+        if [ -z "$JOB_NAME" ]; then
+            echo "Usage: $0 running-alloc <job-name>" >&2
+            exit 1
+        fi
+        get_running_allocation "$JOB_NAME"
+        ;;
+    
+    "logs")
+        if [ -z "$JOB_NAME" ]; then
+            echo "Usage: $0 logs <alloc-id> [task] [lines]" >&2
+            exit 1
+        fi
+        get_allocation_logs "$JOB_NAME" "$JOB_FILE" "${3:-10}"
+        ;;
+    
     *)
-        echo "Usage: $0 {stop|run|status|wait} <job-name> [job-file]" >&2
+        echo "Usage: $0 {stop|run|status|wait|allocs|alloc-status|running-alloc|logs} <job-name> [job-file|format|alloc-id]" >&2
         echo "Actions:"
-        echo "  stop <job-name>           - Stop a running job"
-        echo "  run <job-name> <job-file> - Submit and run a job"
-        echo "  status <job-name>         - Get job allocation status"
-        echo "  wait <job-name> [timeout] - Wait for job to be running"
+        echo "  stop <job-name>               - Stop a running job"
+        echo "  run <job-name> <job-file>     - Submit and run a job"
+        echo "  status <job-name>             - Get job allocation status"
+        echo "  wait <job-name> [timeout]     - Wait for job to be running"
+        echo "  allocs <job-name> [format]    - Get job allocations (format: json, short, human)"
+        echo "  alloc-status <alloc-id>       - Get allocation status"
+        echo "  running-alloc <job-name>      - Get running allocation ID"
+        echo "  logs <alloc-id> [task] [lines] - Get allocation logs"
         exit 1
         ;;
 esac

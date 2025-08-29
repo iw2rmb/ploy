@@ -33,6 +33,11 @@ performance {
   raft_multiplier = 1
 }
 
+# Rate limiting configuration to prevent 429 errors
+limits {
+  http_max_conns_per_client = 300
+}
+
 # Logging configuration
 enable_syslog = false
 log_rotate_duration = "24h"
