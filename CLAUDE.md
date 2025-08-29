@@ -162,7 +162,7 @@ ployman api deploy
 **PROHIBITED (Never):**
 - Execute binaries locally: `./bin/api`, `go run ./controller`
 - Run integration tests locally: `./tests/scripts/test-*.sh`
-- Manual controller deployment: `nomad job run platform/nomad/ploy-api.hcl`
+- Manual Nomad deployments: Always use Ansible playbooks for deployment
 
 ### Git Current Branch Workflow
 

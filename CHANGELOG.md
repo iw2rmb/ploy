@@ -1892,7 +1892,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 
 ### Added
 - **Production Nomad System Job Configuration**
-  - `platform/nomad/ploy-api.hcl` with comprehensive system job definition
+  - Nomad job template at `iac/common/templates/nomad-ploy-api.hcl.j2`
   - Multi-instance deployment configuration with proper resource allocation (200 MHz CPU, 256 MB RAM)
   - System job type for deployment on every Nomad client node ensuring high availability
   - Linux-only constraint with minimum memory requirements (1GB) for stable operation
@@ -1921,7 +1921,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
   - Proper read/write permissions and path specifications for production deployment
 
 - **Testing Configuration**
-  - `platform/nomad/ploy-api-simple.hcl` simplified service job for validation
+  - Simplified service job configuration for validation
   - Service type deployment with 2 instances for high availability testing
   - Reduced complexity configuration for development and testing environments
 
