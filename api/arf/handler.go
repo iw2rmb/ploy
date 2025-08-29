@@ -18,7 +18,6 @@ type Handler struct {
 	learningSystem   LearningSystem
 	hybridPipeline   HybridPipeline
 	multiLangEngine  MultiLanguageEngine
-	abTestFramework  ABTestFramework
 	strategySelector StrategySelector
 	// Phase 4 components
 	securityEngine *SecurityEngine
@@ -67,7 +66,6 @@ func NewHandlerWithPhase3(
 	learning LearningSystem,
 	hybrid HybridPipeline,
 	multiLang MultiLanguageEngine,
-	abTest ABTestFramework,
 	strategy StrategySelector,
 ) *Handler {
 	return &Handler{
@@ -78,7 +76,6 @@ func NewHandlerWithPhase3(
 		learningSystem:   learning,
 		hybridPipeline:   hybrid,
 		multiLangEngine:  multiLang,
-		abTestFramework:  abTest,
 		strategySelector: strategy,
 		// Initialize Phase 4 components
 		securityEngine: NewSecurityEngine(),
@@ -134,10 +131,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// arf.Post("/learning/outcome", h.RecordTransformationOutcome)
 	// arf.Get("/learning/patterns", h.ExtractLearningPatterns)
 
-	// Phase 3: A/B Testing
-	arf.Post("/ab-test", h.CreateABTest)
-	arf.Get("/ab-test/:id/results", h.GetABTestResults)
-	arf.Post("/ab-test/:id/graduate", h.GraduateABTest)
+	// Phase 3: A/B Testing removed - functionality deprecated
 
 	// Phase 4: Security
 	arf.Post("/security/scan", h.SecurityScan)

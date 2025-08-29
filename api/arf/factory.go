@@ -31,11 +31,6 @@ type Phase3Config struct {
 	// Multi-Language Configuration
 	TreeSitterPath string   `yaml:"tree_sitter_path"`
 	SupportedLangs []string `yaml:"supported_languages"`
-
-	// A/B Testing Configuration
-	ABTestMinSamples   int     `yaml:"ab_test_min_samples"`
-	ABTestConfidence   float64 `yaml:"ab_test_confidence"`
-	ABTestTrafficSplit float64 `yaml:"ab_test_traffic_split"`
 }
 
 // DefaultPhase3Config returns default configuration for Phase 3
@@ -61,10 +56,6 @@ func DefaultPhase3Config() *Phase3Config {
 
 		TreeSitterPath: "/usr/local/bin/tree-sitter",
 		SupportedLangs: []string{"java", "javascript", "python", "go", "rust"},
-
-		ABTestMinSamples:   100,
-		ABTestConfidence:   0.95,
-		ABTestTrafficSplit: 0.5,
 	}
 }
 
@@ -148,11 +139,6 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 		components.MultiLangEngine,
 	)
 
-	// Initialize A/B Test Framework
-	if components.LearningSystem != nil {
-		components.ABTestFramework = NewDefaultABTestFramework(getDBFromLearningSystem(components.LearningSystem))
-	}
-
 	// Initialize Strategy Selector
 	components.StrategySelector = NewDefaultStrategySelector()
 
@@ -165,7 +151,6 @@ type Phase3Components struct {
 	LearningSystem   LearningSystem
 	HybridPipeline   HybridPipeline
 	MultiLangEngine  MultiLanguageEngine
-	ABTestFramework  ABTestFramework
 	StrategySelector StrategySelector
 }
 
@@ -275,7 +260,6 @@ func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sa
 		components.LearningSystem,
 		components.HybridPipeline,
 		components.MultiLangEngine,
-		components.ABTestFramework,
 		components.StrategySelector,
 	), nil
 }
