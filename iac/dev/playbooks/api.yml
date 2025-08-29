@@ -86,13 +86,13 @@
           when: git_update.changed
         
         - name: Build API binary with version information
-          shell: cd /home/ploy/ploy && ./scripts/build.sh api
+          shell: cd /home/ploy/ploy && ./scripts/build.sh api bin
           become_user: ploy
           register: api_build
           changed_when: api_build.rc == 0
 
         - name: Build CLI (ploy) binary with version information  
-          shell: cd /home/ploy/ploy && ./scripts/build.sh cli
+          shell: cd /home/ploy/ploy && ./scripts/build.sh cli bin
           become_user: ploy
           register: ploy_build
           changed_when: ploy_build.rc == 0
