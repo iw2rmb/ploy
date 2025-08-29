@@ -81,9 +81,9 @@ The system implements a progressive 3-phase testing approach:
 ```
 
 **Test Repositories**:
-- `spring-projects/spring-petclinic` (Reference implementation)
+- `winterbe/java8-tutorial` (Reference implementation)
 - `eugenp/tutorials` (Tutorial collection)
-- `winterbe/java8-tutorial` (Simple examples)
+- `iluwatar/java-design-patterns` (Design patterns examples)
 
 ### Phase 2: LLM-Enhanced Testing
 **Objective**: Test hybrid OpenRewrite + LLM pipeline
@@ -135,7 +135,7 @@ STOP_ON_FAILURE=true ./scripts/run-openrewrite-comprehensive-test.sh
 ```bash
 # Single repository migration
 ploy arf benchmark run java11to17_migration \
-  --repository "https://github.com/spring-projects/spring-petclinic.git" \
+  --repository "https://github.com/winterbe/java8-tutorial.git" \
   --app-name "test-migration" \
   --branch main \
   --lane C \
@@ -163,7 +163,7 @@ description: "Parallel Java 11→17 migration"
 
 repositories:
   - id: "simple-1"
-    url: "https://github.com/spring-projects/spring-petclinic.git"
+    url: "https://github.com/winterbe/java8-tutorial.git"
     branch: "main"
     language: "java"
     build_tool: "maven"

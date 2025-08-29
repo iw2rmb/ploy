@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Phase 1 ARF Java 11→17 Migration Benchmark Test Script
-# Simulates benchmark execution with Spring PetClinic repository
+# Phase 1 ARF Java 8→17 Migration Benchmark Test Script
+# Simulates benchmark execution with Java 8 Tutorial repository
 
 set -e
 
 echo "=== Phase 1: ARF Java 11→17 Migration Benchmark Test ==="
 echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
-echo "Repository: Spring PetClinic"
+echo "Repository: Java 8 Tutorial"
 echo ""
 
 # Colors for output
@@ -18,9 +18,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-TEST_REPO="https://github.com/spring-projects/spring-petclinic.git"
+TEST_REPO="https://github.com/winterbe/java8-tutorial.git"
 TEST_BRANCH="main"
-TEST_APP="test-petclinic-phase1-$(date +%s)"
+TEST_APP="test-java8-tutorial-phase1-$(date +%s)"
 TEST_DIR="/tmp/arf-benchmark-test"
 BENCHMARK_ID="bench-$(date +%s)"
 

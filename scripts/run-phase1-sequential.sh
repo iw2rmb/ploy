@@ -19,9 +19,9 @@ echo
 
 # Phase 1 test repositories (Tier 1: Simple projects)
 PHASE1_REPOS=(
-  "https://github.com/spring-projects/spring-petclinic.git"
-  "https://github.com/eugenp/tutorials.git" 
   "https://github.com/winterbe/java8-tutorial.git"
+  "https://github.com/eugenp/tutorials.git" 
+  "https://github.com/iluwatar/java-design-patterns.git"
 )
 
 # Results tracking

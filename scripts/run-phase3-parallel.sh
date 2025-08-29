@@ -30,7 +30,7 @@ execution_config:
 
 repositories:
   - id: "simple-1"
-    url: "https://github.com/spring-projects/spring-petclinic.git"
+    url: "https://github.com/winterbe/java8-tutorial.git"
     branch: "main"
     language: "java"
     build_tool: "maven" 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -184,8 +185,12 @@ func runAnsibleDeployment() {
 	
 	fmt.Printf("Using Ansible playbooks from: %s\n", iacPath)
 	
-	// Execute Ansible playbook locally
-	ansibleCmd := exec.Command("ansible-playbook",
+	// Create context with 5-minute timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	
+	// Execute Ansible playbook locally with timeout
+	ansibleCmd := exec.CommandContext(ctx, "ansible-playbook",
 		"playbooks/api.yml",
 		"-e", fmt.Sprintf("target_host=%s", targetHost),
 		"-e", fmt.Sprintf("deploy_branch=%s", branch),
@@ -199,9 +204,13 @@ func runAnsibleDeployment() {
 	// Set environment variables that might be needed
 	ansibleCmd.Env = os.Environ()
 	
-	fmt.Println("Running Ansible playbook...")
+	fmt.Println("Running Ansible playbook (5-minute timeout)...")
 	if err := ansibleCmd.Run(); err != nil {
-		fmt.Printf("Ansible deployment failed: %v\n", err)
+		if ctx.Err() == context.DeadlineExceeded {
+			fmt.Printf("Ansible deployment timed out after 5 minutes\n")
+		} else {
+			fmt.Printf("Ansible deployment failed: %v\n", err)
+		}
 		fmt.Println("Tip: Ensure you have SSH access to the target host and all required Ansible dependencies")
 		return
 	}

@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # Test configuration
 CONTROLLER_URL="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
 TEST_APP="test-java-analysis"
-TEST_REPO_URL="https://github.com/spring-projects/spring-petclinic.git"
+TEST_REPO_URL="https://github.com/winterbe/java8-tutorial.git"
 
 echo -e "${GREEN}=== Static Analysis Framework Phase 1 Test ===${NC}"
 echo "Controller: $CONTROLLER_URL"
