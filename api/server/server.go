@@ -1580,3 +1580,4 @@ func initializeOpenRewriteHandler(cfg *ControllerConfig) (*handlers.ARFOpenRewri
 	log.Printf("OpenRewrite handler initialized successfully")
 	return handler, nil
 }
+// Test comment for self-update verification - Fri Aug 29 09:21:29 MSK 2025
