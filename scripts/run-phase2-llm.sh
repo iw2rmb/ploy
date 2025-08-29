@@ -7,29 +7,20 @@ set -e
 echo "🧠 Starting ARF OpenRewrite Phase 2 LLM-Enhanced Testing"
 echo "======================================================="
 
-# Configure OpenRewrite service AND LLM provider
-export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
-export ARF_OPENREWRITE_MODE=service
+# Configure OpenRewrite (batch jobs) AND LLM provider
+export ARF_OPENREWRITE_MODE=embedded
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 export ARF_LLM_PROVIDER="ollama"
 export ARF_LLM_MODEL="codellama:7b"
 
 echo "📋 Configuration:"
-echo "  OpenRewrite Service: $OPENREWRITE_SERVICE_URL"
-echo "  ARF Mode: $ARF_OPENREWRITE_MODE"  
+echo "  ARF Mode: $ARF_OPENREWRITE_MODE (using batch job dispatcher)"
 echo "  Controller: $PLOY_CONTROLLER"
 echo "  LLM Provider: $ARF_LLM_PROVIDER"
 echo "  LLM Model: $ARF_LLM_MODEL"
 echo
 
-# Verify both services
-echo "🏥 Checking OpenRewrite service..."
-if curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" >/dev/null 2>&1; then
-  echo "✅ OpenRewrite service is healthy"
-else
-  echo "⚠️  OpenRewrite service not responding, proceeding with embedded mode"
-  export ARF_OPENREWRITE_MODE=embedded
-fi
+echo "🔧 Using ARF batch job dispatcher for OpenRewrite transformations"
 
 echo "🧠 Checking LLM provider..."
 if curl -f "http://localhost:11434/api/tags" >/dev/null 2>&1; then
