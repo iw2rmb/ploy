@@ -125,9 +125,9 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Delete("/models/:name", h.RemoveModel)
 	arf.Post("/models/:name/set-default", h.SetDefaultModel)
 
-	// TODO: Transformation execution - methods not yet implemented
-	// arf.Post("/transform", h.ExecuteTransformation)
-	// arf.Get("/transforms/:id", h.GetTransformationResult)
+	// Transformation execution
+	arf.Post("/transform", h.ExecuteTransformation)
+	arf.Get("/transforms/:id", h.GetTransformationResult)
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)
