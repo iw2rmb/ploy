@@ -19,6 +19,7 @@ type Codebase struct {
 
 // TransformationResult contains the results of a recipe execution
 type TransformationResult struct {
+	TransformationID string                 `json:"transformation_id,omitempty"`
 	RecipeID        string                 `json:"recipe_id"`
 	Success         bool                   `json:"success"`
 	ChangesApplied  int                    `json:"changes_applied"`

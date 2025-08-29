@@ -145,7 +145,7 @@
 - `POST /v1/arf/models/:name/set-default` — set default model
 
 ### Transformation & Sandbox Operations
-- `POST /v1/arf/transform` — execute code transformation
+- `POST /v1/arf/transform` — execute code transformation (supports OpenRewrite recipes)
 - `GET /v1/arf/transforms/:id` — get transformation result
 - `GET /v1/arf/sandboxes` — list active sandboxes
 - `POST /v1/arf/sandboxes` — create new sandbox
