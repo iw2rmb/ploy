@@ -26,16 +26,14 @@ func handleARFCommand(args []string) error {
 		return handleARFRecipesCommand(args[1:])
 	case "transform":
 		return handleARFTransformCommand(args[1:])
-	case "sandbox":
-		return handleARFSandboxCommand(args[1:])
-	case "benchmark":
-		return handleARFBenchmarkCommand(args[1:])
-	case "workflow":
-		return handleARFWorkflowCommand(args[1:])
 	case "health":
 		return handleARFHealthCommand()
 	case "cache":
 		return handleARFCacheCommand(args[1:])
+	// Removed commands - functionality integrated into transform:
+	// - sandbox: deployment testing is now automatic in transform
+	// - benchmark: multi-iteration testing is part of transform --iterations
+	// - workflow: human approval not needed in automated system
 	default:
 		fmt.Printf("Unknown ARF subcommand: %s\n", subcommand)
 		printARFUsage()
@@ -48,10 +46,7 @@ func printARFUsage() {
 	fmt.Println()
 	fmt.Println("Available subcommands:")
 	fmt.Println("  recipes    Manage transformation recipes")
-	fmt.Println("  transform  Execute code transformations")
-	fmt.Println("  sandbox    Manage sandboxes")
-	fmt.Println("  benchmark  Run and manage transformation benchmarks")
-	fmt.Println("  workflow   Execute end-to-end transformation workflows")
+	fmt.Println("  transform  Execute code transformations with self-healing")
 	fmt.Println("  health     Check ARF system health")
 	fmt.Println("  cache      Manage AST cache")
 	fmt.Println()

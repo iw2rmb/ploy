@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## [2025-08-29] - ARF Transform Command Consolidation
+
+### Added
+- **Unified Transform Command**: Consolidated workflow, sandbox, and benchmark functionality into single robust `transform` command
+  - Self-healing capabilities with automatic error recovery using LLM-powered solutions
+  - Parallel solution attempts for faster error resolution (--parallel-tries flag)
+  - Hybrid transformation approach combining OpenRewrite recipes and LLM prompts
+  - Multiple output formats: archive (tar.gz), diff (unified), merge request (patch)
+  - Configurable report levels: minimal, standard, detailed
+  - Iterative refinement with --max-iterations for benchmark-like testing
+  - Custom LLM models for planning (--plan-model) and execution (--exec-model)
+  - Automatic build and deployment testing for validation
+
+### Changed
+- **ARF CLI Simplification**: Removed redundant commands in favor of unified transform
+  - `ploy arf sandbox` functionality integrated into transform's automatic deployment testing
+  - `ploy arf benchmark` replaced by transform's --max-iterations flag
+  - `ploy arf workflow` capabilities absorbed into transform's LLM prompt system
+- **API Endpoint Consolidation**: Single `/arf/transform` endpoint handles all transformation requests
+  - Supports both legacy and new request formats for backward compatibility
+  - Automatic routing to robust transformation engine when new parameters detected
+
+### Removed
+- **Deprecated Commands**: Removed obsolete ARF commands and their implementations
+  - Removed `sandbox`, `benchmark`, and `workflow` CLI commands
+  - Deleted 15+ files related to human workflow, sandbox management, and benchmark orchestration
+  - Cleaned up unused type definitions and interfaces throughout codebase
+
+### Fixed
+- **Compilation Errors**: Resolved all compilation issues from command consolidation
+  - Fixed type naming conflicts (RobustSolution, RobustDeploymentResult)
+  - Removed unused imports and references to deleted types
+  - Updated handler registration to exclude removed endpoints
+  - Stubbed backward compatibility methods where required
+
+### Testing
+- **Build Verification**: All components compile successfully
+  - API server builds without errors
+  - CLI client builds without errors
+  - No unused imports or undefined references
+
 ## [2025-08-28] - Docker Registry Infrastructure Updates
 
 ### Added

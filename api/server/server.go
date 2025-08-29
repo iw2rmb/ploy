@@ -28,6 +28,7 @@ import (
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/config"
+	"github.com/iw2rmb/ploy/api/handlers"
 	"github.com/iw2rmb/ploy/api/consul_envstore"
 	"github.com/iw2rmb/ploy/api/coordination"
 	"github.com/iw2rmb/ploy/api/dns"
@@ -66,8 +67,8 @@ type ServiceDependencies struct {
 	ACMEHandler             *acme.Handler
 	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
-	ARFHandler              *arf.Handler
-	// OpenRewriteHandler *openrewrite.Handler
+	ARFHandler          *arf.Handler
+	OpenRewriteHandler  *handlers.ARFOpenRewriteHandler
 	AnalysisHandler     *analysis.Handler
 	CoordinationManager *coordination.CoordinationManager
 	BlueGreenManager    *bluegreen.Manager
@@ -265,11 +266,10 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 	}
 
 	// Initialize OpenRewrite Handler
-	// openRewriteHandler, err := initializeOpenRewriteHandler(cfg)
-	// if err != nil {
-	// 	log.Printf("Warning: Failed to initialize OpenRewrite handler: %v", err)
-	// }
-	// var openRewriteHandler interface{} = nil // Placeholder
+	openRewriteHandler, err := initializeOpenRewriteHandler(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize OpenRewrite handler: %v", err)
+	}
 
 	// Initialize Analysis Handler
 	analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler)
@@ -322,9 +322,9 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		DNSHandler:              dnsHandler,
 		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
-		ARFHandler:              arfHandler,
-		// OpenRewriteHandler: openRewriteHandler,
-		AnalysisHandler:     analysisHandler,
+		ARFHandler:         arfHandler,
+		OpenRewriteHandler: openRewriteHandler,
+		AnalysisHandler:    analysisHandler,
 		CoordinationManager: coordinationManager,
 		BlueGreenManager:    blueGreenManager,
 		Metrics:             metricsInstance,
@@ -667,10 +667,10 @@ func (s *Server) setupRoutes() {
 	}
 
 	// OpenRewrite endpoints
-	// if s.dependencies.OpenRewriteHandler != nil {
-	// 	s.dependencies.OpenRewriteHandler.RegisterRoutes(s.app)
-	// 	log.Printf("OpenRewrite routes registered successfully")
-	// }
+	if s.dependencies.OpenRewriteHandler != nil {
+		s.dependencies.OpenRewriteHandler.RegisterRoutes(s.app)
+		log.Printf("OpenRewrite routes registered successfully")
+	}
 
 	// Static Analysis endpoints
 	if s.dependencies.AnalysisHandler != nil {
@@ -1591,5 +1591,25 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (
 
 	log.Printf("Static Analysis handler initialized with %d language analyzers (mode: %s)",
 		len(engine.GetSupportedLanguages()), analysisMode)
+	return handler, nil
+}
+
+// initializeOpenRewriteHandler initializes the OpenRewrite handler for Java transformations
+func initializeOpenRewriteHandler(cfg *ControllerConfig) (*handlers.ARFOpenRewriteHandler, error) {
+	log.Printf("Initializing OpenRewrite handler")
+
+	// Create storage client for OpenRewrite artifacts
+	storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage client: %w", err)
+	}
+
+	// Create OpenRewrite handler
+	handler, err := handlers.NewARFOpenRewriteHandler(storageClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OpenRewrite handler: %w", err)
+	}
+
+	log.Printf("OpenRewrite handler initialized successfully")
 	return handler, nil
 }

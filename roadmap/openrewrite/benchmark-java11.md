@@ -1,14 +1,24 @@
 # Comprehensive ARF Java 11→17 Migration Test Scenario
 
+## ⚠️ Updated for New Transform Command (August 2025)
+This document has been updated to use the new unified `ploy arf transform` command that consolidates all transformation, benchmarking, and testing functionality with self-healing capabilities. The previous `benchmark`, `sandbox`, and `workflow` commands have been deprecated.
+
+### Key Changes:
+- **Unified Command**: All tests now use `ploy arf transform` with various flags
+- **Self-Healing**: Built-in error recovery with `--max-iterations` and `--parallel-tries`
+- **Output Formats**: Support for `archive`, `diff`, and `mr` (merge request) outputs
+- **Hybrid Approach**: Combine `--recipe` and `--prompt` for maximum flexibility
+- **Real-time Reporting**: Three levels (`minimal`, `standard`, `detailed`) for monitoring progress
+
 ## Overall Progress Tracking
 - [ ] **Service Setup Complete**: OpenRewrite Lane E service deployed and validated
-- [ ] **Phase 1 Complete**: Baseline OpenRewrite Testing
-- [ ] **Phase 2 Complete**: LLM Self-Healing Integration  
-- [ ] **Phase 3 Complete**: Parallel Execution Testing
+- [ ] **Phase 1 Complete**: Baseline recipe-based transformations
+- [ ] **Phase 2 Complete**: LLM self-healing with parallel solution attempts
+- [ ] **Phase 3 Complete**: Parallel execution of multiple repositories
 - [ ] **All Success Metrics Met**: Production readiness confirmed
 
 ## Overview
-Design a comprehensive test scenario that progressively evaluates ARF features (OpenRewrite, LLM self-healing, parallel execution) using real-world Java 11 Maven projects for Java 11→17 migrations.
+Design a comprehensive test scenario that progressively evaluates ARF's enhanced transformation capabilities (OpenRewrite recipes, LLM self-healing, parallel solution attempts) using real-world Java 11 Maven projects for Java 11→17 migrations.
 
 **OpenRewrite Service Architecture**: As of 2025-08-26, OpenRewrite runs as a standalone Lane E service at `openrewrite.dev.ployman.app`, deployed via `ployman push` with automatic SSL and routing.
 
@@ -56,20 +66,20 @@ ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
 
 ## Test Projects Classification
 
-### Tier 1: Simple Projects (Single-threaded baseline)
-1. **SLOC Counter** - Java program to count SLOC, blank lines and comments
-2. **Basic CRUD API** - SpringBoot Simple Crud Rest API with pagination
-3. **Utility Libraries** - Small Java 11 utilities from GitHub topics
+### Tier 1: Simple Projects (Recipe-based transformation)
+1. **Java 8 Tutorial** - Simple examples for basic Java 8→17 transformation
+2. **Baeldung Tutorials** - Large tutorial collection with Java 11 code
+3. **Simple Java Util** - Small utility libraries requiring migration
 
-### Tier 2: Medium Complexity Projects (LLM integration)
-4. **Reactive Programming Demo** - "progamacao-reativa-em-java-com-spring"
-5. **Spring Boot Microservice** - With H2, MongoDB reactive features
-6. **Legacy Integration Service** - Projects requiring API compatibility fixes
+### Tier 2: Medium Complexity Projects (LLM self-healing)
+4. **Spring Boot Framework** - Core framework requiring complex migration
+5. **Reactor Core** - Reactive programming with advanced patterns
+6. **Apache Kafka** - Distributed streaming with API compatibility challenges
 
-### Tier 3: Complex Projects (Full hybrid pipeline)
-7. **E-commerce Application** - "SpringBoot-Angular7-Online-Shopping-Store"
-8. **Event-driven Microservices** - "apachecamel-debezium" with Kafka, Debezium
-9. **Spring PetClinic** - Reference implementation for comprehensive testing
+### Tier 3: Complex Projects (Full self-healing with parallel attempts)
+7. **Spring Cloud Alibaba** - Microservices framework with dependencies
+8. **Netflix Eureka** - Service discovery requiring iterative fixes
+9. **Large Enterprise Apps** - Complex migrations needing parallel solution attempts
 
 ## Progressive Test Scenario Design
 
@@ -143,76 +153,116 @@ ployman env set -a openrewrite-service AUTO_SHUTDOWN_MINUTES=0
 
 ## Detailed Test Configuration
 
-### ARF Benchmark Commands
+### ARF Transform Commands (New Unified Interface)
 
-**Phase 1: Sequential Simple Projects**
+**Phase 1: Sequential Simple Projects (Recipe-based)**
 ```bash
 # IMPORTANT: Configure service URL first
 export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 export ARF_OPENREWRITE_MODE=service
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-# Single project baseline (Spring PetClinic - Java 17 deployment test)
-ploy arf benchmark run java17_deployment_test \
-  --repository "https://github.com/spring-projects/spring-petclinic.git" \
-  --app-name "test-petclinic-deployment" \
-  --branch main \
-  --lane C --iterations 1
+# Single project baseline (Java 8 Tutorial - actual migration test)
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.Java8toJava17 \
+  --repository "https://github.com/winterbe/java8-tutorial.git" \
+  --branch master \
+  --output archive \
+  --output-path ./java8-tutorial-migrated.tar.gz \
+  --report standard
 
 # Multiple simple projects (sequential with real repos)
 SIMPLE_REPOS=(
-  "https://github.com/spring-projects/spring-petclinic.git"
-  "https://github.com/eugenp/tutorials.git"
   "https://github.com/winterbe/java8-tutorial.git"
+  "https://github.com/eugenp/tutorials.git"
+  "https://github.com/iluwatar/java-design-patterns.git"  # Uses Java 11
 )
 
 for i in "${!SIMPLE_REPOS[@]}"; do
   repo="${SIMPLE_REPOS[$i]}"
-  app_name="test-simple-$((i+1))"
-  echo "Testing: $repo as $app_name"
+  output_file="test-simple-$((i+1)).tar.gz"
+  echo "Testing: $repo"
   
-  ploy arf benchmark run java11to17_migration \
+  ploy arf transform \
+    --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
     --repository "$repo" \
-    --app-name "$app_name" \
     --branch main \
-    --lane C --iterations 1
-    
-  # Check job status
-  sleep 10
-  ploy arf benchmark status --app-name "$app_name"
+    --output archive \
+    --output-path "./$output_file" \
+    --report standard \
+    --timeout 10m
 done
 ```
 
-**Phase 2: LLM-Enhanced Complex Projects**
+**Phase 2: LLM-Enhanced Self-Healing**
 ```bash
 # Configure both OpenRewrite service and LLM provider
 export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 export ARF_OPENREWRITE_MODE=service
-export ARF_LLM_PROVIDER=ollama
-export ARF_LLM_MODEL=codellama:7b
 
-# Test with real medium-complexity projects
-ploy arf benchmark run java11to17_migration \
+# Test with self-healing capabilities
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --prompt "Also update deprecated APIs and fix any compilation errors" \
   --repository "https://github.com/spring-projects/spring-boot.git" \
-  --app-name "test-llm-springboot" \
   --branch main \
-  --lane C --iterations 3
+  --plan-model codellama:13b \
+  --exec-model codellama:7b \
+  --max-iterations 3 \
+  --parallel-tries 2 \
+  --output diff \
+  --output-path ./springboot-migration.diff \
+  --report detailed
 
-# Additional complex project testing
-ploy arf benchmark run java11to17_migration \
+# Complex project with aggressive self-healing
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --prompt "Ensure all tests pass after migration" \
   --repository "https://github.com/reactor/reactor-core.git" \
-  --app-name "test-llm-reactor" \
   --branch main \
-  --lane C --iterations 3
+  --plan-model codellama:13b \
+  --exec-model codellama:7b \
+  --max-iterations 5 \
+  --parallel-tries 3 \
+  --output mr \
+  --output-path ./reactor-migration.patch \
+  --report detailed \
+  --timeout 30m
 ```
 
-**Phase 3: Parallel Multi-Repository**
+**Phase 3: Batch Transformations with Parallel Attempts**
 ```bash
-# Create batch transformation configuration
-ploy arf benchmark run batch_java11to17_migration \
-  --config-file batch-config.yaml \
-  --app-name "test-parallel-batch" \
-  --lane C
+# Parallel transformation of multiple repositories
+# Note: Use multiple transform commands with background execution for parallelism
+
+# Start parallel transformations
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --repository "https://github.com/spring-projects/spring-petclinic.git" \
+  --max-iterations 3 \
+  --parallel-tries 2 \
+  --output archive \
+  --output-path ./batch-1.tar.gz &
+
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --repository "https://github.com/eugenp/tutorials.git" \
+  --max-iterations 3 \
+  --parallel-tries 2 \
+  --output archive \
+  --output-path ./batch-2.tar.gz &
+
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --repository "https://github.com/winterbe/java8-tutorial.git" \
+  --max-iterations 3 \
+  --parallel-tries 2 \
+  --output archive \
+  --output-path ./batch-3.tar.gz &
+
+# Wait for all parallel jobs
+wait
+echo "All parallel transformations completed"
 ```
 
 ### Sample Batch Configuration (batch-config.yaml)
@@ -359,31 +409,36 @@ curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" || {
 }
 
 PHASE1_REPOS=(
-  "https://github.com/spring-projects/spring-petclinic.git"
-  "https://github.com/eugenp/tutorials.git"
   "https://github.com/winterbe/java8-tutorial.git"
+  "https://github.com/eugenp/tutorials.git"
+  "https://github.com/iluwatar/java-design-patterns.git"
 )
 
 for i in "${!PHASE1_REPOS[@]}"; do
   repo="${PHASE1_REPOS[$i]}"
-  app_name="phase1-simple-$((i+1))"
+  output_file="phase1-result-$((i+1)).tar.gz"
   
   echo "Starting Phase 1 test $((i+1))/3: $repo"
   
-  ploy arf benchmark run java11to17_migration \
+  ploy arf transform \
+    --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
     --repository "$repo" \
     --branch main \
-    --app-name "$app_name" \
-    --lane C \
-    --iterations 1
+    --output archive \
+    --output-path "./$output_file" \
+    --report standard \
+    --timeout 10m
     
-  # Monitor job status
-  benchmark_id=$(ploy arf benchmark list --latest --app-name "$app_name" | head -1 | cut -f1)
-  echo "Benchmark ID: $benchmark_id"
+  # Check if transformation succeeded
+  if [ -f "$output_file" ]; then
+    echo "✅ Transformation completed: $output_file"
+    tar -tzf "$output_file" | head -5
+  else
+    echo "❌ Transformation failed for $repo"
+  fi
   
-  # Wait for completion before next test
-  sleep 30
-  ploy arf benchmark status "$benchmark_id"
+  # Brief pause between tests
+  sleep 5
 done
 
 echo "Phase 1 sequential testing completed"
@@ -400,15 +455,10 @@ set -e
 export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 export ARF_OPENREWRITE_MODE=service
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
-export ARF_LLM_PROVIDER="ollama"
-export ARF_LLM_MODEL="codellama:7b"
 
-# Verify both services
+# Verify OpenRewrite service
 echo "Checking OpenRewrite service..."
 curl -f "${OPENREWRITE_SERVICE_URL}/v1/openrewrite/health" || exit 1
-
-echo "Checking LLM provider..."
-# Add LLM provider check if needed
 
 PHASE2_REPOS=(
   "https://github.com/spring-projects/spring-boot.git"
@@ -418,26 +468,36 @@ PHASE2_REPOS=(
 
 for i in "${!PHASE2_REPOS[@]}"; do
   repo="${PHASE2_REPOS[$i]}"
-  app_name="phase2-llm-$((i+1))"
+  output_file="phase2-llm-result-$((i+1)).diff"
   
   echo "Starting Phase 2 LLM test $((i+1))/3: $repo"
   
-  ploy arf benchmark run java11to17_migration \
+  # Use transform with self-healing capabilities
+  ploy arf transform \
+    --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+    --prompt "Fix any compilation errors and update deprecated APIs" \
     --repository "$repo" \
     --branch main \
-    --app-name "$app_name" \
-    --lane C \
-    --iterations 3  # Allow up to 3 LLM iterations
+    --plan-model codellama:13b \
+    --exec-model codellama:7b \
+    --max-iterations 3 \
+    --parallel-tries 2 \
+    --output diff \
+    --output-path "./$output_file" \
+    --report detailed \
+    --timeout 20m
     
-  # Monitor benchmark progress
-  benchmark_id=$(ploy arf benchmark list --latest --app-name "$app_name" | head -1 | cut -f1)
-  echo "Monitoring benchmark: $benchmark_id"
+  # Check transformation results
+  if [ -f "$output_file" ]; then
+    echo "✅ Self-healing transformation completed: $output_file"
+    echo "Diff stats:"
+    wc -l "$output_file"
+  else
+    echo "❌ Transformation failed for $repo"
+  fi
   
-  # Wait and check status periodically
-  for j in {1..10}; do
-    sleep 30
-    ploy arf benchmark status "$benchmark_id" || true
-  done
+  # Pause between complex transformations
+  sleep 10
 done
 
 echo "Phase 2 LLM-enhanced testing completed"
@@ -455,78 +515,69 @@ export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 export ARF_OPENREWRITE_MODE=service
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-# Create batch configuration for parallel execution
-cat > /tmp/phase3-batch-config.yaml << EOF
-name: "phase3_parallel_java11to17"
-description: "Parallel execution test across all complexity tiers"
-
-# Service configuration
-service_config:
-  openrewrite_url: "${OPENREWRITE_SERVICE_URL}"
-  mode: "service"
-
-repositories:
-  - id: "simple-1"
-    url: "https://github.com/spring-projects/spring-petclinic.git"
-    branch: "main"
-    language: "java"
-    build_tool: "maven" 
-    priority: 1
-    
-  - id: "simple-2"  
-    url: "https://github.com/winterbe/java8-tutorial.git"
-    branch: "master"
-    language: "java"
-    build_tool: "maven"
-    priority: 1
-    
-  - id: "medium-1"
-    url: "https://github.com/spring-projects/spring-boot.git" 
-    branch: "main"
-    language: "java"
-    build_tool: "maven"
-    priority: 2
-    dependencies: ["simple-1"]
-    
-  - id: "complex-1"
-    url: "https://github.com/reactor/reactor-core.git"
-    branch: "main"
-    language: "java"
-    build_tool: "gradle"
-    priority: 3
-    dependencies: ["medium-1"]
-
-recipes:
-  - "org.openrewrite.java.migrate.JavaVersion11to17"
-  - "org.openrewrite.java.migrate.javax.JavaxToJakarta"
-
-options:
-  parallel_execution: true
-  max_concurrency: 3
-  fail_fast: false
-  timeout: "45m"
-  dry_run: false
-  create_pull_request: false
-
-# LLM configuration
-llm_provider: "ollama"
-llm_model: "codellama:7b"
-llm_options:
-  base_url: "http://localhost:11434"
-  temperature: "0.1"
-  max_tokens: "4096"
-EOF
-
 echo "Starting Phase 3 parallel execution test"
 
-# Submit batch transformation
-ploy arf benchmark run custom \
-  --config-file /tmp/phase3-batch-config.yaml \
-  --app-name "phase3-parallel-test" \
-  --lane C
+# Define repositories for parallel testing
+REPOS=(
+  "https://github.com/winterbe/java8-tutorial.git"
+  "https://github.com/eugenp/tutorials.git"
+  "https://github.com/iluwatar/java-design-patterns.git"
+  "https://github.com/apache/commons-lang.git"  # Apache Commons - Java 8
+)
 
-# Monitor overall progress
-echo "Phase 3 parallel testing submitted - monitor with 'ploy arf benchmark list'"
+# Start parallel transformations with self-healing
+echo "Launching parallel transformations..."
+
+for i in "${!REPOS[@]}"; do
+  repo="${REPOS[$i]}"
+  output_file="phase3-parallel-$((i+1)).tar.gz"
+  
+  # Launch transform in background with self-healing
+  (
+    echo "Starting parallel transform $((i+1)): $repo"
+    ploy arf transform \
+      --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+      --recipe org.openrewrite.java.migrate.javax.JavaxToJakarta \
+      --prompt "Ensure compatibility with Java 17 and fix any issues" \
+      --repository "$repo" \
+      --branch main \
+      --plan-model codellama:13b \
+      --exec-model codellama:7b \
+      --max-iterations 5 \
+      --parallel-tries 3 \
+      --output archive \
+      --output-path "./$output_file" \
+      --report detailed \
+      --timeout 30m
+    
+    if [ -f "$output_file" ]; then
+      echo "✅ Parallel transform $((i+1)) completed: $output_file"
+    else
+      echo "❌ Parallel transform $((i+1)) failed: $repo"
+    fi
+  ) &
+done
+
+# Wait for all background jobs to complete
+echo "Waiting for all parallel transformations to complete..."
+wait
+
+# Summarize results
+echo ""
+echo "Phase 3 Parallel Execution Summary:"
+echo "===================================="
+for i in {1..4}; do
+  output_file="phase3-parallel-${i}.tar.gz"
+  if [ -f "$output_file" ]; then
+    size=$(du -h "$output_file" | cut -f1)
+    echo "✅ Transform ${i}: SUCCESS (${size})"
+  else
+    echo "❌ Transform ${i}: FAILED"
+  fi
+done
+
+echo ""
+echo "Phase 3 parallel testing completed"
 ```
 
 ## Risk Mitigation
@@ -562,11 +613,18 @@ ployman logs -a openrewrite-service
 
 **Recipe Failures**:
 ```bash
-# Verify recipe configuration
-ploy arf benchmark validate-recipe java11to17_migration
+# Verify recipe is available
+ploy arf recipes search "JavaVersion11to17"
 
 # Check OpenRewrite service metrics for errors
 curl https://openrewrite.dev.ployman.app/v1/openrewrite/metrics
+
+# Try with different output format for debugging
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --repository "https://github.com/simple/test.git" \
+  --output diff \
+  --report detailed
 ```
 
 **ARF Not Using Service**:
@@ -580,13 +638,16 @@ export ARF_OPENREWRITE_MODE=service
 export OPENREWRITE_SERVICE_URL=https://openrewrite.dev.ployman.app
 ```
 
-**Job Status Unknown**:
+**Transformation Status Unknown**:
 ```bash
-# Check job status directly via API
-curl "https://openrewrite.dev.ployman.app/v1/openrewrite/jobs/${JOB_ID}/status"
+# Check transformation logs via API
+curl "${PLOY_CONTROLLER}/arf/transform/status"
 
-# List all jobs
-ploy arf benchmark list
+# Monitor self-healing iterations in real-time
+ploy arf transform \
+  --recipe org.openrewrite.java.migrate.JavaVersion11to17 \
+  --repository "..." \
+  --report detailed  # Shows real-time progress
 ```
 
 ## Success Metrics

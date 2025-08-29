@@ -117,6 +117,102 @@
             msg: "Successfully built: {{ item.item }} (exists: {{ item.stat.exists }})"
           loop: "{{ binary_check.results }}"
 
+    - name: Upload API binary to SeaweedFS for self-update
+      block:
+        - name: Generate version identifier for binary upload
+          shell: echo "$(date +%Y%m%d-%H%M%S)-$(cd /home/ploy/ploy && git rev-parse --short HEAD)"
+          register: binary_version
+          become_user: ploy
+          changed_when: false
+
+        - name: Get git commit hash
+          shell: cd /home/ploy/ploy && git rev-parse HEAD
+          register: git_commit_full
+          become_user: ploy
+          changed_when: false
+
+        - name: Get git branch
+          shell: cd /home/ploy/ploy && git rev-parse --abbrev-ref HEAD
+          register: git_branch
+          become_user: ploy
+          changed_when: false
+
+        - name: Calculate SHA256 hash of API binary
+          shell: sha256sum /home/ploy/ploy/bin/api | awk '{print $1}'
+          register: api_binary_hash
+          become_user: ploy
+          changed_when: false
+
+        - name: Get API binary size
+          stat:
+            path: /home/ploy/ploy/bin/api
+          register: api_binary_stat
+
+        - name: Create metadata JSON for API binary
+          copy:
+            content: |
+              {
+                "version": "{{ binary_version.stdout }}",
+                "build_time": "{{ ansible_date_time.iso8601 }}",
+                "git_commit": "{{ git_commit_full.stdout }}",
+                "git_branch": "{{ git_branch.stdout }}",
+                "platform": "linux",
+                "architecture": "amd64",
+                "sha256_hash": "{{ api_binary_hash.stdout }}",
+                "size": {{ api_binary_stat.stat.size }},
+                "path": "api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+              }
+            dest: /tmp/api-metadata.json
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+        - name: Upload API binary to SeaweedFS
+          shell: |
+            curl -X POST \
+              -F "file=@/home/ploy/ploy/bin/api" \
+              "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+          register: binary_upload
+          retries: 3
+          delay: 5
+          until: binary_upload.rc == 0
+          become_user: ploy
+
+        - name: Upload metadata to SeaweedFS
+          shell: |
+            curl -X POST \
+              -F "file=@/tmp/api-metadata.json" \
+              "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
+          register: metadata_upload
+          retries: 3
+          delay: 5
+          until: metadata_upload.rc == 0
+          become_user: ploy
+
+        - name: Verify upload by listing versions
+          uri:
+            url: "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/?pretty=y"
+            method: GET
+          register: version_list
+          ignore_errors: true
+
+        - name: Display upload results
+          debug:
+            msg: |
+              API binary uploaded successfully:
+              - Version: {{ binary_version.stdout }}
+              - SHA256: {{ api_binary_hash.stdout }}
+              - Size: {{ api_binary_stat.stat.size }} bytes
+              - Location: ploy-artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api
+
+        - name: Save uploaded version for reference
+          copy:
+            content: "{{ binary_version.stdout }}"
+            dest: /opt/ploy/uploaded-api-version
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
     - name: Initialize unified deployment system
       block:
         - name: Generate deployment version identifier

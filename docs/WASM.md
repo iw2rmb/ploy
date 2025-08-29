@@ -407,7 +407,7 @@ This detection system ensures accurate Lane G routing while providing fallback o
 #### Deploy Rust WASM Application
 ```bash
 # Create Rust WASM app
-./build/ploy apps new --lang rust --name rust-wasm-app
+./bin/ploy apps new --lang rust --name rust-wasm-app
 
 # Configure for WASM target in Cargo.toml:
 # [lib]
@@ -416,13 +416,13 @@ This detection system ensures accurate Lane G routing while providing fallback o
 # wasm-bindgen = "0.2"
 
 # Deploy (automatically detects Lane G)
-./build/ploy push -a rust-wasm-app
+./bin/ploy push -a rust-wasm-app
 ```
 
 #### Deploy Go WASM Application  
 ```bash
 # Create Go WASM app
-./build/ploy apps new --lang go --name go-wasm-app
+./bin/ploy apps new --lang go --name go-wasm-app
 
 # Add build constraints:
 # // +build js,wasm
@@ -430,13 +430,13 @@ This detection system ensures accurate Lane G routing while providing fallback o
 # import "syscall/js"
 
 # Deploy (automatically detects Lane G)
-./build/ploy push -a go-wasm-app
+./bin/ploy push -a go-wasm-app
 ```
 
 #### Deploy AssemblyScript Application
 ```bash
 # Create AssemblyScript app
-./build/ploy apps new --lang node --name assemblyscript-app
+./bin/ploy apps new --lang node --name assemblyscript-app
 
 # Configure package.json:
 # "scripts": {
@@ -447,7 +447,7 @@ This detection system ensures accurate Lane G routing while providing fallback o
 # }
 
 # Deploy (automatically detects Lane G)
-./build/ploy push -a assemblyscript-app
+./bin/ploy push -a assemblyscript-app
 ```
 
 ### Sample Applications

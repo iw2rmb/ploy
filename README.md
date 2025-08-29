@@ -139,8 +139,8 @@ Ploy uses **automated version generation** from git metadata, eliminating manual
 ### Version Discovery
 ```bash
 # CLI version
-./build/ploy version
-./build/ploy version --detailed
+./bin/ploy version
+./bin/ploy version --detailed
 
 # API endpoints
 curl http://localhost:8081/version

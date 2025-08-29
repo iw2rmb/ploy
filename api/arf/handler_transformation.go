@@ -7,8 +7,17 @@ import (
 	"github.com/iw2rmb/ploy/api/arf/models"
 )
 
-// ExecuteTransformation executes a transformation using a recipe
+// ExecuteTransformation executes a transformation with robust self-healing capabilities
 func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
+	// Check if this is the new robust transformation request format
+	var robustReq RobustTransformRequest
+	if err := c.BodyParser(&robustReq); err == nil && 
+		(len(robustReq.Transformations.RecipeIDs) > 0 || len(robustReq.Transformations.LLMPrompts) > 0) {
+		// New robust transformation format
+		return h.ExecuteRobustTransformation(c)
+	}
+	
+	// Legacy transformation request format
 	var req struct {
 		RecipeID   string            `json:"recipe_id"`
 		Repository Repository        `json:"repository"`
@@ -21,30 +30,60 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create a sandbox for the transformation
-	sandbox, err := h.sandboxMgr.CreateSandbox(c.Context(), SandboxConfig{
-		Repository: req.Repository.URL,
-		Branch:     req.Repository.Branch,
-		TTL:        30 * time.Minute,
-	})
+	// Convert legacy request to robust format
+	robustReq = RobustTransformRequest{}
+	robustReq.InputSource.Repository = req.Repository.URL
+	robustReq.InputSource.Branch = req.Repository.Branch
+	robustReq.Transformations.RecipeIDs = []string{req.RecipeID}
+	robustReq.Execution.MaxIterations = 3
+	robustReq.Execution.ParallelTries = 3
+	robustReq.Execution.Timeout = "30m"
+	robustReq.Execution.PlanModel = "ollama/codellama:7b"
+	robustReq.Execution.ExecModel = "ollama/codellama:7b"
+	robustReq.Output.Format = "diff"
+	robustReq.Output.ReportLevel = "standard"
+	
+	// Execute robust transformation
+	logger := func(level, stage, message, details string) {
+		// Log to Fiber context logger if available
+		c.Context().Logger().Printf("[%s] %s: %s %s", level, stage, message, details)
+	}
+	
+	result, err := ExecuteRobustTransformation(c.Context(), &robustReq, logger)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to create sandbox",
+			"error":   "Transformation failed",
 			"details": err.Error(),
 		})
 	}
 
-	// Mock transformation execution
-	result := TransformationResult{
-		RecipeID:       req.RecipeID,
-		Success:        true,
-		ChangesApplied: 5,
-		FilesModified:  []string{"pom.xml", "src/main/java/App.java"},
-		ExecutionTime:  2 * time.Minute,
-	}
-	_ = sandbox // Use the sandbox variable
-	// Return the result
+	return c.JSON(result)
+}
 
+// ExecuteRobustTransformation handles the new robust transformation format
+func (h *Handler) ExecuteRobustTransformation(c *fiber.Ctx) error {
+	var req RobustTransformRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{
+			"error":   "Invalid request",
+			"details": err.Error(),
+		})
+	}
+	
+	// Logger function for tracking progress
+	logger := func(level, stage, message, details string) {
+		c.Context().Logger().Printf("[%s] %s: %s %s", level, stage, message, details)
+	}
+	
+	// Execute the robust transformation
+	result, err := ExecuteRobustTransformation(c.Context(), &req, logger)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error":   "Transformation failed",
+			"details": err.Error(),
+		})
+	}
+	
 	return c.JSON(result)
 }
 

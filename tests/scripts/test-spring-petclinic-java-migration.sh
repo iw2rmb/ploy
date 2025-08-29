@@ -187,7 +187,7 @@ EOF
     
     # Use the benchmark CLI command we implemented
     BENCHMARK_OUTPUT=$(cd "$PROJECT_ROOT" && \
-        ./build/ploy arf benchmark run petclinic-java17-migration \
+        ./bin/ploy arf benchmark run petclinic-java17-migration \
             --repository "$PETCLINIC_REPO" \
             --transformations "migration.java11-to-17,cleanup.unused-imports" \
             --app-name "$TEST_APP_NAME" \

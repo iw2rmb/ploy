@@ -709,15 +709,22 @@ CLLM is a standalone microservice for secure, sandboxed LLM-based code transform
 
 ## 🧬 Automated Remediation Framework (ARF) ✅ OPERATIONAL
 
-**STATUS: ✅ OPERATIONAL** - Phases 1-4 ✅ COMPLETE (August 2025), integrated with dedicated OpenRewrite service. Comprehensive roadmap available in `roadmap/arf/`
+**STATUS: ✅ OPERATIONAL** - Enhanced with unified transform command and self-healing capabilities (August 2025). Comprehensive roadmap available in `roadmap/arf/`
 
-ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. ARF integrates with the dedicated OpenRewrite service for Java transformations while providing LLM-assisted intelligence and multi-language support.
+ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. The system now features a unified `transform` command that consolidates all transformation, benchmarking, and testing capabilities with advanced self-healing powered by LLM.
+
+### ✅ **Enhanced Transform Command with Self-Healing (August 2025)**
+- ✅ **Unified Transformation Engine**: Single `transform` command replacing sandbox, benchmark, and workflow commands
+- ✅ **Self-Healing Capabilities**: Automatic error recovery with LLM-powered solution planning and parallel attempts
+- ✅ **Hybrid Transformation**: Combine OpenRewrite recipes with natural language LLM prompts for maximum flexibility
+- ✅ **Multiple Output Formats**: Support for archive (tar.gz), diff (unified), and merge request (patch) outputs
+- ✅ **Iterative Refinement**: Multi-iteration testing with configurable parallel solution attempts
+- ✅ **Comprehensive Reporting**: Three levels of reporting (minimal, standard, detailed) with timing and metrics
 
 ### ✅ **Recent Achievements: Java 11→17 Migration Success (August 2025)**
 - ✅ **Complete End-to-End Pipeline**: Successfully processing Spring PetClinic Java 11→17 migrations with full deployment validation
 - ✅ **Lane C Integration**: ARF benchmarks deploying to OSv unikernels via Lane C with 60-80MB image optimization
 - ✅ **Template Processing Resolution**: Resolved complex HCL conditional block parsing enabling seamless Nomad deployments
-- ✅ **Benchmark System**: Comprehensive benchmark suite with diff capture, timing analysis, and success rate tracking
 - ✅ **Production Validation**: End-to-end testing on VPS infrastructure with real HTTP endpoint validation
 
 ### ✅ **Implemented Core Transformation Engine**

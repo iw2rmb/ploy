@@ -80,7 +80,7 @@ export CERT_EMAIL="admin@ployd.app"
 # Deployed via Ansible - no user action required
 curl https://api.dev.ployman.app/health          # ✅ Works automatically
 curl https://myapp.dev.ployd.app               # ✅ Works automatically
-./build/ploy push -a testapp                   # ✅ HTTPS enabled automatically
+./bin/ploy push -a testapp                   # ✅ HTTPS enabled automatically
 curl https://testapp.dev.ployd.app             # ✅ Works automatically
 ```
 
@@ -88,10 +88,10 @@ curl https://testapp.dev.ployd.app             # ✅ Works automatically
 
 ```bash
 # User adds custom domain to their app
-./build/ploy domains:add myapp custom-domain.com
+./bin/ploy domains:add myapp custom-domain.com
 
 # Platform provisions individual certificate
-./build/ploy domains:list myapp
+./bin/ploy domains:list myapp
 # Output: custom-domain.com (SSL: active, expires: 2024-09-15)
 
 # User can access their app via custom domain

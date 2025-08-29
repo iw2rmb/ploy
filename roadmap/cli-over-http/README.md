@@ -1025,7 +1025,7 @@ set -e
 echo "Starting CHTTP integration tests..."
 
 # Start test server
-./build/chttp --config configs/test-config.yaml &
+./bin/chttp --config configs/test-config.yaml &
 SERVER_PID=$!
 
 # Wait for server to start

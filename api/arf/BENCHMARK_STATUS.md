@@ -39,7 +39,7 @@
 ```bash
 # 1. Build the components
 go build -o bin/api ./api
-go build -o build/ploy ./cmd/ploy
+go build -o bin/ploy ./cmd/ploy
 
 # 2. Run minimal test
 ./tests/scripts/test-arf-benchmark-minimal.sh

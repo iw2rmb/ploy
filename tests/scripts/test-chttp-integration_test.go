@@ -177,7 +177,7 @@ func TestAnsibleTemplates(t *testing.T) {
 		switch template {
 		case "pylint-chttp-config.yaml.j2":
 			assert.Contains(t, templateStr, "service:", "Should define service configuration")
-			assert.Contains(t, templateStr, "pylint-chttp", "Should configure Pylint service")
+			assert.Contains(t, templateStr, "pylint-analysis", "Should configure Pylint service")
 			assert.Contains(t, templateStr, "security:", "Should include security settings")
 
 		case "chttp-service.service.j2":

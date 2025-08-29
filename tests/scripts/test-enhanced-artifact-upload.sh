@@ -96,7 +96,7 @@ cleanup_test_environment() {
     # Clean up test app if it exists
     if curl -s "${CONTROLLER_URL}/apps/${TEST_APP_NAME}" >/dev/null 2>&1; then
         log "Destroying test app: $TEST_APP_NAME"
-        ./build/ploy apps destroy --name "$TEST_APP_NAME" --force || warning "Failed to destroy test app"
+        ./bin/ploy apps destroy --name "$TEST_APP_NAME" --force || warning "Failed to destroy test app"
     fi
     
     # Clean up test directory
@@ -315,9 +315,9 @@ check_controller_availability() {
 }
 
 check_build_binary() {
-    if [[ ! -x "./build/ploy" ]]; then
-        error "Ploy CLI binary not found at ./build/ploy"
-        log "Please build the CLI: go build -o build/ploy ./cmd/ploy"
+    if [[ ! -x "./bin/ploy" ]]; then
+        error "Ploy CLI binary not found at ./bin/ploy"
+        log "Please build the CLI: go build -o bin/ploy ./cmd/ploy"
         exit 1
     fi
     

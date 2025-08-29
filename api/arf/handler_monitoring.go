@@ -77,7 +77,6 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 			"strategy_selector": h.strategySelector != nil,
 			"security_engine": h.securityEngine != nil,
 			"sbom_analyzer":   h.sbomAnalyzer != nil,
-			"workflow_engine": h.workflowEngine != nil,
 			"production_optimizer": h.productionOptimizer != nil,
 		},
 		"version": "2.0.0",

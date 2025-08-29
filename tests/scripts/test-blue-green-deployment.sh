@@ -49,7 +49,7 @@ cleanup() {
     curl -s -X POST "$CONTROLLER_URL/apps/$TEST_APP/blue-green/rollback" || true
     
     # Remove test app
-    ./build/ploy apps destroy --name "$TEST_APP" --force 2>/dev/null || true
+    ./bin/ploy apps destroy --name "$TEST_APP" --force 2>/dev/null || true
     
     echo "Cleanup completed"
 }
@@ -113,9 +113,9 @@ test_prerequisites() {
     print_success "Controller is accessible"
     
     # Check if CLI binary exists
-    if [ ! -f "./build/ploy" ]; then
-        print_error "CLI binary not found at ./build/ploy"
-        print_warning "Build the CLI with: go build -o build/ploy ./cmd/ploy"
+    if [ ! -f "./bin/ploy" ]; then
+        print_error "CLI binary not found at ./bin/ploy"
+        print_warning "Build the CLI with: go build -o bin/ploy ./cmd/ploy"
         exit 1
     fi
     print_success "CLI binary found"
@@ -174,7 +174,7 @@ EOF
     echo "go 1.21" >> go.mod
     
     # Deploy initial version
-    APP_VERSION="$VERSION_1" ../../build/ploy push -a "$TEST_APP" -sha "$VERSION_1"
+    APP_VERSION="$VERSION_1" ../../bin/ploy push -a "$TEST_APP" -sha "$VERSION_1"
     
     # Wait for deployment
     sleep 10
@@ -398,7 +398,7 @@ test_cli_integration() {
     print_test "Testing CLI integration"
     
     # Test CLI status command
-    local cli_status=$(./build/ploy bluegreen status "$TEST_APP" 2>&1)
+    local cli_status=$(./bin/ploy bluegreen status "$TEST_APP" 2>&1)
     if echo "$cli_status" | grep -q "Blue-Green Deployment Status"; then
         print_success "CLI status command working"
     else
@@ -406,7 +406,7 @@ test_cli_integration() {
     fi
     
     # Test CLI help
-    local cli_help=$(./build/ploy bluegreen --help 2>&1 || ./build/ploy bluegreen 2>&1)
+    local cli_help=$(./bin/ploy bluegreen --help 2>&1 || ./bin/ploy bluegreen 2>&1)
     if echo "$cli_help" | grep -q "Commands:"; then
         print_success "CLI help working"
     else

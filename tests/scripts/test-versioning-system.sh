@@ -17,8 +17,8 @@ NC='\033[0m'
 echo -e "${YELLOW}Test 1: Building controller with version injection...${NC}"
 ./scripts/build.sh controller
 
-if [ -f "build/controller.version" ]; then
-    VERSION=$(cat build/controller.version)
+if [ -f "bin/controller.version" ]; then
+    VERSION=$(cat bin/controller.version)
     echo -e "${GREEN}✓ Version file created: $VERSION${NC}"
 else
     echo -e "${RED}✗ Version file not found${NC}"
@@ -29,8 +29,8 @@ fi
 echo -e "${YELLOW}Test 2: Building CLI with version injection...${NC}"
 ./scripts/build.sh cli
 
-if [ -f "build/ploy.version" ]; then
-    CLI_VERSION=$(cat build/ploy.version)
+if [ -f "bin/ploy.version" ]; then
+    CLI_VERSION=$(cat bin/ploy.version)
     echo -e "${GREEN}✓ CLI version file created: $CLI_VERSION${NC}"
 else
     echo -e "${RED}✗ CLI version file not found${NC}"
@@ -39,9 +39,9 @@ fi
 
 # Test 3: Check version manifest
 echo -e "${YELLOW}Test 3: Checking version manifest...${NC}"
-if [ -f "build/version.json" ]; then
+if [ -f "bin/version.json" ]; then
     echo -e "${GREEN}✓ Version manifest created:${NC}"
-    cat build/version.json | jq .
+    cat bin/version.json | jq .
 else
     echo -e "${RED}✗ Version manifest not found${NC}"
     exit 1
@@ -77,7 +77,7 @@ kill $CONTROLLER_PID 2>/dev/null || true
 
 # Test 6: Test CLI version command
 echo -e "${YELLOW}Test 6: Testing CLI version command...${NC}"
-./build/ploy version
+./bin/ploy version
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ CLI version command working${NC}"
 else
@@ -87,7 +87,7 @@ fi
 
 # Test 7: Test CLI with PLOY_APPS_DOMAIN
 echo -e "${YELLOW}Test 7: Testing CLI with PLOY_APPS_DOMAIN...${NC}"
-PLOY_APPS_DOMAIN=test.example.com ./build/ploy version 2>&1 | head -1
+PLOY_APPS_DOMAIN=test.example.com ./bin/ploy version 2>&1 | head -1
 echo -e "${GREEN}✓ CLI respects PLOY_APPS_DOMAIN for controller URL${NC}"
 
 echo ""

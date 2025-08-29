@@ -3,81 +3,60 @@ package arf
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"time"
-
-	"github.com/google/uuid"
+	
 	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
-// OpenRewriteClient implements HTTP client for OpenRewrite service
+// OpenRewriteClient handles OpenRewrite transformations via batch jobs
 type OpenRewriteClient struct {
-	baseURL string
-	client  *http.Client
+	dispatcher *OpenRewriteDispatcher
 }
 
-// TransformRequest represents a transformation request to the service
-type TransformRequest struct {
-	JobID        string       `json:"job_id"`
-	TarArchive   string       `json:"tar_archive"`   // base64 encoded
-	RecipeConfig RecipeConfig `json:"recipe_config"`
-}
-
-// RecipeConfig represents OpenRewrite recipe configuration
-type RecipeConfig struct {
-	Recipe    string `json:"recipe"`
-	Artifacts string `json:"artifacts,omitempty"`
-}
-
-// CreateJobRequest represents an async job creation request
-type CreateJobRequest struct {
-	TarArchive   string       `json:"tar_archive"`
-	RecipeConfig RecipeConfig `json:"recipe_config"`
-}
-
-// JobResponse represents a job creation response
-type JobResponse struct {
-	JobID string `json:"job_id"`
-}
-
-// JobStatus represents job status information
-type JobStatus struct {
-	JobID     string `json:"job_id"`
-	Status    string `json:"status"`    // pending, running, completed, failed
-	Progress  int    `json:"progress"`  // 0-100
-	StartTime string `json:"start_time"`
-	EndTime   string `json:"end_time,omitempty"`
-	Error     string `json:"error,omitempty"`
-}
-
-// NewOpenRewriteClient creates a new HTTP client for OpenRewrite service
+// NewOpenRewriteClient creates a new OpenRewrite client using the dispatcher
 func NewOpenRewriteClient() *OpenRewriteClient {
-	// Get platform domain
-	platformDomain := os.Getenv("PLOY_PLATFORM_DOMAIN")
-	if platformDomain == "" {
-		platformDomain = "ployman.app"
+	// Get Nomad and Consul addresses from environment
+	nomadAddr := os.Getenv("NOMAD_ADDR")
+	if nomadAddr == "" {
+		nomadAddr = "http://localhost:4646"
 	}
 	
-	baseURL := fmt.Sprintf("https://openrewrite.%s", platformDomain)
+	consulAddr := os.Getenv("CONSUL_HTTP_ADDR")
+	if consulAddr == "" {
+		consulAddr = "http://localhost:8500"
+	}
 	
-	// Allow override for development
-	if override := os.Getenv("OPENREWRITE_SERVICE_URL"); override != "" {
-		baseURL = override
+	// Create storage client (simplified for now)
+	seaweedClient, err := storage.NewSeaweedFSClient(storage.SeaweedFSConfig{
+		Master: "localhost:9333",
+		Filer:  "localhost:8888",
+		Collection: "ploy-artifacts",
+		Replication: "001",
+		Timeout: 30,
+	})
+	
+	var storageClient *storage.StorageClient
+	if err == nil && seaweedClient != nil {
+		// Wrap SeaweedFS client in StorageClient with default config
+		storageClient = storage.NewStorageClient(seaweedClient, nil)
+	}
+	
+	// Create dispatcher
+	dispatcher, err := NewOpenRewriteDispatcher(nomadAddr, consulAddr, storageClient)
+	if err != nil {
+		// Log error but continue with nil dispatcher
+		fmt.Printf("Warning: failed to create dispatcher: %v\n", err)
 	}
 	
 	return &OpenRewriteClient{
-		baseURL: baseURL,
-		client: &http.Client{
-			Timeout: 5 * time.Minute,
-		},
+		dispatcher: dispatcher,
 	}
 }
 
-// Execute implements the TransformationEngine interface for HTTP service calls
+// Execute implements the TransformationEngine interface for batch job execution
 func (c *OpenRewriteClient) Execute(ctx context.Context, step *models.RecipeStep, repoPath string) (*TransformationResult, error) {
 	// Parse recipe configuration
 	recipe, ok := step.Config["recipe"].(string)
@@ -85,174 +64,203 @@ func (c *OpenRewriteClient) Execute(ctx context.Context, step *models.RecipeStep
 		return nil, fmt.Errorf("OpenRewrite step missing recipe configuration")
 	}
 	
-	// Create tar archive of the repository (simplified - would need actual tar creation)
-	// For now, return a placeholder implementation
-	tarData := []byte("placeholder-tar-data") // TODO: Implement actual tar creation
+	// Create tar archive of the repository
+	// TODO: Implement actual tar creation from repoPath
+	tarData := []byte("placeholder-tar-data")
 	
-	// Determine recipe artifacts
-	artifacts := c.getRecipeArtifacts(recipe)
+	// Transform recipe name to our simplified format
+	simplifiedRecipe := c.simplifyRecipeName(recipe)
 	
-	// Call service transform endpoint
-	result, err := c.Transform(tarData, RecipeConfig{
-		Recipe:    recipe,
-		Artifacts: artifacts,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("OpenRewrite service call failed: %w", err)
-	}
-	
-	return result, nil
+	// Submit and wait for completion
+	return c.Transform(ctx, tarData, simplifiedRecipe)
 }
 
-// Transform calls the synchronous transformation endpoint
-func (c *OpenRewriteClient) Transform(tarData []byte, recipe RecipeConfig) (*TransformationResult, error) {
-	req := TransformRequest{
-		JobID:        uuid.New().String(),
-		TarArchive:   base64.StdEncoding.EncodeToString(tarData),
-		RecipeConfig: recipe,
+// Transform submits a transformation job and waits for completion
+func (c *OpenRewriteClient) Transform(ctx context.Context, tarArchive []byte, recipe string) (*TransformationResult, error) {
+	if c.dispatcher == nil {
+		return nil, fmt.Errorf("dispatcher not initialized")
 	}
 	
-	body, err := json.Marshal(req)
+	// Submit job
+	job, err := c.dispatcher.SubmitJob(ctx, recipe, bytes.NewReader(tarArchive))
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, fmt.Errorf("failed to submit job: %w", err)
 	}
 	
-	resp, err := c.client.Post(
-		fmt.Sprintf("%s/v1/openrewrite/transform", c.baseURL),
-		"application/json",
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
+	// Poll for completion (with timeout)
+	timeout := time.After(5 * time.Minute)
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
 	
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("service returned status %d", resp.StatusCode)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timeout:
+			return nil, fmt.Errorf("transformation timeout after 5 minutes")
+		case <-ticker.C:
+			// Check job status
+			updatedJob, err := c.dispatcher.GetJob(ctx, job.ID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get job status: %w", err)
+			}
+			
+			switch updatedJob.Status {
+			case "completed":
+				// Success - build result
+				result := &TransformationResult{
+					RecipeID:       recipe,
+					Success:        true,
+					ExecutionTime:  updatedJob.CompletedAt.Sub(*updatedJob.StartedAt),
+					ChangesApplied: 0,
+					FilesModified:  []string{},
+				}
+				
+				// Add result metadata if available
+				if updatedJob.Result != nil {
+					if changed, ok := updatedJob.Result["files_changed"].(float64); ok {
+						result.ChangesApplied = int(changed)
+					}
+					if totalFiles, ok := updatedJob.Result["total_files"].(float64); ok {
+						result.TotalFiles = int(totalFiles)
+					}
+				}
+				
+				return result, nil
+				
+			case "failed":
+				// Failure
+				return &TransformationResult{
+					RecipeID: recipe,
+					Success:  false,
+					Errors: []TransformationError{
+						{
+							Type:    "job_failed",
+							Message: updatedJob.Error,
+						},
+					},
+				}, nil
+			}
+		}
 	}
-	
-	var result TransformationResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-	
-	return &result, nil
 }
 
-// CreateJob creates an asynchronous transformation job
+// CreateJob submits a job without waiting for completion
 func (c *OpenRewriteClient) CreateJob(tarData []byte, recipe RecipeConfig) (string, error) {
-	req := CreateJobRequest{
-		TarArchive:   base64.StdEncoding.EncodeToString(tarData),
-		RecipeConfig: recipe,
+	if c.dispatcher == nil {
+		return "", fmt.Errorf("dispatcher not initialized")
 	}
 	
-	body, err := json.Marshal(req)
+	simplifiedRecipe := c.simplifyRecipeName(recipe.Recipe)
+	job, err := c.dispatcher.SubmitJob(context.Background(), simplifiedRecipe, bytes.NewReader(tarData))
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", fmt.Errorf("failed to submit job: %w", err)
 	}
 	
-	resp, err := c.client.Post(
-		fmt.Sprintf("%s/v1/openrewrite/jobs", c.baseURL),
-		"application/json",
-		bytes.NewReader(body),
-	)
-	if err != nil {
-		return "", fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("service returned status %d", resp.StatusCode)
-	}
-	
-	var result JobResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
-	
-	return result.JobID, nil
+	return job.ID, nil
 }
 
-// GetJobStatus retrieves the status of an asynchronous job
+// GetJobStatus retrieves the status of a job
 func (c *OpenRewriteClient) GetJobStatus(jobID string) (*JobStatus, error) {
-	resp, err := c.client.Get(
-		fmt.Sprintf("%s/v1/openrewrite/jobs/%s/status", c.baseURL, jobID),
-	)
+	if c.dispatcher == nil {
+		return nil, fmt.Errorf("dispatcher not initialized")
+	}
+	
+	job, err := c.dispatcher.GetJob(context.Background(), jobID)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("service returned status %d", resp.StatusCode)
+		return nil, err
 	}
 	
-	var status JobStatus
-	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	status := &JobStatus{
+		JobID:  job.ID,
+		Status: job.Status,
 	}
 	
-	return &status, nil
+	if job.StartedAt != nil {
+		status.StartTime = job.StartedAt.Format(time.RFC3339)
+	}
+	if job.CompletedAt != nil {
+		status.EndTime = job.CompletedAt.Format(time.RFC3339)
+	}
+	if job.Error != "" {
+		status.Error = job.Error
+	}
+	
+	// Calculate progress based on status
+	switch job.Status {
+	case "pending":
+		status.Progress = 0
+	case "submitted", "running":
+		status.Progress = 50
+	case "completed":
+		status.Progress = 100
+	case "failed":
+		status.Progress = 100
+	}
+	
+	return status, nil
 }
 
-// GetJobDiff retrieves the diff for a completed job
+// GetJobDiff retrieves the diff for a completed job (not implemented for batch jobs)
 func (c *OpenRewriteClient) GetJobDiff(jobID string) ([]byte, error) {
-	resp, err := c.client.Get(
-		fmt.Sprintf("%s/v1/openrewrite/jobs/%s/diff", c.baseURL, jobID),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("service returned status %d", resp.StatusCode)
-	}
-	
-	// Read response body as raw bytes (could be text diff or binary)
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(resp.Body); err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-	
-	return buf.Bytes(), nil
+	// Diffs are embedded in the output tar file
+	return nil, fmt.Errorf("diff retrieval not implemented for batch jobs")
 }
 
-// Health checks if the OpenRewrite service is healthy
+// Health checks system health by verifying queue depth
 func (c *OpenRewriteClient) Health() error {
-	resp, err := c.client.Get(fmt.Sprintf("%s/v1/openrewrite/health", c.baseURL))
-	if err != nil {
-		return fmt.Errorf("health check failed: %w", err)
+	if c.dispatcher == nil {
+		return fmt.Errorf("dispatcher not initialized")
 	}
-	defer resp.Body.Close()
 	
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("service unhealthy, status: %d", resp.StatusCode)
+	depth, err := c.dispatcher.GetQueueDepth(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get queue depth: %w", err)
+	}
+	
+	// Warn if queue is too deep
+	if depth > 100 {
+		return fmt.Errorf("queue depth too high: %d jobs pending", depth)
 	}
 	
 	return nil
 }
 
-// getRecipeArtifacts returns the Maven coordinates for recipe artifacts
-func (c *OpenRewriteClient) getRecipeArtifacts(recipe string) string {
-	// Map common recipes to their artifacts (same logic as embedded engine)
-	recipeMap := map[string]string{
-		"org.openrewrite.java.migrate.Java11toJava17":            "org.openrewrite.recipe:rewrite-migrate-java:2.5.0",
-		"org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0": "org.openrewrite.recipe:rewrite-spring:5.7.0",
-		"org.openrewrite.java.spring.boot3.SpringBoot3BestPractices": "org.openrewrite.recipe:rewrite-spring:5.7.0",
-		"org.openrewrite.java.cleanup.UnnecessaryThrows":         "org.openrewrite:rewrite-java:8.21.0",
-	}
-	
-	if artifacts, ok := recipeMap[recipe]; ok {
-		return artifacts
-	}
-	
-	// Default to core Java recipes
-	return "org.openrewrite:rewrite-java:8.21.0"
+// ConfigureForJavaMigration is a compatibility method (no-op for batch jobs)
+func (c *OpenRewriteClient) ConfigureForJavaMigration() {
+	// Batch jobs handle configuration internally
 }
 
-// ConfigureForJavaMigration configures client for Java migration (compatibility method)
-func (c *OpenRewriteClient) ConfigureForJavaMigration() {
-	// Client doesn't need local configuration - service handles this
-	// This method exists for interface compatibility
+// simplifyRecipeName converts full recipe names to simplified versions
+func (c *OpenRewriteClient) simplifyRecipeName(recipe string) string {
+	// Map full recipe names to simplified versions that native binary understands
+	simplifiedMap := map[string]string{
+		"org.openrewrite.java.migrate.Java11toJava17": "java11to17",
+		"org.openrewrite.java.migrate.UpgradeToJava17": "java11to17",
+		"org.openrewrite.java.migrate.Java8toJava11": "java8to11",
+		"org.openrewrite.java.migrate.UpgradeToJava11": "java8to11",
+	}
+	
+	if simplified, ok := simplifiedMap[recipe]; ok {
+		return simplified
+	}
+	
+	// Return as-is if not in map
+	return recipe
+}
+
+// RecipeConfig for compatibility
+type RecipeConfig struct {
+	Recipe    string `json:"recipe"`
+	Artifacts string `json:"artifacts,omitempty"`
+}
+
+// JobStatus for compatibility
+type JobStatus struct {
+	JobID     string `json:"job_id"`
+	Status    string `json:"status"`
+	Progress  int    `json:"progress"`
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time,omitempty"`
+	Error     string `json:"error,omitempty"`
 }

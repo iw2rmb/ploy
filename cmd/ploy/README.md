@@ -86,125 +86,82 @@ ploy env delete myapp DEBUG
 - Persistent storage across api restarts
 - Full CRUD operations with user-friendly output
 
-### `ploy arf` (implemented - Phase ARF-1)
+### `ploy arf` (implemented - Enhanced with Self-Healing)
 ```
 ploy arf recipes list [--language <java|python|rust>] [--category <cleanup|modernize|security>] [--min-confidence <0.0-1.0>]
 ploy arf recipes get <recipe-id>
 ploy arf recipes search <query>
 ploy arf recipes stats <recipe-id>
-ploy arf transform <recipe-id> [--repository <url>] [--branch <branch>] [--language <language>]
-ploy arf sandboxes list
-ploy arf sandboxes create [--repository <url>] [--language <language>] [--ttl <duration>]
-ploy arf sandboxes destroy <sandbox-id>
+ploy arf transform [--recipe <recipe-id>] [--prompt <llm-prompt>] [--repository <url>] [--archive <path>] 
+                   [--branch <branch>] [--plan-model <model>] [--exec-model <model>]
+                   [--max-iterations <n>] [--parallel-tries <n>] [--timeout <duration>]
+                   [--output <archive|diff|mr>] [--output-path <path>] [--report <minimal|standard|detailed>]
 ploy arf health
 ploy arf cache stats
 ploy arf cache clear
 ```
-**Automated Remediation Framework**: Execute code transformations using OpenRewrite recipes with secure sandbox isolation.
+**Automated Remediation Framework**: Execute code transformations with self-healing capabilities powered by LLM.
+
+**Transform Command - Unified Transformation Engine:**
+The `transform` command now consolidates all transformation, benchmarking, and testing functionality with advanced self-healing capabilities:
 
 **Examples:**
 ```bash
-# List Java cleanup recipes with high confidence
-ploy arf recipes list --language java --category cleanup --min-confidence 0.8
+# Execute recipe-based transformation
+ploy arf transform --recipe cleanup.unused-imports --repository https://github.com/user/repo
 
-# Search for specific transformation recipes
-ploy arf recipes search "unused imports"
+# Execute LLM-guided transformation
+ploy arf transform --prompt "Migrate from JUnit 4 to JUnit 5" --repository https://github.com/user/repo
 
-# Execute transformation on current directory
-ploy arf transform cleanup.unused-imports
+# Combine recipes and LLM prompts for hybrid approach
+ploy arf transform --recipe modernize.java-8-to-11 --prompt "Also update logging to SLF4J" --repository https://github.com/user/repo
 
-# Execute transformation on remote repository
-ploy arf transform modernize.java-8-to-11 --repository https://github.com/user/repo --branch main
+# Advanced self-healing with parallel solution attempts
+ploy arf transform --recipe complex.migration --max-iterations 5 --parallel-tries 3 --plan-model codellama:13b
 
-# Create sandbox for testing transformations
-ploy arf sandboxes create --repository https://github.com/user/repo --language java --ttl 30m
+# Output as merge request
+ploy arf transform --recipe security.fixes --output mr --output-path ./security-fixes.patch
 
-# Check ARF system health and performance
-ploy arf health
-ploy arf cache stats
+# Detailed reporting with custom timeout
+ploy arf transform --prompt "Optimize database queries" --report detailed --timeout 30m
+
+# Transform local archive
+ploy arf transform --archive ./myproject.tar.gz --recipe cleanup.all
+
+# Multi-iteration benchmarking (replaces old benchmark command)
+ploy arf transform --recipe performance.optimize --repository https://github.com/user/app --max-iterations 10
 ```
+
+**Self-Healing Features:**
+- **Automatic Error Recovery**: When transformations fail, the system automatically attempts recovery
+- **LLM-Powered Planning**: Uses specified models to plan solutions when errors occur
+- **Parallel Solution Attempts**: Tries multiple fix approaches simultaneously for faster resolution
+- **Iterative Refinement**: Continues attempting fixes up to max-iterations
+- **Build & Deploy Testing**: Validates each solution with actual compilation and deployment
+
+**Output Formats:**
+- **archive**: Produces transformed code as tar.gz archive
+- **diff**: Generates unified diff showing all changes
+- **mr**: Creates merge request format with commit messages
+
+**Report Levels:**
+- **minimal**: Only critical information and final status
+- **standard**: Includes timing, key metrics, and major events
+- **detailed**: Comprehensive logs with all transformation steps
+
+**Migration from Legacy Commands:**
+- `ploy arf sandbox` → Use `transform` with deployment testing (automatic)
+- `ploy arf benchmark` → Use `transform --max-iterations N` for multi-run testing
+- `ploy arf workflow` → Use `transform` with LLM prompts for complex workflows
 
 **Features:**
 - **2,800+ OpenRewrite Recipes**: Java transformations for cleanup, modernization, security, and migration
-- **Secure Sandboxing**: FreeBSD jail isolation for safe code transformation
-- **Recipe Discovery**: Search and filter recipes by language, category, and confidence score
+- **LLM-Powered Transformations**: Natural language prompts for custom transformations
+- **Self-Healing Engine**: Automatic error recovery with parallel solution attempts
+- **Hybrid Approach**: Combine recipes and LLM prompts for maximum flexibility
 - **Performance Caching**: Memory-mapped AST caching for 60% faster analysis
-- **Statistics Tracking**: Recipe usage statistics and success rates
-- **Multi-Repository Support**: Transform code from local directories or remote repositories
-- **Confidence Scoring**: Automated vs manual remediation based on transformation confidence
-
-### `ploy arf benchmark` (implemented - Phase ARF-4.5: Deployment Integration)
-```
-ploy arf benchmark run <name> --repository <url> [--transformations <recipe-ids>] [--app-name <name>] [--lane <A-G>]
-ploy arf benchmark list [--active] [--completed]
-ploy arf benchmark status <benchmark-id>
-ploy arf benchmark logs <benchmark-id> [--stage <transformation|deployment|testing>]
-ploy arf benchmark stop <benchmark-id>
-```
-**ARF Benchmark Pipeline**: Execute comprehensive benchmarks with real application deployment and HTTP testing.
-
-**Examples:**
-```bash
-# Run Java Spring Boot migration benchmark with deployment
-ploy arf benchmark run java-migration --repository https://github.com/spring-projects/spring-petclinic --transformations org.springframework.boot.upgrade.SpringBoot_2_7 --app-name test-petclinic --lane C
-
-# Monitor benchmark progress
-ploy arf benchmark status bench-123
-
-# View benchmark deployment logs
-ploy arf benchmark logs bench-123 --stage deployment
-
-# List all active benchmarks
-ploy arf benchmark list --active
-```
-
-### `ploy arf sandbox` (enhanced - Deployment Integration)
-```
-ploy arf sandbox create <name> --repository <url> [--app-name <name>] [--lane <A-G>] [--ttl <duration>]
-ploy arf sandbox list [--show-apps]
-ploy arf sandbox status <sandbox-id>
-ploy arf sandbox destroy <sandbox-id>
-ploy arf sandbox logs <sandbox-id>
-ploy arf sandbox test-http <sandbox-id> [--endpoint <health|root|all>]
-```
-**Deployment Sandbox Management**: Create sandboxes with full application deployment and HTTP testing capabilities.
-
-**Examples:**
-```bash
-# Create deployment sandbox with Java application
-ploy arf sandbox create test-env --repository https://github.com/user/java-app --app-name sandbox-test --lane C --ttl 2h
-
-# Test HTTP endpoints of deployed application
-ploy arf sandbox test-http sandbox-456 --endpoint health
-
-# View deployment logs
-ploy arf sandbox logs sandbox-456
-
-# List all sandboxes with deployed applications
-ploy arf sandbox list --show-apps
-```
-
-### `ploy arf workflow` (implemented - End-to-End Integration)
-```
-ploy arf workflow run <name> --repository <url> [--transformations <recipe-ids>] [--deployment-config <config>]
-ploy arf workflow status <workflow-id>
-ploy arf workflow metrics <workflow-id> [--format <json|table>]
-ploy arf workflow logs <workflow-id> [--stage <all|transformation|deployment|testing|cleanup>]
-ploy arf workflow stop <workflow-id>
-```
-**End-to-End Workflow Management**: Execute complete ARF workflows with transformation, deployment, testing, and cleanup.
-
-**Examples:**
-```bash
-# Run complete Java migration workflow
-ploy arf workflow run java-e2e --repository https://github.com/user/app --transformations cleanup.unused-imports,modernize.java-8-to-11 --deployment-config '{"lane": "auto", "health_check": true}'
-
-# Get comprehensive workflow metrics
-ploy arf workflow metrics wf-789 --format table
-
-# View all workflow logs
-ploy arf workflow logs wf-789 --stage all
-```
+- **Multi-Repository Support**: Transform code from local archives or remote repositories
+- **Comprehensive Testing**: Automatic build and deployment validation
 
 ### `ploy webhooks` (planned)
 ```
