@@ -29,10 +29,12 @@ func NewOpenRewriteClient() *OpenRewriteClient {
 		consulAddr = "http://localhost:8500"
 	}
 	
-	// Create storage client (simplified for now)
+	fmt.Printf("[OpenRewrite] Initializing client with Nomad: %s, Consul: %s\n", nomadAddr, consulAddr)
+	
+	// Create storage client
 	seaweedClient, err := storage.NewSeaweedFSClient(storage.SeaweedFSConfig{
-		Master: "localhost:9333",
-		Filer:  "localhost:8888",
+		Master: "http://localhost:9333",
+		Filer:  "http://localhost:8888",
 		Collection: "ploy-artifacts",
 		Replication: "001",
 		Timeout: 30,
@@ -42,13 +44,19 @@ func NewOpenRewriteClient() *OpenRewriteClient {
 	if err == nil && seaweedClient != nil {
 		// Wrap SeaweedFS client in StorageClient with default config
 		storageClient = storage.NewStorageClient(seaweedClient, nil)
+		fmt.Printf("[OpenRewrite] Storage client created successfully\n")
+	} else {
+		fmt.Printf("[OpenRewrite] Storage client creation failed: %v\n", err)
 	}
 	
 	// Create dispatcher
+	fmt.Printf("[OpenRewrite] Creating dispatcher...\n")
 	dispatcher, err := NewOpenRewriteDispatcher(nomadAddr, consulAddr, storageClient)
 	if err != nil {
 		// Log error but continue with nil dispatcher
-		fmt.Printf("Warning: failed to create dispatcher: %v\n", err)
+		fmt.Printf("[OpenRewrite] ERROR: failed to create dispatcher: %v\n", err)
+	} else {
+		fmt.Printf("[OpenRewrite] Dispatcher created successfully\n")
 	}
 	
 	return &OpenRewriteClient{

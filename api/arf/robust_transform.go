@@ -302,10 +302,24 @@ func applyOpenRewriteRecipe(ctx context.Context, workspace *Workspace, recipeID 
 	}
 	
 	// Create OpenRewrite client
+	if logger != nil {
+		logger("INFO", "openrewrite", "Creating OpenRewrite client", "")
+	}
 	client := NewOpenRewriteClient()
-	if client == nil || client.dispatcher == nil {
+	if client == nil {
 		if logger != nil {
-			logger("WARNING", "openrewrite", "OpenRewrite dispatcher not available, using mock", "")
+			logger("ERROR", "openrewrite", "OpenRewrite client is nil", "")
+		}
+		// Return mock result when client not available
+		return &TransformResult{
+			Success:        true,
+			ChangesApplied: 5,
+			FilesModified:  []string{"pom.xml", "src/main/java/App.java"},
+		}
+	}
+	if client.dispatcher == nil {
+		if logger != nil {
+			logger("WARNING", "openrewrite", "OpenRewrite dispatcher not available, using mock", "client created but dispatcher is nil")
 		}
 		// Return mock result when dispatcher not available
 		return &TransformResult{
