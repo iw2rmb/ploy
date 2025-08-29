@@ -73,11 +73,7 @@
 - `GET /v1/analysis/cache/metrics` — get cache performance metrics
 - `GET /v1/analysis/health` — check analysis service health
 
-## OpenRewrite Integration
-- `POST /v1/arf/openrewrite/transform` — execute transformation
-- `GET /v1/arf/openrewrite/status/:jobId` — get transformation job status
-
-**Note**: OpenRewrite recipes are managed through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
+**Note**: OpenRewrite transformations are executed through the unified ARF system using `/v1/arf/transform` with OpenRewrite recipes managed via `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
 ## Storage Management
 - `GET /v1/storage/health` — get comprehensive storage system health status
@@ -135,7 +131,7 @@
 - `DELETE /v1/arf/recipes/:id` — delete recipe from catalog
 - `GET /v1/arf/recipes/search` — search recipes by name or tags
 - `POST /v1/arf/recipes/upload` — upload recipe
-- `POST /v1/arf/recipes/validate` — validate recipe
+- `POST /v1/arf/recipes/validate` — validate recipe (supports OpenRewrite recipes with `type: "openrewrite"`)
 - `GET /v1/arf/recipes/:id/download` — download recipe
 - `GET /v1/arf/recipes/:id/metadata` — get recipe metadata
 - `GET /v1/arf/recipes/:id/stats` — get recipe usage statistics

@@ -1,7 +1,6 @@
 package consul_envstore
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"

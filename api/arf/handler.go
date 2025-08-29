@@ -125,9 +125,9 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Delete("/models/:name", h.RemoveModel)
 	arf.Post("/models/:name/set-default", h.SetDefaultModel)
 
-	// Transformation execution
-	arf.Post("/transform", h.ExecuteTransformation)
-	arf.Get("/transforms/:id", h.GetTransformationResult)
+	// TODO: Transformation execution - methods not yet implemented
+	// arf.Post("/transform", h.ExecuteTransformation)
+	// arf.Get("/transforms/:id", h.GetTransformationResult)
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)
@@ -165,15 +165,15 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/patterns/stats", h.GetPatternLearningStats)
 	arf.Get("/patterns/recommendations", h.GetPatternRecommendations)
 
-	// Phase 3: LLM and Hybrid Intelligence
-	arf.Post("/recipes/generate", h.GenerateLLMRecipe)
-	arf.Post("/transform/hybrid", h.ExecuteHybridTransformation)
-	arf.Post("/strategy/select", h.SelectTransformationStrategy)
-	arf.Post("/complexity/analyze", h.AnalyzeComplexity)
+	// TODO: Phase 3 LLM and Hybrid Intelligence - methods not yet implemented
+	// arf.Post("/recipes/generate", h.GenerateLLMRecipe)
+	// arf.Post("/transform/hybrid", h.ExecuteHybridTransformation)
+	// arf.Post("/strategy/select", h.SelectTransformationStrategy)
+	// arf.Post("/complexity/analyze", h.AnalyzeComplexity)
 
-	// Phase 3: Learning System
-	arf.Post("/learning/outcome", h.RecordTransformationOutcome)
-	arf.Get("/learning/patterns", h.ExtractLearningPatterns)
+	// TODO: Phase 3 Learning System - methods not yet implemented
+	// arf.Post("/learning/outcome", h.RecordTransformationOutcome)
+	// arf.Get("/learning/patterns", h.ExtractLearningPatterns)
 
 	// Phase 3: A/B Testing
 	arf.Post("/ab-test", h.CreateABTest)
