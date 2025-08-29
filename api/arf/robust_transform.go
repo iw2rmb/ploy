@@ -125,12 +125,36 @@ type Workspace struct {
 }
 
 // ExecuteRobustTransformation executes a robust transformation with self-healing
-func ExecuteRobustTransformation(ctx context.Context, req *RobustTransformRequest, logger func(level, stage, message, details string)) (*RobustTransformResult, error) {
+func ExecuteRobustTransformation(ctx context.Context, req *RobustTransformRequest, logger func(level, stage, message, details string)) (result *RobustTransformResult, err error) {
+	// Add comprehensive panic recovery
+	defer func() {
+		if r := recover(); r != nil {
+			if logger != nil {
+				logger("ERROR", "transform_panic", "Panic during robust transformation", fmt.Sprintf("Panic: %v", r))
+			}
+			err = fmt.Errorf("robust transformation panic: %v", r)
+			result = nil
+		}
+	}()
+	
 	startTime := time.Now()
 	
+	// Defensive nil checks
+	if req == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+	
 	if logger != nil {
+		recipeCount := 0
+		promptCount := 0
+		if req.Transformations.RecipeIDs != nil {
+			recipeCount = len(req.Transformations.RecipeIDs)
+		}
+		if req.Transformations.LLMPrompts != nil {
+			promptCount = len(req.Transformations.LLMPrompts)
+		}
 		logger("INFO", "transform_start", "Starting robust transformation", fmt.Sprintf("Recipes: %d, Prompts: %d", 
-			len(req.Transformations.RecipeIDs), len(req.Transformations.LLMPrompts)))
+			recipeCount, promptCount))
 	}
 
 	// Step 1: Prepare workspace
