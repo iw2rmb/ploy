@@ -53,7 +53,8 @@ job "ploy-api" {
 
       # Configuration for raw_exec driver
       config {
-        command = "local/api"
+        command = "/bin/bash"
+        args = ["local/start-api.sh"]
       }
 
 
@@ -151,11 +152,6 @@ exec local/api
 EOF
         destination = "local/start-api.sh"
         perms = "755"
-      }
-
-      config {
-        command = "/bin/bash"
-        args = ["local/start-api.sh"]
       }
 
       # Health checks
