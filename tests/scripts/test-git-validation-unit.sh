@@ -50,7 +50,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"github.com/ploy/ploy/internal/git"
+	"github.com/iw2rmb/ploy/internal/git"
 )
 
 func main() {
@@ -193,11 +193,11 @@ git init test-repo
 cd test-repo
 git config user.name "Test User"
 git config user.email "test@ploy.dev"
-git remote add origin https://github.com/ploy/test-repo.git
+git remote add origin https://github.com/iw2rmb/test-repo.git
 
 # Create test files
 echo "console.log('Hello World');" > app.js
-echo '{"name": "test-app", "repository": "https://github.com/ploy/test-repo"}' > package.json
+echo '{"name": "test-app", "repository": "https://github.com/iw2rmb/test-repo"}' > package.json
 echo "# Test Repository" > README.md
 git add .
 git commit -m "Initial test commit"

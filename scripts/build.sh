@@ -58,10 +58,14 @@ build_with_version() {
     
     # Build with version information injected via ldflags
     CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build \
-        -ldflags "-X github.com/ploy/ploy/internal/version.Version=${VERSION} \
-                  -X github.com/ploy/ploy/internal/version.GitCommit=${GIT_COMMIT}${GIT_DIRTY} \
-                  -X github.com/ploy/ploy/internal/version.GitBranch=${GIT_BRANCH} \
-                  -X github.com/ploy/ploy/internal/version.BuildTime=${BUILD_TIME} \
+        -ldflags "-X github.com/iw2rmb/ploy/internal/version.Version=${VERSION} \
+                  -X github.com/iw2rmb/ploy/internal/version.GitCommit=${GIT_COMMIT}${GIT_DIRTY} \
+                  -X github.com/iw2rmb/ploy/internal/version.GitBranch=${GIT_BRANCH} \
+                  -X github.com/iw2rmb/ploy/internal/version.BuildTime=${BUILD_TIME} \
+                  -X github.com/iw2rmb/ploy/api/selfupdate.BuildVersion=${VERSION} \
+                  -X github.com/iw2rmb/ploy/api/selfupdate.GitCommit=${GIT_COMMIT}${GIT_DIRTY} \
+                  -X github.com/iw2rmb/ploy/api/selfupdate.GitBranch=${GIT_BRANCH} \
+                  -X github.com/iw2rmb/ploy/api/selfupdate.BuildTime=${BUILD_TIME} \
                   -s -w" \
         -o "$output" \
         "$package"
