@@ -157,7 +157,7 @@ func (v *RecipeValidator) validateShellScriptSecurity(step *models.RecipeStep) e
 		"rm -rf /",
 		"rm -rf /*",
 		"dd if=/dev/zero",
-		":(){ :|:& };:",  // Fork bomb
+		":(){ :|:& };:", // Fork bomb
 		"fork bomb",
 		"> /dev/sda",
 		"mkfs.",

@@ -4,40 +4,40 @@ import "time"
 
 // CVEInfo represents detailed CVE information
 type CVEInfo struct {
-	ID              string                 `json:"id"`
-	Description     string                 `json:"description"`
-	CVSS            CVSSScore              `json:"cvss"`
+	ID               string                 `json:"id"`
+	Description      string                 `json:"description"`
+	CVSS             CVSSScore              `json:"cvss"`
 	AffectedPackages []AffectedPackage      `json:"affected_packages"`
-	References      []CVEReference         `json:"references"`
-	PublishedDate   time.Time              `json:"published_date"`
-	Severity        string                 `json:"severity"`
-	Remediation     RemediationGuidance    `json:"remediation"`
-	Exploitability  ExploitabilityInfo     `json:"exploitability"`
-	Metadata        map[string]interface{} `json:"metadata"`
+	References       []CVEReference         `json:"references"`
+	PublishedDate    time.Time              `json:"published_date"`
+	Severity         string                 `json:"severity"`
+	Remediation      RemediationGuidance    `json:"remediation"`
+	Exploitability   ExploitabilityInfo     `json:"exploitability"`
+	Metadata         map[string]interface{} `json:"metadata"`
 }
 
 // CVSSScore represents CVSS vulnerability scoring
 type CVSSScore struct {
-	Version     string  `json:"version"`
-	BaseScore   float64 `json:"base_score"`
-	Vector      string  `json:"vector"`
-	Impact      float64 `json:"impact_score"`
+	Version        string  `json:"version"`
+	BaseScore      float64 `json:"base_score"`
+	Vector         string  `json:"vector"`
+	Impact         float64 `json:"impact_score"`
 	Exploitability float64 `json:"exploitability_score"`
 }
 
 // AffectedPackage represents a package affected by a CVE
 type AffectedPackage struct {
-	Name            string   `json:"name"`
-	Ecosystem       string   `json:"ecosystem"`
+	Name             string   `json:"name"`
+	Ecosystem        string   `json:"ecosystem"`
 	AffectedVersions []string `json:"affected_versions"`
-	FixedVersions   []string `json:"fixed_versions"`
-	PatchAvailable  bool     `json:"patch_available"`
+	FixedVersions    []string `json:"fixed_versions"`
+	PatchAvailable   bool     `json:"patch_available"`
 }
 
 // CVEReference represents external references for a CVE
 type CVEReference struct {
-	Type string `json:"type"`
-	URL  string `json:"url"`
+	Type string   `json:"type"`
+	URL  string   `json:"url"`
 	Tags []string `json:"tags,omitempty"`
 }
 
@@ -53,19 +53,19 @@ type RemediationGuidance struct {
 
 // AutoRemediationRecipe contains automatic remediation instructions
 type AutoRemediationRecipe struct {
-	Type           string                 `json:"type"`
-	Operations     []RemediationOperation `json:"operations"`
-	Validation     ValidationCriteria     `json:"validation"`
-	Rollback       RollbackStrategy       `json:"rollback"`
-	Dependencies   []string               `json:"dependencies"`
+	Type         string                 `json:"type"`
+	Operations   []RemediationOperation `json:"operations"`
+	Validation   ValidationCriteria     `json:"validation"`
+	Rollback     RollbackStrategy       `json:"rollback"`
+	Dependencies []string               `json:"dependencies"`
 }
 
 // RemediationOperation represents a specific remediation action
 type RemediationOperation struct {
-	Action      string                 `json:"action"` // replace, upgrade, remove, configure
-	Target      OperationTarget        `json:"target"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Conditions  []OperationCondition   `json:"conditions"`
+	Action     string                 `json:"action"` // replace, upgrade, remove, configure
+	Target     OperationTarget        `json:"target"`
+	Parameters map[string]interface{} `json:"parameters"`
+	Conditions []OperationCondition   `json:"conditions"`
 }
 
 // OperationTarget specifies what the operation targets
@@ -79,11 +79,11 @@ type OperationTarget struct {
 
 // OperationCondition represents conditions for applying operations
 type OperationCondition struct {
-	Type      string      `json:"type"`
-	Field     string      `json:"field"`
-	Operator  string      `json:"operator"`
-	Value     interface{} `json:"value"`
-	Required  bool        `json:"required"`
+	Type     string      `json:"type"`
+	Field    string      `json:"field"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
+	Required bool        `json:"required"`
 }
 
 // ValidationCriteria defines how to validate remediation success
@@ -96,18 +96,18 @@ type ValidationCriteria struct {
 
 // RollbackStrategy defines how to roll back failed remediations
 type RollbackStrategy struct {
-	Type       string            `json:"type"`
-	Steps      []RollbackStep    `json:"steps"`
-	Timeout    time.Duration     `json:"timeout"`
+	Type       string             `json:"type"`
+	Steps      []RollbackStep     `json:"steps"`
+	Timeout    time.Duration      `json:"timeout"`
 	Validation ValidationCriteria `json:"validation"`
 }
 
 // RollbackStep represents a single rollback operation
 type RollbackStep struct {
-	Action      string                 `json:"action"`
-	Target      OperationTarget        `json:"target"`
-	Parameters  map[string]interface{} `json:"parameters"`
-	Order       int                    `json:"order"`
+	Action     string                 `json:"action"`
+	Target     OperationTarget        `json:"target"`
+	Parameters map[string]interface{} `json:"parameters"`
+	Order      int                    `json:"order"`
 }
 
 // ExploitabilityInfo provides information about exploit potential
@@ -144,34 +144,34 @@ type CVSSRange struct {
 
 // VulnerabilityInfo represents comprehensive vulnerability information
 type VulnerabilityInfo struct {
-	CVE             CVEInfo               `json:"cve"`
-	Package         Dependency            `json:"package"`
-	Severity        string                `json:"severity"`
-	CVSS            float64               `json:"cvss_score"`
-	Exploitable     bool                  `json:"exploitable"`
-	HasFix          bool                  `json:"has_fix"`
-	FixVersion      string                `json:"fix_version,omitempty"`
-	Remediation     RemediationGuidance   `json:"remediation"`
-	Context         SecurityContext       `json:"context"`
-	Discovery       VulnerabilityDiscovery `json:"discovery"`
+	CVE         CVEInfo                `json:"cve"`
+	Package     Dependency             `json:"package"`
+	Severity    string                 `json:"severity"`
+	CVSS        float64                `json:"cvss_score"`
+	Exploitable bool                   `json:"exploitable"`
+	HasFix      bool                   `json:"has_fix"`
+	FixVersion  string                 `json:"fix_version,omitempty"`
+	Remediation RemediationGuidance    `json:"remediation"`
+	Context     SecurityContext        `json:"context"`
+	Discovery   VulnerabilityDiscovery `json:"discovery"`
 }
 
 // SecurityContext provides context for security analysis
 type SecurityContext struct {
-	Environment   string   `json:"environment"` // development, staging, production
-	ExposureLevel string   `json:"exposure_level"` // internal, external, public
-	DataSensitivity string `json:"data_sensitivity"` // low, medium, high
-	ComplianceReqs []string `json:"compliance_requirements"`
-	BusinessImpact string   `json:"business_impact"`
+	Environment     string   `json:"environment"`      // development, staging, production
+	ExposureLevel   string   `json:"exposure_level"`   // internal, external, public
+	DataSensitivity string   `json:"data_sensitivity"` // low, medium, high
+	ComplianceReqs  []string `json:"compliance_requirements"`
+	BusinessImpact  string   `json:"business_impact"`
 }
 
 // VulnerabilityDiscovery tracks how a vulnerability was discovered
 type VulnerabilityDiscovery struct {
-	Method      string    `json:"method"` // scan, manual, automated
-	Tool        string    `json:"tool"`
-	Timestamp   time.Time `json:"timestamp"`
-	Confidence  float64   `json:"confidence"`
-	Source      string    `json:"source"`
+	Method     string    `json:"method"` // scan, manual, automated
+	Tool       string    `json:"tool"`
+	Timestamp  time.Time `json:"timestamp"`
+	Confidence float64   `json:"confidence"`
+	Source     string    `json:"source"`
 }
 
 // VulnerabilityPriority represents prioritized vulnerability information
@@ -185,13 +185,13 @@ type VulnerabilityPriority struct {
 
 // SecurityReport represents a comprehensive security analysis report
 type SecurityReport struct {
-	Summary         SecuritySummary        `json:"summary"`
-	Vulnerabilities []VulnerabilityInfo    `json:"vulnerabilities"`
-	RiskAssessment  RiskAssessment         `json:"risk_assessment"`
-	Recommendations []SecurityRecommendation `json:"recommendations"`
-	ComplianceReport ComplianceStatus       `json:"compliance"`
-	GeneratedAt     time.Time              `json:"generated_at"`
-	Metadata        map[string]interface{} `json:"metadata"`
+	Summary          SecuritySummary          `json:"summary"`
+	Vulnerabilities  []VulnerabilityInfo      `json:"vulnerabilities"`
+	RiskAssessment   RiskAssessment           `json:"risk_assessment"`
+	Recommendations  []SecurityRecommendation `json:"recommendations"`
+	ComplianceReport ComplianceStatus         `json:"compliance"`
+	GeneratedAt      time.Time                `json:"generated_at"`
+	Metadata         map[string]interface{}   `json:"metadata"`
 }
 
 // SecuritySummary provides high-level security status
@@ -217,22 +217,22 @@ type RemediationRecipe struct {
 
 // RemediationResult represents the outcome of applying a remediation
 type RemediationResult struct {
-	Success          bool                   `json:"success"`
+	Success              bool               `json:"success"`
 	VulnerabilitiesFixed []string           `json:"vulnerabilities_fixed"`
-	Errors           []string               `json:"errors"`
-	Warnings         []string               `json:"warnings"`
-	ValidationResults []ValidationResult    `json:"validation_results"`
-	Duration         time.Duration          `json:"duration"`
-	ChangeSummary    ChangeSummary          `json:"changes"`
-	RollbackRequired bool                   `json:"rollback_required"`
+	Errors               []string           `json:"errors"`
+	Warnings             []string           `json:"warnings"`
+	ValidationResults    []ValidationResult `json:"validation_results"`
+	Duration             time.Duration      `json:"duration"`
+	ChangeSummary        ChangeSummary      `json:"changes"`
+	RollbackRequired     bool               `json:"rollback_required"`
 }
 
 // ChangeSummary summarizes changes made during remediation
 type ChangeSummary struct {
-	FilesModified   []string `json:"files_modified"`
-	DependenciesChanged []DependencyChange `json:"dependencies_changed"`
-	ConfigurationChanges []ConfigChange `json:"configuration_changes"`
-	Statistics      ChangeStatistics `json:"statistics"`
+	FilesModified        []string           `json:"files_modified"`
+	DependenciesChanged  []DependencyChange `json:"dependencies_changed"`
+	ConfigurationChanges []ConfigChange     `json:"configuration_changes"`
+	Statistics           ChangeStatistics   `json:"statistics"`
 }
 
 // DependencyChange represents a change to a dependency
@@ -264,12 +264,12 @@ type ChangeStatistics struct {
 
 // SBOMSecurityAnalysis represents security analysis of an SBOM
 type SBOMSecurityAnalysis struct {
-	Dependencies      []Dependency          `json:"dependencies"`
-	Vulnerabilities   []VulnerabilityMatch  `json:"vulnerabilities"`
-	SecurityMetrics   SBOMSecurityMetrics   `json:"metrics"`
-	RiskAssessment    RiskAssessment        `json:"risk_assessment"`
-	Recommendations   []SecurityRecommendation `json:"recommendations"`
-	AnalyzedAt        time.Time             `json:"analyzed_at"`
+	Dependencies    []Dependency             `json:"dependencies"`
+	Vulnerabilities []VulnerabilityMatch     `json:"vulnerabilities"`
+	SecurityMetrics SBOMSecurityMetrics      `json:"metrics"`
+	RiskAssessment  RiskAssessment           `json:"risk_assessment"`
+	Recommendations []SecurityRecommendation `json:"recommendations"`
+	AnalyzedAt      time.Time                `json:"analyzed_at"`
 }
 
 // VulnerabilityMatch represents a vulnerability matched to a dependency
@@ -282,11 +282,11 @@ type VulnerabilityMatch struct {
 
 // SBOMSecurityMetrics provides security metrics for an SBOM
 type SBOMSecurityMetrics struct {
-	TotalDependencies    int     `json:"total_dependencies"`
-	VulnerableDependencies int   `json:"vulnerable_dependencies"`
-	SecurityScore        float64 `json:"security_score"`
-	LicenseIssues        int     `json:"license_issues"`
-	OutdatedDependencies int     `json:"outdated_dependencies"`
+	TotalDependencies      int     `json:"total_dependencies"`
+	VulnerableDependencies int     `json:"vulnerable_dependencies"`
+	SecurityScore          float64 `json:"security_score"`
+	LicenseIssues          int     `json:"license_issues"`
+	OutdatedDependencies   int     `json:"outdated_dependencies"`
 }
 
 // RemediationPlan represents a comprehensive plan for addressing vulnerabilities

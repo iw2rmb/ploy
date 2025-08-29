@@ -18,39 +18,39 @@ type TransformationWorkflow struct {
 
 // WorkflowConfig defines parameters for the complete transformation workflow
 type WorkflowConfig struct {
-	Repository      string            `json:"repository"`
-	Branch          string            `json:"branch"`
-	RecipeIDs       []string          `json:"recipe_ids"`
-	AppName         string            `json:"app_name"`
-	Lane            string            `json:"lane"`
-	DeployTimeout   time.Duration     `json:"deploy_timeout"`
-	TestEndpoints   []string          `json:"test_endpoints"`
-	CleanupAfter    bool              `json:"cleanup_after"`
-	Metadata        map[string]string `json:"metadata"`
+	Repository    string            `json:"repository"`
+	Branch        string            `json:"branch"`
+	RecipeIDs     []string          `json:"recipe_ids"`
+	AppName       string            `json:"app_name"`
+	Lane          string            `json:"lane"`
+	DeployTimeout time.Duration     `json:"deploy_timeout"`
+	TestEndpoints []string          `json:"test_endpoints"`
+	CleanupAfter  bool              `json:"cleanup_after"`
+	Metadata      map[string]string `json:"metadata"`
 }
 
 // WorkflowResult contains the results of the complete transformation workflow
 type WorkflowResult struct {
-	WorkflowID       string                    `json:"workflow_id"`
-	Success          bool                      `json:"success"`
-	Transformations  []*TransformationResult   `json:"transformations"`
-	DeploymentResult *DeploymentResult         `json:"deployment_result"`
-	TestResults      []*EndpointTestResult     `json:"test_results"`
-	ExecutionTime    time.Duration             `json:"execution_time"`
-	Errors           []WorkflowError           `json:"errors,omitempty"`
-	Warnings         []WorkflowError           `json:"warnings,omitempty"`
-	Metadata         map[string]interface{}    `json:"metadata"`
+	WorkflowID       string                  `json:"workflow_id"`
+	Success          bool                    `json:"success"`
+	Transformations  []*TransformationResult `json:"transformations"`
+	DeploymentResult *DeploymentResult       `json:"deployment_result"`
+	TestResults      []*EndpointTestResult   `json:"test_results"`
+	ExecutionTime    time.Duration           `json:"execution_time"`
+	Errors           []WorkflowError         `json:"errors,omitempty"`
+	Warnings         []WorkflowError         `json:"warnings,omitempty"`
+	Metadata         map[string]interface{}  `json:"metadata"`
 }
 
 // DeploymentResult contains deployment-specific results
 type DeploymentResult struct {
-	AppName       string            `json:"app_name"`
-	AppURL        string            `json:"app_url"`
-	Lane          string            `json:"lane"`
-	DeployTime    time.Duration     `json:"deploy_time"`
-	Status        string            `json:"status"`
-	BuildLogs     string            `json:"build_logs,omitempty"`
-	Metadata      map[string]string `json:"metadata"`
+	AppName    string            `json:"app_name"`
+	AppURL     string            `json:"app_url"`
+	Lane       string            `json:"lane"`
+	DeployTime time.Duration     `json:"deploy_time"`
+	Status     string            `json:"status"`
+	BuildLogs  string            `json:"build_logs,omitempty"`
+	Metadata   map[string]string `json:"metadata"`
 }
 
 // EndpointTestResult contains HTTP endpoint testing results
@@ -66,7 +66,7 @@ type EndpointTestResult struct {
 
 // WorkflowError represents errors and warnings in the workflow
 type WorkflowError struct {
-	Stage       string `json:"stage"`       // transformation, deployment, testing
+	Stage       string `json:"stage"` // transformation, deployment, testing
 	Type        string `json:"type"`
 	Message     string `json:"message"`
 	Recoverable bool   `json:"recoverable"`
@@ -76,25 +76,25 @@ type WorkflowError struct {
 func NewTransformationWorkflow(executor *RecipeExecutor, sandboxMgr SandboxManager, workspaceDir string) *TransformationWorkflow {
 	return &TransformationWorkflow{
 		recipeExecutor: executor,
-		sandboxMgr:   sandboxMgr,
-		workspaceDir: workspaceDir,
+		sandboxMgr:     sandboxMgr,
+		workspaceDir:   workspaceDir,
 	}
 }
 
 // ExecuteWorkflow runs the complete transformation → deployment → testing workflow
 func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config WorkflowConfig) (*WorkflowResult, error) {
 	startTime := time.Now()
-	
+
 	result := &WorkflowResult{
-		WorkflowID:       generateWorkflowID(),
-		Success:          false,
-		Transformations:  []*TransformationResult{},
-		TestResults:      []*EndpointTestResult{},
-		Errors:           []WorkflowError{},
-		Warnings:         []WorkflowError{},
-		Metadata:         make(map[string]interface{}),
+		WorkflowID:      generateWorkflowID(),
+		Success:         false,
+		Transformations: []*TransformationResult{},
+		TestResults:     []*EndpointTestResult{},
+		Errors:          []WorkflowError{},
+		Warnings:        []WorkflowError{},
+		Metadata:        make(map[string]interface{}),
 	}
-	
+
 	// Stage 1: Create sandbox with repository
 	sandbox, err := w.createWorkflowSandbox(ctx, config)
 	if err != nil {
@@ -107,7 +107,7 @@ func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config Wor
 		result.ExecutionTime = time.Since(startTime)
 		return result, nil
 	}
-	
+
 	// Ensure cleanup
 	if config.CleanupAfter {
 		defer func() {
@@ -121,7 +121,7 @@ func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config Wor
 			}
 		}()
 	}
-	
+
 	// Stage 2: Apply transformations
 	for _, recipeID := range config.RecipeIDs {
 		transformResult, err := w.executeTransformation(ctx, sandbox, recipeID)
@@ -134,19 +134,19 @@ func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config Wor
 			})
 			continue
 		}
-		
+
 		result.Transformations = append(result.Transformations, transformResult)
-		
+
 		if !transformResult.Success {
 			result.Warnings = append(result.Warnings, WorkflowError{
 				Stage:       "transformation",
-				Type:        "transformation_warning", 
+				Type:        "transformation_warning",
 				Message:     fmt.Sprintf("Recipe %s completed with warnings", recipeID),
 				Recoverable: true,
 			})
 		}
 	}
-	
+
 	// Stage 3: Commit transformed code and deploy
 	deployResult, err := w.deployTransformedCode(ctx, sandbox, config)
 	if err != nil {
@@ -159,9 +159,9 @@ func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config Wor
 		result.ExecutionTime = time.Since(startTime)
 		return result, nil
 	}
-	
+
 	result.DeploymentResult = deployResult
-	
+
 	// Stage 4: Test deployed application
 	testResults, err := w.testDeployedApplication(ctx, deployResult, config.TestEndpoints)
 	if err != nil {
@@ -174,23 +174,23 @@ func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config Wor
 	} else {
 		result.TestResults = testResults
 	}
-	
+
 	// Determine overall success
 	result.Success = len(result.Errors) == 0 && deployResult.Status == "running"
 	result.ExecutionTime = time.Since(startTime)
-	
+
 	// Add workflow metadata
 	result.Metadata = map[string]interface{}{
-		"repository":            config.Repository,
-		"branch":               config.Branch,
-		"recipes_applied":      len(result.Transformations),
-		"app_name":             config.AppName,
-		"lane":                 config.Lane,
-		"total_changes":        w.sumChangesApplied(result.Transformations),
-		"deployment_url":       deployResult.AppURL,
-		"workflow_type":        "transformation_deployment",
+		"repository":      config.Repository,
+		"branch":          config.Branch,
+		"recipes_applied": len(result.Transformations),
+		"app_name":        config.AppName,
+		"lane":            config.Lane,
+		"total_changes":   w.sumChangesApplied(result.Transformations),
+		"deployment_url":  deployResult.AppURL,
+		"workflow_type":   "transformation_deployment",
 	}
-	
+
 	return result, nil
 }
 
@@ -199,7 +199,7 @@ func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, conf
 	sandboxConfig := SandboxConfig{
 		Repository:    config.Repository,
 		Branch:        config.Branch,
-		Language:      "java", // Default to Java for now
+		Language:      "java",  // Default to Java for now
 		BuildTool:     "maven", // Will be auto-detected
 		TTL:           config.DeployTimeout,
 		MemoryLimit:   "4G",
@@ -207,7 +207,7 @@ func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, conf
 		NetworkAccess: true, // Needed for deployment
 		TempSpace:     "2G",
 	}
-	
+
 	return w.sandboxMgr.CreateSandbox(ctx, sandboxConfig)
 }
 
@@ -218,19 +218,19 @@ func (w *TransformationWorkflow) executeTransformation(ctx context.Context, sand
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 	}
-	
+
 	return result, nil
 }
 
 // deployTransformedCode commits the transformed code and deploys it
 func (w *TransformationWorkflow) deployTransformedCode(ctx context.Context, sandbox *Sandbox, config WorkflowConfig) (*DeploymentResult, error) {
 	startTime := time.Now()
-	
+
 	// Commit transformed changes to a temporary branch
 	if err := w.commitTransformedCode(ctx, sandbox); err != nil {
 		return nil, fmt.Errorf("failed to commit transformed code: %w", err)
 	}
-	
+
 	// Create deployment using DeploymentSandboxManager
 	deployConfig := SandboxConfig{
 		Repository:    sandbox.Config.Repository,
@@ -243,14 +243,14 @@ func (w *TransformationWorkflow) deployTransformedCode(ctx context.Context, sand
 		NetworkAccess: true,
 		TempSpace:     "2G",
 	}
-	
+
 	// If using DeploymentSandboxManager, it will handle the deployment
 	if deployMgr, ok := w.sandboxMgr.(*DeploymentSandboxManager); ok {
 		deploySandbox, err := deployMgr.CreateSandbox(ctx, deployConfig)
 		if err != nil {
 			return nil, fmt.Errorf("deployment failed: %w", err)
 		}
-		
+
 		// Test the deployment
 		if err := deployMgr.TestSandbox(ctx, deploySandbox); err != nil {
 			return &DeploymentResult{
@@ -262,7 +262,7 @@ func (w *TransformationWorkflow) deployTransformedCode(ctx context.Context, sand
 				Metadata:   deploySandbox.Metadata,
 			}, nil
 		}
-		
+
 		return &DeploymentResult{
 			AppName:    deploySandbox.JailName,
 			AppURL:     deploySandbox.Metadata["app_url"],
@@ -272,7 +272,7 @@ func (w *TransformationWorkflow) deployTransformedCode(ctx context.Context, sand
 			Metadata:   deploySandbox.Metadata,
 		}, nil
 	}
-	
+
 	// Fallback for other sandbox managers
 	return &DeploymentResult{
 		AppName:    config.AppName,
@@ -287,7 +287,7 @@ func (w *TransformationWorkflow) deployTransformedCode(ctx context.Context, sand
 // commitTransformedCode commits the transformed code to prepare for deployment
 func (w *TransformationWorkflow) commitTransformedCode(ctx context.Context, sandbox *Sandbox) error {
 	workspaceDir := filepath.Join(sandbox.RootPath, "workspace")
-	
+
 	// Check if there are any changes to commit
 	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
 	cmd.Dir = workspaceDir
@@ -295,19 +295,19 @@ func (w *TransformationWorkflow) commitTransformedCode(ctx context.Context, sand
 	if err != nil {
 		return fmt.Errorf("failed to check git status: %w", err)
 	}
-	
+
 	if len(strings.TrimSpace(string(output))) == 0 {
 		// No changes to commit
 		return nil
 	}
-	
+
 	// Add all changes
 	cmd = exec.CommandContext(ctx, "git", "add", ".")
 	cmd.Dir = workspaceDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to add changes: %w", err)
 	}
-	
+
 	// Commit changes
 	commitMsg := fmt.Sprintf("ARF transformation applied at %s", time.Now().Format("2006-01-02 15:04:05"))
 	cmd = exec.CommandContext(ctx, "git", "commit", "-m", commitMsg)
@@ -315,7 +315,7 @@ func (w *TransformationWorkflow) commitTransformedCode(ctx context.Context, sand
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -324,50 +324,50 @@ func (w *TransformationWorkflow) testDeployedApplication(ctx context.Context, de
 	if len(testEndpoints) == 0 {
 		testEndpoints = []string{"/", "/healthz", "/actuator/health"}
 	}
-	
+
 	var results []*EndpointTestResult
-	
+
 	for _, endpoint := range testEndpoints {
 		result := w.testEndpoint(ctx, deployResult.AppURL, endpoint)
 		results = append(results, result)
 	}
-	
+
 	return results, nil
 }
 
 // testEndpoint tests a single HTTP endpoint
 func (w *TransformationWorkflow) testEndpoint(ctx context.Context, baseURL, endpoint string) *EndpointTestResult {
 	startTime := time.Now()
-	
+
 	fullURL := baseURL + endpoint
 	if !strings.HasPrefix(endpoint, "/") {
 		fullURL = baseURL + "/" + endpoint
 	}
-	
+
 	// Use curl for testing to avoid import dependencies
 	cmd := exec.CommandContext(ctx, "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", fullURL)
 	output, err := cmd.Output()
-	
+
 	result := &EndpointTestResult{
 		Endpoint:     endpoint,
 		ResponseTime: time.Since(startTime),
 		Success:      false,
 	}
-	
+
 	if err != nil {
 		result.Error = fmt.Sprintf("Request failed: %v", err)
 		result.StatusCode = 0
 		return result
 	}
-	
+
 	statusCode := 0
 	if len(output) > 0 {
 		fmt.Sscanf(string(output), "%d", &statusCode)
 	}
-	
+
 	result.StatusCode = statusCode
 	result.Success = statusCode >= 200 && statusCode < 400
-	
+
 	return result
 }
 

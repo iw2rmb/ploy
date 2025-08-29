@@ -71,8 +71,8 @@ func (m *MockRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]
 	var result []*models.Recipe
 	for _, recipe := range m.recipes {
 		if m.containsQuery(recipe.Metadata.Name, query) ||
-		   m.containsQuery(recipe.Metadata.Description, query) ||
-		   m.containsQueryInTags(recipe.Metadata.Tags, query) {
+			m.containsQuery(recipe.Metadata.Description, query) ||
+			m.containsQueryInTags(recipe.Metadata.Tags, query) {
 			result = append(result, recipe)
 		}
 	}
@@ -133,7 +133,7 @@ func (m *MockRecipeCatalog) matchesFilters(recipe *models.Recipe, filters Recipe
 			return false
 		}
 	}
-	
+
 	// Category filter - check if recipe has the category
 	if filters.Category != "" {
 		hasCategory := false
@@ -147,12 +147,12 @@ func (m *MockRecipeCatalog) matchesFilters(recipe *models.Recipe, filters Recipe
 			return false
 		}
 	}
-	
+
 	// Author filter
 	if filters.Author != "" && recipe.Metadata.Author != filters.Author {
 		return false
 	}
-	
+
 	// Tags filter - recipe must have all specified tags
 	if len(filters.Tags) > 0 {
 		for _, filterTag := range filters.Tags {
@@ -168,7 +168,7 @@ func (m *MockRecipeCatalog) matchesFilters(recipe *models.Recipe, filters Recipe
 			}
 		}
 	}
-	
+
 	return true
 }
 
@@ -257,8 +257,8 @@ func TestRecipeCatalogOperations(t *testing.T) {
 			},
 			Steps: []models.RecipeStep{
 				{
-					Name: "update-step",
-					Type: models.StepTypeOpenRewrite,
+					Name:   "update-step",
+					Type:   models.StepTypeOpenRewrite,
 					Config: map[string]interface{}{"recipe": "test"},
 				},
 			},
@@ -328,11 +328,11 @@ func TestRecipeCatalogOperations(t *testing.T) {
 			{
 				ID: "java-recipe-1",
 				Metadata: models.RecipeMetadata{
-					Name:       "java-cleanup-1",
+					Name:        "java-cleanup-1",
 					Description: "Java cleanup recipe",
-					Author:     "test-author",
-					Languages:  []string{"java"},
-					Categories: []string{"code-cleanup"},
+					Author:      "test-author",
+					Languages:   []string{"java"},
+					Categories:  []string{"code-cleanup"},
 				},
 				Steps: []models.RecipeStep{{
 					Name:   "cleanup",
@@ -343,11 +343,11 @@ func TestRecipeCatalogOperations(t *testing.T) {
 			{
 				ID: "java-recipe-2",
 				Metadata: models.RecipeMetadata{
-					Name:       "java-modernize-1",
+					Name:        "java-modernize-1",
 					Description: "Java modernization recipe",
-					Author:     "test-author",
-					Languages:  []string{"java"},
-					Categories: []string{"modernization"},
+					Author:      "test-author",
+					Languages:   []string{"java"},
+					Categories:  []string{"modernization"},
 				},
 				Steps: []models.RecipeStep{{
 					Name:   "modernize",
@@ -358,11 +358,11 @@ func TestRecipeCatalogOperations(t *testing.T) {
 			{
 				ID: "python-recipe-1",
 				Metadata: models.RecipeMetadata{
-					Name:       "python-cleanup-1",
+					Name:        "python-cleanup-1",
 					Description: "Python cleanup recipe",
-					Author:     "test-author",
-					Languages:  []string{"python"},
-					Categories: []string{"code-cleanup"},
+					Author:      "test-author",
+					Languages:   []string{"python"},
+					Categories:  []string{"code-cleanup"},
 				},
 				Steps: []models.RecipeStep{{
 					Name:   "cleanup",

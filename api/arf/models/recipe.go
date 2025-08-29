@@ -27,8 +27,8 @@ type Recipe struct {
 	CreatedAt  time.Time `json:"created_at" yaml:"-"`
 	UpdatedAt  time.Time `json:"updated_at" yaml:"-"`
 	UploadedBy string    `json:"uploaded_by" yaml:"-"`
-	Hash       string    `json:"hash" yaml:"-"`        // Content hash for integrity
-	Version    string    `json:"version" yaml:"-"`     // Semantic version
+	Hash       string    `json:"hash" yaml:"-"`    // Content hash for integrity
+	Version    string    `json:"version" yaml:"-"` // Semantic version
 }
 
 // GenerateID creates a unique ID for the recipe based on name and version
@@ -105,11 +105,11 @@ func (r *Recipe) SetSystemFields(uploadedBy string) {
 	r.UpdatedAt = now
 	r.UploadedBy = uploadedBy
 	r.ID = r.GenerateID()
-	
+
 	// Calculate content hash
 	hash, _ := r.CalculateHash()
 	r.Hash = hash
-	
+
 	// Use metadata version as recipe version
 	if r.Metadata.Version != "" {
 		r.Version = r.Metadata.Version

@@ -33,7 +33,7 @@ func (b *BuildOperations) DetectBuildSystem(repoPath string) string {
 	if _, err := os.Stat(filepath.Join(repoPath, "pom.xml")); err == nil {
 		return "maven"
 	}
-	
+
 	// Check for Gradle
 	if _, err := os.Stat(filepath.Join(repoPath, "build.gradle")); err == nil {
 		return "gradle"
@@ -41,7 +41,7 @@ func (b *BuildOperations) DetectBuildSystem(repoPath string) string {
 	if _, err := os.Stat(filepath.Join(repoPath, "build.gradle.kts")); err == nil {
 		return "gradle"
 	}
-	
+
 	// Check for npm/yarn
 	if _, err := os.Stat(filepath.Join(repoPath, "package.json")); err == nil {
 		if _, err := os.Stat(filepath.Join(repoPath, "yarn.lock")); err == nil {
@@ -49,12 +49,12 @@ func (b *BuildOperations) DetectBuildSystem(repoPath string) string {
 		}
 		return "npm"
 	}
-	
+
 	// Check for Go
 	if _, err := os.Stat(filepath.Join(repoPath, "go.mod")); err == nil {
 		return "go"
 	}
-	
+
 	// Check for Python
 	if _, err := os.Stat(filepath.Join(repoPath, "setup.py")); err == nil {
 		return "python"
@@ -65,7 +65,7 @@ func (b *BuildOperations) DetectBuildSystem(repoPath string) string {
 	if _, err := os.Stat(filepath.Join(repoPath, "pyproject.toml")); err == nil {
 		return "poetry"
 	}
-	
+
 	return "unknown"
 }
 
@@ -74,7 +74,7 @@ func (b *BuildOperations) ValidateBuild(ctx context.Context, repoPath string, bu
 	if buildSystem == "" {
 		buildSystem = b.DetectBuildSystem(repoPath)
 	}
-	
+
 	switch buildSystem {
 	case "maven":
 		return b.buildMaven(ctx, repoPath)
@@ -98,11 +98,11 @@ func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error
 	// First, try to run clean compile
 	cmd := exec.CommandContext(ctx, "mvn", "clean", "compile", "-B", "-DskipTests")
 	cmd.Dir = repoPath
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		// Extract compilation errors from Maven output
 		errors := b.parseMavenErrors(stderr.String())
@@ -115,7 +115,7 @@ func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error
 		}
 		return fmt.Errorf("maven build failed: %v\n%s", err, stderr.String())
 	}
-	
+
 	return nil
 }
 
@@ -126,14 +126,14 @@ func (b *BuildOperations) buildGradle(ctx context.Context, repoPath string) erro
 	if _, err := os.Stat(filepath.Join(repoPath, "gradlew")); err == nil {
 		gradleCmd = "./gradlew"
 	}
-	
+
 	cmd := exec.CommandContext(ctx, gradleCmd, "clean", "compileJava", "-x", "test")
 	cmd.Dir = repoPath
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		// Extract compilation errors from Gradle output
 		errors := b.parseGradleErrors(stderr.String())
@@ -146,7 +146,7 @@ func (b *BuildOperations) buildGradle(ctx context.Context, repoPath string) erro
 		}
 		return fmt.Errorf("gradle build failed: %v\n%s", err, stderr.String())
 	}
-	
+
 	return nil
 }
 
@@ -163,14 +163,14 @@ func (b *BuildOperations) buildNpm(ctx context.Context, repoPath string) error {
 			return fmt.Errorf("npm install failed: %w", err)
 		}
 	}
-	
+
 	// Run build
 	cmd := exec.CommandContext(ctx, "npm", "run", "build")
 	cmd.Dir = repoPath
-	
+
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		// If no build script, try compile
 		if strings.Contains(stderr.String(), "Missing script") {
@@ -187,7 +187,7 @@ func (b *BuildOperations) buildNpm(ctx context.Context, repoPath string) error {
 		}
 		return fmt.Errorf("npm build failed: %v\n%s", err, stderr.String())
 	}
-	
+
 	return nil
 }
 
@@ -199,11 +199,11 @@ func (b *BuildOperations) buildYarn(ctx context.Context, repoPath string) error 
 	if err := installCmd.Run(); err != nil {
 		return fmt.Errorf("yarn install failed: %w", err)
 	}
-	
+
 	// Run build
 	cmd := exec.CommandContext(ctx, "yarn", "build")
 	cmd.Dir = repoPath
-	
+
 	if err := cmd.Run(); err != nil {
 		// Try compile if build doesn't exist
 		compileCmd := exec.CommandContext(ctx, "yarn", "compile")
@@ -213,7 +213,7 @@ func (b *BuildOperations) buildYarn(ctx context.Context, repoPath string) error 
 			return nil
 		}
 	}
-	
+
 	return nil
 }
 
@@ -221,14 +221,14 @@ func (b *BuildOperations) buildYarn(ctx context.Context, repoPath string) error 
 func (b *BuildOperations) buildGo(ctx context.Context, repoPath string) error {
 	cmd := exec.CommandContext(ctx, "go", "build", "./...")
 	cmd.Dir = repoPath
-	
+
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("go build failed: %v\n%s", err, stderr.String())
 	}
-	
+
 	return nil
 }
 
@@ -237,7 +237,7 @@ func (b *BuildOperations) buildPython(ctx context.Context, repoPath string, buil
 	// Python doesn't have a traditional build step, but we can check syntax
 	cmd := exec.CommandContext(ctx, "python", "-m", "py_compile", ".")
 	cmd.Dir = repoPath
-	
+
 	// Just check if we can import the main module
 	// This is a simplified check
 	return nil
@@ -248,7 +248,7 @@ func (b *BuildOperations) RunTests(ctx context.Context, repoPath string, buildSy
 	if buildSystem == "" {
 		buildSystem = b.DetectBuildSystem(repoPath)
 	}
-	
+
 	switch buildSystem {
 	case "maven":
 		return b.testMaven(ctx, repoPath)
@@ -271,22 +271,22 @@ func (b *BuildOperations) RunTests(ctx context.Context, repoPath string, buildSy
 func (b *BuildOperations) testMaven(ctx context.Context, repoPath string) (*TestResults, error) {
 	cmd := exec.CommandContext(ctx, "mvn", "test", "-B")
 	cmd.Dir = repoPath
-	
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	err := cmd.Run()
-	
+
 	// Parse test results from Maven output
 	results := b.parseMavenTestResults(stdout.String())
-	
+
 	if err != nil && results.Failed > 0 {
 		results.Success = false
 	} else if err == nil && results.Failed == 0 {
 		results.Success = true
 	}
-	
+
 	return results, nil
 }
 
@@ -296,24 +296,24 @@ func (b *BuildOperations) testGradle(ctx context.Context, repoPath string) (*Tes
 	if _, err := os.Stat(filepath.Join(repoPath, "gradlew")); err == nil {
 		gradleCmd = "./gradlew"
 	}
-	
+
 	cmd := exec.CommandContext(ctx, gradleCmd, "test")
 	cmd.Dir = repoPath
-	
+
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
-	
+
 	err := cmd.Run()
-	
+
 	// Parse test results from Gradle output
 	results := b.parseGradleTestResults(stdout.String())
-	
+
 	if err != nil && results.Failed > 0 {
 		results.Success = false
 	} else if err == nil && results.Failed == 0 {
 		results.Success = true
 	}
-	
+
 	return results, nil
 }
 
@@ -326,26 +326,26 @@ func (b *BuildOperations) testJavaScript(ctx context.Context, repoPath string, t
 		cmd = exec.CommandContext(ctx, "npm", "test", "--", "--watchAll=false", "--passWithNoTests")
 	}
 	cmd.Dir = repoPath
-	
+
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
-	
+
 	err := cmd.Run()
-	
+
 	// Basic parsing - look for common test output patterns
 	output := stdout.String()
 	results := &TestResults{}
-	
+
 	// Look for Jest-style output
 	if strings.Contains(output, "Tests:") {
 		// Parse Jest results
 		results = b.parseJestResults(output)
 	}
-	
+
 	if err == nil {
 		results.Success = true
 	}
-	
+
 	return results, nil
 }
 
@@ -353,25 +353,25 @@ func (b *BuildOperations) testJavaScript(ctx context.Context, repoPath string, t
 func (b *BuildOperations) testGo(ctx context.Context, repoPath string) (*TestResults, error) {
 	cmd := exec.CommandContext(ctx, "go", "test", "./...", "-v")
 	cmd.Dir = repoPath
-	
+
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
-	
+
 	err := cmd.Run()
-	
+
 	// Parse Go test results
 	output := stdout.String()
 	results := &TestResults{}
-	
+
 	// Count PASS and FAIL
 	passes := strings.Count(output, "--- PASS:")
 	fails := strings.Count(output, "--- FAIL:")
-	
+
 	results.Passed = passes
 	results.Failed = fails
 	results.Total = passes + fails
 	results.Success = err == nil && fails == 0
-	
+
 	return results, nil
 }
 
@@ -380,59 +380,59 @@ func (b *BuildOperations) testGo(ctx context.Context, repoPath string) (*TestRes
 func (b *BuildOperations) parseMavenErrors(output string) []string {
 	var errors []string
 	lines := strings.Split(output, "\n")
-	
+
 	errorPattern := regexp.MustCompile(`\[ERROR\] (.+\.java):\[(\d+),(\d+)\] (.+)`)
-	
+
 	for _, line := range lines {
 		if matches := errorPattern.FindStringSubmatch(line); matches != nil {
 			errors = append(errors, fmt.Sprintf("%s:%s:%s - %s", matches[1], matches[2], matches[3], matches[4]))
 		}
 	}
-	
+
 	return errors
 }
 
 func (b *BuildOperations) parseGradleErrors(output string) []string {
 	var errors []string
 	lines := strings.Split(output, "\n")
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "error:") || strings.Contains(line, "ERROR") {
 			errors = append(errors, strings.TrimSpace(line))
 		}
 	}
-	
+
 	return errors
 }
 
 func (b *BuildOperations) parseMavenTestResults(output string) *TestResults {
 	results := &TestResults{}
-	
+
 	// Look for Maven Surefire test results
 	summaryPattern := regexp.MustCompile(`Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)`)
-	
+
 	if matches := summaryPattern.FindStringSubmatch(output); matches != nil {
 		fmt.Sscanf(matches[1], "%d", &results.Total)
 		var failures, errors, skipped int
 		fmt.Sscanf(matches[2], "%d", &failures)
 		fmt.Sscanf(matches[3], "%d", &errors)
 		fmt.Sscanf(matches[4], "%d", &skipped)
-		
+
 		results.Failed = failures + errors
 		results.Passed = results.Total - results.Failed - skipped
 	}
-	
+
 	return results
 }
 
 func (b *BuildOperations) parseGradleTestResults(output string) *TestResults {
 	results := &TestResults{}
-	
+
 	// Look for Gradle test summary
 	if strings.Contains(output, "BUILD SUCCESSFUL") {
 		results.Success = true
 	}
-	
+
 	// Parse test counts
 	testPattern := regexp.MustCompile(`(\d+) tests completed, (\d+) failed`)
 	if matches := testPattern.FindStringSubmatch(output); matches != nil {
@@ -440,17 +440,17 @@ func (b *BuildOperations) parseGradleTestResults(output string) *TestResults {
 		fmt.Sscanf(matches[2], "%d", &results.Failed)
 		results.Passed = results.Total - results.Failed
 	}
-	
+
 	return results
 }
 
 func (b *BuildOperations) parseJestResults(output string) *TestResults {
 	results := &TestResults{}
-	
+
 	// Parse Jest summary line
 	// Tests:       1 failed, 1 passed, 2 total
 	testPattern := regexp.MustCompile(`Tests:\s+(?:(\d+) failed,\s*)?(?:(\d+) passed,\s*)?(\d+) total`)
-	
+
 	if matches := testPattern.FindStringSubmatch(output); matches != nil {
 		if matches[1] != "" {
 			fmt.Sscanf(matches[1], "%d", &results.Failed)
@@ -460,17 +460,17 @@ func (b *BuildOperations) parseJestResults(output string) *TestResults {
 		}
 		fmt.Sscanf(matches[3], "%d", &results.Total)
 	}
-	
+
 	return results
 }
 
 // DetectErrors parses build/compilation errors from output
 func (b *BuildOperations) DetectErrors(ctx context.Context, repoPath string, buildOutput string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	// Detect build system
 	buildSystem := b.DetectBuildSystem(repoPath)
-	
+
 	switch buildSystem {
 	case "maven":
 		errors = b.detectMavenErrors(buildOutput)
@@ -481,34 +481,34 @@ func (b *BuildOperations) DetectErrors(ctx context.Context, repoPath string, bui
 	case "go":
 		errors = b.detectGoErrors(buildOutput)
 	}
-	
+
 	return errors
 }
 
 func (b *BuildOperations) detectMavenErrors(output string) []ErrorCapture {
 	var errors []ErrorCapture
-	
+
 	errorPattern := regexp.MustCompile(`\[ERROR\] (.+\.java):\[(\d+),(\d+)\] (.+)`)
 	lines := strings.Split(output, "\n")
-	
+
 	for _, line := range lines {
 		if matches := errorPattern.FindStringSubmatch(line); matches != nil {
 			errors = append(errors, ErrorCapture{
-				Type:    "compile",
-				Message: matches[4],
-				Details: fmt.Sprintf("File: %s, Line: %s, Column: %s", matches[1], matches[2], matches[3]),
+				Type:      "compile",
+				Message:   matches[4],
+				Details:   fmt.Sprintf("File: %s, Line: %s, Column: %s", matches[1], matches[2], matches[3]),
 				Timestamp: time.Now(),
 			})
 		}
 	}
-	
+
 	return errors
 }
 
 func (b *BuildOperations) detectGradleErrors(output string) []ErrorCapture {
 	var errors []ErrorCapture
 	lines := strings.Split(output, "\n")
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "error:") {
 			errors = append(errors, ErrorCapture{
@@ -518,14 +518,14 @@ func (b *BuildOperations) detectGradleErrors(output string) []ErrorCapture {
 			})
 		}
 	}
-	
+
 	return errors
 }
 
 func (b *BuildOperations) detectJavaScriptErrors(output string) []ErrorCapture {
 	var errors []ErrorCapture
 	lines := strings.Split(output, "\n")
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "ERROR in") || strings.Contains(line, "SyntaxError") || strings.Contains(line, "TypeError") {
 			errors = append(errors, ErrorCapture{
@@ -535,27 +535,27 @@ func (b *BuildOperations) detectJavaScriptErrors(output string) []ErrorCapture {
 			})
 		}
 	}
-	
+
 	return errors
 }
 
 func (b *BuildOperations) detectGoErrors(output string) []ErrorCapture {
 	var errors []ErrorCapture
 	lines := strings.Split(output, "\n")
-	
+
 	errorPattern := regexp.MustCompile(`(.+\.go):(\d+):(\d+): (.+)`)
-	
+
 	for _, line := range lines {
 		if matches := errorPattern.FindStringSubmatch(line); matches != nil {
 			errors = append(errors, ErrorCapture{
-				Type:    "compile",
-				Message: matches[4],
-				Details: fmt.Sprintf("File: %s, Line: %s, Column: %s", matches[1], matches[2], matches[3]),
+				Type:      "compile",
+				Message:   matches[4],
+				Details:   fmt.Sprintf("File: %s, Line: %s, Column: %s", matches[1], matches[2], matches[3]),
 				Timestamp: time.Now(),
 			})
 		}
 	}
-	
+
 	return errors
 }
 
@@ -572,10 +572,10 @@ func (e *BuildError) Error() string {
 
 // TestResults represents test execution results
 type TestResults struct {
-	Success bool
-	Passed  int
-	Failed  int
-	Total   int
+	Success  bool
+	Passed   int
+	Failed   int
+	Total    int
 	Coverage float64
 	Duration time.Duration
 }

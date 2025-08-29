@@ -16,23 +16,23 @@ type StrategySelector interface {
 
 // StrategyRequest contains information needed for strategy selection
 type StrategyRequest struct {
-	Repository         Repository              `json:"repository"`
-	TransformationType TransformationType      `json:"transformation_type"`
-	ErrorContext       ErrorContext           `json:"error_context"`
-	ResourceConstraints ResourceConstraints    `json:"resource_constraints"`
-	TimeConstraints    TimeConstraints        `json:"time_constraints"`
-	QualityRequirements QualityRequirements   `json:"quality_requirements"`
+	Repository          Repository          `json:"repository"`
+	TransformationType  TransformationType  `json:"transformation_type"`
+	ErrorContext        ErrorContext        `json:"error_context"`
+	ResourceConstraints ResourceConstraints `json:"resource_constraints"`
+	TimeConstraints     TimeConstraints     `json:"time_constraints"`
+	QualityRequirements QualityRequirements `json:"quality_requirements"`
 }
 
 // SelectedStrategy represents the chosen strategy with alternatives
 type SelectedStrategy struct {
-	Primary           TransformationStrategy  `json:"primary"`
-	Alternatives      []TransformationStrategy `json:"alternatives"`
-	Confidence        float64                 `json:"confidence"`
-	Reasoning         StrategyReasoning       `json:"reasoning"`
-	ResourceEstimate  ResourcePrediction      `json:"resource_estimate"`
-	TimeEstimate      time.Duration           `json:"time_estimate"`
-	RiskAssessment    StrategyRiskAssessment          `json:"risk_assessment"`
+	Primary          TransformationStrategy   `json:"primary"`
+	Alternatives     []TransformationStrategy `json:"alternatives"`
+	Confidence       float64                  `json:"confidence"`
+	Reasoning        StrategyReasoning        `json:"reasoning"`
+	ResourceEstimate ResourcePrediction       `json:"resource_estimate"`
+	TimeEstimate     time.Duration            `json:"time_estimate"`
+	RiskAssessment   StrategyRiskAssessment   `json:"risk_assessment"`
 }
 
 // StrategyReasoning explains why a strategy was selected
@@ -46,19 +46,19 @@ type StrategyReasoning struct {
 
 // ResourcePrediction estimates resource requirements for a strategy
 type ResourcePrediction struct {
-	EstimatedCPU     int           `json:"estimated_cpu"`
-	EstimatedMemory  int64         `json:"estimated_memory"`
-	EstimatedTime    time.Duration `json:"estimated_time"`
-	EstimatedCost    float64       `json:"estimated_cost"`
-	Confidence       float64       `json:"confidence"`
+	EstimatedCPU    int           `json:"estimated_cpu"`
+	EstimatedMemory int64         `json:"estimated_memory"`
+	EstimatedTime   time.Duration `json:"estimated_time"`
+	EstimatedCost   float64       `json:"estimated_cost"`
+	Confidence      float64       `json:"confidence"`
 }
 
 // StrategyRiskAssessment evaluates the risks of a transformation strategy
 type StrategyRiskAssessment struct {
-	OverallRisk      float64     `json:"overall_risk"`
-	RiskFactors      []RiskFactor `json:"risk_factors"`
-	MitigationSteps  []string    `json:"mitigation_steps"`
-	FailureProbability float64   `json:"failure_probability"`
+	OverallRisk        float64      `json:"overall_risk"`
+	RiskFactors        []RiskFactor `json:"risk_factors"`
+	MitigationSteps    []string     `json:"mitigation_steps"`
+	FailureProbability float64      `json:"failure_probability"`
 }
 
 // RiskFactor represents a specific risk in transformation
@@ -74,11 +74,11 @@ type RiskFactor struct {
 
 // EscalationRecommendation suggests next steps after failures
 type EscalationRecommendation struct {
-	RecommendedAction string                 `json:"recommended_action"`
+	RecommendedAction string                  `json:"recommended_action"`
 	NextStrategy      *TransformationStrategy `json:"next_strategy"`
-	HumanReview       bool                   `json:"human_review"`
-	Reasoning         string                 `json:"reasoning"`
-	Priority          string                 `json:"priority"`
+	HumanReview       bool                    `json:"human_review"`
+	Reasoning         string                  `json:"reasoning"`
+	Priority          string                  `json:"priority"`
 }
 
 // DefaultStrategySelector implements strategy selection logic
@@ -94,10 +94,10 @@ func NewDefaultStrategySelector() *DefaultStrategySelector {
 		complexityAnalyzer: NewDefaultComplexityAnalyzer(),
 		strategyWeights: map[StrategyType]float64{
 			StrategyOpenRewriteOnly:  0.7,
-			StrategyLLMOnly:         0.5,
+			StrategyLLMOnly:          0.5,
 			StrategyHybridSequential: 0.8,
 			StrategyHybridParallel:   0.6,
-			StrategyTreeSitter:      0.6,
+			StrategyTreeSitter:       0.6,
 		},
 	}
 }
@@ -160,7 +160,7 @@ func (s *DefaultStrategySelector) PredictResourceRequirements(ctx context.Contex
 
 	// Adjust based on strategy enhancement
 	if strategy.Enhancement == StrategyLLMOnly || strategy.Enhancement == StrategyHybridSequential {
-		basePrediction.EstimatedCPU += 1000  // Additional CPU for LLM processing
+		basePrediction.EstimatedCPU += 1000                  // Additional CPU for LLM processing
 		basePrediction.EstimatedMemory += 1024 * 1024 * 1024 // Additional 1GB memory
 		basePrediction.EstimatedTime += 30 * time.Second
 		basePrediction.EstimatedCost += 0.10 // LLM API costs
@@ -335,9 +335,9 @@ func (s *DefaultStrategySelector) calculateStrategyScore(strategy Transformation
 
 func (s *DefaultStrategySelector) getScoreFactors(strategy TransformationStrategy, request StrategyRequest, complexity ComplexityAnalysis) map[string]float64 {
 	return map[string]float64{
-		"base_weight":        s.strategyWeights[strategy.Primary],
-		"complexity_factor":  complexity.OverallComplexity,
-		"time_preference":    s.getTimePreferenceScore(request.TimeConstraints.PreferredSpeed),
+		"base_weight":         s.strategyWeights[strategy.Primary],
+		"complexity_factor":   complexity.OverallComplexity,
+		"time_preference":     s.getTimePreferenceScore(request.TimeConstraints.PreferredSpeed),
 		"quality_requirement": request.QualityRequirements.MinConfidence,
 	}
 }
@@ -357,9 +357,9 @@ func (s *DefaultStrategySelector) getTimePreferenceScore(preference string) floa
 
 func (s *DefaultStrategySelector) isMultiLanguageScenario(request StrategyRequest) bool {
 	// Simple heuristic - could be enhanced with actual analysis
-	return request.Repository.Language == "mixed" || 
-		   request.TransformationType == "migration" &&
-		   (request.Repository.Metadata["framework"] == "polyglot" || request.Repository.Metadata["framework"] == "microservices")
+	return request.Repository.Language == "mixed" ||
+		request.TransformationType == "migration" &&
+			(request.Repository.Metadata["framework"] == "polyglot" || request.Repository.Metadata["framework"] == "microservices")
 }
 
 func (s *DefaultStrategySelector) extractStrategies(scored []scoredStrategy) []TransformationStrategy {
@@ -475,7 +475,7 @@ func (s *DefaultStrategySelector) assessRisks(strategy TransformationStrategy, r
 		overallRisk += factor.Severity * factor.Probability
 		failureProbability += factor.Probability
 	}
-	
+
 	if len(riskFactors) > 0 {
 		overallRisk = overallRisk / float64(len(riskFactors))
 		failureProbability = failureProbability / float64(len(riskFactors))

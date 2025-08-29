@@ -1096,9 +1096,6 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 
 	sandboxMgr := arf.NewSandboxManagerForOS(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
 
-	// Create shared benchmark manager
-	benchmarkMgr := arf.NewBenchmarkManager("./benchmark_results")
-
 	// Initialize storage backend
 	recipeStorage, err := arfConfig.InitializeStorage()
 	if err != nil {
@@ -1129,7 +1126,6 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			recipeIndex,
 			recipeValidator,
 			sandboxMgr,
-			benchmarkMgr,
 		)
 		log.Printf("ARF handler initialized with storage backend: %s", arfConfig.Storage.Backend)
 	} else {
@@ -1140,7 +1136,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			return nil, fmt.Errorf("failed to create recipe catalog: %w", err)
 		}
 
-		handler = arf.NewHandler(engine, catalog, sandboxMgr, benchmarkMgr)
+		handler = arf.NewHandler(engine, catalog, sandboxMgr)
 		log.Printf("ARF handler initialized with catalog fallback")
 	}
 

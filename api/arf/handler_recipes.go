@@ -23,7 +23,7 @@ func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilt
 			Author:     filters.Author,
 			Limit:      20, // Default limit
 		}
-		
+
 		// Convert single values to slices
 		if filters.Category != "" {
 			storageFilter.Categories = []string{filters.Category}
@@ -31,15 +31,15 @@ func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilt
 		if filters.Language != "" {
 			storageFilter.Languages = []string{filters.Language}
 		}
-		
+
 		return h.recipeStorage.ListRecipes(ctx, storageFilter)
 	}
-	
+
 	// Fallback to catalog
 	if h.catalog != nil {
 		return h.catalog.ListRecipes(ctx, filters)
 	}
-	
+
 	return nil, fmt.Errorf("no storage backend available")
 }
 
@@ -47,12 +47,12 @@ func (h *Handler) getRecipeWithStorage(ctx context.Context, recipeID string) (*m
 	if h.recipeStorage != nil {
 		return h.recipeStorage.GetRecipe(ctx, recipeID)
 	}
-	
+
 	// Fallback to catalog
 	if h.catalog != nil {
 		return h.catalog.GetRecipe(ctx, recipeID)
 	}
-	
+
 	return nil, fmt.Errorf("no storage backend available")
 }
 
@@ -63,16 +63,16 @@ func (h *Handler) createRecipeWithStorage(ctx context.Context, recipe *models.Re
 			return fmt.Errorf("recipe validation failed: %w", err)
 		}
 	}
-	
+
 	if h.recipeStorage != nil {
 		return h.recipeStorage.CreateRecipe(ctx, recipe)
 	}
-	
+
 	// Fallback to catalog
 	if h.catalog != nil {
 		return h.catalog.StoreRecipe(ctx, recipe)
 	}
-	
+
 	return fmt.Errorf("no storage backend available")
 }
 
@@ -83,16 +83,16 @@ func (h *Handler) updateRecipeWithStorage(ctx context.Context, recipeID string, 
 			return fmt.Errorf("recipe validation failed: %w", err)
 		}
 	}
-	
+
 	if h.recipeStorage != nil {
 		return h.recipeStorage.UpdateRecipe(ctx, recipeID, recipe)
 	}
-	
-	// Fallback to catalog  
+
+	// Fallback to catalog
 	if h.catalog != nil {
 		return h.catalog.UpdateRecipe(ctx, recipe)
 	}
-	
+
 	return fmt.Errorf("no storage backend available")
 }
 
@@ -100,12 +100,12 @@ func (h *Handler) deleteRecipeWithStorage(ctx context.Context, recipeID string) 
 	if h.recipeStorage != nil {
 		return h.recipeStorage.DeleteRecipe(ctx, recipeID)
 	}
-	
+
 	// Fallback to catalog
 	if h.catalog != nil {
 		return h.catalog.DeleteRecipe(ctx, recipeID)
 	}
-	
+
 	return fmt.Errorf("no storage backend available")
 }
 
@@ -115,7 +115,7 @@ func (h *Handler) searchRecipesWithStorage(ctx context.Context, query string) ([
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Convert search results to recipes
 		recipes := make([]*models.Recipe, len(results))
 		for i, result := range results {
@@ -123,12 +123,12 @@ func (h *Handler) searchRecipesWithStorage(ctx context.Context, query string) ([
 		}
 		return recipes, nil
 	}
-	
+
 	// Fallback to catalog
 	if h.catalog != nil {
 		return h.catalog.SearchRecipes(ctx, query)
 	}
-	
+
 	return nil, fmt.Errorf("no storage backend available")
 }
 
@@ -137,7 +137,7 @@ func (h *Handler) getRecipeStatsWithStorage(ctx context.Context, recipeID string
 	if h.catalog != nil {
 		return h.catalog.GetRecipeStats(ctx, recipeID)
 	}
-	
+
 	// If no catalog available, return mock stats
 	return map[string]interface{}{
 		"recipe_id":        recipeID,
@@ -273,7 +273,7 @@ func (h *Handler) DeleteRecipeLegacy(c *fiber.Ctx) error {
 // SearchRecipesLegacy searches for recipes based on criteria (old implementation)
 func (h *Handler) SearchRecipesLegacy(c *fiber.Ctx) error {
 	query := c.Query("q")
-	
+
 	recipes, err := h.searchRecipesWithStorage(c.Context(), query)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
@@ -295,15 +295,15 @@ func (h *Handler) GetRecipeMetadata(c *fiber.Ctx) error {
 
 	// Mock metadata for now as GetRecipeMetadata is not in interface
 	metadata := fiber.Map{
-		"recipe_id": recipeID,
+		"recipe_id":  recipeID,
 		"created_at": time.Now().Add(-30 * 24 * time.Hour),
 		"updated_at": time.Now().Add(-5 * 24 * time.Hour),
-		"author": "system",
-		"version": "1.0.0",
-		"tags": []string{"spring", "migration"},
+		"author":     "system",
+		"version":    "1.0.0",
+		"tags":       []string{"spring", "migration"},
 	}
 	_ = metadata
-	
+
 	recipe, err := h.getRecipeWithStorage(c.Context(), recipeID)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{
@@ -314,12 +314,12 @@ func (h *Handler) GetRecipeMetadata(c *fiber.Ctx) error {
 
 	// Return metadata based on recipe
 	return c.JSON(fiber.Map{
-		"recipe_id": recipeID,
+		"recipe_id":  recipeID,
 		"created_at": recipe.CreatedAt,
 		"updated_at": recipe.UpdatedAt,
-		"author": recipe.Metadata.Author,
-		"version": recipe.Metadata.Version,
-		"tags": recipe.Metadata.Tags,
+		"author":     recipe.Metadata.Author,
+		"version":    recipe.Metadata.Version,
+		"tags":       recipe.Metadata.Tags,
 	})
 }
 
@@ -357,7 +357,7 @@ func (h *Handler) UploadRecipe(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
-	
+
 	// Validate recipe
 	if err := recipe.Validate(); err != nil {
 		return c.Status(400).JSON(fiber.Map{
@@ -365,10 +365,10 @@ func (h *Handler) UploadRecipe(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
-	
+
 	// Set system fields
 	recipe.SetSystemFields("api-user")
-	
+
 	// Store recipe using storage backend
 	if err := h.createRecipeWithStorage(c.Context(), &recipe); err != nil {
 		return c.Status(500).JSON(fiber.Map{
@@ -376,7 +376,7 @@ func (h *Handler) UploadRecipe(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
-	
+
 	return c.Status(201).JSON(fiber.Map{
 		"id":      recipe.ID,
 		"message": "Recipe uploaded successfully",
@@ -392,7 +392,7 @@ func (h *Handler) ValidateRecipe(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
-	
+
 	// Basic validation
 	if err := recipe.Validate(); err != nil {
 		return c.Status(400).JSON(fiber.Map{
@@ -401,10 +401,10 @@ func (h *Handler) ValidateRecipe(c *fiber.Ctx) error {
 			"valid":   false,
 		})
 	}
-	
+
 	// Additional validation checks
 	warnings := []string{}
-	
+
 	// Check for missing optional but recommended fields
 	if recipe.Metadata.MinPlatform == "" {
 		warnings = append(warnings, "Missing minimum platform version")
@@ -415,13 +415,13 @@ func (h *Handler) ValidateRecipe(c *fiber.Ctx) error {
 	if recipe.Metadata.License == "" {
 		warnings = append(warnings, "No license specified")
 	}
-	
+
 	// Check step configurations
 	for i, step := range recipe.Steps {
 		if step.Timeout.Duration == 0 {
 			warnings = append(warnings, "Step "+strconv.Itoa(i+1)+" ("+step.Name+") has no timeout specified")
 		}
-		
+
 		// OpenRewrite-specific validation
 		if step.Type == models.StepTypeOpenRewrite {
 			if recipe, ok := step.Config["recipe"].(string); !ok || recipe == "" {
@@ -432,7 +432,7 @@ func (h *Handler) ValidateRecipe(c *fiber.Ctx) error {
 			}
 		}
 	}
-	
+
 	response := fiber.Map{
 		"valid":   true,
 		"message": "Recipe is valid",
@@ -444,18 +444,18 @@ func (h *Handler) ValidateRecipe(c *fiber.Ctx) error {
 			"categories": recipe.Metadata.Categories,
 		},
 	}
-	
+
 	if len(warnings) > 0 {
 		response["warnings"] = warnings
 	}
-	
+
 	return c.JSON(response)
 }
 
 // DownloadRecipe returns a recipe in YAML format
 func (h *Handler) DownloadRecipe(c *fiber.Ctx) error {
 	recipeID := c.Params("id")
-	
+
 	// Get recipe from storage backend
 	recipe, err := h.getRecipeWithStorage(c.Context(), recipeID)
 	if err != nil {
@@ -464,10 +464,10 @@ func (h *Handler) DownloadRecipe(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
-	
+
 	// Set appropriate headers for YAML download
 	c.Set("Content-Type", "application/x-yaml")
 	c.Set("Content-Disposition", "attachment; filename="+recipeID+".yaml")
-	
+
 	return c.JSON(recipe)
 }

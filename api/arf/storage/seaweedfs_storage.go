@@ -17,13 +17,13 @@ import (
 
 // SeaweedFSRecipeStorage implements RecipeStorage using SeaweedFS
 type SeaweedFSRecipeStorage struct {
-	client      storage.StorageProvider
-	bucketName  string
-	keyPrefix   string
-	indexStore  RecipeIndexStore
-	validator   RecipeValidator
-	cache       *recipeCache
-	mu          sync.RWMutex
+	client     storage.StorageProvider
+	bucketName string
+	keyPrefix  string
+	indexStore RecipeIndexStore
+	validator  RecipeValidator
+	cache      *recipeCache
+	mu         sync.RWMutex
 }
 
 // recipeCache provides in-memory caching for recipes
@@ -256,7 +256,7 @@ func (s *SeaweedFSRecipeStorage) DeleteRecipe(ctx context.Context, id string) er
 	// Mark recipe as deleted by creating a deletion marker
 	key := s.getRecipeKey(id)
 	deletionKey := s.getDeletionKey(id)
-	
+
 	// Create deletion marker with timestamp
 	deletionInfo := map[string]interface{}{
 		"deleted_at":   time.Now().UTC().Format(time.RFC3339),
@@ -264,7 +264,7 @@ func (s *SeaweedFSRecipeStorage) DeleteRecipe(ctx context.Context, id string) er
 		"original_key": key,
 	}
 	deletionData, _ := yaml.Marshal(deletionInfo)
-	
+
 	// Store deletion marker
 	err = s.retryOperation(func() error {
 		_, err := s.client.PutObject(s.bucketName, deletionKey, bytes.NewReader(deletionData), "application/x-yaml")

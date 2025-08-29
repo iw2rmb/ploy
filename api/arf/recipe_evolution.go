@@ -22,26 +22,26 @@ type RecipeEvolution interface {
 type ErrorType string
 
 const (
-	ErrorRecipeMismatch       ErrorType = "recipe_mismatch"
-	ErrorCompilationFailure   ErrorType = "compilation_failure"
-	ErrorSemanticChange       ErrorType = "semantic_change"
-	ErrorIncompleteTransform  ErrorType = "incomplete_transformation"
-	ErrorResourceExhaustion   ErrorType = "resource_exhaustion"
-	ErrorTimeoutFailure       ErrorType = "timeout_failure"
-	ErrorDependencyIssue      ErrorType = "dependency_issue"
-	ErrorUnknown              ErrorType = "unknown"
+	ErrorRecipeMismatch      ErrorType = "recipe_mismatch"
+	ErrorCompilationFailure  ErrorType = "compilation_failure"
+	ErrorSemanticChange      ErrorType = "semantic_change"
+	ErrorIncompleteTransform ErrorType = "incomplete_transformation"
+	ErrorResourceExhaustion  ErrorType = "resource_exhaustion"
+	ErrorTimeoutFailure      ErrorType = "timeout_failure"
+	ErrorDependencyIssue     ErrorType = "dependency_issue"
+	ErrorUnknown             ErrorType = "unknown"
 )
 
 // FailureAnalysis contains the analysis of a transformation failure
 type FailureAnalysis struct {
-	ErrorType        ErrorType             `json:"error_type"`
-	RootCause        string                `json:"root_cause"`
-	SuggestedFixes   []RecipeModification  `json:"suggested_fixes"`
-	Confidence       float64               `json:"confidence"`
-	SimilarPatterns  []FailurePattern      `json:"similar_patterns"`
-	AffectedFiles    []string              `json:"affected_files"`
-	ContextInfo      map[string]interface{} `json:"context_info"`
-	AnalysisTime     time.Time             `json:"analysis_time"`
+	ErrorType       ErrorType              `json:"error_type"`
+	RootCause       string                 `json:"root_cause"`
+	SuggestedFixes  []RecipeModification   `json:"suggested_fixes"`
+	Confidence      float64                `json:"confidence"`
+	SimilarPatterns []FailurePattern       `json:"similar_patterns"`
+	AffectedFiles   []string               `json:"affected_files"`
+	ContextInfo     map[string]interface{} `json:"context_info"`
+	AnalysisTime    time.Time              `json:"analysis_time"`
 }
 
 // RecipeModification describes a specific change to make to a recipe
@@ -68,37 +68,36 @@ const (
 	ModificationReduceScope   ModificationType = "reduce_scope"
 )
 
-
 // Note: FailurePattern type is defined in learning_system.go
 
 // TransformationFailure contains details about a failed transformation
 type TransformationFailure struct {
-	RecipeID       string                 `json:"recipe_id"`
-	ErrorMessage   string                 `json:"error_message"`
-	StackTrace     string                 `json:"stack_trace,omitempty"`
-	FailedFiles    []string               `json:"failed_files"`
-	Codebase       Codebase               `json:"codebase"`
-	Context        map[string]interface{} `json:"context"`
-	FailureTime    time.Time              `json:"failure_time"`
-	OperationLogs  []string               `json:"operation_logs,omitempty"`
+	RecipeID      string                 `json:"recipe_id"`
+	ErrorMessage  string                 `json:"error_message"`
+	StackTrace    string                 `json:"stack_trace,omitempty"`
+	FailedFiles   []string               `json:"failed_files"`
+	Codebase      Codebase               `json:"codebase"`
+	Context       map[string]interface{} `json:"context"`
+	FailureTime   time.Time              `json:"failure_time"`
+	OperationLogs []string               `json:"operation_logs,omitempty"`
 }
 
 // EvolutionValidationResult contains the results of recipe evolution validation
 type EvolutionValidationResult struct {
-	Valid           bool                   `json:"valid"`
-	SafetyScore     float64                `json:"safety_score"`
-	Warnings        []string               `json:"warnings"`
-	CriticalIssues  []string               `json:"critical_issues"`
-	TestResults     []EvolutionValidationTest       `json:"test_results"`
-	RecommendAction ValidationAction       `json:"recommend_action"`
+	Valid           bool                      `json:"valid"`
+	SafetyScore     float64                   `json:"safety_score"`
+	Warnings        []string                  `json:"warnings"`
+	CriticalIssues  []string                  `json:"critical_issues"`
+	TestResults     []EvolutionValidationTest `json:"test_results"`
+	RecommendAction ValidationAction          `json:"recommend_action"`
 }
 
 // EvolutionValidationTest represents a specific validation check
 type EvolutionValidationTest struct {
-	Name        string    `json:"name"`
-	Status      string    `json:"status"`
-	Description string    `json:"description"`
-	Details     string    `json:"details,omitempty"`
+	Name        string        `json:"name"`
+	Status      string        `json:"status"`
+	Description string        `json:"description"`
+	Details     string        `json:"details,omitempty"`
 	Runtime     time.Duration `json:"runtime"`
 }
 
@@ -106,22 +105,22 @@ type EvolutionValidationTest struct {
 type ValidationAction string
 
 const (
-	ActionApprove      ValidationAction = "approve"
-	ActionReject       ValidationAction = "reject"
+	ActionApprove       ValidationAction = "approve"
+	ActionReject        ValidationAction = "reject"
 	ActionRequireReview ValidationAction = "require_review"
-	ActionRunTests     ValidationAction = "run_tests"
+	ActionRunTests      ValidationAction = "run_tests"
 )
 
 // RecipeVersion tracks recipe evolution history
 type RecipeVersion struct {
-	Version       int                    `json:"version"`
-	Recipe        *models.Recipe         `json:"recipe"`
-	Changes       []RecipeModification   `json:"changes"`
-	Reason        string                 `json:"reason"`
-	CreatedAt     time.Time              `json:"created_at"`
-	CreatedBy     string                 `json:"created_by"`
-	Rollbackable  bool                   `json:"rollbackable"`
-	TestResults   *EvolutionValidationResult      `json:"test_results,omitempty"`
+	Version      int                        `json:"version"`
+	Recipe       *models.Recipe             `json:"recipe"`
+	Changes      []RecipeModification       `json:"changes"`
+	Reason       string                     `json:"reason"`
+	CreatedAt    time.Time                  `json:"created_at"`
+	CreatedBy    string                     `json:"created_by"`
+	Rollbackable bool                       `json:"rollbackable"`
+	TestResults  *EvolutionValidationResult `json:"test_results,omitempty"`
 }
 
 // convertStringMap converts map[string]string to map[string]interface{}
@@ -135,11 +134,10 @@ func convertStringMap(stringMap map[string]string) map[string]interface{} {
 
 // DefaultRecipeEvolution implements the RecipeEvolution interface
 type DefaultRecipeEvolution struct {
-	catalog        RecipeCatalog
-	patternDB      ErrorPatternDB
-	validator      RecipeValidator
-	versioning     RecipeVersioning
-	config         RecipeEvolutionConfig
+	catalog    RecipeCatalog
+	validator  RecipeValidator
+	versioning RecipeVersioning
+	config     RecipeEvolutionConfig
 }
 
 // RecipeEvolutionConfig configures the recipe evolution behavior
@@ -149,23 +147,20 @@ type RecipeEvolutionConfig struct {
 	EnableAutoApproval    bool    `yaml:"enable_auto_approval"`
 	AutoApprovalThreshold float64 `yaml:"auto_approval_threshold"`
 	RetainVersionHistory  int     `yaml:"retain_version_history"`
-	EnablePatternLearning bool    `yaml:"enable_pattern_learning"`
 }
 
 // NewRecipeEvolution creates a new recipe evolution system
-func NewRecipeEvolution(catalog RecipeCatalog, patternDB ErrorPatternDB, validator RecipeValidator, versioning RecipeVersioning) RecipeEvolution {
+func NewRecipeEvolution(catalog RecipeCatalog, validator RecipeValidator, versioning RecipeVersioning) RecipeEvolution {
 	config := RecipeEvolutionConfig{
 		MaxEvolutionDepth:     5,
 		MinConfidenceRequired: 0.7,
 		EnableAutoApproval:    false,
 		AutoApprovalThreshold: 0.9,
 		RetainVersionHistory:  10,
-		EnablePatternLearning: true,
 	}
 
 	return &DefaultRecipeEvolution{
 		catalog:    catalog,
-		patternDB:  patternDB,
 		validator:  validator,
 		versioning: versioning,
 		config:     config,
@@ -182,13 +177,7 @@ func (re *DefaultRecipeEvolution) AnalyzeFailure(ctx context.Context, failure Tr
 		AnalysisTime:  time.Now(),
 	}
 
-	// Find similar patterns if pattern learning is enabled
-	if re.config.EnablePatternLearning && re.patternDB != nil {
-		patterns, err := re.findSimilarPatterns(ctx, failure)
-		if err == nil {
-			analysis.SimilarPatterns = patterns
-		}
-	}
+	// Pattern learning disabled - no similar patterns
 
 	// Generate suggested fixes based on error type and patterns
 	fixes, confidence := re.generateSuggestedFixes(failure, analysis.SimilarPatterns)
@@ -265,51 +254,6 @@ func (re *DefaultRecipeEvolution) identifyRootCause(failure TransformationFailur
 	}
 
 	return "Unknown error"
-}
-
-// findSimilarPatterns searches for similar failure patterns in the database
-func (re *DefaultRecipeEvolution) findSimilarPatterns(ctx context.Context, failure TransformationFailure) ([]FailurePattern, error) {
-	if re.patternDB == nil {
-		return nil, fmt.Errorf("pattern database not available")
-	}
-
-	// Create a transformation error for pattern matching
-	transformError := TransformationError{
-		Message:     failure.ErrorMessage,
-		Type:        string(re.classifyError(failure)),
-		Recoverable: false,
-	}
-
-	// Find similar patterns with 0.7 similarity threshold
-	errorPatterns, err := re.patternDB.FindSimilarPatterns(ctx, transformError, 0.7)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to FailurePattern format
-	patterns := make([]FailurePattern, 0, len(errorPatterns))
-	for _, ep := range errorPatterns {
-		pattern := FailurePattern{
-			Signature:       ep.Signature,
-			Frequency:       ep.Occurrences,
-			FailureRate:     float64(ep.Occurrences) / 100.0,
-			CommonErrors:    []string{"transformation_error"},
-			ContextFactors:  []string{"environment_specific"},
-			Mitigations:     []string{"review_configuration"},
-		}
-
-		// Find successful fix if available
-		for _, solution := range ep.Solutions {
-			if solution.Success {
-				pattern.Mitigations[0] = solution.Description
-				break
-			}
-		}
-
-		patterns = append(patterns, pattern)
-	}
-
-	return patterns, nil
 }
 
 // generateSuggestedFixes creates modification suggestions based on analysis
@@ -562,7 +506,7 @@ func (re *DefaultRecipeEvolution) calculateModificationConfidence(mod RecipeModi
 // EvolveRecipe applies the suggested modifications to create an evolved recipe
 func (re *DefaultRecipeEvolution) EvolveRecipe(ctx context.Context, recipe *models.Recipe, analysis FailureAnalysis) (*models.Recipe, error) {
 	if analysis.Confidence < re.config.MinConfidenceRequired {
-		return nil, fmt.Errorf("analysis confidence %.2f below required threshold %.2f", 
+		return nil, fmt.Errorf("analysis confidence %.2f below required threshold %.2f",
 			analysis.Confidence, re.config.MinConfidenceRequired)
 	}
 
@@ -613,7 +557,7 @@ func (re *DefaultRecipeEvolution) EvolveRecipe(ctx context.Context, recipe *mode
 	evolved.Metadata.Tags = append(evolved.Metadata.Tags, "evolved")
 	evolved.Metadata.Tags = append(evolved.Metadata.Tags, fmt.Sprintf("evolved-from:%s", recipe.ID))
 	evolved.Metadata.Tags = append(evolved.Metadata.Tags, fmt.Sprintf("confidence:%.3f", analysis.Confidence))
-	
+
 	// Add evolution notes as tags
 	for _, note := range evolutionNotes {
 		evolved.Metadata.Tags = append(evolved.Metadata.Tags, fmt.Sprintf("evolution:%s", note))
@@ -690,11 +634,11 @@ func (re *DefaultRecipeEvolution) appendToOptionArray(recipe *models.Recipe, key
 // ValidateEvolution validates that an evolved recipe is safe to use
 func (re *DefaultRecipeEvolution) ValidateEvolution(ctx context.Context, original, evolved *models.Recipe) (*EvolutionValidationResult, error) {
 	result := &EvolutionValidationResult{
-		Valid:       true,
-		SafetyScore: 1.0,
-		Warnings:    []string{},
-		CriticalIssues: []string{},
-		TestResults: []EvolutionValidationTest{},
+		Valid:           true,
+		SafetyScore:     1.0,
+		Warnings:        []string{},
+		CriticalIssues:  []string{},
+		TestResults:     []EvolutionValidationTest{},
 		RecommendAction: ActionApprove,
 	}
 
@@ -713,7 +657,7 @@ func (re *DefaultRecipeEvolution) ValidateEvolution(ctx context.Context, origina
 			break
 		}
 	}
-	
+
 	if isEvolved {
 		confidenceTest.Status = "passed"
 		confidenceTest.Details = "Recipe evolution completed"
@@ -740,7 +684,7 @@ func (re *DefaultRecipeEvolution) ValidateEvolution(ctx context.Context, origina
 			evolutionTagCount++
 		}
 	}
-	
+
 	if evolutionTagCount > 0 {
 		optionsTest.Status = "passed"
 		optionsTest.Details = fmt.Sprintf("Evolution notes: %d modifications", evolutionTagCount)
@@ -809,17 +753,16 @@ func (re *DefaultRecipeEvolution) RollbackRecipe(ctx context.Context, recipeID s
 
 // ErrorPattern represents a stored error pattern in the database
 type ErrorPattern struct {
-	ID              string              `json:"id"`
-	Signature       string              `json:"signature"`
-	ErrorType       string              `json:"error_type"`
-	Context         ErrorContext        `json:"context"`
-	Solutions       []Solution          `json:"solutions"`
-	Effectiveness   float64             `json:"effectiveness"`
-	Occurrences     int                 `json:"occurrences"`
-	LastSeen        time.Time           `json:"last_seen"`
-	Embedding       []float64           `json:"embedding"`
+	ID            string       `json:"id"`
+	Signature     string       `json:"signature"`
+	ErrorType     string       `json:"error_type"`
+	Context       ErrorContext `json:"context"`
+	Solutions     []Solution   `json:"solutions"`
+	Effectiveness float64      `json:"effectiveness"`
+	Occurrences   int          `json:"occurrences"`
+	LastSeen      time.Time    `json:"last_seen"`
+	Embedding     []float64    `json:"embedding"`
 }
-
 
 // Solution represents a successful fix for an error pattern
 type Solution struct {
@@ -831,9 +774,6 @@ type Solution struct {
 }
 
 // Placeholder interfaces for dependencies
-type ErrorPatternDB interface {
-	FindSimilarPatterns(ctx context.Context, error TransformationError, threshold float64) ([]ErrorPattern, error)
-}
 
 type RecipeValidator interface {
 	ValidateRecipe(ctx context.Context, recipe *models.Recipe) error

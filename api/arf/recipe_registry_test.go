@@ -33,7 +33,7 @@ func TestRecipeRegistry_RegisterMavenRecipe(t *testing.T) {
 	// Verify recipe was stored in unified format
 	recipe, err := registry.GetRecipe(ctx, "java11to17")
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, "java11to17", recipe.Metadata.ID)
 	assert.Equal(t, "Java 11 to 17 Migration", recipe.Metadata.Name)
 	assert.Equal(t, "openrewrite", recipe.Metadata.Type)
@@ -80,7 +80,7 @@ func TestRecipeRegistry_RegisterCustomRecipe(t *testing.T) {
 	// Note: ID includes version when version is not empty or "latest"
 	recipe, err := registry.GetRecipe(ctx, "custom-security-fix-1.0.0")
 	require.NoError(t, err)
-	
+
 	assert.Equal(t, "custom-security-fix-1.0.0", recipe.Metadata.ID)
 	assert.Equal(t, "Custom security vulnerability fixes", recipe.Metadata.Name)
 	assert.Equal(t, "shell", recipe.Metadata.Type)
@@ -96,7 +96,7 @@ func TestRecipeRegistry_ListAllRecipes(t *testing.T) {
 	registry := NewRecipeRegistry(mockStorage)
 
 	// Register Maven recipe
-	err := registry.RegisterMavenRecipe(ctx, 
+	err := registry.RegisterMavenRecipe(ctx,
 		"org.openrewrite.recipe:rewrite-migrate-java:2.11.0",
 		"maven/org/openrewrite/recipe/rewrite-migrate-java/2.11.0/rewrite-migrate-java-2.11.0.jar",
 		"org.openrewrite.java.migrate.Java11toJava17")
@@ -139,14 +139,14 @@ func TestRecipeRegistry_ExtractRecipeFromJAR(t *testing.T) {
 
 	// Create a mock JAR file (ZIP format) in storage
 	jarPath := "test-data/rewrite-migrate-java-2.11.0.jar"
-	
+
 	// For now, skip this test as it requires a real JAR file
 	t.Skip("Skipping JAR extraction test - requires mock JAR implementation")
-	
+
 	// Extract and register
 	metadata, err := registry.ExtractRecipeFromJAR(ctx, jarPath)
 	require.NoError(t, err)
-	
+
 	assert.NotNil(t, metadata)
 	assert.Contains(t, metadata.Metadata.Tags, "java")
 	assert.Contains(t, metadata.Metadata.Categories, "java-migration")
@@ -159,14 +159,14 @@ func TestRecipeRegistry_QueryByType(t *testing.T) {
 	registry := NewRecipeRegistry(mockStorage)
 
 	// Register different types
-	registry.RegisterMavenRecipe(ctx, 
+	registry.RegisterMavenRecipe(ctx,
 		"org.openrewrite.recipe:rewrite-migrate-java:2.11.0",
 		"path/to/jar",
 		"org.openrewrite.java.migrate.Java11toJava17")
-	
+
 	customRecipe := &models.Recipe{
 		Metadata: models.RecipeMetadata{Name: "shell-script"},
-		Steps: []models.RecipeStep{{Type: models.StepTypeShellScript}},
+		Steps:    []models.RecipeStep{{Type: models.StepTypeShellScript}},
 	}
 	registry.RegisterCustomRecipe(ctx, customRecipe)
 
@@ -189,7 +189,7 @@ func TestRecipeRegistry_CacheIntegration(t *testing.T) {
 
 	coords := "org.openrewrite.recipe:rewrite-spring:5.7.0"
 	jarPath := "maven/org/openrewrite/recipe/rewrite-spring/5.7.0/rewrite-spring-5.7.0.jar"
-	
+
 	// Register with cache info
 	err := registry.RegisterMavenRecipe(ctx, coords, jarPath, "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2")
 	require.NoError(t, err)
@@ -198,7 +198,7 @@ func TestRecipeRegistry_CacheIntegration(t *testing.T) {
 	// The recipe ID is generated from the class name: UpgradeSpringBoot_3_2 -> springboot_3_2
 	recipe, err := registry.GetRecipe(ctx, "springboot_3_2")
 	require.NoError(t, err)
-	
+
 	assert.NotNil(t, recipe.Cache)
 	assert.Equal(t, jarPath, recipe.Cache.JarPath)
 	assert.NotZero(t, recipe.Cache.StoredAt)
@@ -214,18 +214,18 @@ func (m *mockStorageProvider) PutObject(bucket, key string, data io.ReadSeeker, 
 	if m.storage == nil {
 		m.storage = make(map[string][]byte)
 	}
-	
+
 	// Read data from ReadSeeker
 	buf := new(bytes.Buffer)
 	_, err := io.Copy(buf, data)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Store the data
 	fullKey := bucket + "/" + key
 	m.storage[fullKey] = buf.Bytes()
-	
+
 	return &storage.PutObjectResult{
 		Location: key,
 		Size:     int64(buf.Len()),
@@ -237,14 +237,14 @@ func (m *mockStorageProvider) GetObject(bucket, key string) (io.ReadCloser, erro
 	if m.storage == nil {
 		return nil, fmt.Errorf("not found")
 	}
-	
+
 	// Retrieve stored data
 	fullKey := bucket + "/" + key
 	data, ok := m.storage[fullKey]
 	if !ok {
 		return nil, fmt.Errorf("not found")
 	}
-	
+
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
@@ -257,7 +257,7 @@ func (m *mockStorageProvider) ListObjects(bucket, prefix string) ([]storage.Obje
 	if m.storage == nil {
 		return []storage.ObjectInfo{}, nil
 	}
-	
+
 	var objects []storage.ObjectInfo
 	for key := range m.storage {
 		// Check if key starts with bucket/prefix

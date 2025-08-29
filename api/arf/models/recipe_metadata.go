@@ -175,7 +175,7 @@ func isValidRepositoryURL(url string) bool {
 		`^git@github\.com:[\w\-]+/[\w\-]+\.git$`,
 		`^git@gitlab\.com:[\w\-]+/[\w\-]+\.git$`,
 	}
-	
+
 	for _, pattern := range patterns {
 		if match, _ := regexp.MatchString(pattern, url); match {
 			return true
@@ -200,7 +200,7 @@ func isValidCategory(category string) bool {
 		"formatting",
 		"best-practices",
 	}
-	
+
 	for _, valid := range validCategories {
 		if strings.EqualFold(category, valid) {
 			return true
@@ -223,7 +223,7 @@ func isValidLanguage(language string) bool {
 		"csharp", "c#",
 		"shell", "bash", "sh",
 	}
-	
+
 	for _, valid := range validLanguages {
 		if strings.EqualFold(language, valid) {
 			return true

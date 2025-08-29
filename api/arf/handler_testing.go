@@ -94,49 +94,8 @@ func (h *Handler) GraduateABTest(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "Winner graduated successfully",
+		"message":       "Winner graduated successfully",
 		"experiment_id": experimentID,
 	})
-}
-
-
-
-
-
-
-
-// GetBenchmarkResultsMock returns mock benchmark results (replaced by real implementation in benchmark_manager.go)
-func (h *Handler) GetBenchmarkResultsMock(c *fiber.Ctx) error {
-	benchmarkID := c.Params("id")
-	
-	// Mock benchmark results
-	results := fiber.Map{
-		"benchmark_id": benchmarkID,
-		"status":       "completed",
-		"iterations":   100,
-		"duration":     "9m 45s",
-		"results": fiber.Map{
-			"avg_execution_time": "5.8s",
-			"min_execution_time": "4.2s",
-			"max_execution_time": "8.1s",
-			"p50_latency":        "5.5s",
-			"p95_latency":        "7.2s",
-			"p99_latency":        "7.9s",
-			"throughput":         "10.3 ops/min",
-			"success_rate":       0.98,
-		},
-		"resource_usage": fiber.Map{
-			"avg_cpu":    "2.5 cores",
-			"peak_cpu":   "4.0 cores",
-			"avg_memory": "3.2GB",
-			"peak_memory": "5.1GB",
-		},
-		"comparison": fiber.Map{
-			"vs_baseline": "+15% throughput",
-			"vs_previous": "+8% success rate",
-		},
-	}
-
-	return c.JSON(results)
 }
 

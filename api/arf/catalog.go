@@ -35,20 +35,20 @@ type RecipeFilters struct {
 
 // RecipeStats tracks usage and performance metrics for recipes
 type RecipeStats struct {
-	RecipeID        string        `json:"recipe_id"`
-	TotalExecutions int64         `json:"total_executions"`
-	SuccessfulRuns  int64         `json:"successful_runs"`
-	FailedRuns      int64         `json:"failed_runs"`
-	SuccessRate     float64       `json:"success_rate"`
+	RecipeID         string        `json:"recipe_id"`
+	TotalExecutions  int64         `json:"total_executions"`
+	SuccessfulRuns   int64         `json:"successful_runs"`
+	FailedRuns       int64         `json:"failed_runs"`
+	SuccessRate      float64       `json:"success_rate"`
 	AvgExecutionTime time.Duration `json:"avg_execution_time"`
-	LastExecuted    time.Time     `json:"last_executed"`
-	FirstExecuted   time.Time     `json:"first_executed"`
+	LastExecuted     time.Time     `json:"last_executed"`
+	FirstExecuted    time.Time     `json:"first_executed"`
 }
 
 // ConsulRecipeCatalog implements RecipeCatalog using Consul KV store
 type ConsulRecipeCatalog struct {
-	client     *api.Client
-	keyPrefix  string
+	client      *api.Client
+	keyPrefix   string
 	statsPrefix string
 }
 
@@ -104,7 +104,7 @@ func (c *ConsulRecipeCatalog) StoreRecipe(ctx context.Context, recipe *models.Re
 		RecipeID:      recipe.ID,
 		FirstExecuted: time.Now(),
 	}
-	
+
 	if err := c.storeRecipeStats(ctx, stats); err != nil {
 		// Log error but don't fail recipe storage
 		fmt.Printf("Warning: failed to initialize recipe stats: %v\n", err)
@@ -198,7 +198,7 @@ func (c *ConsulRecipeCatalog) DeleteRecipe(ctx context.Context, recipeID string)
 // SearchRecipes performs a text search across recipe names and descriptions
 func (c *ConsulRecipeCatalog) SearchRecipes(ctx context.Context, query string) ([]*models.Recipe, error) {
 	queryLower := strings.ToLower(query)
-	
+
 	kv := c.client.KV()
 	pairs, _, err := kv.List(c.keyPrefix, nil)
 	if err != nil {
@@ -214,8 +214,8 @@ func (c *ConsulRecipeCatalog) SearchRecipes(ctx context.Context, query string) (
 
 		// Search in name, description, and tags
 		if c.containsQuery(recipe.Metadata.Name, queryLower) ||
-		   c.containsQuery(recipe.Metadata.Description, queryLower) ||
-		   c.containsQueryInTags(recipe.Metadata.Tags, queryLower) {
+			c.containsQuery(recipe.Metadata.Description, queryLower) ||
+			c.containsQueryInTags(recipe.Metadata.Tags, queryLower) {
 			recipes = append(recipes, &recipe)
 		}
 	}

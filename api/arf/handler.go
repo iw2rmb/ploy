@@ -21,23 +21,19 @@ type Handler struct {
 	abTestFramework  ABTestFramework
 	strategySelector StrategySelector
 	// Phase 4 components
-	securityEngine      *SecurityEngine
-	sbomAnalyzer        *SyftSBOMAnalyzer
-	// Phase 8 components
-	benchmarkManager    *BenchmarkManager
+	securityEngine *SecurityEngine
+	sbomAnalyzer   *SyftSBOMAnalyzer
 }
 
 // NewHandler creates a new ARF HTTP handler
-func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager, benchmarkMgr *BenchmarkManager) *Handler {
+func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) *Handler {
 	return &Handler{
 		recipeExecutor: executor,
-		catalog:    catalog,
-		sandboxMgr: sandboxMgr,
+		catalog:        catalog,
+		sandboxMgr:     sandboxMgr,
 		// Initialize Phase 4 components
-		securityEngine:      NewSecurityEngine(),
-		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		// Phase 8 components
-		benchmarkManager:    benchmarkMgr,
+		securityEngine: NewSecurityEngine(),
+		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
 	}
 }
 
@@ -48,7 +44,6 @@ func NewHandlerWithStorage(
 	recipeIndex storage.RecipeIndexStore,
 	recipeValidator storage.RecipeValidator,
 	sandboxMgr SandboxManager,
-	benchmarkMgr *BenchmarkManager,
 ) *Handler {
 	return &Handler{
 		recipeExecutor:  executor,
@@ -58,10 +53,8 @@ func NewHandlerWithStorage(
 		catalog:         nil, // Will use storage directly
 		sandboxMgr:      sandboxMgr,
 		// Initialize Phase 4 components
-		securityEngine:      NewSecurityEngine(),
-		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		// Phase 8 components
-		benchmarkManager: benchmarkMgr,
+		securityEngine: NewSecurityEngine(),
+		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
 	}
 }
 
@@ -76,7 +69,6 @@ func NewHandlerWithPhase3(
 	multiLang MultiLanguageEngine,
 	abTest ABTestFramework,
 	strategy StrategySelector,
-	benchmarkMgr *BenchmarkManager,
 ) *Handler {
 	return &Handler{
 		recipeExecutor:   executor,
@@ -89,10 +81,8 @@ func NewHandlerWithPhase3(
 		abTestFramework:  abTest,
 		strategySelector: strategy,
 		// Initialize Phase 4 components
-		securityEngine:      NewSecurityEngine(),
-		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		// Phase 8 components
-		benchmarkManager:    benchmarkMgr,
+		securityEngine: NewSecurityEngine(),
+		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
 	}
 }
 
@@ -114,7 +104,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// Recipe metadata and stats
 	arf.Get("/recipes/:id/metadata", h.GetRecipeMetadata)
 	arf.Get("/recipes/:id/stats", h.GetRecipeStats)
-	
+
 	// Recipe registration from OpenRewrite JVM runner
 	arf.Post("/recipes/register", h.RegisterRecipeFromRunner)
 
@@ -133,37 +123,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/sandboxes", h.ListSandboxes)
 	arf.Post("/sandboxes", h.CreateSandbox)
 	arf.Delete("/sandboxes/:id", h.DestroySandbox)
-
-	// Health and monitoring
-	arf.Get("/health", h.HealthCheck)
-	arf.Get("/stats/cache", h.GetCacheStats)
-	arf.Delete("/cache", h.ClearCache)
-
-	// Circuit breaker management
-	arf.Get("/circuit-breaker/stats", h.GetCircuitBreakerStats)
-	arf.Post("/circuit-breaker/reset", h.ResetCircuitBreaker)
-	arf.Get("/circuit-breaker/state", h.GetCircuitBreakerState)
-
-	// Parallel resolver stats
-	arf.Get("/parallel-resolver/stats", h.GetParallelResolverStats)
-	arf.Put("/parallel-resolver/config", h.SetParallelResolverConfig)
-
-	// Multi-repo orchestration
-	arf.Get("/orchestration/stats", h.GetMultiRepoStats)
-	arf.Post("/orchestration/batch", h.OrchestrateBatchTransformation)
-	arf.Get("/orchestration/:id/status", h.GetOrchestrationStatus)
-
-	// High availability
-	arf.Get("/ha/stats", h.GetHAStats)
-	arf.Get("/ha/nodes", h.GetHANodes)
-
-	// Monitoring and metrics
-	arf.Get("/monitoring/metrics", h.GetMonitoringMetrics)
-	arf.Get("/monitoring/alerts", h.GetActiveAlerts)
-
-	// Pattern learning
-	arf.Get("/patterns/stats", h.GetPatternLearningStats)
-	arf.Get("/patterns/recommendations", h.GetPatternRecommendations)
 
 	// TODO: Phase 3 LLM and Hybrid Intelligence - methods not yet implemented
 	// arf.Post("/recipes/generate", h.GenerateLLMRecipe)
@@ -196,17 +155,5 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/sbom/:id", h.GetSBOMReport) // Support route param
 
 	// Phase 4: Workflow removed - functionality integrated into transform command
-
-	
-	// Phase 8: RESTful Benchmark Test Suite API
-	arf.Post("/benchmarks", h.RunBenchmarkSuite)                    // Create new benchmark
-	arf.Get("/benchmarks", h.ListBenchmarks)                        // List all benchmarks  
-	arf.Get("/benchmarks/:id", h.GetBenchmark)                      // Get benchmark details
-	arf.Get("/benchmarks/:id/status", h.GetBenchmarkStatus)         // Get benchmark status
-	arf.Get("/benchmarks/:id/logs", h.GetBenchmarkLogs)             // Get benchmark logs
-	arf.Get("/benchmarks/:id/results", h.GetBenchmarkResults)       // Get benchmark results
-	arf.Get("/benchmarks/:id/errors", h.GetBenchmarkErrors)         // Get benchmark errors
-	arf.Post("/benchmarks/:id/stop", h.CancelBenchmark)             // Stop benchmark
-	arf.Post("/benchmarks/:id/reports", h.GenerateBenchmarkReport)  // Generate report
-	arf.Post("/benchmarks/compare", h.CompareBenchmarks)             // Compare benchmarks
+	// Phase 8: Benchmark functionality removed - integrated into transform endpoint
 }

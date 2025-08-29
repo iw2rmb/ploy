@@ -82,8 +82,7 @@ func setupTestHandler() (*Handler, *RecipeExecutor, *MockRecipeCatalog, *MockSan
 	sandboxMgr := NewMockSandboxManager()
 	executor := NewRecipeExecutor(storage, sandboxMgr)
 	catalog := NewMockRecipeCatalog()
-	benchmarkMgr := NewBenchmarkManager("./test_benchmarks")
-	handler := NewHandler(executor, catalog, sandboxMgr, benchmarkMgr)
+	handler := NewHandler(executor, catalog, sandboxMgr)
 
 	// Add some test recipes
 	testRecipe := &models.Recipe{

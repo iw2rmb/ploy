@@ -32,7 +32,7 @@ func (s *InMemoryRecipeStorage) CreateRecipe(ctx context.Context, recipe *models
 	if recipe.ID == "" {
 		recipe.ID = recipe.GenerateID()
 	}
-	
+
 	if _, exists := s.recipes[recipe.ID]; exists {
 		return fmt.Errorf("recipe %s already exists", recipe.ID)
 	}
@@ -161,16 +161,16 @@ func (s *InMemoryRecipeStorage) CheckRecipeIntegrity(ctx context.Context, id str
 	if err != nil {
 		return err
 	}
-	
+
 	currentHash, err := recipe.CalculateHash()
 	if err != nil {
 		return err
 	}
-	
+
 	if recipe.Hash != "" && recipe.Hash != currentHash {
 		return fmt.Errorf("integrity check failed")
 	}
-	
+
 	return nil
 }
 
@@ -180,12 +180,12 @@ func (s *InMemoryRecipeStorage) VerifyRecipeHash(ctx context.Context, id string,
 	if err != nil {
 		return false, err
 	}
-	
+
 	currentHash, err := recipe.CalculateHash()
 	if err != nil {
 		return false, err
 	}
-	
+
 	return currentHash == expectedHash, nil
 }
 
@@ -198,4 +198,3 @@ func (s *InMemoryRecipeStorage) RebuildIndex(ctx context.Context) error {
 func (s *InMemoryRecipeStorage) UpdateIndex(ctx context.Context, recipe *models.Recipe, action storage.IndexAction) error {
 	return nil
 }
-

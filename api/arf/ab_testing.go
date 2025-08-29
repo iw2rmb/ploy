@@ -22,41 +22,41 @@ type ABTestFramework interface {
 
 // ABExperiment defines an A/B test experiment
 type ABExperiment struct {
-	ID              string          `json:"id"`
-	Name            string          `json:"name"`
-	VariantA        *models.Recipe  `json:"variant_a"`
-	VariantB        *models.Recipe  `json:"variant_b"`
-	TrafficSplit    float64         `json:"traffic_split"`
-	MinSampleSize   int             `json:"min_sample_size"`
-	ConfidenceLevel float64         `json:"confidence_level"`
+	ID              string         `json:"id"`
+	Name            string         `json:"name"`
+	VariantA        *models.Recipe `json:"variant_a"`
+	VariantB        *models.Recipe `json:"variant_b"`
+	TrafficSplit    float64        `json:"traffic_split"`
+	MinSampleSize   int            `json:"min_sample_size"`
+	ConfidenceLevel float64        `json:"confidence_level"`
 }
 
 // Variant represents a recipe variant in an experiment
 type Variant struct {
-	ID         string  `json:"id"`
-	Recipe     *models.Recipe `json:"recipe"`
-	Weight     float64 `json:"weight"`
-	IsControl  bool    `json:"is_control"`
+	ID        string         `json:"id"`
+	Recipe    *models.Recipe `json:"recipe"`
+	Weight    float64        `json:"weight"`
+	IsControl bool           `json:"is_control"`
 }
 
 // ABTestResults contains the statistical analysis of an A/B test
 type ABTestResults struct {
-	ExperimentID     string                 `json:"experiment_id"`
-	VariantAResults  VariantResults         `json:"variant_a_results"`
-	VariantBResults  VariantResults         `json:"variant_b_results"`
-	StatisticalTest  StatisticalTestResult  `json:"statistical_test"`
-	Recommendation   ABTestRecommendation   `json:"recommendation"`
-	AnalyzedAt       time.Time              `json:"analyzed_at"`
+	ExperimentID    string                `json:"experiment_id"`
+	VariantAResults VariantResults        `json:"variant_a_results"`
+	VariantBResults VariantResults        `json:"variant_b_results"`
+	StatisticalTest StatisticalTestResult `json:"statistical_test"`
+	Recommendation  ABTestRecommendation  `json:"recommendation"`
+	AnalyzedAt      time.Time             `json:"analyzed_at"`
 }
 
 // VariantResults contains results for a specific variant
 type VariantResults struct {
-	VariantID       string    `json:"variant_id"`
-	TotalTrials     int       `json:"total_trials"`
-	Successes       int       `json:"successes"`
-	SuccessRate     float64   `json:"success_rate"`
-	ConfidenceInterval ConfidenceInterval `json:"confidence_interval"`
-	AverageExecutionTime time.Duration `json:"average_execution_time"`
+	VariantID            string             `json:"variant_id"`
+	TotalTrials          int                `json:"total_trials"`
+	Successes            int                `json:"successes"`
+	SuccessRate          float64            `json:"success_rate"`
+	ConfidenceInterval   ConfidenceInterval `json:"confidence_interval"`
+	AverageExecutionTime time.Duration      `json:"average_execution_time"`
 }
 
 // ConfidenceInterval represents a statistical confidence interval
@@ -68,28 +68,28 @@ type ConfidenceInterval struct {
 
 // StatisticalTestResult contains the results of statistical significance testing
 type StatisticalTestResult struct {
-	TestType     string  `json:"test_type"`
-	PValue       float64 `json:"p_value"`
-	ZScore       float64 `json:"z_score"`
-	Significant  bool    `json:"significant"`
-	EffectSize   float64 `json:"effect_size"`
+	TestType      string        `json:"test_type"`
+	PValue        float64       `json:"p_value"`
+	ZScore        float64       `json:"z_score"`
+	Significant   bool          `json:"significant"`
+	EffectSize    float64       `json:"effect_size"`
 	PowerAnalysis PowerAnalysis `json:"power_analysis"`
 }
 
 // PowerAnalysis contains statistical power analysis
 type PowerAnalysis struct {
-	Power              float64 `json:"power"`
-	MinDetectableDiff  float64 `json:"min_detectable_diff"`
-	RecommendedSample  int     `json:"recommended_sample"`
+	Power             float64 `json:"power"`
+	MinDetectableDiff float64 `json:"min_detectable_diff"`
+	RecommendedSample int     `json:"recommended_sample"`
 }
 
 // ABTestRecommendation provides guidance based on test results
 type ABTestRecommendation struct {
-	Action       string  `json:"action"` // "adopt_a", "adopt_b", "continue_test", "inconclusive"
-	Confidence   float64 `json:"confidence"`
-	WinningVariant string `json:"winning_variant"`
-	Reasoning    string  `json:"reasoning"`
-	NextSteps    []string `json:"next_steps"`
+	Action         string   `json:"action"` // "adopt_a", "adopt_b", "continue_test", "inconclusive"
+	Confidence     float64  `json:"confidence"`
+	WinningVariant string   `json:"winning_variant"`
+	Reasoning      string   `json:"reasoning"`
+	NextSteps      []string `json:"next_steps"`
 }
 
 // DefaultABTestFramework implements A/B testing using PostgreSQL
@@ -240,18 +240,18 @@ func (f *DefaultABTestFramework) AnalyzeResults(ctx context.Context, experimentI
 
 	// Calculate variant results
 	variantAResults := VariantResults{
-		VariantID:         experimentID + "-variant-a",
-		TotalTrials:       countA,
-		Successes:         int(float64(countA) * successRateA),
-		SuccessRate:       successRateA,
+		VariantID:          experimentID + "-variant-a",
+		TotalTrials:        countA,
+		Successes:          int(float64(countA) * successRateA),
+		SuccessRate:        successRateA,
 		ConfidenceInterval: f.calculateConfidenceInterval(successRateA, countA, 0.95),
 	}
 
 	variantBResults := VariantResults{
-		VariantID:         experimentID + "-variant-b", 
-		TotalTrials:       countB,
-		Successes:         int(float64(countB) * successRateB),
-		SuccessRate:       successRateB,
+		VariantID:          experimentID + "-variant-b",
+		TotalTrials:        countB,
+		Successes:          int(float64(countB) * successRateB),
+		SuccessRate:        successRateB,
 		ConfidenceInterval: f.calculateConfidenceInterval(successRateB, countB, 0.95),
 	}
 
@@ -262,7 +262,7 @@ func (f *DefaultABTestFramework) AnalyzeResults(ctx context.Context, experimentI
 	recommendation := f.generateRecommendation(variantAResults, variantBResults, statisticalTest)
 
 	// Update statistical significance in database
-	_, err = f.db.ExecContext(ctx, 
+	_, err = f.db.ExecContext(ctx,
 		`UPDATE ab_experiments SET statistical_significance = $1 WHERE id = $2`,
 		statisticalTest.PValue, experimentID)
 	if err != nil {
@@ -328,7 +328,7 @@ func (f *DefaultABTestFramework) calculateConfidenceInterval(successRate float64
 
 	denominator := 1 + (z*z)/n
 	center := p + (z*z)/(2*n)
-	spread := z * math.Sqrt((p*(1-p))/n + (z*z)/(4*n*n))
+	spread := z * math.Sqrt((p*(1-p))/n+(z*z)/(4*n*n))
 
 	lower := (center - spread) / denominator
 	upper := (center + spread) / denominator
@@ -359,10 +359,10 @@ func (f *DefaultABTestFramework) performZTest(variantA, variantB VariantResults)
 
 	// Pooled proportion
 	pooledP := (p1*n1 + p2*n2) / (n1 + n2)
-	
+
 	// Standard error
 	se := math.Sqrt(pooledP * (1 - pooledP) * (1/n1 + 1/n2))
-	
+
 	// Z-score
 	zScore := 0.0
 	if se > 0 {
@@ -399,7 +399,7 @@ func (f *DefaultABTestFramework) normalCDF(x float64) float64 {
 func (f *DefaultABTestFramework) calculatePowerAnalysis(n1, n2, p1, p2 float64) PowerAnalysis {
 	// Simplified power analysis
 	effectSize := math.Abs(p1 - p2)
-	
+
 	// Approximate power calculation
 	power := 0.8 // Placeholder
 	if effectSize > 0.1 && n1 > 30 && n2 > 30 {
@@ -436,10 +436,10 @@ func (f *DefaultABTestFramework) generateRecommendation(variantA, variantB Varia
 	// Not enough data
 	if totalSamples < minSampleSize {
 		return ABTestRecommendation{
-			Action:       "continue_test",
-			Confidence:   0.0,
-			Reasoning:    fmt.Sprintf("Insufficient data: %d samples (need at least %d)", totalSamples, minSampleSize),
-			NextSteps:    []string{"Continue collecting data", "Aim for at least 30 samples per variant"},
+			Action:     "continue_test",
+			Confidence: 0.0,
+			Reasoning:  fmt.Sprintf("Insufficient data: %d samples (need at least %d)", totalSamples, minSampleSize),
+			NextSteps:  []string{"Continue collecting data", "Aim for at least 30 samples per variant"},
 		}
 	}
 
@@ -507,9 +507,9 @@ func NewDefaultPatternMatcher() *DefaultPatternMatcher {
 
 func (m *DefaultPatternMatcher) MatchPattern(pattern string, text string) bool {
 	// Simple substring matching - could be enhanced with regex
-	return len(pattern) > 0 && len(text) > 0 && 
-		   (pattern == text || (len(pattern) < len(text) && 
-		   text[:len(pattern)] == pattern))
+	return len(pattern) > 0 && len(text) > 0 &&
+		(pattern == text || (len(pattern) < len(text) &&
+			text[:len(pattern)] == pattern))
 }
 
 func (m *DefaultPatternMatcher) ExtractPatterns(text string) []string {
@@ -529,10 +529,10 @@ func (m *DefaultPatternMatcher) GenerateSignature(context map[string]interface{}
 	if errorType, ok := context["error_type"]; ok {
 		signature += fmt.Sprintf("%v", errorType)
 	}
-	
+
 	if signature == "" {
 		signature = "unknown"
 	}
-	
+
 	return signature
 }

@@ -22,22 +22,22 @@ func NewLearningDB(pool *pgxpool.Pool) *LearningDB {
 
 // TransformationOutcome represents a transformation outcome record
 type TransformationOutcome struct {
-	ID                  uuid.UUID       `json:"id" db:"id"`
-	TransformationID    string          `json:"transformation_id" db:"transformation_id"`
-	RecipeID            string          `json:"recipe_id" db:"recipe_id"`
-	Success             bool            `json:"success" db:"success"`
-	DurationSeconds     int32           `json:"duration_seconds" db:"duration_seconds"`
-	Language            string          `json:"language" db:"language"`
-	Framework           *string         `json:"framework,omitempty" db:"framework"`
-	PatternSignature    string          `json:"pattern_signature" db:"pattern_signature"`
-	CodebaseSize        *int32          `json:"codebase_size,omitempty" db:"codebase_size"`
-	ComplexityScore     *float64        `json:"complexity_score,omitempty" db:"complexity_score"`
-	Strategy            string          `json:"strategy" db:"strategy"`
-	ErrorType           *string         `json:"error_type,omitempty" db:"error_type"`
-	ErrorMessage        *string         `json:"error_message,omitempty" db:"error_message"`
-	PerformanceImpact   *float64        `json:"performance_impact,omitempty" db:"performance_impact"`
-	CreatedAt           time.Time       `json:"created_at" db:"created_at"`
-	Metadata            json.RawMessage `json:"metadata" db:"metadata"`
+	ID                uuid.UUID       `json:"id" db:"id"`
+	TransformationID  string          `json:"transformation_id" db:"transformation_id"`
+	RecipeID          string          `json:"recipe_id" db:"recipe_id"`
+	Success           bool            `json:"success" db:"success"`
+	DurationSeconds   int32           `json:"duration_seconds" db:"duration_seconds"`
+	Language          string          `json:"language" db:"language"`
+	Framework         *string         `json:"framework,omitempty" db:"framework"`
+	PatternSignature  string          `json:"pattern_signature" db:"pattern_signature"`
+	CodebaseSize      *int32          `json:"codebase_size,omitempty" db:"codebase_size"`
+	ComplexityScore   *float64        `json:"complexity_score,omitempty" db:"complexity_score"`
+	Strategy          string          `json:"strategy" db:"strategy"`
+	ErrorType         *string         `json:"error_type,omitempty" db:"error_type"`
+	ErrorMessage      *string         `json:"error_message,omitempty" db:"error_message"`
+	PerformanceImpact *float64        `json:"performance_impact,omitempty" db:"performance_impact"`
+	CreatedAt         time.Time       `json:"created_at" db:"created_at"`
+	Metadata          json.RawMessage `json:"metadata" db:"metadata"`
 }
 
 // SuccessPattern represents a learned success pattern
@@ -91,18 +91,18 @@ func (db *LearningDB) CreateTransformationOutcome(ctx context.Context, outcome *
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 		) RETURNING id, created_at`
-	
+
 	err := db.pool.QueryRow(ctx, query,
 		outcome.TransformationID, outcome.RecipeID, outcome.Success, outcome.DurationSeconds,
 		outcome.Language, outcome.Framework, outcome.PatternSignature, outcome.CodebaseSize,
 		outcome.ComplexityScore, outcome.Strategy, outcome.ErrorType, outcome.ErrorMessage,
 		outcome.PerformanceImpact, outcome.Metadata,
 	).Scan(&outcome.ID, &outcome.CreatedAt)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transformation outcome: %w", err)
 	}
-	
+
 	return outcome, nil
 }
 
@@ -114,13 +114,13 @@ func (db *LearningDB) GetSuccessPatternsByLanguage(ctx context.Context, language
 		FROM success_patterns 
 		WHERE language = $1 AND confidence_level >= $2 
 		ORDER BY success_rate DESC, occurrence_count DESC`
-	
+
 	rows, err := db.pool.Query(ctx, query, language, minConfidence)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query success patterns: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var patterns []SuccessPattern
 	for rows.Next() {
 		var pattern SuccessPattern
@@ -134,7 +134,7 @@ func (db *LearningDB) GetSuccessPatternsByLanguage(ctx context.Context, language
 		}
 		patterns = append(patterns, pattern)
 	}
-	
+
 	return patterns, nil
 }
 
@@ -154,16 +154,16 @@ func (db *LearningDB) CreateOrUpdateStrategyWeight(ctx context.Context, weight *
 			sample_size = $6,
 			updated_at = NOW()
 		RETURNING id, updated_at`
-	
+
 	err := db.pool.QueryRow(ctx, query,
 		weight.StrategyName, weight.Language, weight.PatternType,
 		weight.Weight, weight.PerformanceScore, weight.SampleSize,
 	).Scan(&weight.ID, &weight.UpdatedAt)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/update strategy weight: %w", err)
 	}
-	
+
 	return weight, nil
 }
 
@@ -175,13 +175,13 @@ func (db *LearningDB) GetOptimalStrategies(ctx context.Context, language, patter
 		FROM strategy_weights 
 		WHERE language = $1 AND pattern_type = $2 AND sample_size >= $3 
 		ORDER BY weight DESC, performance_score DESC`
-	
+
 	rows, err := db.pool.Query(ctx, query, language, patternType, minSampleSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query optimal strategies: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var strategies []StrategyWeight
 	for rows.Next() {
 		var strategy StrategyWeight
@@ -194,6 +194,6 @@ func (db *LearningDB) GetOptimalStrategies(ctx context.Context, language, patter
 		}
 		strategies = append(strategies, strategy)
 	}
-	
+
 	return strategies, nil
 }

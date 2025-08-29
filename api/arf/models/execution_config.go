@@ -25,18 +25,18 @@ type RetryPolicy struct {
 
 // SandboxConfig defines sandbox execution environment settings
 type SandboxConfig struct {
-	Enabled           bool     `json:"enabled" yaml:"enabled"`
-	AllowNetwork      bool     `json:"allow_network,omitempty" yaml:"allow_network,omitempty"`
-	AllowFileWrite    bool     `json:"allow_file_write,omitempty" yaml:"allow_file_write,omitempty"`
-	MaxMemory         string   `json:"max_memory,omitempty" yaml:"max_memory,omitempty"`
-	MaxCPU            float64  `json:"max_cpu,omitempty" yaml:"max_cpu,omitempty"`
-	MaxDiskUsage      string   `json:"max_disk_usage,omitempty" yaml:"max_disk_usage,omitempty"`
-	AllowedPaths      []string `json:"allowed_paths,omitempty" yaml:"allowed_paths,omitempty"`
-	BlockedPaths      []string `json:"blocked_paths,omitempty" yaml:"blocked_paths,omitempty"`
-	AllowedCommands   []string `json:"allowed_commands,omitempty" yaml:"allowed_commands,omitempty"`
-	BlockedCommands   []string `json:"blocked_commands,omitempty" yaml:"blocked_commands,omitempty"`
-	DockerImage       string   `json:"docker_image,omitempty" yaml:"docker_image,omitempty"`
-	IsolationLevel    string   `json:"isolation_level,omitempty" yaml:"isolation_level,omitempty"`
+	Enabled         bool     `json:"enabled" yaml:"enabled"`
+	AllowNetwork    bool     `json:"allow_network,omitempty" yaml:"allow_network,omitempty"`
+	AllowFileWrite  bool     `json:"allow_file_write,omitempty" yaml:"allow_file_write,omitempty"`
+	MaxMemory       string   `json:"max_memory,omitempty" yaml:"max_memory,omitempty"`
+	MaxCPU          float64  `json:"max_cpu,omitempty" yaml:"max_cpu,omitempty"`
+	MaxDiskUsage    string   `json:"max_disk_usage,omitempty" yaml:"max_disk_usage,omitempty"`
+	AllowedPaths    []string `json:"allowed_paths,omitempty" yaml:"allowed_paths,omitempty"`
+	BlockedPaths    []string `json:"blocked_paths,omitempty" yaml:"blocked_paths,omitempty"`
+	AllowedCommands []string `json:"allowed_commands,omitempty" yaml:"allowed_commands,omitempty"`
+	BlockedCommands []string `json:"blocked_commands,omitempty" yaml:"blocked_commands,omitempty"`
+	DockerImage     string   `json:"docker_image,omitempty" yaml:"docker_image,omitempty"`
+	IsolationLevel  string   `json:"isolation_level,omitempty" yaml:"isolation_level,omitempty"`
 }
 
 // Validate validates the execution configuration
@@ -254,7 +254,7 @@ func isReservedEnvVar(key string) bool {
 		"PLOY_RECIPE_ID", "PLOY_RECIPE_NAME",
 		"PLOY_SANDBOX", "PLOY_WORKSPACE",
 	}
-	
+
 	for _, r := range reserved {
 		if key == r {
 			return true
@@ -294,7 +294,7 @@ func isValidDockerImage(image string) bool {
 	if image == "" {
 		return false
 	}
-	
+
 	// Check for invalid characters
 	invalidChars := []string{" ", "\t", "\n", "\r"}
 	for _, char := range invalidChars {
@@ -302,6 +302,6 @@ func isValidDockerImage(image string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }

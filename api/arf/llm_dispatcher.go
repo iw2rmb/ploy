@@ -19,22 +19,22 @@ import (
 
 // LLMJob represents an LLM transformation job
 type LLMJob struct {
-	ID              string                 `json:"id"`
-	Provider        string                 `json:"provider"`        // ollama, openai, anthropic
-	Model           string                 `json:"model"`           // specific model name
-	Prompt          string                 `json:"prompt"`          // transformation prompt
-	InputURL        string                 `json:"input_url"`       // code archive location
-	OutputURL       string                 `json:"output_url"`      // transformed code location
-	Language        string                 `json:"language"`        // programming language
-	Framework       string                 `json:"framework,omitempty"`
-	Status          string                 `json:"status"` // pending, running, completed, failed
-	CreatedAt       time.Time              `json:"created_at"`
-	StartedAt       *time.Time             `json:"started_at"`
-	CompletedAt     *time.Time             `json:"completed_at"`
-	Result          map[string]interface{} `json:"result,omitempty"`
-	Error           string                 `json:"error,omitempty"`
-	Temperature     float64                `json:"temperature"`
-	MaxTokens       int                    `json:"max_tokens"`
+	ID          string                 `json:"id"`
+	Provider    string                 `json:"provider"`   // ollama, openai, anthropic
+	Model       string                 `json:"model"`      // specific model name
+	Prompt      string                 `json:"prompt"`     // transformation prompt
+	InputURL    string                 `json:"input_url"`  // code archive location
+	OutputURL   string                 `json:"output_url"` // transformed code location
+	Language    string                 `json:"language"`   // programming language
+	Framework   string                 `json:"framework,omitempty"`
+	Status      string                 `json:"status"` // pending, running, completed, failed
+	CreatedAt   time.Time              `json:"created_at"`
+	StartedAt   *time.Time             `json:"started_at"`
+	CompletedAt *time.Time             `json:"completed_at"`
+	Result      map[string]interface{} `json:"result,omitempty"`
+	Error       string                 `json:"error,omitempty"`
+	Temperature float64                `json:"temperature"`
+	MaxTokens   int                    `json:"max_tokens"`
 }
 
 // LLMDispatcher handles job dispatch and monitoring for LLM transformations
@@ -259,7 +259,7 @@ func (d *LLMDispatcher) SubmitLLMTransformation(ctx context.Context, provider, m
 	if t, ok := params["temperature"].(float64); ok {
 		temperature = t
 	}
-	
+
 	maxTokens := 2048
 	if mt, ok := params["max_tokens"].(int); ok {
 		maxTokens = mt
@@ -443,16 +443,16 @@ func (d *LLMDispatcher) submitToNomad(job *LLMJob, params map[string]interface{}
 	}
 
 	templateParams := map[string]string{
-		"JobID":       job.ID,
-		"Model":       job.Model,
+		"JobID":        job.ID,
+		"Model":        job.Model,
 		"PromptBase64": promptBase64,
-		"InputURL":    job.InputURL,
-		"OutputURL":   job.OutputURL,
-		"ConsulAddr":  consulAddr,
-		"Temperature": fmt.Sprintf("%f", job.Temperature),
-		"MaxTokens":   fmt.Sprintf("%d", job.MaxTokens),
-		"Language":    job.Language,
-		"APIKey":      apiKey,
+		"InputURL":     job.InputURL,
+		"OutputURL":    job.OutputURL,
+		"ConsulAddr":   consulAddr,
+		"Temperature":  fmt.Sprintf("%f", job.Temperature),
+		"MaxTokens":    fmt.Sprintf("%d", job.MaxTokens),
+		"Language":     job.Language,
+		"APIKey":       apiKey,
 	}
 
 	err := tmpl.Execute(&buf, templateParams)
@@ -478,7 +478,7 @@ func (d *LLMDispatcher) submitToNomad(job *LLMJob, params map[string]interface{}
 // CleanupOldJobs removes completed jobs older than specified duration
 func (d *LLMDispatcher) CleanupOldJobs(ctx context.Context, maxAge time.Duration) error {
 	kv := d.consulClient.KV()
-	
+
 	// List all job keys
 	keys, _, err := kv.Keys("ploy/llm/jobs/", "/", nil)
 	if err != nil {

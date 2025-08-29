@@ -10,7 +10,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
-	
+
 	"github.com/iw2rmb/ploy/api/arf/db"
 )
 
@@ -24,34 +24,34 @@ type LearningSystem interface {
 
 // TransformationOutcome represents the complete outcome of a transformation
 type TransformationOutcome struct {
-	TransformationID  string                    `json:"transformation_id"`
-	Repository        RepositoryMetadata        `json:"repository"`
-	Strategy          TransformationStrategy    `json:"strategy"`
-	Result            TransformationResult      `json:"result"`
-	Metrics           PerformanceMetrics        `json:"metrics"`
-	Context           EnvironmentContext        `json:"context"`
-	Timestamp         time.Time                 `json:"timestamp"`
+	TransformationID string                 `json:"transformation_id"`
+	Repository       RepositoryMetadata     `json:"repository"`
+	Strategy         TransformationStrategy `json:"strategy"`
+	Result           TransformationResult   `json:"result"`
+	Metrics          PerformanceMetrics     `json:"metrics"`
+	Context          EnvironmentContext     `json:"context"`
+	Timestamp        time.Time              `json:"timestamp"`
 }
 
 // RepositoryMetadata contains metadata about the repository being transformed
 type RepositoryMetadata struct {
-	URL          string            `json:"url"`
-	Language     string            `json:"language"`
-	Framework    string            `json:"framework"`
-	Size         int64             `json:"size"`
-	FileCount    int               `json:"file_count"`
-	Dependencies []string          `json:"dependencies"`
-	TestCoverage float64           `json:"test_coverage"`
-	Complexity   float64           `json:"complexity"`
+	URL          string                 `json:"url"`
+	Language     string                 `json:"language"`
+	Framework    string                 `json:"framework"`
+	Size         int64                  `json:"size"`
+	FileCount    int                    `json:"file_count"`
+	Dependencies []string               `json:"dependencies"`
+	TestCoverage float64                `json:"test_coverage"`
+	Complexity   float64                `json:"complexity"`
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
 // EnvironmentContext captures the environment in which transformation occurred
 type EnvironmentContext struct {
-	PlatformVersion   string            `json:"platform_version"`
-	ControllerVersion string            `json:"controller_version"`
-	ResourcesUsed     LearningResourceUsage `json:"resources_used"`
-	ConfigurationHash string            `json:"configuration_hash"`
+	PlatformVersion   string                 `json:"platform_version"`
+	ControllerVersion string                 `json:"controller_version"`
+	ResourcesUsed     LearningResourceUsage  `json:"resources_used"`
+	ConfigurationHash string                 `json:"configuration_hash"`
 	NodeInfo          map[string]interface{} `json:"node_info"`
 }
 
@@ -65,63 +65,63 @@ type LearningResourceUsage struct {
 
 // PatternAnalysis contains extracted patterns from transformation history
 type PatternAnalysis struct {
-	SuccessPatterns        []SuccessPattern   `json:"success_patterns"`
-	FailurePatterns        []FailurePattern   `json:"failure_patterns"`
-	StrategyEffectiveness  map[string]float64 `json:"strategy_effectiveness"`
-	RecommendedUpdates     []StrategyUpdate   `json:"recommended_updates"`
-	Confidence             float64            `json:"confidence"`
-	AnalysisTimestamp      time.Time          `json:"analysis_timestamp"`
+	SuccessPatterns       []SuccessPattern   `json:"success_patterns"`
+	FailurePatterns       []FailurePattern   `json:"failure_patterns"`
+	StrategyEffectiveness map[string]float64 `json:"strategy_effectiveness"`
+	RecommendedUpdates    []StrategyUpdate   `json:"recommended_updates"`
+	Confidence            float64            `json:"confidence"`
+	AnalysisTimestamp     time.Time          `json:"analysis_timestamp"`
 }
 
 // SuccessPattern represents a pattern of successful transformations
 type SuccessPattern struct {
-	Signature         string                 `json:"signature"`
-	Frequency         int                    `json:"frequency"`
-	SuccessRate       float64                `json:"success_rate"`
-	OptimalStrategy   TransformationStrategy `json:"optimal_strategy"`
-	ContextFactors    []string               `json:"context_factors"`
-	Generalization    PatternGeneralization  `json:"generalization"`
-	Examples          []string               `json:"examples"`
+	Signature       string                 `json:"signature"`
+	Frequency       int                    `json:"frequency"`
+	SuccessRate     float64                `json:"success_rate"`
+	OptimalStrategy TransformationStrategy `json:"optimal_strategy"`
+	ContextFactors  []string               `json:"context_factors"`
+	Generalization  PatternGeneralization  `json:"generalization"`
+	Examples        []string               `json:"examples"`
 }
 
 // FailurePattern represents a pattern of failed transformations
 type FailurePattern struct {
-	Signature       string               `json:"signature"`
-	Frequency       int                  `json:"frequency"`
-	FailureRate     float64              `json:"failure_rate"`
-	CommonErrors    []string             `json:"common_errors"`
-	ContextFactors  []string             `json:"context_factors"`
-	Mitigations     []string             `json:"mitigations"`
+	Signature      string   `json:"signature"`
+	Frequency      int      `json:"frequency"`
+	FailureRate    float64  `json:"failure_rate"`
+	CommonErrors   []string `json:"common_errors"`
+	ContextFactors []string `json:"context_factors"`
+	Mitigations    []string `json:"mitigations"`
 }
 
 // PatternGeneralization describes how a pattern can be applied more broadly
 type PatternGeneralization struct {
-	ApplicableLanguages []string `json:"applicable_languages"`
+	ApplicableLanguages  []string `json:"applicable_languages"`
 	ApplicableFrameworks []string `json:"applicable_frameworks"`
-	Conditions          []string `json:"conditions"`
-	ConfidenceLevel     float64  `json:"confidence_level"`
+	Conditions           []string `json:"conditions"`
+	ConfidenceLevel      float64  `json:"confidence_level"`
 }
 
 // StrategyUpdate represents a recommended update to transformation strategies
 type StrategyUpdate struct {
-	StrategyType    StrategyType `json:"strategy_type"`
-	CurrentWeight   float64      `json:"current_weight"`
-	RecommendedWeight float64    `json:"recommended_weight"`
-	Reasoning       string       `json:"reasoning"`
-	Evidence        []string     `json:"evidence"`
+	StrategyType      StrategyType `json:"strategy_type"`
+	CurrentWeight     float64      `json:"current_weight"`
+	RecommendedWeight float64      `json:"recommended_weight"`
+	Reasoning         string       `json:"reasoning"`
+	Evidence          []string     `json:"evidence"`
 }
 
 // RecipeTemplate represents a generalized recipe template derived from patterns
 type RecipeTemplate struct {
-	ID               string                 `json:"id"`
-	Name             string                 `json:"name"`
-	Description      string                 `json:"description"`
-	ApplicablePattern SuccessPattern        `json:"applicable_pattern"`
-	Template         map[string]interface{} `json:"template"`
-	Variables        []TemplateVariable     `json:"variables"`
-	SuccessRate      float64                `json:"success_rate"`
-	UsageCount       int                    `json:"usage_count"`
-	CreatedAt        time.Time              `json:"created_at"`
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Description       string                 `json:"description"`
+	ApplicablePattern SuccessPattern         `json:"applicable_pattern"`
+	Template          map[string]interface{} `json:"template"`
+	Variables         []TemplateVariable     `json:"variables"`
+	SuccessRate       float64                `json:"success_rate"`
+	UsageCount        int                    `json:"usage_count"`
+	CreatedAt         time.Time              `json:"created_at"`
 }
 
 // TemplateVariable defines a variable in a recipe template
@@ -135,11 +135,11 @@ type TemplateVariable struct {
 
 // PostgreSQLLearningSystem implements learning system using PostgreSQL with pgx driver
 type PostgreSQLLearningSystem struct {
-	db               *sql.DB
-	learningDB       *db.LearningDB
-	abTestFramework  ABTestFramework
-	patternMatcher   PatternMatcher
-	strategyWeights  map[StrategyType]float64
+	db              *sql.DB
+	learningDB      *db.LearningDB
+	abTestFramework ABTestFramework
+	patternMatcher  PatternMatcher
+	strategyWeights map[StrategyType]float64
 }
 
 // NewPostgreSQLLearningSystem creates a new PostgreSQL-based learning system
@@ -298,13 +298,13 @@ func (ls *PostgreSQLLearningSystem) ExtractPatterns(ctx context.Context, timeWin
 func (ls *PostgreSQLLearningSystem) UpdateStrategyWeights(ctx context.Context, patterns PatternAnalysis) error {
 	for _, update := range patterns.RecommendedUpdates {
 		oldWeight := ls.strategyWeights[update.StrategyType]
-		
+
 		// Apply gradual weight adjustment (learning rate = 0.1)
 		learningRate := 0.1
 		newWeight := oldWeight + learningRate*(update.RecommendedWeight-oldWeight)
-		
+
 		ls.strategyWeights[update.StrategyType] = newWeight
-		
+
 		// Record weight update in database
 		updateQuery := `
 			INSERT INTO strategy_weights (strategy_type, weight, updated_at, reasoning)
@@ -313,7 +313,7 @@ func (ls *PostgreSQLLearningSystem) UpdateStrategyWeights(ctx context.Context, p
 				weight = EXCLUDED.weight,
 				updated_at = EXCLUDED.updated_at,
 				reasoning = EXCLUDED.reasoning`
-		
+
 		_, err := ls.db.ExecContext(ctx, updateQuery,
 			string(update.StrategyType),
 			newWeight,
@@ -343,9 +343,9 @@ func (ls *PostgreSQLLearningSystem) GenerateRecipeTemplate(ctx context.Context, 
 
 	// Generate template structure based on pattern
 	templateMap := map[string]interface{}{
-		"type":     "generated_template",
-		"pattern":  pattern.Signature,
-		"strategy": pattern.OptimalStrategy.Primary,
+		"type":                 "generated_template",
+		"pattern":              pattern.Signature,
+		"strategy":             pattern.OptimalStrategy.Primary,
 		"confidence_threshold": pattern.SuccessRate,
 	}
 
@@ -596,10 +596,10 @@ func (ls *PostgreSQLLearningSystem) calculateAnalysisConfidence(successPatterns,
 func (ls *PostgreSQLLearningSystem) generateMitigations(commonErrors []string) []string {
 	mitigationMap := map[string]string{
 		"compilation_failure": "Review dependency versions and build configuration",
-		"timeout":            "Increase resource allocation or break into smaller tasks",
-		"memory_error":       "Increase memory limits or optimize transformation approach",
-		"syntax_error":       "Improve recipe validation and syntax checking",
-		"semantic_error":     "Enhance semantic analysis and context awareness",
+		"timeout":             "Increase resource allocation or break into smaller tasks",
+		"memory_error":        "Increase memory limits or optimize transformation approach",
+		"syntax_error":        "Improve recipe validation and syntax checking",
+		"semantic_error":      "Enhance semantic analysis and context awareness",
 	}
 
 	var mitigations []string
@@ -690,11 +690,11 @@ func (ls *PostgreSQLLearningSystem) loadStrategyWeights() error {
 	if err != nil {
 		// Initialize default weights if table is empty
 		ls.strategyWeights = map[StrategyType]float64{
-			StrategyOpenRewriteOnly: 0.7,
-			StrategyLLMOnly:        0.5,
+			StrategyOpenRewriteOnly:  0.7,
+			StrategyLLMOnly:          0.5,
 			StrategyHybridSequential: 0.8,
-			StrategyHybridParallel:  0.6,
-			StrategyTreeSitter:     0.6,
+			StrategyHybridParallel:   0.6,
+			StrategyTreeSitter:       0.6,
 		}
 		return nil
 	}

@@ -14,8 +14,8 @@ import (
 
 // RecipeExecutor executes transformation recipes
 type RecipeExecutor struct {
-	storage         storage.RecipeStorage
-	sandboxMgr      SandboxManager
+	storage           storage.RecipeStorage
+	sandboxMgr        SandboxManager
 	openRewriteEngine *OpenRewriteEngine
 }
 
@@ -147,8 +147,8 @@ func (e *RecipeExecutor) executeMockOpenRewrite(ctx context.Context, step *model
 		Success:        true,
 		ChangesApplied: 1,
 		FilesModified:  []string{"MockFile.java"},
-		Diff:          fmt.Sprintf("Applied mock transformation for recipe: %s", recipe),
-		ExecutionTime: 100 * time.Millisecond,
+		Diff:           fmt.Sprintf("Applied mock transformation for recipe: %s", recipe),
+		ExecutionTime:  100 * time.Millisecond,
 	}
 
 	return result, nil
@@ -168,7 +168,7 @@ func (e *RecipeExecutor) checkConditions(conditions []models.ExecutionCondition,
 			if _, err := os.Stat(path); err == nil {
 				return false
 			}
-		// Add more condition types as needed
+			// Add more condition types as needed
 		}
 	}
 	return true
