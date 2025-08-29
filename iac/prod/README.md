@@ -146,7 +146,7 @@ curl -s https://api.ployd.app/health
 curl -s https://api.ployd.app/version
 
 # Deploy test application
-./build/ploy push -a test-prod-app
+./bin/ploy push -a test-prod-app
 curl -s https://test-prod-app.ployd.app
 ```
 

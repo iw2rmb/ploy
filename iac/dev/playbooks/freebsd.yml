@@ -55,22 +55,30 @@
         state: directory
         mode: '0755'
 
+    - name: Check if FreeBSD image already exists
+      stat:
+        path: /var/lib/libvirt/images/freebsd-dev.qcow2
+      register: freebsd_image_exists
+
     - name: Download FreeBSD cloud image
       get_url:
         url: "https://download.freebsd.org/ftp/releases/VM-IMAGES/14.0-RELEASE/amd64/Latest/FreeBSD-14.0-RELEASE-amd64.qcow2.xz"
         dest: /tmp/freebsd-14.0.qcow2.xz
         timeout: 1800
+      when: not freebsd_image_exists.stat.exists
 
     - name: Extract FreeBSD image
       command: xz -d /tmp/freebsd-14.0.qcow2.xz
       args:
         creates: /tmp/freebsd-14.0.qcow2
+      when: not freebsd_image_exists.stat.exists
 
     - name: Copy FreeBSD image to VM storage
       copy:
         src: /tmp/freebsd-14.0.qcow2
         dest: /var/lib/libvirt/images/freebsd-dev.qcow2
         remote_src: true
+      when: not freebsd_image_exists.stat.exists
 
     - name: Resize FreeBSD disk
       command: qemu-img resize /var/lib/libvirt/images/freebsd-dev.qcow2 {{ freebsd_vm.disk_size }}

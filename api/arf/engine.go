@@ -22,6 +22,7 @@ type TransformationResult struct {
 	RecipeID        string                 `json:"recipe_id"`
 	Success         bool                   `json:"success"`
 	ChangesApplied  int                    `json:"changes_applied"`
+	TotalFiles      int                    `json:"total_files"`
 	FilesModified   []string               `json:"files_modified"`
 	Diff            string                 `json:"diff"`
 	ValidationScore float64                `json:"validation_score"`

@@ -164,11 +164,17 @@
 
         - name: Download and install hcl2json
           block:
+            - name: Check if hcl2json is already installed
+              stat:
+                path: /usr/local/bin/hcl2json
+              register: hcl2json_binary
+
             - name: Download hcl2json
               get_url:
                 url: "https://github.com/tmccombs/hcl2json/releases/latest/download/hcl2json_linux_amd64"
                 dest: /usr/local/bin/hcl2json
                 mode: '0755'
+              when: not hcl2json_binary.stat.exists
           when: not hcl2json_binary.stat.exists
 
         - name: Check if terraform is already installed
@@ -178,10 +184,23 @@
 
         - name: Install terraform for HCL validation
           block:
+            - name: Check if terraform is already installed
+              stat:
+                path: /usr/local/bin/terraform
+              register: terraform_binary
+
+            - name: Get current terraform version (if installed)
+              command: /usr/local/bin/terraform version
+              register: current_terraform_version
+              changed_when: false
+              ignore_errors: true
+              when: terraform_binary.stat.exists
+
             - name: Download terraform
               get_url:
                 url: "https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip"
                 dest: /tmp/terraform.zip
+              when: not terraform_binary.stat.exists or "1.5.7" not in (current_terraform_version.stdout | default(''))
 
             - name: Install unzip if needed
               apt:

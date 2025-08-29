@@ -22,7 +22,6 @@ type Handler struct {
 	// Phase 4 components
 	securityEngine      *SecurityEngine
 	sbomAnalyzer        *SyftSBOMAnalyzer
-	workflowEngine      *HumanWorkflowEngine
 	productionOptimizer *ProductionOptimizer
 	// Phase 8 components
 	benchmarkManager    *BenchmarkManager
@@ -37,7 +36,6 @@ func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr Sand
 		// Initialize Phase 4 components
 		securityEngine:      NewSecurityEngine(),
 		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		workflowEngine:      NewHumanWorkflowEngine(nil, nil, nil, nil, nil), // Will be properly initialized with dependencies
 		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
 			EnableCircuitBreaker: true,
 			EnableCaching:        true,
@@ -66,7 +64,6 @@ func NewHandlerWithStorage(
 		// Initialize Phase 4 components
 		securityEngine:      NewSecurityEngine(),
 		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		workflowEngine:      NewHumanWorkflowEngine(nil, nil, nil, nil, nil),
 		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
 			EnableCircuitBreaker: true,
 			EnableCaching:        true,
@@ -102,7 +99,6 @@ func NewHandlerWithPhase3(
 		// Initialize Phase 4 components
 		securityEngine:      NewSecurityEngine(),
 		sbomAnalyzer:        NewSyftSBOMAnalyzer(),
-		workflowEngine:      NewHumanWorkflowEngine(nil, nil, nil, nil, nil),
 		productionOptimizer: NewProductionOptimizer(OptimizerConfig{
 			EnableCircuitBreaker: true,
 			EnableCaching:        true,
@@ -202,19 +198,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/sbom/report", h.GetSBOMReport)
 	arf.Get("/sbom/:id", h.GetSBOMReport) // Support route param
 
-	// Phase 4: Human Workflow
-	arf.Post("/workflow", h.CreateWorkflow)
-	arf.Post("/workflow/create", h.CreateWorkflow) // Alternative route for tests
-	arf.Post("/workflow/:id/approve", h.ApproveWorkflow)
-	arf.Post("/workflow/:id/reject", h.RejectWorkflow)
-	arf.Get("/workflow/:id/history", h.GetApprovalHistory)
-	arf.Delete("/workflow/:id", h.CancelWorkflow)
-	arf.Get("/workflow/pending", h.GetPendingWorkflows)
-	arf.Get("/workflow/:id/status", h.GetWorkflowStatus)
-	arf.Put("/workflow/:id/priority", h.UpdateWorkflowPriority)
-	arf.Get("/workflow/metrics", h.GetWorkflowMetrics)
-	arf.Post("/workflow/:id/escalate", h.EscalateWorkflow)
-	arf.Get("/workflow/templates", h.GetWorkflowTemplates)
+	// Phase 4: Workflow removed - functionality integrated into transform command
 
 	// Phase 4: Production Optimization
 	arf.Post("/optimize/execution", h.OptimizeExecution)

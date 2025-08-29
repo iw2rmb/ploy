@@ -261,7 +261,7 @@ Before deploying templates:
 3. **Integration Tests**:
    ```bash
    # Deploy test application with new template
-   ./build/ploy apps new --name test-app --lang java --lane C
+   ./bin/ploy apps new --name test-app --lang java --lane C
    ```
 
 ## Storage and Distribution

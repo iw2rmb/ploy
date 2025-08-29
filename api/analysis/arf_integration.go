@@ -54,33 +54,7 @@ func (a *ARFIntegration) TriggerRemediation(ctx context.Context, result *Analysi
 	return nil
 }
 
-// CreateRemediationWorkflow creates a human-in-the-loop workflow for complex remediations
-func (a *ARFIntegration) CreateRemediationWorkflow(ctx context.Context, result *AnalysisResult) (*arf.HumanWorkflow, error) {
-	// Filter issues that need human review
-	criticalIssues := a.filterCriticalIssues(result.Issues)
-	
-	if len(criticalIssues) == 0 {
-		return nil, nil
-	}
-
-	// Create a simplified workflow structure
-	workflow := &arf.HumanWorkflow{
-		ID:        fmt.Sprintf("analysis-%s-%d", result.ID, time.Now().Unix()),
-		Priority:  arf.PriorityHigh,
-		CreatedAt: time.Now(),
-		Metadata: map[string]interface{}{
-			"analysis_id":     result.ID,
-			"repository":      result.Repository.Name,
-			"critical_issues": len(criticalIssues),
-			"total_issues":    len(result.Issues),
-		},
-	}
-
-	// Add steps for each critical issue category
-	workflow.Steps = a.createWorkflowSteps(criticalIssues)
-
-	return workflow, nil
-}
+// CreateRemediationWorkflow removed - workflow functionality moved to transform command
 
 // GenerateRecipeFromIssues generates an ARF recipe from analysis issues
 func (a *ARFIntegration) GenerateRecipeFromIssues(issues []Issue, language string) (*models.Recipe, error) {
@@ -217,28 +191,11 @@ func (a *ARFIntegration) filterCriticalIssues(issues []Issue) []Issue {
 	return critical
 }
 
-// createWorkflowSteps creates workflow steps for issue review
+// createWorkflowSteps removed - workflow functionality moved to transform command
+/*
 func (a *ARFIntegration) createWorkflowSteps(issues []Issue) []arf.WorkflowStep {
-	steps := []arf.WorkflowStep{}
-	
-	// Group issues by category
-	categoryGroups := make(map[IssueCategory][]Issue)
-	for _, issue := range issues {
-		categoryGroups[issue.Category] = append(categoryGroups[issue.Category], issue)
-	}
-
-	// Create a step for each category
-	stepID := 1
-	for category, categoryIssues := range categoryGroups {
-		step := arf.WorkflowStep{
-			ID:          fmt.Sprintf("step-%d", stepID),
-			Name:        fmt.Sprintf("Review %s Issues", category),
-			Type:        "approval",
-			Status:      arf.StepPending,
-			Description: fmt.Sprintf("Review and approve remediation for %d %s issues", len(categoryIssues), category),
-			Metadata: map[string]interface{}{
-				"category":     category,
-				"issue_count":  len(categoryIssues),
+	// This functionality has been moved to the transform command's self-healing capabilities
+	// Issues are now automatically remediated using LLM-powered solutions
 				"issue_ids":    a.getIssueIDs(categoryIssues),
 			},
 		}
@@ -248,6 +205,7 @@ func (a *ARFIntegration) createWorkflowSteps(issues []Issue) []arf.WorkflowStep 
 
 	return steps
 }
+*/
 
 // generateRecipeSteps generates recipe steps from issues
 func (a *ARFIntegration) generateRecipeSteps(issues []Issue, language string) []*models.RecipeStep {
@@ -415,3 +373,4 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+

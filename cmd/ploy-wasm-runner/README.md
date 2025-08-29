@@ -90,10 +90,10 @@ For local testing during Lane G development:
 
 ```bash
 # Build the runner
-go build -o build/ploy-wasm-runner ./cmd/ploy-wasm-runner
+go build -o bin/ploy-wasm-runner ./cmd/ploy-wasm-runner
 
 # Test with a WASM module
-./build/ploy-wasm-runner \
+./bin/ploy-wasm-runner \
   --module test.wasm \
   --port 8080 \
   --max-memory 64MB

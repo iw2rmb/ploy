@@ -32,7 +32,7 @@ test_wasm_detection() {
     # Test Rust WASM detection
     echo "Testing Rust WASM detection..."
     if [ -d "apps/wasm-rust-hello" ]; then
-        result=$(./build/ploy-lane-pick --path apps/wasm-rust-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./bin/ploy-lane-pick --path apps/wasm-rust-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ Rust WASM detected as Lane G"
         else
@@ -46,7 +46,7 @@ test_wasm_detection() {
     # Test Go WASM detection  
     echo "Testing Go WASM detection..."
     if [ -d "apps/wasm-go-hello" ]; then
-        result=$(./build/ploy-lane-pick --path apps/wasm-go-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./bin/ploy-lane-pick --path apps/wasm-go-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ Go WASM detected as Lane G"
         else
@@ -60,7 +60,7 @@ test_wasm_detection() {
     # Test AssemblyScript detection
     echo "Testing AssemblyScript detection..."
     if [ -d "apps/wasm-assemblyscript-hello" ]; then
-        result=$(./build/ploy-lane-pick --path apps/wasm-assemblyscript-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./bin/ploy-lane-pick --path apps/wasm-assemblyscript-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ AssemblyScript detected as Lane G"
         else
@@ -74,7 +74,7 @@ test_wasm_detection() {
     # Test C++ Emscripten detection
     echo "Testing C++ Emscripten detection..."
     if [ -d "apps/wasm-cpp-hello" ]; then
-        result=$(./build/ploy-lane-pick --path apps/wasm-cpp-hello 2>/dev/null || echo '{"lane":"unknown"}')
+        result=$(./bin/ploy-lane-pick --path apps/wasm-cpp-hello 2>/dev/null || echo '{"lane":"unknown"}')
         if echo "$result" | jq -r '.lane' | grep -q "G"; then
             print_success "✓ C++ Emscripten detected as Lane G"
         else
@@ -198,7 +198,7 @@ test_nomad_integration() {
     # Check WASM runner binary
     if [ -f "cmd/ploy-wasm-runner/main.go" ]; then
         echo "Testing WASM runner compilation..."
-        if [ -f "build/ploy-wasm-runner" ]; then
+        if [ -f "bin/ploy-wasm-runner" ]; then
             print_success "✓ WASM runner compiles successfully"
         elif go build -o /tmp/test-wasm-runner ./cmd/ploy-wasm-runner >/dev/null 2>&1; then
             print_success "✓ WASM runner compiles successfully"

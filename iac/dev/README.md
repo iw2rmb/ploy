@@ -230,11 +230,11 @@ nomad job status ploy-api
 # Controller management
 /home/ploy/controller-scripts/update-api.sh
 /home/ploy/controller-scripts/rollback-api.sh <version>
-./build/ployman controller list
+./bin/ployman controller list
 
 # CLI operations
-./build/ploy apps new --lang {go|node|java} --name myapp
-./build/ploy push -a myapp [-lane {A|B|C|D|E|F}]
+./bin/ploy apps new --lang {go|node|java} --name myapp
+./bin/ploy push -a myapp [-lane {A|B|C|D|E|F}]
 
 # Lane selection testing
 ./build/lane-pick --path apps/{go|node|java}-hello

@@ -779,7 +779,7 @@ Each test should:
 **Test Steps**:
 1. Run security scan on vulnerable Java application:
    ```bash
-   ./build/ploy arf security scan --type sbom --target /path/to/app.jar
+   ./bin/ploy arf security scan --type sbom --target /path/to/app.jar
    ```
 2. Verify vulnerability report contains:
    - Critical vulnerabilities with CVSS scores
@@ -813,11 +813,11 @@ Each test should:
 **Test Steps**:
 1. Generate remediation recipe for SQL injection vulnerability:
    ```bash
-   ./build/ploy arf remediation generate --cve CVE-2023-1234 --codebase /path/to/vulnerable/app
+   ./bin/ploy arf remediation generate --cve CVE-2023-1234 --codebase /path/to/vulnerable/app
    ```
 2. Apply remediation in sandbox:
    ```bash
-   ./build/ploy arf remediation apply --recipe-id remedy-123 --sandbox
+   ./bin/ploy arf remediation apply --recipe-id remedy-123 --sandbox
    ```
 3. Test different remediation types:
    - Dependency upgrades
@@ -826,7 +826,7 @@ Each test should:
    - Security hardening measures
 4. Validate rollback capabilities:
    ```bash
-   ./build/ploy arf remediation rollback --recipe-id remedy-123
+   ./bin/ploy arf remediation rollback --recipe-id remedy-123
    ```
 
 **Expected Results**:
@@ -847,7 +847,7 @@ Each test should:
 **Test Steps**:
 1. Create high-severity remediation requiring approval:
    ```bash
-   ./build/ploy arf workflow create --type approval --priority critical --recipe remedy-456
+   ./bin/ploy arf workflow create --type approval --priority critical --recipe remedy-456
    ```
 2. Test approval process:
    - Notification delivery to stakeholders
@@ -860,7 +860,7 @@ Each test should:
    - Business impact evaluations
 4. Validate audit trail:
    ```bash
-   ./build/ploy arf workflow audit --id workflow-789
+   ./bin/ploy arf workflow audit --id workflow-789
    ```
 
 **Expected Results**:
@@ -881,11 +881,11 @@ Each test should:
 **Test Steps**:
 1. Generate enhanced SBOM with security metadata:
    ```bash
-   ./build/ploy arf sbom generate --target /path/to/app --format spdx-json --security-analysis
+   ./bin/ploy arf sbom generate --target /path/to/app --format spdx-json --security-analysis
    ```
 2. Analyze SBOM for security issues:
    ```bash
-   ./build/ploy arf sbom analyze --sbom-file app.sbom.json --deep-scan
+   ./bin/ploy arf sbom analyze --sbom-file app.sbom.json --deep-scan
    ```
 3. Test different SBOM formats:
    - SPDX JSON/XML
@@ -893,7 +893,7 @@ Each test should:
    - Syft native format
 4. Validate license compliance checking:
    ```bash
-   ./build/ploy arf sbom compliance --sbom-file app.sbom.json --policy corporate-policy
+   ./bin/ploy arf sbom compliance --sbom-file app.sbom.json --policy corporate-policy
    ```
 
 **Expected Results**:
@@ -914,7 +914,7 @@ Each test should:
 **Test Steps**:
 1. Monitor performance during high-load operations:
    ```bash
-   ./build/ploy arf monitor start --duration 30m --load-test
+   ./bin/ploy arf monitor start --duration 30m --load-test
    ```
 2. Test auto-scaling capabilities:
    - CPU/memory threshold breaches
@@ -922,11 +922,11 @@ Each test should:
    - Load distribution
 3. Validate circuit breaker functionality:
    ```bash
-   ./build/ploy arf circuit-breaker test --failure-rate 50%
+   ./bin/ploy arf circuit-breaker test --failure-rate 50%
    ```
 4. Test rate limiting:
    ```bash
-   ./build/ploy arf rate-limit test --requests 1000 --duration 60s
+   ./bin/ploy arf rate-limit test --requests 1000 --duration 60s
    ```
 
 **Expected Results**:
@@ -947,11 +947,11 @@ Each test should:
 **Test Steps**:
 1. Run OWASP compliance assessment:
    ```bash
-   ./build/ploy arf compliance assess --framework owasp --baseline production
+   ./bin/ploy arf compliance assess --framework owasp --baseline production
    ```
 2. Generate NIST cybersecurity framework report:
    ```bash
-   ./build/ploy arf compliance report --framework nist --format pdf --timeframe 30d
+   ./bin/ploy arf compliance report --framework nist --format pdf --timeframe 30d
    ```
 3. Test continuous compliance monitoring:
    - Real-time compliance scoring
@@ -959,7 +959,7 @@ Each test should:
    - Remediation tracking
 4. Validate audit evidence collection:
    ```bash
-   ./build/ploy arf compliance evidence --framework owasp --control A06
+   ./bin/ploy arf compliance evidence --framework owasp --control A06
    ```
 
 **Expected Results**:
@@ -980,7 +980,7 @@ Each test should:
 **Test Steps**:
 1. Test tenant isolation:
    ```bash
-   ./build/ploy arf security test-isolation --tenant-a app1 --tenant-b app2
+   ./bin/ploy arf security test-isolation --tenant-a app1 --tenant-b app2
    ```
 2. Validate access controls:
    - User permission enforcement
@@ -988,11 +988,11 @@ Each test should:
    - Data segregation
 3. Test security event correlation:
    ```bash
-   ./build/ploy arf security events --tenant tenant-1 --timeframe 24h
+   ./bin/ploy arf security events --tenant tenant-1 --timeframe 24h
    ```
 4. Validate encryption in transit and at rest:
    ```bash
-   ./build/ploy arf security encryption-test --all-interfaces
+   ./bin/ploy arf security encryption-test --all-interfaces
    ```
 
 **Expected Results**:
@@ -1013,8 +1013,8 @@ Each test should:
 **Test Steps**:
 1. Test security data backup and recovery:
    ```bash
-   ./build/ploy arf backup create --include-security-data
-   ./build/ploy arf backup restore --backup-id backup-123 --validate-integrity
+   ./bin/ploy arf backup create --include-security-data
+   ./bin/ploy arf backup restore --backup-id backup-123 --validate-integrity
    ```
 2. Simulate security incident response:
    - Compromise detection
@@ -1023,7 +1023,7 @@ Each test should:
    - Post-incident analysis
 3. Test security configuration consistency:
    ```bash
-   ./build/ploy arf config validate --environment production --against-baseline
+   ./bin/ploy arf config validate --environment production --against-baseline
    ```
 
 **Expected Results**:
@@ -1044,7 +1044,7 @@ Each test should:
 **Test Steps**:
 1. Test API security:
    ```bash
-   ./build/ploy arf security api-test --endpoint /v1/arf/security --auth-test
+   ./bin/ploy arf security api-test --endpoint /v1/arf/security --auth-test
    ```
 2. Validate webhook security:
    - Signature verification
@@ -1056,7 +1056,7 @@ Each test should:
    - Container registry security
 4. Database security testing:
    ```bash
-   ./build/ploy arf security db-test --connection-security --injection-test
+   ./bin/ploy arf security db-test --connection-security --injection-test
    ```
 
 **Expected Results**:

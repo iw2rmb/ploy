@@ -471,7 +471,7 @@ func (cm *CertificateManager) GetPreferredCertificate(domain string) (*DomainCer
 
 1. **Standalone Certificate Provisioning**
    ```bash
-   PLOY_APPS_DOMAIN=ployd.app ./build/ploy certs issue-wildcard ployd.app
+   PLOY_APPS_DOMAIN=ployd.app ./bin/ploy certs issue-wildcard ployd.app
    ```
 
 2. **Ansible Integration Test**

@@ -24,7 +24,7 @@ cleanup() {
     echo "Cleaning up test resources..."
     rm -rf "$TEST_DIR"
     # Try to destroy the test app
-    ./build/ploy apps destroy --name "$TEST_APP" 2>/dev/null || true
+    ./bin/ploy apps destroy --name "$TEST_APP" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -37,7 +37,7 @@ fi
 # Build the binaries
 echo "Building ploy binaries..."
 go build -o bin/api ./api
-go build -o build/ploy ./cmd/ploy
+go build -o bin/ploy ./cmd/ploy
 
 # Test 301: Job validation before submission
 echo ""

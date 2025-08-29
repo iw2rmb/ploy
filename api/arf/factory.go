@@ -256,18 +256,12 @@ func CreateOpenRewriteEngine(config *Phase3Config) interface{} {
 	switch config.OpenRewriteMode {
 	case "service":
 		client := NewOpenRewriteClient()
-		if config.OpenRewriteURL != "" {
-			// Set custom URL if provided
-			client.baseURL = config.OpenRewriteURL
-		}
+		// URL configuration now handled internally
 		return client
 		
 	case "auto":
 		// Try service first, fallback to embedded
 		client := NewOpenRewriteClient()
-		if config.OpenRewriteURL != "" {
-			client.baseURL = config.OpenRewriteURL
-		}
 		
 		// Test service health
 		if err := client.Health(); err == nil {

@@ -1178,7 +1178,7 @@ echo "Testing WASM lane detection..."
 
 # Test Rust WASM detection
 echo "Testing Rust WASM detection..."
-result=$(./build/ploy lane-pick --path apps/wasm-rust-hello)
+result=$(./bin/ploy lane-pick --path apps/wasm-rust-hello)
 if echo "$result" | jq -r '.lane' | grep -q "G"; then
     echo "✓ Rust WASM detected as Lane G"
 else
@@ -1188,7 +1188,7 @@ fi
 
 # Test Go WASM detection
 echo "Testing Go WASM detection..."
-result=$(./build/ploy lane-pick --path apps/wasm-go-hello)
+result=$(./bin/ploy lane-pick --path apps/wasm-go-hello)
 if echo "$result" | jq -r '.lane' | grep -q "G"; then
     echo "✓ Go WASM detected as Lane G"
 else
@@ -1198,7 +1198,7 @@ fi
 
 # Test AssemblyScript detection
 echo "Testing AssemblyScript detection..."
-result=$(./build/ploy lane-pick --path apps/wasm-assemblyscript-hello)
+result=$(./bin/ploy lane-pick --path apps/wasm-assemblyscript-hello)
 if echo "$result" | jq -r '.lane' | grep -q "G"; then
     echo "✓ AssemblyScript detected as Lane G"
 else

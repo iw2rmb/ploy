@@ -57,14 +57,14 @@ fi
 echo -e "${YELLOW}Setting up DNS records automatically...${NC}"
 
 # Build the ploy CLI to use DNS management
-if [ ! -f "build/ploy" ]; then
+if [ ! -f "bin/ploy" ]; then
     echo "Building Ploy CLI..."
     ./scripts/build.sh cli
 fi
 
 # Add dev subdomain A record
 echo -e "${YELLOW}Adding A record for $DEV_DOMAIN...${NC}"
-./build/ploy domains add-dns "$DEV_DOMAIN" "$VPS_IP" --type A --ttl 300
+./bin/ploy domains add-dns "$DEV_DOMAIN" "$VPS_IP" --type A --ttl 300
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ A record added: $DEV_DOMAIN → $VPS_IP${NC}"
@@ -75,7 +75,7 @@ fi
 
 # Add wildcard A record
 echo -e "${YELLOW}Adding wildcard A record for *.$DEV_DOMAIN...${NC}"
-./build/ploy domains add-dns "*.$DEV_DOMAIN" "$VPS_IP" --type A --ttl 300
+./bin/ploy domains add-dns "*.$DEV_DOMAIN" "$VPS_IP" --type A --ttl 300
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Wildcard A record added: *.$DEV_DOMAIN → $VPS_IP${NC}"
