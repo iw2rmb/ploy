@@ -256,46 +256,48 @@
           environment:
             NOMAD_ADDR: "http://localhost:4646"
 
-        - name: Check if any API job is running
-          uri:
-            url: "http://localhost:4646/v1/job/ploy-api"
-            method: GET
-            status_code: [200, 404]
-          register: api_job_check
-          ignore_errors: true
+        - name: Copy job manager script
+          copy:
+            src: /Users/vk/@iw2rmb/ploy/iac/common/scripts/nomad-job-manager.sh
+            dest: /opt/hashicorp/bin/nomad-job-manager.sh
+            mode: '0755'
+            owner: root
+            group: root
 
         - name: Stop existing API job if running
-          command: nomad job stop ploy-api
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh stop ploy-api
           environment:
             NOMAD_ADDR: "http://localhost:4646"
-          when: api_job_check.status == 200
-          ignore_errors: true
+          register: stop_result
+          failed_when: false
 
-        - name: Deploy API job
-          command: nomad job run /opt/hashicorp/nomad/jobs/ploy-api.hcl
-          register: bootstrap_deploy
+        - name: Wait between stop and deploy operations
+          pause:
+            seconds: 5
+
+        - name: Deploy API job using HTTP API
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run ploy-api /opt/hashicorp/nomad/jobs/ploy-api.hcl
           environment:
             NOMAD_ADDR: "http://localhost:4646"
+          register: bootstrap_deploy
 
         - name: Wait for bootstrap allocation to be running
-          uri:
-            url: "http://localhost:4646/v1/job/ploy-api/allocations"
-            method: GET
-            status_code: [200, 429]
-            return_content: yes
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait ploy-api 300
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: wait_result
+          failed_when: wait_result.rc != 0
+
+        - name: Get allocation status for verification
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh status ploy-api
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
           register: bootstrap_allocs
-          until: >
-            bootstrap_allocs.status == 200 and
-            bootstrap_allocs.json is defined and
-            bootstrap_allocs.json | length > 0 and
-            (bootstrap_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
-          retries: 30
-          delay: 20
           failed_when: false
 
         - name: Display bootstrap deployment status
           debug:
-            msg: "Bootstrap API deployed successfully with {{ bootstrap_allocs.json | length }} allocation(s)"
+            msg: "Bootstrap API deployed successfully. Status: {{ wait_result.rc == 0 | ternary('Running', 'Failed') }}"
 
         - name: Wait for bootstrap API to be available
           uri:

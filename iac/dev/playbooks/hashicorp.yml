@@ -500,6 +500,14 @@
           ignore_errors: true
           when: traefik_binary.stat.exists
 
+        - name: Copy job manager script
+          copy:
+            src: /Users/vk/@iw2rmb/ploy/iac/common/scripts/nomad-job-manager.sh
+            dest: /opt/hashicorp/bin/nomad-job-manager.sh
+            mode: '0755'
+            owner: root
+            group: root
+
         - name: Check if Traefik job is already running
           uri:
             url: "http://localhost:4646/v1/job/traefik-system"
@@ -550,23 +558,19 @@
             NOMAD_ADDR: "http://localhost:4646"
 
         - name: Submit Traefik system job to Nomad (if not running)
-          command: nomad job run /opt/hashicorp/nomad/jobs/traefik-system.hcl
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run traefik-system /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_job_submit
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           when: traefik_job_check.status == 404
 
         - name: Wait for Traefik service to be healthy
-          uri:
-            url: "http://localhost:4646/v1/job/traefik-system/allocations"
-            method: GET
-            status_code: 200
-          register: traefik_allocs
-          until: >
-            traefik_allocs.json | length > 0 and
-            (traefik_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
-          retries: 12
-          delay: 10
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait traefik-system 180
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: traefik_wait_result
+          failed_when: traefik_wait_result.rc != 0
+          when: traefik_job_check.status == 404
 
         - name: Verify Traefik is accessible
           uri:
