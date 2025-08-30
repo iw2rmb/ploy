@@ -226,9 +226,28 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 
 // Helper functions for tar operations and storage
 func (d *OpenRewriteDispatcher) createTarFromRepo(repoPath, tarPath string) error {
+	// Validate repo path exists
+	if _, err := os.Stat(repoPath); err != nil {
+		return fmt.Errorf("repository path does not exist: %s", repoPath)
+	}
+	
+	// Remove existing tar file if it exists
+	os.Remove(tarPath)
+	
 	// Use tar command to create archive
 	cmd := fmt.Sprintf("tar -cf %s -C %s .", tarPath, repoPath)
-	return executeCommand(cmd)
+	if err := executeCommand(cmd); err != nil {
+		return fmt.Errorf("failed to create tar archive: %w", err)
+	}
+	
+	// Verify tar file was created
+	fileInfo, err := os.Stat(tarPath)
+	if err != nil {
+		return fmt.Errorf("tar file was not created: %w", err)
+	}
+	
+	log.Printf("Created tar archive %s (size: %d bytes)", tarPath, fileInfo.Size())
+	return nil
 }
 
 func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error {
@@ -238,18 +257,43 @@ func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error
 }
 
 func (d *OpenRewriteDispatcher) uploadToStorage(ctx context.Context, filePath, storageKey string) error {
+	// Check if file exists and get its size
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to stat file %s: %w", filePath, err)
+	}
+	
+	// Open file for reading
 	file, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 	defer file.Close()
 	
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return err
+	// Read entire file into memory (we know the size)
+	data := make([]byte, fileInfo.Size())
+	n, err := io.ReadFull(file, data)
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+	if int64(n) != fileInfo.Size() {
+		return fmt.Errorf("read %d bytes but expected %d from %s", n, fileInfo.Size(), filePath)
 	}
 	
-	return d.storageClient.Put(ctx, storageKey, data)
+	// Upload to storage with retry logic
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		if err := d.storageClient.Put(ctx, storageKey, data); err != nil {
+			lastErr = err
+			log.Printf("Upload attempt %d failed for %s: %v", i+1, storageKey, err)
+			time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+			continue
+		}
+		log.Printf("Successfully uploaded %s to storage (size: %d bytes)", storageKey, len(data))
+		return nil
+	}
+	
+	return fmt.Errorf("failed to upload to storage after 3 attempts: %w", lastErr)
 }
 
 func (d *OpenRewriteDispatcher) downloadFromStorage(ctx context.Context, storageKey, filePath string) error {
