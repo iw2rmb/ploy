@@ -50,6 +50,8 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 	if err != nil {
 		// Check if this is an OpenRewrite recipe and we have a dispatcher
 		if e.isOpenRewriteRecipe(recipeID) && e.openRewriteDispatcher != nil {
+			fmt.Printf("[RecipeExecutor] Recipe %s not found in cache, triggering dynamic download via Nomad\n", recipeID)
+			
 			// Parse OpenRewrite recipe ID to get Maven coordinates
 			req, parseErr := ParseOpenRewriteRecipeID(recipeID)
 			if parseErr != nil {
@@ -59,11 +61,16 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 			// Set the repository path
 			req.RepoPath = repoPath
 			
+			fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine for discovery and execution\n", recipeID)
+			
 			// Dispatch to Nomad for dynamic download and execution
 			result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(ctx, req)
 			if execErr != nil {
+				fmt.Printf("[RecipeExecutor] Failed to execute recipe %s: %v\n", recipeID, execErr)
 				return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
 			}
+			
+			fmt.Printf("[RecipeExecutor] Recipe %s executed successfully, result: %+v\n", recipeID, result)
 			
 			// Recipe was successfully downloaded and executed, optionally cache it
 			// Note: The runner.sh script already registers the recipe with the API
@@ -73,9 +80,12 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 		}
 		
 		// Not an OpenRewrite recipe or no dispatcher available
+		fmt.Printf("[RecipeExecutor] Recipe %s not found and no fallback available (isOpenRewrite=%v, hasDispatcher=%v)\n", 
+			recipeID, e.isOpenRewriteRecipe(recipeID), e.openRewriteDispatcher != nil)
 		return nil, fmt.Errorf("failed to load recipe %s: %w", recipeID, err)
 	}
 
+	fmt.Printf("[RecipeExecutor] Recipe %s found in cache, executing from storage\n", recipeID)
 	return e.ExecuteRecipeObject(ctx, recipe, repoPath)
 }
 

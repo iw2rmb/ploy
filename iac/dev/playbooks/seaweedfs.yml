@@ -231,6 +231,92 @@
       debug:
         msg: "SeaweedFS cluster status: {{ cluster_status.json if cluster_status.json is defined else 'Unable to fetch status' }}"
 
+    - name: Register SeaweedFS services with Consul
+      block:
+        - name: Create Consul service definition for SeaweedFS master
+          copy:
+            content: |
+              {
+                "service": {
+                  "name": "seaweedfs-master",
+                  "port": {{ seaweedfs.master_port }},
+                  "tags": ["seaweedfs", "master"],
+                  "check": {
+                    "http": "http://localhost:{{ seaweedfs.master_port }}/cluster/status",
+                    "interval": "10s",
+                    "timeout": "5s"
+                  }
+                }
+              }
+            dest: /etc/consul.d/seaweedfs-master.json
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Create Consul service definition for SeaweedFS volume
+          copy:
+            content: |
+              {
+                "service": {
+                  "name": "seaweedfs-volume",
+                  "port": {{ seaweedfs.volume_port }},
+                  "tags": ["seaweedfs", "volume"],
+                  "check": {
+                    "http": "http://localhost:{{ seaweedfs.volume_port }}/status",
+                    "interval": "10s",
+                    "timeout": "5s"
+                  }
+                }
+              }
+            dest: /etc/consul.d/seaweedfs-volume.json
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Create Consul service definition for SeaweedFS filer
+          copy:
+            content: |
+              {
+                "service": {
+                  "name": "seaweedfs-filer",
+                  "port": {{ seaweedfs.filer_port }},
+                  "tags": ["seaweedfs", "filer", "storage"],
+                  "check": {
+                    "http": "http://localhost:{{ seaweedfs.filer_port }}/",
+                    "interval": "10s",
+                    "timeout": "5s"
+                  }
+                }
+              }
+            dest: /etc/consul.d/seaweedfs-filer.json
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Reload Consul to register SeaweedFS services
+          systemd:
+            name: consul
+            state: reloaded
+          ignore_errors: true
+
+        - name: Wait for SeaweedFS services to be registered in Consul
+          uri:
+            url: "http://localhost:8500/v1/catalog/service/{{ item }}"
+            method: GET
+            status_code: 200
+          register: consul_service_check
+          retries: 6
+          delay: 5
+          until: consul_service_check.status == 200
+          loop:
+            - seaweedfs-master
+            - seaweedfs-volume
+            - seaweedfs-filer
+
+        - name: Display SeaweedFS Consul registration status
+          debug:
+            msg: "✅ SeaweedFS services successfully registered with Consul"
+
     - name: Cleanup installation files
       file:
         path: /tmp/seaweedfs.tar.gz
