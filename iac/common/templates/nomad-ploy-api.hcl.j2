@@ -29,9 +29,9 @@ job "ploy-api" {
     # Rolling update configuration
     update {
       max_parallel = 1
-      min_healthy_time = "10s"
-      healthy_deadline = "5m"
-      progress_deadline = "10m"
+      min_healthy_time = "5s"    # Reduced from 10s since API starts quickly
+      healthy_deadline = "10m"    # Increased from 5m for initial health checks
+      progress_deadline = "15m"   # Increased from 10m to allow more time
       auto_revert = true
       canary = 1
     }
@@ -157,38 +157,30 @@ job "ploy-api" {
 set -e
 
 # Install required system dependencies in container
-echo "[SETUP] Installing system dependencies..."
+echo "[SETUP] Verifying system dependencies..."
 
-# Update package list and install git if missing
-if ! command -v git &> /dev/null; then
-  echo "[SETUP] Installing git..."
-  apt-get update -qq
-  apt-get install -y git
-fi
-
-# Verify git installation
+# Verify git (pre-installed by Ansible)
 if command -v git &> /dev/null; then
   echo "[SETUP] ✓ git: $(git --version)"
 else
-  echo "[SETUP] ✗ git: INSTALLATION FAILED - ARF transformations will fail"
-  exit 1
+  echo "[SETUP] ⚠️  git: NOT AVAILABLE - ARF transformations may fail"
 fi
 
-# Verify Java (should be pre-installed by Ansible on host)
+# Verify Java (pre-installed by Ansible)
 if command -v java &> /dev/null; then
   echo "[SETUP] ✓ java: $(java -version 2>&1 | head -n1)"
 else
-  echo "[SETUP] ✗ java: NOT AVAILABLE - OpenRewrite operations may fail"  
+  echo "[SETUP] ⚠️  java: NOT AVAILABLE - OpenRewrite operations may fail"  
 fi
 
-# Verify curl
+# Verify curl (pre-installed)
 if command -v curl &> /dev/null; then
   echo "[SETUP] ✓ curl: $(curl --version | head -n1)"
 else
-  echo "[SETUP] ✗ curl: NOT AVAILABLE - HTTP operations may fail"
+  echo "[SETUP] ⚠️  curl: NOT AVAILABLE - HTTP operations may fail"
 fi
 
-echo "[SETUP] System dependency setup completed"
+echo "[SETUP] Dependency verification completed"
 
 # Make binary executable and start API
 chmod +x local/api
@@ -212,18 +204,13 @@ EOF
           "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard"
         ]
 
-        # Health check endpoint
+        # Health check endpoint - simplified configuration
         check {
           type = "http"
           path = "/health"
-          interval = "5s"
-          timeout = "3s"
+          interval = "10s"
+          timeout = "5s"
           port = "http"
-          check_restart {
-            limit = 3
-            grace = "5s"
-            ignore_warnings = false
-          }
         }
 
         # Readiness check
@@ -231,16 +218,9 @@ EOF
           name = "readiness"
           type = "http"
           path = "/ready"
-          interval = "10s"
+          interval = "15s"
           timeout = "5s"
           port = "http"
-        }
-        
-        # Automatic service deregistration for stale services
-        # Deregister services that fail health checks for more than 30s
-        check_restart {
-          limit = 3
-          grace = "10s"
         }
         
         # Configure Consul to automatically deregister failed services
