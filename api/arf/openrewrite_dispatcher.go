@@ -56,41 +56,61 @@ type OpenRewriteRecipeRequest struct {
 
 // ExecuteOpenRewriteRecipe dispatches an OpenRewrite transformation to Nomad
 func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, req *OpenRewriteRecipeRequest) (*TransformationResult, error) {
-	log.Printf("Dispatching OpenRewrite recipe to Nomad: recipe=%s (dynamic discovery mode)", 
-		req.RecipeClass)
+	log.Printf("[OpenRewrite Dispatcher] Starting dispatch for recipe=%s, repo=%s", 
+		req.RecipeClass, req.RepoPath)
 	
 	// Create a unique job ID if not provided
 	if req.JobID == "" {
 		req.JobID = fmt.Sprintf("openrewrite-%d", time.Now().Unix())
 	}
+	log.Printf("[OpenRewrite Dispatcher] Job ID: %s", req.JobID)
 	
 	// Package the repository as tar
 	inputTarPath := fmt.Sprintf("/tmp/%s-input.tar", req.JobID)
+	log.Printf("[OpenRewrite Dispatcher] Creating tar from repo: %s -> %s", req.RepoPath, inputTarPath)
 	if err := d.createTarFromRepo(req.RepoPath, inputTarPath); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to create tar: %v", err)
 		return nil, fmt.Errorf("failed to create input tar: %w", err)
 	}
 	defer os.Remove(inputTarPath)
 	
+	// Check tar file size
+	if fileInfo, err := os.Stat(inputTarPath); err == nil {
+		log.Printf("[OpenRewrite Dispatcher] Tar file created: size=%d bytes", fileInfo.Size())
+	}
+	
 	// Upload input tar to storage
 	inputStorageKey := fmt.Sprintf("openrewrite/%s/input.tar", req.JobID)
+	log.Printf("[OpenRewrite Dispatcher] Uploading tar to storage: key=%s", inputStorageKey)
 	if err := d.uploadToStorage(ctx, inputTarPath, inputStorageKey); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to upload tar: %v", err)
 		return nil, fmt.Errorf("failed to upload input tar: %w", err)
 	}
+	log.Printf("[OpenRewrite Dispatcher] Tar uploaded successfully")
 	
 	// Create Nomad job
+	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
 	job := d.createNomadJob(req)
+	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest", 
+		*job.ID, d.registryURL)
 	
 	// Submit job to Nomad
-	_, _, err := d.nomadClient.Jobs().Register(job, nil)
+	log.Printf("[OpenRewrite Dispatcher] Submitting job to Nomad at %s", d.nomadClient.Address())
+	jobResp, _, err := d.nomadClient.Jobs().Register(job, nil)
 	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to submit job: %v", err)
 		return nil, fmt.Errorf("failed to submit Nomad job: %w", err)
 	}
+	log.Printf("[OpenRewrite Dispatcher] Job submitted successfully: EvalID=%s", jobResp.EvalID)
 	
 	// Wait for job completion
+	log.Printf("[OpenRewrite Dispatcher] Waiting for job completion: %s", req.JobID)
 	result, err := d.waitForJobCompletion(ctx, req.JobID)
 	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Job execution failed: %v", err)
 		return nil, fmt.Errorf("job execution failed: %w", err)
 	}
+	log.Printf("[OpenRewrite Dispatcher] Job completed successfully")
 	
 	// Download and extract output
 	outputStorageKey := fmt.Sprintf("openrewrite/%s/output.tar", req.JobID)
@@ -135,18 +155,21 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				Name:   "transform",
 				Driver: "docker",
 				Config: map[string]interface{}{
-					"image": fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
+					// Use public OpenRewrite image as fallback
+					// TODO: Build and use custom image from registry.dev.ployman.app
+					"image": "openrewrite/rewrite:latest",
 					"volumes": []string{
 						"/tmp/openrewrite:/workspace",
 					},
-					"command": "/runner.sh",
+					// Use OpenRewrite CLI directly instead of custom runner script
+					"command": "sh",
 					"args": []string{
-						"/workspace/input.tar",
-						"/workspace/output.tar",
-						req.RecipeClass,
+						"-c",
+						fmt.Sprintf("cd /workspace && tar -xf input.tar && rewrite run %s --fail-on-dry-run && tar -cf output.tar .", req.RecipeClass),
 					},
 					"dns_servers": []string{"172.17.0.1"},
 					"dns_search_domains": []string{"service.consul"},
+					"force_pull": false, // Don't force pull if image exists
 				},
 				Env: map[string]string{
 					"RECIPE":           req.RecipeClass,
@@ -196,28 +219,69 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 	defer ticker.Stop()
 	
 	timeout := time.After(10 * time.Minute)
+	startTime := time.Now()
+	lastStatus := ""
 	
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("[OpenRewrite Dispatcher] Context cancelled while waiting for job %s", jobID)
 			return nil, ctx.Err()
 		case <-timeout:
+			log.Printf("[OpenRewrite Dispatcher] Job %s timed out after 10 minutes", jobID)
 			return nil, fmt.Errorf("job execution timeout")
 		case <-ticker.C:
 			job, _, err := d.nomadClient.Jobs().Info(jobID, nil)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get job info: %w", err)
+				log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to get job info for %s: %v", jobID, err)
+				// Don't fail immediately, could be transient
+				continue
+			}
+			
+			// Log status changes
+			currentStatus := ""
+			if job.Status != nil {
+				currentStatus = *job.Status
+				if currentStatus != lastStatus {
+					log.Printf("[OpenRewrite Dispatcher] Job %s status: %s (elapsed: %v)", 
+						jobID, currentStatus, time.Since(startTime))
+					lastStatus = currentStatus
+					
+					// Also check allocations for more details
+					allocs, _, err := d.nomadClient.Jobs().Allocations(jobID, false, nil)
+					if err == nil && len(allocs) > 0 {
+						alloc := allocs[0]
+						log.Printf("[OpenRewrite Dispatcher] Allocation %s: Status=%s, DesiredStatus=%s", 
+							alloc.ID, alloc.ClientStatus, alloc.DesiredStatus)
+						
+						// Check task states
+						if alloc.TaskStates != nil {
+							for taskName, taskState := range alloc.TaskStates {
+								log.Printf("[OpenRewrite Dispatcher] Task %s: State=%s, Failed=%v", 
+									taskName, taskState.State, taskState.Failed)
+								// Log any events
+								for _, event := range taskState.Events {
+									if event.DisplayMessage != "" {
+										log.Printf("[OpenRewrite Dispatcher] Task event: %s", event.DisplayMessage)
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 			
 			if job.Status != nil && *job.Status == "dead" {
 				// Check if job succeeded
 				if job.StatusDescription != nil && strings.Contains(*job.StatusDescription, "completed") {
+					log.Printf("[OpenRewrite Dispatcher] Job %s completed successfully", jobID)
 					return &TransformationResult{
 						Success:        true,
-						ExecutionTime:  10 * time.Second, // TODO: Calculate actual time
+						ExecutionTime:  time.Since(startTime),
 						ChangesApplied: 1,
 					}, nil
 				}
+				log.Printf("[OpenRewrite Dispatcher] Job %s failed: %s", jobID, *job.StatusDescription)
 				return nil, fmt.Errorf("job failed: %s", *job.StatusDescription)
 			}
 		}
