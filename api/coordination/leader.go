@@ -19,6 +19,7 @@ type LeaderElection struct {
 	ttl          string
 	isLeader     bool
 	mu           sync.RWMutex
+	stopOnce     sync.Once
 	stopCh       chan struct{}
 	leadershipCh chan bool
 	callbacks    LeaderCallbacks
@@ -227,26 +228,28 @@ func (le *LeaderElection) LeadershipChannel() <-chan bool {
 
 // Stop stops the leader election
 func (le *LeaderElection) Stop() {
-	close(le.stopCh)
+	le.stopOnce.Do(func() {
+		close(le.stopCh)
 
-	// Release leadership if we have it
-	if le.IsLeader() {
-		le.setLeader(false)
-		if le.callbacks.OnStoppedLeading != nil {
-			le.callbacks.OnStoppedLeading()
+		// Release leadership if we have it
+		if le.IsLeader() {
+			le.setLeader(false)
+			if le.callbacks.OnStoppedLeading != nil {
+				le.callbacks.OnStoppedLeading()
+			}
 		}
-	}
 
-	// Destroy session
-	if le.sessionID != "" {
-		session := le.client.Session()
-		_, err := session.Destroy(le.sessionID, nil)
-		if err != nil {
-			le.logger.Printf("Failed to destroy session: %v", err)
+		// Destroy session
+		if le.sessionID != "" {
+			session := le.client.Session()
+			_, err := session.Destroy(le.sessionID, nil)
+			if err != nil {
+				le.logger.Printf("Failed to destroy session: %v", err)
+			}
 		}
-	}
 
-	close(le.leadershipCh)
+		close(le.leadershipCh)
+	})
 }
 
 // getHostname returns the hostname for identification
@@ -368,6 +371,11 @@ func (cm *CoordinationManager) stopCoordinationTasks() {
 
 // Stop stops the coordination manager
 func (cm *CoordinationManager) Stop() {
+	defer func() {
+		if r := recover(); r != nil {
+			cm.logger.Printf("PANIC during coordination manager stop: %v", r)
+		}
+	}()
 	cm.stopCoordinationTasks()
 	cm.leader.Stop()
 }

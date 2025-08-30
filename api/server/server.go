@@ -13,7 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	consulapi "github.com/hashicorp/consul/api"
 	nomadapi "github.com/hashicorp/nomad/api"
 	"github.com/sirupsen/logrus"
@@ -150,7 +150,7 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	})
 
 	// Add middleware with detailed panic recovery
-	app.Use(recover.New(recover.Config{
+	app.Use(fiberrecover.New(fiberrecover.Config{
 		EnableStackTrace: true,
 		StackTraceHandler: func(c *fiber.Ctx, err interface{}) {
 			log.Printf("PANIC RECOVERED: %v", err)
@@ -193,29 +193,38 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error) {
 	startTime := time.Now()
 	log.Printf("Initializing service dependencies (caching: %v)", cfg.EnableCaching)
+	log.Printf("Configuration: Port=%s, ConsulAddr=%s, NomadAddr=%s", cfg.Port, cfg.ConsulAddr, cfg.NomadAddr)
 
 	// Validate storage configuration at startup
+	log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
 	if _, err := config.Load(cfg.StorageConfigPath); err != nil {
 		log.Printf("Warning: Storage configuration validation failed: %v", err)
 	} else {
-		log.Printf("Storage configuration validated successfully from: %s", cfg.StorageConfigPath)
+		log.Printf("✓ Storage configuration validated successfully")
 	}
 
 	// Initialize environment store with fallback logic
+	log.Printf("Initializing environment store...")
 	envStore, err := initializeEnvStore(cfg)
 	if err != nil {
+		log.Printf("❌ Failed to initialize environment store: %v", err)
 		return nil, fmt.Errorf("failed to initialize environment store: %w", err)
 	}
+	log.Printf("✓ Environment store initialized successfully")
 
 	// Initialize Traefik router
+	log.Printf("Initializing Traefik router with Consul address: %s", cfg.ConsulAddr)
 	traefikRouter, err := initializeTraefikRouter(cfg.ConsulAddr)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize Traefik router: %v", err)
+		log.Printf("⚠️  Failed to initialize Traefik router: %v", err)
+	} else {
+		log.Printf("✓ Traefik router initialized successfully")
 	}
 
 	// Initialize health checker
+	log.Printf("Initializing health checker...")
 	healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
-	log.Printf("Health checker initialized")
+	log.Printf("✓ Health checker initialized")
 
 	// Initialize TTL cleanup service
 	cleanupHandler, ttlService, err := initializeCleanupService(cfg)
@@ -882,13 +891,20 @@ func (s *Server) Start() error {
 	// Start coordination manager for leader election
 	if s.dependencies.CoordinationManager != nil {
 		go func() {
-			log.Printf("Starting coordination manager")
+			log.Printf("🔄 Starting coordination manager for leader election")
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("❌ PANIC in coordination manager: %v", r)
+				}
+			}()
 			if err := s.dependencies.CoordinationManager.Run(s.coordinationCtx); err != nil {
-				log.Printf("Coordination manager error: %v", err)
+				log.Printf("❌ Coordination manager error: %v", err)
+			} else {
+				log.Printf("✓ Coordination manager completed successfully")
 			}
 		}()
 	} else {
-		log.Printf("Coordination manager not available, running in single-instance mode")
+		log.Printf("⚠️  Coordination manager not available, running in single-instance mode")
 	}
 
 	// Ensure platform wildcard certificate is provisioned
@@ -897,10 +913,15 @@ func (s *Server) Start() error {
 		// Don't fail server startup, certificate provisioning can be retried
 	}
 
-	// Register controller with Traefik for platform domain access
-	if err := s.registerControllerWithTraefik(); err != nil {
-		log.Printf("Warning: Failed to register controller with Traefik: %v", err)
-		// Don't fail server startup, Traefik registration can be retried
+	// Skip self-registration when running in Nomad (let Nomad template handle Traefik registration)
+	if os.Getenv("NOMAD_ALLOC_ID") != "" {
+		log.Printf("Running in Nomad environment - skipping API self-registration (using Nomad service template)")
+	} else {
+		// Register controller with Traefik for platform domain access (only in non-Nomad environments)
+		if err := s.registerControllerWithTraefik(); err != nil {
+			log.Printf("Warning: Failed to register controller with Traefik: %v", err)
+			// Don't fail server startup, Traefik registration can be retried
+		}
 	}
 
 	// Start server in goroutine
