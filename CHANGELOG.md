@@ -1284,7 +1284,7 @@
 ## [2025-08-26] - OpenRewrite Service HTTP API Implementation (Stream A Phase A2)
 
 ### Added
-- **✅ OpenRewrite HTTP API**: Complete REST API implementation with `/v1/openrewrite/transform` and `/v1/openrewrite/health` endpoints
+- **✅ OpenRewrite HTTP API**: Complete REST API implementation with `/v1/transform` and `/v1/health` endpoints
 - **✅ Request/Response Types**: Comprehensive type definitions for transformation requests, responses, and error handling
 - **✅ HTTP Handler**: Full Fiber v2 handler with request validation, base64 tar encoding/decoding, and transformation orchestration
 - **✅ Controller Integration**: Seamless integration with existing controller server architecture and dependency injection
