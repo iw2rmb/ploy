@@ -18,14 +18,17 @@ import (
 func ApiCmd(args []string) {
 	if len(args) == 0 {
 		fmt.Println("API management commands:")
-		fmt.Println("  ployman api deploy              Deploy latest code changes via full build")
+		fmt.Println("  ployman api deploy              Deploy latest code changes (runs in background)")
 		fmt.Println("  ployman api status              Check API deployment status")
 		fmt.Println("  ployman api rollback <version>  Rollback to specific version")
 		fmt.Println("")
 		fmt.Println("Deploy flags:")
-		fmt.Println("  --background       Run deployment in background")
-		fmt.Println("  --monitor          Monitor deployment progress (implies --background)")
+		fmt.Println("  --foreground       Wait for deployment to complete (instead of background)")
+		fmt.Println("  --monitor          Monitor deployment progress with live output")
 		fmt.Println("  --timeout <mins>   Deployment timeout in minutes (default: 10, max: 10)")
+		fmt.Println("")
+		fmt.Println("Note: Deployments run in background by default to avoid timeout issues.")
+		fmt.Println("      Use 'ployman api status' to check deployment progress.")
 		fmt.Println("")
 		fmt.Println("Environment variables:")
 		fmt.Println("  TARGET_HOST        VPS host for deployment (required)")
@@ -53,9 +56,11 @@ func ApiCmd(args []string) {
 func runApiDeploy(args []string) {
 	// Parse flags for deploy command
 	deployCmd := flag.NewFlagSet("deploy", flag.ExitOnError)
-	background := deployCmd.Bool("background", false, "Run deployment in background")
+	foreground := deployCmd.Bool("foreground", false, "Run deployment in foreground (wait for completion)")
 	timeoutMinutes := deployCmd.Int("timeout", 10, "Deployment timeout in minutes (max 10)")
-	monitor := deployCmd.Bool("monitor", false, "Monitor deployment progress (implies background)")
+	monitor := deployCmd.Bool("monitor", false, "Monitor deployment progress in background")
+	// Legacy background flag (now default behavior)
+	legacyBackground := deployCmd.Bool("background", false, "[DEPRECATED] Run in background (now default)")
 	
 	deployCmd.Parse(args)
 	
@@ -71,13 +76,21 @@ func runApiDeploy(args []string) {
 	// This includes: git pull, build, upload to SeaweedFS, and Nomad deployment
 	fmt.Println("Running full deployment to ensure latest code changes...")
 	
-	if *monitor {
-		*background = true // Monitor implies background
+	// Legacy background flag warning
+	if *legacyBackground {
+		fmt.Println("Note: --background flag is deprecated (deployments run in background by default)")
 	}
 	
-	if *background {
+	// Default to background mode unless foreground is explicitly requested
+	runInBackground := !*foreground
+	
+	if runInBackground {
+		if !*foreground {
+			fmt.Println("Running in background mode (use --foreground to wait for completion)")
+		}
 		runAnsibleDeploymentBackground(*timeoutMinutes, *monitor)
 	} else {
+		fmt.Println("Running in foreground mode (waiting for completion)")
 		runAnsibleDeployment(*timeoutMinutes)
 	}
 }

@@ -211,6 +211,77 @@
         marker: "# {mark} CONSUL DNS CONFIGURATION"
         backup: yes
       notify: restart systemd-resolved
+      register: dns_config_changed
+
+    - name: Link /etc/resolv.conf to systemd-resolved stub for proper DNS routing
+      file:
+        src: /run/systemd/resolve/stub-resolv.conf
+        dest: /etc/resolv.conf
+        state: link
+        force: yes
+      notify: restart systemd-resolved
+
+    - name: Force systemd-resolved restart if DNS config changed
+      systemd:
+        name: systemd-resolved
+        state: restarted
+      when: dns_config_changed.changed
+
+    - name: Wait for systemd-resolved to fully restart
+      wait_for:
+        timeout: 10
+      when: dns_config_changed.changed
+
+    - name: Verify systemd-resolved is running and configured
+      systemd:
+        name: systemd-resolved
+      register: resolved_status
+
+    - name: Display systemd-resolved status
+      debug:
+        msg: "systemd-resolved status: {{ resolved_status.status.ActiveState }}"
+
+    - name: Test Consul DNS resolution with resolvectl
+      shell: resolvectl query nomad.service.consul
+      register: consul_dns_test
+      retries: 5
+      delay: 3
+      until: consul_dns_test.rc == 0
+      failed_when: false
+
+    - name: Display Consul DNS test result
+      debug:
+        msg: |
+          Consul DNS Resolution Test:
+          Command: resolvectl query nomad.service.consul
+          Result: {{ consul_dns_test.stdout if consul_dns_test.rc == 0 else 'FAILED - ' + consul_dns_test.stderr }}
+          Status: {{ 'SUCCESS' if consul_dns_test.rc == 0 else 'FAILED' }}
+
+    - name: Verify /etc/resolv.conf configuration
+      shell: cat /etc/resolv.conf
+      register: resolv_conf_content
+      changed_when: false
+
+    - name: Display /etc/resolv.conf content
+      debug:
+        msg: |
+          /etc/resolv.conf configuration:
+          {{ resolv_conf_content.stdout_lines | join('\n') }}
+
+    - name: Test Consul service discovery from Go programs
+      shell: |
+        export GODEBUG=netdns=go+2
+        nslookup consul.service.consul 127.0.0.1
+      register: go_dns_test
+      failed_when: false
+      changed_when: false
+
+    - name: Display Go DNS compatibility test
+      debug:
+        msg: |
+          Go DNS Resolution Test (consul.service.consul):
+          {{ go_dns_test.stdout if go_dns_test.rc == 0 else 'FAILED - ' + (go_dns_test.stderr | default('No error output')) }}
+          Status: {{ 'SUCCESS' if go_dns_test.rc == 0 else 'FAILED' }}
 
     - name: Check Vault service status
       command: systemctl is-active vault
@@ -249,7 +320,13 @@
         - "/opt/ploy/debug"
         - "/opt/ploy/cache"
         - "/opt/ploy/temp"
-      failed_when: not nomad_volume_dirs.results[0].stat.exists
+      failed_when: false
+
+    - name: Check if all Nomad volume directories exist
+      fail:
+        msg: "Required Nomad volume directory {{ item.item }} does not exist"
+      loop: "{{ nomad_volume_dirs.results }}"
+      when: not item.stat.exists
 
     - name: Restart Nomad if configuration changed
       systemd:

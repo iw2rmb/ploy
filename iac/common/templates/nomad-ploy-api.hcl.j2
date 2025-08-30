@@ -116,7 +116,11 @@ job "ploy-api" {
         LLM_TEMPERATURE = "{{ llm_temperature | default('0.1') }}"
 
         # Platform wildcard certificate configuration
+        {% if ploy_environment is defined and ploy_environment == 'dev' %}
+        PLOY_APPS_DOMAIN = "dev.{{ ploy.apps_domain }}"
+        {% else %}
         PLOY_APPS_DOMAIN = "{{ ploy.apps_domain }}"
+        {% endif %}
         PLOY_APPS_DOMAIN_PROVIDER = "{{ ploy.apps_domain_provider }}"
         
         # Development environment wildcard certificate (*.dev.ployd.app)
@@ -214,6 +218,7 @@ EOF
           path = "/health"
           interval = "5s"
           timeout = "3s"
+          port = "http"
           check_restart {
             limit = 3
             grace = "5s"
@@ -228,6 +233,7 @@ EOF
           path = "/ready"
           interval = "10s"
           timeout = "5s"
+          port = "http"
         }
         
         # Automatic service deregistration for stale services
