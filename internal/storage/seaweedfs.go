@@ -437,9 +437,13 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 	}
 	defer resp.Body.Close()
 
+	// Read response body for debugging
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("[SeaweedFS createDirectory] Response Status: %d, Body: %s\n", resp.StatusCode, string(body))
+
 	// Accept 409 Conflict as success (directory already exists)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
-		return fmt.Errorf("failed to create directory: %s", resp.Status)
+		return fmt.Errorf("failed to create directory: %s, body: %s", resp.Status, string(body))
 	}
 
 	return nil
