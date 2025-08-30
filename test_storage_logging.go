@@ -18,7 +18,7 @@ func main() {
 		Master:      "seaweedfs-master.service.consul:9333",
 		Filer:       "seaweedfs-filer.service.consul:8888", 
 		Collection:  "ploy-artifacts",
-		Replication: "001",
+		Replication: "000", // No replication for dev
 		Timeout:     30,
 	}
 
