@@ -49,12 +49,29 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 	recipe, err := e.storage.GetRecipe(ctx, recipeID)
 	if err != nil {
 		// Check if this is an OpenRewrite recipe and we have a dispatcher
-		if e.isOpenRewriteRecipe(recipeID) && e.openRewriteDispatcher != nil {
-			fmt.Printf("[RecipeExecutor] Recipe %s not found in cache, triggering dynamic download via Nomad\n", recipeID)
+		fmt.Printf("[RecipeExecutor] Recipe %s not found in cache (error: %v), checking for OpenRewrite fallback\n", recipeID, err)
+		fmt.Printf("[RecipeExecutor] Dispatcher availability check: isOpenRewrite=%v, dispatcherExists=%v\n", 
+			e.isOpenRewriteRecipe(recipeID), e.openRewriteDispatcher != nil)
+			
+		if e.isOpenRewriteRecipe(recipeID) {
+			if e.openRewriteDispatcher == nil {
+				fmt.Printf("[RecipeExecutor] ERROR: Recipe %s is OpenRewrite but dispatcher is nil - check server initialization\n", recipeID)
+				return nil, fmt.Errorf("OpenRewrite recipe %s cannot be executed: dispatcher not initialized (check Nomad/SeaweedFS connectivity)", recipeID)
+			}
+			
+			fmt.Printf("[RecipeExecutor] Recipe %s not found in cache, triggering dynamic download via Nomad dispatcher\n", recipeID)
+			
+			// Add panic recovery around dispatcher operations
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("[RecipeExecutor] PANIC in OpenRewrite dispatcher: %v\n", r)
+				}
+			}()
 			
 			// Parse OpenRewrite recipe ID to get Maven coordinates
 			req, parseErr := ParseOpenRewriteRecipeID(recipeID)
 			if parseErr != nil {
+				fmt.Printf("[RecipeExecutor] Failed to parse OpenRewrite recipe ID %s: %v\n", recipeID, parseErr)
 				return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
 			}
 			
@@ -62,6 +79,7 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 			req.RepoPath = repoPath
 			
 			fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine for discovery and execution\n", recipeID)
+			fmt.Printf("[RecipeExecutor] Dispatcher call about to execute: recipe=%s, repoPath=%s\n", req.RecipeClass, req.RepoPath)
 			
 			// Dispatch to Nomad for dynamic download and execution
 			result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(ctx, req)
