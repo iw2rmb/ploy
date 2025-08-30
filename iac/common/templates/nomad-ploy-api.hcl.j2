@@ -80,13 +80,13 @@ job "ploy-api" {
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         
         # HashiCorp service addresses
-        CONSUL_ADDR = "http://localhost:8500"
-        NOMAD_ADDR = "http://localhost:4646"
-        VAULT_ADDR = "http://localhost:8200"
+        CONSUL_ADDR = "http://consul.service.consul:8500"
+        NOMAD_ADDR = "http://nomad.service.consul:4646"
+        VAULT_ADDR = "http://vault.service.consul:8200"
 
         # SeaweedFS configuration
-        SEAWEEDFS_MASTER = "localhost:{{ seaweedfs.master_port }}"
-        SEAWEEDFS_FILER = "localhost:{{ seaweedfs.filer_port }}"
+        SEAWEEDFS_MASTER = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
+        SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
 
         # ARF (Automated Remediation Framework) configuration
         ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"

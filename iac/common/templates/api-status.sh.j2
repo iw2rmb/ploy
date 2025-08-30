@@ -78,19 +78,7 @@ fi
 echo ""
 echo "🌐 API Health:"
 
-# Local endpoint (direct port)
-if curl -f -s "http://localhost:{{ ploy.api_port }}/health" >/dev/null 2>&1; then
-    echo "  ✅ Local health: http://localhost:{{ ploy.api_port }}/health"
-    
-    # Try to get detailed health info
-    if HEALTH_RESPONSE=$(curl -s "http://localhost:{{ ploy.api_port }}/health" 2>/dev/null); then
-        if PARSED_HEALTH=$(echo "$HEALTH_RESPONSE" | jq -r '.status // "unparseable"' 2>/dev/null); then
-            echo "  Status: $PARSED_HEALTH"
-        fi
-    fi
-else
-    echo "  ❌ Local health unreachable: http://localhost:{{ ploy.api_port }}/health"
-fi
+# Note: API uses dynamic ports in Nomad, so we check via external domain only
 
 # External endpoint (via Traefik)
 if curl -f -s "https://api.dev.ployman.app/health" >/dev/null 2>&1; then
@@ -99,17 +87,17 @@ else
     echo "  ❌ External health unreachable: https://api.dev.ployman.app/health"
 fi
 
-# Readiness check
-if curl -f -s "http://localhost:{{ ploy.api_port }}/ready" >/dev/null 2>&1; then
-    echo "  ✅ Readiness: http://localhost:{{ ploy.api_port }}/ready"
+# Readiness check (external only due to dynamic ports)
+if curl -f -s "https://api.dev.ployman.app/ready" >/dev/null 2>&1; then
+    echo "  ✅ Readiness: https://api.dev.ployman.app/ready"
 else
-    echo "  ❌ Readiness unreachable: http://localhost:{{ ploy.api_port }}/ready"
+    echo "  ❌ Readiness unreachable: https://api.dev.ployman.app/ready"
 fi
 
 # Version endpoint
 echo ""
 echo "📊 API Version Info:"
-for endpoint in "http://localhost:{{ ploy.api_port }}/v1/version" "https://api.dev.ployman.app/v1/version"; do
+for endpoint in "https://api.dev.ployman.app/v1/version"; do
     if VERSION_INFO=$(curl -s "$endpoint" 2>/dev/null); then
         echo "  ✅ Version endpoint: $endpoint"
         if PARSED_VERSION=$(echo "$VERSION_INFO" | jq -r '.version // "unknown"' 2>/dev/null); then
@@ -148,7 +136,7 @@ if [[ -x "./bin/ployman" ]]; then
     echo "  ✅ ployman CLI available"
     
     # Try to get system status if API is accessible
-    if curl -f -s "http://localhost:{{ ploy.api_port }}/health" >/dev/null 2>&1; then
+    if curl -f -s "https://api.dev.ployman.app/health" >/dev/null 2>&1; then
         echo "  ✅ API accessible for deployments"
     else
         echo "  ❌ API not accessible for deployments"
@@ -180,7 +168,7 @@ echo ""
 echo "=== Status Check Complete ==="
 echo ""
 echo "🌐 Quick Access URLs:"
-echo "  - Local Health: http://localhost:{{ ploy.api_port }}/health"
+echo "  - Health: https://api.dev.ployman.app/health"
 echo "  - External Health: https://api.dev.ployman.app/health"
 echo "  - API Version: https://api.dev.ployman.app/v1/version"
 echo "  - Nomad UI: http://127.0.0.1:4646/ui/jobs/ploy-api@default"
