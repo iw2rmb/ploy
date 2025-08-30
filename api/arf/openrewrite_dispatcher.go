@@ -253,8 +253,8 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				// Add artifact download/upload tasks  
 				Artifacts: []*api.TaskArtifact{
 					{
-						// Include bucket/collection prefix to match upload path
-						GetterSource: stringPtr(fmt.Sprintf("%s/ploy-artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
+						// Include bucket/collection prefix to match upload path (artifacts, not ploy-artifacts)
+						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
 						RelativeDest: stringPtr("/workspace/"),
 					},
 				},
