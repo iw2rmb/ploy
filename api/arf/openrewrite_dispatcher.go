@@ -145,6 +145,8 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 						"/workspace/output.tar",
 						req.RecipeClass,
 					},
+					"dns_servers": []string{"172.17.0.1"},
+					"dns_search_domains": []string{"service.consul"},
 				},
 				Env: map[string]string{
 					"RECIPE":           req.RecipeClass,
