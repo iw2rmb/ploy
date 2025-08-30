@@ -200,6 +200,18 @@
         port: 8500
         delay: 10
 
+    - name: Configure DNS to use Consul for .consul domain resolution
+      blockinfile:
+        path: /etc/systemd/resolved.conf
+        create: yes
+        block: |
+          [Resolve]
+          DNS=127.0.0.1:8600 1.1.1.1 8.8.8.8
+          Domains=~consul
+        marker: "# {mark} CONSUL DNS CONFIGURATION"
+        backup: yes
+      notify: restart systemd-resolved
+
     - name: Check Vault service status
       command: systemctl is-active vault
       register: vault_service_status
@@ -681,3 +693,9 @@
               - Traefik Dashboard: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8095
               - Nomad UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:4646
               - Consul UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8500
+
+  handlers:
+    - name: restart systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: restarted
