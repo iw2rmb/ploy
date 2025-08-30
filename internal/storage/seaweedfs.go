@@ -100,12 +100,11 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 	}
 
 	// Use filer's direct upload endpoint which handles both volume upload and registration
-	url := fmt.Sprintf("%s/%s/%s?collection=%s&replication=%s", c.filerURL, bucket, key, c.collection, c.replication)
+	// Note: We don't include collection parameter as it causes "context canceled" errors in SeaweedFS
+	url := fmt.Sprintf("%s/%s/%s?replication=%s", c.filerURL, bucket, key, c.replication)
 	fmt.Printf("[SeaweedFS PutObject] Upload URL: %s\n", url)
 
 	// Get file size for logging
-	currentPos, _ := body.Seek(0, 1) // Get current position
-	body.Seek(0, 0)                  // Reset to start
 	fileSize := int64(0)
 	if size, err := body.Seek(0, 2); err == nil { // Seek to end to get size
 		fileSize = size
