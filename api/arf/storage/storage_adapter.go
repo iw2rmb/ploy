@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
@@ -46,7 +47,7 @@ func (a *InternalStorageAdapter) Get(ctx context.Context, key string) ([]byte, e
 			data = append(data, buffer[:n]...)
 		}
 		if err != nil {
-			if err.Error() == "EOF" {
+			if err == io.EOF {
 				break
 			}
 			return nil, err
@@ -79,10 +80,13 @@ type bytesReadSeeker struct {
 
 func (b *bytesReadSeeker) Read(p []byte) (n int, err error) {
 	if b.pos >= int64(len(b.data)) {
-		return 0, fmt.Errorf("EOF")
+		return 0, io.EOF
 	}
 	n = copy(p, b.data[b.pos:])
 	b.pos += int64(n)
+	if b.pos >= int64(len(b.data)) && n == 0 {
+		return 0, io.EOF
+	}
 	return n, nil
 }
 
