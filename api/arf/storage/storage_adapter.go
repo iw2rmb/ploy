@@ -24,10 +24,20 @@ func NewInternalStorageAdapter(client internalStorage.StorageProvider) StorageSe
 
 // Put stores data at the given key
 func (a *InternalStorageAdapter) Put(ctx context.Context, key string, data []byte) error {
+	fmt.Printf("[StorageAdapter] Put called - bucket: %s, key: %s, data size: %d bytes\n", a.bucket, key, len(data))
+
 	// Create a reader from the data
 	reader := &bytesReadSeeker{data: data}
-	_, err := a.client.PutObject(a.bucket, key, reader, "application/octet-stream")
-	return err
+
+	fmt.Printf("[StorageAdapter] Calling PutObject with bucket=%s, key=%s\n", a.bucket, key)
+	result, err := a.client.PutObject(a.bucket, key, reader, "application/octet-stream")
+	if err != nil {
+		fmt.Printf("[StorageAdapter] PutObject failed: %v\n", err)
+		return err
+	}
+
+	fmt.Printf("[StorageAdapter] PutObject succeeded: %+v\n", result)
+	return nil
 }
 
 // Get retrieves data from the given key
@@ -37,7 +47,7 @@ func (a *InternalStorageAdapter) Get(ctx context.Context, key string) ([]byte, e
 		return nil, fmt.Errorf("failed to get key %s: %w", key, err)
 	}
 	defer reader.Close()
-	
+
 	// Read all data from the reader
 	data := make([]byte, 0)
 	buffer := make([]byte, 4096)
