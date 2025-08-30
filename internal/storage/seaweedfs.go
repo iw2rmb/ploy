@@ -261,8 +261,8 @@ func (c *SeaweedFSClient) UploadArtifactBundleWithVerification(keyPrefix, artifa
 }
 
 func (c *SeaweedFSClient) VerifyUpload(key string) error {
-	// Use HEAD request to check if file exists
-	url := fmt.Sprintf("%s/%s", c.filerURL, key)
+	// Use HEAD request to check if file exists - include collection/bucket prefix to match PutObject
+	url := fmt.Sprintf("%s/%s/%s", c.filerURL, c.collection, key)
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
 		return err
