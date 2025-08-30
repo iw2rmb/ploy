@@ -28,6 +28,7 @@ type Handler struct {
 func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) *Handler {
 	return &Handler{
 		recipeExecutor: executor,
+		recipeRegistry: nil, // Will be initialized when needed
 		catalog:        catalog,
 		sandboxMgr:     sandboxMgr,
 		// Initialize Phase 4 components
@@ -44,11 +45,22 @@ func NewHandlerWithStorage(
 	recipeValidator storage.RecipeValidator,
 	sandboxMgr SandboxManager,
 ) *Handler {
+	// Initialize recipe registry if we have storage
+	var recipeRegistry *RecipeRegistry
+	if recipeStorage != nil {
+		// Convert storage to storage provider interface
+		// For now, we'll use a wrapper or nil since the storage backend is already set
+		// The registry can work without being initialized if storage is directly used
+		// TODO: Create storage provider wrapper for recipe registry
+		recipeRegistry = nil // Will be initialized when needed
+	}
+	
 	return &Handler{
 		recipeExecutor:  executor,
 		recipeStorage:   recipeStorage,
 		recipeIndex:     recipeIndex,
 		recipeValidator: recipeValidator,
+		recipeRegistry:  recipeRegistry,
 		catalog:         nil, // Will use storage directly
 		sandboxMgr:      sandboxMgr,
 		// Initialize Phase 4 components
