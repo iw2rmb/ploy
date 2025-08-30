@@ -171,8 +171,6 @@
 - `GET /v1/arf/sbom/report` — get SBOM report
 - `GET /v1/arf/sbom/:id` — get SBOM by ID
 
-
-
 **Note**: ARF provides comprehensive code transformation, analysis, and remediation capabilities with advanced LLM integration, security scanning, and deployment testing.
 
 ## Webhook Events

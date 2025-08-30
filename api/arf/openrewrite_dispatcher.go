@@ -56,8 +56,8 @@ type OpenRewriteRecipeRequest struct {
 
 // ExecuteOpenRewriteRecipe dispatches an OpenRewrite transformation to Nomad
 func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, req *OpenRewriteRecipeRequest) (*TransformationResult, error) {
-	log.Printf("Dispatching OpenRewrite recipe to Nomad: recipe=%s, coords=%s:%s:%s", 
-		req.RecipeClass, req.RecipeGroup, req.RecipeArtifact, req.RecipeVersion)
+	log.Printf("Dispatching OpenRewrite recipe to Nomad: recipe=%s (dynamic discovery mode)", 
+		req.RecipeClass)
 	
 	// Create a unique job ID if not provided
 	if req.JobID == "" {
@@ -147,13 +147,14 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					},
 				},
 				Env: map[string]string{
-					"RECIPE":          req.RecipeClass,
-					"RECIPE_GROUP":    req.RecipeGroup,
-					"RECIPE_ARTIFACT": req.RecipeArtifact,
-					"RECIPE_VERSION":  req.RecipeVersion,
-					"SEAWEEDFS_URL":   d.seaweedfsURL,
-					"PLOY_API_URL":    d.apiURL,
+					"RECIPE":           req.RecipeClass,
+					"RECIPE_GROUP":     req.RecipeGroup,    // Empty for dynamic discovery
+					"RECIPE_ARTIFACT":  req.RecipeArtifact, // Empty for dynamic discovery
+					"RECIPE_VERSION":   req.RecipeVersion,  // Empty for dynamic discovery
+					"SEAWEEDFS_URL":    d.seaweedfsURL,
+					"PLOY_API_URL":     d.apiURL,
 					"MAVEN_CACHE_PATH": "maven-repository",
+					"DISCOVER_RECIPE":  "true", // Tell runner.sh to discover recipe coordinates
 				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
@@ -298,58 +299,15 @@ func intPtr(i int) *int {
 
 // ParseOpenRewriteRecipeID parses an OpenRewrite recipe ID into its components
 func ParseOpenRewriteRecipeID(recipeID string) (*OpenRewriteRecipeRequest, error) {
-	// OpenRewrite recipes typically follow the pattern:
-	// org.openrewrite.java.migrate.Java8toJava11
-	// We need to map this to Maven coordinates
+	// Pass the recipe class name directly to the OpenRewrite engine
+	// The universal OpenRewrite image will discover the correct Maven coordinates dynamically
+	// This allows any recipe to be used without hardcoding
 	
-	// Default values for common OpenRewrite recipes
-	recipeMap := map[string]*OpenRewriteRecipeRequest{
-		"org.openrewrite.java.migrate.Java8toJava11": {
-			RecipeClass:    "org.openrewrite.java.migrate.Java8toJava11",
-			RecipeGroup:    "org.openrewrite.recipe",
-			RecipeArtifact: "rewrite-migrate-java",
-			RecipeVersion:  "2.11.0",
-		},
-		"org.openrewrite.java.migrate.Java11toJava17": {
-			RecipeClass:    "org.openrewrite.java.migrate.Java11toJava17",
-			RecipeGroup:    "org.openrewrite.recipe",
-			RecipeArtifact: "rewrite-migrate-java",
-			RecipeVersion:  "2.11.0",
-		},
-		"org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0": {
-			RecipeClass:    "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0",
-			RecipeGroup:    "org.openrewrite.recipe",
-			RecipeArtifact: "rewrite-spring",
-			RecipeVersion:  "5.7.0",
-		},
-		"org.openrewrite.java.testing.junit5.JUnit5BestPractices": {
-			RecipeClass:    "org.openrewrite.java.testing.junit5.JUnit5BestPractices",
-			RecipeGroup:    "org.openrewrite.recipe",
-			RecipeArtifact: "rewrite-testing-frameworks",
-			RecipeVersion:  "2.11.0",
-		},
-	}
-	
-	if req, ok := recipeMap[recipeID]; ok {
-		return req, nil
-	}
-	
-	// For unknown recipes, try to infer from the ID
-	// Default to rewrite-migrate-java for Java migration recipes
-	if strings.Contains(recipeID, "migrate") {
-		return &OpenRewriteRecipeRequest{
-			RecipeClass:    recipeID,
-			RecipeGroup:    "org.openrewrite.recipe",
-			RecipeArtifact: "rewrite-migrate-java",
-			RecipeVersion:  "2.11.0",
-		}, nil
-	}
-	
-	// Default fallback
 	return &OpenRewriteRecipeRequest{
 		RecipeClass:    recipeID,
-		RecipeGroup:    "org.openrewrite.recipe",
-		RecipeArtifact: "rewrite-migrate-java",
-		RecipeVersion:  "2.11.0",
+		// These will be discovered by OpenRewrite CLI automatically
+		RecipeGroup:    "",
+		RecipeArtifact: "",
+		RecipeVersion:  "",
 	}, nil
 }

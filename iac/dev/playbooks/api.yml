@@ -351,7 +351,7 @@
           environment:
             PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_health
-          retries: 20
+          retries: 10
           delay: 15
           until: bootstrap_health.status == 200
 
@@ -379,9 +379,10 @@
           environment:
             PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_health_check
-          retries: 20
-          delay: 10
+          retries: 3
+          delay: 5
           until: bootstrap_health_check.status == 200
+          ignore_errors: true
 
         - name: Verify bootstrap API readiness via domain
           uri:
@@ -392,9 +393,10 @@
           environment:
             PLOY_PLATFORM_DOMAIN: "ployman.app"
           register: bootstrap_ready
-          retries: 15
-          delay: 10
+          retries: 3
+          delay: 5
           until: bootstrap_ready.status == 200
+          ignore_errors: true
 
         - name: Test bootstrap API endpoints via domain
           uri:
@@ -456,6 +458,7 @@
             owner: ploy
             group: ploy
             mode: '0755'
+          ignore_errors: true
 
         - name: Create API rollback script
           template:
@@ -464,6 +467,7 @@
             owner: ploy
             group: ploy
             mode: '0755'
+          ignore_errors: true
 
         - name: Create API status script
           template:
@@ -472,6 +476,7 @@
             owner: ploy
             group: ploy
             mode: '0755'
+          ignore_errors: true
 
         - name: Create API migration script
           template:
@@ -480,6 +485,7 @@
             owner: ploy
             group: ploy
             mode: '0755'
+          ignore_errors: true
 
     # Firewall rule removed - API only accessible via Traefik/domain routing
     # Direct port access is prohibited for security

@@ -69,7 +69,7 @@ func NewLLMDispatcher(nomadAddr, consulAddr string, storageClient *storage.Stora
 	}
 
 	// Get storage base URL from environment
-	storageBaseURL := "http://seaweedfs.service.consul:8888"
+	storageBaseURL := "http://seaweedfs-filer.service.consul:8888"
 	if url := os.Getenv("SEAWEEDFS_URL"); url != "" {
 		storageBaseURL = url
 	}

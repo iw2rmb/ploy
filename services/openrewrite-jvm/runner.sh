@@ -10,20 +10,29 @@ OUTPUT_TAR="${2:-/workspace/output.tar}"
 RECIPE_CLASS="${3:-${RECIPE}}"
 
 # Environment variables (set by Nomad job)
-SEAWEEDFS_URL="${SEAWEEDFS_URL:-http://seaweedfs.service.consul:8888}"
+SEAWEEDFS_URL="${SEAWEEDFS_URL:-http://seaweedfs-filer.service.consul:8888}"
 MAVEN_CACHE_PATH="${MAVEN_CACHE_PATH:-maven-repository}"
-RECIPE_GROUP="${RECIPE_GROUP:-org.openrewrite.recipe}"
-RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-rewrite-migrate-java}"
-RECIPE_VERSION="${RECIPE_VERSION:-2.11.0}"
 PLOY_API_URL="${PLOY_API_URL:-http://api.service.consul:8081}"
-
-# Build full recipe coordinates
-RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
+DISCOVER_RECIPE="${DISCOVER_RECIPE:-false}"
 
 echo "[OpenRewrite] Starting transformation"
 echo "[OpenRewrite] Recipe: ${RECIPE_CLASS}"
-echo "[OpenRewrite] Coordinates: ${RECIPE_COORDS}"
+echo "[OpenRewrite] Discovery mode: ${DISCOVER_RECIPE}"
 echo "[OpenRewrite] SeaweedFS: ${SEAWEEDFS_URL}"
+
+# Check if we need to discover recipe coordinates
+if [ "${DISCOVER_RECIPE}" = "true" ] || [ -z "${RECIPE_GROUP}" ]; then
+    echo "[OpenRewrite] Dynamic recipe discovery enabled - OpenRewrite will find coordinates automatically"
+    # OpenRewrite will discover the recipe's Maven coordinates from its built-in catalog
+    RECIPE_COORDS=""
+else
+    # Use provided coordinates
+    RECIPE_GROUP="${RECIPE_GROUP:-org.openrewrite.recipe}"
+    RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-rewrite-migrate-java}"
+    RECIPE_VERSION="${RECIPE_VERSION:-2.11.0}"
+    RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
+    echo "[OpenRewrite] Using provided coordinates: ${RECIPE_COORDS}"
+fi
 
 # Function to download from SeaweedFS cache
 download_from_cache() {
@@ -94,53 +103,62 @@ if [ ! -f "pom.xml" ] && [ ! -f "build.gradle" ]; then
 EOF
 fi
 
-# Step 3: Try to get recipe from cache first
-echo "[OpenRewrite] Checking SeaweedFS cache for recipe artifacts..."
+# Step 3: Handle caching based on discovery mode
+echo "[OpenRewrite] Checking cache strategy..."
 CACHE_HIT=false
 
-if download_from_cache "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "jar" && \
-   download_from_cache "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "pom"; then
-    CACHE_HIT=true
-    echo "[OpenRewrite] Recipe artifacts found in cache"
-    
-    # Register recipe metadata even for cached recipes (idempotent operation)
-    JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
-    register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
+if [ "${DISCOVER_RECIPE}" = "true" ] || [ -z "${RECIPE_COORDS}" ]; then
+    echo "[OpenRewrite] Dynamic discovery mode - OpenRewrite will handle recipe resolution"
+    # In discovery mode, OpenRewrite will download recipes as needed
+    # We'll cache them after the transformation completes
 else
-    echo "[OpenRewrite] Recipe not in cache, downloading from Maven Central..."
+    # Try to get recipe from cache first
+    echo "[OpenRewrite] Checking SeaweedFS cache for recipe artifacts..."
     
-    # Mark timestamp before download for tracking new files
-    touch /tmp/before_download
-    
-    # Download recipe and its dependencies
-    mvn dependency:get \
-        -DgroupId="${RECIPE_GROUP}" \
-        -DartifactId="${RECIPE_ARTIFACT}" \
-        -Dversion="${RECIPE_VERSION}" \
-        -Dtransitive=true \
-        -DremoteRepositories=https://repo.maven.apache.org/maven2 \
-        || {
-            echo "[Error] Failed to download recipe from Maven Central"
-            exit 1
-        }
-    
-    # Upload newly downloaded artifacts to SeaweedFS
-    echo "[OpenRewrite] Caching downloaded artifacts to SeaweedFS..."
-    find /workspace/.m2/repository -type f \( -name "*.jar" -o -name "*.pom" \) \
-         -newer /tmp/before_download \
-         -exec bash -c 'upload_to_cache() { 
-            local file=$1
-            local relative_path=${file#/workspace/.m2/repository/}
-            curl -X PUT "'${SEAWEEDFS_URL}'/'${MAVEN_CACHE_PATH}'/${relative_path}" \
-                 --data-binary "@${file}" \
-                 -H "Content-Type: application/octet-stream" \
-                 -s -o /dev/null 2>/dev/null && \
-            echo "[Cache] Uploaded ${relative_path}"
-         }; upload_to_cache "$1"' _ {} \;
-    
-    # Register the main recipe metadata with Ploy API
-    JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
-    register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
+    if download_from_cache "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "jar" && \
+       download_from_cache "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "pom"; then
+        CACHE_HIT=true
+        echo "[OpenRewrite] Recipe artifacts found in cache"
+        
+        # Register recipe metadata even for cached recipes (idempotent operation)
+        JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
+        register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
+    else
+        echo "[OpenRewrite] Recipe not in cache, downloading from Maven Central..."
+        
+        # Mark timestamp before download for tracking new files
+        touch /tmp/before_download
+        
+        # Download recipe and its dependencies
+        mvn dependency:get \
+            -DgroupId="${RECIPE_GROUP}" \
+            -DartifactId="${RECIPE_ARTIFACT}" \
+            -Dversion="${RECIPE_VERSION}" \
+            -Dtransitive=true \
+            -DremoteRepositories=https://repo.maven.apache.org/maven2 \
+            || {
+                echo "[Error] Failed to download recipe from Maven Central"
+                exit 1
+            }
+        
+        # Upload newly downloaded artifacts to SeaweedFS
+        echo "[OpenRewrite] Caching downloaded artifacts to SeaweedFS..."
+        find /workspace/.m2/repository -type f \( -name "*.jar" -o -name "*.pom" \) \
+             -newer /tmp/before_download \
+             -exec bash -c 'upload_to_cache() { 
+                local file=$1
+                local relative_path=${file#/workspace/.m2/repository/}
+                curl -X PUT "'${SEAWEEDFS_URL}'/'${MAVEN_CACHE_PATH}'/${relative_path}" \
+                     --data-binary "@${file}" \
+                     -H "Content-Type: application/octet-stream" \
+                     -s -o /dev/null 2>/dev/null && \
+                echo "[Cache] Uploaded ${relative_path}"
+             }; upload_to_cache "$1"' _ {} \;
+        
+        # Register the main recipe metadata with Ploy API
+        JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
+        register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
+    fi
 fi
 
 # Step 4: Run OpenRewrite transformation
@@ -151,15 +169,29 @@ if [ -f "pom.xml" ]; then
     echo "[OpenRewrite] Using Maven for transformation..."
     
     # Run OpenRewrite
-    mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
-        -Drewrite.recipe="${RECIPE_CLASS}" \
-        -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
-        -Drewrite.activeRecipes="${RECIPE_CLASS}" \
-        -DskipTests \
-        || {
-            echo "[Error] OpenRewrite transformation failed"
-            exit 1
-        }
+    if [ -n "${RECIPE_COORDS}" ]; then
+        # Use explicit coordinates if provided
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
+            -Drewrite.recipe="${RECIPE_CLASS}" \
+            -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
+            -Drewrite.activeRecipes="${RECIPE_CLASS}" \
+            -DskipTests \
+            || {
+                echo "[Error] OpenRewrite transformation failed"
+                exit 1
+            }
+    else
+        # Let OpenRewrite discover recipe from its catalog
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:discover \
+            org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
+            -Drewrite.recipe="${RECIPE_CLASS}" \
+            -Drewrite.activeRecipes="${RECIPE_CLASS}" \
+            -DskipTests \
+            || {
+                echo "[Error] OpenRewrite transformation failed"
+                exit 1
+            }
+    fi
         
 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
     echo "[OpenRewrite] Using Gradle for transformation..."
