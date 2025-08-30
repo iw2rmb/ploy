@@ -475,6 +475,20 @@ func intPtr(i int) *int {
 
 // ParseOpenRewriteRecipeID parses an OpenRewrite recipe ID into its components
 func ParseOpenRewriteRecipeID(recipeID string) (*OpenRewriteRecipeRequest, error) {
+	// Map common recipe IDs to actual OpenRewrite recipe classes
+	recipeMapping := map[string]string{
+		"java11to17_migration": "org.openrewrite.java.migrate.Java11to17",
+		"java8to11_migration":  "org.openrewrite.java.migrate.Java8toJava11",
+		"java17to21_migration": "org.openrewrite.java.migrate.UpgradeToJava21",
+		"spring_boot_3":        "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0",
+		"junit5_migration":     "org.openrewrite.java.testing.junit5.JUnit5BestPractices",
+	}
+	
+	// Check if we have a mapping for this recipe ID
+	if mappedRecipe, ok := recipeMapping[recipeID]; ok {
+		recipeID = mappedRecipe
+	}
+	
 	// Pass the recipe class name directly to the OpenRewrite engine
 	// The universal OpenRewrite image will discover the correct Maven coordinates dynamically
 	// This allows any recipe to be used without hardcoding
