@@ -1118,7 +1118,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	var openRewriteDispatcher *arf.OpenRewriteDispatcher
 	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://nomad.service.consul:4646")
 	registryURL := utils.Getenv("PLOY_REGISTRY_URL", "registry.dev.ployman.app")
-	seaweedfsURL := utils.Getenv("SEAWEEDFS_URL", "http://localhost:8888")
+	seaweedfsURL := utils.Getenv("SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
 	apiURL := utils.Getenv("PLOY_API_URL", "http://api.service.consul:8081")
 	
 	// Create storage provider for OpenRewrite dispatcher

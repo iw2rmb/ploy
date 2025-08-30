@@ -145,7 +145,6 @@ echo "Verifying API health after rollback..."
 sleep 30  # Allow time for startup
 
 HEALTH_ENDPOINTS=(
-    "http://localhost:{{ ploy.api_port }}/health"
     "https://api.dev.ployman.app/health"
 )
 
@@ -176,6 +175,6 @@ fi
 # Stay on the rollback commit
 echo "Repository is now on rollback commit: $TARGET_VERSION"
 echo "API endpoints:"
-echo "  - Local: http://localhost:{{ ploy.api_port }}/health"
+echo "  - Health: https://api.dev.ployman.app/health"
 echo "  - External: https://api.dev.ployman.app/health"
 echo "  - API version: https://api.dev.ployman.app/v1/version"

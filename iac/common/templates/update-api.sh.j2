@@ -108,7 +108,6 @@ echo "Verifying API health..."
 sleep 30  # Allow time for startup
 
 HEALTH_ENDPOINTS=(
-    "http://localhost:{{ ploy.api_port }}/health"
     "https://api.dev.ployman.app/health"
 )
 
@@ -140,6 +139,6 @@ echo "unified-deployment-active" | sudo tee /opt/ploy/deployment-method > /dev/n
 
 echo "✅ API updated successfully to version $NEW_VERSION"
 echo "API endpoints:"
-echo "  - Local: http://localhost:{{ ploy.api_port }}/health"
+echo "  - Health: https://api.dev.ployman.app/health"
 echo "  - External: https://api.dev.ployman.app/health"
 echo "  - API version: https://api.dev.ployman.app/v1/version"
