@@ -58,7 +58,7 @@ func NewSeaweedFSClient(cfg SeaweedFSConfig) (*SeaweedFSClient, error) {
 
 	replication := cfg.Replication
 	if replication == "" {
-		replication = "001" // default replication
+		replication = "000" // no replication for dev environment
 	}
 
 	client := &SeaweedFSClient{
@@ -176,9 +176,6 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 	}
 
 	fmt.Printf("[SeaweedFS PutObject] Upload successful - Name: %s, Size: %d\n", result.Name, result.Size)
-
-	// Reset body position back to where it was
-	body.Seek(currentPos, 0)
 
 	return &PutObjectResult{
 		ETag:     "", // Not provided by filer direct upload
