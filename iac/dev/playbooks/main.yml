@@ -1067,9 +1067,9 @@
           export PLOY_APPS_DOMAIN={{ ploy.apps_domain | default('ployd.app') }}
           export PLOY_ENVIRONMENT={{ ploy_environment | default('dev') }}
           {% if ploy_environment == 'dev' %}
-          export PLOY_CONTROLLER=https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/v1
+          export PLOY_CONTROLLER=https://api.dev.{{ ploy.platform_domain | default('ployman.app', true) }}/v1
           {% else %}
-          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain | default('ployman.app') }}/v1
+          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain | default('ployman.app', true) }}/v1
           {% endif %}
           
           # ARF (Automated Remediation Framework) environment variables
@@ -1691,7 +1691,7 @@
           export PLOY_DNS_PROVIDER="{{ lookup('env', 'PLOY_DNS_PROVIDER') | default('namecheap') }}"
           
           # Platform domain configuration
-          export PLOY_PLATFORM_DOMAIN="{{ ploy.platform_domain | default('ployman.app') }}"
+          export PLOY_PLATFORM_DOMAIN="{{ ploy.platform_domain | default('ployman.app', true) }}"
           export PLOY_DNS_DOMAIN="{{ lookup('env', 'PLOY_DNS_DOMAIN') | default('ployd.app') }}"
           export PLOY_DNS_TARGET_IP="{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
           
@@ -2109,7 +2109,7 @@
     # Platform wildcard certificate health check (after api deployment)
     - name: Wait for api health endpoint to be available
       uri:
-        url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health"
+        url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app', true) }}/health"
         validate_certs: no
         method: GET
         status_code: 200
@@ -2123,7 +2123,7 @@
 
     - name: Check platform wildcard certificate health
       uri:
-        url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app') }}/health/platform-certificates"
+        url: "https://api.dev.{{ ploy.platform_domain | default('ployman.app', true) }}/health/platform-certificates"
         validate_certs: no
         method: GET
         status_code: [200, 503]  # 503 is acceptable during initial provisioning
