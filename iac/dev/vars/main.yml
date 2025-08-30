@@ -60,7 +60,7 @@ ploy:
   apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | default('namecheap') }}"
   
   # Platform services domain configuration
-  platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('ployman.app') }}"
+  platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('ployman.app', true) }}"
   platform_domain_provider: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN_PROVIDER') | default('namecheap') }}"
   
   # API accessible at api.{platform_domain}
