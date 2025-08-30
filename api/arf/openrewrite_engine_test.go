@@ -2,6 +2,7 @@ package arf
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -304,17 +305,40 @@ public class TestApp {
 	assert.Contains(t, javaStr, "jakarta.annotation.PostConstruct", "javax imports should be migrated to jakarta")
 }
 
-// TestRecipeExecutor_RealOpenRewriteExecution verifies mock is replaced with real engine
+// TestRecipeExecutor_RealOpenRewriteExecution verifies mock is replaced with real dispatcher
 // TDD RED PHASE: This test MUST FAIL initially while mock is still in use
 func TestRecipeExecutor_RealOpenRewriteExecution(t *testing.T) {
-	// Create a mock storage
-	storage := &mockRecipeStorage{}
+	// Skip if not in integration mode
+	if testing.Short() {
+		t.Skip("Skipping real OpenRewrite test in short mode")
+	}
+
+	// Create a mock storage that will return "recipe not found" to force dispatcher usage
+	storage := &mockRecipeStorage{
+		shouldReturnNotFound: true,
+	}
 
 	// Create sandbox manager
 	sandboxMgr := NewMockSandboxManager()
 
-	// Create recipe executor
-	executor := NewRecipeExecutor(storage, sandboxMgr)
+	// Create real OpenRewrite dispatcher for integration testing
+	mockStorageService := &MockStorageServiceForTest{}
+	
+	dispatcher, err := NewOpenRewriteDispatcher(
+		os.Getenv("NOMAD_ADDR"),                          // Will use default if empty
+		"registry.dev.ployman.app",                       // Registry URL
+		"http://seaweedfs-filer.service.consul:8888",     // SeaweedFS URL
+		"https://api.dev.ployman.app/v1",                 // API URL
+		mockStorageService,
+	)
+	
+	if err != nil {
+		t.Logf("Could not create real dispatcher (infrastructure not available): %v", err)
+		t.Skip("Real infrastructure not available for integration test")
+	}
+
+	// Create recipe executor WITH real dispatcher (not mock)
+	executor := NewRecipeExecutorWithDispatcher(storage, sandboxMgr, dispatcher)
 
 	// Create test repository path
 	repoPath := testutils.CreateTempDir(t, "executor-test")
@@ -330,33 +354,47 @@ func TestRecipeExecutor_RealOpenRewriteExecution(t *testing.T) {
 </project>`
 	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "pom.xml"), []byte(pomContent), 0644))
 
-	// Execute with OpenRewrite step
-	ctx := context.Background()
-	result, err := executor.ExecuteRecipeByID(ctx, "test-recipe", repoPath)
+	// Execute with OpenRewrite recipe (will force dispatcher usage)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	
+	result, err := executor.ExecuteRecipeByID(ctx, "org.openrewrite.java.cleanup.UnnecessaryThrows", repoPath)
 
-	// This should NOT return mock results
-	require.NoError(t, err)
-	assert.NotNil(t, result)
+	// TDD RED: This should FAIL initially due to dispatcher issues
+	require.NoError(t, err, "Real OpenRewrite execution should not error")
+	assert.NotNil(t, result, "Should return result")
 
-	// Key assertion: We should NOT get MockFile.java
+	// Key assertion: We should NOT get MockFile.java (proves real execution)
 	if len(result.FilesModified) > 0 {
 		assert.NotEqual(t, "MockFile.java", result.FilesModified[0],
-			"Should use real OpenRewrite engine, not mock")
+			"Should use real OpenRewrite dispatcher, not mock engine")
 	}
 
-	// The result should reflect real execution
+	// The result should reflect real execution, not mock
 	assert.NotContains(t, result.Diff, "mock transformation",
 		"Should not contain mock transformation text")
+	
+	// Verify it's a real transformation result
+	assert.True(t, result.Success, "Real transformation should succeed")
+	assert.Greater(t, result.ExecutionTime, time.Duration(0), "Should have real execution time")
+
+	t.Logf("Real OpenRewrite execution completed: %+v", result)
 }
 
 // mockRecipeStorage implements storage.RecipeStorage for testing
-type mockRecipeStorage struct{}
+type mockRecipeStorage struct{
+	shouldReturnNotFound bool
+}
 
 func (m *mockRecipeStorage) CreateRecipe(ctx context.Context, recipe *models.Recipe) error {
 	return nil
 }
 
 func (m *mockRecipeStorage) GetRecipe(ctx context.Context, recipeID string) (*models.Recipe, error) {
+	if m.shouldReturnNotFound {
+		return nil, fmt.Errorf("recipe %s not found", recipeID)
+	}
+	
 	recipe := &models.Recipe{
 		ID: recipeID,
 		Steps: []models.RecipeStep{
@@ -427,4 +465,27 @@ func (m *mockRecipeStorage) UpdateIndex(ctx context.Context, recipe *models.Reci
 
 func (m *mockRecipeStorage) VerifyRecipeHash(ctx context.Context, id, expectedHash string) (bool, error) {
 	return true, nil
+}
+
+// MockStorageServiceForTest implements storage.StorageService for testing
+type MockStorageServiceForTest struct{}
+
+func (m *MockStorageServiceForTest) Put(ctx context.Context, key string, data []byte) error {
+	return nil // Simulate successful storage
+}
+
+func (m *MockStorageServiceForTest) Get(ctx context.Context, key string) ([]byte, error) {
+	return []byte("mock tar data"), nil // Return mock data
+}
+
+func (m *MockStorageServiceForTest) Delete(ctx context.Context, key string) error {
+	return nil
+}
+
+func (m *MockStorageServiceForTest) Exists(ctx context.Context, key string) (bool, error) {
+	return true, nil
+}
+
+func (m *MockStorageServiceForTest) List(ctx context.Context, prefix string) ([]string, error) {
+	return []string{}, nil
 }

@@ -25,23 +25,41 @@ type OpenRewriteDispatcher struct {
 
 // NewOpenRewriteDispatcher creates a new OpenRewrite dispatcher
 func NewOpenRewriteDispatcher(nomadAddr, registryURL, seaweedfsURL, apiURL string, storageClient storage.StorageService) (*OpenRewriteDispatcher, error) {
+	log.Printf("[OpenRewriteDispatcher] Initializing with parameters:")
+	log.Printf("  - Nomad Address: %s", nomadAddr)
+	log.Printf("  - Registry URL: %s", registryURL) 
+	log.Printf("  - SeaweedFS URL: %s", seaweedfsURL)
+	log.Printf("  - API URL: %s", apiURL)
+	log.Printf("  - Storage Client: %T", storageClient)
+	
+	if storageClient == nil {
+		return nil, fmt.Errorf("storage client cannot be nil")
+	}
+	
 	config := api.DefaultConfig()
 	if nomadAddr != "" {
 		config.Address = nomadAddr
 	}
+	log.Printf("[OpenRewriteDispatcher] Creating Nomad client with address: %s", config.Address)
 	
 	client, err := api.NewClient(config)
 	if err != nil {
+		log.Printf("[OpenRewriteDispatcher] ERROR: Failed to create Nomad client: %v", err)
 		return nil, fmt.Errorf("failed to create Nomad client: %w", err)
 	}
 	
-	return &OpenRewriteDispatcher{
+	log.Printf("[OpenRewriteDispatcher] Nomad client created successfully")
+	
+	dispatcher := &OpenRewriteDispatcher{
 		nomadClient:   client,
 		storageClient: storageClient,
 		registryURL:   registryURL,
 		seaweedfsURL:  seaweedfsURL,
 		apiURL:        apiURL,
-	}, nil
+	}
+	
+	log.Printf("[OpenRewriteDispatcher] Dispatcher created successfully")
+	return dispatcher, nil
 }
 
 // OpenRewriteRecipeRequest represents a request to execute an OpenRewrite recipe
@@ -56,8 +74,23 @@ type OpenRewriteRecipeRequest struct {
 
 // ExecuteOpenRewriteRecipe dispatches an OpenRewrite transformation to Nomad
 func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, req *OpenRewriteRecipeRequest) (*TransformationResult, error) {
+	log.Printf("[OpenRewrite Dispatcher] ===== ENTRY POINT =====")
+	log.Printf("[OpenRewrite Dispatcher] Function called with context deadline: %v", ctx.Done())
+	log.Printf("[OpenRewrite Dispatcher] Dispatcher instance: %p", d)
+	
+	if d == nil {
+		log.Printf("[OpenRewrite Dispatcher] CRITICAL ERROR: Dispatcher is nil!")
+		return nil, fmt.Errorf("dispatcher is nil")
+	}
+	
+	if req == nil {
+		log.Printf("[OpenRewrite Dispatcher] CRITICAL ERROR: Request is nil!")
+		return nil, fmt.Errorf("request cannot be nil")
+	}
+	
 	log.Printf("[OpenRewrite Dispatcher] Starting dispatch for recipe=%s, repo=%s", 
 		req.RecipeClass, req.RepoPath)
+	log.Printf("[OpenRewrite Dispatcher] Nomad client: %p, Storage client: %p", d.nomadClient, d.storageClient)
 	
 	// Create a unique job ID if not provided
 	if req.JobID == "" {
@@ -79,20 +112,58 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 		log.Printf("[OpenRewrite Dispatcher] Tar file created: size=%d bytes", fileInfo.Size())
 	}
 	
+	// Test storage connectivity first
+	testKey := fmt.Sprintf("openrewrite/connectivity-test-%d", time.Now().Unix())
+	testData := []byte("connectivity-test")
+	log.Printf("[OpenRewrite Dispatcher] Testing storage connectivity with key: %s", testKey)
+	if err := d.storageClient.Put(ctx, testKey, testData); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Storage connectivity test failed: %v", err)
+		return nil, fmt.Errorf("storage not accessible: %w", err)
+	}
+	log.Printf("[OpenRewrite Dispatcher] Storage connectivity test successful")
+	
+	// Clean up test file
+	d.storageClient.Delete(ctx, testKey)
+	
 	// Upload input tar to storage
 	inputStorageKey := fmt.Sprintf("openrewrite/%s/input.tar", req.JobID)
-	log.Printf("[OpenRewrite Dispatcher] Uploading tar to storage: key=%s", inputStorageKey)
-	if err := d.uploadToStorage(ctx, inputTarPath, inputStorageKey); err != nil {
-		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to upload tar: %v", err)
-		return nil, fmt.Errorf("failed to upload input tar: %w", err)
+	
+	// Get file size for logging
+	fileInfo, _ := os.Stat(inputTarPath)
+	fileSize := int64(0)
+	if fileInfo != nil {
+		fileSize = fileInfo.Size()
 	}
-	log.Printf("[OpenRewrite Dispatcher] Tar uploaded successfully")
+	
+	log.Printf("[OpenRewrite Dispatcher] Uploading tar to storage: key=%s, size=%d bytes", inputStorageKey, fileSize)
+	if err := d.uploadToStorage(ctx, inputTarPath, inputStorageKey); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to upload tar to key=%s: %v", inputStorageKey, err)
+		return nil, fmt.Errorf("failed to upload input tar to %s: %w", inputStorageKey, err)
+	}
+	
+	// Verify upload by checking if file exists
+	log.Printf("[OpenRewrite Dispatcher] Verifying upload: checking if file exists at key=%s", inputStorageKey)
+	exists, err := d.storageClient.Exists(ctx, inputStorageKey)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] WARNING: Failed to verify upload existence: %v", err)
+	} else if !exists {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Upload verification failed - file does not exist at key=%s", inputStorageKey)
+		return nil, fmt.Errorf("upload verification failed: file not found at %s", inputStorageKey)
+	} else {
+		log.Printf("[OpenRewrite Dispatcher] Upload verification successful - file exists at key=%s", inputStorageKey)
+	}
+	
+	log.Printf("[OpenRewrite Dispatcher] Tar uploaded and verified successfully")
 	
 	// Create Nomad job
 	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
 	job := d.createNomadJob(req)
+	
+	// Log the download URL that will be used
+	downloadURL := fmt.Sprintf("%s/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest", 
 		*job.ID, d.registryURL)
+	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
 	
 	// Submit job to Nomad
 	log.Printf("[OpenRewrite Dispatcher] Submitting job to Nomad at %s", d.nomadClient.Address())
@@ -155,18 +226,12 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				Name:   "transform",
 				Driver: "docker",
 				Config: map[string]interface{}{
-					// Use public OpenRewrite image as fallback
-					// TODO: Build and use custom image from registry.dev.ployman.app
-					"image": "openrewrite/rewrite:latest",
+					// Use custom OpenRewrite image from registry
+					"image": fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
 					"volumes": []string{
 						"/tmp/openrewrite:/workspace",
 					},
-					// Use OpenRewrite CLI directly instead of custom runner script
-					"command": "sh",
-					"args": []string{
-						"-c",
-						fmt.Sprintf("cd /workspace && tar -xf input.tar && rewrite run %s --fail-on-dry-run && tar -cf output.tar .", req.RecipeClass),
-					},
+					// Use custom image's default entrypoint (no command override needed)
 					"dns_servers": []string{"172.17.0.1"},
 					"dns_search_domains": []string{"service.consul"},
 					"force_pull": false, // Don't force pull if image exists
@@ -185,10 +250,11 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					CPU:      intPtr(500),
 					MemoryMB: intPtr(2048),
 				},
-				// Add artifact download/upload tasks
+				// Add artifact download/upload tasks  
 				Artifacts: []*api.TaskArtifact{
 					{
-						GetterSource: stringPtr(fmt.Sprintf("%s/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
+						// Include bucket/collection prefix to match upload path
+						GetterSource: stringPtr(fmt.Sprintf("%s/ploy-artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
 						RelativeDest: stringPtr("/workspace/"),
 					},
 				},

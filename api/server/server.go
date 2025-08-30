@@ -1161,8 +1161,13 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	}
 	
 	if storageProvider != nil {
+		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s", 
+			nomadAddr, registryURL, seaweedfsURL, apiURL)
+		
 		// Adapt internal storage to ARF storage interface
 		arfStorageService := arfStorage.NewInternalStorageAdapter(storageProvider)
+		log.Printf("ARF storage adapter created successfully")
+		
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
 			nomadAddr,
 			registryURL,
@@ -1171,21 +1176,26 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			arfStorageService,
 		)
 		if err != nil {
-			log.Printf("Warning: Failed to create OpenRewrite dispatcher: %v", err)
+			log.Printf("ERROR: Failed to create OpenRewrite dispatcher: %v", err)
+			log.Printf("This will prevent OpenRewrite transformations from working")
 			openRewriteDispatcher = nil
 		} else {
-			log.Printf("OpenRewrite dispatcher initialized for dynamic recipe downloading")
+			log.Printf("SUCCESS: OpenRewrite dispatcher initialized for dynamic recipe downloading")
 		}
+	} else {
+		log.Printf("WARNING: No storage provider available - OpenRewrite dispatcher will not be initialized")
+		log.Printf("Check SeaweedFS connectivity at: %s", seaweedfsURL)
 	}
 	
 	// Initialize recipe executor with dispatcher if available
 	var engine *arf.RecipeExecutor
 	if openRewriteDispatcher != nil {
 		engine = arf.NewRecipeExecutorWithDispatcher(recipeStorage, sandboxMgr, openRewriteDispatcher)
-		log.Printf("Recipe executor initialized with OpenRewrite dispatcher for fallback")
+		log.Printf("SUCCESS: Recipe executor initialized WITH OpenRewrite dispatcher for fallback execution")
 	} else {
 		engine = arf.NewRecipeExecutor(recipeStorage, sandboxMgr)
-		log.Printf("Recipe executor initialized without OpenRewrite dispatcher")
+		log.Printf("WARNING: Recipe executor initialized WITHOUT OpenRewrite dispatcher")
+		log.Printf("OpenRewrite recipes that are not in storage will fail")
 	}
 
 	// Create ARF handler based on available backends
