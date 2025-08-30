@@ -370,7 +370,7 @@ func (c *OpenRewriteClient) Transform(tarData []byte, recipe RecipeConfig) (*Tra
     }
     
     resp, err := c.client.Post(
-        fmt.Sprintf("%s/v1/openrewrite/transform", c.baseURL),
+        fmt.Sprintf("%s/v1/transform", c.baseURL),
         "application/json",
         bytes.NewReader(body),
     )
@@ -489,7 +489,7 @@ func TestJava11to17Migration(t *testing.T) {
     
     body, _ := json.Marshal(req)
     resp, err := http.Post(
-        serviceURL + "/v1/openrewrite/transform",
+        serviceURL + "/v1/transform",
         "application/json",
         bytes.NewReader(body),
     )

@@ -186,7 +186,7 @@ start_openrewrite_container() {
     
     # Test OpenRewrite health endpoint
     local health_response
-    health_response=$(curl -s "http://localhost:$OPENREWRITE_PORT/v1/openrewrite/health")
+    health_response=$(curl -s "http://localhost:$OPENREWRITE_PORT/v1/health")
     local java_version
     java_version=$(echo "$health_response" | jq -r '.java_version // "not detected"')
     local maven_version
@@ -281,7 +281,7 @@ EOF
     
     # Use timeout to prevent hanging
     if ! transform_response=$(timeout $((PHASE1_TIMEOUT + 30)) curl -s -w "\n%{http_code}" \
-        -X POST "http://localhost:$OPENREWRITE_PORT/v1/openrewrite/transform" \
+        -X POST "http://localhost:$OPENREWRITE_PORT/v1/transform" \
         -H "Content-Type: application/json" \
         -d "$transform_request"); then
         test_failed "Transformation request failed or timed out for $repo_name"
