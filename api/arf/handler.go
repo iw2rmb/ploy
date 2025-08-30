@@ -127,6 +127,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// Transformation execution
 	arf.Post("/transform", h.ExecuteTransformation)
 	arf.Get("/transforms/:id", h.GetTransformationResult)
+	arf.Get("/transforms/:id/status", h.GetTransformationStatus)
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)

@@ -76,6 +76,10 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		})
 	}
 
+	// Log incoming request
+	fmt.Printf("[ARF Transform] Received transformation request: recipe=%s, repo=%s, branch=%s, language=%s, build_tool=%s\n",
+		req.RecipeID, req.Codebase.Repository, req.Codebase.Branch, req.Codebase.Language, req.Codebase.BuildTool)
+
 	// Validate required fields
 	if req.RecipeID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -96,11 +100,27 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 
 	// Generate transformation ID
 	transformID := uuid.New().String()
+	fmt.Printf("[ARF Transform] Generated transformation ID: %s\n", transformID)
+
+	// Create context with timeout (5 minutes)
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Minute)
+	defer cancel()
 
 	// Execute transformation
-	ctx := c.Context()
+	fmt.Printf("[ARF Transform] Starting transformation execution for ID: %s\n", transformID)
 	result, err := h.executeTransformationInternal(ctx, transformID, &req)
 	if err != nil {
+		fmt.Printf("[ARF Transform] Transformation failed for ID %s: %v\n", transformID, err)
+		
+		// Check if context deadline exceeded
+		if ctx.Err() == context.DeadlineExceeded {
+			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
+				"error":   "Transformation timeout",
+				"details": "The transformation took longer than 5 minutes to complete",
+				"transformation_id": transformID,
+			})
+		}
+		
 		// Check if this is a NotFoundError (recipe not found)
 		if _, isNotFound := err.(*NotFoundError); isNotFound {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -111,11 +131,13 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   "Transformation execution failed",
 			"details": err.Error(),
+			"transformation_id": transformID,
 		})
 	}
 
 	// Store result for later retrieval
 	globalTransformStore.store(transformID, result)
+	fmt.Printf("[ARF Transform] Transformation completed successfully for ID: %s\n", transformID)
 
 	// Add transformation ID to result
 	result.TransformationID = transformID
@@ -126,6 +148,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 // executeTransformationInternal performs the actual transformation with comprehensive reporting
 func (h *Handler) executeTransformationInternal(ctx context.Context, transformID string, req *TransformRequest) (*TransformationResult, error) {
 	transformStartTime := time.Now()
+	fmt.Printf("[ARF Transform Internal] Starting internal transformation for ID: %s at %v\n", transformID, transformStartTime)
 	
 	// Initialize comprehensive result
 	result := &TransformationResult{
@@ -219,7 +242,10 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 	
 	// Stage 4: Recipe execution
 	stageStart = time.Now()
+	fmt.Printf("[ARF Transform Internal] Stage 4: Starting recipe execution for recipe=%s, repo=%s\n", req.RecipeID, repoPath)
+	
 	if h.recipeExecutor == nil {
+		fmt.Printf("[ARF Transform Internal] ERROR: Recipe executor not available\n")
 		iteration.Stages = append(iteration.Stages, TransformationStage{
 			Name:      "recipe_execution",
 			StartTime: stageStart,
@@ -231,8 +257,10 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		return nil, fmt.Errorf("recipe executor not available")
 	}
 	
+	fmt.Printf("[ARF Transform Internal] Calling recipe executor for recipe: %s\n", req.RecipeID)
 	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath)
 	if err != nil {
+		fmt.Printf("[ARF Transform Internal] Recipe execution failed: %v\n", err)
 		// Let RecipeExecutor handle fallback logic internally before treating as error
 		iteration.Stages = append(iteration.Stages, TransformationStage{
 			Name:      "recipe_execution",
@@ -251,6 +279,8 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		})
 		return nil, fmt.Errorf("recipe execution failed: %w", err)
 	}
+	
+	fmt.Printf("[ARF Transform Internal] Recipe execution completed successfully in %v\n", time.Since(stageStart))
 	
 	iteration.Stages = append(iteration.Stages, TransformationStage{
 		Name:      "recipe_execution",
@@ -671,4 +701,37 @@ func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(result)
+}
+
+
+// GetTransformationStatus handles GET /v1/arf/transforms/:id/status
+func (h *Handler) GetTransformationStatus(c *fiber.Ctx) error {
+	transformID := c.Params("id")
+	if transformID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "transformation_id is required",
+		})
+	}
+
+	// Check if transformation exists in store
+	result, exists := globalTransformStore.get(transformID)
+	if exists {
+		// Transformation completed
+		return c.JSON(fiber.Map{
+			"transformation_id": transformID,
+			"status": "completed",
+			"success": result.Success,
+			"execution_time": result.ExecutionTime,
+			"changes_applied": result.ChangesApplied,
+		})
+	}
+
+	// Check if job is still running in Nomad
+	// For now, return in-progress status
+	// TODO: Query Nomad for actual job status
+	return c.JSON(fiber.Map{
+		"transformation_id": transformID,
+		"status": "in_progress",
+		"message": "Transformation is still running",
+	})
 }
