@@ -615,7 +615,7 @@ Auto-classified lanes:
   - Phase 1: Baseline OpenRewrite testing (simple projects, 100% success target)
   - Phase 2: LLM self-healing integration (medium complexity, 80% success target)  
   - Phase 3: Parallel execution testing (all tiers, 70% success target)
-- ✅ **Real-World Project Testing**: Curated repository selection from GitHub (Baeldung tutorials, Spring Boot, Apache Kafka, Spring PetClinic)
+- ✅ **Real-World Project Testing**: Curated repository selection from GitHub (Java 8 Tutorial, Baeldung tutorials, Spring Boot, Apache Kafka)
 - ✅ **Automated Test Scripts**: Ready-to-execute bash scripts for each testing phase
 - ✅ **Success Metrics Tracking**: 49 detailed checkboxes for comprehensive progress monitoring
 - ✅ **Repository Classification**: Tier 1 (simple), Tier 2 (medium), Tier 3 (complex) project categorization
@@ -713,7 +713,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Comprehensive Reporting**: Three levels of reporting (minimal, standard, detailed) with timing and metrics
 
 ### ✅ **Recent Achievements: Java 11→17 Migration Success (August 2025)**
-- ✅ **Complete End-to-End Pipeline**: Successfully processing Spring PetClinic Java 11→17 migrations with full deployment validation
+- ✅ **Complete End-to-End Pipeline**: Successfully processing Java 8 Tutorial Java 8→17 migrations with full deployment validation
 - ✅ **Lane C Integration**: ARF benchmarks deploying to OSv unikernels via Lane C with 60-80MB image optimization
 - ✅ **Template Processing Resolution**: Resolved complex HCL conditional block parsing enabling seamless Nomad deployments
 - ✅ **Production Validation**: End-to-end testing on VPS infrastructure with real HTTP endpoint validation

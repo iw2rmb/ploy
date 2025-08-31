@@ -58,14 +58,14 @@ test_stage "Repository Preparation"
 START_TIME=$(date +%s)
 
 test_info "Cloning repository: $TEST_REPO"
-if git clone --branch "$TEST_BRANCH" --depth 1 "$TEST_REPO" petclinic 2>/dev/null; then
+if git clone --branch "$TEST_BRANCH" --depth 1 "$TEST_REPO" java8-tutorial 2>/dev/null; then
     test_passed "Repository cloned successfully"
 else
     test_failed "Failed to clone repository"
     exit 1
 fi
 
-cd petclinic
+cd java8-tutorial
 
 # Check repository structure
 test_info "Analyzing repository structure..."
