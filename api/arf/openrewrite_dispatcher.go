@@ -263,14 +263,22 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				Config: map[string]interface{}{
 					// Use custom OpenRewrite image from registry
 					"image": fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
-					"volumes": []string{
-						"/tmp/openrewrite:/workspace",
-					},
-					// Ensure project directory exists with extracted content
+					// No volume mount - use Nomad's workspace
+					// Nomad extracts artifacts to local/ directory by default
 					"command": "/bin/sh",
 					"args": []string{
 						"-c",
-						"mkdir -p /workspace/project && tar -xf /workspace/input.tar -C /workspace/project && /usr/local/bin/openrewrite",
+						// Debug and setup: Nomad extracts to local/ directory
+						"echo '[DEBUG] Current directory:' && pwd && " +
+						"echo '[DEBUG] Directory contents:' && ls -la && " +
+						"echo '[DEBUG] Local directory contents:' && ls -la local/ 2>/dev/null || echo 'No local dir' && " +
+						"echo '[DEBUG] Creating workspace structure...' && " +
+						"mkdir -p /workspace/project && " +
+						"echo '[DEBUG] Copying extracted files to workspace...' && " +
+						"cp -r local/* /workspace/project/ 2>/dev/null || cp -r * /workspace/project/ 2>/dev/null || true && " +
+						"echo '[DEBUG] Workspace contents:' && ls -la /workspace/project/ | head -20 && " +
+						"echo '[DEBUG] Starting OpenRewrite...' && " +
+						"/usr/local/bin/openrewrite",
 					},
 					// Use custom image's default entrypoint (no command override needed)
 					"dns_servers":        []string{"172.17.0.1"},
@@ -296,7 +304,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					{
 						// Include bucket/collection prefix to match upload path (artifacts, not ploy-artifacts)
 						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
-						RelativeDest: stringPtr("/workspace/"),  // Extract to workspace root
+						RelativeDest: stringPtr("local/"),  // Nomad extracts to local/ directory
 					},
 				},
 			},
