@@ -196,7 +196,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	job := d.createNomadJob(req)
 
 	// Log the download URL that will be used
-	downloadURL := fmt.Sprintf("%s/ploy-artifacts/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
+	downloadURL := fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest",
 		*job.ID, d.registryURL)
 	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
@@ -277,6 +277,8 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					"PLOY_API_URL":     d.apiURL,
 					"MAVEN_CACHE_PATH": "maven-repository",
 					"DISCOVER_RECIPE":  "true", // Tell runner.sh to discover recipe coordinates
+					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID), // Pass full artifact URL
+					"OUTPUT_KEY":       fmt.Sprintf("artifacts/openrewrite/%s/output.tar", req.JobID), // Output storage key
 				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
@@ -285,8 +287,8 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				// Add artifact download/upload tasks
 				Artifacts: []*api.TaskArtifact{
 					{
-						// Include bucket/collection prefix to match upload path 
-						GetterSource: stringPtr(fmt.Sprintf("%s/ploy-artifacts/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
+						// Download artifact from SeaweedFS
+						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
 						RelativeDest: stringPtr("local/"),  // Nomad extracts to local/ directory
 					},
 				},

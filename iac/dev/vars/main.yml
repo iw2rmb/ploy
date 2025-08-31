@@ -98,7 +98,7 @@ seaweedfs:
   # Collection configuration for different artifact types (dev environment)
   collections:
     artifacts:
-      name: "ploy-artifacts"
+      name: "artifacts"
       replication: "000"  # No replication for development environment
     metadata:
       name: "ploy-metadata"
@@ -112,13 +112,13 @@ storage_config:
   seaweedfs:
     master: "localhost:9333"
     filer: "localhost:8888"
-    collection: "ploy-artifacts"
+    collection: "artifacts"
     replication: "000"
     timeout: 30
     datacenter: ""
     rack: ""
     collections:
-      artifacts: "ploy-artifacts"
+      artifacts: "artifacts"
       metadata: "ploy-metadata"
       debug: "ploy-debug"
   

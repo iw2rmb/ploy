@@ -31,29 +31,29 @@ type mockResponse struct {
 
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	m.requests = append(m.requests, req)
-	
+
 	if m.index >= len(m.responses) {
 		return nil, fmt.Errorf("no more mock responses available")
 	}
-	
+
 	resp := m.responses[m.index]
 	m.index++
-	
+
 	if resp.err != nil {
 		return nil, resp.err
 	}
-	
+
 	response := &http.Response{
 		StatusCode: resp.statusCode,
 		Status:     fmt.Sprintf("%d", resp.statusCode),
 		Body:       io.NopCloser(strings.NewReader(resp.body)),
 		Header:     make(http.Header),
 	}
-	
+
 	for k, v := range resp.headers {
 		response.Header.Set(k, v)
 	}
-	
+
 	return response, nil
 }
 
@@ -124,11 +124,11 @@ func TestNewSeaweedFSClient(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, err := NewSeaweedFSClient(tt.config)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errMsg)
@@ -136,26 +136,26 @@ func TestNewSeaweedFSClient(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, client)
-				
+
 				// Verify defaults
 				if tt.config.Collection == "" {
-					assert.Equal(t, "ploy-artifacts", client.collection)
+					assert.Equal(t, "artifacts", client.collection)
 				} else {
 					assert.Equal(t, tt.config.Collection, client.collection)
 				}
-				
+
 				if tt.config.Replication == "" {
 					assert.Equal(t, "001", client.replication)
 				} else {
 					assert.Equal(t, tt.config.Replication, client.replication)
 				}
-				
+
 				if tt.config.Timeout == 0 {
 					assert.Equal(t, 30*time.Second, client.timeout)
 				} else {
 					assert.Equal(t, time.Duration(tt.config.Timeout)*time.Second, client.timeout)
 				}
-				
+
 				// Verify HTTP scheme is added
 				assert.True(t, strings.HasPrefix(client.masterURL, "http://") || strings.HasPrefix(client.masterURL, "https://"))
 				assert.True(t, strings.HasPrefix(client.filerURL, "http://") || strings.HasPrefix(client.filerURL, "https://"))
@@ -302,7 +302,7 @@ func TestSeaweedFSClient_PutObject(t *testing.T) {
 			errContains: "failed to create directory",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
@@ -316,10 +316,10 @@ func TestSeaweedFSClient_PutObject(t *testing.T) {
 					Transport: mock,
 				},
 			}
-			
+
 			body := strings.NewReader(tt.body)
 			result, err := client.PutObject(tt.bucket, tt.key, body, tt.contentType)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -412,7 +412,7 @@ func TestSeaweedFSClient_GetObject(t *testing.T) {
 			errContains: "failed to get object: 500",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
@@ -422,9 +422,9 @@ func TestSeaweedFSClient_GetObject(t *testing.T) {
 					Transport: mock,
 				},
 			}
-			
+
 			reader, err := client.GetObject(tt.bucket, tt.key)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -433,7 +433,7 @@ func TestSeaweedFSClient_GetObject(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, reader)
 				defer reader.Close()
-				
+
 				content, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantBody, string(content))
@@ -582,7 +582,7 @@ func TestSeaweedFSClient_ListObjects(t *testing.T) {
 			wantObjects: []ObjectInfo{},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
@@ -592,9 +592,9 @@ func TestSeaweedFSClient_ListObjects(t *testing.T) {
 					Transport: mock,
 				},
 			}
-			
+
 			objects, err := client.ListObjects(tt.bucket, tt.prefix)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -670,7 +670,7 @@ func TestSeaweedFSClient_VerifyUpload(t *testing.T) {
 			errContains: "timeout",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
@@ -680,16 +680,16 @@ func TestSeaweedFSClient_VerifyUpload(t *testing.T) {
 					Transport: mock,
 				},
 			}
-			
+
 			err := client.VerifyUpload(tt.key)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
 			} else {
 				assert.NoError(t, err)
 			}
-			
+
 			// Verify HEAD request was made
 			assert.Len(t, mock.requests, 1)
 			assert.Equal(t, "HEAD", mock.requests[0].Method)
@@ -700,27 +700,27 @@ func TestSeaweedFSClient_VerifyUpload(t *testing.T) {
 func TestSeaweedFSClient_UploadArtifactBundle(t *testing.T) {
 	// Create temporary test files
 	tempDir := t.TempDir()
-	
+
 	// Create main artifact file
 	artifactPath := tempDir + "/artifact.tar"
 	err := os.WriteFile(artifactPath, []byte("artifact content"), 0644)
 	require.NoError(t, err)
-	
+
 	// Create SBOM file
 	sbomPath := artifactPath + ".sbom.json"
 	err = os.WriteFile(sbomPath, []byte(`{"sbom":"data"}`), 0644)
 	require.NoError(t, err)
-	
+
 	// Create signature file
 	sigPath := artifactPath + ".sig"
 	err = os.WriteFile(sigPath, []byte("signature"), 0644)
 	require.NoError(t, err)
-	
+
 	// Create certificate file
 	crtPath := artifactPath + ".crt"
 	err = os.WriteFile(crtPath, []byte("certificate"), 0644)
 	require.NoError(t, err)
-	
+
 	tests := []struct {
 		name         string
 		keyPrefix    string
@@ -792,7 +792,7 @@ func TestSeaweedFSClient_UploadArtifactBundle(t *testing.T) {
 				soloPath := tempDir + "/solo.tar"
 				err := os.WriteFile(soloPath, []byte("solo content"), 0644)
 				require.NoError(t, err)
-				
+
 				return &mockRoundTripper{
 					responses: []mockResponse{
 						// Directory creation for "apps"
@@ -823,7 +823,7 @@ func TestSeaweedFSClient_UploadArtifactBundle(t *testing.T) {
 							statusCode: http.StatusInternalServerError,
 							body:       "Server Error",
 						},
-						// Second attempt - directory creation fails again  
+						// Second attempt - directory creation fails again
 						{
 							statusCode: http.StatusInternalServerError,
 							body:       "Server Error",
@@ -878,7 +878,7 @@ func TestSeaweedFSClient_UploadArtifactBundle(t *testing.T) {
 			errContains: "failed to upload SBOM",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
@@ -890,9 +890,9 @@ func TestSeaweedFSClient_UploadArtifactBundle(t *testing.T) {
 					Transport: mock,
 				},
 			}
-			
+
 			err := client.UploadArtifactBundle(tt.keyPrefix, tt.artifactPath)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -972,7 +972,7 @@ func TestSeaweedFSClient_TestVolumeAssignment(t *testing.T) {
 			errContains: "connection refused",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.setupMock()
@@ -983,9 +983,9 @@ func TestSeaweedFSClient_TestVolumeAssignment(t *testing.T) {
 					Transport: mock,
 				},
 			}
-			
+
 			result, err := client.TestVolumeAssignment()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errContains)
@@ -1016,28 +1016,28 @@ func TestSeaweedFSClient_Retry(t *testing.T) {
 			},
 		},
 	}
-	
+
 	client := &SeaweedFSClient{
 		filerURL: "http://localhost:8888",
 		httpClient: &http.Client{
 			Transport: mock,
 		},
 	}
-	
+
 	// This test verifies that the client can handle transient failures
 	// In a real implementation, retry logic would be in a wrapper
 	reader, err := client.GetObject("bucket", "key")
-	
+
 	// First attempt should fail
 	assert.Error(t, err)
 	attempts++
-	
+
 	// Second attempt should succeed
 	reader, err = client.GetObject("bucket", "key")
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	attempts++
-	
+
 	assert.Equal(t, 2, attempts)
 }
 
@@ -1048,7 +1048,7 @@ func TestSeaweedFSClient_UploadArtifactBundleWithVerification(t *testing.T) {
 	artifactPath := tempDir + "/artifact.tar"
 	err := os.WriteFile(artifactPath, []byte("test content"), 0644)
 	require.NoError(t, err)
-	
+
 	mock := &mockRoundTripper{
 		responses: []mockResponse{
 			// Directory creation for main artifact
@@ -1069,7 +1069,7 @@ func TestSeaweedFSClient_UploadArtifactBundleWithVerification(t *testing.T) {
 			},
 		},
 	}
-	
+
 	client := &SeaweedFSClient{
 		filerURL:    "http://localhost:8888",
 		collection:  "test-collection",
@@ -1078,9 +1078,9 @@ func TestSeaweedFSClient_UploadArtifactBundleWithVerification(t *testing.T) {
 			Transport: mock,
 		},
 	}
-	
+
 	result, err := client.UploadArtifactBundleWithVerification("test-prefix", artifactPath)
-	
+
 	// The upload succeeds and integrity verification returns a result
 	// The verifier will try to download the file but we don't have enough mock responses
 	// This causes the verification to fail internally but still return a result
@@ -1088,10 +1088,10 @@ func TestSeaweedFSClient_UploadArtifactBundleWithVerification(t *testing.T) {
 		// If there's an error, it's from the verification process
 		assert.Contains(t, err.Error(), "integrity verification failed")
 	}
-	
+
 	// The result should be returned regardless
 	assert.NotNil(t, result)
-	
+
 	// Check if verification failed (it should due to insufficient mock responses)
 	if result != nil && !result.Verified {
 		// Verification failed as expected
@@ -1105,14 +1105,14 @@ func BenchmarkSeaweedFSClient_PutObject(b *testing.B) {
 	mock := &mockRoundTripper{
 		responses: make([]mockResponse, b.N),
 	}
-	
+
 	for i := 0; i < b.N; i++ {
 		mock.responses[i] = mockResponse{
 			statusCode: http.StatusCreated,
 			body:       `{"name":"test","size":100}`,
 		}
 	}
-	
+
 	client := &SeaweedFSClient{
 		filerURL:    "http://localhost:8888",
 		collection:  "test-collection",
@@ -1121,9 +1121,9 @@ func BenchmarkSeaweedFSClient_PutObject(b *testing.B) {
 			Transport: mock,
 		},
 	}
-	
+
 	data := bytes.Repeat([]byte("x"), 1024) // 1KB data
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader := bytes.NewReader(data)
@@ -1138,21 +1138,21 @@ func BenchmarkSeaweedFSClient_GetObject(b *testing.B) {
 	mock := &mockRoundTripper{
 		responses: make([]mockResponse, b.N),
 	}
-	
+
 	for i := 0; i < b.N; i++ {
 		mock.responses[i] = mockResponse{
 			statusCode: http.StatusOK,
 			body:       "test content",
 		}
 	}
-	
+
 	client := &SeaweedFSClient{
 		filerURL: "http://localhost:8888",
 		httpClient: &http.Client{
 			Transport: mock,
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader, err := client.GetObject("bucket", fmt.Sprintf("key-%d", i))

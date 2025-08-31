@@ -19,14 +19,13 @@
 4. **Request Format**:
    ```json
    {
-     "repository_url": "https://github.com/winterbe/java8-tutorial.git",
      "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-     "recipe_type": "openrewrite",
-     "branch": "master",
-     "configuration": {
-       "target_recipes": ["org.openrewrite.java.migrate.UpgradeToJava17"],
-       "package_manager": "maven",
-       "target_jdk": "17"
+     "type": "openrewrite",
+     "codebase": {
+       "repository": "https://github.com/winterbe/java8-tutorial.git",
+       "branch": "master",
+       "language": "java",
+       "build_tool": "maven"
      }
    }
    ```
@@ -170,21 +169,20 @@ Based on `/api/README.md`, OpenRewrite integration uses the unified ARF system:
 
 ### Step 1: Execute Transformation via Unified ARF
 ```bash
-# Using unified ARF endpoint
+# Using unified ARF endpoint with correct format
 curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
   -H "Content-Type: application/json" \
   -d '{
-    "repository_url": "https://github.com/winterbe/java8-tutorial.git",
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-    "recipe_type": "openrewrite",
-    "branch": "master",
-    "configuration": {
-      "target_recipes": ["org.openrewrite.java.migrate.UpgradeToJava17"],
-      "package_manager": "maven",
-      "target_jdk": "17"
+    "type": "openrewrite",
+    "codebase": {
+      "repository": "https://github.com/winterbe/java8-tutorial.git",
+      "branch": "master",
+      "language": "java",
+      "build_tool": "maven"
     }
   }' \
-  --max-time 120  # 2 minute timeout for transformation submission
+  --max-time 600  # 10 minute timeout for transformation
 ```
 
 ### Step 2: Monitor Transformation Status (with 60-minute maximum wait)
@@ -219,11 +217,7 @@ curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/recipes/validate" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-    "type": "openrewrite",
-    "configuration": {
-      "target_recipes": ["org.openrewrite.java.migrate.UpgradeToJava17"],
-      "package_manager": "maven"
-    }
+    "type": "openrewrite"
   }'
 ```
 

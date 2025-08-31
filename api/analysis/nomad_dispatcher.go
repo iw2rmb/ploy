@@ -18,18 +18,18 @@ import (
 
 // AnalysisJob represents a code analysis job
 type AnalysisJob struct {
-	ID          string                 `json:"id"`
-	Analyzer    string                 `json:"analyzer"`    // pylint, eslint, golangci-lint, etc.
-	Language    string                 `json:"language"`    // python, javascript, go, etc.
-	InputURL    string                 `json:"input_url"`
-	OutputURL   string                 `json:"output_url"`
-	Config      map[string]interface{} `json:"config,omitempty"`
-	Status      string                 `json:"status"` // pending, running, completed, failed
-	CreatedAt   time.Time              `json:"created_at"`
-	StartedAt   *time.Time             `json:"started_at"`
-	CompletedAt *time.Time             `json:"completed_at"`
+	ID          string                  `json:"id"`
+	Analyzer    string                  `json:"analyzer"` // pylint, eslint, golangci-lint, etc.
+	Language    string                  `json:"language"` // python, javascript, go, etc.
+	InputURL    string                  `json:"input_url"`
+	OutputURL   string                  `json:"output_url"`
+	Config      map[string]interface{}  `json:"config,omitempty"`
+	Status      string                  `json:"status"` // pending, running, completed, failed
+	CreatedAt   time.Time               `json:"created_at"`
+	StartedAt   *time.Time              `json:"started_at"`
+	CompletedAt *time.Time              `json:"completed_at"`
 	Result      *LanguageAnalysisResult `json:"result,omitempty"`
-	Error       string                 `json:"error,omitempty"`
+	Error       string                  `json:"error,omitempty"`
 }
 
 // AnalysisDispatcher handles job dispatch and monitoring for code analysis
@@ -378,8 +378,8 @@ EOF
 
 	// Parse templates
 	templates := map[string]string{
-		"pylint":       pylintTemplate,
-		"eslint":       eslintTemplate,
+		"pylint":        pylintTemplate,
+		"eslint":        eslintTemplate,
 		"golangci-lint": golangciTemplate,
 	}
 
@@ -405,7 +405,7 @@ func (d *AnalysisDispatcher) SubmitJob(ctx context.Context, analyzer string, inp
 	}
 
 	// Prepare output URL
-	outputURL := fmt.Sprintf("%s/ploy-artifacts/analysis/outputs/%s.json", d.storageBaseURL, jobID)
+	outputURL := fmt.Sprintf("%s/analysis/outputs/%s.json", d.storageBaseURL, jobID)
 
 	// Determine language from analyzer
 	language := d.getLanguageForAnalyzer(analyzer)
@@ -547,7 +547,7 @@ func (d *AnalysisDispatcher) ListJobs(ctx context.Context, limit int) ([]*Analys
 
 // uploadInput uploads the input tar to storage
 func (d *AnalysisDispatcher) uploadInput(ctx context.Context, jobID string, inputTar io.Reader) (string, error) {
-	bucket := "ploy-artifacts"
+	bucket := "artifacts"
 	key := fmt.Sprintf("analysis/inputs/%s.tar.gz", jobID)
 
 	// Read input into buffer for ReadSeeker

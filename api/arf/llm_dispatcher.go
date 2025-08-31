@@ -252,7 +252,7 @@ func (d *LLMDispatcher) SubmitLLMTransformation(ctx context.Context, provider, m
 	}
 
 	// Prepare output URL
-	outputURL := fmt.Sprintf("%s/ploy-artifacts/llm/outputs/%s.tar.gz", d.storageBaseURL, jobID)
+	outputURL := fmt.Sprintf("%s/llm/outputs/%s.tar.gz", d.storageBaseURL, jobID)
 
 	// Extract parameters
 	temperature := 0.1
@@ -374,7 +374,7 @@ func (d *LLMDispatcher) WaitForCompletion(ctx context.Context, jobID string, tim
 
 // uploadInput uploads the input tar to storage
 func (d *LLMDispatcher) uploadInput(ctx context.Context, jobID string, inputTar io.Reader) (string, error) {
-	bucket := "ploy-artifacts"
+	bucket := "artifacts"
 	key := fmt.Sprintf("llm/inputs/%s.tar.gz", jobID)
 
 	// Read input into buffer

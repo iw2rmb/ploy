@@ -13,11 +13,11 @@ import (
 func main() {
 	log.Println("Starting SeaweedFS storage adapter logging test...")
 
-	// Create SeaweedFS client configuration  
+	// Create SeaweedFS client configuration
 	config := internalStorage.SeaweedFSConfig{
 		Master:      "seaweedfs-master.service.consul:9333",
-		Filer:       "seaweedfs-filer.service.consul:8888", 
-		Collection:  "ploy-artifacts",
+		Filer:       "seaweedfs-filer.service.consul:8888",
+		Collection:  "artifacts",
 		Replication: "000", // No replication for dev
 		Timeout:     30,
 	}

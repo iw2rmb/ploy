@@ -2,30 +2,26 @@
 
 ## Overview
 
-The ARF (Automated Refactoring Framework) OpenRewrite migration system provides automated Java 11→17 migrations using OpenRewrite recipes via Nomad batch jobs, with optional LLM self-healing capabilities. This system implements the comprehensive testing approach described in `roadmap/openrewrite/benchmark-java11.md`.
+The ARF (Automated Refactoring Framework) OpenRewrite migration system provides automated Java 11→17 migrations using OpenRewrite recipes via Nomad batch jobs, with optional LLM self-healing capabilities. This system implements batch job execution for reliable, scalable transformations.
 
 ## Architecture
 
 ### Batch Job Architecture
-- **Nomad Batch Jobs**: OpenRewrite transformations run as ephemeral batch jobs via dispatcher
-- **ARF Integration**: Batch job dispatcher for job submission and monitoring (`api/arf/openrewrite_dispatcher.go`)
-- **Benchmark System**: CLI commands and configuration management
-- **LLM Enhancement**: Ollama integration with CodeLlama 7B for self-healing
+- **Nomad Batch Jobs**: OpenRewrite transformations run as ephemeral batch jobs
+- **ARF Dispatcher**: Manages job submission and monitoring (`api/arf/openrewrite_dispatcher.go`)
+- **Storage Integration**: SeaweedFS for artifact storage and retrieval
+- **Dynamic Recipe Discovery**: Automatic resolution of recipe coordinates from Maven Central
 
 ### Key Components
 
 ```
 ploy/
 ├── api/arf/
-│   ├── openrewrite_engine.go          # Core OpenRewrite execution engine
 │   ├── openrewrite_dispatcher.go      # Nomad batch job dispatcher
-│   ├── openrewrite_client.go          # Batch job client wrapper
-│   ├── benchmark_configs/
-│   │   └── java11to17_migration.yaml  # Migration configuration
-│   └── examples/
-│       └── java11to17.yaml            # Example recipes
+│   ├── openrewrite_engine.go          # Local execution engine (testing)
+│   └── factory.go                     # Engine factory configuration
 ├── platform/nomad/
-│   └── openrewrite-batch.hcl         # Nomad batch job template
+│   └── [job templates via dispatcher]  # Dynamic job generation
 ├── scripts/                           # Testing scripts
 │   ├── run-phase1-sequential.sh       # Sequential baseline testing
 │   ├── run-phase2-llm.sh             # LLM-enhanced testing
@@ -34,6 +30,38 @@ ploy/
 │   └── validate-arf-openrewrite-setup.sh      # Prerequisites validation
 └── internal/cli/arf/
     └── benchmark.go                   # CLI interface
+```
+
+## Implementation Details
+
+### Batch Job Dispatcher
+
+The OpenRewrite dispatcher (`api/arf/openrewrite_dispatcher.go`) manages the complete transformation lifecycle:
+
+1. **Infrastructure Validation**: Verifies Nomad and storage connectivity
+2. **Artifact Preparation**: Creates tar archives of source code
+3. **Storage Upload**: Uploads artifacts to SeaweedFS at `artifacts/openrewrite/{job-id}/`
+4. **Job Submission**: Creates and submits Nomad batch jobs
+5. **Execution Monitoring**: Tracks job progress with 4-minute timeout
+6. **Result Retrieval**: Downloads transformed code from storage
+
+### Docker Image
+
+- **Image**: `registry.dev.ployman.app/openrewrite-jvm:latest`
+- **Features**:
+  - Dynamic recipe discovery from Maven Central
+  - Built-in Maven cache for performance
+  - Automatic artifact download/upload
+  - Recipe coordinate resolution
+
+### Resource Configuration
+
+```yaml
+# Nomad Job Resources
+CPU: 500 MHz
+Memory: 2048 MB (2GB)
+Ephemeral Disk: Dynamic
+Timeout: 4 minutes per job
 ```
 
 ## Usage
@@ -45,9 +73,9 @@ ploy/
    brew install maven gradle
    ```
 
-2. **LLM Provider Setup**:
+2. **LLM Provider Setup** (Optional):
    ```bash
-   # Install Ollama
+   # Install Ollama for self-healing
    curl -fsSL https://ollama.ai/install.sh | sh
    ollama serve &
    ollama pull codellama:7b
@@ -56,21 +84,61 @@ ploy/
 3. **Environment Variables**:
    ```bash
    export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
-   export ARF_LLM_PROVIDER=ollama
-   export ARF_LLM_MODEL=codellama:7b
+   export ARF_LLM_PROVIDER=ollama  # Optional
+   export ARF_LLM_MODEL=codellama:7b  # Optional
    ```
 
 ### Validation
 
-Validate your setup before running tests:
+Validate your setup before running:
 
 ```bash
 ./scripts/validate-arf-openrewrite-setup.sh
 ```
 
-## Testing Framework
+## API Integration
 
-The system implements a progressive 3-phase testing approach:
+### Unified ARF Endpoints
+
+OpenRewrite transformations use the unified ARF transformation pipeline:
+
+```bash
+# Execute transformation
+curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
+    "type": "openrewrite",
+    "codebase": {
+      "repository": "https://github.com/winterbe/java8-tutorial.git",
+      "branch": "master",
+      "language": "java",
+      "build_tool": "maven"
+    }
+  }'
+
+# Check transformation status
+curl "${PLOY_CONTROLLER}/arf/transforms/{transformation_id}"
+```
+
+### Recipe Management
+
+OpenRewrite recipes are managed through the unified ARF recipe system:
+
+```bash
+# List OpenRewrite recipes
+curl "${PLOY_CONTROLLER}/arf/recipes?type=openrewrite"
+
+# Validate recipe
+curl -X POST "${PLOY_CONTROLLER}/arf/recipes/validate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
+    "type": "openrewrite"
+  }'
+```
+
+## Testing Framework
 
 ### Phase 1: Sequential Baseline Testing
 **Objective**: Validate core OpenRewrite functionality
@@ -81,9 +149,9 @@ The system implements a progressive 3-phase testing approach:
 ```
 
 **Test Repositories**:
-- `winterbe/java8-tutorial` (Reference implementation)
+- `winterbe/java8-tutorial` (Simple tutorial)
 - `eugenp/tutorials` (Tutorial collection)
-- `iluwatar/java-design-patterns` (Design patterns examples)
+- `iluwatar/java-design-patterns` (Design patterns)
 
 ### Phase 2: LLM-Enhanced Testing
 **Objective**: Test hybrid OpenRewrite + LLM pipeline
@@ -106,21 +174,13 @@ The system implements a progressive 3-phase testing approach:
 ./scripts/run-phase3-parallel.sh
 ```
 
-**Features**:
-- 3 concurrent transformations
-- Dependency-aware execution ordering
-- Resource monitoring and error isolation
-
 ### Comprehensive Testing
 
 Run all phases in sequence:
 
 ```bash
 ./scripts/run-openrewrite-comprehensive-test.sh
-```
 
-**Configuration Options**:
-```bash
 # Run specific phases only
 RUN_PHASE1=true RUN_PHASE2=false RUN_PHASE3=true ./scripts/run-openrewrite-comprehensive-test.sh
 
@@ -153,52 +213,6 @@ ploy arf benchmark run java11to17_migration \
   --iterations 3
 ```
 
-### Batch Configuration
-
-For parallel execution, create a batch configuration file:
-
-```yaml
-name: "parallel_java11to17_migration"
-description: "Parallel Java 11→17 migration"
-
-repositories:
-  - id: "simple-1"
-    url: "https://github.com/winterbe/java8-tutorial.git"
-    branch: "main"
-    language: "java"
-    build_tool: "maven"
-    priority: 1
-    
-  - id: "complex-1"
-    url: "https://github.com/spring-projects/spring-boot.git"
-    branch: "main"
-    language: "java" 
-    build_tool: "maven"
-    priority: 2
-    dependencies: ["simple-1"]
-
-recipes:
-  - "org.openrewrite.java.migrate.JavaVersion11to17"
-  - "org.openrewrite.java.migrate.javax.JavaxToJakarta"
-
-options:
-  parallel_execution: true
-  max_concurrency: 3
-  timeout: "45m"
-
-llm_provider: "ollama"
-llm_model: "codellama:7b"
-```
-
-Then run:
-
-```bash
-ploy arf benchmark run custom \
-  --config-file batch-config.yaml \
-  --app-name "batch-migration" \
-  --lane C
-```
-
 ## Status Monitoring
 
 ### Check Benchmark Status
@@ -212,158 +226,114 @@ ploy arf benchmark status <benchmark-id>
 
 # View benchmark logs
 ploy arf benchmark logs <benchmark-id>
-
-# Stop running benchmark
-ploy arf benchmark stop <benchmark-id>
 ```
 
 ### Health Checks
 
 ```bash
-# Controller health (manages batch jobs)
+# Controller health
 curl https://api.dev.ployman.app/v1/version
 
-# Nomad cluster health (for batch job execution)
-nomad node status
-
-# Ollama LLM provider
-curl http://localhost:11434/api/tags
+# Nomad job status (via wrapper)
+nomad job status | grep openrewrite
 ```
 
-## Configuration
+## Batch Job Architecture Details
 
-### Migration Recipes
+### Job Execution Flow
 
-The default Java 11→17 migration includes:
+1. **Job Creation**: Dispatcher creates unique job ID and packages repository
+2. **Storage Upload**: Tar archive uploaded to SeaweedFS at `artifacts/openrewrite/{job-id}/input.tar`
+3. **Nomad Submission**: Batch job submitted with artifact URL
+4. **Artifact Download**: Job downloads input via HTTP from SeaweedFS
+5. **Transformation**: OpenRewrite executes with dynamic recipe discovery
+6. **Result Upload**: Transformed code uploaded to `artifacts/openrewrite/{job-id}/output.tar`
+7. **Cleanup**: Job completes and resources are released
 
-- `org.openrewrite.java.migrate.UpgradeToJava17`
-- `org.openrewrite.java.migrate.javax.JavaxToJakarta`
+### Environment Variables
 
-### LLM Self-Healing
-
-Configuration for LLM-assisted error resolution:
-
-```yaml
-# LLM configuration
-llm_provider: ollama
-llm_model: codellama:7b
-llm_options:
-  temperature: "0.1"
-  max_tokens: "2000"
-  base_url: "http://localhost:11434"
-
-# Iteration control
-max_iterations: 10
-timeout_per_iteration: 5m
-stop_on_success: true
-```
-
-## Batch Job Architecture
-
-### OpenRewrite Batch Jobs
-
-ARF uses Nomad batch jobs for OpenRewrite transformations instead of persistent services. This provides:
-
-- **Resource Efficiency**: Jobs run only when needed, consuming zero resources when idle
-- **Scalability**: Batch jobs can scale horizontally across Nomad cluster nodes
-- **Isolation**: Each transformation runs in a clean, isolated environment
-- **Fault Tolerance**: Failed jobs can be automatically retried or rescheduled
-
-Configuration:
-- **Job Type**: Nomad batch job (ephemeral)
-- **Memory**: 256MB per job
-- **CPU**: 500MHz per job  
-- **Storage**: Ephemeral disk (1GB)
-- **Image**: `registry.dev.ployman.app/openrewrite-native:latest`
-
-### Batch Job Variables
+Jobs are configured with:
 
 ```bash
-# Batch job configuration (set by dispatcher)
-JOB_ID=<unique-job-id>
-RECIPE=<openrewrite-recipe-name>
-INPUT_URL=<storage-url-for-input-tar>
-OUTPUT_URL=<storage-url-for-output-tar>
-CONSUL_HTTP_ADDR=<consul-url-for-status-updates>
-
-# OpenRewrite batch execution
-OPENREWRITE_TEMP_DIR=/workspace
-OPENREWRITE_MAX_MEMORY=256m
-OPENREWRITE_TIMEOUT=300s
+RECIPE=<openrewrite-recipe-class>
+ARTIFACT_URL=http://seaweedfs-filer.service.consul:8888/artifacts/openrewrite/{job-id}/input.tar
+OUTPUT_KEY=artifacts/openrewrite/{job-id}/output.tar
+DISCOVER_RECIPE=true  # Enable dynamic discovery
+MAVEN_CACHE_PATH=maven-repository
 ```
+
+### Dynamic Recipe Discovery
+
+The system automatically resolves recipe coordinates:
+- Recipe class name provided (e.g., `org.openrewrite.java.migrate.UpgradeToJava17`)
+- Maven coordinates discovered from Maven Central
+- Dependencies downloaded and cached
+- No hardcoded recipe mappings required
 
 ## Troubleshooting
 
-### Batch Job Issues
-
-```bash
-# Check running/recent batch jobs
-nomad job status | grep openrewrite
-
-# View specific batch job details
-nomad job status openrewrite-<job-id>
-
-# Check batch job logs
-nomad logs <allocation-id>
-
-# Monitor job queue in Consul
-consul kv get -recurse ploy/openrewrite/jobs/
-```
-
-### LLM Provider Issues
-
-```bash
-# Check Ollama status
-curl http://localhost:11434/api/tags
-
-# Restart Ollama
-pkill ollama
-ollama serve &
-
-# Verify model availability
-ollama list | grep codellama:7b
-```
-
-### Recipe Issues
-
-```bash
-# Validate recipe configuration  
-ploy arf benchmark validate-recipe java11to17_migration
-
-# Check for recipe updates
-# OpenRewrite recipes are updated regularly - check versions
-```
-
 ### Common Issues
 
-1. **Connection Refused**: Service not deployed or domain misconfigured
-2. **Timeout Errors**: Large repositories may need increased timeout values
-3. **Recipe Failures**: Check Java version compatibility and project structure
-4. **LLM Errors**: Verify Ollama is running and model is downloaded
+1. **Job Timeout (4 minutes)**:
+   - Large repositories may need optimization
+   - Check Nomad allocation logs for details
+   - Consider splitting into smaller transformations
+
+2. **Storage Upload Failures**:
+   - Verify SeaweedFS connectivity
+   - Check storage space availability
+   - Review dispatcher logs for upload errors
+
+3. **Recipe Discovery Issues**:
+   - Ensure Maven Central is accessible
+   - Check for network proxy requirements
+   - Verify recipe class name is correct
+
+### Debug Commands
+
+```bash
+# Check running batch jobs
+nomad job status | grep openrewrite
+
+# View job allocation details
+nomad job status openrewrite-<job-id>
+
+# Check dispatcher logs (in API logs)
+curl https://api.dev.ployman.app/v1/logs | grep OpenRewriteDispatcher
+
+# Verify storage accessibility
+curl -I http://seaweedfs-filer.service.consul:8888/artifacts/
+```
 
 ## Performance Metrics
 
 ### Expected Results
 
-Based on the comprehensive testing framework:
-
 - **Phase 1**: 100% success rate, <5 minutes per simple project
-- **Phase 2**: 80% success rate with LLM assistance, 10-15 minutes per medium project  
+- **Phase 2**: 80% success rate with LLM assistance, 10-15 minutes per medium project
 - **Phase 3**: 70% overall success rate, 60% time reduction through parallelism
 
 ### Monitoring Points
 
-- Transformation success rate by complexity tier
-- Average execution time per project type
-- LLM iteration count and success rate
-- Resource utilization during parallel execution
-- Build success rate post-transformation
+- Job submission to completion time
+- Storage upload/download performance
+- Recipe discovery and caching efficiency
+- Transformation success rate by repository complexity
+- Resource utilization (CPU, memory) during execution
+
+## Migration Recipes
+
+### Default Java 11→17 Migration
+
+The standard migration includes:
+- `org.openrewrite.java.migrate.UpgradeToJava17` (comprehensive migration)
+- `org.openrewrite.java.migrate.javax.JavaxToJakarta` (javax→jakarta)
+
+Additional recipes are discovered dynamically based on project needs.
 
 ## Integration
 
 ### CI/CD Pipeline
-
-Integrate ARF migrations into your CI/CD workflow:
 
 ```yaml
 # Example GitHub Actions
@@ -378,16 +348,14 @@ Integrate ARF migrations into your CI/CD workflow:
 
 ### API Integration
 
-The ARF system provides REST API endpoints for programmatic access:
-
 ```bash
 # Create migration job
-curl -X POST https://api.dev.ployman.app/v1/arf/benchmark \
+curl -X POST https://api.dev.ployman.app/v1/arf/transform \
   -H "Content-Type: application/json" \
-  -d '{"recipe":"java11to17_migration","repository":"...","branch":"main"}'
+  -d '{"recipe_id":"org.openrewrite.java.migrate.UpgradeToJava17","type":"openrewrite","codebase":{...}}'
 
 # Check job status
-curl https://api.dev.ployman.app/v1/arf/benchmark/{id}/status
+curl https://api.dev.ployman.app/v1/arf/transforms/{id}
 ```
 
-This comprehensive migration system provides automated, scalable Java migration capabilities with intelligent self-healing and parallel execution support.
+This migration system provides automated, scalable Java migration capabilities through reliable batch job execution with intelligent recipe discovery and optional LLM enhancement.

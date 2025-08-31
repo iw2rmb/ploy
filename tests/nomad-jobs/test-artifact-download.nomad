@@ -12,9 +12,9 @@ job "test-artifact-download" {
         args = ["-c", "ls -la; echo 'Checking for artifacts:'; if [ -d local ]; then echo 'local directory exists:'; ls -la local/; else echo 'local directory not found'; fi"]
       }
       
-      # Use one of the existing input.tar files we know exists
+      # Test artifact download with corrected path (no artifacts prefix)
       artifact {
-        source = "http://seaweedfs-filer.service.consul:8888/artifacts/openrewrite/openrewrite-1756650683/input.tar"
+        source = "http://seaweedfs-filer.service.consul:8888/artifacts/openrewrite/test-job/input.tar"
         destination = "local/"
       }
       

@@ -276,7 +276,7 @@ func (m *mockStorageProvider) ListObjects(bucket, prefix string) ([]storage.Obje
 
 // Additional methods to satisfy StorageProvider interface
 func (m *mockStorageProvider) GetArtifactsBucket() string {
-	return "ploy-artifacts"
+	return "artifacts"
 }
 
 func (m *mockStorageProvider) GetTempBucket() string {

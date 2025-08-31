@@ -2,13 +2,13 @@ storage:
   provider: seaweedfs
   master: localhost:9333
   filer: localhost:8888
-  collection: ploy-artifacts
+  collection: artifacts
   replication: "000"
   timeout: 30
   datacenter: ""
   rack: ""
   collections:
-    artifacts: ploy-artifacts
+    artifacts: artifacts
     metadata: ploy-metadata
     debug: ploy-debug
   client:

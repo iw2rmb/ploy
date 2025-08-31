@@ -54,7 +54,7 @@ job "ploy-api" {
 
       # Binary distribution via artifact download from SeaweedFS
       artifact {
-        source = "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
+        source = "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
         destination = "local/api"
         mode = "file"
       }

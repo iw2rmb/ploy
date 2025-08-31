@@ -1843,13 +1843,13 @@
             # SeaweedFS Configuration
             master: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
             filer: "{{ storage_config.seaweedfs.filer | default('localhost:8888') }}"
-            collection: "{{ storage_config.seaweedfs.collection | default('ploy-artifacts') }}"
+            collection: "{{ storage_config.seaweedfs.collection | default('artifacts') }}"
             replication: "{{ seaweedfs_single_node.replication | default(storage_config.seaweedfs.replication | default('001')) }}"
             timeout: {{ storage_config.seaweedfs.timeout | default(30) }}
             datacenter: "{{ storage_config.seaweedfs.datacenter | default('') }}"
             rack: "{{ storage_config.seaweedfs.rack | default('') }}"
             collections:
-              artifacts: "{{ storage_config.seaweedfs.collections.artifacts | default('ploy-artifacts') }}"
+              artifacts: "{{ storage_config.seaweedfs.collections.artifacts | default('artifacts') }}"
               metadata: "{{ storage_config.seaweedfs.collections.metadata | default('ploy-metadata') }}"
               debug: "{{ storage_config.seaweedfs.collections.debug | default('ploy-debug') }}"
             
