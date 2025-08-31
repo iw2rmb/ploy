@@ -15,14 +15,14 @@ NC='\033[0m'
 # Configuration
 BASE_DOMAIN="dev.ployd.app"
 CONTROLLER_DOMAIN="api.dev.ployman.app"
-TARGET_IP="45.12.75.241"
+# TARGET_HOST should already be set globally
 
 echo -e "${BLUE}🌐 DNS Records Validation${NC}"
 echo "=========================="
 echo ""
 
 echo -e "${BLUE}Configuration:${NC}"
-echo "  🎯 Target IP: $TARGET_IP"
+echo "  🎯 Target IP: $TARGET_HOST"
 echo "  🌐 Base Domain: $BASE_DOMAIN"
 echo "  🎯 Controller: $CONTROLLER_DOMAIN"
 echo ""
@@ -120,12 +120,12 @@ echo "------------------------"
 dns_valid=true
 
 # Check base domain
-if ! check_dns_record "$BASE_DOMAIN" "$TARGET_IP" "base domain"; then
+if ! check_dns_record "$BASE_DOMAIN" "$TARGET_HOST" "base domain"; then
     dns_valid=false
 fi
 
 # Check controller domain
-if ! check_dns_record "$CONTROLLER_DOMAIN" "$TARGET_IP" "controller domain"; then
+if ! check_dns_record "$CONTROLLER_DOMAIN" "$TARGET_HOST" "controller domain"; then
     dns_valid=false
 fi
 
@@ -135,7 +135,7 @@ echo ""
 echo -e "${BLUE}Step 2: Wildcard DNS Resolution${NC}"
 echo "-------------------------------"
 
-if ! test_wildcard "$BASE_DOMAIN" "$TARGET_IP"; then
+if ! test_wildcard "$BASE_DOMAIN" "$TARGET_HOST"; then
     dns_valid=false
     echo -e "${YELLOW}⚠️  Wildcard DNS may not be properly configured${NC}"
 fi
@@ -146,7 +146,7 @@ echo ""
 echo -e "${BLUE}Step 3: DNS Propagation Check${NC}"
 echo "-----------------------------"
 
-if ! check_propagation_timing "$BASE_DOMAIN" "$TARGET_IP"; then
+if ! check_propagation_timing "$BASE_DOMAIN" "$TARGET_HOST"; then
     echo -e "${YELLOW}⚠️  DNS propagation incomplete - wait 5-10 minutes and retry${NC}"
 fi
 
@@ -169,8 +169,8 @@ else
     echo -e "${RED}❌ DNS configuration issues detected${NC}"
     echo ""
     echo -e "${YELLOW}🔧 Required DNS records in Namecheap:${NC}"
-    echo "  Type: A, Host: dev, Value: $TARGET_IP, TTL: 300"
-    echo "  Type: A, Host: *.dev, Value: $TARGET_IP, TTL: 300"
+    echo "  Type: A, Host: dev, Value: $TARGET_HOST, TTL: 300"
+    echo "  Type: A, Host: *.dev, Value: $TARGET_HOST, TTL: 300"
     echo ""
     echo -e "${YELLOW}📋 Instructions:${NC}"
     echo "  1. Login to Namecheap.com"

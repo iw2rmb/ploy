@@ -19,19 +19,19 @@ NC='\033[0m'
 BASE_DOMAIN="${PLOY_APPS_DOMAIN:-ployd.app}"
 DEV_SUBDOMAIN="${PLOY_DEV_SUBDOMAIN:-dev}"
 DEV_DOMAIN="$DEV_SUBDOMAIN.$BASE_DOMAIN"
-VPS_IP="${TARGET_IP:-45.12.75.241}"
+# TARGET_HOST should already be set globally
 
 echo -e "${BLUE}Testing Configuration:${NC}"
 echo "  Base domain: $BASE_DOMAIN"
 echo "  Dev domain: $DEV_DOMAIN"
 echo "  Controller: api.$DEV_DOMAIN"
 echo "  Wildcard: *.$DEV_DOMAIN"
-echo "  VPS IP: $VPS_IP"
+echo "  VPS IP: $TARGET_HOST"
 echo ""
 
 # Test 1: Controller environment variables
 echo -e "${YELLOW}Test 1: Checking controller environment...${NC}"
-CONTROLLER_ENV=$(ssh root@$VPS_IP "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && nomad alloc exec \"\$ALLOC_ID\" env | grep PLOY_" 2>/dev/null || echo "failed")
+CONTROLLER_ENV=$(ssh root@$TARGET_HOST "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && nomad alloc exec \"\$ALLOC_ID\" env | grep PLOY_" 2>/dev/null || echo "failed")
 
 if echo "$CONTROLLER_ENV" | grep -q "PLOY_ENVIRONMENT=dev"; then
     echo -e "${GREEN}✓ Controller has dev environment variables${NC}"
@@ -42,10 +42,10 @@ fi
 
 # Test 2: Reserved app names
 echo -e "${YELLOW}Test 2: Testing app name protection...${NC}"
-CONTROLLER_PORT=$(ssh root@$VPS_IP "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && /opt/hashicorp/bin/nomad-job-manager.sh alloc-status \"\$ALLOC_ID\" 2>/dev/null | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == \"http\") | .Value // empty'" 2>/dev/null)
+CONTROLLER_PORT=$(ssh root@$TARGET_HOST "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && /opt/hashicorp/bin/nomad-job-manager.sh alloc-status \"\$ALLOC_ID\" 2>/dev/null | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == \"http\") | .Value // empty'" 2>/dev/null)
 
 if [ -n "$CONTROLLER_PORT" ]; then
-    API_RESPONSE=$(ssh root@$VPS_IP "curl -s -X POST http://localhost:$CONTROLLER_PORT/v1/apps/api/builds -H 'Content-Type: application/tar' --data-binary @/dev/null")
+    API_RESPONSE=$(ssh root@$TARGET_HOST "curl -s -X POST http://localhost:$CONTROLLER_PORT/v1/apps/api/builds -H 'Content-Type: application/tar' --data-binary @/dev/null")
     if echo "$API_RESPONSE" | grep -q "reserved"; then
         echo -e "${GREEN}✓ App name 'api' is protected${NC}"
     else
@@ -58,7 +58,7 @@ fi
 # Test 3: Version endpoints
 echo -e "${YELLOW}Test 3: Testing version endpoints...${NC}"
 if [ -n "$CONTROLLER_PORT" ]; then
-    VERSION_RESPONSE=$(ssh root@$VPS_IP "curl -s http://localhost:$CONTROLLER_PORT/version")
+    VERSION_RESPONSE=$(ssh root@$TARGET_HOST "curl -s http://localhost:$CONTROLLER_PORT/version")
     if echo "$VERSION_RESPONSE" | grep -q "version"; then
         echo -e "${GREEN}✓ Version endpoint working${NC}"
         echo "  Version: $(echo "$VERSION_RESPONSE" | jq -r .version 2>/dev/null)"
@@ -70,7 +70,7 @@ fi
 # Test 4: Platform certificate manager
 echo -e "${YELLOW}Test 4: Testing platform certificate manager...${NC}"
 if [ -n "$CONTROLLER_PORT" ]; then
-    CERT_RESPONSE=$(ssh root@$VPS_IP "curl -s http://localhost:$CONTROLLER_PORT/health/platform-certificates" 2>/dev/null || echo "failed")
+    CERT_RESPONSE=$(ssh root@$TARGET_HOST "curl -s http://localhost:$CONTROLLER_PORT/health/platform-certificates" 2>/dev/null || echo "failed")
     if echo "$CERT_RESPONSE" | grep -q "platform\|certificate"; then
         echo -e "${GREEN}✓ Platform certificate manager accessible${NC}"
     else
@@ -87,9 +87,9 @@ CURRENT_API_IP=$(dig +short "api.$DEV_DOMAIN" | tail -n1)
 echo "  Current DNS:"
 echo "    $DEV_DOMAIN → $CURRENT_DEV_IP"
 echo "    api.$DEV_DOMAIN → $CURRENT_API_IP"
-echo "  Expected: $VPS_IP"
+echo "  Expected: $TARGET_HOST"
 
-if [ "$CURRENT_DEV_IP" = "$VPS_IP" ] && [ "$CURRENT_API_IP" = "$VPS_IP" ]; then
+if [ "$CURRENT_DEV_IP" = "$TARGET_HOST" ] && [ "$CURRENT_API_IP" = "$TARGET_HOST" ]; then
     echo -e "${GREEN}✓ DNS records are correct${NC}"
     DNS_READY=true
 else
@@ -144,7 +144,7 @@ else
     if [ "$DNS_READY" = false ]; then
         echo "📋 DNS Update Required:"
         echo "  1. Log into Namecheap control panel"
-        echo "  2. Update *.dev.ployd.app records to $VPS_IP"
+        echo "  2. Update *.dev.ployd.app records to $TARGET_HOST"
         echo "  3. Wait for DNS propagation (5-10 minutes)"
         echo ""
     fi

@@ -141,7 +141,6 @@ git checkout main && git merge <current-branch> && git push origin main && git c
 **VPS (Integration/Functional):**
 ```bash
 # API Deployment (Preferred Method - handles both cold start and hot reload)
-export TARGET_HOST=45.12.75.241       # Your VPS IP
 ./bin/ployman api deploy              # Deploys API (auto-fallback to Ansible if needed)
 
 # Alternative deployment methods
@@ -166,7 +165,7 @@ The `./bin/ployman api deploy` command provides a robust deployment solution:
 
 **Environment Variables for Deployment:**
 ```bash
-export TARGET_HOST=45.12.75.241              # VPS IP address (required for Ansible fallback)
+# TARGET_HOST should already be set globally
 export PLOY_CONTROLLER=https://api.dev.ployman.app/v1  # API endpoint (default: dev)
 export DEPLOY_BRANCH=main                    # Git branch to deploy (auto-detected if not set)
 

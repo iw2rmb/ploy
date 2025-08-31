@@ -138,7 +138,7 @@ test_recipe_type_enforcement() {
     # Test 1b: Request with explicit type - expect infrastructure issue (dispatcher not ready)
     # Note: This will timeout until OpenRewrite infrastructure is fully deployed
     # We accept 000 (timeout) or 500 (infrastructure error) as valid responses for now
-    local transform_response=$(test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"org.openrewrite.java.migrate.UpgradeToJava17\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200' '10')
+    local transform_response=$(test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"org.openrewrite.java.migrate.UpgradeToJava17\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200' '600')
     if [[ $? -ne 0 ]]; then
         log_info "Transform with type returned non-200 (expected until infrastructure ready)"
         # Check if it's a timeout or infrastructure error
@@ -162,7 +162,7 @@ test_full_recipe_names() {
     
     # Test 2a: Submit OpenRewrite transformation
     log_info "Submitting OpenRewrite transformation job..."
-    local transform_response=$(curl -s -X POST -H "Content-Type: application/json" \
+    local transform_response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
         -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
         "$CONTROLLER_URL/arf/transform" || echo '{"error":"request_failed"}')
     
@@ -236,7 +236,7 @@ monitor_transformation_with_timeout() {
             return 1
         fi
         
-        local status_response=$(curl -s "$CONTROLLER_URL/arf/transforms/$transform_id" || echo '{"status":"connection_error"}')
+        local status_response=$(curl -s -m 600 "$CONTROLLER_URL/arf/transforms/$transform_id" || echo '{"status":"connection_error"}')
         local status=$(echo "$status_response" | jq -r '.status // "unknown"')
         
         if [[ "$status" != "$last_status" ]]; then
@@ -295,7 +295,7 @@ test_unified_arf_system() {
 # Helper to verify dispatcher path usage
 verify_openrewrite_dispatcher_path() {
     # Submit an OpenRewrite transformation and check logs/behavior
-    local response=$(curl -s -X POST -H "Content-Type: application/json" \
+    local response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
         -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
         "$CONTROLLER_URL/arf/transform")
     
@@ -305,7 +305,7 @@ verify_openrewrite_dispatcher_path() {
         
         # Wait a bit and check status to verify it's using unified system
         sleep 10
-        local status_response=$(curl -s "$CONTROLLER_URL/arf/transforms/$transform_id")
+        local status_response=$(curl -s -m 600 "$CONTROLLER_URL/arf/transforms/$transform_id")
         
         if echo "$status_response" | jq -e '.transformation_id' >/dev/null 2>&1; then
             log_success "OpenRewrite transformation using unified system path"
@@ -335,7 +335,7 @@ verify_unified_container_usage() {
     local all_consistent=true
     
     for recipe in "${recipes[@]}"; do
-        local response=$(curl -s -X POST -H "Content-Type: application/json" \
+        local response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
             -d "{\"recipe_id\":\"$recipe\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}" \
             "$CONTROLLER_URL/arf/transform")
         

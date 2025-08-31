@@ -284,6 +284,9 @@
               export NAMECHEAP_API_USER="{{ lookup('env', 'NAMECHEAP_API_USER') | default('iw2rmb') }}"
               export NAMECHEAP_USERNAME="{{ lookup('env', 'NAMECHEAP_USERNAME') | default('iw2rmb') }}"
               export NAMECHEAP_CLIENT_IP="{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}"
+              
+              # Global deployment target host
+              export TARGET_HOST="{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}"
             marker: "# {mark} ANSIBLE MANAGED BLOCK - Production SSL Certificate vars"
 
     - name: Initialize SSL certificate provisioning for production environment
@@ -292,15 +295,15 @@
           shell: |
             PROD_IP=$(dig +short {{ ploy_prod_certificate.base_domain }} | tail -n1)
             API_IP=$(dig +short {{ ploy_prod_routing.controller_domain }} | tail -n1)
-            TARGET_IP="{{ ansible_default_ipv4.address }}"
+            TARGET_HOST="{{ ansible_default_ipv4.address }}"
             
-            if [ "$PROD_IP" = "$TARGET_IP" ] && [ "$API_IP" = "$TARGET_IP" ]; then
+            if [ "$PROD_IP" = "$TARGET_HOST" ] && [ "$API_IP" = "$TARGET_HOST" ]; then
               echo "DNS_READY"
             else
               echo "DNS_NOT_READY"
               echo "Current: {{ ploy_prod_certificate.base_domain }} -> $PROD_IP"
               echo "Current: {{ ploy_prod_routing.controller_domain }} -> $API_IP"
-              echo "Required: $TARGET_IP"
+              echo "Required: $TARGET_HOST"
             fi
           register: dns_status
           changed_when: false

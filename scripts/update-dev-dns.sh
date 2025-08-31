@@ -19,16 +19,16 @@ NC='\033[0m'
 BASE_DOMAIN="${PLOY_APPS_DOMAIN:-ployd.app}"
 DEV_SUBDOMAIN="${PLOY_DEV_SUBDOMAIN:-dev}"
 DEV_DOMAIN="$DEV_SUBDOMAIN.$BASE_DOMAIN"
-VPS_IP="${TARGET_IP:-45.12.75.241}"
+# TARGET_HOST should already be set globally
 
 echo -e "${BLUE}Configuration:${NC}"
 echo "  Base domain: $BASE_DOMAIN"
 echo "  Dev domain: $DEV_DOMAIN"
-echo "  VPS IP: $VPS_IP"
+echo "  VPS IP: $TARGET_HOST"
 echo ""
 
 # Get controller endpoint
-CONTROLLER_PORT=$(ssh root@$VPS_IP "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && /opt/hashicorp/bin/nomad-job-manager.sh alloc-status \"\$ALLOC_ID\" 2>/dev/null | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == \"http\") | .Value // empty'" 2>/dev/null || echo "")
+CONTROLLER_PORT=$(ssh root@$TARGET_HOST "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && /opt/hashicorp/bin/nomad-job-manager.sh alloc-status \"\$ALLOC_ID\" 2>/dev/null | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == \"http\") | .Value // empty'" 2>/dev/null || echo "")
 
 if [ -z "$CONTROLLER_PORT" ]; then
     echo -e "${RED}✗ Could not find running controller${NC}"
@@ -36,7 +36,7 @@ if [ -z "$CONTROLLER_PORT" ]; then
     exit 1
 fi
 
-CONTROLLER_URL="http://$VPS_IP:$CONTROLLER_PORT"
+CONTROLLER_URL="http://$TARGET_HOST:$CONTROLLER_PORT"
 echo "Controller URL: $CONTROLLER_URL"
 
 # Check if DNS API is available
@@ -54,8 +54,8 @@ else
     echo "2. Go to Domain List → ployd.app → Manage"
     echo "3. Advanced DNS tab"
     echo "4. Update these A records:"
-    echo "   Host: dev, Value: $VPS_IP"
-    echo "   Host: *.dev, Value: $VPS_IP"
+    echo "   Host: dev, Value: $TARGET_HOST"
+    echo "   Host: *.dev, Value: $TARGET_HOST"
     exit 1
 fi
 
@@ -66,12 +66,12 @@ UPDATE_RESPONSE=$(curl -s -X PUT "$CONTROLLER_URL/v1/dns/records" \
     -d "{
         \"hostname\": \"$DEV_DOMAIN\",
         \"type\": \"A\",
-        \"value\": \"$VPS_IP\",
+        \"value\": \"$TARGET_HOST\",
         \"ttl\": 300
     }")
 
 if echo "$UPDATE_RESPONSE" | grep -q "success\|updated"; then
-    echo -e "${GREEN}✓ Updated $DEV_DOMAIN → $VPS_IP${NC}"
+    echo -e "${GREEN}✓ Updated $DEV_DOMAIN → $TARGET_HOST${NC}"
 else
     echo -e "${RED}✗ Failed to update $DEV_DOMAIN${NC}"
     echo "Response: $UPDATE_RESPONSE"
@@ -84,12 +84,12 @@ WILDCARD_RESPONSE=$(curl -s -X PUT "$CONTROLLER_URL/v1/dns/records" \
     -d "{
         \"hostname\": \"*.$DEV_DOMAIN\",
         \"type\": \"A\",
-        \"value\": \"$VPS_IP\",
+        \"value\": \"$TARGET_HOST\",
         \"ttl\": 300
     }")
 
 if echo "$WILDCARD_RESPONSE" | grep -q "success\|updated"; then
-    echo -e "${GREEN}✓ Updated *.$DEV_DOMAIN → $VPS_IP${NC}"
+    echo -e "${GREEN}✓ Updated *.$DEV_DOMAIN → $TARGET_HOST${NC}"
 else
     echo -e "${RED}✗ Failed to update *.$DEV_DOMAIN${NC}"
     echo "Response: $WILDCARD_RESPONSE"
@@ -99,8 +99,8 @@ echo ""
 echo -e "${GREEN}DNS update complete!${NC}"
 echo ""
 echo "Updated records:"
-echo "  $DEV_DOMAIN → $VPS_IP"
-echo "  *.$DEV_DOMAIN → $VPS_IP"
+echo "  $DEV_DOMAIN → $TARGET_HOST"
+echo "  *.$DEV_DOMAIN → $TARGET_HOST"
 echo ""
 echo "⏱ DNS propagation typically takes 5-10 minutes."
 echo "Run: ./scripts/test-dns-propagation.sh to check status"

@@ -133,9 +133,9 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 	// Create context with shorter timeout for OpenRewrite recipes
 	timeoutDuration := 30*time.Minute
 	if req.Type == "openrewrite" {
-		// OpenRewrite jobs have shorter timeout for faster failure detection
-		timeoutDuration = 3*time.Minute
-		fmt.Printf("[DEBUG] Using reduced timeout for OpenRewrite: %v\n", timeoutDuration)
+		// OpenRewrite jobs have 5-minute timeout to allow proper job completion
+		timeoutDuration = 5*time.Minute
+		fmt.Printf("[DEBUG] Using OpenRewrite timeout: %v\n", timeoutDuration)
 	}
 	
 	ctx, cancel := context.WithTimeout(c.Context(), timeoutDuration)
@@ -153,7 +153,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		if ctx.Err() == context.DeadlineExceeded {
 			timeoutMsg := "The transformation took longer than expected to complete"
 			if req.Type == "openrewrite" {
-				timeoutMsg = "OpenRewrite transformation timed out after 3 minutes - infrastructure may not be ready"
+				timeoutMsg = "OpenRewrite transformation timed out after 5 minutes - check job status or infrastructure"
 			}
 			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
 				"error":   "Transformation timeout",
@@ -239,8 +239,12 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 	// Stage 2: Repository cloning
 	stageStart = time.Now()
 	repoPath := filepath.Join(workspaceDir, "repository")
+	fmt.Printf("[DEBUG] [%s] Starting repository cloning stage\n", transformID)
+	fmt.Printf("[DEBUG] [%s] Repository URL: %s, Branch: %s, Target: %s\n", transformID, req.Codebase.Repository, req.Codebase.Branch, repoPath)
+	fmt.Printf("[DEBUG] [%s] About to call cloneRepositoryWithInfo...\n", transformID)
 	repoInfo, err := h.cloneRepositoryWithInfo(req.Codebase.Repository, req.Codebase.Branch, repoPath)
 	if err != nil {
+		fmt.Printf("[ERROR] [%s] Repository cloning failed: %v\n", transformID, err)
 		iteration.Stages = append(iteration.Stages, TransformationStage{
 			Name:      "repository_clone",
 			StartTime: stageStart,
@@ -258,6 +262,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		})
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
 	}
+	fmt.Printf("[SUCCESS] [%s] Repository cloned successfully: %d files\n", transformID, repoInfo.FileCount)
 	
 	iteration.Stages = append(iteration.Stages, TransformationStage{
 		Name:      "repository_clone",
@@ -437,26 +442,84 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 
 // cloneRepositoryWithInfo clones a git repository and returns repository information
 func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*RepositoryInfo, error) {
+	// Create a context with timeout for git clone operation
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	fmt.Printf("[DEBUG] cloneRepositoryWithInfo called with URL=%s, branch=%s, target=%s\n", repoURL, branch, targetPath)
+	
 	// Ensure git is available
-	if _, err := exec.LookPath("git"); err != nil {
-		return nil, fmt.Errorf("git command not available")
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		fmt.Printf("[ERROR] Git command not found: %v\n", err)
+		return nil, fmt.Errorf("git command not available: %v", err)
 	}
+	fmt.Printf("[DEBUG] Git found at: %s\n", gitPath)
 
-	// Execute git clone
+	// Prepare clone arguments
 	args := []string{"clone", "--depth=1"}
 	if branch != "" {
 		args = append(args, "--branch", branch)
 	}
 	args = append(args, repoURL, targetPath)
+	fmt.Printf("[DEBUG] Git command: %s %v\n", gitPath, args)
 
-	// Execute git clone
-	cmd := exec.CommandContext(context.Background(), "git", args...)
+	// Execute git clone with comprehensive error capture
+	fmt.Printf("[DEBUG] Starting git clone execution...\n")
+	cmd := exec.CommandContext(ctx, "git", args...)
 	var stderr bytes.Buffer
+	var stdout bytes.Buffer
 	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("git clone failed: %v - %s", err, stderr.String())
+	cmd.Stdout = &stdout
+	
+	// Set working directory and environment
+	cmd.Dir = "/"  // Set a safe working directory
+	cmd.Env = os.Environ()
+	
+	fmt.Printf("[DEBUG] Executing git clone command...\n")
+	startTime := time.Now()
+	err = cmd.Run()
+	duration := time.Since(startTime)
+	
+	fmt.Printf("[DEBUG] Git clone completed in %v\n", duration)
+	fmt.Printf("[DEBUG] Git stdout: %s\n", stdout.String())
+	fmt.Printf("[DEBUG] Git stderr: %s\n", stderr.String())
+	
+	if err != nil {
+		fmt.Printf("[ERROR] Git clone command failed: %v\n", err)
+		fmt.Printf("[ERROR] Full error details: stdout=%s, stderr=%s\n", stdout.String(), stderr.String())
+		
+		// Check for specific error types
+		if ctx.Err() == context.DeadlineExceeded {
+			fmt.Printf("[ERROR] Git clone timed out after 2 minutes\n")
+			return nil, fmt.Errorf("git clone timed out after 2 minutes: %v", err)
+		}
+		
+		if ctx.Err() == context.Canceled {
+			fmt.Printf("[ERROR] Git clone was canceled\n")
+			return nil, fmt.Errorf("git clone was canceled: %v", err)
+		}
+		
+		// Check stderr for specific git errors
+		stderrStr := stderr.String()
+		if strings.Contains(stderrStr, "fatal: repository") && strings.Contains(stderrStr, "not found") {
+			fmt.Printf("[ERROR] Repository not found\n")
+			return nil, fmt.Errorf("repository not found: %s", repoURL)
+		}
+		
+		if strings.Contains(stderrStr, "fatal: Remote branch") && strings.Contains(stderrStr, "not found") {
+			fmt.Printf("[ERROR] Branch not found: %s\n", branch)
+			return nil, fmt.Errorf("branch '%s' not found in repository %s", branch, repoURL)
+		}
+		
+		if strings.Contains(stderrStr, "Permission denied") || strings.Contains(stderrStr, "Authentication failed") {
+			fmt.Printf("[ERROR] Authentication failed\n")
+			return nil, fmt.Errorf("authentication failed for repository: %s", repoURL)
+		}
+		
+		return nil, fmt.Errorf("git clone failed: %v - stdout: %s - stderr: %s", err, stdout.String(), stderr.String())
 	}
+	
+	fmt.Printf("[SUCCESS] Git clone completed successfully\n")
 
 	// Gather repository information
 	repoInfo := &RepositoryInfo{
@@ -465,11 +528,19 @@ func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*
 		Metadata: make(map[string]string),
 	}
 
-	// Count files and calculate size
+	// Verify target directory exists and count files
+	fmt.Printf("[DEBUG] Verifying cloned repository at: %s\n", targetPath)
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		fmt.Printf("[ERROR] Target directory does not exist after clone: %s\n", targetPath)
+		return nil, fmt.Errorf("target directory does not exist after clone: %s", targetPath)
+	}
+	fmt.Printf("[DEBUG] Target directory exists, counting files...\n")
+	
 	fileCount := 0
 	var totalSize int64
-	err := filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			fmt.Printf("[DEBUG] Error walking path %s: %v\n", path, err)
 			return nil // Skip errors
 		}
 		if !info.IsDir() {
@@ -481,6 +552,9 @@ func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*
 	if err == nil {
 		repoInfo.FileCount = fileCount
 		repoInfo.Size = totalSize
+		fmt.Printf("[DEBUG] Repository analysis: %d files, %d bytes total\n", fileCount, totalSize)
+	} else {
+		fmt.Printf("[ERROR] Failed to analyze repository: %v\n", err)
 	}
 
 	// Detect language and build tool

@@ -201,8 +201,8 @@ The dev environment uses `*.dev.ployd.app` subdomain pattern:
    ./scripts/setup-dev-dns.sh
    
    # Manually add to Namecheap:
-   # Type: A, Host: dev, Value: YOUR_VPS_IP
-   # Type: A, Host: *.dev, Value: YOUR_VPS_IP
+   # Type: A, Host: dev, Value: YOUR_TARGET_HOST_IP
+   # Type: A, Host: *.dev, Value: YOUR_TARGET_HOST_IP
    ```
 
 2. **Verify DNS Propagation**

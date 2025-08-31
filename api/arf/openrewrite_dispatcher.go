@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -195,7 +196,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	job := d.createNomadJob(req)
 
 	// Log the download URL that will be used
-	downloadURL := fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
+	downloadURL := fmt.Sprintf("%s/ploy-artifacts/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest",
 		*job.ID, d.registryURL)
 	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
@@ -284,8 +285,8 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				// Add artifact download/upload tasks
 				Artifacts: []*api.TaskArtifact{
 					{
-						// Include bucket/collection prefix to match upload path (artifacts, not ploy-artifacts)
-						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
+						// Include bucket/collection prefix to match upload path 
+						GetterSource: stringPtr(fmt.Sprintf("%s/ploy-artifacts/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
 						RelativeDest: stringPtr("local/"),  // Nomad extracts to local/ directory
 					},
 				},
@@ -315,19 +316,30 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	// Reduced timeout for faster failure detection
-	timeout := time.After(2 * time.Minute)
+	// 4-minute timeout allows proper job completion while staying under handler timeout
+	timeout := time.After(4 * time.Minute)
 	startTime := time.Now()
 	lastStatus := ""
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[OpenRewrite Dispatcher] Context cancelled while waiting for job %s", jobID)
+			log.Printf("[OpenRewrite Dispatcher] Context cancelled while waiting for job %s - performing cleanup", jobID)
+			
+			// Attempt to stop the job to free resources
+			go func() {
+				_, _, stopErr := d.nomadClient.Jobs().Deregister(jobID, false, nil)
+				if stopErr != nil {
+					log.Printf("[OpenRewrite Dispatcher] Warning: Failed to stop job %s after context cancellation: %v", jobID, stopErr)
+				} else {
+					log.Printf("[OpenRewrite Dispatcher] Job %s stopped successfully after context cancellation", jobID)
+				}
+			}()
+			
 			return nil, ctx.Err()
 		case <-timeout:
-			log.Printf("[OpenRewrite Dispatcher] Job %s timed out after 2 minutes", jobID)
-			return nil, fmt.Errorf("job execution timeout after 2 minutes")
+			log.Printf("[OpenRewrite Dispatcher] Job %s timed out after 4 minutes", jobID)
+			return nil, fmt.Errorf("job execution timeout after 4 minutes")
 		case <-ticker.C:
 			job, _, err := d.nomadClient.Jobs().Info(jobID, nil)
 			if err != nil {
@@ -370,7 +382,51 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 			}
 
 			if job.Status != nil && *job.Status == "dead" {
-				// Check if job succeeded
+				// Enhanced failure detection - check allocations for actual task status
+				allocs, _, allocErr := d.nomadClient.Jobs().Allocations(jobID, false, nil)
+				if allocErr == nil && len(allocs) > 0 {
+					alloc := allocs[0]
+					log.Printf("[OpenRewrite Dispatcher] Analyzing allocation %s: Status=%s", alloc.ID, alloc.ClientStatus)
+					
+					// Check for explicit task failures
+					if alloc.TaskStates != nil {
+						for taskName, taskState := range alloc.TaskStates {
+							if taskState.Failed {
+								log.Printf("[OpenRewrite Dispatcher] Task %s failed: State=%s", taskName, taskState.State)
+								// Check for specific failure reasons in events
+								var failureReason string
+								for _, event := range taskState.Events {
+									if event.Type == "Driver Failure" || event.Type == "Task Setup" {
+										failureReason = event.DisplayMessage
+										break
+									}
+								}
+								if failureReason == "" {
+									failureReason = "Task execution failed"
+								}
+								return nil, fmt.Errorf("job failed: %s", failureReason)
+							}
+							
+							// Check for successful completion
+							if taskState.State == "dead" && !taskState.Failed {
+								log.Printf("[OpenRewrite Dispatcher] Job %s completed successfully", jobID)
+								return &TransformationResult{
+									Success:        true,
+									ExecutionTime:  time.Since(startTime),
+									ChangesApplied: 1,
+								}, nil
+							}
+						}
+					}
+					
+					// Fall back to allocation status for failure detection
+					if alloc.ClientStatus == "failed" {
+						log.Printf("[OpenRewrite Dispatcher] Job %s failed: Allocation failed", jobID)
+						return nil, fmt.Errorf("job failed: allocation status failed")
+					}
+				}
+				
+				// Original logic as fallback
 				if job.StatusDescription != nil && strings.Contains(*job.StatusDescription, "completed") {
 					log.Printf("[OpenRewrite Dispatcher] Job %s completed successfully", jobID)
 					return &TransformationResult{
@@ -379,8 +435,13 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 						ChangesApplied: 1,
 					}, nil
 				}
-				log.Printf("[OpenRewrite Dispatcher] Job %s failed: %s", jobID, *job.StatusDescription)
-				return nil, fmt.Errorf("job failed: %s", *job.StatusDescription)
+				
+				statusDesc := "unknown failure"
+				if job.StatusDescription != nil {
+					statusDesc = *job.StatusDescription
+				}
+				log.Printf("[OpenRewrite Dispatcher] Job %s failed: %s", jobID, statusDesc)
+				return nil, fmt.Errorf("job failed: %s", statusDesc)
 			}
 		}
 	}
@@ -388,26 +449,104 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 
 // Helper functions for tar operations and storage
 func (d *OpenRewriteDispatcher) createTarFromRepo(repoPath, tarPath string) error {
-	// Validate repo path exists
-	if _, err := os.Stat(repoPath); err != nil {
+	log.Printf("[OpenRewrite Dispatcher] ===== TAR CREATION START =====")
+	log.Printf("[OpenRewrite Dispatcher] Source repo path: %s", repoPath)
+	log.Printf("[OpenRewrite Dispatcher] Target tar path: %s", tarPath)
+	
+	// Validate repo path exists and analyze contents
+	repoInfo, err := os.Stat(repoPath)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Repository path does not exist: %s - %v", repoPath, err)
 		return fmt.Errorf("repository path does not exist: %s", repoPath)
+	}
+	log.Printf("[OpenRewrite Dispatcher] Repository path exists: isDir=%v, size=%d", repoInfo.IsDir(), repoInfo.Size())
+	
+	// Count files in repository before tar creation
+	fileCount := 0
+	var totalSize int64
+	err = filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Printf("[OpenRewrite Dispatcher] Warning: Error walking path %s: %v", path, err)
+			return nil // Skip errors
+		}
+		if !info.IsDir() {
+			fileCount++
+			totalSize += info.Size()
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] Warning: Error analyzing repository: %v", err)
+	}
+	log.Printf("[OpenRewrite Dispatcher] Repository analysis: %d files, %d bytes total", fileCount, totalSize)
+	
+	// List some sample files for debugging
+	log.Printf("[OpenRewrite Dispatcher] Sample files in repository:")
+	files, err := os.ReadDir(repoPath)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] Warning: Cannot read directory: %v", err)
+	} else {
+		sampleCount := 0
+		for _, file := range files {
+			if sampleCount >= 10 {
+				log.Printf("[OpenRewrite Dispatcher] ... and %d more files", len(files)-10)
+				break
+			}
+			log.Printf("[OpenRewrite Dispatcher]   - %s (isDir: %v)", file.Name(), file.IsDir())
+			sampleCount++
+		}
 	}
 
 	// Remove existing tar file if it exists
-	os.Remove(tarPath)
+	if _, err := os.Stat(tarPath); err == nil {
+		log.Printf("[OpenRewrite Dispatcher] Removing existing tar file: %s", tarPath)
+		if err := os.Remove(tarPath); err != nil {
+			log.Printf("[OpenRewrite Dispatcher] Warning: Failed to remove existing tar file: %v", err)
+		}
+	}
 
-	// Use tar command to create archive
+	// Use tar command to create archive with comprehensive logging
 	cmd := fmt.Sprintf("tar -cf %s -C %s .", tarPath, repoPath)
+	log.Printf("[OpenRewrite Dispatcher] Executing tar command: %s", cmd)
+	
+	startTime := time.Now()
 	if err := executeCommand(cmd); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Tar command failed after %v: %v", time.Since(startTime), err)
+		log.Printf("[OpenRewrite Dispatcher] Command was: %s", cmd)
 		return fmt.Errorf("failed to create tar archive: %w", err)
 	}
+	duration := time.Since(startTime)
+	log.Printf("[OpenRewrite Dispatcher] Tar command completed successfully in %v", duration)
 
-	// Verify tar file was created
+	// Verify tar file was created and analyze it
 	fileInfo, err := os.Stat(tarPath)
 	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Tar file was not created: %s - %v", tarPath, err)
 		return fmt.Errorf("tar file was not created: %w", err)
 	}
+	log.Printf("[OpenRewrite Dispatcher] Tar file created successfully: %s", tarPath)
+	log.Printf("[OpenRewrite Dispatcher] Tar file size: %d bytes", fileInfo.Size())
 
+	// Test tar file integrity by listing contents
+	log.Printf("[OpenRewrite Dispatcher] Verifying tar file integrity...")
+	listCmd := fmt.Sprintf("tar -tf %s", tarPath)
+	output, err := executeCommandWithOutput(listCmd)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] Warning: Cannot verify tar contents: %v", err)
+	} else {
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		log.Printf("[OpenRewrite Dispatcher] Tar contains %d entries", len(lines))
+		// Show first few entries
+		for i, line := range lines {
+			if i >= 5 {
+				log.Printf("[OpenRewrite Dispatcher] ... and %d more entries", len(lines)-5)
+				break
+			}
+			log.Printf("[OpenRewrite Dispatcher]   - %s", line)
+		}
+	}
+
+	log.Printf("[OpenRewrite Dispatcher] ===== TAR CREATION SUCCESS =====")
 	log.Printf("Created tar archive %s (size: %d bytes)", tarPath, fileInfo.Size())
 	return nil
 }
@@ -419,43 +558,132 @@ func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error
 }
 
 func (d *OpenRewriteDispatcher) uploadToStorage(ctx context.Context, filePath, storageKey string) error {
+	log.Printf("[OpenRewrite Dispatcher] ===== STORAGE UPLOAD START =====")
+	log.Printf("[OpenRewrite Dispatcher] Local file path: %s", filePath)
+	log.Printf("[OpenRewrite Dispatcher] Storage key: %s", storageKey)
+	log.Printf("[OpenRewrite Dispatcher] SeaweedFS URL: %s", d.seaweedfsURL)
+	
 	// Check if file exists and get its size
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot stat file %s: %v", filePath, err)
 		return fmt.Errorf("failed to stat file %s: %w", filePath, err)
+	}
+	log.Printf("[OpenRewrite Dispatcher] File exists: size=%d bytes, mode=%v", fileInfo.Size(), fileInfo.Mode())
+
+	// Verify file is readable and not empty
+	if fileInfo.Size() == 0 {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: File is empty: %s", filePath)
+		return fmt.Errorf("file is empty: %s", filePath)
 	}
 
 	// Open file for reading
+	log.Printf("[OpenRewrite Dispatcher] Opening file for reading...")
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot open file %s: %v", filePath, err)
 		return fmt.Errorf("failed to open file %s: %w", filePath, err)
 	}
 	defer file.Close()
+	log.Printf("[OpenRewrite Dispatcher] File opened successfully")
 
 	// Read entire file into memory (we know the size)
+	log.Printf("[OpenRewrite Dispatcher] Reading file into memory (%d bytes)...", fileInfo.Size())
 	data := make([]byte, fileInfo.Size())
+	startRead := time.Now()
 	n, err := io.ReadFull(file, data)
+	readDuration := time.Since(startRead)
 	if err != nil && err != io.EOF {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to read file %s after %v: %v", filePath, readDuration, err)
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 	if int64(n) != fileInfo.Size() {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Size mismatch - read %d bytes but expected %d from %s", n, fileInfo.Size(), filePath)
 		return fmt.Errorf("read %d bytes but expected %d from %s", n, fileInfo.Size(), filePath)
 	}
+	log.Printf("[OpenRewrite Dispatcher] File read successfully: %d bytes in %v", n, readDuration)
 
-	// Upload to storage with retry logic
+	// Log storage client details
+	log.Printf("[OpenRewrite Dispatcher] Storage client type: %T", d.storageClient)
+	
+	// Upload to storage with retry logic and detailed error tracking
+	log.Printf("[OpenRewrite Dispatcher] Starting upload with retry logic...")
 	var lastErr error
 	for i := 0; i < 3; i++ {
+		log.Printf("[OpenRewrite Dispatcher] Upload attempt %d/3 for key: %s", i+1, storageKey)
+		attemptStart := time.Now()
+		
 		if err := d.storageClient.Put(ctx, storageKey, data); err != nil {
+			attemptDuration := time.Since(attemptStart)
 			lastErr = err
-			log.Printf("Upload attempt %d failed for %s: %v", i+1, storageKey, err)
-			time.Sleep(time.Second * time.Duration(i+1)) // Exponential backoff
+			log.Printf("[OpenRewrite Dispatcher] Upload attempt %d FAILED after %v: %v", i+1, attemptDuration, err)
+			log.Printf("[OpenRewrite Dispatcher] Error type: %T", err)
+			
+			if i < 2 { // Don't sleep on the last attempt
+				sleepDuration := time.Second * time.Duration(i+1)
+				log.Printf("[OpenRewrite Dispatcher] Waiting %v before retry...", sleepDuration)
+				time.Sleep(sleepDuration) // Exponential backoff
+			}
 			continue
 		}
-		log.Printf("Successfully uploaded %s to storage (size: %d bytes)", storageKey, len(data))
-		return nil
+		
+		attemptDuration := time.Since(attemptStart)
+		log.Printf("[OpenRewrite Dispatcher] Upload attempt %d SUCCESS in %v", i+1, attemptDuration)
+		break
+	}
+	
+	if lastErr != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: All upload attempts failed. Final error: %v", lastErr)
+		return fmt.Errorf("failed to upload to storage after 3 attempts: %w", lastErr)
 	}
 
-	return fmt.Errorf("failed to upload to storage after 3 attempts: %w", lastErr)
+	log.Printf("[OpenRewrite Dispatcher] Upload completed successfully")
+
+	// Verify upload by checking if file exists in storage
+	log.Printf("[OpenRewrite Dispatcher] Verifying upload by checking storage existence...")
+	exists, err := d.storageClient.Exists(ctx, storageKey)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot verify upload existence: %v", err)
+		return fmt.Errorf("failed to verify upload existence: %w", err)
+	}
+	if !exists {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: File does not exist in storage after upload: %s", storageKey)
+		return fmt.Errorf("file does not exist in storage after upload: %s", storageKey)
+	}
+	log.Printf("[OpenRewrite Dispatcher] Storage existence verified successfully")
+
+	// Additional verification: construct HTTP URL and test accessibility
+	httpURL := fmt.Sprintf("%s/%s", d.seaweedfsURL, storageKey)
+	log.Printf("[OpenRewrite Dispatcher] HTTP URL for verification: %s", httpURL)
+	
+	// Test HTTP access using a simple HEAD request
+	log.Printf("[OpenRewrite Dispatcher] Testing HTTP accessibility...")
+	testCmd := fmt.Sprintf("curl -s -I --max-time 10 '%s'", httpURL)
+	output, err := executeCommandWithOutput(testCmd)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] WARNING: HTTP accessibility test failed: %v", err)
+		log.Printf("[OpenRewrite Dispatcher] Command was: %s", testCmd)
+		// Don't fail the upload for this, it might be a network issue
+	} else {
+		log.Printf("[OpenRewrite Dispatcher] HTTP accessibility test result:")
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		for _, line := range lines {
+			log.Printf("[OpenRewrite Dispatcher]   %s", line)
+		}
+		
+		// Check for successful HTTP status
+		if strings.Contains(output, "200 OK") {
+			log.Printf("[OpenRewrite Dispatcher] HTTP accessibility confirmed: 200 OK")
+		} else if strings.Contains(output, "HTTP/") {
+			log.Printf("[OpenRewrite Dispatcher] HTTP response received (may not be 200 OK)")
+		} else {
+			log.Printf("[OpenRewrite Dispatcher] WARNING: Unexpected HTTP response format")
+		}
+	}
+
+	log.Printf("[OpenRewrite Dispatcher] ===== STORAGE UPLOAD SUCCESS =====")
+	log.Printf("Successfully uploaded %s to storage (size: %d bytes)", storageKey, len(data))
+	return nil
 }
 
 func (d *OpenRewriteDispatcher) downloadFromStorage(ctx context.Context, storageKey, filePath string) error {
