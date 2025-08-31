@@ -561,9 +561,83 @@ func (d *OpenRewriteDispatcher) createTarFromRepo(repoPath, tarPath string) erro
 }
 
 func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error {
-	// Use tar command to extract archive
-	cmd := fmt.Sprintf("tar -xf %s -C %s", tarPath, repoPath)
-	return executeCommand(cmd)
+	log.Printf("[OpenRewrite Dispatcher] ===== TAR EXTRACTION START =====")
+	log.Printf("[OpenRewrite Dispatcher] Source tar file: %s", tarPath)
+	log.Printf("[OpenRewrite Dispatcher] Destination repo: %s", repoPath)
+	
+	// Check if tar file exists and get stats
+	tarInfo, err := os.Stat(tarPath)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot stat tar file %s: %v", tarPath, err)
+		return fmt.Errorf("tar file not accessible: %w", err)
+	}
+	log.Printf("[OpenRewrite Dispatcher] Tar file size: %d bytes", tarInfo.Size())
+	
+	// Check if destination directory exists, create if needed
+	if err := os.MkdirAll(repoPath, 0755); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot create destination directory %s: %v", repoPath, err)
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+	
+	// Test tar file integrity first
+	log.Printf("[OpenRewrite Dispatcher] Testing tar file integrity...")
+	testCmd := fmt.Sprintf("tar -tf %s", tarPath)
+	if output, err := executeCommandWithOutput(testCmd); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Tar integrity test failed: %v", err)
+		log.Printf("[OpenRewrite Dispatcher] Tar test output: %s", output)
+		return fmt.Errorf("tar file integrity test failed: %w", err)
+	} else {
+		log.Printf("[OpenRewrite Dispatcher] Tar integrity test passed")
+		// Log first few entries for debugging
+		lines := strings.Split(output, "\n")
+		maxLines := 10
+		if len(lines) < maxLines {
+			maxLines = len(lines)
+		}
+		log.Printf("[OpenRewrite Dispatcher] Tar contents preview (first %d entries):", maxLines)
+		for i := 0; i < maxLines && i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) != "" {
+				log.Printf("  %s", strings.TrimSpace(lines[i]))
+			}
+		}
+	}
+	
+	// Perform extraction with verbose output
+	log.Printf("[OpenRewrite Dispatcher] Performing tar extraction...")
+	cmd := fmt.Sprintf("tar -xvf %s -C %s", tarPath, repoPath)
+	if output, err := executeCommandWithOutput(cmd); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Tar extraction failed: %v", err)
+		log.Printf("[OpenRewrite Dispatcher] Extraction output: %s", output)
+		
+		// Additional diagnostics
+		log.Printf("[OpenRewrite Dispatcher] === EXTRACTION FAILURE DIAGNOSTICS ===")
+		
+		// Check destination permissions
+		if destInfo, statErr := os.Stat(repoPath); statErr == nil {
+			log.Printf("[OpenRewrite Dispatcher] Destination permissions: %v", destInfo.Mode())
+		}
+		
+		// Check disk space (simple approach)
+		if spaceOutput, spaceErr := executeCommandWithOutput("df -h " + repoPath); spaceErr == nil {
+			log.Printf("[OpenRewrite Dispatcher] Disk space: %s", spaceOutput)
+		}
+		
+		return fmt.Errorf("tar extraction failed with exit code: %w", err)
+	} else {
+		log.Printf("[OpenRewrite Dispatcher] Extraction completed successfully")
+		// Log extraction summary
+		extractedLines := strings.Split(output, "\n")
+		fileCount := 0
+		for _, line := range extractedLines {
+			if strings.TrimSpace(line) != "" {
+				fileCount++
+			}
+		}
+		log.Printf("[OpenRewrite Dispatcher] Extracted %d files/directories", fileCount)
+	}
+	
+	log.Printf("[OpenRewrite Dispatcher] ===== TAR EXTRACTION SUCCESS =====")
+	return nil
 }
 
 func (d *OpenRewriteDispatcher) uploadToStorage(ctx context.Context, filePath, storageKey string) error {
