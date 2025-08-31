@@ -59,7 +59,7 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - SeaweedFS for AST cache storage and artifact management
 - Consul for distributed coordination and state management
 
-**Status:** ✅ **Phases ARF-1 through ARF-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 11→17 migration pipeline successfully validated with Spring PetClinic on production VPS infrastructure.
+**Status:** ✅ **Phases ARF-1 through ARF-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 8→17 migration pipeline successfully validated with Java 8 Tutorial on production VPS infrastructure.
 
 ## Platform Services vs User Applications
 

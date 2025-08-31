@@ -1263,21 +1263,21 @@
 ## [2025-08-26] - OpenRewrite Service Integration Testing Complete (Stream A Phase A1.3)
 
 ### Added
-- **✅ Integration Test Suite**: Comprehensive testing framework with Spring Petclinic, simple Maven, and multi-module Maven projects
+- **✅ Integration Test Suite**: Comprehensive testing framework with Java 8 Tutorial, simple Maven, and multi-module Maven projects
 - **✅ Performance Benchmarks**: Performance validation tests ensuring <5 minute transformation times and memory usage compliance
 - **✅ Multi-module Support**: Validated OpenRewrite executor works with complex multi-module Maven reactor projects
 - **✅ Transformation Quality**: Verified Java 11→17 migration produces correct diffs and detects build systems properly
 - **✅ Error Handling Validation**: Confirmed graceful handling of Maven dependency issues and transformation failures
 
 ### Testing
-- **✅ Spring Petclinic Integration**: Modified Spring Petclinic main branch from Java 17→11→17 for meaningful migration testing
+- **✅ Java 8 Tutorial Integration**: Using Java 8 Tutorial repository for meaningful Java 8→17 migration testing
 - **✅ Performance Metrics**: Transformation time: 6.9s, Build system detection: Maven, Java version detection: 11→17
 - **✅ Multi-module Testing**: Verified reactor build order processing across parent, common, service, and web modules
 - **✅ Benchmark Framework**: Created benchmark tests for measuring transformation performance and resource usage
 - **✅ Integration Test Coverage**: Build tagged integration tests (`// +build integration`) for comprehensive system validation
 
 ### Fixed
-- **✅ Spring Petclinic Version Issue**: Resolved Java version mismatch by dynamically modifying pom.xml from 17→11 for testing
+- **✅ Java Version Selection**: Using winterbe/java8-tutorial repository which natively supports Java 8→17 migration testing
 - **✅ Integration Test Build Tags**: Fixed test execution with proper `-tags=integration` flag usage
 - **✅ Multi-module Complexity**: Validated executor handles complex project structures with inter-module dependencies
 
@@ -1294,7 +1294,7 @@
 ### Testing
 - **✅ HTTP Handler Unit Tests**: Complete test coverage for all endpoints, validation logic, and error scenarios
 - **✅ Mock Integration**: Proper mocking of OpenRewrite executor for isolated HTTP layer testing
-- **✅ Spring Petclinic Integration Test**: Real-world testing scenario for Java 11→17 migration
+- **✅ Java 8 Tutorial Integration Test**: Real-world testing scenario for Java 8→17 migration
 - **✅ TDD Implementation**: Red-Green-Refactor cycle maintained throughout HTTP API development
 - **✅ Build Integration**: Successful compilation and test execution in controller environment
 
@@ -1455,7 +1455,7 @@
 - **✅ Lane C Template Processing**: Complete resolution of HCL conditional block processing for OSv deployments
 - **✅ Capstan OSv Integration**: Full Java→OSv unikernel build pipeline with package-based approach
 - **✅ HCL Validation Tools**: Added hcl2json and terraform validation tools to development environment
-- **✅ Java 11→17 Migration Pipeline**: End-to-end ARF benchmark system successfully processing Spring PetClinic migrations
+- **✅ Java 8→17 Migration Pipeline**: End-to-end ARF benchmark system successfully processing Java 8 Tutorial migrations
 - **✅ OSv Image Optimization**: Achieving 60-62MB unikernel images within Lane C 50-200MB specifications
 
 ### Fixed

@@ -110,7 +110,7 @@ graph TD
 - [x] Git repository management (A1) ✅ 2025-08-26
 - [x] OpenRewrite executor working (A1) ✅ 2025-08-26
 - [x] Basic HTTP endpoint (A2) ✅ 2025-08-26
-- [x] Manual testing with Spring Petclinic ✅ 2025-08-26
+- [x] Manual testing with Java 8 Tutorial ✅ 2025-08-26
 
 ### Day 2 Goals
 - [x] Docker container built (A3) ✅ 2025-08-26
@@ -163,7 +163,7 @@ graph TD
 
 ### MVP Metrics
 - [x] Java 11→17 migration completes successfully ✅ 2025-08-26
-- [x] Transformation time < 5 minutes for Spring Petclinic ✅ 2025-08-26
+- [x] Transformation time < 5 minutes for Java 8 Tutorial ✅ 2025-08-26
 - [x] API responds within 1 second ✅ 2025-08-26
 - [x] Container size < 1GB ✅ 2025-08-26
 

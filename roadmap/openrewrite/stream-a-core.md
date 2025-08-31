@@ -165,7 +165,7 @@ recipeList:
 ```
 
 ### A1.3: Testing Checklist
-- [x] Test with Spring Petclinic repository ✅ 2025-08-26
+- [x] Test with Java 8 Tutorial repository ✅ 2025-08-26
 - [x] Verify Java 11→17 migration works ✅ 2025-08-26
 - [x] Ensure diff generation is correct ✅ 2025-08-26
 - [x] Measure transformation time ✅ 2025-08-26
@@ -275,7 +275,7 @@ func (h *Handler) Health(c *fiber.Ctx) error {
 - [x] API responds to health check ✅ 2025-08-26
 - [x] Transform endpoint accepts tar and returns diff ✅ 2025-08-26
 - [x] Error handling works correctly ✅ 2025-08-26
-- [x] Response time < 5 minutes for Spring Petclinic ✅ 2025-08-26
+- [x] Response time < 5 minutes for Java 8 Tutorial ✅ 2025-08-26
 
 ## Phase A3: Docker Container
 
@@ -351,7 +351,7 @@ curl -X POST http://localhost:8090/transform \
 - [ ] Memory usage < 2GB
 
 ### Testing Requirements
-- [x] Spring Petclinic migrated successfully ✅ 2025-08-26
+- [x] Java 8 Tutorial migrated successfully ✅ 2025-08-26
 - [x] Diff is valid and applies cleanly ✅ 2025-08-26
 - [ ] No memory leaks during transformation
 - [x] Error cases handled gracefully ✅ 2025-08-26
