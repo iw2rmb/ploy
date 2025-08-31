@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // TransformationWorkflow orchestrates the complete transformation → deployment → testing pipeline
@@ -213,8 +215,11 @@ func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, conf
 
 // executeTransformation applies a single transformation recipe
 func (w *TransformationWorkflow) executeTransformation(ctx context.Context, sandbox *Sandbox, recipeID string) (*TransformationResult, error) {
+	// Generate a transformation ID for this execution
+	transformationID := uuid.New().String()
+	
 	// Execute the recipe directly using the executor
-	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir, "")
+	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir, "openrewrite", transformationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 	}
