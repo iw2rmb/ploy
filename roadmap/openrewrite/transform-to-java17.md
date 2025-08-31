@@ -76,6 +76,26 @@
 - **Network Timeout**: 30 seconds for external repository access
 - **Docker Image Pull**: 10 minutes (openrewrite-jvm image + dependencies)
 
+## Container Implementation
+
+### OpenRewrite Docker Container (`services/openrewrite-jvm/`)
+
+The OpenRewrite transformations run in a custom Docker container with two-stage execution:
+
+1. **Setup Stage** (`setup-workspace.sh` - entrypoint):
+   - Detects Nomad artifact locations (`local/`, `artifacts/`, or current directory)
+   - Handles both tar file artifacts and extracted directory structures
+   - Creates `/workspace/input.tar` for the runner script
+   - Manages workspace permissions and file structure
+
+2. **Execution Stage** (`runner.sh`):
+   - Extracts input tar to `/workspace/project/`
+   - Detects build system (Maven/Gradle) or creates minimal POM
+   - Handles recipe discovery and Maven Central caching
+   - Executes OpenRewrite transformation
+   - Creates output tar with transformed code
+   - Registers recipe metadata with Ploy API
+
 ## Expected Outcomes
 
 ### Success Criteria:
