@@ -263,12 +263,9 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				Config: map[string]interface{}{
 					// Use custom OpenRewrite image from registry
 					"image": fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
-					// No volume mount - use Nomad's workspace
-					// Nomad extracts artifacts to local/ directory by default
-					"command": "/bin/sh",
-					"args": []string{
-						"-c",
-						// Debug and setup: Nomad extracts to local/ directory
+					// Override Docker entrypoint to run our custom setup
+					"entrypoint": []string{"/bin/sh", "-c"},
+					"command": // Debug and setup: Nomad extracts to local/ directory
 						"echo '[DEBUG] Current directory:' && pwd && " +
 						"echo '[DEBUG] Directory contents:' && ls -la && " +
 						"echo '[DEBUG] Local directory contents:' && ls -la local/ 2>/dev/null || echo 'No local dir' && " +
@@ -279,8 +276,6 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 						"echo '[DEBUG] Workspace contents:' && ls -la /workspace/project/ | head -20 && " +
 						"echo '[DEBUG] Starting OpenRewrite...' && " +
 						"/usr/local/bin/openrewrite",
-					},
-					// Use custom image's default entrypoint (no command override needed)
 					"dns_servers":        []string{"172.17.0.1"},
 					"dns_search_domains": []string{"service.consul"},
 					"force_pull":         false, // Don't force pull if image exists
