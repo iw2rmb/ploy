@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/iw2rmb/ploy/internal/testutils"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,7 +62,7 @@ func TestOpenRewriteEngine_DetectBuildSystem(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temp directory with test files
-			tmpDir := testutils.CreateTempDir(t, "build-detect")
+			tmpDir := helpers.CreateTempDir(t, "build-detect")
 			defer os.RemoveAll(tmpDir)
 
 			for filename, content := range tt.files {
@@ -147,7 +147,7 @@ func TestOpenRewriteEngine_Execute_NoMaven(t *testing.T) {
 		t.Skip("Maven is available, skipping no-Maven test")
 	}
 
-	repoPath := testutils.CreateTempDir(t, "no-maven-test")
+	repoPath := helpers.CreateTempDir(t, "no-maven-test")
 	defer os.RemoveAll(repoPath)
 
 	// Create pom.xml to trigger Maven detection
@@ -178,7 +178,7 @@ func TestOpenRewriteEngine_Execute_NoMaven(t *testing.T) {
 
 // TestOpenRewriteEngine_Execute_NoBuildSystem tests error handling for unsupported projects
 func TestOpenRewriteEngine_Execute_NoBuildSystem(t *testing.T) {
-	repoPath := testutils.CreateTempDir(t, "no-build-test")
+	repoPath := helpers.CreateTempDir(t, "no-build-test")
 	defer os.RemoveAll(repoPath)
 
 	// Create a project with no build system
@@ -208,7 +208,7 @@ func TestOpenRewriteEngine_Execute_NoBuildSystem(t *testing.T) {
 
 // TestOpenRewriteEngine_Execute_MissingRecipe tests error handling for missing recipe config
 func TestOpenRewriteEngine_Execute_MissingRecipe(t *testing.T) {
-	repoPath := testutils.CreateTempDir(t, "missing-recipe-test")
+	repoPath := helpers.CreateTempDir(t, "missing-recipe-test")
 	defer os.RemoveAll(repoPath)
 
 	// Create pom.xml
@@ -320,7 +320,7 @@ BUILD SUCCESSFUL`,
 // TestOpenRewriteEngine_ExecutionTimeout tests timeout handling
 func TestOpenRewriteEngine_ExecutionTimeout(t *testing.T) {
 	// This test verifies that the engine respects context cancellation
-	repoPath := testutils.CreateTempDir(t, "timeout-test")
+	repoPath := helpers.CreateTempDir(t, "timeout-test")
 	defer os.RemoveAll(repoPath)
 
 	// Create pom.xml

@@ -16,20 +16,21 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iw2rmb/ploy/internal/storage"
-	"github.com/iw2rmb/ploy/internal/testutil"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
+	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
 
 // MockBuildDependencies provides mock implementations for build dependencies
 type MockBuildDependencies struct {
-	StorageClient *testutil.MockStorageClient
-	EnvStore      *testutil.MockEnvStore
+	StorageClient *mocks.StorageClient
+	EnvStore      *mocks.EnvStore
 }
 
 // NewMockBuildDependencies creates new mock dependencies
 func NewMockBuildDependencies() *MockBuildDependencies {
 	return &MockBuildDependencies{
-		StorageClient: testutil.NewMockStorageClient(),
-		EnvStore:      testutil.NewMockEnvStore(),
+		StorageClient: mocks.NewStorageClient(),
+		EnvStore:      mocks.NewEnvStore(),
 	}
 }
 
@@ -40,7 +41,7 @@ func TestTriggerBuild(t *testing.T) {
 		appName        string
 		queryParams    string
 		requestBody    []byte
-		mockSetup      func(*testutil.MockEnvStore)
+		mockSetup      func(*mocks.EnvStore)
 		expectedStatus int
 		expectedError  string
 		skipReason     string
@@ -67,7 +68,7 @@ func TestTriggerBuild(t *testing.T) {
 			name:        "successful basic validation - valid app name",
 			appName:     "valid-app",
 			requestBody: createTestTarball(t, map[string]string{"README.md": "test"}),
-			mockSetup: func(envStore *testutil.MockEnvStore) {
+			mockSetup: func(envStore *mocks.EnvStore) {
 				envStore.On("GetAll", "valid-app").Return(map[string]string{
 					"ENV_VAR": "value",
 				}, nil)
@@ -79,7 +80,7 @@ func TestTriggerBuild(t *testing.T) {
 			name:        "env store error handling",
 			appName:     "test-app",
 			requestBody: createTestTarball(t, map[string]string{"main.go": "package main"}),
-			mockSetup: func(envStore *testutil.MockEnvStore) {
+			mockSetup: func(envStore *mocks.EnvStore) {
 				envStore.On("GetAll", "test-app").Return(nil, fmt.Errorf("env store error"))
 			},
 			expectedStatus: 500, // Will fail at build stage
@@ -90,7 +91,7 @@ func TestTriggerBuild(t *testing.T) {
 			appName:     "lane-test",
 			queryParams: "?lane=A",
 			requestBody: createTestTarball(t, map[string]string{"go.mod": "module test"}),
-			mockSetup: func(envStore *testutil.MockEnvStore) {
+			mockSetup: func(envStore *mocks.EnvStore) {
 				envStore.On("GetAll", "lane-test").Return(map[string]string{}, nil)
 			},
 			expectedStatus: 500, // Will fail at build stage but lane logic passes
@@ -106,7 +107,7 @@ func TestTriggerBuild(t *testing.T) {
 			
 			// Setup Fiber app for testing
 			app := fiber.New()
-			mockEnvStore := testutil.NewMockEnvStore()
+			mockEnvStore := mocks.NewEnvStore()
 			
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockEnvStore)
@@ -220,7 +221,7 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 		
 		// Use fast retry config for unit tests to prevent timeouts
 		config := storage.DefaultClientConfig()
-		config.RetryConfig = testutil.TestRetryConfig()
+		config.RetryConfig = helpers.TestRetryConfig()
 		storeClient := storage.NewStorageClient(mockProvider, config)
 		
 		err = uploadFileWithRetryAndVerification(storeClient, testPath, "test-key", "text/plain")

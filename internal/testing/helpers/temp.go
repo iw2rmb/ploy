@@ -1,0 +1,48 @@
+package helpers
+
+import (
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+// CreateTempDir creates a temporary directory for testing with automatic cleanup
+func CreateTempDir(t *testing.T, prefix string) string {
+	t.Helper()
+
+	dir, err := os.MkdirTemp("", prefix)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		os.RemoveAll(dir)
+	})
+
+	return dir
+}
+
+// CreateTempFile creates a temporary file for testing with automatic cleanup
+func CreateTempFile(t *testing.T, dir, pattern string) *os.File {
+	t.Helper()
+
+	file, err := os.CreateTemp(dir, pattern)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		file.Close()
+		os.Remove(file.Name())
+	})
+
+	return file
+}
+
+// WriteFile writes content to a file in the given directory
+func WriteFile(t *testing.T, dir, filename, content string) string {
+	t.Helper()
+
+	path := dir + "/" + filename
+	err := os.WriteFile(path, []byte(content), 0644)
+	require.NoError(t, err)
+
+	return path
+}

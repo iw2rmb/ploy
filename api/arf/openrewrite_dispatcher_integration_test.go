@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/testutils"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,24 +20,24 @@ func TestOpenRewriteDispatcher_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
-	
+
 	// Check for required environment variables
 	nomadAddr := os.Getenv("NOMAD_ADDR")
 	if nomadAddr == "" {
 		nomadAddr = "http://localhost:4646" // Default for local testing
 	}
-	
+
 	seaweedfsURL := os.Getenv("SEAWEEDFS_URL")
 	if seaweedfsURL == "" {
 		seaweedfsURL = "http://seaweedfs-filer.service.consul:8888" // Default
 	}
-	
+
 	t.Logf("Integration test running with Nomad: %s, SeaweedFS: %s", nomadAddr, seaweedfsURL)
-	
+
 	// Create test repository with Java code
-	repoPath := testutils.CreateTempDir(t, "integration-test-repo")
+	repoPath := helpers.CreateTempDir(t, "integration-test-repo")
 	defer os.RemoveAll(repoPath)
-	
+
 	// Create a simple Maven project that OpenRewrite can process
 	pomContent := `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -54,11 +54,11 @@ func TestOpenRewriteDispatcher_Integration(t *testing.T) {
     </properties>
 </project>`
 	require.NoError(t, os.WriteFile(filepath.Join(repoPath, "pom.xml"), []byte(pomContent), 0644))
-	
+
 	// Create Java source file with old-style code
 	srcDir := filepath.Join(repoPath, "src", "main", "java", "com", "test")
 	require.NoError(t, os.MkdirAll(srcDir, 0755))
-	
+
 	javaContent := `package com.test;
 
 import java.util.ArrayList;
@@ -79,10 +79,10 @@ public class TestApp {
     }
 }`
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "TestApp.java"), []byte(javaContent), 0644))
-	
+
 	// Create mock storage service
 	mockStorage := &MockStorageService{}
-	
+
 	// Create OpenRewrite dispatcher - this should work if infrastructure is available
 	dispatcher, err := NewOpenRewriteDispatcher(
 		nomadAddr,
@@ -91,40 +91,40 @@ public class TestApp {
 		"https://api.dev.ployman.app/v1", // API URL
 		mockStorage,
 	)
-	
+
 	// This assertion will FAIL if dispatcher initialization fails (RED phase of TDD)
 	require.NoError(t, err, "Dispatcher initialization should succeed")
 	require.NotNil(t, dispatcher, "Dispatcher should not be nil")
-	
+
 	// Test a simple OpenRewrite recipe
 	req := &OpenRewriteRecipeRequest{
 		RecipeClass: "org.openrewrite.java.cleanup.UnnecessaryThrows",
 		RepoPath:    repoPath,
 		JobID:       "integration-test-job",
 	}
-	
+
 	// Execute with reasonable timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	
+
 	// This is where the current system fails - the dispatcher times out
 	result, err := dispatcher.ExecuteOpenRewriteRecipe(ctx, req)
-	
+
 	// TDD RED: These assertions MUST fail initially to expose the real issues
 	require.NoError(t, err, "OpenRewrite execution should not error")
 	require.NotNil(t, result, "Result should not be nil")
 	assert.True(t, result.Success, "Transformation should be successful")
-	
+
 	// Verify that this is NOT a mock result
 	if len(result.FilesModified) > 0 {
-		assert.NotEqual(t, "MockFile.java", result.FilesModified[0], 
+		assert.NotEqual(t, "MockFile.java", result.FilesModified[0],
 			"Should not return mock files - this indicates real execution")
 	}
-	
+
 	// Verify real transformation occurred (or at least real execution was attempted)
 	assert.NotEmpty(t, result.RecipeID, "Result should have recipe ID")
 	assert.Greater(t, result.ExecutionTime, time.Duration(0), "Should have execution time")
-	
+
 	t.Logf("Integration test completed successfully with result: %+v", result)
 }
 
@@ -132,7 +132,7 @@ public class TestApp {
 func TestOpenRewriteDispatcher_MissingInfrastructure(t *testing.T) {
 	// Test with invalid Nomad address to simulate infrastructure issues
 	mockStorage := &MockStorageService{}
-	
+
 	dispatcher, err := NewOpenRewriteDispatcher(
 		"http://invalid-nomad:4646", // Invalid Nomad
 		"registry.dev.ployman.app",
@@ -140,30 +140,30 @@ func TestOpenRewriteDispatcher_MissingInfrastructure(t *testing.T) {
 		"https://api.dev.ployman.app/v1",
 		mockStorage,
 	)
-	
+
 	// Dispatcher creation might succeed (Nomad client is lazy)
 	if err != nil {
 		t.Logf("Expected: Dispatcher creation failed with invalid infrastructure: %v", err)
 		return
 	}
-	
+
 	// Create minimal test request
 	req := &OpenRewriteRecipeRequest{
 		RecipeClass: "org.openrewrite.java.cleanup.UnnecessaryThrows",
 		RepoPath:    "/tmp/nonexistent",
 		JobID:       "test-failure",
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	// This should fail gracefully with meaningful error
 	result, err := dispatcher.ExecuteOpenRewriteRecipe(ctx, req)
-	
+
 	assert.Error(t, err, "Should fail with infrastructure unavailable")
 	assert.Nil(t, result, "Should not return result on failure")
 	assert.Contains(t, err.Error(), "failed", "Error should indicate failure reason")
-	
+
 	t.Logf("Expected failure occurred: %v", err)
 }
 
