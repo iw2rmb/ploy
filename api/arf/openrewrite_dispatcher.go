@@ -266,6 +266,12 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					"volumes": []string{
 						"/tmp/openrewrite:/workspace",
 					},
+					// Ensure project directory exists with extracted content
+					"command": "/bin/sh",
+					"args": []string{
+						"-c",
+						"mkdir -p /workspace/project && if [ -d /workspace/project ]; then cd /workspace && find . -maxdepth 1 -type f -exec mv {} project/ \\; 2>/dev/null || true; find . -maxdepth 1 -type d ! -name project ! -name . -exec mv {} project/ \\; 2>/dev/null || true; fi && /usr/local/bin/openrewrite",
+					},
 					// Use custom image's default entrypoint (no command override needed)
 					"dns_servers":        []string{"172.17.0.1"},
 					"dns_search_domains": []string{"service.consul"},
@@ -290,7 +296,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					{
 						// Include bucket/collection prefix to match upload path (artifacts, not ploy-artifacts)
 						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
-						RelativeDest: stringPtr("/workspace/project/"),  // Extract to project subdirectory
+						RelativeDest: stringPtr("/workspace/"),  // Extract to workspace root
 					},
 				},
 			},
