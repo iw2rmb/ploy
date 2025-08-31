@@ -33,7 +33,7 @@ fi
 echo "[SETUP] Creating workspace structure..."
 mkdir -p /workspace/project
 
-# Copy extracted files to workspace
+# Copy extracted files to workspace and create input.tar that runner script expects
 echo "[SETUP] Copying files from $ARTIFACT_DIR to /workspace/project..."
 if [ "$ARTIFACT_DIR" = "." ]; then
     # Copy all files except known Nomad directories
@@ -41,6 +41,21 @@ if [ "$ARTIFACT_DIR" = "." ]; then
     find . -maxdepth 1 -type d ! -name . ! -name tmp ! -name secrets -exec cp -r {} /workspace/project/ \; 2>/dev/null || true
 else
     cp -r "$ARTIFACT_DIR"/* /workspace/project/ 2>/dev/null || true
+fi
+
+# Create input.tar that the OpenRewrite runner script expects
+echo "[SETUP] Creating input.tar for OpenRewrite runner..."
+cd /workspace/project
+if [ $(find . -type f | wc -l) -gt 0 ]; then
+    tar -cf /workspace/input.tar . 2>/dev/null || {
+        echo "[SETUP] Failed to create input.tar"
+        exit 1
+    }
+    echo "[SETUP] Created input.tar successfully"
+    ls -la /workspace/input.tar
+else
+    echo "[SETUP] ERROR: No files found to tar in /workspace/project"
+    exit 1
 fi
 
 # Verify workspace contents

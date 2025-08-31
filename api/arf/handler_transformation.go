@@ -449,16 +449,13 @@ func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*
 	}
 	args = append(args, repoURL, targetPath)
 
-	// For simplicity, we'll simulate a successful clone
-	// In real implementation, you'd use exec.Command to run git
-	if err := os.MkdirAll(targetPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create repository directory: %w", err)
-	}
+	// Execute git clone
+	cmd := exec.CommandContext(context.Background(), "git", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
-	// Create a simple placeholder to indicate repository was "cloned"
-	placeholderFile := filepath.Join(targetPath, ".git-placeholder")
-	if err := os.WriteFile(placeholderFile, []byte("repository cloned"), 0644); err != nil {
-		return nil, fmt.Errorf("failed to create repository placeholder: %w", err)
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("git clone failed: %v - %s", err, stderr.String())
 	}
 
 	// Gather repository information
