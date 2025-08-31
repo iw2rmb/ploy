@@ -319,7 +319,24 @@ tar -cvf "${OUTPUT_TAR}" . 2>&1 | head -50 || {
 echo "[OpenRewrite] Output tar created successfully"
 ls -la "${OUTPUT_TAR}"
 
-# Step 6: Generate transformation report
+# Step 6: Upload output to SeaweedFS (if OUTPUT_KEY is provided)
+if [ -n "${OUTPUT_KEY}" ]; then
+    echo "[OpenRewrite] Uploading output to SeaweedFS..."
+    echo "[OpenRewrite] Upload URL: ${SEAWEEDFS_URL}/${OUTPUT_KEY}"
+    
+    if curl -X PUT "${SEAWEEDFS_URL}/${OUTPUT_KEY}" \
+           --data-binary "@${OUTPUT_TAR}" \
+           -H "Content-Type: application/octet-stream" \
+           -s -o /dev/null; then
+        echo "[OpenRewrite] Output uploaded successfully to ${OUTPUT_KEY}"
+    else
+        echo "[OpenRewrite] WARNING: Failed to upload output to SeaweedFS"
+    fi
+else
+    echo "[OpenRewrite] No OUTPUT_KEY provided, skipping upload"
+fi
+
+# Step 7: Generate transformation report
 cat > /workspace/transformation-report.json << EOF
 {
   "recipe": "${RECIPE_CLASS}",
