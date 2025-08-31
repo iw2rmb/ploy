@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,15 @@ func CreateTempFile(t *testing.T, dir, pattern string) *os.File {
 func WriteFile(t *testing.T, dir, filename, content string) string {
 	t.Helper()
 
-	path := dir + "/" + filename
+	path := filepath.Join(dir, filename)
+	
+	// Create parent directories if needed
+	parentDir := filepath.Dir(path)
+	if parentDir != dir {
+		err := os.MkdirAll(parentDir, 0755)
+		require.NoError(t, err)
+	}
+	
 	err := os.WriteFile(path, []byte(content), 0644)
 	require.NoError(t, err)
 

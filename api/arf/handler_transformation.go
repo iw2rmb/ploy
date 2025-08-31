@@ -303,8 +303,8 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		return nil, fmt.Errorf("recipe executor not available")
 	}
 	
-	fmt.Printf("[ARF Transform Internal] Calling recipe executor for recipe: %s (type: %s)\n", req.RecipeID, req.Type)
-	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath, req.Type)
+	fmt.Printf("[ARF Transform Internal] Calling recipe executor for recipe: %s (type: %s, transformationID: %s)\n", req.RecipeID, req.Type, transformID)
+	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath, req.Type, transformID)
 	if err != nil {
 		fmt.Printf("[ARF Transform Internal] Recipe execution failed: %v\n", err)
 		// Let RecipeExecutor handle fallback logic internally before treating as error
