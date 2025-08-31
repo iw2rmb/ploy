@@ -261,24 +261,11 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 				Name:   "openrewrite",  // Changed from "transform" to match task group name
 				Driver: "docker",
 				Config: map[string]interface{}{
-					// Use custom OpenRewrite image from registry
-					"image": fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
-					// Override Docker entrypoint to run our custom setup
-					"entrypoint": []string{"/bin/sh", "-c"},
-					"command": // Debug and setup: Nomad extracts to local/ directory
-						"echo '[DEBUG] Current directory:' && pwd && " +
-						"echo '[DEBUG] Directory contents:' && ls -la && " +
-						"echo '[DEBUG] Local directory contents:' && ls -la local/ 2>/dev/null || echo 'No local dir' && " +
-						"echo '[DEBUG] Creating workspace structure...' && " +
-						"mkdir -p /workspace/project && " +
-						"echo '[DEBUG] Copying extracted files to workspace...' && " +
-						"cp -r local/* /workspace/project/ 2>/dev/null || cp -r * /workspace/project/ 2>/dev/null || true && " +
-						"echo '[DEBUG] Workspace contents:' && ls -la /workspace/project/ | head -20 && " +
-						"echo '[DEBUG] Starting OpenRewrite...' && " +
-						"/usr/local/bin/openrewrite",
+					// Use custom OpenRewrite image from registry (now with setup script)
+					"image":              fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
 					"dns_servers":        []string{"172.17.0.1"},
 					"dns_search_domains": []string{"service.consul"},
-					"force_pull":         false, // Don't force pull if image exists
+					"force_pull":         true, // Force pull to get latest image with setup script
 				},
 				Env: map[string]string{
 					"RECIPE":           req.RecipeClass,
