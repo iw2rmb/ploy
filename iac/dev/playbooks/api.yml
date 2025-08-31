@@ -141,6 +141,22 @@
 
     - name: Upload API binary to SeaweedFS for self-update
       block:
+        - name: Verify SeaweedFS filer is accessible
+          uri:
+            url: "http://{{ ansible_default_ipv4.address }}:{{ seaweedfs.filer_port }}/"
+            method: GET
+            status_code: [200, 301, 302]
+            timeout: 10
+          register: seaweedfs_check
+          retries: 3
+          delay: 5
+          until: seaweedfs_check.status in [200, 301, 302]
+          ignore_errors: false
+
+        - name: Display SeaweedFS connectivity status
+          debug:
+            msg: "SeaweedFS filer is accessible at {{ ansible_default_ipv4.address }}:{{ seaweedfs.filer_port }}"
+
         - name: Generate version identifier for binary upload
           shell: echo "$(date +%Y%m%d-%H%M%S)-$(cd /home/ploy/ploy && git rev-parse --short HEAD)"
           register: binary_version
@@ -191,9 +207,26 @@
 
         - name: Upload API binary to SeaweedFS
           shell: |
+            # Try using IP address directly to avoid DNS issues
+            SEAWEEDFS_URL="http://{{ ansible_default_ipv4.address }}:{{ seaweedfs.filer_port }}"
+            
+            # First try with IP address
+            echo "Uploading to SeaweedFS at $SEAWEEDFS_URL"
             curl -X POST \
               -F "file=@/home/ploy/ploy/bin/api" \
-              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+              --max-time 30 \
+              --connect-timeout 10 \
+              "${SEAWEEDFS_URL}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+            
+            # Check if upload was successful
+            if [ $? -ne 0 ]; then
+              echo "Failed to upload via IP, trying localhost as fallback"
+              curl -X POST \
+                -F "file=@/home/ploy/ploy/bin/api" \
+                --max-time 30 \
+                --connect-timeout 10 \
+                "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+            fi
           register: binary_upload
           retries: 3
           delay: 5
@@ -202,9 +235,25 @@
 
         - name: Upload metadata to SeaweedFS
           shell: |
+            # Use IP address directly to avoid DNS issues
+            SEAWEEDFS_URL="http://{{ ansible_default_ipv4.address }}:{{ seaweedfs.filer_port }}"
+            
+            echo "Uploading metadata to SeaweedFS at $SEAWEEDFS_URL"
             curl -X POST \
               -F "file=@/tmp/api-metadata.json" \
-              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
+              --max-time 30 \
+              --connect-timeout 10 \
+              "${SEAWEEDFS_URL}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
+            
+            # Check if upload was successful
+            if [ $? -ne 0 ]; then
+              echo "Failed to upload via IP, trying localhost as fallback"
+              curl -X POST \
+                -F "file=@/tmp/api-metadata.json" \
+                --max-time 30 \
+                --connect-timeout 10 \
+                "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
+            fi
           register: metadata_upload
           retries: 3
           delay: 5
@@ -213,10 +262,13 @@
 
         - name: Verify upload by listing versions
           uri:
-            url: "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/?pretty=y"
+            url: "http://{{ ansible_default_ipv4.address }}:{{ seaweedfs.filer_port }}/artifacts/api-binaries/?pretty=y"
             method: GET
+            timeout: 10
           register: version_list
           ignore_errors: true
+          retries: 2
+          delay: 3
 
         - name: Display upload results
           debug:
