@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [2025-08-31] - OpenRewrite Transformation Pipeline Fix
+
+### Fixed
+- **Critical**: Resolved tar file corruption in OpenRewrite transformations caused by premature pipe termination
+  - Root cause: `tar -cvf output.tar . | head -50` was killing tar process mid-creation
+  - Solution: Removed output limitation, allowing complete tar archive generation
+  - Result: Valid 9.2MB output.tar files now generated successfully
+- **Infrastructure**: Fixed Docker registry mismatch preventing deployment of fixes
+  - Ensured openrewrite-jvm:latest pushed to correct registry (registry.dev.ployman.app)
+  - Validated force_pull configuration for latest image updates
+
+### Added
+- Enhanced tar extraction diagnostics in OpenRewrite dispatcher
+  - Tar integrity verification before extraction
+  - Detailed error logging with file size, permissions, and disk space checks
+  - Preview of tar contents for debugging
+
+### Testing
+- Confirmed successful Java 8→17 transformation via unified ARF endpoint
+- Validated non-corrupted tar file generation (9.2MB valid archives)
+- Verified complete upload/download cycle through SeaweedFS storage
+
 ## [2025-08-29] - Performance Monitoring System and cHTTP Infrastructure Removal
 
 ### Removed

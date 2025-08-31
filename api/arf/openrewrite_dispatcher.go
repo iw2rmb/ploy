@@ -128,20 +128,13 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 		req.RecipeClass, req.RepoPath)
 	log.Printf("[OpenRewrite Dispatcher] Nomad client: %p, Storage client: %p", d.nomadClient, d.storageClient)
 
-	// Create a unique job ID if not provided
-	var jobTimestamp string
+	// Ensure job ID is set (use provided ID or generate one)
 	if req.JobID == "" {
-		jobTimestamp = fmt.Sprintf("%d", time.Now().Unix())
-		req.JobID = fmt.Sprintf("openrewrite-%s", jobTimestamp)
-	} else {
-		// Extract timestamp from existing JobID (format: openrewrite-1234567890)
-		if strings.HasPrefix(req.JobID, "openrewrite-") {
-			jobTimestamp = strings.TrimPrefix(req.JobID, "openrewrite-")
-		} else {
-			jobTimestamp = req.JobID
-		}
+		// Generate a unique job ID using timestamp for simplicity
+		timestamp := fmt.Sprintf("%d", time.Now().Unix())
+		req.JobID = fmt.Sprintf("openrewrite-%s", timestamp)
 	}
-	log.Printf("[OpenRewrite Dispatcher] Job ID: %s (timestamp: %s)", req.JobID, jobTimestamp)
+	log.Printf("[OpenRewrite Dispatcher] Job ID: %s", req.JobID)
 
 	// Package the repository as tar
 	inputTarPath := fmt.Sprintf("/tmp/%s-input.tar", req.JobID)
@@ -171,7 +164,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	d.storageClient.Delete(ctx, testKey)
 
 	// Upload input tar to storage (bucket is already 'artifacts', so key should not include 'artifacts/' prefix)
-	inputStorageKey := fmt.Sprintf("openrewrite/%s/input.tar", jobTimestamp)
+	inputStorageKey := fmt.Sprintf("jobs/%s/input.tar", req.JobID)
 
 	// Get file size for logging
 	fileInfo, _ := os.Stat(inputTarPath)
@@ -202,10 +195,10 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 
 	// Create Nomad job
 	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
-	job := d.createNomadJob(req, jobTimestamp)
+	job := d.createNomadJob(req)
 
 	// Log the download URL that will be used
-	downloadURL := fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, jobTimestamp)
+	downloadURL := fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest",
 		*job.ID, d.registryURL)
 	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
@@ -229,7 +222,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	log.Printf("[OpenRewrite Dispatcher] Job completed successfully")
 
 	// Download and extract output (bucket is already 'artifacts', so key should not include 'artifacts/' prefix)
-	outputStorageKey := fmt.Sprintf("openrewrite/%s/output.tar", jobTimestamp)
+	outputStorageKey := fmt.Sprintf("jobs/%s/output.tar", req.JobID)
 	outputTarPath := fmt.Sprintf("/tmp/%s-output.tar", req.JobID)
 	defer os.Remove(outputTarPath)
 
@@ -257,7 +250,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 }
 
 // createNomadJob creates a Nomad job for OpenRewrite transformation
-func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jobTimestamp string) *api.Job {
+func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *api.Job {
 	jobID := req.JobID
 	jobType := "batch"
 	priority := 50
@@ -276,6 +269,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"force_pull": true, // Force pull to get latest image with setup script
 				},
 				Env: map[string]string{
+					"JOB_ID":           req.JobID,          // Pass job ID to runner script
 					"RECIPE":           req.RecipeClass,
 					"RECIPE_GROUP":     req.RecipeGroup,    // Empty for dynamic discovery
 					"RECIPE_ARTIFACT":  req.RecipeArtifact, // Empty for dynamic discovery
@@ -283,9 +277,9 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"SEAWEEDFS_URL":    "http://45.12.75.241:8888",
 					"PLOY_API_URL":     d.apiURL,
 					"MAVEN_CACHE_PATH": "maven-repository",
-					"DISCOVER_RECIPE":  "true",                                                                             // Tell runner.sh to discover recipe coordinates
-					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, jobTimestamp), // Pass full artifact URL
-					"OUTPUT_KEY":       fmt.Sprintf("openrewrite/%s/output.tar", jobTimestamp),                             // Output storage key (no artifacts/ prefix)
+					"DISCOVER_RECIPE":  "true",                                                                 // Tell runner.sh to discover recipe coordinates
+					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Pass full artifact URL
+					"OUTPUT_KEY":       fmt.Sprintf("jobs/%s/output.tar", req.JobID),                           // Output storage key (no artifacts/ prefix)
 				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
@@ -295,7 +289,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 				Artifacts: []*api.TaskArtifact{
 					{
 						// Download artifact from SeaweedFS
-						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, jobTimestamp)),
+						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID)),
 						RelativeDest: stringPtr("local/"), // Nomad extracts to local/ directory
 					},
 				},
