@@ -297,7 +297,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 				Artifacts: []*api.TaskArtifact{
 					{
 						// Download artifact from SeaweedFS
-						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
+						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, jobTimestamp)),
 						RelativeDest: stringPtr("local/"),  // Nomad extracts to local/ directory
 					},
 				},
