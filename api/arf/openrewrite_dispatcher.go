@@ -655,7 +655,8 @@ func (d *OpenRewriteDispatcher) uploadToStorage(ctx context.Context, filePath, s
 	log.Printf("[OpenRewrite Dispatcher] Storage existence verified successfully")
 
 	// Additional verification: construct HTTP URL and test accessibility
-	httpURL := fmt.Sprintf("%s/%s", d.seaweedfsURL, storageKey)
+	// Note: HTTP URL needs to include bucket prefix since storage client uses bucket + key
+	httpURL := fmt.Sprintf("%s/artifacts/%s", d.seaweedfsURL, storageKey)
 	log.Printf("[OpenRewrite Dispatcher] HTTP URL for verification: %s", httpURL)
 	
 	// Test HTTP access using a simple HEAD request
