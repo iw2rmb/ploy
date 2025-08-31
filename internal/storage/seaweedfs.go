@@ -298,9 +298,11 @@ func (c *SeaweedFSClient) UploadArtifactBundleWithVerification(keyPrefix, artifa
 }
 
 func (c *SeaweedFSClient) VerifyUpload(key string) error {
-	// Use HEAD request to check if file exists - include collection/bucket prefix to match PutObject
-	url := fmt.Sprintf("%s/%s/%s", c.filerURL, c.collection, key)
-	fmt.Printf("[SeaweedFS VerifyUpload] Checking upload at URL: %s\n", url)
+	// Use HEAD request to check if file exists - use the same bucket pattern as PutObject
+	// NOTE: We use the artifacts bucket (collection) to match PutObject behavior
+	bucket := c.GetArtifactsBucket()
+	url := fmt.Sprintf("%s/%s/%s", c.filerURL, bucket, key)
+	fmt.Printf("[SeaweedFS VerifyUpload] Checking upload at URL: %s (bucket: %s)\n", url, bucket)
 
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {

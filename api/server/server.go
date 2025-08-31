@@ -141,6 +141,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	// Create Fiber app with middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
+		ReadTimeout:          10 * time.Minute, // 10-minute request timeout
+		WriteTimeout:         10 * time.Minute, // 10-minute response timeout
+		IdleTimeout:          60 * time.Second, // Connection idle timeout
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			log.Printf("Request error: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

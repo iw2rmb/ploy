@@ -11,8 +11,20 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
+
+// DeploymentState tracks active deployment information
+type DeploymentState struct {
+	StartTime    time.Time `json:"start_time"`
+	PID          int       `json:"pid"`
+	TargetBranch string    `json:"target_branch"`
+	TargetHost   string    `json:"target_host"`
+	Timeout      int       `json:"timeout_minutes"`
+	ExpectedCommit string  `json:"expected_commit"`
+	LogFile      string    `json:"log_file"`
+}
 
 // ApiCmd handles API management commands
 func ApiCmd(args []string) {
@@ -251,8 +263,31 @@ func runAnsibleDeployment(timeoutMinutes int) {
 	// Set environment variables that might be needed
 	ansibleCmd.Env = os.Environ()
 	
+	// Save deployment state before starting
+	deploymentState := &DeploymentState{
+		StartTime:      time.Now(),
+		PID:            0, // Will be updated after starting
+		TargetBranch:   branch,
+		TargetHost:     targetHost,
+		Timeout:        timeoutMinutes,
+		ExpectedCommit: getCurrentCommit(),
+		LogFile:        "", // Foreground deployment doesn't use log file
+	}
+	
 	fmt.Printf("Running Ansible playbook (%d-minute timeout)...\n", timeoutMinutes)
-	if err := ansibleCmd.Run(); err != nil {
+	
+	// Start the command and get PID
+	if err := ansibleCmd.Start(); err != nil {
+		fmt.Printf("Error starting deployment: %v\n", err)
+		return
+	}
+	
+	// Update PID and save deployment state
+	deploymentState.PID = ansibleCmd.Process.Pid
+	saveDeploymentState(deploymentState)
+	
+	// Wait for completion
+	if err := ansibleCmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			fmt.Printf("Ansible deployment timed out after %d minutes\n", timeoutMinutes)
 			fmt.Println("Tip: Use --background flag to run deployment in background")
@@ -265,6 +300,9 @@ func runAnsibleDeployment(timeoutMinutes int) {
 	}
 	
 	fmt.Println("Ansible deployment completed successfully!")
+	
+	// Clear deployment state on successful completion
+	clearDeploymentState()
 }
 
 func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
@@ -372,6 +410,17 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 	// Set working directory to iac/dev
 	ansibleCmd.Dir = iacPath
 	
+	// Prepare deployment state
+	deploymentState := &DeploymentState{
+		StartTime:      time.Now(),
+		PID:            0, // Will be updated after starting
+		TargetBranch:   branch,
+		TargetHost:     targetHost,
+		Timeout:        timeoutMinutes,
+		ExpectedCommit: getCurrentCommit(),
+		LogFile:        logFile,
+	}
+	
 	if monitor {
 		// For monitoring, use pipes to capture output
 		stdout, err := ansibleCmd.StdoutPipe()
@@ -391,6 +440,10 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 			fmt.Printf("Error starting deployment: %v\n", err)
 			return
 		}
+		
+		// Update PID and save deployment state
+		deploymentState.PID = ansibleCmd.Process.Pid
+		saveDeploymentState(deploymentState)
 		
 		fmt.Printf("Deployment started in background (PID: %d)\n", ansibleCmd.Process.Pid)
 		fmt.Printf("Monitoring deployment progress (timeout: %d minutes)...\n", timeoutMinutes)
@@ -453,6 +506,10 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 			return
 		}
 		
+		// Update PID and save deployment state
+		deploymentState.PID = ansibleCmd.Process.Pid
+		saveDeploymentState(deploymentState)
+		
 		fmt.Printf("Deployment started in background (PID: %d)\n", ansibleCmd.Process.Pid)
 		fmt.Printf("Timeout: %d minutes\n", timeoutMinutes)
 		fmt.Printf("Log file: %s\n", logFile)
@@ -486,7 +543,57 @@ func runApiStatus(args []string) {
 	fmt.Println("Checking API deployment status...")
 	fmt.Println("")
 	
-	// Check version
+	// Check for active deployment first
+	deploymentState, err := loadDeploymentState()
+	if err == nil {
+		// Deployment state exists, check if still active
+		if isProcessRunning(deploymentState.PID) {
+			// Deployment is still running
+			elapsed := time.Since(deploymentState.StartTime)
+			timeoutDuration := time.Duration(deploymentState.Timeout) * time.Minute
+			remaining := timeoutDuration - elapsed
+			
+			fmt.Printf("🔄 Deployment in progress (PID: %d)\n", deploymentState.PID)
+			fmt.Printf("Branch: %s\n", deploymentState.TargetBranch)
+			fmt.Printf("Target: %s\n", deploymentState.TargetHost)
+			fmt.Printf("Started: %s (%s ago)\n", deploymentState.StartTime.Format("15:04:05"), elapsed.Round(time.Second))
+			
+			if remaining > 0 {
+				fmt.Printf("Timeout: %s remaining\n", remaining.Round(time.Second))
+			} else {
+				fmt.Printf("⚠️  Deployment has exceeded timeout (%d minutes)\n", deploymentState.Timeout)
+			}
+			
+			if deploymentState.LogFile != "" {
+				fmt.Printf("Log file: %s\n", deploymentState.LogFile)
+				fmt.Println("")
+				fmt.Println("To monitor progress:")
+				fmt.Printf("  tail -f %s\n", deploymentState.LogFile)
+			}
+			
+			fmt.Println("")
+			fmt.Printf("Progress: Deployment started %s ago\n", elapsed.Round(time.Second))
+			return
+		} else {
+			// Process is no longer running, check deployment completion
+			fmt.Printf("📋 Previous deployment completed (PID %d no longer running)\n", deploymentState.PID)
+			
+			// Check if deployment was successful by comparing versions
+			if deploymentState.ExpectedCommit != "" {
+				if checkVersionMatch(controllerURL, deploymentState.ExpectedCommit) {
+					fmt.Printf("✅ Deployment completed successfully\n")
+					fmt.Printf("Branch '%s' deployed to %s\n", deploymentState.TargetBranch, deploymentState.TargetHost)
+					clearDeploymentState() // Clean up successful deployment state
+				} else {
+					fmt.Printf("⚠️  Deployment may have failed - version mismatch\n")
+					fmt.Printf("Expected commit: %s\n", deploymentState.ExpectedCommit)
+				}
+			}
+			fmt.Println("")
+		}
+	}
+	
+	// Check current API status
 	versionURL := fmt.Sprintf("%s/version", controllerURL)
 	req, err := http.NewRequest("GET", versionURL, nil)
 	if err != nil {
@@ -548,6 +655,101 @@ func runApiStatus(args []string) {
 	
 	fmt.Println("")
 	fmt.Printf("API Endpoint: %s\n", controllerURL)
+}
+
+func getDeploymentStateFile() string {
+	return "/tmp/ploy-deployment-state.json"
+}
+
+func saveDeploymentState(state *DeploymentState) error {
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(getDeploymentStateFile(), data, 0644)
+}
+
+func loadDeploymentState() (*DeploymentState, error) {
+	data, err := os.ReadFile(getDeploymentStateFile())
+	if err != nil {
+		return nil, err
+	}
+	
+	var state DeploymentState
+	err = json.Unmarshal(data, &state)
+	return &state, err
+}
+
+func clearDeploymentState() error {
+	return os.Remove(getDeploymentStateFile())
+}
+
+func isProcessRunning(pid int) bool {
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	
+	// Send signal 0 to check if process exists without affecting it
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
+}
+
+func getCurrentCommit() string {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func checkVersionMatch(controllerURL, expectedCommit string) bool {
+	versionURL := fmt.Sprintf("%s/version", controllerURL)
+	
+	req, err := http.NewRequest("GET", versionURL, nil)
+	if err != nil {
+		return false
+	}
+	
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	
+	var versionInfo map[string]interface{}
+	if err := json.Unmarshal(body, &versionInfo); err != nil {
+		return false
+	}
+	
+	if gitCommit, ok := versionInfo["git_commit"]; ok {
+		if commitStr, ok := gitCommit.(string); ok {
+			// Compare full commit hash or shortened versions
+			if commitStr == expectedCommit {
+				return true
+			}
+			// Check if either is a prefix of the other (for short vs long commit hashes)
+			if len(commitStr) > len(expectedCommit) && strings.HasPrefix(commitStr, expectedCommit) {
+				return true
+			}
+			if len(expectedCommit) > len(commitStr) && strings.HasPrefix(expectedCommit, commitStr) {
+				return true
+			}
+		}
+	}
+	
+	return false
 }
 
 func checkDeploymentStatus(controllerURL string) {
