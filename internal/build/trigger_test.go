@@ -47,20 +47,20 @@ func TestTriggerBuild(t *testing.T) {
 		skipReason     string
 	}{
 		{
-			name:    "invalid app name - too short",
-			appName: "x", // Single character name (invalid, minimum is 2)
+			name:           "invalid app name - too short",
+			appName:        "x", // Single character name (invalid, minimum is 2)
 			expectedStatus: 400,
 			expectedError:  "Invalid app name",
 		},
 		{
-			name:    "invalid app name - special characters",
-			appName: "invalid@app",
+			name:           "invalid app name - special characters",
+			appName:        "invalid@app",
 			expectedStatus: 400,
 			expectedError:  "Invalid app name",
 		},
 		{
-			name:    "invalid app name - reserved name",
-			appName: "api",
+			name:           "invalid app name - reserved name",
+			appName:        "api",
 			expectedStatus: 400,
 			expectedError:  "Invalid app name",
 		},
@@ -104,11 +104,11 @@ func TestTriggerBuild(t *testing.T) {
 			if tt.skipReason != "" {
 				t.Skip(tt.skipReason)
 			}
-			
+
 			// Setup Fiber app for testing
 			app := fiber.New()
 			mockEnvStore := mocks.NewEnvStore()
-			
+
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockEnvStore)
 			}
@@ -118,7 +118,7 @@ func TestTriggerBuild(t *testing.T) {
 				return TriggerBuild(c, nil, mockEnvStore)
 			})
 
-			// Create test request  
+			// Create test request
 			url := "/apps/" + tt.appName + "/build" + tt.queryParams
 			var reqBody io.Reader
 			if tt.requestBody != nil {
@@ -132,16 +132,16 @@ func TestTriggerBuild(t *testing.T) {
 
 			// Verify response
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
-			
+
 			if tt.expectedError != "" {
 				var responseBody map[string]interface{}
 				json.NewDecoder(resp.Body).Decode(&responseBody)
-				
+
 				if errorMsg, exists := responseBody["error"]; exists {
 					assert.Contains(t, errorMsg.(string), tt.expectedError)
 				}
 			}
-			
+
 			// Verify mock expectations
 			mockEnvStore.AssertExpectations(t)
 		})
@@ -156,14 +156,14 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	t.Run("upload file with retry - file not found", func(t *testing.T) {
-		mockProvider := &MockStorageClient{}
+		mockProvider := mocks.NewStorageClient()
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
-		
+
 		// Create storage client wrapper
 		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
-		
+
 		nonExistentPath := filepath.Join(tmpDir, "nonexistent.txt")
-		
+
 		err := uploadFileWithRetryAndVerification(storeClient, nonExistentPath, "test-key", "text/plain")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to open file")
@@ -176,23 +176,23 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 		err := os.WriteFile(testPath, testContent, 0644)
 		require.NoError(t, err)
 
-		mockProvider := &MockStorageClient{}
+		mockProvider := mocks.NewStorageClient()
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
 		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(&storage.PutObjectResult{
 			ETag:     "test-etag",
 			Location: "test-location",
 			Size:     int64(len(testContent)),
 		}, nil)
-		
+
 		// Mock successful integrity verification
 		mockProvider.On("VerifyUpload", "test-key").Return(nil)
 		mockProvider.On("GetObject", "test-bucket", "test-key").Return(io.NopCloser(bytes.NewReader(testContent)), nil)
-		
+
 		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
-		
+
 		err = uploadFileWithRetryAndVerification(storeClient, testPath, "test-key", "text/plain")
 		assert.NoError(t, err)
-		
+
 		mockProvider.AssertExpectations(t)
 	})
 
@@ -203,9 +203,9 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 		err := os.WriteFile(testPath, testContent, 0644)
 		require.NoError(t, err)
 
-		mockProvider := &MockStorageClient{}
+		mockProvider := mocks.NewStorageClient()
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
-		
+
 		// First attempt fails
 		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(nil, fmt.Errorf("network error")).Once()
 		// Second attempt succeeds
@@ -214,27 +214,27 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 			Location: "test-location",
 			Size:     int64(len(testContent)),
 		}, nil).Once()
-		
+
 		// Mock successful verification after retry
 		mockProvider.On("VerifyUpload", "test-key").Return(nil)
 		mockProvider.On("GetObject", "test-bucket", "test-key").Return(io.NopCloser(bytes.NewReader(testContent)), nil)
-		
+
 		// Use fast retry config for unit tests to prevent timeouts
 		config := storage.DefaultClientConfig()
 		config.RetryConfig = helpers.TestRetryConfig()
 		storeClient := storage.NewStorageClient(mockProvider, config)
-		
+
 		err = uploadFileWithRetryAndVerification(storeClient, testPath, "test-key", "text/plain")
 		assert.NoError(t, err)
-		
+
 		// Verify both attempts were made
 		mockProvider.AssertExpectations(t)
 	})
 
 	t.Run("upload file with retry - integration note", func(t *testing.T) {
 		t.Skip("Integration test - has hardcoded delays unsuitable for unit testing. Should be tested on VPS.")
-		
-		// NOTE: The uploadFileWithRetryAndVerification function has its own hardcoded 
+
+		// NOTE: The uploadFileWithRetryAndVerification function has its own hardcoded
 		// retry delays (1 second baseDelay) that make it unsuitable for fast unit tests.
 		// This functionality should be tested in integration tests on VPS where delays are acceptable.
 	})
@@ -242,28 +242,28 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 
 func TestUploadBytesWithRetryAndVerification(t *testing.T) {
 	t.Run("upload bytes with retry - success", func(t *testing.T) {
-		mockProvider := &MockStorageClient{}
+		mockProvider := mocks.NewStorageClient()
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
 		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
 			ETag:     "test-etag",
 			Location: "test-location",
 			Size:     10,
 		}, nil)
-		
+
 		// Create storage client wrapper
 		storeClient := storage.NewStorageClient(mockProvider, storage.DefaultClientConfig())
-		
+
 		testData := []byte("test data!")
-		
+
 		err := uploadBytesWithRetryAndVerification(storeClient, testData, "test-key", "application/json")
 		assert.NoError(t, err)
-		
+
 		mockProvider.AssertExpectations(t)
 	})
 
 	t.Run("upload bytes with retry - size mismatch then success", func(t *testing.T) {
 		t.Skip("Integration test - has hardcoded delays unsuitable for unit testing. Should be tested on VPS.")
-		
+
 		// NOTE: The uploadBytesWithRetryAndVerification function has hardcoded retry delays
 		// (1 second baseDelay) that cause unit tests to timeout. Test on VPS instead.
 	})
@@ -295,19 +295,19 @@ func TestCopyFile(t *testing.T) {
 	t.Run("successful copy", func(t *testing.T) {
 		srcPath := filepath.Join(tmpDir, "source.txt")
 		dstPath := filepath.Join(tmpDir, "destination.txt")
-		
+
 		testContent := []byte("Hello, World!")
 		err := os.WriteFile(srcPath, testContent, 0644)
 		require.NoError(t, err)
-		
+
 		err = copyFile(srcPath, dstPath)
 		assert.NoError(t, err)
-		
+
 		// Verify file was copied correctly
 		copiedContent, err := os.ReadFile(dstPath)
 		require.NoError(t, err)
 		assert.Equal(t, testContent, copiedContent)
-		
+
 		// Verify permissions were set correctly
 		info, err := os.Stat(dstPath)
 		require.NoError(t, err)
@@ -318,7 +318,7 @@ func TestCopyFile(t *testing.T) {
 	t.Run("non-existent source file", func(t *testing.T) {
 		srcPath := filepath.Join(tmpDir, "nonexistent.txt")
 		dstPath := filepath.Join(tmpDir, "destination2.txt")
-		
+
 		err := copyFile(srcPath, dstPath)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no such file or directory")
@@ -328,11 +328,11 @@ func TestCopyFile(t *testing.T) {
 	t.Run("invalid destination directory", func(t *testing.T) {
 		srcPath := filepath.Join(tmpDir, "source2.txt")
 		dstPath := "/nonexistent/directory/destination.txt"
-		
+
 		testContent := []byte("Test content")
 		err := os.WriteFile(srcPath, testContent, 0644)
 		require.NoError(t, err)
-		
+
 		err = copyFile(srcPath, dstPath)
 		assert.Error(t, err)
 	})

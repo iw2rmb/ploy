@@ -16,73 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iw2rmb/ploy/api/envstore"
+	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
-
-// Mock storage client for testing
-type MockStorageClient struct {
-	mock.Mock
-}
-
-func (m *MockStorageClient) GetHealthStatus() interface{} {
-	args := m.Called()
-	return args.Get(0)
-}
-
-func (m *MockStorageClient) GetMetrics() interface{} {
-	args := m.Called()
-	return args.Get(0)
-}
-
-func (m *MockStorageClient) GetArtifactsBucket() string {
-	args := m.Called()
-	return args.String(0)
-}
-
-func (m *MockStorageClient) UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (interface{}, error) {
-	args := m.Called(keyPrefix, artifactPath)
-	return args.Get(0), args.Error(1)
-}
-
-// Mock environment store for testing
-type MockEnvStore struct {
-	mock.Mock
-}
-
-func (m *MockEnvStore) Get(appName, key string) (string, bool, error) {
-	args := m.Called(appName, key)
-	return args.String(0), args.Bool(1), args.Error(2)
-}
-
-func (m *MockEnvStore) GetAll(appName string) (envstore.AppEnvVars, error) {
-	args := m.Called(appName)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(envstore.AppEnvVars), args.Error(1)
-}
-
-func (m *MockEnvStore) Set(appName, key, value string) error {
-	args := m.Called(appName, key, value)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) Delete(appName, key string) error {
-	args := m.Called(appName, key)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) SetAll(appName string, envVars envstore.AppEnvVars) error {
-	args := m.Called(appName, envVars)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) ToStringArray(appName string) ([]string, error) {
-	args := m.Called(appName)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]string), args.Error(1)
-}
 
 // Mock config manager
 type MockConfigManager struct {
@@ -131,7 +66,7 @@ func createMockServer() *TestableServer {
 		app:    createTestApp(),
 		config: &ControllerConfig{},
 		dependencies: &ServiceDependencies{
-			EnvStore:          &MockEnvStore{},
+			EnvStore:          mocks.NewEnvStore(),
 			StorageConfigPath: "/test/config",
 		},
 	}
@@ -519,7 +454,7 @@ func TestServer_HandleStorageHealth(t *testing.T) {
 
 	t.Run("successful health status retrieval", func(t *testing.T) {
 		// Create mock storage client with health data
-		mockStorage := &MockStorageClient{}
+		mockStorage := mocks.NewStorageClient()
 		healthStatus := map[string]interface{}{
 			"status":      "healthy",
 			"uptime":      "24h30m",
@@ -539,7 +474,7 @@ func TestServer_HandleStorageHealth(t *testing.T) {
 			if err != nil {
 				return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 			}
-			storeClient := storeClientInterface.(*MockStorageClient)
+			storeClient := storeClientInterface.(*mocks.StorageClient)
 			health := storeClient.GetHealthStatus()
 			return c.JSON(health)
 		})
@@ -592,7 +527,7 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 
 	t.Run("successful metrics retrieval", func(t *testing.T) {
 		// Create mock storage client with metrics data
-		mockStorage := &MockStorageClient{}
+		mockStorage := mocks.NewStorageClient()
 		metricsData := map[string]interface{}{
 			"requests_total":     12345,
 			"response_time_ms":   25.7,
@@ -613,7 +548,7 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 			if err != nil {
 				return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 			}
-			storeClient := storeClientInterface.(*MockStorageClient)
+			storeClient := storeClientInterface.(*mocks.StorageClient)
 			metrics := storeClient.GetMetrics()
 			return c.JSON(metrics)
 		})
@@ -642,7 +577,7 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 
 func TestServer_HandleGetEnvVars(t *testing.T) {
 	// Create mock environment store
-	mockEnvStore := &MockEnvStore{}
+	mockEnvStore := mocks.NewEnvStore()
 	expectedVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",
@@ -691,7 +626,7 @@ func TestServer_HandleGetEnvVars(t *testing.T) {
 
 func TestServer_HandleGetEnvVars_Error(t *testing.T) {
 	// Create mock environment store that returns error
-	mockEnvStore := &MockEnvStore{}
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("GetAll", "testapp").Return(nil, fmt.Errorf("environment store error"))
 
 	server := createMockServer()
@@ -733,7 +668,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 		name             string
 		appName          string
 		requestBody      map[string]string
-		mockSetup        func(*MockEnvStore)
+		mockSetup        func(*mocks.EnvStore)
 		expectedStatus   int
 		expectedError    string
 		validateResponse func(t *testing.T, response map[string]interface{})
@@ -831,7 +766,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-			mockEnvStore := &MockEnvStore{}
+			mockEnvStore := mocks.NewEnvStore()
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockEnvStore)
 			}
@@ -1002,7 +937,7 @@ func TestServer_HandleSetEnvVars_InvalidJSON(t *testing.T) {
 
 func TestServer_HandleSetEnvVar(t *testing.T) {
 	// Create mock environment store
-	mockEnvStore := &MockEnvStore{}
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Set", "testapp", "NEW_VAR", "new-value").Return(nil)
 
 	server := createMockServer()
@@ -1058,7 +993,7 @@ func TestServer_HandleSetEnvVar(t *testing.T) {
 
 func TestServer_HandleDeleteEnvVar(t *testing.T) {
 	// Create mock environment store
-	mockEnvStore := &MockEnvStore{}
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Delete", "testapp", "OLD_VAR").Return(nil)
 
 	server := createMockServer()
@@ -1133,7 +1068,7 @@ func TestServer_HandleSetEnvVar_InvalidBody(t *testing.T) {
 
 func TestServer_HandleDeleteEnvVar_Error(t *testing.T) {
 	// Create mock environment store that returns error
-	mockEnvStore := &MockEnvStore{}
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Delete", "testapp", "NONEXISTENT_VAR").Return(fmt.Errorf("variable not found"))
 
 	server := createMockServer()
@@ -1175,7 +1110,7 @@ func TestServer_HandleDeleteEnvVar_Error(t *testing.T) {
 
 // Benchmarks for handler performance
 func BenchmarkServer_HandleStorageHealth(b *testing.B) {
-	mockStorage := &MockStorageClient{}
+	mockStorage := mocks.NewStorageClient()
 	healthStatus := map[string]interface{}{
 		"status":    "healthy",
 		"timestamp": time.Now(),
@@ -1206,7 +1141,7 @@ func BenchmarkServer_HandleStorageHealth(b *testing.B) {
 }
 
 func BenchmarkServer_HandleGetEnvVars(b *testing.B) {
-	mockEnvStore := &MockEnvStore{}
+	mockEnvStore := mocks.NewEnvStore()
 	envVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",
@@ -1335,37 +1270,5 @@ func TestServer_LifecycleManagement(t *testing.T) {
 
 		assert.Equal(t, "/test/config", deps.StorageConfigPath)
 		assert.Nil(t, deps.EnvStore) // Not initialized in test
-	})
-}
-
-// Test mock implementations work correctly
-func TestMockImplementations(t *testing.T) {
-	t.Run("mock storage client", func(t *testing.T) {
-		mockStorage := &MockStorageClient{}
-		mockStorage.On("GetHealthStatus").Return(map[string]interface{}{"status": "healthy"})
-		mockStorage.On("GetMetrics").Return(map[string]interface{}{"requests": 100})
-
-		health := mockStorage.GetHealthStatus()
-		metrics := mockStorage.GetMetrics()
-
-		assert.Equal(t, "healthy", health.(map[string]interface{})["status"])
-		assert.Equal(t, 100, metrics.(map[string]interface{})["requests"])
-
-		mockStorage.AssertExpectations(t)
-	})
-
-	t.Run("mock env store", func(t *testing.T) {
-		mockEnv := &MockEnvStore{}
-		mockEnv.On("GetAll", "testapp").Return(envstore.AppEnvVars{"KEY": "value"}, nil)
-		mockEnv.On("Set", "testapp", "KEY", "newvalue").Return(nil)
-
-		vars, err := mockEnv.GetAll("testapp")
-		assert.NoError(t, err)
-		assert.Equal(t, "value", vars["KEY"])
-
-		err = mockEnv.Set("testapp", "KEY", "newvalue")
-		assert.NoError(t, err)
-
-		mockEnv.AssertExpectations(t)
 	})
 }

@@ -11,58 +11,13 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/api/envstore"
+	"github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/testing/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/iw2rmb/ploy/api/envstore"
-	"github.com/iw2rmb/ploy/internal/storage"
 )
-
-// Mock for EnvStore
-type MockEnvStore struct {
-	mock.Mock
-}
-
-func (m *MockEnvStore) GetAll(app string) (envstore.AppEnvVars, error) {
-	args := m.Called(app)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(envstore.AppEnvVars), args.Error(1)
-}
-
-func (m *MockEnvStore) Set(app, key, value string) error {
-	args := m.Called(app, key, value)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) SetAll(app string, envVars envstore.AppEnvVars) error {
-	args := m.Called(app, envVars)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) Get(app, key string) (string, bool, error) {
-	args := m.Called(app, key)
-	return args.String(0), args.Bool(1), args.Error(2)
-}
-
-func (m *MockEnvStore) Delete(app, key string) error {
-	args := m.Called(app, key)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) ToStringArray(app string) ([]string, error) {
-	args := m.Called(app)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]string), args.Error(1)
-}
-
-// Mock for StorageClient
-type MockStorageClient struct {
-	mock.Mock
-}
 
 // Test helpers for mocking exec.Command
 var execCommand = exec.Command
@@ -82,7 +37,7 @@ func TestDestroyApp(t *testing.T) {
 		name           string
 		appName        string
 		force          bool
-		setupMocks     func(*MockEnvStore, *MockStorageClient)
+		setupMocks     func(*mocks.EnvStore, *mocks.StorageClient)
 		expectedStatus string
 		expectedErrors int
 	}{
@@ -90,7 +45,7 @@ func TestDestroyApp(t *testing.T) {
 			name:    "successful complete destruction",
 			appName: "test-app",
 			force:   false,
-			setupMocks: func(envStore *MockEnvStore, storageClient *MockStorageClient) {
+			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
 				envVars := envstore.AppEnvVars{
 					"KEY1": "value1",
 					"KEY2": "value2",
@@ -100,13 +55,13 @@ func TestDestroyApp(t *testing.T) {
 				envStore.On("Delete", "test-app", "KEY2").Return(nil)
 			},
 			expectedStatus: "partially_destroyed", // Commands will fail in test environment
-			expectedErrors: 1, // Nomad command will fail
+			expectedErrors: 1,                     // Nomad command will fail
 		},
 		{
 			name:    "partial destruction with env error",
 			appName: "test-app",
 			force:   false,
-			setupMocks: func(envStore *MockEnvStore, storageClient *MockStorageClient) {
+			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
 				envVars := envstore.AppEnvVars{
 					"KEY1": "value1",
 				}
@@ -120,7 +75,7 @@ func TestDestroyApp(t *testing.T) {
 			name:    "no environment variables found",
 			appName: "test-app",
 			force:   false,
-			setupMocks: func(envStore *MockEnvStore, storageClient *MockStorageClient) {
+			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
 				envStore.On("GetAll", "test-app").Return(nil, errors.New("not found"))
 			},
 			expectedStatus: "partially_destroyed",
@@ -130,7 +85,7 @@ func TestDestroyApp(t *testing.T) {
 			name:    "force destruction",
 			appName: "force-test-app",
 			force:   true,
-			setupMocks: func(envStore *MockEnvStore, storageClient *MockStorageClient) {
+			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
 				envStore.On("GetAll", "force-test-app").Return(nil, errors.New("not found"))
 			},
 			expectedStatus: "partially_destroyed",
@@ -147,41 +102,41 @@ func TestDestroyApp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup Fiber app
 			app := fiber.New()
-			
+
 			// Setup mocks
-			mockEnvStore := new(MockEnvStore)
-			mockStorageClient := new(MockStorageClient)
+			mockEnvStore := mocks.NewEnvStore()
+			mockStorageClient := mocks.NewStorageClient()
 			tt.setupMocks(mockEnvStore, mockStorageClient)
-			
+
 			// Setup route
 			app.Delete("/apps/:app", func(c *fiber.Ctx) error {
 				return DestroyApp(c, (*storage.StorageClient)(nil), mockEnvStore)
 			})
-			
+
 			// Create request
 			url := fmt.Sprintf("/apps/%s", tt.appName)
 			if tt.force {
 				url += "?force=true"
 			}
 			req := httptest.NewRequest("DELETE", url, nil)
-			
+
 			// Execute request
 			resp, err := app.Test(req)
 			require.NoError(t, err)
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
-			
+
 			// Parse response
 			var result map[string]interface{}
 			err = json.NewDecoder(resp.Body).Decode(&result)
 			require.NoError(t, err)
-			
+
 			// Verify response
 			assert.Equal(t, tt.appName, result["app"])
 			assert.Equal(t, tt.expectedStatus, result["status"])
-			
+
 			errors := result["errors"].([]interface{})
 			assert.Len(t, errors, tt.expectedErrors)
-			
+
 			// Verify mock expectations
 			mockEnvStore.AssertExpectations(t)
 			mockStorageClient.AssertExpectations(t)
@@ -228,14 +183,14 @@ func TestDestroyNomadJobs(t *testing.T) {
 
 			// Mock exec.Command behavior would go here
 			// For simplicity, we're testing the logic without actual command execution
-			
+
 			// Since we can't easily mock exec.Command without refactoring,
 			// we'll focus on testing the function logic
 			if tt.name == "successful nomad job destruction" {
 				// Simulate successful execution
 				status["operations"].(map[string]string)["nomad_"+tt.appName] = "stopped"
 			}
-			
+
 			// The actual test would need command mocking infrastructure
 			// This is a simplified version focusing on the logic
 		})
@@ -285,7 +240,7 @@ func TestDestroyEnvironmentVariables(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockEnvStore := new(MockEnvStore)
+			mockEnvStore := mocks.NewEnvStore()
 			status := map[string]interface{}{
 				"operations": map[string]string{},
 			}
@@ -326,7 +281,7 @@ func TestDestroyDomains(t *testing.T) {
 
 	err := destroyDomains("test-app", status)
 	assert.NoError(t, err)
-	
+
 	operations := status["operations"].(map[string]string)
 	assert.Equal(t, "not_implemented", operations["domains"])
 }
@@ -338,17 +293,17 @@ func TestDestroyCertificates(t *testing.T) {
 
 	err := destroyCertificates("test-app", status)
 	assert.NoError(t, err)
-	
+
 	operations := status["operations"].(map[string]string)
 	assert.Equal(t, "not_implemented", operations["certificates"])
 }
 
 func TestDestroyStorageArtifacts(t *testing.T) {
 	tests := []struct {
-		name         string
-		appName      string
-		storeClient  *storage.StorageClient
-		expectedOp   string
+		name        string
+		appName     string
+		storeClient *storage.StorageClient
+		expectedOp  string
 	}{
 		{
 			name:        "no storage client",
@@ -372,7 +327,7 @@ func TestDestroyStorageArtifacts(t *testing.T) {
 
 			err := destroyStorageArtifacts(tt.appName, status, tt.storeClient)
 			assert.NoError(t, err)
-			
+
 			operations := status["operations"].(map[string]string)
 			assert.Equal(t, tt.expectedOp, operations["storage"])
 		})
@@ -393,15 +348,15 @@ func TestDestroyTemporaryFiles(t *testing.T) {
 
 // Integration test for the full destroy flow
 func TestDestroyApp_Integration(t *testing.T) {
-	mockEnvStore := new(MockEnvStore)
-	
+	mockEnvStore := mocks.NewEnvStore()
+
 	// Setup comprehensive mocks for full flow
 	envVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgres://localhost",
 		"API_KEY":      "secret-key",
 		"DEBUG":        "false",
 	}
-	
+
 	mockEnvStore.On("GetAll", "integration-app").Return(envVars, nil)
 	for key := range envVars {
 		mockEnvStore.On("Delete", "integration-app", key).Return(nil)
@@ -432,15 +387,15 @@ func TestDestroyApp_Integration(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkDestroyEnvironmentVariables(b *testing.B) {
-	mockEnvStore := new(MockEnvStore)
+	mockEnvStore := mocks.NewEnvStore()
 	envVars := make(envstore.AppEnvVars)
-	
+
 	// Create a large set of environment variables
 	for i := 0; i < 100; i++ {
 		key := fmt.Sprintf("KEY_%d", i)
 		envVars[key] = fmt.Sprintf("value_%d", i)
 	}
-	
+
 	mockEnvStore.On("GetAll", mock.Anything).Return(envVars, nil)
 	for key := range envVars {
 		mockEnvStore.On("Delete", mock.Anything, key).Return(nil)
@@ -460,7 +415,7 @@ func BenchmarkDestroyEnvironmentVariables(b *testing.B) {
 func TestDestroyApp_ErrorScenarios(t *testing.T) {
 	scenarios := []struct {
 		name           string
-		setupMocks     func(*MockEnvStore) 
+		setupMocks     func(*MockEnvStore)
 		expectedErrors []string
 	}{
 		{
@@ -483,7 +438,7 @@ func TestDestroyApp_ErrorScenarios(t *testing.T) {
 
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
-			mockEnvStore := new(MockEnvStore)
+			mockEnvStore := mocks.NewEnvStore()
 			sc.setupMocks(mockEnvStore)
 
 			app := fiber.New()
