@@ -1206,6 +1206,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			recipeIndex,
 			recipeValidator,
 			sandboxMgr,
+			storageProvider, // Pass the storage provider for recipe registry
 		)
 		log.Printf("ARF handler initialized with storage backend: %s", arfConfig.Storage.Backend)
 	} else {

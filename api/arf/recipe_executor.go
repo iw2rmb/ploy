@@ -32,80 +32,60 @@ func NewRecipeExecutor(storage storage.RecipeStorage, sandboxMgr SandboxManager,
 }
 
 // ExecuteRecipeByID executes a recipe by ID against a repository
-// recipeType can be "openrewrite" to force OpenRewrite dispatcher usage
+// Uses unified execution path based on recipe type
 func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string, repoPath string, recipeType string) (*TransformationResult, error) {
-	// Try to load recipe from storage
-	recipe, err := e.storage.GetRecipe(ctx, recipeID)
-	if err != nil {
-		// Check if this is an OpenRewrite recipe and we have a dispatcher
-		fmt.Printf("[RecipeExecutor] Recipe %s not found in cache (error: %v), checking for OpenRewrite fallback\n", recipeID, err)
-		fmt.Printf("[RecipeExecutor] Recipe type: %s, dispatcher available: %v\n", 
-			recipeType, e.openRewriteDispatcher != nil)
-			
-		if recipeType == "openrewrite" {
-			if e.openRewriteDispatcher == nil {
-				fmt.Printf("[RecipeExecutor] ERROR: Recipe %s is OpenRewrite but dispatcher is nil - check server initialization\n", recipeID)
-				return nil, fmt.Errorf("OpenRewrite recipe %s cannot be executed: dispatcher not initialized (check Nomad/SeaweedFS connectivity)", recipeID)
-			}
-			
-			fmt.Printf("[RecipeExecutor] Recipe %s not found in cache, triggering dynamic download via Nomad dispatcher\n", recipeID)
-			
-			// Add panic recovery around dispatcher operations
-			defer func() {
-				if r := recover(); r != nil {
-					fmt.Printf("[RecipeExecutor] PANIC in OpenRewrite dispatcher: %v\n", r)
-				}
-			}()
-			
-			// Parse OpenRewrite recipe ID to get Maven coordinates
-			req, parseErr := ParseOpenRewriteRecipeID(recipeID)
-			if parseErr != nil {
-				fmt.Printf("[RecipeExecutor] Failed to parse OpenRewrite recipe ID %s: %v\n", recipeID, parseErr)
-				return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
-			}
-			
-			// Set the repository path
-			req.RepoPath = repoPath
-			
-			fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine for discovery and execution\n", recipeID)
-			fmt.Printf("[RecipeExecutor] Dispatcher call about to execute: recipe=%s, repoPath=%s\n", req.RecipeClass, req.RepoPath)
-			
-			// Add timeout context for dispatcher call (30 seconds)
-			dispatcherCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			defer cancel()
-			
-			fmt.Printf("[RecipeExecutor] Starting dispatcher call with 30s timeout...\n")
-			dispatcherStart := time.Now()
-			
-			// Dispatch to Nomad for dynamic download and execution
-			result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(dispatcherCtx, req)
-			if execErr != nil {
-				if dispatcherCtx.Err() == context.DeadlineExceeded {
-					fmt.Printf("[RecipeExecutor] OpenRewrite dispatcher timed out after 30s for recipe %s\n", recipeID)
-					return nil, fmt.Errorf("OpenRewrite dispatcher timed out for recipe %s after 30 seconds", recipeID)
-				}
-				fmt.Printf("[RecipeExecutor] Failed to execute recipe %s: %v\n", recipeID, execErr)
-				return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
-			}
-			
-			fmt.Printf("[RecipeExecutor] Dispatcher call completed successfully after %v\n", time.Since(dispatcherStart))
-			
-			fmt.Printf("[RecipeExecutor] Recipe %s executed successfully, result: %+v\n", recipeID, result)
-			
-			// Recipe was successfully downloaded and executed, optionally cache it
-			// Note: The runner.sh script already registers the recipe with the API
-			// so it will be available in storage for future use
-			
-			return result, nil
+	fmt.Printf("[RecipeExecutor] Starting unified recipe execution: recipe=%s, type=%s, repoPath=%s\n", recipeID, recipeType, repoPath)
+	
+	// Unified execution path: OpenRewrite recipes ALWAYS go through dispatcher
+	if recipeType == "openrewrite" {
+		if e.openRewriteDispatcher == nil {
+			fmt.Printf("[RecipeExecutor] ERROR: Recipe %s is OpenRewrite but dispatcher is nil - check server initialization\n", recipeID)
+			return nil, fmt.Errorf("OpenRewrite recipe %s cannot be executed: dispatcher not initialized (check Nomad/SeaweedFS connectivity)", recipeID)
 		}
 		
-		// Not an OpenRewrite recipe or no dispatcher available
-		fmt.Printf("[RecipeExecutor] Recipe %s not found and no fallback available (type=%s, hasDispatcher=%v)\n", 
-			recipeID, recipeType, e.openRewriteDispatcher != nil)
+		fmt.Printf("[RecipeExecutor] OpenRewrite recipe - using unified dispatcher execution path\n")
+		
+		// Parse OpenRewrite recipe ID to get Maven coordinates
+		req, parseErr := ParseOpenRewriteRecipeID(recipeID)
+		if parseErr != nil {
+			fmt.Printf("[RecipeExecutor] Failed to parse OpenRewrite recipe ID %s: %v\n", recipeID, parseErr)
+			return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
+		}
+		
+		// Set the repository path
+		req.RepoPath = repoPath
+		
+		fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine using openrewrite-jvm:latest\n", recipeID)
+		
+		// Add timeout context for dispatcher call (inherit from parent context)
+		dispatcherCtx, cancel := context.WithTimeout(ctx, 25*time.Minute)
+		defer cancel()
+		
+		dispatcherStart := time.Now()
+		
+		// Dispatch to Nomad for unified execution using openrewrite-jvm:latest
+		result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(dispatcherCtx, req)
+		if execErr != nil {
+			if dispatcherCtx.Err() == context.DeadlineExceeded {
+				fmt.Printf("[RecipeExecutor] OpenRewrite dispatcher timed out after 25m for recipe %s\n", recipeID)
+				return nil, fmt.Errorf("OpenRewrite dispatcher timed out for recipe %s after 25 minutes", recipeID)
+			}
+			fmt.Printf("[RecipeExecutor] Failed to execute recipe %s: %v\n", recipeID, execErr)
+			return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
+		}
+		
+		fmt.Printf("[RecipeExecutor] OpenRewrite recipe %s executed successfully after %v\n", recipeID, time.Since(dispatcherStart))
+		return result, nil
+	}
+	
+	// Non-OpenRewrite recipes: try storage first
+	recipe, err := e.storage.GetRecipe(ctx, recipeID)
+	if err != nil {
+		fmt.Printf("[RecipeExecutor] Recipe %s not found in storage and not OpenRewrite type (type=%s)\n", recipeID, recipeType)
 		return nil, fmt.Errorf("failed to load recipe %s: %w", recipeID, err)
 	}
 
-	fmt.Printf("[RecipeExecutor] Recipe %s found in cache, executing from storage\n", recipeID)
+	fmt.Printf("[RecipeExecutor] Non-OpenRewrite recipe %s found in storage, executing\n", recipeID)
 	return e.ExecuteRecipeObject(ctx, recipe, repoPath)
 }
 

@@ -475,64 +475,19 @@ func intPtr(i int) *int {
 }
 
 // ParseOpenRewriteRecipeID parses an OpenRewrite recipe ID into its components
+// This function now relies purely on type-based detection and dynamic discovery
+// No shortcut recipe mappings are used - all recipes use full OpenRewrite class names
 func ParseOpenRewriteRecipeID(recipeID string) (*OpenRewriteRecipeRequest, error) {
-	// Recipe metadata with proper Maven coordinates
-	type recipeMetadata struct {
-		recipeClass string
-		group       string
-		artifact    string
-		version     string
+	// Validate that the recipe ID looks like a valid OpenRewrite recipe class
+	if recipeID == "" {
+		return nil, fmt.Errorf("recipe ID cannot be empty")
 	}
 
-	// Map common recipe IDs to actual OpenRewrite recipe classes with coordinates
-	recipeMap := map[string]recipeMetadata{
-		"java11to17_migration": {
-			recipeClass: "org.openrewrite.java.migrate.Java11to17",
-			group:       "org.openrewrite.recipe",
-			artifact:    "rewrite-migrate-java",
-			version:     "3.16.0",
-		},
-		"java8to11_migration": {
-			recipeClass: "org.openrewrite.java.migrate.Java8toJava11",
-			group:       "org.openrewrite.recipe",
-			artifact:    "rewrite-migrate-java",
-			version:     "3.16.0",
-		},
-		"java17to21_migration": {
-			recipeClass: "org.openrewrite.java.migrate.UpgradeToJava21",
-			group:       "org.openrewrite.recipe",
-			artifact:    "rewrite-migrate-java",
-			version:     "3.16.0",
-		},
-		"spring_boot_3": {
-			recipeClass: "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0",
-			group:       "org.openrewrite.recipe",
-			artifact:    "rewrite-spring",
-			version:     "6.13.0",
-		},
-		"junit5_migration": {
-			recipeClass: "org.openrewrite.java.testing.junit5.JUnit5BestPractices",
-			group:       "org.openrewrite.recipe",
-			artifact:    "rewrite-testing-frameworks",
-			version:     "3.16.0",
-		},
-	}
-
-	// Check if we have metadata for this recipe ID
-	if metadata, ok := recipeMap[recipeID]; ok {
-		return &OpenRewriteRecipeRequest{
-			RecipeClass:    metadata.recipeClass,
-			RecipeGroup:    metadata.group,
-			RecipeArtifact: metadata.artifact,
-			RecipeVersion:  metadata.version,
-		}, nil
-	}
-
-	// For unknown recipes, try dynamic discovery
-	// Pass the recipe class name directly to the OpenRewrite engine
+	// All OpenRewrite recipes should use full class names (e.g., org.openrewrite.java.migrate.UpgradeToJava17)
+	// Dynamic discovery will handle Maven coordinate resolution automatically
 	return &OpenRewriteRecipeRequest{
 		RecipeClass: recipeID,
-		// These will be discovered by OpenRewrite CLI automatically
+		// OpenRewrite CLI will discover these automatically
 		RecipeGroup:    "",
 		RecipeArtifact: "",
 		RecipeVersion:  "",

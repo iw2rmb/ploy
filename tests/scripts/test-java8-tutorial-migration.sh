@@ -128,7 +128,7 @@ test_recipe_availability() {
     test_passed "Found $RECIPE_COUNT available recipes"
     
     # Check for Java 11→17 migration recipe specifically
-    JAVA_MIGRATION_RECIPE=$(echo "$RECIPES_RESPONSE" | jq -r '.recipes[] | select(.id == "migration.java11-to-17") | .id')
+    JAVA_MIGRATION_RECIPE=$(echo "$RECIPES_RESPONSE" | jq -r '.recipes[] | select(.id == "org.openrewrite.java.migrate.UpgradeToJava17") | .id')
     if [[ -z "$JAVA_MIGRATION_RECIPE" ]]; then
         test_failed "Java 11→17 migration recipe not found"
     fi
@@ -289,7 +289,7 @@ validate_transformation_results() {
     test_passed "Found $TRANSFORMATIONS_COUNT transformation results"
     
     # Analyze Java 11→17 migration results
-    JAVA17_RESULT=$(echo "$RESULTS_RESPONSE" | jq -r '.transformations[] | select(.recipe_id == "migration.java11-to-17")')
+    JAVA17_RESULT=$(echo "$RESULTS_RESPONSE" | jq -r '.transformations[] | select(.recipe_id == "org.openrewrite.java.migrate.UpgradeToJava17")')
     if [[ -z "$JAVA17_RESULT" ]]; then
         test_failed "Java 11→17 transformation results not found"
     fi
