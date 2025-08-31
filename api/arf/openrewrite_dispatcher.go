@@ -160,8 +160,8 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	// Clean up test file
 	d.storageClient.Delete(ctx, testKey)
 
-	// Upload input tar to storage
-	inputStorageKey := fmt.Sprintf("openrewrite/%s/input.tar", req.JobID)
+	// Upload input tar to storage (match artifacts path used by Nomad job)
+	inputStorageKey := fmt.Sprintf("artifacts/openrewrite/%s/input.tar", req.JobID)
 
 	// Get file size for logging
 	fileInfo, _ := os.Stat(inputTarPath)
@@ -195,7 +195,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	job := d.createNomadJob(req)
 
 	// Log the download URL that will be used
-	downloadURL := fmt.Sprintf("%s/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
+	downloadURL := fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest",
 		*job.ID, d.registryURL)
 	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
@@ -219,7 +219,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	log.Printf("[OpenRewrite Dispatcher] Job completed successfully")
 
 	// Download and extract output
-	outputStorageKey := fmt.Sprintf("openrewrite/%s/output.tar", req.JobID)
+	outputStorageKey := fmt.Sprintf("artifacts/openrewrite/%s/output.tar", req.JobID)
 	outputTarPath := fmt.Sprintf("/tmp/%s-output.tar", req.JobID)
 	defer os.Remove(outputTarPath)
 
