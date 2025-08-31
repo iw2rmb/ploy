@@ -266,15 +266,6 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 	// Create task group
 	taskGroup := &api.TaskGroup{
 		Name: stringPtr("openrewrite"),
-		// Add network configuration for Consul DNS resolution
-		Networks: []*api.NetworkResource{
-			{
-				Mode: "bridge",
-				DNS: &api.DNSConfig{
-					Servers: []string{"172.17.0.1"},
-				},
-			},
-		},
 		Tasks: []*api.Task{
 			{
 				Name:   "openrewrite", // Changed from "transform" to match task group name

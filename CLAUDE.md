@@ -141,7 +141,7 @@ git checkout main && git merge <current-branch> && git push origin main && git c
 **VPS (Integration/Functional):**
 ```bash
 # API Deployment (Preferred Method - handles both cold start and hot reload)
-./bin/ployman api deploy              # Deploys API (auto-fallback to Ansible if needed)
+./bin/ployman api deploy --monitor    # Deploys API with real-time progress monitoring
 
 # Alternative deployment methods
 ./bin/ployman push -a ploy-api        # Unified deployment (requires API running)
@@ -155,13 +155,14 @@ curl https://api.dev.ployman.app/v1/version
 ```
 
 **API Deployment Workflow:**
-The `./bin/ployman api deploy` command provides a robust deployment solution:
+The `./bin/ployman api deploy --monitor` command provides a robust deployment solution with real-time feedback:
 1. **Primary**: Attempts self-update via `/v1/update/latest` endpoint (fastest when API is running)
 2. **Fallback**: Runs Ansible playbook locally if API is unreachable (handles cold start)
    - Ansible runs from your local machine (requires local Ansible installation)
    - Updates code from git repository on VPS
    - Builds binaries from source on VPS
    - Deploys via Nomad job on VPS
+3. **Monitoring**: `--monitor` flag provides real-time deployment progress and proper log file creation
 
 **Environment Variables for Deployment:**
 ```bash
@@ -171,7 +172,7 @@ export DEPLOY_BRANCH=main                    # Git branch to deploy (auto-detect
 
 # For production deployment:
 export PLOY_CONTROLLER=https://api.prod.ployman.app/v1
-./bin/ployman api deploy
+./bin/ployman api deploy --monitor
 ```
 
 **PROHIBITED (Never):**
@@ -217,9 +218,15 @@ git checkout $CURRENT_BRANCH                 # Return to worktree branch
 - **Return to Work**: Always return to worktree branch after completion
 
 ### Controller Deployment Priority Order
-1. **Self-Update Endpoint** (Primary): `curl -X POST https://api.dev.ployman.app/v1/update/latest`
-2. **Unified Deployment** (Alternative): `ployman push -a ploy-api`
-3. **Investigation Required** if both methods fail
+1. **Monitored Deployment** (Primary): `./bin/ployman api deploy --monitor` (provides real-time feedback and proper logging)
+2. **Self-Update Endpoint** (Alternative): `curl -X POST https://api.dev.ployman.app/v1/update/latest`
+3. **Unified Deployment** (Alternative): `ployman push -a ploy-api`
+4. **Investigation Required** if all methods fail
+
+**Deployment Flag Options:**
+- `--monitor`: Real-time progress display with proper log file creation (recommended)
+- `--foreground`: Wait for completion without background execution
+- `--timeout <mins>`: Set deployment timeout (default: 10, max: 10)
 
 ## App Naming Restrictions
 
