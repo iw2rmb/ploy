@@ -33,7 +33,7 @@ func NewRecipeExecutor(storage storage.RecipeStorage, sandboxMgr SandboxManager,
 
 // ExecuteRecipeByID executes a recipe by ID against a repository
 // Uses unified execution path based on recipe type
-func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string, repoPath string, recipeType string) (*TransformationResult, error) {
+func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string, repoPath string, recipeType string, transformationID string) (*TransformationResult, error) {
 	fmt.Printf("[RecipeExecutor] Starting unified recipe execution: recipe=%s, type=%s, repoPath=%s\n", recipeID, recipeType, repoPath)
 	
 	// Unified execution path: OpenRewrite recipes ALWAYS go through dispatcher
@@ -52,10 +52,11 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 			return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
 		}
 		
-		// Set the repository path
+		// Set the repository path and transformation ID
 		req.RepoPath = repoPath
+		req.TransformationID = transformationID
 		
-		fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine using openrewrite-jvm:latest\n", recipeID)
+		fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine using openrewrite-jvm:latest (transformationID: %s)\n", recipeID, transformationID)
 		
 		// Add timeout context for dispatcher call (inherit from parent context)
 		dispatcherCtx, cancel := context.WithTimeout(ctx, 25*time.Minute)

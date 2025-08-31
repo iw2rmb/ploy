@@ -66,12 +66,13 @@ func NewOpenRewriteDispatcher(nomadAddr, registryURL, seaweedfsURL, apiURL strin
 
 // OpenRewriteRecipeRequest represents a request to execute an OpenRewrite recipe
 type OpenRewriteRecipeRequest struct {
-	RecipeClass    string `json:"recipe_class"`
-	RecipeGroup    string `json:"recipe_group"`
-	RecipeArtifact string `json:"recipe_artifact"`
-	RecipeVersion  string `json:"recipe_version"`
-	RepoPath       string `json:"repo_path"`
-	JobID          string `json:"job_id"`
+	RecipeClass      string `json:"recipe_class"`
+	RecipeGroup      string `json:"recipe_group"`
+	RecipeArtifact   string `json:"recipe_artifact"`
+	RecipeVersion    string `json:"recipe_version"`
+	RepoPath         string `json:"repo_path"`
+	JobID            string `json:"job_id"`           // Nomad job ID (will be set after job submission)
+	TransformationID string `json:"transformation_id"` // UUID from ARF handler
 }
 
 // ExecuteOpenRewriteRecipe dispatches an OpenRewrite transformation to Nomad
@@ -128,16 +129,15 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 		req.RecipeClass, req.RepoPath)
 	log.Printf("[OpenRewrite Dispatcher] Nomad client: %p, Storage client: %p", d.nomadClient, d.storageClient)
 
-	// Ensure job ID is set (use provided ID or generate one)
-	if req.JobID == "" {
-		// Generate a unique job ID using timestamp for simplicity
-		timestamp := fmt.Sprintf("%d", time.Now().Unix())
-		req.JobID = fmt.Sprintf("openrewrite-%s", timestamp)
-	}
-	log.Printf("[OpenRewrite Dispatcher] Job ID: %s", req.JobID)
+	// Log the transformation ID from the handler
+	log.Printf("[OpenRewrite Dispatcher] Transformation ID: %s", req.TransformationID)
+	
+	// Generate a Nomad job name using timestamp (Nomad will assign its own ID)
+	nomadJobName := fmt.Sprintf("openrewrite-%d", time.Now().Unix())
+	log.Printf("[OpenRewrite Dispatcher] Nomad job name: %s", nomadJobName)
 
 	// Package the repository as tar
-	inputTarPath := fmt.Sprintf("/tmp/%s-input.tar", req.JobID)
+	inputTarPath := fmt.Sprintf("/tmp/%s-input.tar", req.TransformationID)
 	log.Printf("[OpenRewrite Dispatcher] Creating tar from repo: %s -> %s", req.RepoPath, inputTarPath)
 	if err := d.createTarFromRepo(req.RepoPath, inputTarPath); err != nil {
 		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to create tar: %v", err)
@@ -163,7 +163,11 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	// Clean up test file
 	d.storageClient.Delete(ctx, testKey)
 
-	// Upload input tar to storage (bucket is already 'artifacts', so key should not include 'artifacts/' prefix)
+	// For now, we'll use the nomadJobName as the storage key since Nomad job names are unique
+	// The actual Nomad job ID will be the same as the name we provide
+	req.JobID = nomadJobName
+	
+	// Upload input tar to storage using the job name (which will be the job ID)
 	inputStorageKey := fmt.Sprintf("jobs/%s/input.tar", req.JobID)
 
 	// Get file size for logging
@@ -193,16 +197,16 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 
 	log.Printf("[OpenRewrite Dispatcher] Tar uploaded and verified successfully")
 
-	// Create Nomad job
+	// Create and submit Nomad job
 	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
-	job := d.createNomadJob(req)
-
+	job := d.createNomadJob(req, nomadJobName)
+	
 	// Log the download URL that will be used
 	downloadURL := fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest",
 		*job.ID, d.registryURL)
 	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
-
+	
 	// Submit job to Nomad
 	log.Printf("[OpenRewrite Dispatcher] Submitting job to Nomad at %s", d.nomadClient.Address())
 	jobResp, _, err := d.nomadClient.Jobs().Register(job, nil)
@@ -250,8 +254,8 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 }
 
 // createNomadJob creates a Nomad job for OpenRewrite transformation
-func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *api.Job {
-	jobID := req.JobID
+func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jobName string) *api.Job {
+	jobID := jobName
 	jobType := "batch"
 	priority := 50
 	datacenters := []string{"dc1"}
@@ -269,17 +273,18 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					"force_pull": true, // Force pull to get latest image with setup script
 				},
 				Env: map[string]string{
-					"JOB_ID":           req.JobID,          // Pass job ID to runner script
-					"RECIPE":           req.RecipeClass,
-					"RECIPE_GROUP":     req.RecipeGroup,    // Empty for dynamic discovery
-					"RECIPE_ARTIFACT":  req.RecipeArtifact, // Empty for dynamic discovery
-					"RECIPE_VERSION":   req.RecipeVersion,  // Empty for dynamic discovery
-					"SEAWEEDFS_URL":    "http://45.12.75.241:8888",
-					"PLOY_API_URL":     d.apiURL,
-					"MAVEN_CACHE_PATH": "maven-repository",
-					"DISCOVER_RECIPE":  "true",                                                                 // Tell runner.sh to discover recipe coordinates
-					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Pass full artifact URL
-					"OUTPUT_KEY":       fmt.Sprintf("jobs/%s/output.tar", req.JobID),                           // Output storage key (no artifacts/ prefix)
+					"JOB_ID":            req.JobID,             // Nomad job ID for storage paths
+					"TRANSFORMATION_ID": req.TransformationID,  // UUID from ARF handler
+					"RECIPE":            req.RecipeClass,
+					"RECIPE_GROUP":      req.RecipeGroup,       // Empty for dynamic discovery
+					"RECIPE_ARTIFACT":   req.RecipeArtifact,    // Empty for dynamic discovery
+					"RECIPE_VERSION":    req.RecipeVersion,     // Empty for dynamic discovery
+					"SEAWEEDFS_URL":     "http://45.12.75.241:8888",
+					"PLOY_API_URL":      d.apiURL,
+					"MAVEN_CACHE_PATH":  "maven-repository",
+					"DISCOVER_RECIPE":   "true",                                                                    // Tell runner.sh to discover recipe coordinates
+					"ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID),  // Pass full artifact URL
+					"OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),                              // Output storage key (no artifacts/ prefix)
 				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
