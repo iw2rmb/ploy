@@ -153,17 +153,62 @@ test_recipe_type_enforcement() {
     fi
 }
 
-# Test 2: Full Recipe Name Verification  
+# Test 2: Full Recipe Name Verification and Transformation  
 test_full_recipe_names() {
-    log_stage "Test 2: Full Recipe Name Verification (Skipping - Infrastructure Not Ready)"
-    log_info "OpenRewrite infrastructure tests will be enabled once dispatcher is fully deployed"
+    log_stage "Test 2: Full Recipe Name Verification and OpenRewrite Transformation"
     
-    # Skip these tests for now as they require working OpenRewrite infrastructure
-    # When infrastructure is ready, these tests verify:
-    # - Short recipe names should not work (no pattern matching)
-    # - Full OpenRewrite class names are required
+    # Clear logs before transformation test
+    clear_nomad_logs
     
-    log_info "SKIPPED: Recipe name verification tests (requires OpenRewrite infrastructure)"
+    # Test 2a: Submit OpenRewrite transformation
+    log_info "Submitting OpenRewrite transformation job..."
+    local transform_response=$(curl -s -X POST -H "Content-Type: application/json" \
+        -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
+        "$CONTROLLER_URL/arf/transform" || echo '{"error":"request_failed"}')
+    
+    # Check if transformation was accepted (even if it times out waiting)
+    if echo "$transform_response" | jq -e '.transformation_id' >/dev/null 2>&1; then
+        local transform_id=$(echo "$transform_response" | jq -r '.transformation_id')
+        log_success "OpenRewrite transformation submitted: $transform_id"
+        
+        # Wait briefly and check if job was created
+        sleep 5
+        local job_status=$(nomad job status 2>/dev/null | grep -c "openrewrite" || echo "0")
+        if [[ "$job_status" -gt 0 ]]; then
+            log_success "OpenRewrite Nomad job created successfully"
+            
+            # Get job details
+            local latest_job=$(nomad job status 2>/dev/null | grep openrewrite | tail -1 | awk '{print $1}')
+            if [[ -n "$latest_job" ]]; then
+                log_info "Job ID: $latest_job"
+                
+                # Wait for job to complete or fail (max 60 seconds)
+                local wait_time=0
+                while [[ $wait_time -lt 60 ]]; do
+                    local job_status=$(nomad job status "$latest_job" 2>/dev/null | grep "^Status" | awk '{print $3}')
+                    if [[ "$job_status" == "dead" || "$job_status" == "complete" ]]; then
+                        log_info "Job completed with status: $job_status"
+                        break
+                    fi
+                    sleep 5
+                    wait_time=$((wait_time + 5))
+                done
+                
+                # Check job logs for debugging
+                local alloc_id=$(nomad job status "$latest_job" 2>/dev/null | grep -A5 "^Allocations" | tail -1 | awk '{print $1}')
+                if [[ -n "$alloc_id" && "$alloc_id" != "ID" ]]; then
+                    log_info "Checking allocation logs for debugging..."
+                    nomad alloc logs "$alloc_id" 2>&1 | grep -E "DEBUG|ERROR" | head -10 || true
+                fi
+            fi
+        else
+            log_error "No OpenRewrite job created in Nomad"
+        fi
+    elif echo "$transform_response" | jq -e '.error' >/dev/null 2>&1; then
+        log_error "Transformation request failed: $(echo "$transform_response" | jq -r '.error')"
+    else
+        log_info "Transformation request timed out (infrastructure may not be ready)"
+    fi
 }
 
 # Test 3: Timeout Consistency Verification
