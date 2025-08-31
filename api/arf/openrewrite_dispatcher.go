@@ -89,6 +89,29 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 		return nil, fmt.Errorf("request cannot be nil")
 	}
 
+	// Early infrastructure validation with short timeout
+	log.Printf("[OpenRewrite Dispatcher] Validating Nomad infrastructure...")
+	infraCtx, infraCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer infraCancel()
+	
+	// Test Nomad connectivity
+	if _, _, err := d.nomadClient.Agent().NodeID(); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Nomad is not accessible: %v", err)
+		return nil, fmt.Errorf("OpenRewrite infrastructure not ready - Nomad unreachable: %w", err)
+	}
+	
+	// Check if we can list jobs (basic health check)
+	if _, _, err := d.nomadClient.Jobs().List(&api.QueryOptions{
+		Region: "global",
+		AllowStale: true,
+		Ctx: infraCtx,
+	}); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot query Nomad jobs: %v", err)
+		return nil, fmt.Errorf("OpenRewrite infrastructure not ready - cannot query jobs: %w", err)
+	}
+	
+	log.Printf("[OpenRewrite Dispatcher] Infrastructure validation passed")
+	
 	log.Printf("[OpenRewrite Dispatcher] Starting dispatch for recipe=%s, repo=%s",
 		req.RecipeClass, req.RepoPath)
 	log.Printf("[OpenRewrite Dispatcher] Nomad client: %p, Storage client: %p", d.nomadClient, d.storageClient)
@@ -285,7 +308,8 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	timeout := time.After(10 * time.Minute)
+	// Reduced timeout for faster failure detection
+	timeout := time.After(2 * time.Minute)
 	startTime := time.Now()
 	lastStatus := ""
 
@@ -295,8 +319,8 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 			log.Printf("[OpenRewrite Dispatcher] Context cancelled while waiting for job %s", jobID)
 			return nil, ctx.Err()
 		case <-timeout:
-			log.Printf("[OpenRewrite Dispatcher] Job %s timed out after 10 minutes", jobID)
-			return nil, fmt.Errorf("job execution timeout")
+			log.Printf("[OpenRewrite Dispatcher] Job %s timed out after 2 minutes", jobID)
+			return nil, fmt.Errorf("job execution timeout after 2 minutes")
 		case <-ticker.C:
 			job, _, err := d.nomadClient.Jobs().Info(jobID, nil)
 			if err != nil {

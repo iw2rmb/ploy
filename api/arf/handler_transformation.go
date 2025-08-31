@@ -130,8 +130,15 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 
 	fmt.Printf("[DEBUG] Creating context with timeout...\n")
 	
-	// Create context with timeout (30 minutes total transformation timeout)
-	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Minute)
+	// Create context with shorter timeout for OpenRewrite recipes
+	timeoutDuration := 30*time.Minute
+	if req.Type == "openrewrite" {
+		// OpenRewrite jobs have shorter timeout for faster failure detection
+		timeoutDuration = 3*time.Minute
+		fmt.Printf("[DEBUG] Using reduced timeout for OpenRewrite: %v\n", timeoutDuration)
+	}
+	
+	ctx, cancel := context.WithTimeout(c.Context(), timeoutDuration)
 	defer cancel()
 
 	fmt.Printf("[DEBUG] About to call executeTransformationInternal\n")
@@ -144,9 +151,13 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		
 		// Check if context deadline exceeded
 		if ctx.Err() == context.DeadlineExceeded {
+			timeoutMsg := "The transformation took longer than expected to complete"
+			if req.Type == "openrewrite" {
+				timeoutMsg = "OpenRewrite transformation timed out after 3 minutes - infrastructure may not be ready"
+			}
 			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
 				"error":   "Transformation timeout",
-				"details": "The transformation took longer than 30 minutes to complete",
+				"details": timeoutMsg,
 				"transformation_id": transformID,
 			})
 		}
