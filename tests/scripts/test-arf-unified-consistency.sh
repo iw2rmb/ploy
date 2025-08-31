@@ -107,9 +107,28 @@ test_arf_endpoint() {
     fi
 }
 
+# Helper function to clear Nomad logs
+clear_nomad_logs() {
+    log_info "Clearing Nomad logs and allocations..."
+    
+    # Check if clear script exists
+    if [[ -f "./tests/scripts/clear-nomad-logs.sh" ]]; then
+        ./tests/scripts/clear-nomad-logs.sh >/dev/null 2>&1 || true
+    else
+        # Basic cleanup if script not available
+        for job in $(nomad job status 2>/dev/null | grep openrewrite | awk '{print $1}'); do
+            nomad job stop -purge "$job" 2>/dev/null || true
+        done
+        rm -rf /tmp/openrewrite-* 2>/dev/null || true
+    fi
+}
+
 # Test 1: Verify Recipe Type Enforcement
 test_recipe_type_enforcement() {
     log_stage "Test 1: Recipe Type Enforcement"
+    
+    # Clear logs before transformation tests
+    clear_nomad_logs
     
     # Test 1a: Request without type should fail
     run_consistency_test "ARF Transform without recipe type" \
