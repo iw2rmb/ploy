@@ -326,13 +326,32 @@ if [ -n "${OUTPUT_KEY}" ]; then
     UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
     echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
     
-    if curl -X PUT "${UPLOAD_URL}" \
+    echo "[OpenRewrite] Attempting to upload $(ls -lh ${OUTPUT_TAR} | awk '{print $5}') file to SeaweedFS..."
+    echo "[OpenRewrite] Testing network connectivity to SeaweedFS..."
+    if ! curl -f -s --connect-timeout 10 "${SEAWEEDFS_URL}/status" >/dev/null; then
+        echo "[OpenRewrite] WARNING: Cannot reach SeaweedFS at ${SEAWEEDFS_URL}"
+    fi
+    
+    echo "[OpenRewrite] Uploading with verbose output..."
+    UPLOAD_RESPONSE=$(curl -X PUT "${UPLOAD_URL}" \
            --data-binary "@${OUTPUT_TAR}" \
            -H "Content-Type: application/octet-stream" \
-           -s -o /dev/null; then
+           --connect-timeout 30 \
+           --max-time 300 \
+           -w "HTTP_CODE:%{http_code} SIZE_UPLOAD:%{size_upload} TIME_TOTAL:%{time_total}" \
+           2>&1)
+    UPLOAD_EXIT_CODE=$?
+    
+    echo "[OpenRewrite] Upload response: ${UPLOAD_RESPONSE}"
+    echo "[OpenRewrite] Upload exit code: ${UPLOAD_EXIT_CODE}"
+    
+    if [ $UPLOAD_EXIT_CODE -eq 0 ] && echo "$UPLOAD_RESPONSE" | grep -q "HTTP_CODE:2[0-9][0-9]"; then
         echo "[OpenRewrite] Output uploaded successfully to artifacts/${OUTPUT_KEY}"
     else
-        echo "[OpenRewrite] WARNING: Failed to upload output to SeaweedFS"
+        echo "[OpenRewrite] ERROR: Failed to upload output to SeaweedFS"
+        echo "[OpenRewrite] Exit code: ${UPLOAD_EXIT_CODE}"
+        echo "[OpenRewrite] Response: ${UPLOAD_RESPONSE}"
+        # Continue anyway - transformation was successful
     fi
 else
     echo "[OpenRewrite] No OUTPUT_KEY provided, skipping upload"

@@ -106,10 +106,11 @@ func (h *Handler) executeTransformationBackground(transformID string, req *Trans
 }
 ```
 
-#### Migration Strategy
-1. **Feature Flag**: `ARF_ASYNC_TRANSFORM=true/false` environment variable
-2. **Backward Compatibility**: When flag is false, use current synchronous behavior
-3. **Client Detection**: Optionally detect client preference via `Accept: application/json+async` header
+#### Breaking Change Notice
+**This is a breaking change to the `/v1/arf/transform` endpoint:**
+- **Old behavior**: Synchronous execution, returns complete `TransformationResult`
+- **New behavior**: Asynchronous execution, returns status link immediately
+- **No backward compatibility**: All clients must be updated to use async pattern
 
 ## Current Implementation Status
 
@@ -523,7 +524,7 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 - [ ] Implement basic Consul KV operations for transformation status
 - [ ] Update existing status endpoints to use Consul
 - [ ] Add TTL and cleanup mechanisms
-- [ ] **Migration Strategy**: Implement backward compatibility and feature flags
+- [ ] **Breaking Change Implementation**: Complete replacement of synchronous behavior
 
 ### Phase 2: Enhanced Data Structures (Week 3-4)
 - [ ] Implement nested `HealingAttempt` structure
