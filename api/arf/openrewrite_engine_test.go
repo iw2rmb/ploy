@@ -19,9 +19,9 @@ func TestOpenRewriteEngine_DetectBuildSystem(t *testing.T) {
 	engine := NewOpenRewriteEngine()
 
 	tests := []struct {
-		name      string
-		files     map[string]string
-		expected  string
+		name     string
+		files    map[string]string
+		expected string
 	}{
 		{
 			name: "Maven project",
