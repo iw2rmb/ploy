@@ -289,7 +289,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"RECIPE_GROUP":     req.RecipeGroup,    // Empty for dynamic discovery
 					"RECIPE_ARTIFACT":  req.RecipeArtifact, // Empty for dynamic discovery
 					"RECIPE_VERSION":   req.RecipeVersion,  // Empty for dynamic discovery
-					"SEAWEEDFS_URL":    "http://seaweedfs-filer.service.consul:8888",
+					"SEAWEEDFS_URL":    "http://45.12.75.241:8888",
 					"PLOY_API_URL":     d.apiURL,
 					"MAVEN_CACHE_PATH": "maven-repository",
 					"DISCOVER_RECIPE":  "true",                                                                             // Tell runner.sh to discover recipe coordinates
