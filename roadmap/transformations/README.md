@@ -115,7 +115,7 @@ func (h *Handler) executeTransformationBackground(transformID string, req *Trans
 ## Current Implementation Status
 
 ### Existing Components
-- **Basic Status Endpoint**: `/v1/arf/transforms/:id` and `/v1/arf/transforms/:id/status`
+- **Basic Status Endpoint**: `/v1/arf/transforms/:id/status` (Note: `/v1/arf/transforms/:id` to be removed, keeping only `/status` variant)
 - **In-Memory Storage**: Uses `globalTransformStore` for transformation results
 - **Simple Workflow**: OpenRewrite transformation with basic success/failure tracking
 - **Limited Status Info**: Only shows completed/in_progress states
@@ -415,9 +415,6 @@ Returns comprehensive transformation status with complete healing hierarchy:
 }
 ```
 
-#### GET /v1/arf/transforms/{id}
-
-Returns complete transformation result with healing hierarchy (same as status but includes full diff captures, build results, etc.).
 
 ### Status Values
 
@@ -517,6 +514,12 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 ## Implementation Phases
 
 ### Phase 1: Transform Route Enhancement & Consul KV Integration (Week 1-2)
+- [ ] **RESTful Endpoint Rename**: Rename `/v1/arf/transform` to `/v1/arf/transforms` (plural) to follow RESTful conventions
+  - Update route registration in `api/arf/handler.go`
+  - Update handler comment in `api/arf/handler_transformation.go`
+  - Update all documentation references (8+ files identified)
+  - Update test scripts and test cases
+  - Note: This is a breaking change requiring client updates
 - [ ] **Transform Route Async Conversion**: Modify `/v1/arf/transform` to return status link instead of waiting
 - [ ] **Background Execution**: Implement goroutine-based transformation execution
 - [ ] **Initial Status Storage**: Store transformation initiation status in Consul immediately

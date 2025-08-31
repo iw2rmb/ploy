@@ -323,6 +323,7 @@ ls -la "${OUTPUT_TAR}"
 # Step 6: Upload output to SeaweedFS (if OUTPUT_KEY is provided)
 if [ -n "${OUTPUT_KEY}" ]; then
     echo "[OpenRewrite] Uploading output to SeaweedFS..."
+    echo "[OpenRewrite] Job ID: ${JOB_ID}"
     # Add artifacts/ prefix to OUTPUT_KEY since SeaweedFS base URL doesn't include it
     UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
     echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
