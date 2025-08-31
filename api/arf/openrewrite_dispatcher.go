@@ -258,7 +258,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 		Name: stringPtr("openrewrite"),
 		Tasks: []*api.Task{
 			{
-				Name:   "transform",
+				Name:   "openrewrite",  // Changed from "transform" to match task group name
 				Driver: "docker",
 				Config: map[string]interface{}{
 					// Use custom OpenRewrite image from registry
@@ -290,7 +290,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					{
 						// Include bucket/collection prefix to match upload path (artifacts, not ploy-artifacts)
 						GetterSource: stringPtr(fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID)),
-						RelativeDest: stringPtr("/workspace/"),
+						RelativeDest: stringPtr("/workspace/project/"),  // Extract to project subdirectory
 					},
 				},
 			},
