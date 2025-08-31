@@ -185,7 +185,7 @@ curl -X POST https://api.dev.ployman.app/v1/apps/myapp/domains \
 - Controller registered at `api.{PLOY_APPS_DOMAIN}`
 - Apps registered at `{app}.{PLOY_APPS_DOMAIN}`
 
-**Collections**: `ploy-artifacts` (build outputs), `ploy-metadata` (SBOMs, signatures), `ploy-debug` (ephemeral)
+**Collections**: `artifacts` (build outputs), `ploy-metadata` (SBOMs, signatures), `ploy-debug` (ephemeral)
 
 ## Services After Setup
 

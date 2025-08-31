@@ -38,7 +38,7 @@ This pack includes:
 storage:
   provider: s3                 # keep this "s3" to ensure portability
   endpoint: http://seaweedfs.ploy.local:8333  # SeaweedFS S3 API/Ceph RGW/AWS S3
-  bucket: ploy-artifacts       # default artifact bucket
+  bucket: artifacts       # default artifact bucket
   region: us-east-1            # fake region is fine for most S3-compatible backends
   access_key: PLOYACCESSKEY
   secret_key: PLOYSECRETKEY
@@ -49,7 +49,7 @@ storage:
 
 # Optional: separate buckets per domain
 buckets:
-  artifacts: ploy-artifacts
+  artifacts: artifacts
   logs: ploy-logs
   cache: ploy-cache
 
@@ -216,7 +216,7 @@ Principles
 
 Steps
 	1.	Deploy target backend (Alternative S3-compatible storage).
-	2.	Mirror: rclone sync s3:source/ploy-artifacts s3:target/ploy-artifacts (or mc mirror).
+	2.	Mirror: rclone sync s3:source/artifacts s3:target/artifacts (or mc mirror).
 	3.	Dual-write (optional): enable temporary dual writes for new artifacts.
 	4.	Smoke-test: run ploy push + artifact fetch against target.
 	5.	Flip: change endpoint in config.yaml or repoint DNS.

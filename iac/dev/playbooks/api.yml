@@ -193,7 +193,7 @@
           shell: |
             curl -X POST \
               -F "file=@/home/ploy/ploy/bin/api" \
-              "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
           register: binary_upload
           retries: 3
           delay: 5
@@ -204,7 +204,7 @@
           shell: |
             curl -X POST \
               -F "file=@/tmp/api-metadata.json" \
-              "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
+              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
           register: metadata_upload
           retries: 3
           delay: 5
@@ -213,7 +213,7 @@
 
         - name: Verify upload by listing versions
           uri:
-            url: "http://localhost:{{ seaweedfs.filer_port }}/ploy-artifacts/api-binaries/?pretty=y"
+            url: "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/?pretty=y"
             method: GET
           register: version_list
           ignore_errors: true
@@ -225,7 +225,7 @@
               - Version: {{ binary_version.stdout }}
               - SHA256: {{ api_binary_hash.stdout }}
               - Size: {{ api_binary_stat.stat.size }} bytes
-              - Location: ploy-artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api
+              - Location: artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api
 
         - name: Save uploaded version for reference
           copy:

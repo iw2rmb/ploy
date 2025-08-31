@@ -51,7 +51,7 @@ func NewHandler(storageProvider storage.StorageProvider, consulAddr, currentVers
 		}
 	}
 
-	distributor := distribution.NewBinaryDistributor(storageProvider, "ploy-artifacts", cacheDir)
+	distributor := distribution.NewBinaryDistributor(storageProvider, "artifacts", cacheDir)
 
 	// Initialize Consul client
 	config := api.DefaultConfig()

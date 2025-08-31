@@ -319,7 +319,7 @@ func TestServer_HandleStorageConfig(t *testing.T) {
   datacenter: "dc1"
   rack: "rack1"
   collections:
-    artifacts: "ploy-artifacts"
+    artifacts: "artifacts"
     metadata: "ploy-metadata" 
     debug: "ploy-debug"
   client:
@@ -444,7 +444,7 @@ func TestServer_HandleReloadStorageConfig(t *testing.T) {
   filer: "http://localhost:8888"
   collection: "ploy"
   replication: "001"`
-		
+
 		err := os.WriteFile(configPath, []byte(configContent), 0644)
 		require.NoError(t, err)
 		defer os.Remove(configPath)
@@ -594,11 +594,11 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 		// Create mock storage client with metrics data
 		mockStorage := &MockStorageClient{}
 		metricsData := map[string]interface{}{
-			"requests_total":    12345,
-			"response_time_ms":  25.7,
-			"error_rate":        0.02,
+			"requests_total":     12345,
+			"response_time_ms":   25.7,
+			"error_rate":         0.02,
 			"active_connections": 8,
-			"storage_used_gb":   156.4,
+			"storage_used_gb":    156.4,
 		}
 		mockStorage.On("GetMetrics").Return(metricsData)
 
@@ -661,7 +661,7 @@ func TestServer_HandleGetEnvVars(t *testing.T) {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to get environment variables", "details": err.Error()})
 		}
 		return c.JSON(fiber.Map{
-			"app":     appName,
+			"app":      appName,
 			"env_vars": envVars,
 		})
 	})
@@ -679,7 +679,7 @@ func TestServer_HandleGetEnvVars(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "testapp", response["app"])
-	
+
 	envVars, ok := response["env_vars"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, "postgresql://localhost/myapp", envVars["DATABASE_URL"])
@@ -705,7 +705,7 @@ func TestServer_HandleGetEnvVars_Error(t *testing.T) {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to get environment variables", "details": err.Error()})
 		}
 		return c.JSON(fiber.Map{
-			"app":     appName,
+			"app":      appName,
 			"env_vars": envVars,
 		})
 	})
@@ -730,12 +730,12 @@ func TestServer_HandleGetEnvVars_Error(t *testing.T) {
 
 func TestServer_HandleSetEnvVars(t *testing.T) {
 	tests := []struct {
-		name           string
-		appName        string
-		requestBody    map[string]string
-		mockSetup      func(*MockEnvStore)
-		expectedStatus int
-		expectedError  string
+		name             string
+		appName          string
+		requestBody      map[string]string
+		mockSetup        func(*MockEnvStore)
+		expectedStatus   int
+		expectedError    string
 		validateResponse func(t *testing.T, response map[string]interface{})
 	}{
 		{
@@ -764,8 +764,8 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 			},
 		},
 		{
-			name:    "empty request body",
-			appName: "testapp",
+			name:        "empty request body",
+			appName:     "testapp",
 			requestBody: map[string]string{},
 			mockSetup: func(store *MockEnvStore) {
 				store.On("SetAll", "testapp", envstore.AppEnvVars{}).Return(nil)
@@ -1012,7 +1012,7 @@ func TestServer_HandleSetEnvVar(t *testing.T) {
 	server.app.Put("/apps/:app/env/:key", func(c *fiber.Ctx) error {
 		appName := c.Params("app")
 		key := c.Params("key")
-		
+
 		var req struct {
 			Value string `json:"value"`
 		}
@@ -1025,9 +1025,9 @@ func TestServer_HandleSetEnvVar(t *testing.T) {
 		}
 
 		return c.JSON(fiber.Map{
-			"app":   appName,
-			"key":   key,
-			"value": req.Value,
+			"app":    appName,
+			"key":    key,
+			"value":  req.Value,
 			"status": "set",
 		})
 	})
@@ -1223,7 +1223,7 @@ func BenchmarkServer_HandleGetEnvVars(b *testing.B) {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to get environment variables"})
 		}
 		return c.JSON(fiber.Map{
-			"app":     appName,
+			"app":      appName,
 			"env_vars": envVars,
 		})
 	})
@@ -1296,7 +1296,7 @@ func TestServer_Properties(t *testing.T) {
 // Integration test structure (would run on VPS)
 func TestServer_Integration(t *testing.T) {
 	t.Skip("Integration test - requires VPS environment with dependencies")
-	
+
 	// This test would be run on VPS with actual dependencies
 	// config := LoadConfigFromEnv()
 	// server, err := NewServer(config)

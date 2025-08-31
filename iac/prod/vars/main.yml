@@ -91,7 +91,7 @@ seaweedfs:
   # Production collection configuration with replication
   collections:
     artifacts:
-      name: "ploy-artifacts"
+      name: "artifacts"
       replication: "001"  # Production replication across nodes
     metadata:
       name: "ploy-metadata"
@@ -105,13 +105,13 @@ storage_config:
   seaweedfs:
     master: "{{ groups['linux_hosts'] | map('extract', hostvars, 'ansible_default_ipv4') | map(attribute='address') | list | join(':9333,') }}:9333"  # All masters
     filer: "{{ groups['linux_hosts'][0] }}:8888"  # Primary filer
-    collection: "ploy-artifacts"
+    collection: "artifacts"
     replication: "001"  # Production replication
     timeout: 30
     datacenter: "prod"
     rack: "rack1"
     collections:
-      artifacts: "ploy-artifacts"
+      artifacts: "artifacts"
       metadata: "ploy-metadata"
       debug: "ploy-debug"
   

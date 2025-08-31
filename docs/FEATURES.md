@@ -475,7 +475,7 @@ Auto-classified lanes:
 ## 🗄 Storage
 - ✅ **SeaweedFS Distributed Storage** (Aug 2025):
   - SeaweedFS cluster with master, volume, and filer servers for optimal small file performance
-  - Collection-based organization optimized for artifact types (ploy-artifacts, ploy-metadata, ploy-debug)
+  - Collection-based organization optimized for artifact types (artifacts, ploy-metadata, ploy-debug)
   - Automated upload of complete deployment packages (artifact + SBOM + signature + certificate)
   - Upload retry logic with FileID verification for reliable storage operations
   - Enhanced metadata tracking with timestamps and artifact status information

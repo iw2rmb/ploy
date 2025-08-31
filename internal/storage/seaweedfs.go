@@ -53,7 +53,7 @@ func NewSeaweedFSClient(cfg SeaweedFSConfig) (*SeaweedFSClient, error) {
 
 	collection := cfg.Collection
 	if collection == "" {
-		collection = "ploy-artifacts"
+		collection = "artifacts"
 	}
 
 	replication := cfg.Replication

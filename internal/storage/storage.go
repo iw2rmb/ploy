@@ -8,25 +8,25 @@ import (
 type Config struct {
 	// SeaweedFS Master server address (e.g., "localhost:9333")
 	Master string `yaml:"master"`
-	
+
 	// SeaweedFS Filer server address (e.g., "localhost:8888")
 	Filer string `yaml:"filer"`
-	
-	// Collection name for artifacts (e.g., "ploy-artifacts")
+
+	// Collection name for artifacts (e.g., "artifacts")
 	Collection string `yaml:"collection"`
-	
+
 	// Replication strategy (e.g., "001")
 	Replication string `yaml:"replication"`
-	
+
 	// Timeout in seconds for requests
 	Timeout int `yaml:"timeout"`
-	
+
 	// Data center identifier
 	DataCenter string `yaml:"datacenter"`
-	
-	// Rack identifier  
+
+	// Rack identifier
 	Rack string `yaml:"rack"`
-	
+
 	// Collection organization for different artifact types
 	Collections struct {
 		Artifacts string `yaml:"artifacts"`
