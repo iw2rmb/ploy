@@ -161,8 +161,8 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	// Clean up test file
 	d.storageClient.Delete(ctx, testKey)
 
-	// Upload input tar to storage (match artifacts path used by Nomad job)
-	inputStorageKey := fmt.Sprintf("artifacts/openrewrite/%s/input.tar", req.JobID)
+	// Upload input tar to storage (bucket is already 'artifacts', so key should not include 'artifacts/' prefix)
+	inputStorageKey := fmt.Sprintf("openrewrite/%s/input.tar", req.JobID)
 
 	// Get file size for logging
 	fileInfo, _ := os.Stat(inputTarPath)
@@ -219,8 +219,8 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	}
 	log.Printf("[OpenRewrite Dispatcher] Job completed successfully")
 
-	// Download and extract output
-	outputStorageKey := fmt.Sprintf("artifacts/openrewrite/%s/output.tar", req.JobID)
+	// Download and extract output (bucket is already 'artifacts', so key should not include 'artifacts/' prefix)
+	outputStorageKey := fmt.Sprintf("openrewrite/%s/output.tar", req.JobID)
 	outputTarPath := fmt.Sprintf("/tmp/%s-output.tar", req.JobID)
 	defer os.Remove(outputTarPath)
 
@@ -278,7 +278,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					"MAVEN_CACHE_PATH": "maven-repository",
 					"DISCOVER_RECIPE":  "true", // Tell runner.sh to discover recipe coordinates
 					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/openrewrite/%s/input.tar", d.seaweedfsURL, req.JobID), // Pass full artifact URL
-					"OUTPUT_KEY":       fmt.Sprintf("artifacts/openrewrite/%s/output.tar", req.JobID), // Output storage key
+					"OUTPUT_KEY":       fmt.Sprintf("openrewrite/%s/output.tar", req.JobID), // Output storage key (no artifacts/ prefix)
 				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
