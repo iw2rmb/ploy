@@ -50,16 +50,16 @@ if nomad job status ploy-api >/dev/null 2>&1; then
     # Allocation details
     echo ""
     echo "📦 Allocations:"
-    /opt/hashicorp/bin/nomad-job-manager.sh allocs ploy-api | head -10
+    /opt/hashicorp/bin/nomad-job-manager.sh allocs --job ploy-api | head -10
     
     # Health check status
     echo ""
     echo "🏥 Service Health:"
-    ALLOC_ID=$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api)
+    ALLOC_ID=$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc --job ploy-api)
     if [[ -n "$ALLOC_ID" ]]; then
         echo "  Allocation ID: $ALLOC_ID"
         # Get allocation status via HTTP API
-        if ALLOC_STATUS=$(/opt/hashicorp/bin/nomad-job-manager.sh alloc-status "$ALLOC_ID" 2>/dev/null); then
+        if ALLOC_STATUS=$(/opt/hashicorp/bin/nomad-job-manager.sh alloc-status --alloc-id "$ALLOC_ID" 2>/dev/null); then
             NODE_NAME=$(echo "$ALLOC_STATUS" | jq -r '.NodeName // "unknown"')
             echo "  Node: $NODE_NAME"
             
@@ -150,7 +150,7 @@ echo ""
 echo "📋 Recent Logs:"
 if [[ -n "$ALLOC_ID" ]]; then
     echo "  Last 10 log lines from allocation $ALLOC_ID:"
-    /opt/hashicorp/bin/nomad-job-manager.sh logs "$ALLOC_ID" "" 10 2>/dev/null | sed 's/^/    /' || echo "    Unable to fetch logs"
+    /opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id "$ALLOC_ID" --lines 10 2>/dev/null | sed 's/^/    /' || echo "    Unable to fetch logs"
 else
     echo "  ⚠️  No running allocation found"
 fi

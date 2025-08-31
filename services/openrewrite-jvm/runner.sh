@@ -2,7 +2,7 @@
 # OpenRewrite Runner with SeaweedFS Maven Repository Caching
 # This script manages recipe downloads and caching to avoid repeated Maven Central hits
 
-set -e
+set -ex  # Enable verbose output for debugging
 
 # Arguments from Nomad job
 INPUT_TAR="${1:-/workspace/input.tar}"
@@ -73,14 +73,43 @@ upload_to_cache() {
 
 # Step 1: Extract input tar
 echo "[OpenRewrite] Extracting input archive..."
+echo "[OpenRewrite] Current directory: $(pwd)"
+echo "[OpenRewrite] Input tar location: ${INPUT_TAR}"
+ls -la "${INPUT_TAR}" || echo "[Error] Input tar not found at ${INPUT_TAR}"
+
+# Ensure project directory exists
+echo "[OpenRewrite] Creating project directory if it doesn't exist..."
+mkdir -p /workspace/project
+
 cd /workspace/project
-tar -xf "${INPUT_TAR}" 2>/dev/null || {
+echo "[OpenRewrite] Changed to project directory: $(pwd)"
+
+# Extract with verbose output for debugging
+echo "[OpenRewrite] Extracting tar archive..."
+tar -xvf "${INPUT_TAR}" 2>&1 || {
     echo "[Error] Failed to extract input tar"
+    echo "[Error] Tar exit code: $?"
+    ls -la /workspace/
     exit 1
 }
 
+echo "[OpenRewrite] Archive extracted successfully"
+echo "[OpenRewrite] Project directory contents:"
+ls -la
+echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
+
 # Step 2: Detect project type and create minimal POM if needed
-if [ ! -f "pom.xml" ] && [ ! -f "build.gradle" ]; then
+echo "[OpenRewrite] Checking for build files..."
+if [ -f "pom.xml" ]; then
+    echo "[OpenRewrite] Found pom.xml"
+    head -20 pom.xml
+elif [ -f "build.gradle" ]; then
+    echo "[OpenRewrite] Found build.gradle"
+    head -20 build.gradle
+elif [ -f "build.gradle.kts" ]; then
+    echo "[OpenRewrite] Found build.gradle.kts"
+    head -20 build.gradle.kts
+else
     echo "[OpenRewrite] No build file found, creating minimal pom.xml..."
     cat > pom.xml << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -106,6 +135,13 @@ fi
 # Step 3: Handle caching based on discovery mode
 echo "[OpenRewrite] Checking cache strategy..."
 CACHE_HIT=false
+
+echo "[OpenRewrite] Recipe coordinates check:"
+echo "  RECIPE_GROUP: ${RECIPE_GROUP}"
+echo "  RECIPE_ARTIFACT: ${RECIPE_ARTIFACT}"
+echo "  RECIPE_VERSION: ${RECIPE_VERSION}"
+echo "  RECIPE_COORDS: ${RECIPE_COORDS}"
+echo "  DISCOVER_RECIPE: ${DISCOVER_RECIPE}"
 
 if [ "${DISCOVER_RECIPE}" = "true" ] || [ -z "${RECIPE_COORDS}" ]; then
     echo "[OpenRewrite] Dynamic discovery mode - OpenRewrite will handle recipe resolution"
@@ -171,26 +207,52 @@ if [ -f "pom.xml" ]; then
     # Run OpenRewrite
     if [ -n "${RECIPE_COORDS}" ]; then
         # Use explicit coordinates if provided
+        echo "[OpenRewrite] Running Maven command with explicit coordinates..."
+        echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
+        echo "[OpenRewrite] Recipe coordinates: ${RECIPE_COORDS}"
+        
         mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \
-            || {
+            -X 2>&1 | tee /tmp/transform.log || {
                 echo "[Error] OpenRewrite transformation failed"
+                echo "[Error] Exit code: $?"
+                echo "[Error] Last 100 lines of output:"
+                tail -100 /tmp/transform.log
                 exit 1
             }
+        
+        echo "[OpenRewrite] Transformation completed successfully"
     else
         # Let OpenRewrite discover recipe from its catalog
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:discover \
-            org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
+        echo "[OpenRewrite] Running Maven command for dynamic discovery..."
+        echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
+        
+        # First, try to discover available recipes
+        echo "[OpenRewrite] Step 1: Discovering available recipes..."
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:discover 2>&1 | tee /tmp/discover.log || {
+            echo "[Error] Recipe discovery failed"
+            echo "[Error] Discovery output:"
+            cat /tmp/discover.log
+        }
+        
+        # Now run the transformation
+        echo "[OpenRewrite] Step 2: Running transformation..."
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \
-            || {
+            -X 2>&1 | tee /tmp/transform.log || {
                 echo "[Error] OpenRewrite transformation failed"
+                echo "[Error] Exit code: $?"
+                echo "[Error] Last 100 lines of output:"
+                tail -100 /tmp/transform.log
                 exit 1
             }
+        
+        echo "[OpenRewrite] Transformation completed successfully"
     fi
         
 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
@@ -244,10 +306,18 @@ fi
 
 # Step 5: Create output tar
 echo "[OpenRewrite] Creating output archive..."
-tar -cf "${OUTPUT_TAR}" . 2>/dev/null || {
+echo "[OpenRewrite] Files to archive:"
+find . -type f | head -20
+echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
+
+tar -cvf "${OUTPUT_TAR}" . 2>&1 | head -50 || {
     echo "[Error] Failed to create output tar"
+    echo "[Error] Exit code: $?"
     exit 1
 }
+
+echo "[OpenRewrite] Output tar created successfully"
+ls -la "${OUTPUT_TAR}"
 
 # Step 6: Generate transformation report
 cat > /workspace/transformation-report.json << EOF

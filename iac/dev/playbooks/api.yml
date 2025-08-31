@@ -308,7 +308,7 @@
           when: cleanup_result.stdout_lines is defined
 
         - name: Stop existing API job if running
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh stop ploy-api
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh stop --job ploy-api
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           register: stop_result
@@ -319,20 +319,20 @@
             seconds: 5
 
         - name: Deploy API job using HTTP API
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh run ploy-api /opt/hashicorp/nomad/jobs/ploy-api.hcl
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job ploy-api --file /opt/hashicorp/nomad/jobs/ploy-api.hcl
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           register: bootstrap_deploy
 
         - name: Wait for bootstrap allocation to be running
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait ploy-api 300
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job ploy-api --timeout 300
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           register: wait_result
           failed_when: wait_result.rc != 0
 
         - name: Get allocation status for verification
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh status ploy-api
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh status --job ploy-api
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           register: bootstrap_allocs

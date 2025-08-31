@@ -80,7 +80,7 @@ func setupTestHandler() (*Handler, *RecipeExecutor, *MockRecipeCatalog, *MockSan
 	// Create mock storage and sandbox manager for RecipeExecutor
 	storage := NewInMemoryRecipeStorage()
 	sandboxMgr := NewMockSandboxManager()
-	executor := NewRecipeExecutor(storage, sandboxMgr)
+	executor := NewRecipeExecutor(storage, sandboxMgr, nil)
 	catalog := NewMockRecipeCatalog()
 	handler := NewHandler(executor, catalog, sandboxMgr)
 
