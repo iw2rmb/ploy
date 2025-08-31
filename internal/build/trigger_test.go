@@ -1,6 +1,7 @@
 package build
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,69 @@ import (
 	"github.com/iw2rmb/ploy/internal/testing/helpers"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
+
+// createTestTarball creates a tarball from a map of files for testing
+func createTestTarball(t *testing.T, files map[string]string) []byte {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	for name, content := range files {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0644,
+			Size: int64(len(content)),
+		}
+		err := tw.WriteHeader(hdr)
+		require.NoError(t, err)
+
+		_, err = tw.Write([]byte(content))
+		require.NoError(t, err)
+	}
+
+	err := tw.Close()
+	require.NoError(t, err)
+
+	return buf.Bytes()
+}
+
+// MockStorageClient for testing - implements storage.StorageProvider
+type MockStorageClient struct {
+	mock.Mock
+}
+
+func (m *MockStorageClient) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*storage.PutObjectResult, error) {
+	args := m.Called(bucket, key, body, contentType)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*storage.PutObjectResult), args.Error(1)
+}
+
+func (m *MockStorageClient) GetObject(bucket, key string) (io.ReadCloser, error) {
+	args := m.Called(bucket, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockStorageClient) VerifyUpload(key string) error {
+	args := m.Called(key)
+	return args.Error(0)
+}
+
+func (m *MockStorageClient) GetArtifactsBucket() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockStorageClient) GetProviderType() string {
+	args := m.Called()
+	if args.String(0) == "" {
+		return "mock"
+	}
+	return args.String(0)
+}
 
 // MockBuildDependencies provides mock implementations for build dependencies
 type MockBuildDependencies struct {
@@ -156,7 +220,7 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	t.Run("upload file with retry - file not found", func(t *testing.T) {
-		mockProvider := mocks.NewStorageClient()
+		mockProvider := &MockStorageClient{}
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
 
 		// Create storage client wrapper
@@ -176,7 +240,7 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 		err := os.WriteFile(testPath, testContent, 0644)
 		require.NoError(t, err)
 
-		mockProvider := mocks.NewStorageClient()
+		mockProvider := &MockStorageClient{}
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
 		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").Return(&storage.PutObjectResult{
 			ETag:     "test-etag",
@@ -203,7 +267,7 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 		err := os.WriteFile(testPath, testContent, 0644)
 		require.NoError(t, err)
 
-		mockProvider := mocks.NewStorageClient()
+		mockProvider := &MockStorageClient{}
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
 
 		// First attempt fails
@@ -242,7 +306,7 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 
 func TestUploadBytesWithRetryAndVerification(t *testing.T) {
 	t.Run("upload bytes with retry - success", func(t *testing.T) {
-		mockProvider := mocks.NewStorageClient()
+		mockProvider := &MockStorageClient{}
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket")
 		mockProvider.On("PutObject", "test-bucket", "test-key", mock.Anything, "application/json").Return(&storage.PutObjectResult{
 			ETag:     "test-etag",

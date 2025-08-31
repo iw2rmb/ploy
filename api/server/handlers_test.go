@@ -682,7 +682,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 				"API_KEY":      "secret-key-123",
 				"DEBUG":        "false",
 			},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("SetAll", "testapp", mock.MatchedBy(func(envVars envstore.AppEnvVars) bool {
 					return envVars["NODE_ENV"] == "production" &&
 						envVars["DATABASE_URL"] == "postgres://localhost/db" &&
@@ -702,7 +702,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 			name:        "empty request body",
 			appName:     "testapp",
 			requestBody: map[string]string{},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("SetAll", "testapp", envstore.AppEnvVars{}).Return(nil)
 			},
 			expectedStatus: 200,
@@ -717,7 +717,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 			requestBody: map[string]string{
 				"VAR1": "value1",
 			},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("SetAll", "testapp", mock.Anything).Return(fmt.Errorf("storage connection failed"))
 			},
 			expectedStatus: 500,
@@ -729,7 +729,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 			requestBody: map[string]string{
 				"LARGE_VAR": strings.Repeat("x", 65536), // Maximum allowed size
 			},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("SetAll", "testapp", mock.MatchedBy(func(envVars envstore.AppEnvVars) bool {
 					return len(envVars["LARGE_VAR"]) == 65536
 				})).Return(nil)
@@ -748,7 +748,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 				"SCRIPT_PATH": "/usr/local/bin/script.sh",
 				"CONNECTION":  "user:pass@host:5432/db?ssl=true",
 			},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("SetAll", "testapp", mock.MatchedBy(func(envVars envstore.AppEnvVars) bool {
 					return envVars["JSON_CONFIG"] == `{"key": "value", "nested": {"data": true}}` &&
 						envVars["SCRIPT_PATH"] == "/usr/local/bin/script.sh" &&
@@ -1127,7 +1127,7 @@ func BenchmarkServer_HandleStorageHealth(b *testing.B) {
 		if err != nil {
 			return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed"})
 		}
-		storeClient := storeClientInterface.(*MockStorageClient)
+		storeClient := storeClientInterface.(*mocks.StorageClient)
 		health := storeClient.GetHealthStatus()
 		return c.JSON(health)
 	})
