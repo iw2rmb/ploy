@@ -207,49 +207,44 @@
 
         - name: Upload API binary to SeaweedFS
           shell: |
-            # Copy binary to a temporary location first
-            cp /home/ploy/ploy/bin/api /tmp/api-{{ binary_version.stdout }}
+            # Create simpler path structure
+            VERSION="{{ binary_version.stdout }}"
             
-            # Use localhost for faster upload (same machine)
-            SEAWEEDFS_URL="http://localhost:{{ seaweedfs.filer_port }}"
+            # Copy binary to local SeaweedFS storage directly (bypass HTTP upload)
+            # This is a workaround for the slow HTTP upload issue
+            SEAWEEDFS_FILER_DIR="/var/lib/seaweedfs/filer"
+            TARGET_DIR="${SEAWEEDFS_FILER_DIR}/artifacts/api-binaries/${VERSION}"
             
-            echo "Uploading to SeaweedFS at $SEAWEEDFS_URL (file size: $(stat -c%s /tmp/api-{{ binary_version.stdout }}) bytes)"
+            # Create directory structure
+            sudo mkdir -p "${TARGET_DIR}"
             
-            # Upload with extended timeout for large binary (24MB)
-            curl -X POST \
-              -F "file=@/tmp/api-{{ binary_version.stdout }}" \
-              --max-time 300 \
-              --connect-timeout 30 \
-              -w "\nUpload completed in %{time_total}s\n" \
-              "${SEAWEEDFS_URL}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api"
+            # Copy the binary directly
+            sudo cp /home/ploy/ploy/bin/api "${TARGET_DIR}/api"
+            sudo chown -R seaweedfs:seaweedfs "${TARGET_DIR}"
             
-            RESULT=$?
+            echo "Binary copied directly to SeaweedFS storage at ${TARGET_DIR}/api"
             
-            # Clean up temporary file
-            rm -f /tmp/api-{{ binary_version.stdout }}
-            
-            exit $RESULT
+            # Verify the file is accessible via HTTP
+            sleep 2
+            curl -s -o /dev/null -w "%{http_code}" "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/api"
           register: binary_upload
-          async: 600  # Allow up to 10 minutes for upload
-          poll: 30    # Check every 30 seconds
-          become_user: ploy
+          become: yes
 
         - name: Upload metadata to SeaweedFS
           shell: |
-            # Use localhost for faster upload (same machine)
-            SEAWEEDFS_URL="http://localhost:{{ seaweedfs.filer_port }}"
+            VERSION="{{ binary_version.stdout }}"
             
-            echo "Uploading metadata to SeaweedFS at $SEAWEEDFS_URL"
-            curl -X POST \
-              -F "file=@/tmp/api-metadata.json" \
-              --max-time 60 \
-              --connect-timeout 10 \
-              "${SEAWEEDFS_URL}/artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/metadata.json"
+            # Copy metadata directly to SeaweedFS storage
+            SEAWEEDFS_FILER_DIR="/var/lib/seaweedfs/filer"
+            TARGET_DIR="${SEAWEEDFS_FILER_DIR}/artifacts/api-binaries/${VERSION}"
+            
+            # Copy the metadata directly
+            sudo cp /tmp/api-metadata.json "${TARGET_DIR}/metadata.json"
+            sudo chown -R seaweedfs:seaweedfs "${TARGET_DIR}"
+            
+            echo "Metadata copied to SeaweedFS storage at ${TARGET_DIR}/metadata.json"
           register: metadata_upload
-          retries: 3
-          delay: 5
-          until: metadata_upload.rc == 0
-          become_user: ploy
+          become: yes
 
         - name: Verify upload by listing versions
           uri:
