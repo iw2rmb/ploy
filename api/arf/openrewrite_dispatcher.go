@@ -270,7 +270,7 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest) *a
 					"command": "/bin/sh",
 					"args": []string{
 						"-c",
-						"mkdir -p /workspace/project && if [ -d /workspace/project ]; then cd /workspace && find . -maxdepth 1 -type f -exec mv {} project/ \\; 2>/dev/null || true; find . -maxdepth 1 -type d ! -name project ! -name . -exec mv {} project/ \\; 2>/dev/null || true; fi && /usr/local/bin/openrewrite",
+						"mkdir -p /workspace/project && tar -xf /workspace/input.tar -C /workspace/project && /usr/local/bin/openrewrite",
 					},
 					// Use custom image's default entrypoint (no command override needed)
 					"dns_servers":        []string{"172.17.0.1"},
