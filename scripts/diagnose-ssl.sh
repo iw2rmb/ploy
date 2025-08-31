@@ -17,7 +17,7 @@ BASE_DOMAIN="${PLOY_APPS_DOMAIN:-ployd.app}"
 DEV_SUBDOMAIN="${PLOY_DEV_SUBDOMAIN:-dev}"
 DEV_DOMAIN="$DEV_SUBDOMAIN.$BASE_DOMAIN"
 API_DOMAIN="api.$DEV_DOMAIN"
-TARGET_IP="${TARGET_IP:-45.12.75.241}"
+# TARGET_HOST should already be set globally
 TIMEOUT=10
 
 echo -e "${BLUE}Ploy SSL/DNS Diagnostic Tool${NC}"
@@ -27,7 +27,7 @@ echo -e "${BLUE}Configuration:${NC}"
 echo "  Base domain: $BASE_DOMAIN"
 echo "  Dev domain: $DEV_DOMAIN"
 echo "  API domain: $API_DOMAIN"
-echo "  Target IP: $TARGET_IP"
+echo "  Target IP: $TARGET_HOST"
 echo ""
 
 # Function to check command availability
@@ -54,10 +54,10 @@ test_dns() {
         if resolved_ip=$(dig @"$resolver" +short "$domain" A | head -1); then
             if [[ -n "$resolved_ip" && "$resolved_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                 resolved_ips+=("$resolved_ip")
-                if [[ "$resolved_ip" == "$TARGET_IP" ]]; then
+                if [[ "$resolved_ip" == "$TARGET_HOST" ]]; then
                     echo -e "${GREEN}$resolved_ip ✓${NC}"
                 else
-                    echo -e "${YELLOW}$resolved_ip (expected $TARGET_IP)${NC}"
+                    echo -e "${YELLOW}$resolved_ip (expected $TARGET_HOST)${NC}"
                 fi
             else
                 echo -e "${RED}Failed to resolve${NC}"
@@ -84,11 +84,11 @@ test_dns() {
             echo -e "${YELLOW}  ⚠ DNS resolution inconsistent across resolvers${NC}"
         fi
         
-        if [[ "$first_ip" == "$TARGET_IP" ]]; then
+        if [[ "$first_ip" == "$TARGET_HOST" ]]; then
             echo -e "${GREEN}  ✓ DNS points to correct IP${NC}"
             return 0
         else
-            echo -e "${RED}  ✗ DNS points to wrong IP (got $first_ip, expected $TARGET_IP)${NC}"
+            echo -e "${RED}  ✗ DNS points to wrong IP (got $first_ip, expected $TARGET_HOST)${NC}"
             return 1
         fi
     else
@@ -219,7 +219,7 @@ check_traefik() {
     echo -e "${YELLOW}Checking Traefik configuration...${NC}"
     
     # Try to access Traefik API if available
-    local traefik_endpoints=("http://$TARGET_IP:8080/api/rawdata" "http://$TARGET_IP:9090/api/rawdata")
+    local traefik_endpoints=("http://$TARGET_HOST:8080/api/rawdata" "http://$TARGET_HOST:9090/api/rawdata")
     
     for endpoint in "${traefik_endpoints[@]}"; do
         echo -e "${YELLOW}  Checking Traefik at $endpoint...${NC}"
@@ -253,7 +253,7 @@ check_nomad_service() {
     echo -e "${YELLOW}Checking Nomad ploy-api service...${NC}"
     
     # Try to get Nomad job status
-    local nomad_endpoints=("http://$TARGET_IP:4646/v1/job/ploy-api")
+    local nomad_endpoints=("http://$TARGET_HOST:4646/v1/job/ploy-api")
     
     for endpoint in "${nomad_endpoints[@]}"; do
         echo -e "${YELLOW}  Checking Nomad at $endpoint...${NC}"
@@ -288,15 +288,15 @@ generate_recommendations() {
         issues_found=true
         echo -e "${RED}DNS Issues Detected:${NC}"
         echo "  1. Check Namecheap DNS settings for $BASE_DOMAIN"
-        echo "  2. Ensure A record exists: $DEV_SUBDOMAIN → $TARGET_IP"
-        echo "  3. Ensure A record exists: *.$DEV_SUBDOMAIN → $TARGET_IP"
+        echo "  2. Ensure A record exists: $DEV_SUBDOMAIN → $TARGET_HOST"
+        echo "  3. Ensure A record exists: *.$DEV_SUBDOMAIN → $TARGET_HOST"
         echo "  4. Wait for DNS propagation (5-10 minutes)"
         echo "  5. Run: ./scripts/setup-dev-dns.sh"
         echo ""
     fi
     
     # Port connectivity issues
-    if ! test_port "$TARGET_IP" 443 "HTTPS" &>/dev/null; then
+    if ! test_port "$TARGET_HOST" 443 "HTTPS" &>/dev/null; then
         issues_found=true
         echo -e "${RED}Port Connectivity Issues:${NC}"
         echo "  1. Check if Traefik is running and binding to port 443"
@@ -339,7 +339,7 @@ generate_recommendations() {
         echo "  1. Fix the identified issues above"
         echo "  2. Run this diagnostic script again to verify fixes"
         echo "  3. Test manually: curl -v https://$API_DOMAIN/health"
-        echo "  4. Check VPS logs: ssh root@$TARGET_IP"
+        echo "  4. Check VPS logs: ssh root@$TARGET_HOST"
     fi
     echo ""
 }
@@ -369,10 +369,10 @@ test_dns "$API_DOMAIN"
 echo ""
 
 echo -e "${BLUE}Phase 2: Port Connectivity${NC}"
-test_port "$TARGET_IP" 80 "HTTP"
-test_port "$TARGET_IP" 443 "HTTPS"
-test_port "$TARGET_IP" 8500 "Consul"
-test_port "$TARGET_IP" 4646 "Nomad"
+test_port "$TARGET_HOST" 80 "HTTP"
+test_port "$TARGET_HOST" 443 "HTTPS"
+test_port "$TARGET_HOST" 8500 "Consul"
+test_port "$TARGET_HOST" 4646 "Nomad"
 echo ""
 
 echo -e "${BLUE}Phase 3: HTTP/HTTPS Connectivity${NC}"

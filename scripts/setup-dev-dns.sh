@@ -19,12 +19,12 @@ NC='\033[0m'
 BASE_DOMAIN="${PLOY_APPS_DOMAIN:-ployd.app}"
 DEV_SUBDOMAIN="${PLOY_DEV_SUBDOMAIN:-dev}"
 DEV_DOMAIN="$DEV_SUBDOMAIN.$BASE_DOMAIN"
-VPS_IP="${TARGET_IP:-$(curl -s ifconfig.me)}"
+# TARGET_HOST should already be set globally
 
 echo -e "${BLUE}Configuration:${NC}"
 echo "  Base domain: $BASE_DOMAIN"
 echo "  Dev domain: $DEV_DOMAIN"
-echo "  VPS IP: $VPS_IP"
+echo "  VPS IP: $TARGET_HOST"
 echo ""
 
 # Check if we have DNS credentials
@@ -35,18 +35,18 @@ if [ -z "$NAMECHEAP_API_USER" ] || [ -z "$NAMECHEAP_API_KEY" ]; then
     echo ""
     echo "  Type: A"
     echo "  Host: $DEV_SUBDOMAIN"
-    echo "  Value: $VPS_IP"
+    echo "  Value: $TARGET_HOST"
     echo "  TTL: 300 (5 minutes)"
     echo ""
     echo "  Type: A"
     echo "  Host: *.$DEV_SUBDOMAIN"
-    echo "  Value: $VPS_IP"
+    echo "  Value: $TARGET_HOST"
     echo "  TTL: 300 (5 minutes)"
     echo ""
     echo "This will create:"
-    echo "  - $DEV_DOMAIN → $VPS_IP"
-    echo "  - api.$DEV_DOMAIN → $VPS_IP"
-    echo "  - {app}.$DEV_DOMAIN → $VPS_IP (wildcard)"
+    echo "  - $DEV_DOMAIN → $TARGET_HOST"
+    echo "  - api.$DEV_DOMAIN → $TARGET_HOST"
+    echo "  - {app}.$DEV_DOMAIN → $TARGET_HOST (wildcard)"
     echo ""
     echo "After adding these records, wait 5-10 minutes for DNS propagation."
     echo "Then run: ./scripts/test-dns-propagation.sh"
@@ -64,10 +64,10 @@ fi
 
 # Add dev subdomain A record
 echo -e "${YELLOW}Adding A record for $DEV_DOMAIN...${NC}"
-./bin/ploy domains add-dns "$DEV_DOMAIN" "$VPS_IP" --type A --ttl 300
+./bin/ploy domains add-dns "$DEV_DOMAIN" "$TARGET_HOST" --type A --ttl 300
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ A record added: $DEV_DOMAIN → $VPS_IP${NC}"
+    echo -e "${GREEN}✓ A record added: $DEV_DOMAIN → $TARGET_HOST${NC}"
 else
     echo -e "${RED}✗ Failed to add A record for $DEV_DOMAIN${NC}"
     exit 1
@@ -75,10 +75,10 @@ fi
 
 # Add wildcard A record
 echo -e "${YELLOW}Adding wildcard A record for *.$DEV_DOMAIN...${NC}"
-./bin/ploy domains add-dns "*.$DEV_DOMAIN" "$VPS_IP" --type A --ttl 300
+./bin/ploy domains add-dns "*.$DEV_DOMAIN" "$TARGET_HOST" --type A --ttl 300
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Wildcard A record added: *.$DEV_DOMAIN → $VPS_IP${NC}"
+    echo -e "${GREEN}✓ Wildcard A record added: *.$DEV_DOMAIN → $TARGET_HOST${NC}"
 else
     echo -e "${RED}✗ Failed to add wildcard A record${NC}"
     exit 1
@@ -88,8 +88,8 @@ echo ""
 echo -e "${GREEN}DNS setup complete!${NC}"
 echo ""
 echo "Records created:"
-echo "  $DEV_DOMAIN → $VPS_IP"
-echo "  *.$DEV_DOMAIN → $VPS_IP"
+echo "  $DEV_DOMAIN → $TARGET_HOST"
+echo "  *.$DEV_DOMAIN → $TARGET_HOST"
 echo ""
 echo "This enables:"
 echo "  - api.$DEV_DOMAIN (controller endpoint)"

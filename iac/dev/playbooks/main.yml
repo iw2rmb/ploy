@@ -1695,6 +1695,9 @@
           export PLOY_DNS_DOMAIN="{{ lookup('env', 'PLOY_DNS_DOMAIN') | default('ployd.app') }}"
           export PLOY_DNS_TARGET_IP="{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
           
+          # Global deployment target host
+          export TARGET_HOST="{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
+          
           # Platform wildcard certificate configuration
           export PLOY_APPS_DOMAIN="{{ ploy.apps_domain }}"
           export PLOY_APPS_DOMAIN_PROVIDER="{{ ploy.apps_domain_provider }}"
@@ -2061,15 +2064,15 @@
           shell: |
             DEV_IP=$(dig +short {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} | tail -n1)
             API_IP=$(dig +short {{ ploy_dev_routing.api_domain | default('api.dev.ployman.app') }} | tail -n1)
-            TARGET_IP="{{ ansible_default_ipv4.address }}"
+            TARGET_HOST="{{ ansible_default_ipv4.address }}"
             
-            if [ "$DEV_IP" = "$TARGET_IP" ] && [ "$API_IP" = "$TARGET_IP" ]; then
+            if [ "$DEV_IP" = "$TARGET_HOST" ] && [ "$API_IP" = "$TARGET_HOST" ]; then
               echo "DNS_READY"
             else
               echo "DNS_NOT_READY"
               echo "Current: {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} -> $DEV_IP"
               echo "Current: {{ ploy_dev_routing.api_domain | default('api.dev.ployman.app') }} -> $API_IP"
-              echo "Required: $TARGET_IP"
+              echo "Required: $TARGET_HOST"
             fi
           register: dns_status
           changed_when: false

@@ -19,44 +19,44 @@ NC='\033[0m'
 BASE_DOMAIN="${PLOY_APPS_DOMAIN:-ployd.app}"
 DEV_SUBDOMAIN="${PLOY_DEV_SUBDOMAIN:-dev}"
 DEV_DOMAIN="$DEV_SUBDOMAIN.$BASE_DOMAIN"
-EXPECTED_IP="${TARGET_IP:-45.12.75.241}"
+# TARGET_HOST should already be set globally
 
 echo -e "${BLUE}Testing domains:${NC}"
 echo "  Dev domain: $DEV_DOMAIN"
 echo "  Controller: api.$DEV_DOMAIN"
-echo "  Expected IP: $EXPECTED_IP"
+echo "  Expected IP: $TARGET_HOST"
 echo ""
 
 # Test dev domain
 echo -e "${YELLOW}Testing $DEV_DOMAIN...${NC}"
 RESOLVED_IP=$(dig +short "$DEV_DOMAIN" @8.8.8.8 | tail -n1)
-if [ "$RESOLVED_IP" = "$EXPECTED_IP" ]; then
+if [ "$RESOLVED_IP" = "$TARGET_HOST" ]; then
     echo -e "${GREEN}✓ $DEV_DOMAIN resolves to $RESOLVED_IP${NC}"
 else
     echo -e "${RED}✗ $DEV_DOMAIN does not resolve correctly${NC}"
-    echo "  Expected: $EXPECTED_IP"
+    echo "  Expected: $TARGET_HOST"
     echo "  Got: $RESOLVED_IP"
 fi
 
 # Test controller subdomain
 echo -e "${YELLOW}Testing api.$DEV_DOMAIN...${NC}"
 CONTROLLER_IP=$(dig +short "api.$DEV_DOMAIN" @8.8.8.8 | tail -n1)
-if [ "$CONTROLLER_IP" = "$EXPECTED_IP" ]; then
+if [ "$CONTROLLER_IP" = "$TARGET_HOST" ]; then
     echo -e "${GREEN}✓ api.$DEV_DOMAIN resolves to $CONTROLLER_IP${NC}"
 else
     echo -e "${RED}✗ api.$DEV_DOMAIN does not resolve correctly${NC}"
-    echo "  Expected: $EXPECTED_IP"
+    echo "  Expected: $TARGET_HOST"
     echo "  Got: $CONTROLLER_IP"
 fi
 
 # Test sample app subdomain
 echo -e "${YELLOW}Testing myapp.$DEV_DOMAIN...${NC}"
 APP_IP=$(dig +short "myapp.$DEV_DOMAIN" @8.8.8.8 | tail -n1)
-if [ "$APP_IP" = "$EXPECTED_IP" ]; then
+if [ "$APP_IP" = "$TARGET_HOST" ]; then
     echo -e "${GREEN}✓ myapp.$DEV_DOMAIN resolves to $APP_IP (wildcard working)${NC}"
 else
     echo -e "${RED}✗ myapp.$DEV_DOMAIN does not resolve correctly${NC}"
-    echo "  Expected: $EXPECTED_IP"
+    echo "  Expected: $TARGET_HOST"
     echo "  Got: $APP_IP"
 fi
 
@@ -72,7 +72,7 @@ DNS_SERVERS=(
 for dns_server in "${DNS_SERVERS[@]}"; do
     echo -n "  $dns_server: "
     resolved=$(dig +short "api.$DEV_DOMAIN" "@$dns_server" | tail -n1)
-    if [ "$resolved" = "$EXPECTED_IP" ]; then
+    if [ "$resolved" = "$TARGET_HOST" ]; then
         echo -e "${GREEN}✓ $resolved${NC}"
     else
         echo -e "${RED}✗ $resolved${NC}"
@@ -81,7 +81,7 @@ done
 
 echo ""
 echo -e "${BLUE}Summary:${NC}"
-if [ "$RESOLVED_IP" = "$EXPECTED_IP" ] && [ "$CONTROLLER_IP" = "$EXPECTED_IP" ] && [ "$APP_IP" = "$EXPECTED_IP" ]; then
+if [ "$RESOLVED_IP" = "$TARGET_HOST" ] && [ "$CONTROLLER_IP" = "$TARGET_HOST" ] && [ "$APP_IP" = "$TARGET_HOST" ]; then
     echo -e "${GREEN}✓ DNS propagation complete! All domains resolve correctly.${NC}"
     echo ""
     echo "Ready for wildcard certificate provisioning!"
