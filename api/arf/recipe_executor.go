@@ -70,12 +70,25 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 			fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine for discovery and execution\n", recipeID)
 			fmt.Printf("[RecipeExecutor] Dispatcher call about to execute: recipe=%s, repoPath=%s\n", req.RecipeClass, req.RepoPath)
 			
+			// Add timeout context for dispatcher call (30 seconds)
+			dispatcherCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			
+			fmt.Printf("[RecipeExecutor] Starting dispatcher call with 30s timeout...\n")
+			dispatcherStart := time.Now()
+			
 			// Dispatch to Nomad for dynamic download and execution
-			result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(ctx, req)
+			result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(dispatcherCtx, req)
 			if execErr != nil {
+				if dispatcherCtx.Err() == context.DeadlineExceeded {
+					fmt.Printf("[RecipeExecutor] OpenRewrite dispatcher timed out after 30s for recipe %s\n", recipeID)
+					return nil, fmt.Errorf("OpenRewrite dispatcher timed out for recipe %s after 30 seconds", recipeID)
+				}
 				fmt.Printf("[RecipeExecutor] Failed to execute recipe %s: %v\n", recipeID, execErr)
 				return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
 			}
+			
+			fmt.Printf("[RecipeExecutor] Dispatcher call completed successfully after %v\n", time.Since(dispatcherStart))
 			
 			fmt.Printf("[RecipeExecutor] Recipe %s executed successfully, result: %+v\n", recipeID, result)
 			
