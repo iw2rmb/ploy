@@ -3,6 +3,7 @@ package arf
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/api/arf/storage"
+	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
 // Handler provides HTTP endpoints for ARF operations
@@ -44,15 +45,13 @@ func NewHandlerWithStorage(
 	recipeIndex storage.RecipeIndexStore,
 	recipeValidator storage.RecipeValidator,
 	sandboxMgr SandboxManager,
+	storageProvider internalStorage.StorageProvider, // Storage provider for recipe registry
 ) *Handler {
-	// Initialize recipe registry if we have storage
+	// Initialize recipe registry if we have storage provider
 	var recipeRegistry *RecipeRegistry
-	if recipeStorage != nil {
-		// Convert storage to storage provider interface
-		// For now, we'll use a wrapper or nil since the storage backend is already set
-		// The registry can work without being initialized if storage is directly used
-		// TODO: Create storage provider wrapper for recipe registry
-		recipeRegistry = nil // Will be initialized when needed
+	if storageProvider != nil {
+		// Create recipe registry with the storage provider
+		recipeRegistry = NewRecipeRegistry(storageProvider)
 	}
 	
 	return &Handler{

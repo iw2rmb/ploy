@@ -15,16 +15,16 @@
    - **Timeout**: 30 minutes (generous time for repository cloning, recipe download, and transformation)
    - **Extended Processing Time**: Allow for recipe download if not cached
 2. **Target Repository**: https://github.com/winterbe/java8-tutorial.git
-3. **Recipe**: `org.openrewrite.java.migrate.Java11toJava17` (or appropriate Java 8→17 recipe)
+3. **Recipe**: `org.openrewrite.java.migrate.UpgradeToJava17` (unified Java 8→17 recipe)
 4. **Request Format**:
    ```json
    {
      "repository_url": "https://github.com/winterbe/java8-tutorial.git",
-     "recipe_id": "java8-to-java17",
+     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
      "recipe_type": "openrewrite",
      "branch": "master",
      "configuration": {
-       "target_recipes": ["org.openrewrite.java.migrate.Java8toJava17"],
+       "target_recipes": ["org.openrewrite.java.migrate.UpgradeToJava17"],
        "package_manager": "maven",
        "target_jdk": "17"
      }
@@ -36,7 +36,7 @@
    - **Initial Response Timeout**: 2 minutes
 2. **Status Monitoring**: Poll `/v1/arf/transforms/{transformation_id}` endpoint
    - **Polling Interval**: 30 seconds
-   - **Maximum Wait Time**: 45 minutes total (allows for recipe download + transformation)
+   - **Maximum Wait Time**: 30 minutes total (allows for recipe download + transformation)
    - **Status Check Timeout**: 10 seconds per poll
 3. **Progress Tracking**: Monitor transformation job until completion
    - **Expected Phases**: Repository clone → Recipe download (if needed) → Transformation → Result packaging
@@ -45,7 +45,7 @@
 ### Step 3: Post-Transformation Recipe Verification
 1. **Recipe Storage Check**: After successful transformation, verify that recipes are available
    - **Endpoint**: `/v1/arf/recipes?type=openrewrite` (should show OpenRewrite recipes)
-   - **Expected**: Recipe cache populated with `org.openrewrite.java.migrate.Java11toJava17`
+   - **Expected**: Recipe cache populated with `org.openrewrite.java.migrate.UpgradeToJava17`
 2. **Cache Verification**: Confirm that subsequent transformations are faster due to cached recipes
 3. **Performance Comparison**: Second transformation should be significantly faster (no recipe download)
 
@@ -63,14 +63,14 @@
 - **Recipe List/Validate**: 60 seconds (recipe resolution)
 - **Transform Submission**: 2 minutes (transformation job creation and validation)
 - **Status Polling**: 10 seconds per request
-- **Total Job Wait**: 60 minutes maximum per transformation
+- **Total Job Wait**: 30 minutes maximum per transformation
 
 ### Job Execution Timeouts:
 - **Repository Clone**: 5 minutes
 - **Recipe Download**: 15 minutes (Maven Central + artifact resolution)
-- **Transformation Execution**: 30 minutes (large codebases)
+- **Transformation Execution**: 15 minutes (large codebases)
 - **Result Packaging**: 5 minutes
-- **Total Job Timeout**: 60 minutes per transformation job
+- **Total Job Timeout**: 30 minutes per transformation job
 
 ### Retry and Circuit Breaker Configuration:
 - **Status Poll Retries**: 3 attempts with 5-second backoff
@@ -91,7 +91,7 @@
 ### Performance Targets (with generous timeouts):
 - **First Transformation** (with recipe download):
   - Endpoint Response Time: <2 minutes for job submission
-  - Job Completion: <60 minutes for simple repositories
+  - Job Completion: <30 minutes for simple repositories
   - Success Rate: >80% for Tier 1 (simple) repositories
 - **Subsequent Transformations** (with cached recipes):
   - Endpoint Response Time: <30 seconds for job submission
@@ -175,13 +175,13 @@ curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
   -H "Content-Type: application/json" \
   -d '{
     "repository_url": "https://github.com/winterbe/java8-tutorial.git",
-    "recipe_id": "java8-to-java11",
+    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
     "recipe_type": "openrewrite",
     "branch": "master",
     "configuration": {
-      "target_recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
+      "target_recipes": ["org.openrewrite.java.migrate.UpgradeToJava17"],
       "package_manager": "maven",
-      "target_jdk": "11"
+      "target_jdk": "17"
     }
   }' \
   --max-time 120  # 2 minute timeout for transformation submission
@@ -218,10 +218,10 @@ curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes?type=openrewrite" | jq '.recipes[
 curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/recipes/validate" \
   -H "Content-Type: application/json" \
   -d '{
-    "recipe_id": "java8-to-java11",
+    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
     "type": "openrewrite",
     "configuration": {
-      "target_recipes": ["org.openrewrite.java.migrate.Java8toJava11"],
+      "target_recipes": ["org.openrewrite.java.migrate.UpgradeToJava17"],
       "package_manager": "maven"
     }
   }'

@@ -69,50 +69,73 @@ func (ts *transformationStore) get(id string) (*TransformationResult, bool) {
 
 // ExecuteTransformation handles POST /v1/arf/transform
 func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
+	fmt.Printf("[DEBUG] Request received, starting body parsing...\n")
+	
 	var req TransformRequest
 	if err := c.BodyParser(&req); err != nil {
+		fmt.Printf("[DEBUG] Body parsing failed: %v\n", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   "Invalid request format",
 			"details": err.Error(),
 		})
 	}
+	
+	fmt.Printf("[DEBUG] Body parsed successfully, type='%s'\n", req.Type)
 
 	// Log incoming request
 	fmt.Printf("[ARF Transform] Received transformation request: recipe=%s, type=%s, repo=%s, branch=%s, language=%s, build_tool=%s\n",
 		req.RecipeID, req.Type, req.Codebase.Repository, req.Codebase.Branch, req.Codebase.Language, req.Codebase.BuildTool)
 
+	fmt.Printf("[DEBUG] Starting validation...\n")
+	
 	// Validate required fields
 	if req.RecipeID == "" {
+		fmt.Printf("[DEBUG] Validation failed: recipe_id required\n")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "recipe_id is required",
 		})
 	}
 
 	if req.Codebase.Repository == "" {
+		fmt.Printf("[DEBUG] Validation failed: repository required\n")
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "codebase.repository is required",
 		})
 	}
+	
+	fmt.Printf("[DEBUG] Validation complete\n")
 
+	fmt.Printf("[DEBUG] Processing defaults...\n")
+	
 	// Set default branch if not specified
 	if req.Codebase.Branch == "" {
 		req.Codebase.Branch = "main"
+		fmt.Printf("[DEBUG] Set default branch to 'main'\n")
 	}
 
-	// Set default type to "openrewrite" if not specified
+	// Require explicit type specification - no default assumptions
 	if req.Type == "" {
-		req.Type = "openrewrite"
-		fmt.Printf("[ARF Transform] Type not specified, defaulting to 'openrewrite'\n")
+		fmt.Printf("[DEBUG] Validation failed: recipe type required\n")
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "recipe type is required - specify 'openrewrite' or other valid type",
+		})
 	}
+	fmt.Printf("[DEBUG] Type explicitly set to '%s'\n", req.Type)
+	
+	fmt.Printf("[DEBUG] Final type='%s'\n", req.Type)
 
 	// Generate transformation ID
 	transformID := uuid.New().String()
 	fmt.Printf("[ARF Transform] Generated transformation ID: %s\n", transformID)
 
-	// Create context with timeout (5 minutes)
-	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Minute)
+	fmt.Printf("[DEBUG] Creating context with timeout...\n")
+	
+	// Create context with timeout (30 minutes total transformation timeout)
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Minute)
 	defer cancel()
 
+	fmt.Printf("[DEBUG] About to call executeTransformationInternal\n")
+	
 	// Execute transformation
 	fmt.Printf("[ARF Transform] Starting transformation execution for ID: %s\n", transformID)
 	result, err := h.executeTransformationInternal(ctx, transformID, &req)
@@ -123,7 +146,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		if ctx.Err() == context.DeadlineExceeded {
 			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
 				"error":   "Transformation timeout",
-				"details": "The transformation took longer than 5 minutes to complete",
+				"details": "The transformation took longer than 30 minutes to complete",
 				"transformation_id": transformID,
 			})
 		}

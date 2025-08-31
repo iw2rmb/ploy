@@ -22,7 +22,7 @@ PURPLE='\033[0;35m'
 NC='\033[0m' # No Color
 
 # Phase 1 Configuration
-OPENREWRITE_IMAGE="openrewrite-service:mvp"
+OPENREWRITE_IMAGE="openrewrite-jvm:latest"
 OPENREWRITE_PORT="8090"
 OPENREWRITE_CONTAINER="openrewrite-phase1-test"
 CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
@@ -121,18 +121,15 @@ check_phase1_prerequisites() {
     fi
     test_passed "Docker is available"
     
-    # Check if OpenRewrite container image exists
+    # Check if unified OpenRewrite container image is available
+    phase1_log "Checking for unified OpenRewrite image: $OPENREWRITE_IMAGE"
     if ! docker images "$OPENREWRITE_IMAGE" | grep -q "$OPENREWRITE_IMAGE"; then
-        phase1_log "OpenRewrite image not found, attempting to build..."
-        if [[ -f "$PROJECT_ROOT/Dockerfile.openrewrite" ]]; then
-            docker build -f "$PROJECT_ROOT/Dockerfile.openrewrite" -t "$OPENREWRITE_IMAGE" "$PROJECT_ROOT" || \
-                test_failed "Failed to build OpenRewrite container image"
-            test_passed "OpenRewrite container image built successfully"
-        else
-            test_failed "OpenRewrite container image not found and Dockerfile missing"
-        fi
+        phase1_log "Pulling unified OpenRewrite image from registry..."
+        docker pull "$OPENREWRITE_IMAGE" || \
+            test_failed "Failed to pull unified OpenRewrite image. Ensure openrewrite-jvm:latest is available in your registry."
+        test_passed "Unified OpenRewrite container image pulled successfully"
     else
-        test_passed "OpenRewrite container image available"
+        test_passed "Unified OpenRewrite container image available"
     fi
     
     # Check required tools
