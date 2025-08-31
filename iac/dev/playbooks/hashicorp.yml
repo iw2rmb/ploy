@@ -647,14 +647,14 @@
             NOMAD_ADDR: "http://localhost:4646"
 
         - name: Submit Traefik system job to Nomad (if not running)
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh run traefik-system /opt/hashicorp/nomad/jobs/traefik-system.hcl
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job traefik-system --file /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_job_submit
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           when: traefik_job_check.status == 404
 
         - name: Wait for Traefik service to be healthy
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait traefik-system 180
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job traefik-system --timeout 180
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           register: traefik_wait_result

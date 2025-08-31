@@ -1,14 +1,11 @@
 #!/bin/bash
 # Nomad Job Manager - HTTP API wrapper to prevent 429 rate limiting
-# Usage: nomad-job-manager.sh <action> <job-name> [job-file]
-# Actions: stop, run, status
+# Usage: nomad-job-manager.sh <command> --param value
+# Commands: stop, run, status, wait, allocs, alloc-status, running-alloc, logs, cleanup
 
 set -e
 
 NOMAD_ADDR=${NOMAD_ADDR:-"http://localhost:4646"}
-ACTION=$1
-JOB_NAME=$2
-JOB_FILE=$3
 
 # Retry configuration
 MAX_RETRIES=5
@@ -17,6 +14,94 @@ BACKOFF_MULTIPLIER=2
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+# Parse named parameters
+parse_params() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --job)
+                JOB_NAME="$2"
+                shift 2
+                ;;
+            --file)
+                JOB_FILE="$2"
+                shift 2
+                ;;
+            --alloc-id|--alloc)
+                ALLOC_ID="$2"
+                shift 2
+                ;;
+            --task)
+                TASK_NAME="$2"
+                shift 2
+                ;;
+            --lines)
+                LOG_LINES="$2"
+                shift 2
+                ;;
+            --follow)
+                FOLLOW="true"
+                shift
+                ;;
+            --stderr)
+                LOG_TYPE="stderr"
+                shift
+                ;;
+            --both)
+                LOG_BOTH="true"
+                shift
+                ;;
+            --timeout)
+                TIMEOUT="$2"
+                shift 2
+                ;;
+            --format)
+                OUTPUT_FORMAT="$2"
+                shift 2
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                echo "Unknown parameter: $1" >&2
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+show_help() {
+    cat << EOF
+Nomad Job Manager - HTTP API wrapper to prevent 429 rate limiting
+
+Commands:
+  stop --job <name>                        Stop a running job
+  run --job <name> --file <file>          Submit and run a job
+  status --job <name>                      Get job allocation status
+  wait --job <name> [--timeout <sec>]      Wait for job to be running
+  allocs --job <name> [--format <fmt>]     Get job allocations (json|short|human)
+  alloc-status --alloc-id <id>             Get allocation status
+  running-alloc --job <name>               Get running allocation ID
+  logs --alloc-id <id> [options]           Get allocation logs
+    Options:
+      --task <name>                        Task name (optional)
+      --lines <num>                        Number of lines (default: 100)
+      --follow                             Follow log output
+      --stderr                             Show stderr instead of stdout
+      --both                               Show both stdout and stderr
+  cleanup --job <name>                      Clean up stale service registrations
+
+Examples:
+  $0 stop --job ploy-api
+  $0 run --job ploy-api --file api.nomad
+  $0 logs --alloc-id abc123 --task api --lines 500
+  $0 logs --alloc-id abc123 --stderr --lines 100
+  $0 logs --alloc-id abc123 --both --follow
+  $0 allocs --job ploy-api --format json
+EOF
 }
 
 # HTTP request with retry logic
@@ -74,57 +159,59 @@ http_request() {
 }
 
 stop_job() {
-    local job_name=$1
-    log "Stopping job: $job_name"
+    if [ -z "$JOB_NAME" ]; then
+        echo "Error: --job parameter is required" >&2
+        show_help
+        exit 1
+    fi
+    
+    log "Stopping job: $JOB_NAME"
     
     # First check if job exists
-    if ! http_request "GET" "$NOMAD_ADDR/v1/job/$job_name" "" "200 404" >/dev/null; then
+    if ! http_request "GET" "$NOMAD_ADDR/v1/job/$JOB_NAME" "" "200 404" >/dev/null; then
         log "Failed to check job status"
         return 1
     fi
     
     # Stop the job
-    if http_request "DELETE" "$NOMAD_ADDR/v1/job/$job_name" "" "200 404" >/dev/null; then
-        log "Job $job_name stopped successfully"
+    if http_request "DELETE" "$NOMAD_ADDR/v1/job/$JOB_NAME" "" "200 404" >/dev/null; then
+        log "Job $JOB_NAME stopped successfully"
         return 0
     else
-        log "Failed to stop job $job_name"
+        log "Failed to stop job $JOB_NAME"
         return 1
     fi
 }
 
 run_job() {
-    local job_file=$1
-    log "Running job from file: $job_file"
+    if [ -z "$JOB_NAME" ] || [ -z "$JOB_FILE" ]; then
+        echo "Error: --job and --file parameters are required" >&2
+        show_help
+        exit 1
+    fi
     
-    if [ ! -f "$job_file" ]; then
-        log "Job file not found: $job_file"
+    log "Running job $JOB_NAME from file: $JOB_FILE"
+    
+    if [ ! -f "$JOB_FILE" ]; then
+        log "Job file not found: $JOB_FILE"
         return 1
     fi
     
     # Convert HCL to JSON if needed
     local json_file="/tmp/nomad-job-$$.json"
     
-    if [ "${job_file##*.}" = "hcl" ]; then
+    if [ "${JOB_FILE##*.}" = "hcl" ]; then
         log "Converting HCL to JSON..."
-        if ! nomad job run -output "$job_file" > "$json_file" 2>/dev/null; then
+        if ! nomad job run -output "$JOB_FILE" > "$json_file" 2>/dev/null; then
             log "Failed to convert HCL to JSON"
             return 1
         fi
     else
-        cp "$job_file" "$json_file"
-    fi
-    
-    # Extract job name from JSON for cleanup
-    local job_name=""
-    if [ -f "$json_file" ]; then
-        job_name=$(jq -r '.Job.ID // .ID // empty' "$json_file" 2>/dev/null)
+        cp "$JOB_FILE" "$json_file"
     fi
     
     # Clean up stale services before deployment
-    if [ -n "$job_name" ]; then
-        cleanup_stale_services "$job_name"
-    fi
+    cleanup_stale_services
     
     # Submit job
     if http_request "POST" "$NOMAD_ADDR/v1/jobs" "$json_file" "200"; then
@@ -139,10 +226,15 @@ run_job() {
 }
 
 get_job_status() {
-    local job_name=$1
-    log "Getting status for job: $job_name"
+    if [ -z "$JOB_NAME" ]; then
+        echo "Error: --job parameter is required" >&2
+        show_help
+        exit 1
+    fi
     
-    if http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"; then
+    log "Getting status for job: $JOB_NAME"
+    
+    if http_request "GET" "$NOMAD_ADDR/v1/job/$JOB_NAME/allocations" "" "200"; then
         return 0
     else
         log "Failed to get job status"
@@ -151,12 +243,17 @@ get_job_status() {
 }
 
 cleanup_stale_services() {
-    local job_name=$1
-    log "Cleaning up stale service registrations for job: $job_name"
+    if [ -z "$JOB_NAME" ]; then
+        echo "Error: --job parameter is required" >&2
+        show_help
+        exit 1
+    fi
+    
+    log "Cleaning up stale service registrations for job: $JOB_NAME"
     
     # Get currently running allocation IDs
     local running_allocs=""
-    if allocations=$(get_job_status "$job_name" 2>/dev/null); then
+    if allocations=$(get_job_status 2>/dev/null); then
         running_allocs=$(echo "$allocations" | jq -r '.[] | select(.ClientStatus == "running") | .ID' 2>/dev/null | tr '\n' '|' | sed 's/|$//')
     fi
     
@@ -168,10 +265,10 @@ cleanup_stale_services() {
     log "Active allocations: $running_allocs"
     
     # Query Consul for service registrations
-    local consul_url="http://127.0.0.1:8500/v1/catalog/service/$job_name"
+    local consul_url="http://127.0.0.1:8500/v1/catalog/service/$JOB_NAME"
     
     if ! curl -sf "$consul_url" >/dev/null 2>&1; then
-        log "Consul not accessible or no services found for $job_name"
+        log "Consul not accessible or no services found for $JOB_NAME"
         return 0
     fi
     
@@ -194,18 +291,23 @@ cleanup_stale_services() {
 }
 
 wait_for_job_running() {
-    local job_name=$1
-    local max_wait=${2:-300}  # 5 minutes default
+    if [ -z "$JOB_NAME" ]; then
+        echo "Error: --job parameter is required" >&2
+        show_help
+        exit 1
+    fi
+    
+    local max_wait=${TIMEOUT:-300}  # 5 minutes default
     local check_interval=10
     
-    log "Waiting for job $job_name to be running (timeout: ${max_wait}s)"
+    log "Waiting for job $JOB_NAME to be running (timeout: ${max_wait}s)"
     
     local elapsed=0
     while [ $elapsed -lt $max_wait ]; do
-        if allocations=$(get_job_status "$job_name" 2>/dev/null); then
+        if allocations=$(get_job_status 2>/dev/null); then
             # Check if any allocation is running
             if echo "$allocations" | grep -q '"ClientStatus":"running"'; then
-                log "Job $job_name is running"
+                log "Job $JOB_NAME is running"
                 return 0
             fi
         fi
@@ -215,22 +317,27 @@ wait_for_job_running() {
         log "Still waiting... (${elapsed}s elapsed)"
     done
     
-    log "Timeout waiting for job $job_name to be running"
+    log "Timeout waiting for job $JOB_NAME to be running"
     return 1
 }
 
 get_job_allocations() {
-    local job_name=$1
-    local format=${2:-""}  # "" for human readable, "json" for JSON, "short" for short format
+    if [ -z "$JOB_NAME" ]; then
+        echo "Error: --job parameter is required" >&2
+        show_help
+        exit 1
+    fi
     
-    log "Getting allocations for job: $job_name (format: ${format:-human})"
+    local format=${OUTPUT_FORMAT:-"human"}
+    
+    log "Getting allocations for job: $JOB_NAME (format: $format)"
     
     if [ "$format" = "json" ]; then
-        if http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"; then
+        if http_request "GET" "$NOMAD_ADDR/v1/job/$JOB_NAME/allocations" "" "200"; then
             return 0
         fi
     elif [ "$format" = "short" ]; then
-        if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"); then
+        if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$JOB_NAME/allocations" "" "200"); then
             # Parse JSON and format as short table
             echo "$allocations" | jq -r '.[] | [.ID[0:8], .Name, .ClientStatus, .DesiredStatus, .NodeName] | @tsv' | \
                 awk 'BEGIN{print "ID       Name    ClientStatus DesiredStatus Node"} {printf "%-8s %-7s %-12s %-13s %s\n", $1, $2, $3, $4, $5}'
@@ -238,7 +345,7 @@ get_job_allocations() {
         fi
     else
         # Human readable format
-        if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$job_name/allocations" "" "200"); then
+        if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$JOB_NAME/allocations" "" "200"); then
             echo "$allocations" | jq -r '.[] | [.ID[0:8], .Name, .ClientStatus, .DesiredStatus, .NodeName, .CreateTime] | @tsv' | \
                 awk 'BEGIN{print "ID       Name    Status       Desired      Node                    Created"} {printf "%-8s %-7s %-12s %-12s %-23s %s\n", $1, $2, $3, $4, $5, strftime("%Y-%m-%d %H:%M:%S", $6/1000000000)}'
             return 0
@@ -250,10 +357,15 @@ get_job_allocations() {
 }
 
 get_allocation_status() {
-    local alloc_id=$1
-    log "Getting status for allocation: $alloc_id"
+    if [ -z "$ALLOC_ID" ]; then
+        echo "Error: --alloc-id parameter is required" >&2
+        show_help
+        exit 1
+    fi
     
-    if http_request "GET" "$NOMAD_ADDR/v1/allocation/$alloc_id" "" "200"; then
+    log "Getting status for allocation: $ALLOC_ID"
+    
+    if http_request "GET" "$NOMAD_ADDR/v1/allocation/$ALLOC_ID" "" "200"; then
         return 0
     else
         log "Failed to get allocation status"
@@ -262,10 +374,15 @@ get_allocation_status() {
 }
 
 get_running_allocation() {
-    local job_name=$1
-    log "Getting running allocation ID for job: $job_name"
+    if [ -z "$JOB_NAME" ]; then
+        echo "Error: --job parameter is required" >&2
+        show_help
+        exit 1
+    fi
     
-    if allocations=$(get_job_allocations "$job_name" "json" 2>/dev/null); then
+    log "Getting running allocation ID for job: $JOB_NAME"
+    
+    if allocations=$(http_request "GET" "$NOMAD_ADDR/v1/job/$JOB_NAME/allocations" "" "200" 2>/dev/null); then
         # Extract first running allocation ID
         echo "$allocations" | jq -r '.[] | select(.ClientStatus == "running") | .ID' | head -1
         return 0
@@ -276,126 +393,119 @@ get_running_allocation() {
 }
 
 get_allocation_logs() {
-    local alloc_id=$1
-    local task=${2:-""}
-    local lines=${3:-10}
-    local follow=${4:-false}
+    if [ -z "$ALLOC_ID" ]; then
+        echo "Error: --alloc-id parameter is required" >&2
+        show_help
+        exit 1
+    fi
     
-    log "Getting logs for allocation: $alloc_id (task: ${task:-auto}, lines: $lines)"
+    # Default values
+    local lines=${LOG_LINES:-100}
+    local follow=${FOLLOW:-false}
+    local log_type=${LOG_TYPE:-stdout}
+    local both=${LOG_BOTH:-false}
+    
+    if [ "$both" = "true" ]; then
+        log "Getting both stdout and stderr logs for allocation: $ALLOC_ID (task: ${TASK_NAME:-auto}, lines: $lines, follow: $follow)"
+        
+        # Get stdout
+        echo "=== STDOUT ===" 
+        get_single_log_stream "$ALLOC_ID" "$TASK_NAME" "$lines" "$follow" "stdout"
+        
+        echo ""
+        echo "=== STDERR ===" 
+        get_single_log_stream "$ALLOC_ID" "$TASK_NAME" "$lines" "$follow" "stderr"
+    else
+        log "Getting $log_type logs for allocation: $ALLOC_ID (task: ${TASK_NAME:-auto}, lines: $lines, follow: $follow)"
+        get_single_log_stream "$ALLOC_ID" "$TASK_NAME" "$lines" "$follow" "$log_type"
+    fi
+}
+
+get_single_log_stream() {
+    local alloc_id=$1
+    local task_name=$2
+    local lines=$3
+    local follow=$4
+    local stream_type=$5
     
     # Build URL with query parameters
     local url="$NOMAD_ADDR/v1/client/fs/logs/$alloc_id"
-    local query_params="type=stdout&plain=true"  # Always include type and plain parameters
+    local query_params="type=$stream_type&plain=true"
     
-    if [ -n "$task" ]; then
-        query_params="$query_params&task=$task"
+    # Add task if specified
+    if [ -n "$task_name" ]; then
+        query_params="$query_params&task=$task_name"
     fi
     
-    if [ "$lines" != "10" ]; then
-        query_params="$query_params&offset=-$lines"
-    fi
+    # Add offset for line count
+    query_params="$query_params&offset=-$lines"
     
+    # Add follow if requested
     if [ "$follow" = "true" ]; then
         query_params="$query_params&follow=true"
     fi
     
     url="$url?$query_params"
     
-    if http_request "GET" "$url" "" "200"; then
-        return 0
-    else
-        log "Failed to get allocation logs"
+    if ! http_request "GET" "$url" "" "200"; then
+        log "Failed to get $stream_type logs"
         return 1
     fi
 }
 
-# Main logic
-case "$ACTION" in
+# Main command routing
+COMMAND=$1
+shift
+
+# Parse remaining parameters
+parse_params "$@"
+
+case "$COMMAND" in
     "stop")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 stop <job-name>" >&2
-            exit 1
-        fi
-        stop_job "$JOB_NAME"
+        stop_job
         ;;
     
     "run")
-        if [ -z "$JOB_NAME" ] || [ -z "$JOB_FILE" ]; then
-            echo "Usage: $0 run <job-name> <job-file>" >&2
-            exit 1
-        fi
-        run_job "$JOB_FILE"
+        run_job
         ;;
     
     "status")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 status <job-name>" >&2
-            exit 1
-        fi
-        get_job_status "$JOB_NAME"
+        get_job_status
         ;;
     
     "wait")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 wait <job-name> [timeout]" >&2
-            exit 1
-        fi
-        wait_for_job_running "$JOB_NAME" "$JOB_FILE"
+        wait_for_job_running
         ;;
     
     "allocs")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 allocs <job-name> [format]" >&2
-            echo "Format: json, short, or human (default)" >&2
-            exit 1
-        fi
-        get_job_allocations "$JOB_NAME" "$JOB_FILE"
+        get_job_allocations
         ;;
     
     "alloc-status")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 alloc-status <allocation-id>" >&2
-            exit 1
-        fi
-        get_allocation_status "$JOB_NAME"
+        get_allocation_status
         ;;
     
     "running-alloc")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 running-alloc <job-name>" >&2
-            exit 1
-        fi
-        get_running_allocation "$JOB_NAME"
+        get_running_allocation
         ;;
     
     "logs")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 logs <alloc-id> [task] [lines]" >&2
-            exit 1
-        fi
-        get_allocation_logs "$JOB_NAME" "$JOB_FILE" "${3:-10}"
+        get_allocation_logs
         ;;
     
     "cleanup")
-        if [ -z "$JOB_NAME" ]; then
-            echo "Usage: $0 cleanup <job-name>" >&2
-            exit 1
-        fi
-        cleanup_stale_services "$JOB_NAME"
+        cleanup_stale_services
+        ;;
+    
+    "help"|"--help"|"-h"|"")
+        show_help
+        exit 0
         ;;
     
     *)
-        echo "Usage: $0 {stop|run|status|wait|allocs|alloc-status|running-alloc|logs|cleanup} <job-name> [job-file|format|alloc-id]" >&2
-        echo "Actions:"
-        echo "  stop <job-name>               - Stop a running job"
-        echo "  run <job-name> <job-file>     - Submit and run a job"
-        echo "  status <job-name>             - Get job allocation status"
-        echo "  wait <job-name> [timeout]     - Wait for job to be running"
-        echo "  allocs <job-name> [format]    - Get job allocations (format: json, short, human)"
-        echo "  alloc-status <alloc-id>       - Get allocation status"
-        echo "  running-alloc <job-name>      - Get running allocation ID"
-        echo "  logs <alloc-id> [task] [lines] - Get allocation logs"
-        echo "  cleanup <job-name>            - Clean up stale service registrations"
+        echo "Unknown command: $COMMAND" >&2
+        echo "" >&2
+        show_help
         exit 1
         ;;
 esac

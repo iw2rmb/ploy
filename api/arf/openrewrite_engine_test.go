@@ -338,7 +338,7 @@ func TestRecipeExecutor_RealOpenRewriteExecution(t *testing.T) {
 	}
 
 	// Create recipe executor WITH real dispatcher (not mock)
-	executor := NewRecipeExecutorWithDispatcher(storage, sandboxMgr, dispatcher)
+	executor := NewRecipeExecutor(storage, sandboxMgr, dispatcher)
 
 	// Create test repository path
 	repoPath := testutils.CreateTempDir(t, "executor-test")

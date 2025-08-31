@@ -86,7 +86,7 @@ while true; do
     fi
 
     # Check allocation status
-    if ALLOCS=$(/opt/hashicorp/bin/nomad-job-manager.sh allocs ploy-api json 2>/dev/null); then
+    if ALLOCS=$(/opt/hashicorp/bin/nomad-job-manager.sh allocs --job ploy-api --format json 2>/dev/null); then
         RUNNING_COUNT=$(echo "$ALLOCS" | jq -r '.[].ClientStatus' | grep -c "running" || echo "0")
         TOTAL_COUNT=$(echo "$ALLOCS" | jq '. | length')
 

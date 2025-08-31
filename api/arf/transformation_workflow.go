@@ -214,7 +214,7 @@ func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, conf
 // executeTransformation applies a single transformation recipe
 func (w *TransformationWorkflow) executeTransformation(ctx context.Context, sandbox *Sandbox, recipeID string) (*TransformationResult, error) {
 	// Execute the recipe directly using the executor
-	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir)
+	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
 	}

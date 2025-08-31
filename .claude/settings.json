@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh:*)",
+      "Bash(curl:*)",
+      "Bash(sleep:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

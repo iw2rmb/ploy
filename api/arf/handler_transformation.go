@@ -18,6 +18,7 @@ import (
 // TransformRequest represents a transformation request
 type TransformRequest struct {
 	RecipeID string   `json:"recipe_id" validate:"required"`
+	Type     string   `json:"type,omitempty"`  // "openrewrite" or empty for regular recipes
 	Codebase Codebase `json:"codebase" validate:"required"`
 }
 
@@ -77,8 +78,8 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 	}
 
 	// Log incoming request
-	fmt.Printf("[ARF Transform] Received transformation request: recipe=%s, repo=%s, branch=%s, language=%s, build_tool=%s\n",
-		req.RecipeID, req.Codebase.Repository, req.Codebase.Branch, req.Codebase.Language, req.Codebase.BuildTool)
+	fmt.Printf("[ARF Transform] Received transformation request: recipe=%s, type=%s, repo=%s, branch=%s, language=%s, build_tool=%s\n",
+		req.RecipeID, req.Type, req.Codebase.Repository, req.Codebase.Branch, req.Codebase.Language, req.Codebase.BuildTool)
 
 	// Validate required fields
 	if req.RecipeID == "" {
@@ -257,8 +258,8 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		return nil, fmt.Errorf("recipe executor not available")
 	}
 	
-	fmt.Printf("[ARF Transform Internal] Calling recipe executor for recipe: %s\n", req.RecipeID)
-	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath)
+	fmt.Printf("[ARF Transform Internal] Calling recipe executor for recipe: %s (type: %s)\n", req.RecipeID, req.Type)
+	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath, req.Type)
 	if err != nil {
 		fmt.Printf("[ARF Transform Internal] Recipe execution failed: %v\n", err)
 		// Let RecipeExecutor handle fallback logic internally before treating as error

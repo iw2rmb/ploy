@@ -1187,13 +1187,11 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		log.Printf("Check SeaweedFS connectivity at: %s", seaweedfsURL)
 	}
 	
-	// Initialize recipe executor with dispatcher if available
-	var engine *arf.RecipeExecutor
+	// Initialize recipe executor with optional dispatcher
+	engine := arf.NewRecipeExecutor(recipeStorage, sandboxMgr, openRewriteDispatcher)
 	if openRewriteDispatcher != nil {
-		engine = arf.NewRecipeExecutorWithDispatcher(recipeStorage, sandboxMgr, openRewriteDispatcher)
 		log.Printf("SUCCESS: Recipe executor initialized WITH OpenRewrite dispatcher for fallback execution")
 	} else {
-		engine = arf.NewRecipeExecutor(recipeStorage, sandboxMgr)
 		log.Printf("WARNING: Recipe executor initialized WITHOUT OpenRewrite dispatcher")
 		log.Printf("OpenRewrite recipes that are not in storage will fail")
 	}

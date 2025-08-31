@@ -92,12 +92,16 @@ Example: feature changes must update FEATURES.md.
 ### CRITICAL: Nomad Operations
 **MANDATORY**: Always use `/opt/hashicorp/bin/nomad-job-manager.sh` instead of calling `nomad` directly to avoid 429 rate limiting errors.
 
-**Wrapper Commands**:
-- `/opt/hashicorp/bin/nomad-job-manager.sh status <job-name>` (instead of `nomad job status`)
-- `/opt/hashicorp/bin/nomad-job-manager.sh run <job-name> <job-file>` (instead of `nomad job run`)
-- `/opt/hashicorp/bin/nomad-job-manager.sh stop <job-name>` (instead of `nomad job stop`)
-- `/opt/hashicorp/bin/nomad-job-manager.sh logs <alloc-id> <task> <lines>` (for log retrieval)
-- `/opt/hashicorp/bin/nomad-job-manager.sh running-alloc <job-name>` (get running allocation ID)
+**Wrapper Commands** (using named parameters):
+- `/opt/hashicorp/bin/nomad-job-manager.sh status --job <job-name>` (instead of `nomad job status`)
+- `/opt/hashicorp/bin/nomad-job-manager.sh run --job <job-name> --file <job-file>` (instead of `nomad job run`)
+- `/opt/hashicorp/bin/nomad-job-manager.sh stop --job <job-name>` (instead of `nomad job stop`)
+- `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <id> --task <task> --lines <num>` (for stdout log retrieval)
+- `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <id> --stderr --lines <num>` (for stderr logs)
+- `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <id> --both` (for both stdout and stderr)
+- `/opt/hashicorp/bin/nomad-job-manager.sh running-alloc --job <job-name>` (get running allocation ID)
+- `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job <job-name> --format json` (get allocations in JSON)
+- `/opt/hashicorp/bin/nomad-job-manager.sh wait --job <job-name> --timeout 300` (wait for job to start)
 
 **PROHIBITED**: Direct `nomad` command usage will result in 429 errors and failed operations.
 
@@ -138,10 +142,10 @@ git checkout main && git merge <current-branch> && git push origin main && git c
 ```bash
 # API Deployment (Preferred Method - handles both cold start and hot reload)
 export TARGET_HOST=45.12.75.241       # Your VPS IP
-ployman api deploy                    # Deploys API (auto-fallback to Ansible if needed)
+./bin/ployman api deploy              # Deploys API (auto-fallback to Ansible if needed)
 
 # Alternative deployment methods
-ployman push -a ploy-api              # Unified deployment (requires API running)
+./bin/ployman push -a ploy-api        # Unified deployment (requires API running)
 curl -X POST https://api.dev.ployman.app/v1/update/latest  # Self-update (requires API running)
 
 # Test execution
@@ -152,7 +156,7 @@ curl https://api.dev.ployman.app/v1/version
 ```
 
 **API Deployment Workflow:**
-The `ployman api deploy` command provides a robust deployment solution:
+The `./bin/ployman api deploy` command provides a robust deployment solution:
 1. **Primary**: Attempts self-update via `/v1/update/latest` endpoint (fastest when API is running)
 2. **Fallback**: Runs Ansible playbook locally if API is unreachable (handles cold start)
    - Ansible runs from your local machine (requires local Ansible installation)
@@ -168,7 +172,7 @@ export DEPLOY_BRANCH=main                    # Git branch to deploy (auto-detect
 
 # For production deployment:
 export PLOY_CONTROLLER=https://api.prod.ployman.app/v1
-ployman api deploy
+./bin/ployman api deploy
 ```
 
 **PROHIBITED (Never):**
