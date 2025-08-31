@@ -11,52 +11,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iw2rmb/ploy/api/envstore"
+	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
-
-// Mock environment store for testing
-type MockEnvStore struct {
-	mock.Mock
-}
-
-func (m *MockEnvStore) Get(appName, key string) (string, bool, error) {
-	args := m.Called(appName, key)
-	return args.String(0), args.Bool(1), args.Error(2)
-}
-
-func (m *MockEnvStore) GetAll(appName string) (envstore.AppEnvVars, error) {
-	args := m.Called(appName)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(envstore.AppEnvVars), args.Error(1)
-}
-
-func (m *MockEnvStore) Set(appName, key, value string) error {
-	args := m.Called(appName, key, value)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) Delete(appName, key string) error {
-	args := m.Called(appName, key)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) SetAll(appName string, envVars envstore.AppEnvVars) error {
-	args := m.Called(appName, envVars)
-	return args.Error(0)
-}
-
-func (m *MockEnvStore) ToStringArray(appName string) ([]string, error) {
-	args := m.Called(appName)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).([]string), args.Error(1)
-}
 
 // Test utility functions
 func createTestApp() *fiber.App {
@@ -87,7 +46,7 @@ func TestSetEnvVars(t *testing.T) {
 		name           string
 		appName        string
 		requestBody    interface{}
-		mockSetup      func(*MockEnvStore)
+		mockSetup      func(*mocks.EnvStore)
 		expectedStatus int
 		expectedFields map[string]interface{}
 		wantErr        bool
@@ -100,7 +59,7 @@ func TestSetEnvVars(t *testing.T) {
 				"API_KEY":      "secret-key-123",
 				"DEBUG":        "true",
 			},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				expectedVars := envstore.AppEnvVars{
 					"DATABASE_URL": "postgresql://localhost/testdb",
 					"API_KEY":      "secret-key-123",
@@ -118,10 +77,10 @@ func TestSetEnvVars(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "invalid JSON body",
-			appName:     "test-app",
-			requestBody: "invalid-json",
-			mockSetup:   func(store *MockEnvStore) {},
+			name:           "invalid JSON body",
+			appName:        "test-app",
+			requestBody:    "invalid-json",
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "invalid request body",
@@ -134,7 +93,7 @@ func TestSetEnvVars(t *testing.T) {
 			requestBody: map[string]string{
 				"TEST_VAR": "test-value",
 			},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				expectedVars := envstore.AppEnvVars{
 					"TEST_VAR": "test-value",
 				}
@@ -152,7 +111,7 @@ func TestSetEnvVars(t *testing.T) {
 			requestBody: map[string]string{
 				"INVALID VAR": "value",
 			},
-			mockSetup:      func(store *MockEnvStore) {},
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "validation failed: invalid environment variable 'INVALID VAR': environment variable name contains invalid character (space)",
@@ -165,7 +124,7 @@ func TestSetEnvVars(t *testing.T) {
 			requestBody: map[string]string{
 				"PATH": "/custom/path",
 			},
-			mockSetup:      func(store *MockEnvStore) {},
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "validation failed: invalid environment variable 'PATH': environment variable name 'PATH' is reserved and cannot be modified",
@@ -178,7 +137,7 @@ func TestSetEnvVars(t *testing.T) {
 			requestBody: map[string]string{
 				"VALID_VAR": "value\x00with\x00null",
 			},
-			mockSetup:      func(store *MockEnvStore) {},
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "validation failed: invalid value for environment variable 'VALID_VAR': environment variable value contains null byte",
@@ -189,7 +148,7 @@ func TestSetEnvVars(t *testing.T) {
 			name:        "empty environment variables",
 			appName:     "test-app",
 			requestBody: map[string]string{},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("SetAll", "test-app", envstore.AppEnvVars{}).Return(nil)
 			},
 			expectedStatus: 200,
@@ -206,7 +165,7 @@ func TestSetEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-			mockStore := &MockEnvStore{}
+			mockStore := mocks.NewEnvStore()
 			tt.mockSetup(mockStore)
 
 			// Create test app and route
@@ -252,7 +211,7 @@ func TestGetEnvVars(t *testing.T) {
 	tests := []struct {
 		name           string
 		appName        string
-		mockSetup      func(*MockEnvStore)
+		mockSetup      func(*mocks.EnvStore)
 		expectedStatus int
 		expectedFields map[string]interface{}
 		wantErr        bool
@@ -260,7 +219,7 @@ func TestGetEnvVars(t *testing.T) {
 		{
 			name:    "successful environment variables retrieval",
 			appName: "test-app",
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				envVars := envstore.AppEnvVars{
 					"DATABASE_URL": "postgresql://localhost/testdb",
 					"API_KEY":      "secret-key-123",
@@ -277,7 +236,7 @@ func TestGetEnvVars(t *testing.T) {
 		{
 			name:    "empty environment variables",
 			appName: "empty-app",
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				envVars := envstore.AppEnvVars{}
 				store.On("GetAll", "empty-app").Return(envVars, nil)
 			},
@@ -290,7 +249,7 @@ func TestGetEnvVars(t *testing.T) {
 		{
 			name:    "env store error",
 			appName: "error-app",
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("GetAll", "error-app").Return(nil, fmt.Errorf("storage connection error"))
 			},
 			expectedStatus: 500,
@@ -304,7 +263,7 @@ func TestGetEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-			mockStore := &MockEnvStore{}
+			mockStore := mocks.NewEnvStore()
 			tt.mockSetup(mockStore)
 
 			// Create test app and route
@@ -361,7 +320,7 @@ func TestSetEnvVar(t *testing.T) {
 		appName        string
 		keyName        string
 		requestBody    interface{}
-		mockSetup      func(*MockEnvStore)
+		mockSetup      func(*mocks.EnvStore)
 		expectedStatus int
 		expectedFields map[string]interface{}
 		wantErr        bool
@@ -371,7 +330,7 @@ func TestSetEnvVar(t *testing.T) {
 			appName:     "test-app",
 			keyName:     "NEW_VAR",
 			requestBody: map[string]string{"value": "test-value-123"},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("Set", "test-app", "NEW_VAR", "test-value-123").Return(nil)
 			},
 			expectedStatus: 200,
@@ -384,11 +343,11 @@ func TestSetEnvVar(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:        "invalid JSON body",
-			appName:     "test-app",
-			keyName:     "TEST_VAR",
-			requestBody: "invalid-json",
-			mockSetup:   func(store *MockEnvStore) {},
+			name:           "invalid JSON body",
+			appName:        "test-app",
+			keyName:        "TEST_VAR",
+			requestBody:    "invalid-json",
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "invalid request body",
@@ -400,7 +359,7 @@ func TestSetEnvVar(t *testing.T) {
 			appName:     "test-app",
 			keyName:     "ERROR_VAR",
 			requestBody: map[string]string{"value": "error-value"},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("Set", "test-app", "ERROR_VAR", "error-value").Return(fmt.Errorf("storage write error"))
 			},
 			expectedStatus: 500,
@@ -410,11 +369,11 @@ func TestSetEnvVar(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:        "invalid variable name with special char",
-			appName:     "test-app",
-			keyName:     "INVALID-VAR",
-			requestBody: map[string]string{"value": "value"},
-			mockSetup:   func(store *MockEnvStore) {},
+			name:           "invalid variable name with special char",
+			appName:        "test-app",
+			keyName:        "INVALID-VAR",
+			requestBody:    map[string]string{"value": "value"},
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "invalid environment variable name: environment variable name contains invalid character '-'",
@@ -422,11 +381,11 @@ func TestSetEnvVar(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:        "reserved variable name PATH",
-			appName:     "test-app",
-			keyName:     "PATH",
-			requestBody: map[string]string{"value": "/custom/path"},
-			mockSetup:   func(store *MockEnvStore) {},
+			name:           "reserved variable name PATH",
+			appName:        "test-app",
+			keyName:        "PATH",
+			requestBody:    map[string]string{"value": "/custom/path"},
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "invalid environment variable name: environment variable name 'PATH' is reserved and cannot be modified",
@@ -434,11 +393,11 @@ func TestSetEnvVar(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:        "value with null byte",
-			appName:     "test-app",
-			keyName:     "VALID_VAR",
-			requestBody: map[string]string{"value": "value\x00null"},
-			mockSetup:   func(store *MockEnvStore) {},
+			name:           "value with null byte",
+			appName:        "test-app",
+			keyName:        "VALID_VAR",
+			requestBody:    map[string]string{"value": "value\x00null"},
+			mockSetup:      func(store *mocks.EnvStore) {},
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
 				"error": "invalid environment variable value: environment variable value contains null byte",
@@ -450,7 +409,7 @@ func TestSetEnvVar(t *testing.T) {
 			appName:     "test-app",
 			keyName:     "EMPTY_VAR",
 			requestBody: map[string]string{"value": ""},
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("Set", "test-app", "EMPTY_VAR", "").Return(nil)
 			},
 			expectedStatus: 200,
@@ -467,7 +426,7 @@ func TestSetEnvVar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-			mockStore := &MockEnvStore{}
+			mockStore := mocks.NewEnvStore()
 			tt.mockSetup(mockStore)
 
 			// Create test app and route
@@ -514,7 +473,7 @@ func TestDeleteEnvVar(t *testing.T) {
 		name           string
 		appName        string
 		keyName        string
-		mockSetup      func(*MockEnvStore)
+		mockSetup      func(*mocks.EnvStore)
 		expectedStatus int
 		expectedFields map[string]interface{}
 		wantErr        bool
@@ -523,7 +482,7 @@ func TestDeleteEnvVar(t *testing.T) {
 			name:    "successful environment variable deletion",
 			appName: "test-app",
 			keyName: "OLD_VAR",
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("Delete", "test-app", "OLD_VAR").Return(nil)
 			},
 			expectedStatus: 200,
@@ -539,7 +498,7 @@ func TestDeleteEnvVar(t *testing.T) {
 			name:    "env store error",
 			appName: "test-app",
 			keyName: "NONEXISTENT_VAR",
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("Delete", "test-app", "NONEXISTENT_VAR").Return(fmt.Errorf("variable not found"))
 			},
 			expectedStatus: 500,
@@ -552,7 +511,7 @@ func TestDeleteEnvVar(t *testing.T) {
 			name:    "deletion of special characters key",
 			appName: "test-app",
 			keyName: "SPECIAL_VAR-123",
-			mockSetup: func(store *MockEnvStore) {
+			mockSetup: func(store *mocks.EnvStore) {
 				store.On("Delete", "test-app", "SPECIAL_VAR-123").Return(nil)
 			},
 			expectedStatus: 200,
@@ -569,7 +528,7 @@ func TestDeleteEnvVar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-			mockStore := &MockEnvStore{}
+			mockStore := mocks.NewEnvStore()
 			tt.mockSetup(mockStore)
 
 			// Create test app and route

@@ -92,20 +92,23 @@
           when: git_auth_check.rc == 0
           
         - name: Pull latest code from git repository
-          git:
-            repo: https://github.com/iw2rmb/ploy.git
-            dest: /home/ploy/ploy
-            version: "{{ deploy_branch | default('main') }}"
-            force: yes
+          shell: |
+            cd /home/ploy/ploy
+            # Reset any local changes and pull latest
+            git fetch origin
+            git reset --hard origin/{{ deploy_branch | default('main') }}
+            git clean -fd
+            echo "Updated to commit: $(git rev-parse HEAD)"
           become_user: ploy
           register: git_update
           environment:
             HOME: /home/ploy
+          changed_when: true
           
         - name: Display git update status
           debug:
-            msg: "Git repository updated to {{ git_update.after[:8] }} on branch {{ deploy_branch | default('main') }}"
-          when: git_update.changed
+            msg: "Git repository updated: {{ git_update.stdout }}"
+          when: git_update.rc == 0
         
         - name: Build API binary with version information
           shell: cd /home/ploy/ploy && ./scripts/build.sh api bin
