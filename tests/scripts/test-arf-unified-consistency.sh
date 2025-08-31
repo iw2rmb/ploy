@@ -118,7 +118,7 @@ test_recipe_type_enforcement() {
     
     # Test 1b: Request with explicit type should succeed (or get proper processing response)
     run_consistency_test "ARF Transform with explicit openrewrite type" \
-        "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"org.openrewrite.java.migrate.UpgradeToJava17\",\"recipe_type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200'" \
+        "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"org.openrewrite.java.migrate.UpgradeToJava17\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200'" \
         "success"
 }
 
@@ -128,7 +128,7 @@ test_full_recipe_names() {
     
     # Test 2a: Short recipe names should not work (no pattern matching)
     run_consistency_test "ARF Transform with shortcut recipe name should fail" \
-        "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"java11to17_migration\",\"recipe_type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '400'" \
+        "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"java11to17_migration\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '400'" \
         "success"
     
     # Test 2b: Full OpenRewrite class names should work
@@ -140,7 +140,7 @@ test_full_recipe_names() {
     
     for recipe in "${full_recipes[@]}"; do
         run_consistency_test "ARF Transform with full recipe name: $recipe" \
-            "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"$recipe\",\"recipe_type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200'" \
+            "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"$recipe\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200'" \
             "success"
     done
 }
@@ -151,7 +151,7 @@ test_timeout_consistency() {
     
     # Submit transformation and monitor with consistent 30-minute timeout
     local transform_response=$(curl -s -X POST -H "Content-Type: application/json" \
-        -d '{"recipe_id":"org.openrewrite.java.migrate.UpgradeToJava17","recipe_type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
+        -d '{"recipe_id":"org.openrewrite.java.migrate.UpgradeToJava17","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
         "$CONTROLLER_URL/arf/transform")
     
     if [[ $? -eq 0 ]] && echo "$transform_response" | jq -e '.transformation_id' >/dev/null 2>&1; then
@@ -223,7 +223,7 @@ test_unified_arf_system() {
 verify_openrewrite_dispatcher_path() {
     # Submit an OpenRewrite transformation and check logs/behavior
     local response=$(curl -s -X POST -H "Content-Type: application/json" \
-        -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","recipe_type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
+        -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
         "$CONTROLLER_URL/arf/transform")
     
     if echo "$response" | jq -e '.transformation_id' >/dev/null 2>&1; then
@@ -266,7 +266,7 @@ verify_unified_container_usage() {
     
     for recipe in "${recipes[@]}"; do
         local response=$(curl -s -X POST -H "Content-Type: application/json" \
-            -d "{\"recipe_id\":\"$recipe\",\"recipe_type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}" \
+            -d "{\"recipe_id\":\"$recipe\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}" \
             "$CONTROLLER_URL/arf/transform")
         
         if ! echo "$response" | jq -e '.transformation_id' >/dev/null 2>&1; then
