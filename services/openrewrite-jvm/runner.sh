@@ -322,13 +322,15 @@ ls -la "${OUTPUT_TAR}"
 # Step 6: Upload output to SeaweedFS (if OUTPUT_KEY is provided)
 if [ -n "${OUTPUT_KEY}" ]; then
     echo "[OpenRewrite] Uploading output to SeaweedFS..."
-    echo "[OpenRewrite] Upload URL: ${SEAWEEDFS_URL}/${OUTPUT_KEY}"
+    # Add artifacts/ prefix to OUTPUT_KEY since SeaweedFS base URL doesn't include it
+    UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
+    echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
     
-    if curl -X PUT "${SEAWEEDFS_URL}/${OUTPUT_KEY}" \
+    if curl -X PUT "${UPLOAD_URL}" \
            --data-binary "@${OUTPUT_TAR}" \
            -H "Content-Type: application/octet-stream" \
            -s -o /dev/null; then
-        echo "[OpenRewrite] Output uploaded successfully to ${OUTPUT_KEY}"
+        echo "[OpenRewrite] Output uploaded successfully to artifacts/${OUTPUT_KEY}"
     else
         echo "[OpenRewrite] WARNING: Failed to upload output to SeaweedFS"
     fi
