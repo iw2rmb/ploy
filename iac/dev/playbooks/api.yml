@@ -217,44 +217,70 @@
 
         - name: Upload API binary to SeaweedFS
           shell: |
-            # Create simpler path structure
+            # Upload binary via HTTP to ensure SeaweedFS indexes it properly
             VERSION="{{ binary_version.stdout }}"
             
-            # Copy binary to local SeaweedFS storage directly (bypass HTTP upload)
-            # This is a workaround for the slow HTTP upload issue
-            SEAWEEDFS_FILER_DIR="/var/lib/seaweedfs/filer"
-            TARGET_DIR="${SEAWEEDFS_FILER_DIR}/artifacts/api-binaries/${VERSION}"
+            # Copy binary to temp location for faster local access
+            cp /home/ploy/ploy/bin/api /tmp/api-${VERSION}
             
-            # Create directory structure
-            sudo mkdir -p "${TARGET_DIR}"
+            echo "Uploading API binary to SeaweedFS ({{ api_binary_stat.stat.size }} bytes)..."
             
-            # Copy the binary directly
-            sudo cp /home/ploy/ploy/bin/api "${TARGET_DIR}/api"
-            sudo chown -R seaweedfs:seaweedfs "${TARGET_DIR}"
+            # Upload to the full path that Nomad expects
+            # Note: SeaweedFS will create parent directories automatically
+            curl -X POST \
+              -F "file=@/tmp/api-${VERSION}" \
+              --max-time 60 \
+              --connect-timeout 10 \
+              -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" \
+              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/api"
             
-            echo "Binary copied directly to SeaweedFS storage at ${TARGET_DIR}/api"
+            RESULT=$?
             
-            # Verify the file is accessible via HTTP
-            sleep 2
-            curl -s -o /dev/null -w "%{http_code}" "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/api"
+            # Clean up temp file
+            rm -f /tmp/api-${VERSION}
+            
+            # Verify upload succeeded
+            if [ $RESULT -eq 0 ]; then
+              echo "Upload successful, verifying accessibility..."
+              sleep 1
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/api")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✓ Binary is accessible via HTTP"
+              else
+                echo "⚠ Binary uploaded but not accessible (HTTP $HTTP_CODE)"
+                exit 1
+              fi
+            else
+              echo "Upload failed with exit code $RESULT"
+              exit $RESULT
+            fi
           register: binary_upload
-          become: yes
+          become_user: ploy
 
         - name: Upload metadata to SeaweedFS
           shell: |
             VERSION="{{ binary_version.stdout }}"
             
-            # Copy metadata directly to SeaweedFS storage
-            SEAWEEDFS_FILER_DIR="/var/lib/seaweedfs/filer"
-            TARGET_DIR="${SEAWEEDFS_FILER_DIR}/artifacts/api-binaries/${VERSION}"
+            echo "Uploading metadata to SeaweedFS..."
             
-            # Copy the metadata directly
-            sudo cp /tmp/api-metadata.json "${TARGET_DIR}/metadata.json"
-            sudo chown -R seaweedfs:seaweedfs "${TARGET_DIR}"
+            # Upload metadata via HTTP
+            curl -X POST \
+              -F "file=@/tmp/api-metadata.json" \
+              --max-time 30 \
+              --connect-timeout 10 \
+              -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" \
+              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/metadata.json"
             
-            echo "Metadata copied to SeaweedFS storage at ${TARGET_DIR}/metadata.json"
+            RESULT=$?
+            
+            if [ $RESULT -eq 0 ]; then
+              echo "✓ Metadata uploaded successfully"
+            else
+              echo "Metadata upload failed with exit code $RESULT"
+              exit $RESULT
+            fi
           register: metadata_upload
-          become: yes
+          become_user: ploy
 
         - name: Verify upload by listing versions
           uri:
