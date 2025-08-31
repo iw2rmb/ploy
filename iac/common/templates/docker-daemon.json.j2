@@ -1,13 +1,26 @@
 {
+  {% if kvm_available | default(false) -%}
   "runtimes": {
     "io.kontain": {
-      "path": "/usr/local/bin/krun"
+      "path": "/opt/kontain/bin/krun"
     }
   },
+  "default-runtime": "runc",
+  {% else -%}
+  "default-runtime": "runc",
+  {% endif -%}
   "storage-driver": "overlay2",
   "log-driver": "json-file",
   "log-opts": {
-    "max-size": "100m",
+    "max-size": "10m",
     "max-file": "3"
-  }
+  },
+  "insecure-registries": [
+    "localhost:5000",
+    "registry.{{ ploy_domain | default('dev.ployman.app') }}"
+  ],
+  "experimental": false,
+  "live-restore": true,
+  "userland-proxy": false,
+  "no-new-privileges": false
 }
