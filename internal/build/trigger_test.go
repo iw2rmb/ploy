@@ -84,6 +84,27 @@ func (m *MockStorageClient) GetProviderType() string {
 	return args.String(0)
 }
 
+func (m *MockStorageClient) ListObjects(bucket, prefix string) ([]storage.ObjectInfo, error) {
+	args := m.Called(bucket, prefix)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]storage.ObjectInfo), args.Error(1)
+}
+
+func (m *MockStorageClient) UploadArtifactBundle(keyPrefix, artifactPath string) error {
+	args := m.Called(keyPrefix, artifactPath)
+	return args.Error(0)
+}
+
+func (m *MockStorageClient) UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (*storage.BundleIntegrityResult, error) {
+	args := m.Called(keyPrefix, artifactPath)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*storage.BundleIntegrityResult), args.Error(1)
+}
+
 // MockBuildDependencies provides mock implementations for build dependencies
 type MockBuildDependencies struct {
 	StorageClient *mocks.StorageClient
