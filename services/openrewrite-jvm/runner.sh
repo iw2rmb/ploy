@@ -310,7 +310,8 @@ echo "[OpenRewrite] Files to archive:"
 find . -type f | head -20
 echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
 
-tar -cvf "${OUTPUT_TAR}" . 2>&1 | head -50 || {
+echo "[OpenRewrite] Creating tar archive (this may take a moment for large projects)..."
+tar -cf "${OUTPUT_TAR}" . || {
     echo "[Error] Failed to create output tar"
     echo "[Error] Exit code: $?"
     exit 1
