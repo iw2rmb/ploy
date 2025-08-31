@@ -48,11 +48,17 @@ The OpenRewrite dispatcher (`api/arf/openrewrite_dispatcher.go`) manages the com
 ### Docker Image
 
 - **Image**: `registry.dev.ployman.app/openrewrite-jvm:latest`
+- **Source**: `services/openrewrite-jvm/`
+- **Key Components**:
+  - `setup-workspace.sh`: Entrypoint script that handles Nomad artifact extraction and workspace setup
+  - `runner.sh`: Main OpenRewrite execution script with Maven/Gradle integration
+  - `Dockerfile`: Container definition with JVM, Maven, Gradle, and tooling
 - **Features**:
   - Dynamic recipe discovery from Maven Central
   - Built-in Maven cache for performance
   - Automatic artifact download/upload
   - Recipe coordinate resolution
+  - Smart artifact handling for Nomad environments
 
 ### Resource Configuration
 
