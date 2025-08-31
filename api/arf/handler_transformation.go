@@ -99,6 +99,12 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		req.Codebase.Branch = "main"
 	}
 
+	// Set default type to "openrewrite" if not specified
+	if req.Type == "" {
+		req.Type = "openrewrite"
+		fmt.Printf("[ARF Transform] Type not specified, defaulting to 'openrewrite'\n")
+	}
+
 	// Generate transformation ID
 	transformID := uuid.New().String()
 	fmt.Printf("[ARF Transform] Generated transformation ID: %s\n", transformID)
