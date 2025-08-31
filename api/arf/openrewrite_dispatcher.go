@@ -95,19 +95,30 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	defer infraCancel()
 	
 	// Test Nomad connectivity
-	if _, _, err := d.nomadClient.Agent().NodeID(); err != nil {
+	if _, err := d.nomadClient.Agent().Self(); err != nil {
 		log.Printf("[OpenRewrite Dispatcher] ERROR: Nomad is not accessible: %v", err)
 		return nil, fmt.Errorf("OpenRewrite infrastructure not ready - Nomad unreachable: %w", err)
 	}
 	
-	// Check if we can list jobs (basic health check)
-	if _, _, err := d.nomadClient.Jobs().List(&api.QueryOptions{
-		Region: "global",
-		AllowStale: true,
-		Ctx: infraCtx,
-	}); err != nil {
-		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot query Nomad jobs: %v", err)
-		return nil, fmt.Errorf("OpenRewrite infrastructure not ready - cannot query jobs: %w", err)
+	// Check if we can list jobs (basic health check)  
+	jobsDone := make(chan error, 1)
+	go func() {
+		_, _, err := d.nomadClient.Jobs().List(&api.QueryOptions{
+			Region: "global",
+			AllowStale: true,
+		})
+		jobsDone <- err
+	}()
+	
+	select {
+	case err := <-jobsDone:
+		if err != nil {
+			log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot query Nomad jobs: %v", err)
+			return nil, fmt.Errorf("OpenRewrite infrastructure not ready - cannot query jobs: %w", err)
+		}
+	case <-infraCtx.Done():
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Nomad jobs query timed out")
+		return nil, fmt.Errorf("OpenRewrite infrastructure not ready - Nomad query timed out")
 	}
 	
 	log.Printf("[OpenRewrite Dispatcher] Infrastructure validation passed")
