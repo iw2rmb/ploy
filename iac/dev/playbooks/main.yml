@@ -151,18 +151,47 @@
         groups: docker
         append: true
 
-    - name: Check Docker service status
-      command: systemctl is-active docker
-      register: docker_service_status
-      ignore_errors: true
-      changed_when: false
+    - name: Enhanced Docker service management
+      block:
+        - name: Check Docker service status
+          command: systemctl is-active docker
+          register: docker_service_status
+          ignore_errors: true
+          changed_when: false
 
-    - name: Start and enable Docker (if not running)
-      systemd:
-        name: docker
-        state: started
-        enabled: true
-      when: docker_service_status.stdout != "active"
+        - name: Check Docker service health if running
+          command: docker info
+          register: docker_info_check
+          ignore_errors: true
+          changed_when: false
+          when: docker_service_status.stdout == "active"
+
+        - name: Start and enable Docker service
+          systemd:
+            name: docker
+            state: started
+            enabled: true
+            daemon_reload: true
+          when: docker_service_status.stdout != "active"
+          register: docker_start_result
+          retries: 3
+          delay: 5
+          until: docker_start_result is succeeded
+
+        - name: Wait for Docker socket to be available
+          wait_for:
+            path: /var/run/docker.sock
+            state: present
+            timeout: 30
+          when: docker_service_status.stdout != "active" or docker_info_check is failed
+
+        - name: Verify Docker is responding
+          command: docker version
+          register: docker_version_check
+          retries: 3
+          delay: 5
+          until: docker_version_check.rc == 0
+          changed_when: false
 
     - name: Setup Docker Registry for local image management
       block:
@@ -171,7 +200,16 @@
             path: /var/lib/docker-registry
             state: directory
             mode: '0755'
+            owner: root
+            group: root
         
+        - name: Pull Docker Registry image
+          docker_image:
+            name: registry:2
+            source: pull
+          retries: 3
+          delay: 10
+
         - name: Run Docker Registry container
           docker_container:
             name: registry
@@ -182,6 +220,27 @@
               - "5000:5000"
             volumes:
               - /var/lib/docker-registry:/var/lib/registry
+            env:
+              REGISTRY_STORAGE_DELETE_ENABLED: "true"
+            healthcheck:
+              test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5000/v2/"]
+              interval: 30s
+              timeout: 10s
+              retries: 3
+          register: registry_container_result
+          retries: 3
+          delay: 5
+          until: registry_container_result is succeeded
+
+        - name: Wait for Docker Registry to be ready
+          uri:
+            url: http://localhost:5000/v2/
+            method: GET
+            status_code: 200
+          register: registry_health_check
+          retries: 10
+          delay: 5
+          until: registry_health_check.status == 200
     
     - name: Install Docker Compose
       block:
@@ -204,7 +263,7 @@
             mode: '0755'
           when: not docker_compose_binary.stat.exists or docker_compose_version not in (current_docker_compose_version.stdout | default(''))
 
-    - name: Install Kontain Runtime for VM-level Container Isolation (Optional - Requires KVM)
+    - name: Setup Docker daemon configuration with optional Kontain runtime
       block:
         - name: Check if KVM is available
           stat:
@@ -218,52 +277,44 @@
           args:
             creates: /opt/kontain/bin/krun
 
-        - name: Configure Docker daemon for Kontain runtime (if KVM available)
-          copy:
-            content: |
-              {
-                "runtimes": {
-                  "io.kontain": {
-                    "path": "/opt/kontain/bin/krun"
-                  }
-                },
-                "default-runtime": "runc",
-                "storage-driver": "overlay2",
-                "log-driver": "json-file",
-                "log-opts": {
-                  "max-size": "10m",
-                  "max-file": "3"
-                },
-                "insecure-registries": ["localhost:5000"]
-              }
+        - name: Set KVM availability fact for template
+          set_fact:
+            kvm_available: "{{ kvm_device.stat.exists }}"
+
+        - name: Configure Docker daemon using standardized template
+          template:
+            src: ../../common/templates/docker-daemon.json.j2
             dest: /etc/docker/daemon.json
             backup: true
-          notify: restart docker
-          when: kvm_device.stat.exists
+            owner: root
+            group: root
+            mode: '0644'
+          register: docker_config_result
 
-        - name: Configure Docker daemon without Kontain (if KVM not available)
-          copy:
-            content: |
-              {
-                "default-runtime": "runc",
-                "storage-driver": "overlay2",
-                "log-driver": "json-file",
-                "log-opts": {
-                  "max-size": "10m",
-                  "max-file": "3"
-                },
-                "insecure-registries": ["localhost:5000"]
-              }
-            dest: /etc/docker/daemon.json
-            backup: true
-          notify: restart docker
-          when: not kvm_device.stat.exists
+        - name: Validate Docker daemon configuration
+          command: dockerd --validate --config-file=/etc/docker/daemon.json
+          register: docker_config_validation
+          failed_when: docker_config_validation.rc != 0
+          changed_when: false
 
-        - name: Restart Docker to apply configuration
+        - name: Restart Docker if configuration changed
           systemd:
             name: docker
             state: restarted
             daemon_reload: true
+          when: docker_config_result.changed
+          register: docker_restart_result
+          retries: 3
+          delay: 5
+          until: docker_restart_result is succeeded
+
+        - name: Verify Docker restart was successful
+          command: docker info
+          retries: 5
+          delay: 3
+          register: docker_info_verify
+          changed_when: false
+          when: docker_config_result.changed
 
     - name: Install Docker Buildx
       block:
@@ -1629,12 +1680,6 @@
 
     # MinIO has been replaced with SeaweedFS for better scalability and performance
 
-    - name: Add ploy user to docker group
-      user:
-        name: ploy
-        groups: docker
-        append: true
-
     - name: Clean up conflicting environment variables from /etc/environment
       lineinfile:
         path: /etc/environment
@@ -2155,7 +2200,36 @@
 
   handlers:
     - name: restart docker
-      systemd:
-        name: docker
-        state: restarted
-        daemon_reload: true
+      block:
+        - name: Stop Docker service gracefully
+          systemd:
+            name: docker
+            state: stopped
+          ignore_errors: true
+
+        - name: Clean up Docker temporary files
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /var/lib/docker/tmp
+            - /var/run/docker
+          ignore_errors: true
+
+        - name: Start Docker service with daemon reload
+          systemd:
+            name: docker
+            state: started
+            daemon_reload: true
+          register: docker_restart_result
+          retries: 3
+          delay: 5
+          until: docker_restart_result is succeeded
+
+        - name: Verify Docker restart was successful
+          command: docker info
+          retries: 5
+          delay: 3
+          until: docker_info_verify.rc == 0
+          register: docker_info_verify
+          changed_when: false

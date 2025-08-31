@@ -11,6 +11,7 @@ Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu V
 **Templates:** Use Jinja2 templates for all configuration files, never hardcode values
 **Error Handling:** Set `failed_when: false` for optional components, proper status codes for API calls
 **Rolling Updates:** Configure Nomad jobs with canary deployments, health checks, and automatic rollback
+**Docker Reliability:** Robust Docker setup with configuration validation, graceful restarts, and comprehensive error handling
 
 ## Quick Setup
 
@@ -268,12 +269,19 @@ ssh freebsd@192.168.100.10
 
 ```bash
 # Services
-systemctl status {nomad,consul,vault,seaweedfs-*,node-exporter}
+systemctl status {nomad,consul,vault,seaweedfs-*,node-exporter,docker}
 journalctl -u {service-name} -f
 
 # HashiCorp cluster
 nomad {node status,job status traefik}
 consul members && vault status
+
+# Docker troubleshooting
+systemctl status docker
+docker info && docker version
+docker ps -a && docker images
+curl http://localhost:5000/v2/
+docker system df && docker system prune -f
 
 # Storage and routing
 curl localhost:9333/{cluster,vol}/status
@@ -282,6 +290,26 @@ curl localhost:8095/{ping,api/overview}
 # Performance
 time ansible-playbook playbooks/{testing,freebsd}.yml
 ```
+
+## Docker Configuration Improvements
+
+**Enhanced Reliability:**
+- Consolidated daemon.json configuration template with proper validation
+- Graceful service restart with cleanup and verification steps
+- Comprehensive error handling and retry logic
+- Automatic KVM/Kontain runtime detection and configuration
+
+**Registry Setup:**
+- Local Docker Registry v2 at localhost:5000 for development
+- Insecure registry configuration for local testing
+- Healthcheck validation and automatic startup
+- Registry cleanup and management features
+
+**Service Management:**
+- Docker service health validation before configuration changes
+- Socket availability verification
+- Configuration validation before service restart
+- Rollback capability for failed configurations
 
 ## Security & Performance
 
@@ -294,11 +322,16 @@ time ansible-playbook playbooks/{testing,freebsd}.yml
 
 ```bash
 # Stop services
-sudo systemctl stop nomad consul vault seaweedfs-* node-exporter
+sudo systemctl stop nomad consul vault seaweedfs-* node-exporter docker
 
 # Clean data
 rm -rf /home/ploy/ploy/build/* /opt/ploy/* /var/lib/seaweedfs/*
 rm -rf /opt/hashicorp/{nomad/alloc,consul/data}/*
+
+# Docker cleanup
+docker system prune -af
+docker volume prune -f
+rm -rf /var/lib/docker-registry/*
 
 # VM cleanup
 virsh destroy freebsd-dev && virsh undefine freebsd-dev
