@@ -141,6 +141,16 @@
 
     - name: Upload API binary to SeaweedFS for self-update
       block:
+        - name: Ensure SeaweedFS artifacts directory has correct ownership
+          file:
+            path: /var/lib/seaweedfs/filer/artifacts
+            state: directory
+            owner: seaweedfs
+            group: seaweedfs
+            mode: '0755'
+          become: yes
+          ignore_errors: yes  # May not exist yet
+
         - name: Verify SeaweedFS filer is accessible
           uri:
             url: "http://{{ ansible_default_ipv4.address }}:{{ seaweedfs.filer_port }}/"

@@ -415,12 +415,12 @@ func BenchmarkDestroyEnvironmentVariables(b *testing.B) {
 func TestDestroyApp_ErrorScenarios(t *testing.T) {
 	scenarios := []struct {
 		name           string
-		setupMocks     func(*MockEnvStore)
+		setupMocks     func(*mocks.EnvStore)
 		expectedErrors []string
 	}{
 		{
 			name: "env store returns error on delete",
-			setupMocks: func(envStore *MockEnvStore) {
+			setupMocks: func(envStore *mocks.EnvStore) {
 				envVars := envstore.AppEnvVars{"KEY": "value"}
 				envStore.On("GetAll", mock.Anything).Return(envVars, nil)
 				envStore.On("Delete", mock.Anything, "KEY").Return(errors.New("delete error"))
@@ -429,7 +429,7 @@ func TestDestroyApp_ErrorScenarios(t *testing.T) {
 		},
 		{
 			name: "multiple operations fail",
-			setupMocks: func(envStore *MockEnvStore) {
+			setupMocks: func(envStore *mocks.EnvStore) {
 				envStore.On("GetAll", mock.Anything).Return(nil, nil)
 			},
 			expectedErrors: []string{}, // Other operations would fail if properly mocked
