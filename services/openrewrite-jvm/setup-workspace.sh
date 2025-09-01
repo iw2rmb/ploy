@@ -44,45 +44,50 @@ else
     ARTIFACT_DIR="."
 fi
 
-# Create OpenRewrite expected workspace structure
-echo "[SETUP] Creating workspace structure..."
-mkdir -p /workspace/project
+# Create workspace directory only (runner.sh will create project subdirectory)
+echo "[SETUP] Creating workspace directory..."
+mkdir -p /workspace
 
-# Copy extracted files to workspace and create input.tar that runner script expects
-echo "[SETUP] Copying files from $ARTIFACT_DIR to /workspace/project..."
+# Create input.tar directly from the artifact directory
+echo "[SETUP] Creating input.tar for OpenRewrite runner from $ARTIFACT_DIR..."
+
 if [ "$ARTIFACT_DIR" = "." ]; then
-    # Copy all files except known Nomad directories
-    find . -maxdepth 1 -type f -exec cp {} /workspace/project/ \; 2>/dev/null || true
-    find . -maxdepth 1 -type d ! -name . ! -name tmp ! -name secrets -exec cp -r {} /workspace/project/ \; 2>/dev/null || true
+    # Create tar from current directory, excluding Nomad directories
+    echo "[SETUP] Creating tar from current directory (excluding Nomad dirs)..."
+    tar -cf /workspace/input.tar \
+        --exclude='./tmp' \
+        --exclude='./secrets' \
+        --exclude='./local' \
+        --exclude='./artifacts' \
+        --exclude='./alloc' \
+        . 2>/dev/null || {
+        echo "[SETUP] Failed to create input.tar"
+        exit 1
+    }
 else
-    cp -r "$ARTIFACT_DIR"/* /workspace/project/ 2>/dev/null || true
-fi
-
-# Create input.tar that the OpenRewrite runner script expects
-echo "[SETUP] Creating input.tar for OpenRewrite runner..."
-cd /workspace/project
-if [ $(find . -type f | wc -l) -gt 0 ]; then
+    # Create tar from artifact directory contents
+    echo "[SETUP] Creating tar from $ARTIFACT_DIR contents..."
+    cd "$ARTIFACT_DIR"
     tar -cf /workspace/input.tar . 2>/dev/null || {
         echo "[SETUP] Failed to create input.tar"
         exit 1
     }
-    echo "[SETUP] Created input.tar successfully"
-    ls -la /workspace/input.tar
-else
-    echo "[SETUP] ERROR: No files found to tar in /workspace/project"
-    exit 1
+    cd -
 fi
 
-# Verify workspace contents
-echo "[SETUP] Workspace contents:"
-ls -la /workspace/project/ | head -20
+echo "[SETUP] Created input.tar successfully"
+ls -la /workspace/input.tar
 
-# Check if we have any files
-FILE_COUNT=$(find /workspace/project -type f | wc -l)
-echo "[SETUP] Total files in workspace: $FILE_COUNT"
+# Debug: Show what's in the tar
+echo "[SETUP] Input tar contents (first 10 files):"
+tar -tvf /workspace/input.tar | head -10
+
+# Verify tar was created with content
+FILE_COUNT=$(tar -tf /workspace/input.tar 2>/dev/null | wc -l)
+echo "[SETUP] Total files in input.tar: $FILE_COUNT"
 
 if [ "$FILE_COUNT" -eq 0 ]; then
-    echo "[SETUP] WARNING: No files found in workspace!"
+    echo "[SETUP] WARNING: No files found in input.tar!"
     echo "[SETUP] This might indicate an issue with artifact extraction"
     
     # Additional debugging
@@ -91,9 +96,9 @@ if [ "$FILE_COUNT" -eq 0 ]; then
     find . -name "*.tar" 2>/dev/null | head -5 || true
 fi
 
-# Set proper permissions
-chown -R $(whoami):$(whoami) /workspace/project/ 2>/dev/null || true
-chmod -R 755 /workspace/project/ 2>/dev/null || true
+# Set proper permissions on workspace
+chown -R $(whoami):$(whoami) /workspace/ 2>/dev/null || true
+chmod -R 755 /workspace/ 2>/dev/null || true
 
 echo "[SETUP] Workspace setup complete!"
 echo "[SETUP] Starting OpenRewrite transformation..."
