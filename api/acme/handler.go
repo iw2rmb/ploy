@@ -36,7 +36,7 @@ type ACMEConfig struct {
 }
 
 // NewHandler creates a new ACME handler
-func NewHandler(consulClient *consulapi.Client, storageClient storage.StorageProvider, dnsProvider dns.Provider) (*Handler, error) {
+func NewHandler(consulClient *consulapi.Client, storageClient storage.Storage, dnsProvider dns.Provider) (*Handler, error) {
 	// Load configuration
 	config, err := loadACMEConfig()
 	if err != nil {
@@ -49,9 +49,8 @@ func NewHandler(consulClient *consulapi.Client, storageClient storage.StoragePro
 		return nil, fmt.Errorf("failed to create ACME client: %w", err)
 	}
 
-	// Create certificate storage with adapter for StorageProvider
-	storageAdapter := storage.NewStorageAdapter(storageClient)
-	certStorage := NewCertificateStorage(consulClient, storageAdapter)
+	// Create certificate storage directly with Storage interface
+	certStorage := NewCertificateStorage(consulClient, storageClient)
 
 	// Create renewal service
 	renewalConfig := DefaultRenewalConfig()
