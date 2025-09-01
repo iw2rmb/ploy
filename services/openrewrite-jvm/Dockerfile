@@ -39,7 +39,7 @@ RUN mkdir -p /root/.m2 && \
     echo '</settings>' >> /root/.m2/settings.xml
 
 # Pre-download the OpenRewrite Maven plugin to speed up first run
-RUN mvn org.openrewrite.maven:rewrite-maven-plugin:5.34.0:help \
+RUN mvn org.openrewrite.maven:rewrite-maven-plugin:6.17.0:help \
     -Ddetail=true -DskipTests 2>/dev/null || true
 
 # Use setup script as entrypoint (which then calls openrewrite)
