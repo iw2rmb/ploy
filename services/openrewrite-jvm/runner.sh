@@ -77,16 +77,17 @@ echo "[OpenRewrite] Current directory: $(pwd)"
 echo "[OpenRewrite] Input tar location: ${INPUT_TAR}"
 ls -la "${INPUT_TAR}" || echo "[Error] Input tar not found at ${INPUT_TAR}"
 
-# Ensure project directory exists
-echo "[OpenRewrite] Creating project directory if it doesn't exist..."
+# Clean workspace to avoid mixing files from previous runs
+echo "[OpenRewrite] Cleaning workspace..."
+rm -rf /workspace/project
 mkdir -p /workspace/project
 
 cd /workspace/project
 echo "[OpenRewrite] Changed to project directory: $(pwd)"
 
-# Extract with verbose output for debugging
+# Extract tar archive
 echo "[OpenRewrite] Extracting tar archive..."
-tar -xvf "${INPUT_TAR}" 2>&1 || {
+tar -xf "${INPUT_TAR}" || {
     echo "[Error] Failed to extract input tar"
     echo "[Error] Tar exit code: $?"
     ls -la /workspace/
@@ -310,8 +311,8 @@ echo "[OpenRewrite] Files to archive:"
 find . -type f | head -20
 echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
 
-echo "[OpenRewrite] Creating tar archive (excluding Maven cache)..."
-tar -cf "${OUTPUT_TAR}" --exclude='.m2' . || {
+echo "[OpenRewrite] Creating tar archive (excluding Maven cache and workspace files)..."
+tar -cf "${OUTPUT_TAR}" --exclude='.m2' --exclude='target' --exclude='.gradle' --exclude='build' . || {
     echo "[Error] Failed to create output tar"
     echo "[Error] Exit code: $?"
     exit 1
