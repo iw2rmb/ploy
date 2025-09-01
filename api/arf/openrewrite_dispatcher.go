@@ -70,7 +70,7 @@ type OpenRewriteRecipeRequest struct {
 	RecipeArtifact   string `json:"recipe_artifact"`
 	RecipeVersion    string `json:"recipe_version"`
 	RepoPath         string `json:"repo_path"`
-	JobID            string `json:"job_id"`           // Nomad job ID (will be set after job submission)
+	JobID            string `json:"job_id"`            // Nomad job ID (will be set after job submission)
 	TransformationID string `json:"transformation_id"` // UUID from ARF handler
 }
 
@@ -130,7 +130,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 
 	// Log the transformation ID from the handler
 	log.Printf("[OpenRewrite Dispatcher] Transformation ID: %s", req.TransformationID)
-	
+
 	// Generate a Nomad job name using timestamp (Nomad will assign its own ID)
 	nomadJobName := fmt.Sprintf("openrewrite-%d", time.Now().Unix())
 	log.Printf("[OpenRewrite Dispatcher] Nomad job name: %s", nomadJobName)
@@ -165,7 +165,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	// For now, we'll use the nomadJobName as the storage key since Nomad job names are unique
 	// The actual Nomad job ID will be the same as the name we provide
 	req.JobID = nomadJobName
-	
+
 	// Upload input tar to storage using the job name (which will be the job ID)
 	inputStorageKey := fmt.Sprintf("jobs/%s/input.tar", req.JobID)
 
@@ -199,13 +199,13 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	// Create and submit Nomad job
 	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
 	job := d.createNomadJob(req, nomadJobName)
-	
+
 	// Log the download URL that will be used
 	downloadURL := fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID)
 	log.Printf("[OpenRewrite Dispatcher] Job config: ID=%s, Image=%s/openrewrite-jvm:latest",
 		*job.ID, d.registryURL)
 	log.Printf("[OpenRewrite Dispatcher] Artifact download URL: %s", downloadURL)
-	
+
 	// Submit job to Nomad
 	log.Printf("[OpenRewrite Dispatcher] Submitting job to Nomad at %s", d.nomadClient.Address())
 	jobResp, _, err := d.nomadClient.Jobs().Register(job, nil)
@@ -272,18 +272,18 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"force_pull": true, // Force pull to get latest image with setup script
 				},
 				Env: map[string]string{
-					"JOB_ID":            req.JobID,             // Nomad job ID for storage paths
-					"TRANSFORMATION_ID": req.TransformationID,  // UUID from ARF handler
+					"JOB_ID":            req.JobID,            // Nomad job ID for storage paths
+					"TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
 					"RECIPE":            req.RecipeClass,
-					"RECIPE_GROUP":      req.RecipeGroup,       // Empty for dynamic discovery
-					"RECIPE_ARTIFACT":   req.RecipeArtifact,    // Empty for dynamic discovery
-					"RECIPE_VERSION":    req.RecipeVersion,     // Empty for dynamic discovery
+					"RECIPE_GROUP":      req.RecipeGroup,    // Empty for dynamic discovery
+					"RECIPE_ARTIFACT":   req.RecipeArtifact, // Empty for dynamic discovery
+					"RECIPE_VERSION":    req.RecipeVersion,  // Empty for dynamic discovery
 					"SEAWEEDFS_URL":     "http://45.12.75.241:8888",
 					"PLOY_API_URL":      d.apiURL,
 					"MAVEN_CACHE_PATH":  "maven-repository",
-					"DISCOVER_RECIPE":   "true",                                                                    // Tell runner.sh to discover recipe coordinates
-					"ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID),  // Pass full artifact URL
-					"OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),                              // Output storage key (no artifacts/ prefix)
+					"DISCOVER_RECIPE":   "true",                                                                   // Tell runner.sh to discover recipe coordinates
+					"ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Pass full artifact URL
+					"OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),                             // Output storage key (no artifacts/ prefix)
 				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
@@ -562,7 +562,7 @@ func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error
 	log.Printf("[OpenRewrite Dispatcher] ===== TAR EXTRACTION START =====")
 	log.Printf("[OpenRewrite Dispatcher] Source tar file: %s", tarPath)
 	log.Printf("[OpenRewrite Dispatcher] Destination repo: %s", repoPath)
-	
+
 	// Check if tar file exists and get stats
 	tarInfo, err := os.Stat(tarPath)
 	if err != nil {
@@ -570,13 +570,13 @@ func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error
 		return fmt.Errorf("tar file not accessible: %w", err)
 	}
 	log.Printf("[OpenRewrite Dispatcher] Tar file size: %d bytes", tarInfo.Size())
-	
+
 	// Check if destination directory exists, create if needed
 	if err := os.MkdirAll(repoPath, 0755); err != nil {
 		log.Printf("[OpenRewrite Dispatcher] ERROR: Cannot create destination directory %s: %v", repoPath, err)
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
-	
+
 	// Test tar file integrity first
 	log.Printf("[OpenRewrite Dispatcher] Testing tar file integrity...")
 	testCmd := fmt.Sprintf("tar -tf %s", tarPath)
@@ -599,27 +599,27 @@ func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error
 			}
 		}
 	}
-	
+
 	// Perform extraction with verbose output
 	log.Printf("[OpenRewrite Dispatcher] Performing tar extraction...")
 	cmd := fmt.Sprintf("tar -xvf %s -C %s", tarPath, repoPath)
 	if output, err := executeCommandWithOutput(cmd); err != nil {
 		log.Printf("[OpenRewrite Dispatcher] ERROR: Tar extraction failed: %v", err)
 		log.Printf("[OpenRewrite Dispatcher] Extraction output: %s", output)
-		
+
 		// Additional diagnostics
 		log.Printf("[OpenRewrite Dispatcher] === EXTRACTION FAILURE DIAGNOSTICS ===")
-		
+
 		// Check destination permissions
 		if destInfo, statErr := os.Stat(repoPath); statErr == nil {
 			log.Printf("[OpenRewrite Dispatcher] Destination permissions: %v", destInfo.Mode())
 		}
-		
+
 		// Check disk space (simple approach)
 		if spaceOutput, spaceErr := executeCommandWithOutput("df -h " + repoPath); spaceErr == nil {
 			log.Printf("[OpenRewrite Dispatcher] Disk space: %s", spaceOutput)
 		}
-		
+
 		return fmt.Errorf("tar extraction failed with exit code: %w", err)
 	} else {
 		log.Printf("[OpenRewrite Dispatcher] Extraction completed successfully")
@@ -633,7 +633,7 @@ func (d *OpenRewriteDispatcher) extractTarToRepo(tarPath, repoPath string) error
 		}
 		log.Printf("[OpenRewrite Dispatcher] Extracted %d files/directories", fileCount)
 	}
-	
+
 	log.Printf("[OpenRewrite Dispatcher] ===== TAR EXTRACTION SUCCESS =====")
 	return nil
 }

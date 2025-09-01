@@ -8,35 +8,31 @@ import (
 
 // handlePlatformDeploy handles platform service deployment
 func (s *Server) handlePlatformDeploy(c *fiber.Ctx) error {
-	// For now, we need to use the old CreateStorageClientFromConfig since
-	// platform.NewHandler still expects *storage.StorageClient
-	// TODO: Update platform.NewHandler to use storage.Storage interface
-	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	// Use factory pattern to get unified storage interface
+	storage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{
-			"error":   "Storage client initialization failed",
+			"error":   "Storage initialization failed",
 			"details": err.Error(),
 		})
 	}
 
-	handler := platform.NewHandler(storeClient, s.dependencies.EnvStore)
+	handler := platform.NewHandlerWithStorage(storage, s.dependencies.EnvStore)
 	return handler.DeployPlatformService(c)
 }
 
 // handlePlatformStatus handles platform service status requests
 func (s *Server) handlePlatformStatus(c *fiber.Ctx) error {
-	// For now, we need to use the old CreateStorageClientFromConfig since
-	// platform.NewHandler still expects *storage.StorageClient
-	// TODO: Update platform.NewHandler to use storage.Storage interface
-	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	// Use factory pattern to get unified storage interface
+	storage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{
-			"error":   "Storage client initialization failed",
+			"error":   "Storage initialization failed",
 			"details": err.Error(),
 		})
 	}
 
-	handler := platform.NewHandler(storeClient, s.dependencies.EnvStore)
+	handler := platform.NewHandlerWithStorage(storage, s.dependencies.EnvStore)
 	return handler.GetPlatformStatus(c)
 }
 

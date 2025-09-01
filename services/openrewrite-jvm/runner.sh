@@ -29,7 +29,7 @@ else
     # Use provided coordinates
     RECIPE_GROUP="${RECIPE_GROUP:-org.openrewrite.recipe}"
     RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-rewrite-migrate-java}"
-    RECIPE_VERSION="${RECIPE_VERSION:-2.11.0}"
+    RECIPE_VERSION="${RECIPE_VERSION:-2.20.0}"
     RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
     echo "[OpenRewrite] Using provided coordinates: ${RECIPE_COORDS}"
 fi
@@ -215,7 +215,7 @@ if [ -f "pom.xml" ]; then
         echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
         echo "[OpenRewrite] Recipe coordinates: ${RECIPE_COORDS}"
         
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
@@ -236,7 +236,7 @@ if [ -f "pom.xml" ]; then
         
         # First, try to discover available recipes
         echo "[OpenRewrite] Step 1: Discovering available recipes..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:discover 2>&1 | tee /tmp/discover.log || {
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:discover 2>&1 | tee /tmp/discover.log || {
             echo "[Error] Recipe discovery failed"
             echo "[Error] Discovery output:"
             cat /tmp/discover.log
@@ -244,7 +244,7 @@ if [ -f "pom.xml" ]; then
         
         # Now run the transformation
         echo "[OpenRewrite] Step 2: Running transformation..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:5.34.0:run \
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \
@@ -352,21 +352,15 @@ else
 fi
 
 echo "[OpenRewrite] Final location for tar creation: $(pwd)"
-echo "[OpenRewrite] Creating tar archive (excluding Maven cache and workspace files)..."
-# Check if project directory is empty and exclude it if so
-if [ -d "project" ] && [ -z "$(ls -A project)" ]; then
-    echo "[OpenRewrite] Excluding empty project/ directory from output"
-    tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build --exclude=project . || {
-        echo "[Error] Failed to create output tar"
-        exit 1
-    }
-else
-    tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build . || {
-        echo "[Error] Failed to create output tar"
-        echo "[Error] Exit code: $?"
-        exit 1
-    }
-fi
+echo "[OpenRewrite] Creating tar archive (excluding Maven cache and build artifacts)..."
+
+# Create tar with all transformed content, excluding only build artifacts
+# Never exclude the project directory as it contains the actual source files
+tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build . || {
+    echo "[Error] Failed to create output tar"
+    echo "[Error] Exit code: $?"
+    exit 1
+}
 
 echo "[OpenRewrite] Output tar created successfully"
 ls -la "${OUTPUT_TAR}"
