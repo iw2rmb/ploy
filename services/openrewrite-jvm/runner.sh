@@ -257,6 +257,12 @@ if [ -f "pom.xml" ]; then
             }
         
         echo "[OpenRewrite] Transformation completed successfully"
+        
+        # Check what Maven/OpenRewrite created
+        echo "[OpenRewrite] Post-transformation directory check:"
+        echo "[OpenRewrite] Current directory: $(pwd)"
+        echo "[OpenRewrite] All directories after transformation:"
+        find . -type d | sort
     fi
         
 elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
@@ -313,9 +319,19 @@ echo "[OpenRewrite] Creating output archive..."
 echo "[OpenRewrite] Current working directory: $(pwd)"
 echo "[OpenRewrite] Directory structure before tar:"
 ls -la
+echo "[OpenRewrite] All directories in workspace:"
+find . -type d | sort
 echo "[OpenRewrite] Files to archive:"
 find . -type f | head -20
 echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
+echo "[OpenRewrite] Checking for project directory:"
+if [ -d "project" ]; then
+    echo "[OpenRewrite] WARNING: project/ directory exists!"
+    echo "[OpenRewrite] Contents of project/:"
+    ls -la project/ || echo "Empty"
+else
+    echo "[OpenRewrite] No project/ directory found (good)"
+fi
 
 echo "[OpenRewrite] Creating tar archive (excluding Maven cache and workspace files)..."
 tar -cf "${OUTPUT_TAR}" --exclude='.m2' --exclude='target' --exclude='.gradle' --exclude='build' . || {
