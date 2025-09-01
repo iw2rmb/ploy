@@ -50,7 +50,7 @@ type DomainCertificate struct {
 }
 
 // NewCertificateManager creates a new certificate manager
-func NewCertificateManager(consulClient *consulapi.Client, storageClient storage.StorageProvider, dnsProvider dns.Provider) (*CertificateManager, error) {
+func NewCertificateManager(consulClient *consulapi.Client, storageClient storage.Storage, dnsProvider dns.Provider) (*CertificateManager, error) {
 	// Load configuration
 	config := loadCertConfig()
 
@@ -60,9 +60,8 @@ func NewCertificateManager(consulClient *consulapi.Client, storageClient storage
 		return nil, fmt.Errorf("failed to create ACME client: %w", err)
 	}
 
-	// Create certificate storage with adapter for StorageProvider
-	storageAdapter := storage.NewStorageAdapter(storageClient)
-	certStorage := acme.NewCertificateStorage(consulClient, storageAdapter)
+	// Create certificate storage directly with Storage interface
+	certStorage := acme.NewCertificateStorage(consulClient, storageClient)
 
 	// Create renewal service
 	renewalConfig := acme.DefaultRenewalConfig()

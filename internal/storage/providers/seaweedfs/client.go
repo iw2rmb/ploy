@@ -255,13 +255,21 @@ func (p *Provider) Metrics() *storage.StorageMetrics {
 func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*storage.PutObjectResult, error) {
 	fmt.Printf("[SeaweedFS PutObject] Starting upload - bucket: %s, key: %s, contentType: %s\n", bucket, key, contentType)
 
+	// Construct full path with bucket if provided
+	var fullPath string
+	if bucket != "" {
+		fullPath = fmt.Sprintf("%s/%s", bucket, key)
+	} else {
+		// If no bucket, key contains the full path
+		fullPath = key
+	}
+	fmt.Printf("[SeaweedFS PutObject] Full path: %s\n", fullPath)
+
 	// Create directory structure in filer if needed
-	dir := filepath.Dir(key)
+	dir := filepath.Dir(fullPath)
 	fmt.Printf("[SeaweedFS PutObject] Directory path: %s\n", dir)
 	if dir != "." && dir != "/" {
-		// For unified storage, the key already contains the full path including bucket
-		// So we don't need to add bucket prefix again
-		fmt.Printf("[SeaweedFS PutObject] Creating directory with full path: %s\n", dir)
+		fmt.Printf("[SeaweedFS PutObject] Creating directory: %s\n", dir)
 		if err := p.createDirectoryFullPath(dir); err != nil {
 			fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to create directory %s: %v\n", dir, err)
 			return nil, fmt.Errorf("failed to create directory: %w", err)
@@ -269,9 +277,8 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 		fmt.Printf("[SeaweedFS PutObject] Directory created successfully\n")
 	}
 
-	// Use filer's direct upload endpoint
-	// For unified storage, key already contains the full path including bucket
-	url := fmt.Sprintf("%s/%s?replication=%s", p.filerURL, key, p.replication)
+	// Use filer's direct upload endpoint with full path
+	url := fmt.Sprintf("%s/%s?replication=%s", p.filerURL, fullPath, p.replication)
 	fmt.Printf("[SeaweedFS PutObject] Upload URL: %s\n", url)
 
 	// Get file size for logging
@@ -355,7 +362,16 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 }
 
 func (p *Provider) GetObject(bucket, key string) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%s/%s/%s", p.filerURL, bucket, key)
+	// Construct full path with bucket if provided
+	var fullPath string
+	if bucket != "" {
+		fullPath = fmt.Sprintf("%s/%s", bucket, key)
+	} else {
+		// If no bucket, key contains the full path
+		fullPath = key
+	}
+
+	url := fmt.Sprintf("%s/%s", p.filerURL, fullPath)
 	resp, err := p.httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -368,7 +384,16 @@ func (p *Provider) GetObject(bucket, key string) (io.ReadCloser, error) {
 }
 
 func (p *Provider) ListObjects(bucket, prefix string) ([]storage.ObjectInfo, error) {
-	url := fmt.Sprintf("%s/%s/%s", p.filerURL, bucket, prefix)
+	// Construct full path with bucket if provided
+	var fullPath string
+	if bucket != "" {
+		fullPath = fmt.Sprintf("%s/%s", bucket, prefix)
+	} else {
+		// If no bucket, prefix contains the full path
+		fullPath = prefix
+	}
+
+	url := fmt.Sprintf("%s/%s", p.filerURL, fullPath)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -550,7 +575,16 @@ func (p *Provider) assignVolume() (*VolumeAssignment, error) {
 }
 
 func (p *Provider) createDirectory(bucket, dir string) error {
-	url := fmt.Sprintf("%s/%s/%s/", p.filerURL, bucket, dir)
+	// Construct full path with bucket if provided
+	var fullPath string
+	if bucket != "" {
+		fullPath = fmt.Sprintf("%s/%s", bucket, dir)
+	} else {
+		// If no bucket, dir contains the full path
+		fullPath = dir
+	}
+
+	url := fmt.Sprintf("%s/%s/", p.filerURL, fullPath)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
