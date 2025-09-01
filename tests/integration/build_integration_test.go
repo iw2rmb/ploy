@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/iw2rmb/ploy/internal/storage"
-	"github.com/iw2rmb/ploy/internal/testutil"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
 )
 
 // BuildIntegrationSuite tests build pipeline with real services
@@ -35,7 +35,7 @@ type BuildIntegrationSuite struct {
 func (suite *BuildIntegrationSuite) SetupSuite() {
 	// Initialize Nomad client
 	nomadConfig := nomadapi.DefaultConfig()
-	nomadConfig.Address = testutil.GetEnvOrDefault("NOMAD_ADDR", "http://localhost:4646")
+	nomadConfig.Address = helpers.GetEnvOrDefault("NOMAD_ADDR", "http://localhost:4646")
 
 	var err error
 	suite.nomadClient, err = nomadapi.NewClient(nomadConfig)
@@ -46,7 +46,7 @@ func (suite *BuildIntegrationSuite) SetupSuite() {
 
 	// Initialize Consul client
 	consulConfig := consulapi.DefaultConfig()
-	consulConfig.Address = testutil.GetEnvOrDefault("CONSUL_HTTP_ADDR", "localhost:8500")
+	consulConfig.Address = helpers.GetEnvOrDefault("CONSUL_HTTP_ADDR", "localhost:8500")
 
 	suite.consulClient, err = consulapi.NewClient(consulConfig)
 	require.NoError(suite.T(), err)
@@ -56,8 +56,8 @@ func (suite *BuildIntegrationSuite) SetupSuite() {
 
 	// Initialize storage client
 	seaweedfsConfig := storage.SeaweedFSConfig{
-		Master: testutil.GetEnvOrDefault("SEAWEEDFS_MASTER", "localhost:9333"),
-		Filer:  testutil.GetEnvOrDefault("SEAWEEDFS_FILER", "localhost:8888"),
+		Master: helpers.GetEnvOrDefault("SEAWEEDFS_MASTER", "localhost:9333"),
+		Filer:  helpers.GetEnvOrDefault("SEAWEEDFS_FILER", "localhost:8888"),
 	}
 
 	seaweedfsProvider, err := storage.NewSeaweedFSClient(seaweedfsConfig)

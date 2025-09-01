@@ -42,14 +42,14 @@ func WriteFile(t *testing.T, dir, filename, content string) string {
 	t.Helper()
 
 	path := filepath.Join(dir, filename)
-	
+
 	// Create parent directories if needed
 	parentDir := filepath.Dir(path)
 	if parentDir != dir {
 		err := os.MkdirAll(parentDir, 0755)
 		require.NoError(t, err)
 	}
-	
+
 	err := os.WriteFile(path, []byte(content), 0644)
 	require.NoError(t, err)
 

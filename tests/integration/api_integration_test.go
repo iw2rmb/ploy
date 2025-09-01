@@ -11,34 +11,34 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/iw2rmb/ploy/internal/testutil"
-	"github.com/iw2rmb/ploy/internal/testutil/api"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
+	"github.com/iw2rmb/ploy/internal/testing/integration"
 )
 
 // APIIntegrationSuite tests API endpoints with real services
 type APIIntegrationSuite struct {
 	suite.Suite
 
-	apiSuite    *api.APITestSuite
+	apiSuite      *integration.APITestSuite
 	controllerURL string
 }
 
 func (suite *APIIntegrationSuite) SetupSuite() {
 	// Get controller URL from environment or use default
-	suite.controllerURL = testutil.GetEnvOrDefault("PLOY_CONTROLLER", "http://localhost:8081")
+	suite.controllerURL = helpers.GetEnvOrDefault("PLOY_CONTROLLER", "http://localhost:8081")
 
 	// Wait for controller to be ready
 	suite.waitForController()
 
 	// Create API test suite
-	suite.apiSuite = api.NewAPITestSuite(suite.T(), suite.controllerURL)
+	suite.apiSuite = integration.NewAPITestSuite(suite.T(), suite.controllerURL)
 }
 
 func (suite *APIIntegrationSuite) waitForController() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client := api.NewTestClient(suite.T(), suite.controllerURL)
+	client := integration.NewTestClient(suite.T(), suite.controllerURL)
 
 	for {
 		select {

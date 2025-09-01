@@ -19,7 +19,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 				"branch":  "main",
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/builds").
+			resp := apiClient.POST("/v1/apps/" + appName + "/builds").
 				WithJSON(buildRequest).
 				Execute()
 
@@ -52,19 +52,19 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 
 				By("Step 3: Configuring comprehensive environment variables")
 				envVars := map[string]interface{}{
-					"NODE_ENV":           "production",
-					"DATABASE_URL":       "postgres://prod-db:5432/app",
-					"REDIS_URL":          "redis://prod-redis:6379",
-					"LOG_LEVEL":          "info",
-					"METRICS_ENABLED":    "true",
-					"HEALTH_CHECK_PATH":  "/health",
-					"API_KEY":            "test-api-key-12345",
-					"MAX_CONNECTIONS":    "100",
-					"TIMEOUT_SECONDS":    "30",
-					"FEATURE_FLAGS":      "advanced_logging,metrics_collection",
+					"NODE_ENV":          "production",
+					"DATABASE_URL":      "postgres://prod-db:5432/app",
+					"REDIS_URL":         "redis://prod-redis:6379",
+					"LOG_LEVEL":         "info",
+					"METRICS_ENABLED":   "true",
+					"HEALTH_CHECK_PATH": "/health",
+					"API_KEY":           "test-api-key-12345",
+					"MAX_CONNECTIONS":   "100",
+					"TIMEOUT_SECONDS":   "30",
+					"FEATURE_FLAGS":     "advanced_logging,metrics_collection",
 				}
 
-				resp = apiClient.POST("/v1/apps/"+appName+"/env").
+				resp = apiClient.POST("/v1/apps/" + appName + "/env").
 					WithJSON(envVars).
 					Execute()
 
@@ -81,7 +81,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 						"domain": customDomain,
 					}
 
-					resp = apiClient.POST("/v1/apps/"+appName+"/domains").
+					resp = apiClient.POST("/v1/apps/" + appName + "/domains").
 						WithJSON(domainRequest).
 						Execute()
 
@@ -127,7 +127,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 							"instances": 3,
 						}
 
-						resp = apiClient.PUT("/v1/apps/"+appName+"/scale").
+						resp = apiClient.PUT("/v1/apps/" + appName + "/scale").
 							WithJSON(scaleRequest).
 							Execute()
 
@@ -164,7 +164,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 							"branch":  "v2.0",
 						}
 
-						resp = apiClient.POST("/v1/apps/"+appName+"/builds").
+						resp = apiClient.POST("/v1/apps/" + appName + "/builds").
 							WithJSON(updateRequest).
 							Execute()
 
@@ -191,7 +191,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 								"target_version": "v1.0",
 							}
 
-							resp = apiClient.POST("/v1/apps/"+appName+"/rollback").
+							resp = apiClient.POST("/v1/apps/" + appName + "/rollback").
 								WithJSON(rollbackRequest).
 								Execute()
 
@@ -222,7 +222,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 							}
 
 							By("Step 10: Monitoring and debugging capabilities")
-							
+
 							// Check application logs
 							logsResp := apiClient.GET("/v1/apps/" + appName + "/logs").Execute()
 							Expect(logsResp.StatusCode).To(SatisfyAny(
@@ -346,7 +346,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 					"branch":  app["branch"],
 				}
 
-				resp := apiClient.POST("/v1/apps/"+appName+"/builds").
+				resp := apiClient.POST("/v1/apps/" + appName + "/builds").
 					WithJSON(buildRequest).
 					Execute()
 
@@ -360,11 +360,11 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 				By("Configuring inter-service communication")
 				// Configure primary app to connect to API
 				primaryEnvVars := map[string]interface{}{
-					"API_SERVICE_URL": fmt.Sprintf("http://%s.dev.ployd.app", apiApp),
+					"API_SERVICE_URL":  fmt.Sprintf("http://%s.dev.ployd.app", apiApp),
 					"WORKER_QUEUE_URL": fmt.Sprintf("http://%s.dev.ployd.app", workerApp),
 				}
 
-				apiClient.POST("/v1/apps/"+primaryApp+"/env").
+				apiClient.POST("/v1/apps/" + primaryApp + "/env").
 					WithJSON(primaryEnvVars).
 					Execute()
 
@@ -374,7 +374,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 					"REDIS_URL":    "redis://shared-redis:6379",
 				}
 
-				apiClient.POST("/v1/apps/"+apiApp+"/env").
+				apiClient.POST("/v1/apps/" + apiApp + "/env").
 					WithJSON(apiEnvVars).
 					Execute()
 
@@ -410,7 +410,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 				"branch":  "main",
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/builds").
+			resp := apiClient.POST("/v1/apps/" + appName + "/builds").
 				WithJSON(buildRequest).
 				Execute()
 
@@ -447,7 +447,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 					"branch":  "main",
 				}
 
-				resp = apiClient.POST("/v1/apps/"+appName+"/builds").
+				resp = apiClient.POST("/v1/apps/" + appName + "/builds").
 					WithJSON(recoveryRequest).
 					Execute()
 

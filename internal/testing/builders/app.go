@@ -111,11 +111,11 @@ func (b *AppBuilder) WithEnvVars(envVars map[string]string) *AppBuilder {
 		b.app.EnvVars = make(map[string]string)
 		return b
 	}
-	
+
 	if b.app.EnvVars == nil {
 		b.app.EnvVars = make(map[string]string)
 	}
-	
+
 	for k, v := range envVars {
 		b.app.EnvVars[k] = v
 	}
@@ -164,12 +164,12 @@ func (b *AppBuilder) WithTimestamps(createdAt, updatedAt time.Time) *AppBuilder 
 func (b *AppBuilder) Build() *App {
 	// Create a copy to avoid mutation issues
 	app := b.app
-	
+
 	// Ensure EnvVars is not nil
 	if app.EnvVars == nil {
 		app.EnvVars = make(map[string]string)
 	}
-	
+
 	return &app
 }
 

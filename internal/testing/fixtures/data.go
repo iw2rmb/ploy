@@ -1,4 +1,4 @@
-package testutil
+package fixtures
 
 import (
 	"time"
@@ -234,11 +234,11 @@ func generateTestBuildConfigs() []TestBuildConfig {
 // generateTestStorageItems creates test storage items
 func generateTestStorageItems() []TestStorageItem {
 	baseTime := time.Now().Add(-24 * time.Hour)
-	
+
 	return []TestStorageItem{
 		{
 			Key:         "apps/go-api/v1.0.0/source.tar.gz",
-			Size:        1024 * 1024,     // 1MB
+			Size:        1024 * 1024, // 1MB
 			ContentType: "application/gzip",
 			Checksum:    "sha256:abc123def456",
 			CreatedAt:   baseTime,
@@ -278,11 +278,11 @@ func generateTestStorageItems() []TestStorageItem {
 func generateTestEnvVarSets() []envstore.AppEnvVars {
 	return []envstore.AppEnvVars{
 		{
-			"NODE_ENV":     "production",
-			"PORT":         "3000",
-			"API_URL":      "https://api.example.com",
-			"LOG_LEVEL":    "info",
-			"CACHE_TTL":    "300",
+			"NODE_ENV":  "production",
+			"PORT":      "3000",
+			"API_URL":   "https://api.example.com",
+			"LOG_LEVEL": "info",
+			"CACHE_TTL": "300",
 		},
 		{
 			"JAVA_OPTS":      "-Xmx1g -Xms512m",
@@ -292,24 +292,24 @@ func generateTestEnvVarSets() []envstore.AppEnvVars {
 			"REDIS_URL":      "redis://cache:6379",
 		},
 		{
-			"PYTHON_ENV":     "production",
-			"MODEL_PATH":     "/models/latest",
-			"BATCH_SIZE":     "32",
-			"GPU_MEMORY":     "4096",
-			"WORKERS":        "4",
+			"PYTHON_ENV": "production",
+			"MODEL_PATH": "/models/latest",
+			"BATCH_SIZE": "32",
+			"GPU_MEMORY": "4096",
+			"WORKERS":    "4",
 		},
 		{
-			"GO_ENV":         "production",
-			"PORT":           "8080",
-			"GRPC_PORT":      "9090",
-			"METRICS_PORT":   "8081",
-			"LOG_FORMAT":     "json",
+			"GO_ENV":       "production",
+			"PORT":         "8080",
+			"GRPC_PORT":    "9090",
+			"METRICS_PORT": "8081",
+			"LOG_FORMAT":   "json",
 		},
 		{
-			"RUST_ENV":       "production",
-			"WASM_OPTIMIZE":  "true",
-			"MEMORY_LIMIT":   "64MB",
-			"THREAD_COUNT":   "1",
+			"RUST_ENV":      "production",
+			"WASM_OPTIMIZE": "true",
+			"MEMORY_LIMIT":  "64MB",
+			"THREAD_COUNT":  "1",
 		},
 	}
 }
@@ -317,25 +317,25 @@ func generateTestEnvVarSets() []envstore.AppEnvVars {
 // Common test constants
 const (
 	// Test app names
-	TestAppGoAPI        = "go-api"
-	TestAppNodeFrontend = "node-frontend"
-	TestAppJavaService  = "java-service"
-	TestAppRustWasm     = "rust-wasm"
-	TestAppPythonML     = "python-ml"
+	TestAppGoAPI          = "go-api"
+	TestAppNodeFrontend   = "node-frontend"
+	TestAppJavaService    = "java-service"
+	TestAppRustWasm       = "rust-wasm"
+	TestAppPythonML       = "python-ml"
 	TestAppScalaAnalytics = "scala-analytics"
-	
+
 	// Test lanes
 	TestLaneA = "A" // Unikraft Go/Rust
 	TestLaneB = "B" // Unikraft Node/Python
 	TestLaneC = "C" // OSv JVM
 	TestLaneE = "E" // Containers
 	TestLaneG = "G" // WASM
-	
+
 	// Test versions
 	TestVersionLatest = "latest"
 	TestVersionV1     = "v1.0.0"
 	TestVersionV2     = "v2.0.0"
-	
+
 	// Test statuses
 	TestStatusRunning  = "running"
 	TestStatusBuilding = "building"

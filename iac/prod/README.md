@@ -234,10 +234,7 @@ To add more nodes:
 ### Updates
 To update Ploy:
 ```bash
-# Update controller via self-update endpoint
-curl -X POST https://api.ployman.app/v1/update/latest
-
-# Alternative: deploy via unified system
+# Deploy via unified system
 ployman push -a ploy-api -env prod
 
 # Update infrastructure

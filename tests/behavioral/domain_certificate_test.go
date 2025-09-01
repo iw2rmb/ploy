@@ -20,8 +20,8 @@ var _ = Describe("Domain and Certificate Management", func() {
 
 	AfterEach(func() {
 		// Cleanup domains and certificates
-		apiClient.DELETE("/v1/apps/"+appName+"/domains/"+testDomain).Execute()
-		apiClient.DELETE("/v1/apps/"+appName+"/certificates/"+testDomain).Execute()
+		apiClient.DELETE("/v1/apps/" + appName + "/domains/" + testDomain).Execute()
+		apiClient.DELETE("/v1/apps/" + appName + "/certificates/" + testDomain).Execute()
 		apiClient.DELETE("/v1/apps/" + appName).Execute()
 	})
 
@@ -51,7 +51,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 				"domain": testDomain,
 			}
 
-			resp = apiClient.POST("/v1/apps/"+appName+"/domains").
+			resp = apiClient.POST("/v1/apps/" + appName + "/domains").
 				WithJSON(domainRequest).
 				Execute()
 
@@ -83,7 +83,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 				}
 
 				By("Removing the domain")
-				resp = apiClient.DELETE("/v1/apps/"+appName+"/domains/"+testDomain).
+				resp = apiClient.DELETE("/v1/apps/" + appName + "/domains/" + testDomain).
 					Execute()
 
 				Expect(resp.StatusCode).To(SatisfyAny(
@@ -115,11 +115,11 @@ var _ = Describe("Domain and Certificate Management", func() {
 		It("should validate domain constraints and reject invalid domains", func() {
 			By("Attempting to add invalid domains")
 			invalidDomains := []map[string]interface{}{
-				{"domain": ""},                           // Empty domain
-				{"domain": "invalid.domain"},            // Invalid TLD
-				{"domain": "localhost"},                 // Localhost not allowed
-				{"domain": "invalid space.com"},         // Space in domain  
-				{"domain": "sub.sub.sub.sub.example.com"}, // Too many subdomains
+				{"domain": ""},                                              // Empty domain
+				{"domain": "invalid.domain"},                                // Invalid TLD
+				{"domain": "localhost"},                                     // Localhost not allowed
+				{"domain": "invalid space.com"},                             // Space in domain
+				{"domain": "sub.sub.sub.sub.example.com"},                   // Too many subdomains
 				{"domain": "toolongdomainname" + string(make([]byte, 250))}, // Too long
 			}
 
@@ -127,7 +127,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 				domainName := invalidDomain["domain"].(string)
 				By(fmt.Sprintf("Testing invalid domain: '%s'", domainName))
 
-				resp := apiClient.POST("/v1/apps/"+appName+"/domains").
+				resp := apiClient.POST("/v1/apps/" + appName + "/domains").
 					WithJSON(invalidDomain).
 					Execute()
 
@@ -155,7 +155,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 					"domain": domain,
 				}
 
-				resp := apiClient.POST("/v1/apps/"+appName+"/domains").
+				resp := apiClient.POST("/v1/apps/" + appName + "/domains").
 					WithJSON(domainRequest).
 					Execute()
 
@@ -180,7 +180,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 
 				By("Cleaning up all domains")
 				for _, domain := range domains {
-					apiClient.DELETE("/v1/apps/"+appName+"/domains/"+domain).Execute()
+					apiClient.DELETE("/v1/apps/" + appName + "/domains/" + domain).Execute()
 				}
 			} else {
 				By("Acknowledging that domain endpoints may not be fully implemented yet")
@@ -198,7 +198,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 				"domain": testDomain,
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/domains").
+			resp := apiClient.POST("/v1/apps/" + appName + "/domains").
 				WithJSON(domainRequest).
 				Execute()
 
@@ -213,7 +213,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 			if resp.StatusCode == 201 || resp.StatusCode == 200 {
 				By("Waiting for automatic certificate provisioning")
 				Eventually(func() string {
-					resp := apiClient.GET("/v1/apps/"+appName+"/certificates/"+testDomain).
+					resp := apiClient.GET("/v1/apps/" + appName + "/certificates/" + testDomain).
 						Execute()
 
 					if resp.StatusCode != 200 {
@@ -233,7 +233,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 				), "Certificate provisioning should be attempted")
 
 				By("Verifying certificate details")
-				resp := apiClient.GET("/v1/apps/"+appName+"/certificates/"+testDomain).
+				resp := apiClient.GET("/v1/apps/" + appName + "/certificates/" + testDomain).
 					Execute()
 
 				if resp.StatusCode == 200 {
@@ -257,13 +257,13 @@ var _ = Describe("Domain and Certificate Management", func() {
 			// This would test uploading custom certificates
 			// Implementation requires test certificate data
 			certRequest := map[string]interface{}{
-				"domain":     testDomain,
-				"cert_pem":   "test-certificate-pem-data",
-				"key_pem":    "test-private-key-pem-data",
-				"chain_pem":  "test-certificate-chain-pem-data",
+				"domain":    testDomain,
+				"cert_pem":  "test-certificate-pem-data",
+				"key_pem":   "test-private-key-pem-data",
+				"chain_pem": "test-certificate-chain-pem-data",
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/certificates").
+			resp := apiClient.POST("/v1/apps/" + appName + "/certificates").
 				WithJSON(certRequest).
 				Execute()
 
@@ -299,7 +299,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 			if resp.StatusCode == 200 {
 				var certsResp map[string]interface{}
 				resp.JSON(&certsResp)
-				
+
 				By("Verifying certificate list structure")
 				if certificates, exists := certsResp["certificates"]; exists {
 					// Should be an array, even if empty
@@ -322,14 +322,14 @@ var _ = Describe("Domain and Certificate Management", func() {
 				"auto_certificate": true,
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/domains").
+			resp := apiClient.POST("/v1/apps/" + appName + "/domains").
 				WithJSON(domainRequest).
 				Execute()
 
 			if resp.StatusCode == 201 || resp.StatusCode == 200 {
 				By("Verifying domain validation process")
 				Eventually(func() string {
-					resp := apiClient.GET("/v1/apps/"+appName+"/domains/"+testDomain).
+					resp := apiClient.GET("/v1/apps/" + appName + "/domains/" + testDomain).
 						Execute()
 
 					if resp.StatusCode != 200 {
@@ -350,7 +350,7 @@ var _ = Describe("Domain and Certificate Management", func() {
 
 				By("Checking certificate was automatically provisioned")
 				Eventually(func() string {
-					resp := apiClient.GET("/v1/apps/"+appName+"/certificates/"+testDomain).
+					resp := apiClient.GET("/v1/apps/" + appName + "/certificates/" + testDomain).
 						Execute()
 
 					if resp.StatusCode != 200 {
@@ -379,19 +379,19 @@ var _ = Describe("Domain and Certificate Management", func() {
 				"domain": testDomain,
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/domains").
+			resp := apiClient.POST("/v1/apps/" + appName + "/domains").
 				WithJSON(domainRequest).
 				Execute()
 
 			if resp.StatusCode == 201 || resp.StatusCode == 200 {
 				By("Removing domain and verifying certificate cleanup")
-				resp = apiClient.DELETE("/v1/apps/"+appName+"/domains/"+testDomain).
+				resp = apiClient.DELETE("/v1/apps/" + appName + "/domains/" + testDomain).
 					Execute()
 
 				if resp.StatusCode == 200 || resp.StatusCode == 204 {
 					By("Verifying associated certificate was also removed")
 					Eventually(func() int {
-						resp := apiClient.GET("/v1/apps/"+appName+"/certificates/"+testDomain).
+						resp := apiClient.GET("/v1/apps/" + appName + "/certificates/" + testDomain).
 							Execute()
 						return resp.StatusCode
 					}, "1m", "5s").Should(Equal(404), "Certificate should be removed with domain")

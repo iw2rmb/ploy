@@ -50,7 +50,7 @@ ployman api deploy
 ```
 
 This command:
-1. **Primary**: Attempts self-update via API `/v1/update/latest` endpoint (fastest for running API)
+1. **Primary**: Attempts deployment via API (fastest for running API)
 2. **Fallback**: Runs Ansible playbook locally if API is unreachable (for cold start scenarios)
    - Ansible executes from your local machine (requires local Ansible installation)
    - Provides direct output and better debugging visibility

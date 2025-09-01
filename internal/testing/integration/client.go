@@ -1,4 +1,4 @@
-package api
+package integration
 
 import (
 	"bytes"
@@ -203,7 +203,7 @@ func (rb *RequestBuilder) Execute() *APIResponse {
 		if rb.client.t != nil {
 			require.NoError(rb.client.t, err, "Failed to read response body")
 		} else if err != nil {
-			// For BDD tests, return error response instead of panicking  
+			// For BDD tests, return error response instead of panicking
 			return &APIResponse{StatusCode: 500, Body: []byte("Failed to read response body"), t: nil}
 		}
 	}

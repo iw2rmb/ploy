@@ -11,8 +11,8 @@ import (
 func TestRetryConfig() *storage.RetryConfig {
 	return &storage.RetryConfig{
 		MaxAttempts:       3,
-		InitialDelay:      1 * time.Millisecond,  // Minimal delay for unit tests
-		MaxDelay:          5 * time.Millisecond,  // Keep very short
+		InitialDelay:      1 * time.Millisecond, // Minimal delay for unit tests
+		MaxDelay:          5 * time.Millisecond, // Keep very short
 		BackoffMultiplier: 2.0,
 		RetryableErrors: []storage.ErrorType{
 			storage.ErrorTypeNetwork,

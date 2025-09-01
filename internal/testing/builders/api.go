@@ -118,7 +118,7 @@ func (b *RequestBuilder) WithBody(body interface{}) *RequestBuilder {
 // Build creates an *http.Request
 func (b *RequestBuilder) Build() (*http.Request, error) {
 	var bodyReader io.Reader
-	
+
 	if b.req.Body != nil {
 		switch v := b.req.Body.(type) {
 		case string:
@@ -136,17 +136,17 @@ func (b *RequestBuilder) Build() (*http.Request, error) {
 			bodyReader = bytes.NewBuffer(data)
 		}
 	}
-	
+
 	req, err := http.NewRequest(b.req.Method, b.req.Path, bodyReader)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Add headers
 	for k, v := range b.req.Headers {
 		req.Header.Set(k, v)
 	}
-	
+
 	// Add query parameters
 	if len(b.req.Query) > 0 {
 		q := req.URL.Query()
@@ -155,7 +155,7 @@ func (b *RequestBuilder) Build() (*http.Request, error) {
 		}
 		req.URL.RawQuery = q.Encode()
 	}
-	
+
 	return req, nil
 }
 
@@ -234,15 +234,15 @@ func (b *ResponseBuilder) WithBody(body interface{}) *ResponseBuilder {
 // Build creates an *httptest.ResponseRecorder with the configured response
 func (b *ResponseBuilder) Build() *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
-	
+
 	// Set headers
 	for k, v := range b.resp.Headers {
 		w.Header().Set(k, v)
 	}
-	
+
 	// Write status code
 	w.WriteHeader(b.resp.StatusCode)
-	
+
 	// Write body
 	if b.resp.Body != nil {
 		switch v := b.resp.Body.(type) {
@@ -255,7 +255,7 @@ func (b *ResponseBuilder) Build() *httptest.ResponseRecorder {
 			json.NewEncoder(w).Encode(v)
 		}
 	}
-	
+
 	return w
 }
 

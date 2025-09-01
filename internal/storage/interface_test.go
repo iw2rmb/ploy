@@ -1,8 +1,13 @@
 package storage
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -37,10 +42,10 @@ func TestObjectInfo(t *testing.T) {
 
 func TestObjectInfo_Fields(t *testing.T) {
 	tests := []struct {
-		name        string
-		objectInfo  ObjectInfo
-		fieldName   string
-		fieldValue  interface{}
+		name       string
+		objectInfo ObjectInfo
+		fieldName  string
+		fieldValue interface{}
 	}{
 		{
 			name: "key field",
@@ -461,4 +466,407 @@ func TestPutObjectResult_EdgeCases(t *testing.T) {
 		assert.Equal(t, "unquoted-etag-value", result.ETag)
 		assert.NotContains(t, result.ETag, "\"")
 	})
+}
+
+// Tests for new unified Storage interface - RED phase (failing tests)
+
+func TestObject(t *testing.T) {
+	obj := Object{
+		Key:          "test/key",
+		Size:         1024,
+		ContentType:  "application/octet-stream",
+		ETag:         "test-etag",
+		LastModified: time.Date(2023, 12, 1, 10, 0, 0, 0, time.UTC),
+		Metadata:     map[string]string{"version": "1.0.0"},
+	}
+
+	assert.Equal(t, "test/key", obj.Key)
+	assert.Equal(t, int64(1024), obj.Size)
+	assert.Equal(t, "application/octet-stream", obj.ContentType)
+	assert.Equal(t, "test-etag", obj.ETag)
+	assert.Equal(t, "1.0.0", obj.Metadata["version"])
+}
+
+func TestListOptions(t *testing.T) {
+	opts := ListOptions{
+		Prefix:     "artifacts/",
+		MaxKeys:    100,
+		Delimiter:  "/",
+		StartAfter: "artifacts/app/v1.0.0/",
+	}
+
+	assert.Equal(t, "artifacts/", opts.Prefix)
+	assert.Equal(t, 100, opts.MaxKeys)
+	assert.Equal(t, "/", opts.Delimiter)
+	assert.Equal(t, "artifacts/app/v1.0.0/", opts.StartAfter)
+}
+
+func TestPutOptions(t *testing.T) {
+	t.Run("WithContentType", func(t *testing.T) {
+		opts := &putOptions{}
+		option := WithContentType("application/json")
+		option(opts)
+
+		assert.Equal(t, "application/json", opts.ContentType)
+	})
+
+	t.Run("WithMetadata", func(t *testing.T) {
+		metadata := map[string]string{"version": "1.0.0", "env": "prod"}
+		opts := &putOptions{}
+		option := WithMetadata(metadata)
+		option(opts)
+
+		assert.Equal(t, metadata, opts.Metadata)
+		assert.Equal(t, "1.0.0", opts.Metadata["version"])
+		assert.Equal(t, "prod", opts.Metadata["env"])
+	})
+
+	t.Run("WithCacheControl", func(t *testing.T) {
+		opts := &putOptions{}
+		option := WithCacheControl("max-age=3600")
+		option(opts)
+
+		assert.Equal(t, "max-age=3600", opts.CacheControl)
+	})
+}
+
+func TestStorageMetrics(t *testing.T) {
+	metrics := NewStorageMetrics()
+	
+	// Test that we get a valid StorageMetrics instance
+	assert.NotNil(t, metrics)
+	assert.Equal(t, int64(0), metrics.TotalUploads)
+	assert.Equal(t, int64(0), metrics.TotalDownloads)
+}
+
+// Mock implementation for testing new Storage interface
+type MockStorage struct {
+	objects map[string]Object
+	err     error
+}
+
+func NewMockStorage() *MockStorage {
+	return &MockStorage{
+		objects: make(map[string]Object),
+	}
+}
+
+func (m *MockStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	obj, exists := m.objects[key]
+	if !exists {
+		return nil, NewStorageError("get", fmt.Errorf("object not found"), ErrorContext{Key: key})
+	}
+	return io.NopCloser(strings.NewReader(fmt.Sprintf("content-%s", obj.Key))), nil
+}
+
+func (m *MockStorage) Put(ctx context.Context, key string, reader io.Reader, opts ...PutOption) error {
+	if m.err != nil {
+		return m.err
+	}
+
+	options := &putOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	m.objects[key] = Object{
+		Key:          key,
+		Size:         1024,
+		ContentType:  options.ContentType,
+		ETag:         "mock-etag",
+		LastModified: time.Now(),
+		Metadata:     options.Metadata,
+	}
+	return nil
+}
+
+func (m *MockStorage) Delete(ctx context.Context, key string) error {
+	if m.err != nil {
+		return m.err
+	}
+	delete(m.objects, key)
+	return nil
+}
+
+func (m *MockStorage) Exists(ctx context.Context, key string) (bool, error) {
+	if m.err != nil {
+		return false, m.err
+	}
+	_, exists := m.objects[key]
+	return exists, nil
+}
+
+func (m *MockStorage) List(ctx context.Context, opts ListOptions) ([]Object, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	var objects []Object
+	for _, obj := range m.objects {
+		if strings.HasPrefix(obj.Key, opts.Prefix) {
+			objects = append(objects, obj)
+		}
+	}
+	return objects, nil
+}
+
+func (m *MockStorage) DeleteBatch(ctx context.Context, keys []string) error {
+	if m.err != nil {
+		return m.err
+	}
+	for _, key := range keys {
+		delete(m.objects, key)
+	}
+	return nil
+}
+
+func (m *MockStorage) Head(ctx context.Context, key string) (*Object, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	obj, exists := m.objects[key]
+	if !exists {
+		return nil, NewStorageError("head", fmt.Errorf("object not found"), ErrorContext{Key: key})
+	}
+	return &obj, nil
+}
+
+func (m *MockStorage) UpdateMetadata(ctx context.Context, key string, metadata map[string]string) error {
+	if m.err != nil {
+		return m.err
+	}
+	obj, exists := m.objects[key]
+	if !exists {
+		return NewStorageError("update_metadata", fmt.Errorf("object not found"), ErrorContext{Key: key})
+	}
+	obj.Metadata = metadata
+	m.objects[key] = obj
+	return nil
+}
+
+func (m *MockStorage) Copy(ctx context.Context, src, dst string) error {
+	if m.err != nil {
+		return m.err
+	}
+	obj, exists := m.objects[src]
+	if !exists {
+		return NewStorageError("copy", fmt.Errorf("source object not found"), ErrorContext{Key: src})
+	}
+	obj.Key = dst
+	m.objects[dst] = obj
+	return nil
+}
+
+func (m *MockStorage) Move(ctx context.Context, src, dst string) error {
+	if m.err != nil {
+		return m.err
+	}
+	if err := m.Copy(ctx, src, dst); err != nil {
+		return err
+	}
+	delete(m.objects, src)
+	return nil
+}
+
+func (m *MockStorage) Health(ctx context.Context) error {
+	if m.err != nil {
+		return m.err
+	}
+	return nil
+}
+
+func (m *MockStorage) Metrics() *StorageMetrics {
+	return NewStorageMetrics()
+}
+
+func (m *MockStorage) SetError(err error) {
+	m.err = err
+}
+
+// Test the new Storage interface methods
+func TestStorage_Get(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	// Store an object first
+	key := "test/object"
+	err := storage.Put(ctx, key, strings.NewReader("test content"))
+	assert.NoError(t, err)
+
+	// Test Get
+	reader, err := storage.Get(ctx, key)
+	assert.NoError(t, err)
+	assert.NotNil(t, reader)
+	defer reader.Close()
+
+	content, err := io.ReadAll(reader)
+	assert.NoError(t, err)
+	assert.Contains(t, string(content), key)
+}
+
+func TestStorage_Put(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	key := "test/put"
+	content := "test content"
+
+	// Test Put with options
+	err := storage.Put(ctx, key, strings.NewReader(content),
+		WithContentType("text/plain"),
+		WithMetadata(map[string]string{"version": "1.0.0"}),
+		WithCacheControl("max-age=3600"))
+
+	assert.NoError(t, err)
+
+	// Verify object was stored
+	exists, err := storage.Exists(ctx, key)
+	assert.NoError(t, err)
+	assert.True(t, exists)
+}
+
+func TestStorage_Delete(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	key := "test/delete"
+
+	// Store object first
+	err := storage.Put(ctx, key, strings.NewReader("test"))
+	assert.NoError(t, err)
+
+	// Verify it exists
+	exists, err := storage.Exists(ctx, key)
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	// Delete it
+	err = storage.Delete(ctx, key)
+	assert.NoError(t, err)
+
+	// Verify it's gone
+	exists, err = storage.Exists(ctx, key)
+	assert.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestStorage_List(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	// Store multiple objects
+	keys := []string{"test/a", "test/b", "other/c"}
+	for _, key := range keys {
+		err := storage.Put(ctx, key, strings.NewReader("content"))
+		assert.NoError(t, err)
+	}
+
+	// List with prefix
+	objects, err := storage.List(ctx, ListOptions{Prefix: "test/"})
+	assert.NoError(t, err)
+	assert.Len(t, objects, 2)
+
+	// Check all returned objects have the correct prefix
+	for _, obj := range objects {
+		assert.True(t, strings.HasPrefix(obj.Key, "test/"))
+	}
+}
+
+func TestStorage_Head(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	key := "test/head"
+	metadata := map[string]string{"version": "1.0.0"}
+
+	// Store object with metadata
+	err := storage.Put(ctx, key, strings.NewReader("content"),
+		WithContentType("text/plain"),
+		WithMetadata(metadata))
+	assert.NoError(t, err)
+
+	// Get object metadata
+	obj, err := storage.Head(ctx, key)
+	assert.NoError(t, err)
+	assert.NotNil(t, obj)
+	assert.Equal(t, key, obj.Key)
+	assert.Equal(t, "text/plain", obj.ContentType)
+	assert.Equal(t, "1.0.0", obj.Metadata["version"])
+}
+
+func TestStorage_Copy(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	src := "source/object"
+	dst := "destination/object"
+
+	// Store source object
+	err := storage.Put(ctx, src, strings.NewReader("content"))
+	assert.NoError(t, err)
+
+	// Copy it
+	err = storage.Copy(ctx, src, dst)
+	assert.NoError(t, err)
+
+	// Verify both exist
+	srcExists, err := storage.Exists(ctx, src)
+	assert.NoError(t, err)
+	assert.True(t, srcExists)
+
+	dstExists, err := storage.Exists(ctx, dst)
+	assert.NoError(t, err)
+	assert.True(t, dstExists)
+}
+
+func TestStorage_Move(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	src := "source/object"
+	dst := "destination/object"
+
+	// Store source object
+	err := storage.Put(ctx, src, strings.NewReader("content"))
+	assert.NoError(t, err)
+
+	// Move it
+	err = storage.Move(ctx, src, dst)
+	assert.NoError(t, err)
+
+	// Verify source is gone and destination exists
+	srcExists, err := storage.Exists(ctx, src)
+	assert.NoError(t, err)
+	assert.False(t, srcExists)
+
+	dstExists, err := storage.Exists(ctx, dst)
+	assert.NoError(t, err)
+	assert.True(t, dstExists)
+}
+
+func TestStorage_Health(t *testing.T) {
+	storage := NewMockStorage()
+	ctx := context.Background()
+
+	// Test healthy storage
+	err := storage.Health(ctx)
+	assert.NoError(t, err)
+
+	// Test unhealthy storage
+	storage.SetError(errors.New("storage unavailable"))
+	err = storage.Health(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "storage unavailable")
+}
+
+func TestStorage_Metrics(t *testing.T) {
+	storage := NewMockStorage()
+
+	metrics := storage.Metrics()
+	assert.NotNil(t, metrics)
+	assert.Equal(t, int64(0), metrics.TotalUploads)
+	assert.Equal(t, int64(0), metrics.TotalDownloads)
 }

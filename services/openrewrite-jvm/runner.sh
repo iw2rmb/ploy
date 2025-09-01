@@ -310,8 +310,8 @@ echo "[OpenRewrite] Files to archive:"
 find . -type f | head -20
 echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
 
-echo "[OpenRewrite] Creating tar archive (this may take a moment for large projects)..."
-tar -cf "${OUTPUT_TAR}" . || {
+echo "[OpenRewrite] Creating tar archive (excluding Maven cache)..."
+tar -cf "${OUTPUT_TAR}" --exclude='.m2' . || {
     echo "[Error] Failed to create output tar"
     echo "[Error] Exit code: $?"
     exit 1

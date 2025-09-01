@@ -34,7 +34,7 @@ var _ = Describe("Application Deployment Workflow", func() {
 				"branch":  branch,
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/builds").
+			resp := apiClient.POST("/v1/apps/" + appName + "/builds").
 				WithJSON(buildRequest).
 				Execute()
 
@@ -131,7 +131,7 @@ var _ = Describe("Application Deployment Workflow", func() {
 				"branch":  "main",
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/builds").
+			resp := apiClient.POST("/v1/apps/" + appName + "/builds").
 				WithJSON(buildRequest).
 				Execute()
 
@@ -190,7 +190,7 @@ var _ = Describe("Application Deployment Workflow", func() {
 					"branch":  "main",
 				}
 
-				resp := apiClient.POST("/v1/apps/"+appName+"/builds").
+				resp := apiClient.POST("/v1/apps/" + appName + "/builds").
 					WithJSON(buildRequest).
 					Execute()
 

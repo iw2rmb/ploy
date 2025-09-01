@@ -39,7 +39,7 @@ var _ = Describe("Environment Variable Management", func() {
 				"DEBUG":        "false",
 			}
 
-			resp = apiClient.POST("/v1/apps/"+appName+"/env").
+			resp = apiClient.POST("/v1/apps/" + appName + "/env").
 				WithJSON(envVars).
 				Execute()
 
@@ -59,7 +59,7 @@ var _ = Describe("Environment Variable Management", func() {
 				if resp.StatusCode == 200 {
 					var envResp map[string]interface{}
 					resp.JSON(&envResp)
-					
+
 					if envMap, ok := envResp["env"].(map[string]interface{}); ok {
 						Expect(envMap["DATABASE_URL"]).To(Equal("postgres://localhost:5432/myapp"))
 						Expect(envMap["REDIS_URL"]).To(Equal("redis://localhost:6379"))
@@ -73,7 +73,7 @@ var _ = Describe("Environment Variable Management", func() {
 					"value": "debug",
 				}
 
-				resp = apiClient.PUT("/v1/apps/"+appName+"/env/LOG_LEVEL").
+				resp = apiClient.PUT("/v1/apps/" + appName + "/env/LOG_LEVEL").
 					WithJSON(updateRequest).
 					Execute()
 
@@ -92,7 +92,7 @@ var _ = Describe("Environment Variable Management", func() {
 					if resp.StatusCode == 200 {
 						var envResp map[string]interface{}
 						resp.JSON(&envResp)
-						
+
 						if envMap, ok := envResp["env"].(map[string]interface{}); ok {
 							Expect(envMap["LOG_LEVEL"]).To(Equal("debug"))
 							Expect(envMap["DATABASE_URL"]).To(Equal("postgres://localhost:5432/myapp")) // unchanged
@@ -118,7 +118,7 @@ var _ = Describe("Environment Variable Management", func() {
 					if resp.StatusCode == 200 {
 						var envResp map[string]interface{}
 						resp.JSON(&envResp)
-						
+
 						if envMap, ok := envResp["env"].(map[string]interface{}); ok {
 							Expect(envMap["REDIS_URL"]).To(BeNil(), "REDIS_URL should be deleted")
 							Expect(envMap["DATABASE_URL"]).To(Equal("postgres://localhost:5432/myapp")) // still present
@@ -134,13 +134,13 @@ var _ = Describe("Environment Variable Management", func() {
 		It("should validate environment variable constraints", func() {
 			By("Attempting to set invalid environment variables")
 			invalidEnvVars := map[string]string{
-				"":          "empty-key",           // Empty key
-				"123START":  "numeric-start",       // Key starts with number  
-				"INVALID=":  "contains-equals",     // Key contains equals
-				"SPACE KEY": "contains-space",      // Key contains space
+				"":          "empty-key",       // Empty key
+				"123START":  "numeric-start",   // Key starts with number
+				"INVALID=":  "contains-equals", // Key contains equals
+				"SPACE KEY": "contains-space",  // Key contains space
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/env").
+			resp := apiClient.POST("/v1/apps/" + appName + "/env").
 				WithJSON(invalidEnvVars).
 				Execute()
 
@@ -158,7 +158,7 @@ var _ = Describe("Environment Variable Management", func() {
 				"LONG_VALUE": longValue,
 			}
 
-			resp = apiClient.POST("/v1/apps/"+appName+"/env").
+			resp = apiClient.POST("/v1/apps/" + appName + "/env").
 				WithJSON(longEnvVars).
 				Execute()
 
@@ -178,7 +178,7 @@ var _ = Describe("Environment Variable Management", func() {
 				"STATUS":  "initial",
 			}
 
-			resp := apiClient.POST("/v1/apps/"+appName+"/env").
+			resp := apiClient.POST("/v1/apps/" + appName + "/env").
 				WithJSON(initialEnvVars).
 				Execute()
 
@@ -186,12 +186,12 @@ var _ = Describe("Environment Variable Management", func() {
 				By("Performing concurrent updates")
 				// This is a simplified test - in practice you'd use goroutines
 				// to test true concurrency, but for BDD we focus on the behavior
-				
-				resp1 := apiClient.PUT("/v1/apps/"+appName+"/env/COUNTER").
+
+				resp1 := apiClient.PUT("/v1/apps/" + appName + "/env/COUNTER").
 					WithJSON(map[string]string{"value": "1"}).
 					Execute()
 
-				resp2 := apiClient.PUT("/v1/apps/"+appName+"/env/STATUS").
+				resp2 := apiClient.PUT("/v1/apps/" + appName + "/env/STATUS").
 					WithJSON(map[string]string{"value": "updated"}).
 					Execute()
 
@@ -206,7 +206,7 @@ var _ = Describe("Environment Variable Management", func() {
 					if resp.StatusCode == 200 {
 						var envResp map[string]interface{}
 						resp.JSON(&envResp)
-						
+
 						if envMap, ok := envResp["env"].(map[string]interface{}); ok {
 							Expect(envMap["COUNTER"]).To(Equal("1"))
 							Expect(envMap["STATUS"]).To(Equal("updated"))
