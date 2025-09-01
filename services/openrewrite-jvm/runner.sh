@@ -369,8 +369,8 @@ ls -la "${OUTPUT_TAR}"
 if [ -n "${OUTPUT_KEY}" ]; then
     echo "[OpenRewrite] Uploading output to SeaweedFS..."
     echo "[OpenRewrite] Job ID: ${JOB_ID}"
-    # Add artifacts/ prefix to OUTPUT_KEY since SeaweedFS base URL doesn't include it
-    UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
+    # Use OUTPUT_KEY directly - unified storage layer handles bucket/collection path construction
+    UPLOAD_URL="${SEAWEEDFS_URL}/${OUTPUT_KEY}"
     echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
     
     echo "[OpenRewrite] Attempting to upload $(ls -lh ${OUTPUT_TAR} | awk '{print $5}') file to SeaweedFS..."
@@ -393,7 +393,7 @@ if [ -n "${OUTPUT_KEY}" ]; then
     echo "[OpenRewrite] Upload exit code: ${UPLOAD_EXIT_CODE}"
     
     if [ $UPLOAD_EXIT_CODE -eq 0 ] && echo "$UPLOAD_RESPONSE" | grep -q "HTTP_CODE:2[0-9][0-9]"; then
-        echo "[OpenRewrite] Output uploaded successfully to artifacts/${OUTPUT_KEY}"
+        echo "[OpenRewrite] Output uploaded successfully to ${OUTPUT_KEY}"
     else
         echo "[OpenRewrite] ERROR: Failed to upload output to SeaweedFS"
         echo "[OpenRewrite] Exit code: ${UPLOAD_EXIT_CODE}"
