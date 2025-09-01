@@ -27,6 +27,7 @@ import (
 // BuildDependencies holds the dependencies needed for build operations
 type BuildDependencies struct {
 	StorageClient *storage.StorageClient
+	Storage       storage.Storage // NEW: Unified storage interface
 	EnvStore      envstore.EnvStoreInterface
 }
 
@@ -76,11 +77,11 @@ func TriggerAppBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore 
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
 func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext) error {
 	appName := c.Params("app")
-	
+
 	// Validate app name
 	if err := validation.ValidateAppName(appName); err != nil {
 		return c.Status(400).JSON(fiber.Map{
-			"error": "Invalid app name",
+			"error":   "Invalid app name",
 			"details": err.Error(),
 		})
 	}
@@ -190,28 +191,28 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		if err := os.MkdirAll(persistentDir, 0755); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("failed to create persistent artifacts directory: %w", err))
 		}
-		
+
 		persistentImagePath := filepath.Join(persistentDir, filepath.Base(imagePath))
-		
+
 		// Copy the image file
 		if err := copyFile(imagePath, persistentImagePath); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("failed to copy image to persistent location: %w", err))
 		}
-		
+
 		// Also copy any signature files
 		if utils.FileExists(imagePath + ".sig") {
 			if err := copyFile(imagePath+".sig", persistentImagePath+".sig"); err != nil {
 				fmt.Printf("Warning: Failed to copy signature file: %v\n", err)
 			}
 		}
-		
+
 		// Also copy any SBOM files
 		if utils.FileExists(imagePath + ".sbom.json") {
 			if err := copyFile(imagePath+".sbom.json", persistentImagePath+".sbom.json"); err != nil {
 				fmt.Printf("Warning: Failed to copy SBOM file: %v\n", err)
 			}
 		}
-		
+
 		// Update imagePath to point to the persistent location
 		imagePath = persistentImagePath
 	}
@@ -232,7 +233,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			fmt.Printf("Warning: SBOM generation failed for container %s: %v\n", dockerImage, err)
 		}
 	}
-	
+
 	// Also generate source code SBOM for dependency analysis
 	if !utils.FileExists(filepath.Join(srcDir, ".sbom.json")) {
 		generator := supply.NewSBOMGenerator()
@@ -247,7 +248,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Sign the built artifact if not already signed
-	if imagePath != "" && !utils.FileExists(imagePath + ".sig") {
+	if imagePath != "" && !utils.FileExists(imagePath+".sig") {
 		// Sign file-based artifacts (Lanes A, B, C, D, F)
 		if err := supply.SignArtifact(imagePath); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("artifact signing failed: %w", err))
@@ -261,7 +262,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	sbom := utils.FileExists(imagePath+".sbom.json") || utils.FileExists(filepath.Join(srcDir, "SBOM.json"))
-	
+
 	var signed bool
 	if imagePath != "" {
 		// Check for file-based artifact signatures
@@ -291,18 +292,18 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	vulnScanPassed := false
 	var scanResult *security.ScanResult
 	var scanner *security.VulnerabilityScanner
-	
+
 	// Only perform Harbor integration for container images (Lane E, G)
 	if dockerImage != "" {
 		// Harbor authentication is mandatory for container images
 		if err := registry.MustAuthenticate(); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("Harbor authentication failed: %w", err))
 		}
-		
+
 		// Harbor vulnerability scanning with context-specific thresholds
 		harborClient := harbor.NewClient(registry.GetFullEndpoint(), registry.Username, registry.Password)
 		scanner = security.NewVulnerabilityScanner(harborClient)
-		
+
 		// Extract repository name from Docker image tag
 		parts := strings.Split(dockerImage, "/")
 		if len(parts) >= 2 {
@@ -312,7 +313,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			if len(repoParts) >= 2 {
 				repoName := repoParts[0]
 				tag := repoParts[1]
-				
+
 				// Apply context-specific vulnerability thresholds
 				var err error
 				if buildCtx.AppType == config.PlatformApp {
@@ -320,7 +321,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				} else {
 					scanResult, err = scanner.ValidateForUserApps(projectName, repoName, tag)
 				}
-				
+
 				if err != nil {
 					// For non-production environments, log warning but don't fail
 					env := c.Query("env", "dev")
@@ -332,10 +333,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				} else {
 					vulnScanPassed = scanResult.Passed
 					fmt.Printf("Harbor vulnerability scan: %s\n", scanner.GetVulnerabilitySummary(scanResult))
-					
+
 					// Log scan results for monitoring
 					if scanResult.HighSeverity {
-						fmt.Printf("WARNING: Image contains high severity vulnerabilities (%d critical, %d high)\n", 
+						fmt.Printf("WARNING: Image contains high severity vulnerabilities (%d critical, %d high)\n",
 							scanResult.CriticalCount, scanResult.HighCount)
 					}
 				}
@@ -350,13 +351,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	env := c.Query("env", "dev")
 	breakGlass := c.Query("break_glass", "false") == "true"
 	debug := c.Query("debug", "false") == "true"
-	
+
 	// Determine signing method based on environment and available signatures
 	signingMethod := determineSigningMethod(imagePath, dockerImage, env)
-	
+
 	// Get source repository information and perform Git validation if available
 	sourceRepo := extractSourceRepository(srcDir)
-	
+
 	// Perform Git repository validation if this is a Git repository
 	gitUtils := git.NewGitUtils(srcDir)
 	if gitUtils.IsGitRepository() {
@@ -372,14 +373,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 					fmt.Printf("  Security Issue: %s\n", issue)
 				}
 			}
-			
+
 			// Get repository health score
 			if health, err := validator.GetRepositoryHealth(srcDir); err == nil {
 				fmt.Printf("Repository health score: %d/100\n", health)
 			}
 		}
 	}
-	
+
 	if err := opa.Enforce(opa.ArtifactInput{
 		Signed:         signed,
 		SBOMPresent:    sbom,
@@ -402,51 +403,51 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	// Use enhanced templates with comprehensive configuration
 	jobFile, err := nomad.RenderTemplate(lane, nomad.RenderData{
-		App:           appName,
-		ImagePath:     imagePath,
-		DockerImage:   dockerImage,
-		EnvVars:       appEnvVars,
-		Version:       sha,
-		MainClass:     mainClass,
-		IsDebug:       debug,
-		
+		App:         appName,
+		ImagePath:   imagePath,
+		DockerImage: dockerImage,
+		EnvVars:     appEnvVars,
+		Version:     sha,
+		MainClass:   mainClass,
+		IsDebug:     debug,
+
 		// Enable enhanced features
 		VaultEnabled:        true,  // Enable Vault integration for secrets
 		ConsulConfigEnabled: true,  // Enable Consul KV configuration
 		ConnectEnabled:      true,  // Enable Consul Connect service mesh
 		VolumeEnabled:       false, // Disable volumes by default (can be enabled per app)
 		DebugEnabled:        debug, // Enable debug features for debug builds
-		
+
 		// Resource allocation based on lane
 		InstanceCount: getInstanceCountForLane(lane),
 		CpuLimit:      getCpuLimitForLane(lane),
 		MemoryLimit:   getMemoryLimitForLane(lane),
 		HttpPort:      8080,
-		
+
 		// JVM-specific configuration for Lane C
 		JvmMemory:   getJvmMemoryForLane(lane),
 		JvmCpus:     2,
 		JavaVersion: "17", // Default Java version
-		
+
 		// Domain configuration
 		DomainSuffix: "ployd.app",
-		
+
 		// Build metadata
 		BuildTime: time.Now().Format(time.RFC3339),
 	})
 	if err != nil {
 		return utils.ErrJSON(c, 500, err)
 	}
-	
+
 	if err := nomad.Submit(jobFile); err != nil {
 		return utils.ErrJSON(c, 500, err)
 	}
-	
+
 	_ = nomad.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
 
 	if deps.StorageClient != nil {
 		keyPrefix := appName + "/" + sha + "/"
-		
+
 		// Upload artifact bundle with comprehensive error handling and verification
 		if imagePath != "" {
 			if result, err := deps.StorageClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
@@ -458,7 +459,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				}
 			}
 		}
-		
+
 		// Upload source code SBOM with enhanced retry and verification
 		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
 		if _, err := os.Stat(sourceSBOMPath); err == nil {
@@ -468,7 +469,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				fmt.Printf("Source SBOM uploaded and verified successfully\n")
 			}
 		}
-		
+
 		// Upload container SBOM for Lane E with enhanced retry and verification
 		if dockerImage != "" {
 			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
@@ -480,7 +481,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				}
 			}
 		}
-		
+
 		// Upload metadata with enhanced retry and verification
 		meta := map[string]string{
 			"lane":        lane,
@@ -507,7 +508,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		"namespace":   buildCtx.APIContext,
 		"appType":     string(buildCtx.AppType),
 	}
-	
+
 	// Add Harbor registry information for container images
 	if dockerImage != "" {
 		response["harbor"] = fiber.Map{
@@ -516,18 +517,18 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			"imageTag": dockerImage,
 		}
 	}
-	
+
 	// Add vulnerability scan results if available
 	if scanResult != nil && scanner != nil {
 		response["security"] = fiber.Map{
-			"vulnScanPassed":    scanResult.Passed,
+			"vulnScanPassed":     scanResult.Passed,
 			"vulnerabilityCount": scanResult.VulnCount,
-			"criticalCount":     scanResult.CriticalCount,
-			"highCount":         scanResult.HighCount,
-			"severityThreshold": scanner.GetSeverityThreshold(),
+			"criticalCount":      scanResult.CriticalCount,
+			"highCount":          scanResult.HighCount,
+			"severityThreshold":  scanner.GetSeverityThreshold(),
 		}
 	}
-	
+
 	return c.JSON(response)
 }
 
@@ -538,20 +539,20 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer srcFile.Close()
-	
+
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer dstFile.Close()
-	
+
 	if _, err := srcFile.WriteTo(dstFile); err != nil {
 		return err
 	}
-	
+
 	// Set readable permissions for Nomad access
 	os.Chmod(dst, 0755)
-	
+
 	return nil
 }
 
@@ -559,18 +560,18 @@ func copyFile(src, dst string) error {
 func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, filePath, storageKey, contentType string) error {
 	const maxRetries = 3
 	const baseDelay = time.Second
-	
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Open file for this attempt
 		f, err := os.Open(filePath)
 		if err != nil {
 			return fmt.Errorf("failed to open file %s: %w", filePath, err)
 		}
-		
+
 		// Attempt upload with verification
 		_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), storageKey, f, contentType)
 		f.Close()
-		
+
 		if uploadErr == nil {
 			// Upload successful, now verify integrity
 			verifier := storage.NewIntegrityVerifier(storeClient)
@@ -586,15 +587,15 @@ func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, file
 				return fmt.Errorf("integrity verification failed after %d attempts: %w", maxRetries, verifyErr)
 			} else {
 				// Success: upload and verification both passed
-				fmt.Printf("File %s uploaded and verified: %s (size: %d bytes)\n", 
+				fmt.Printf("File %s uploaded and verified: %s (size: %d bytes)\n",
 					filepath.Base(filePath), info.StorageKey, info.UploadedSize)
 				return nil
 			}
 		}
-		
+
 		// Upload failed
 		fmt.Printf("Upload attempt %d failed: %v\n", attempt, uploadErr)
-		
+
 		// If this is not the last attempt, retry with exponential backoff
 		if attempt < maxRetries {
 			delay := time.Duration(attempt) * baseDelay
@@ -602,7 +603,7 @@ func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, file
 			time.Sleep(delay)
 		}
 	}
-	
+
 	return fmt.Errorf("upload failed after %d attempts", maxRetries)
 }
 
@@ -610,21 +611,21 @@ func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, file
 func uploadBytesWithRetryAndVerification(storeClient *storage.StorageClient, data []byte, storageKey, contentType string) error {
 	const maxRetries = 3
 	const baseDelay = time.Second
-	
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Create new reader for this attempt
 		reader := bytes.NewReader(data)
-		
+
 		// Attempt upload
 		result, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), storageKey, reader, contentType)
-		
+
 		if uploadErr == nil {
 			// Upload successful, verify by checking result and optionally retrieving object
 			if result != nil && result.Size == int64(len(data)) {
 				fmt.Printf("Data uploaded and size verified: %s (%d bytes)\n", storageKey, result.Size)
 				return nil
 			} else {
-				fmt.Printf("Upload attempt %d: size mismatch (expected %d, got %d)\n", 
+				fmt.Printf("Upload attempt %d: size mismatch (expected %d, got %d)\n",
 					attempt, len(data), result.Size)
 				// If this is not the last attempt, continue to retry
 				if attempt < maxRetries {
@@ -636,10 +637,10 @@ func uploadBytesWithRetryAndVerification(storeClient *storage.StorageClient, dat
 				return fmt.Errorf("size verification failed after %d attempts", maxRetries)
 			}
 		}
-		
+
 		// Upload failed
 		fmt.Printf("Upload attempt %d failed: %v\n", attempt, uploadErr)
-		
+
 		// If this is not the last attempt, retry with exponential backoff
 		if attempt < maxRetries {
 			delay := time.Duration(attempt) * baseDelay
@@ -647,6 +648,6 @@ func uploadBytesWithRetryAndVerification(storeClient *storage.StorageClient, dat
 			time.Sleep(delay)
 		}
 	}
-	
+
 	return fmt.Errorf("upload failed after %d attempts", maxRetries)
 }

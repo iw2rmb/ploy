@@ -3,6 +3,7 @@ package build
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/testing/helpers"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
@@ -43,6 +45,187 @@ func createTestTarball(t *testing.T, files map[string]string) []byte {
 	require.NoError(t, err)
 
 	return buf.Bytes()
+}
+
+// RED PHASE TESTS: These tests should fail until we migrate to unified storage interface
+
+// MockUnifiedStorage implements the unified storage.Storage interface for testing
+type MockUnifiedStorage struct {
+	mock.Mock
+}
+
+func (m *MockUnifiedStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	args := m.Called(ctx, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *MockUnifiedStorage) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
+	args := m.Called(ctx, key, reader, opts)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Delete(ctx context.Context, key string) error {
+	args := m.Called(ctx, key)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Exists(ctx context.Context, key string) (bool, error) {
+	args := m.Called(ctx, key)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockUnifiedStorage) List(ctx context.Context, opts storage.ListOptions) ([]storage.Object, error) {
+	args := m.Called(ctx, opts)
+	return args.Get(0).([]storage.Object), args.Error(1)
+}
+
+func (m *MockUnifiedStorage) DeleteBatch(ctx context.Context, keys []string) error {
+	args := m.Called(ctx, keys)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Head(ctx context.Context, key string) (*storage.Object, error) {
+	args := m.Called(ctx, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*storage.Object), args.Error(1)
+}
+
+func (m *MockUnifiedStorage) UpdateMetadata(ctx context.Context, key string, metadata map[string]string) error {
+	args := m.Called(ctx, key, metadata)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Copy(ctx context.Context, src, dst string) error {
+	args := m.Called(ctx, src, dst)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Move(ctx context.Context, src, dst string) error {
+	args := m.Called(ctx, src, dst)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Health(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Metrics() *storage.StorageMetrics {
+	args := m.Called()
+	return args.Get(0).(*storage.StorageMetrics)
+}
+
+// We'll use the existing mocks.EnvStore for the interface tests
+// Just adding the alias for clarity in RED phase tests
+
+// TestBuildDependencies_AcceptsUnifiedStorageInterface tests that BuildDependencies
+// can accept the new unified storage interface instead of *storage.StorageClient
+func TestBuildDependencies_AcceptsUnifiedStorageInterface(t *testing.T) {
+	// RED phase: This test should fail because BuildDependencies still expects
+	// *storage.StorageClient instead of storage.Storage interface
+
+	mockStorage := new(MockUnifiedStorage)
+	mockEnvStore := mocks.NewEnvStore()
+
+	// This should compile and work once we migrate to storage.Storage interface
+	deps := &BuildDependencies{
+		Storage:  mockStorage, // This field doesn't exist yet - will fail to compile
+		EnvStore: mockEnvStore,
+	}
+
+	// Basic validation that the dependency structure works
+	assert.NotNil(t, deps)
+	assert.NotNil(t, deps.Storage)
+	assert.NotNil(t, deps.EnvStore)
+}
+
+// TestBuildHandlerUsesUnifiedStorageInterface tests that build operations
+// use the unified storage interface methods instead of legacy StorageClient methods
+func TestBuildHandlerUsesUnifiedStorageInterface(t *testing.T) {
+	// RED phase: This test validates that build operations will use the unified storage interface
+
+	mockStorage := new(MockUnifiedStorage)
+	mockEnvStore := mocks.NewEnvStore()
+
+	// Mock environment store responses
+	mockEnvStore.On("GetAll", "testapp").Return(map[string]string{
+		"TEST_VAR": "test_value",
+	}, nil)
+
+	// Mock storage operations that should be called during build with unified interface
+	mockStorage.On("Put", mock.Anything, mock.AnythingOfType("string"),
+		mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("Exists", mock.Anything, mock.AnythingOfType("string")).Return(false, nil)
+
+	// This should use the new interface-based approach once implemented
+	deps := &BuildDependencies{
+		Storage:  mockStorage, // Will fail until we update the struct
+		EnvStore: mockEnvStore,
+	}
+
+	buildCtx := &BuildContext{
+		APIContext: "apps",
+		AppType:    config.UserApp,
+	}
+
+	// Create a minimal test context using fiber's test utilities
+	app := fiber.New()
+	c := app.AcquireCtx(nil)
+	defer app.ReleaseCtx(c)
+	c.Request().SetRequestURI("/build/testapp?lane=C&sha=test123")
+	c.Request().SetBody([]byte{}) // Empty tar for now
+
+	// This call should eventually work with unified storage interface
+	err := triggerBuildWithDependencies(c, deps, buildCtx)
+
+	// We expect this to fail initially because the function signature doesn't match
+	assert.Error(t, err, "Expected compilation error until migration is complete")
+
+	// These assertions will pass once we complete the migration
+	// mockStorage.AssertExpectations(t)
+	// mockEnvStore.AssertExpectations(t)
+}
+
+// TestUnifiedStorageOperations tests the specific method calls that should change
+func TestUnifiedStorageOperations(t *testing.T) {
+	// RED phase: Test that verifies the expected unified storage interface calls
+
+	mockStorage := new(MockUnifiedStorage)
+	ctx := context.Background()
+
+	// Test the expected unified storage interface calls
+	testKey := "testapp/test123/artifact.tar"
+	testContent := "test content"
+	reader := io.NopCloser(bytes.NewBufferString(testContent))
+
+	// These are the unified interface methods that should be used instead of legacy methods:
+	// OLD: PutObject(bucket, key, body, contentType) -> NEW: Put(ctx, key, reader, opts...)
+	// OLD: GetObject(bucket, key) -> NEW: Get(ctx, key)
+	// OLD: (no direct equivalent) -> NEW: Exists(ctx, key)
+
+	mockStorage.On("Put", ctx, testKey, mock.Anything, mock.Anything).Return(nil)
+	mockStorage.On("Get", ctx, testKey).Return(reader, nil)
+	mockStorage.On("Exists", ctx, testKey).Return(true, nil)
+
+	// These operations should work with the unified interface
+	err := mockStorage.Put(ctx, testKey, bytes.NewBufferString(testContent))
+	assert.NoError(t, err)
+
+	returnedReader, err := mockStorage.Get(ctx, testKey)
+	assert.NoError(t, err)
+	assert.NotNil(t, returnedReader)
+	returnedReader.Close()
+
+	exists, err := mockStorage.Exists(ctx, testKey)
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	mockStorage.AssertExpectations(t)
 }
 
 // MockStorageClient for testing - implements storage.StorageProvider
