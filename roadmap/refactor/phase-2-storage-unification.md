@@ -303,6 +303,16 @@ Update all storage consumers to use new interface:
    - Deployed to VPS for integration testing (REFACTOR phase)
    - Part of incremental migration strategy - maintains both interfaces during transition
 
+6. ✅ Migrate build handler storage operations to unified interface (COMPLETED - 2025-09-01)
+   - Updated `triggerBuildWithDependencies` to prefer unified storage interface
+   - Implemented `uploadArtifactBundleWithUnifiedStorage` for artifact bundle uploads
+   - Implemented `uploadFileWithUnifiedStorage` with retry logic for file uploads
+   - Implemented `uploadBytesWithUnifiedStorage` for metadata uploads
+   - Maintained backward compatibility with legacy StorageClient
+   - Added comprehensive tests for all unified storage operations
+   - Fixed compilation errors in ARF and ACME modules after migration
+   - Successfully deployed and tested on VPS - API healthy with unified storage
+
 ```go
 // Before
 import "github.com/iw2rmb/internal/storage"
