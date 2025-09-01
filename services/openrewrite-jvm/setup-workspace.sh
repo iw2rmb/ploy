@@ -44,45 +44,42 @@ else
     ARTIFACT_DIR="."
 fi
 
-# Create workspace directory only (runner.sh will create project subdirectory)
-echo "[SETUP] Creating workspace directory..."
-mkdir -p /workspace
+# Create OpenRewrite expected workspace structure
+echo "[SETUP] Creating workspace structure..."
+mkdir -p /workspace/project
 
-# Create input.tar directly from the artifact directory
-echo "[SETUP] Creating input.tar for OpenRewrite runner from $ARTIFACT_DIR..."
-
+# Copy extracted files to workspace and create input.tar that runner script expects
+echo "[SETUP] Copying files from $ARTIFACT_DIR to /workspace/project..."
 if [ "$ARTIFACT_DIR" = "." ]; then
-    # Create tar from current directory, excluding Nomad directories
-    echo "[SETUP] Creating tar from current directory (excluding Nomad dirs)..."
-    tar -cf /workspace/input.tar \
-        --exclude='./tmp' \
-        --exclude='./secrets' \
-        --exclude='./local' \
-        --exclude='./artifacts' \
-        --exclude='./alloc' \
-        . 2>/dev/null || {
-        echo "[SETUP] Failed to create input.tar"
-        exit 1
-    }
+    # Copy all files except known Nomad directories
+    find . -maxdepth 1 -type f -exec cp {} /workspace/project/ \; 2>/dev/null || true
+    find . -maxdepth 1 -type d ! -name . ! -name tmp ! -name secrets -exec cp -r {} /workspace/project/ \; 2>/dev/null || true
 else
-    # Create tar from artifact directory contents
-    echo "[SETUP] Creating tar from $ARTIFACT_DIR contents..."
-    tar -cf /workspace/input.tar -C "$ARTIFACT_DIR" . 2>/dev/null || {
-        echo "[SETUP] Failed to create input.tar"
-        exit 1
-    }
+    cp -r "$ARTIFACT_DIR"/* /workspace/project/ 2>/dev/null || true
 fi
 
-echo "[SETUP] Created input.tar successfully"
-ls -la /workspace/input.tar
+# Create input.tar that the OpenRewrite runner script expects
+echo "[SETUP] Creating input.tar for OpenRewrite runner..."
+cd /workspace/project
+if [ $(find . -type f | wc -l) -gt 0 ]; then
+    tar -cf /workspace/input.tar . 2>/dev/null || {
+        echo "[SETUP] Failed to create input.tar"
+        exit 1
+    }
+    echo "[SETUP] Created input.tar successfully"
+    ls -la /workspace/input.tar
+else
+    echo "[SETUP] ERROR: No files found to tar in /workspace/project"
+    exit 1
+fi
 
-# Debug: Show what's in the tar
-echo "[SETUP] Input tar contents (first 10 files):"
-tar -tvf /workspace/input.tar | head -10
+# Verify workspace contents
+echo "[SETUP] Workspace contents:"
+ls -la /workspace/project/ | head -20
 
-# Verify tar was created with content
-FILE_COUNT=$(tar -tf /workspace/input.tar 2>/dev/null | wc -l)
-echo "[SETUP] Total files in input.tar: $FILE_COUNT"
+# Check if we have any files
+FILE_COUNT=$(find /workspace/project -type f | wc -l)
+echo "[SETUP] Total files in workspace: $FILE_COUNT"
 
 if [ "$FILE_COUNT" -eq 0 ]; then
     echo "[SETUP] WARNING: No files found in input.tar!"
