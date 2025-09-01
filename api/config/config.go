@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/storage/factory"
 )
 
 // ConfigCacheEntry represents a cached configuration with expiration
@@ -40,16 +41,16 @@ func (c *ConfigCache) Get(key string) (interface{}, bool) {
 	if c == nil {
 		return nil, false
 	}
-	
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	entry, exists := c.entries[key]
 	if !exists || time.Now().After(entry.ExpiresAt) {
 		c.misses++
 		return nil, false
 	}
-	
+
 	c.hits++
 	return entry.Config, true
 }
@@ -59,10 +60,10 @@ func (c *ConfigCache) Set(key string, config interface{}) {
 	if c == nil {
 		return
 	}
-	
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.entries[key] = &ConfigCacheEntry{
 		Key:       key,
 		Config:    config,
@@ -74,22 +75,22 @@ func (c *ConfigCache) Set(key string, config interface{}) {
 func (c *ConfigCache) GetStats() map[string]interface{} {
 	if c == nil {
 		return map[string]interface{}{
-			"size": 0,
-			"hits": int64(0),
-			"misses": int64(0),
+			"size":     0,
+			"hits":     int64(0),
+			"misses":   int64(0),
 			"hit_rate": 0.0,
 		}
 	}
-	
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	total := c.hits + c.misses
 	var hitRate float64
 	if total > 0 {
 		hitRate = float64(c.hits) / float64(total)
 	}
-	
+
 	// Count valid entries
 	validEntries := 0
 	now := time.Now()
@@ -98,11 +99,11 @@ func (c *ConfigCache) GetStats() map[string]interface{} {
 			validEntries++
 		}
 	}
-	
+
 	return map[string]interface{}{
-		"size": validEntries,
-		"hits": c.hits,
-		"misses": c.misses,
+		"size":     validEntries,
+		"hits":     c.hits,
+		"misses":   c.misses,
 		"hit_rate": hitRate,
 	}
 }
@@ -112,25 +113,25 @@ func (c *ConfigCache) Clear() {
 	if c == nil {
 		return
 	}
-	
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.entries = make(map[string]*ConfigCacheEntry)
 }
 
 // StorageConfig represents the complete storage configuration
 type StorageConfig struct {
-	Provider    string                `yaml:"provider"`
-	Master      string                `yaml:"master"`
-	Filer       string                `yaml:"filer"`
-	Collection  string                `yaml:"collection"`
-	Replication string                `yaml:"replication"`
-	Timeout     int                   `yaml:"timeout"`
-	DataCenter  string                `yaml:"datacenter"`
-	Rack        string                `yaml:"rack"`
-	Collections CollectionConfig      `yaml:"collections"`
-	Client      ClientConfig          `yaml:"client"`
+	Provider    string           `yaml:"provider"`
+	Master      string           `yaml:"master"`
+	Filer       string           `yaml:"filer"`
+	Collection  string           `yaml:"collection"`
+	Replication string           `yaml:"replication"`
+	Timeout     int              `yaml:"timeout"`
+	DataCenter  string           `yaml:"datacenter"`
+	Rack        string           `yaml:"rack"`
+	Collections CollectionConfig `yaml:"collections"`
+	Client      ClientConfig     `yaml:"client"`
 }
 
 // CollectionConfig defines collection organization
@@ -291,11 +292,11 @@ func (cm *ConfigManager) validateConfig(config *Root) error {
 
 	// Validate duration strings if present
 	durations := map[string]string{
-		"initial_delay":        storage.Client.RetryConfig.InitialDelay,
-		"max_delay":           storage.Client.RetryConfig.MaxDelay,
+		"initial_delay":         storage.Client.RetryConfig.InitialDelay,
+		"max_delay":             storage.Client.RetryConfig.MaxDelay,
 		"health_check_interval": storage.Client.HealthCheckConfig.Interval,
 		"health_check_timeout":  storage.Client.HealthCheckConfig.Timeout,
-		"max_operation_time":   storage.Client.MaxOperationTime,
+		"max_operation_time":    storage.Client.MaxOperationTime,
 	}
 
 	for name, duration := range durations {
@@ -397,11 +398,11 @@ func (cc *ClientConfig) ToClientConfig() (*storage.ClientConfig, error) {
 			BackoffMultiplier: cc.RetryConfig.Multiplier,
 		},
 		HealthCheckConfig: &storage.HealthCheckConfig{
-			CheckInterval:    healthInterval,
-			Timeout:          healthTimeout,
-			TestBucket:       "health-check",
-			TestObjectSize:   1024,
-			EnableDeepCheck:  true,
+			CheckInterval:   healthInterval,
+			Timeout:         healthTimeout,
+			TestBucket:      "health-check",
+			TestObjectSize:  1024,
+			EnableDeepCheck: true,
 		},
 		EnableMetrics:     cc.EnableMetrics,
 		EnableHealthCheck: cc.EnableHealthCheck,
@@ -434,6 +435,62 @@ func CreateStorageClientFromConfig(configPath string) (*storage.StorageClient, e
 
 	// Create enhanced storage client
 	return storage.NewStorageClient(provider, clientConfig), nil
+}
+
+// CreateStorageFromFactory creates a storage instance using the new factory pattern
+// This is the recommended way to create storage instances going forward
+func CreateStorageFromFactory(configPath string) (storage.Storage, error) {
+	// Load configuration
+	config, err := Load(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load storage config: %w", err)
+	}
+
+	// Convert to factory config
+	factoryConfig := factory.FactoryConfig{
+		Provider: config.Storage.Provider,
+		Endpoint: config.Storage.Master, // For SeaweedFS, endpoint is the master
+		Bucket:   config.Storage.Collection,
+		Region:   "", // Not used for SeaweedFS
+	}
+
+	// If provider is empty, default to seaweedfs
+	if factoryConfig.Provider == "" {
+		factoryConfig.Provider = "seaweedfs"
+	}
+
+	// Add extra configuration for SeaweedFS
+	if factoryConfig.Provider == "seaweedfs" {
+		factoryConfig.Extra = map[string]interface{}{
+			"filer":       config.Storage.Filer,
+			"replication": config.Storage.Replication,
+			"timeout":     config.Storage.Timeout,
+		}
+	}
+
+	// Configure retry middleware
+	if config.Storage.Client.RetryConfig.MaxRetries > 0 {
+		initialDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.InitialDelay)
+		maxDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.MaxDelay)
+
+		factoryConfig.Retry = factory.RetryConfig{
+			Enabled:           true,
+			MaxAttempts:       config.Storage.Client.RetryConfig.MaxRetries,
+			InitialDelay:      initialDelay,
+			MaxDelay:          maxDelay,
+			BackoffMultiplier: config.Storage.Client.RetryConfig.Multiplier,
+		}
+	}
+
+	// Configure monitoring middleware
+	if config.Storage.Client.EnableMetrics {
+		factoryConfig.Monitoring = factory.MonitoringConfig{
+			Enabled: true,
+		}
+	}
+
+	// Create storage instance with factory
+	return factory.New(factoryConfig)
 }
 
 // GetStorageConfigPath returns the storage configuration path with fallback logic
@@ -472,9 +529,9 @@ func (cm *ConfigManager) GetCacheStats() map[string]interface{} {
 		return cm.cache.GetStats()
 	}
 	return map[string]interface{}{
-		"size": 0,
-		"hits": int64(0),
-		"misses": int64(0),
+		"size":     0,
+		"hits":     int64(0),
+		"misses":   int64(0),
 		"hit_rate": 0.0,
 	}
 }
