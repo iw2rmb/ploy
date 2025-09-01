@@ -23,7 +23,6 @@ import (
 	javaanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/java"
 	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
 	"github.com/iw2rmb/ploy/api/arf"
-	arfStorage "github.com/iw2rmb/ploy/api/arf/storage"
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/config"
 	"github.com/iw2rmb/ploy/api/consul_envstore"
@@ -63,13 +62,13 @@ type ServiceDependencies struct {
 	ACMEHandler             *acme.Handler
 	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
-	ARFHandler          *arf.Handler
-	AnalysisHandler     *analysis.Handler
-	CoordinationManager *coordination.CoordinationManager
-	BlueGreenManager    *bluegreen.Manager
-	Metrics             *metrics.Metrics
-	StorageConfigPath   string
-	StorageFactory *config.OptimizedStorageClientFactory
+	ARFHandler              *arf.Handler
+	AnalysisHandler         *analysis.Handler
+	CoordinationManager     *coordination.CoordinationManager
+	BlueGreenManager        *bluegreen.Manager
+	Metrics                 *metrics.Metrics
+	StorageConfigPath       string
+	StorageFactory          *config.OptimizedStorageClientFactory
 }
 
 // ControllerConfig holds configuration for controller initialization
@@ -83,7 +82,7 @@ type ControllerConfig struct {
 	EnvStorePath      string
 	CleanupAutoStart  bool
 	ShutdownTimeout   time.Duration
-	EnableCaching  bool
+	EnableCaching     bool
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -103,7 +102,7 @@ func LoadConfigFromEnv() *ControllerConfig {
 	if port == "" {
 		port = utils.Getenv("PORT", "8081")
 	}
-	
+
 	return &ControllerConfig{
 		Port:              port,
 		ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
@@ -114,7 +113,7 @@ func LoadConfigFromEnv() *ControllerConfig {
 		EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
 		CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
 		ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
-		EnableCaching:  utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
+		EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
 	}
 }
 
@@ -141,9 +140,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	// Create Fiber app with middleware
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
-		ReadTimeout:          10 * time.Minute, // 10-minute request timeout
-		WriteTimeout:         10 * time.Minute, // 10-minute response timeout
-		IdleTimeout:          60 * time.Second, // Connection idle timeout
+		ReadTimeout:           10 * time.Minute, // 10-minute request timeout
+		WriteTimeout:          10 * time.Minute, // 10-minute response timeout
+		IdleTimeout:           60 * time.Second, // Connection idle timeout
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			log.Printf("Request error: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -224,6 +223,10 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("✓ Traefik router initialized successfully")
 	}
 
+	// Initialize optimized storage factory early (before components that need it)
+	// Always create the factory - it's required for most components
+	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
+
 	// Initialize health checker
 	log.Printf("Initializing health checker...")
 	healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
@@ -236,7 +239,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 	}
 
 	// Initialize self-update handler
-	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg)
+	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg, storageFactory)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize self-update handler: %v", err)
 	}
@@ -248,7 +251,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 	}
 
 	// Initialize Certificate Manager
-	certificateManager, err := initializeCertificateManager(cfg)
+	certificateManager, err := initializeCertificateManager(cfg, storageFactory)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize certificate manager: %v", err)
 	}
@@ -271,16 +274,11 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		log.Printf("Warning: Failed to initialize ARF handler: %v", err)
 	}
 
-
 	// Initialize Analysis Handler
-	analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler)
+	analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler, storageFactory)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize analysis handler: %v", err)
 	}
-
-
-	// Initialize optimized storage factory
-	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
 
 	// Initialize Metrics
 	metricsInstance := metrics.NewMetrics()
@@ -307,13 +305,13 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 		DNSHandler:              dnsHandler,
 		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
-		ARFHandler:         arfHandler,
-		AnalysisHandler:    analysisHandler,
-		CoordinationManager: coordinationManager,
-		BlueGreenManager:    blueGreenManager,
-		Metrics:             metricsInstance,
-		StorageConfigPath:   cfg.StorageConfigPath,
-		StorageFactory: storageFactory,
+		ARFHandler:              arfHandler,
+		AnalysisHandler:         analysisHandler,
+		CoordinationManager:     coordinationManager,
+		BlueGreenManager:        blueGreenManager,
+		Metrics:                 metricsInstance,
+		StorageConfigPath:       cfg.StorageConfigPath,
+		StorageFactory:          storageFactory,
 	}
 
 	// Record startup time
@@ -406,9 +404,19 @@ func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *
 }
 
 // initializeSelfUpdateHandler initializes self-update handler
-func initializeSelfUpdateHandler(cfg *ControllerConfig) (*selfupdate.Handler, error) {
+func initializeSelfUpdateHandler(cfg *ControllerConfig, factory *config.OptimizedStorageClientFactory) (*selfupdate.Handler, error) {
 	// Create storage client for self-update operations
-	storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+	var storageClient *internalStorage.StorageClient
+	var err error
+
+	if factory != nil {
+		// Use factory if available
+		storageClient, err = factory.CreateClient()
+	} else {
+		// Factory is required for self-update handler
+		return nil, fmt.Errorf("storage factory required for self-update handler")
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage client for self-update: %w", err)
 	}
@@ -438,7 +446,7 @@ func initializeDNSHandler(consulAddr string) (*dns.Handler, error) {
 }
 
 // initializeCertificateManager initializes the certificate manager
-func initializeCertificateManager(cfg *ControllerConfig) (*certificates.CertificateManager, error) {
+func initializeCertificateManager(cfg *ControllerConfig, factory *config.OptimizedStorageClientFactory) (*certificates.CertificateManager, error) {
 	// Create Consul client
 	consulConfig := consulapi.DefaultConfig()
 	if cfg.ConsulAddr != "" {
@@ -450,7 +458,14 @@ func initializeCertificateManager(cfg *ControllerConfig) (*certificates.Certific
 	}
 
 	// Create storage client
-	storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+	var storageClient *internalStorage.StorageClient
+	if factory != nil {
+		// Use factory if available
+		storageClient, err = factory.CreateClient()
+	} else {
+		// Factory is required for certificate manager
+		return nil, fmt.Errorf("storage factory required for certificate manager")
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage client: %w", err)
 	}
@@ -536,24 +551,15 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 }
 
 // getStorageClient creates a new storage client for each request (stateless with caching)
-func (s *Server) getStorageClient() (*internalStorage.StorageClient, error) {
-	if s.dependencies.StorageFactory != nil {
-		// Use optimized factory with caching
-		start := time.Now()
-		client, err := s.dependencies.StorageFactory.CreateClient()
-		if s.dependencies.Metrics != nil {
-			s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
-		}
-		return client, err
-	}
-
-	// Fallback to direct creation
+// Now returns the new storage.Storage interface instead of *storage.StorageClient
+func (s *Server) getStorageClient() (internalStorage.Storage, error) {
+	// Always use the new factory pattern
 	start := time.Now()
-	client, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	storageClient, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if s.dependencies.Metrics != nil {
-		s.dependencies.Metrics.RecordConfigLoadTime("storage", false, time.Since(start))
+		s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
 	}
-	return client, err
+	return storageClient, err
 }
 
 // setupRoutes configures all API routes with dependency injection
@@ -577,14 +583,14 @@ func (s *Server) setupRoutes() {
 	api := s.app.Group("/v1")
 
 	// Application build endpoints with request-scoped storage
-	api.Post("/apps/:app/builds", s.handleTriggerAppBuild)     // Harbor apps namespace
+	api.Post("/apps/:app/builds", s.handleTriggerAppBuild) // Harbor apps namespace
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)
-	
+
 	// Platform service endpoints with Harbor platform namespace
 	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)
-	
+
 	// Legacy build endpoint (backward compatibility - defaults to apps namespace)
 	api.Post("/builds/:app", s.handleTriggerBuild)
 
@@ -641,7 +647,6 @@ func (s *Server) setupRoutes() {
 		log.Printf("ARF routes registered successfully")
 	}
 
-
 	// Static Analysis endpoints
 	if s.dependencies.AnalysisHandler != nil {
 		s.dependencies.AnalysisHandler.RegisterRoutes(s.app)
@@ -659,7 +664,6 @@ func (s *Server) setupRoutes() {
 
 	// Version endpoints
 	version.RegisterRoutes(s.app)
-
 
 	// Health endpoints in API group for versioned access
 	api.Get("/health", s.dependencies.HealthChecker.HealthHandler)
@@ -722,14 +726,14 @@ func (s *Server) setupBlueGreenRoutes(api fiber.Router) {
 func (s *Server) setupPlatformRoutes(api fiber.Router) {
 	// Platform services use separate routes to avoid conflicts with regular apps
 	platformAPI := api.Group("/platform")
-	
+
 	// Platform deployment endpoints
 	platformAPI.Post("/:service/deploy", s.handlePlatformDeploy)
 	platformAPI.Get("/:service/status", s.handlePlatformStatus)
 	platformAPI.Post("/:service/rollback", s.handlePlatformRollback)
 	platformAPI.Delete("/:service", s.handlePlatformRemove)
 	platformAPI.Get("/:service/logs", s.handlePlatformLogs)
-	
+
 	log.Printf("Platform service routes configured at /v1/platform/*")
 }
 
@@ -1144,7 +1148,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 	registryURL := utils.Getenv("PLOY_REGISTRY_URL", "registry.dev.ployman.app")
 	seaweedfsURL := utils.Getenv("SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
 	apiURL := utils.Getenv("PLOY_API_URL", "http://api.service.consul:8081")
-	
+
 	// Create storage provider for OpenRewrite dispatcher
 	var storageProvider internalStorage.StorageProvider
 	seaweedConfig := internalStorage.SeaweedFSConfig{
@@ -1162,15 +1166,15 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		// Use the raw client as provider
 		storageProvider = seaweedClient
 	}
-	
+
 	if storageProvider != nil {
-		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s", 
+		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
 			nomadAddr, registryURL, seaweedfsURL, apiURL)
-		
+
 		// Adapt internal storage to ARF storage interface
-		arfStorageService := arfStorage.NewInternalStorageAdapter(storageProvider)
+		arfStorageService := arf.NewStorageAdapter(storageClient)
 		log.Printf("ARF storage adapter created successfully")
-		
+
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
 			nomadAddr,
 			registryURL,
@@ -1189,7 +1193,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		log.Printf("WARNING: No storage provider available - OpenRewrite dispatcher will not be initialized")
 		log.Printf("Check SeaweedFS connectivity at: %s", seaweedfsURL)
 	}
-	
+
 	// Initialize recipe executor with optional dispatcher
 	engine := arf.NewRecipeExecutor(recipeStorage, sandboxMgr, openRewriteDispatcher)
 	if openRewriteDispatcher != nil {
@@ -1530,7 +1534,7 @@ func initializeTemplateHandler() (*templates.Handler, error) {
 // loadCHTTPPrivateKey loads an RSA private key from a PEM file
 
 // initializeAnalysisHandler initializes the static analysis handler
-func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (*analysis.Handler, error) {
+func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, factory *config.OptimizedStorageClientFactory) (*analysis.Handler, error) {
 	log.Printf("Initializing Static Analysis handler")
 
 	// Create a logger for the analysis engine
@@ -1545,7 +1549,15 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler) (
 
 	if analysisMode == "nomad" {
 		// Create Nomad-based analysis dispatcher
-		storageClient, err := config.CreateStorageClientFromConfig(cfg.StorageConfigPath)
+		var storageClient *internalStorage.StorageClient
+		var err error
+		if factory != nil {
+			// Use factory if available
+			storageClient, err = factory.CreateClient()
+		} else {
+			// Factory is required for analysis handler in nomad mode
+			return nil, fmt.Errorf("storage factory required for analysis handler in nomad mode")
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to create storage client for analysis: %w", err)
 		}

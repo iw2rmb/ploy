@@ -1,6 +1,7 @@
 package health
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -349,8 +350,8 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 		Latency: time.Since(start),
 	}
 
-	// Try to create storage client
-	storeClient, err := config.CreateStorageClientFromConfig(h.storageConfigPath)
+	// Try to create storage client using factory pattern
+	storageClient, err := config.CreateStorageFromFactory(h.storageConfigPath)
 	if err != nil {
 		dep.Status = "unhealthy"
 		dep.Error = fmt.Sprintf("Failed to create storage client: %v", err)
@@ -358,15 +359,25 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 		return dep
 	}
 
-	// Test storage health
-	healthStatus := storeClient.GetHealthStatus()
-	if healthStatus.Status != "healthy" {
+	// Test storage health using new interface
+	ctx := context.Background()
+	if err := storageClient.Health(ctx); err != nil {
 		dep.Status = "unhealthy"
-		dep.Error = "Storage health check failed"
-		dep.Details = healthStatus
+		dep.Error = fmt.Sprintf("Storage health check failed: %v", err)
 	} else {
+		// Get metrics for additional details
+		metrics := storageClient.Metrics()
 		dep.Details = map[string]interface{}{
-			"health": healthStatus,
+			"metrics": map[string]interface{}{
+				"total_uploads":        metrics.TotalUploads,
+				"successful_uploads":   metrics.SuccessfulUploads,
+				"failed_uploads":       metrics.FailedUploads,
+				"total_downloads":      metrics.TotalDownloads,
+				"successful_downloads": metrics.SuccessfulDownloads,
+				"failed_downloads":     metrics.FailedDownloads,
+				"bytes_uploaded":       metrics.TotalBytesUploaded,
+				"bytes_downloaded":     metrics.TotalBytesDownloaded,
+			},
 		}
 	}
 
