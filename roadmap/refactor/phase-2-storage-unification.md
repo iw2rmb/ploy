@@ -313,6 +313,16 @@ Update all storage consumers to use new interface:
    - Fixed compilation errors in ARF and ACME modules after migration
    - Successfully deployed and tested on VPS - API healthy with unified storage
 
+7. ✅ Migrate platform handlers to unified storage (COMPLETED - 2025-09-01)
+   - Created comprehensive tests for platform handler storage migration (`api/platform/handler_test.go`)
+   - Added dual storage support to `platform.Handler` (unified + legacy for backward compatibility)
+   - Implemented `NewHandlerWithStorage` constructor for unified storage interface
+   - Updated `DeployPlatformService` to prefer unified storage with context-aware operations
+   - Migrated `api/server/platform_handlers.go` to use `CreateStorageFromFactory`
+   - Replaced 2 instances of `CreateStorageClientFromConfig` with factory pattern
+   - Successfully deployed to VPS - API healthy with unified storage implementation
+   - Storage operations now use `storage.Put` with `storage.WithContentType` option
+
 ```go
 // Before
 import "github.com/iw2rmb/internal/storage"
