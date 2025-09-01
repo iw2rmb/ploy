@@ -95,8 +95,11 @@ tar -xf "${INPUT_TAR}" || {
 }
 
 echo "[OpenRewrite] Archive extracted successfully"
+echo "[OpenRewrite] Current working directory after extraction: $(pwd)"
 echo "[OpenRewrite] Project directory contents:"
 ls -la
+echo "[OpenRewrite] Directory tree (max depth 2):"
+find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
 
 # Step 2: Detect project type and create minimal POM if needed
@@ -307,6 +310,9 @@ fi
 
 # Step 5: Create output tar
 echo "[OpenRewrite] Creating output archive..."
+echo "[OpenRewrite] Current working directory: $(pwd)"
+echo "[OpenRewrite] Directory structure before tar:"
+ls -la
 echo "[OpenRewrite] Files to archive:"
 find . -type f | head -20
 echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
