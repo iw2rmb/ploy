@@ -28,7 +28,7 @@ func NewARFService(storage storage.Storage, bucket string) (*ARFService, error) 
 	if bucket == "" {
 		bucket = "arf-recipes" // Default bucket for backward compatibility
 	}
-	
+
 	return &ARFService{
 		storage: storage,
 		bucket:  bucket,
@@ -39,29 +39,32 @@ func NewARFService(storage storage.Storage, bucket string) (*ARFService, error) 
 func (s *ARFService) Put(ctx context.Context, key string, data []byte) error {
 	fullKey := fmt.Sprintf("%s/%s", s.bucket, key)
 	reader := bytes.NewReader(data)
-	
+
 	return s.storage.Put(ctx, fullKey, reader)
 }
 
 // Get retrieves data from the given key using the configured bucket
 func (s *ARFService) Get(ctx context.Context, key string) ([]byte, error) {
-	reader, err := s.storage.Get(ctx, key)
+	fullKey := fmt.Sprintf("%s/%s", s.bucket, key)
+	reader, err := s.storage.Get(ctx, fullKey)
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	
+
 	return io.ReadAll(reader)
 }
 
 // Delete removes data at the given key using the configured bucket
 func (s *ARFService) Delete(ctx context.Context, key string) error {
-	return s.storage.Delete(ctx, key)
+	fullKey := fmt.Sprintf("%s/%s", s.bucket, key)
+	return s.storage.Delete(ctx, fullKey)
 }
 
 // Exists checks if a key exists in storage using the configured bucket
 func (s *ARFService) Exists(ctx context.Context, key string) (bool, error) {
-	return s.storage.Exists(ctx, key)
+	fullKey := fmt.Sprintf("%s/%s", s.bucket, key)
+	return s.storage.Exists(ctx, fullKey)
 }
 
 // GetStorage returns the underlying storage interface for advanced operations

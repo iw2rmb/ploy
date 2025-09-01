@@ -686,6 +686,12 @@ func (d *OpenRewriteDispatcher) uploadToStorage(ctx context.Context, filePath, s
 
 	// Log storage client details
 	log.Printf("[OpenRewrite Dispatcher] Storage client type: %T", d.storageClient)
+	
+	// Additional debugging for ARF storage service
+	if arfService, ok := d.storageClient.(*ARFService); ok {
+		log.Printf("[OpenRewrite Dispatcher] ARF Service bucket: %s", arfService.GetBucket())
+		log.Printf("[OpenRewrite Dispatcher] Expected final path: %s/%s", arfService.GetBucket(), storageKey)
+	}
 
 	// Upload to storage with retry logic and detailed error tracking
 	log.Printf("[OpenRewrite Dispatcher] Starting upload with retry logic...")
