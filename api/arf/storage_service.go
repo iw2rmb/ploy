@@ -23,11 +23,19 @@ type StorageAdapter struct {
 	bucket  string
 }
 
-// NewStorageAdapter creates a new adapter for the unified storage interface
+// NewStorageAdapter creates a new adapter for the unified storage interface with default bucket
 func NewStorageAdapter(s storage.Storage) StorageService {
+	return NewStorageAdapterWithBucket(s, "arf-recipes")
+}
+
+// NewStorageAdapterWithBucket creates a new adapter with a specified bucket
+func NewStorageAdapterWithBucket(s storage.Storage, bucket string) StorageService {
+	if bucket == "" {
+		bucket = "arf-recipes" // Default bucket for backward compatibility
+	}
 	return &StorageAdapter{
 		storage: s,
-		bucket:  "arf-recipes", // Default bucket for ARF recipes
+		bucket:  bucket,
 	}
 }
 
