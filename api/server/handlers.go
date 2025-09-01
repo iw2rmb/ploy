@@ -47,14 +47,13 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 
 // handleDestroyApp handles app destruction with request-scoped storage
 func (s *Server) handleDestroyApp(c *fiber.Ctx) error {
-	// For now, we need to use the old CreateStorageClientFromConfig since
-	// lifecycle.DestroyApp still expects *storage.StorageClient
-	// TODO: Update lifecycle.DestroyApp to use storage.Storage interface
-	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	// Use factory pattern to get unified storage interface
+	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if err != nil {
-		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return lifecycle.DestroyApp(c, storeClient, s.dependencies.EnvStore)
+	// Use the new DestroyAppWithStorage function that accepts unified storage
+	return lifecycle.DestroyAppWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
 // handleStorageHealth handles storage health checks with request-scoped client

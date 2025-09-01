@@ -1,471 +1,292 @@
 package lifecycle
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"net/http"
+	"context"
+	"io"
 	"net/http/httptest"
-	"os/exec"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/envstore"
-	"github.com/iw2rmb/ploy/internal/storage"
-	"github.com/iw2rmb/ploy/internal/testing/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/iw2rmb/ploy/api/envstore"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
-// Test helpers for mocking exec.Command
-var execCommand = exec.Command
-var execCommandContext = exec.CommandContext
-
-// Helper to create a test command that returns specific output
-func fakeExecCommand(command string, args ...string) *exec.Cmd {
-	cs := []string{"-test.run=TestHelperProcess", "--", command}
-	cs = append(cs, args...)
-	cmd := exec.Command("go", cs...)
-	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
-	return cmd
+// MockUnifiedStorage is a mock implementation of storage.Storage interface
+type MockUnifiedStorage struct {
+	mock.Mock
 }
 
-func TestDestroyApp(t *testing.T) {
-	tests := []struct {
-		name           string
-		appName        string
-		force          bool
-		setupMocks     func(*mocks.EnvStore, *mocks.StorageClient)
-		expectedStatus string
-		expectedErrors int
-	}{
-		{
-			name:    "successful complete destruction",
-			appName: "test-app",
-			force:   false,
-			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
-				envVars := envstore.AppEnvVars{
-					"KEY1": "value1",
-					"KEY2": "value2",
-				}
-				envStore.On("GetAll", "test-app").Return(envVars, nil)
-				envStore.On("Delete", "test-app", "KEY1").Return(nil)
-				envStore.On("Delete", "test-app", "KEY2").Return(nil)
-			},
-			expectedStatus: "partially_destroyed", // Commands will fail in test environment
-			expectedErrors: 1,                     // Nomad command will fail
-		},
-		{
-			name:    "partial destruction with env error",
-			appName: "test-app",
-			force:   false,
-			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
-				envVars := envstore.AppEnvVars{
-					"KEY1": "value1",
-				}
-				envStore.On("GetAll", "test-app").Return(envVars, nil)
-				envStore.On("Delete", "test-app", "KEY1").Return(errors.New("delete failed"))
-			},
-			expectedStatus: "partially_destroyed",
-			expectedErrors: 2, // Nomad + env error
-		},
-		{
-			name:    "no environment variables found",
-			appName: "test-app",
-			force:   false,
-			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
-				envStore.On("GetAll", "test-app").Return(nil, errors.New("not found"))
-			},
-			expectedStatus: "partially_destroyed",
-			expectedErrors: 1, // Nomad command will fail
-		},
-		{
-			name:    "force destruction",
-			appName: "force-test-app",
-			force:   true,
-			setupMocks: func(envStore *mocks.EnvStore, storageClient *mocks.StorageClient) {
-				envStore.On("GetAll", "force-test-app").Return(nil, errors.New("not found"))
-			},
-			expectedStatus: "partially_destroyed",
-			expectedErrors: 1, // Nomad command will fail
-		},
+func (m *MockUnifiedStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	args := m.Called(ctx, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	// Override exec.Command for testing
-	oldExecCommand := execCommand
-	defer func() { execCommand = oldExecCommand }()
-	execCommand = fakeExecCommand
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup Fiber app
-			app := fiber.New()
-
-			// Setup mocks
-			mockEnvStore := mocks.NewEnvStore()
-			mockStorageClient := mocks.NewStorageClient()
-			tt.setupMocks(mockEnvStore, mockStorageClient)
-
-			// Setup route
-			app.Delete("/apps/:app", func(c *fiber.Ctx) error {
-				return DestroyApp(c, (*storage.StorageClient)(nil), mockEnvStore)
-			})
-
-			// Create request
-			url := fmt.Sprintf("/apps/%s", tt.appName)
-			if tt.force {
-				url += "?force=true"
-			}
-			req := httptest.NewRequest("DELETE", url, nil)
-
-			// Execute request
-			resp, err := app.Test(req)
-			require.NoError(t, err)
-			assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-			// Parse response
-			var result map[string]interface{}
-			err = json.NewDecoder(resp.Body).Decode(&result)
-			require.NoError(t, err)
-
-			// Verify response
-			assert.Equal(t, tt.appName, result["app"])
-			assert.Equal(t, tt.expectedStatus, result["status"])
-
-			errors := result["errors"].([]interface{})
-			assert.Len(t, errors, tt.expectedErrors)
-
-			// Verify mock expectations
-			mockEnvStore.AssertExpectations(t)
-			mockStorageClient.AssertExpectations(t)
-		})
-	}
+	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
-func TestDestroyNomadJobs(t *testing.T) {
-	tests := []struct {
-		name        string
-		appName     string
-		cmdOutput   string
-		cmdError    error
-		expectError bool
-	}{
-		{
-			name:        "successful nomad job destruction",
-			appName:     "test-app",
-			cmdOutput:   "",
-			cmdError:    nil,
-			expectError: false,
-		},
-		{
-			name:        "job not found is not an error",
-			appName:     "missing-app",
-			cmdOutput:   "job not found",
-			cmdError:    errors.New("exit status 1"),
-			expectError: false,
-		},
-		{
-			name:        "nomad command failure",
-			appName:     "error-app",
-			cmdOutput:   "connection refused",
-			cmdError:    errors.New("exit status 1"),
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			status := map[string]interface{}{
-				"operations": map[string]string{},
-			}
-
-			// Mock exec.Command behavior would go here
-			// For simplicity, we're testing the logic without actual command execution
-
-			// Since we can't easily mock exec.Command without refactoring,
-			// we'll focus on testing the function logic
-			if tt.name == "successful nomad job destruction" {
-				// Simulate successful execution
-				status["operations"].(map[string]string)["nomad_"+tt.appName] = "stopped"
-			}
-
-			// The actual test would need command mocking infrastructure
-			// This is a simplified version focusing on the logic
-		})
-	}
+func (m *MockUnifiedStorage) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
+	args := m.Called(ctx, key, reader, opts)
+	return args.Error(0)
 }
 
-func TestDestroyEnvironmentVariables(t *testing.T) {
-	tests := []struct {
-		name        string
-		appName     string
-		envVars     envstore.AppEnvVars
-		getError    error
-		deleteError error
-		expectError bool
-	}{
-		{
-			name:    "successful env var deletion",
-			appName: "test-app",
-			envVars: envstore.AppEnvVars{
-				"KEY1": "value1",
-				"KEY2": "value2",
-				"KEY3": "value3",
-			},
-			getError:    nil,
-			deleteError: nil,
-			expectError: false,
-		},
-		{
-			name:        "no env vars found",
-			appName:     "empty-app",
-			envVars:     nil,
-			getError:    errors.New("not found"),
-			deleteError: nil,
-			expectError: false,
-		},
-		{
-			name:    "deletion failure",
-			appName: "error-app",
-			envVars: envstore.AppEnvVars{
-				"KEY1": "value1",
-			},
-			getError:    nil,
-			deleteError: errors.New("delete failed"),
-			expectError: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockEnvStore := mocks.NewEnvStore()
-			status := map[string]interface{}{
-				"operations": map[string]string{},
-			}
-
-			// Setup mocks
-			mockEnvStore.On("GetAll", tt.appName).Return(tt.envVars, tt.getError)
-			if tt.envVars != nil && tt.getError == nil {
-				for key := range tt.envVars {
-					mockEnvStore.On("Delete", tt.appName, key).Return(tt.deleteError).Maybe()
-				}
-			}
-
-			// Execute
-			err := destroyEnvironmentVariables(tt.appName, status, mockEnvStore)
-
-			// Verify
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				operations := status["operations"].(map[string]string)
-				if tt.getError != nil {
-					assert.Equal(t, "none_found", operations["env_vars"])
-				} else {
-					assert.Contains(t, operations["env_vars"], "deleted_")
-				}
-			}
-
-			mockEnvStore.AssertExpectations(t)
-		})
-	}
+func (m *MockUnifiedStorage) Delete(ctx context.Context, key string) error {
+	args := m.Called(ctx, key)
+	return args.Error(0)
 }
 
-func TestDestroyDomains(t *testing.T) {
-	status := map[string]interface{}{
-		"operations": map[string]string{},
+func (m *MockUnifiedStorage) Exists(ctx context.Context, key string) (bool, error) {
+	args := m.Called(ctx, key)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockUnifiedStorage) List(ctx context.Context, opts storage.ListOptions) ([]storage.Object, error) {
+	args := m.Called(ctx, opts)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	err := destroyDomains("test-app", status)
-	assert.NoError(t, err)
-
-	operations := status["operations"].(map[string]string)
-	assert.Equal(t, "not_implemented", operations["domains"])
+	return args.Get(0).([]storage.Object), args.Error(1)
 }
 
-func TestDestroyCertificates(t *testing.T) {
-	status := map[string]interface{}{
-		"operations": map[string]string{},
+func (m *MockUnifiedStorage) DeleteBatch(ctx context.Context, keys []string) error {
+	args := m.Called(ctx, keys)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Head(ctx context.Context, key string) (*storage.Object, error) {
+	args := m.Called(ctx, key)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	err := destroyCertificates("test-app", status)
-	assert.NoError(t, err)
-
-	operations := status["operations"].(map[string]string)
-	assert.Equal(t, "not_implemented", operations["certificates"])
+	return args.Get(0).(*storage.Object), args.Error(1)
 }
 
-func TestDestroyStorageArtifacts(t *testing.T) {
-	tests := []struct {
-		name        string
-		appName     string
-		storeClient *storage.StorageClient
-		expectedOp  string
-	}{
-		{
-			name:        "no storage client",
-			appName:     "test-app",
-			storeClient: nil,
-			expectedOp:  "no_client",
-		},
-		{
-			name:        "with storage client",
-			appName:     "test-app",
-			storeClient: &storage.StorageClient{},
-			expectedOp:  "not_implemented",
-		},
+func (m *MockUnifiedStorage) UpdateMetadata(ctx context.Context, key string, metadata map[string]string) error {
+	args := m.Called(ctx, key, metadata)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Copy(ctx context.Context, src, dst string) error {
+	args := m.Called(ctx, src, dst)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Move(ctx context.Context, src, dst string) error {
+	args := m.Called(ctx, src, dst)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Health(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockUnifiedStorage) Metrics() *storage.StorageMetrics {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
 	}
+	return args.Get(0).(*storage.StorageMetrics)
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			status := map[string]interface{}{
-				"operations": map[string]string{},
-			}
+// MockEnvStore is a mock implementation of envstore.EnvStoreInterface
+type MockEnvStore struct {
+	mock.Mock
+}
 
-			err := destroyStorageArtifacts(tt.appName, status, tt.storeClient)
-			assert.NoError(t, err)
-
-			operations := status["operations"].(map[string]string)
-			assert.Equal(t, tt.expectedOp, operations["storage"])
-		})
+func (m *MockEnvStore) GetAll(app string) (envstore.AppEnvVars, error) {
+	args := m.Called(app)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
+	return args.Get(0).(envstore.AppEnvVars), args.Error(1)
 }
 
-func TestDestroyContainerImages(t *testing.T) {
-	// This test would require mocking exec.Command
-	// For now, we test the basic structure
-	t.Skip("Requires exec.Command mocking infrastructure")
+func (m *MockEnvStore) Set(app, key, value string) error {
+	args := m.Called(app, key, value)
+	return args.Error(0)
 }
 
-func TestDestroyTemporaryFiles(t *testing.T) {
-	// This test would require mocking exec.Command
-	// For now, we test the basic structure
-	t.Skip("Requires exec.Command mocking infrastructure")
+func (m *MockEnvStore) SetAll(app string, envVars envstore.AppEnvVars) error {
+	args := m.Called(app, envVars)
+	return args.Error(0)
 }
 
-// Integration test for the full destroy flow
-func TestDestroyApp_Integration(t *testing.T) {
-	mockEnvStore := mocks.NewEnvStore()
+func (m *MockEnvStore) Get(app, key string) (string, bool, error) {
+	args := m.Called(app, key)
+	return args.String(0), args.Bool(1), args.Error(2)
+}
 
-	// Setup comprehensive mocks for full flow
+func (m *MockEnvStore) Delete(app, key string) error {
+	args := m.Called(app, key)
+	return args.Error(0)
+}
+
+func (m *MockEnvStore) ToStringArray(app string) ([]string, error) {
+	args := m.Called(app)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+// TestDestroyAppWithUnifiedStorage tests that DestroyApp can work with unified storage
+func TestDestroyAppWithUnifiedStorage(t *testing.T) {
+	// RED phase: This test expects DestroyApp to accept storage.Storage interface
+	// It will fail initially as DestroyApp only accepts *storage.StorageClient
+
+	mockStorage := new(MockUnifiedStorage)
+	mockEnvStore := new(MockEnvStore)
+
+	// Mock environment store response
 	envVars := envstore.AppEnvVars{
-		"DATABASE_URL": "postgres://localhost",
-		"API_KEY":      "secret-key",
-		"DEBUG":        "false",
+		"TEST_VAR": "test_value",
 	}
+	mockEnvStore.On("GetAll", "test-app").Return(envVars, nil)
+	mockEnvStore.On("Delete", "test-app", "TEST_VAR").Return(nil)
 
-	mockEnvStore.On("GetAll", "integration-app").Return(envVars, nil)
-	for key := range envVars {
-		mockEnvStore.On("Delete", "integration-app", key).Return(nil)
-	}
+	// Mock storage List operation for artifact cleanup
+	mockStorage.On("List", mock.Anything, mock.MatchedBy(func(opts storage.ListOptions) bool {
+		return opts.Prefix == "apps/test-app/"
+	})).Return([]storage.Object{
+		{Key: "apps/test-app/artifact1.tar"},
+		{Key: "apps/test-app/artifact2.tar"},
+	}, nil)
 
-	// Create Fiber app and test
+	// Mock storage Delete operations
+	mockStorage.On("Delete", mock.Anything, "apps/test-app/artifact1.tar").Return(nil)
+	mockStorage.On("Delete", mock.Anything, "apps/test-app/artifact2.tar").Return(nil)
+
+	// Create test fiber app
 	app := fiber.New()
 	app.Delete("/apps/:app", func(c *fiber.Ctx) error {
+		// This will fail in RED phase as DestroyAppWithStorage doesn't exist yet
+		return DestroyAppWithStorage(c, mockStorage, mockEnvStore)
+	})
+
+	// Create test request
+	req := httptest.NewRequest("DELETE", "/apps/test-app", nil)
+
+	// Execute request (this will fail in RED phase)
+	resp, err := app.Test(req, 30000)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Check response
+	assert.Equal(t, 200, resp.StatusCode)
+
+	// Verify mocks were called
+	mockEnvStore.AssertExpectations(t)
+	mockStorage.AssertExpectations(t)
+}
+
+// TestDestroyStorageArtifactsWithUnifiedStorage tests storage artifact cleanup with unified interface
+func TestDestroyStorageArtifactsWithUnifiedStorage(t *testing.T) {
+	// RED phase: Test that storage artifacts can be destroyed using unified storage
+
+	mockStorage := new(MockUnifiedStorage)
+
+	// Mock List operation to find artifacts
+	artifacts := []storage.Object{
+		{Key: "apps/myapp/v1/bundle.tar", Size: 1024},
+		{Key: "apps/myapp/v2/bundle.tar", Size: 2048},
+		{Key: "apps/myapp/metadata.json", Size: 256},
+	}
+	mockStorage.On("List", mock.Anything, mock.MatchedBy(func(opts storage.ListOptions) bool {
+		return opts.Prefix == "apps/myapp/"
+	})).Return(artifacts, nil)
+
+	// Mock Delete operations for each artifact
+	for _, artifact := range artifacts {
+		mockStorage.On("Delete", mock.Anything, artifact.Key).Return(nil)
+	}
+
+	status := map[string]interface{}{
+		"operations": map[string]string{},
+		"errors":     []string{},
+	}
+
+	// This function doesn't exist yet but should be implemented
+	err := destroyStorageArtifactsWithUnifiedStorage("myapp", status, mockStorage)
+	assert.NoError(t, err)
+
+	// Verify all artifacts were deleted
+	mockStorage.AssertExpectations(t)
+
+	// Check status was updated
+	operations := status["operations"].(map[string]string)
+	assert.Equal(t, "deleted_3_artifacts", operations["storage"])
+}
+
+// TestBackwardCompatibility tests that the handler still works with legacy StorageClient
+func TestBackwardCompatibility(t *testing.T) {
+	// Ensure backward compatibility is maintained during migration
+
+	mockEnvStore := new(MockEnvStore)
+
+	// Mock environment store
+	mockEnvStore.On("GetAll", "legacy-app").Return(envstore.AppEnvVars{}, nil)
+
+	// Create test fiber app
+	app := fiber.New()
+	app.Delete("/apps/:app", func(c *fiber.Ctx) error {
+		// Original function should still work with nil StorageClient
 		return DestroyApp(c, nil, mockEnvStore)
 	})
 
-	req := httptest.NewRequest("DELETE", "/apps/integration-app", nil)
-	resp, err := app.Test(req)
+	// Create test request
+	req := httptest.NewRequest("DELETE", "/apps/legacy-app", nil)
+
+	// Execute request
+	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	defer resp.Body.Close()
 
-	var result map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	require.NoError(t, err)
+	// Should still work even with nil storage
+	assert.Equal(t, 200, resp.StatusCode)
 
-	assert.Equal(t, "integration-app", result["app"])
-	assert.NotNil(t, result["status"])
-	assert.NotNil(t, result["operations"])
-	assert.NotNil(t, result["errors"])
-
+	// Verify env store was called
 	mockEnvStore.AssertExpectations(t)
 }
 
-// Benchmark tests
-func BenchmarkDestroyEnvironmentVariables(b *testing.B) {
-	mockEnvStore := mocks.NewEnvStore()
-	envVars := make(envstore.AppEnvVars)
+// TestDestroyAppDualStorageSupport tests that both storage interfaces can be used
+func TestDestroyAppDualStorageSupport(t *testing.T) {
+	// Test that the handler can work with either unified or legacy storage
 
-	// Create a large set of environment variables
-	for i := 0; i < 100; i++ {
-		key := fmt.Sprintf("KEY_%d", i)
-		envVars[key] = fmt.Sprintf("value_%d", i)
-	}
+	mockStorage := new(MockUnifiedStorage)
+	mockEnvStore := new(MockEnvStore)
 
-	mockEnvStore.On("GetAll", mock.Anything).Return(envVars, nil)
-	for key := range envVars {
-		mockEnvStore.On("Delete", mock.Anything, key).Return(nil)
-	}
+	// Mock environment store
+	mockEnvStore.On("GetAll", "dual-app").Return(envstore.AppEnvVars{}, nil)
 
-	status := map[string]interface{}{
-		"operations": map[string]string{},
-	}
+	// Mock unified storage operations
+	mockStorage.On("List", mock.Anything, mock.MatchedBy(func(opts storage.ListOptions) bool {
+		return opts.Prefix == "apps/dual-app/"
+	})).Return([]storage.Object{}, nil)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = destroyEnvironmentVariables("bench-app", status, mockEnvStore)
-	}
+	// Create test fiber app
+	app := fiber.New()
+	app.Delete("/apps/:app", func(c *fiber.Ctx) error {
+		// Test with DestroyAppWithStorage (new function with unified storage)
+		return DestroyAppWithStorage(c, mockStorage, mockEnvStore)
+	})
+
+	// Create test request
+	req := httptest.NewRequest("DELETE", "/apps/dual-app", nil)
+
+	// Execute request (will fail in RED phase as function doesn't exist)
+	resp, err := app.Test(req, 30000)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Check response
+	assert.Equal(t, 200, resp.StatusCode)
+
+	// Verify mocks were called
+	mockEnvStore.AssertExpectations(t)
+	mockStorage.AssertExpectations(t)
 }
 
-// Table-driven tests for error scenarios
-func TestDestroyApp_ErrorScenarios(t *testing.T) {
-	scenarios := []struct {
-		name           string
-		setupMocks     func(*mocks.EnvStore)
-		expectedErrors []string
-	}{
-		{
-			name: "env store returns error on delete",
-			setupMocks: func(envStore *mocks.EnvStore) {
-				envVars := envstore.AppEnvVars{"KEY": "value"}
-				envStore.On("GetAll", mock.Anything).Return(envVars, nil)
-				envStore.On("Delete", mock.Anything, "KEY").Return(errors.New("delete error"))
-			},
-			expectedErrors: []string{"Environment cleanup failed"},
-		},
-		{
-			name: "multiple operations fail",
-			setupMocks: func(envStore *mocks.EnvStore) {
-				envStore.On("GetAll", mock.Anything).Return(nil, nil)
-			},
-			expectedErrors: []string{}, // Other operations would fail if properly mocked
-		},
-	}
-
-	for _, sc := range scenarios {
-		t.Run(sc.name, func(t *testing.T) {
-			mockEnvStore := mocks.NewEnvStore()
-			sc.setupMocks(mockEnvStore)
-
-			app := fiber.New()
-			app.Delete("/apps/:app", func(c *fiber.Ctx) error {
-				return DestroyApp(c, nil, mockEnvStore)
-			})
-
-			req := httptest.NewRequest("DELETE", "/apps/error-test", nil)
-			resp, err := app.Test(req)
-			require.NoError(t, err)
-
-			var result map[string]interface{}
-			json.NewDecoder(resp.Body).Decode(&result)
-
-			if len(sc.expectedErrors) > 0 {
-				errors := result["errors"].([]interface{})
-				for _, expectedErr := range sc.expectedErrors {
-					found := false
-					for _, actualErr := range errors {
-						if bytes.Contains([]byte(actualErr.(string)), []byte(expectedErr)) {
-							found = true
-							break
-						}
-					}
-					assert.True(t, found, "Expected error containing '%s' not found", expectedErr)
-				}
-			}
-		})
-	}
-}

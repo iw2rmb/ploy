@@ -280,7 +280,7 @@ consul members && vault status
 systemctl status docker
 docker info && docker version
 docker ps -a && docker images
-curl http://localhost:5000/v2/
+curl http://registry.dev.ployman.app/v2/
 docker system df && docker system prune -f
 
 # Storage and routing
@@ -300,7 +300,7 @@ time ansible-playbook playbooks/{testing,freebsd}.yml
 - Automatic KVM/Kontain runtime detection and configuration
 
 **Registry Setup:**
-- Local Docker Registry v2 at localhost:5000 for development
+- Local Docker Registry v2 at registry.dev.ployman.app for development
 - Insecure registry configuration for local testing
 - Healthcheck validation and automatic startup
 - Registry cleanup and management features
