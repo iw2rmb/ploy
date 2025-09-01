@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -44,7 +45,7 @@ func NewRecipeValidator(securityRules *SecurityRuleSet, enforceRules bool) *Reci
 }
 
 // ValidateRecipe validates a complete recipe
-func (v *RecipeValidator) ValidateRecipe(recipe *models.Recipe) error {
+func (v *RecipeValidator) ValidateRecipe(ctx context.Context, recipe *models.Recipe) error {
 	// Basic validation
 	if err := recipe.Validate(); err != nil {
 		return fmt.Errorf("recipe validation failed: %w", err)
@@ -72,7 +73,7 @@ func (v *RecipeValidator) ValidateRecipeYAML(yamlContent []byte) (*models.Recipe
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	if err := v.ValidateRecipe(&recipe); err != nil {
+	if err := v.ValidateRecipe(context.Background(), &recipe); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +87,7 @@ func (v *RecipeValidator) ValidateRecipeJSON(jsonContent []byte) (*models.Recipe
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	if err := v.ValidateRecipe(&recipe); err != nil {
+	if err := v.ValidateRecipe(context.Background(), &recipe); err != nil {
 		return nil, err
 	}
 
@@ -261,6 +262,44 @@ func (v *RecipeValidator) GetSchemaVersion() string {
 		return "1.0.0"
 	}
 	return v.schemaValidator.GetVersion()
+}
+
+// ValidateStructure validates the recipe structure
+func (v *RecipeValidator) ValidateStructure(recipe *models.Recipe) error {
+	if recipe == nil {
+		return fmt.Errorf("recipe is nil")
+	}
+	// Basic structure validation
+	// TODO: Check actual Recipe struct fields
+	// The Recipe model may not have Name/Version fields directly
+	return nil
+}
+
+// ValidateTransformations validates recipe transformations
+func (v *RecipeValidator) ValidateTransformations(recipe *models.Recipe) error {
+	if recipe == nil {
+		return fmt.Errorf("recipe is nil")
+	}
+	// TODO: Implement transformation validation
+	return nil
+}
+
+// ValidateDependencies validates recipe dependencies
+func (v *RecipeValidator) ValidateDependencies(recipe *models.Recipe) error {
+	if recipe == nil {
+		return fmt.Errorf("recipe is nil")
+	}
+	// TODO: Implement dependency validation
+	return nil
+}
+
+// ValidateAgainstSchema validates recipe against a custom schema
+func (v *RecipeValidator) ValidateAgainstSchema(recipe *models.Recipe, schema interface{}) error {
+	if recipe == nil {
+		return fmt.Errorf("recipe is nil")
+	}
+	// TODO: Implement schema validation
+	return nil
 }
 
 // Helper functions

@@ -27,12 +27,12 @@ type Handler struct {
 
 // ACMEConfig represents ACME configuration
 type ACMEConfig struct {
-	Email              string        `json:"email"`
-	Staging            bool          `json:"staging"`
-	DefaultDomain      string        `json:"default_domain"`
-	AutoRenew          bool          `json:"auto_renew"`
-	RenewalThreshold   time.Duration `json:"renewal_threshold"`
-	NotificationWebhook string       `json:"notification_webhook"`
+	Email               string        `json:"email"`
+	Staging             bool          `json:"staging"`
+	DefaultDomain       string        `json:"default_domain"`
+	AutoRenew           bool          `json:"auto_renew"`
+	RenewalThreshold    time.Duration `json:"renewal_threshold"`
+	NotificationWebhook string        `json:"notification_webhook"`
 }
 
 // NewHandler creates a new ACME handler
@@ -49,8 +49,9 @@ func NewHandler(consulClient *consulapi.Client, storageClient storage.StoragePro
 		return nil, fmt.Errorf("failed to create ACME client: %w", err)
 	}
 
-	// Create certificate storage
-	certStorage := NewCertificateStorage(consulClient, storageClient)
+	// Create certificate storage with adapter for StorageProvider
+	storageAdapter := storage.NewStorageAdapter(storageClient)
+	certStorage := NewCertificateStorage(consulClient, storageAdapter)
 
 	// Create renewal service
 	renewalConfig := DefaultRenewalConfig()
@@ -81,27 +82,27 @@ func NewHandler(consulClient *consulapi.Client, storageClient storage.StoragePro
 // SetupACMERoutes configures ACME certificate management API routes
 func SetupACMERoutes(app *fiber.App, handler *Handler) {
 	api := app.Group("/v1/certs")
-	
+
 	// Certificate issuance
 	api.Post("/issue", handler.IssueCertificate)
 	api.Post("/issue/wildcard", handler.IssueWildcardCertificate)
-	
+
 	// Certificate management
 	api.Get("/", handler.ListCertificates)
 	api.Get("/:domain", handler.GetCertificate)
 	api.Delete("/:domain", handler.DeleteCertificate)
-	
+
 	// Certificate renewal
 	api.Post("/renew/:domain", handler.RenewCertificate)
 	api.Post("/renew/all", handler.RenewAllCertificates)
 	api.Post("/renew/check", handler.CheckRenewal)
-	
+
 	// Renewal service management
 	api.Get("/renewal/status", handler.GetRenewalStatus)
 	api.Post("/renewal/start", handler.StartRenewalService)
 	api.Post("/renewal/stop", handler.StopRenewalService)
 	api.Get("/renewal/stats", handler.GetRenewalStats)
-	
+
 	// Configuration
 	api.Get("/config", handler.GetConfig)
 	api.Post("/config", handler.UpdateConfig)
@@ -134,12 +135,12 @@ func (h *Handler) IssueCertificate(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status":     "issued",
-		"domain":     req.Domains[0],
-		"domains":    req.Domains,
-		"expires":    cert.ExpiresAt.Format("2006-01-02"),
+		"status":      "issued",
+		"domain":      req.Domains[0],
+		"domains":     req.Domains,
+		"expires":     cert.ExpiresAt.Format("2006-01-02"),
 		"is_wildcard": cert.IsWildcard,
-		"message":    "Certificate issued successfully",
+		"message":     "Certificate issued successfully",
 	})
 }
 
@@ -170,12 +171,12 @@ func (h *Handler) IssueWildcardCertificate(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"status":     "issued",
-		"domain":     req.Domain,
-		"wildcard":   fmt.Sprintf("*.%s", req.Domain),
-		"expires":    cert.ExpiresAt.Format("2006-01-02"),
+		"status":      "issued",
+		"domain":      req.Domain,
+		"wildcard":    fmt.Sprintf("*.%s", req.Domain),
+		"expires":     cert.ExpiresAt.Format("2006-01-02"),
 		"is_wildcard": true,
-		"message":    "Wildcard certificate issued successfully",
+		"message":     "Wildcard certificate issued successfully",
 	})
 }
 
@@ -338,7 +339,7 @@ func (h *Handler) CheckRenewal(c *fiber.Ctx) error {
 
 	threshold := time.Duration(thresholdDays) * 24 * time.Hour
 	ctx := context.Background()
-	
+
 	expiring, err := h.storage.GetExpiringSoon(ctx, threshold)
 	if err != nil {
 		return utils.ErrJSON(c, 500, fmt.Errorf("failed to check expiring certificates: %w", err))
@@ -358,9 +359,9 @@ func (h *Handler) CheckRenewal(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"expiring_certificates": expiringList,
-		"count":                len(expiringList),
-		"threshold_days":       thresholdDays,
-		"message":              fmt.Sprintf("Found %d certificates expiring within %d days", len(expiringList), thresholdDays),
+		"count":                 len(expiringList),
+		"threshold_days":        thresholdDays,
+		"message":               fmt.Sprintf("Found %d certificates expiring within %d days", len(expiringList), thresholdDays),
 	})
 }
 
@@ -427,10 +428,10 @@ func (h *Handler) GetRenewalStats(c *fiber.Ctx) error {
 // GetConfig gets current ACME configuration
 func (h *Handler) GetConfig(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
-		"email":         h.config.Email,
-		"staging":       h.config.Staging,
-		"default_domain": h.config.DefaultDomain,
-		"auto_renew":    h.config.AutoRenew,
+		"email":                  h.config.Email,
+		"staging":                h.config.Staging,
+		"default_domain":         h.config.DefaultDomain,
+		"auto_renew":             h.config.AutoRenew,
 		"renewal_threshold_days": int(h.config.RenewalThreshold.Hours() / 24),
 	})
 }
@@ -438,13 +439,13 @@ func (h *Handler) GetConfig(c *fiber.Ctx) error {
 // UpdateConfig updates ACME configuration
 func (h *Handler) UpdateConfig(c *fiber.Ctx) error {
 	var req struct {
-		Email            string `json:"email,omitempty"`
-		Staging          *bool  `json:"staging,omitempty"`
-		DefaultDomain    string `json:"default_domain,omitempty"`
-		AutoRenew        *bool  `json:"auto_renew,omitempty"`
-		RenewalThresholdDays *int `json:"renewal_threshold_days,omitempty"`
+		Email                string `json:"email,omitempty"`
+		Staging              *bool  `json:"staging,omitempty"`
+		DefaultDomain        string `json:"default_domain,omitempty"`
+		AutoRenew            *bool  `json:"auto_renew,omitempty"`
+		RenewalThresholdDays *int   `json:"renewal_threshold_days,omitempty"`
 	}
-	
+
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrJSON(c, 400, fmt.Errorf("invalid request body"))
 	}
@@ -501,7 +502,7 @@ func loadACMEConfig() (*ACMEConfig, error) {
 func saveACMEConfig(config *ACMEConfig) error {
 	// This would typically save to a configuration file or database
 	// For now, just log the configuration
-	log.Printf("ACME configuration updated: email=%s, staging=%v, auto_renew=%v", 
+	log.Printf("ACME configuration updated: email=%s, staging=%v, auto_renew=%v",
 		config.Email, config.Staging, config.AutoRenew)
 	return nil
 }

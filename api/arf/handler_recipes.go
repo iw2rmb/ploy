@@ -16,19 +16,10 @@ func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilt
 	if h.recipeStorage != nil {
 		// Convert RecipeFilters to RecipeFilter
 		storageFilter := RecipeFilter{
-			Tags:       filters.Tags,
-			Categories: []string{}, // Will be set below
-			Languages:  []string{}, // Will be set below
-			Author:     filters.Author,
-			Limit:      20, // Default limit
-		}
-
-		// Convert single values to slices
-		if filters.Category != "" {
-			storageFilter.Categories = []string{filters.Category}
-		}
-		if filters.Language != "" {
-			storageFilter.Languages = []string{filters.Language}
+			Tags:     filters.Tags,
+			Language: filters.Language,
+			Author:   filters.Author,
+			Limit:    20, // Default limit
 		}
 
 		return h.recipeStorage.ListRecipes(ctx, storageFilter)
@@ -58,7 +49,7 @@ func (h *Handler) getRecipeWithStorage(ctx context.Context, recipeID string) (*m
 func (h *Handler) createRecipeWithStorage(ctx context.Context, recipe *models.Recipe) error {
 	// Validate recipe if validator is available
 	if h.recipeValidator != nil {
-		if err := h.recipeValidator.ValidateRecipe(recipe); err != nil {
+		if err := h.recipeValidator.ValidateRecipe(ctx, recipe); err != nil {
 			return fmt.Errorf("recipe validation failed: %w", err)
 		}
 	}
@@ -78,7 +69,7 @@ func (h *Handler) createRecipeWithStorage(ctx context.Context, recipe *models.Re
 func (h *Handler) updateRecipeWithStorage(ctx context.Context, recipeID string, recipe *models.Recipe) error {
 	// Validate recipe if validator is available
 	if h.recipeValidator != nil {
-		if err := h.recipeValidator.ValidateRecipe(recipe); err != nil {
+		if err := h.recipeValidator.ValidateRecipe(ctx, recipe); err != nil {
 			return fmt.Errorf("recipe validation failed: %w", err)
 		}
 	}

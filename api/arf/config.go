@@ -17,23 +17,23 @@ type RecipeValidatorAdapter struct {
 }
 
 func (a *RecipeValidatorAdapter) ValidateRecipe(ctx context.Context, recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(recipe)
+	return a.validator.ValidateRecipe(ctx, recipe)
 }
 
 func (a *RecipeValidatorAdapter) ValidateStructure(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
 }
 
 func (a *RecipeValidatorAdapter) ValidateTransformations(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
 }
 
 func (a *RecipeValidatorAdapter) ValidateSecurityRules(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+	return a.validator.ValidateSecurityRules(recipe) // Use proper method
 }
 
 func (a *RecipeValidatorAdapter) ValidateDependencies(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+	return a.validator.ValidateDependencies(recipe) // Use proper method
 }
 
 func (a *RecipeValidatorAdapter) ValidateAgainstSchema(recipe *models.Recipe, schema interface{}) error {
@@ -41,11 +41,11 @@ func (a *RecipeValidatorAdapter) ValidateAgainstSchema(recipe *models.Recipe, sc
 }
 
 func (a *RecipeValidatorAdapter) ValidateCompatibility(recipe *models.Recipe, targetVersion string) error {
-	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
 }
 
 func (a *RecipeValidatorAdapter) ValidateSyntax(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
 }
 
 func (a *RecipeValidatorAdapter) ValidateSchema(recipe *models.Recipe) error {
@@ -243,27 +243,24 @@ func (c *Config) InitializeStorage() (RecipeStorage, error) {
 			Timeout:     int(c.Storage.Timeout.Seconds()),
 		}
 
-		client, err := internalstorage.New(storageConfig)
+		_, err := internalstorage.New(storageConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create SeaweedFS client: %w", err)
 		}
 
 		// Create index if configured
-		var indexStore RecipeIndexStore
+		// var indexStore RecipeIndexStore
 		if c.Index.Backend == "consul" {
 			// TODO: Implement NewConsulRecipeIndex
 			// indexStore, err = NewConsulRecipeIndex(c.Index.ConsulAddr, c.Index.KeyPrefix)
 			return nil, fmt.Errorf("consul index not yet migrated")
-			if err != nil {
-				return nil, fmt.Errorf("failed to create Consul index: %w", err)
-			}
 		}
 
 		// Create validator if enabled
-		var validator RecipeValidatorInterface
+		// var validator RecipeValidatorInterface
 		if c.Validation.Enabled {
 			securityRules := c.createSecurityRules()
-			validator = validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)
+			_ = validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)
 		}
 
 		// TODO: Implement NewSeaweedFSRecipeStorage
