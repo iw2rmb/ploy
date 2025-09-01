@@ -58,6 +58,9 @@ func New(cfg Config) (*Provider, error) {
 			Timeout: timeout,
 		},
 	}
+	
+	log.Printf("[SeaweedFS Provider] Initialized with Master: %s, Filer: %s, Collection: %s", 
+		provider.masterURL, provider.filerURL, provider.collection)
 
 	return provider, nil
 }

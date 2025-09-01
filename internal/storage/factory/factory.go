@@ -109,6 +109,9 @@ func createSeaweedFSProvider(cfg FactoryConfig) (storage.Storage, error) {
 
 	// Apply extra configuration if provided
 	if cfg.Extra != nil {
+		if filer, ok := cfg.Extra["filer"].(string); ok {
+			seaweedCfg.Filer = filer
+		}
 		if replication, ok := cfg.Extra["replication"].(string); ok {
 			seaweedCfg.Replication = replication
 		}
