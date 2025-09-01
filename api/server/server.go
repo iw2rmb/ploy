@@ -1171,11 +1171,20 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
 			nomadAddr, registryURL, seaweedfsURL, apiURL)
 
-		// Adapt internal storage to ARF storage interface
+		// Create ARF service with unified storage interface
 		// Use "artifacts" bucket for OpenRewrite transformations to match Nomad job expectations
-		storageAdapter := internalStorage.NewStorageAdapter(storageProvider)
-		arfStorageService := arf.NewStorageAdapterWithBucket(storageAdapter, "artifacts")
-		log.Printf("ARF storage adapter created with 'artifacts' bucket for OpenRewrite")
+		storageClient, err := config.CreateStorageFromFactory(cfg.StorageConfigPath)
+		if err != nil {
+			log.Printf("ERROR: Failed to create unified storage for ARF: %v", err)
+			return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
+		}
+		
+		arfStorageService, err := arf.NewARFService(storageClient, "artifacts")
+		if err != nil {
+			log.Printf("ERROR: Failed to create ARF service: %v", err)
+			return nil, fmt.Errorf("failed to create ARF service: %w", err)
+		}
+		log.Printf("ARF service created with unified storage and 'artifacts' bucket for OpenRewrite")
 
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
 			nomadAddr,
