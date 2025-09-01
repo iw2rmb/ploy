@@ -1,4 +1,4 @@
-package api
+package integration
 
 import (
 	"net/http"
@@ -73,7 +73,7 @@ func TestAPITestingFramework(t *testing.T) {
 
 	t.Run("Client configuration", func(t *testing.T) {
 		configuredClient := client.
-			WithTimeout(5 * time.Second).
+			WithTimeout(5*time.Second).
 			WithDefaultHeader("User-Agent", "ploy-test-client")
 
 		assert.Equal(t, 5*time.Second, configuredClient.timeout)

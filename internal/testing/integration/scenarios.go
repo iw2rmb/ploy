@@ -1,16 +1,16 @@
-package api
+package integration
 
 import (
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/testing/fixtures"
 	"github.com/stretchr/testify/assert"
-	"github.com/iw2rmb/ploy/internal/testutil"
 )
 
 // APITestSuite provides comprehensive API testing scenarios
 type APITestSuite struct {
 	client   *TestClient
-	fixtures *testutil.TestDataRepository
+	fixtures *fixtures.TestDataRepository
 	t        *testing.T
 }
 
@@ -18,7 +18,7 @@ type APITestSuite struct {
 func NewAPITestSuite(t *testing.T, baseURL string) *APITestSuite {
 	return &APITestSuite{
 		client:   NewTestClient(t, baseURL),
-		fixtures: testutil.NewTestDataRepository(),
+		fixtures: fixtures.NewTestDataRepository(),
 		t:        t,
 	}
 }
@@ -77,7 +77,7 @@ func (suite *APITestSuite) TestAppLifecycle() {
 		// Could add more specific assertions about app in list
 
 		// 3. Get app status
-		suite.client.GET("/v1/apps/"+appName+"/status").
+		suite.client.GET("/v1/apps/" + appName + "/status").
 			ExpectStatus(200).
 			ExpectJSON().
 			Execute()
@@ -88,7 +88,7 @@ func (suite *APITestSuite) TestAppLifecycle() {
 			"DEBUG":    "true",
 		}
 
-		suite.client.POST("/v1/apps/"+appName+"/env").
+		suite.client.POST("/v1/apps/" + appName + "/env").
 			WithJSON(envVars).
 			ExpectStatus(200).
 			Execute()
@@ -102,12 +102,12 @@ func (suite *APITestSuite) TestAppLifecycle() {
 			AssertJSONPath("env.DEBUG", "true")
 
 		// 6. Cleanup - destroy app
-		suite.client.DELETE("/v1/apps/"+appName).
+		suite.client.DELETE("/v1/apps/" + appName).
 			ExpectStatus(200).
 			Execute()
 
 		// 7. Verify app is gone
-		suite.client.GET("/v1/apps/"+appName+"/status").
+		suite.client.GET("/v1/apps/" + appName + "/status").
 			ExpectStatus(404).
 			Execute()
 	})
@@ -132,13 +132,13 @@ func (suite *APITestSuite) TestEnvironmentVariables() {
 			"VAR3": "value3",
 		}
 
-		suite.client.POST("/v1/apps/"+appName+"/env").
+		suite.client.POST("/v1/apps/" + appName + "/env").
 			WithJSON(envVars).
 			ExpectStatus(200).
 			Execute()
 
 		// Verify all set
-		resp := suite.client.GET("/v1/apps/"+appName+"/env").
+		resp := suite.client.GET("/v1/apps/" + appName + "/env").
 			ExpectStatus(200).
 			ExpectJSON().
 			Execute()
@@ -152,7 +152,7 @@ func (suite *APITestSuite) TestEnvironmentVariables() {
 		assert.Equal(suite.t, "value3", envMap["VAR3"])
 
 		// Update single variable
-		suite.client.PUT("/v1/apps/"+appName+"/env/VAR1").
+		suite.client.PUT("/v1/apps/" + appName + "/env/VAR1").
 			WithJSON(map[string]string{"value": "updated_value1"}).
 			ExpectStatus(200).
 			Execute()
@@ -165,7 +165,7 @@ func (suite *APITestSuite) TestEnvironmentVariables() {
 			AssertJSONPath("env.VAR2", "value2") // unchanged
 
 		// Delete single variable
-		suite.client.DELETE("/v1/apps/"+appName+"/env/VAR2").
+		suite.client.DELETE("/v1/apps/" + appName + "/env/VAR2").
 			ExpectStatus(200).
 			Execute()
 
@@ -186,24 +186,24 @@ func (suite *APITestSuite) TestDomainManagement() {
 		domain := "test.example.com"
 
 		// Add domain
-		suite.client.POST("/v1/apps/"+appName+"/domains").
+		suite.client.POST("/v1/apps/" + appName + "/domains").
 			WithJSON(map[string]string{"domain": domain}).
 			ExpectStatus(201).
 			Execute()
 
 		// List domains
-		suite.client.GET("/v1/apps/"+appName+"/domains").
+		suite.client.GET("/v1/apps/" + appName + "/domains").
 			ExpectStatus(200).
 			ExpectJSON().
 			Execute()
 
 		// Remove domain
-		suite.client.DELETE("/v1/apps/"+appName+"/domains/"+domain).
+		suite.client.DELETE("/v1/apps/" + appName + "/domains/" + domain).
 			ExpectStatus(200).
 			Execute()
 
 		// Verify domain removed
-		suite.client.GET("/v1/apps/"+appName+"/domains").
+		suite.client.GET("/v1/apps/" + appName + "/domains").
 			ExpectStatus(200).
 			ExpectJSON().
 			Execute()

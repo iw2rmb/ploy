@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iw2rmb/ploy/internal/testutil"
-	"github.com/iw2rmb/ploy/internal/testutil/api"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
+	"github.com/iw2rmb/ploy/internal/testing/integration"
 )
 
 // ServiceContract defines the contract between services
@@ -187,14 +187,14 @@ func testServiceContract(t *testing.T, contract ServiceContract) {
 
 // testEndpointContract validates an endpoint contract
 func testEndpointContract(t *testing.T, contract EndpointContract) {
-	controllerURL := testutil.GetEnvOrDefault("PLOY_CONTROLLER", "http://localhost:8081")
-	client := api.NewTestClient(t, controllerURL)
+	controllerURL := helpers.GetEnvOrDefault("PLOY_CONTROLLER", "http://localhost:8081")
+	client := integration.NewTestClient(t, controllerURL)
 
 	// Convert path template to actual path for testing
 	testPath := convertPathTemplate(contract.Path)
 
 	// Build request
-	var resp *api.APIResponse
+	var resp *integration.APIResponse
 
 	switch contract.Method {
 	case "GET":

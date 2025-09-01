@@ -1,8 +1,8 @@
 package mocks
 
 import (
-	"github.com/stretchr/testify/mock"
 	"github.com/iw2rmb/ploy/api/envstore"
+	"github.com/stretchr/testify/mock"
 )
 
 // EnvStore provides a mock implementation of envstore.EnvStoreInterface
@@ -66,12 +66,12 @@ func (m *EnvStore) ToStringArray(app string) ([]string, error) {
 func (m *EnvStore) WithApp(app string, envVars envstore.AppEnvVars) *EnvStore {
 	m.data[app] = envVars
 	m.On("GetAll", app).Return(envVars, nil)
-	
+
 	// Set up individual Get calls
 	for key, value := range envVars {
 		m.On("Get", app, key).Return(value, true, nil)
 	}
-	
+
 	return m
 }
 

@@ -9,15 +9,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/iw2rmb/ploy/internal/testutil"
-	"github.com/iw2rmb/ploy/internal/testutil/api"
+	"github.com/iw2rmb/ploy/internal/testing/fixtures"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
+	"github.com/iw2rmb/ploy/internal/testing/integration"
 )
 
 var (
-	apiClient   *api.TestClient
+	apiClient   *integration.TestClient
 	testContext context.Context
 	testCancel  context.CancelFunc
-	fixtures    *testutil.TestDataRepository
+	fixtures    *fixtures.TestDataRepository
 )
 
 func TestBehavioral(t *testing.T) {
@@ -32,15 +33,15 @@ var _ = BeforeSuite(func() {
 	// Initialize API client
 	baseURL := os.Getenv("PLOY_TEST_BASE_URL")
 	if baseURL == "" {
-		baseURL = testutil.GetEnvOrDefault("PLOY_CONTROLLER", "http://localhost:8081")
+		baseURL = helpers.GetEnvOrDefault("PLOY_CONTROLLER", "http://localhost:8081")
 	}
 
 	// Create BDD-friendly API client that handles unavailable services gracefully
-	apiClient = api.NewBDDTestClient(baseURL)
+	apiClient = integration.NewBDDTestClient(baseURL)
 	apiClient.WithTimeout(30 * time.Second)
 
 	// Initialize test fixtures
-	fixtures = testutil.NewTestDataRepository()
+	fixtures = fixtures.NewTestDataRepository()
 
 	// Wait for services to be ready (optional - gracefully handle unavailable services)
 	By("Checking if controller is available for testing")
