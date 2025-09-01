@@ -323,6 +323,16 @@ Update all storage consumers to use new interface:
    - Successfully deployed to VPS - API healthy with unified storage implementation
    - Storage operations now use `storage.Put` with `storage.WithContentType` option
 
+8. ✅ Migrate lifecycle handlers to unified storage (COMPLETED - 2025-09-01)
+   - Created comprehensive tests for lifecycle handler storage migration (`internal/lifecycle/handler_test.go`)
+   - Implemented `DestroyAppWithStorage` function accepting `storage.Storage` interface
+   - Added `destroyStorageArtifactsWithUnifiedStorage` for artifact cleanup with unified storage
+   - Uses `storage.List` to find artifacts and `storage.Delete` for cleanup operations
+   - Migrated `api/server/handlers.go` `handleDestroyApp` to use `CreateStorageFromFactory`
+   - Replaced 1 instance of `CreateStorageClientFromConfig` with factory pattern
+   - Maintained backward compatibility with original `DestroyApp` function
+   - Successfully deployed to VPS - API healthy and lifecycle operations functional
+
 ```go
 // Before
 import "github.com/iw2rmb/internal/storage"

@@ -75,6 +75,46 @@ func TriggerAppBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore 
 	return TriggerBuildWithContext(c, storeClient, envStore, "apps")
 }
 
+// TriggerBuildWithStorage handles build requests using unified storage interface
+func TriggerBuildWithStorage(c *fiber.Ctx, unifiedStorage storage.Storage, envStore envstore.EnvStoreInterface) error {
+	deps := &BuildDependencies{
+		Storage:  unifiedStorage,
+		EnvStore: envStore,
+	}
+	// Default to user app context for compatibility
+	buildCtx := &BuildContext{
+		APIContext: "apps",
+		AppType:    config.UserApp,
+	}
+	return triggerBuildWithDependencies(c, deps, buildCtx)
+}
+
+// TriggerPlatformBuildWithStorage handles platform builds using unified storage
+func TriggerPlatformBuildWithStorage(c *fiber.Ctx, unifiedStorage storage.Storage, envStore envstore.EnvStoreInterface) error {
+	deps := &BuildDependencies{
+		Storage:  unifiedStorage,
+		EnvStore: envStore,
+	}
+	buildCtx := &BuildContext{
+		APIContext: "platform",
+		AppType:    config.PlatformApp,
+	}
+	return triggerBuildWithDependencies(c, deps, buildCtx)
+}
+
+// TriggerAppBuildWithStorage handles app builds using unified storage
+func TriggerAppBuildWithStorage(c *fiber.Ctx, unifiedStorage storage.Storage, envStore envstore.EnvStoreInterface) error {
+	deps := &BuildDependencies{
+		Storage:  unifiedStorage,
+		EnvStore: envStore,
+	}
+	buildCtx := &BuildContext{
+		APIContext: "apps",
+		AppType:    config.UserApp,
+	}
+	return triggerBuildWithDependencies(c, deps, buildCtx)
+}
+
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
 func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext) error {
 	appName := c.Params("app")
