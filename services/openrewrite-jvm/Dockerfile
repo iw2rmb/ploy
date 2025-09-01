@@ -24,7 +24,7 @@ ENV PATH="/opt/gradle/bin:${PATH}"
 
 # Create workspace directory
 WORKDIR /workspace
-RUN mkdir -p /workspace/.m2/repository /workspace/project
+RUN mkdir -p /workspace/.m2/repository
 
 # Create the OpenRewrite runner script and workspace setup
 COPY --chmod=755 runner.sh /usr/local/bin/openrewrite
