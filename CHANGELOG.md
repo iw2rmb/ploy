@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [2025-09-01] - Storage Bucket Configuration for OpenRewrite
+
+### Fixed
+- **OpenRewrite Storage**: Fixed bucket mismatch causing 404 errors in Nomad jobs
+  - Problem: ARF storage adapter was hardcoded to use "arf-recipes" bucket
+  - Solution: Added `NewStorageAdapterWithBucket` function to allow bucket configuration
+  - Result: OpenRewrite now correctly uses "artifacts" bucket matching Nomad job expectations
+  - Maintains backward compatibility with default "arf-recipes" bucket for other use cases
+
+### Changed
+- Updated `api/arf/storage_service.go` to support configurable bucket parameter
+- Modified `api/server/server.go` to use "artifacts" bucket for OpenRewrite dispatcher
+
 ## [2025-08-31] - OpenRewrite Transformation Pipeline Fix
 
 ### Fixed
