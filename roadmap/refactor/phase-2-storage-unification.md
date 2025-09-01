@@ -295,6 +295,14 @@ Update all storage consumers to use new interface:
    - Added TODOs for handlers that still need *StorageClient (build, platform, lifecycle)
    - All code compiles successfully
 
+5. ✅ Begin BuildDependencies migration to unified storage (COMPLETED - 2025-09-01)
+   - Added `Storage storage.Storage` field to `internal/build/trigger.go` BuildDependencies struct
+   - Created failing tests for build handler storage interface migration (RED phase)
+   - Implemented minimal code to pass interface tests (GREEN phase) 
+   - Tests verify BuildDependencies can accept unified storage interface alongside legacy StorageClient
+   - Deployed to VPS for integration testing (REFACTOR phase)
+   - Part of incremental migration strategy - maintains both interfaces during transition
+
 ```go
 // Before
 import "github.com/iw2rmb/internal/storage"
