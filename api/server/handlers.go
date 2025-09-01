@@ -11,7 +11,10 @@ import (
 
 // handleTriggerBuild handles build trigger requests with request-scoped storage (legacy)
 func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
-	storeClient, err := s.getStorageClient()
+	// For now, we need to use the old CreateStorageClientFromConfig since
+	// TriggerBuild still expects *storage.StorageClient
+	// TODO: Update build.TriggerBuild to use storage.Storage interface
+	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
@@ -20,7 +23,10 @@ func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
 
 // handleTriggerPlatformBuild handles platform service builds with Harbor platform namespace
 func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
-	storeClient, err := s.getStorageClient()
+	// For now, we need to use the old CreateStorageClientFromConfig since
+	// TriggerPlatformBuild still expects *storage.StorageClient
+	// TODO: Update build.TriggerPlatformBuild to use storage.Storage interface
+	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
@@ -29,7 +35,10 @@ func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
 
 // handleTriggerAppBuild handles user application builds with Harbor apps namespace
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
-	storeClient, err := s.getStorageClient()
+	// For now, we need to use the old CreateStorageClientFromConfig since
+	// TriggerAppBuild still expects *storage.StorageClient
+	// TODO: Update build.TriggerAppBuild to use storage.Storage interface
+	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
@@ -38,7 +47,10 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 
 // handleDestroyApp handles app destruction with request-scoped storage
 func (s *Server) handleDestroyApp(c *fiber.Ctx) error {
-	storeClient, err := s.getStorageClient()
+	// For now, we need to use the old CreateStorageClientFromConfig since
+	// lifecycle.DestroyApp still expects *storage.StorageClient
+	// TODO: Update lifecycle.DestroyApp to use storage.Storage interface
+	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
@@ -51,8 +63,12 @@ func (s *Server) handleStorageHealth(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
-	health := storeClient.GetHealthStatus()
-	return c.JSON(health)
+	// Use the new Health method from Storage interface
+	ctx := c.Context()
+	if err := storeClient.Health(ctx); err != nil {
+		return c.Status(503).JSON(fiber.Map{"status": "unhealthy", "error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "healthy"})
 }
 
 // handleStorageMetrics handles storage metrics with request-scoped client
@@ -61,7 +77,8 @@ func (s *Server) handleStorageMetrics(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
 	}
-	metrics := storeClient.GetMetrics()
+	// Use the new Metrics method from Storage interface
+	metrics := storeClient.Metrics()
 	return c.JSON(metrics)
 }
 
