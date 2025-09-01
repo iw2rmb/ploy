@@ -333,6 +333,25 @@ else
     echo "[OpenRewrite] No project/ directory found (good)"
 fi
 
+# Debug: Show exactly where we are and what files exist before tar creation
+echo "[OpenRewrite] Pre-tar debugging:"
+echo "[OpenRewrite] Current directory: $(pwd)"
+echo "[OpenRewrite] Contents of current directory:"
+ls -la . | head -10
+echo "[OpenRewrite] Contents of /workspace:"
+ls -la /workspace | head -10
+echo "[OpenRewrite] Checking if files moved up to /workspace level:"
+if [ -f "/workspace/pom.xml" ]; then
+    echo "[OpenRewrite] FOUND: Files were moved up to /workspace level!"
+    echo "[OpenRewrite] Changing to /workspace for tar creation"
+    cd /workspace
+elif [ -f "./pom.xml" ]; then
+    echo "[OpenRewrite] Files remain in current directory (/workspace/project/)"
+else
+    echo "[OpenRewrite] Warning: No pom.xml found in either location"
+fi
+
+echo "[OpenRewrite] Final location for tar creation: $(pwd)"
 echo "[OpenRewrite] Creating tar archive (excluding Maven cache and workspace files)..."
 # Check if project directory is empty and exclude it if so
 if [ -d "project" ] && [ -z "$(ls -A project)" ]; then

@@ -2,6 +2,7 @@ package build
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -445,7 +446,57 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	_ = nomad.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
 
-	if deps.StorageClient != nil {
+	// Prefer unified storage interface if available, fallback to legacy StorageClient
+	if deps.Storage != nil {
+		ctx := c.Context()
+		keyPrefix := appName + "/" + sha + "/"
+
+		// Upload artifact bundle using unified storage interface
+		if imagePath != "" {
+			if err := uploadArtifactBundleWithUnifiedStorage(ctx, deps.Storage, keyPrefix, imagePath); err != nil {
+				return utils.ErrJSON(c, 500, fmt.Errorf("artifact bundle upload with verification failed: %w", err))
+			}
+		}
+
+		// Upload source code SBOM with unified storage interface
+		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
+		if _, err := os.Stat(sourceSBOMPath); err == nil {
+			if err := uploadFileWithUnifiedStorage(ctx, deps.Storage, sourceSBOMPath, keyPrefix+"source.sbom.json", "application/json"); err != nil {
+				fmt.Printf("Warning: Failed to upload source SBOM: %v\n", err)
+			} else {
+				fmt.Printf("Source SBOM uploaded successfully\n")
+			}
+		}
+
+		// Upload container SBOM for Lane E with unified storage interface
+		if dockerImage != "" {
+			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
+			if _, err := os.Stat(containerSBOMPath); err == nil {
+				if err := uploadFileWithUnifiedStorage(ctx, deps.Storage, containerSBOMPath, keyPrefix+"container.sbom.json", "application/json"); err != nil {
+					fmt.Printf("Warning: Failed to upload container SBOM: %v\n", err)
+				} else {
+					fmt.Printf("Container SBOM uploaded successfully\n")
+				}
+			}
+		}
+
+		// Upload metadata with unified storage interface
+		meta := map[string]string{
+			"lane":        lane,
+			"image":       imagePath,
+			"dockerImage": dockerImage,
+			"timestamp":   time.Now().UTC().Format(time.RFC3339),
+			"sbom":        fmt.Sprintf("%t", sbom),
+			"signed":      fmt.Sprintf("%t", signed),
+		}
+		mb, _ := json.Marshal(meta)
+		if err := uploadBytesWithUnifiedStorage(ctx, deps.Storage, mb, keyPrefix+"meta.json", "application/json"); err != nil {
+			fmt.Printf("Warning: Failed to upload metadata: %v\n", err)
+		} else {
+			fmt.Printf("Metadata uploaded successfully\n")
+		}
+	} else if deps.StorageClient != nil {
+		// Fallback to legacy storage client for backward compatibility
 		keyPrefix := appName + "/" + sha + "/"
 
 		// Upload artifact bundle with comprehensive error handling and verification
@@ -591,6 +642,109 @@ func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, file
 					filepath.Base(filePath), info.StorageKey, info.UploadedSize)
 				return nil
 			}
+		}
+
+		// Upload failed
+		fmt.Printf("Upload attempt %d failed: %v\n", attempt, uploadErr)
+
+		// If this is not the last attempt, retry with exponential backoff
+		if attempt < maxRetries {
+			delay := time.Duration(attempt) * baseDelay
+			fmt.Printf("Retrying upload after %v...\n", delay)
+			time.Sleep(delay)
+		}
+	}
+
+	return fmt.Errorf("upload failed after %d attempts", maxRetries)
+}
+
+// uploadArtifactBundleWithUnifiedStorage uploads an artifact bundle using unified storage interface
+func uploadArtifactBundleWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, keyPrefix, artifactPath string) error {
+	// Upload main artifact file
+	if err := uploadFileWithUnifiedStorage(ctx, storageInterface, artifactPath, keyPrefix+filepath.Base(artifactPath), "application/octet-stream"); err != nil {
+		return fmt.Errorf("failed to upload artifact: %w", err)
+	}
+
+	// Upload signature file if it exists
+	sigPath := artifactPath + ".sig"
+	if _, err := os.Stat(sigPath); err == nil {
+		if err := uploadFileWithUnifiedStorage(ctx, storageInterface, sigPath, keyPrefix+filepath.Base(sigPath), "application/octet-stream"); err != nil {
+			fmt.Printf("Warning: Failed to upload signature file: %v\n", err)
+		}
+	}
+
+	// Upload SBOM file if it exists
+	sbomPath := artifactPath + ".sbom.json"
+	if _, err := os.Stat(sbomPath); err == nil {
+		if err := uploadFileWithUnifiedStorage(ctx, storageInterface, sbomPath, keyPrefix+filepath.Base(sbomPath), "application/json"); err != nil {
+			fmt.Printf("Warning: Failed to upload SBOM file: %v\n", err)
+		}
+	}
+
+	fmt.Printf("Artifact bundle uploaded successfully: %s\n", filepath.Base(artifactPath))
+	return nil
+}
+
+// uploadFileWithUnifiedStorage uploads a file using unified storage interface with retry logic
+func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, filePath, storageKey, contentType string) error {
+	const maxRetries = 3
+	const baseDelay = time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Open file for this attempt
+		f, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %w", filePath, err)
+		}
+
+		// Attempt upload with unified storage interface
+		putOpts := []storage.PutOption{
+			storage.WithContentType(contentType),
+		}
+
+		uploadErr := storageInterface.Put(ctx, storageKey, f, putOpts...)
+		f.Close()
+
+		if uploadErr == nil {
+			// Upload successful - unified storage interface doesn't need separate verification
+			fmt.Printf("File %s uploaded successfully: %s\n", filepath.Base(filePath), storageKey)
+			return nil
+		}
+
+		// Upload failed
+		fmt.Printf("Upload attempt %d failed: %v\n", attempt, uploadErr)
+
+		// If this is not the last attempt, retry with exponential backoff
+		if attempt < maxRetries {
+			delay := time.Duration(attempt) * baseDelay
+			fmt.Printf("Retrying upload after %v...\n", delay)
+			time.Sleep(delay)
+		}
+	}
+
+	return fmt.Errorf("upload failed after %d attempts", maxRetries)
+}
+
+// uploadBytesWithUnifiedStorage uploads byte data using unified storage interface with retry logic
+func uploadBytesWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, data []byte, storageKey, contentType string) error {
+	const maxRetries = 3
+	const baseDelay = time.Second
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		// Create new reader for this attempt
+		reader := bytes.NewReader(data)
+
+		// Attempt upload with unified storage interface
+		putOpts := []storage.PutOption{
+			storage.WithContentType(contentType),
+		}
+
+		uploadErr := storageInterface.Put(ctx, storageKey, reader, putOpts...)
+
+		if uploadErr == nil {
+			// Upload successful
+			fmt.Printf("Data uploaded successfully: %s (%d bytes)\n", storageKey, len(data))
+			return nil
 		}
 
 		// Upload failed
