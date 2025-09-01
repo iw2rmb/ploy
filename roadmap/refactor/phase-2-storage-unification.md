@@ -253,8 +253,8 @@ func New(cfg Config) (Storage, error) {
 ### Step 3: Add Middleware Layers
 
 1. ✅ Extract retry logic to middleware (COMPLETED)
-2. Extract monitoring to middleware
-3. Add new cache middleware
+2. ✅ Extract monitoring to middleware (COMPLETED)
+3. ✅ Add new cache middleware (COMPLETED)
 
 ### Step 4: Update Consumers
 
