@@ -8,13 +8,12 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/iw2rmb/ploy/api/arf/storage"
 	"gopkg.in/yaml.v3"
 )
 
 // RecipeExecutor executes transformation recipes
 type RecipeExecutor struct {
-	storage              storage.RecipeStorage
+	storage              RecipeStorage
 	sandboxMgr           SandboxManager
 	openRewriteEngine    *OpenRewriteEngine
 	openRewriteDispatcher *OpenRewriteDispatcher
@@ -22,7 +21,7 @@ type RecipeExecutor struct {
 
 // NewRecipeExecutor creates a new recipe executor
 // The dispatcher parameter is optional and can be nil if OpenRewrite support is not needed
-func NewRecipeExecutor(storage storage.RecipeStorage, sandboxMgr SandboxManager, dispatcher *OpenRewriteDispatcher) *RecipeExecutor {
+func NewRecipeExecutor(storage RecipeStorage, sandboxMgr SandboxManager, dispatcher *OpenRewriteDispatcher) *RecipeExecutor {
 	return &RecipeExecutor{
 		storage:              storage,
 		sandboxMgr:           sandboxMgr,

@@ -8,15 +8,14 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/iw2rmb/ploy/api/arf/storage"
 )
 
 // Helper methods to bridge catalog and storage interfaces
 
 func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error) {
 	if h.recipeStorage != nil {
-		// Convert RecipeFilters to storage.RecipeFilter
-		storageFilter := storage.RecipeFilter{
+		// Convert RecipeFilters to RecipeFilter
+		storageFilter := RecipeFilter{
 			Tags:       filters.Tags,
 			Categories: []string{}, // Will be set below
 			Languages:  []string{}, // Will be set below
