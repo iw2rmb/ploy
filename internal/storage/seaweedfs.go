@@ -91,9 +91,11 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 	dir := filepath.Dir(key)
 	fmt.Printf("[SeaweedFS PutObject] Directory path: %s\n", dir)
 	if dir != "." && dir != "/" {
-		fmt.Printf("[SeaweedFS PutObject] Creating directory: %s/%s\n", bucket, dir)
-		if err := c.createDirectory(bucket, dir); err != nil {
-			fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to create directory %s/%s: %v\n", bucket, dir, err)
+		// For unified storage, the key already contains the full path including bucket
+		// So we don't need to add bucket prefix again
+		fmt.Printf("[SeaweedFS PutObject] Creating directory with full path: %s\n", dir)
+		if err := c.createDirectoryFullPath(dir); err != nil {
+			fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to create directory %s: %v\n", dir, err)
 			return nil, fmt.Errorf("failed to create directory: %w", err)
 		}
 		fmt.Printf("[SeaweedFS PutObject] Directory created successfully\n")
@@ -101,7 +103,8 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 
 	// Use filer's direct upload endpoint which handles both volume upload and registration
 	// Note: We don't include collection parameter as it causes "context canceled" errors in SeaweedFS
-	url := fmt.Sprintf("%s/%s/%s?replication=%s", c.filerURL, bucket, key, c.replication)
+	// For unified storage, key already contains the full path including bucket
+	url := fmt.Sprintf("%s/%s?replication=%s", c.filerURL, key, c.replication)
 	fmt.Printf("[SeaweedFS PutObject] Upload URL: %s\n", url)
 
 	// Get file size for logging
@@ -438,6 +441,32 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
 	fmt.Printf("[SeaweedFS createDirectory] Response Status: %d, Body: %s\n", resp.StatusCode, string(body))
+
+	// Accept 409 Conflict as success (directory already exists)
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
+		return fmt.Errorf("failed to create directory: %s, body: %s", resp.Status, string(body))
+	}
+
+	return nil
+}
+
+func (c *SeaweedFSClient) createDirectoryFullPath(fullPath string) error {
+	// For unified storage where the path already includes all components
+	url := fmt.Sprintf("%s/%s/", c.filerURL, fullPath)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Read response body for debugging
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("[SeaweedFS createDirectoryFullPath] Response Status: %d, Body: %s\n", resp.StatusCode, string(body))
 
 	// Accept 409 Conflict as success (directory already exists)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
