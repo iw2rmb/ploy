@@ -17,80 +17,54 @@ type StorageService interface {
 	Exists(ctx context.Context, key string) (bool, error)
 }
 
-// StorageAdapter adapts the new storage.Storage interface to ARF StorageService
-type StorageAdapter struct {
-	storage storage.Storage
-	bucket  string
-}
-
 // NewStorageAdapter creates a new adapter for the unified storage interface with default bucket
+// Deprecated: Use NewARFService directly for new code
 func NewStorageAdapter(s storage.Storage) StorageService {
 	return NewStorageAdapterWithBucket(s, "arf-recipes")
 }
 
 // NewStorageAdapterWithBucket creates a new adapter with a specified bucket
+// Deprecated: Use NewARFService directly for new code
 func NewStorageAdapterWithBucket(s storage.Storage, bucket string) StorageService {
-	if bucket == "" {
-		bucket = "arf-recipes" // Default bucket for backward compatibility
-	}
-	return &StorageAdapter{
-		storage: s,
-		bucket:  bucket,
-	}
-}
-
-// Put stores data at the given key
-func (a *StorageAdapter) Put(ctx context.Context, key string, data []byte) error {
-	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-	reader := &bytesReader{data: data}
-
-	// Use the new storage interface Put method
-	err := a.storage.Put(ctx, fullKey, reader)
+	// Use the new unified ARF service internally for consistency
+	service, err := NewARFService(s, bucket)
 	if err != nil {
-		return fmt.Errorf("failed to put key %s: %w", key, err)
+		// This should not happen with valid parameters, but handle gracefully
+		return &fallbackStorageAdapter{storage: s, bucket: bucket}
 	}
-
-	return nil
+	return service
 }
 
-// Get retrieves data from the given key
-func (a *StorageAdapter) Get(ctx context.Context, key string) ([]byte, error) {
-	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
+// fallbackStorageAdapter is a minimal fallback implementation
+// This should rarely be used, only if NewARFService fails unexpectedly
+type fallbackStorageAdapter struct {
+	storage storage.Storage
+	bucket  string
+}
 
-	// Use the new storage interface Get method
+func (a *fallbackStorageAdapter) Put(ctx context.Context, key string, data []byte) error {
+	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
+	return a.storage.Put(ctx, fullKey, &bytesReader{data: data})
+}
+
+func (a *fallbackStorageAdapter) Get(ctx context.Context, key string) ([]byte, error) {
+	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
 	reader, err := a.storage.Get(ctx, fullKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key %s: %w", key, err)
+		return nil, err
 	}
 	defer reader.Close()
-
 	return io.ReadAll(reader)
 }
 
-// Delete removes data at the given key
-func (a *StorageAdapter) Delete(ctx context.Context, key string) error {
+func (a *fallbackStorageAdapter) Delete(ctx context.Context, key string) error {
 	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-
-	// Use the new storage interface Delete method
-	err := a.storage.Delete(ctx, fullKey)
-	if err != nil {
-		return fmt.Errorf("failed to delete key %s: %w", key, err)
-	}
-
-	return nil
+	return a.storage.Delete(ctx, fullKey)
 }
 
-// Exists checks if a key exists in storage
-func (a *StorageAdapter) Exists(ctx context.Context, key string) (bool, error) {
+func (a *fallbackStorageAdapter) Exists(ctx context.Context, key string) (bool, error) {
 	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-
-	// Use the new storage interface Exists method
-	exists, err := a.storage.Exists(ctx, fullKey)
-	if err != nil {
-		return false, fmt.Errorf("failed to check existence of key %s: %w", key, err)
-	}
-
-	return exists, nil
+	return a.storage.Exists(ctx, fullKey)
 }
 
 // bytesReader implements io.Reader for []byte
