@@ -9,40 +9,34 @@ import (
 	"github.com/iw2rmb/ploy/internal/lifecycle"
 )
 
-// handleTriggerBuild handles build trigger requests with request-scoped storage (legacy)
+// handleTriggerBuild handles build trigger requests with request-scoped storage
 func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
-	// For now, we need to use the old CreateStorageClientFromConfig since
-	// TriggerBuild still expects *storage.StorageClient
-	// TODO: Update build.TriggerBuild to use storage.Storage interface
-	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	// Use factory pattern to get unified storage interface
+	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if err != nil {
-		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return build.TriggerBuild(c, storeClient, s.dependencies.EnvStore)
+	return build.TriggerBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
 // handleTriggerPlatformBuild handles platform service builds with Harbor platform namespace
 func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
-	// For now, we need to use the old CreateStorageClientFromConfig since
-	// TriggerPlatformBuild still expects *storage.StorageClient
-	// TODO: Update build.TriggerPlatformBuild to use storage.Storage interface
-	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	// Use factory pattern to get unified storage interface
+	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if err != nil {
-		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return build.TriggerPlatformBuild(c, storeClient, s.dependencies.EnvStore)
+	return build.TriggerPlatformBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
 // handleTriggerAppBuild handles user application builds with Harbor apps namespace
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
-	// For now, we need to use the old CreateStorageClientFromConfig since
-	// TriggerAppBuild still expects *storage.StorageClient
-	// TODO: Update build.TriggerAppBuild to use storage.Storage interface
-	storeClient, err := config.CreateStorageClientFromConfig(s.dependencies.StorageConfigPath)
+	// Use factory pattern to get unified storage interface
+	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
 	if err != nil {
-		return c.Status(503).JSON(fiber.Map{"error": "Storage client initialization failed", "details": err.Error()})
+		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return build.TriggerAppBuild(c, storeClient, s.dependencies.EnvStore)
+	return build.TriggerAppBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
 // handleDestroyApp handles app destruction with request-scoped storage
