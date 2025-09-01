@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -253,7 +254,7 @@ func (p *Provider) Metrics() *storage.StorageMetrics {
 // StorageProvider interface implementation (for backward compatibility)
 
 func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType string) (*storage.PutObjectResult, error) {
-	fmt.Printf("[SeaweedFS PutObject] Starting upload - bucket: %s, key: %s, contentType: %s\n", bucket, key, contentType)
+	log.Printf("[SeaweedFS PutObject] Starting upload - bucket: %s, key: %s, contentType: %s", bucket, key, contentType)
 
 	// Construct full path with bucket if provided
 	var fullPath string
@@ -263,23 +264,23 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 		// If no bucket, key contains the full path
 		fullPath = key
 	}
-	fmt.Printf("[SeaweedFS PutObject] Full path: %s\n", fullPath)
+	log.Printf("[SeaweedFS PutObject] Full path: %s", fullPath)
 
 	// Create directory structure in filer if needed
 	dir := filepath.Dir(fullPath)
-	fmt.Printf("[SeaweedFS PutObject] Directory path: %s\n", dir)
+	log.Printf("[SeaweedFS PutObject] Directory path: %s", dir)
 	if dir != "." && dir != "/" {
-		fmt.Printf("[SeaweedFS PutObject] Creating directory: %s\n", dir)
+		log.Printf("[SeaweedFS PutObject] Creating directory: %s", dir)
 		if err := p.createDirectoryFullPath(dir); err != nil {
-			fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to create directory %s: %v\n", dir, err)
+			log.Printf("[SeaweedFS PutObject] ERROR: Failed to create directory %s: %v", dir, err)
 			return nil, fmt.Errorf("failed to create directory: %w", err)
 		}
-		fmt.Printf("[SeaweedFS PutObject] Directory created successfully\n")
+		log.Printf("[SeaweedFS PutObject] Directory created successfully")
 	}
 
 	// Use filer's direct upload endpoint with full path
 	url := fmt.Sprintf("%s/%s?replication=%s", p.filerURL, fullPath, p.replication)
-	fmt.Printf("[SeaweedFS PutObject] Upload URL: %s\n", url)
+	log.Printf("[SeaweedFS PutObject] Upload URL: %s", url)
 
 	// Get file size for logging
 	fileSize := int64(0)
@@ -287,7 +288,7 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 		fileSize = size
 	}
 	body.Seek(0, 0) // Reset to start for actual upload
-	fmt.Printf("[SeaweedFS PutObject] File size: %d bytes\n", fileSize)
+	log.Printf("[SeaweedFS PutObject] File size: %d bytes", fileSize)
 
 	// Create multipart form data
 	var buf bytes.Buffer
@@ -296,45 +297,45 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 	// Add file field
 	fileWriter, err := writer.CreateFormFile("file", filepath.Base(key))
 	if err != nil {
-		fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to create form file: %v\n", err)
+		log.Printf("[SeaweedFS PutObject] ERROR: Failed to create form file: %v", err)
 		return nil, fmt.Errorf("failed to create form file: %w", err)
 	}
 
 	bytesWritten, err := io.Copy(fileWriter, body)
 	if err != nil {
-		fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to copy file data: %v\n", err)
+		log.Printf("[SeaweedFS PutObject] ERROR: Failed to copy file data: %v", err)
 		return nil, fmt.Errorf("failed to copy file data: %w", err)
 	}
-	fmt.Printf("[SeaweedFS PutObject] Copied %d bytes to multipart form\n", bytesWritten)
+	log.Printf("[SeaweedFS PutObject] Copied %d bytes to multipart form", bytesWritten)
 
 	writer.Close()
-	fmt.Printf("[SeaweedFS PutObject] Multipart form size: %d bytes\n", buf.Len())
+	log.Printf("[SeaweedFS PutObject] Multipart form size: %d bytes", buf.Len())
 
 	// Make the request
 	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
-		fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to create request: %v\n", err)
+		log.Printf("[SeaweedFS PutObject] ERROR: Failed to create request: %v", err)
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	fmt.Printf("[SeaweedFS PutObject] Request Content-Type: %s\n", writer.FormDataContentType())
+	log.Printf("[SeaweedFS PutObject] Request Content-Type: %s", writer.FormDataContentType())
 
-	fmt.Printf("[SeaweedFS PutObject] Executing HTTP POST request...\n")
+	log.Printf("[SeaweedFS PutObject] Executing HTTP POST request...")
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		fmt.Printf("[SeaweedFS PutObject] ERROR: HTTP request failed: %v\n", err)
+		log.Printf("[SeaweedFS PutObject] ERROR: HTTP request failed: %v", err)
 		return nil, fmt.Errorf("failed to upload: %w", err)
 	}
 	defer resp.Body.Close()
 
-	fmt.Printf("[SeaweedFS PutObject] HTTP Response Status: %s (%d)\n", resp.Status, resp.StatusCode)
+	log.Printf("[SeaweedFS PutObject] HTTP Response Status: %s (%d)", resp.Status, resp.StatusCode)
 
 	// Read response body for debugging
 	responseBody, _ := io.ReadAll(resp.Body)
-	fmt.Printf("[SeaweedFS PutObject] Response Body: %s\n", string(responseBody))
+	log.Printf("[SeaweedFS PutObject] Response Body: %s", string(responseBody))
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		fmt.Printf("[SeaweedFS PutObject] ERROR: Upload failed with status %s, body: %s\n", resp.Status, string(responseBody))
+		log.Printf("[SeaweedFS PutObject] ERROR: Upload failed with status %s, body: %s", resp.Status, string(responseBody))
 		return nil, fmt.Errorf("upload failed: %s", resp.Status)
 	}
 
@@ -347,12 +348,12 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 	// Reset response body reader since we already read it
 	responseReader := bytes.NewReader(responseBody)
 	if err := json.NewDecoder(responseReader).Decode(&result); err != nil {
-		fmt.Printf("[SeaweedFS PutObject] ERROR: Failed to parse response JSON: %v\n", err)
-		fmt.Printf("[SeaweedFS PutObject] Raw response: %s\n", string(responseBody))
+		log.Printf("[SeaweedFS PutObject] ERROR: Failed to parse response JSON: %v", err)
+		log.Printf("[SeaweedFS PutObject] Raw response: %s", string(responseBody))
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	fmt.Printf("[SeaweedFS PutObject] Upload successful - Name: %s, Size: %d\n", result.Name, result.Size)
+	log.Printf("[SeaweedFS PutObject] Upload successful - Name: %s, Size: %d", result.Name, result.Size)
 
 	return &storage.PutObjectResult{
 		ETag:     "", // Not provided by filer direct upload
@@ -496,28 +497,28 @@ func (p *Provider) VerifyUpload(key string) error {
 	// Use HEAD request to check if file exists - use the same bucket pattern as PutObject
 	bucket := p.GetArtifactsBucket()
 	url := fmt.Sprintf("%s/%s/%s", p.filerURL, bucket, key)
-	fmt.Printf("[SeaweedFS VerifyUpload] Checking upload at URL: %s (bucket: %s)\n", url, bucket)
+	log.Printf("[SeaweedFS VerifyUpload] Checking upload at URL: %s (bucket: %s)", url, bucket)
 
 	req, err := http.NewRequest("HEAD", url, nil)
 	if err != nil {
-		fmt.Printf("[SeaweedFS VerifyUpload] ERROR: Failed to create HEAD request: %v\n", err)
+		log.Printf("[SeaweedFS VerifyUpload] ERROR: Failed to create HEAD request: %v", err)
 		return err
 	}
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		fmt.Printf("[SeaweedFS VerifyUpload] ERROR: HEAD request failed: %v\n", err)
+		log.Printf("[SeaweedFS VerifyUpload] ERROR: HEAD request failed: %v", err)
 		return err
 	}
 	defer resp.Body.Close()
 
-	fmt.Printf("[SeaweedFS VerifyUpload] HEAD response status: %s (%d)\n", resp.Status, resp.StatusCode)
+	log.Printf("[SeaweedFS VerifyUpload] HEAD response status: %s (%d)", resp.Status, resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("[SeaweedFS VerifyUpload] ERROR: Object not found at %s, status: %s\n", url, resp.Status)
+		log.Printf("[SeaweedFS VerifyUpload] ERROR: Object not found at %s, status: %s", url, resp.Status)
 		return fmt.Errorf("object not found: %s", resp.Status)
 	}
 
-	fmt.Printf("[SeaweedFS VerifyUpload] SUCCESS: Upload verified at %s\n", url)
+	log.Printf("[SeaweedFS VerifyUpload] SUCCESS: Upload verified at %s", url)
 	return nil
 }
 
@@ -598,7 +599,7 @@ func (p *Provider) createDirectory(bucket, dir string) error {
 
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("[SeaweedFS createDirectory] Response Status: %d, Body: %s\n", resp.StatusCode, string(body))
+	log.Printf("[SeaweedFS createDirectory] Response Status: %d, Body: %s", resp.StatusCode, string(body))
 
 	// Accept 409 Conflict as success (directory already exists)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
@@ -611,8 +612,8 @@ func (p *Provider) createDirectory(bucket, dir string) error {
 func (p *Provider) createDirectoryFullPath(fullPath string) error {
 	// For unified storage where the path already includes all components
 	url := fmt.Sprintf("%s/%s/", p.filerURL, fullPath)
-	fmt.Printf("[SeaweedFS createDirectoryFullPath] Creating directory at URL: %s\n", url)
-	fmt.Printf("[SeaweedFS createDirectoryFullPath] Full path being created: %s\n", fullPath)
+	log.Printf("[SeaweedFS createDirectoryFullPath] Creating directory at URL: %s", url)
+	log.Printf("[SeaweedFS createDirectoryFullPath] Full path being created: %s", fullPath)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
@@ -626,7 +627,7 @@ func (p *Provider) createDirectoryFullPath(fullPath string) error {
 
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("[SeaweedFS createDirectoryFullPath] Response Status: %d, Body: %s\n", resp.StatusCode, string(body))
+	log.Printf("[SeaweedFS createDirectoryFullPath] Response Status: %d, Body: %s", resp.StatusCode, string(body))
 
 	// Accept 409 Conflict as success (directory already exists)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusConflict {
@@ -656,13 +657,13 @@ func (p *Provider) uploadFile(keyPrefix, filePath, contentType string) error {
 		result, err := p.PutObject(p.collection, key, file, contentType)
 		if err != nil {
 			lastErr = err
-			fmt.Printf("SeaweedFS upload attempt %d failed for %s: %v\n", attempt, key, err)
+			log.Printf("SeaweedFS upload attempt %d failed for %s: %v", attempt, key, err)
 			continue
 		}
 
 		// Verify upload by checking if we got a valid result with size
 		if result != nil && result.Size > 0 {
-			fmt.Printf("Successfully uploaded to SeaweedFS %s (size: %d bytes)\n", key, result.Size)
+			log.Printf("Successfully uploaded to SeaweedFS %s (size: %d bytes)", key, result.Size)
 			return nil
 		}
 
