@@ -28,7 +28,7 @@ type CertificateManager struct {
 
 // CertConfig holds certificate management configuration
 type CertConfig struct {
-	AutoProvision    bool          `json:"auto_provision"`     // Auto-provision certificates for new domains
+	AutoProvision    bool          `json:"auto_provision"`    // Auto-provision certificates for new domains
 	Email            string        `json:"email"`             // Let's Encrypt account email
 	Staging          bool          `json:"staging"`           // Use staging environment
 	RenewalThreshold time.Duration `json:"renewal_threshold"` // When to renew certificates
@@ -37,16 +37,16 @@ type CertConfig struct {
 
 // DomainCertificate represents a certificate associated with a domain
 type DomainCertificate struct {
-	Domain       string    `json:"domain"`
-	AppName      string    `json:"app_name"`
-	Status       string    `json:"status"`        // "provisioning", "active", "expired", "failed"
-	Provider     string    `json:"provider"`      // "letsencrypt", "custom"
-	IssuedAt     time.Time `json:"issued_at"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	AutoRenew    bool      `json:"auto_renew"`
-	CertPath     string    `json:"cert_path,omitempty"`     // Storage path for certificate
-	KeyPath      string    `json:"key_path,omitempty"`      // Storage path for private key
-	LastError    string    `json:"last_error,omitempty"`    // Last error message
+	Domain    string    `json:"domain"`
+	AppName   string    `json:"app_name"`
+	Status    string    `json:"status"`   // "provisioning", "active", "expired", "failed"
+	Provider  string    `json:"provider"` // "letsencrypt", "custom"
+	IssuedAt  time.Time `json:"issued_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	AutoRenew bool      `json:"auto_renew"`
+	CertPath  string    `json:"cert_path,omitempty"`  // Storage path for certificate
+	KeyPath   string    `json:"key_path,omitempty"`   // Storage path for private key
+	LastError string    `json:"last_error,omitempty"` // Last error message
 }
 
 // NewCertificateManager creates a new certificate manager
@@ -60,8 +60,9 @@ func NewCertificateManager(consulClient *consulapi.Client, storageClient storage
 		return nil, fmt.Errorf("failed to create ACME client: %w", err)
 	}
 
-	// Create certificate storage
-	certStorage := acme.NewCertificateStorage(consulClient, storageClient)
+	// Create certificate storage with adapter for StorageProvider
+	storageAdapter := storage.NewStorageAdapter(storageClient)
+	certStorage := acme.NewCertificateStorage(consulClient, storageAdapter)
 
 	// Create renewal service
 	renewalConfig := acme.DefaultRenewalConfig()
@@ -74,7 +75,7 @@ func NewCertificateManager(consulClient *consulapi.Client, storageClient storage
 		renewalService:     renewalService,
 		dnsProvider:        dnsProvider,
 		consulClient:       consulClient,
-		config:            config,
+		config:             config,
 	}
 
 	// Start renewal service if auto-provision is enabled
@@ -184,7 +185,7 @@ func (cm *CertificateManager) GetDomainCertificate(appName, domain string) (*Dom
 // ListAppCertificates lists all certificates for an app
 func (cm *CertificateManager) ListAppCertificates(appName string) ([]*DomainCertificate, error) {
 	key := fmt.Sprintf("ploy/certificates/apps/%s", appName)
-	
+
 	pairs, _, err := cm.consulClient.KV().List(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list app certificates: %w", err)
@@ -292,7 +293,7 @@ func (cm *CertificateManager) isDefaultDomainSubdomain(domain string) bool {
 // storeDomainCertificate stores domain certificate metadata in Consul
 func (cm *CertificateManager) storeDomainCertificate(cert *DomainCertificate) error {
 	key := fmt.Sprintf("ploy/certificates/apps/%s/%s", cert.AppName, cert.Domain)
-	
+
 	data, err := json.Marshal(cert)
 	if err != nil {
 		return fmt.Errorf("failed to marshal certificate: %w", err)
@@ -314,7 +315,7 @@ func (cm *CertificateManager) storeDomainCertificate(cert *DomainCertificate) er
 // getDomainCertificate retrieves domain certificate metadata from Consul
 func (cm *CertificateManager) getDomainCertificate(appName, domain string) (*DomainCertificate, error) {
 	key := fmt.Sprintf("ploy/certificates/apps/%s/%s", appName, domain)
-	
+
 	pair, _, err := cm.consulClient.KV().Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get certificate from Consul: %w", err)
@@ -380,7 +381,7 @@ func (cm *CertificateManager) UploadCustomCertificate(ctx context.Context, appNa
 		Provider:  "custom",
 		IssuedAt:  time.Now(),
 		ExpiresAt: time.Now().Add(365 * 24 * time.Hour), // Default 1 year
-		AutoRenew: false, // Custom certificates don't auto-renew
+		AutoRenew: false,                                // Custom certificates don't auto-renew
 		CertPath:  fmt.Sprintf("certificates/%s/cert.pem", domain),
 		KeyPath:   fmt.Sprintf("certificates/%s/key.pem", domain),
 	}
@@ -398,10 +399,10 @@ func (cm *CertificateManager) UploadCustomCertificate(ctx context.Context, appNa
 func loadCertConfig() *CertConfig {
 	return &CertConfig{
 		AutoProvision:    getEnvOrDefault("CERT_AUTO_PROVISION", "true") == "true",
-		Email:           getEnvOrDefault("CERT_EMAIL", "admin@ployd.app"),
-		Staging:         getEnvOrDefault("CERT_STAGING", "true") == "true",
+		Email:            getEnvOrDefault("CERT_EMAIL", "admin@ployd.app"),
+		Staging:          getEnvOrDefault("CERT_STAGING", "true") == "true",
 		RenewalThreshold: 30 * 24 * time.Hour, // 30 days
-		DefaultDomain:   getEnvOrDefault("CERT_DEFAULT_DOMAIN", "ployd.app"),
+		DefaultDomain:    getEnvOrDefault("CERT_DEFAULT_DOMAIN", "ployd.app"),
 	}
 }
 

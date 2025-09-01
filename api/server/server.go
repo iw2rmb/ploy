@@ -1172,7 +1172,8 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			nomadAddr, registryURL, seaweedfsURL, apiURL)
 
 		// Adapt internal storage to ARF storage interface
-		arfStorageService := arf.NewStorageAdapter(storageClient)
+		storageAdapter := internalStorage.NewStorageAdapter(storageProvider)
+		arfStorageService := arf.NewStorageAdapter(storageAdapter)
 		log.Printf("ARF storage adapter created successfully")
 
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
