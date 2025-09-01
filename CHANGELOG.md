@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2025-09-01] - Storage Architecture Consolidation
+
+### Improved
+- **Storage Adapter Consolidation**: Eliminated redundant storage adapter implementations (Phase 2.1)
+  - Created unified `ARFService` using `storage.Storage` interface directly (67 LOC)
+  - Replaced duplicate `StorageAdapter` with delegation pattern maintaining backward compatibility  
+  - Reduced ARF storage adapter complexity by 24% (110 → 83 LOC)
+  - Updated server initialization to use factory pattern instead of double adaptation chain
+  - Completed Phase 2 storage unification by removing StorageProvider → Storage → StorageService layers
+
+### Fixed
+- **Storage Layer Redundancy**: Addressed architectural redundancy identified in Phase 2 analysis
+  - Problem: ARF module maintained custom `StorageService` interface with duplicate adapter logic
+  - Solution: Unified ARF to use `storage.Storage` directly while preserving interface compatibility
+  - Result: Single storage implementation reduces maintenance burden and improves consistency
+  - Benefits: Follows factory pattern, eliminates duplicate code, maintains backward compatibility
+
 ## [2025-09-01] - Storage Bucket Configuration for OpenRewrite
 
 ### Fixed
