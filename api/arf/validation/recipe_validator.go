@@ -4,21 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/iw2rmb/ploy/api/arf/storage"
 	"gopkg.in/yaml.v3"
 )
 
+// SecurityRuleSet defines security constraints
+type SecurityRuleSet struct {
+	AllowedCommands      []string
+	ForbiddenCommands    []string
+	MaxExecutionTime     time.Duration
+	AllowNetworkAccess   bool
+	AllowFileSystemWrite bool
+	SandboxRequired      bool
+	MaxMemoryUsage       int64
+	MaxCPUUsage          float64
+}
+
 // RecipeValidator ensures recipe safety and correctness
 type RecipeValidator struct {
-	securityRules   *storage.SecurityRuleSet
+	securityRules   *SecurityRuleSet
 	schemaValidator *SchemaValidator
 	enforceRules    bool
 }
 
 // NewRecipeValidator creates a new recipe validator
-func NewRecipeValidator(securityRules *storage.SecurityRuleSet, enforceRules bool) *RecipeValidator {
+func NewRecipeValidator(securityRules *SecurityRuleSet, enforceRules bool) *RecipeValidator {
 	if securityRules == nil {
 		// Set default security rules
 		securityRules = GetDefaultSecurityRules()
@@ -363,8 +375,8 @@ func isDangerousPath(path string) bool {
 }
 
 // GetDefaultSecurityRules returns default security rules
-func GetDefaultSecurityRules() *storage.SecurityRuleSet {
-	return &storage.SecurityRuleSet{
+func GetDefaultSecurityRules() *SecurityRuleSet {
+	return &SecurityRuleSet{
 		AllowedCommands: []string{
 			"echo", "printf", "cat", "grep", "sed", "awk",
 			"find", "ls", "pwd", "cd", "mkdir", "cp", "mv",

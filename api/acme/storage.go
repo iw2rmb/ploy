@@ -16,17 +16,17 @@ import (
 
 // CertificateStorage manages certificate storage operations
 type CertificateStorage struct {
-	consulClient  *consulapi.Client
-	storage       storage.StorageProvider
-	keyPrefix     string
+	consulClient *consulapi.Client
+	storage      storage.Storage
+	keyPrefix    string
 }
 
 // CertificateMetadata represents certificate metadata stored in Consul
 type CertificateMetadata struct {
 	Domain       string    `json:"domain"`
-	CertPath     string    `json:"cert_path"`     // Path in storage system
-	KeyPath      string    `json:"key_path"`      // Path in storage system
-	IssuerPath   string    `json:"issuer_path"`   // Path in storage system
+	CertPath     string    `json:"cert_path"`   // Path in storage system
+	KeyPath      string    `json:"key_path"`    // Path in storage system
+	IssuerPath   string    `json:"issuer_path"` // Path in storage system
 	CertURL      string    `json:"cert_url"`
 	IssuedAt     time.Time `json:"issued_at"`
 	ExpiresAt    time.Time `json:"expires_at"`
@@ -37,7 +37,7 @@ type CertificateMetadata struct {
 }
 
 // NewCertificateStorage creates a new certificate storage manager
-func NewCertificateStorage(consulClient *consulapi.Client, storage storage.StorageProvider) *CertificateStorage {
+func NewCertificateStorage(consulClient *consulapi.Client, storage storage.Storage) *CertificateStorage {
 	return &CertificateStorage{
 		consulClient: consulClient,
 		storage:      storage,
@@ -139,7 +139,7 @@ func (cs *CertificateStorage) GetCertificate(ctx context.Context, domain string)
 // ListCertificates lists all stored certificates
 func (cs *CertificateStorage) ListCertificates(ctx context.Context) ([]*CertificateMetadata, error) {
 	kv := cs.consulClient.KV()
-	
+
 	// List all certificate keys
 	keys, _, err := kv.Keys(cs.keyPrefix+"/", "/", nil)
 	if err != nil {
@@ -150,13 +150,13 @@ func (cs *CertificateStorage) ListCertificates(ctx context.Context) ([]*Certific
 	for _, key := range keys {
 		// Extract domain from key
 		domain := filepath.Base(key)
-		
+
 		metadata, err := cs.getMetadata(ctx, domain)
 		if err != nil {
 			log.Printf("Warning: failed to get metadata for domain %s: %v", domain, err)
 			continue
 		}
-		
+
 		certificates = append(certificates, metadata)
 	}
 
@@ -224,7 +224,7 @@ func (cs *CertificateStorage) GetExpiringSoon(ctx context.Context, threshold tim
 
 	var expiring []*CertificateMetadata
 	now := time.Now()
-	
+
 	for _, cert := range allCerts {
 		if cert.AutoRenew && now.Add(threshold).After(cert.ExpiresAt) {
 			expiring = append(expiring, cert)
@@ -254,7 +254,7 @@ func (cs *CertificateStorage) storeMetadata(ctx context.Context, domain string, 
 
 	kv := cs.consulClient.KV()
 	key := fmt.Sprintf("%s/%s", cs.keyPrefix, domain)
-	
+
 	pair := &consulapi.KVPair{
 		Key:   key,
 		Value: data,
@@ -272,7 +272,7 @@ func (cs *CertificateStorage) storeMetadata(ctx context.Context, domain string, 
 func (cs *CertificateStorage) getMetadata(ctx context.Context, domain string) (*CertificateMetadata, error) {
 	kv := cs.consulClient.KV()
 	key := fmt.Sprintf("%s/%s", cs.keyPrefix, domain)
-	
+
 	pair, _, err := kv.Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metadata from Consul: %w", err)
@@ -290,21 +290,24 @@ func (cs *CertificateStorage) getMetadata(ctx context.Context, domain string) (*
 	return &metadata, nil
 }
 
-// uploadData uploads data to storage using the StorageProvider interface
+// uploadData uploads data to storage using the Storage interface
 func (cs *CertificateStorage) uploadData(key string, data []byte) error {
 	reader := bytes.NewReader(data)
-	_, err := cs.storage.PutObject(cs.storage.GetArtifactsBucket(), key, reader, "application/octet-stream")
-	return err
+	ctx := context.Background()
+	fullKey := fmt.Sprintf("certificates/%s", key)
+	return cs.storage.Put(ctx, fullKey, reader, storage.WithContentType("application/octet-stream"))
 }
 
-// downloadData downloads data from storage using the StorageProvider interface
+// downloadData downloads data from storage using the Storage interface
 func (cs *CertificateStorage) downloadData(key string) ([]byte, error) {
-	reader, err := cs.storage.GetObject(cs.storage.GetArtifactsBucket(), key)
+	ctx := context.Background()
+	fullKey := fmt.Sprintf("certificates/%s", key)
+	reader, err := cs.storage.Get(ctx, fullKey)
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	
+
 	return io.ReadAll(reader)
 }
 

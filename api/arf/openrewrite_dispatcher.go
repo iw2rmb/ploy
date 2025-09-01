@@ -13,20 +13,19 @@ import (
 	"log"
 
 	"github.com/hashicorp/nomad/api"
-	"github.com/iw2rmb/ploy/api/arf/storage"
 )
 
 // OpenRewriteDispatcher handles dispatching OpenRewrite transformations to Nomad
 type OpenRewriteDispatcher struct {
 	nomadClient   *api.Client
-	storageClient storage.StorageService
+	storageClient StorageService
 	registryURL   string
 	seaweedfsURL  string
 	apiURL        string
 }
 
 // NewOpenRewriteDispatcher creates a new OpenRewrite dispatcher
-func NewOpenRewriteDispatcher(nomadAddr, registryURL, seaweedfsURL, apiURL string, storageClient storage.StorageService) (*OpenRewriteDispatcher, error) {
+func NewOpenRewriteDispatcher(nomadAddr, registryURL, seaweedfsURL, apiURL string, storageClient StorageService) (*OpenRewriteDispatcher, error) {
 	log.Printf("[OpenRewriteDispatcher] Initializing with parameters:")
 	log.Printf("  - Nomad Address: %s", nomadAddr)
 	log.Printf("  - Registry URL: %s", registryURL)

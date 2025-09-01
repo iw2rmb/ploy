@@ -2,16 +2,15 @@ package arf
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/arf/storage"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
 // Handler provides HTTP endpoints for ARF operations
 type Handler struct {
 	recipeExecutor   *RecipeExecutor
-	recipeStorage    storage.RecipeStorage
-	recipeIndex      storage.RecipeIndexStore
-	recipeValidator  storage.RecipeValidator
+	recipeStorage    RecipeStorage
+	recipeIndex      RecipeIndexStore
+	recipeValidator  RecipeValidatorInterface
 	recipeRegistry   *RecipeRegistry // Unified recipe registry
 	catalog          RecipeCatalog
 	sandboxMgr       SandboxManager
@@ -41,9 +40,9 @@ func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr Sand
 // NewHandlerWithStorage creates a new ARF HTTP handler with storage backend
 func NewHandlerWithStorage(
 	executor *RecipeExecutor,
-	recipeStorage storage.RecipeStorage,
-	recipeIndex storage.RecipeIndexStore,
-	recipeValidator storage.RecipeValidator,
+	recipeStorage RecipeStorage,
+	recipeIndex RecipeIndexStore,
+	recipeValidator RecipeValidatorInterface,
 	sandboxMgr SandboxManager,
 	storageProvider internalStorage.StorageProvider, // Storage provider for recipe registry
 ) *Handler {

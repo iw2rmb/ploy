@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/iw2rmb/ploy/api/arf/storage"
 )
 
 // InMemoryRecipeStorage provides a simple in-memory implementation of RecipeStorage
@@ -93,7 +92,7 @@ func (s *InMemoryRecipeStorage) DeleteRecipe(ctx context.Context, id string) err
 }
 
 // ListRecipes lists recipes with filtering
-func (s *InMemoryRecipeStorage) ListRecipes(ctx context.Context, filter storage.RecipeFilter) ([]*models.Recipe, error) {
+func (s *InMemoryRecipeStorage) ListRecipes(ctx context.Context, filter RecipeFilter) ([]*models.Recipe, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -105,7 +104,7 @@ func (s *InMemoryRecipeStorage) ListRecipes(ctx context.Context, filter storage.
 }
 
 // SearchRecipes performs full-text search
-func (s *InMemoryRecipeStorage) SearchRecipes(ctx context.Context, query string) ([]*storage.RecipeSearchResult, error) {
+func (s *InMemoryRecipeStorage) SearchRecipes(ctx context.Context, query string) ([]*RecipeSearchResult, error) {
 	return nil, fmt.Errorf("search not implemented in memory storage")
 }
 
@@ -146,7 +145,7 @@ func (s *InMemoryRecipeStorage) ImportRecipes(ctx context.Context, recipes []*mo
 }
 
 // ExportRecipes exports recipes matching filter
-func (s *InMemoryRecipeStorage) ExportRecipes(ctx context.Context, filter storage.RecipeFilter) ([]*models.Recipe, error) {
+func (s *InMemoryRecipeStorage) ExportRecipes(ctx context.Context, filter RecipeFilter) ([]*models.Recipe, error) {
 	return s.ListRecipes(ctx, filter)
 }
 
@@ -195,6 +194,6 @@ func (s *InMemoryRecipeStorage) RebuildIndex(ctx context.Context) error {
 }
 
 // UpdateIndex updates the recipe index (no-op for in-memory)
-func (s *InMemoryRecipeStorage) UpdateIndex(ctx context.Context, recipe *models.Recipe, action storage.IndexAction) error {
+func (s *InMemoryRecipeStorage) UpdateIndex(ctx context.Context, recipe *models.Recipe, action IndexAction) error {
 	return nil
 }

@@ -1,14 +1,60 @@
 package arf
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/storage"
+	"github.com/iw2rmb/ploy/api/arf/models"
 	"github.com/iw2rmb/ploy/api/arf/validation"
 	internalstorage "github.com/iw2rmb/ploy/internal/storage"
 )
+
+// RecipeValidatorAdapter adapts validation.RecipeValidator to RecipeValidatorInterface
+type RecipeValidatorAdapter struct {
+	validator *validation.RecipeValidator
+}
+
+func (a *RecipeValidatorAdapter) ValidateRecipe(ctx context.Context, recipe *models.Recipe) error {
+	return a.validator.ValidateRecipe(recipe)
+}
+
+func (a *RecipeValidatorAdapter) ValidateStructure(recipe *models.Recipe) error {
+	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+}
+
+func (a *RecipeValidatorAdapter) ValidateTransformations(recipe *models.Recipe) error {
+	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+}
+
+func (a *RecipeValidatorAdapter) ValidateSecurityRules(recipe *models.Recipe) error {
+	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+}
+
+func (a *RecipeValidatorAdapter) ValidateDependencies(recipe *models.Recipe) error {
+	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+}
+
+func (a *RecipeValidatorAdapter) ValidateAgainstSchema(recipe *models.Recipe, schema interface{}) error {
+	return a.validator.ValidateSchema(recipe)
+}
+
+func (a *RecipeValidatorAdapter) ValidateCompatibility(recipe *models.Recipe, targetVersion string) error {
+	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+}
+
+func (a *RecipeValidatorAdapter) ValidateSyntax(recipe *models.Recipe) error {
+	return a.validator.ValidateRecipe(recipe) // Use base validation for now
+}
+
+func (a *RecipeValidatorAdapter) ValidateSchema(recipe *models.Recipe) error {
+	return a.validator.ValidateSchema(recipe)
+}
+
+func (a *RecipeValidatorAdapter) GetSchemaVersion() string {
+	return a.validator.GetSchemaVersion()
+}
 
 // Config represents the ARF system configuration
 type Config struct {
@@ -185,7 +231,7 @@ func (c *Config) Validate() error {
 }
 
 // InitializeStorage creates and configures the storage backend from config
-func (c *Config) InitializeStorage() (storage.RecipeStorage, error) {
+func (c *Config) InitializeStorage() (RecipeStorage, error) {
 	switch c.Storage.Backend {
 	case "seaweedfs":
 		// Create SeaweedFS client
@@ -203,22 +249,26 @@ func (c *Config) InitializeStorage() (storage.RecipeStorage, error) {
 		}
 
 		// Create index if configured
-		var indexStore storage.RecipeIndexStore
+		var indexStore RecipeIndexStore
 		if c.Index.Backend == "consul" {
-			indexStore, err = storage.NewConsulRecipeIndex(c.Index.ConsulAddr, c.Index.KeyPrefix)
+			// TODO: Implement NewConsulRecipeIndex
+			// indexStore, err = NewConsulRecipeIndex(c.Index.ConsulAddr, c.Index.KeyPrefix)
+			return nil, fmt.Errorf("consul index not yet migrated")
 			if err != nil {
 				return nil, fmt.Errorf("failed to create Consul index: %w", err)
 			}
 		}
 
 		// Create validator if enabled
-		var validator storage.RecipeValidator
+		var validator RecipeValidatorInterface
 		if c.Validation.Enabled {
 			securityRules := c.createSecurityRules()
 			validator = validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)
 		}
 
-		return storage.NewSeaweedFSRecipeStorage(client, indexStore, validator), nil
+		// TODO: Implement NewSeaweedFSRecipeStorage
+		// return NewSeaweedFSRecipeStorage(client, indexStore, validator), nil
+		return nil, fmt.Errorf("seaweedfs storage not yet migrated")
 
 	case "memory":
 		return NewInMemoryRecipeStorage(), nil
@@ -229,10 +279,12 @@ func (c *Config) InitializeStorage() (storage.RecipeStorage, error) {
 }
 
 // InitializeIndex creates and configures the index backend from config
-func (c *Config) InitializeIndex() (storage.RecipeIndexStore, error) {
+func (c *Config) InitializeIndex() (RecipeIndexStore, error) {
 	switch c.Index.Backend {
 	case "consul":
-		return storage.NewConsulRecipeIndex(c.Index.ConsulAddr, c.Index.KeyPrefix)
+		// TODO: Implement NewConsulRecipeIndex
+		// return NewConsulRecipeIndex(c.Index.ConsulAddr, c.Index.KeyPrefix)
+		return nil, fmt.Errorf("consul index not yet migrated")
 	case "memory":
 		// Memory index is handled internally by storage
 		return nil, nil
@@ -242,18 +294,18 @@ func (c *Config) InitializeIndex() (storage.RecipeIndexStore, error) {
 }
 
 // InitializeValidator creates and configures the validator from config
-func (c *Config) InitializeValidator() storage.RecipeValidator {
+func (c *Config) InitializeValidator() RecipeValidatorInterface {
 	if !c.Validation.Enabled {
 		return nil
 	}
 
 	securityRules := c.createSecurityRules()
-	return validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)
+	return &RecipeValidatorAdapter{validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)}
 }
 
-// createSecurityRules converts config to storage.SecurityRuleSet
-func (c *Config) createSecurityRules() *storage.SecurityRuleSet {
-	return &storage.SecurityRuleSet{
+// createSecurityRules converts config to validation.SecurityRuleSet
+func (c *Config) createSecurityRules() *validation.SecurityRuleSet {
+	return &validation.SecurityRuleSet{
 		AllowedCommands:      c.Validation.SecurityRules.AllowedCommands,
 		ForbiddenCommands:    c.Validation.SecurityRules.ForbiddenCommands,
 		MaxExecutionTime:     c.Validation.SecurityRules.MaxExecutionTime,
