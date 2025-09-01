@@ -1172,9 +1172,10 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			nomadAddr, registryURL, seaweedfsURL, apiURL)
 
 		// Adapt internal storage to ARF storage interface
+		// Use "artifacts" bucket for OpenRewrite transformations to match Nomad job expectations
 		storageAdapter := internalStorage.NewStorageAdapter(storageProvider)
-		arfStorageService := arf.NewStorageAdapter(storageAdapter)
-		log.Printf("ARF storage adapter created successfully")
+		arfStorageService := arf.NewStorageAdapterWithBucket(storageAdapter, "artifacts")
+		log.Printf("ARF storage adapter created with 'artifacts' bucket for OpenRewrite")
 
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
 			nomadAddr,
