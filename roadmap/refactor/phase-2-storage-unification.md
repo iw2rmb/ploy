@@ -333,6 +333,20 @@ Update all storage consumers to use new interface:
    - Maintained backward compatibility with original `DestroyApp` function
    - Successfully deployed to VPS - API healthy and lifecycle operations functional
 
+9. ✅ Migrate build trigger handlers to unified storage (COMPLETED - 2025-09-01)
+   - Created comprehensive tests for build trigger storage migration (`internal/build/trigger_storage_test.go`)
+   - Implemented `TriggerBuildWithStorage` for standard builds with unified storage
+   - Implemented `TriggerPlatformBuildWithStorage` for platform service builds
+   - Implemented `TriggerAppBuildWithStorage` for user application builds
+   - All functions use unified storage interface via BuildDependencies dual storage support
+   - Migrated `api/server/handlers.go` build endpoints to use `CreateStorageFromFactory`:
+     - `handleTriggerBuild` → `TriggerBuildWithStorage`
+     - `handleTriggerPlatformBuild` → `TriggerPlatformBuildWithStorage`
+     - `handleTriggerAppBuild` → `TriggerAppBuildWithStorage`
+   - **Eliminated ALL remaining `CreateStorageClientFromConfig` usage** (0 instances remaining)
+   - Maintained backward compatibility throughout migration
+   - Successfully deployed to VPS - API healthy with fully unified storage
+
 ```go
 // Before
 import "github.com/iw2rmb/internal/storage"
