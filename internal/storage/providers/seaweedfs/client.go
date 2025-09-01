@@ -611,6 +611,8 @@ func (p *Provider) createDirectory(bucket, dir string) error {
 func (p *Provider) createDirectoryFullPath(fullPath string) error {
 	// For unified storage where the path already includes all components
 	url := fmt.Sprintf("%s/%s/", p.filerURL, fullPath)
+	fmt.Printf("[SeaweedFS createDirectoryFullPath] Creating directory at URL: %s\n", url)
+	fmt.Printf("[SeaweedFS createDirectoryFullPath] Full path being created: %s\n", fullPath)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
