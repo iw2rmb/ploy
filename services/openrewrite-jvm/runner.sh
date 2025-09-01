@@ -340,15 +340,20 @@ echo "[OpenRewrite] Contents of current directory:"
 ls -la . | head -10
 echo "[OpenRewrite] Contents of /workspace:"
 ls -la /workspace | head -10
-echo "[OpenRewrite] Checking if files moved up to /workspace level:"
-if [ -f "/workspace/pom.xml" ]; then
-    echo "[OpenRewrite] FOUND: Files were moved up to /workspace level!"
-    echo "[OpenRewrite] Changing to /workspace for tar creation"
-    cd /workspace
-elif [ -f "./pom.xml" ]; then
-    echo "[OpenRewrite] Files remain in current directory (/workspace/project/)"
+
+# Always create tar from the project directory where source files are located
+# This ensures we capture all transformed source files, not just moved pom.xml
+echo "[OpenRewrite] Ensuring we're in project directory for tar creation..."
+if [ "$(pwd)" != "/workspace/project" ]; then
+    echo "[OpenRewrite] Current directory is $(pwd), changing to /workspace/project"
+    cd /workspace/project
+fi
+
+# Verify we have source files in the current directory
+if [ -f "./pom.xml" ]; then
+    echo "[OpenRewrite] Found pom.xml in current directory: $(pwd)"
 else
-    echo "[OpenRewrite] Warning: No pom.xml found in either location"
+    echo "[OpenRewrite] WARNING: No pom.xml found in project directory $(pwd)"
 fi
 
 echo "[OpenRewrite] Final location for tar creation: $(pwd)"
