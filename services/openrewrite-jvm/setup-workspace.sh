@@ -67,12 +67,10 @@ if [ "$ARTIFACT_DIR" = "." ]; then
 else
     # Create tar from artifact directory contents
     echo "[SETUP] Creating tar from $ARTIFACT_DIR contents..."
-    cd "$ARTIFACT_DIR"
-    tar -cf /workspace/input.tar . 2>/dev/null || {
+    tar -cf /workspace/input.tar -C "$ARTIFACT_DIR" . 2>/dev/null || {
         echo "[SETUP] Failed to create input.tar"
         exit 1
     }
-    cd -
 fi
 
 echo "[SETUP] Created input.tar successfully"
