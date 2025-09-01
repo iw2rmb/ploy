@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	apiClient   *integration.TestClient
-	testContext context.Context
-	testCancel  context.CancelFunc
-	fixtures    *fixtures.TestDataRepository
+	apiClient    *integration.TestClient
+	testContext  context.Context
+	testCancel   context.CancelFunc
+	testFixtures *fixtures.TestDataRepository
 )
 
 func TestBehavioral(t *testing.T) {
@@ -41,7 +41,7 @@ var _ = BeforeSuite(func() {
 	apiClient.WithTimeout(30 * time.Second)
 
 	// Initialize test fixtures
-	fixtures = fixtures.NewTestDataRepository()
+	testFixtures = fixtures.NewTestDataRepository()
 
 	// Wait for services to be ready (optional - gracefully handle unavailable services)
 	By("Checking if controller is available for testing")
