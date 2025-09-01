@@ -335,16 +335,19 @@ fi
 
 echo "[OpenRewrite] Creating tar archive (excluding Maven cache and workspace files)..."
 # Check if project directory is empty and exclude it if so
-EXCLUDE_OPTS="--exclude='.m2' --exclude='target' --exclude='.gradle' --exclude='build'"
 if [ -d "project" ] && [ -z "$(ls -A project)" ]; then
     echo "[OpenRewrite] Excluding empty project/ directory from output"
-    EXCLUDE_OPTS="$EXCLUDE_OPTS --exclude='project'"
+    tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build --exclude=project . || {
+        echo "[Error] Failed to create output tar"
+        exit 1
+    }
+else
+    tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build . || {
+        echo "[Error] Failed to create output tar"
+        echo "[Error] Exit code: $?"
+        exit 1
+    }
 fi
-tar -cf "${OUTPUT_TAR}" $EXCLUDE_OPTS . || {
-    echo "[Error] Failed to create output tar"
-    echo "[Error] Exit code: $?"
-    exit 1
-}
 
 echo "[OpenRewrite] Output tar created successfully"
 ls -la "${OUTPUT_TAR}"
