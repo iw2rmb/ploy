@@ -111,26 +111,22 @@ func (m *MockUnifiedStorage) Metrics() *storage.StorageMetrics {
 }
 
 // TestNewARFServiceWithUnifiedStorage tests creating ARF service with unified storage interface
-// This test should FAIL initially since ARF doesn't support unified storage directly yet
 func TestNewARFServiceWithUnifiedStorage(t *testing.T) {
 	mockStorage := NewMockUnifiedStorage()
 
-	// This should work with unified storage interface directly
-	// Currently fails because NewARFService doesn't exist yet
-	service, err := NewARFService(mockStorage, "artifacts")
+	// ARFService now works with unified storage interface directly
+	service, err := NewARFService(mockStorage)
 	require.NoError(t, err)
 	require.NotNil(t, service)
 }
 
 // TestARFOperationsWithUnifiedStorage tests ARF operations using unified storage
-// This test should FAIL initially since ARF operations don't use unified storage yet
 func TestARFOperationsWithUnifiedStorage(t *testing.T) {
 	mockStorage := NewMockUnifiedStorage()
 	ctx := context.Background()
 
-	// This should work with unified storage interface directly
-	// Currently fails because ARFService doesn't exist yet
-	service, err := NewARFService(mockStorage, "artifacts")
+	// ARFService now works with unified storage interface directly
+	service, err := NewARFService(mockStorage)
 	require.NoError(t, err)
 
 	// Test Put operation
@@ -163,7 +159,7 @@ func TestBucketPrefixing(t *testing.T) {
 	mockStorage := NewMockUnifiedStorage()
 	ctx := context.Background()
 
-	service, err := NewARFService(mockStorage, "artifacts")
+	service, err := NewARFService(mockStorage)
 	require.NoError(t, err)
 
 	// Store data - should be prefixed with bucket name

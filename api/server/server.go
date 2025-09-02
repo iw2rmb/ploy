@@ -1180,7 +1180,7 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 			return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
 		}
 
-		arfStorageService, err := arf.NewARFService(storageClient, "")
+		arfStorageService, err := arf.NewARFService(storageClient)
 		if err != nil {
 			log.Printf("ERROR: Failed to create ARF service: %v", err)
 			return nil, fmt.Errorf("failed to create ARF service: %w", err)

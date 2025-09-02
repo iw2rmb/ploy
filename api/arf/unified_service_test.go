@@ -103,9 +103,9 @@ func TestARFServiceDoesNotAddBucketPrefix(t *testing.T) {
 	mockStorage := &MockUnifiedStorageForNoBucketPrefix{}
 	ctx := context.Background()
 
-	// Create ARFService with "artifacts" bucket
-	// Even though bucket is specified, it should NOT be added to keys
-	service, err := NewARFService(mockStorage, "artifacts")
+	// Create ARFService - no bucket parameter needed
+	// Storage provider manages its own bucket/collection
+	service, err := NewARFService(mockStorage)
 	require.NoError(t, err)
 	require.NotNil(t, service)
 
@@ -177,8 +177,8 @@ func TestARFServiceWithEmptyBucket(t *testing.T) {
 	mockStorage := &MockUnifiedStorageForNoBucketPrefix{}
 	ctx := context.Background()
 
-	// Create ARFService with empty bucket
-	service, err := NewARFService(mockStorage, "")
+	// Create ARFService
+	service, err := NewARFService(mockStorage)
 	require.NoError(t, err)
 	require.NotNil(t, service)
 
