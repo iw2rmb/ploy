@@ -156,7 +156,6 @@ type TransformationResult struct {
 	RecipeID         string    `json:"recipe_id"`
 	StartTime        time.Time `json:"start_time"`
 	EndTime          time.Time `json:"end_time"`
-	Status           string    `json:"status,omitempty"` // pending, running, completed, failed
 	
 	// Basic results (backward compatible)
 	Success         bool          `json:"success"`
@@ -166,7 +165,6 @@ type TransformationResult struct {
 	Diff            string        `json:"diff"` // Simple unified diff for backward compatibility
 	ValidationScore float64       `json:"validation_score"`
 	ExecutionTime   time.Duration `json:"execution_time"`
-	Error           string        `json:"error,omitempty"` // Error message if failed
 	
 	// Legacy error tracking (backward compatible)
 	Errors   []TransformationError  `json:"errors,omitempty"`
