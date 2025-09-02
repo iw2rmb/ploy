@@ -226,6 +226,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/transforms/:id/active", h.GetActiveHealingAttempts)
 	arf.Get("/transforms/:id/timeline", h.GetTransformationTimeline)
 	arf.Get("/transforms/:id/analysis", h.GetTransformationAnalysis)
+	arf.Get("/transforms/:id/report", h.GetTransformationReport)
 	arf.Get("/transforms/orphaned", h.GetOrphanedTransformations)
 
 	// Sandbox management
