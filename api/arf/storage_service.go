@@ -17,54 +17,23 @@ type StorageService interface {
 	Exists(ctx context.Context, key string) (bool, error)
 }
 
-// NewStorageAdapter creates a new adapter for the unified storage interface with default bucket
+// NewStorageAdapter creates a new adapter for the unified storage interface
 // Deprecated: Use NewARFService directly for new code
 func NewStorageAdapter(s storage.Storage) StorageService {
-	return NewStorageAdapterWithBucket(s, "arf-recipes")
-}
-
-// NewStorageAdapterWithBucket creates a new adapter with a specified bucket
-// Deprecated: Use NewARFService directly for new code
-func NewStorageAdapterWithBucket(s storage.Storage, bucket string) StorageService {
 	// Use the new unified ARF service internally for consistency
-	service, err := NewARFService(s, bucket)
+	service, err := NewARFService(s)
 	if err != nil {
-		// This should not happen with valid parameters, but handle gracefully
-		return &fallbackStorageAdapter{storage: s, bucket: bucket}
+		// This should not happen with valid parameters
+		panic(fmt.Sprintf("failed to create ARF service: %v", err))
 	}
 	return service
 }
 
-// fallbackStorageAdapter is a minimal fallback implementation
-// This should rarely be used, only if NewARFService fails unexpectedly
-type fallbackStorageAdapter struct {
-	storage storage.Storage
-	bucket  string
-}
-
-func (a *fallbackStorageAdapter) Put(ctx context.Context, key string, data []byte) error {
-	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-	return a.storage.Put(ctx, fullKey, &bytesReader{data: data})
-}
-
-func (a *fallbackStorageAdapter) Get(ctx context.Context, key string) ([]byte, error) {
-	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-	reader, err := a.storage.Get(ctx, fullKey)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-	return io.ReadAll(reader)
-}
-
-func (a *fallbackStorageAdapter) Delete(ctx context.Context, key string) error {
-	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-	return a.storage.Delete(ctx, fullKey)
-}
-
-func (a *fallbackStorageAdapter) Exists(ctx context.Context, key string) (bool, error) {
-	fullKey := fmt.Sprintf("%s/%s", a.bucket, key)
-	return a.storage.Exists(ctx, fullKey)
+// NewStorageAdapterWithBucket creates a new adapter (bucket parameter is ignored)
+// Deprecated: Use NewARFService directly for new code. The bucket parameter is no longer used.
+func NewStorageAdapterWithBucket(s storage.Storage, bucket string) StorageService {
+	// Ignore bucket parameter - storage provider manages its own bucket/collection
+	return NewStorageAdapter(s)
 }
 
 // bytesReader implements io.Reader for []byte

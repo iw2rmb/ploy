@@ -98,7 +98,7 @@ func TestStorageAdapter_Put(t *testing.T) {
 	testData := []byte("test data")
 
 	// Mock expects Put to be called with the right parameters
-	mockStorage.On("Put", ctx, "arf-recipes/test-key", mock.Anything).Return(nil)
+	mockStorage.On("Put", ctx, "test-key", mock.Anything).Return(nil)
 
 	err := adapter.Put(ctx, "test-key", testData)
 	assert.NoError(t, err)
@@ -116,7 +116,7 @@ func TestStorageAdapter_Get(t *testing.T) {
 
 	// Create a mock ReadCloser
 	reader := io.NopCloser(bytes.NewReader(testData))
-	mockStorage.On("Get", ctx, "arf-recipes/test-key").Return(reader, nil)
+	mockStorage.On("Get", ctx, "test-key").Return(reader, nil)
 
 	data, err := adapter.Get(ctx, "test-key")
 	assert.NoError(t, err)
@@ -132,7 +132,7 @@ func TestStorageAdapter_Delete(t *testing.T) {
 
 	ctx := context.Background()
 
-	mockStorage.On("Delete", ctx, "arf-recipes/test-key").Return(nil)
+	mockStorage.On("Delete", ctx, "test-key").Return(nil)
 
 	err := adapter.Delete(ctx, "test-key")
 	assert.NoError(t, err)
@@ -147,7 +147,7 @@ func TestStorageAdapter_Exists(t *testing.T) {
 
 	ctx := context.Background()
 
-	mockStorage.On("Exists", ctx, "arf-recipes/test-key").Return(true, nil)
+	mockStorage.On("Exists", ctx, "test-key").Return(true, nil)
 
 	exists, err := adapter.Exists(ctx, "test-key")
 	assert.NoError(t, err)
@@ -165,25 +165,25 @@ func TestStorageAdapter_ErrorHandling(t *testing.T) {
 	testErr := errors.New("storage error")
 
 	// Test Put error
-	mockStorage.On("Put", ctx, "arf-recipes/error-key", mock.Anything).Return(testErr)
+	mockStorage.On("Put", ctx, "error-key", mock.Anything).Return(testErr)
 	err := adapter.Put(ctx, "error-key", []byte("data"))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to put key")
 
 	// Test Get error
-	mockStorage.On("Get", ctx, "arf-recipes/error-key").Return(nil, testErr)
+	mockStorage.On("Get", ctx, "error-key").Return(nil, testErr)
 	_, err = adapter.Get(ctx, "error-key")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get key")
 
 	// Test Delete error
-	mockStorage.On("Delete", ctx, "arf-recipes/error-key").Return(testErr)
+	mockStorage.On("Delete", ctx, "error-key").Return(testErr)
 	err = adapter.Delete(ctx, "error-key")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete key")
 
 	// Test Exists error
-	mockStorage.On("Exists", ctx, "arf-recipes/error-key").Return(false, testErr)
+	mockStorage.On("Exists", ctx, "error-key").Return(false, testErr)
 	_, err = adapter.Exists(ctx, "error-key")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to check existence")

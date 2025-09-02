@@ -64,7 +64,7 @@ func TestStoragePathVerification_NoDoubleBucketPrefix(t *testing.T) {
 	pathTracker := NewPathTrackingStorage(mockStorage)
 
 	// Create ARFService with empty bucket (storage layer handles bucket)
-	service, err := NewARFService(pathTracker, "")
+	service, err := NewARFService(pathTracker)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -130,7 +130,7 @@ func TestStoragePathVerification_CorrectPathStructure(t *testing.T) {
 	pathTracker := NewPathTrackingStorage(mockStorage)
 
 	// Create ARFService with empty bucket
-	service, err := NewARFService(pathTracker, "")
+	service, err := NewARFService(pathTracker)
 	require.NoError(t, err)
 
 	// Test OpenRewrite job paths
@@ -196,7 +196,7 @@ func TestStoragePathVerification_DirectoryCreation(t *testing.T) {
 	pathTracker := NewPathTrackingStorage(mockStorage)
 
 	// Create ARFService
-	service, err := NewARFService(pathTracker, "")
+	service, err := NewARFService(pathTracker)
 	require.NoError(t, err)
 
 	// Test creating nested directory structure
@@ -237,7 +237,7 @@ func TestStoragePathVerification_EndToEnd(t *testing.T) {
 	pathTracker := NewPathTrackingStorage(mockStorage)
 
 	// Create ARFService
-	service, err := NewARFService(pathTracker, "")
+	service, err := NewARFService(pathTracker)
 	require.NoError(t, err)
 
 	// Simulate OpenRewrite transformation flow
