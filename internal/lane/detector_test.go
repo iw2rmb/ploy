@@ -19,7 +19,7 @@ func TestDetect_GoProject(t *testing.T) {
 		{
 			name: "simple go project",
 			files: map[string]string{
-				"go.mod":  "module test\n\ngo 1.21",
+				"go.mod": "module test\n\ngo 1.21",
 				"main.go": "package main\n\nfunc main() {}",
 			},
 			expected: Result{
@@ -46,7 +46,7 @@ func main() {}`,
 		{
 			name: "go with GOOS/GOARCH wasm",
 			files: map[string]string{
-				"go.mod":   "module test",
+				"go.mod": "module test",
 				"build.sh": "GOOS=js GOARCH=wasm go build",
 			},
 			expected: Result{
@@ -79,7 +79,7 @@ func TestDetect_RustProject(t *testing.T) {
 		{
 			name: "simple rust project",
 			files: map[string]string{
-				"Cargo.toml":  "[package]\nname = \"test\"",
+				"Cargo.toml": "[package]\nname = \"test\"",
 				"src/main.rs": "fn main() {}",
 			},
 			expected: Result{
@@ -123,7 +123,7 @@ crate-type = ["cdylib"]`,
 			name: "rust with wasm32 target",
 			files: map[string]string{
 				"Cargo.toml": "[package]\nname = \"test\"",
-				"build.sh":   "cargo build --target wasm32-unknown-unknown",
+				"build.sh": "cargo build --target wasm32-unknown-unknown",
 			},
 			expected: Result{
 				Lane:     "G",
@@ -156,7 +156,7 @@ func TestDetect_NodeProject(t *testing.T) {
 			name: "simple node project",
 			files: map[string]string{
 				"package.json": `{"name": "test", "version": "1.0.0"}`,
-				"index.js":     "console.log('hello');",
+				"index.js": "console.log('hello');",
 			},
 			expected: Result{
 				Lane:     "B",
@@ -184,7 +184,7 @@ func TestDetect_NodeProject(t *testing.T) {
 		{
 			name: "node with .as files",
 			files: map[string]string{
-				"package.json":  `{"name": "test"}`,
+				"package.json": `{"name": "test"}`,
 				"src/module.as": "// AssemblyScript code",
 			},
 			expected: Result{
@@ -218,7 +218,7 @@ func TestDetect_PythonProject(t *testing.T) {
 			name: "simple python project",
 			files: map[string]string{
 				"requirements.txt": "flask==2.0.0",
-				"app.py":           "from flask import Flask",
+				"app.py": "from flask import Flask",
 			},
 			expected: Result{
 				Lane:     "B",
@@ -230,7 +230,7 @@ func TestDetect_PythonProject(t *testing.T) {
 			name: "python with pyproject.toml",
 			files: map[string]string{
 				"pyproject.toml": "[tool.poetry]\nname = \"test\"",
-				"main.py":        "print('hello')",
+				"main.py": "print('hello')",
 			},
 			expected: Result{
 				Lane:     "B",
@@ -242,7 +242,7 @@ func TestDetect_PythonProject(t *testing.T) {
 			name: "python with C extensions",
 			files: map[string]string{
 				"requirements.txt": "numpy==1.21.0\npandas==1.3.0",
-				"setup.py":         "from setuptools import setup, Extension",
+				"setup.py": "from setuptools import setup, Extension",
 			},
 			expected: Result{
 				Lane:     "C",
@@ -254,7 +254,7 @@ func TestDetect_PythonProject(t *testing.T) {
 			name: "python with Cython",
 			files: map[string]string{
 				"pyproject.toml": "[tool.poetry]",
-				"module.pyx":     "def hello(): pass",
+				"module.pyx": "def hello(): pass",
 			},
 			expected: Result{
 				Lane:     "C",
@@ -299,7 +299,7 @@ func TestDetect_JavaProject(t *testing.T) {
 		{
 			name: "maven java project",
 			files: map[string]string{
-				"pom.xml":       "<project><groupId>test</groupId></project>",
+				"pom.xml": "<project><groupId>test</groupId></project>",
 				"src/Main.java": "public class Main {}",
 			},
 			expected: Result{
@@ -311,7 +311,7 @@ func TestDetect_JavaProject(t *testing.T) {
 		{
 			name: "gradle java project",
 			files: map[string]string{
-				"build.gradle":  "apply plugin: 'java'",
+				"build.gradle": "apply plugin: 'java'",
 				"src/Main.java": "public class Main {}",
 			},
 			expected: Result{
@@ -370,7 +370,7 @@ func TestDetect_ScalaProject(t *testing.T) {
 		{
 			name: "sbt scala project",
 			files: map[string]string{
-				"build.sbt":      "name := \"test\"\nscalaVersion := \"2.13.8\"",
+				"build.sbt": "name := \"test\"\nscalaVersion := \"2.13.8\"",
 				"src/Main.scala": "object Main extends App {}",
 			},
 			expected: Result{
@@ -394,7 +394,7 @@ addSbtPlugin("de.gccc.sbt" % "sbt-jib" % "1.0.0")`,
 		{
 			name: "scala with gradle",
 			files: map[string]string{
-				"build.gradle":              "apply plugin: 'scala'\ndependencies { implementation 'org.scala-lang:scala-library:2.13.8' }",
+				"build.gradle": "apply plugin: 'scala'\ndependencies { implementation 'org.scala-lang:scala-library:2.13.8' }",
 				"src/main/scala/Main.scala": "object Main",
 			},
 			expected: Result{
@@ -428,7 +428,7 @@ func TestDetect_DotNetProject(t *testing.T) {
 			name: "dotnet project",
 			files: map[string]string{
 				"MyApp.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>",
-				"Program.cs":   "Console.WriteLine(\"Hello\");",
+				"Program.cs": "Console.WriteLine(\"Hello\");",
 			},
 			expected: Result{
 				Lane:     "C",
@@ -461,7 +461,7 @@ func TestDetect_CppEmscripten(t *testing.T) {
 			name: "emscripten project",
 			files: map[string]string{
 				".emscripten": "# Emscripten config",
-				"main.cpp":    "#include <emscripten.h>",
+				"main.cpp": "#include <emscripten.h>",
 			},
 			expected: Result{
 				Lane:     "G",
@@ -473,7 +473,7 @@ func TestDetect_CppEmscripten(t *testing.T) {
 			name: "cmake with emscripten",
 			files: map[string]string{
 				"CMakeLists.txt": "set(CMAKE_TOOLCHAIN_FILE $ENV{EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake)",
-				"src/main.cpp":   "int main() { return 0; }",
+				"src/main.cpp": "int main() { return 0; }",
 			},
 			expected: Result{
 				Lane:     "G",
@@ -498,7 +498,7 @@ int add(int a, int b) { return a + b; }`,
 			name: "build script with emcc",
 			files: map[string]string{
 				"build.sh": "emcc main.c -o main.js -s WASM=1",
-				"main.c":   "int main() { return 0; }",
+				"main.c": "int main() { return 0; }",
 			},
 			expected: Result{
 				Lane:     "G",
@@ -626,7 +626,7 @@ func TestDetect_PriorityHandling(t *testing.T) {
 		{
 			name: "WASM takes priority over regular Go",
 			files: map[string]string{
-				"go.mod":  "module test",
+				"go.mod": "module test",
 				"main.go": "package main\nimport \"syscall/js\"",
 			},
 			expected: Result{
@@ -650,7 +650,7 @@ func TestDetect_PriorityHandling(t *testing.T) {
 			name: "Python C-extensions override basic Python",
 			files: map[string]string{
 				"requirements.txt": "numpy\nscipy\npandas",
-				"app.py":           "import numpy as np",
+				"app.py": "import numpy as np",
 			},
 			expected: Result{
 				Lane:     "C",
@@ -696,7 +696,7 @@ func TestDetect_PriorityHandling(t *testing.T) {
 func TestDetect_UnknownProject(t *testing.T) {
 	tmpDir := createTestDir(t, map[string]string{
 		"README.md": "# Test Project",
-		"data.txt":  "some data",
+		"data.txt": "some data",
 	})
 	defer os.RemoveAll(tmpDir)
 
@@ -727,7 +727,7 @@ func TestDetect_NonExistentDirectory(t *testing.T) {
 // Benchmark tests
 func BenchmarkDetect_SimpleProject(b *testing.B) {
 	tmpDir := createTestDir(b, map[string]string{
-		"go.mod":  "module test",
+		"go.mod": "module test",
 		"main.go": "package main\nfunc main() {}",
 	})
 	defer os.RemoveAll(tmpDir)
@@ -740,11 +740,11 @@ func BenchmarkDetect_SimpleProject(b *testing.B) {
 
 func BenchmarkDetect_ComplexProject(b *testing.B) {
 	files := map[string]string{
-		"go.mod":     "module test",
-		"main.go":    "package main",
+		"go.mod": "module test",
+		"main.go": "package main",
 		"Dockerfile": "FROM golang:1.21",
-		"Makefile":   "build:\n\tgo build",
-		"README.md":  "# Project",
+		"Makefile": "build:\n\tgo build",
+		"README.md": "# Project",
 		".gitignore": "*.exe\n*.dll",
 	}
 	// Add more files to simulate a complex project
@@ -766,7 +766,7 @@ func BenchmarkDetect_WASMDetection(b *testing.B) {
 	tmpDir := createTestDir(b, map[string]string{
 		"Cargo.toml": "[dependencies]\nwasm-bindgen = \"0.2\"",
 		"src/lib.rs": "use wasm_bindgen::prelude::*;",
-		"build.sh":   "wasm-pack build",
+		"build.sh": "wasm-pack build",
 	})
 	defer os.RemoveAll(tmpDir)
 
@@ -779,20 +779,20 @@ func BenchmarkDetect_WASMDetection(b *testing.B) {
 // Helper function to create test directory with files
 func createTestDir(t testing.TB, files map[string]string) string {
 	t.Helper()
-
+	
 	tmpDir, err := os.MkdirTemp("", "test-detect-")
 	require.NoError(t, err)
 
 	for path, content := range files {
 		fullPath := filepath.Join(tmpDir, path)
 		dir := filepath.Dir(fullPath)
-
+		
 		// Create directory if needed
 		if dir != tmpDir {
 			err := os.MkdirAll(dir, 0755)
 			require.NoError(t, err)
 		}
-
+		
 		// Write file
 		err := os.WriteFile(fullPath, []byte(content), 0644)
 		require.NoError(t, err)

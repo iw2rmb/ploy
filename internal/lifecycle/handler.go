@@ -319,3 +319,4 @@ func destroyTemporaryFiles(app string, status map[string]interface{}) error {
 	log.Printf("Temporary files destroyed for app: %s", app)
 	return nil
 }
+

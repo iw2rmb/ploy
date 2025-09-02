@@ -20,7 +20,7 @@ func main() {
 	fmt.Printf("Target: %s\n", targetPath)
 	fmt.Printf("Working Directory: %s\n", os.Getenv("PWD"))
 	fmt.Printf("HOME: %s\n", os.Getenv("HOME"))
-	fmt.Printf("PATH: %s\n", os.Getenv("PATH")[:100]+"...")
+	fmt.Printf("PATH: %s\n", os.Getenv("PATH")[:100] + "...")
 	fmt.Printf("\n")
 
 	// Replicate the exact API logic
@@ -56,7 +56,7 @@ func main() {
 		}
 		return nil
 	})
-
+	
 	if err != nil {
 		fmt.Printf("Error walking directory: %v\n", err)
 	}
@@ -64,7 +64,7 @@ func main() {
 	fmt.Printf("=== Results ===\n")
 	fmt.Printf("Target directory exists: %v\n", dirExists(targetPath))
 	fmt.Printf("File count: %d\n", fileCount)
-
+	
 	if fileCount > 0 {
 		fmt.Printf("Sample files:\n")
 		files, _ := filepath.Glob(filepath.Join(targetPath, "*"))

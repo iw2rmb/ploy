@@ -239,12 +239,12 @@ func TestBuildVMCommandArguments(t *testing.T) {
 // TestBuildVMEnvironmentVariables tests environment variable propagation
 func TestBuildVMEnvironmentVariables(t *testing.T) {
 	envVars := map[string]string{
-		"PACKER_LOG":       "1",
-		"PACKER_CACHE_DIR": "/tmp/packer-cache",
-		"VM_DISK_SIZE":     "20G",
-		"VM_MEMORY":        "4096",
-		"VM_CPUS":          "2",
-		"CUSTOM_CONFIG":    "custom.json",
+		"PACKER_LOG":        "1",
+		"PACKER_CACHE_DIR":  "/tmp/packer-cache",
+		"VM_DISK_SIZE":      "20G",
+		"VM_MEMORY":         "4096",
+		"VM_CPUS":           "2",
+		"CUSTOM_CONFIG":     "custom.json",
 	}
 
 	var capturedEnv []string
@@ -337,14 +337,14 @@ func testBuildVM(app, sha, outDir string, envVars map[string]string, mockOutput 
 func BuildVMWithMock(app, sha, outDir string, envVars map[string]string, commandExecutor func(string, ...string) *exec.Cmd) (string, error) {
 	args := []string{"--app", app, "--sha", sha, "--out-dir", outDir}
 	cmd := commandExecutor("./scripts/build/packer/build_vm.sh", args...)
-
+	
 	// Add environment variables
 	env := os.Environ()
 	for k, v := range envVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	cmd.Env = env
-
+	
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("vm build failed: %v: %s", err, string(b))

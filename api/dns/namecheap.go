@@ -14,12 +14,12 @@ import (
 
 // NamecheapProvider implements DNS provider for Namecheap
 type NamecheapProvider struct {
-	apiUser  string
-	apiKey   string
-	username string
-	clientIP string
-	baseURL  string
-	client   *http.Client
+	apiUser    string
+	apiKey     string
+	username   string
+	clientIP   string
+	baseURL    string
+	client     *http.Client
 }
 
 // NamecheapConfig holds Namecheap-specific configuration
@@ -65,12 +65,12 @@ type NamecheapDNSGetHostsResult struct {
 
 // NamecheapHostRecord represents a DNS host record
 type NamecheapHostRecord struct {
-	HostId             int    `xml:"HostId,attr"`
-	Name               string `xml:"Name,attr"`
-	Type               string `xml:"Type,attr"`
-	Address            string `xml:"Address,attr"`
-	MXPref             string `xml:"MXPref,attr"`
-	TTL                int    `xml:"TTL,attr"`
+	HostId      int    `xml:"HostId,attr"`
+	Name        string `xml:"Name,attr"`
+	Type        string `xml:"Type,attr"`
+	Address     string `xml:"Address,attr"`
+	MXPref      string `xml:"MXPref,attr"`
+	TTL         int    `xml:"TTL,attr"`
 	AssociatedAppTitle string `xml:"AssociatedAppTitle,attr"`
 	FriendlyName       string `xml:"FriendlyName,attr"`
 	IsActive           bool   `xml:"IsActive,attr"`

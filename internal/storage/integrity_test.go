@@ -9,8 +9,8 @@ import (
 
 func TestIntegrityInfo(t *testing.T) {
 	tests := []struct {
-		name   string
-		info   IntegrityInfo
+		name string
+		info IntegrityInfo
 		verify func(*testing.T, IntegrityInfo)
 	}{
 		{
@@ -197,7 +197,7 @@ func TestBundleIntegrityResult(t *testing.T) {
 			},
 		},
 		{
-			name:   "zero value bundle",
+			name: "zero value bundle",
 			result: BundleIntegrityResult{},
 			verify: func(t *testing.T, result BundleIntegrityResult) {
 				assert.Empty(t, result.KeyPrefix)
@@ -220,8 +220,8 @@ func TestBundleIntegrityResult(t *testing.T) {
 
 func TestBundleIntegrityResult_GetVerificationSummary(t *testing.T) {
 	tests := []struct {
-		name            string
-		result          BundleIntegrityResult
+		name           string
+		result         BundleIntegrityResult
 		expectedSummary string
 	}{
 		{
@@ -423,13 +423,13 @@ func TestBundleIntegrityResult_Fields(t *testing.T) {
 	errors := []string{"signature verification failed", "certificate expired"}
 
 	result := BundleIntegrityResult{
-		KeyPrefix:    "artifacts/testapp/v2.0.0",
+		KeyPrefix:   "artifacts/testapp/v2.0.0",
 		MainArtifact: mainArtifact,
-		SBOM:         sbom,
-		Signature:    signature,
-		Certificate:  certificate,
-		Verified:     false,
-		Errors:       errors,
+		SBOM:        sbom,
+		Signature:   signature,
+		Certificate: certificate,
+		Verified:    false,
+		Errors:      errors,
 	}
 
 	// Test individual field access
@@ -488,7 +488,7 @@ func TestBundleIntegrityResult_JSONCompatibility(t *testing.T) {
 	assert.NotEmpty(t, result.KeyPrefix)
 	assert.NotNil(t, result.MainArtifact)
 	assert.NotNil(t, result.SBOM)
-	assert.Nil(t, result.Signature)   // Optional field
+	assert.Nil(t, result.Signature) // Optional field
 	assert.Nil(t, result.Certificate) // Optional field
 	assert.True(t, result.Verified)
 	assert.Empty(t, result.Errors)
@@ -501,7 +501,7 @@ func TestIntegrityInfo_EdgeCases(t *testing.T) {
 			LocalSize:    9223372036854775807, // Max int64
 			UploadedSize: 9223372036854775807,
 		}
-
+		
 		assert.Equal(t, int64(9223372036854775807), info.LocalSize)
 		assert.Equal(t, info.LocalSize, info.UploadedSize)
 	})
@@ -514,7 +514,7 @@ func TestIntegrityInfo_EdgeCases(t *testing.T) {
 			UploadedHash:     "",
 			VerificationTime: "",
 		}
-
+		
 		assert.Empty(t, info.LocalPath)
 		assert.Empty(t, info.StorageKey)
 		assert.Empty(t, info.LocalChecksum)
@@ -527,7 +527,7 @@ func TestIntegrityInfo_EdgeCases(t *testing.T) {
 			LocalPath:  "/tmp/应用程序.tar.gz",
 			StorageKey: "artifacts/应用程序/版本1.0.0/应用程序.tar.gz",
 		}
-
+		
 		assert.Contains(t, info.LocalPath, "应用程序")
 		assert.Contains(t, info.StorageKey, "应用程序")
 		assert.Contains(t, info.StorageKey, "版本1.0.0")
@@ -537,14 +537,14 @@ func TestIntegrityInfo_EdgeCases(t *testing.T) {
 func TestBundleIntegrityResult_EdgeCases(t *testing.T) {
 	t.Run("all nil pointers", func(t *testing.T) {
 		result := BundleIntegrityResult{
-			KeyPrefix:    "artifacts/empty/v1.0.0",
+			KeyPrefix:   "artifacts/empty/v1.0.0",
 			MainArtifact: nil,
-			SBOM:         nil,
-			Signature:    nil,
-			Certificate:  nil,
-			Verified:     false,
+			SBOM:        nil,
+			Signature:   nil,
+			Certificate: nil,
+			Verified:    false,
 		}
-
+		
 		assert.Nil(t, result.MainArtifact)
 		assert.Nil(t, result.SBOM)
 		assert.Nil(t, result.Signature)
@@ -557,11 +557,11 @@ func TestBundleIntegrityResult_EdgeCases(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			manyErrors[i] = fmt.Sprintf("error %d", i+1)
 		}
-
+		
 		result := BundleIntegrityResult{
 			Errors: manyErrors,
 		}
-
+		
 		assert.Len(t, result.Errors, 100)
 		assert.Equal(t, "error 1", result.Errors[0])
 		assert.Equal(t, "error 100", result.Errors[99])
@@ -575,7 +575,7 @@ func TestBundleIntegrityResult_EdgeCases(t *testing.T) {
 			},
 			Verified: true,
 		}
-
+		
 		assert.Empty(t, result.KeyPrefix)
 		assert.True(t, result.Verified)
 	})
@@ -589,7 +589,7 @@ func TestIntegrityVerification_UsagePatterns(t *testing.T) {
 			MainArtifact: &IntegrityInfo{
 				LocalPath:        "/builds/production-app-v2.1.0.tar.gz",
 				StorageKey:       "artifacts/production-app/v2.1.0/production-app-v2.1.0.tar.gz",
-				LocalSize:        52428800, // 50MB
+				LocalSize:        52428800,  // 50MB
 				UploadedSize:     52428800,
 				LocalChecksum:    "sha256:d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
 				UploadedHash:     "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",

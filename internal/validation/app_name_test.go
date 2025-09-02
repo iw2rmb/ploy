@@ -146,6 +146,7 @@ func TestValidateAppName(t *testing.T) {
 			appName:       "app--name--test",
 			expectedError: "app name cannot contain consecutive hyphens",
 		},
+
 	}
 
 	for _, tt := range tests {
@@ -166,7 +167,7 @@ func TestValidateAppName_EdgeCases(t *testing.T) {
 		// Create exactly 63 character name: start with 'a', fill middle with 'b', end with 'c'
 		appName := "a" + strings.Repeat("b", 61) + "c"
 		assert.Len(t, appName, 63)
-
+		
 		err := ValidateAppName(appName)
 		assert.NoError(t, err)
 	})
@@ -175,7 +176,7 @@ func TestValidateAppName_EdgeCases(t *testing.T) {
 		// Create exactly 64 character name
 		appName := strings.Repeat("a", 64)
 		assert.Len(t, appName, 64)
-
+		
 		err := ValidateAppName(appName)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot exceed 63 characters")
@@ -188,7 +189,7 @@ func TestValidateAppName_EdgeCases(t *testing.T) {
 			"mY-aPp-TeSt",
 			"CamelCaseApp",
 		}
-
+		
 		for _, testCase := range testCases {
 			err := ValidateAppName(testCase)
 			assert.NoError(t, err, "mixed case should be converted to lowercase and be valid")
@@ -197,12 +198,12 @@ func TestValidateAppName_EdgeCases(t *testing.T) {
 
 	t.Run("unicode characters", func(t *testing.T) {
 		testCases := []string{
-			"appñame",    // Spanish character
+			"appñame",     // Spanish character
 			"app名前",      // Japanese characters
-			"appémilie",  // French characters
-			"приложение", // Cyrillic characters
+			"appémilie",   // French characters
+			"приложение",   // Cyrillic characters
 		}
-
+		
 		for _, testCase := range testCases {
 			err := ValidateAppName(testCase)
 			assert.Error(t, err, "unicode characters should not be allowed")
@@ -300,20 +301,20 @@ func TestIsReservedAppName(t *testing.T) {
 func TestGetReservedAppNames(t *testing.T) {
 	t.Run("returns all reserved names", func(t *testing.T) {
 		names := GetReservedAppNames()
-
+		
 		// Check that we have the expected count
 		expectedCount := len(reservedAppNames)
 		assert.Len(t, names, expectedCount, "should return all reserved names")
-
+		
 		// Check that all expected names are present
 		expectedNames := []string{
 			"dev",
 		}
-
+		
 		for _, expected := range expectedNames {
 			assert.Contains(t, names, expected, "should contain reserved name: %s", expected)
 		}
-
+		
 		// Verify no duplicates
 		nameMap := make(map[string]bool)
 		for _, name := range names {
@@ -324,7 +325,7 @@ func TestGetReservedAppNames(t *testing.T) {
 
 	t.Run("returned names are all reserved", func(t *testing.T) {
 		names := GetReservedAppNames()
-
+		
 		for _, name := range names {
 			assert.True(t, IsReservedAppName(name), "returned name should be reserved: %s", name)
 		}
@@ -333,20 +334,20 @@ func TestGetReservedAppNames(t *testing.T) {
 	t.Run("consistency check", func(t *testing.T) {
 		// Ensure the slice matches the map
 		names := GetReservedAppNames()
-
+		
 		assert.Len(t, names, len(reservedAppNames), "slice length should match map length")
-
+		
 		// Every name in slice should be in map
 		for _, name := range names {
 			assert.True(t, reservedAppNames[name], "name from slice should exist in map: %s", name)
 		}
-
+		
 		// Every name in map should be in slice
 		nameSliceMap := make(map[string]bool)
 		for _, name := range names {
 			nameSliceMap[name] = true
 		}
-
+		
 		for mapName := range reservedAppNames {
 			assert.True(t, nameSliceMap[mapName], "name from map should exist in slice: %s", mapName)
 		}
@@ -460,7 +461,7 @@ func BenchmarkValidateAppName(b *testing.B) {
 		"dev", // reserved
 		"invalid--name",
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, name := range testNames {
@@ -472,11 +473,11 @@ func BenchmarkValidateAppName(b *testing.B) {
 func BenchmarkIsReservedAppName(b *testing.B) {
 	testNames := []string{
 		"dev",
-		"myapp",
+		"myapp", 
 		"api",
 		"test-app",
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, name := range testNames {
@@ -492,7 +493,7 @@ func BenchmarkAppNamePattern(b *testing.B) {
 		"123invalid",
 		"app-",
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, name := range testNames {
@@ -510,11 +511,11 @@ func TestValidateAppName_Properties(t *testing.T) {
 			"invalid--name",
 			"123invalid",
 		}
-
+		
 		for _, testCase := range testCases {
 			err1 := ValidateAppName(testCase)
 			err2 := ValidateAppName(testCase)
-
+			
 			if err1 == nil {
 				assert.NoError(t, err2, "second validation should also succeed")
 			} else {
@@ -530,15 +531,15 @@ func TestValidateAppName_Properties(t *testing.T) {
 			upper string
 		}{
 			{"myapp", "MYAPP"},
-			{"my-app", "MY-APP"},
+			{"my-app", "MY-APP"}, 
 			{"test123", "TEST123"},
 			{"dev", "DEV"}, // reserved
 		}
-
+		
 		for _, pair := range testPairs {
 			lowerErr := ValidateAppName(pair.lower)
 			upperErr := ValidateAppName(pair.upper)
-
+			
 			if lowerErr == nil {
 				assert.NoError(t, upperErr, "uppercase version should also be valid")
 			} else {

@@ -74,11 +74,11 @@ func TestBuildJail(t *testing.T) {
 			errContains:    "jail build failed",
 		},
 		{
-			name:   "multiple environment variables",
-			app:    "multi-env-app",
-			srcDir: "/tmp/src",
-			sha:    "def456",
-			outDir: "/tmp/out",
+			name:           "multiple environment variables",
+			app:            "multi-env-app",
+			srcDir:         "/tmp/src",
+			sha:            "def456",
+			outDir:         "/tmp/out",
 			envVars: map[string]string{
 				"VAR1": "value1",
 				"VAR2": "value2",
@@ -273,7 +273,7 @@ func testBuildJail(app, srcDir, sha, outDir string, envVars map[string]string, m
 	if mockError != nil {
 		return "", fmt.Errorf("jail build failed: %v: %s", mockError, mockOutput)
 	}
-
+	
 	// Trim whitespace from output (matching the actual function behavior)
 	return strings.TrimSpace(mockOutput), nil
 }
@@ -282,14 +282,14 @@ func testBuildJail(app, srcDir, sha, outDir string, envVars map[string]string, m
 func BuildJailWithMock(app, srcDir, sha, outDir string, envVars map[string]string, commandExecutor func(string, ...string) *exec.Cmd) (string, error) {
 	args := []string{"--app", app, "--src", srcDir, "--sha", sha, "--out-dir", outDir}
 	cmd := commandExecutor("./scripts/build/jail/build_jail.sh", args...)
-
+	
 	// Add environment variables to the build process
 	env := os.Environ()
 	for k, v := range envVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	cmd.Env = env
-
+	
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("jail build failed: %v: %s", err, string(b))

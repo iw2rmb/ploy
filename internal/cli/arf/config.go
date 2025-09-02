@@ -16,16 +16,16 @@ import (
 type CLIConfig struct {
 	// Recipe settings
 	Recipes RecipeConfig `yaml:"recipes" json:"recipes"`
-
+	
 	// Storage settings
 	Storage StorageConfig `yaml:"storage" json:"storage"`
-
-	// Execution settings
+	
+	// Execution settings  
 	Execution ExecutionSettings `yaml:"execution" json:"execution"`
-
+	
 	// Display settings
 	Display DisplayConfig `yaml:"display" json:"display"`
-
+	
 	// Template settings
 	Templates TemplateConfig `yaml:"templates" json:"templates"`
 }
@@ -49,31 +49,31 @@ type StorageConfig struct {
 
 // ExecutionSettings contains execution-related settings
 type ExecutionSettings struct {
-	DefaultTimeout     time.Duration     `yaml:"default_timeout" json:"default_timeout"`
-	AutoBackup         bool              `yaml:"auto_backup" json:"auto_backup"`
-	BackupLocation     string            `yaml:"backup_location" json:"backup_location"`
-	DefaultEnvironment map[string]string `yaml:"default_environment" json:"default_environment"`
-	MaxConcurrentRuns  int               `yaml:"max_concurrent_runs" json:"max_concurrent_runs"`
-	RetryAttempts      int               `yaml:"retry_attempts" json:"retry_attempts"`
-	RetryDelay         time.Duration     `yaml:"retry_delay" json:"retry_delay"`
+	DefaultTimeout      time.Duration     `yaml:"default_timeout" json:"default_timeout"`
+	AutoBackup          bool              `yaml:"auto_backup" json:"auto_backup"`
+	BackupLocation      string            `yaml:"backup_location" json:"backup_location"`
+	DefaultEnvironment  map[string]string `yaml:"default_environment" json:"default_environment"`
+	MaxConcurrentRuns   int               `yaml:"max_concurrent_runs" json:"max_concurrent_runs"`
+	RetryAttempts       int               `yaml:"retry_attempts" json:"retry_attempts"`
+	RetryDelay          time.Duration     `yaml:"retry_delay" json:"retry_delay"`
 }
 
 // DisplayConfig contains display and output settings
 type DisplayConfig struct {
-	DefaultOutputFormat string `yaml:"default_output_format" json:"default_output_format"`
-	DefaultPageSize     int    `yaml:"default_page_size" json:"default_page_size"`
-	ShowProgressBars    bool   `yaml:"show_progress_bars" json:"show_progress_bars"`
-	ColorOutput         bool   `yaml:"color_output" json:"color_output"`
-	VerboseByDefault    bool   `yaml:"verbose_by_default" json:"verbose_by_default"`
-	ShowTimestamps      bool   `yaml:"show_timestamps" json:"show_timestamps"`
+	DefaultOutputFormat  string `yaml:"default_output_format" json:"default_output_format"`
+	DefaultPageSize      int    `yaml:"default_page_size" json:"default_page_size"`
+	ShowProgressBars     bool   `yaml:"show_progress_bars" json:"show_progress_bars"`
+	ColorOutput          bool   `yaml:"color_output" json:"color_output"`
+	VerboseByDefault     bool   `yaml:"verbose_by_default" json:"verbose_by_default"`
+	ShowTimestamps       bool   `yaml:"show_timestamps" json:"show_timestamps"`
 }
 
 // TemplateConfig contains template-related settings
 type TemplateConfig struct {
-	DefaultTemplate    string            `yaml:"default_template" json:"default_template"`
-	CustomTemplatePath string            `yaml:"custom_template_path" json:"custom_template_path"`
-	TemplateVariables  map[string]string `yaml:"template_variables" json:"template_variables"`
-	AutoloadCustom     bool              `yaml:"autoload_custom" json:"autoload_custom"`
+	DefaultTemplate     string            `yaml:"default_template" json:"default_template"`
+	CustomTemplatePath  string            `yaml:"custom_template_path" json:"custom_template_path"`
+	TemplateVariables   map[string]string `yaml:"template_variables" json:"template_variables"`
+	AutoloadCustom      bool              `yaml:"autoload_custom" json:"autoload_custom"`
 }
 
 var (
@@ -111,7 +111,7 @@ func LoadConfig() (*CLIConfig, error) {
 	}
 
 	configFile := GetConfigPath()
-
+	
 	// Create default config if file doesn't exist
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		defaultConfig := GetDefaultConfig()
@@ -145,7 +145,7 @@ func LoadConfig() (*CLIConfig, error) {
 // SaveConfig saves the configuration to file
 func SaveConfig(config *CLIConfig) error {
 	configFile := GetConfigPath()
-
+	
 	// Ensure config directory exists
 	configDir := filepath.Dir(configFile)
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -170,7 +170,7 @@ func SaveConfig(config *CLIConfig) error {
 // GetDefaultConfig returns the default CLI configuration
 func GetDefaultConfig() *CLIConfig {
 	homeDir, _ := os.UserHomeDir()
-
+	
 	return &CLIConfig{
 		Recipes: RecipeConfig{
 			DefaultAuthor:    "ploy-user",
@@ -285,7 +285,7 @@ func ShowConfig(outputFormat string) error {
 	default: // table
 		fmt.Printf("Ploy ARF Configuration\n")
 		fmt.Printf("======================\n\n")
-
+		
 		fmt.Printf("Configuration file: %s\n\n", GetConfigPath())
 
 		fmt.Printf("Recipe Settings:\n")

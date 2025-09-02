@@ -25,12 +25,12 @@ func createTempDir(t *testing.T) string {
 // TestEnvStore_New tests the constructor
 func TestEnvStore_New(t *testing.T) {
 	tmpDir := createTempDir(t)
-
+	
 	store := New(tmpDir)
-
+	
 	assert.NotNil(t, store)
 	assert.Equal(t, tmpDir, store.basePath)
-
+	
 	// Verify directory was created
 	_, err := os.Stat(tmpDir)
 	assert.NoError(t, err)
@@ -39,11 +39,11 @@ func TestEnvStore_New(t *testing.T) {
 // TestEnvStore_New_CreatesDirectory tests directory creation
 func TestEnvStore_New_CreatesDirectory(t *testing.T) {
 	tmpDir := filepath.Join(createTempDir(t), "subdir", "nested")
-
+	
 	store := New(tmpDir)
-
+	
 	assert.NotNil(t, store)
-
+	
 	// Verify nested directory was created
 	_, err := os.Stat(tmpDir)
 	assert.NoError(t, err)
@@ -52,11 +52,11 @@ func TestEnvStore_New_CreatesDirectory(t *testing.T) {
 // TestEnvStore_GetAll tests getting all environment variables
 func TestEnvStore_GetAll(t *testing.T) {
 	tests := []struct {
-		name         string
-		app          string
-		setupData    AppEnvVars
-		expectedVars AppEnvVars
-		expectError  bool
+		name          string
+		app           string
+		setupData     AppEnvVars
+		expectedVars  AppEnvVars
+		expectError   bool
 	}{
 		{
 			name: "existing app with variables",
@@ -125,10 +125,10 @@ func TestEnvStore_Set(t *testing.T) {
 		expectedAll AppEnvVars
 	}{
 		{
-			name:      "set variable in new app",
-			app:       "new-app",
-			key:       "NODE_ENV",
-			value:     "development",
+			name:  "set variable in new app",
+			app:   "new-app",
+			key:   "NODE_ENV",
+			value: "development",
 			setupData: nil,
 			expectedAll: AppEnvVars{
 				"NODE_ENV": "development",
@@ -164,20 +164,20 @@ func TestEnvStore_Set(t *testing.T) {
 			},
 		},
 		{
-			name:      "empty key",
-			app:       "empty-key-app",
-			key:       "",
-			value:     "some-value",
+			name:  "empty key",
+			app:   "empty-key-app",
+			key:   "",
+			value: "some-value",
 			setupData: nil,
 			expectedAll: AppEnvVars{
 				"": "some-value",
 			},
 		},
 		{
-			name:      "empty value",
-			app:       "empty-value-app",
-			key:       "EMPTY_VAR",
-			value:     "",
+			name:  "empty value",
+			app:   "empty-value-app",
+			key:   "EMPTY_VAR",
+			value: "",
 			setupData: nil,
 			expectedAll: AppEnvVars{
 				"EMPTY_VAR": "",
@@ -471,7 +471,7 @@ func TestEnvStore_ToStringArray(t *testing.T) {
 			name: "empty values",
 			app:  "empty-values-app",
 			setupData: AppEnvVars{
-				"EMPTY_VAR":  "",
+				"EMPTY_VAR": "",
 				"NORMAL_VAR": "normal_value",
 			},
 			expected: []string{"EMPTY_VAR=", "NORMAL_VAR=normal_value"},
@@ -495,18 +495,18 @@ func TestEnvStore_ToStringArray(t *testing.T) {
 
 			// Verify the result
 			assert.Len(t, result, len(tt.expected))
-
+			
 			// Convert to map for easier comparison (order doesn't matter)
 			resultMap := make(map[string]bool)
 			for _, item := range result {
 				resultMap[item] = true
 			}
-
+			
 			expectedMap := make(map[string]bool)
 			for _, item := range tt.expected {
 				expectedMap[item] = true
 			}
-
+			
 			assert.Equal(t, expectedMap, resultMap)
 		})
 	}
@@ -516,24 +516,24 @@ func TestEnvStore_ToStringArray(t *testing.T) {
 func TestEnvStore_ConcurrentAccess(t *testing.T) {
 	tmpDir := createTempDir(t)
 	store := New(tmpDir)
-
+	
 	const numGoroutines = 10
 	const numOperations = 50
-
+	
 	var wg sync.WaitGroup
 	errors := make(chan error, numGoroutines*numOperations)
-
+	
 	// Concurrent writers
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(routineID int) {
 			defer wg.Done()
-
+			
 			for j := 0; j < numOperations; j++ {
 				appName := fmt.Sprintf("app-%d", routineID)
 				key := fmt.Sprintf("VAR_%d", j)
 				value := fmt.Sprintf("value_%d_%d", routineID, j)
-
+				
 				if err := store.Set(appName, key, value); err != nil {
 					errors <- err
 					return
@@ -541,16 +541,16 @@ func TestEnvStore_ConcurrentAccess(t *testing.T) {
 			}
 		}(i)
 	}
-
+	
 	// Concurrent readers
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(routineID int) {
 			defer wg.Done()
-
+			
 			for j := 0; j < numOperations; j++ {
 				appName := fmt.Sprintf("app-%d", routineID)
-
+				
 				if _, err := store.GetAll(appName); err != nil {
 					errors <- err
 					return
@@ -558,16 +558,16 @@ func TestEnvStore_ConcurrentAccess(t *testing.T) {
 			}
 		}(i)
 	}
-
+	
 	// Wait for all goroutines to complete
 	wg.Wait()
 	close(errors)
-
+	
 	// Check for any errors
 	for err := range errors {
 		assert.NoError(t, err)
 	}
-
+	
 	// Verify final state - each app should have all its variables
 	for i := 0; i < numGoroutines; i++ {
 		appName := fmt.Sprintf("app-%d", i)
@@ -582,34 +582,34 @@ func TestEnvStore_FileSystemEdgeCases(t *testing.T) {
 	t.Run("corrupt JSON file", func(t *testing.T) {
 		tmpDir := createTempDir(t)
 		store := New(tmpDir)
-
+		
 		// Write invalid JSON directly to file
 		corruptFile := filepath.Join(tmpDir, "corrupt-app.env.json")
 		err := os.WriteFile(corruptFile, []byte("invalid json content"), 0644)
 		require.NoError(t, err)
-
+		
 		// Attempt to read should return error
 		_, err = store.GetAll("corrupt-app")
 		assert.Error(t, err)
 	})
-
+	
 	t.Run("read-only directory", func(t *testing.T) {
 		if os.Getuid() == 0 {
 			t.Skip("Skipping read-only test when running as root")
 		}
-
+		
 		tmpDir := createTempDir(t)
 		store := New(tmpDir)
-
+		
 		// Make directory read-only
 		err := os.Chmod(tmpDir, 0444)
 		require.NoError(t, err)
-
+		
 		// Restore permissions for cleanup
 		t.Cleanup(func() {
 			os.Chmod(tmpDir, 0755)
 		})
-
+		
 		// Attempt to write should return error
 		err = store.Set("test-app", "KEY", "value")
 		assert.Error(t, err)
@@ -620,27 +620,27 @@ func TestEnvStore_FileSystemEdgeCases(t *testing.T) {
 func TestEnvStore_Performance(t *testing.T) {
 	tmpDir := createTempDir(t)
 	store := New(tmpDir)
-
+	
 	// Test with large number of environment variables
 	largeEnvVars := make(AppEnvVars)
 	for i := 0; i < 1000; i++ {
 		largeEnvVars[fmt.Sprintf("VAR_%d", i)] = fmt.Sprintf("value_%d", i)
 	}
-
+	
 	// Measure SetAll performance
 	start := time.Now()
 	err := store.SetAll("large-app", largeEnvVars)
 	setAllDuration := time.Since(start)
-
+	
 	require.NoError(t, err)
-	assert.Less(t, setAllDuration, 100*time.Millisecond,
+	assert.Less(t, setAllDuration, 100*time.Millisecond, 
 		"SetAll with 1000 vars should complete within 100ms")
-
+	
 	// Measure GetAll performance
 	start = time.Now()
 	result, err := store.GetAll("large-app")
 	getAllDuration := time.Since(start)
-
+	
 	require.NoError(t, err)
 	assert.Len(t, result, 1000)
 	assert.Less(t, getAllDuration, 50*time.Millisecond,
@@ -651,9 +651,9 @@ func TestEnvStore_Performance(t *testing.T) {
 func BenchmarkEnvStore_Set(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "envstore_bench_*")
 	defer os.RemoveAll(tmpDir)
-
+	
 	store := New(tmpDir)
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		store.Set("bench-app", fmt.Sprintf("VAR_%d", i), fmt.Sprintf("value_%d", i))
@@ -664,16 +664,16 @@ func BenchmarkEnvStore_Set(b *testing.B) {
 func BenchmarkEnvStore_Get(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "envstore_bench_*")
 	defer os.RemoveAll(tmpDir)
-
+	
 	store := New(tmpDir)
-
+	
 	// Setup test data
 	testVars := make(AppEnvVars)
 	for i := 0; i < 100; i++ {
 		testVars[fmt.Sprintf("VAR_%d", i)] = fmt.Sprintf("value_%d", i)
 	}
 	store.SetAll("bench-app", testVars)
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		store.Get("bench-app", fmt.Sprintf("VAR_%d", i%100))
@@ -684,16 +684,16 @@ func BenchmarkEnvStore_Get(b *testing.B) {
 func BenchmarkEnvStore_GetAll(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "envstore_bench_*")
 	defer os.RemoveAll(tmpDir)
-
+	
 	store := New(tmpDir)
-
+	
 	// Setup test data
 	testVars := make(AppEnvVars)
 	for i := 0; i < 100; i++ {
 		testVars[fmt.Sprintf("VAR_%d", i)] = fmt.Sprintf("value_%d", i)
 	}
 	store.SetAll("bench-app", testVars)
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		store.GetAll("bench-app")

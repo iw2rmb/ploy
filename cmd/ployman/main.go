@@ -15,13 +15,13 @@ func getControllerURL() string {
 	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
 		return url
 	}
-
+	
 	// Check if PLOY_PLATFORM_DOMAIN is set for SSL endpoint
 	if domain := os.Getenv("PLOY_PLATFORM_DOMAIN"); domain != "" {
 		// Platform services use ployman.app domain
 		return fmt.Sprintf("https://api.%s/v1", domain)
 	}
-
+	
 	// Default to platform domain
 	return "https://api.dev.ployman.app/v1"
 }
@@ -29,7 +29,7 @@ func getControllerURL() string {
 func main() {
 	// Set platform mode environment variable
 	os.Setenv("PLOY_PLATFORM_MODE", "true")
-
+	
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "api":
@@ -53,7 +53,7 @@ func main() {
 		}
 		return
 	}
-
+	
 	printUsage()
 }
 

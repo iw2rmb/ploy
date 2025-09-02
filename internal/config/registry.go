@@ -75,16 +75,16 @@ func (r *RegistryConfig) MustAuthenticate() error {
 	if r.Username == "" && r.Password == "" {
 		return nil
 	}
-
-	cmd := exec.Command("docker", "login",
+	
+	cmd := exec.Command("docker", "login", 
 		r.Endpoint,
 		"-u", r.Username,
 		"-p", r.Password)
-
+	
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("Docker Registry authentication failed: %w", err)
 	}
-
+	
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (r *RegistryConfig) Validate() error {
 	if r.Endpoint == "" {
 		return fmt.Errorf("Registry endpoint is required")
 	}
-
+	
 	return nil
 }
 
@@ -112,7 +112,7 @@ func (r *RegistryConfig) GetFullEndpoint() string {
 	if strings.HasPrefix(r.Endpoint, "http://") || strings.HasPrefix(r.Endpoint, "https://") {
 		return r.Endpoint
 	}
-
+	
 	// Default to HTTPS unless explicitly insecure
 	if r.Insecure {
 		return fmt.Sprintf("http://%s", r.Endpoint)

@@ -289,3 +289,4 @@ func TestDestroyAppDualStorageSupport(t *testing.T) {
 	mockEnvStore.AssertExpectations(t)
 	mockStorage.AssertExpectations(t)
 }
+

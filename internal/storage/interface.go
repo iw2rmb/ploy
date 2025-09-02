@@ -87,7 +87,7 @@ type Storage interface {
 	Copy(ctx context.Context, src, dst string) error
 	Move(ctx context.Context, src, dst string) error
 
-	// Health and metrics
+	// Health and metrics  
 	Health(ctx context.Context) error
 	Metrics() *StorageMetrics // Use existing StorageMetrics from monitoring.go
 }

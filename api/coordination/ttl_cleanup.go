@@ -14,10 +14,10 @@ import (
 
 // TTLCleanupWorker handles cleanup of preview allocations with TTL
 type TTLCleanupWorker struct {
-	nomadClient  *nomadapi.Client
+	nomadClient *nomadapi.Client
 	consulClient *api.Client
-	logger       *log.Logger
-	stopCh       chan struct{}
+	logger      *log.Logger
+	stopCh      chan struct{}
 }
 
 // NewTTLCleanupWorker creates a new TTL cleanup worker
@@ -47,7 +47,7 @@ func NewTTLCleanupWorker() *TTLCleanupWorker {
 // Run starts the TTL cleanup worker
 func (w *TTLCleanupWorker) Run(ctx context.Context) {
 	w.logger.Println("Starting TTL cleanup worker")
-
+	
 	ticker := time.NewTicker(5 * time.Minute) // Run every 5 minutes
 	defer ticker.Stop()
 
@@ -131,9 +131,9 @@ func (w *TTLCleanupWorker) shouldCleanupJob(jobStub *nomadapi.JobListStub) bool 
 	// Check if job has exceeded TTL
 	submitTime := time.Unix(0, jobStub.SubmitTime)
 	expireTime := submitTime.Add(ttl)
-
+	
 	if time.Now().After(expireTime) {
-		w.logger.Printf("Job %s has expired (TTL: %s, Age: %s)",
+		w.logger.Printf("Job %s has expired (TTL: %s, Age: %s)", 
 			jobStub.ID, ttl, time.Since(submitTime))
 		return true
 	}
@@ -169,7 +169,7 @@ func (w *TTLCleanupWorker) cleanupConsulEntries(jobID string) {
 	}
 
 	kv := w.consulClient.KV()
-
+	
 	// Common patterns for job-related KV entries
 	patterns := []string{
 		fmt.Sprintf("ploy/jobs/%s/", jobID),
@@ -202,7 +202,7 @@ func (w *TTLCleanupWorker) cleanupConsulServices(jobID string) {
 	}
 
 	catalog := w.consulClient.Catalog()
-
+	
 	// List all services
 	services, _, err := catalog.Services(&api.QueryOptions{})
 	if err != nil {
@@ -212,9 +212,9 @@ func (w *TTLCleanupWorker) cleanupConsulServices(jobID string) {
 
 	// Look for services related to this job
 	for serviceName := range services {
-		if strings.Contains(serviceName, jobID) ||
-			strings.Contains(serviceName, extractAppName(jobID)) {
-
+		if strings.Contains(serviceName, jobID) || 
+		   strings.Contains(serviceName, extractAppName(jobID)) {
+			
 			// Get service instances
 			serviceNodes, _, err := catalog.Service(serviceName, "", &api.QueryOptions{})
 			if err != nil {
@@ -242,7 +242,7 @@ func extractAppName(jobID string) string {
 	// preview-<app>-<hash>
 	// <app>-preview-<hash>
 	// <app>-<lane>-<hash>
-
+	
 	parts := strings.Split(jobID, "-")
 	if len(parts) >= 2 {
 		if parts[0] == "preview" {
@@ -250,7 +250,7 @@ func extractAppName(jobID string) string {
 		}
 		return parts[0]
 	}
-
+	
 	return jobID
 }
 
@@ -259,7 +259,7 @@ func (w *TTLCleanupWorker) GetCleanupStats() map[string]interface{} {
 	if w.nomadClient == nil {
 		return map[string]interface{}{
 			"enabled": false,
-			"error":   "Nomad client not available",
+			"error": "Nomad client not available",
 		}
 	}
 
@@ -268,13 +268,13 @@ func (w *TTLCleanupWorker) GetCleanupStats() map[string]interface{} {
 	if err != nil {
 		return map[string]interface{}{
 			"enabled": true,
-			"error":   fmt.Sprintf("Failed to list jobs: %v", err),
+			"error": fmt.Sprintf("Failed to list jobs: %v", err),
 		}
 	}
 
 	previewJobs := 0
 	expiredJobs := 0
-
+	
 	for _, jobStub := range jobList {
 		if strings.Contains(jobStub.ID, "-preview-") || strings.HasPrefix(jobStub.ID, "preview-") {
 			previewJobs++
@@ -285,9 +285,9 @@ func (w *TTLCleanupWorker) GetCleanupStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"enabled":      true,
+		"enabled": true,
 		"preview_jobs": previewJobs,
 		"expired_jobs": expiredJobs,
-		"last_run":     time.Now().Format(time.RFC3339),
+		"last_run": time.Now().Format(time.RFC3339),
 	}
 }

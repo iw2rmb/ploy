@@ -13,13 +13,13 @@ import (
 
 // IntegrityInfo contains verification data for an uploaded artifact
 type IntegrityInfo struct {
-	LocalPath        string `json:"local_path"`
-	StorageKey       string `json:"storage_key"`
-	LocalSize        int64  `json:"local_size"`
-	UploadedSize     int64  `json:"uploaded_size"`
-	LocalChecksum    string `json:"local_checksum"`
-	UploadedHash     string `json:"uploaded_hash"`
-	Verified         bool   `json:"verified"`
+	LocalPath      string `json:"local_path"`
+	StorageKey     string `json:"storage_key"`
+	LocalSize      int64  `json:"local_size"`
+	UploadedSize   int64  `json:"uploaded_size"`
+	LocalChecksum  string `json:"local_checksum"`
+	UploadedHash   string `json:"uploaded_hash"`
+	Verified       bool   `json:"verified"`
 	VerificationTime string `json:"verification_time"`
 }
 
@@ -209,13 +209,13 @@ func (v *IntegrityVerifier) validateSBOMContent(sbomPath string) error {
 
 // BundleIntegrityResult represents the result of bundle integrity verification
 type BundleIntegrityResult struct {
-	KeyPrefix    string         `json:"key_prefix"`
-	MainArtifact *IntegrityInfo `json:"main_artifact"`
-	SBOM         *IntegrityInfo `json:"sbom,omitempty"`
-	Signature    *IntegrityInfo `json:"signature,omitempty"`
-	Certificate  *IntegrityInfo `json:"certificate,omitempty"`
-	Verified     bool           `json:"verified"`
-	Errors       []string       `json:"errors,omitempty"`
+	KeyPrefix     string          `json:"key_prefix"`
+	MainArtifact  *IntegrityInfo  `json:"main_artifact"`
+	SBOM          *IntegrityInfo  `json:"sbom,omitempty"`
+	Signature     *IntegrityInfo  `json:"signature,omitempty"`
+	Certificate   *IntegrityInfo  `json:"certificate,omitempty"`
+	Verified      bool            `json:"verified"`
+	Errors        []string        `json:"errors,omitempty"`
 }
 
 // GetVerificationSummary returns a human-readable summary of verification results

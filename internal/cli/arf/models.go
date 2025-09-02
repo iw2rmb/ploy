@@ -15,13 +15,13 @@ import (
 
 // ModelConfig represents a single LLM model configuration
 type ModelConfig struct {
-	Name        string  `json:"name" yaml:"name"`
-	Provider    string  `json:"provider" yaml:"provider"`
-	Endpoint    string  `json:"endpoint" yaml:"endpoint"`
-	APIKey      string  `json:"api_key" yaml:"api_key"`
-	Model       string  `json:"model" yaml:"model"`
-	Default     bool    `json:"default,omitempty" yaml:"default,omitempty"`
-	MaxTokens   int     `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
+	Name     string `json:"name" yaml:"name"`
+	Provider string `json:"provider" yaml:"provider"`
+	Endpoint string `json:"endpoint" yaml:"endpoint"`
+	APIKey   string `json:"api_key" yaml:"api_key"`
+	Model    string `json:"model" yaml:"model"`
+	Default  bool   `json:"default,omitempty" yaml:"default,omitempty"`
+	MaxTokens int   `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
 	Temperature float64 `json:"temperature,omitempty" yaml:"temperature,omitempty"`
 }
 
@@ -94,7 +94,7 @@ func handleARFModelsList() error {
 		if len(endpoint) > 40 {
 			endpoint = endpoint[:37] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", 
 			model.Name, model.Provider, model.Model, endpoint, defaultStr)
 	}
 	w.Flush()
@@ -283,7 +283,7 @@ func handleARFModelsImport(args []string) error {
 	}
 
 	var registry ModelRegistry
-
+	
 	// Try YAML first, then JSON
 	if strings.HasSuffix(filePath, ".yaml") || strings.HasSuffix(filePath, ".yml") {
 		if err := yaml.Unmarshal(data, &registry); err != nil {

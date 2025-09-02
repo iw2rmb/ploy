@@ -68,13 +68,13 @@ func getPlatformDomain(service string) string {
 	if platformDomain == "" {
 		platformDomain = "ployman.app"
 	}
-
+	
 	// Check for dev environment
 	environment := os.Getenv("PLOY_ENVIRONMENT")
 	if environment == "dev" {
 		return fmt.Sprintf("%s.dev.%s", service, platformDomain)
 	}
-
+	
 	// Production domain
 	return fmt.Sprintf("%s.%s", service, platformDomain)
 }

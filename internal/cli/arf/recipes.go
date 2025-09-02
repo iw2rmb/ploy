@@ -14,15 +14,15 @@ import (
 
 // RecipeFilter contains filtering options for recipe listing
 type RecipeFilter struct {
-	Language  string
-	Category  string
-	Tags      []string
-	Author    string
-	Limit     int
-	Offset    int
-	MinRating float64
-	SortBy    string
-	SortOrder string
+	Language   string
+	Category   string
+	Tags       []string
+	Author     string
+	Limit      int
+	Offset     int
+	MinRating  float64
+	SortBy     string
+	SortOrder  string
 }
 
 // CommandFlags contains common flags for recipe commands
@@ -73,7 +73,7 @@ func handleARFRecipesCommand(args []string) error {
 			}
 		}
 		query = strings.Join(queryArgs, " ")
-
+		
 		flags := parseCommonFlags(args[len(queryArgs)+1:])
 		return searchRecipes(query, flags)
 	case "upload", "u":
@@ -230,19 +230,19 @@ func handleRecipeList(args []string) error {
 	// Parse filter and common flags
 	filter, remainingArgs := ParseFilterFlags(args)
 	flags := parseCommonFlags(remainingArgs)
-
+	
 	// Validate filter values
 	if err := ValidateFilterValues(filter); err != nil {
 		PrintError(err)
 		return err
 	}
-
+	
 	// Validate output format
 	if err := ValidateOutputFormat(flags.OutputFormat); err != nil {
 		PrintError(err)
 		return err
 	}
-
+	
 	return listRecipes(filter, flags.OutputFormat, flags.Verbose)
 }
 
@@ -288,13 +288,13 @@ func listRecipes(filter RecipeFilter, outputFormat string, verbose bool) error {
 	if totalCount == 0 {
 		totalCount = data.Count
 	}
-
+	
 	page := (filter.Offset / filter.Limit) + 1
 	if page < 1 {
 		page = 1
 	}
 	paginationInfo := NewPaginationInfo(page, filter.Limit, totalCount)
-
+	
 	result := PaginatedResult{
 		Recipes:    recipes,
 		Pagination: paginationInfo,
@@ -408,18 +408,18 @@ func uploadRecipe(recipePath string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to read recipe file: %w", err)
 	}
-
+	
 	// Parse YAML
 	var recipe models.Recipe
 	if err := yaml.Unmarshal(data, &recipe); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-
+	
 	// Override name if specified
 	if flags.Name != "" {
 		recipe.Metadata.Name = flags.Name
 	}
-
+	
 	// Validate recipe
 	if err := recipe.Validate(); err != nil {
 		if !flags.Force {
@@ -427,31 +427,31 @@ func uploadRecipe(recipePath string, flags CommandFlags) error {
 		}
 		fmt.Printf("Warning: %v (continuing due to --force)\n", err)
 	}
-
+	
 	// Dry run mode
 	if flags.DryRun {
 		fmt.Printf("Recipe '%s' is valid and ready for upload\n", recipe.Metadata.Name)
 		return nil
 	}
-
+	
 	// Send to API
 	recipeJSON, err := json.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to serialize recipe: %w", err)
 	}
-
+	
 	url := fmt.Sprintf("%s/arf/recipes/upload", arfControllerURL)
 	response, err := makeAPIRequest("POST", url, recipeJSON)
 	if err != nil {
 		return fmt.Errorf("upload failed: %w", err)
 	}
-
+	
 	var result struct {
 		ID      string `json:"id"`
 		Message string `json:"message"`
 	}
 	json.Unmarshal(response, &result)
-
+	
 	fmt.Printf("Recipe '%s' uploaded successfully (ID: %s)\n", recipe.Metadata.Name, result.ID)
 	return nil
 }
@@ -463,30 +463,30 @@ func updateRecipe(recipeID, recipePath string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to read recipe file: %w", err)
 	}
-
+	
 	// Parse YAML
 	var recipe models.Recipe
 	if err := yaml.Unmarshal(data, &recipe); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-
+	
 	// Validate recipe
 	if err := recipe.Validate(); err != nil {
 		return fmt.Errorf("recipe validation failed: %w", err)
 	}
-
+	
 	// Send to API
 	recipeJSON, err := json.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to serialize recipe: %w", err)
 	}
-
+	
 	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
 	_, err = makeAPIRequest("PUT", url, recipeJSON)
 	if err != nil {
 		return fmt.Errorf("update failed: %w", err)
 	}
-
+	
 	fmt.Printf("Recipe '%s' updated successfully\n", recipeID)
 	return nil
 }
@@ -503,13 +503,13 @@ func deleteRecipe(recipeID string, flags CommandFlags) error {
 			return nil
 		}
 	}
-
+	
 	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
 	_, err := makeAPIRequest("DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("deletion failed: %w", err)
 	}
-
+	
 	fmt.Printf("Recipe '%s' deleted successfully\n", recipeID)
 	return nil
 }
@@ -522,29 +522,29 @@ func downloadRecipe(recipeID string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch recipe: %w", err)
 	}
-
+	
 	var recipe models.Recipe
 	if err := json.Unmarshal(response, &recipe); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
-
+	
 	// Convert to YAML
 	yamlData, err := yaml.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to convert to YAML: %w", err)
 	}
-
+	
 	// Determine output file name
 	outputFile := flags.OutputFile
 	if outputFile == "" {
 		outputFile = fmt.Sprintf("%s.yaml", recipeID)
 	}
-
+	
 	// Write to file
 	if err := os.WriteFile(outputFile, yamlData, 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
-
+	
 	fmt.Printf("Recipe downloaded to %s\n", outputFile)
 	return nil
 }
@@ -556,23 +556,23 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to read recipe file: %w", err)
 	}
-
+	
 	// Parse YAML
 	var recipe models.Recipe
 	if err := yaml.Unmarshal(data, &recipe); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-
+	
 	// Basic validation
 	if err := recipe.Validate(); err != nil {
 		fmt.Printf("❌ Recipe validation failed: %v\n", err)
 		return nil
 	}
-
+	
 	// Additional strict validation
 	if flags.Strict {
 		warnings := []string{}
-
+		
 		// Check for missing optional but recommended fields
 		if recipe.Metadata.MinPlatform == "" {
 			warnings = append(warnings, "Missing minimum platform version")
@@ -583,14 +583,14 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 		if recipe.Metadata.License == "" {
 			warnings = append(warnings, "No license specified")
 		}
-
+		
 		// Check step configurations
 		for i, step := range recipe.Steps {
 			if step.Timeout.Duration == 0 {
 				warnings = append(warnings, fmt.Sprintf("Step %d (%s) has no timeout specified", i+1, step.Name))
 			}
 		}
-
+		
 		if len(warnings) > 0 {
 			fmt.Println("⚠️  Warnings (strict mode):")
 			for _, warning := range warnings {
@@ -598,9 +598,9 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 			}
 		}
 	}
-
+	
 	fmt.Printf("✅ Recipe '%s' is valid\n", recipe.Metadata.Name)
-
+	
 	// Display recipe summary
 	fmt.Printf("\nRecipe Summary:\n")
 	fmt.Printf("  Name: %s\n", recipe.Metadata.Name)
@@ -608,7 +608,7 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 	fmt.Printf("  Steps: %d\n", len(recipe.Steps))
 	fmt.Printf("  Languages: %s\n", strings.Join(recipe.Metadata.Languages, ", "))
 	fmt.Printf("  Categories: %s\n", strings.Join(recipe.Metadata.Categories, ", "))
-
+	
 	return nil
 }
 
@@ -624,7 +624,7 @@ func parseCommonFlags(args []string) CommandFlags {
 	flags := CommandFlags{
 		OutputFormat: "table", // Default output format
 	}
-
+	
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--dry-run", "-n":
@@ -727,7 +727,7 @@ func listUnifiedRecipes(args []string) error {
 	// Parse filter arguments
 	recipeType := ""
 	source := ""
-
+	
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--type", "-t":
@@ -755,7 +755,7 @@ func listUnifiedRecipes(args []string) error {
 			queryParams += "&source=" + source
 		}
 	}
-
+	
 	// List recipes
 	filter := RecipeFilter{}
 	return listRecipes(filter, "table", false)
@@ -804,3 +804,8 @@ Examples:
   # Search for Java migration recipes
   ploy arf recipes unified search java`)
 }
+
+
+
+
+

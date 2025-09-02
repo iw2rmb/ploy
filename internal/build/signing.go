@@ -18,7 +18,7 @@ func determineSigningMethod(imagePath, dockerImage, env string) string {
 			return "keyless-oidc"
 		}
 	}
-
+	
 	// Check for key-based signing indicators
 	if imagePath != "" && utils.FileExists(imagePath+".sig") {
 		// Read signature file to determine if it's key-based or development
@@ -29,7 +29,7 @@ func determineSigningMethod(imagePath, dockerImage, env string) string {
 			return "key-based"
 		}
 	}
-
+	
 	// For Docker images, assume keyless OIDC in production/staging, development otherwise
 	if dockerImage != "" {
 		if env == "prod" || env == "production" || env == "staging" {
@@ -37,7 +37,7 @@ func determineSigningMethod(imagePath, dockerImage, env string) string {
 		}
 		return "development"
 	}
-
+	
 	// Default to development signing
 	return "development"
 }
@@ -48,13 +48,13 @@ func performVulnerabilityScanning(imagePath, dockerImage, env string) bool {
 	if env == "dev" || env == "development" || env == "" {
 		return false
 	}
-
+	
 	// Check if Grype is available
 	if _, err := exec.LookPath("grype"); err != nil {
 		fmt.Printf("Warning: Grype not available for vulnerability scanning: %v\n", err)
 		return false
 	}
-
+	
 	var target string
 	if imagePath != "" {
 		target = imagePath
@@ -63,14 +63,14 @@ func performVulnerabilityScanning(imagePath, dockerImage, env string) bool {
 	} else {
 		return false
 	}
-
+	
 	// Run Grype vulnerability scan
 	cmd := exec.Command("grype", target, "--fail-on", "medium", "--output", "json")
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("Vulnerability scan failed for %s: %v\n", target, err)
 		return false
 	}
-
+	
 	fmt.Printf("Vulnerability scan passed for %s\n", target)
 	return true
 }

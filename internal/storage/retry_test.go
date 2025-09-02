@@ -14,11 +14,11 @@ import (
 
 func TestRetryWithBackoff(t *testing.T) {
 	tests := []struct {
-		name           string
-		operation      func() RetryOperation
-		config         *RetryConfig
-		operationName  string
-		expectError    bool
+		name          string
+		operation     func() RetryOperation
+		config        *RetryConfig
+		operationName string
+		expectError   bool
 		expectAttempts int
 	}{
 		{
@@ -345,12 +345,12 @@ func TestRetryableStorageClient_GetObject(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, reader)
-
+				
 				// Test reading from the retryable reader
 				data, err := io.ReadAll(reader)
 				assert.NoError(t, err)
 				assert.Equal(t, "test content", string(data))
-
+				
 				// Close the reader
 				err = reader.Close()
 				assert.NoError(t, err)
@@ -517,13 +517,13 @@ func TestRetryableStorageClient_VerifyUpload(t *testing.T) {
 
 func TestRetryableStorageClient_ListObjects(t *testing.T) {
 	tests := []struct {
-		name            string
-		setupMock       func(*MockStorageProvider)
-		bucket          string
-		prefix          string
+		name           string
+		setupMock      func(*MockStorageProvider)
+		bucket         string
+		prefix         string
 		expectedObjects []ObjectInfo
-		expectError     bool
-		errorContains   string
+		expectError    bool
+		errorContains  string
 	}{
 		{
 			name:   "successful list",
@@ -710,14 +710,14 @@ func TestRetryableReadCloser(t *testing.T) {
 
 			var retryableReader *retryableReadCloser
 			var expectedReader ReadCloser
-
+			
 			// Setup different readers based on test scenario
 			if tt.expectRetry {
 				// Use a failing reader that returns a network error
 				failingReader := &FailingReader{}
 				failingReader.On("Close").Return(nil)
 				expectedReader = failingReader
-
+				
 				retryableReader = &retryableReadCloser{
 					reader: failingReader,
 					client: mockProvider,
@@ -730,7 +730,7 @@ func TestRetryableReadCloser(t *testing.T) {
 				initialReader := NewMockReadCloser(tt.content)
 				initialReader.On("Close").Return(nil)
 				expectedReader = initialReader
-
+				
 				retryableReader = &retryableReadCloser{
 					reader: initialReader,
 					client: mockProvider,
@@ -746,9 +746,9 @@ func TestRetryableReadCloser(t *testing.T) {
 				bufSize = len("recovered content") // Make buffer big enough for recovery
 			}
 			buf := make([]byte, bufSize)
-
+			
 			n, err := retryableReader.Read(buf)
-
+			
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -767,7 +767,7 @@ func TestRetryableReadCloser(t *testing.T) {
 			assert.NoError(t, closeErr)
 
 			mockProvider.AssertExpectations(t)
-
+			
 			// Assert expectations on the reader that was actually used
 			if mockReader, ok := expectedReader.(interface{ AssertExpectations(*testing.T) }); ok {
 				mockReader.AssertExpectations(t)

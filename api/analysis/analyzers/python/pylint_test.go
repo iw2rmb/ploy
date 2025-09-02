@@ -15,7 +15,7 @@ import (
 func TestNewPylintAnalyzer(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	assert.NotNil(t, analyzer)
 	assert.NotNil(t, analyzer.config)
 	assert.NotNil(t, analyzer.logger)
@@ -25,7 +25,7 @@ func TestNewPylintAnalyzer(t *testing.T) {
 func TestPylintAnalyzer_GetSupportedFileTypes(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	fileTypes := analyzer.GetSupportedFileTypes()
 	assert.Contains(t, fileTypes, ".py")
 	assert.Contains(t, fileTypes, ".pyw")
@@ -34,7 +34,7 @@ func TestPylintAnalyzer_GetSupportedFileTypes(t *testing.T) {
 func TestPylintAnalyzer_GetAnalyzerInfo(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	info := analyzer.GetAnalyzerInfo()
 	assert.Equal(t, "pylint", info.Name)
 	assert.Equal(t, "python", info.Language)
@@ -45,7 +45,7 @@ func TestPylintAnalyzer_GetAnalyzerInfo(t *testing.T) {
 func TestPylintAnalyzer_ValidateConfiguration(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		name    string
 		config  interface{}
@@ -54,18 +54,18 @@ func TestPylintAnalyzer_ValidateConfiguration(t *testing.T) {
 		{
 			name: "valid PylintConfig",
 			config: &PylintConfig{
-				Enabled:    true,
-				PylintPath: "pylint",
-				MinScore:   7.0,
+				Enabled:     true,
+				PylintPath:  "pylint",
+				MinScore:    7.0,
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid map config",
 			config: map[string]interface{}{
-				"enabled":     true,
-				"pylint_path": "pylint",
-				"min_score":   7.0,
+				"enabled":      true,
+				"pylint_path":  "pylint",
+				"min_score":    7.0,
 			},
 			wantErr: false,
 		},
@@ -80,7 +80,7 @@ func TestPylintAnalyzer_ValidateConfiguration(t *testing.T) {
 			wantErr: false, // Should use defaults
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := analyzer.ValidateConfiguration(tt.config)
@@ -96,14 +96,14 @@ func TestPylintAnalyzer_ValidateConfiguration(t *testing.T) {
 func TestPylintAnalyzer_Configure(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	config := &PylintConfig{
 		Enabled:      true,
 		PylintPath:   "/custom/pylint",
 		MinScore:     8.0,
 		DisableRules: []string{"C0111", "R0903"},
 	}
-
+	
 	err := analyzer.Configure(config)
 	assert.NoError(t, err)
 	assert.Equal(t, "/custom/pylint", analyzer.config.PylintPath)
@@ -114,7 +114,7 @@ func TestPylintAnalyzer_Configure(t *testing.T) {
 func TestPylintAnalyzer_parsePylintOutput(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	// Sample Pylint JSON output
 	pylintOutput := `[
 		{
@@ -151,11 +151,11 @@ func TestPylintAnalyzer_parsePylintOutput(t *testing.T) {
 			"message-id": "C0111"
 		}
 	]`
-
+	
 	issues := analyzer.parsePylintOutput(pylintOutput)
-
+	
 	require.Len(t, issues, 3)
-
+	
 	// Check first issue (error)
 	assert.Equal(t, "syntax-error", issues[0].RuleName)
 	assert.Equal(t, analysis.SeverityHigh, issues[0].Severity)
@@ -163,12 +163,12 @@ func TestPylintAnalyzer_parsePylintOutput(t *testing.T) {
 	assert.Equal(t, 10, issues[0].Line)
 	assert.Equal(t, 4, issues[0].Column)
 	assert.Contains(t, issues[0].Message, "Syntax error")
-
+	
 	// Check second issue (warning)
 	assert.Equal(t, "unused-variable", issues[1].RuleName)
 	assert.Equal(t, analysis.SeverityMedium, issues[1].Severity)
 	assert.Equal(t, 25, issues[1].Line)
-
+	
 	// Check third issue (convention)
 	assert.Equal(t, "missing-docstring", issues[2].RuleName)
 	assert.Equal(t, analysis.SeverityLow, issues[2].Severity)
@@ -177,7 +177,7 @@ func TestPylintAnalyzer_parsePylintOutput(t *testing.T) {
 func TestPylintAnalyzer_mapSeverity(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		pylintSeverity string
 		expected       analysis.SeverityLevel
@@ -190,7 +190,7 @@ func TestPylintAnalyzer_mapSeverity(t *testing.T) {
 		{"info", analysis.SeverityInfo},
 		{"unknown", analysis.SeverityInfo},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.pylintSeverity, func(t *testing.T) {
 			severity := analyzer.mapSeverity(tt.pylintSeverity)
@@ -202,20 +202,20 @@ func TestPylintAnalyzer_mapSeverity(t *testing.T) {
 func TestPylintAnalyzer_categorizeMessage(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		messageID string
 		expected  analysis.IssueCategory
 	}{
-		{"E0001", analysis.CategoryBug},         // Error
-		{"W0612", analysis.CategoryDeprecation}, // Warning - W06xx is deprecation
-		{"C0111", analysis.CategoryStyle},       // Convention
-		{"R0903", analysis.CategoryComplexity},  // Refactor
-		{"I0011", analysis.CategoryStyle},       // Information
-		{"F0001", analysis.CategoryBug},         // Fatal
-		{"X0000", analysis.CategoryMaintenance}, // Unknown
+		{"E0001", analysis.CategoryBug},          // Error
+		{"W0612", analysis.CategoryDeprecation},  // Warning - W06xx is deprecation
+		{"C0111", analysis.CategoryStyle},        // Convention
+		{"R0903", analysis.CategoryComplexity},   // Refactor
+		{"I0011", analysis.CategoryStyle},        // Information
+		{"F0001", analysis.CategoryBug},          // Fatal
+		{"X0000", analysis.CategoryMaintenance},  // Unknown
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.messageID, func(t *testing.T) {
 			category := analyzer.categorizeMessage(tt.messageID)
@@ -227,7 +227,7 @@ func TestPylintAnalyzer_categorizeMessage(t *testing.T) {
 func TestPylintAnalyzer_findPythonFiles(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	codebase := analysis.Codebase{
 		Files: []string{
 			"main.py",
@@ -241,9 +241,9 @@ func TestPylintAnalyzer_findPythonFiles(t *testing.T) {
 			"__pycache__/cached.pyc",
 		},
 	}
-
+	
 	pythonFiles := analyzer.findPythonFiles(codebase)
-
+	
 	assert.Len(t, pythonFiles, 6) // Including script.pyw
 	assert.Contains(t, pythonFiles, "main.py")
 	assert.Contains(t, pythonFiles, "test.py")
@@ -258,7 +258,7 @@ func TestPylintAnalyzer_findPythonFiles(t *testing.T) {
 func TestPylintAnalyzer_detectPythonProject(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		name     string
 		files    []string
@@ -290,7 +290,7 @@ func TestPylintAnalyzer_detectPythonProject(t *testing.T) {
 			expected: "standalone",
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock codebase with specific files
@@ -298,7 +298,7 @@ func TestPylintAnalyzer_detectPythonProject(t *testing.T) {
 				RootPath: "/tmp/test",
 				Files:    tt.files,
 			}
-
+			
 			projectType := analyzer.detectPythonProject(codebase)
 			assert.Equal(t, tt.expected, projectType)
 		})
@@ -308,7 +308,7 @@ func TestPylintAnalyzer_detectPythonProject(t *testing.T) {
 func TestPylintAnalyzer_GenerateFixSuggestions(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		name        string
 		issue       analysis.Issue
@@ -343,12 +343,12 @@ func TestPylintAnalyzer_GenerateFixSuggestions(t *testing.T) {
 			expectCount: 0,
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			suggestions, err := analyzer.GenerateFixSuggestions(tt.issue)
 			assert.NoError(t, err)
-
+			
 			if tt.expectFix {
 				assert.Len(t, suggestions, tt.expectCount)
 				if len(suggestions) > 0 {
@@ -365,7 +365,7 @@ func TestPylintAnalyzer_GenerateFixSuggestions(t *testing.T) {
 func TestPylintAnalyzer_CanAutoFix(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		name     string
 		issue    analysis.Issue
@@ -402,7 +402,7 @@ func TestPylintAnalyzer_CanAutoFix(t *testing.T) {
 			expected: false,
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			canFix := analyzer.CanAutoFix(tt.issue)
@@ -414,7 +414,7 @@ func TestPylintAnalyzer_CanAutoFix(t *testing.T) {
 func TestPylintAnalyzer_GetARFRecipes(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	tests := []struct {
 		name         string
 		issue        analysis.Issue
@@ -441,11 +441,11 @@ func TestPylintAnalyzer_GetARFRecipes(t *testing.T) {
 			expectRecipe: false,
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recipes := analyzer.GetARFRecipes(tt.issue)
-
+			
 			if tt.expectRecipe {
 				assert.NotEmpty(t, recipes)
 				for _, recipe := range recipes {
@@ -462,15 +462,15 @@ func TestPylintAnalyzer_GetARFRecipes(t *testing.T) {
 func TestPylintAnalyzer_Analyze_EmptyCodebase(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	ctx := context.Background()
 	codebase := analysis.Codebase{
 		RootPath: "/tmp/empty",
 		Files:    []string{},
 	}
-
+	
 	result, err := analyzer.Analyze(ctx, codebase)
-
+	
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, "python", result.Language)
@@ -482,21 +482,21 @@ func TestPylintAnalyzer_Analyze_EmptyCodebase(t *testing.T) {
 func TestPylintAnalyzer_Analyze_Timeout(t *testing.T) {
 	logger := logrus.New()
 	analyzer := NewPylintAnalyzer(logger)
-
+	
 	// Create a context that times out immediately
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
-
+	
 	// Sleep to ensure context is cancelled
 	time.Sleep(10 * time.Millisecond)
-
+	
 	codebase := analysis.Codebase{
 		RootPath: "/tmp/test",
 		Files:    []string{"test.py"},
 	}
-
+	
 	result, err := analyzer.Analyze(ctx, codebase)
-
+	
 	// Should handle timeout gracefully
 	assert.NoError(t, err)
 	assert.NotNil(t, result)

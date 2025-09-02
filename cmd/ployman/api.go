@@ -17,13 +17,13 @@ import (
 
 // DeploymentState tracks active deployment information
 type DeploymentState struct {
-	StartTime      time.Time `json:"start_time"`
-	PID            int       `json:"pid"`
-	TargetBranch   string    `json:"target_branch"`
-	TargetHost     string    `json:"target_host"`
-	Timeout        int       `json:"timeout_minutes"`
-	ExpectedCommit string    `json:"expected_commit"`
-	LogFile        string    `json:"log_file"`
+	StartTime    time.Time `json:"start_time"`
+	PID          int       `json:"pid"`
+	TargetBranch string    `json:"target_branch"`
+	TargetHost   string    `json:"target_host"`
+	Timeout      int       `json:"timeout_minutes"`
+	ExpectedCommit string  `json:"expected_commit"`
+	LogFile      string    `json:"log_file"`
 }
 
 // ApiCmd handles API management commands
@@ -73,29 +73,29 @@ func runApiDeploy(args []string) {
 	monitor := deployCmd.Bool("monitor", false, "Monitor deployment progress in background")
 	// Legacy background flag (now default behavior)
 	legacyBackground := deployCmd.Bool("background", false, "[DEPRECATED] Run in background (now default)")
-
+	
 	deployCmd.Parse(args)
-
+	
 	// Validate timeout
 	if *timeoutMinutes < 1 || *timeoutMinutes > 10 {
 		fmt.Println("Error: timeout must be between 1 and 10 minutes")
 		return
 	}
-
+	
 	fmt.Println("Deploying latest API version...")
-
+	
 	// Always run full deployment to ensure latest code changes are deployed
 	// This includes: git pull, build, upload to SeaweedFS, and Nomad deployment
 	fmt.Println("Running full deployment to ensure latest code changes...")
-
+	
 	// Legacy background flag warning
 	if *legacyBackground {
 		fmt.Println("Note: --background flag is deprecated (deployments run in background by default)")
 	}
-
+	
 	// Default to background mode unless foreground is explicitly requested
 	runInBackground := !*foreground
-
+	
 	if runInBackground {
 		if !*foreground {
 			fmt.Println("Running in background mode (use --foreground to wait for completion)")
@@ -112,32 +112,32 @@ func runApiRollback(args []string) {
 		fmt.Println("Usage: ployman api rollback <version>")
 		return
 	}
-
+	
 	targetVersion := args[0]
 	controllerURL := getControllerURL()
-
+	
 	// Call rollback endpoint
 	rollbackURL := fmt.Sprintf("%s/rollback", controllerURL)
-
+	
 	payload := map[string]string{
 		"version": targetVersion,
 		"reason":  "Manual rollback via ployman CLI",
 	}
-
+	
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		fmt.Printf("Error: failed to create request: %v\n", err)
 		return
 	}
-
+	
 	req, err := http.NewRequest("POST", rollbackURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Printf("Error creating request: %v\n", err)
 		return
 	}
-
+	
 	req.Header.Set("Content-Type", "application/json")
-
+	
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -145,24 +145,24 @@ func runApiRollback(args []string) {
 		return
 	}
 	defer resp.Body.Close()
-
+	
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("Error reading response: %v\n", err)
 		return
 	}
-
+	
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Rollback failed with status %d: %s\n", resp.StatusCode, string(body))
 		return
 	}
-
+	
 	fmt.Printf("Successfully rolled back to version %s\n", targetVersion)
 }
 
 func runAnsibleDeployment(timeoutMinutes int) {
 	fmt.Println("Running Ansible deployment to build and deploy latest code...")
-
+	
 	// Get target host from environment
 	targetHost := os.Getenv("TARGET_HOST")
 	if targetHost == "" {
@@ -170,20 +170,20 @@ func runAnsibleDeployment(timeoutMinutes int) {
 		fmt.Println("Please set TARGET_HOST to your VPS IP address")
 		return
 	}
-
+	
 	// Check if Ansible is installed locally
 	if _, err := exec.LookPath("ansible-playbook"); err != nil {
 		fmt.Println("Error: ansible-playbook not found in PATH")
 		fmt.Println("Please install Ansible locally: brew install ansible")
 		return
 	}
-
+	
 	// Determine which branch to deploy
 	var branch string
-
+	
 	// First check if DEPLOY_BRANCH is explicitly set
 	branch = os.Getenv("DEPLOY_BRANCH")
-
+	
 	if branch == "" {
 		// Check if we're in a git repository
 		cmd := exec.Command("git", "rev-parse", "--git-dir")
@@ -205,64 +205,64 @@ func runAnsibleDeployment(timeoutMinutes int) {
 			}
 		}
 	}
-
+	
 	// Default to main if no branch determined
 	if branch == "" {
 		branch = "main"
 		fmt.Println("Note: Not in a git repository, defaulting to 'main' branch")
 		fmt.Println("Tip: Set DEPLOY_BRANCH environment variable to deploy a specific branch")
 	}
-
+	
 	fmt.Printf("Deploying branch '%s' to %s via Ansible...\n", branch, targetHost)
-
+	
 	// Find the repository root (where iac/dev directory should be)
 	// First try to find it relative to the current working directory
 	var iacPath string
-
+	
 	// Try common paths relative to where ployman might be run from
 	possiblePaths := []string{
-		"iac/dev",                        // Running from repo root
-		"../iac/dev",                     // Running from cmd/ployman or bin
-		"../../iac/dev",                  // Running from deeper directory
-		"/Users/vk/@iw2rmb/ploy/iac/dev", // Absolute fallback path
+		"iac/dev",                                    // Running from repo root
+		"../iac/dev",                                 // Running from cmd/ployman or bin
+		"../../iac/dev",                              // Running from deeper directory
+		"/Users/vk/@iw2rmb/ploy/iac/dev",            // Absolute fallback path
 	}
-
+	
 	for _, path := range possiblePaths {
 		if _, err := os.Stat(path + "/playbooks/api.yml"); err == nil {
 			iacPath = path
 			break
 		}
 	}
-
+	
 	if iacPath == "" {
 		fmt.Println("Error: Could not find iac/dev/playbooks/api.yml")
 		fmt.Println("Please run this command from the ploy repository root or set up the correct path")
 		return
 	}
-
+	
 	fmt.Printf("Using Ansible playbooks from: %s\n", iacPath)
-
+	
 	// Create context with configurable timeout
 	timeout := time.Duration(timeoutMinutes) * time.Minute
 	fmt.Printf("Setting deployment timeout to %d minutes\n", timeoutMinutes)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
+	
 	// Execute Ansible playbook locally with timeout
 	ansibleCmd := exec.CommandContext(ctx, "ansible-playbook",
 		"playbooks/api.yml",
 		"-e", fmt.Sprintf("target_host=%s", targetHost),
 		"-e", fmt.Sprintf("deploy_branch=%s", branch),
 	)
-
+	
 	// Set working directory to iac/dev
 	ansibleCmd.Dir = iacPath
 	ansibleCmd.Stdout = os.Stdout
 	ansibleCmd.Stderr = os.Stderr
-
+	
 	// Set environment variables that might be needed
 	ansibleCmd.Env = os.Environ()
-
+	
 	// Save deployment state before starting
 	deploymentState := &DeploymentState{
 		StartTime:      time.Now(),
@@ -273,19 +273,19 @@ func runAnsibleDeployment(timeoutMinutes int) {
 		ExpectedCommit: getCurrentCommit(),
 		LogFile:        "", // Foreground deployment doesn't use log file
 	}
-
+	
 	fmt.Printf("Running Ansible playbook (%d-minute timeout)...\n", timeoutMinutes)
-
+	
 	// Start the command and get PID
 	if err := ansibleCmd.Start(); err != nil {
 		fmt.Printf("Error starting deployment: %v\n", err)
 		return
 	}
-
+	
 	// Update PID and save deployment state
 	deploymentState.PID = ansibleCmd.Process.Pid
 	saveDeploymentState(deploymentState)
-
+	
 	// Wait for completion
 	if err := ansibleCmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -298,16 +298,16 @@ func runAnsibleDeployment(timeoutMinutes int) {
 		fmt.Println("Tip: Ensure you have SSH access to the target host and all required Ansible dependencies")
 		return
 	}
-
+	
 	fmt.Println("Ansible deployment completed successfully!")
-
+	
 	// Clear deployment state on successful completion
 	clearDeploymentState()
 }
 
 func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 	fmt.Println("Starting deployment in background...")
-
+	
 	// Get target host from environment
 	targetHost := os.Getenv("TARGET_HOST")
 	if targetHost == "" {
@@ -315,20 +315,20 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		fmt.Println("Please set TARGET_HOST to your VPS IP address")
 		return
 	}
-
+	
 	// Check if Ansible is installed locally
 	if _, err := exec.LookPath("ansible-playbook"); err != nil {
 		fmt.Println("Error: ansible-playbook not found in PATH")
 		fmt.Println("Please install Ansible locally: brew install ansible")
 		return
 	}
-
+	
 	// Determine which branch to deploy
 	var branch string
-
+	
 	// First check if DEPLOY_BRANCH is explicitly set
 	branch = os.Getenv("DEPLOY_BRANCH")
-
+	
 	if branch == "" {
 		// Check if we're in a git repository
 		cmd := exec.Command("git", "rev-parse", "--git-dir")
@@ -350,42 +350,42 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 			}
 		}
 	}
-
+	
 	// Default to main if no branch determined
 	if branch == "" {
 		branch = "main"
 		fmt.Println("Note: Not in a git repository, defaulting to 'main' branch")
 		fmt.Println("Tip: Set DEPLOY_BRANCH environment variable to deploy a specific branch")
 	}
-
+	
 	fmt.Printf("Deploying branch '%s' to %s via Ansible...\n", branch, targetHost)
-
+	
 	// Find the repository root (where iac/dev directory should be)
 	var iacPath string
-
+	
 	// Try common paths relative to where ployman might be run from
 	possiblePaths := []string{
-		"iac/dev",                        // Running from repo root
-		"../iac/dev",                     // Running from cmd/ployman or bin
-		"../../iac/dev",                  // Running from deeper directory
-		"/Users/vk/@iw2rmb/ploy/iac/dev", // Absolute fallback path
+		"iac/dev",                                    // Running from repo root
+		"../iac/dev",                                 // Running from cmd/ployman or bin
+		"../../iac/dev",                              // Running from deeper directory
+		"/Users/vk/@iw2rmb/ploy/iac/dev",            // Absolute fallback path
 	}
-
+	
 	for _, path := range possiblePaths {
 		if _, err := os.Stat(path + "/playbooks/api.yml"); err == nil {
 			iacPath = path
 			break
 		}
 	}
-
+	
 	if iacPath == "" {
 		fmt.Println("Error: Could not find iac/dev/playbooks/api.yml")
 		fmt.Println("Please run this command from the ploy repository root or set up the correct path")
 		return
 	}
-
+	
 	fmt.Printf("Using Ansible playbooks from: %s\n", iacPath)
-
+	
 	// Create log file for background deployment
 	logFile := fmt.Sprintf("/tmp/ploy-deploy-%s.log", time.Now().Format("20060102-150405"))
 	log, err := os.Create(logFile)
@@ -394,22 +394,22 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		return
 	}
 	defer log.Close()
-
+	
 	// Create context with configurable timeout
 	timeout := time.Duration(timeoutMinutes) * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
+	
 	// Execute Ansible playbook in background
 	ansibleCmd := exec.CommandContext(ctx, "ansible-playbook",
 		"playbooks/api.yml",
 		"-e", fmt.Sprintf("target_host=%s", targetHost),
 		"-e", fmt.Sprintf("deploy_branch=%s", branch),
 	)
-
+	
 	// Set working directory to iac/dev
 	ansibleCmd.Dir = iacPath
-
+	
 	// Prepare deployment state
 	deploymentState := &DeploymentState{
 		StartTime:      time.Now(),
@@ -420,7 +420,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		ExpectedCommit: getCurrentCommit(),
 		LogFile:        logFile,
 	}
-
+	
 	if monitor {
 		// For monitoring, use pipes to capture output
 		stdout, err := ansibleCmd.StdoutPipe()
@@ -428,27 +428,27 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 			fmt.Printf("Error creating stdout pipe: %v\n", err)
 			return
 		}
-
+		
 		stderr, err := ansibleCmd.StderrPipe()
 		if err != nil {
 			fmt.Printf("Error creating stderr pipe: %v\n", err)
 			return
 		}
-
+		
 		// Start the command
 		if err := ansibleCmd.Start(); err != nil {
 			fmt.Printf("Error starting deployment: %v\n", err)
 			return
 		}
-
+		
 		// Update PID and save deployment state
 		deploymentState.PID = ansibleCmd.Process.Pid
 		saveDeploymentState(deploymentState)
-
+		
 		fmt.Printf("Deployment started in background (PID: %d)\n", ansibleCmd.Process.Pid)
 		fmt.Printf("Monitoring deployment progress (timeout: %d minutes)...\n", timeoutMinutes)
 		fmt.Printf("Log file: %s\n\n", logFile)
-
+		
 		// Monitor output in real-time
 		go func() {
 			buf := make([]byte, 1024)
@@ -464,7 +464,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 				}
 			}
 		}()
-
+		
 		go func() {
 			buf := make([]byte, 1024)
 			for {
@@ -479,7 +479,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 				}
 			}
 		}()
-
+		
 		// Wait for completion
 		if err := ansibleCmd.Wait(); err != nil {
 			if ctx.Err() == context.DeadlineExceeded {
@@ -496,20 +496,20 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		// For background without monitoring, redirect to log file
 		ansibleCmd.Stdout = log
 		ansibleCmd.Stderr = log
-
+		
 		// Set environment variables that might be needed
 		ansibleCmd.Env = os.Environ()
-
+		
 		// Start the command in background
 		if err := ansibleCmd.Start(); err != nil {
 			fmt.Printf("Error starting deployment: %v\n", err)
 			return
 		}
-
+		
 		// Update PID and save deployment state
 		deploymentState.PID = ansibleCmd.Process.Pid
 		saveDeploymentState(deploymentState)
-
+		
 		fmt.Printf("Deployment started in background (PID: %d)\n", ansibleCmd.Process.Pid)
 		fmt.Printf("Timeout: %d minutes\n", timeoutMinutes)
 		fmt.Printf("Log file: %s\n", logFile)
@@ -521,7 +521,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		fmt.Println("  ployman api status")
 		fmt.Println("")
 		fmt.Println("Note: The deployment will continue running even if you close this terminal.")
-
+		
 		// Start a goroutine to wait for completion and log the result
 		go func() {
 			if err := ansibleCmd.Wait(); err != nil {
@@ -539,10 +539,10 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 
 func runApiStatus(args []string) {
 	controllerURL := getControllerURL()
-
+	
 	fmt.Println("Checking API deployment status...")
 	fmt.Println("")
-
+	
 	// Check for active deployment first
 	deploymentState, err := loadDeploymentState()
 	if err == nil {
@@ -552,32 +552,32 @@ func runApiStatus(args []string) {
 			elapsed := time.Since(deploymentState.StartTime)
 			timeoutDuration := time.Duration(deploymentState.Timeout) * time.Minute
 			remaining := timeoutDuration - elapsed
-
+			
 			fmt.Printf("🔄 Deployment in progress (PID: %d)\n", deploymentState.PID)
 			fmt.Printf("Branch: %s\n", deploymentState.TargetBranch)
 			fmt.Printf("Target: %s\n", deploymentState.TargetHost)
 			fmt.Printf("Started: %s (%s ago)\n", deploymentState.StartTime.Format("15:04:05"), elapsed.Round(time.Second))
-
+			
 			if remaining > 0 {
 				fmt.Printf("Timeout: %s remaining\n", remaining.Round(time.Second))
 			} else {
 				fmt.Printf("⚠️  Deployment has exceeded timeout (%d minutes)\n", deploymentState.Timeout)
 			}
-
+			
 			if deploymentState.LogFile != "" {
 				fmt.Printf("Log file: %s\n", deploymentState.LogFile)
 				fmt.Println("")
 				fmt.Println("To monitor progress:")
 				fmt.Printf("  tail -f %s\n", deploymentState.LogFile)
 			}
-
+			
 			fmt.Println("")
 			fmt.Printf("Progress: Deployment started %s ago\n", elapsed.Round(time.Second))
 			return
 		} else {
 			// Process is no longer running, check deployment completion
 			fmt.Printf("📋 Previous deployment completed (PID %d no longer running)\n", deploymentState.PID)
-
+			
 			// Check if deployment was successful by comparing versions
 			if deploymentState.ExpectedCommit != "" {
 				if checkVersionMatch(controllerURL, deploymentState.ExpectedCommit) {
@@ -592,7 +592,7 @@ func runApiStatus(args []string) {
 			fmt.Println("")
 		}
 	}
-
+	
 	// Check current API status
 	versionURL := fmt.Sprintf("%s/version", controllerURL)
 	req, err := http.NewRequest("GET", versionURL, nil)
@@ -600,7 +600,7 @@ func runApiStatus(args []string) {
 		fmt.Printf("Error creating request: %v\n", err)
 		return
 	}
-
+	
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -613,7 +613,7 @@ func runApiStatus(args []string) {
 		return
 	}
 	defer resp.Body.Close()
-
+	
 	if resp.StatusCode == http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
 		if err == nil {
@@ -637,7 +637,7 @@ func runApiStatus(args []string) {
 	} else {
 		fmt.Printf("⚠️  API returned status %d\n", resp.StatusCode)
 	}
-
+	
 	// Check health endpoint
 	healthURL := fmt.Sprintf("%s/health", controllerURL)
 	req, err = http.NewRequest("GET", healthURL, nil)
@@ -652,7 +652,7 @@ func runApiStatus(args []string) {
 			}
 		}
 	}
-
+	
 	fmt.Println("")
 	fmt.Printf("API Endpoint: %s\n", controllerURL)
 }
@@ -674,7 +674,7 @@ func loadDeploymentState() (*DeploymentState, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	
 	var state DeploymentState
 	err = json.Unmarshal(data, &state)
 	return &state, err
@@ -689,7 +689,7 @@ func isProcessRunning(pid int) bool {
 	if err != nil {
 		return false
 	}
-
+	
 	// Send signal 0 to check if process exists without affecting it
 	err = process.Signal(syscall.Signal(0))
 	return err == nil
@@ -706,33 +706,33 @@ func getCurrentCommit() string {
 
 func checkVersionMatch(controllerURL, expectedCommit string) bool {
 	versionURL := fmt.Sprintf("%s/version", controllerURL)
-
+	
 	req, err := http.NewRequest("GET", versionURL, nil)
 	if err != nil {
 		return false
 	}
-
+	
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return false
 	}
 	defer resp.Body.Close()
-
+	
 	if resp.StatusCode != http.StatusOK {
 		return false
 	}
-
+	
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false
 	}
-
+	
 	var versionInfo map[string]interface{}
 	if err := json.Unmarshal(body, &versionInfo); err != nil {
 		return false
 	}
-
+	
 	if gitCommit, ok := versionInfo["git_commit"]; ok {
 		if commitStr, ok := gitCommit.(string); ok {
 			// Compare full commit hash or shortened versions
@@ -748,25 +748,25 @@ func checkVersionMatch(controllerURL, expectedCommit string) bool {
 			}
 		}
 	}
-
+	
 	return false
 }
 
 func checkDeploymentStatus(controllerURL string) {
 	versionURL := fmt.Sprintf("%s/version", controllerURL)
-
+	
 	req, err := http.NewRequest("GET", versionURL, nil)
 	if err != nil {
 		return
 	}
-
+	
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
-
+	
 	if resp.StatusCode == http.StatusOK {
 		fmt.Println("API is responding normally")
 	}

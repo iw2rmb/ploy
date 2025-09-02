@@ -21,7 +21,7 @@ func NewHandler() (*Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consul template client: %w", err)
 	}
-
+	
 	return &Handler{
 		consulClient: consulClient,
 	}, nil
@@ -34,7 +34,7 @@ type SyncTemplatesRequest struct {
 
 // SyncTemplatesResponse represents the response from template sync
 type SyncTemplatesResponse struct {
-	Success      bool             `json:"success"`
+	Success      bool              `json:"success"`
 	Message      string           `json:"message"`
 	SyncedCount  int              `json:"synced_count"`
 	SkippedCount int              `json:"skipped_count"`
@@ -60,18 +60,18 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 
 	// Try multiple possible locations for platform templates
 	possibleDirs := []string{
-		"platform/nomad", // Relative path (development)
+		"platform/nomad",                              // Relative path (development)
 	}
-
+	
 	// Add path from environment variable if set
 	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
 		possibleDirs = append(possibleDirs, filepath.Join(templateDir, "platform/nomad"))
 	}
-
+	
 	// Add fallback paths
 	possibleDirs = append(possibleDirs,
-		"/home/ploy/ploy/platform/nomad", // Absolute path on VPS
-		"/opt/ploy/platform/nomad",       // Alternative deployment location
+		"/home/ploy/ploy/platform/nomad",             // Absolute path on VPS
+		"/opt/ploy/platform/nomad",                   // Alternative deployment location
 	)
 
 	var templates []os.DirEntry
@@ -155,18 +155,18 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
 	// Try multiple possible locations for platform templates
 	possibleDirs := []string{
-		"platform/nomad", // Relative path (development)
+		"platform/nomad",                              // Relative path (development)
 	}
-
+	
 	// Add path from environment variable if set
 	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
 		possibleDirs = append(possibleDirs, filepath.Join(templateDir, "platform/nomad"))
 	}
-
+	
 	// Add fallback paths
 	possibleDirs = append(possibleDirs,
-		"/home/ploy/ploy/platform/nomad", // Absolute path on VPS
-		"/opt/ploy/platform/nomad",       // Alternative deployment location
+		"/home/ploy/ploy/platform/nomad",             // Absolute path on VPS
+		"/opt/ploy/platform/nomad",                   // Alternative deployment location
 	)
 
 	var templates []os.DirEntry
@@ -231,7 +231,7 @@ func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
 // SetupRoutes registers template management routes
 func SetupRoutes(app *fiber.App, handler *Handler) {
 	api := app.Group("/v1")
-
+	
 	// Template management endpoints
 	api.Post("/templates/sync", handler.SyncTemplates)
 	api.Get("/templates/status", handler.GetTemplateStatus)

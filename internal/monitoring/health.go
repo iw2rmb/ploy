@@ -75,15 +75,15 @@ func (hc *HealthChecker) GetHealth(ctx context.Context) *HealthStatus {
 	// Run all checks concurrently
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-
+	
 	for name, checkFunc := range hc.checks {
 		wg.Add(1)
 		go func(checkName string, fn func(context.Context) *Check) {
 			defer wg.Done()
-
+			
 			// Run check with context
 			check := fn(ctx)
-
+			
 			// Store result
 			mu.Lock()
 			status.Checks[checkName] = check
@@ -132,7 +132,7 @@ func (hc *HealthChecker) calculateOverallStatus(checks map[string]*Check) string
 	} else if unhealthyCount > 0 {
 		return StatusDegraded
 	}
-
+	
 	return StatusHealthy
 }
 
@@ -175,7 +175,7 @@ func (hc *HealthChecker) checkWorkerPool(ctx context.Context) *Check {
 	}
 
 	utilization := hc.worker.GetUtilization()
-
+	
 	// Consider unhealthy if utilization is above 90%
 	if utilization > 0.9 {
 		check.Healthy = false

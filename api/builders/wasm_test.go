@@ -14,7 +14,7 @@ import (
 // TestNewWASMBuilder tests the WASMBuilder constructor
 func TestNewWASMBuilder(t *testing.T) {
 	builder := NewWASMBuilder()
-
+	
 	if builder == nil {
 		t.Fatal("NewWASMBuilder returned nil")
 	}
@@ -29,14 +29,14 @@ func TestNewWASMBuilder(t *testing.T) {
 // TestWASMBuilderBuild tests the Build method
 func TestWASMBuilderBuild(t *testing.T) {
 	tests := []struct {
-		name            string
-		request         BuildRequest
-		setupFiles      map[string]string
-		mockStrategy    buildStrategy
-		mockBuildError  error
-		expectError     bool
-		errContains     string
-		expectedLane    string
+		name           string
+		request        BuildRequest
+		setupFiles     map[string]string
+		mockStrategy   buildStrategy
+		mockBuildError error
+		expectError    bool
+		errContains    string
+		expectedLane   string
 		expectedRuntime string
 	}{
 		{
@@ -170,7 +170,7 @@ func TestWASMBuilderBuild(t *testing.T) {
 			if tt.setupFiles != nil {
 				tmpDir := t.TempDir()
 				tt.request.SourcePath = tmpDir
-
+				
 				// Create test files
 				for filename, content := range tt.setupFiles {
 					filePath := filepath.Join(tmpDir, filename)
@@ -184,7 +184,7 @@ func TestWASMBuilderBuild(t *testing.T) {
 						t.Fatalf("failed to create test file %s: %v", filename, err)
 					}
 				}
-
+				
 				// Set output path to temp dir if not testing error case
 				if !strings.Contains(tt.request.OutputPath, "/nonexistent") {
 					tt.request.OutputPath = t.TempDir()
@@ -207,7 +207,7 @@ func TestWASMBuilderBuild(t *testing.T) {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
-
+				
 				// Verify result
 				if result == nil {
 					t.Fatal("expected result but got nil")
@@ -379,22 +379,22 @@ import "syscall/js"`,
 // TestBuildContextCancellation tests build cancellation via context
 func TestBuildContextCancellation(t *testing.T) {
 	builder := NewWASMBuilder()
-
+	
 	// Create a context that's already cancelled
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-
+	
 	request := BuildRequest{
 		SourcePath: t.TempDir(),
 		AppName:    "test-app",
 		BuildID:    "build-123",
 		OutputPath: t.TempDir(),
 	}
-
+	
 	// Create a Rust WASM project
 	cargoPath := filepath.Join(request.SourcePath, "Cargo.toml")
 	os.WriteFile(cargoPath, []byte("[dependencies]\nwasm-bindgen = \"0.2\""), 0644)
-
+	
 	// The build should fail due to cancelled context
 	_, err := builder.Build(ctx, request)
 	if err == nil {
@@ -405,25 +405,25 @@ func TestBuildContextCancellation(t *testing.T) {
 // TestBuildTimeout tests build timeout handling
 func TestBuildTimeout(t *testing.T) {
 	builder := NewWASMBuilder()
-
+	
 	// Create a context with very short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
-
+	
 	request := BuildRequest{
 		SourcePath: t.TempDir(),
 		AppName:    "test-app",
 		BuildID:    "build-123",
 		OutputPath: t.TempDir(),
 	}
-
+	
 	// Create a Rust WASM project
 	cargoPath := filepath.Join(request.SourcePath, "Cargo.toml")
 	os.WriteFile(cargoPath, []byte("[dependencies]\nwasm-bindgen = \"0.2\""), 0644)
-
+	
 	// Sleep to ensure timeout
 	time.Sleep(2 * time.Millisecond)
-
+	
 	// The build should fail due to timeout
 	_, err := builder.Build(ctx, request)
 	if err == nil {
@@ -437,7 +437,7 @@ func testWASMBuild(ctx context.Context, builder *WASMBuilder, req BuildRequest, 
 	if strings.Contains(req.OutputPath, "/nonexistent") {
 		return nil, fmt.Errorf("failed to create output directory: permission denied")
 	}
-
+	
 	// Detect strategy (or use mock)
 	strategy := mockStrategy
 	if strategy == "" {
@@ -447,21 +447,21 @@ func testWASMBuild(ctx context.Context, builder *WASMBuilder, req BuildRequest, 
 			return nil, fmt.Errorf("failed to detect build strategy: %w", err)
 		}
 	}
-
+	
 	// Simulate build error if provided
 	if mockError != nil {
 		return nil, fmt.Errorf("WASM build failed: %w", mockError)
 	}
-
+	
 	// Create output directory
 	outputDir := filepath.Join(req.OutputPath, "wasm")
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
-
+	
 	// Simulate successful build
 	artifactPath := filepath.Join(outputDir, req.AppName+".wasm")
-
+	
 	return &BuildResult{
 		ArtifactPath: artifactPath,
 		Lane:         "G",
