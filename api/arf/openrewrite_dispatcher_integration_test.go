@@ -198,9 +198,9 @@ func (m *MockStorageService) List(ctx context.Context, prefix string) ([]string,
 func TestOpenRewriteDispatcher_DoubleArtifactsPath(t *testing.T) {
 	// This test reproduces the double artifacts path issue reported in OpenRewrite transformations
 	// Expected to FAIL initially (RED phase), then pass after fix (GREEN phase)
-	
+
 	mockStorage := &MockStorageService{}
-	
+
 	// Create dispatcher with real URLs to test path construction
 	dispatcher, err := NewOpenRewriteDispatcher(
 		"http://localhost:4646", // Nomad URL
@@ -211,51 +211,51 @@ func TestOpenRewriteDispatcher_DoubleArtifactsPath(t *testing.T) {
 	)
 	require.NoError(t, err, "Dispatcher should initialize successfully")
 	require.NotNil(t, dispatcher, "Dispatcher should not be nil")
-	
+
 	// Create test request with specific JobID to track path construction
 	req := &OpenRewriteRecipeRequest{
-		RecipeClass: "org.openrewrite.java.migrate.UpgradeToJava17", 
+		RecipeClass: "org.openrewrite.java.migrate.UpgradeToJava17",
 		RepoPath:    "/tmp/test-repo",
 		JobID:       "path-test-12345",
 	}
-	
+
 	// Mock the Nomad job submission to capture environment variables
 	// This will help us verify that OUTPUT_KEY is constructed correctly
 	testJobID := "path-test-12345"
 	expectedOutputKey := "jobs/" + testJobID + "/output.tar" // Should NOT have artifacts/ prefix
-	
+
 	// Verify OUTPUT_KEY generation in dispatcher
 	// This should match line 286 in openrewrite_dispatcher.go
 	actualOutputKey := "jobs/" + req.JobID + "/output.tar"
-	assert.Equal(t, expectedOutputKey, actualOutputKey, 
+	assert.Equal(t, expectedOutputKey, actualOutputKey,
 		"OUTPUT_KEY should be generated without artifacts/ prefix")
-	
+
 	// Test the problematic URL construction that happens in runner.sh line 373
 	seaweedfsURL := "http://45.12.75.241:8888"
 	outputKey := actualOutputKey
-	
+
 	// This is the CURRENT (broken) behavior in runner.sh
 	brokenUploadURL := seaweedfsURL + "/artifacts/" + outputKey
 	expectedBrokenPath := "http://45.12.75.241:8888/artifacts/jobs/path-test-12345/output.tar"
 	assert.Equal(t, expectedBrokenPath, brokenUploadURL,
 		"Current runner.sh creates this URL with hardcoded artifacts/ prefix")
-	
+
 	// When SeaweedFS unified storage uses "artifacts" as bucket and the above URL,
 	// it constructs: filerURL/bucket/key = http://45.12.75.241:8888/artifacts/artifacts/jobs/path-test-12345/output.tar
 	// This creates the double artifacts/ path!
-	
+
 	// What the URL SHOULD be (after fix)
-	correctUploadURL := seaweedfsURL + "/" + outputKey  // No hardcoded artifacts/ prefix
+	correctUploadURL := seaweedfsURL + "/" + outputKey // No hardcoded artifacts/ prefix
 	expectedCorrectPath := "http://45.12.75.241:8888/jobs/path-test-12345/output.tar"
 	assert.Equal(t, expectedCorrectPath, correctUploadURL,
 		"Fixed runner.sh should create this URL without hardcoded artifacts/ prefix")
-	
+
 	// The test documents the issue: runner.sh adds artifacts/ prefix unnecessarily
 	// This will be fixed by removing hardcoded prefix in runner.sh line 373
 	t.Logf("Current broken upload URL: %s", brokenUploadURL)
 	t.Logf("Correct upload URL should be: %s", correctUploadURL)
 	t.Logf("Issue: runner.sh hardcodes 'artifacts/' prefix, causing double paths in unified storage")
-	
+
 	// This test will PASS after we fix runner.sh to remove hardcoded artifacts/ prefix
 }
 
@@ -263,9 +263,9 @@ func TestOpenRewriteDispatcher_DoubleArtifactsPath(t *testing.T) {
 func TestOpenRewriteDispatcher_VerifyFixedPaths(t *testing.T) {
 	// This test validates that after the fix, paths are constructed correctly
 	// and there are no double artifacts/ prefixes
-	
+
 	mockStorage := &MockStorageService{}
-	
+
 	dispatcher, err := NewOpenRewriteDispatcher(
 		"http://localhost:4646",
 		"registry.dev.ployman.app",
@@ -275,36 +275,36 @@ func TestOpenRewriteDispatcher_VerifyFixedPaths(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, dispatcher)
-	
+
 	// Simulate the exact scenario from openrewrite_dispatcher.go
 	jobID := "test-fix-12345"
-	
-	// This matches line 286 in openrewrite_dispatcher.go  
+
+	// This matches line 286 in openrewrite_dispatcher.go
 	outputKey := fmt.Sprintf("jobs/%s/output.tar", jobID)
 	assert.Equal(t, "jobs/test-fix-12345/output.tar", outputKey,
 		"OUTPUT_KEY should be generated without artifacts/ prefix")
-	
+
 	// After the fix in runner.sh, this should create the correct URL
 	seaweedfsURL := "http://45.12.75.241:8888"
-	fixedUploadURL := seaweedfsURL + "/" + outputKey  // No hardcoded artifacts/
+	fixedUploadURL := seaweedfsURL + "/" + outputKey // No hardcoded artifacts/
 	expectedURL := "http://45.12.75.241:8888/jobs/test-fix-12345/output.tar"
-	
+
 	assert.Equal(t, expectedURL, fixedUploadURL,
 		"Fixed runner.sh should create URL without hardcoded artifacts/ prefix")
-	
+
 	// The unified storage layer will properly handle bucket/key separation
 	// SeaweedFS provider constructs: filerURL/bucket/key
 	// If bucket="artifacts" and key="jobs/test-fix-12345/output.tar"
 	// Result: http://45.12.75.241:8888/artifacts/jobs/test-fix-12345/output.tar
 	// This is correct - single artifacts/ prefix from storage layer
-	
+
 	expectedFinalPath := "http://45.12.75.241:8888/artifacts/jobs/test-fix-12345/output.tar"
 	t.Logf("Fixed upload URL from runner.sh: %s", fixedUploadURL)
 	t.Logf("Final path with storage bucket: %s", expectedFinalPath)
 	t.Logf("SUCCESS: Only one artifacts/ prefix, added by unified storage layer")
-	
+
 	// Verify the path components
-	assert.NotContains(t, outputKey, "artifacts/", 
+	assert.NotContains(t, outputKey, "artifacts/",
 		"OUTPUT_KEY should never contain artifacts/ prefix")
 	assert.Contains(t, expectedFinalPath, "/artifacts/jobs/",
 		"Final path should have single artifacts/ prefix from storage layer")

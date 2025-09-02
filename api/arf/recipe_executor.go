@@ -13,9 +13,9 @@ import (
 
 // RecipeExecutor executes transformation recipes
 type RecipeExecutor struct {
-	storage              RecipeStorage
-	sandboxMgr           SandboxManager
-	openRewriteEngine    *OpenRewriteEngine
+	storage               RecipeStorage
+	sandboxMgr            SandboxManager
+	openRewriteEngine     *OpenRewriteEngine
 	openRewriteDispatcher *OpenRewriteDispatcher
 }
 
@@ -23,9 +23,9 @@ type RecipeExecutor struct {
 // The dispatcher parameter is optional and can be nil if OpenRewrite support is not needed
 func NewRecipeExecutor(storage RecipeStorage, sandboxMgr SandboxManager, dispatcher *OpenRewriteDispatcher) *RecipeExecutor {
 	return &RecipeExecutor{
-		storage:              storage,
-		sandboxMgr:           sandboxMgr,
-		openRewriteEngine:    NewOpenRewriteEngine(),
+		storage:               storage,
+		sandboxMgr:            sandboxMgr,
+		openRewriteEngine:     NewOpenRewriteEngine(),
 		openRewriteDispatcher: dispatcher,
 	}
 }
@@ -34,35 +34,35 @@ func NewRecipeExecutor(storage RecipeStorage, sandboxMgr SandboxManager, dispatc
 // Uses unified execution path based on recipe type
 func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string, repoPath string, recipeType string, transformationID string) (*TransformationResult, error) {
 	fmt.Printf("[RecipeExecutor] Starting unified recipe execution: recipe=%s, type=%s, repoPath=%s\n", recipeID, recipeType, repoPath)
-	
+
 	// Unified execution path: OpenRewrite recipes ALWAYS go through dispatcher
 	if recipeType == "openrewrite" {
 		if e.openRewriteDispatcher == nil {
 			fmt.Printf("[RecipeExecutor] ERROR: Recipe %s is OpenRewrite but dispatcher is nil - check server initialization\n", recipeID)
 			return nil, fmt.Errorf("OpenRewrite recipe %s cannot be executed: dispatcher not initialized (check Nomad/SeaweedFS connectivity)", recipeID)
 		}
-		
+
 		fmt.Printf("[RecipeExecutor] OpenRewrite recipe - using unified dispatcher execution path\n")
-		
+
 		// Parse OpenRewrite recipe ID to get Maven coordinates
 		req, parseErr := ParseOpenRewriteRecipeID(recipeID)
 		if parseErr != nil {
 			fmt.Printf("[RecipeExecutor] Failed to parse OpenRewrite recipe ID %s: %v\n", recipeID, parseErr)
 			return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
 		}
-		
+
 		// Set the repository path and transformation ID
 		req.RepoPath = repoPath
 		req.TransformationID = transformationID
-		
+
 		fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine using openrewrite-jvm:latest (transformationID: %s)\n", recipeID, transformationID)
-		
+
 		// Add timeout context for dispatcher call (inherit from parent context)
 		dispatcherCtx, cancel := context.WithTimeout(ctx, 25*time.Minute)
 		defer cancel()
-		
+
 		dispatcherStart := time.Now()
-		
+
 		// Dispatch to Nomad for unified execution using openrewrite-jvm:latest
 		result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(dispatcherCtx, req)
 		if execErr != nil {
@@ -73,11 +73,11 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 			fmt.Printf("[RecipeExecutor] Failed to execute recipe %s: %v\n", recipeID, execErr)
 			return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
 		}
-		
+
 		fmt.Printf("[RecipeExecutor] OpenRewrite recipe %s executed successfully after %v\n", recipeID, time.Since(dispatcherStart))
 		return result, nil
 	}
-	
+
 	// Non-OpenRewrite recipes: try storage first
 	recipe, err := e.storage.GetRecipe(ctx, recipeID)
 	if err != nil {
@@ -88,7 +88,6 @@ func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string,
 	fmt.Printf("[RecipeExecutor] Non-OpenRewrite recipe %s found in storage, executing\n", recipeID)
 	return e.ExecuteRecipeObject(ctx, recipe, repoPath)
 }
-
 
 // min returns the minimum of two integers
 func min(a, b int) int {

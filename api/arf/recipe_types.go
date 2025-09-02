@@ -9,16 +9,16 @@ import (
 
 // RecipeFilter represents filter criteria for recipe queries
 type RecipeFilter struct {
-	Tags       []string
-	Language   string
-	Framework  string
-	Name       string
-	Version    string
-	Author     string
-	IsPublic   bool
-	SortBy     string
-	Limit      int
-	Offset     int
+	Tags      []string
+	Language  string
+	Framework string
+	Name      string
+	Version   string
+	Author    string
+	IsPublic  bool
+	SortBy    string
+	Limit     int
+	Offset    int
 }
 
 // RecipeSearchResult represents a search result with relevance score
@@ -113,15 +113,14 @@ type RecipeValidatorInterface interface {
 	GetSchemaVersion() string
 }
 
-
 // RecipeStorageConfig holds configuration for recipe storage
 type RecipeStorageConfig struct {
 	// Storage backend configuration
-	StorageType   string // "seaweedfs", "s3", "local"
-	BucketName    string
-	KeyPrefix     string
-	CacheEnabled  bool
-	CacheTTL      time.Duration
+	StorageType  string // "seaweedfs", "s3", "local"
+	BucketName   string
+	KeyPrefix    string
+	CacheEnabled bool
+	CacheTTL     time.Duration
 
 	// Index configuration
 	IndexType     string // "consul", "etcd", "inmemory"

@@ -195,4 +195,3 @@ func TestARFServiceWithEmptyBucket(t *testing.T) {
 	assert.Equal(t, testKey, mockStorage.lastPutKey, "ARFService should pass key without modification when bucket is empty")
 	mockStorage.AssertExpectations(t)
 }
-

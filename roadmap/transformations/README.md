@@ -135,9 +135,9 @@ The transformation system uses Consul KV for persistent, distributed storage of 
 
 #### Key Structure
 ```
-ploy/arf/transformations/{transform_id}/status          # Current workflow status
-ploy/arf/transformations/{transform_id}/children         # Complete children hierarchy
-ploy/arf/transformations/{transform_id}/sandbox/{id}    # Sandbox deployment info
+ploy/arf/transforms/{transform_id}/status          # Current workflow status
+ploy/arf/transforms/{transform_id}/children         # Complete children hierarchy
+ploy/arf/transforms/{transform_id}/sandbox/{id}    # Sandbox deployment info
 ```
 
 #### Status Document Format
@@ -466,10 +466,10 @@ func (c *ConsulHealingStore) SetTransformationTTL(id string, ttl time.Duration) 
 ### Key Naming Conventions
 
 ```
-ploy/arf/transformations/{root_id}/status                    # Main transformation status
-ploy/arf/transformations/{root_id}/children/{path}           # Individual healing attempts
-ploy/arf/transformations/{root_id}/sandbox/{sandbox_id}      # Sandbox deployment info
-ploy/arf/transformations/{root_id}/metadata                  # Additional metadata
+ploy/arf/transforms/{root_id}/status                    # Main transformation status
+ploy/arf/transforms/{root_id}/children/{path}           # Individual healing attempts
+ploy/arf/transforms/{root_id}/sandbox/{sandbox_id}      # Sandbox deployment info
+ploy/arf/transforms/{root_id}/metadata                  # Additional metadata
 ```
 
 ## Configuration & Limits
