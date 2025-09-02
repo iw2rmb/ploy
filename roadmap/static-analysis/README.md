@@ -1,5 +1,6 @@
 # Static Analysis Integration Framework
 
+**Status**: Core framework implemented, multi-language expansion pending
 **Integration Point**: Pre-build analysis for all programming languages with ARF workflow compatibility
 **Primary Example**: Google Error Prone for Java projects
 **Architecture**: Language-agnostic static analysis pipeline with pluggable analyzers
@@ -44,17 +45,16 @@ The Static Analysis framework implementation is structured in 4 progressive phas
 
 **Priority**: High (Java is primary enterprise language)
 
-### [Phase 2: Multi-Language Support](./phase-2.md) ✅ COMPLETED (2025-08-28)
-**Language Expansion** - Python, Go, JavaScript, C#, Rust analyzer integration with parallel execution
+### [Phase 2: Multi-Language Support](./phase-2.md) ⏳ IN PROGRESS
+**Language Expansion** - Python, Go, JavaScript, C#, Rust analyzer integration
 
 **Key Deliverables:**
-- ✅ Python (Pylint) analyzer integration via CHTTP service (2025-08-28)
-- ✅ CHTTP service architecture for distributed analysis (2025-08-28)
-- ✅ ARF integration for automatic remediation workflows (2025-08-28)
+- ⏳ Python (Pylint) analyzer integration - framework ready, implementation pending
+- ✅ ARF integration for automatic remediation workflows (implemented in Phase 1)
 - ❌ Go (golangci-lint, gosec) static analysis
 - ❌ JavaScript/TypeScript (ESLint) support
 - ❌ C# (Roslyn Analyzers, FxCop) integration
-- ❌ Additional language CHTTP services
+- ❌ Rust (Clippy) analyzer integration
 
 **Dependencies**: Phase 1 core framework
 
@@ -91,9 +91,9 @@ The Static Analysis framework implementation is structured in 4 progressive phas
 - ✅ CLI foundation for analysis operations
 - **Key Deliverable**: Production-ready Java static analysis with 400+ bug patterns
 
-### [Phase 2: Multi-Language Support](phase-2.md) ✅ COMPLETED (2025-08-28)
-- ✅ Python Pylint analyzer integration (2025-08-26)
-- 🚧 Python additional tools (Bandit, mypy, Black, isort) - partially configured
+### [Phase 2: Multi-Language Support](phase-2.md) ⏳ IN PROGRESS
+- ⏳ Python Pylint analyzer integration - framework ready
+- ❌ Python additional tools (Bandit, mypy, Black, isort)
 - ❌ Go analysis tools (go vet, golangci-lint, gosec)
 - ❌ JavaScript/TypeScript support (ESLint, TypeScript compiler)
 - ❌ C# Roslyn analyzers and FxCop integration
@@ -118,13 +118,13 @@ The Static Analysis framework implementation is structured in 4 progressive phas
 
 | Language | Primary Analyzer | Implementation Method | Implementation Status | ARF Integration | Phase |
 |----------|-----------------|----------------------|---------------------|-----------------|--------|
-| Java | Google Error Prone | In-process | ✅ Implemented | ✅ Complete | Phase 1 |
-| Python | Pylint | CHTTP Service | ✅ Implemented | ✅ Complete | Phase 2 |
-| Go | golangci-lint | CHTTP Service | ❌ Not Started | 📋 Planned | Phase 2 |
-| JavaScript/TypeScript | ESLint | CHTTP Service | ❌ Not Started | 📋 Planned | Phase 2 |
-| C# | Roslyn Analyzers | CHTTP Service | ❌ Not Started | 📋 Planned | Phase 2 |
-| Rust | Clippy | CHTTP Service | ❌ Not Started | 📋 Planned | Phase 2 |
-| C/C++ | Clang Static Analyzer | CHTTP Service | ❌ Not Started | 📋 Planned | Phase 3 |
+| Java | Google Error Prone | Direct Integration | ✅ Implemented | ✅ Complete | Phase 1 |
+| Python | Pylint | Nomad Job | ⏳ Framework Ready | ✅ Available | Phase 2 |
+| Go | golangci-lint | Nomad Job | ❌ Not Started | 📋 Planned | Phase 2 |
+| JavaScript/TypeScript | ESLint | Nomad Job | ❌ Not Started | 📋 Planned | Phase 2 |
+| C# | Roslyn Analyzers | Nomad Job | ❌ Not Started | 📋 Planned | Phase 2 |
+| Rust | Clippy | Nomad Job | ❌ Not Started | 📋 Planned | Phase 2 |
+| C/C++ | Clang Static Analyzer | Nomad Job | ❌ Not Started | 📋 Planned | Phase 3 |
 
 ## Success Metrics & Targets
 

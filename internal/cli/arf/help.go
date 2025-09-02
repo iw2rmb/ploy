@@ -182,8 +182,8 @@ before upload to ensure recipe integrity.`,
 		Synopsis: "Execute a recipe against a repository",
 		Description: `
 Executes a transformation recipe against a specified repository. Can work with
-local directories or remote Git repositories. Integration with the benchmark
-system provides comprehensive execution tracking and reporting.`,
+local directories or remote Git repositories, providing comprehensive execution
+tracking and reporting.`,
 		Usage: "ploy arf recipe run <recipe-id> [flags]",
 		Flags: []FlagHelp{
 			{Long: "--repo", Short: "-r", Description: "Repository URL or local path", Default: ".", Required: true},
@@ -216,7 +216,7 @@ system provides comprehensive execution tracking and reporting.`,
 				Description: "Show what the recipe would do without making changes",
 			},
 		},
-		SeeAlso: []string{"compose", "status", "benchmark"},
+		SeeAlso: []string{"compose", "status"},
 	}
 
 	// Recipe compose command

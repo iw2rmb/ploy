@@ -176,6 +176,7 @@ jobs:
         with:
           ploy-api: ${{ secrets.PLOY_CONTROLLER_URL }}
           api-key: ${{ secrets.PLOY_API_KEY }}
+          execution-mode: "nomad"  # Use Nomad job execution
           fail-on-critical: true
           report-format: "sarif"
       - name: Upload SARIF results
@@ -874,9 +875,9 @@ const ctoDashboard: ExecutiveDashboardConfig = {
 ## Deployment Strategy
 
 ### Phase 4A: Build Pipeline Integration (Month 1)
-- Complete Lane A-G integration with quality gates
-- Deploy CI/CD platform plugins for major systems
-- Test build performance impact and optimize
+- Complete Lane A-G integration with quality gates using Nomad job execution
+- Deploy CI/CD platform plugins for major systems with Nomad integration
+- Test build performance impact and optimize job scheduling
 
 ### Phase 4B: Team Collaboration (Month 1.5)
 - Deploy code review integration and team dashboards
@@ -890,15 +891,15 @@ const ctoDashboard: ExecutiveDashboardConfig = {
 
 ## Production Readiness Checklist
 
-- ✅ **Comprehensive Lane Integration**: All 7 Ploy lanes support static analysis
+- ✅ **Comprehensive Lane Integration**: All 7 Ploy lanes support static analysis via Nomad job execution
 - ✅ **Quality Gate Enforcement**: Configurable quality standards with bypass procedures
 - ✅ **Team Collaboration**: Code review integration, dashboards, and coaching
-- ✅ **CI/CD Platform Support**: Major CI/CD systems supported with plugins
+- ✅ **CI/CD Platform Support**: Major CI/CD systems supported with Nomad-based plugins
 - ✅ **Compliance Framework**: Regulatory compliance with automated reporting
 - ✅ **Audit Capabilities**: Complete audit trail with immutable logging
 - ✅ **Executive Oversight**: Governance dashboards and strategic reporting
-- ✅ **Performance Optimization**: Minimal build time impact with caching
+- ✅ **Performance Optimization**: Minimal build time impact with Nomad job caching
 - ✅ **Data Privacy**: GDPR and regulatory data protection compliance
 - ✅ **Documentation**: Complete user guides and administrator documentation
 
-Phase 4 delivers a production-ready static analysis platform that seamlessly integrates with existing development workflows while providing enterprise-grade governance, compliance, and team collaboration capabilities.
+Phase 4 delivers a production-ready static analysis platform that leverages Nomad job execution for scalable, isolated analysis across all languages while providing enterprise-grade governance, compliance, and team collaboration capabilities.

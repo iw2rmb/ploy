@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// GitOperations provides Git functionality for the benchmark suite
+// GitOperations provides Git functionality for ARF transformations
 type GitOperations struct {
 	workDir string
 }
