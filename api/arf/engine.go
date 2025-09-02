@@ -19,16 +19,16 @@ type Codebase struct {
 
 // TransformationIteration represents a single iteration in the transformation process
 type TransformationIteration struct {
-	Number    int                    `json:"number"`
-	StartTime time.Time              `json:"start_time"`
-	EndTime   time.Time              `json:"end_time"`
-	Duration  time.Duration          `json:"duration"`
-	Status    string                 `json:"status"` // success, partial, failed, timeout
-	Stages    []TransformationStage  `json:"stages"`
-	Diffs     []DiffCapture          `json:"diffs"`
-	Errors    []ErrorCapture         `json:"errors"`
-	Metrics   IterationMetrics       `json:"metrics"`
-	LLMCalls  []LLMCallMetrics       `json:"llm_calls,omitempty"`
+	Number    int                   `json:"number"`
+	StartTime time.Time             `json:"start_time"`
+	EndTime   time.Time             `json:"end_time"`
+	Duration  time.Duration         `json:"duration"`
+	Status    string                `json:"status"` // success, partial, failed, timeout
+	Stages    []TransformationStage `json:"stages"`
+	Diffs     []DiffCapture         `json:"diffs"`
+	Errors    []ErrorCapture        `json:"errors"`
+	Metrics   IterationMetrics      `json:"metrics"`
+	LLMCalls  []LLMCallMetrics      `json:"llm_calls,omitempty"`
 }
 
 // TransformationStage represents a stage within a transformation iteration
@@ -156,7 +156,7 @@ type TransformationResult struct {
 	RecipeID         string    `json:"recipe_id"`
 	StartTime        time.Time `json:"start_time"`
 	EndTime          time.Time `json:"end_time"`
-	
+
 	// Basic results (backward compatible)
 	Success         bool          `json:"success"`
 	ChangesApplied  int           `json:"changes_applied"`
@@ -165,11 +165,11 @@ type TransformationResult struct {
 	Diff            string        `json:"diff"` // Simple unified diff for backward compatibility
 	ValidationScore float64       `json:"validation_score"`
 	ExecutionTime   time.Duration `json:"execution_time"`
-	
+
 	// Legacy error tracking (backward compatible)
-	Errors   []TransformationError  `json:"errors,omitempty"`
-	Warnings []TransformationError  `json:"warnings,omitempty"`
-	
+	Errors   []TransformationError `json:"errors,omitempty"`
+	Warnings []TransformationError `json:"warnings,omitempty"`
+
 	// Comprehensive reporting (new fields)
 	Iterations   []TransformationIteration `json:"iterations,omitempty"`
 	Summary      *TransformationSummary    `json:"summary,omitempty"`
@@ -180,7 +180,7 @@ type TransformationResult struct {
 	DiffCaptures []DiffCapture             `json:"diff_captures,omitempty"`
 	ErrorLog     []ErrorCapture            `json:"error_log,omitempty"`
 	Comparison   *ComparisonResult         `json:"comparison,omitempty"`
-	
+
 	// Metadata
 	Metadata map[string]interface{} `json:"metadata"`
 }

@@ -217,7 +217,7 @@ func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, conf
 func (w *TransformationWorkflow) executeTransformation(ctx context.Context, sandbox *Sandbox, recipeID string) (*TransformationResult, error) {
 	// Generate a transformation ID for this execution
 	transformationID := uuid.New().String()
-	
+
 	// Execute the recipe directly using the executor
 	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir, "openrewrite", transformationID)
 	if err != nil {

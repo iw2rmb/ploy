@@ -18,7 +18,7 @@ import (
 // TransformRequest represents a transformation request
 type TransformRequest struct {
 	RecipeID string   `json:"recipe_id" validate:"required"`
-	Type     string   `json:"type,omitempty"`  // "openrewrite" or empty for regular recipes
+	Type     string   `json:"type,omitempty"` // "openrewrite" or empty for regular recipes
 	Codebase Codebase `json:"codebase" validate:"required"`
 }
 
@@ -70,7 +70,7 @@ func (ts *transformationStore) get(id string) (*TransformationResult, bool) {
 // ExecuteTransformation handles POST /v1/arf/transform
 func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 	fmt.Printf("[DEBUG] Request received, starting body parsing...\n")
-	
+
 	var req TransformRequest
 	if err := c.BodyParser(&req); err != nil {
 		fmt.Printf("[DEBUG] Body parsing failed: %v\n", err)
@@ -79,7 +79,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 			"details": err.Error(),
 		})
 	}
-	
+
 	fmt.Printf("[DEBUG] Body parsed successfully, type='%s'\n", req.Type)
 
 	// Log incoming request
@@ -87,7 +87,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		req.RecipeID, req.Type, req.Codebase.Repository, req.Codebase.Branch, req.Codebase.Language, req.Codebase.BuildTool)
 
 	fmt.Printf("[DEBUG] Starting validation...\n")
-	
+
 	// Validate required fields
 	if req.RecipeID == "" {
 		fmt.Printf("[DEBUG] Validation failed: recipe_id required\n")
@@ -102,11 +102,11 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 			"error": "codebase.repository is required",
 		})
 	}
-	
+
 	fmt.Printf("[DEBUG] Validation complete\n")
 
 	fmt.Printf("[DEBUG] Processing defaults...\n")
-	
+
 	// Set default branch if not specified
 	if req.Codebase.Branch == "" {
 		req.Codebase.Branch = "main"
@@ -121,7 +121,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		})
 	}
 	fmt.Printf("[DEBUG] Type explicitly set to '%s'\n", req.Type)
-	
+
 	fmt.Printf("[DEBUG] Final type='%s'\n", req.Type)
 
 	// Generate transformation ID
@@ -129,26 +129,26 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 	fmt.Printf("[ARF Transform] Generated transformation ID: %s\n", transformID)
 
 	fmt.Printf("[DEBUG] Creating context with timeout...\n")
-	
+
 	// Create context with shorter timeout for OpenRewrite recipes
-	timeoutDuration := 30*time.Minute
+	timeoutDuration := 30 * time.Minute
 	if req.Type == "openrewrite" {
 		// OpenRewrite jobs have 5-minute timeout to allow proper job completion
-		timeoutDuration = 5*time.Minute
+		timeoutDuration = 5 * time.Minute
 		fmt.Printf("[DEBUG] Using OpenRewrite timeout: %v\n", timeoutDuration)
 	}
-	
+
 	ctx, cancel := context.WithTimeout(c.Context(), timeoutDuration)
 	defer cancel()
 
 	fmt.Printf("[DEBUG] About to call executeTransformationInternal\n")
-	
+
 	// Execute transformation
 	fmt.Printf("[ARF Transform] Starting transformation execution for ID: %s\n", transformID)
 	result, err := h.executeTransformationInternal(ctx, transformID, &req)
 	if err != nil {
 		fmt.Printf("[ARF Transform] Transformation failed for ID %s: %v\n", transformID, err)
-		
+
 		// Check if context deadline exceeded
 		if ctx.Err() == context.DeadlineExceeded {
 			timeoutMsg := "The transformation took longer than expected to complete"
@@ -156,12 +156,12 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 				timeoutMsg = "OpenRewrite transformation timed out after 5 minutes - check job status or infrastructure"
 			}
 			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
-				"error":   "Transformation timeout",
-				"details": timeoutMsg,
+				"error":             "Transformation timeout",
+				"details":           timeoutMsg,
 				"transformation_id": transformID,
 			})
 		}
-		
+
 		// Check if this is a NotFoundError (recipe not found)
 		if _, isNotFound := err.(*NotFoundError); isNotFound {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -170,8 +170,8 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "Transformation execution failed",
-			"details": err.Error(),
+			"error":             "Transformation execution failed",
+			"details":           err.Error(),
 			"transformation_id": transformID,
 		})
 	}
@@ -190,7 +190,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 func (h *Handler) executeTransformationInternal(ctx context.Context, transformID string, req *TransformRequest) (*TransformationResult, error) {
 	transformStartTime := time.Now()
 	fmt.Printf("[ARF Transform Internal] Starting internal transformation for ID: %s at %v\n", transformID, transformStartTime)
-	
+
 	// Initialize comprehensive result
 	result := &TransformationResult{
 		TransformationID: transformID,
@@ -198,7 +198,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		StartTime:        transformStartTime,
 		Metadata:         make(map[string]interface{}),
 	}
-	
+
 	// Initialize iteration for tracking
 	iteration := TransformationIteration{
 		Number:    1,
@@ -208,7 +208,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		Errors:    []ErrorCapture{},
 		Metrics:   IterationMetrics{},
 	}
-	
+
 	// Stage 1: Workspace preparation
 	stageStart := time.Now()
 	workspaceDir := filepath.Join("/tmp", "arf-transformations", transformID)
@@ -227,7 +227,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		// Clean up workspace after transformation
 		os.RemoveAll(workspaceDir)
 	}()
-	
+
 	iteration.Stages = append(iteration.Stages, TransformationStage{
 		Name:      "workspace_preparation",
 		StartTime: stageStart,
@@ -235,7 +235,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		Duration:  time.Since(stageStart),
 		Status:    "success",
 	})
-	
+
 	// Stage 2: Repository cloning
 	stageStart = time.Now()
 	repoPath := filepath.Join(workspaceDir, "repository")
@@ -263,7 +263,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
 	}
 	fmt.Printf("[SUCCESS] [%s] Repository cloned successfully: %d files\n", transformID, repoInfo.FileCount)
-	
+
 	iteration.Stages = append(iteration.Stages, TransformationStage{
 		Name:      "repository_clone",
 		StartTime: stageStart,
@@ -272,7 +272,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		Status:    "success",
 	})
 	result.Repository = repoInfo
-	
+
 	// Stage 3: Pre-transformation analysis
 	stageStart = time.Now()
 	beforeState := h.captureRepositoryState(repoPath)
@@ -285,11 +285,11 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		Status:    "success",
 		Details:   map[string]int{"files_analyzed": len(beforeState)},
 	})
-	
+
 	// Stage 4: Recipe execution
 	stageStart = time.Now()
 	fmt.Printf("[ARF Transform Internal] Stage 4: Starting recipe execution for recipe=%s, repo=%s\n", req.RecipeID, repoPath)
-	
+
 	if h.recipeExecutor == nil {
 		fmt.Printf("[ARF Transform Internal] ERROR: Recipe executor not available\n")
 		iteration.Stages = append(iteration.Stages, TransformationStage{
@@ -302,7 +302,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		})
 		return nil, fmt.Errorf("recipe executor not available")
 	}
-	
+
 	fmt.Printf("[ARF Transform Internal] Calling recipe executor for recipe: %s (type: %s, transformationID: %s)\n", req.RecipeID, req.Type, transformID)
 	recipeResult, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath, req.Type, transformID)
 	if err != nil {
@@ -318,16 +318,16 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		})
 		iteration.Errors = append(iteration.Errors, ErrorCapture{
 			Stage:     "recipe_execution",
-			Type:      "runtime", 
+			Type:      "runtime",
 			Message:   "Recipe execution failed",
 			Details:   err.Error(),
 			Timestamp: time.Now(),
 		})
 		return nil, fmt.Errorf("recipe execution failed: %w", err)
 	}
-	
+
 	fmt.Printf("[ARF Transform Internal] Recipe execution completed successfully in %v\n", time.Since(stageStart))
-	
+
 	iteration.Stages = append(iteration.Stages, TransformationStage{
 		Name:      "recipe_execution",
 		StartTime: stageStart,
@@ -335,19 +335,19 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		Duration:  time.Since(stageStart),
 		Status:    "success",
 	})
-	
+
 	// Stage 5: Post-transformation analysis
 	stageStart = time.Now()
 	afterState := h.captureRepositoryState(repoPath)
 	diffs := h.calculateDiffs(beforeState, afterState, repoPath)
 	iteration.Diffs = diffs
 	iteration.Metrics.FilesModified = len(diffs)
-	
+
 	for _, diff := range diffs {
 		iteration.Metrics.LinesAdded += diff.LinesAdded
 		iteration.Metrics.LinesRemoved += diff.LinesRemoved
 	}
-	
+
 	iteration.Stages = append(iteration.Stages, TransformationStage{
 		Name:      "post_transformation_analysis",
 		StartTime: stageStart,
@@ -360,7 +360,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 			"lines_removed":  iteration.Metrics.LinesRemoved,
 		},
 	})
-	
+
 	// Stage 6: Build validation (if applicable)
 	stageStart = time.Now()
 	buildMetrics := h.runBuildValidation(repoPath, req.Codebase.BuildTool)
@@ -376,7 +376,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 			Details:   buildMetrics,
 		})
 	}
-	
+
 	// Stage 7: Test execution (if applicable)
 	stageStart = time.Now()
 	testMetrics := h.runTests(repoPath, req.Codebase.BuildTool)
@@ -394,7 +394,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 			Details:   testMetrics,
 		})
 	}
-	
+
 	// Complete iteration
 	iteration.EndTime = time.Now()
 	iteration.Duration = time.Since(iteration.StartTime)
@@ -402,7 +402,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 	if len(iteration.Errors) > 0 {
 		iteration.Status = "partial"
 	}
-	
+
 	// Populate result from recipe execution (backward compatibility)
 	if recipeResult != nil {
 		result.Success = recipeResult.Success
@@ -414,12 +414,12 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		result.Errors = recipeResult.Errors
 		result.Warnings = recipeResult.Warnings
 	}
-	
+
 	// Add comprehensive reporting
 	result.Iterations = []TransformationIteration{iteration}
 	result.DiffCaptures = diffs
 	result.ErrorLog = iteration.Errors
-	
+
 	// Generate summary
 	result.Summary = &TransformationSummary{
 		TotalIterations:      1,
@@ -432,11 +432,11 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 		TotalFilesModified:   iteration.Metrics.FilesModified,
 		TotalLinesChanged:    iteration.Metrics.LinesAdded + iteration.Metrics.LinesRemoved,
 	}
-	
+
 	// Complete result
 	result.EndTime = time.Now()
 	result.ExecutionTime = time.Since(transformStartTime)
-	
+
 	return result, nil
 }
 
@@ -446,7 +446,7 @@ func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	fmt.Printf("[DEBUG] cloneRepositoryWithInfo called with URL=%s, branch=%s, target=%s\n", repoURL, branch, targetPath)
-	
+
 	// Ensure git is available
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
@@ -470,55 +470,55 @@ func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*
 	var stdout bytes.Buffer
 	cmd.Stderr = &stderr
 	cmd.Stdout = &stdout
-	
+
 	// Set working directory and environment
-	cmd.Dir = "/"  // Set a safe working directory
+	cmd.Dir = "/" // Set a safe working directory
 	cmd.Env = os.Environ()
-	
+
 	fmt.Printf("[DEBUG] Executing git clone command...\n")
 	startTime := time.Now()
 	err = cmd.Run()
 	duration := time.Since(startTime)
-	
+
 	fmt.Printf("[DEBUG] Git clone completed in %v\n", duration)
 	fmt.Printf("[DEBUG] Git stdout: %s\n", stdout.String())
 	fmt.Printf("[DEBUG] Git stderr: %s\n", stderr.String())
-	
+
 	if err != nil {
 		fmt.Printf("[ERROR] Git clone command failed: %v\n", err)
 		fmt.Printf("[ERROR] Full error details: stdout=%s, stderr=%s\n", stdout.String(), stderr.String())
-		
+
 		// Check for specific error types
 		if ctx.Err() == context.DeadlineExceeded {
 			fmt.Printf("[ERROR] Git clone timed out after 2 minutes\n")
 			return nil, fmt.Errorf("git clone timed out after 2 minutes: %v", err)
 		}
-		
+
 		if ctx.Err() == context.Canceled {
 			fmt.Printf("[ERROR] Git clone was canceled\n")
 			return nil, fmt.Errorf("git clone was canceled: %v", err)
 		}
-		
+
 		// Check stderr for specific git errors
 		stderrStr := stderr.String()
 		if strings.Contains(stderrStr, "fatal: repository") && strings.Contains(stderrStr, "not found") {
 			fmt.Printf("[ERROR] Repository not found\n")
 			return nil, fmt.Errorf("repository not found: %s", repoURL)
 		}
-		
+
 		if strings.Contains(stderrStr, "fatal: Remote branch") && strings.Contains(stderrStr, "not found") {
 			fmt.Printf("[ERROR] Branch not found: %s\n", branch)
 			return nil, fmt.Errorf("branch '%s' not found in repository %s", branch, repoURL)
 		}
-		
+
 		if strings.Contains(stderrStr, "Permission denied") || strings.Contains(stderrStr, "Authentication failed") {
 			fmt.Printf("[ERROR] Authentication failed\n")
 			return nil, fmt.Errorf("authentication failed for repository: %s", repoURL)
 		}
-		
+
 		return nil, fmt.Errorf("git clone failed: %v - stdout: %s - stderr: %s", err, stdout.String(), stderr.String())
 	}
-	
+
 	fmt.Printf("[SUCCESS] Git clone completed successfully\n")
 
 	// Gather repository information
@@ -535,7 +535,7 @@ func (h *Handler) cloneRepositoryWithInfo(repoURL, branch, targetPath string) (*
 		return nil, fmt.Errorf("target directory does not exist after clone: %s", targetPath)
 	}
 	fmt.Printf("[DEBUG] Target directory exists, counting files...\n")
-	
+
 	fileCount := 0
 	var totalSize int64
 	err = filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
@@ -594,7 +594,7 @@ func (h *Handler) captureRepositoryState(repoPath string) map[string]string {
 // calculateDiffs calculates the differences between before and after states
 func (h *Handler) calculateDiffs(before, after map[string]string, repoPath string) []DiffCapture {
 	var diffs []DiffCapture
-	
+
 	// Check for modified and deleted files
 	for path, beforeContent := range before {
 		afterContent, exists := after[path]
@@ -621,7 +621,7 @@ func (h *Handler) calculateDiffs(before, after map[string]string, repoPath strin
 			diffs = append(diffs, diff)
 		}
 	}
-	
+
 	// Check for added files
 	for path, afterContent := range after {
 		if _, exists := before[path]; !exists {
@@ -634,7 +634,7 @@ func (h *Handler) calculateDiffs(before, after map[string]string, repoPath strin
 			})
 		}
 	}
-	
+
 	return diffs
 }
 
@@ -643,15 +643,15 @@ func (h *Handler) runBuildValidation(repoPath string, buildTool string) *BuildMe
 	if buildTool == "" {
 		buildTool = h.detectBuildTool(repoPath)
 	}
-	
+
 	if buildTool == "" {
 		return nil // No build tool detected
 	}
-	
+
 	metrics := &BuildMetrics{
 		BuildTool: buildTool,
 	}
-	
+
 	// Determine build command based on build tool
 	switch buildTool {
 	case "maven":
@@ -665,12 +665,12 @@ func (h *Handler) runBuildValidation(repoPath string, buildTool string) *BuildMe
 	default:
 		return nil
 	}
-	
+
 	// Simulate build execution (in production, would actually run the command)
 	startTime := time.Now()
 	metrics.BuildSuccess = true // Simulated success
 	metrics.BuildDuration = time.Since(startTime)
-	
+
 	return metrics
 }
 
@@ -679,15 +679,15 @@ func (h *Handler) runTests(repoPath string, buildTool string) *TestMetrics {
 	if buildTool == "" {
 		buildTool = h.detectBuildTool(repoPath)
 	}
-	
+
 	if buildTool == "" {
 		return nil // No build tool detected
 	}
-	
+
 	metrics := &TestMetrics{
 		TestFramework: buildTool,
 	}
-	
+
 	// Determine test command based on build tool
 	switch buildTool {
 	case "maven":
@@ -701,15 +701,15 @@ func (h *Handler) runTests(repoPath string, buildTool string) *TestMetrics {
 	default:
 		return nil
 	}
-	
+
 	// Simulate test execution (in production, would actually run the command)
 	startTime := time.Now()
-	metrics.TotalTests = 10      // Simulated
-	metrics.PassedTests = 9      // Simulated
-	metrics.FailedTests = 1      // Simulated
+	metrics.TotalTests = 10        // Simulated
+	metrics.PassedTests = 9        // Simulated
+	metrics.FailedTests = 1        // Simulated
 	metrics.CoveragePercent = 85.5 // Simulated
 	metrics.TestDuration = time.Since(startTime)
-	
+
 	return metrics
 }
 
@@ -763,14 +763,14 @@ func countLines(content string) int {
 func calculateLineChanges(before, after string) (added, removed int) {
 	beforeLines := strings.Split(before, "\n")
 	afterLines := strings.Split(after, "\n")
-	
+
 	// Simple line count difference (in production, would use proper diff algorithm)
 	if len(afterLines) > len(beforeLines) {
 		added = len(afterLines) - len(beforeLines)
 	} else {
 		removed = len(beforeLines) - len(afterLines)
 	}
-	
+
 	return added, removed
 }
 
@@ -779,10 +779,10 @@ func generateUnifiedDiff(filename, before, after string) string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "--- a/%s\n", filename)
 	fmt.Fprintf(&buf, "+++ b/%s\n", filename)
-	
+
 	beforeLines := strings.Split(before, "\n")
 	afterLines := strings.Split(after, "\n")
-	
+
 	// Show first few lines of difference
 	maxLines := 5
 	for i := 0; i < len(beforeLines) && i < maxLines; i++ {
@@ -791,7 +791,7 @@ func generateUnifiedDiff(filename, before, after string) string {
 			fmt.Fprintf(&buf, "+%s\n", afterLines[i])
 		}
 	}
-	
+
 	return buf.String()
 }
 
@@ -815,7 +815,6 @@ func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
-
 // GetTransformationStatus handles GET /v1/arf/transforms/:id/status
 func (h *Handler) GetTransformationStatus(c *fiber.Ctx) error {
 	transformID := c.Params("id")
@@ -831,10 +830,10 @@ func (h *Handler) GetTransformationStatus(c *fiber.Ctx) error {
 		// Transformation completed
 		return c.JSON(fiber.Map{
 			"transformation_id": transformID,
-			"status": "completed",
-			"success": result.Success,
-			"execution_time": result.ExecutionTime,
-			"changes_applied": result.ChangesApplied,
+			"status":            "completed",
+			"success":           result.Success,
+			"execution_time":    result.ExecutionTime,
+			"changes_applied":   result.ChangesApplied,
 		})
 	}
 
@@ -843,7 +842,7 @@ func (h *Handler) GetTransformationStatus(c *fiber.Ctx) error {
 	// TODO: Query Nomad for actual job status
 	return c.JSON(fiber.Map{
 		"transformation_id": transformID,
-		"status": "in_progress",
-		"message": "Transformation is still running",
+		"status":            "in_progress",
+		"message":           "Transformation is still running",
 	})
 }

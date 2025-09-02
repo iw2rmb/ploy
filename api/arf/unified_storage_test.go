@@ -114,7 +114,7 @@ func (m *MockUnifiedStorage) Metrics() *storage.StorageMetrics {
 // This test should FAIL initially since ARF doesn't support unified storage directly yet
 func TestNewARFServiceWithUnifiedStorage(t *testing.T) {
 	mockStorage := NewMockUnifiedStorage()
-	
+
 	// This should work with unified storage interface directly
 	// Currently fails because NewARFService doesn't exist yet
 	service, err := NewARFService(mockStorage, "artifacts")
@@ -123,35 +123,35 @@ func TestNewARFServiceWithUnifiedStorage(t *testing.T) {
 }
 
 // TestARFOperationsWithUnifiedStorage tests ARF operations using unified storage
-// This test should FAIL initially since ARF operations don't use unified storage yet  
+// This test should FAIL initially since ARF operations don't use unified storage yet
 func TestARFOperationsWithUnifiedStorage(t *testing.T) {
 	mockStorage := NewMockUnifiedStorage()
 	ctx := context.Background()
-	
+
 	// This should work with unified storage interface directly
 	// Currently fails because ARFService doesn't exist yet
 	service, err := NewARFService(mockStorage, "artifacts")
 	require.NoError(t, err)
-	
+
 	// Test Put operation
 	testData := []byte("test recipe data")
 	err = service.Put(ctx, "recipes/test-recipe.yaml", testData)
 	assert.NoError(t, err)
-	
+
 	// Test Get operation
 	data, err := service.Get(ctx, "recipes/test-recipe.yaml")
 	assert.NoError(t, err)
 	assert.Equal(t, testData, data)
-	
+
 	// Test Exists operation
 	exists, err := service.Exists(ctx, "recipes/test-recipe.yaml")
 	assert.NoError(t, err)
 	assert.True(t, exists)
-	
+
 	// Test Delete operation
 	err = service.Delete(ctx, "recipes/test-recipe.yaml")
 	assert.NoError(t, err)
-	
+
 	// Verify deletion
 	exists, err = service.Exists(ctx, "recipes/test-recipe.yaml")
 	assert.NoError(t, err)
@@ -162,21 +162,21 @@ func TestARFOperationsWithUnifiedStorage(t *testing.T) {
 func TestBucketPrefixing(t *testing.T) {
 	mockStorage := NewMockUnifiedStorage()
 	ctx := context.Background()
-	
+
 	service, err := NewARFService(mockStorage, "artifacts")
 	require.NoError(t, err)
-	
+
 	// Store data - should be prefixed with bucket name
 	testData := []byte("test data")
 	err = service.Put(ctx, "test-key", testData)
 	assert.NoError(t, err)
-	
+
 	// Verify the key was prefixed with bucket name in underlying storage
 	prefixedKey := "artifacts/test-key"
 	reader, err := mockStorage.Get(ctx, prefixedKey)
 	assert.NoError(t, err)
 	defer reader.Close()
-	
+
 	storedData, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	assert.Equal(t, testData, storedData)

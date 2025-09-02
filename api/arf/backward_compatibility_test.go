@@ -68,4 +68,3 @@ func TestAdapterImplementsInterface(t *testing.T) {
 	assert.NotNil(t, service1)
 	assert.NotNil(t, service2)
 }
-

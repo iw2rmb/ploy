@@ -22,6 +22,8 @@ type Handler struct {
 	// Phase 4 components
 	securityEngine *SecurityEngine
 	sbomAnalyzer   *SyftSBOMAnalyzer
+	// Consul store for transformation status
+	consulStore ConsulStoreInterface
 }
 
 // NewHandler creates a new ARF HTTP handler
@@ -52,7 +54,7 @@ func NewHandlerWithStorage(
 		// Create recipe registry with the storage provider
 		recipeRegistry = NewRecipeRegistry(storageProvider)
 	}
-	
+
 	return &Handler{
 		recipeExecutor:  executor,
 		recipeStorage:   recipeStorage,
