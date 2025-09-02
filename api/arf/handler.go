@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Handler provides HTTP endpoints for ARF operations
@@ -58,6 +59,25 @@ func (h *Handler) SetConsulStore(store ConsulStoreInterface) {
 	}
 }
 
+// RegisterPrometheusMetrics registers the healing metrics with the Prometheus registry
+func (h *Handler) RegisterPrometheusMetrics(registry interface{}) error {
+	if h.healingCoordinator == nil {
+		return fmt.Errorf("healing coordinator not initialized")
+	}
+
+	exporter := h.healingCoordinator.GetMetricsExporter()
+	if exporter == nil {
+		return fmt.Errorf("metrics exporter not available")
+	}
+
+	// Check if registry is a Prometheus registry
+	if promRegistry, ok := registry.(*prometheus.Registry); ok {
+		return exporter.Register(promRegistry)
+	}
+
+	return fmt.Errorf("invalid registry type")
+}
+
 // GetHealingCoordinatorMetrics returns metrics from the healing coordinator
 func (h *Handler) GetHealingCoordinatorMetrics() *HealingCoordinatorMetrics {
 	if h.healingCoordinator != nil {
@@ -85,6 +105,10 @@ func (h *Handler) GetHealingMetrics(c *fiber.Ctx) error {
 
 	metrics := h.healingCoordinator.GetMetrics()
 
+	// Get active alerts
+	activeAlerts := h.healingCoordinator.GetActiveAlerts()
+	alertHistory := h.healingCoordinator.GetAlertHistory()
+
 	// Create enhanced response with additional context
 	response := fiber.Map{
 		"coordinator_metrics": metrics,
@@ -96,6 +120,11 @@ func (h *Handler) GetHealingMetrics(c *fiber.Ctx) error {
 			"max_parallel_attempts": 3, // Default from config
 			"max_healing_depth":     5,
 			"max_total_attempts":    20,
+		},
+		"alerts": fiber.Map{
+			"active":        activeAlerts,
+			"active_count":  len(activeAlerts),
+			"history_count": len(alertHistory),
 		},
 	}
 
@@ -191,6 +220,13 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Post("/transforms", h.ExecuteTransformationAsync)
 	arf.Get("/transforms/:id", h.GetTransformationResult)
 	arf.Get("/transforms/:id/status", h.GetTransformationStatusAsync)
+
+	// Transformation debugging endpoints
+	arf.Get("/transforms/:id/hierarchy", h.GetTransformationHierarchy)
+	arf.Get("/transforms/:id/active", h.GetActiveHealingAttempts)
+	arf.Get("/transforms/:id/timeline", h.GetTransformationTimeline)
+	arf.Get("/transforms/:id/analysis", h.GetTransformationAnalysis)
+	arf.Get("/transforms/orphaned", h.GetOrphanedTransformations)
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)

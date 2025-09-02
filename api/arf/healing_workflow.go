@@ -31,6 +31,9 @@ type HealingConfig struct {
 	TestTimeout          time.Duration `json:"test_timeout"`           // Test validation timeout (default: 15m)
 	DefaultBuildTool     string        `json:"default_build_tool"`     // Default build tool (maven, gradle, npm, go)
 	DefaultTestFramework string        `json:"default_test_framework"` // Default test framework
+
+	// Alert configuration
+	AlertConfig *AlertConfig `json:"alert_config,omitempty"` // Alert system configuration
 }
 
 // DefaultHealingConfig returns default healing configuration
@@ -51,6 +54,15 @@ func DefaultHealingConfig() *HealingConfig {
 		TestTimeout:          15 * time.Minute,
 		DefaultBuildTool:     "maven",
 		DefaultTestFramework: "maven",
+		AlertConfig: &AlertConfig{
+			Enabled:              true,
+			FailureRateThreshold: 0.8,
+			MaxTreeDepth:         8,
+			MaxDuration:          4 * time.Hour,
+			EvaluationInterval:   1 * time.Minute,
+			DeduplicationWindow:  5 * time.Minute,
+			MaxHistorySize:       100,
+		},
 	}
 }
 
@@ -97,6 +109,9 @@ func (h *Handler) executeHealingWorkflow(
 		Children:         []HealingAttempt{},
 		ParentAttempt:    parentPath,
 	}
+
+	// Log healing start
+	GetHealingLogger().LogHealingStarted(ctx, transformID, attemptPath, attempt.TriggerReason, errors)
 
 	// Store in Consul
 	if err := h.consulStore.AddHealingAttempt(ctx, transformID, attemptPath, attempt); err != nil {
@@ -172,14 +187,21 @@ func (h *Handler) executeHealingWorkflow(
 				}
 
 				if err := h.healingCoordinator.SubmitTask(ctx, childTask); err != nil {
-					fmt.Printf("Failed to submit child healing task: %v\n", err)
+					GetHealingLogger().WithFields(LogFields{
+						"transformation_id": transformID,
+						"parent_path":       attemptPath,
+						"child_path":        attemptPath + ".1",
+					}).Error("Failed to submit child healing task", err)
 				}
 			} else {
 				// Fallback to direct execution
 				go func() {
 					childCtx := context.Background()
 					if err := h.executeHealingWorkflow(childCtx, transformID, newErrors, attemptPath, config); err != nil {
-						fmt.Printf("Child healing workflow failed: %v\n", err)
+						GetHealingLogger().WithFields(LogFields{
+							"transformation_id": transformID,
+							"parent_path":       attemptPath,
+						}).Error("Child healing workflow failed", err)
 					}
 				}()
 			}
@@ -478,6 +500,11 @@ func (h *Handler) triggerHealingIfNeeded(
 
 	// Trigger healing workflow through coordinator for proper concurrency control
 	if h.healingCoordinator != nil && h.healingCoordinator.IsRunning() {
+		// Record transformation start in Prometheus metrics
+		if exporter := h.healingCoordinator.GetMetricsExporter(); exporter != nil {
+			exporter.RecordTransformationStarted(transformID)
+		}
+
 		task := &HealingTask{
 			TransformID: transformID,
 			AttemptPath: "", // Root healing attempt
@@ -490,14 +517,21 @@ func (h *Handler) triggerHealingIfNeeded(
 		}
 
 		if err := h.healingCoordinator.SubmitTask(ctx, task); err != nil {
-			fmt.Printf("Failed to submit healing task: %v\n", err)
+			GetHealingLogger().WithFields(LogFields{
+				"transformation_id": transformID,
+				"attempt_path":      "1",
+				"error_count":       len(errors),
+			}).Error("Failed to submit healing task", err)
 		}
 	} else {
 		// Fallback to direct execution if coordinator unavailable
 		go func() {
 			healingCtx := context.Background()
 			if err := h.executeHealingWorkflow(healingCtx, transformID, errors, "", config); err != nil {
-				fmt.Printf("Healing workflow failed: %v\n", err)
+				GetHealingLogger().WithFields(LogFields{
+					"transformation_id": transformID,
+					"error_count":       len(errors),
+				}).Error("Healing workflow failed", err)
 			}
 		}()
 	}

@@ -1,5 +1,90 @@
 # CHANGELOG
 
+## [2025-09-02] - ARF Controls & Optimization (Phase 5)
+
+### Added
+- **Circuit Breaker Pattern**: Prevents runaway healing attempts
+  - Configurable failure threshold (default: 3 consecutive failures)
+  - Automatic circuit opening on threshold breach
+  - Half-open state for recovery testing
+  - Auto-recovery after configurable duration
+
+### Enhanced
+- **Healing Coordinator with Limits Enforcement**
+  - Strict depth limit enforcement (max healing depth configurable)
+  - Per-transformation total attempts limit
+  - Parallel attempt control with semaphore
+  - Timeout tracking and enforcement
+
+### Added
+- **Performance Metrics Tracking**
+  - Success rate calculation for healing attempts
+  - Average healing duration tracking
+  - Total healing time accumulation
+  - Timeout exceeded counter
+  - Depth and attempts limit breach counters
+
+### Enhanced
+- **HealingCoordinatorMetrics Structure**
+  - Added `SuccessRate`, `AverageHealingDuration`, `TotalHealingTime`
+  - Added `CircuitBreakerState`, `ConsecutiveFailures`, `CircuitOpenUntil`
+  - Added `DepthLimitReached`, `AttemptsLimitReached`, `TimeoutExceeded`
+  - Real-time circuit breaker state monitoring
+
+### Testing
+- **Comprehensive Test Coverage**
+  - Circuit breaker state transitions (closed → open → half-open → closed)
+  - Depth limit enforcement validation
+  - Total attempts limit per transformation
+  - Circuit breaker integration with coordinator
+  - Performance metrics accuracy verification
+  - Timeout tracking validation
+
+### Technical Details
+- Implemented first three tasks of Phase 5 from `roadmap/transformations/README.md`
+- Circuit breaker prevents cascade failures in healing workflows
+- Metrics provide insights into healing effectiveness and resource usage
+- Protection against infinite healing loops and resource exhaustion
+
+## [2025-09-02] - ARF Enhanced API Response (Phase 4)
+
+### Added
+- **Enhanced Status Response Structure**: Comprehensive transformation status with full healing tree
+  - `TransformationSandboxInfo` type for sandbox deployment tracking
+  - `HealingSummary` embedded structure with aggregated metrics
+  - `SandboxDeployment` details including deployment URLs and build/test status
+  - Progress information added to individual `HealingAttempt` structures
+
+### Enhanced
+- **GetTransformationStatusAsync Handler**: Complete overhaul for comprehensive status reporting
+  - Returns full `TransformationStatus` structure instead of building response map
+  - Automatic progress calculation based on workflow stage
+  - Sandbox information populated from sandbox manager
+  - Active healing attempts enhanced with real-time progress
+  - Healing summary automatically calculated from children tree
+  - LLM analysis results properly included in healing attempts
+
+### Added 
+- **Progress Calculation**: Intelligent progress tracking across workflow stages
+  - OpenRewrite: 25% complete
+  - Build: 50% complete  
+  - Deploy: 60% complete
+  - Test: 75% complete
+  - Healing: Dynamic calculation based on completed attempts (75-100%)
+
+### Testing
+- **Comprehensive Unit Tests**: Full test coverage for enhanced status endpoint
+  - Tests for healing tree with nested attempts and LLM analysis
+  - Progress calculation verification for all workflow stages
+  - Sandbox information integration tests
+  - Edge cases including simple transformations without healing
+
+### Technical Details
+- Implemented Phase 4 of ARF Transformation roadmap from `roadmap/transformations/README.md`
+- Added helper functions for progress calculation and sandbox info retrieval
+- Enhanced MockConsulStore with full ConsulStoreInterface implementation
+- All tests passing with comprehensive coverage of new functionality
+
 ## [2025-09-02] - ARF Async Transformation with Consul KV Storage (Phase 1)
 
 ### Added
