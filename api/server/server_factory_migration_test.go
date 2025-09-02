@@ -40,7 +40,7 @@ func TestServerMustUseFactoryPattern(t *testing.T) {
 // TODO: This will be addressed in the next migration step
 func TestHealthCheckerUsesFactoryPattern(t *testing.T) {
 	t.Skip("Skipping - health.go migration will be done in next step")
-	
+
 	// Read health.go source code
 	healthCode, err := os.ReadFile("../health/health.go")
 	require.NoError(t, err)

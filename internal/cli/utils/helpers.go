@@ -71,7 +71,7 @@ func ReadGitignore(dir string) (Ignore, error) {
 		return Ignore{}, nil
 	}
 	defer f.Close()
-	
+
 	s := bufio.NewScanner(f)
 	var pats, neg []string
 	for s.Scan() {

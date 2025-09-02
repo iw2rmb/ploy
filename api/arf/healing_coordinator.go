@@ -11,13 +11,13 @@ import (
 
 // HealingTask represents a healing attempt to be coordinated
 type HealingTask struct {
-	TransformID  string
-	AttemptPath  string
-	Errors       []string
-	ParentPath   string
-	Priority     int // Lower values = higher priority
-	SubmittedAt  time.Time
-	ExecuteFn    func(context.Context) error
+	TransformID string
+	AttemptPath string
+	Errors      []string
+	ParentPath  string
+	Priority    int // Lower values = higher priority
+	SubmittedAt time.Time
+	ExecuteFn   func(context.Context) error
 }
 
 // HealingCoordinatorMetrics provides statistics about the coordinator's operation

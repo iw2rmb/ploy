@@ -10,14 +10,14 @@ import (
 
 // ImageSizeInfo contains detailed size information for an artifact
 type ImageSizeInfo struct {
-	FilePath         string `json:"file_path,omitempty"`         // For file-based artifacts
-	DockerImage      string `json:"docker_image,omitempty"`      // For container images
-	SizeBytes        int64  `json:"size_bytes"`                  // Size in bytes
-	SizeMB          float64 `json:"size_mb"`                     // Size in megabytes for easier reading
-	CompressedSize   int64  `json:"compressed_size,omitempty"`   // For Docker images
-	UncompressedSize int64  `json:"uncompressed_size,omitempty"` // For Docker images
-	Lane            string `json:"lane"`                        // Deployment lane
-	MeasurementType string `json:"measurement_type"`            // "file" or "docker"
+	FilePath         string  `json:"file_path,omitempty"`         // For file-based artifacts
+	DockerImage      string  `json:"docker_image,omitempty"`      // For container images
+	SizeBytes        int64   `json:"size_bytes"`                  // Size in bytes
+	SizeMB           float64 `json:"size_mb"`                     // Size in megabytes for easier reading
+	CompressedSize   int64   `json:"compressed_size,omitempty"`   // For Docker images
+	UncompressedSize int64   `json:"uncompressed_size,omitempty"` // For Docker images
+	Lane             string  `json:"lane"`                        // Deployment lane
+	MeasurementType  string  `json:"measurement_type"`            // "file" or "docker"
 }
 
 // GetImageSize measures the size of an artifact based on its type
@@ -27,7 +27,7 @@ func GetImageSize(imagePath, dockerImage, lane string) (*ImageSizeInfo, error) {
 	} else if dockerImage != "" {
 		return getDockerImageSize(dockerImage, lane)
 	}
-	
+
 	return nil, fmt.Errorf("no artifact specified for size measurement")
 }
 
@@ -37,21 +37,21 @@ func getFileSize(filePath, lane string) (*ImageSizeInfo, error) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("artifact file not found: %s", filePath)
 	}
-	
+
 	// Get file info
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
-	
+
 	sizeBytes := fileInfo.Size()
 	sizeMB := float64(sizeBytes) / (1024 * 1024)
-	
+
 	return &ImageSizeInfo{
 		FilePath:        filePath,
 		SizeBytes:       sizeBytes,
 		SizeMB:          sizeMB,
-		Lane:           lane,
+		Lane:            lane,
 		MeasurementType: "file",
 	}, nil
 }
@@ -64,42 +64,42 @@ func getDockerImageSize(dockerImage, lane string) (*ImageSizeInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get docker image size: %w", err)
 	}
-	
+
 	sizeStr := strings.TrimSpace(string(output))
 	if sizeStr == "" {
 		return nil, fmt.Errorf("docker image not found: %s", dockerImage)
 	}
-	
+
 	// Parse size (format could be "123MB", "1.5GB", etc.)
 	sizeBytes, err := parseDockerSize(sizeStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse docker image size: %w", err)
 	}
-	
+
 	sizeMB := float64(sizeBytes) / (1024 * 1024)
-	
+
 	// For Docker images, try to get more detailed size information
 	compressedSize, uncompressedSize := getDetailedDockerSize(dockerImage)
-	
+
 	return &ImageSizeInfo{
 		DockerImage:      dockerImage,
 		SizeBytes:        sizeBytes,
 		SizeMB:           sizeMB,
 		CompressedSize:   compressedSize,
 		UncompressedSize: uncompressedSize,
-		Lane:            lane,
-		MeasurementType: "docker",
+		Lane:             lane,
+		MeasurementType:  "docker",
 	}, nil
 }
 
 // parseDockerSize converts Docker size format (e.g., "123MB", "1.5GB") to bytes
 func parseDockerSize(sizeStr string) (int64, error) {
 	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
-	
+
 	// Extract number and unit
 	var num float64
 	var unit string
-	
+
 	if strings.HasSuffix(sizeStr, "GB") {
 		unit = "GB"
 		numStr := strings.TrimSuffix(sizeStr, "GB")
@@ -141,12 +141,12 @@ func parseDockerSize(sizeStr string) (int64, error) {
 		}
 		unit = "B"
 	}
-	
+
 	// Validate that the number is non-negative
 	if num < 0 {
 		return 0, fmt.Errorf("size cannot be negative: %s", sizeStr)
 	}
-	
+
 	// Convert to bytes
 	switch unit {
 	case "GB":
@@ -171,11 +171,11 @@ func getDetailedDockerSize(dockerImage string) (compressedSize, uncompressedSize
 			uncompressedSize = size
 		}
 	}
-	
+
 	// For compressed size, we'd need registry API access, so for now return 0
 	// In a production environment, this could query the registry
 	compressedSize = 0
-	
+
 	return compressedSize, uncompressedSize
 }
 
@@ -195,7 +195,7 @@ func GetLaneSizeLimits() []LaneSizeLimit {
 			Description: "Unikernel minimal - optimized for microsecond boot performance",
 		},
 		{
-			Lane:        "B", 
+			Lane:        "B",
 			MaxSizeMB:   100,
 			Description: "Unikernel POSIX - enhanced runtime compatibility",
 		},
@@ -225,13 +225,13 @@ func GetLaneSizeLimits() []LaneSizeLimit {
 // GetLaneSizeLimit returns the size limit for a specific lane
 func GetLaneSizeLimit(lane string) (LaneSizeLimit, error) {
 	limits := GetLaneSizeLimits()
-	
+
 	for _, limit := range limits {
 		if strings.ToUpper(limit.Lane) == strings.ToUpper(lane) {
 			return limit, nil
 		}
 	}
-	
+
 	return LaneSizeLimit{}, fmt.Errorf("no size limit defined for lane: %s", lane)
 }
 

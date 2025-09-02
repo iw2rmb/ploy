@@ -64,14 +64,14 @@ func Untar(tarPath, dst string) error {
 		return err
 	}
 	defer f.Close()
-	
+
 	var r io.Reader = f
 	if strings.HasSuffix(tarPath, ".gz") {
 		gzr, _ := gzip.NewReader(f)
 		defer gzr.Close()
 		r = gzr
 	}
-	
+
 	tr := tar.NewReader(r)
 	for {
 		h, err := tr.Next()
@@ -81,13 +81,13 @@ func Untar(tarPath, dst string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		p := filepath.Join(dst, h.Name)
 		if h.FileInfo().IsDir() {
 			os.MkdirAll(p, 0755)
 			continue
 		}
-		
+
 		os.MkdirAll(filepath.Dir(p), 0755)
 		out, _ := os.Create(p)
 		io.Copy(out, tr)
@@ -99,7 +99,7 @@ func Untar(tarPath, dst string) error {
 func RunLanePick(path string) (LanePickResult, error) {
 	// Try to run pre-built lane-pick binary first
 	lanePickBinary := "/home/ploy/ploy/bin/lane-pick"
-	
+
 	var cmd *exec.Cmd
 	if _, err := os.Stat(lanePickBinary); err == nil {
 		// Use pre-built binary if it exists
@@ -117,7 +117,7 @@ func RunLanePick(path string) (LanePickResult, error) {
 	if err != nil {
 		return LanePickResult{}, err
 	}
-	
+
 	var res LanePickResult
 	if err := json.Unmarshal(b, &res); err != nil {
 		return LanePickResult{}, err
