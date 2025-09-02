@@ -1,19 +1,28 @@
 # OpenRewrite Java 17 Transformation Test Plan
 
-## Unified ARF System Approach
+## Unified ARF System with Async Execution
 
-**Strategy**: Use the unified ARF (Automated Remediation Framework) system with OpenRewrite integration through standard ARF endpoints and recipe management.
+**Strategy**: Use the unified ARF (Automated Remediation Framework) system with asynchronous transformation execution and Consul KV persistence.
 
-**Key Assumptions**:
-1. **Recipe Auto-Download**: If recipe is not available locally, the openrewrite-jvm image will automatically download and store it during transformation
-2. **Extended Timeouts**: All timeouts are set to generous values to ensure processes have sufficient time to complete correctly
+**Implementation Status**:
+✅ **Phase 1 Completed**: Async transformation with Consul KV storage
+✅ **Transform Route Enhancement**: Returns immediate status link instead of waiting
+✅ **Background Execution**: Goroutine-based transformation execution
+✅ **Persistent Storage**: Consul KV replaces in-memory storage
 
-## Phase 1: Direct OpenRewrite Transformation Testing
+**Key Features**:
+1. **Asynchronous Execution**: Transformations run in background, return status URL immediately
+2. **Consul KV Persistence**: Transformation status survives API restarts
+3. **Recipe Auto-Download**: OpenRewrite image automatically downloads and stores recipes during transformation
+4. **Nested Healing Support**: Full healing workflow with recursive child transformations (Phase 2 ready)
 
-### Step 1: Execute ARF Transformation with OpenRewrite
+## Phase 1: Async OpenRewrite Transformation Testing
+
+### Step 1: Execute ARF Transformation with OpenRewrite (Async)
 1. **Transform Request**: Use `/v1/arf/transform` endpoint with OpenRewrite recipe
-   - **Timeout**: 30 minutes (generous time for repository cloning, recipe download, and transformation)
-   - **Extended Processing Time**: Allow for recipe download if not cached
+   - **Response Time**: <1 second (returns status URL immediately)
+   - **Background Processing**: Transformation runs asynchronously
+   - **Consul Storage**: Status persisted to Consul KV immediately
 2. **Target Repository**: https://github.com/winterbe/java8-tutorial.git
 3. **Recipe**: `org.openrewrite.java.migrate.UpgradeToJava17` (unified Java 8→17 recipe)
 4. **Request Format**:
@@ -29,17 +38,39 @@
      }
    }
    ```
+5. **Expected Response** (immediate):
+   ```json
+   {
+     "transformation_id": "uuid-1234-5678",
+     "status": "initiated",
+     "status_url": "/v1/arf/transforms/uuid-1234-5678/status",
+     "message": "Transformation started, use status_url to monitor progress"
+   }
+   ```
 
 ### Step 2: Monitor Transformation Execution
-1. **Job Submission**: Receive transformation_id from transform request
-   - **Initial Response Timeout**: 2 minutes
-2. **Status Monitoring**: Poll `/v1/arf/transforms/{transformation_id}` endpoint
+1. **Immediate Status URL**: Use the `status_url` from initial response
+2. **Status Monitoring**: Poll `/v1/arf/transforms/{transformation_id}/status` endpoint
    - **Polling Interval**: 30 seconds
    - **Maximum Wait Time**: 30 minutes total (allows for recipe download + transformation)
    - **Status Check Timeout**: 10 seconds per poll
-3. **Progress Tracking**: Monitor transformation job until completion
-   - **Expected Phases**: Repository clone → Recipe download (if needed) → Transformation → Result packaging
-4. **Result Retrieval**: Get transformation output/diff when available
+3. **Consul KV Status**: Transformation status persisted in:
+   - Key: `ploy/arf/transforms/{transform_id}/status`
+   - Updates in real-time as transformation progresses
+4. **Progress Tracking**: Monitor workflow stages:
+   - `initiated` → `openrewrite` → `build` → `test` → `heal` (if needed) → `completed`
+5. **Enhanced Status Response**:
+   ```json
+   {
+     "transformation_id": "uuid-1234-5678",
+     "workflow_stage": "openrewrite",
+     "status": "in_progress",
+     "start_time": "2025-01-15T10:00:00Z",
+     "children": [],  // Populated if healing workflow triggered
+     "active_healing_count": 0,
+     "total_healing_attempts": 0
+   }
+   ```
 
 ### Step 3: Post-Transformation Recipe Verification
 1. **Recipe Storage Check**: After successful transformation, verify that recipes are available
@@ -56,13 +87,13 @@
 3. **Java Design Patterns**: iluwatar/java-design-patterns (well-structured)
    - **Timeout**: 45 minutes (medium complexity, cached recipes)
 
-## Timeout Configuration Strategy
+## Timeout Configuration Strategy (Async Model)
 
 ### API Endpoint Timeouts:
-- **Recipe List/Validate**: 60 seconds (recipe resolution)
-- **Transform Submission**: 2 minutes (transformation job creation and validation)
+- **Transform Submission**: <1 second (immediate response with status URL)
 - **Status Polling**: 10 seconds per request
-- **Total Job Wait**: 30 minutes maximum per transformation
+- **Recipe List/Validate**: 60 seconds (recipe resolution)
+- **Background Job Execution**: No HTTP timeout (runs independently)
 
 ### Job Execution Timeouts:
 - **Repository Clone**: 5 minutes
@@ -99,22 +130,27 @@ The OpenRewrite transformations run in a custom Docker container with two-stage 
 ## Expected Outcomes
 
 ### Success Criteria:
+- ✅ **Async Execution**: Transform endpoint returns status URL within <1 second
+- ✅ **Consul Persistence**: Transformation status survives API restarts
+- ✅ **Background Processing**: Transformations run independently of HTTP connections
 - ✅ Recipe listing works via `/v1/arf/recipes?type=openrewrite`
 - ✅ Recipe validation succeeds for Java migration recipes via `/v1/arf/recipes/validate`
-- ✅ Transform job submission returns transformation_id within 2 minutes
-- ✅ Transformation status tracking provides progress updates every 30 seconds
+- ✅ Transformation status tracking provides progress updates from Consul KV
 - ✅ At least one repository transformation completes successfully within 60 minutes
 - ✅ **Recipe Caching**: Recipes are downloaded and stored after first transformation
 - ✅ **Performance Improvement**: Subsequent transformations are 50%+ faster with cached recipes
+- ✅ **Healing Ready**: Data structures support nested healing workflows (Phase 2)
 
-### Performance Targets (with generous timeouts):
+### Performance Targets (Async Model):
+- **All Transformations**:
+  - Endpoint Response Time: <1 second (returns status URL immediately)
+  - Consul Status Update: Within 100ms of state changes
+  - HTTP Connection Duration: <1 second per request
 - **First Transformation** (with recipe download):
-  - Endpoint Response Time: <2 minutes for job submission
-  - Job Completion: <30 minutes for simple repositories
+  - Background Job Completion: <30 minutes for simple repositories
   - Success Rate: >80% for Tier 1 (simple) repositories
 - **Subsequent Transformations** (with cached recipes):
-  - Endpoint Response Time: <30 seconds for job submission
-  - Job Completion: <30 minutes for simple repositories
+  - Background Job Completion: <15 minutes for simple repositories
   - Success Rate: >95% for Tier 1 repositories
 
 ## Recipe Management Validation
@@ -136,14 +172,15 @@ The OpenRewrite transformations run in a custom Docker container with two-stage 
 - **Storage Location**: Recipes stored in openrewrite-jvm image or persistent volume
 - **Performance Impact**: Second transformation should skip download phase
 
-## Advantages of This Approach:
-1. **Component Independence**: Bypasses failed advanced components
-2. **Direct Testing**: Tests core OpenRewrite functionality directly
-3. **Simplified Debugging**: Easier to isolate issues to specific components
-4. **Incremental Validation**: Can verify each step independently
-5. **Production Pathway**: Uses the same underlying infrastructure as full ARF
+## Advantages of Async Implementation:
+1. **No Long-lived Connections**: HTTP connections released immediately
+2. **Persistent State**: Transformation status survives API restarts via Consul KV
+3. **Scalability**: Can handle many concurrent transformations without connection limits
+4. **Background Processing**: Transformations continue even if client disconnects
+5. **Healing Workflow Ready**: Data structures support nested healing transformations
 6. **Recipe Auto-Management**: Validates automatic recipe download and caching
-7. **Realistic Timeouts**: Generous timeouts ensure reliable completion
+7. **Real-time Status**: Consul KV provides instant status updates
+8. **Production Ready**: Async pattern suitable for production deployments
 
 ## Risk Mitigation:
 - **Docker Dependencies**: OpenRewrite uses Docker images - verify Docker/registry access
@@ -159,13 +196,14 @@ The OpenRewrite transformations run in a custom Docker container with two-stage 
 - **Storage Utilization**: Monitor disk usage during recipe downloads
 - **Performance Metrics**: Track transformation times before/after recipe caching
 
-## API Endpoint Reference
+## API Endpoint Reference (Async Implementation)
 
-Based on `/api/README.md`, OpenRewrite integration uses the unified ARF system:
+Based on Phase 1 implementation, OpenRewrite uses async ARF system:
 
-### Unified ARF System for OpenRewrite
-- `POST /v1/arf/transform` — execute transformation (including OpenRewrite recipes)
-- `GET /v1/arf/transforms/:id` — get transformation result
+### Unified ARF System for OpenRewrite (Async)
+- `POST /v1/arf/transform` — initiate async transformation, returns status URL immediately
+- `GET /v1/arf/transforms/:id/status` — get transformation status from Consul KV
+- `GET /v1/arf/transforms/:id` — (deprecated) legacy endpoint for compatibility
 
 **Note**: OpenRewrite recipes are managed exclusively through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
@@ -187,10 +225,10 @@ Based on `/api/README.md`, OpenRewrite integration uses the unified ARF system:
 
 ## Test Execution Commands
 
-### Step 1: Execute Transformation via Unified ARF
+### Step 1: Execute Async Transformation via Unified ARF
 ```bash
-# Using unified ARF endpoint with correct format
-curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
+# Initiate async transformation (returns immediately)
+RESPONSE=$(curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
@@ -201,17 +239,31 @@ curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
       "language": "java",
       "build_tool": "maven"
     }
-  }' \
-  --max-time 600  # 10 minute timeout for transformation
+  }')
+
+# Extract transformation_id and status_url from immediate response
+TRANSFORM_ID=$(echo "$RESPONSE" | jq -r '.transformation_id')
+STATUS_URL=$(echo "$RESPONSE" | jq -r '.status_url')
+echo "Transformation initiated: $TRANSFORM_ID"
+echo "Monitor at: $STATUS_URL"
 ```
 
-### Step 2: Monitor Transformation Status (with 60-minute maximum wait)
+### Step 2: Monitor Transformation Status (Async)
 ```bash
-TRANSFORM_ID="<transformation_id_from_step_1>"
+# Poll status endpoint (data from Consul KV)
 timeout 3600 bash -c '
   while true; do
-    STATUS=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/transforms/'$TRANSFORM_ID'" | jq -r ".status")
-    echo "$(date): Transformation status: $STATUS"
+    STATUS_RESPONSE=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/transforms/'$TRANSFORM_ID'/status")
+    STATUS=$(echo "$STATUS_RESPONSE" | jq -r ".status")
+    STAGE=$(echo "$STATUS_RESPONSE" | jq -r ".workflow_stage")
+    echo "$(date): Stage: $STAGE, Status: $STATUS"
+    
+    # Check for healing workflows
+    HEALING_COUNT=$(echo "$STATUS_RESPONSE" | jq -r ".active_healing_count // 0")
+    if [ "$HEALING_COUNT" -gt 0 ]; then
+      echo "  Active healing attempts: $HEALING_COUNT"
+    fi
+    
     if [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]]; then
       break
     fi
@@ -241,10 +293,35 @@ curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/recipes/validate" \
   }'
 ```
 
-## Documentation Updates:
-- Update main roadmap with direct OpenRewrite testing results
-- Document working endpoints vs. failed advanced components
-- Create alternative testing guide for basic OpenRewrite functionality
-- Document recipe caching behavior and performance improvements
+## Implementation Phases Completed:
 
-This focused approach should provide a clear validation of core OpenRewrite capabilities while ensuring sufficient time for recipe downloads and transformations to complete successfully.
+### ✅ Phase 1: Async Transformation & Consul KV (COMPLETED)
+- Transform route returns status URL immediately (<1 second)
+- Background goroutine executes transformation
+- Consul KV stores transformation status persistently
+- Breaking change: Clients must use async pattern
+
+### ✅ Phase 2: Enhanced Data Structures (COMPLETED)
+- Nested `HealingAttempt` structure implemented
+- `HealingTree` management logic ready
+- `TransformationResult` extended with healing fields
+- Attempt path generation and management complete
+
+### 🚧 Phase 3: Healing Workflow Logic (IN PROGRESS)
+- Recursive healing workflow execution implemented
+- LLM error analysis integration pending
+- Build/test validation in sandbox pending
+
+## Consul KV Structure:
+```
+ploy/arf/transforms/{id}/status     # Main transformation status
+ploy/arf/transforms/{id}/children   # Healing attempts hierarchy
+ploy/arf/transforms/{id}/sandbox    # Sandbox deployment info
+```
+
+## Breaking Changes:
+- `/v1/arf/transform` now returns status URL, not full result
+- Clients must poll `/v1/arf/transforms/{id}/status` for results
+- No backward compatibility with synchronous pattern
+
+This async approach with Consul persistence provides production-ready OpenRewrite transformation capabilities with support for complex healing workflows.

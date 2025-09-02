@@ -102,6 +102,24 @@ func (c *ConsulHealingStore) AddHealingAttempt(ctx context.Context, rootID, atte
 		return fmt.Errorf("transformation %s not found", rootID)
 	}
 
+	// Auto-generate path if not provided
+	if attemptPath == "" && attempt != nil {
+		parentPath := attempt.ParentAttempt
+		attemptPath = GenerateAttemptPath(rootID, parentPath, status.Children)
+		attempt.AttemptPath = attemptPath
+	}
+
+	// Validate the attempt path
+	if err := ValidateAttemptPath(attemptPath); err != nil {
+		return fmt.Errorf("invalid attempt path: %w", err)
+	}
+
+	// Ensure the parent exists if this is a child attempt
+	parentPath := GetParentPath(attemptPath)
+	if parentPath != "" && !IsValidParent(status.Children, parentPath) {
+		return fmt.Errorf("parent path %s does not exist", parentPath)
+	}
+
 	// Add attempt to the correct position in the tree
 	if err := c.addAttemptToTree(&status.Children, attemptPath, attempt); err != nil {
 		return err
@@ -351,4 +369,28 @@ func (c *ConsulHealingStore) countHealsRecursive(attempts []HealingAttempt, coun
 			c.countHealsRecursive(attempt.Children, count)
 		}
 	}
+}
+
+// GenerateNextAttemptPath generates the next available attempt path for a transformation
+func (c *ConsulHealingStore) GenerateNextAttemptPath(ctx context.Context, rootID string, parentPath string) (string, error) {
+	status, err := c.GetTransformationStatus(ctx, rootID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get transformation status: %w", err)
+	}
+
+	if status == nil {
+		// No existing transformation, this would be the first attempt
+		if parentPath != "" {
+			return "", fmt.Errorf("cannot create child attempt for non-existent transformation")
+		}
+		// For a new transformation, we might want to initialize it first
+		return "", fmt.Errorf("transformation %s not found - initialize it first", rootID)
+	}
+
+	// Validate parent path exists if specified
+	if parentPath != "" && !IsValidParent(status.Children, parentPath) {
+		return "", fmt.Errorf("parent path %s does not exist", parentPath)
+	}
+
+	return GenerateAttemptPath(rootID, parentPath, status.Children), nil
 }
