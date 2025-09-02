@@ -4,16 +4,17 @@ import "time"
 
 // TransformationStatus represents the current status of a transformation with healing support
 type TransformationStatus struct {
-	TransformationID     string                  `json:"transformation_id"`
-	WorkflowStage        string                  `json:"workflow_stage"` // openrewrite, build, deploy, test, heal
-	Status               string                  `json:"status"`         // pending, in_progress, completed, failed
-	StartTime            time.Time               `json:"start_time"`
-	EndTime              time.Time               `json:"end_time,omitempty"`
-	Children             []HealingAttempt        `json:"children"`
-	ActiveHealingCount   int                     `json:"active_healing_count"`
-	TotalHealingAttempts int                     `json:"total_healing_attempts"`
-	Progress             *TransformationProgress `json:"progress,omitempty"`
-	Error                string                  `json:"error,omitempty"`
+	TransformationID     string                     `json:"transformation_id"`
+	WorkflowStage        string                     `json:"workflow_stage"` // openrewrite, build, deploy, test, heal
+	Status               string                     `json:"status"`         // pending, in_progress, completed, failed
+	StartTime            time.Time                  `json:"start_time"`
+	EndTime              time.Time                  `json:"end_time,omitempty"`
+	Children             []HealingAttempt           `json:"children"`
+	ActiveHealingCount   int                        `json:"active_healing_count"`
+	TotalHealingAttempts int                        `json:"total_healing_attempts"`
+	CoordinatorMetrics   *HealingCoordinatorMetrics `json:"coordinator_metrics,omitempty"`
+	Progress             *TransformationProgress    `json:"progress,omitempty"`
+	Error                string                     `json:"error,omitempty"`
 }
 
 // TransformationProgress represents the progress of a transformation

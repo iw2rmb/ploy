@@ -47,10 +47,11 @@ func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
 	// Generate transformation ID
 	transformID := uuid.New().String()
 
-	// Check if we have Consul store
+	// Consul store is required for async transformations
 	if h.consulStore == nil {
-		// Fallback to synchronous execution if no Consul store
-		return h.ExecuteTransformation(c)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Async transformations require Consul store to be configured",
+		})
 	}
 
 	// Store initial status in Consul immediately
@@ -128,10 +129,11 @@ func (h *Handler) GetTransformationStatusAsync(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if we have Consul store
+	// Consul store is required for async transformation status
 	if h.consulStore == nil {
-		// Fallback to existing method
-		return h.GetTransformationStatus(c)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Async transformation status requires Consul store to be configured",
+		})
 	}
 
 	// Get status from Consul
@@ -186,6 +188,13 @@ func (h *Handler) GetTransformationStatusAsync(c *fiber.Ctx) error {
 	if status.ActiveHealingCount > 0 {
 		activeAttempts, _ := h.consulStore.GetActiveHealingAttempts(c.Context(), transformID)
 		response["active_attempts"] = activeAttempts
+	}
+
+	// Add healing coordinator metrics if available
+	if h.healingCoordinator != nil && h.healingCoordinator.IsRunning() {
+		metrics := h.healingCoordinator.GetMetrics()
+		status.CoordinatorMetrics = &metrics
+		response["coordinator_metrics"] = metrics
 	}
 
 	return c.JSON(response)

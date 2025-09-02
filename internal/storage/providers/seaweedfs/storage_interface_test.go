@@ -14,6 +14,8 @@ import (
 // TestProviderStorageInterface verifies that SeaweedFS Provider correctly implements Storage interface
 // and handles bucket/collection prefixing internally
 func TestProviderStorageInterface(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	// Create a test provider with a collection/bucket
 	config := Config{
 		Master:      "localhost:9333",
@@ -59,6 +61,8 @@ func TestProviderStorageInterface(t *testing.T) {
 
 // TestProviderNoBucketInStorageInterface verifies Storage interface methods don't require bucket parameter
 func TestProviderNoBucketInStorageInterface(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	config := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",

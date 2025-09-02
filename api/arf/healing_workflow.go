@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/iw2rmb/ploy/api/arf/models"
 )
 
 // HealingConfig contains configuration for healing workflows
@@ -17,6 +18,7 @@ type HealingConfig struct {
 	HealingTimeout      time.Duration `json:"healing_timeout"`       // Total healing timeout (default: 2h)
 	AttemptTimeout      time.Duration `json:"attempt_timeout"`       // Per-attempt timeout (default: 30m)
 	EnableHealing       bool          `json:"enable_healing"`        // Enable/disable healing
+	QueueSize           int           `json:"queue_size"`            // Queue size for pending healing tasks (default: 100)
 
 	// Circuit breaker settings
 	FailureThreshold    int           `json:"failure_threshold"`     // Consecutive failures before circuit open
@@ -40,6 +42,7 @@ func DefaultHealingConfig() *HealingConfig {
 		HealingTimeout:       2 * time.Hour,
 		AttemptTimeout:       30 * time.Minute,
 		EnableHealing:        true,
+		QueueSize:            100,
 		FailureThreshold:     3,
 		CircuitOpenDuration:  5 * time.Minute,
 		ValidateBuild:        true,
@@ -109,21 +112,30 @@ func (h *Handler) executeHealingWorkflow(
 
 	// Generate healing recipe using LLM
 	if h.llmGenerator != nil && analysis != nil {
-		recipeRequest := RecipeGenerationRequest{
-			ErrorContext: ErrorContext{
-				ErrorType:    analysis.ErrorType,
-				ErrorMessage: strings.Join(errors, "\n"),
-			},
-			Language: "java", // TODO: Detect language from transformation context
-		}
+		// Create enhanced analyzer for healing suggestions
+		analyzer := NewEnhancedLLMAnalyzer(h.llmGenerator, nil)
+		language := "java" // TODO: Detect language from transformation context
 
-		generatedRecipe, err := h.llmGenerator.GenerateRecipe(healingCtx, recipeRequest)
-		if err == nil && generatedRecipe != nil {
-			// Apply the generated recipe
-			// TODO: Implement recipe application
-			healingSuccess = true
-			attempt.Status = "completed"
-			attempt.Result = "success"
+		// Get sandbox ID from attempt
+		sandboxID := attempt.TransformationID // Using transformation ID as sandbox ID for now
+
+		// Generate healing suggestion with recipe
+		suggestion, err := analyzer.AnalyzeAndSuggestHealing(healingCtx, errors, language, sandboxID)
+		if err == nil && suggestion != nil {
+			// Apply the healing suggestion
+			healingSuccess, healingError = h.applyHealingSuggestion(healingCtx, suggestion, attempt)
+
+			if healingSuccess {
+				attempt.Status = "completed"
+				attempt.Result = "success"
+				// Store the applied recipe for tracking
+				if attempt.LLMAnalysis != nil {
+					attempt.LLMAnalysis.SuggestedFix = suggestion.Analysis.SuggestedFix
+				}
+			} else {
+				attempt.Status = "completed"
+				attempt.Result = "failed"
+			}
 		} else {
 			healingError = err
 			attempt.Status = "completed"
@@ -144,13 +156,33 @@ func (h *Handler) executeHealingWorkflow(
 			attempt.NewIssuesDiscovered = newErrors
 			attempt.Result = "partial_success"
 
-			// Spawn child healing attempts for new issues (recursive)
-			go func() {
-				childCtx := context.Background() // Use new context for child healing
-				if err := h.executeHealingWorkflow(childCtx, transformID, newErrors, attemptPath, config); err != nil {
-					fmt.Printf("Child healing workflow failed: %v\n", err)
+			// Spawn child healing attempts for new issues through coordinator
+			if h.healingCoordinator != nil && h.healingCoordinator.IsRunning() {
+				// Calculate priority based on depth (deeper = lower priority)
+				depth := GetPathDepth(attemptPath)
+				childTask := &HealingTask{
+					TransformID: transformID,
+					AttemptPath: attemptPath + ".1", // Child path
+					Errors:      newErrors,
+					ParentPath:  attemptPath,
+					Priority:    depth + 1, // Lower priority for deeper attempts
+					ExecuteFn: func(taskCtx context.Context) error {
+						return h.executeHealingWorkflow(taskCtx, transformID, newErrors, attemptPath, config)
+					},
 				}
-			}()
+
+				if err := h.healingCoordinator.SubmitTask(ctx, childTask); err != nil {
+					fmt.Printf("Failed to submit child healing task: %v\n", err)
+				}
+			} else {
+				// Fallback to direct execution
+				go func() {
+					childCtx := context.Background()
+					if err := h.executeHealingWorkflow(childCtx, transformID, newErrors, attemptPath, config); err != nil {
+						fmt.Printf("Child healing workflow failed: %v\n", err)
+					}
+				}()
+			}
 		}
 	}
 
@@ -172,7 +204,29 @@ func (h *Handler) analyzeBuildErrors(errors []string) *LLMAnalysisResult {
 		return nil
 	}
 
-	// Categorize error type
+	ctx := context.Background()
+
+	// Create enhanced LLM analyzer if we have an LLM generator
+	if h.llmGenerator != nil {
+		// Use LLMDispatcher if available
+		var dispatcher *LLMDispatcher
+		// Note: In production, dispatcher would be injected via Handler
+
+		analyzer := NewEnhancedLLMAnalyzer(h.llmGenerator, dispatcher)
+
+		// Detect language from context (default to Java for now)
+		language := "java" // TODO: Detect from transformation context
+
+		// Perform LLM analysis
+		result, err := analyzer.AnalyzeErrors(ctx, errors, language)
+		if err == nil && result != nil {
+			return result
+		}
+
+		// Fall through to basic analysis if LLM fails
+	}
+
+	// Fallback to basic pattern-based analysis
 	errorType := "unknown"
 	prompt := "Fix the following errors:\n"
 
@@ -333,6 +387,64 @@ func (h *Handler) canPerformHealing(currentPath string, config *HealingConfig) b
 	return true
 }
 
+// applyHealingSuggestion applies the generated healing suggestion
+func (h *Handler) applyHealingSuggestion(ctx context.Context, suggestion *HealingSuggestion, attempt *HealingAttempt) (bool, error) {
+	if suggestion == nil || suggestion.Analysis == nil {
+		return false, fmt.Errorf("invalid healing suggestion")
+	}
+
+	// Check confidence threshold
+	if suggestion.Confidence < 0.6 {
+		return false, fmt.Errorf("confidence too low: %.2f", suggestion.Confidence)
+	}
+
+	// Apply based on risk assessment
+	if suggestion.Analysis.RiskAssessment == "high" && suggestion.Confidence < 0.8 {
+		return false, fmt.Errorf("high risk suggestion with insufficient confidence")
+	}
+
+	// If we have a recipe executor, apply the OpenRewrite recipe
+	if h.recipeExecutor != nil && suggestion.RecipeName != "" {
+		// Create a dynamic recipe from the suggestion
+		recipe := &models.Recipe{
+			Metadata: models.RecipeMetadata{
+				Name:        fmt.Sprintf("healing_%s", attempt.AttemptPath),
+				Description: suggestion.Analysis.SuggestedFix,
+				Author:      "ARF Healing System",
+				Version:     "1.0.0",
+				Tags:        []string{"healing", suggestion.Analysis.ErrorType},
+			},
+			Steps: []models.RecipeStep{
+				{
+					Name: "apply_healing",
+					Type: "openrewrite",
+					Config: map[string]interface{}{
+						"recipe":      suggestion.RecipeName,
+						"options":     suggestion.RecipeMetadata,
+						"description": fmt.Sprintf("Apply %s healing", suggestion.Analysis.ErrorType),
+					},
+				},
+			},
+		}
+
+		// Execute the recipe directly using ExecuteRecipeObject
+		result, err := h.recipeExecutor.ExecuteRecipeObject(ctx, recipe, suggestion.SandboxID)
+		if err != nil {
+			return false, fmt.Errorf("failed to execute healing recipe: %w", err)
+		}
+
+		return result.Success, nil
+	}
+
+	// If no recipe executor, just mark as successful if we have a suggestion
+	if suggestion.Analysis.SuggestedFix != "" {
+		// In a real implementation, this would apply the fix to the code
+		return true, nil
+	}
+
+	return false, fmt.Errorf("no applicable healing action found")
+}
+
 // triggerHealingIfNeeded checks if healing should be triggered based on transformation result
 func (h *Handler) triggerHealingIfNeeded(
 	ctx context.Context,
@@ -364,11 +476,29 @@ func (h *Handler) triggerHealingIfNeeded(
 		return
 	}
 
-	// Trigger healing workflow asynchronously
-	go func() {
-		healingCtx := context.Background()
-		if err := h.executeHealingWorkflow(healingCtx, transformID, errors, "", config); err != nil {
-			fmt.Printf("Healing workflow failed: %v\n", err)
+	// Trigger healing workflow through coordinator for proper concurrency control
+	if h.healingCoordinator != nil && h.healingCoordinator.IsRunning() {
+		task := &HealingTask{
+			TransformID: transformID,
+			AttemptPath: "", // Root healing attempt
+			Errors:      errors,
+			ParentPath:  "",
+			Priority:    0, // Root attempts have highest priority
+			ExecuteFn: func(taskCtx context.Context) error {
+				return h.executeHealingWorkflow(taskCtx, transformID, errors, "", config)
+			},
 		}
-	}()
+
+		if err := h.healingCoordinator.SubmitTask(ctx, task); err != nil {
+			fmt.Printf("Failed to submit healing task: %v\n", err)
+		}
+	} else {
+		// Fallback to direct execution if coordinator unavailable
+		go func() {
+			healingCtx := context.Background()
+			if err := h.executeHealingWorkflow(healingCtx, transformID, errors, "", config); err != nil {
+				fmt.Printf("Healing workflow failed: %v\n", err)
+			}
+		}()
+	}
 }

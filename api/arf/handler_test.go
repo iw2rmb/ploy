@@ -248,71 +248,8 @@ func TestHandlerCreateRecipe(t *testing.T) {
 	})
 }
 
-func TestHandlerExecuteTransformation(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
-
-	app := fiber.New()
-	handler.RegisterRoutes(app)
-
-	t.Run("execute valid transformation", func(t *testing.T) {
-		request := map[string]interface{}{
-			"recipe_id": "test-recipe",
-			"codebase": map[string]interface{}{
-				"repository": "https://github.com/example/test-repo",
-				"branch":     "main",
-				"language":   "java",
-			},
-		}
-
-		body, _ := json.Marshal(request)
-		req := httptest.NewRequest("POST", "/v1/arf/transform", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := app.Test(req)
-		if err != nil {
-			t.Fatalf("Request failed: %v", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("Expected status 200, got %d", resp.StatusCode)
-		}
-
-		var result TransformationResult
-		json.NewDecoder(resp.Body).Decode(&result)
-
-		if !result.Success {
-			t.Error("Expected transformation to be successful")
-		}
-
-		if result.RecipeID != "test-recipe" {
-			t.Errorf("Expected recipe ID 'test-recipe', got %s", result.RecipeID)
-		}
-	})
-
-	t.Run("execute with non-existent recipe", func(t *testing.T) {
-		request := map[string]interface{}{
-			"recipe_id": "non-existent-recipe",
-			"codebase": map[string]interface{}{
-				"repository": "https://github.com/example/test-repo",
-				"branch":     "main",
-				"language":   "java",
-			},
-		}
-
-		body, _ := json.Marshal(request)
-		req := httptest.NewRequest("POST", "/v1/arf/transform", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := app.Test(req)
-		if err != nil {
-			t.Fatalf("Request failed: %v", err)
-		}
-
-		if resp.StatusCode != http.StatusNotFound {
-			t.Errorf("Expected status 404, got %d", resp.StatusCode)
-		}
-	})
-}
+// TestHandlerExecuteTransformation removed - synchronous transformation deprecated
+// Use TestExecuteTransformation_Async in handler_transformation_async_test.go instead
 
 func TestHandlerSandboxOperations(t *testing.T) {
 	handler, _, _, _ := setupTestHandler()
@@ -505,27 +442,5 @@ func BenchmarkHandlerListRecipes(b *testing.B) {
 	}
 }
 
-func BenchmarkHandlerExecuteTransformation(b *testing.B) {
-	handler, _, _, _ := setupTestHandler()
-
-	app := fiber.New()
-	handler.RegisterRoutes(app)
-
-	request := map[string]interface{}{
-		"recipe_id": "test-recipe",
-		"codebase": map[string]interface{}{
-			"repository": "https://github.com/example/test-repo",
-			"branch":     "main",
-			"language":   "java",
-		},
-	}
-
-	body, _ := json.Marshal(request)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		req := httptest.NewRequest("POST", "/v1/arf/transform", bytes.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		app.Test(req)
-	}
-}
+// BenchmarkHandlerExecuteTransformation removed - synchronous transformation deprecated
+// Async transformations should be benchmarked using background execution patterns

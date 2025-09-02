@@ -23,6 +23,32 @@ func (m *MockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGen
 	return args.Get(0).(*GeneratedRecipe), args.Error(1)
 }
 
+func (m *MockLLMGenerator) GetCapabilities() LLMCapabilities {
+	args := m.Called()
+	return args.Get(0).(LLMCapabilities)
+}
+
+func (m *MockLLMGenerator) IsAvailable(ctx context.Context) bool {
+	args := m.Called(ctx)
+	return args.Bool(0)
+}
+
+func (m *MockLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
+	args := m.Called(ctx, recipe)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*EvolutionValidationResult), args.Error(1)
+}
+
+func (m *MockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error) {
+	args := m.Called(ctx, recipe, feedback)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0), args.Error(1)
+}
+
 // HealingMockConsulStore for testing
 type HealingMockConsulStore struct {
 	mock.Mock
@@ -389,28 +415,31 @@ func (m *TestSandboxManager) CreateSandbox(ctx context.Context, config SandboxCo
 	return &Sandbox{ID: "mock-sandbox"}, nil
 }
 
-func (m *TestSandboxManager) GetSandbox(ctx context.Context, id string) (*Sandbox, error) {
-	return &Sandbox{ID: id}, nil
-}
-
-func (m *TestSandboxManager) DeleteSandbox(ctx context.Context, id string) error {
+func (m *TestSandboxManager) DestroySandbox(ctx context.Context, sandboxID string) error {
 	return nil
 }
 
-func (m *TestSandboxManager) ListSandboxes(ctx context.Context) ([]*Sandbox, error) {
-	return []*Sandbox{}, nil
+func (m *TestSandboxManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {
+	return []SandboxInfo{}, nil
 }
 
-func (m *TestSandboxManager) ValidateBuild(ctx context.Context, sandboxID string) (bool, []string) {
-	if !m.buildSuccess {
-		return false, []string{"Build failed: compilation error"}
-	}
-	return true, nil
+func (m *TestSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error {
+	return nil
 }
 
-func (m *TestSandboxManager) RunTests(ctx context.Context, sandboxID string) (bool, []string) {
-	if !m.testSuccess {
-		return false, []string{"Tests failed: 2 failures"}
+func (m *TestSandboxManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {
+	// Mock implementation for testing
+	if command == "mvn" && args[0] == "clean" && args[1] == "compile" {
+		if m.buildSuccess {
+			return "[INFO] BUILD SUCCESS", nil
+		}
+		return "[ERROR] Build failed: compilation error", nil
 	}
-	return true, nil
+	if command == "mvn" && args[0] == "test" {
+		if m.testSuccess {
+			return "Tests run: 10, Failures: 0, Errors: 0, Skipped: 0", nil
+		}
+		return "Tests run: 10, Failures: 2, Errors: 0, Skipped: 0", nil
+	}
+	return "", nil
 }

@@ -83,6 +83,14 @@ func (m *MockConsulHealingStore) SetTransformationTTL(ctx context.Context, id st
 	return nil
 }
 
+func (m *MockConsulHealingStore) GenerateNextAttemptPath(ctx context.Context, transformID string, parentPath string) (string, error) {
+	status, exists := m.data[transformID]
+	if !exists {
+		return "1", nil
+	}
+	return GenerateAttemptPath(transformID, parentPath, status.Children), nil
+}
+
 func TestExecuteTransformation_Async(t *testing.T) {
 	// Create a mock Consul store
 	mockStore := &MockConsulHealingStore{
@@ -133,7 +141,7 @@ func TestExecuteTransformation_Async(t *testing.T) {
 
 		// Check response format
 		assert.NotEmpty(t, result["transformation_id"])
-		assert.Equal(t, "initiated", result["status"])
+		assert.Contains(t, []string{"initiated", "in_progress"}, result["status"], "Status should be either 'initiated' or 'in_progress' due to async execution race condition")
 		assert.Contains(t, result["status_url"], "/v1/arf/transforms/")
 		assert.Contains(t, result["status_url"], "/status")
 		assert.Contains(t, result["message"], "Transformation started")
@@ -165,7 +173,7 @@ func TestExecuteTransformation_Async(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, status)
 		assert.Equal(t, transformID, status.TransformationID)
-		assert.Equal(t, "initiated", status.Status)
+		assert.Contains(t, []string{"initiated", "in_progress"}, status.Status, "Status should be either 'initiated' or 'in_progress' due to async execution race condition")
 		assert.Equal(t, "openrewrite", status.WorkflowStage)
 	})
 

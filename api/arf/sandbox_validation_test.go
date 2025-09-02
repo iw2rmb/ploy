@@ -112,9 +112,14 @@ func TestValidateBuild(t *testing.T) {
 				},
 			}
 
+			timeout := 30 * time.Second
+			if tt.name == "build timeout" {
+				timeout = 1 * time.Second // Use short timeout for timeout test
+			}
+			
 			config := BuildConfig{
 				BuildTool: tt.buildTool,
-				Timeout:   30 * time.Second,
+				Timeout:   timeout,
 			}
 
 			result, err := validator.ValidateBuild(context.Background(), tt.sandboxID, config)
@@ -419,10 +424,12 @@ func (m *MockValidationSandboxManager) CleanupExpiredSandboxes(ctx context.Conte
 
 func (m *MockValidationSandboxManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {
 	if m.shouldTimeout {
+		// Simulate a command that takes longer than the context timeout
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
 		case <-time.After(10 * time.Second):
+			// This shouldn't be reached if context times out first
 			return "", context.DeadlineExceeded
 		}
 	}

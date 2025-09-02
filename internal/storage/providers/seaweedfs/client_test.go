@@ -3,8 +3,10 @@ package seaweedfs
 import (
 	"context"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,19 @@ import (
 )
 
 // RED Phase: These tests will fail initially as the provider doesn't implement Storage interface yet
+
+// skipIfSeaweedFSUnavailable checks if SeaweedFS is running and skips the test if not
+func skipIfSeaweedFSUnavailable(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping SeaweedFS integration tests in short mode")
+	}
+
+	client := &http.Client{Timeout: 1 * time.Second}
+	_, err := client.Get("http://localhost:9333/cluster/status")
+	if err != nil {
+		t.Skipf("SeaweedFS not available: %v", err)
+	}
+}
 
 func TestSeaweedFSProvider_ImplementsStorageInterface(t *testing.T) {
 	// Test that SeaweedFS provider implements the Storage interface
@@ -54,6 +69,8 @@ func TestSeaweedFSProvider_Get(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_Put(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
@@ -77,6 +94,8 @@ func TestSeaweedFSProvider_Put(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_Delete(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
@@ -116,6 +135,8 @@ func TestSeaweedFSProvider_Exists(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_List(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
@@ -162,6 +183,8 @@ func TestSeaweedFSProvider_Head(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_Health(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
@@ -198,6 +221,8 @@ func TestSeaweedFSProvider_Metrics(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_BatchOperations(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
@@ -238,6 +263,8 @@ func TestSeaweedFSProvider_MetadataOperations(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_AdvancedOperations(t *testing.T) {
+	skipIfSeaweedFSUnavailable(t)
+
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
