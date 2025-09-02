@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [2025-09-02] - ARF Async Transformation with Consul KV Storage (Phase 1)
+
+### Added
+- **ConsulHealingStore**: New persistent storage backend for transformation status using Consul KV
+  - Stores transformation status with healing workflow support
+  - Manages hierarchical healing attempt trees
+  - Provides cleanup operations with TTL support
+  - Enables persistence across API restarts
+
+### Changed
+- **BREAKING: Transform Endpoint**: `/v1/arf/transform` now returns immediately with status link
+  - Old behavior: Synchronous execution returning complete `TransformationResult` (could timeout)
+  - New behavior: Asynchronous execution returning status link within <1 second
+  - Response format changed to include `transformation_id`, `status`, `status_url`, and `message`
+  - Clients must now poll `/v1/arf/transforms/{id}/status` for transformation results
+
+### Added
+- **Enhanced Status Endpoint**: `/v1/arf/transforms/{id}/status` provides comprehensive status
+  - Workflow stage tracking (openrewrite, build, deploy, test, heal)
+  - Healing tree visualization with nested attempts
+  - Progress indicators with percentage complete
+  - Active healing attempt tracking
+  - Healing summary statistics
+
+### Technical Details
+- Implemented Phase 1 of ARF Transformation Status & Healing Workflow from `roadmap/transformations/README.md`
+- Added comprehensive data structures for healing workflows (`HealingAttempt`, `HealingTree`, `TransformationStatus`)
+- Background goroutine execution for long-running transformations
+- Consul KV integration for distributed state management
+- Unit tests for all new functionality with mock stores
+
 ## [2025-09-01] - Storage Architecture Consolidation
 
 ### Improved
