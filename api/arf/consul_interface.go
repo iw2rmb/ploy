@@ -21,4 +21,7 @@ type ConsulStoreInterface interface {
 	// Cleanup operations
 	CleanupCompletedTransformations(ctx context.Context, maxAge time.Duration) error
 	SetTransformationTTL(ctx context.Context, id string, ttl time.Duration) error
+
+	// Path generation
+	GenerateNextAttemptPath(ctx context.Context, rootID string, parentPath string) (string, error)
 }

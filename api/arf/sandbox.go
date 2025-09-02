@@ -18,6 +18,9 @@ type SandboxManager interface {
 	DestroySandbox(ctx context.Context, sandboxID string) error
 	ListSandboxes(ctx context.Context) ([]SandboxInfo, error)
 	CleanupExpiredSandboxes(ctx context.Context) error
+
+	// ExecuteCommand executes a command in a sandbox and returns output
+	ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error)
 }
 
 // Sandbox represents an isolated environment for transformations
@@ -314,6 +317,20 @@ func (m *FreeBSDJailManager) stopJail(ctx context.Context, jailName string) erro
 	return cmd.Run()
 }
 
+// ExecuteCommand executes a command in a FreeBSD jail sandbox
+func (m *FreeBSDJailManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {
+	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:])
+
+	// Build the jexec command
+	jexecArgs := []string{jailName, command}
+	jexecArgs = append(jexecArgs, args...)
+
+	cmd := exec.CommandContext(ctx, "jexec", jexecArgs...)
+	output, err := cmd.CombinedOutput()
+
+	return string(output), err
+}
+
 // MockSandboxManager provides a mock implementation for non-FreeBSD systems
 type MockSandboxManager struct {
 	sandboxes map[string]*Sandbox
@@ -405,6 +422,21 @@ func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error 
 	}
 
 	return nil
+}
+
+// ExecuteCommand executes a command in a mock sandbox
+func (m *MockSandboxManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {
+	sandbox, exists := m.sandboxes[sandboxID]
+	if !exists {
+		return "", fmt.Errorf("sandbox %s not found", sandboxID)
+	}
+
+	// Build the command
+	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Dir = filepath.Join(sandbox.RootPath, "workspace")
+
+	output, err := cmd.CombinedOutput()
+	return string(output), err
 }
 
 // NewSandboxManagerForOS creates appropriate sandbox manager for the current OS
@@ -545,4 +577,20 @@ func (m *RemoteFreeBSDJailManager) startJail(ctx context.Context, jailName strin
 func (m *RemoteFreeBSDJailManager) stopJail(ctx context.Context, jailName string) error {
 	command := fmt.Sprintf("jail -r %s", jailName)
 	return m.executeRemoteCommand(ctx, command)
+}
+
+// ExecuteCommand executes a command in a remote FreeBSD jail sandbox
+func (m *RemoteFreeBSDJailManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {
+	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:])
+
+	// Build the jexec command with proper escaping
+	quotedArgs := make([]string, len(args))
+	for i, arg := range args {
+		quotedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\\''"))
+	}
+
+	jexecCmd := fmt.Sprintf("jexec %s %s %s", jailName, command, strings.Join(quotedArgs, " "))
+	output, err := m.executeRemoteCommandWithOutput(ctx, jexecCmd)
+
+	return string(output), err
 }

@@ -746,3 +746,48 @@ func (d *DeploymentSandboxManager) GetSandboxMetrics(ctx context.Context, sandbo
 
 	return metrics, nil
 }
+
+// ExecuteCommand executes a command in a deployment sandbox
+func (d *DeploymentSandboxManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {
+	// Extract app name from sandbox ID
+	appName := strings.TrimPrefix(sandboxID, "arf-sandbox-")
+
+	// Build the exec request
+	execReq := map[string]interface{}{
+		"command": command,
+		"args":    args,
+	}
+
+	body, err := json.Marshal(execReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal exec request: %w", err)
+	}
+
+	// Send exec request to the deployment
+	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("%s/apps/%s/exec", d.controllerURL, appName), bytes.NewBuffer(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to create exec request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if d.apiKey != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", d.apiKey))
+	}
+
+	resp, err := d.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute command: %w", err)
+	}
+	defer resp.Body.Close()
+
+	output, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read exec output: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return string(output), fmt.Errorf("exec failed with status %d: %s", resp.StatusCode, string(output))
+	}
+
+	return string(output), nil
+}

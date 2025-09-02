@@ -181,6 +181,18 @@ type TransformationResult struct {
 	ErrorLog     []ErrorCapture            `json:"error_log,omitempty"`
 	Comparison   *ComparisonResult         `json:"comparison,omitempty"`
 
+	// Enhanced healing workflow fields
+	WorkflowStage    string             `json:"workflow_stage,omitempty"`    // openrewrite, build, deploy, test, heal
+	ChildTransforms  []string           `json:"child_transforms,omitempty"`  // IDs of healing transformations
+	ParentTransform  string             `json:"parent_transform,omitempty"`  // ID of parent transformation
+	Children         []HealingAttempt   `json:"children,omitempty"`          // Nested healing attempts
+	SandboxID        string             `json:"sandbox_id,omitempty"`        // Sandbox used for testing
+	DeploymentStatus *DeploymentMetrics `json:"deployment_status,omitempty"` // Deployment metrics
+
+	// Consul metadata
+	ConsulKey   string    `json:"consul_key,omitempty"`   // Consul storage key
+	LastUpdated time.Time `json:"last_updated,omitempty"` // Last update timestamp
+
 	// Metadata
 	Metadata map[string]interface{} `json:"metadata"`
 }
