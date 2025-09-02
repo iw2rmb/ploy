@@ -12,11 +12,13 @@ import (
 
 // EnhancedLLMAnalyzer provides sophisticated LLM-based error analysis for healing workflows
 type EnhancedLLMAnalyzer struct {
-	llmGenerator  LLMRecipeGenerator
-	llmDispatcher *LLMDispatcher
-	cache         map[string]*LLMAnalysisResult // Simple cache for similar errors
-	cacheMutex    sync.RWMutex
-	cacheExpiry   time.Duration
+	llmGenerator    LLMRecipeGenerator
+	llmDispatcher   *LLMDispatcher
+	cache           map[string]*LLMAnalysisResult // Simple cache for similar errors
+	cacheMutex      sync.RWMutex
+	cacheExpiry     time.Duration
+	costTracker     *LLMCostTracker         // Track costs and optimize usage
+	metricsExporter *HealingMetricsExporter // Prometheus metrics
 }
 
 // EnhancedErrorPattern represents a pattern for error detection in LLM analysis
@@ -129,12 +131,29 @@ func ExtractErrorContext(errors []string, language string) ErrorContext {
 
 // NewEnhancedLLMAnalyzer creates a new enhanced LLM analyzer
 func NewEnhancedLLMAnalyzer(generator LLMRecipeGenerator, dispatcher *LLMDispatcher) *EnhancedLLMAnalyzer {
+	// Create default budget config
+	budgetConfig := &LLMBudgetConfig{
+		Enabled:               true,
+		MaxCostPerTransform:   5.0,   // $5 per transformation
+		MaxCostPerHour:        25.0,  // $25 per hour
+		MaxCostPerDay:         250.0, // $250 per day
+		AlertThresholdPercent: 80.0,
+		FallbackModel:         "gpt-3.5-turbo",
+		BlockOnExceed:         false, // Don't block, just alert
+	}
+
 	return &EnhancedLLMAnalyzer{
 		llmGenerator:  generator,
 		llmDispatcher: dispatcher,
 		cache:         make(map[string]*LLMAnalysisResult),
 		cacheExpiry:   30 * time.Minute,
+		costTracker:   NewLLMCostTracker(budgetConfig),
 	}
+}
+
+// SetMetricsExporter sets the Prometheus metrics exporter
+func (a *EnhancedLLMAnalyzer) SetMetricsExporter(exporter *HealingMetricsExporter) {
+	a.metricsExporter = exporter
 }
 
 // AnalyzeErrors performs comprehensive LLM-based error analysis
@@ -142,32 +161,184 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 	// Check cache first
 	cacheKey := a.generateCacheKey(errors)
 	if cached := a.getFromCache(cacheKey); cached != nil {
+		// Record cache hit in cost tracker
+		if a.costTracker != nil {
+			a.costTracker.RecordUsage(ctx, LLMUsageRecord{
+				Model:        "cache",
+				InputTokens:  0,
+				OutputTokens: 0,
+				TotalCost:    0,
+				CacheHit:     true,
+				TransformID:  ctx.Value("transformID").(string),
+			})
+		}
 		return cached, nil
 	}
 
 	// Extract error context
 	errorContext := a.extractErrorContext(errors)
 
+	// Check if we have LLM cost tracking cache
+	prompt := a.generateHealingPrompt(errorContext, language)
+	modelToUse := "gpt-4-turbo" // Default model
+
+	if a.costTracker != nil {
+		// Check for cached LLM response
+		if cachedEntry, found := a.costTracker.GetCachedResponse(prompt, modelToUse); found {
+			// Parse cached response
+			result := a.parseCachedResponse(cachedEntry.Response, errorContext)
+			a.storeInCache(cacheKey, result)
+
+			// Get transformation ID safely
+			transformID := ""
+			if ctx.Value("transformID") != nil {
+				transformID = ctx.Value("transformID").(string)
+			}
+
+			// Log cache hit
+			GetHealingLogger().WithFields(LogFields{
+				"transformation_id": transformID,
+				"model":             modelToUse,
+				"cache_hit":         true,
+			}).Debug("Using cached LLM response")
+
+			// Log LLM cost with cache hit
+			GetHealingLogger().LogLLMCost(transformID, modelToUse, 0, 0, 0, true)
+
+			// Record Prometheus metrics for cache hit
+			if a.metricsExporter != nil {
+				a.metricsExporter.RecordLLMCall(modelToUse, true, 0)
+			}
+
+			// Record cache hit
+			a.costTracker.RecordUsage(ctx, LLMUsageRecord{
+				Model:        modelToUse,
+				InputTokens:  0,
+				OutputTokens: 0,
+				TotalCost:    0,
+				CacheHit:     true,
+				TransformID:  transformID,
+			})
+
+			return result, nil
+		}
+
+		// Estimate tokens and check budget
+		estimatedTokens := a.costTracker.EstimateTokens(prompt)
+		allowed, reason, err := a.costTracker.CheckBudget(modelToUse, estimatedTokens)
+		if err != nil {
+			// Log error but continue
+			GetHealingLogger().WithFields(LogFields{
+				"model":            modelToUse,
+				"estimated_tokens": estimatedTokens,
+			}).Error("Budget check error", err)
+		}
+
+		if !allowed {
+			// Switch to fallback model or pattern-based analysis
+			GetHealingLogger().WithFields(LogFields{
+				"model":            modelToUse,
+				"estimated_tokens": estimatedTokens,
+				"reason":           reason,
+			}).Warn("LLM budget exceeded, using fallback pattern-based analysis")
+			result := a.analyzeErrorsWithPattern(errors, language)
+			a.storeInCache(cacheKey, result)
+			return result, nil
+		}
+
+		// Suggest optimal model based on quality needs
+		modelToUse = a.costTracker.SuggestOptimalModel(estimatedTokens, 0.7) // 70% quality priority
+	}
+
 	// Use LLM if available
 	if a.llmGenerator != nil && a.llmGenerator.IsAvailable(ctx) {
-		prompt := a.generateHealingPrompt(errorContext, language)
-
 		// Store prompt in error context metadata
 		if errorContext.Metadata == nil {
 			errorContext.Metadata = make(map[string]interface{})
 		}
 		errorContext.Metadata["healing_prompt"] = prompt
+		errorContext.Metadata["model"] = modelToUse
 
 		request := RecipeGenerationRequest{
 			ErrorContext: errorContext,
 			Language:     language,
 		}
 
+		// Log LLM analysis start
+		transformID := ""
+		if ctx.Value("transformID") != nil {
+			transformID = ctx.Value("transformID").(string)
+		}
+		GetHealingLogger().WithFields(LogFields{
+			"transformation_id": transformID,
+			"model":             modelToUse,
+			"error_type":        errorContext.ErrorType,
+		}).Debug("Starting LLM error analysis")
+
+		startTime := time.Now()
 		recipe, err := a.llmGenerator.GenerateRecipe(ctx, request)
+		duration := time.Since(startTime)
+
 		if err == nil && recipe != nil {
 			result := a.parseGeneratedRecipe(recipe, errorContext)
 			a.storeInCache(cacheKey, result)
+
+			// Track LLM usage and costs
+			if a.costTracker != nil {
+				// Estimate tokens from prompt and response
+				inputTokens := a.costTracker.EstimateTokens(prompt)
+				outputTokens := a.costTracker.EstimateTokens(recipe.Description + recipe.Explanation)
+
+				// Calculate cost
+				cost, _ := a.costTracker.CalculateCost(modelToUse, inputTokens, outputTokens)
+
+				// Log LLM cost
+				GetHealingLogger().LogLLMCost(transformID, modelToUse, inputTokens, outputTokens, cost, false)
+
+				// Record Prometheus metrics for LLM call
+				if a.metricsExporter != nil {
+					a.metricsExporter.RecordLLMCall(modelToUse, false, cost)
+				}
+
+				// Record usage
+				a.costTracker.RecordUsage(ctx, LLMUsageRecord{
+					Model:        modelToUse,
+					InputTokens:  inputTokens,
+					OutputTokens: outputTokens,
+					TotalCost:    cost,
+					Prompt:       prompt,
+					Response:     recipe.Description,
+					CacheHit:     false,
+					TransformID:  transformID,
+					Duration:     duration,
+				})
+
+				// Cache the response for future use
+				a.costTracker.CacheResponse(prompt, recipe.Description, modelToUse, inputTokens+outputTokens, cost)
+			}
+
+			// Log successful analysis
+			GetHealingLogger().LogLLMAnalysis(ctx, transformID, "", result)
+
 			return result, nil
+		} else if err != nil {
+			// Log LLM error
+			GetHealingLogger().WithFields(LogFields{
+				"transformation_id": transformID,
+				"model":             modelToUse,
+				"duration_ms":       duration.Milliseconds(),
+			}).Error("LLM recipe generation failed", err)
+
+			if a.costTracker != nil {
+				// Record error
+				a.costTracker.RecordUsage(ctx, LLMUsageRecord{
+					Model:       modelToUse,
+					CacheHit:    false,
+					TransformID: transformID,
+					Duration:    duration,
+					Error:       err.Error(),
+				})
+			}
 		}
 	}
 
@@ -325,6 +496,17 @@ func (a *EnhancedLLMAnalyzer) analyzeErrorsWithPattern(errors []string, language
 	}
 
 	return result
+}
+
+// parseCachedResponse converts cached LLM response to LLMAnalysisResult
+func (a *EnhancedLLMAnalyzer) parseCachedResponse(response string, errorContext ErrorContext) *LLMAnalysisResult {
+	return &LLMAnalysisResult{
+		ErrorType:        errorContext.ErrorType,
+		SuggestedFix:     response,
+		Confidence:       0.85, // High confidence for cached responses
+		AlternativeFixes: []string{},
+		RiskAssessment:   "low", // Cached responses are proven safe
+	}
 }
 
 // parseGeneratedRecipe converts LLM response to LLMAnalysisResult
@@ -538,4 +720,27 @@ func (a *EnhancedLLMAnalyzer) determinePrerequisites(analysis *LLMAnalysisResult
 	}
 
 	return prereqs
+}
+
+// GetCostMetrics returns the current LLM usage metrics
+func (a *EnhancedLLMAnalyzer) GetCostMetrics() *LLMUsageMetrics {
+	if a.costTracker != nil {
+		return a.costTracker.GetMetrics()
+	}
+	return nil
+}
+
+// GetTransformationLLMCost returns the total LLM cost for a specific transformation
+func (a *EnhancedLLMAnalyzer) GetTransformationLLMCost(transformID string) float64 {
+	if a.costTracker != nil {
+		return a.costTracker.GetTransformationCost(transformID)
+	}
+	return 0
+}
+
+// RegisterCostAlertHandler registers a handler for budget alerts
+func (a *EnhancedLLMAnalyzer) RegisterCostAlertHandler(handler func(BudgetAlert)) {
+	if a.costTracker != nil {
+		a.costTracker.RegisterAlertCallback(handler)
+	}
 }

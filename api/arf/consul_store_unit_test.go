@@ -12,12 +12,14 @@ import (
 
 // MockConsulStore implements an in-memory version for unit testing
 type MockConsulStore struct {
-	data map[string]*TransformationStatus
+	data           map[string]*TransformationStatus
+	activeAttempts map[string][]string // Map of transformation ID to active attempt IDs
 }
 
 func NewMockConsulStore() *MockConsulStore {
 	return &MockConsulStore{
-		data: make(map[string]*TransformationStatus),
+		data:           make(map[string]*TransformationStatus),
+		activeAttempts: make(map[string][]string),
 	}
 }
 
@@ -41,6 +43,69 @@ func (m *MockConsulStore) UpdateWorkflowStage(ctx context.Context, id string, st
 	}
 	status.WorkflowStage = stage
 	return nil
+}
+
+func (m *MockConsulStore) AddHealingAttempt(ctx context.Context, rootID, attemptPath string, attempt *HealingAttempt) error {
+	status, exists := m.data[rootID]
+	if !exists {
+		return fmt.Errorf("transformation %s not found", rootID)
+	}
+	status.Children = append(status.Children, *attempt)
+	status.TotalHealingAttempts++
+	if attempt.Status == "in_progress" {
+		status.ActiveHealingCount++
+		m.activeAttempts[rootID] = append(m.activeAttempts[rootID], attempt.TransformationID)
+	}
+	return nil
+}
+
+func (m *MockConsulStore) UpdateHealingAttempt(ctx context.Context, rootID, attemptPath string, attempt *HealingAttempt) error {
+	// Simple implementation for testing
+	return nil
+}
+
+func (m *MockConsulStore) GetHealingTree(ctx context.Context, rootID string) (*HealingTree, error) {
+	status, exists := m.data[rootID]
+	if !exists {
+		return nil, fmt.Errorf("transformation %s not found", rootID)
+	}
+
+	tree := &HealingTree{
+		RootTransformID: rootID,
+		Attempts:        status.Children,
+		ActiveAttempts:  m.activeAttempts[rootID],
+		TotalAttempts:   status.TotalHealingAttempts,
+	}
+	return tree, nil
+}
+
+func (m *MockConsulStore) GetActiveHealingAttempts(ctx context.Context, rootID string) ([]string, error) {
+	return m.activeAttempts[rootID], nil
+}
+
+func (m *MockConsulStore) CleanupCompletedTransformations(ctx context.Context, maxAge time.Duration) error {
+	// Simple implementation for testing
+	return nil
+}
+
+func (m *MockConsulStore) SetTransformationTTL(ctx context.Context, id string, ttl time.Duration) error {
+	// Simple implementation for testing
+	return nil
+}
+
+func (m *MockConsulStore) GenerateNextAttemptPath(ctx context.Context, rootID string, parentPath string) (string, error) {
+	if parentPath == "" {
+		// Generate root-level path (1, 2, 3, etc.)
+		count := 1
+		for _, attempt := range m.data[rootID].Children {
+			if attempt.ParentAttempt == "" {
+				count++
+			}
+		}
+		return fmt.Sprintf("%d", count), nil
+	}
+	// Generate nested path (1.1, 1.2, etc.)
+	return fmt.Sprintf("%s.1", parentPath), nil
 }
 
 func TestConsulStore_BasicOperations(t *testing.T) {

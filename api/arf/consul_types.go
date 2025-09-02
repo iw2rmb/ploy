@@ -15,6 +15,8 @@ type TransformationStatus struct {
 	CoordinatorMetrics   *HealingCoordinatorMetrics `json:"coordinator_metrics,omitempty"`
 	Progress             *TransformationProgress    `json:"progress,omitempty"`
 	Error                string                     `json:"error,omitempty"`
+	SandboxInfo          *TransformationSandboxInfo `json:"sandbox_info,omitempty"`
+	HealingSummary       *HealingSummary            `json:"healing_summary,omitempty"`
 }
 
 // TransformationProgress represents the progress of a transformation
@@ -26,18 +28,20 @@ type TransformationProgress struct {
 
 // HealingAttempt represents a single healing attempt in the transformation workflow
 type HealingAttempt struct {
-	TransformationID    string             `json:"transformation_id"`
-	AttemptPath         string             `json:"attempt_path"`   // "1.1.2" for nested attempts
-	TriggerReason       string             `json:"trigger_reason"` // build_failure, test_failure, etc.
-	TargetErrors        []string           `json:"target_errors"`  // Specific errors this attempt targets
-	LLMAnalysis         *LLMAnalysisResult `json:"llm_analysis,omitempty"`
-	Status              string             `json:"status"`           // pending, in_progress, completed, failed
-	Result              string             `json:"result,omitempty"` // success, partial_success, failed
-	StartTime           time.Time          `json:"start_time"`
-	EndTime             time.Time          `json:"end_time,omitempty"`
-	NewIssuesDiscovered []string           `json:"new_issues_discovered,omitempty"`
-	Children            []HealingAttempt   `json:"children"`
-	ParentAttempt       string             `json:"parent_attempt,omitempty"` // "1.1" for parent path
+	TransformationID    string                  `json:"transformation_id"`
+	AttemptPath         string                  `json:"attempt_path"`   // "1.1.2" for nested attempts
+	TriggerReason       string                  `json:"trigger_reason"` // build_failure, test_failure, etc.
+	TargetErrors        []string                `json:"target_errors"`  // Specific errors this attempt targets
+	LLMAnalysis         *LLMAnalysisResult      `json:"llm_analysis,omitempty"`
+	Status              string                  `json:"status"`           // pending, in_progress, completed, failed
+	Result              string                  `json:"result,omitempty"` // success, partial_success, failed
+	StartTime           time.Time               `json:"start_time"`
+	EndTime             time.Time               `json:"end_time,omitempty"`
+	NewIssuesDiscovered []string                `json:"new_issues_discovered,omitempty"`
+	Children            []HealingAttempt        `json:"children"`
+	ParentAttempt       string                  `json:"parent_attempt,omitempty"` // "1.1" for parent path
+	Progress            *TransformationProgress `json:"progress,omitempty"`
+	SandboxID           string                  `json:"sandbox_id,omitempty"`
 }
 
 // LLMAnalysisResult represents the result of LLM analysis for error resolution
@@ -67,4 +71,35 @@ type DeploymentMetrics struct {
 	DeploymentStatus string        `json:"deployment_status"`
 	DeploymentTime   time.Duration `json:"deployment_time"`
 	SandboxID        string        `json:"sandbox_id"`
+}
+
+// TransformationSandboxInfo contains sandbox deployment information for a transformation
+type TransformationSandboxInfo struct {
+	PrimarySandbox   *SandboxDeployment  `json:"primary_sandbox,omitempty"`
+	HealingSandboxes []SandboxDeployment `json:"healing_sandboxes,omitempty"`
+}
+
+// SandboxDeployment represents a single sandbox deployment
+type SandboxDeployment struct {
+	TransformationID string    `json:"transformation_id"`
+	SandboxID        string    `json:"sandbox_id"`
+	DeploymentURL    string    `json:"deployment_url"`
+	BuildStatus      string    `json:"build_status"`
+	TestStatus       string    `json:"test_status"`
+	CreatedAt        time.Time `json:"created_at"`
+	LastUpdated      time.Time `json:"last_updated"`
+}
+
+// HealingSummary provides aggregated metrics for healing attempts
+type HealingSummary struct {
+	TotalAttempts   int `json:"total_attempts"`
+	ActiveAttempts  int `json:"active_attempts"`
+	SuccessfulHeals int `json:"successful_heals"`
+	FailedHeals     int `json:"failed_heals"`
+	MaxDepthReached int `json:"max_depth_reached"`
+	// LLM cost tracking
+	TotalLLMCalls   int     `json:"total_llm_calls,omitempty"`
+	TotalLLMTokens  int     `json:"total_llm_tokens,omitempty"`
+	TotalLLMCost    float64 `json:"total_llm_cost,omitempty"`
+	LLMCacheHitRate float64 `json:"llm_cache_hit_rate,omitempty"`
 }

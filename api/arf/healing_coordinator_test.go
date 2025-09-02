@@ -474,3 +474,404 @@ func TestHealingCoordinator_ContextCancellation(t *testing.T) {
 	err = coordinator.SubmitTask(ctx, task)
 	assert.Error(t, err)
 }
+
+// TestCircuitBreaker tests the circuit breaker functionality
+func TestCircuitBreaker(t *testing.T) {
+	t.Run("opens after threshold failures", func(t *testing.T) {
+		config := &HealingConfig{
+			FailureThreshold:    3,
+			CircuitOpenDuration: 100 * time.Millisecond,
+		}
+		cb := NewCircuitBreaker(config)
+
+		// Should be closed initially
+		assert.True(t, cb.CanExecute())
+		state, failures, _ := cb.GetState()
+		assert.Equal(t, "closed", state)
+		assert.Equal(t, 0, failures)
+
+		// Record failures up to threshold
+		cb.RecordFailure()
+		assert.True(t, cb.CanExecute()) // Still closed after 1 failure
+
+		cb.RecordFailure()
+		assert.True(t, cb.CanExecute()) // Still closed after 2 failures
+
+		cb.RecordFailure()
+		assert.False(t, cb.CanExecute()) // Should be open after 3 failures
+
+		state, failures, openUntil := cb.GetState()
+		assert.Equal(t, "open", state)
+		assert.Equal(t, 3, failures)
+		assert.False(t, openUntil.IsZero())
+	})
+
+	t.Run("transitions to half-open after timeout", func(t *testing.T) {
+		config := &HealingConfig{
+			FailureThreshold:    2,
+			CircuitOpenDuration: 50 * time.Millisecond,
+		}
+		cb := NewCircuitBreaker(config)
+
+		// Open the circuit
+		cb.RecordFailure()
+		cb.RecordFailure()
+		assert.False(t, cb.CanExecute())
+
+		// Wait for circuit open duration
+		time.Sleep(60 * time.Millisecond)
+
+		// Should transition to half-open and allow one attempt
+		assert.True(t, cb.CanExecute())
+		state, _, _ := cb.GetState()
+		assert.Equal(t, "half-open", state)
+	})
+
+	t.Run("closes on success in half-open state", func(t *testing.T) {
+		config := &HealingConfig{
+			FailureThreshold:    2,
+			CircuitOpenDuration: 50 * time.Millisecond,
+		}
+		cb := NewCircuitBreaker(config)
+
+		// Open the circuit
+		cb.RecordFailure()
+		cb.RecordFailure()
+
+		// Wait for half-open
+		time.Sleep(60 * time.Millisecond)
+		assert.True(t, cb.CanExecute())
+
+		// Record success
+		cb.RecordSuccess()
+
+		// Should be closed now
+		state, failures, _ := cb.GetState()
+		assert.Equal(t, "closed", state)
+		assert.Equal(t, 0, failures)
+	})
+
+	t.Run("reopens on failure in half-open state", func(t *testing.T) {
+		config := &HealingConfig{
+			FailureThreshold:    2,
+			CircuitOpenDuration: 50 * time.Millisecond,
+		}
+		cb := NewCircuitBreaker(config)
+
+		// Open the circuit
+		cb.RecordFailure()
+		cb.RecordFailure()
+
+		// Wait for half-open
+		time.Sleep(60 * time.Millisecond)
+		assert.True(t, cb.CanExecute())
+
+		// Record failure in half-open
+		cb.RecordFailure()
+
+		// Should be open again
+		assert.False(t, cb.CanExecute())
+		state, _, _ := cb.GetState()
+		assert.Equal(t, "open", state)
+	})
+}
+
+// TestHealingCoordinator_DepthLimits tests depth limit enforcement
+func TestHealingCoordinator_DepthLimits(t *testing.T) {
+	config := &HealingConfig{
+		MaxHealingDepth:     3,
+		MaxParallelAttempts: 5,
+		MaxTotalAttempts:    100,
+		AttemptTimeout:      1 * time.Second,
+		FailureThreshold:    10,
+		CircuitOpenDuration: 1 * time.Minute,
+	}
+
+	coordinator := NewHealingCoordinator(config)
+	ctx := context.Background()
+	err := coordinator.Start(ctx)
+	require.NoError(t, err)
+	defer coordinator.Stop()
+
+	t.Run("accepts tasks within depth limit", func(t *testing.T) {
+		validPaths := []string{"1", "1.1", "1.1.1"}
+
+		for _, path := range validPaths {
+			task := &HealingTask{
+				TransformID: fmt.Sprintf("transform-%s", path),
+				AttemptPath: path,
+				ExecuteFn: func(ctx context.Context) error {
+					return nil
+				},
+			}
+
+			err := coordinator.SubmitTask(ctx, task)
+			assert.NoError(t, err, "should accept path %s", path)
+		}
+	})
+
+	t.Run("rejects tasks exceeding depth limit", func(t *testing.T) {
+		deepPaths := []string{"1.1.1.1", "2.3.4.5", "1.2.3.4.5"}
+
+		for _, path := range deepPaths {
+			task := &HealingTask{
+				TransformID: fmt.Sprintf("transform-%s", path),
+				AttemptPath: path,
+				ExecuteFn: func(ctx context.Context) error {
+					return nil
+				},
+			}
+
+			err := coordinator.SubmitTask(ctx, task)
+			assert.Error(t, err, "should reject path %s", path)
+			assert.Contains(t, err.Error(), "max healing depth")
+		}
+
+		// Check metrics
+		metrics := coordinator.GetMetrics()
+		assert.Greater(t, metrics.DepthLimitReached, 0)
+	})
+}
+
+// TestHealingCoordinator_TotalAttemptsLimit tests total attempts limit enforcement
+func TestHealingCoordinator_TotalAttemptsLimit(t *testing.T) {
+	config := &HealingConfig{
+		MaxHealingDepth:     5,
+		MaxParallelAttempts: 2,
+		MaxTotalAttempts:    5,
+		AttemptTimeout:      1 * time.Second,
+		FailureThreshold:    10,
+		CircuitOpenDuration: 1 * time.Minute,
+	}
+
+	coordinator := NewHealingCoordinator(config)
+	ctx := context.Background()
+	err := coordinator.Start(ctx)
+	require.NoError(t, err)
+	defer coordinator.Stop()
+
+	transformID := "test-transform"
+
+	// Submit tasks up to the limit
+	for i := 0; i < config.MaxTotalAttempts; i++ {
+		task := &HealingTask{
+			TransformID: transformID,
+			AttemptPath: fmt.Sprintf("%d", i+1),
+			ExecuteFn: func(ctx context.Context) error {
+				time.Sleep(10 * time.Millisecond)
+				return nil
+			},
+		}
+
+		err := coordinator.SubmitTask(ctx, task)
+		assert.NoError(t, err, "should accept attempt %d", i+1)
+	}
+
+	// Next attempt should be rejected
+	task := &HealingTask{
+		TransformID: transformID,
+		AttemptPath: "6",
+		ExecuteFn: func(ctx context.Context) error {
+			return nil
+		},
+	}
+
+	err = coordinator.SubmitTask(ctx, task)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "max total attempts")
+
+	// Check metrics
+	metrics := coordinator.GetMetrics()
+	assert.Greater(t, metrics.AttemptsLimitReached, 0)
+}
+
+// TestHealingCoordinator_CircuitBreakerIntegration tests circuit breaker integration
+func TestHealingCoordinator_CircuitBreakerIntegration(t *testing.T) {
+	config := &HealingConfig{
+		MaxHealingDepth:     5,
+		MaxParallelAttempts: 2,
+		MaxTotalAttempts:    100,
+		AttemptTimeout:      100 * time.Millisecond,
+		FailureThreshold:    3,
+		CircuitOpenDuration: 200 * time.Millisecond,
+	}
+
+	coordinator := NewHealingCoordinator(config)
+	ctx := context.Background()
+	err := coordinator.Start(ctx)
+	require.NoError(t, err)
+	defer coordinator.Stop()
+
+	// Submit failing tasks to trip the circuit breaker
+	var failCount int32
+	for i := 0; i < config.FailureThreshold; i++ {
+		task := &HealingTask{
+			TransformID: fmt.Sprintf("fail-%d", i),
+			AttemptPath: fmt.Sprintf("%d", i+1),
+			ExecuteFn: func(ctx context.Context) error {
+				atomic.AddInt32(&failCount, 1)
+				return fmt.Errorf("intentional failure")
+			},
+		}
+
+		err := coordinator.SubmitTask(ctx, task)
+		assert.NoError(t, err)
+	}
+
+	// Wait for tasks to fail
+	time.Sleep(150 * time.Millisecond)
+
+	// Circuit should be open now, new submissions should fail
+	task := &HealingTask{
+		TransformID: "should-be-rejected",
+		AttemptPath: "1",
+		ExecuteFn: func(ctx context.Context) error {
+			return nil
+		},
+	}
+
+	err = coordinator.SubmitTask(ctx, task)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "circuit breaker")
+
+	// Check metrics
+	metrics := coordinator.GetMetrics()
+	assert.Equal(t, "open", metrics.CircuitBreakerState)
+	assert.Equal(t, config.FailureThreshold, metrics.ConsecutiveFailures)
+
+	// Wait for circuit to potentially reset to half-open
+	time.Sleep(config.CircuitOpenDuration + 50*time.Millisecond)
+
+	// Should allow one attempt now (half-open)
+	successTask := &HealingTask{
+		TransformID: "recovery-attempt",
+		AttemptPath: "1",
+		ExecuteFn: func(ctx context.Context) error {
+			return nil // Success to close the circuit
+		},
+	}
+
+	err = coordinator.SubmitTask(ctx, successTask)
+	assert.NoError(t, err)
+
+	// Wait for task to complete
+	time.Sleep(50 * time.Millisecond)
+
+	// Circuit should be closed now
+	metrics = coordinator.GetMetrics()
+	assert.Equal(t, "closed", metrics.CircuitBreakerState)
+}
+
+// TestHealingCoordinator_PerformanceMetrics tests performance metrics tracking
+func TestHealingCoordinator_PerformanceMetrics(t *testing.T) {
+	config := &HealingConfig{
+		MaxHealingDepth:     5,
+		MaxParallelAttempts: 3,
+		MaxTotalAttempts:    100,
+		AttemptTimeout:      1 * time.Second,
+		FailureThreshold:    10,
+		CircuitOpenDuration: 1 * time.Minute,
+	}
+
+	coordinator := NewHealingCoordinator(config)
+	ctx := context.Background()
+	err := coordinator.Start(ctx)
+	require.NoError(t, err)
+	defer coordinator.Stop()
+
+	// Submit mix of successful and failing tasks
+	successCount := 7
+	failCount := 3
+
+	for i := 0; i < successCount; i++ {
+		task := &HealingTask{
+			TransformID: fmt.Sprintf("success-%d", i),
+			AttemptPath: fmt.Sprintf("%d", i+1),
+			ExecuteFn: func(ctx context.Context) error {
+				time.Sleep(50 * time.Millisecond)
+				return nil
+			},
+		}
+		err := coordinator.SubmitTask(ctx, task)
+		assert.NoError(t, err)
+	}
+
+	for i := 0; i < failCount; i++ {
+		task := &HealingTask{
+			TransformID: fmt.Sprintf("fail-%d", i),
+			AttemptPath: fmt.Sprintf("%d", i+1),
+			ExecuteFn: func(ctx context.Context) error {
+				time.Sleep(30 * time.Millisecond)
+				return fmt.Errorf("failure")
+			},
+		}
+		err := coordinator.SubmitTask(ctx, task)
+		assert.NoError(t, err)
+	}
+
+	// Wait for all tasks to complete
+	time.Sleep(200 * time.Millisecond)
+
+	// Check metrics
+	metrics := coordinator.GetMetrics()
+
+	// Verify counts
+	assert.Equal(t, successCount+failCount, metrics.TotalSubmitted)
+	assert.Equal(t, successCount, metrics.CompletedTasks)
+	assert.Equal(t, failCount, metrics.FailedTasks)
+
+	// Verify success rate
+	expectedRate := float64(successCount) / float64(successCount+failCount)
+	assert.InDelta(t, expectedRate, metrics.SuccessRate, 0.01)
+
+	// Verify average duration is calculated
+	assert.Greater(t, metrics.AverageHealingDuration, time.Duration(0))
+	assert.Greater(t, metrics.TotalHealingTime, time.Duration(0))
+
+	// Verify timing makes sense
+	assert.True(t, metrics.AverageHealingDuration > 30*time.Millisecond)
+	assert.True(t, metrics.AverageHealingDuration < 100*time.Millisecond)
+}
+
+// TestHealingCoordinator_TimeoutTracking tests timeout tracking
+func TestHealingCoordinator_TimeoutTracking(t *testing.T) {
+	config := &HealingConfig{
+		MaxHealingDepth:     5,
+		MaxParallelAttempts: 2,
+		MaxTotalAttempts:    100,
+		AttemptTimeout:      50 * time.Millisecond, // Short timeout
+		FailureThreshold:    10,
+		CircuitOpenDuration: 1 * time.Minute,
+	}
+
+	coordinator := NewHealingCoordinator(config)
+	ctx := context.Background()
+	err := coordinator.Start(ctx)
+	require.NoError(t, err)
+	defer coordinator.Stop()
+
+	// Submit task that will timeout
+	task := &HealingTask{
+		TransformID: "timeout-task",
+		AttemptPath: "1",
+		ExecuteFn: func(ctx context.Context) error {
+			select {
+			case <-time.After(200 * time.Millisecond):
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		},
+	}
+
+	err = coordinator.SubmitTask(ctx, task)
+	assert.NoError(t, err)
+
+	// Wait for timeout
+	time.Sleep(100 * time.Millisecond)
+
+	// Check metrics
+	metrics := coordinator.GetMetrics()
+	assert.Greater(t, metrics.TimeoutExceeded, 0)
+	assert.Greater(t, metrics.FailedTasks, 0)
+}

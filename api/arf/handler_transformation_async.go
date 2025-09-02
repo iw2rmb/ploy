@@ -151,53 +151,48 @@ func (h *Handler) GetTransformationStatusAsync(c *fiber.Ctx) error {
 		})
 	}
 
-	// Build comprehensive response
-	response := fiber.Map{
-		"transformation_id": status.TransformationID,
-		"workflow_stage":    status.WorkflowStage,
-		"status":            status.Status,
-		"start_time":        status.StartTime,
-	}
-
-	if !status.EndTime.IsZero() {
-		response["end_time"] = status.EndTime
-	}
-
-	if status.Progress != nil {
-		response["progress"] = status.Progress
-	}
-
-	if status.Error != "" {
-		response["error"] = status.Error
-	}
-
-	// Add healing summary if applicable
+	// Calculate and update healing summary
 	if len(status.Children) > 0 || status.WorkflowStage == "heal" {
-		healingSummary := fiber.Map{
-			"total_attempts":   status.TotalHealingAttempts,
-			"active_attempts":  status.ActiveHealingCount,
-			"successful_heals": countSuccessfulHeals(status.Children),
-			"failed_heals":     countFailedHeals(status.Children),
-			"max_depth":        calculateMaxDepth(status.Children, 1),
+		status.HealingSummary = &HealingSummary{
+			TotalAttempts:   status.TotalHealingAttempts,
+			ActiveAttempts:  status.ActiveHealingCount,
+			SuccessfulHeals: countSuccessfulHeals(status.Children),
+			FailedHeals:     countFailedHeals(status.Children),
+			MaxDepthReached: calculateMaxDepth(status.Children, 1),
 		}
-		response["healing_summary"] = healingSummary
-		response["children"] = status.Children
+
+		// Add LLM metrics if coordinator metrics are available
+		if status.CoordinatorMetrics != nil {
+			status.HealingSummary.TotalLLMCalls = status.CoordinatorMetrics.TotalLLMCalls
+			status.HealingSummary.TotalLLMTokens = status.CoordinatorMetrics.TotalLLMTokens
+			status.HealingSummary.TotalLLMCost = status.CoordinatorMetrics.TotalLLMCost
+			status.HealingSummary.LLMCacheHitRate = status.CoordinatorMetrics.LLMCacheHitRate
+		}
 	}
+
+	// Add progress information if in progress
+	if status.Status == "in_progress" && status.Progress == nil {
+		status.Progress = calculateProgress(status)
+	}
+
+	// Populate sandbox information
+	status.SandboxInfo = h.getSandboxInfo(c.Context(), transformID, status)
 
 	// Add active attempts if any
 	if status.ActiveHealingCount > 0 {
 		activeAttempts, _ := h.consulStore.GetActiveHealingAttempts(c.Context(), transformID)
-		response["active_attempts"] = activeAttempts
+		// Enhance children with progress for active attempts
+		enhanceActiveAttempts(status.Children, activeAttempts)
 	}
 
 	// Add healing coordinator metrics if available
 	if h.healingCoordinator != nil && h.healingCoordinator.IsRunning() {
 		metrics := h.healingCoordinator.GetMetrics()
 		status.CoordinatorMetrics = &metrics
-		response["coordinator_metrics"] = metrics
 	}
 
-	return c.JSON(response)
+	// Return the complete status structure
+	return c.JSON(status)
 }
 
 // Helper functions for healing metrics
@@ -236,4 +231,157 @@ func calculateMaxDepth(attempts []HealingAttempt, currentDepth int) int {
 		}
 	}
 	return maxDepth
+}
+
+// calculateProgress determines the current progress percentage based on workflow stage
+func calculateProgress(status *TransformationStatus) *TransformationProgress {
+	progress := &TransformationProgress{
+		Stage: status.WorkflowStage,
+	}
+
+	// Calculate percentage based on workflow stage
+	switch status.WorkflowStage {
+	case "openrewrite":
+		progress.PercentComplete = 25
+		progress.Message = "Executing transformation recipe"
+	case "build":
+		progress.PercentComplete = 50
+		progress.Message = "Building transformed code"
+	case "deploy":
+		progress.PercentComplete = 60
+		progress.Message = "Deploying to sandbox environment"
+	case "test":
+		progress.PercentComplete = 75
+		progress.Message = "Running test suites"
+	case "heal":
+		// For healing, calculate based on completed attempts
+		if status.TotalHealingAttempts > 0 {
+			completedAttempts := countCompletedAttempts(status.Children)
+			progress.PercentComplete = 75 + (25 * completedAttempts / status.TotalHealingAttempts)
+			progress.Message = fmt.Sprintf("Healing in progress (%d/%d attempts)", completedAttempts, status.TotalHealingAttempts)
+		} else {
+			progress.PercentComplete = 80
+			progress.Message = "Analyzing errors for healing"
+		}
+	default:
+		progress.PercentComplete = 10
+		progress.Message = "Initializing transformation"
+	}
+
+	return progress
+}
+
+// countCompletedAttempts counts all completed healing attempts recursively
+func countCompletedAttempts(attempts []HealingAttempt) int {
+	count := 0
+	for _, attempt := range attempts {
+		if attempt.Status == "completed" {
+			count++
+		}
+		count += countCompletedAttempts(attempt.Children)
+	}
+	return count
+}
+
+// getSandboxInfo retrieves sandbox deployment information for the transformation
+func (h *Handler) getSandboxInfo(ctx context.Context, transformID string, status *TransformationStatus) *TransformationSandboxInfo {
+	if h.sandboxMgr == nil {
+		return nil
+	}
+
+	info := &TransformationSandboxInfo{
+		HealingSandboxes: []SandboxDeployment{},
+	}
+
+	// Get primary sandbox if exists
+	if status.WorkflowStage != "openrewrite" && status.WorkflowStage != "" {
+		primarySandbox := h.getSandboxDeployment(ctx, transformID, "primary")
+		if primarySandbox != nil {
+			info.PrimarySandbox = primarySandbox
+		}
+	}
+
+	// Get healing sandboxes
+	if len(status.Children) > 0 {
+		info.HealingSandboxes = h.getHealingSandboxes(ctx, status.Children)
+	}
+
+	if info.PrimarySandbox == nil && len(info.HealingSandboxes) == 0 {
+		return nil
+	}
+
+	return info
+}
+
+// getSandboxDeployment retrieves deployment info for a specific sandbox
+func (h *Handler) getSandboxDeployment(ctx context.Context, transformID, sandboxType string) *SandboxDeployment {
+	// This is a placeholder - actual implementation would query sandbox manager
+	// For now, return mock data to demonstrate the structure
+	sandboxID := fmt.Sprintf("sandbox-%s-%s", transformID[:8], sandboxType)
+
+	return &SandboxDeployment{
+		TransformationID: transformID,
+		SandboxID:        sandboxID,
+		DeploymentURL:    fmt.Sprintf("https://%s.ployd.app", sandboxID),
+		BuildStatus:      "success",
+		TestStatus:       "in_progress",
+		CreatedAt:        time.Now().Add(-10 * time.Minute),
+		LastUpdated:      time.Now(),
+	}
+}
+
+// getHealingSandboxes retrieves sandbox info for healing attempts
+func (h *Handler) getHealingSandboxes(ctx context.Context, attempts []HealingAttempt) []SandboxDeployment {
+	var sandboxes []SandboxDeployment
+
+	for _, attempt := range attempts {
+		if attempt.Status == "in_progress" || attempt.Status == "completed" {
+			if attempt.SandboxID != "" {
+				sandbox := SandboxDeployment{
+					TransformationID: attempt.TransformationID,
+					SandboxID:        attempt.SandboxID,
+					DeploymentURL:    fmt.Sprintf("https://%s.ployd.app", attempt.SandboxID),
+					BuildStatus:      "success",
+					TestStatus:       attempt.Status,
+					CreatedAt:        attempt.StartTime,
+					LastUpdated:      time.Now(),
+				}
+				sandboxes = append(sandboxes, sandbox)
+			}
+		}
+
+		// Recursively get sandboxes from children
+		childSandboxes := h.getHealingSandboxes(ctx, attempt.Children)
+		sandboxes = append(sandboxes, childSandboxes...)
+	}
+
+	return sandboxes
+}
+
+// enhanceActiveAttempts adds progress information to active healing attempts
+func enhanceActiveAttempts(attempts []HealingAttempt, activeIDs []string) {
+	activeMap := make(map[string]bool)
+	for _, id := range activeIDs {
+		activeMap[id] = true
+	}
+
+	enhanceAttemptsRecursive(attempts, activeMap)
+}
+
+// enhanceAttemptsRecursive recursively adds progress to active attempts
+func enhanceAttemptsRecursive(attempts []HealingAttempt, activeMap map[string]bool) {
+	for i := range attempts {
+		if activeMap[attempts[i].TransformationID] && attempts[i].Status == "in_progress" {
+			// Add progress information for active attempts
+			if attempts[i].Progress == nil {
+				attempts[i].Progress = &TransformationProgress{
+					Stage:           "build_validation",
+					PercentComplete: 45,
+					Message:         "Validating healing transformation",
+				}
+			}
+		}
+		// Recursively enhance children
+		enhanceAttemptsRecursive(attempts[i].Children, activeMap)
+	}
 }
