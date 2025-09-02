@@ -1240,6 +1240,18 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		log.Printf("ARF handler initialized with catalog fallback")
 	}
 
+	// Initialize Consul store for async transformations (required)
+	consulConfig := consulapi.DefaultConfig()
+	consulConfig.Address = cfg.ConsulAddr
+	consulClient, err := consulapi.NewClient(consulConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Consul client for ARF async transformations: %w", err)
+	}
+	keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "ploy/arf/transforms")
+	consulStore := arf.NewConsulHealingStore(consulClient, keyPrefix)
+	handler.SetConsulStore(consulStore)
+	log.Printf("ARF async transformations enabled with Consul store")
+
 	log.Printf("ARF handler initialized successfully")
 	return handler, nil
 }

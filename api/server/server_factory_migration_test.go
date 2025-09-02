@@ -31,9 +31,9 @@ func TestServerMustUseFactoryPattern(t *testing.T) {
 		}
 	}
 
-	// This test will fail until we complete the migration
-	// Currently there are 4 occurrences, we want to reduce to 1 (the fallback in getStorageClient)
-	assert.Equal(t, 1, count, "CreateStorageClientFromConfig should only be used once as a fallback in getStorageClient. Found %d occurrences", count)
+	// Migration completed - CreateStorageClientFromConfig should no longer be used in server.go
+	// All calls have been migrated to use CreateStorageFromFactory
+	assert.Equal(t, 0, count, "CreateStorageClientFromConfig should no longer be used in server.go after migration completion. Found %d occurrences", count)
 }
 
 // TestHealthCheckerUsesFactoryPattern verifies health.go uses factory pattern

@@ -1,6 +1,9 @@
 package arf
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/gofiber/fiber/v2"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
@@ -24,6 +27,8 @@ type Handler struct {
 	sbomAnalyzer   *SyftSBOMAnalyzer
 	// Consul store for transformation status
 	consulStore ConsulStoreInterface
+	// Healing coordination for parallel attempts
+	healingCoordinator *HealingCoordinator
 }
 
 // NewHandler creates a new ARF HTTP handler
@@ -37,6 +42,64 @@ func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr Sand
 		securityEngine: NewSecurityEngine(),
 		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
 	}
+}
+
+// SetConsulStore sets the Consul store and initializes the healing coordinator
+func (h *Handler) SetConsulStore(store ConsulStoreInterface) {
+	h.consulStore = store
+
+	// Initialize healing coordinator with default config when Consul is available
+	config := DefaultHealingConfig()
+	h.healingCoordinator = NewHealingCoordinator(config)
+
+	// Start the coordinator
+	if err := h.healingCoordinator.Start(context.Background()); err != nil {
+		fmt.Printf("Warning: Failed to start healing coordinator: %v\n", err)
+	}
+}
+
+// GetHealingCoordinatorMetrics returns metrics from the healing coordinator
+func (h *Handler) GetHealingCoordinatorMetrics() *HealingCoordinatorMetrics {
+	if h.healingCoordinator != nil {
+		metrics := h.healingCoordinator.GetMetrics()
+		return &metrics
+	}
+	return nil
+}
+
+// GetHealingMetrics provides an HTTP endpoint for healing coordinator metrics
+func (h *Handler) GetHealingMetrics(c *fiber.Ctx) error {
+	if h.healingCoordinator == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Healing coordinator not initialized",
+			"message": "Healing coordinator requires Consul store to be configured",
+		})
+	}
+
+	if !h.healingCoordinator.IsRunning() {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Healing coordinator not running",
+			"message": "Healing coordinator is not currently active",
+		})
+	}
+
+	metrics := h.healingCoordinator.GetMetrics()
+
+	// Create enhanced response with additional context
+	response := fiber.Map{
+		"coordinator_metrics": metrics,
+		"status": fiber.Map{
+			"running":      h.healingCoordinator.IsRunning(),
+			"active_tasks": h.healingCoordinator.GetActiveTaskCount(),
+		},
+		"configuration": fiber.Map{
+			"max_parallel_attempts": 3, // Default from config
+			"max_healing_depth":     5,
+			"max_total_attempts":    20,
+		},
+	}
+
+	return c.JSON(response)
 }
 
 // NewHandlerWithStorage creates a new ARF HTTP handler with storage backend
@@ -125,9 +188,9 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Post("/models/:name/set-default", h.SetDefaultModel)
 
 	// Transformation execution
-	arf.Post("/transform", h.ExecuteTransformation)
+	arf.Post("/transform", h.ExecuteTransformationAsync)
 	arf.Get("/transforms/:id", h.GetTransformationResult)
-	arf.Get("/transforms/:id/status", h.GetTransformationStatus)
+	arf.Get("/transforms/:id/status", h.GetTransformationStatusAsync)
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)
@@ -163,4 +226,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 
 	// Phase 4: Workflow removed - functionality integrated into transform command
 	// Phase 8: Benchmark functionality removed - integrated into transform endpoint
+
+	// Healing coordinator monitoring
+	arf.Get("/healing/metrics", h.GetHealingMetrics)
 }

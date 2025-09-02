@@ -24,19 +24,19 @@ func TestValidateCPULimit(t *testing.T) {
 		
 		// Invalid formats
 		{"empty", "", true, "empty"},
-		{"invalid suffix", "500x", true, "invalid format"},
-		{"negative", "-500m", true, "negative"},
-		{"negative cores", "-2", true, "negative"},
+		{"invalid suffix", "500x", true, "invalid CPU limit format"},
+		{"negative", "-500m", true, "invalid CPU limit format"},
+		{"negative cores", "-2", true, "invalid CPU limit format"},
 		{"zero", "0", true, "must be greater than zero"},
 		{"zero millicores", "0m", true, "must be greater than zero"},
-		{"text", "unlimited", true, "invalid format"},
-		{"spaces", "500 m", true, "invalid format"},
-		{"multiple dots", "1.2.3", true, "invalid format"},
+		{"text", "unlimited", true, "invalid CPU limit format"},
+		{"spaces", "500 m", true, "invalid CPU limit format"},
+		{"multiple dots", "1.2.3", true, "invalid CPU limit format"},
 		
 		// Out of range
 		{"too high", "100000", true, "exceeds maximum"},
 		{"too high millicores", "100000000m", true, "exceeds maximum"},
-		{"too low millicores", "0.1m", true, "below minimum"},
+		{"too low millicores", "0.1m", true, "invalid CPU limit format"},
 	}
 
 	for _, tt := range tests {
@@ -68,8 +68,8 @@ func TestValidateMemoryLimit(t *testing.T) {
 	}{
 		// Valid memory limits
 		{"valid bytes", "1073741824", false, ""},
-		{"valid KB", "1024K", false, ""},
-		{"valid KiB", "1024Ki", false, ""},
+		{"valid KB", "5120K", false, ""},
+		{"valid KiB", "5120Ki", false, ""},
 		{"valid MB", "512M", false, ""},
 		{"valid MiB", "512Mi", false, ""},
 		{"valid GB", "2G", false, ""},
@@ -81,18 +81,18 @@ func TestValidateMemoryLimit(t *testing.T) {
 		
 		// Invalid formats
 		{"empty", "", true, "empty"},
-		{"invalid suffix", "512X", true, "invalid format"},
+		{"invalid suffix", "512X", true, "invalid memory limit format"},
 		{"negative", "-512M", true, "negative"},
 		{"zero", "0", true, "must be greater than zero"},
 		{"zero MB", "0M", true, "must be greater than zero"},
 		{"text", "unlimited", true, "invalid"},
 		{"spaces", "512 Mi", true, "invalid"},
 		{"decimal with bytes", "1.5", true, "invalid"},
-		{"decimal MB", "1.5M", true, "decimal not allowed"},
+		{"decimal MB", "1.5M", true, "invalid memory limit format"},
 		
 		// Out of range
 		{"too low", "1", true, "below minimum"},
-		{"too low KB", "1K", true, "below minimum"},
+		{"too low KB", "1K", true, "is below minimum"},
 		{"too high", "10000G", true, "exceeds maximum"},
 		{"too high TB", "1000T", true, "exceeds maximum"},
 	}

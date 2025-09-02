@@ -8,18 +8,18 @@ The ARF transformation system provides comprehensive status tracking for code tr
 
 ### Critical Issue Analysis
 
-**Current `/v1/arf/transform` Behavior:**
-- Executes transformation synchronously with timeout (5min for OpenRewrite, 30min for others)
-- Returns complete `TransformationResult` with all details when transformation completes
-- Stores results in in-memory `globalTransformStore` for later retrieval via `/transforms/:id`
-- Keeps HTTP connection alive during entire transformation execution
-- Uses timeout with context cancellation, returning 408 status on timeout
+**Current `/v1/arf/transform` Behavior (Async-Only):**
+- Executes transformation asynchronously in background goroutines
+- Returns immediate response with `transformation_id` and status URL
+- Stores status and progress in Consul KV for persistence across restarts
+- HTTP connections return within <1 second, no long-lived connections
+- Background execution handles timeouts and error recovery
 
-**Problems Identified:**
-1. **Long-lived Connections**: Keeps HTTP connections open for minutes, consuming server resources
-2. **Timeout Risk**: Client connections may drop during long transformations
-3. **In-Memory Storage**: Results lost on server restart, not suitable for healing workflows
-4. **No Async Pattern**: No way to start transformation and check back later
+**Previous Synchronous Problems (Resolved):**
+1. ✅ **Long-lived Connections**: Eliminated - responses now return immediately
+2. ✅ **Timeout Risk**: Eliminated - no client connection timeouts 
+3. ✅ **In-Memory Storage**: Replaced with Consul KV persistence
+4. ✅ **No Async Pattern**: Implemented - full async workflow with status tracking
 
 ### Required Changes
 
@@ -106,11 +106,12 @@ func (h *Handler) executeTransformationBackground(transformID string, req *Trans
 }
 ```
 
-#### Breaking Change Notice
-**This is a breaking change to the `/v1/arf/transform` endpoint:**
-- **Old behavior**: Synchronous execution, returns complete `TransformationResult`
-- **New behavior**: Asynchronous execution, returns status link immediately
-- **No backward compatibility**: All clients must be updated to use async pattern
+#### Implementation Complete ✅
+**The `/v1/arf/transform` endpoint has been converted to async-only:**
+- **Current behavior**: Asynchronous execution, returns status link immediately
+- **Legacy synchronous code**: Removed in Phase 1 cleanup
+- **Status tracking**: Use `/v1/arf/transforms/:id/status` to monitor progress
+- **No backward compatibility**: All clients use async pattern
 
 ## Current Implementation Status
 
@@ -528,6 +529,12 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 - [x] Update existing status endpoints to use Consul
 - [x] Add TTL and cleanup mechanisms
 - [x] **Breaking Change Implementation**: Complete replacement of synchronous behavior
+- [x] **Remove Legacy Synchronous Code**: Remove deprecated synchronous `ExecuteTransformation` method and related code ✅ (Completed 2025-09-02)
+  - [x] Remove `api/arf/handler_transformation.go` file containing legacy synchronous implementation
+  - [x] Remove synchronous execution logic and timeout handling
+  - [x] Update documentation to remove all references to synchronous execution
+  - [x] Update tests to remove synchronous execution test cases
+  - [x] Clean up any remaining backward compatibility code paths
 
 ### Phase 2: Enhanced Data Structures (Week 3-4) ✅ COMPLETED
 - [x] Implement nested `HealingAttempt` structure ✅ (Already implemented in consul_types.go)
@@ -535,11 +542,11 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 - [x] Extend `TransformationResult` with healing workflow fields ✅ (Completed 2025-09-02)
 - [x] Add attempt path generation and management ✅ (Completed 2025-09-02)
 
-### Phase 3: Healing Workflow Logic (Week 5-7)
+### Phase 3: Healing Workflow Logic (Week 5-7) ✅ COMPLETED
 - [x] Implement recursive healing workflow execution ✅ (Completed 2025-09-02)
-- [ ] Add build/test validation in sandbox environments
-- [ ] Integrate LLM error analysis for healing suggestions
-- [ ] Create parallel healing attempt coordination
+- [x] Add build/test validation in sandbox environments ✅ (Completed 2025-09-02)
+- [x] Integrate LLM error analysis for healing suggestions ✅ (Completed 2025-09-02)
+- [x] Create parallel healing attempt coordination ✅ (Completed 2025-09-02)
 
 ### Phase 4: Enhanced API Response (Week 8-9)
 - [ ] Update status endpoint with comprehensive healing tree response
