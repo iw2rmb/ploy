@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -180,6 +181,45 @@ func (h *Handler) GetTransformationAnalysis(c *fiber.Ctx) error {
 	analysis := analyzeTransformation(status)
 
 	return c.JSON(analysis)
+}
+
+// GetTransformationReport generates a human-readable markdown report
+func (h *Handler) GetTransformationReport(c *fiber.Ctx) error {
+	transformID := c.Params("id")
+	if transformID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "transformation_id is required",
+		})
+	}
+
+	// Check if consul store is configured
+	if h.consulStore == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Consul store not configured",
+		})
+	}
+
+	// Get transformation status from Consul
+	status, err := h.consulStore.GetTransformationStatus(c.Context(), transformID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to retrieve transformation status",
+			"details": err.Error(),
+		})
+	}
+
+	if status == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Transformation not found",
+		})
+	}
+
+	// Generate markdown report
+	report := generateMarkdownReport(status)
+	contentType := "text/markdown; charset=utf-8"
+
+	c.Set("Content-Type", contentType)
+	return c.SendString(report)
 }
 
 // GetOrphanedTransformations finds transformations with missing parent references
@@ -730,7 +770,6 @@ func calculateROI(totalCost float64, duration time.Duration) float64 {
 	return 0.0
 }
 
-
 func identifySuccessFactors(status *TransformationStatus, totalAttempts int, successRate float64) []string {
 	var factors []string
 
@@ -967,4 +1006,151 @@ func formatDuration(d time.Duration) string {
 	} else {
 		return fmt.Sprintf("%.1fh", d.Hours())
 	}
+}
+
+// generateMarkdownReport creates a comprehensive markdown report
+func generateMarkdownReport(status *TransformationStatus) string {
+	var report strings.Builder
+
+	// Header
+	report.WriteString(fmt.Sprintf("# Transformation Report: %s\n", status.TransformationID))
+	report.WriteString(fmt.Sprintf("Generated: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
+
+	// Summary section
+	report.WriteString("## 📊 Summary\n")
+	report.WriteString(fmt.Sprintf("- **Status**: %s\n", status.Status))
+
+	if !status.StartTime.IsZero() && !status.EndTime.IsZero() {
+		duration := status.EndTime.Sub(status.StartTime)
+		report.WriteString(fmt.Sprintf("- **Duration**: %s\n", formatDuration(duration)))
+	}
+
+	report.WriteString(fmt.Sprintf("- **Workflow Stage**: %s\n", status.WorkflowStage))
+	report.WriteString(fmt.Sprintf("- **Healing Attempts**: %d\n", len(status.Children)))
+	report.WriteString("\n")
+
+	// Timeline section
+	report.WriteString("## ⏱️ Timeline\n")
+	timeline := buildTimeline(status)
+	report.WriteString(formatTimelineMarkdown(timeline))
+	report.WriteString("\n")
+
+	// Healing Attempts section
+	if len(status.Children) > 0 {
+		report.WriteString("## 🔄 Healing Attempts\n")
+		report.WriteString(formatHealingAttemptsMarkdown(status.Children))
+		report.WriteString("\n")
+	}
+
+	// Code Changes section
+	report.WriteString("## 📝 Code Changes\n")
+	report.WriteString(formatCodeChangesMarkdown(status.Children))
+	report.WriteString("\n")
+
+	// Cost Analysis section
+	if status.CoordinatorMetrics != nil {
+		report.WriteString("## 💰 Cost Analysis\n")
+		report.WriteString(formatCostAnalysisMarkdown(status.CoordinatorMetrics))
+		report.WriteString("\n")
+	}
+
+	return report.String()
+}
+
+// formatTimelineMarkdown formats timeline data as markdown
+func formatTimelineMarkdown(timeline *TransformationTimeline) string {
+	var md strings.Builder
+
+	md.WriteString("### Step-by-Step Execution\n")
+
+	for _, entry := range timeline.Timeline {
+		duration := ""
+		if entry.Duration != nil && *entry.Duration > 0 {
+			duration = fmt.Sprintf(" [%s]", formatDuration(*entry.Duration))
+		}
+
+		md.WriteString(fmt.Sprintf("- **%s**%s **%s** - %s\n",
+			entry.Timestamp.Format("15:04:05"), duration, entry.EventType, entry.Status))
+
+		if entry.Description != "" {
+			md.WriteString(fmt.Sprintf("  - %s\n", entry.Description))
+		}
+	}
+
+	return md.String()
+}
+
+// formatHealingAttemptsMarkdown formats healing attempts as markdown
+func formatHealingAttemptsMarkdown(attempts []HealingAttempt) string {
+	var md strings.Builder
+
+	var formatAttempt func([]HealingAttempt, int)
+	formatAttempt = func(attempts []HealingAttempt, depth int) {
+		for _, attempt := range attempts {
+			indent := strings.Repeat("  ", depth)
+
+			md.WriteString(fmt.Sprintf("%s- **Path**: %s\n", indent, attempt.AttemptPath))
+			md.WriteString(fmt.Sprintf("%s  - **Trigger**: %s\n", indent, attempt.TriggerReason))
+			md.WriteString(fmt.Sprintf("%s  - **Status**: %s\n", indent, attempt.Status))
+
+			if attempt.LLMAnalysis != nil {
+				md.WriteString(fmt.Sprintf("%s  - **LLM Analysis**: %.0f%% confidence - %s\n",
+					indent, attempt.LLMAnalysis.Confidence*100, attempt.LLMAnalysis.SuggestedFix))
+			}
+
+			if len(attempt.TargetErrors) > 0 {
+				md.WriteString(fmt.Sprintf("%s  - **Target Errors**: %s\n", indent,
+					strings.Join(attempt.TargetErrors, ", ")))
+			}
+
+			if len(attempt.Children) > 0 {
+				formatAttempt(attempt.Children, depth+1)
+			}
+
+			md.WriteString("\n")
+		}
+	}
+
+	formatAttempt(attempts, 0)
+	return md.String()
+}
+
+// formatCodeChangesMarkdown formats code changes as markdown
+func formatCodeChangesMarkdown(attempts []HealingAttempt) string {
+	var md strings.Builder
+
+	md.WriteString("### Files Modified\n")
+
+	var collectChanges func([]HealingAttempt)
+	collectChanges = func(attempts []HealingAttempt) {
+		for _, attempt := range attempts {
+			if attempt.LLMAnalysis != nil && attempt.LLMAnalysis.SuggestedFix != "" {
+				md.WriteString(fmt.Sprintf("- **Change**: %s\n", attempt.LLMAnalysis.SuggestedFix))
+			}
+			collectChanges(attempt.Children)
+		}
+	}
+
+	collectChanges(attempts)
+
+	if md.Len() == len("### Files Modified\n") {
+		md.WriteString("- No detailed file changes recorded\n")
+	}
+
+	return md.String()
+}
+
+// formatCostAnalysisMarkdown formats cost analysis as markdown
+func formatCostAnalysisMarkdown(metrics *HealingCoordinatorMetrics) string {
+	var md strings.Builder
+
+	md.WriteString(fmt.Sprintf("- **Total LLM calls**: %d\n", metrics.TotalLLMCalls))
+	md.WriteString(fmt.Sprintf("- **Total tokens**: %d\n", metrics.TotalLLMTokens))
+	md.WriteString(fmt.Sprintf("- **Estimated cost**: $%.2f\n", metrics.TotalLLMCost))
+
+	if metrics.LLMCacheHitRate > 0 {
+		md.WriteString(fmt.Sprintf("- **Cache hit rate**: %.1f%%\n", metrics.LLMCacheHitRate*100))
+	}
+
+	return md.String()
 }

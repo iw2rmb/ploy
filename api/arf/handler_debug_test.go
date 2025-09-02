@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -480,5 +481,132 @@ func TestDebugEndpointsPerformance(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
 		assert.Less(t, duration, 100*time.Millisecond, "Response should be under 100ms for 100 nodes")
+	})
+}
+
+// RED Phase: Write failing tests for GetTransformationReport
+func TestGetTransformationReport(t *testing.T) {
+	mockStore := NewMockConsulStore()
+	handler := &Handler{consulStore: mockStore}
+
+	app := fiber.New()
+	app.Get("/v1/arf/transforms/:id/report", handler.GetTransformationReport)
+
+	t.Run("returns markdown report by default", func(t *testing.T) {
+		transformID := uuid.New().String()
+		now := time.Now()
+
+		// Create comprehensive test data
+		status := &TransformationStatus{
+			TransformationID: transformID,
+			WorkflowStage:    "heal",
+			Status:           "completed",
+			StartTime:        now.Add(-10 * time.Minute),
+			EndTime:          now,
+			Children: []HealingAttempt{
+				{
+					TransformationID: transformID,
+					AttemptPath:      "1",
+					TriggerReason:    "build_failure",
+					Status:           "completed",
+					Result:           "success",
+					StartTime:        now.Add(-8 * time.Minute),
+					EndTime:          now.Add(-5 * time.Minute),
+					TargetErrors:     []string{"compilation error in Main.java"},
+					LLMAnalysis: &LLMAnalysisResult{
+						ErrorType:      "syntax_error",
+						Confidence:     0.95,
+						SuggestedFix:   "Add missing semicolon",
+						RiskAssessment: "low",
+					},
+				},
+			},
+			CoordinatorMetrics: &HealingCoordinatorMetrics{
+				TotalLLMCalls:  5,
+				TotalLLMTokens: 1500,
+				TotalLLMCost:   0.15,
+			},
+		}
+
+		mockStore.StoreTransformationStatus(context.Background(), transformID, status)
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/v1/arf/transforms/%s/report", transformID), nil)
+		resp, err := app.Test(req)
+
+		assert.NoError(t, err)
+		assert.Equal(t, fiber.StatusOK, resp.StatusCode)
+		assert.Equal(t, "text/markdown; charset=utf-8", resp.Header.Get("Content-Type"))
+
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+
+		report := string(body)
+		// Verify markdown report contains key sections
+		assert.Contains(t, report, "# Transformation Report:")
+		assert.Contains(t, report, "## 📊 Summary")
+		assert.Contains(t, report, "## ⏱️ Timeline")
+		assert.Contains(t, report, "## 🔄 Healing Attempts")
+		assert.Contains(t, report, "## 💰 Cost Analysis")
+
+		// Verify specific data is included
+		assert.Contains(t, report, transformID)
+		assert.Contains(t, report, "build_failure")
+		assert.Contains(t, report, "Add missing semicolon")
+		assert.Contains(t, report, "$0.15")
+		assert.Contains(t, report, "**Total LLM calls**: 5")
+	})
+
+	t.Run("returns 404 when transformation not found", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/v1/arf/transforms/non-existent/report", nil)
+		resp, err := app.Test(req)
+
+		assert.NoError(t, err)
+		assert.Equal(t, fiber.StatusNotFound, resp.StatusCode)
+	})
+
+	t.Run("returns error when consul store not configured", func(t *testing.T) {
+		handlerNoConsul := &Handler{consulStore: nil}
+		appNoConsul := fiber.New()
+		appNoConsul.Get("/v1/arf/transforms/:id/report", handlerNoConsul.GetTransformationReport)
+
+		req := httptest.NewRequest("GET", "/v1/arf/transforms/some-id/report", nil)
+		resp, err := appNoConsul.Test(req)
+
+		assert.NoError(t, err)
+		assert.Equal(t, fiber.StatusInternalServerError, resp.StatusCode)
+	})
+
+	t.Run("includes detailed diff information", func(t *testing.T) {
+		transformID := uuid.New().String()
+		status := &TransformationStatus{
+			TransformationID: transformID,
+			Status:           "completed",
+			StartTime:        time.Now().Add(-10 * time.Minute),
+			EndTime:          time.Now(),
+			Children: []HealingAttempt{
+				{
+					TransformationID: transformID,
+					AttemptPath:      "1",
+					Status:           "completed",
+					// Mock file changes would be stored here in real implementation
+					LLMAnalysis: &LLMAnalysisResult{
+						SuggestedFix: "Fixed import statement in com.example.Main",
+					},
+				},
+			},
+		}
+
+		mockStore.StoreTransformationStatus(context.Background(), transformID, status)
+
+		req := httptest.NewRequest("GET", fmt.Sprintf("/v1/arf/transforms/%s/report", transformID), nil)
+		resp, err := app.Test(req)
+
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+
+		report := string(body)
+		assert.Contains(t, report, "## 📝 Code Changes")
+		assert.Contains(t, report, "Fixed import statement")
 	})
 }
