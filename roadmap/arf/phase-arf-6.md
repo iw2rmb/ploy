@@ -1,6 +1,7 @@
-# Phase ARF-6: Intelligent Dependency Resolution 📋 PLANNED
+# Phase ARF-6: Intelligent Dependency Resolution ⏳ PARTIALLY IMPLEMENTED
 
-**Prerequisites**: Phases ARF-1 through ARF-4 completed (framework and LLM integration)
+**Status**: Several components implemented via healing workflow (2025-09-02)
+**Prerequisites**: Phases ARF-1 through ARF-4 completed (framework and LLM integration) ✅
 **Dependencies**: Web search APIs, dependency repositories (Maven Central, npm, PyPI), knowledge base infrastructure
 
 ## Overview
@@ -25,15 +26,30 @@ Current manual resolution requires:
 - Deep understanding of dependency graphs
 - Knowledge of framework migration patterns
 
+## Implementation Status
+
+### Completed Components (via Healing Workflow)
+- ✅ **Dependency Conflict Detection**: Implemented through healing workflow error analysis
+- ✅ **Iterative Resolution**: Recursive healing attempts with child transformations
+- ✅ **LLM-based Solution Generation**: OpenRewrite recipe generation via LLM integration
+- ✅ **Error Pattern Recognition**: Healing workflow identifies and categorizes build/test failures
+- ✅ **Parallel Testing**: Concurrent healing attempts via HealingCoordinator
+
+### Pending Components
+- ❌ **Minimal Reproduction Environment Generator**: Not yet implemented
+- ❌ **Web Intelligence Integration**: Stack Overflow, GitHub search not integrated
+- ❌ **Version Compatibility Matrix**: Automated version discovery pending
+- ❌ **Knowledge Base Persistence**: Pattern learning exists but not persistent
+
 ## Technical Architecture
 
 ### Core Components
 
 #### 1. Dependency Graph Analyzer
 - **Comprehensive Graph Building**: Complete dependency tree analysis including transitive dependencies
-- **Conflict Detection**: Identify version conflicts, diamond dependencies, excluded transitives
+- **Conflict Detection**: Identify version conflicts, diamond dependencies, excluded transitives ✅ (Partial via healing)
 - **Impact Prediction**: Analyze cascading effects of version changes
-- **Resolution Strategy Generation**: Create ordered resolution plans based on dependency relationships
+- **Resolution Strategy Generation**: Create ordered resolution plans based on dependency relationships ✅ (Via healing)
 
 #### 2. Minimal Reproduction Environment Generator
 - **Code Extraction**: Isolate only code relevant to dependency issue (target: <5% of original)

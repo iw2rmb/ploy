@@ -577,12 +577,44 @@ func analyzeTransformation(status *TransformationStatus) *TransformationAnalysis
 		totalDuration = time.Since(status.StartTime)
 	}
 
+	// Calculate success rate with zero-attempt handling
+	var successRate float64
+	if totalAttempts > 0 {
+		successRate = float64(successCount) / float64(totalAttempts)
+	} else if status.Status == "completed" {
+		// No healing attempts but transformation completed = 100% success
+		successRate = 1.0
+	}
+
+	// Calculate max depth
+	maxDepth := calculateMaxDepth(status.Children, 0)
+
+	// Find most common error
+	mostCommonError := ""
+	if len(status.Children) > 0 {
+		errorCounts := make(map[string]int)
+		for _, attempt := range status.Children {
+			if attempt.TriggerReason != "" {
+				errorCounts[attempt.TriggerReason]++
+			}
+		}
+		maxCount := 0
+		for errorType, count := range errorCounts {
+			if count > maxCount {
+				maxCount = count
+				mostCommonError = errorType
+			}
+		}
+	}
+
 	analysis.Summary = AnalysisSummary{
 		TransformationID:   status.TransformationID,
 		Status:             status.Status,
 		TotalDurationHours: math.Round(totalDuration.Hours()*10) / 10, // Round to 1 decimal place
 		TotalAttempts:      totalAttempts,
-		SuccessRate:        float64(successCount) / float64(totalAttempts),
+		SuccessRate:        successRate,
+		MaxDepthReached:    maxDepth,
+		MostCommonError:    mostCommonError,
 		FinalResult:        status.Status,
 	}
 
@@ -592,20 +624,43 @@ func analyzeTransformation(status *TransformationStatus) *TransformationAnalysis
 		analysis.ErrorPatterns = []HealingErrorPattern{}
 	}
 
-	// Cost analysis (simplified)
+	// Enhanced cost analysis with zero-division protection
+	totalCost := estimateCost(status.Children)
+	infraCost := estimateInfrastructureCost(totalDuration)
+
 	analysis.CostAnalysis = CostBreakdown{
-		TotalCost:      estimateCost(status.Children),
-		CostPerAttempt: estimateCost(status.Children) / float64(totalAttempts),
+		TotalCost:          totalCost + infraCost,
+		LLMCost:            estimateLLMCost(status.Children),
+		InfrastructureCost: infraCost,
+		CostPerAttempt:     0.0, // Initialize to zero
+		CostPerSuccess:     0.0, // Initialize to zero
+		ROI:                calculateROI(totalCost+infraCost, totalDuration),
+	}
+
+	// Safe division with zero checks
+	if totalAttempts > 0 {
+		analysis.CostAnalysis.CostPerAttempt = analysis.CostAnalysis.TotalCost / float64(totalAttempts)
 	}
 	if successCount > 0 {
 		analysis.CostAnalysis.CostPerSuccess = analysis.CostAnalysis.TotalCost / float64(successCount)
+	} else if status.Status == "completed" && totalAttempts == 0 {
+		// Successful transformation without healing attempts
+		analysis.CostAnalysis.CostPerSuccess = analysis.CostAnalysis.TotalCost
 	}
 
 	// Performance metrics
 	analysis.PerformanceMetrics = analyzePerformance(status.Children)
 
+	// Add time to first success for completed transformations
+	if status.Status == "completed" {
+		analysis.PerformanceMetrics.TimeToFirstSuccess = totalDuration
+	}
+
 	// Generate recommendations
 	analysis.Recommendations = generateRecommendations(analysis)
+
+	// Add success factors for well-performing transformations
+	analysis.SuccessFactors = identifySuccessFactors(status, totalAttempts, successRate)
 
 	return analysis
 }
@@ -634,15 +689,78 @@ func estimateCost(attempts []HealingAttempt) float64 {
 	baseCost := float64(countAttempts(attempts)) * 0.10
 
 	// Add estimated LLM costs
-	llmCalls := 0
-	for _, attempt := range attempts {
-		if attempt.LLMAnalysis != nil {
-			llmCalls++
-		}
-	}
-	llmCost := float64(llmCalls) * 0.05 // $0.05 per LLM call estimate
+	llmCost := estimateLLMCost(attempts)
 
 	return baseCost + llmCost
+}
+
+func estimateLLMCost(attempts []HealingAttempt) float64 {
+	llmCalls := 0
+	var estimateLLMCalls func([]HealingAttempt)
+	estimateLLMCalls = func(attempts []HealingAttempt) {
+		for _, attempt := range attempts {
+			if attempt.LLMAnalysis != nil {
+				llmCalls++
+			}
+			// Recurse into children
+			estimateLLMCalls(attempt.Children)
+		}
+	}
+
+	estimateLLMCalls(attempts)
+	return float64(llmCalls) * 0.05 // $0.05 per LLM call estimate
+}
+
+func estimateInfrastructureCost(duration time.Duration) float64 {
+	// Estimate based on compute time: $0.10 per hour for container execution
+	hours := duration.Hours()
+	if hours < 0.1 {
+		hours = 0.1 // Minimum billing
+	}
+	return hours * 0.10
+}
+
+func calculateROI(totalCost float64, duration time.Duration) float64 {
+	// Estimate ROI based on developer time saved
+	// Assume manual migration would take 4 hours at $50/hour = $200
+	manualCost := 200.0
+	if totalCost > 0 {
+		return ((manualCost - totalCost) / totalCost) * 100
+	}
+	return 0.0
+}
+
+
+func identifySuccessFactors(status *TransformationStatus, totalAttempts int, successRate float64) []string {
+	var factors []string
+
+	// Check for immediate success
+	if totalAttempts == 0 && status.Status == "completed" {
+		factors = append(factors, "Clean transformation requiring no healing attempts")
+		factors = append(factors, "Well-structured codebase with compatible patterns")
+		factors = append(factors, "Appropriate recipe selection for target transformation")
+	}
+
+	// Check for high success rate
+	if successRate >= 0.8 {
+		factors = append(factors, "High healing success rate indicates robust error recovery")
+	}
+
+	// Check for fast execution
+	var duration time.Duration
+	if !status.EndTime.IsZero() {
+		duration = status.EndTime.Sub(status.StartTime)
+	} else {
+		duration = time.Since(status.StartTime)
+	}
+
+	if duration < 1*time.Minute {
+		factors = append(factors, "Fast execution time indicates efficient processing")
+	} else if duration < 5*time.Minute {
+		factors = append(factors, "Reasonable execution time for transformation complexity")
+	}
+
+	return factors
 }
 
 func analyzeErrorPatterns(attempts []HealingAttempt) []HealingErrorPattern {
@@ -736,10 +854,29 @@ func analyzePerformance(attempts []HealingAttempt) PerformanceAnalysis {
 func generateRecommendations(analysis *TransformationAnalysis) []string {
 	var recommendations []string
 
-	// Check success rate
+	// Handle successful transformations with no healing attempts
+	if analysis.Summary.TotalAttempts == 0 && analysis.Summary.Status == "completed" {
+		recommendations = append(recommendations, "Transformation performing within normal parameters.")
+		recommendations = append(recommendations, "Excellent success rate with no healing required.")
+
+		if analysis.Summary.TotalDurationHours < 0.5 {
+			recommendations = append(recommendations, "Fast execution time - consider using this pattern as a template.")
+		}
+
+		if analysis.CostAnalysis.ROI > 50 {
+			recommendations = append(recommendations, "High ROI transformation - significant cost savings achieved.")
+		}
+
+		return recommendations
+	}
+
+	// Check success rate for transformations with healing attempts
 	if analysis.Summary.SuccessRate < 0.5 {
 		recommendations = append(recommendations,
 			"Low success rate detected. Consider reviewing healing strategies and error patterns.")
+	} else if analysis.Summary.SuccessRate >= 0.8 {
+		recommendations = append(recommendations,
+			"High success rate achieved - healing strategies are working effectively.")
 	}
 
 	// Check for recurring errors
@@ -753,12 +890,36 @@ func generateRecommendations(analysis *TransformationAnalysis) []string {
 	if analysis.CostAnalysis.CostPerSuccess > 10.0 {
 		recommendations = append(recommendations,
 			"High cost per successful heal. Consider optimizing LLM usage or healing strategies.")
+	} else if analysis.CostAnalysis.CostPerSuccess < 1.0 {
+		recommendations = append(recommendations,
+			"Very cost-effective transformation. Current approach is optimal.")
 	}
 
 	// Check performance
 	if analysis.PerformanceMetrics.P95AttemptDuration > 30*time.Minute {
 		recommendations = append(recommendations,
 			"Long-running healing attempts detected. Consider adding timeouts or parallel processing.")
+	}
+
+	// Check transformation duration
+	if analysis.Summary.TotalDurationHours > 2.0 {
+		recommendations = append(recommendations,
+			"Long transformation duration. Consider breaking into smaller chunks or optimizing recipe selection.")
+	}
+
+	// Check healing depth
+	if analysis.Summary.MaxDepthReached > 5 {
+		recommendations = append(recommendations,
+			"Deep healing tree detected. Consider reviewing initial recipe selection to reduce complexity.")
+	}
+
+	// ROI recommendations
+	if analysis.CostAnalysis.ROI > 100 {
+		recommendations = append(recommendations,
+			"Excellent ROI achieved. This transformation approach is highly cost-effective.")
+	} else if analysis.CostAnalysis.ROI < 0 {
+		recommendations = append(recommendations,
+			"Negative ROI detected. Consider optimizing costs or reviewing transformation necessity.")
 	}
 
 	if len(recommendations) == 0 {

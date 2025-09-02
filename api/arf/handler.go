@@ -260,9 +260,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/sbom/report", h.GetSBOMReport)
 	arf.Get("/sbom/:id", h.GetSBOMReport) // Support route param
 
-	// Phase 4: Workflow removed - functionality integrated into transform command
-	// Phase 8: Benchmark functionality removed - integrated into transform endpoint
-
 	// Healing coordinator monitoring
 	arf.Get("/healing/metrics", h.GetHealingMetrics)
 }

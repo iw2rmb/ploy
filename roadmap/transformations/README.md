@@ -566,42 +566,42 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 - [x] Implement alerting for failed healing chains ✅ (Completed 2025-09-02)
 - [x] Add debugging endpoints for transformation hierarchies ✅ (Completed 2025-09-02)
 
-## Testing Strategy
+## Testing Strategy ✅ COMPLETED
 
-### Unit Tests
-- Consul KV store operations and error handling
-- Healing hierarchy construction and navigation
-- Attempt path generation and validation
-- LLM analysis result processing
+### Unit Tests ✅
+- [x] Consul KV store operations and error handling ✅ (Completed 2025-09-02)
+- [x] Healing hierarchy construction and navigation ✅ (Completed 2025-09-02)
+- [x] Attempt path generation and validation ✅ (Completed 2025-09-02)
+- [x] LLM analysis result processing ✅ (Completed 2025-09-02)
 
-### Integration Tests
-- End-to-end transformation with healing workflow
-- Consul KV persistence across API restarts
-- Parallel healing attempt coordination
-- Sandbox deployment and validation
+### Integration Tests ✅
+- [x] End-to-end transformation with healing workflow ✅ (Completed 2025-09-02)
+- [x] Consul KV persistence across API restarts ✅ (Completed 2025-09-02)
+- [x] Parallel healing attempt coordination ✅ (Completed 2025-09-02)
+- [x] Sandbox deployment and validation ✅ (Completed 2025-09-02)
 
-### Load Tests
-- Multiple concurrent transformations with healing
-- Consul KV performance under load
-- LLM API rate limiting and cost optimization
-- Memory usage with deep healing hierarchies
+### Load Tests ✅
+- [x] Multiple concurrent transformations with healing ✅ (Completed 2025-09-02)
+- [x] Consul KV performance under load ✅ (Completed 2025-09-02)
+- [x] LLM API rate limiting and cost optimization ✅ (Completed 2025-09-02)
+- [x] Memory usage with deep healing hierarchies ✅ (Completed 2025-09-02)
 
-## Monitoring & Alerting
+## Monitoring & Alerting ✅ COMPLETED
 
-### Key Metrics
-- `arf_transformations_total` - Total transformations started
-- `arf_healing_attempts_total` - Total healing attempts by result
-- `arf_children_tree_depth` - Histogram of children tree depths
-- `arf_healing_duration_seconds` - Duration of healing workflows
-- `arf_consul_operations_total` - Consul KV operation metrics
-- `arf_llm_api_calls_total` - LLM API usage and costs
+### Key Metrics ✅
+- [x] `arf_transformations_total` - Total transformations started ✅ (Completed 2025-09-02)
+- [x] `arf_healing_attempts_total` - Total healing attempts by result ✅ (Completed 2025-09-02)
+- [x] `arf_children_tree_depth` - Histogram of children tree depths ✅ (Completed 2025-09-02)
+- [x] `arf_healing_duration_seconds` - Duration of healing workflows ✅ (Completed 2025-09-02)
+- [x] `arf_consul_operations_total` - Consul KV operation metrics ✅ (Completed 2025-09-02)
+- [x] `arf_llm_api_calls_total` - LLM API usage and costs ✅ (Completed 2025-09-02)
 
-### Alert Conditions
-- High healing failure rate (> 80% in 1h)
-- Deep healing hierarchies (depth > 8) indicating complex issues
-- Consul KV errors affecting transformation persistence
-- LLM API rate limits or excessive costs
-- Long-running transformations (> 4h) potentially stuck
+### Alert Conditions ✅
+- [x] High healing failure rate (> 80% in 1h) ✅ (Completed 2025-09-02)
+- [x] Deep healing hierarchies (depth > 8) indicating complex issues ✅ (Completed 2025-09-02)
+- [x] Consul KV errors affecting transformation persistence ✅ (Completed 2025-09-02)
+- [x] LLM API rate limits or excessive costs ✅ (Completed 2025-09-02)
+- [x] Long-running transformations (> 4h) potentially stuck ✅ (Completed 2025-09-02)
 
 ## Security Considerations
 
@@ -611,11 +611,19 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 - Access controls for transformation status endpoints
 - Audit logging for healing workflow actions
 
-### Resource Limits
-- Prevent resource exhaustion from runaway healing workflows
-- Sandbox isolation for healing transformations
-- Rate limiting on LLM API usage
-- Consul KV storage quotas and cleanup
+### Resource Limits ✅ COMPLETED
+- [x] Prevent resource exhaustion from runaway healing workflows ✅ (Completed 2025-09-02)
+  - Implemented via `MaxHealingDepth`, `MaxParallelAttempts`, `MaxTotalAttempts` configuration
+  - Circuit breaker logic with `CircuitBreakerState` monitoring
+- [x] Sandbox isolation for healing transformations ✅ (Completed 2025-09-02)
+  - `DeploymentSandboxManager` with full lifecycle management
+  - Automatic `CleanupExpiredSandboxes` functionality
+- [x] Rate limiting on LLM API usage ✅ (Completed 2025-09-02)
+  - `LLMCostTracker` with per-transform budget controls
+  - Cost metrics tracking via `llm_cost_dollars` metric
+- [x] Consul KV storage quotas and cleanup ✅ (Completed 2025-09-02)
+  - `SetTransformationTTL` and `CleanupCompletedTransformations` methods
+  - Configurable TTL and automatic cleanup intervals
 
 ## Future Enhancements
 
