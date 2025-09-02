@@ -15,17 +15,17 @@ type VulnerabilityScanner struct {
 
 // ScanResult represents the result of a vulnerability scan
 type ScanResult struct {
-	Passed          bool                    `json:"passed"`
-	Severity        string                  `json:"severity"`
-	VulnCount       int                     `json:"vulnerability_count"`
-	FixableCount    int                     `json:"fixable_count"`
-	HighSeverity    bool                    `json:"high_severity"`
-	CriticalCount   int                     `json:"critical_count"`
-	HighCount       int                     `json:"high_count"`
-	MediumCount     int                     `json:"medium_count"`
-	LowCount        int                     `json:"low_count"`
-	Vulnerabilities []harbor.Vulnerability  `json:"vulnerabilities"`
-	Report          *harbor.ScanReport      `json:"report,omitempty"`
+	Passed          bool                   `json:"passed"`
+	Severity        string                 `json:"severity"`
+	VulnCount       int                    `json:"vulnerability_count"`
+	FixableCount    int                    `json:"fixable_count"`
+	HighSeverity    bool                   `json:"high_severity"`
+	CriticalCount   int                    `json:"critical_count"`
+	HighCount       int                    `json:"high_count"`
+	MediumCount     int                    `json:"medium_count"`
+	LowCount        int                    `json:"low_count"`
+	Vulnerabilities []harbor.Vulnerability `json:"vulnerabilities"`
+	Report          *harbor.ScanReport     `json:"report,omitempty"`
 }
 
 // NewVulnerabilityScanner creates a new vulnerability scanner
@@ -47,22 +47,22 @@ func (v *VulnerabilityScanner) ScanAndValidate(projectName, repository, tag stri
 	if err := v.client.TriggerScan(projectName, repository, tag); err != nil {
 		return nil, fmt.Errorf("failed to trigger vulnerability scan: %w", err)
 	}
-	
+
 	// Wait for scan to complete with timeout
 	report, err := v.waitForScanComplete(projectName, repository, tag, 5*time.Minute)
 	if err != nil {
 		return nil, fmt.Errorf("vulnerability scan failed: %w", err)
 	}
-	
+
 	// Analyze scan results
 	result := v.analyzeScanReport(report)
-	
+
 	// Apply severity threshold policy
 	if v.exceedsSeverityThreshold(result) {
 		result.Passed = false
 		return result, fmt.Errorf("image contains vulnerabilities exceeding %s severity threshold", v.severityThreshold)
 	}
-	
+
 	result.Passed = true
 	return result, nil
 }
@@ -81,7 +81,7 @@ func (v *VulnerabilityScanner) analyzeScanReport(report *harbor.ScanReport) *Sca
 			FixableCount: 0,
 		}
 	}
-	
+
 	result := &ScanResult{
 		Severity:        report.Severity,
 		VulnCount:       len(report.Vulnerabilities),
@@ -89,21 +89,21 @@ func (v *VulnerabilityScanner) analyzeScanReport(report *harbor.ScanReport) *Sca
 		Vulnerabilities: report.Vulnerabilities,
 		Report:          report,
 	}
-	
+
 	// Count vulnerabilities by severity
 	severityCounts := make(map[string]int)
 	for _, vuln := range report.Vulnerabilities {
 		severityCounts[vuln.Severity]++
 	}
-	
+
 	result.CriticalCount = severityCounts["CRITICAL"]
 	result.HighCount = severityCounts["HIGH"]
 	result.MediumCount = severityCounts["MEDIUM"]
 	result.LowCount = severityCounts["LOW"]
-	
+
 	// Check if has high severity vulnerabilities
 	result.HighSeverity = result.CriticalCount > 0 || result.HighCount > 0
-	
+
 	return result
 }
 
@@ -148,15 +148,15 @@ func (v *VulnerabilityScanner) GetVulnerabilitySummary(result *ScanResult) strin
 	if result == nil || result.VulnCount == 0 {
 		return "No vulnerabilities found"
 	}
-	
-	summary := fmt.Sprintf("Found %d vulnerabilities (%d fixable)", 
+
+	summary := fmt.Sprintf("Found %d vulnerabilities (%d fixable)",
 		result.VulnCount, result.FixableCount)
-	
+
 	if result.CriticalCount > 0 || result.HighCount > 0 || result.MediumCount > 0 || result.LowCount > 0 {
 		summary += fmt.Sprintf(" - Critical: %d, High: %d, Medium: %d, Low: %d",
 			result.CriticalCount, result.HighCount, result.MediumCount, result.LowCount)
 	}
-	
+
 	return summary
 }
 

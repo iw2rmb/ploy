@@ -16,7 +16,7 @@ type DeployConfig struct {
 	Lane          string
 	MainClass     string
 	SHA           string
-	IsPlatform    bool   // true for ployman, false for ploy
+	IsPlatform    bool // true for ployman, false for ploy
 	BlueGreen     bool
 	Environment   string // dev, staging, prod
 	ControllerURL string

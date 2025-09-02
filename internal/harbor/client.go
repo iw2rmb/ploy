@@ -110,56 +110,56 @@ func (c *Client) CreateProject(project *Project) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal project: %w", err)
 	}
-	
-	req, err := http.NewRequest("POST", 
+
+	req, err := http.NewRequest("POST",
 		fmt.Sprintf("%s/api/v2.0/projects", c.baseURL),
 		bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// 201 Created or 409 Conflict (already exists)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
 		return fmt.Errorf("failed to create project: status %s", resp.Status)
 	}
-	
+
 	return nil
 }
 
 // GetProject retrieves project information
 func (c *Client) GetProject(projectName string) (*Project, error) {
-	req, err := http.NewRequest("GET", 
+	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/api/v2.0/projects/%s", c.baseURL, projectName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get project: status %s", resp.Status)
 	}
-	
+
 	var project Project
 	if err := json.NewDecoder(resp.Body).Decode(&project); err != nil {
 		return nil, fmt.Errorf("failed to decode project: %w", err)
 	}
-	
+
 	return &project, nil
 }
 
@@ -167,24 +167,24 @@ func (c *Client) GetProject(projectName string) (*Project, error) {
 func (c *Client) TriggerScan(projectName, repository, tag string) error {
 	url := fmt.Sprintf("%s/api/v2.0/projects/%s/repositories/%s/artifacts/%s/scan",
 		c.baseURL, projectName, repository, tag)
-	
+
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create scan request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute scan request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("failed to trigger scan: status %s", resp.Status)
 	}
-	
+
 	return nil
 }
 
@@ -192,29 +192,29 @@ func (c *Client) TriggerScan(projectName, repository, tag string) error {
 func (c *Client) GetScanReport(projectName, repository, tag string) (*ScanReport, error) {
 	url := fmt.Sprintf("%s/api/v2.0/projects/%s/repositories/%s/artifacts/%s/scan",
 		c.baseURL, projectName, repository, tag)
-	
+
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get scan report: status %s", resp.Status)
 	}
-	
+
 	var report ScanReport
 	if err := json.NewDecoder(resp.Body).Decode(&report); err != nil {
 		return nil, fmt.Errorf("failed to decode scan report: %w", err)
 	}
-	
+
 	return &report, nil
 }
 
@@ -222,24 +222,24 @@ func (c *Client) GetScanReport(projectName, repository, tag string) (*ScanReport
 func (c *Client) DeleteRepository(projectName, repository string) error {
 	url := fmt.Sprintf("%s/api/v2.0/projects/%s/repositories/%s",
 		c.baseURL, projectName, repository)
-	
+
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create delete request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute delete request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to delete repository: status %s", resp.Status)
 	}
-	
+
 	return nil
 }
 
@@ -249,63 +249,63 @@ func (c *Client) CreateRobot(robot *Robot) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal robot: %w", err)
 	}
-	
-	req, err := http.NewRequest("POST", 
+
+	req, err := http.NewRequest("POST",
 		fmt.Sprintf("%s/api/v2.0/robots", c.baseURL),
 		bytes.NewBuffer(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// 201 Created or 409 Conflict (already exists)
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
 		return nil, fmt.Errorf("failed to create robot: status %s", resp.Status)
 	}
-	
+
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode robot response: %w", err)
 	}
-	
+
 	return result, nil
 }
 
 // Health checks Harbor health status
 func (c *Client) Health() error {
-	req, err := http.NewRequest("GET", 
+	req, err := http.NewRequest("GET",
 		fmt.Sprintf("%s/api/v2.0/health", c.baseURL), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create health request: %w", err)
 	}
-	
+
 	req.SetBasicAuth(c.username, c.password)
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to execute health request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Harbor is unhealthy: status %s", resp.Status)
 	}
-	
+
 	return nil
 }
 
 // WaitForScanComplete waits for a vulnerability scan to complete
 func (c *Client) WaitForScanComplete(projectName, repository, tag string, timeout time.Duration) (*ScanReport, error) {
 	deadline := time.Now().Add(timeout)
-	
+
 	for time.Now().Before(deadline) {
 		report, err := c.GetScanReport(projectName, repository, tag)
 		if err != nil {
@@ -316,10 +316,10 @@ func (c *Client) WaitForScanComplete(projectName, repository, tag string, timeou
 			}
 			return nil, err
 		}
-		
+
 		// If we got a report, scan is complete
 		return report, nil
 	}
-	
+
 	return nil, fmt.Errorf("scan did not complete within timeout of %v", timeout)
 }

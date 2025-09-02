@@ -24,7 +24,7 @@ func handleConfigCommand(args []string) error {
 			outputFormat = args[2]
 		}
 		return ShowConfig(outputFormat)
-		
+
 	case "set", "update":
 		if len(args) < 3 {
 			return NewCLIError("Configuration key and value are required", 1).
@@ -32,32 +32,32 @@ func handleConfigCommand(args []string) error {
 				WithUsage()
 		}
 		return UpdateConfig(args[1], args[2])
-		
+
 	case "reset":
 		return ResetConfig()
-		
+
 	case "list", "keys":
 		return ListConfigKeys()
-		
+
 	case "init":
 		return initializeConfig(args[1:])
-		
+
 	case "validate":
 		return validateCurrentConfig()
-		
+
 	case "backup":
 		return backupConfig(args[1:])
-		
+
 	case "restore":
 		if len(args) < 2 {
 			return NewCLIError("Backup file path is required", 1).
 				WithSuggestion("Usage: ploy arf recipe config restore <backup-file>")
 		}
 		return restoreConfig(args[1])
-		
+
 	case "--help", "-h":
 		return showConfigHelp()
-		
+
 	default:
 		return NewCLIError(fmt.Sprintf("Unknown config command: %s", subcommand), 1).
 			WithSuggestion("Use: show, set, reset, list, init, validate, backup, restore")
@@ -80,13 +80,13 @@ func initializeConfig(args []string) error {
 
 	// Interactive configuration
 	config := GetDefaultConfig()
-	
+
 	// Recipe settings
 	fmt.Printf("Recipe Settings:\n")
 	if author := promptInput(fmt.Sprintf("Default author [%s]: ", config.Recipes.DefaultAuthor)); author != "" {
 		config.Recipes.DefaultAuthor = author
 	}
-	
+
 	if license := promptInput(fmt.Sprintf("Default license [%s]: ", config.Recipes.DefaultLicense)); license != "" {
 		config.Recipes.DefaultLicense = license
 	}
@@ -182,18 +182,18 @@ func validateCurrentConfig() error {
 	}
 
 	PrintSuccess("Configuration is valid")
-	
+
 	// Show any recommendations
 	recommendations := []string{}
-	
+
 	if config.Storage.BackupLocation == "" {
 		recommendations = append(recommendations, "Consider setting a backup location for recipes")
 	}
-	
+
 	if config.Execution.DefaultTimeout > 30*time.Minute {
 		recommendations = append(recommendations, "Default timeout is quite high, consider reducing it")
 	}
-	
+
 	if len(recommendations) > 0 {
 		fmt.Printf("\nRecommendations:\n")
 		for _, rec := range recommendations {
@@ -285,7 +285,7 @@ func showConfigHelp() error {
 
 	fmt.Printf("Available commands:\n")
 	fmt.Printf("  show, get                        Display current configuration\n")
-	fmt.Printf("  set <key> <value>                Update configuration value\n") 
+	fmt.Printf("  set <key> <value>                Update configuration value\n")
 	fmt.Printf("  reset                            Reset to default configuration\n")
 	fmt.Printf("  list, keys                       List all configuration keys\n")
 	fmt.Printf("  init                             Interactive configuration setup\n")
