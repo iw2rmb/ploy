@@ -110,6 +110,13 @@
             msg: "Git repository updated: {{ git_update.stdout }}"
           when: git_update.rc == 0
         
+        - name: Ensure /tmp has proper permissions for all users
+          file:
+            path: /tmp
+            mode: '1777'
+            state: directory
+          become: yes
+        
         - name: Build API binary with version information
           shell: cd /home/ploy/ploy && ./scripts/build.sh api bin
           become_user: ploy
