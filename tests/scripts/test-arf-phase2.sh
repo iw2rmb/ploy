@@ -127,7 +127,7 @@ run_test test_endpoint "GET" "/v1/arf/patterns/recommendations?error_type=import
 
 # Transformation Execution Testing
 run_test_section "Transformation Execution"
-run_test test_endpoint "POST" "/v1/arf/transform" "Execute transformation" '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","recipe_type":"openrewrite","codebase":{"language":"java","build_tool":"maven"}}'
+run_test test_endpoint "POST" "/v1/arf/transforms" "Execute transformation" '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","recipe_type":"openrewrite","codebase":{"language":"java","build_tool":"maven"}}'
 run_test test_endpoint "GET" "/v1/arf/transforms/test-transform-123" "Get transformation result" "" 404
 
 # Sandbox Management Testing

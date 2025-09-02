@@ -8,7 +8,7 @@ The ARF transformation system provides comprehensive status tracking for code tr
 
 ### Critical Issue Analysis
 
-**Current `/v1/arf/transform` Behavior (Async-Only):**
+**Current `/v1/arf/transforms` Behavior (Async-Only):**
 - Executes transformation asynchronously in background goroutines
 - Returns immediate response with `transformation_id` and status URL
 - Stores status and progress in Consul KV for persistence across restarts
@@ -107,7 +107,7 @@ func (h *Handler) executeTransformationBackground(transformID string, req *Trans
 ```
 
 #### Implementation Complete ✅
-**The `/v1/arf/transform` endpoint has been converted to async-only:**
+**The `/v1/arf/transforms` endpoint has been converted to async-only:**
 - **Current behavior**: Asynchronous execution, returns status link immediately
 - **Legacy synchronous code**: Removed in Phase 1 cleanup
 - **Status tracking**: Use `/v1/arf/transforms/:id/status` to monitor progress
@@ -515,13 +515,13 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 ## Implementation Phases
 
 ### Phase 1: Transform Route Enhancement & Consul KV Integration (Week 1-2) ✅ COMPLETED
-- [ ] **RESTful Endpoint Rename**: Rename `/v1/arf/transform` to `/v1/arf/transforms` (plural) to follow RESTful conventions
+- [x] **RESTful Endpoint Rename**: Rename `/v1/arf/transform` to `/v1/arf/transforms` (plural) to follow RESTful conventions ✅ (Completed 2025-09-02)
   - Update route registration in `api/arf/handler.go`
   - Update handler comment in `api/arf/handler_transformation.go`
   - Update all documentation references (8+ files identified)
   - Update test scripts and test cases
   - Note: This is a breaking change requiring client updates
-- [x] **Transform Route Async Conversion**: Modify `/v1/arf/transform` to return status link instead of waiting
+- [x] **Transform Route Async Conversion**: Modify `/v1/arf/transforms` to return status link instead of waiting
 - [x] **Background Execution**: Implement goroutine-based transformation execution
 - [x] **Initial Status Storage**: Store transformation initiation status in Consul immediately
 - [x] Replace `globalTransformStore` with `ConsulHealingStore`

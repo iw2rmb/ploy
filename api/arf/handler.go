@@ -188,7 +188,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Post("/models/:name/set-default", h.SetDefaultModel)
 
 	// Transformation execution
-	arf.Post("/transform", h.ExecuteTransformationAsync)
+	arf.Post("/transforms", h.ExecuteTransformationAsync)
 	arf.Get("/transforms/:id", h.GetTransformationResult)
 	arf.Get("/transforms/:id/status", h.GetTransformationStatusAsync)
 

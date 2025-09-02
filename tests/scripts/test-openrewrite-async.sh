@@ -117,13 +117,13 @@ execute_async_transformation() {
 EOF
     )
     
-    log_message "Sending async transformation request to ${CONTROLLER_URL}/v1/arf/transform"
+    log_message "Sending async transformation request to ${CONTROLLER_URL}/v1/arf/transforms"
     log_message "Request body: $transform_request"
     
     # Execute transformation request (expecting immediate response)
     local start_time=$(date +%s%3N)  # milliseconds
     local response
-    response=$(curl -s -X POST "${CONTROLLER_URL}/v1/arf/transform" \
+    response=$(curl -s -X POST "${CONTROLLER_URL}/v1/arf/transforms" \
         -H "Content-Type: application/json" \
         -d "$transform_request" 2>&1) || {
         test_failed "Failed to send transformation request: $response"
