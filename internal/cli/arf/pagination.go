@@ -10,10 +10,10 @@ import (
 
 // PaginationInfo contains pagination metadata
 type PaginationInfo struct {
-	CurrentPage int  `json:"current_page"`
-	PageSize    int  `json:"page_size"`
-	TotalItems  int  `json:"total_items"`
-	TotalPages  int  `json:"total_pages"`
+	CurrentPage int `json:"current_page"`
+	PageSize    int `json:"page_size"`
+	TotalItems  int `json:"total_items"`
+	TotalPages  int `json:"total_pages"`
 	HasNext     bool `json:"has_next"`
 	HasPrev     bool `json:"has_previous"`
 }
@@ -33,12 +33,12 @@ func NewPaginationInfo(page, pageSize, totalItems int) PaginationInfo {
 	if pageSize < 1 {
 		pageSize = 20
 	}
-
+	
 	totalPages := (totalItems + pageSize - 1) / pageSize
 	if totalPages < 1 {
 		totalPages = 1
 	}
-
+	
 	return PaginationInfo{
 		CurrentPage: page,
 		PageSize:    pageSize,
@@ -56,15 +56,15 @@ func DisplayPaginationInfo(info PaginationInfo) {
 	if endItem > info.TotalItems {
 		endItem = info.TotalItems
 	}
-
+	
 	if info.TotalItems == 0 {
 		PrintInfo("No recipes found")
 		return
 	}
-
+	
 	fmt.Printf("\nShowing %d-%d of %d recipes (page %d of %d)\n",
 		startItem, endItem, info.TotalItems, info.CurrentPage, info.TotalPages)
-
+	
 	// Show navigation hints
 	if info.HasPrev || info.HasNext {
 		var hints []string
@@ -81,14 +81,14 @@ func DisplayPaginationInfo(info PaginationInfo) {
 // ApplyFilters applies filters to the recipe list
 func ApplyFilters(recipes []*models.Recipe, filter RecipeFilter) []*models.Recipe {
 	var filtered []*models.Recipe
-
+	
 	for _, recipe := range recipes {
 		if !matchesFilter(recipe, filter) {
 			continue
 		}
 		filtered = append(filtered, recipe)
 	}
-
+	
 	return filtered
 }
 
@@ -107,7 +107,7 @@ func matchesFilter(recipe *models.Recipe, filter RecipeFilter) bool {
 			return false
 		}
 	}
-
+	
 	// Category filter
 	if filter.Category != "" {
 		found := false
@@ -121,7 +121,7 @@ func matchesFilter(recipe *models.Recipe, filter RecipeFilter) bool {
 			return false
 		}
 	}
-
+	
 	// Tags filter (all tags must match)
 	if len(filter.Tags) > 0 {
 		for _, filterTag := range filter.Tags {
@@ -137,44 +137,44 @@ func matchesFilter(recipe *models.Recipe, filter RecipeFilter) bool {
 			}
 		}
 	}
-
+	
 	// Author filter
 	if filter.Author != "" {
 		if !strings.EqualFold(recipe.Metadata.Author, filter.Author) {
 			return false
 		}
 	}
-
+	
 	// TODO: Implement MinRating filter when rating system is available
-
+	
 	return true
 }
 
 // ApplyPagination applies pagination to the recipe list
 func ApplyPagination(recipes []*models.Recipe, offset, limit int) ([]*models.Recipe, PaginationInfo) {
 	total := len(recipes)
-
+	
 	if offset < 0 {
 		offset = 0
 	}
 	if limit <= 0 {
 		limit = 20
 	}
-
+	
 	// Calculate pagination info
 	page := (offset / limit) + 1
 	info := NewPaginationInfo(page, limit, total)
-
+	
 	// Apply pagination
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-
+	
 	if offset >= total {
 		return []*models.Recipe{}, info
 	}
-
+	
 	return recipes[offset:end], info
 }
 
@@ -184,13 +184,13 @@ func ParseFilterFlags(args []string) (RecipeFilter, []string) {
 		Limit:  20, // Default limit
 		Offset: 0,  // Default offset
 	}
-
+	
 	// Track processed arguments
 	var remainingArgs []string
-
+	
 	for i := 0; i < len(args); i++ {
 		processed := false
-
+		
 		switch args[i] {
 		case "--language", "-l":
 			if i+1 < len(args) {
@@ -253,20 +253,20 @@ func ParseFilterFlags(args []string) (RecipeFilter, []string) {
 				processed = true
 			}
 		}
-
+		
 		// If argument wasn't processed, add to remaining args
 		if !processed {
 			remainingArgs = append(remainingArgs, args[i])
 		}
 	}
-
+	
 	return filter, remainingArgs
 }
 
 // BuildAPIQuery builds query parameters for API requests
 func BuildAPIQuery(filter RecipeFilter) string {
 	params := []string{}
-
+	
 	if filter.Language != "" {
 		params = append(params, "language="+filter.Language)
 	}
@@ -294,7 +294,7 @@ func BuildAPIQuery(filter RecipeFilter) string {
 	if filter.MinRating > 0 {
 		params = append(params, fmt.Sprintf("min_rating=%.2f", filter.MinRating))
 	}
-
+	
 	if len(params) > 0 {
 		return "?" + strings.Join(params, "&")
 	}
@@ -318,7 +318,7 @@ func ValidateFilterValues(filter RecipeFilter) error {
 				WithSuggestion(fmt.Sprintf("Valid fields: %s", strings.Join(validSortFields, ", ")))
 		}
 	}
-
+	
 	// Validate sort order
 	if filter.SortOrder != "" {
 		sortOrder := strings.ToLower(filter.SortOrder)
@@ -327,7 +327,7 @@ func ValidateFilterValues(filter RecipeFilter) error {
 				WithSuggestion("Valid orders: asc, desc")
 		}
 	}
-
+	
 	// Validate limit
 	if filter.Limit < 0 {
 		return NewCLIError("Limit cannot be negative", 1)
@@ -336,24 +336,24 @@ func ValidateFilterValues(filter RecipeFilter) error {
 		return NewCLIError("Limit cannot exceed 1000", 1).
 			WithSuggestion("Use a smaller limit value")
 	}
-
+	
 	// Validate offset
 	if filter.Offset < 0 {
 		return NewCLIError("Offset cannot be negative", 1)
 	}
-
+	
 	// Validate rating
 	if filter.MinRating < 0 || filter.MinRating > 5 {
 		return NewCLIError("Rating must be between 0 and 5", 1)
 	}
-
+	
 	return nil
 }
 
 // FormatFilterSummary creates a human-readable summary of active filters
 func FormatFilterSummary(filter RecipeFilter) string {
 	var parts []string
-
+	
 	if filter.Language != "" {
 		parts = append(parts, fmt.Sprintf("language: %s", filter.Language))
 	}
@@ -376,11 +376,11 @@ func FormatFilterSummary(filter RecipeFilter) string {
 		}
 		parts = append(parts, fmt.Sprintf("sort: %s (%s)", filter.SortBy, order))
 	}
-
+	
 	if len(parts) == 0 {
 		return "No filters applied"
 	}
-
+	
 	return fmt.Sprintf("Filters: %s", strings.Join(parts, ", "))
 }
 
@@ -391,16 +391,16 @@ func DisplayAdvancedPaginatedResult(result PaginatedResult, format string, verbo
 	if filterSummary != "No filters applied" {
 		fmt.Printf("🔍 %s\n\n", filterSummary)
 	}
-
+	
 	// Format and display recipes
 	if err := FormatRecipes(result.Recipes, format, verbose); err != nil {
 		return err
 	}
-
+	
 	// Display pagination info for table format
 	if strings.ToLower(format) == "table" {
 		DisplayPaginationInfo(result.Pagination)
 	}
-
+	
 	return nil
 }

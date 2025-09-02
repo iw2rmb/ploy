@@ -22,11 +22,11 @@ import (
 
 // Client represents an ACME client for Let's Encrypt operations
 type Client struct {
-	client      *lego.Client
-	dnsProvider dns.Provider
-	email       string
-	staging     bool
-	user        *ACMEUser
+	client       *lego.Client
+	dnsProvider  dns.Provider
+	email        string
+	staging      bool
+	user         *ACMEUser
 }
 
 // ACMEUser represents a user account for ACME operations
@@ -78,7 +78,7 @@ func NewClient(email string, dnsProvider dns.Provider, staging bool) (*Client, e
 
 	// Create lego configuration
 	config := lego.NewConfig(user)
-
+	
 	// Set ACME directory URL
 	if staging {
 		config.CADirURL = lego.LEDirectoryStaging
@@ -87,7 +87,7 @@ func NewClient(email string, dnsProvider dns.Provider, staging bool) (*Client, e
 		config.CADirURL = lego.LEDirectoryProduction
 		log.Printf("Using Let's Encrypt production environment")
 	}
-
+	
 	config.Certificate.KeyType = certcrypto.RSA2048
 
 	// Create the lego client
@@ -129,7 +129,7 @@ func (c *Client) registerUser() error {
 	if err != nil {
 		return fmt.Errorf("failed to register: %w", err)
 	}
-
+	
 	c.user.Registration = reg
 	log.Printf("User registered with ACME server: %s", c.email)
 	return nil
@@ -190,7 +190,7 @@ func (c *Client) IssueCertificate(ctx context.Context, domains []string) (*Certi
 func (c *Client) IssueWildcardCertificate(ctx context.Context, domain string) (*Certificate, error) {
 	wildcardDomain := fmt.Sprintf("*.%s", domain)
 	domains := []string{wildcardDomain, domain} // Include both wildcard and apex domain
-
+	
 	log.Printf("Issuing wildcard certificate for domain: %s", domain)
 	return c.IssueCertificate(ctx, domains)
 }
@@ -268,7 +268,7 @@ type DNSProviderWrapper struct {
 // Present creates a TXT record to fulfill the dns-01 challenge
 func (d *DNSProviderWrapper) Present(domain, token, keyAuth string) error {
 	fqdn, value := dns01.GetRecord(domain, keyAuth)
-
+	
 	// Extract hostname from FQDN
 	hostname := fqdn
 	if hostname[len(hostname)-1] == '.' {
@@ -283,7 +283,7 @@ func (d *DNSProviderWrapper) Present(domain, token, keyAuth string) error {
 	}
 
 	log.Printf("Creating DNS TXT record for ACME challenge: %s = %s", hostname, value)
-
+	
 	ctx := context.Background()
 	if err := d.provider.CreateRecord(ctx, record); err != nil {
 		return fmt.Errorf("failed to create DNS challenge record: %w", err)
@@ -299,7 +299,7 @@ func (d *DNSProviderWrapper) Present(domain, token, keyAuth string) error {
 // CleanUp removes the TXT record created for the dns-01 challenge
 func (d *DNSProviderWrapper) CleanUp(domain, token, keyAuth string) error {
 	fqdn, _ := dns01.GetRecord(domain, keyAuth)
-
+	
 	// Extract hostname from FQDN
 	hostname := fqdn
 	if hostname[len(hostname)-1] == '.' {
@@ -307,7 +307,7 @@ func (d *DNSProviderWrapper) CleanUp(domain, token, keyAuth string) error {
 	}
 
 	log.Printf("Cleaning up DNS TXT record for ACME challenge: %s", hostname)
-
+	
 	ctx := context.Background()
 	if err := d.provider.DeleteRecord(ctx, hostname, dns.RecordTypeTXT); err != nil {
 		log.Printf("Warning: failed to clean up DNS challenge record: %v", err)

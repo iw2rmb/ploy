@@ -16,22 +16,22 @@ import (
 
 // MockNomadJobStatus represents a mock Nomad job status for testing
 type MockNomadJobStatus struct {
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	Status          string    `json:"status"`
-	StatusDesc      string    `json:"status_description"`
-	Priority        int       `json:"priority"`
-	CreateIndex     uint64    `json:"create_index"`
-	ModifyIndex     uint64    `json:"modify_index"`
-	SubmitTime      time.Time `json:"submit_time"`
-	Running         int       `json:"running"`
-	Queued          int       `json:"queued"`
-	Complete        int       `json:"complete"`
-	Failed          int       `json:"failed"`
-	Unknown         int       `json:"unknown"`
-	PendingChildren int       `json:"pending_children"`
-	RunningChildren int       `json:"running_children"`
-	DeadChildren    int       `json:"dead_children"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Status        string    `json:"status"`
+	StatusDesc    string    `json:"status_description"`
+	Priority      int       `json:"priority"`
+	CreateIndex   uint64    `json:"create_index"`
+	ModifyIndex   uint64    `json:"modify_index"`
+	SubmitTime    time.Time `json:"submit_time"`
+	Running       int       `json:"running"`
+	Queued        int       `json:"queued"`
+	Complete      int       `json:"complete"`
+	Failed        int       `json:"failed"`
+	Unknown       int       `json:"unknown"`
+	PendingChildren int     `json:"pending_children"`
+	RunningChildren int     `json:"running_children"`
+	DeadChildren    int     `json:"dead_children"`
 }
 
 // MockStatusHealthMonitor provides mock implementation for Nomad health monitoring
@@ -226,28 +226,28 @@ func TestStatusFunctionIntegration(t *testing.T) {
 			app.Get("/apps/:app/status", func(c *fiber.Ctx) error {
 				// This is a simplified version of the Status function for testing
 				appName := c.Params("app")
-
+				
 				// Validate app name (same as original function)
 				if len(appName) < 2 || len(appName) > 63 {
 					return c.Status(400).JSON(fiber.Map{
-						"error":   "Invalid app name",
+						"error": "Invalid app name",
 						"details": "name must be between 2-63 characters",
 					})
 				}
-
+				
 				// Check for invalid characters and reserved names
 				if appName == "api" || appName == "dev" || appName == "controller" {
 					return c.Status(400).JSON(fiber.Map{
-						"error":   "Invalid app name",
+						"error": "Invalid app name",
 						"details": "name is reserved",
 					})
 				}
-
+				
 				// Simple character validation
 				for _, char := range appName {
 					if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
 						return c.Status(400).JSON(fiber.Map{
-							"error":   "Invalid app name",
+							"error": "Invalid app name",
 							"details": "name contains invalid characters",
 						})
 					}
@@ -257,7 +257,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 				lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
 				var activeJob *MockNomadJobStatus
 				allErrors := true
-
+				
 				for _, lane := range lanes {
 					jobName := fmt.Sprintf("%s-lane-%s", appName, lane)
 					if job, err := mockMonitor.GetJobStatus(jobName); err == nil && job != nil {
@@ -271,7 +271,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 					// Map Nomad status to ARF status
 					arfStatus := mapNomadStatusToARF(activeJob.Status)
 					lane := extractLaneFromJobName(activeJob.Name)
-
+					
 					return c.JSON(fiber.Map{
 						"status":      arfStatus,
 						"lane":        lane,
@@ -290,19 +290,19 @@ func TestStatusFunctionIntegration(t *testing.T) {
 					// Check if it's a "not found" vs API error case
 					if tt.expectedStatus == 404 {
 						return c.Status(404).JSON(fiber.Map{
-							"error":   "App not found",
+							"error": "App not found",
 							"details": "App is not deployed in any lane",
 						})
 					} else {
 						return c.Status(500).JSON(fiber.Map{
-							"error":   "Failed to get status",
+							"error": "Failed to get status",
 							"details": "Unable to contact deployment system",
 						})
 					}
 				}
 
 				return c.Status(404).JSON(fiber.Map{
-					"error":   "App not found",
+					"error": "App not found",
 					"details": "App is not deployed in any lane",
 				})
 			})
@@ -322,7 +322,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 			var responseBody map[string]interface{}
 			bodyBytes, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
-
+			
 			if len(bodyBytes) > 0 {
 				err = json.Unmarshal(bodyBytes, &responseBody)
 				require.NoError(t, err)
@@ -360,7 +360,7 @@ func TestStatusHelperFunctionsAdvanced(t *testing.T) {
 			"RUNNING":     "deploying",
 			"RuNnInG":     "deploying",
 			"pending":     "building",
-			"PENDING":     "building",
+			"PENDING":     "building", 
 			"dead":        "stopped",
 			"DEAD":        "stopped",
 		}
@@ -395,7 +395,7 @@ func TestStatusHelperFunctionsAdvanced(t *testing.T) {
 
 		for i := 0; i < iterations; i++ {
 			mapNomadStatusToARF("running")
-			mapNomadStatusToARF("pending")
+			mapNomadStatusToARF("pending") 
 			mapNomadStatusToARF("dead")
 			mapNomadStatusToARF("unknown")
 		}
@@ -424,7 +424,7 @@ func TestStatusConcurrency(t *testing.T) {
 	t.Run("concurrent status requests", func(t *testing.T) {
 		// Create mock health monitor
 		mockMonitor := NewMockStatusHealthMonitor()
-
+		
 		jobStatus := &MockNomadJobStatus{
 			ID:         "concurrent-app-lane-a",
 			Name:       "concurrent-app-lane-a",
@@ -432,7 +432,7 @@ func TestStatusConcurrency(t *testing.T) {
 			Running:    3,
 			SubmitTime: time.Now(),
 		}
-
+		
 		// Setup mock for concurrent requests
 		mockMonitor.On("GetJobStatus", "concurrent-app-lane-a").Return(jobStatus, nil)
 		for _, lane := range []string{"b", "c", "d", "e", "f", "g"} {
@@ -443,12 +443,12 @@ func TestStatusConcurrency(t *testing.T) {
 		app.Get("/apps/:app/status", func(c *fiber.Ctx) error {
 			// Simplified status function for concurrency test
 			appName := c.Params("app")
-
+			
 			// Basic validation
 			if len(appName) < 2 {
 				return c.Status(400).JSON(fiber.Map{"error": "Invalid app name"})
 			}
-
+			
 			// Simulate the lane checking logic with a small delay
 			lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
 			for _, lane := range lanes {
@@ -460,14 +460,14 @@ func TestStatusConcurrency(t *testing.T) {
 					})
 				}
 			}
-
+			
 			return c.Status(404).JSON(fiber.Map{"error": "not found"})
 		})
 
 		// Launch multiple concurrent requests
 		const numRequests = 50
 		results := make(chan error, numRequests)
-
+		
 		for i := 0; i < numRequests; i++ {
 			go func() {
 				req := httptest.NewRequest("GET", "/apps/concurrent-app/status", nil)
@@ -476,12 +476,12 @@ func TestStatusConcurrency(t *testing.T) {
 					results <- err
 					return
 				}
-
+				
 				if resp.StatusCode != 200 {
 					results <- fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 					return
 				}
-
+				
 				results <- nil
 			}()
 		}

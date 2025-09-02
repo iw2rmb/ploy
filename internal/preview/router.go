@@ -17,19 +17,19 @@ var previewHostRe = regexp.MustCompile(`^(?P<sha>[a-f0-9]{7,40})\.(?P<app>[a-z0-
 func Router(c *fiber.Ctx) error {
 	host := c.Hostname()
 	m := previewHostRe.FindStringSubmatch(host)
-	if m == nil {
-		return c.Next()
+	if m == nil { 
+		return c.Next() 
 	}
-
+	
 	sha := m[1]
 	app := m[2]
 
 	payload := strings.NewReader("")
-	req, _ := http.NewRequest("POST", fmt.Sprintf("http://localhost:%s/v1/apps/%s/builds?sha=%s", getenv("PORT", "8081"), app, sha), payload)
-	req.Header.Set("Content-Type", "application/x-tar")
+	req, _ := http.NewRequest("POST", fmt.Sprintf("http://localhost:%s/v1/apps/%s/builds?sha=%s", getenv("PORT","8081"), app, sha), payload)
+	req.Header.Set("Content-Type","application/x-tar")
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return c.Status(502).SendString("preview build failed")
+	if err != nil { 
+		return c.Status(502).SendString("preview build failed") 
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
@@ -41,15 +41,15 @@ func Router(c *fiber.Ctx) error {
 			return c.Redirect(endpoint)
 		}
 	}
-
-	c.Set("Content-Type", "application/json")
-	c.Set("Retry-After", "3")
+	
+	c.Set("Content-Type","application/json")
+	c.Set("Retry-After","3")
 	return c.Status(resp.StatusCode).Send(b)
 }
 
-func getenv(k, d string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
+func getenv(k, d string) string { 
+	if v := os.Getenv(k); v != "" { 
+		return v 
 	}
-	return d
+	return d 
 }

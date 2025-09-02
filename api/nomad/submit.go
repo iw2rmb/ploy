@@ -12,7 +12,7 @@ func Submit(jobPath string) error {
 	if err := ValidateJob(jobPath); err != nil {
 		return fmt.Errorf("job validation failed: %w", err)
 	}
-
+	
 	// Use robust submission with monitoring
 	// Default to 2 instances and 3 retries
 	return RobustSubmit(jobPath, 2, 3)

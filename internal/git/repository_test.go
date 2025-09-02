@@ -148,7 +148,7 @@ func TestNewRepository(t *testing.T) {
 				}
 				require.NotNil(t, repo)
 
-				// Verify basic repository properties
+				// Verify basic repository properties  
 				assert.Equal(t, repoPath, repo.Path)
 				// Note: Branch and SHA may be empty if git commands fail
 			}
@@ -159,10 +159,10 @@ func TestNewRepository(t *testing.T) {
 // Tests for parseGitConfig function
 func TestRepository_parseGitConfig(t *testing.T) {
 	tests := []struct {
-		name          string
-		configContent string
-		expectedURL   string
-		expectError   bool
+		name           string
+		configContent  string
+		expectedURL    string
+		expectError    bool
 	}{
 		{
 			name: "HTTPS origin URL",
@@ -336,11 +336,11 @@ func TestRepository_GetShortSHA(t *testing.T) {
 func TestRepository_ValidateRepository(t *testing.T) {
 	t.Run("validation with clean repository", func(t *testing.T) {
 		repo := &Repository{
-			Path:         "/test/path",
-			URL:          "https://github.com/test/repo",
-			Branch:       "main",
-			SHA:          "abc123def456",
-			IsClean:      true,
+			Path:        "/test/path",
+			URL:         "https://github.com/test/repo",
+			Branch:      "main",
+			SHA:         "abc123def456",
+			IsClean:     true,
 			HasUntracked: false,
 			LastCommit: &Commit{
 				SHA:       "abc123def456",
@@ -370,8 +370,8 @@ func TestRepository_ValidateRepository(t *testing.T) {
 			URL:          "http://insecure.com/repo", // Non-HTTPS URL
 			Branch:       "feature-branch",           // Non-default branch
 			SHA:          "abc123def456",
-			IsClean:      false, // Dirty repository
-			HasUntracked: true,  // Has untracked files
+			IsClean:      false,   // Dirty repository
+			HasUntracked: true,    // Has untracked files
 			LastCommit: &Commit{
 				SHA:       "abc123def456",
 				Message:   "Test commit",
@@ -413,45 +413,45 @@ func TestRepository_ValidateRepository(t *testing.T) {
 // Tests for validateURL function
 func TestRepository_validateURL(t *testing.T) {
 	tests := []struct {
-		name                   string
-		url                    string
-		expectedWarnings       int
+		name                  string
+		url                   string
+		expectedWarnings      int
 		expectedSecurityIssues int
 	}{
 		{
-			name:                   "trusted HTTPS URL",
-			url:                    "https://github.com/user/repo",
-			expectedWarnings:       0,
+			name:                  "trusted HTTPS URL",
+			url:                   "https://github.com/user/repo",
+			expectedWarnings:      0,
 			expectedSecurityIssues: 0,
 		},
 		{
-			name:                   "trusted GitLab HTTPS URL",
-			url:                    "https://gitlab.com/user/repo",
-			expectedWarnings:       0,
+			name:                  "trusted GitLab HTTPS URL",
+			url:                   "https://gitlab.com/user/repo",
+			expectedWarnings:      0,
 			expectedSecurityIssues: 0,
 		},
 		{
-			name:                   "untrusted domain HTTPS URL",
-			url:                    "https://untrusted.com/user/repo",
-			expectedWarnings:       1,
+			name:                  "untrusted domain HTTPS URL",
+			url:                   "https://untrusted.com/user/repo",
+			expectedWarnings:      1,
 			expectedSecurityIssues: 0,
 		},
 		{
-			name:                   "trusted HTTP URL (insecure)",
-			url:                    "http://github.com/user/repo",
-			expectedWarnings:       0,
+			name:                  "trusted HTTP URL (insecure)",
+			url:                   "http://github.com/user/repo",
+			expectedWarnings:      0,
 			expectedSecurityIssues: 1,
 		},
 		{
-			name:                   "untrusted HTTP URL",
-			url:                    "http://untrusted.com/user/repo",
-			expectedWarnings:       1,
+			name:                  "untrusted HTTP URL",
+			url:                   "http://untrusted.com/user/repo",
+			expectedWarnings:      1,
 			expectedSecurityIssues: 1,
 		},
 		{
-			name:                   "empty URL",
-			url:                    "",
-			expectedWarnings:       1,
+			name:                  "empty URL",
+			url:                   "",
+			expectedWarnings:      1,
 			expectedSecurityIssues: 0,
 		},
 	}
@@ -460,11 +460,11 @@ func TestRepository_validateURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &Repository{URL: tt.url}
 			result := &ValidationResult{
-				Valid:          true,
-				Warnings:       []string{},
-				Errors:         []string{},
+				Valid:         true,
+				Warnings:      []string{},
+				Errors:        []string{},
 				SecurityIssues: []string{},
-				Suggestions:    []string{},
+				Suggestions:   []string{},
 			}
 
 			repo.validateURL(result)
@@ -515,11 +515,11 @@ func TestRepository_validateCommitSigning(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &Repository{LastCommit: tt.lastCommit}
 			result := &ValidationResult{
-				Valid:          true,
-				Warnings:       []string{},
-				Errors:         []string{},
+				Valid:         true,
+				Warnings:      []string{},
+				Errors:        []string{},
 				SecurityIssues: []string{},
-				Suggestions:    []string{},
+				Suggestions:   []string{},
 			}
 
 			repo.validateCommitSigning(result)
@@ -571,11 +571,11 @@ func TestRepository_validateCleanliness(t *testing.T) {
 				HasUntracked: tt.hasUntracked,
 			}
 			result := &ValidationResult{
-				Valid:          true,
-				Warnings:       []string{},
-				Errors:         []string{},
+				Valid:         true,
+				Warnings:      []string{},
+				Errors:        []string{},
 				SecurityIssues: []string{},
-				Suggestions:    []string{},
+				Suggestions:   []string{},
 			}
 
 			repo.validateCleanliness(result)
@@ -623,11 +623,11 @@ func TestRepository_validateBranch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &Repository{Branch: tt.branch}
 			result := &ValidationResult{
-				Valid:          true,
-				Warnings:       []string{},
-				Errors:         []string{},
+				Valid:         true,
+				Warnings:      []string{},
+				Errors:        []string{},
 				SecurityIssues: []string{},
-				Suggestions:    []string{},
+				Suggestions:   []string{},
 			}
 
 			repo.validateBranch(result)
@@ -691,11 +691,11 @@ func BenchmarkNewRepository(b *testing.B) {
 
 func BenchmarkRepository_ValidateRepository(b *testing.B) {
 	repo := &Repository{
-		Path:         "/test/path",
-		URL:          "https://github.com/test/repo",
-		Branch:       "main",
-		SHA:          "abc123def456",
-		IsClean:      true,
+		Path:        "/test/path",
+		URL:         "https://github.com/test/repo",
+		Branch:      "main",
+		SHA:         "abc123def456",
+		IsClean:     true,
 		HasUntracked: false,
 		LastCommit: &Commit{
 			SHA:       "abc123def456",

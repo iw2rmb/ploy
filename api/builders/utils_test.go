@@ -131,13 +131,13 @@ func TestBytesTrimSpaceEdgeCases(t *testing.T) {
 			t.Errorf("bytesTrimSpace panicked on nil input: %v", r)
 		}
 	}()
-
+	
 	// This should not panic
 	result := bytesTrimSpace(nil)
 	if result != "" {
 		t.Errorf("bytesTrimSpace(nil) = %q, want empty string", result)
 	}
-
+	
 	// Test with very large input
 	largeInput := make([]byte, 10000)
 	for i := range largeInput {
@@ -147,7 +147,7 @@ func TestBytesTrimSpaceEdgeCases(t *testing.T) {
 			largeInput[i] = 'x'
 		}
 	}
-
+	
 	result = bytesTrimSpace(largeInput)
 	expectedLen := 9900 - 100
 	if len(result) != expectedLen {
@@ -186,14 +186,14 @@ func TestBytesTrimSpaceConsistency(t *testing.T) {
 	input := []byte("  hello  ")
 	first := bytesTrimSpace(input)
 	second := bytesTrimSpace([]byte(first))
-
+	
 	if first != second {
 		t.Errorf("bytesTrimSpace is not idempotent: first=%q, second=%q", first, second)
 	}
-
+	
 	// Test that it only trims specific characters (space, \n, \r)
 	specialChars := []struct {
-		char       byte
+		char     byte
 		shouldTrim bool
 	}{
 		{' ', true},
@@ -205,11 +205,11 @@ func TestBytesTrimSpaceConsistency(t *testing.T) {
 		{'0', false},
 		{'a', false},
 	}
-
+	
 	for _, sc := range specialChars {
 		input := []byte{sc.char, 'x', sc.char}
 		result := bytesTrimSpace(input)
-
+		
 		if sc.shouldTrim {
 			if result != "x" {
 				t.Errorf("bytesTrimSpace should trim %q: got %q, want 'x'", sc.char, result)

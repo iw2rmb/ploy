@@ -16,7 +16,7 @@ import (
 
 // DomainHandler handles domain management API endpoints
 type DomainHandler struct {
-	router      *routing.TraefikRouter
+	router    *routing.TraefikRouter
 	certManager *certificates.CertificateManager
 }
 
@@ -31,26 +31,26 @@ func NewDomainHandler(router *routing.TraefikRouter, certManager *certificates.C
 // DomainRequest represents a domain registration request
 type DomainRequest struct {
 	Domain       string `json:"domain"`
-	Certificate  string `json:"certificate,omitempty"`   // "auto", "manual", or "none"
+	Certificate  string `json:"certificate,omitempty"`  // "auto", "manual", or "none"
 	CertProvider string `json:"cert_provider,omitempty"` // "letsencrypt" (default)
 }
 
 // DomainResponse represents a domain API response
 type DomainResponse struct {
-	Status       string             `json:"status"`
-	App          string             `json:"app,omitempty"`
-	Domain       string             `json:"domain,omitempty"`
-	Domains      []string           `json:"domains,omitempty"`
-	Message      string             `json:"message,omitempty"`
-	Certificate  *CertificateInfo   `json:"certificate,omitempty"`
-	Certificates []*CertificateInfo `json:"certificates,omitempty"`
+	Status       string                    `json:"status"`
+	App          string                    `json:"app,omitempty"`
+	Domain       string                    `json:"domain,omitempty"`
+	Domains      []string                  `json:"domains,omitempty"`
+	Message      string                    `json:"message,omitempty"`
+	Certificate  *CertificateInfo          `json:"certificate,omitempty"`
+	Certificates []*CertificateInfo        `json:"certificates,omitempty"`
 }
 
 // CertificateInfo represents certificate information in API responses
 type CertificateInfo struct {
 	Domain    string `json:"domain"`
-	Status    string `json:"status"`   // "active", "provisioning", "failed", "expired"
-	Provider  string `json:"provider"` // "letsencrypt", "custom"
+	Status    string `json:"status"`    // "active", "provisioning", "failed", "expired"
+	Provider  string `json:"provider"`  // "letsencrypt", "custom"
 	IssuedAt  string `json:"issued_at,omitempty"`
 	ExpiresAt string `json:"expires_at,omitempty"`
 	AutoRenew bool   `json:"auto_renew"`
@@ -62,7 +62,7 @@ func SetupDomainRoutes(app *fiber.App, handler *DomainHandler) {
 	app.Post("/v1/apps/:app/domains", handler.AddDomain)
 	app.Get("/v1/apps/:app/domains", handler.ListDomains)
 	app.Delete("/v1/apps/:app/domains/:domain", handler.RemoveDomain)
-
+	
 	// Certificate management for domains (Heroku-style)
 	app.Get("/v1/apps/:app/certificates", handler.ListCertificates)
 	app.Get("/v1/apps/:app/certificates/:domain", handler.GetCertificate)
@@ -118,7 +118,7 @@ func (h *DomainHandler) AddDomain(c *fiber.Ctx) error {
 		// For platform subdomains, automatically register with platform routing
 		// This would typically be called when the app is deployed, but we ensure it's available for routing
 		log.Printf("Platform subdomain detected (%s), routing configured for app %s", req.Domain, appName)
-
+		
 		// Note: Actual Traefik registration happens during app deployment via Nomad
 		// This just ensures the domain-to-app mapping is stored for future routing
 	}
@@ -138,7 +138,7 @@ func (h *DomainHandler) AddDomain(c *fiber.Ctx) error {
 
 	if certificateMode == "auto" && h.certManager != nil {
 		log.Printf("Auto-provisioning certificate for domain %s", req.Domain)
-
+		
 		// Start certificate provisioning in background
 		go func() {
 			ctx := context.Background()
@@ -168,21 +168,21 @@ func (h *DomainHandler) RegisterAppPlatformDomain(appName, allocID, allocIP stri
 	if h.router == nil {
 		return fmt.Errorf("traefik router not available")
 	}
-
+	
 	// Generate platform subdomain for the app
 	platformDomain := h.router.GenerateAppDomain(appName)
-
+	
 	// Register with Traefik using platform subdomain pattern
 	if err := h.router.RegisterAppWithPlatformDomain(appName, allocID, allocIP, port, nil); err != nil {
 		return fmt.Errorf("failed to register app with platform domain: %w", err)
 	}
-
+	
 	// Store the platform domain mapping
 	if err := h.storeDomainConfig(appName, platformDomain); err != nil {
 		log.Printf("Warning: Failed to store platform domain config for %s: %v", appName, err)
 		// Don't fail the registration if storage fails
 	}
-
+	
 	log.Printf("App %s automatically registered with platform domain: %s", appName, platformDomain)
 	return nil
 }
@@ -236,7 +236,7 @@ func (h *DomainHandler) ListDomains(c *fiber.Ctx) error {
 
 	for domain := range domainMap {
 		domains = append(domains, domain)
-
+		
 		// Get certificate info for each domain if certificate manager is available
 		if h.certManager != nil {
 			if cert, err := h.certManager.GetDomainCertificate(appName, domain); err == nil {
@@ -632,3 +632,4 @@ func (h *DomainHandler) RemoveCertificate(c *fiber.Ctx) error {
 		Message: "Certificate removed successfully",
 	})
 }
+

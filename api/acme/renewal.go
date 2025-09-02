@@ -24,41 +24,41 @@ type RenewalService struct {
 
 // RenewalConfig contains configuration for the renewal service
 type RenewalConfig struct {
-	CheckInterval      time.Duration `json:"check_interval"`      // How often to check for expiring certificates
-	RenewalThreshold   time.Duration `json:"renewal_threshold"`   // How long before expiry to renew
-	RetryInterval      time.Duration `json:"retry_interval"`      // How long to wait between retries
-	MaxRetries         int           `json:"max_retries"`         // Maximum number of retry attempts
-	ConcurrentRenewals int           `json:"concurrent_renewals"` // Maximum concurrent renewals
-	NotifyWebhook      string        `json:"notify_webhook"`      // Webhook URL for notifications
+	CheckInterval      time.Duration `json:"check_interval"`       // How often to check for expiring certificates
+	RenewalThreshold   time.Duration `json:"renewal_threshold"`    // How long before expiry to renew
+	RetryInterval      time.Duration `json:"retry_interval"`       // How long to wait between retries
+	MaxRetries         int           `json:"max_retries"`          // Maximum number of retry attempts
+	ConcurrentRenewals int           `json:"concurrent_renewals"`  // Maximum concurrent renewals
+	NotifyWebhook      string        `json:"notify_webhook"`       // Webhook URL for notifications
 }
 
 // RenewalResult represents the result of a renewal attempt
 type RenewalResult struct {
-	Domain    string        `json:"domain"`
-	Success   bool          `json:"success"`
-	Error     string        `json:"error,omitempty"`
-	Timestamp time.Time     `json:"timestamp"`
+	Domain    string    `json:"domain"`
+	Success   bool      `json:"success"`
+	Error     string    `json:"error,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
 	Duration  time.Duration `json:"duration"`
 }
 
 // RenewalStats tracks renewal statistics
 type RenewalStats struct {
-	TotalRenewals      int           `json:"total_renewals"`
-	SuccessfulRenewals int           `json:"successful_renewals"`
-	FailedRenewals     int           `json:"failed_renewals"`
-	LastRenewalCheck   time.Time     `json:"last_renewal_check"`
-	LastRenewalTime    time.Time     `json:"last_renewal_time"`
+	TotalRenewals     int       `json:"total_renewals"`
+	SuccessfulRenewals int      `json:"successful_renewals"`
+	FailedRenewals    int       `json:"failed_renewals"`
+	LastRenewalCheck  time.Time `json:"last_renewal_check"`
+	LastRenewalTime   time.Time `json:"last_renewal_time"`
 	AverageRenewalTime time.Duration `json:"average_renewal_time"`
 }
 
 // DefaultRenewalConfig returns default configuration for the renewal service
 func DefaultRenewalConfig() *RenewalConfig {
 	return &RenewalConfig{
-		CheckInterval:      6 * time.Hour,       // Check every 6 hours
+		CheckInterval:      6 * time.Hour,  // Check every 6 hours
 		RenewalThreshold:   30 * 24 * time.Hour, // Renew 30 days before expiry
-		RetryInterval:      1 * time.Hour,       // Retry every hour on failure
-		MaxRetries:         3,                   // Maximum 3 retry attempts
-		ConcurrentRenewals: 2,                   // Maximum 2 concurrent renewals
+		RetryInterval:      1 * time.Hour,  // Retry every hour on failure
+		MaxRetries:         3,              // Maximum 3 retry attempts
+		ConcurrentRenewals: 2,              // Maximum 2 concurrent renewals
 	}
 }
 
@@ -91,7 +91,7 @@ func (rs *RenewalService) Start(ctx context.Context) error {
 
 	go rs.runRenewalLoop(ctx)
 
-	log.Printf("Certificate renewal service started (check interval: %v, renewal threshold: %v)",
+	log.Printf("Certificate renewal service started (check interval: %v, renewal threshold: %v)", 
 		rs.config.CheckInterval, rs.config.RenewalThreshold)
 	return nil
 }
@@ -129,7 +129,7 @@ func (rs *RenewalService) TriggerRenewal(ctx context.Context) ([]*RenewalResult,
 // RenewCertificate manually renews a specific certificate
 func (rs *RenewalService) RenewCertificate(ctx context.Context, domain string) (*RenewalResult, error) {
 	log.Printf("Manual renewal requested for domain: %s", domain)
-
+	
 	start := time.Now()
 	result := &RenewalResult{
 		Domain:    domain,
@@ -166,7 +166,7 @@ func (rs *RenewalService) RenewCertificate(ctx context.Context, domain string) (
 
 	result.Success = true
 	result.Duration = time.Since(start)
-
+	
 	log.Printf("Certificate renewed successfully for domain: %s (took %v)", domain, result.Duration)
 	return result, nil
 }
@@ -207,7 +207,7 @@ func (rs *RenewalService) runRenewalLoop(ctx context.Context) {
 // performRenewalCheck performs a renewal check
 func (rs *RenewalService) performRenewalCheck(ctx context.Context) {
 	log.Printf("Starting automatic certificate renewal check")
-
+	
 	results, err := rs.checkAndRenewCertificates(ctx)
 	if err != nil {
 		log.Printf("Error during renewal check: %v", err)
@@ -245,7 +245,7 @@ func (rs *RenewalService) checkAndRenewCertificates(ctx context.Context) ([]*Ren
 	// Create semaphore for concurrent renewals
 	semaphore := make(chan struct{}, rs.config.ConcurrentRenewals)
 	resultsCh := make(chan *RenewalResult, len(expiring))
-
+	
 	var wg sync.WaitGroup
 
 	// Process each expiring certificate
@@ -253,7 +253,7 @@ func (rs *RenewalService) checkAndRenewCertificates(ctx context.Context) ([]*Ren
 		wg.Add(1)
 		go func(domain string) {
 			defer wg.Done()
-
+			
 			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
@@ -282,7 +282,7 @@ func (rs *RenewalService) checkAndRenewCertificates(ctx context.Context) ([]*Ren
 // renewWithRetries attempts to renew a certificate with retries
 func (rs *RenewalService) renewWithRetries(ctx context.Context, domain string) *RenewalResult {
 	var lastErr error
-
+	
 	for attempt := 0; attempt < rs.config.MaxRetries; attempt++ {
 		if attempt > 0 {
 			log.Printf("Retrying renewal for domain %s (attempt %d/%d)", domain, attempt+1, rs.config.MaxRetries)

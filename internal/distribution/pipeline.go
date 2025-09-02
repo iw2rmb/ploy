@@ -34,39 +34,39 @@ func (bp *BuildPipeline) BuildAndDistribute(version string, platforms []string, 
 	if err != nil {
 		return fmt.Errorf("failed to get git commit: %w", err)
 	}
-
+	
 	// Build for each platform
 	for _, platform := range platforms {
 		parts := strings.Split(platform, "/")
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid platform format: %s (expected os/arch)", platform)
 		}
-
+		
 		goos, goarch := parts[0], parts[1]
-
+		
 		// Build binary
 		binaryPath, err := bp.buildBinary(goos, goarch, version)
 		if err != nil {
 			return fmt.Errorf("failed to build binary for %s: %w", platform, err)
 		}
-
+		
 		// Create binary info
 		info := CreateBinaryInfo(version, gitCommit, metadata)
 		info.Platform = goos
 		info.Architecture = goarch
 		info.Path = binaryPath
-
+		
 		// Upload to storage
 		if err := bp.distributor.UploadBinary(binaryPath, info); err != nil {
 			return fmt.Errorf("failed to upload binary for %s: %w", platform, err)
 		}
-
+		
 		// Clean up local binary
 		os.Remove(binaryPath)
-
+		
 		fmt.Printf("Successfully built and distributed controller v%s for %s\n", version, platform)
 	}
-
+	
 	return nil
 }
 
@@ -76,14 +76,14 @@ func (bp *BuildPipeline) buildBinary(goos, goarch, version string) (string, erro
 	if err := os.MkdirAll(bp.buildDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create build directory: %w", err)
 	}
-
+	
 	// Binary output path
 	binaryName := "controller"
 	if goos == "windows" {
 		binaryName += ".exe"
 	}
 	binaryPath := filepath.Join(bp.buildDir, fmt.Sprintf("controller-%s-%s-%s", version, goos, goarch))
-
+	
 	// Build command
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./controller")
 	cmd.Dir = bp.gitRepo
@@ -92,23 +92,23 @@ func (bp *BuildPipeline) buildBinary(goos, goarch, version string) (string, erro
 		"GOARCH="+goarch,
 		"CGO_ENABLED=0",
 	)
-
+	
 	// Add build-time variables
 	ldflags := fmt.Sprintf("-ldflags=-X main.Version=%s -X main.BuildTime=%s -X main.GitCommit=%s",
 		version,
 		time.Now().Format(time.RFC3339),
 		bp.getCurrentGitCommit(),
 	)
-
+	
 	cmd.Args = append(cmd.Args[:2], ldflags)
 	cmd.Args = append(cmd.Args, cmd.Args[2:]...)
-
+	
 	// Execute build
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("build failed: %w\nOutput: %s", err, string(output))
 	}
-
+	
 	return binaryPath, nil
 }
 
@@ -116,12 +116,12 @@ func (bp *BuildPipeline) buildBinary(goos, goarch, version string) (string, erro
 func (bp *BuildPipeline) getGitCommit() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	cmd.Dir = bp.gitRepo
-
+	
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
-
+	
 	return strings.TrimSpace(string(output)), nil
 }
 

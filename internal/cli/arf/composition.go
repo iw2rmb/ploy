@@ -33,41 +33,41 @@ type CompositionConfig struct {
 
 // CompositionExecution represents an execution of a recipe composition
 type CompositionExecution struct {
-	ID            string                  `json:"id"`
-	CompositionID string                  `json:"composition_id"`
-	Repository    string                  `json:"repository"`
-	Branch        string                  `json:"branch"`
-	Status        string                  `json:"status"`
-	StartTime     time.Time               `json:"start_time"`
-	EndTime       time.Time               `json:"end_time,omitempty"`
-	Duration      string                  `json:"duration,omitempty"`
-	Results       []RecipeExecutionResult `json:"results"`
-	Summary       CompositionSummary      `json:"summary"`
+	ID            string                   `json:"id"`
+	CompositionID string                   `json:"composition_id"`
+	Repository    string                   `json:"repository"`
+	Branch        string                   `json:"branch"`
+	Status        string                   `json:"status"`
+	StartTime     time.Time                `json:"start_time"`
+	EndTime       time.Time                `json:"end_time,omitempty"`
+	Duration      string                   `json:"duration,omitempty"`
+	Results       []RecipeExecutionResult  `json:"results"`
+	Summary       CompositionSummary       `json:"summary"`
 }
 
 // RecipeExecutionResult represents the result of executing a single recipe
 type RecipeExecutionResult struct {
-	RecipeID     string    `json:"recipe_id"`
-	RecipeName   string    `json:"recipe_name"`
-	Status       string    `json:"status"` // success, failed, skipped
-	StartTime    time.Time `json:"start_time"`
-	EndTime      time.Time `json:"end_time"`
-	Duration     string    `json:"duration"`
-	Output       string    `json:"output,omitempty"`
-	Error        string    `json:"error,omitempty"`
-	FilesChanged int       `json:"files_changed"`
-	LinesChanged int       `json:"lines_changed"`
+	RecipeID    string    `json:"recipe_id"`
+	RecipeName  string    `json:"recipe_name"`
+	Status      string    `json:"status"` // success, failed, skipped
+	StartTime   time.Time `json:"start_time"`
+	EndTime     time.Time `json:"end_time"`
+	Duration    string    `json:"duration"`
+	Output      string    `json:"output,omitempty"`
+	Error       string    `json:"error,omitempty"`
+	FilesChanged int      `json:"files_changed"`
+	LinesChanged int      `json:"lines_changed"`
 }
 
 // CompositionSummary provides a summary of composition execution
 type CompositionSummary struct {
-	TotalRecipes   int     `json:"total_recipes"`
-	SuccessfulRuns int     `json:"successful_runs"`
-	FailedRuns     int     `json:"failed_runs"`
-	SkippedRuns    int     `json:"skipped_runs"`
-	TotalFiles     int     `json:"total_files_changed"`
-	TotalLines     int     `json:"total_lines_changed"`
-	SuccessRate    float64 `json:"success_rate"`
+	TotalRecipes    int `json:"total_recipes"`
+	SuccessfulRuns  int `json:"successful_runs"`
+	FailedRuns      int `json:"failed_runs"`
+	SkippedRuns     int `json:"skipped_runs"`
+	TotalFiles      int `json:"total_files_changed"`
+	TotalLines      int `json:"total_lines_changed"`
+	SuccessRate     float64 `json:"success_rate"`
 }
 
 // composeRecipes creates and executes a recipe composition
@@ -98,7 +98,7 @@ func composeRecipes(args []string) error {
 	i := 0
 	for i < len(args) {
 		arg := args[i]
-
+		
 		// Check for flags
 		if strings.HasPrefix(arg, "--") {
 			switch arg {
@@ -224,9 +224,9 @@ func executeComposition(composition RecipeComposition, repository, branch, outpu
 // executeCompositionAgainstRepo executes a composition against a repository
 func executeCompositionAgainstRepo(compositionID, repository, branch, outputDir string, generateReport bool) error {
 	executionPayload := map[string]interface{}{
-		"composition_id":  compositionID,
-		"repository":      repository,
-		"branch":          branch,
+		"composition_id": compositionID,
+		"repository":     repository,
+		"branch":         branch,
 		"generate_report": generateReport,
 	}
 
@@ -265,7 +265,7 @@ func displayCompositionResults(execution CompositionExecution, verbose bool) err
 	fmt.Printf("Branch:       %s\n", execution.Branch)
 	fmt.Printf("Status:       %s\n", execution.Status)
 	fmt.Printf("Duration:     %s\n", execution.Duration)
-
+	
 	// Summary
 	summary := execution.Summary
 	fmt.Printf("\nSummary:\n")
@@ -287,13 +287,13 @@ func displayCompositionResults(execution CompositionExecution, verbose bool) err
 			} else if result.Status == "skipped" {
 				status = "⏭️"
 			}
-
+			
 			fmt.Printf("  %d. %s %s (%s) - %s\n", i+1, status, result.RecipeName, result.RecipeID, result.Duration)
-
+			
 			if result.FilesChanged > 0 || result.LinesChanged > 0 {
 				fmt.Printf("     Changed: %d files, %d lines\n", result.FilesChanged, result.LinesChanged)
 			}
-
+			
 			if verbose && result.Error != "" {
 				fmt.Printf("     Error: %s\n", result.Error)
 			}
@@ -361,7 +361,7 @@ func listCompositions(outputFormat string, verbose bool) error {
 			fmt.Printf("  Recipes: %s\n", strings.Join(comp.RecipeIDs, ", "))
 			if verbose {
 				fmt.Printf("  Created: %s by %s\n", comp.CreatedAt.Format("2006-01-02 15:04"), comp.CreatedBy)
-				fmt.Printf("  Config: stop_on_error=%t, parallel=%t, timeout=%s\n",
+				fmt.Printf("  Config: stop_on_error=%t, parallel=%t, timeout=%s\n", 
 					comp.Config.StopOnError, comp.Config.Parallel, comp.Config.Timeout)
 			}
 			fmt.Println()

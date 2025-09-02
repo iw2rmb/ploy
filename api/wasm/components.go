@@ -20,13 +20,13 @@ type ComponentManager struct {
 
 // ComponentSpec defines a multi-module WASM application configuration
 type ComponentSpec struct {
-	Name         string            `json:"name"`
-	Version      string            `json:"version"`
-	MainModule   string            `json:"main_module"`
-	Dependencies []ComponentDep    `json:"dependencies"`
-	Interfaces   []InterfaceSpec   `json:"interfaces"`
-	Resources    ResourceLimits    `json:"resources"`
-	Environment  map[string]string `json:"environment"`
+	Name        string            `json:"name"`
+	Version     string            `json:"version"`
+	MainModule  string            `json:"main_module"`
+	Dependencies []ComponentDep   `json:"dependencies"`
+	Interfaces  []InterfaceSpec   `json:"interfaces"`
+	Resources   ResourceLimits    `json:"resources"`
+	Environment map[string]string `json:"environment"`
 }
 
 // ComponentDep represents a dependency module in a WASM component
@@ -201,7 +201,7 @@ func (cm *ComponentManager) ValidateInterfaces(spec ComponentSpec) error {
 func (cm *ComponentManager) Close(ctx context.Context) error {
 	// Clear module cache
 	cm.modules = make(map[string]wazero.CompiledModule)
-
+	
 	// Close runtime
 	return cm.runtime.Close(ctx)
 }
@@ -271,11 +271,11 @@ func ParseComponentSpec(specPath string) (*ComponentSpec, error) {
 // GenerateComponentSpec creates a basic component specification template
 func GenerateComponentSpec(name, mainModule string, dependencies []string) *ComponentSpec {
 	spec := &ComponentSpec{
-		Name:         name,
-		Version:      "1.0.0",
-		MainModule:   mainModule,
+		Name:        name,
+		Version:     "1.0.0",
+		MainModule:  mainModule,
 		Dependencies: make([]ComponentDep, 0, len(dependencies)),
-		Interfaces:   []InterfaceSpec{},
+		Interfaces:  []InterfaceSpec{},
 		Resources: ResourceLimits{
 			MaxMemoryMB:     32,
 			MaxExecutionSec: 30,
@@ -311,7 +311,7 @@ func (cm *ComponentManager) ListComponents() []string {
 // GetComponentInfo returns detailed information about a loaded component
 func (cm *ComponentManager) GetComponentInfo(componentName string) map[string]interface{} {
 	info := make(map[string]interface{})
-
+	
 	// Check if main module exists
 	mainKey := componentName + "_main"
 	if _, exists := cm.modules[mainKey]; exists {

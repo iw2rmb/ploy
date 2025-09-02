@@ -14,9 +14,9 @@ func RetryWithBackoff(ctx context.Context, operation RetryOperation, config *Ret
 	if config == nil {
 		config = DefaultRetryConfig()
 	}
-
+	
 	var lastErr *StorageError
-
+	
 	for attempt := 0; attempt < config.MaxAttempts; attempt++ {
 		// Execute the operation
 		err := operation()
@@ -27,7 +27,7 @@ func RetryWithBackoff(ctx context.Context, operation RetryOperation, config *Ret
 			}
 			return nil
 		}
-
+		
 		// Convert to StorageError if not already
 		var storageErr *StorageError
 		if se, ok := err.(*StorageError); ok {
@@ -37,15 +37,15 @@ func RetryWithBackoff(ctx context.Context, operation RetryOperation, config *Ret
 				AttemptNumber: attempt + 1,
 			})
 		}
-
+		
 		lastErr = storageErr
-
+		
 		// Check if we should retry
 		if !config.ShouldRetry(storageErr, attempt) {
 			fmt.Printf("Storage operation '%s' failed (non-retryable): %v\n", operationName, storageErr)
 			return storageErr
 		}
-
+		
 		// Calculate delay for next attempt
 		var delay time.Duration
 		if storageErr.RetryAfter > 0 {
@@ -53,10 +53,10 @@ func RetryWithBackoff(ctx context.Context, operation RetryOperation, config *Ret
 		} else {
 			delay = config.CalculateDelay(attempt)
 		}
-
-		fmt.Printf("Storage operation '%s' attempt %d failed (%s), retrying in %v: %s\n",
+		
+		fmt.Printf("Storage operation '%s' attempt %d failed (%s), retrying in %v: %s\n", 
 			operationName, attempt+1, storageErr.ErrorType, delay, storageErr.Message)
-
+		
 		// Wait before retry, respecting context cancellation
 		select {
 		case <-ctx.Done():
@@ -65,9 +65,9 @@ func RetryWithBackoff(ctx context.Context, operation RetryOperation, config *Ret
 			// Continue to next attempt
 		}
 	}
-
+	
 	// All attempts exhausted
-	return fmt.Errorf("storage operation '%s' failed after %d attempts: %w",
+	return fmt.Errorf("storage operation '%s' failed after %d attempts: %w", 
 		operationName, config.MaxAttempts, lastErr)
 }
 
@@ -82,7 +82,7 @@ func NewRetryableStorageClient(client StorageProvider, config *RetryConfig) *Ret
 	if config == nil {
 		config = DefaultRetryConfig()
 	}
-
+	
 	return &RetryableStorageClient{
 		client: client,
 		config: config,
@@ -93,17 +93,17 @@ func NewRetryableStorageClient(client StorageProvider, config *RetryConfig) *Ret
 func (r *RetryableStorageClient) PutObject(bucket, key string, body ReadSeekerResetter, contentType string) (*PutObjectResult, error) {
 	ctx := context.Background()
 	var result *PutObjectResult
-
+	
 	operation := func() error {
 		// Reset body to beginning before each attempt
 		if err := body.Reset(); err != nil {
 			return NewStorageError("put_object", err, ErrorContext{
-				Bucket:      bucket,
-				Key:         key,
+				Bucket: bucket,
+				Key:    key,
 				ContentType: contentType,
 			})
 		}
-
+		
 		var err error
 		result, err = r.client.PutObject(bucket, key, body, contentType)
 		if err != nil {
@@ -116,7 +116,7 @@ func (r *RetryableStorageClient) PutObject(bucket, key string, body ReadSeekerRe
 		}
 		return nil
 	}
-
+	
 	err := RetryWithBackoff(ctx, operation, r.config, fmt.Sprintf("put_object(%s/%s)", bucket, key))
 	return result, err
 }
@@ -125,7 +125,7 @@ func (r *RetryableStorageClient) PutObject(bucket, key string, body ReadSeekerRe
 func (r *RetryableStorageClient) GetObject(bucket, key string) (ReadCloserWithRetry, error) {
 	ctx := context.Background()
 	var reader ReadCloserWithRetry
-
+	
 	operation := func() error {
 		rc, err := r.client.GetObject(bucket, key)
 		if err != nil {
@@ -143,7 +143,7 @@ func (r *RetryableStorageClient) GetObject(bucket, key string) (ReadCloserWithRe
 		}
 		return nil
 	}
-
+	
 	err := RetryWithBackoff(ctx, operation, r.config, fmt.Sprintf("get_object(%s/%s)", bucket, key))
 	return reader, err
 }
@@ -151,7 +151,7 @@ func (r *RetryableStorageClient) GetObject(bucket, key string) (ReadCloserWithRe
 // UploadArtifactBundle uploads an artifact bundle with retry logic
 func (r *RetryableStorageClient) UploadArtifactBundle(keyPrefix, artifactPath string) error {
 	ctx := context.Background()
-
+	
 	operation := func() error {
 		err := r.client.UploadArtifactBundle(keyPrefix, artifactPath)
 		if err != nil {
@@ -161,7 +161,7 @@ func (r *RetryableStorageClient) UploadArtifactBundle(keyPrefix, artifactPath st
 		}
 		return nil
 	}
-
+	
 	return RetryWithBackoff(ctx, operation, r.config, fmt.Sprintf("upload_artifact_bundle(%s)", keyPrefix))
 }
 
@@ -169,7 +169,7 @@ func (r *RetryableStorageClient) UploadArtifactBundle(keyPrefix, artifactPath st
 func (r *RetryableStorageClient) UploadArtifactBundleWithVerification(keyPrefix, artifactPath string) (*BundleIntegrityResult, error) {
 	ctx := context.Background()
 	var result *BundleIntegrityResult
-
+	
 	operation := func() error {
 		var err error
 		result, err = r.client.UploadArtifactBundleWithVerification(keyPrefix, artifactPath)
@@ -178,18 +178,18 @@ func (r *RetryableStorageClient) UploadArtifactBundleWithVerification(keyPrefix,
 				Key: keyPrefix,
 			})
 		}
-
+		
 		// Additional validation of verification result
 		if result != nil && !result.Verified {
-			return NewStorageError("upload_artifact_bundle_with_verification",
+			return NewStorageError("upload_artifact_bundle_with_verification", 
 				fmt.Errorf("integrity verification failed"), ErrorContext{
-					Key: keyPrefix,
-				})
+				Key: keyPrefix,
+			})
 		}
-
+		
 		return nil
 	}
-
+	
 	err := RetryWithBackoff(ctx, operation, r.config, fmt.Sprintf("upload_artifact_bundle_with_verification(%s)", keyPrefix))
 	return result, err
 }
@@ -197,7 +197,7 @@ func (r *RetryableStorageClient) UploadArtifactBundleWithVerification(keyPrefix,
 // VerifyUpload verifies an upload with retry logic
 func (r *RetryableStorageClient) VerifyUpload(key string) error {
 	ctx := context.Background()
-
+	
 	operation := func() error {
 		err := r.client.VerifyUpload(key)
 		if err != nil {
@@ -207,7 +207,7 @@ func (r *RetryableStorageClient) VerifyUpload(key string) error {
 		}
 		return nil
 	}
-
+	
 	return RetryWithBackoff(ctx, operation, r.config, fmt.Sprintf("verify_upload(%s)", key))
 }
 
@@ -215,7 +215,7 @@ func (r *RetryableStorageClient) VerifyUpload(key string) error {
 func (r *RetryableStorageClient) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
 	ctx := context.Background()
 	var objects []ObjectInfo
-
+	
 	operation := func() error {
 		var err error
 		objects, err = r.client.ListObjects(bucket, prefix)
@@ -227,7 +227,7 @@ func (r *RetryableStorageClient) ListObjects(bucket, prefix string) ([]ObjectInf
 		}
 		return nil
 	}
-
+	
 	err := RetryWithBackoff(ctx, operation, r.config, fmt.Sprintf("list_objects(%s/%s)", bucket, prefix))
 	return objects, err
 }
@@ -287,13 +287,13 @@ func (r *retryableReadCloser) Retry() error {
 	if r.reader != nil {
 		r.reader.Close()
 	}
-
+	
 	// Reopen the stream
 	newReader, err := r.client.GetObject(r.bucket, r.key)
 	if err != nil {
 		return err
 	}
-
+	
 	r.reader = newReader
 	return nil
 }
@@ -303,12 +303,12 @@ func isRetryableReadError(err error) bool {
 	if err == nil {
 		return false
 	}
-
+	
 	// Check for network-related read errors
 	if isNetworkError(err) || isTimeoutError(err) {
 		return true
 	}
-
+	
 	return false
 }
 

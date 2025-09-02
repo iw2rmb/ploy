@@ -354,12 +354,12 @@ func (a *PylintAnalyzer) findPythonFiles(codebase analysis.Codebase) []string {
 func (a *PylintAnalyzer) detectPythonProject(codebase analysis.Codebase) string {
 	// Check for various Python project files
 	projectIndicators := map[string]string{
-		"pyproject.toml":   "poetry",
-		"poetry.lock":      "poetry",
-		"Pipfile":          "pipenv",
-		"Pipfile.lock":     "pipenv",
-		"setup.py":         "setuptools",
-		"setup.cfg":        "setuptools",
+		"pyproject.toml": "poetry",
+		"poetry.lock":    "poetry",
+		"Pipfile":        "pipenv",
+		"Pipfile.lock":   "pipenv",
+		"setup.py":       "setuptools",
+		"setup.cfg":      "setuptools",
 		"requirements.txt": "pip",
 		"environment.yml":  "conda",
 		"environment.yaml": "conda",
@@ -382,9 +382,9 @@ func (a *PylintAnalyzer) detectPythonProject(codebase analysis.Codebase) string 
 	if codebase.RootPath != "" {
 		// Check in order of precedence
 		checkOrder := []string{
-			"pyproject.toml", "poetry.lock", // Poetry
-			"Pipfile", "Pipfile.lock", // Pipenv
-			"setup.py", "setup.cfg", // Setuptools
+			"pyproject.toml", "poetry.lock",  // Poetry
+			"Pipfile", "Pipfile.lock",         // Pipenv
+			"setup.py", "setup.cfg",            // Setuptools
 			"environment.yml", "environment.yaml", "conda.yml", "conda.yaml", // Conda
 			"requirements.txt", // Pip
 		}

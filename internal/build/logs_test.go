@@ -11,9 +11,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
+	"github.com/stretchr/testify/mock"
+	
 	"github.com/iw2rmb/ploy/api/nomad"
 )
 
@@ -63,8 +63,8 @@ func (m *MockHealthMonitor) WithAllocations(jobID string, allocCount int) *MockH
 	for i := 0; i < allocCount; i++ {
 		healthy := true
 		allocs[i] = &nomad.AllocationStatus{
-			ID:            fmt.Sprintf("alloc-%d", i+1),
-			ClientStatus:  "running",
+			ID:           fmt.Sprintf("alloc-%d", i+1),
+			ClientStatus: "running",
 			DesiredStatus: "run",
 			DeploymentStatus: &nomad.AllocDeploymentStatus{
 				Healthy:   &healthy,
@@ -86,19 +86,20 @@ func (m *MockHealthMonitor) WithNoAllocations(jobID string) *MockHealthMonitor {
 	return m
 }
 
+
 func TestGetLogsWithMonitor(t *testing.T) {
 	tests := []struct {
-		name             string
-		appName          string
-		queryParams      string
-		setupMock        func(*MockHealthMonitor)
-		expectedStatus   int
-		expectedFields   map[string]interface{}
+		name           string
+		appName        string
+		queryParams    string
+		setupMock      func(*MockHealthMonitor)
+		expectedStatus int
+		expectedFields map[string]interface{}
 		expectedContains []string
 	}{
 		{
-			name:        "successful logs retrieval with allocations",
-			appName:     "test-app",
+			name:    "successful logs retrieval with allocations",
+			appName: "test-app",
 			queryParams: "?lines=50",
 			setupMock: func(m *MockHealthMonitor) {
 				// First few lanes return not found, lane c has the app
@@ -109,8 +110,8 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			},
 			expectedStatus: 200,
 			expectedFields: map[string]interface{}{
-				"app_name":        "test-app",
-				"job_name":        "test-app-lane-c",
+				"app_name": "test-app",
+				"job_name": "test-app-lane-c",
 				"lines_requested": "50",
 			},
 			expectedContains: []string{"test-app-lane-c", "Allocations found: 2", "alloc-1", "alloc-2"},
@@ -139,9 +140,9 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			},
 			expectedStatus: 200,
 			expectedFields: map[string]interface{}{
-				"app_name":        "empty-app",
-				"job_name":        "empty-app-lane-a",
-				"logs":            "No running allocations found",
+				"app_name": "empty-app",
+				"job_name": "empty-app-lane-a",
+				"logs": "No running allocations found",
 				"lines_requested": "100", // default value
 			},
 		},
@@ -154,7 +155,7 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			},
 			expectedStatus: 500,
 			expectedFields: map[string]interface{}{
-				"error":   "Failed to retrieve allocations",
+				"error": "Failed to retrieve allocations",
 				"details": "nomad connection failed",
 			},
 		},
@@ -163,7 +164,7 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			appName:        "invalid app",
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
-				"error":   "Invalid app name",
+				"error": "Invalid app name",
 				"details": "app name must start with a letter, end with a letter or number, and contain only lowercase letters, numbers, and hyphens",
 			},
 		},
@@ -172,7 +173,7 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			appName:        "invalid/app",
 			expectedStatus: 400,
 			expectedFields: map[string]interface{}{
-				"error":   "Invalid app name",
+				"error": "Invalid app name",
 				"details": "app name must start with a letter, end with a letter or number, and contain only lowercase letters, numbers, and hyphens",
 			},
 		},
@@ -196,8 +197,8 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			expectedContains: []string{"wasm-app-lane-g", "Allocations found: 1"},
 		},
 		{
-			name:        "custom lines parameter",
-			appName:     "lines-app",
+			name:    "custom lines parameter",
+			appName: "lines-app",
 			queryParams: "?lines=500&follow=true",
 			setupMock: func(m *MockHealthMonitor) {
 				m.WithJobFound("lines-app-lane-a", "running")
@@ -205,8 +206,8 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			},
 			expectedStatus: 200,
 			expectedFields: map[string]interface{}{
-				"app_name":        "lines-app",
-				"job_name":        "lines-app-lane-a",
+				"app_name": "lines-app",
+				"job_name": "lines-app-lane-a",
 				"lines_requested": "500",
 			},
 			expectedContains: []string{"Allocations found: 3"},
@@ -217,7 +218,7 @@ func TestGetLogsWithMonitor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create Fiber app
 			app := fiber.New()
-
+			
 			// Set up mock if provided
 			var monitor HealthMonitorInterface
 			if tt.setupMock != nil {
@@ -225,47 +226,47 @@ func TestGetLogsWithMonitor(t *testing.T) {
 				tt.setupMock(mockMonitor)
 				monitor = mockMonitor
 			}
-
+			
 			// Create route with mock monitor
 			app.Get("/apps/:app/logs", func(c *fiber.Ctx) error {
 				return getLogsWithMonitor(c, monitor)
 			})
-
+			
 			// Create test request
 			testURL := fmt.Sprintf("/apps/%s/logs%s", url.PathEscape(tt.appName), tt.queryParams)
 			req := httptest.NewRequest("GET", testURL, nil)
-
+			
 			// Execute request
 			resp, err := app.Test(req, 10000) // 10 second timeout
 			require.NoError(t, err)
-
+			
 			// Verify status code
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode, "Unexpected status code")
-
+			
 			// Parse response body
 			var respBody map[string]interface{}
 			err = json.NewDecoder(resp.Body).Decode(&respBody)
 			require.NoError(t, err, "Failed to decode response body")
-
+			
 			// Verify expected fields
 			for key, expectedValue := range tt.expectedFields {
 				actualValue, exists := respBody[key]
 				require.True(t, exists, "Expected field %s not found in response", key)
 				assert.Equal(t, expectedValue, actualValue, "Field %s has unexpected value", key)
 			}
-
+			
 			// Verify expected content in logs field
 			if len(tt.expectedContains) > 0 {
 				logs, exists := respBody["logs"]
 				require.True(t, exists, "Logs field not found in response")
 				logsStr, ok := logs.(string)
 				require.True(t, ok, "Logs field is not a string")
-
+				
 				for _, expectedContent := range tt.expectedContains {
 					assert.Contains(t, logsStr, expectedContent, "Logs should contain: %s", expectedContent)
 				}
 			}
-
+			
 			// Verify timestamp field exists for successful responses
 			if tt.expectedStatus == 200 {
 				timestamp, exists := respBody["timestamp"]
@@ -280,7 +281,7 @@ func TestGetLogsEdgeCases(t *testing.T) {
 	t.Run("multiple allocations with different statuses", func(t *testing.T) {
 		app := fiber.New()
 		mockMonitor := &MockHealthMonitor{}
-
+		
 		// Set up custom allocations with different statuses
 		healthy := true
 		unhealthy := false
@@ -309,59 +310,59 @@ func TestGetLogsEdgeCases(t *testing.T) {
 				DesiredStatus: "stop",
 			},
 		}
-
+		
 		mockMonitor.On("GetJobStatus", "multi-app-lane-a").Return(&nomad.JobStatus{
 			ID:     "multi-app-lane-a",
 			Status: "running",
 		}, nil)
 		mockMonitor.On("GetJobAllocations", "multi-app-lane-a").Return(allocations, nil)
-
+		
 		app.Get("/apps/:app/logs", func(c *fiber.Ctx) error {
 			return getLogsWithMonitor(c, mockMonitor)
 		})
-
+		
 		req := httptest.NewRequest("GET", "/apps/multi-app/logs", nil)
 		resp, err := app.Test(req, 10000)
 		require.NoError(t, err)
-
+		
 		assert.Equal(t, 200, resp.StatusCode)
-
+		
 		var respBody map[string]interface{}
 		err = json.NewDecoder(resp.Body).Decode(&respBody)
 		require.NoError(t, err)
-
+		
 		logs := respBody["logs"].(string)
 		assert.Contains(t, logs, "Allocations found: 3")
 		assert.Contains(t, logs, "alloc-running (running)")
 		assert.Contains(t, logs, "alloc-failed (failed)")
 		assert.Contains(t, logs, "alloc-complete (complete)")
 	})
-
+	
 	t.Run("job status check network timeout", func(t *testing.T) {
 		app := fiber.New()
 		mockMonitor := &MockHealthMonitor{}
-
+		
 		// All job status checks fail due to network issues
 		networkError := errors.New("connection timeout")
 		for _, lane := range []string{"a", "b", "c", "d", "e", "f", "g"} {
 			jobName := fmt.Sprintf("timeout-app-lane-%s", lane)
 			mockMonitor.On("GetJobStatus", jobName).Return(nil, networkError)
 		}
-
+		
 		app.Get("/apps/:app/logs", func(c *fiber.Ctx) error {
 			return getLogsWithMonitor(c, mockMonitor)
 		})
-
+		
 		req := httptest.NewRequest("GET", "/apps/timeout-app/logs", nil)
 		resp, err := app.Test(req, 10000)
 		require.NoError(t, err)
-
+		
 		assert.Equal(t, 404, resp.StatusCode)
-
+		
 		var respBody map[string]interface{}
 		err = json.NewDecoder(resp.Body).Decode(&respBody)
 		require.NoError(t, err)
-
+		
 		assert.Equal(t, "App not found or not deployed", respBody["error"])
 	})
 }
@@ -369,17 +370,17 @@ func TestGetLogsEdgeCases(t *testing.T) {
 func BenchmarkGetLogsWithMonitor(b *testing.B) {
 	app := fiber.New()
 	mockMonitor := &MockHealthMonitor{}
-
+	
 	// Set up a successful scenario
 	mockMonitor.WithJobFound("bench-app-lane-a", "running")
 	mockMonitor.WithAllocations("bench-app-lane-a", 3)
-
+	
 	app.Get("/apps/:app/logs", func(c *fiber.Ctx) error {
 		return getLogsWithMonitor(c, mockMonitor)
 	})
-
+	
 	req := httptest.NewRequest("GET", "/apps/bench-app/logs", nil)
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		resp, err := app.Test(req, 5000)
@@ -393,15 +394,15 @@ func BenchmarkGetLogsWithMonitor(b *testing.B) {
 func TestGetLogs(t *testing.T) {
 	t.Run("GetLogs calls getLogsWithMonitor with real monitor", func(t *testing.T) {
 		app := fiber.New()
-
+		
 		// Use the actual GetLogs function which will use nomad.NewHealthMonitor()
 		// This will likely fail due to no Nomad connection, but it will cover the GetLogs function
 		app.Get("/apps/:app/logs", GetLogs)
-
+		
 		req := httptest.NewRequest("GET", "/apps/test-app/logs", nil)
 		resp, err := app.Test(req, 5000)
 		require.NoError(t, err)
-
+		
 		// We expect this to fail with a connection error or 404, but the GetLogs function line should be covered
 		// The test passes as long as the function is called
 		assert.True(t, resp.StatusCode >= 400) // Expect error due to no Nomad connection

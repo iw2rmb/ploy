@@ -24,20 +24,20 @@ type StorageError struct {
 type ErrorType string
 
 const (
-	ErrorTypeNetwork            ErrorType = "network"
-	ErrorTypeAuthentication     ErrorType = "authentication"
-	ErrorTypeAuthorization      ErrorType = "authorization"
-	ErrorTypeQuotaExceeded      ErrorType = "quota_exceeded"
-	ErrorTypeStorageFull        ErrorType = "storage_full"
-	ErrorTypeCorruption         ErrorType = "corruption"
-	ErrorTypeTimeout            ErrorType = "timeout"
-	ErrorTypeConfiguration      ErrorType = "configuration"
+	ErrorTypeNetwork         ErrorType = "network"
+	ErrorTypeAuthentication  ErrorType = "authentication"
+	ErrorTypeAuthorization   ErrorType = "authorization"
+	ErrorTypeQuotaExceeded   ErrorType = "quota_exceeded"
+	ErrorTypeStorageFull     ErrorType = "storage_full"
+	ErrorTypeCorruption      ErrorType = "corruption"
+	ErrorTypeTimeout         ErrorType = "timeout"
+	ErrorTypeConfiguration   ErrorType = "configuration"
 	ErrorTypeServiceUnavailable ErrorType = "service_unavailable"
-	ErrorTypeRateLimit          ErrorType = "rate_limit"
-	ErrorTypeInvalidRequest     ErrorType = "invalid_request"
-	ErrorTypeNotFound           ErrorType = "not_found"
-	ErrorTypeInternal           ErrorType = "internal"
-	ErrorTypeUnknown            ErrorType = "unknown"
+	ErrorTypeRateLimit       ErrorType = "rate_limit"
+	ErrorTypeInvalidRequest  ErrorType = "invalid_request"
+	ErrorTypeNotFound        ErrorType = "not_found"
+	ErrorTypeInternal        ErrorType = "internal"
+	ErrorTypeUnknown         ErrorType = "unknown"
 )
 
 // ErrorContext provides additional context for storage errors
@@ -55,7 +55,7 @@ type ErrorContext struct {
 // Error implements the error interface
 func (e *StorageError) Error() string {
 	if e.OriginalError != nil {
-		return fmt.Sprintf("storage %s failed (%s): %s (original: %v)",
+		return fmt.Sprintf("storage %s failed (%s): %s (original: %v)", 
 			e.Operation, e.ErrorType, e.Message, e.OriginalError)
 	}
 	return fmt.Sprintf("storage %s failed (%s): %s", e.Operation, e.ErrorType, e.Message)
@@ -76,7 +76,7 @@ func (e *StorageError) GetRetryDelay() time.Duration {
 	if e.RetryAfter > 0 {
 		return e.RetryAfter
 	}
-
+	
 	// Default retry delays based on error type
 	switch e.ErrorType {
 	case ErrorTypeNetwork, ErrorTypeTimeout:
@@ -93,7 +93,7 @@ func (e *StorageError) GetRetryDelay() time.Duration {
 // NewStorageError creates a new storage error with automatic error classification
 func NewStorageError(operation string, originalErr error, context ErrorContext) *StorageError {
 	errorType, retryable, retryAfter := classifyError(originalErr, context)
-
+	
 	return &StorageError{
 		Operation:     operation,
 		ErrorType:     errorType,
@@ -113,7 +113,7 @@ func classifyError(err error, context ErrorContext) (ErrorType, bool, time.Durat
 	}
 
 	errStr := strings.ToLower(err.Error())
-
+	
 	// HTTP status code classification (check first for precise mapping)
 	switch context.HTTPStatus {
 	case http.StatusUnauthorized:
@@ -136,43 +136,43 @@ func classifyError(err error, context ErrorContext) (ErrorType, bool, time.Durat
 	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		return ErrorTypeServiceUnavailable, true, 5 * time.Second
 	}
-
+	
 	// Network-related errors (check after HTTP status)
 	if isNetworkError(err) {
 		return ErrorTypeNetwork, true, 1 * time.Second
 	}
-
+	
 	// Timeout errors (check after HTTP status to avoid override)
 	if isTimeoutError(err) {
 		return ErrorTypeTimeout, true, 2 * time.Second
 	}
-
+	
 	// Content-based error classification
 	if strings.Contains(errStr, "quota") || strings.Contains(errStr, "limit exceeded") {
 		return ErrorTypeQuotaExceeded, false, 0
 	}
-
+	
 	if strings.Contains(errStr, "no space left") || strings.Contains(errStr, "disk full") {
 		return ErrorTypeStorageFull, false, 0
 	}
-
-	if strings.Contains(errStr, "checksum") || strings.Contains(errStr, "corruption") ||
-		strings.Contains(errStr, "integrity") {
+	
+	if strings.Contains(errStr, "checksum") || strings.Contains(errStr, "corruption") || 
+	   strings.Contains(errStr, "integrity") {
 		return ErrorTypeCorruption, true, 1 * time.Second
 	}
-
+	
 	if strings.Contains(errStr, "authentication") || strings.Contains(errStr, "credentials") {
 		return ErrorTypeAuthentication, false, 0
 	}
-
+	
 	if strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "permission") {
 		return ErrorTypeAuthorization, false, 0
 	}
-
+	
 	if strings.Contains(errStr, "configuration") || strings.Contains(errStr, "config") {
 		return ErrorTypeConfiguration, false, 0
 	}
-
+	
 	// Default to retryable internal error
 	return ErrorTypeInternal, true, 2 * time.Second
 }
@@ -182,7 +182,7 @@ func isNetworkError(err error) bool {
 	if netErr, ok := err.(net.Error); ok {
 		return netErr.Temporary()
 	}
-
+	
 	// Check for common network error messages
 	errStr := strings.ToLower(err.Error())
 	networkPatterns := []string{
@@ -194,13 +194,13 @@ func isNetworkError(err error) bool {
 		"no route to host",
 		"dns",
 	}
-
+	
 	for _, pattern := range networkPatterns {
 		if strings.Contains(errStr, pattern) {
 			return true
 		}
 	}
-
+	
 	return false
 }
 
@@ -209,7 +209,7 @@ func isTimeoutError(err error) bool {
 	if netErr, ok := err.(net.Error); ok {
 		return netErr.Timeout()
 	}
-
+	
 	errStr := strings.ToLower(err.Error())
 	return strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded")
 }
@@ -219,18 +219,18 @@ func parseRetryAfterHeader(headers map[string]string) time.Duration {
 	if headers == nil {
 		return 10 * time.Second
 	}
-
+	
 	retryAfter, exists := headers["Retry-After"]
 	if !exists {
 		retryAfter, exists = headers["retry-after"]
 	}
-
+	
 	if exists {
 		if duration, err := time.ParseDuration(retryAfter + "s"); err == nil {
 			return duration
 		}
 	}
-
+	
 	return 10 * time.Second // Default retry delay for rate limiting
 }
 
@@ -273,11 +273,11 @@ func generateErrorMessage(errorType ErrorType, originalErr error, context ErrorC
 
 // RetryConfig defines retry behavior for storage operations
 type RetryConfig struct {
-	MaxAttempts       int           `json:"max_attempts"`
-	InitialDelay      time.Duration `json:"initial_delay"`
-	MaxDelay          time.Duration `json:"max_delay"`
-	BackoffMultiplier float64       `json:"backoff_multiplier"`
-	RetryableErrors   []ErrorType   `json:"retryable_errors"`
+	MaxAttempts     int           `json:"max_attempts"`
+	InitialDelay    time.Duration `json:"initial_delay"`
+	MaxDelay        time.Duration `json:"max_delay"`
+	BackoffMultiplier float64     `json:"backoff_multiplier"`
+	RetryableErrors   []ErrorType  `json:"retryable_errors"`
 }
 
 // DefaultRetryConfig returns a sensible default retry configuration
@@ -303,18 +303,18 @@ func (rc *RetryConfig) ShouldRetry(err *StorageError, attempt int) bool {
 	if attempt >= rc.MaxAttempts {
 		return false
 	}
-
+	
 	if !err.IsRetryable() {
 		return false
 	}
-
+	
 	// Check if error type is in retryable list
 	for _, retryableType := range rc.RetryableErrors {
 		if err.ErrorType == retryableType {
 			return true
 		}
 	}
-
+	
 	return false
 }
 
@@ -323,13 +323,13 @@ func (rc *RetryConfig) CalculateDelay(attempt int) time.Duration {
 	if attempt <= 0 {
 		return rc.InitialDelay
 	}
-
-	delay := time.Duration(float64(rc.InitialDelay) *
+	
+	delay := time.Duration(float64(rc.InitialDelay) * 
 		(rc.BackoffMultiplier * float64(attempt)))
-
+	
 	if delay > rc.MaxDelay {
 		delay = rc.MaxDelay
 	}
-
+	
 	return delay
 }

@@ -9,11 +9,11 @@
 //   - Similar to Node.js runtime, JVM, or Python interpreter
 //
 // Deployment Flow:
-//  1. Controller compiles user code to WASM
-//  2. Controller builds this binary for target architecture
-//  3. Both get packaged into deployment artifact
-//  4. Nomad deploys container with this as entrypoint
-//  5. This serves HTTP by executing the WASM module
+//   1. Controller compiles user code to WASM
+//   2. Controller builds this binary for target architecture
+//   3. Both get packaged into deployment artifact
+//   4. Nomad deploys container with this as entrypoint
+//   5. This serves HTTP by executing the WASM module
 //
 // See README.md for detailed documentation.
 package main
@@ -36,13 +36,13 @@ import (
 
 func main() {
 	var (
-		modulePath = flag.String("module", "", "Path to WASM module")
-		port       = flag.String("port", "8080", "HTTP port")
-		maxMemory  = flag.String("max-memory", "32MB", "Maximum memory for WASM module")
-		timeout    = flag.String("timeout", "30s", "Execution timeout")
-		envVars    = flag.String("env", "", "Environment variables (comma-separated key=value pairs)")
-		wasiRoot   = flag.String("wasi-root", "/tmp/wasm-sandbox", "WASI filesystem root")
-		logLevel   = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
+		modulePath    = flag.String("module", "", "Path to WASM module")
+		port          = flag.String("port", "8080", "HTTP port")
+		maxMemory     = flag.String("max-memory", "32MB", "Maximum memory for WASM module")
+		timeout       = flag.String("timeout", "30s", "Execution timeout")
+		envVars       = flag.String("env", "", "Environment variables (comma-separated key=value pairs)")
+		wasiRoot      = flag.String("wasi-root", "/tmp/wasm-sandbox", "WASI filesystem root")
+		logLevel      = flag.String("log-level", "info", "Log level (debug, info, warn, error)")
 	)
 	flag.Parse()
 
@@ -82,7 +82,7 @@ func main() {
 
 	// Setup HTTP server
 	mux := http.NewServeMux()
-
+	
 	// Main application handler
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		requestCtx, cancel := context.WithTimeout(r.Context(), config.MaxExecTime)
@@ -153,12 +153,12 @@ func main() {
 		fmt.Fprintf(w, "# HELP wasm_executions_total Total number of WASM executions\n")
 		fmt.Fprintf(w, "# TYPE wasm_executions_total counter\n")
 		fmt.Fprintf(w, "wasm_executions_total %d\n", executionCount)
-
+		
 		fmt.Fprintf(w, "# HELP wasm_execution_duration_seconds Duration of WASM executions\n")
 		fmt.Fprintf(w, "# TYPE wasm_execution_duration_seconds histogram\n")
 		fmt.Fprintf(w, "wasm_execution_duration_seconds_sum %.3f\n", totalExecutionTime.Seconds())
 		fmt.Fprintf(w, "wasm_execution_duration_seconds_count %d\n", executionCount)
-
+		
 		fmt.Fprintf(w, "# HELP wasm_memory_pages_max Maximum memory pages configured\n")
 		fmt.Fprintf(w, "# TYPE wasm_memory_pages_max gauge\n")
 		fmt.Fprintf(w, "wasm_memory_pages_max %d\n", config.MaxMemoryPages)
@@ -191,7 +191,7 @@ func main() {
 	log.Printf("WASM module: %s", *modulePath)
 	log.Printf("Max memory: %s (%d pages)", *maxMemory, config.MaxMemoryPages)
 	log.Printf("Execution timeout: %s", config.MaxExecTime)
-
+	
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("HTTP server error: %v", err)
 	}
@@ -201,9 +201,9 @@ func main() {
 
 // Global metrics (simple counters for now)
 var (
-	startTime          = time.Now()
-	executionCount     int64
-	totalExecutionTime time.Duration
+	startTime           = time.Now()
+	executionCount      int64
+	totalExecutionTime  time.Duration
 )
 
 // parseConfig parses command line configuration into WASMConfig
@@ -240,7 +240,7 @@ func parseConfig(maxMemory, timeout, envVars, wasiRoot string) (runtime.WASMConf
 // parseMemorySize parses memory size strings like "32MB", "1GB", "512KB"
 func parseMemorySize(size string) (int64, error) {
 	size = strings.ToUpper(strings.TrimSpace(size))
-
+	
 	var multiplier int64 = 1
 	var numStr string
 
@@ -272,7 +272,7 @@ func parseMemorySize(size string) (int64, error) {
 // setupLogging configures logging level and format
 func setupLogging(level string) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
+	
 	switch strings.ToLower(level) {
 	case "debug":
 		log.SetOutput(os.Stdout)

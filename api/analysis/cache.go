@@ -24,10 +24,10 @@ func NewInMemoryCache() *InMemoryCache {
 	cache := &InMemoryCache{
 		entries: make(map[string]*cacheEntry),
 	}
-
+	
 	// Start cleanup goroutine
 	go cache.cleanupExpired()
-
+	
 	return cache
 }
 
@@ -35,19 +35,19 @@ func NewInMemoryCache() *InMemoryCache {
 func (c *InMemoryCache) Get(key string) (*AnalysisResult, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-
+	
 	entry, exists := c.entries[key]
 	if !exists {
 		c.misses++
 		return nil, false
 	}
-
+	
 	// Check if expired
 	if time.Now().After(entry.expiresAt) {
 		c.misses++
 		return nil, false
 	}
-
+	
 	c.hits++
 	return entry.result, true
 }
@@ -56,12 +56,12 @@ func (c *InMemoryCache) Get(key string) (*AnalysisResult, bool) {
 func (c *InMemoryCache) Set(key string, result *AnalysisResult, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
+	
 	c.entries[key] = &cacheEntry{
 		result:    result,
 		expiresAt: time.Now().Add(ttl),
 	}
-
+	
 	return nil
 }
 
@@ -69,7 +69,7 @@ func (c *InMemoryCache) Set(key string, result *AnalysisResult, ttl time.Duratio
 func (c *InMemoryCache) Delete(key string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
+	
 	delete(c.entries, key)
 	return nil
 }
@@ -78,11 +78,11 @@ func (c *InMemoryCache) Delete(key string) error {
 func (c *InMemoryCache) Clear() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
+	
 	c.entries = make(map[string]*cacheEntry)
 	c.hits = 0
 	c.misses = 0
-
+	
 	return nil
 }
 
@@ -90,18 +90,18 @@ func (c *InMemoryCache) Clear() error {
 func (c *InMemoryCache) GetMetrics() map[string]int64 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-
+	
 	total := c.hits + c.misses
 	hitRate := float64(0)
 	if total > 0 {
 		hitRate = float64(c.hits) / float64(total) * 100
 	}
-
+	
 	return map[string]int64{
-		"hits":     c.hits,
-		"misses":   c.misses,
-		"entries":  int64(len(c.entries)),
-		"hit_rate": int64(hitRate),
+		"hits":       c.hits,
+		"misses":     c.misses,
+		"entries":    int64(len(c.entries)),
+		"hit_rate":   int64(hitRate),
 	}
 }
 
@@ -109,7 +109,7 @@ func (c *InMemoryCache) GetMetrics() map[string]int64 {
 func (c *InMemoryCache) cleanupExpired() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-
+	
 	for range ticker.C {
 		c.mu.Lock()
 		now := time.Now()

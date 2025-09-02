@@ -26,7 +26,7 @@ func getControllerURL() string {
 	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
 		return url
 	}
-
+	
 	// Check if PLOY_APPS_DOMAIN is set for SSL endpoint
 	if domain := os.Getenv("PLOY_APPS_DOMAIN"); domain != "" {
 		// Check for environment-specific subdomain
@@ -35,7 +35,7 @@ func getControllerURL() string {
 		}
 		return fmt.Sprintf("https://api.%s/v1", domain)
 	}
-
+	
 	// Default to dev environment endpoint
 	return "https://api.dev.ployman.app/v1"
 }

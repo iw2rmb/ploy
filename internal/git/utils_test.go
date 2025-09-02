@@ -14,10 +14,10 @@ func createTestProjectFiles(t *testing.T, baseDir string, files map[string]strin
 	for filename, content := range files {
 		fullPath := filepath.Join(baseDir, filename)
 		dir := filepath.Dir(fullPath)
-
+		
 		err := os.MkdirAll(dir, 0755)
 		require.NoError(t, err)
-
+		
 		err = os.WriteFile(fullPath, []byte(content), 0644)
 		require.NoError(t, err)
 	}
@@ -26,9 +26,9 @@ func createTestProjectFiles(t *testing.T, baseDir string, files map[string]strin
 // Tests for NewGitUtils function
 func TestNewGitUtils(t *testing.T) {
 	testDir := "/test/working/directory"
-
+	
 	utils := NewGitUtils(testDir)
-
+	
 	assert.NotNil(t, utils)
 	assert.Equal(t, testDir, utils.workingDir)
 }
@@ -77,9 +77,9 @@ func TestGitUtils_normalizeURL(t *testing.T) {
 // Tests for tryParseGitConfig function
 func TestGitUtils_tryParseGitConfig(t *testing.T) {
 	tests := []struct {
-		name          string
+		name        string
 		configContent string
-		expectedURL   string
+		expectedURL string
 	}{
 		{
 			name: "HTTPS origin URL",
@@ -154,9 +154,9 @@ func TestGitUtils_tryParseGitConfig(t *testing.T) {
 // Tests for tryExtractFromPackageJSON function
 func TestGitUtils_tryExtractFromPackageJSON(t *testing.T) {
 	tests := []struct {
-		name           string
-		packageContent string
-		expectedURL    string
+		name            string
+		packageContent  string
+		expectedURL     string
 	}{
 		{
 			name: "repository as string",
@@ -314,7 +314,7 @@ repository = "not-a-repo-url"`,
 	}
 }
 
-// Tests for tryExtractFromGoMod function
+// Tests for tryExtractFromGoMod function  
 func TestGitUtils_tryExtractFromGoMod(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -745,10 +745,10 @@ repository = "https://github.com/user/from-cargo.git"`,
 		createTestProjectFiles(t, tmpDir, files)
 
 		utils := NewGitUtils(tmpDir)
-
+		
 		// The function should prioritize git remote first, then git config, then package.json
 		url, err := utils.GetRepositoryURL()
-
+		
 		require.NoError(t, err)
 		// Should get the first successful extraction (likely package.json)
 		assert.Contains(t, url, "github.com/user/")

@@ -114,7 +114,7 @@ func parseVersion(version string) []int {
 								if day, err := strconv.Atoi(dateStr[6:8]); err == nil {
 									// Valid date format, use timestamp as version
 									timestamp := year*10000 + month*100 + day
-
+									
 									// If there's a time component, add it
 									timeComponent := 0
 									if i+1 < len(parts) && len(parts[i+1]) == 6 {
@@ -122,7 +122,7 @@ func parseVersion(version string) []int {
 											timeComponent = timeVal
 										}
 									}
-
+									
 									return []int{timestamp, timeComponent}
 								}
 							}
@@ -130,7 +130,7 @@ func parseVersion(version string) []int {
 					}
 				}
 			}
-
+			
 			// Fallback: use commit hash as version for Git-based versions
 			if len(parts) >= 2 && len(parts[1]) >= 6 {
 				// Convert first 6 chars of commit hash to number for comparison
@@ -257,13 +257,13 @@ func GetExecutablePath() (string, error) {
 // GetControllerInfo returns information about the running controller
 func GetControllerInfo() map[string]interface{} {
 	executable, _ := GetExecutablePath()
-
+	
 	info := map[string]interface{}{
 		"version":      GetCurrentVersion(),
 		"executable":   executable,
 		"pid":          os.Getpid(),
-		"platform":     "linux", // TODO: detect runtime platform
-		"architecture": "amd64", // TODO: detect runtime architecture
+		"platform":     "linux",  // TODO: detect runtime platform
+		"architecture": "amd64",  // TODO: detect runtime architecture
 	}
 
 	// Add file info if possible

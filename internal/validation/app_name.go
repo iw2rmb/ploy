@@ -18,37 +18,37 @@ var AppNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,61}[a-z0-9]$`)
 func ValidateAppName(appName string) error {
 	// Convert to lowercase for validation
 	appName = strings.ToLower(appName)
-
+	
 	// Check if empty
 	if appName == "" {
 		return fmt.Errorf("app name cannot be empty")
 	}
-
+	
 	// Check minimum length
 	if len(appName) < 2 {
 		return fmt.Errorf("app name must be at least 2 characters long")
 	}
-
+	
 	// Check maximum length
 	if len(appName) > 63 {
 		return fmt.Errorf("app name cannot exceed 63 characters")
 	}
-
+	
 	// Check if reserved
 	if reservedAppNames[appName] {
 		return fmt.Errorf("app name '%s' is reserved for platform use", appName)
 	}
-
+	
 	// Check pattern (lowercase letters, numbers, hyphens)
 	if !AppNamePattern.MatchString(appName) {
 		return fmt.Errorf("app name must start with a letter, end with a letter or number, and contain only lowercase letters, numbers, and hyphens")
 	}
-
+	
 	// Check for double hyphens
 	if strings.Contains(appName, "--") {
 		return fmt.Errorf("app name cannot contain consecutive hyphens")
 	}
-
+	
 	return nil
 }
 

@@ -466,9 +466,9 @@ func TestUntar(t *testing.T) {
 			name: "extract tar with directory structure",
 			setupTarFile: func() (string, error) {
 				return createTestTar(t, tmpDir, map[string]string{
-					"dir1/file1.txt":      "dir content 1",
+					"dir1/file1.txt":     "dir content 1",
 					"dir1/dir2/file2.txt": "nested content",
-					"root.txt":            "root content",
+					"root.txt":           "root content",
 				}, false)
 			},
 			expectedFiles: []string{"dir1/file1.txt", "dir1/dir2/file2.txt", "root.txt"},
@@ -579,7 +579,7 @@ func createTestTar(t *testing.T, baseDir string, files map[string]string, useGzi
 func TestRunLanePick(t *testing.T) {
 	// Note: This test requires the lane-pick tool to be available
 	// In a real scenario, we might want to mock the exec.Command
-
+	
 	tmpDir := createTestTempDir(t)
 	defer cleanupTestTempDir(t, tmpDir)
 
@@ -595,11 +595,11 @@ func TestRunLanePick(t *testing.T) {
 				projectDir := filepath.Join(tmpDir, "go_project")
 				err := os.MkdirAll(projectDir, 0755)
 				require.NoError(t, err)
-
+				
 				// Create go.mod file
 				createTestFile(t, filepath.Join(projectDir, "go.mod"), "module test\n\ngo 1.21")
 				createTestFile(t, filepath.Join(projectDir, "main.go"), "package main\n\nfunc main() {}")
-
+				
 				return projectDir
 			},
 			expectError: false,
@@ -623,7 +623,7 @@ func TestRunLanePick(t *testing.T) {
 					t.Skip("Skipping test - Go not available")
 					return
 				}
-
+				
 				// Check if tools/lane-pick exists
 				if !FileExists("tools/lane-pick") {
 					t.Skip("Skipping test - lane-pick tool not available")
@@ -632,9 +632,9 @@ func TestRunLanePick(t *testing.T) {
 			}
 
 			path := tt.setupPath()
-
+			
 			result, err := RunLanePick(path)
-
+			
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -671,7 +671,7 @@ func BenchmarkParseIntEnv(b *testing.B) {
 func BenchmarkFileExists(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "benchmark_*")
 	defer os.RemoveAll(tmpDir)
-
+	
 	testFile := filepath.Join(tmpDir, "benchmark_file.txt")
 	os.WriteFile(testFile, []byte("benchmark content"), 0644)
 

@@ -10,33 +10,33 @@ import (
 
 // ExecutionRequest represents a recipe execution request
 type ExecutionRequest struct {
-	RecipeID       string            `json:"recipe_id"`
-	Repository     string            `json:"repository"`
-	Branch         string            `json:"branch,omitempty"`
-	OutputDir      string            `json:"output_dir,omitempty"`
-	Environment    map[string]string `json:"environment,omitempty"`
-	WorkingDir     string            `json:"working_dir,omitempty"`
-	Timeout        string            `json:"timeout,omitempty"`
-	DryRun         bool              `json:"dry_run,omitempty"`
-	GenerateReport bool              `json:"generate_report,omitempty"`
+	RecipeID     string            `json:"recipe_id"`
+	Repository   string            `json:"repository"`
+	Branch       string            `json:"branch,omitempty"`
+	OutputDir    string            `json:"output_dir,omitempty"`
+	Environment  map[string]string `json:"environment,omitempty"`
+	WorkingDir   string            `json:"working_dir,omitempty"`
+	Timeout      string            `json:"timeout,omitempty"`
+	DryRun       bool              `json:"dry_run,omitempty"`
+	GenerateReport bool            `json:"generate_report,omitempty"`
 }
 
 // ExecutionResult represents the result of a recipe execution
 type ExecutionResult struct {
-	ID          string            `json:"id"`
-	RecipeID    string            `json:"recipe_id"`
-	Repository  string            `json:"repository"`
-	Branch      string            `json:"branch"`
-	Status      string            `json:"status"` // pending, running, completed, failed
-	StartTime   time.Time         `json:"start_time"`
-	EndTime     time.Time         `json:"end_time,omitempty"`
-	Duration    string            `json:"duration,omitempty"`
-	Output      string            `json:"output,omitempty"`
-	Error       string            `json:"error,omitempty"`
-	Changes     ExecutionChanges  `json:"changes"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	BenchmarkID string            `json:"benchmark_id,omitempty"` // Link to benchmark system
-	ReportURL   string            `json:"report_url,omitempty"`
+	ID           string            `json:"id"`
+	RecipeID     string            `json:"recipe_id"`
+	Repository   string            `json:"repository"`
+	Branch       string            `json:"branch"`
+	Status       string            `json:"status"` // pending, running, completed, failed
+	StartTime    time.Time         `json:"start_time"`
+	EndTime      time.Time         `json:"end_time,omitempty"`
+	Duration     string            `json:"duration,omitempty"`
+	Output       string            `json:"output,omitempty"`
+	Error        string            `json:"error,omitempty"`
+	Changes      ExecutionChanges  `json:"changes"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	BenchmarkID  string            `json:"benchmark_id,omitempty"` // Link to benchmark system
+	ReportURL    string            `json:"report_url,omitempty"`
 }
 
 // ExecutionChanges represents changes made during execution
@@ -51,16 +51,16 @@ type ExecutionChanges struct {
 
 // BenchmarkIntegrationRequest represents integration with benchmark system
 type BenchmarkIntegrationRequest struct {
-	Name        string            `json:"name"`
-	RecipeID    string            `json:"recipe_id"`
-	Repository  string            `json:"repository"`
-	Branch      string            `json:"branch"`
-	AppName     string            `json:"app_name"`
-	Lane        string            `json:"lane,omitempty"`
-	Iterations  int               `json:"iterations,omitempty"`
-	Environment map[string]string `json:"environment,omitempty"`
-	TestSuite   bool              `json:"test_suite,omitempty"`
-	DeployTest  bool              `json:"deploy_test,omitempty"`
+	Name         string            `json:"name"`
+	RecipeID     string            `json:"recipe_id"`
+	Repository   string            `json:"repository"`
+	Branch       string            `json:"branch"`
+	AppName      string            `json:"app_name"`
+	Lane         string            `json:"lane,omitempty"`
+	Iterations   int               `json:"iterations,omitempty"`
+	Environment  map[string]string `json:"environment,omitempty"`
+	TestSuite    bool              `json:"test_suite,omitempty"`
+	DeployTest   bool              `json:"deploy_test,omitempty"`
 }
 
 // runRecipe executes a recipe against a repository
@@ -72,12 +72,12 @@ func runRecipe(recipeID string, flags CommandFlags) error {
 	}
 
 	// Parse execution parameters from command line args
-	repository := "" // TODO: Extract from flags
-	branch := "main" // TODO: Extract from flags
-	outputDir := ""  // TODO: Extract from flags
-	workingDir := "" // TODO: Extract from flags
-	timeout := "15m" // Default timeout
-
+	repository := ""  // TODO: Extract from flags
+	branch := "main"  // TODO: Extract from flags
+	outputDir := ""   // TODO: Extract from flags
+	workingDir := ""  // TODO: Extract from flags
+	timeout := "15m"  // Default timeout
+	
 	// For now, use dummy values - need to implement proper flag parsing
 	if repository == "" {
 		repository = "." // Default to current directory
@@ -85,15 +85,15 @@ func runRecipe(recipeID string, flags CommandFlags) error {
 
 	// Create execution request
 	request := ExecutionRequest{
-		RecipeID:       recipeID,
-		Repository:     repository,
-		Branch:         branch,
-		OutputDir:      outputDir,
-		WorkingDir:     workingDir,
-		Timeout:        timeout,
-		DryRun:         flags.DryRun,
+		RecipeID:      recipeID,
+		Repository:    repository,
+		Branch:        branch,
+		OutputDir:     outputDir,
+		WorkingDir:    workingDir,
+		Timeout:       timeout,
+		DryRun:        flags.DryRun,
 		GenerateReport: flags.Verbose,
-		Environment:    make(map[string]string),
+		Environment:   make(map[string]string),
 	}
 
 	// Validate request
@@ -158,7 +158,7 @@ func executeViaBenchmarkSystem(request ExecutionRequest, flags CommandFlags) err
 	fmt.Printf("Benchmark ID: %s\n", result.BenchmarkID)
 	fmt.Printf("Execution ID: %s\n", result.ExecutionID)
 	fmt.Printf("Status: %s\n", result.Status)
-
+	
 	if result.EstimatedTime != "" {
 		fmt.Printf("Estimated time: %s\n", result.EstimatedTime)
 	}
@@ -231,11 +231,11 @@ func displayExecutionResult(result ExecutionResult, flags CommandFlags) error {
 	if !result.StartTime.IsZero() {
 		fmt.Printf("Started:      %s\n", result.StartTime.Format("2006-01-02 15:04:05"))
 	}
-
+	
 	if !result.EndTime.IsZero() {
 		fmt.Printf("Completed:    %s\n", result.EndTime.Format("2006-01-02 15:04:05"))
 	}
-
+	
 	if result.Duration != "" {
 		fmt.Printf("Duration:     %s\n", result.Duration)
 	}
@@ -262,8 +262,8 @@ func displayExecutionResult(result ExecutionResult, flags CommandFlags) error {
 				fmt.Printf("    - %s\n", file)
 			}
 		}
-
-		fmt.Printf("  Lines: +%d ~%d -%d\n",
+		
+		fmt.Printf("  Lines: +%d ~%d -%d\n", 
 			changes.LinesAdded, changes.LinesModified, changes.LinesDeleted)
 	}
 
@@ -306,28 +306,28 @@ func displayExecutionResult(result ExecutionResult, flags CommandFlags) error {
 // monitorExecution monitors a running execution
 func monitorExecution(executionID string, flags CommandFlags) error {
 	PrintInfo(fmt.Sprintf("Monitoring execution %s...", executionID))
-
+	
 	// Poll for status updates
 	for i := 0; i < 60; i++ { // Max 60 polls (5 minutes with 5s intervals)
 		time.Sleep(5 * time.Second)
-
+		
 		status, err := getExecutionStatus(executionID)
 		if err != nil {
 			PrintWarning(fmt.Sprintf("Failed to get status: %v", err))
 			continue
 		}
-
+		
 		fmt.Printf("Status: %s", status.Status)
 		if status.Duration != "" {
 			fmt.Printf(" (duration: %s)", status.Duration)
 		}
 		fmt.Println()
-
+		
 		if status.Status == "completed" || status.Status == "failed" {
 			return displayExecutionResult(status, flags)
 		}
 	}
-
+	
 	PrintWarning("Monitoring timeout. Execution may still be running.")
 	fmt.Printf("Check status manually: ploy arf recipe status %s\n", executionID)
 	return nil
@@ -352,10 +352,10 @@ func shouldUseBenchmarkSystem(request ExecutionRequest) bool {
 	// 1. Repository is a remote URL (not local directory)
 	// 2. Generation report is requested
 	// 3. Test deployment is needed
-
-	return strings.HasPrefix(request.Repository, "http") ||
-		strings.HasPrefix(request.Repository, "git@") ||
-		request.GenerateReport
+	
+	return strings.HasPrefix(request.Repository, "http") || 
+		   strings.HasPrefix(request.Repository, "git@") ||
+		   request.GenerateReport
 }
 
 // validateExecutionRequest validates an execution request
@@ -369,10 +369,10 @@ func validateExecutionRequest(request ExecutionRequest) error {
 	}
 
 	// Validate repository format
-	if !strings.HasPrefix(request.Repository, "http") &&
-		!strings.HasPrefix(request.Repository, "git@") &&
-		!strings.HasPrefix(request.Repository, "/") &&
-		request.Repository != "." {
+	if !strings.HasPrefix(request.Repository, "http") && 
+	   !strings.HasPrefix(request.Repository, "git@") && 
+	   !strings.HasPrefix(request.Repository, "/") && 
+	   request.Repository != "." {
 		return NewCLIError("Invalid repository format", 1).
 			WithSuggestion("Use HTTP(S) URL, SSH URL, absolute path, or '.' for current directory")
 	}
@@ -436,7 +436,7 @@ func listExecutions(outputFormat string, verbose bool) error {
 			} else if exec.Status == "pending" {
 				status = "⏳"
 			}
-
+			
 			fmt.Printf("%s %s (%s)\n", status, exec.RecipeID, exec.ID)
 			fmt.Printf("  Repository: %s\n", exec.Repository)
 			fmt.Printf("  Status: %s", exec.Status)
@@ -444,7 +444,7 @@ func listExecutions(outputFormat string, verbose bool) error {
 				fmt.Printf(" (%s)", exec.Duration)
 			}
 			fmt.Printf("\n")
-
+			
 			if verbose {
 				fmt.Printf("  Started: %s\n", exec.StartTime.Format("2006-01-02 15:04:05"))
 				if exec.BenchmarkID != "" {

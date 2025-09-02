@@ -16,9 +16,9 @@ func AddDomain(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrJSON(c, 400, fmt.Errorf("invalid request body"))
 	}
-
+	
 	log.Printf("Adding domain %s for app %s", req.Domain, app)
-
+	
 	return c.JSON(fiber.Map{
 		"status":  "added",
 		"app":     app,
@@ -29,7 +29,7 @@ func AddDomain(c *fiber.Ctx) error {
 
 func ListDomains(c *fiber.Ctx) error {
 	app := c.Params("app")
-
+	
 	log.Printf("Listing domains for app %s", app)
 	return c.JSON(fiber.Map{
 		"app": app,
@@ -42,9 +42,9 @@ func ListDomains(c *fiber.Ctx) error {
 func RemoveDomain(c *fiber.Ctx) error {
 	app := c.Params("app")
 	domain := c.Params("domain")
-
+	
 	log.Printf("Removing domain %s from app %s", domain, app)
-
+	
 	return c.JSON(fiber.Map{
 		"status":  "removed",
 		"app":     app,

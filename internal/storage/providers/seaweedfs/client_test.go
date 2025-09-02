@@ -243,8 +243,6 @@ func TestSeaweedFSProvider_BatchOperations(t *testing.T) {
 }
 
 func TestSeaweedFSProvider_MetadataOperations(t *testing.T) {
-	skipIfSeaweedFSUnavailable(t)
-
 	cfg := Config{
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",

@@ -642,7 +642,7 @@ func TestDefaultRetryConfig(t *testing.T) {
 	assert.Equal(t, 1*time.Second, config.InitialDelay)
 	assert.Equal(t, 30*time.Second, config.MaxDelay)
 	assert.Equal(t, 2.0, config.BackoffMultiplier)
-
+	
 	expectedRetryableErrors := []ErrorType{
 		ErrorTypeNetwork,
 		ErrorTypeTimeout,
@@ -722,25 +722,25 @@ func TestRetryConfig_CalculateDelay(t *testing.T) {
 	config := DefaultRetryConfig()
 
 	tests := []struct {
-		name             string
-		attempt          int
-		expectedDelay    time.Duration
+		name            string
+		attempt         int
+		expectedDelay   time.Duration
 		maxExpectedDelay time.Duration
 	}{
 		{
-			name:          "attempt 0 or negative",
-			attempt:       0,
-			expectedDelay: 1 * time.Second, // Initial delay
+			name:            "attempt 0 or negative",
+			attempt:         0,
+			expectedDelay:   1 * time.Second, // Initial delay
 		},
 		{
-			name:          "attempt 1",
-			attempt:       1,
-			expectedDelay: 2 * time.Second, // 1 * 2^1
+			name:            "attempt 1",
+			attempt:         1,
+			expectedDelay:   2 * time.Second, // 1 * 2^1
 		},
 		{
-			name:          "attempt 2",
-			attempt:       2,
-			expectedDelay: 4 * time.Second, // 1 * 2^2
+			name:            "attempt 2",
+			attempt:         2,
+			expectedDelay:   4 * time.Second, // 1 * 2^2
 		},
 		{
 			name:             "attempt causing max delay",
@@ -752,7 +752,7 @@ func TestRetryConfig_CalculateDelay(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			delay := config.CalculateDelay(tt.attempt)
-
+			
 			if tt.maxExpectedDelay > 0 {
 				assert.LessOrEqual(t, delay, tt.maxExpectedDelay)
 			} else {

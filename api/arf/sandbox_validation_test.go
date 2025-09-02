@@ -116,7 +116,7 @@ func TestValidateBuild(t *testing.T) {
 			if tt.name == "build timeout" {
 				timeout = 1 * time.Second // Use short timeout for timeout test
 			}
-
+			
 			config := BuildConfig{
 				BuildTool: tt.buildTool,
 				Timeout:   timeout,

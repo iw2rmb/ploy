@@ -20,7 +20,7 @@ func VersionCmd(args []string, controllerURL string) {
 func showVersion(controllerURL string) {
 	// Show CLI version
 	fmt.Printf("Ploy CLI version: %s\n", version.Short())
-
+	
 	// Try to get controller version
 	resp, err := http.Get(fmt.Sprintf("%s/version", controllerURL))
 	if err == nil {
@@ -42,7 +42,7 @@ func showDetailedVersion(controllerURL string) {
 	fmt.Printf("  Built: %s\n", info.BuildTime)
 	fmt.Printf("  Go Version: %s\n", info.GoVersion)
 	fmt.Printf("  Platform: %s\n", info.Platform)
-
+	
 	// Try to get controller version
 	resp, err := http.Get(fmt.Sprintf("%s/version/detailed", controllerURL))
 	if err == nil {

@@ -30,7 +30,7 @@ func NewPlatformWildcardCertificateManager(certManager *CertificateManager) (*Pl
 		log.Println("PLOY_APPS_DOMAIN not set, platform wildcard certificate provisioning disabled")
 		return &PlatformWildcardCertificateManager{enabled: false}, nil
 	}
-
+	
 	// Check if this is a dev environment
 	environment := os.Getenv("PLOY_ENVIRONMENT")
 	if environment == "dev" {
@@ -51,7 +51,7 @@ func NewPlatformWildcardCertificateManager(certManager *CertificateManager) (*Pl
 		renewalService:     certManager.renewalService,
 		dnsProvider:        certManager.dnsProvider,
 		platformDomain:     platformDomain,
-		enabled:            true,
+		enabled:           true,
 	}, nil
 }
 
@@ -60,7 +60,7 @@ func (pwm *PlatformWildcardCertificateManager) EnsurePlatformWildcardCertificate
 	if !pwm.enabled {
 		return nil
 	}
-
+	
 	// Check if DNS provider is available for wildcard certificate provisioning
 	if pwm.dnsProvider == nil {
 		log.Printf("DNS provider not available, platform wildcard certificate provisioning disabled")
@@ -76,7 +76,7 @@ func (pwm *PlatformWildcardCertificateManager) EnsurePlatformWildcardCertificate
 		// Certificate exists, check if it needs renewal
 		renewalThreshold := 30 * 24 * time.Hour // 30 days
 		if time.Until(existing.ExpiresAt) > renewalThreshold {
-			log.Printf("Platform wildcard certificate for %s is valid until %v (%d days remaining)",
+			log.Printf("Platform wildcard certificate for %s is valid until %v (%d days remaining)", 
 				wildcardDomain, existing.ExpiresAt, int(time.Until(existing.ExpiresAt).Hours()/24))
 			return nil
 		}
@@ -121,23 +121,23 @@ func (pwm *PlatformWildcardCertificateManager) IsPlatformSubdomain(domain string
 	if !pwm.enabled {
 		return false
 	}
-
+	
 	// Check if domain is a direct subdomain of the platform domain
-	// Examples:
+	// Examples: 
 	//   Platform domain: ployd.app
 	//   myapp.ployd.app -> TRUE (direct subdomain)
 	//   api.myapp.ployd.app -> FALSE (nested subdomain, not covered by wildcard)
 	//   external.com -> FALSE (different domain)
 	//   ployd.app -> FALSE (apex domain, not subdomain)
-
+	
 	if !strings.HasSuffix(domain, "."+pwm.platformDomain) {
 		return false
 	}
-
+	
 	// Count dots to ensure it's a direct subdomain
 	domainDotCount := strings.Count(domain, ".")
 	platformDotCount := strings.Count(pwm.platformDomain, ".")
-
+	
 	return domainDotCount == platformDotCount+1
 }
 
@@ -179,19 +179,19 @@ func (pwm *PlatformWildcardCertificateManager) ValidatePlatformDomain() error {
 	if !pwm.enabled {
 		return fmt.Errorf("platform wildcard certificate management disabled - PLOY_APPS_DOMAIN not set")
 	}
-
+	
 	if pwm.platformDomain == "" {
 		return fmt.Errorf("platform domain is empty")
 	}
-
+	
 	// Basic domain validation
 	if !strings.Contains(pwm.platformDomain, ".") {
 		return fmt.Errorf("platform domain %s appears to be invalid (no dots)", pwm.platformDomain)
 	}
-
+	
 	if strings.HasPrefix(pwm.platformDomain, ".") || strings.HasSuffix(pwm.platformDomain, ".") {
 		return fmt.Errorf("platform domain %s appears to be invalid (starts or ends with dot)", pwm.platformDomain)
 	}
-
+	
 	return nil
 }
