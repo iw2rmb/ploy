@@ -356,7 +356,7 @@ Additional recipes are discovered dynamically based on project needs.
 
 ```bash
 # Create migration job
-curl -X POST https://api.dev.ployman.app/v1/arf/transform \
+curl -X POST https://api.dev.ployman.app/v1/arf/transforms \
   -H "Content-Type: application/json" \
   -d '{"recipe_id":"org.openrewrite.java.migrate.UpgradeToJava17","type":"openrewrite","codebase":{...}}'
 

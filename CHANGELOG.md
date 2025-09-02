@@ -10,7 +10,7 @@
   - Enables persistence across API restarts
 
 ### Changed
-- **BREAKING: Transform Endpoint**: `/v1/arf/transform` now returns immediately with status link
+- **BREAKING: Transform Endpoint**: `/v1/arf/transforms` now returns immediately with status link
   - Old behavior: Synchronous execution returning complete `TransformationResult` (could timeout)
   - New behavior: Asynchronous execution returning status link within <1 second
   - Response format changed to include `transformation_id`, `status`, `status_url`, and `message`

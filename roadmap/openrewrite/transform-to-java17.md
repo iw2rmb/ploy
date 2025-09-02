@@ -19,7 +19,7 @@
 ## Phase 1: Async OpenRewrite Transformation Testing
 
 ### Step 1: Execute ARF Transformation with OpenRewrite (Async)
-1. **Transform Request**: Use `/v1/arf/transform` endpoint with OpenRewrite recipe
+1. **Transform Request**: Use `/v1/arf/transforms` endpoint with OpenRewrite recipe
    - **Response Time**: <1 second (returns status URL immediately)
    - **Background Processing**: Transformation runs asynchronously
    - **Consul Storage**: Status persisted to Consul KV immediately
@@ -201,7 +201,7 @@ The OpenRewrite transformations run in a custom Docker container with two-stage 
 Based on Phase 1 implementation, OpenRewrite uses async ARF system:
 
 ### Unified ARF System for OpenRewrite (Async)
-- `POST /v1/arf/transform` — initiate async transformation, returns status URL immediately
+- `POST /v1/arf/transforms` — initiate async transformation, returns status URL immediately
 - `GET /v1/arf/transforms/:id/status` — get transformation status from Consul KV
 - `GET /v1/arf/transforms/:id` — (deprecated) legacy endpoint for compatibility
 
@@ -228,7 +228,7 @@ Based on Phase 1 implementation, OpenRewrite uses async ARF system:
 ### Step 1: Execute Async Transformation via Unified ARF
 ```bash
 # Initiate async transformation (returns immediately)
-RESPONSE=$(curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
+RESPONSE=$(curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transforms" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
@@ -320,7 +320,7 @@ ploy/arf/transforms/{id}/sandbox    # Sandbox deployment info
 ```
 
 ## Breaking Changes:
-- `/v1/arf/transform` now returns status URL, not full result
+- `/v1/arf/transforms` now returns status URL, not full result
 - Clients must poll `/v1/arf/transforms/{id}/status` for results
 - No backward compatibility with synchronous pattern
 

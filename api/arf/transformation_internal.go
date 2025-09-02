@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -58,7 +59,7 @@ func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
 func (h *Handler) executeTransformationInternal(ctx context.Context, transformID string, req *TransformRequest) (*TransformationResult, error) {
 	transformStartTime := time.Now()
 	fmt.Printf("[ARF Transform Internal] Starting internal transformation for ID: %s at %v\n", transformID, transformStartTime)
-	
+
 	// Create workspace directory
 	workspaceDir := filepath.Join("/tmp", "arf-transformations", transformID)
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
@@ -74,7 +75,7 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 	fmt.Printf("[DEBUG] [%s] Starting repository cloning stage\n", transformID)
 	fmt.Printf("[DEBUG] [%s] Repository URL: %s, Branch: %s, Target: %s\n", transformID, req.Codebase.Repository, req.Codebase.Branch, repoPath)
 	fmt.Printf("[DEBUG] [%s] About to call cloneRepositoryWithInfo...\n", transformID)
-	
+
 	if err := h.cloneRepository(req.Codebase.Repository, req.Codebase.Branch, repoPath); err != nil {
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
 	}
@@ -96,9 +97,25 @@ func (h *Handler) executeTransformationInternal(ctx context.Context, transformID
 	return result, nil
 }
 
+// cloneRepository clones a git repository to the specified path
+func (h *Handler) cloneRepository(repoURL, branch, targetPath string) error {
+	args := []string{"clone", "--depth=1"}
+	if branch != "" {
+		args = append(args, "--branch", branch)
+	}
+	args = append(args, repoURL, targetPath)
+
+	fmt.Printf("[DEBUG] Git command: git %v\n", args)
+	cmd := exec.Command("git", args...)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git clone failed: %w", err)
+	}
+	return nil
+}
+
 // Helper function to check if error is a not found error
 func isNotFoundError(err error) bool {
-	return err != nil && (err.Error() == "recipe not found" || 
+	return err != nil && (err.Error() == "recipe not found" ||
 		err.Error() == "recipe not available" ||
 		err.Error() == "no matching recipe")
 }

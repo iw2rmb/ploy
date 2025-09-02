@@ -161,7 +161,7 @@ arfService := arf.NewARFService(storageAdapter, "")  // Empty bucket since adapt
 #### 5.2 Integration Tests
 ```bash
 # Test transformation creates correct paths
-curl -X POST "https://api.dev.ployman.app/v1/arf/transform" \
+curl -X POST "https://api.dev.ployman.app/v1/arf/transforms" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate:java-8-to-11",

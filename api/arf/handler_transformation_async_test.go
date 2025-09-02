@@ -106,7 +106,7 @@ func TestExecuteTransformation_Async(t *testing.T) {
 	}
 
 	app := fiber.New()
-	app.Post("/v1/arf/transform", handler.ExecuteTransformationAsync)
+	app.Post("/v1/arf/transforms", handler.ExecuteTransformationAsync)
 	app.Get("/v1/arf/transforms/:id/status", handler.GetTransformationStatusAsync)
 
 	t.Run("returns immediately with status link", func(t *testing.T) {
@@ -121,7 +121,7 @@ func TestExecuteTransformation_Async(t *testing.T) {
 		}
 
 		body, _ := json.Marshal(request)
-		req := httptest.NewRequest("POST", "/v1/arf/transform", bytes.NewReader(body))
+		req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 
 		// Measure response time
@@ -158,7 +158,7 @@ func TestExecuteTransformation_Async(t *testing.T) {
 		}
 
 		body, _ := json.Marshal(request)
-		req := httptest.NewRequest("POST", "/v1/arf/transform", bytes.NewReader(body))
+		req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := app.Test(req)
