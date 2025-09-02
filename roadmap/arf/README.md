@@ -6,6 +6,7 @@
 - ✅ **Production Metrics**: Prometheus integration with comprehensive monitoring
 - ✅ **Cost Optimization**: LLM cost tracking and budget controls
 - ✅ **OpenRewrite Integration**: Full production-ready transformation engine
+- ✅ **Transformation Reporting**: Human-readable markdown reports for debugging and analysis
 
 The Automated Remediation Framework (ARF) represents Ploy's enterprise code transformation engine, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 
@@ -131,6 +132,32 @@ ARF leverages Ploy's existing infrastructure:
 - **CHTTP Services**: Distributed static analysis integration for Python Pylint and multi-language support
 - **CLLM Service**: Enhanced LLM-based error analysis and code transformation
 - **Aster Integration**: Advanced AST-based semantic analysis for enhanced context building
+
+## API Endpoints & Debugging
+
+ARF provides comprehensive API endpoints for transformation management and debugging:
+
+### Core Transformation Endpoints
+- `POST /v1/arf/transforms` - Execute new transformations
+- `GET /v1/arf/transforms/:id` - Get transformation results
+- `GET /v1/arf/transforms/:id/status` - Check transformation status
+
+### Debugging & Analysis Endpoints
+- `GET /v1/arf/transforms/:id/hierarchy` - Hierarchical view of healing attempts
+- `GET /v1/arf/transforms/:id/timeline` - Chronological timeline of all events
+- `GET /v1/arf/transforms/:id/analysis` - Deep analysis with cost and performance metrics
+- `GET /v1/arf/transforms/:id/active` - Currently active healing attempts
+- `GET /v1/arf/transforms/:id/report` - **Human-readable markdown report** (NEW)
+- `GET /v1/arf/transforms/orphaned` - Find orphaned transformations
+
+### Transformation Reports
+
+The `/report` endpoint generates comprehensive markdown reports for human review and debugging, including:
+- **Executive Summary**: Status, duration, success rates
+- **Detailed Timeline**: Step-by-step execution with timestamps
+- **Healing Analysis**: LLM confidence scores and suggested fixes
+- **Code Changes**: File modifications and diffs
+- **Cost Analysis**: LLM usage and estimated costs
 
 ## Getting Started
 
