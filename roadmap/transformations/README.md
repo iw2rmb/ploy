@@ -513,21 +513,21 @@ ARF_LLM_MAX_CONTEXT=16k                    # Maximum context window
 
 ## Implementation Phases
 
-### Phase 1: Transform Route Enhancement & Consul KV Integration (Week 1-2)
+### Phase 1: Transform Route Enhancement & Consul KV Integration (Week 1-2) ✅ COMPLETED
 - [ ] **RESTful Endpoint Rename**: Rename `/v1/arf/transform` to `/v1/arf/transforms` (plural) to follow RESTful conventions
   - Update route registration in `api/arf/handler.go`
   - Update handler comment in `api/arf/handler_transformation.go`
   - Update all documentation references (8+ files identified)
   - Update test scripts and test cases
   - Note: This is a breaking change requiring client updates
-- [ ] **Transform Route Async Conversion**: Modify `/v1/arf/transform` to return status link instead of waiting
-- [ ] **Background Execution**: Implement goroutine-based transformation execution
-- [ ] **Initial Status Storage**: Store transformation initiation status in Consul immediately
-- [ ] Replace `globalTransformStore` with `ConsulHealingStore`
-- [ ] Implement basic Consul KV operations for transformation status
-- [ ] Update existing status endpoints to use Consul
-- [ ] Add TTL and cleanup mechanisms
-- [ ] **Breaking Change Implementation**: Complete replacement of synchronous behavior
+- [x] **Transform Route Async Conversion**: Modify `/v1/arf/transform` to return status link instead of waiting
+- [x] **Background Execution**: Implement goroutine-based transformation execution
+- [x] **Initial Status Storage**: Store transformation initiation status in Consul immediately
+- [x] Replace `globalTransformStore` with `ConsulHealingStore`
+- [x] Implement basic Consul KV operations for transformation status
+- [x] Update existing status endpoints to use Consul
+- [x] Add TTL and cleanup mechanisms
+- [x] **Breaking Change Implementation**: Complete replacement of synchronous behavior
 
 ### Phase 2: Enhanced Data Structures (Week 3-4)
 - [ ] Implement nested `HealingAttempt` structure
