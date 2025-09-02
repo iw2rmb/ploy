@@ -1,68 +1,196 @@
 # OpenRewrite Java 17 Transformation Test Plan
 
-## Overview
+## Unified ARF System Approach
 
-This document provides a practical guide for testing OpenRewrite Java 8→17 transformations through the Ploy ARF system. The focus is on executing single transformations over a list of repositories and verifying the output artifacts.
+**Strategy**: Use the unified ARF (Automated Remediation Framework) system with OpenRewrite integration through standard ARF endpoints and recipe management.
 
-## System Architecture
+**Key Assumptions**:
+1. **Recipe Auto-Download**: If recipe is not available locally, the openrewrite-jvm image will automatically download and store it during transformation
+2. **Extended Timeouts**: All timeouts are set to generous values to ensure processes have sufficient time to complete correctly
 
-The OpenRewrite integration consists of:
-1. **API Layer**: ARF handlers that accept transformation requests
-2. **Nomad Dispatcher**: Orchestrates containerized transformations
-3. **Container Execution**: OpenRewrite JVM container that performs the actual transformation
-4. **Storage Layer**: SeaweedFS for artifact storage and caching
+## Phase 1: Direct OpenRewrite Transformation Testing
 
-## Prerequisites
+### Step 1: Execute ARF Transformation with OpenRewrite
+1. **Transform Request**: Use `/v1/arf/transform` endpoint with OpenRewrite recipe
+   - **Timeout**: 30 minutes (generous time for repository cloning, recipe download, and transformation)
+   - **Extended Processing Time**: Allow for recipe download if not cached
+2. **Target Repository**: https://github.com/winterbe/java8-tutorial.git
+3. **Recipe**: `org.openrewrite.java.migrate.UpgradeToJava17` (unified Java 8→17 recipe)
+4. **Request Format**:
+   ```json
+   {
+     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
+     "type": "openrewrite",
+     "codebase": {
+       "repository": "https://github.com/winterbe/java8-tutorial.git",
+       "branch": "master",
+       "language": "java",
+       "build_tool": "maven"
+     }
+   }
+   ```
 
-Before running transformations, ensure:
-- Ploy API is running and accessible
-- Nomad cluster is operational
-- SeaweedFS is available for artifact storage
-- Docker registry contains the `openrewrite-jvm` image
+### Step 2: Monitor Transformation Execution
+1. **Job Submission**: Receive transformation_id from transform request
+   - **Initial Response Timeout**: 2 minutes
+2. **Status Monitoring**: Poll `/v1/arf/transforms/{transformation_id}` endpoint
+   - **Polling Interval**: 30 seconds
+   - **Maximum Wait Time**: 30 minutes total (allows for recipe download + transformation)
+   - **Status Check Timeout**: 10 seconds per poll
+3. **Progress Tracking**: Monitor transformation job until completion
+   - **Expected Phases**: Repository clone → Recipe download (if needed) → Transformation → Result packaging
+4. **Result Retrieval**: Get transformation output/diff when available
 
-## API Endpoints
+### Step 3: Post-Transformation Recipe Verification
+1. **Recipe Storage Check**: After successful transformation, verify that recipes are available
+   - **Endpoint**: `/v1/arf/recipes?type=openrewrite` (should show OpenRewrite recipes)
+   - **Expected**: Recipe cache populated with `org.openrewrite.java.migrate.UpgradeToJava17`
+2. **Cache Verification**: Confirm that subsequent transformations are faster due to cached recipes
+3. **Performance Comparison**: Second transformation should be significantly faster (no recipe download)
 
-### Execute Transformation
-```
-POST /v1/arf/transform
-```
+### Step 4: Test Multiple Repositories (if basic test succeeds)
+1. **Simple Java Tutorial**: winterbe/java8-tutorial (already tested)
+   - **Timeout**: 30 minutes (first run with recipe download)
+2. **Baeldung Tutorials**: eugenp/tutorials (larger codebase)
+   - **Timeout**: 60 minutes (larger codebase, recipes should be cached)
+3. **Java Design Patterns**: iluwatar/java-design-patterns (well-structured)
+   - **Timeout**: 45 minutes (medium complexity, cached recipes)
 
-### Get Transformation Status
-```
-GET /v1/arf/transforms/{transformation_id}
-```
+## Timeout Configuration Strategy
 
-## Request Format
+### API Endpoint Timeouts:
+- **Recipe List/Validate**: 60 seconds (recipe resolution)
+- **Transform Submission**: 2 minutes (transformation job creation and validation)
+- **Status Polling**: 10 seconds per request
+- **Total Job Wait**: 30 minutes maximum per transformation
 
-The transformation request must follow this exact structure:
+### Job Execution Timeouts:
+- **Repository Clone**: 5 minutes
+- **Recipe Download**: 15 minutes (Maven Central + artifact resolution)
+- **Transformation Execution**: 15 minutes (large codebases)
+- **Result Packaging**: 5 minutes
+- **Total Job Timeout**: 30 minutes per transformation job
 
-```json
-{
-  "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-  "type": "openrewrite",
-  "codebase": {
-    "repository": "https://github.com/{owner}/{repo}.git",
-    "branch": "master",
-    "language": "java",
-    "build_tool": "maven"
-  }
-}
-```
+### Retry and Circuit Breaker Configuration:
+- **Status Poll Retries**: 3 attempts with 5-second backoff
+- **Network Timeout**: 30 seconds for external repository access
+- **Docker Image Pull**: 10 minutes (openrewrite-jvm image + dependencies)
 
-### Field Descriptions:
-- `recipe_id`: The OpenRewrite recipe class name (required)
-- `type`: Must be "openrewrite" for OpenRewrite transformations
-- `codebase.repository`: Full GitHub URL of the repository
-- `codebase.branch`: Target branch (usually "master" or "main")
-- `codebase.language`: Must be "java" for Java projects
-- `codebase.build_tool`: Either "maven" or "gradle"
+## Container Implementation
 
-## Transformation Workflow
+### OpenRewrite Docker Container (`services/openrewrite-jvm/`)
 
-### 1. Submit Transformation Request
+The OpenRewrite transformations run in a custom Docker container with two-stage execution:
 
+1. **Setup Stage** (`setup-workspace.sh` - entrypoint):
+   - Detects Nomad artifact locations (`local/`, `artifacts/`, or current directory)
+   - Handles both tar file artifacts and extracted directory structures
+   - Creates `/workspace/input.tar` for the runner script
+   - Manages workspace permissions and file structure
+
+2. **Execution Stage** (`runner.sh`):
+   - Extracts input tar to `/workspace/project/`
+   - Detects build system (Maven/Gradle) or creates minimal POM
+   - Handles recipe discovery and Maven Central caching
+   - Executes OpenRewrite transformation
+   - Creates output tar with transformed code
+   - Registers recipe metadata with Ploy API
+
+## Expected Outcomes
+
+### Success Criteria:
+- ✅ Recipe listing works via `/v1/arf/recipes?type=openrewrite`
+- ✅ Recipe validation succeeds for Java migration recipes via `/v1/arf/recipes/validate`
+- ✅ Transform job submission returns transformation_id within 2 minutes
+- ✅ Transformation status tracking provides progress updates every 30 seconds
+- ✅ At least one repository transformation completes successfully within 60 minutes
+- ✅ **Recipe Caching**: Recipes are downloaded and stored after first transformation
+- ✅ **Performance Improvement**: Subsequent transformations are 50%+ faster with cached recipes
+
+### Performance Targets (with generous timeouts):
+- **First Transformation** (with recipe download):
+  - Endpoint Response Time: <2 minutes for job submission
+  - Job Completion: <30 minutes for simple repositories
+  - Success Rate: >80% for Tier 1 (simple) repositories
+- **Subsequent Transformations** (with cached recipes):
+  - Endpoint Response Time: <30 seconds for job submission
+  - Job Completion: <30 minutes for simple repositories
+  - Success Rate: >95% for Tier 1 repositories
+
+## Recipe Management Validation
+
+### Pre-Transformation State:
+- **Recipe Catalog**: Managed through unified ARF recipe system
+- **Expected Behavior**: OpenRewrite recipes are available via ARF recipe endpoints
+
+### During Transformation:
+- **Recipe Download Phase**: Monitor job logs for Maven artifact downloads
+- **Expected Downloads**: 
+  - `org.openrewrite.recipe:rewrite-migrate-java:latest`
+  - Dependencies and transitive dependencies
+  - Recipe metadata and configuration
+
+### Post-Transformation State:
+- **Recipe Catalog**: Contains OpenRewrite recipes accessible via ARF endpoints
+- **Verification Method**: Call `/v1/arf/recipes?type=openrewrite` to confirm available recipes
+- **Storage Location**: Recipes stored in openrewrite-jvm image or persistent volume
+- **Performance Impact**: Second transformation should skip download phase
+
+## Advantages of This Approach:
+1. **Component Independence**: Bypasses failed advanced components
+2. **Direct Testing**: Tests core OpenRewrite functionality directly
+3. **Simplified Debugging**: Easier to isolate issues to specific components
+4. **Incremental Validation**: Can verify each step independently
+5. **Production Pathway**: Uses the same underlying infrastructure as full ARF
+6. **Recipe Auto-Management**: Validates automatic recipe download and caching
+7. **Realistic Timeouts**: Generous timeouts ensure reliable completion
+
+## Risk Mitigation:
+- **Docker Dependencies**: OpenRewrite uses Docker images - verify Docker/registry access
+- **Nomad Integration**: Transformation jobs run via Nomad - confirm job execution capability
+- **Network Access**: Verify API can clone repositories and access Maven Central for recipe downloads
+- **Resource Limits**: Monitor job resource consumption and timeout handling
+- **Recipe Download Failures**: Handle cases where Maven Central or recipe repositories are unavailable
+- **Storage Persistence**: Ensure recipe cache survives container restarts
+
+## Monitoring and Debugging:
+- **Job Log Access**: Monitor Nomad job logs for recipe download progress
+- **Network Connectivity**: Verify access to GitHub (repositories) and Maven Central (recipes)
+- **Storage Utilization**: Monitor disk usage during recipe downloads
+- **Performance Metrics**: Track transformation times before/after recipe caching
+
+## API Endpoint Reference
+
+Based on `/api/README.md`, OpenRewrite integration uses the unified ARF system:
+
+### Unified ARF System for OpenRewrite
+- `POST /v1/arf/transform` — execute transformation (including OpenRewrite recipes)
+- `GET /v1/arf/transforms/:id` — get transformation result
+
+**Note**: OpenRewrite recipes are managed exclusively through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
+
+### General ARF Recipe Management (Lines 137-148)
+- `GET /v1/arf/recipes` — list available transformation recipes
+- `GET /v1/arf/recipes/:id` — get detailed recipe information
+- `POST /v1/arf/recipes` — create new transformation recipe
+- `PUT /v1/arf/recipes/:id` — update existing recipe
+- `DELETE /v1/arf/recipes/:id` — delete recipe from catalog
+- `GET /v1/arf/recipes/search` — search recipes by name or tags
+- `POST /v1/arf/recipes/upload` — upload recipe
+- `POST /v1/arf/recipes/validate` — validate recipe
+- `GET /v1/arf/recipes/:id/download` — download recipe
+- `GET /v1/arf/recipes/:id/metadata` — get recipe metadata
+- `GET /v1/arf/recipes/:id/stats` — get recipe usage statistics
+- `POST /v1/arf/recipes/register` — register recipe from runner
+
+**Important**: The API documentation shows that OpenRewrite uses a unified recipe management system through `/v1/arf/recipes/*` endpoints with `type: "openrewrite"` parameter, rather than dedicated OpenRewrite recipe endpoints.
+
+## Test Execution Commands
+
+### Step 1: Execute Transformation via Unified ARF
 ```bash
-TRANSFORM_ID=$(curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
+# Using unified ARF endpoint with correct format
+curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transform" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
@@ -73,317 +201,50 @@ TRANSFORM_ID=$(curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
       "language": "java",
       "build_tool": "maven"
     }
-  }' | jq -r '.transformation_id')
-
-echo "Transformation ID: $TRANSFORM_ID"
+  }' \
+  --max-time 600  # 10 minute timeout for transformation
 ```
 
-### 2. Monitor Transformation Status
-
+### Step 2: Monitor Transformation Status (with 60-minute maximum wait)
 ```bash
-# Poll for status every 10 seconds
-while true; do
-  STATUS=$(curl -s "${PLOY_CONTROLLER}/arf/transforms/${TRANSFORM_ID}" | jq -r '.status')
-  echo "$(date '+%Y-%m-%d %H:%M:%S') - Status: $STATUS"
-  
-  if [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]]; then
-    break
-  fi
-  
-  sleep 10
-done
-
-# Get full result
-curl -s "${PLOY_CONTROLLER}/arf/transforms/${TRANSFORM_ID}" | jq '.'
-```
-
-## Input and Output Artifacts
-
-### Input Artifact (input.tar)
-The system automatically creates an `input.tar` from the cloned repository containing:
-- All source code files
-- Build configuration (pom.xml, build.gradle)
-- Resource files
-- Project structure
-
-### Output Artifact (output.tar)
-After transformation, the system produces an `output.tar` containing:
-- Transformed source code with Java 17 syntax
-- Updated build configurations
-- All original resources preserved
-- Exclude: build artifacts (.m2, target, .gradle, build directories)
-
-### Accessing Output Artifacts
-
-The output tar is stored in SeaweedFS and can be retrieved via:
-```bash
-# The output location will be in the transformation result
-OUTPUT_KEY=$(curl -s "${PLOY_CONTROLLER}/arf/transforms/${TRANSFORM_ID}" | jq -r '.output_key')
-
-# Download from SeaweedFS
-curl -O "${SEAWEEDFS_URL}/${OUTPUT_KEY}"
-```
-
-## Test Repository List
-
-Execute transformations for each repository individually:
-
-### 1. Simple Java Tutorial (Baseline Test)
-```bash
-curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-    "type": "openrewrite",
-    "codebase": {
-      "repository": "https://github.com/winterbe/java8-tutorial.git",
-      "branch": "master",
-      "language": "java",
-      "build_tool": "maven"
-    }
-  }'
-```
-**Expected Time**: 5-10 minutes  
-**Characteristics**: Small codebase, clear Java 8 patterns
-
-### 2. Spring Boot Sample
-```bash
-curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-    "type": "openrewrite",
-    "codebase": {
-      "repository": "https://github.com/spring-guides/gs-spring-boot.git",
-      "branch": "main",
-      "language": "java",
-      "build_tool": "maven"
-    }
-  }'
-```
-**Expected Time**: 5-15 minutes  
-**Characteristics**: Spring framework usage, dependency management
-
-### 3. Java Design Patterns
-```bash
-curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-    "type": "openrewrite",
-    "codebase": {
-      "repository": "https://github.com/iluwatar/java-design-patterns.git",
-      "branch": "master",
-      "language": "java",
-      "build_tool": "maven"
-    }
-  }'
-```
-**Expected Time**: 20-30 minutes  
-**Characteristics**: Large codebase, multiple modules
-
-### 4. RealWorld Example App
-```bash
-curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-    "type": "openrewrite",
-    "codebase": {
-      "repository": "https://github.com/gothinkster/spring-boot-realworld-example-app.git",
-      "branch": "master",
-      "language": "java",
-      "build_tool": "gradle"
-    }
-  }'
-```
-**Expected Time**: 10-20 minutes  
-**Characteristics**: Gradle build, real-world application patterns
-
-## Logging and Monitoring
-
-### 1. API Logs
-Monitor API logs for request processing and dispatcher activity:
-```bash
-# On the API server
-tail -f /var/log/ploy/api.log
-
-# Or via systemd/docker
-journalctl -u ploy-api -f
-docker logs ploy-api -f
-```
-
-### 2. Nomad Job Logs
-Access transformation container logs:
-```bash
-# Get the Nomad job ID from transformation result
-JOB_ID=$(curl -s "${PLOY_CONTROLLER}/arf/transforms/${TRANSFORM_ID}" | jq -r '.job_id')
-
-# View logs
-nomad logs -f ${JOB_ID}
-
-# Or get all allocations for the job
-nomad job status ${JOB_ID}
-nomad alloc logs {allocation_id}
-```
-
-### 3. Container Debug Output
-The OpenRewrite container produces detailed logs including:
-- `[SETUP]` - Workspace preparation
-- `[OpenRewrite]` - Transformation progress
-- `[Cache]` - Recipe caching operations
-- `[Error]` - Failure details
-
-Key log markers to watch for:
-```
-[OpenRewrite] Extracting input archive...
-[OpenRewrite] Running transformation with recipe: org.openrewrite.java.migrate.UpgradeToJava17
-[OpenRewrite] Transformation completed successfully
-[OpenRewrite] Output tar created successfully
-```
-
-### 4. SeaweedFS Storage Logs
-Monitor artifact storage operations:
-```bash
-# Check SeaweedFS filer logs on VPS
-curl "${SEAWEEDFS_URL}/status"
-```
-
-## Validation Steps
-
-### 1. Extract and Inspect Output
-```bash
-# Download output tar
-curl -o output.tar "${SEAWEEDFS_URL}/${OUTPUT_KEY}"
-
-# Extract and examine
-mkdir output-inspection
-tar -xf output.tar -C output-inspection
-cd output-inspection
-
-# Check for Java 17 features
-grep -r "var " --include="*.java" .  # Local variable type inference
-grep -r "record " --include="*.java" .  # Record classes
-grep -r "sealed " --include="*.java" .  # Sealed classes
-
-# Verify POM updates
-grep "<maven.compiler.source>17" pom.xml
-grep "<maven.compiler.target>17" pom.xml
-```
-
-### 2. Build Verification (Optional)
-```bash
-cd output-inspection
-mvn clean compile  # Should compile with Java 17
-```
-
-## Success Criteria
-
-A transformation is considered successful when:
-
-1. **API Response**: Returns `status: "completed"` with a valid transformation_id
-2. **Output Artifact**: `output.tar` is created and accessible
-3. **Content Validation**: 
-   - Source files are present in output.tar
-   - Java version updated in build configuration
-   - Code compiles with Java 17 (if tested)
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-#### 1. Transformation Stuck in "pending"
-**Cause**: Nomad job not starting  
-**Solution**: Check Nomad cluster health
-```bash
-nomad node status
-nomad job status
-```
-
-#### 2. "Repository not found" Error
-**Cause**: Invalid GitHub URL or private repository  
-**Solution**: Verify repository URL is public and accessible
-
-#### 3. Output tar is empty or missing files
-**Cause**: Build detection failure  
-**Solution**: Check container logs for `[SETUP]` and `[OpenRewrite]` errors
-
-#### 4. Recipe not found
-**Cause**: Maven Central connectivity issue  
-**Sol ution**: Verify network access from Nomad nodes to Maven Central
-
-#### 5. Transformation times out
-**Cause**: Large repository or network issues  
-**Solution**: Increase timeout values or retry with smaller repository
-
-### Debug Commands
-
-```bash
-# Check API health
-curl "${PLOY_CONTROLLER}/health"
-
-# Verify Nomad connectivity
-nomad server members
-nomad node status
-
-# Test SeaweedFS on VPS
-curl "${SEAWEEDFS_URL}/status"
-```
-
-## Batch Execution Script
-
-For testing multiple repositories sequentially:
-
-```bash
-#!/bin/bash
-# batch-transform.sh
-
-REPOS=(
-  "winterbe/java8-tutorial:master:maven"
-  "spring-guides/gs-spring-boot:main:maven"
-  "iluwatar/java-design-patterns:master:maven"
-  "gothinkster/spring-boot-realworld-example-app:master:gradle"
-)
-
-for repo_info in "${REPOS[@]}"; do
-  IFS=':' read -r repo branch build_tool <<< "$repo_info"
-  
-  echo "Starting transformation for $repo..."
-  
-  TRANSFORM_ID=$(curl -s -X POST "${PLOY_CONTROLLER}/arf/transform" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"recipe_id\": \"org.openrewrite.java.migrate.UpgradeToJava17\",
-      \"type\": \"openrewrite\",
-      \"codebase\": {
-        \"repository\": \"https://github.com/${repo}.git\",
-        \"branch\": \"${branch}\",
-        \"language\": \"java\",
-        \"build_tool\": \"${build_tool}\"
-      }
-    }" | jq -r '.transformation_id')
-  
-  echo "Transformation ID: $TRANSFORM_ID"
-  
-  # Wait for completion
+TRANSFORM_ID="<transformation_id_from_step_1>"
+timeout 3600 bash -c '
   while true; do
-    STATUS=$(curl -s "${PLOY_CONTROLLER}/arf/transforms/${TRANSFORM_ID}" | jq -r '.status')
+    STATUS=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/transforms/'$TRANSFORM_ID'" | jq -r ".status")
+    echo "$(date): Transformation status: $STATUS"
     if [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]]; then
-      echo "Transformation $STATUS for $repo"
       break
     fi
-    sleep 10
+    sleep 30
   done
-done
+'
 ```
 
-## Summary
+### Step 3: Verify Recipe Availability
+```bash
+# Check OpenRewrite recipes using unified ARF recipe system
+curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes?type=openrewrite" | jq '.recipes | length'
+# Should show available OpenRewrite recipes
 
-This test plan provides a practical approach to validating OpenRewrite Java 17 transformations through the Ploy ARF system. Focus on:
+# List all OpenRewrite recipes with details
+curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/recipes?type=openrewrite" | jq '.recipes[]'
+```
 
-1. **Single transformations** - Test each repository individually
-2. **Monitor progress** - Use status endpoint and logs
-3. **Validate output** - Verify output.tar contains transformed code
-4. **Track metrics** - Record execution times and success rates
+### Recipe Validation (Optional)
+```bash
+# Validate OpenRewrite recipe before transformation
+curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/recipes/validate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
+    "type": "openrewrite"
+  }'
+```
 
-The system handles recipe downloads, caching, and transformation execution automatically through the containerized OpenRewrite engine.
+## Documentation Updates:
+- Update main roadmap with direct OpenRewrite testing results
+- Document working endpoints vs. failed advanced components
+- Create alternative testing guide for basic OpenRewrite functionality
+- Document recipe caching behavior and performance improvements
+
+This focused approach should provide a clear validation of core OpenRewrite capabilities while ensuring sufficient time for recipe downloads and transformations to complete successfully.

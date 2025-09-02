@@ -162,6 +162,13 @@ Request:
 }
 ```
 
+#### Benchmark Endpoints
+```
+POST /v1/arf/benchmark/run
+GET /v1/arf/benchmark/status/{id}
+GET /v1/arf/benchmark/list
+```
+
 ## Adding New Recipes
 
 ### 1. Using Existing Maven Recipes
