@@ -143,8 +143,65 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 
 	fmt.Printf("[DEBUG] About to call executeTransformationInternal\n")
 	
-	// Execute transformation
-	fmt.Printf("[ARF Transform] Starting transformation execution for ID: %s\n", transformID)
+	// For OpenRewrite transformations, start asynchronously to avoid timeout
+	if req.Type == "openrewrite" {
+		fmt.Printf("[ARF Transform] Starting async OpenRewrite transformation for ID: %s\n", transformID)
+		
+		// Store initial status
+		initialResult := &TransformationResult{
+			TransformationID: transformID,
+			RecipeID:         req.RecipeID,
+			Status:           "pending",
+			StartTime:        time.Now(),
+			Metadata: map[string]interface{}{
+				"type":       "openrewrite",
+				"repository": req.Codebase.Repository,
+				"branch":     req.Codebase.Branch,
+			},
+		}
+		globalTransformStore.store(transformID, initialResult)
+		
+		// Start transformation in background
+		go func() {
+			// Create a new context for the async operation (not tied to HTTP request)
+			asyncCtx := context.Background()
+			
+			fmt.Printf("[ARF Transform Async] Starting background transformation for ID: %s\n", transformID)
+			result, err := h.executeTransformationInternal(asyncCtx, transformID, &req)
+			
+			if err != nil {
+				fmt.Printf("[ARF Transform Async] Transformation failed for ID %s: %v\n", transformID, err)
+				// Update stored result with error
+				errorResult := &TransformationResult{
+					TransformationID: transformID,
+					RecipeID:         req.RecipeID,
+					Status:           "failed",
+					Success:          false,
+					Error:            err.Error(),
+					StartTime:        initialResult.StartTime,
+					EndTime:          time.Now(),
+					ExecutionTime:    time.Since(initialResult.StartTime),
+					Metadata:         initialResult.Metadata,
+				}
+				globalTransformStore.store(transformID, errorResult)
+			} else {
+				// Update with successful result
+				result.Status = "completed"
+				globalTransformStore.store(transformID, result)
+				fmt.Printf("[ARF Transform Async] Transformation completed successfully for ID: %s\n", transformID)
+			}
+		}()
+		
+		// Return immediately with transformation ID
+		return c.JSON(fiber.Map{
+			"transformation_id": transformID,
+			"status": "pending",
+			"message": "OpenRewrite transformation started. Poll /v1/arf/transforms/" + transformID + " for status",
+		})
+	}
+	
+	// For non-OpenRewrite transformations, execute synchronously as before
+	fmt.Printf("[ARF Transform] Starting synchronous transformation execution for ID: %s\n", transformID)
 	result, err := h.executeTransformationInternal(ctx, transformID, &req)
 	if err != nil {
 		fmt.Printf("[ARF Transform] Transformation failed for ID %s: %v\n", transformID, err)
@@ -152,9 +209,6 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
 		// Check if context deadline exceeded
 		if ctx.Err() == context.DeadlineExceeded {
 			timeoutMsg := "The transformation took longer than expected to complete"
-			if req.Type == "openrewrite" {
-				timeoutMsg = "OpenRewrite transformation timed out after 5 minutes - check job status or infrastructure"
-			}
 			return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
 				"error":   "Transformation timeout",
 				"details": timeoutMsg,
@@ -810,6 +864,11 @@ func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
 			"error": "transformation not found",
 			"id":    transformID,
 		})
+	}
+
+	// Ensure the result has required fields for compatibility
+	if result.Status == "" {
+		result.Status = "completed" // Default for old results
 	}
 
 	return c.JSON(result)
