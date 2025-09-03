@@ -457,6 +457,21 @@ func TestHandleRecipeList(t *testing.T) {
 			envCatalog:  "true",
 			expectError: false,
 		},
+		{
+			name:        "with pack filter",
+			args:        []string{"--pack", "rewrite-java"},
+			expectError: false,
+		},
+		{
+			name:        "with version filter",
+			args:        []string{"--version", "8.1.0"},
+			expectError: false,
+		},
+		{
+			name:        "with pack and version filters",
+			args:        []string{"--pack", "rewrite-spring", "--version", "5.0.0"},
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -533,6 +548,70 @@ func TestHandleRecipeList(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestParseFilterFlags(t *testing.T) {
+	tests := []struct {
+		name              string
+		args              []string
+		expectedFilter    RecipeFilter
+		expectedRemaining []string
+	}{
+		{
+			name: "parse pack flag",
+			args: []string{"--pack", "rewrite-java", "--output", "json"},
+			expectedFilter: RecipeFilter{
+				Pack:  "rewrite-java",
+				Limit: 20,
+			},
+			expectedRemaining: []string{"--output", "json"},
+		},
+		{
+			name: "parse version flag",
+			args: []string{"--version", "8.1.0", "-v"},
+			expectedFilter: RecipeFilter{
+				Version: "8.1.0",
+				Limit:   20,
+			},
+			expectedRemaining: []string{"-v"},
+		},
+		{
+			name: "parse pack and version flags",
+			args: []string{"--pack", "rewrite-spring", "--version", "5.0.0", "--language", "java"},
+			expectedFilter: RecipeFilter{
+				Pack:     "rewrite-spring",
+				Version:  "5.0.0",
+				Language: "java",
+				Limit:    20,
+			},
+			expectedRemaining: []string{},
+		},
+		{
+			name: "short form flags",
+			args: []string{"-p", "rewrite-java", "-V", "8.1.0"},
+			expectedFilter: RecipeFilter{
+				Pack:    "rewrite-java",
+				Version: "8.1.0",
+				Limit:   20,
+			},
+			expectedRemaining: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter, remaining := ParseFilterFlags(tt.args)
+
+			// Check filter fields
+			assert.Equal(t, tt.expectedFilter.Pack, filter.Pack, "Pack mismatch")
+			assert.Equal(t, tt.expectedFilter.Version, filter.Version, "Version mismatch")
+			assert.Equal(t, tt.expectedFilter.Language, filter.Language, "Language mismatch")
+			assert.Equal(t, tt.expectedFilter.Limit, filter.Limit, "Limit mismatch")
+
+			// Check remaining args
+			assert.Equal(t, tt.expectedRemaining, remaining, "Remaining args mismatch")
 		})
 	}
 }

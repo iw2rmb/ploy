@@ -15,14 +15,14 @@ import (
 
 // RecipeTemplate represents a template for creating recipes
 type RecipeTemplate struct {
-	ID          string                 `json:"id" yaml:"id"`
-	Name        string                 `json:"name" yaml:"name"`
-	Description string                 `json:"description" yaml:"description"`
-	Category    string                 `json:"category" yaml:"category"`
-	Template    models.Recipe          `json:"template" yaml:"template"`
-	Variables   []TemplateVariable     `json:"variables,omitempty" yaml:"variables,omitempty"`
-	Prompts     []TemplatePrompt       `json:"prompts,omitempty" yaml:"prompts,omitempty"`
-	Examples    []RecipeExample        `json:"examples,omitempty" yaml:"examples,omitempty"`
+	ID          string             `json:"id" yaml:"id"`
+	Name        string             `json:"name" yaml:"name"`
+	Description string             `json:"description" yaml:"description"`
+	Category    string             `json:"category" yaml:"category"`
+	Template    models.Recipe      `json:"template" yaml:"template"`
+	Variables   []TemplateVariable `json:"variables,omitempty" yaml:"variables,omitempty"`
+	Prompts     []TemplatePrompt   `json:"prompts,omitempty" yaml:"prompts,omitempty"`
+	Examples    []RecipeExample    `json:"examples,omitempty" yaml:"examples,omitempty"`
 }
 
 // TemplateVariable represents a variable in a recipe template
@@ -38,13 +38,13 @@ type TemplateVariable struct {
 
 // TemplatePrompt represents an interactive prompt
 type TemplatePrompt struct {
-	Field       string   `json:"field" yaml:"field"`
-	Message     string   `json:"message" yaml:"message"`
-	Type        string   `json:"type" yaml:"type"` // input, select, confirm, multiselect
-	Options     []string `json:"options,omitempty" yaml:"options,omitempty"`
-	Default     string   `json:"default,omitempty" yaml:"default,omitempty"`
-	Required    bool     `json:"required" yaml:"required"`
-	Validation  string   `json:"validation,omitempty" yaml:"validation,omitempty"`
+	Field      string   `json:"field" yaml:"field"`
+	Message    string   `json:"message" yaml:"message"`
+	Type       string   `json:"type" yaml:"type"` // input, select, confirm, multiselect
+	Options    []string `json:"options,omitempty" yaml:"options,omitempty"`
+	Default    string   `json:"default,omitempty" yaml:"default,omitempty"`
+	Required   bool     `json:"required" yaml:"required"`
+	Validation string   `json:"validation,omitempty" yaml:"validation,omitempty"`
 }
 
 // RecipeExample represents an example for a template
@@ -77,9 +77,9 @@ var builtInTemplates = map[string]RecipeTemplate{
 					Name: "Apply OpenRewrite Recipe",
 					Type: models.StepTypeOpenRewrite,
 					Config: map[string]interface{}{
-						"recipe":     "{{.OpenRewriteRecipe}}",
-						"dataTable":  map[string]interface{}{},
-						"options":    map[string]interface{}{},
+						"recipe":    "{{.OpenRewriteRecipe}}",
+						"dataTable": map[string]interface{}{},
+						"options":   map[string]interface{}{},
 					},
 					Timeout: models.Duration{Duration: 10 * time.Minute},
 				},
@@ -106,10 +106,10 @@ var builtInTemplates = map[string]RecipeTemplate{
 				Name:        "Spring Boot 2 to 3 Migration",
 				Description: "Migrate Spring Boot application from version 2 to 3",
 				Values: map[string]string{
-					"RecipeName":       "spring-boot-2-to-3",
-					"Description":      "Migrate Spring Boot 2.x application to 3.x",
-					"Language":         "java",
-					"Category":         "migration", 
+					"RecipeName":        "spring-boot-2-to-3",
+					"Description":       "Migrate Spring Boot 2.x application to 3.x",
+					"Language":          "java",
+					"Category":          "migration",
 					"OpenRewriteRecipe": "org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_0",
 				},
 			},
@@ -356,18 +356,18 @@ func executeInputPrompt(prompt TemplatePrompt) (string, error) {
 
 	for {
 		value := promptInput(message)
-		
+
 		// Use default if empty input
 		if value == "" && prompt.Default != "" {
 			value = prompt.Default
 		}
-		
+
 		// Check required
 		if prompt.Required && value == "" {
 			PrintWarning("This field is required")
 			continue
 		}
-		
+
 		return value, nil
 	}
 }
@@ -382,21 +382,21 @@ func executeSelectPrompt(prompt TemplatePrompt) (string, error) {
 		}
 		fmt.Printf("  %s %d. %s\n", marker, i+1, option)
 	}
-	
+
 	for {
 		choice := promptInput("Select option (1-" + fmt.Sprintf("%d", len(prompt.Options)) + "): ")
-		
+
 		// Use default if empty
 		if choice == "" && prompt.Default != "" {
 			return prompt.Default, nil
 		}
-		
+
 		index, err := strconv.Atoi(choice)
 		if err != nil || index < 1 || index > len(prompt.Options) {
 			PrintWarning("Invalid selection")
 			continue
 		}
-		
+
 		return prompt.Options[index-1], nil
 	}
 }
@@ -417,12 +417,12 @@ func executeMultiSelectPrompt(prompt TemplatePrompt) (string, error) {
 	for i, option := range prompt.Options {
 		fmt.Printf("  %d. %s\n", i+1, option)
 	}
-	
+
 	input := promptInput("Select options (e.g., 1,3,5): ")
 	if input == "" {
 		return prompt.Default, nil
 	}
-	
+
 	// Parse selections
 	var selected []string
 	parts := strings.Split(input, ",")
@@ -434,7 +434,7 @@ func executeMultiSelectPrompt(prompt TemplatePrompt) (string, error) {
 		}
 		selected = append(selected, prompt.Options[index-1])
 	}
-	
+
 	return strings.Join(selected, ","), nil
 }
 
@@ -469,7 +469,7 @@ func generateRecipeFromTemplate(template RecipeTemplate, values map[string]strin
 func previewRecipe(recipe *models.Recipe, flags CommandFlags) error {
 	fmt.Printf("\nRecipe Preview:\n")
 	fmt.Printf("===============\n")
-	
+
 	if flags.Verbose {
 		// Show full YAML
 		data, err := yaml.Marshal(recipe)
@@ -486,7 +486,7 @@ func previewRecipe(recipe *models.Recipe, flags CommandFlags) error {
 		fmt.Printf("Languages:   %s\n", strings.Join(recipe.Metadata.Languages, ", "))
 		fmt.Printf("Categories:  %s\n", strings.Join(recipe.Metadata.Categories, ", "))
 		fmt.Printf("Steps:       %d\n", len(recipe.Steps))
-		
+
 		if len(recipe.Steps) > 0 {
 			fmt.Printf("\nSteps:\n")
 			for i, step := range recipe.Steps {
@@ -537,13 +537,13 @@ func promptConfirm(message string, defaultValue bool) bool {
 	if defaultValue {
 		defaultStr = "Y/n"
 	}
-	
+
 	response := promptInput(fmt.Sprintf("%s (%s): ", message, defaultStr))
-	
+
 	if response == "" {
 		return defaultValue
 	}
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
@@ -551,7 +551,7 @@ func promptConfirm(message string, defaultValue bool) bool {
 // listTemplates lists available recipe templates
 func listTemplates(outputFormat string, verbose bool) error {
 	templates := getAvailableTemplates()
-	
+
 	switch strings.ToLower(outputFormat) {
 	case "json":
 		data, _ := json.MarshalIndent(builtInTemplates, "", "  ")
@@ -563,7 +563,7 @@ func listTemplates(outputFormat string, verbose bool) error {
 			fmt.Printf("• %s (%s)\n", template.Name, template.ID)
 			fmt.Printf("  %s\n", template.Description)
 			fmt.Printf("  Category: %s\n", template.Category)
-			
+
 			if verbose {
 				fmt.Printf("  Prompts: %d\n", len(template.Prompts))
 				if len(template.Examples) > 0 {
@@ -583,16 +583,16 @@ func validateTemplate(template RecipeTemplate) error {
 	if template.ID == "" {
 		return NewCLIError("Template ID is required", 1)
 	}
-	
+
 	if template.Name == "" {
 		return NewCLIError("Template name is required", 1)
 	}
-	
+
 	// Validate template recipe
 	if err := template.Template.Validate(); err != nil {
 		return NewCLIError("Template recipe is invalid", 1).WithCause(err)
 	}
-	
+
 	// Validate prompts
 	for _, prompt := range template.Prompts {
 		if prompt.Field == "" {
@@ -602,6 +602,6 @@ func validateTemplate(template RecipeTemplate) error {
 			return NewCLIError(fmt.Sprintf("Prompt message is required for field '%s'", prompt.Field), 1)
 		}
 	}
-	
+
 	return nil
 }

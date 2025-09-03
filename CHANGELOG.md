@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [2025-09-03] - OpenRewrite Recipes Phase 4 UX Polish (Partial)
+
+### Added
+- CLI: `--pack` flag to filter recipes by pack name
+  - Short form: `-p`
+  - Example: `ploy arf recipes list --pack rewrite-spring`
+- CLI: `--version` flag to filter recipes by pack version
+  - Short form: `-V`
+  - Example: `ploy arf recipes list --version 8.1.0`
+- CLI: Combined pack and version filtering
+  - Example: `ploy arf recipes list --pack rewrite-java --version 8.1.0`
+- Tests: Added comprehensive tests for new filter flags
+
+### Updated
+- roadmap/recepies.md: Marked first 3 items of Phase 4 as complete
+- docs/recipes.md: Added documentation for new pack and version filter flags
+- RecipeFilter struct: Added Pack and Version fields
+- ParseFilterFlags: Added support for --pack/-p and --version/-V
+- BuildAPIQuery: Includes pack and version in API requests
+- Recipe usage help: Documents new filtering options
+
+### Notes
+- CLI recipe suggestion on invalid recipe was already implemented
+- Server-side pluggable pack lists remains as future work
+
 ## [2025-09-03] - OpenRewrite Recipes Phase 3 Complete & Documentation
 
 ### Completed

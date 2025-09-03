@@ -8,11 +8,11 @@ import (
 
 // CLIError represents a CLI-specific error with user-friendly messaging
 type CLIError struct {
-	Message     string
-	Suggestion  string
-	ExitCode    int
-	ShowUsage   bool
-	Cause       error
+	Message    string
+	Suggestion string
+	ExitCode   int
+	ShowUsage  bool
+	Cause      error
 }
 
 func (e *CLIError) Error() string {
@@ -50,17 +50,17 @@ func PrintError(err error) {
 	if cliErr, ok := err.(*CLIError); ok {
 		// Print main error message
 		fmt.Fprintf(os.Stderr, "❌ Error: %s\n", cliErr.Message)
-		
+
 		// Print suggestion if available
 		if cliErr.Suggestion != "" {
 			fmt.Fprintf(os.Stderr, "💡 Suggestion: %s\n", cliErr.Suggestion)
 		}
-		
+
 		// Print underlying cause if available and verbose mode
 		if cliErr.Cause != nil && os.Getenv("PLOY_VERBOSE") == "true" {
 			fmt.Fprintf(os.Stderr, "🔍 Details: %v\n", cliErr.Cause)
 		}
-		
+
 		// Print usage if requested
 		if cliErr.ShowUsage {
 			fmt.Fprintf(os.Stderr, "\n")
@@ -93,17 +93,17 @@ func ValidateRecipeID(recipeID string) error {
 		return NewCLIError("Recipe ID cannot be empty", 1).
 			WithSuggestion("Provide a valid recipe ID, e.g., 'java11to17-1.0.0'")
 	}
-	
+
 	if len(recipeID) < 3 {
 		return NewCLIError("Recipe ID is too short", 1).
 			WithSuggestion("Recipe ID should be at least 3 characters long")
 	}
-	
+
 	if strings.Contains(recipeID, " ") {
 		return NewCLIError("Recipe ID cannot contain spaces", 1).
 			WithSuggestion("Use hyphens (-) or underscores (_) instead of spaces")
 	}
-	
+
 	return nil
 }
 
@@ -112,26 +112,26 @@ func ValidateFilePath(filePath string) error {
 	if filePath == "" {
 		return NewCLIError("File path cannot be empty", 1)
 	}
-	
+
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return NewCLIError(fmt.Sprintf("File not found: %s", filePath), 1).
 			WithSuggestion("Check the file path and ensure the file exists")
 	}
-	
+
 	return nil
 }
 
 // ValidateOutputFormat validates output format
 func ValidateOutputFormat(format string) error {
 	validFormats := []string{"table", "json", "yaml"}
-	
+
 	format = strings.ToLower(format)
 	for _, valid := range validFormats {
 		if format == valid {
 			return nil
 		}
 	}
-	
+
 	return NewCLIError(fmt.Sprintf("Invalid output format: %s", format), 1).
 		WithSuggestion(fmt.Sprintf("Valid formats: %s", strings.Join(validFormats, ", ")))
 }
@@ -150,11 +150,11 @@ func ConfirmAction(action string, force bool) bool {
 	if force {
 		return true
 	}
-	
+
 	fmt.Printf("Are you sure you want to %s? (y/N): ", action)
 	var response string
 	fmt.Scanln(&response)
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }

@@ -54,11 +54,11 @@ Validate recipe names passed to transforms.
 - [x] If found, optionally pass `RECIPE_GROUP/ARTIFACT/VERSION` to speed resolution (runner still supports discovery)
 - [x] TDD: handler tests for happy path + suggestions
 
-## Phase 4 — UX Polish
+## Phase 4 — UX Polish (Partial)
 
-- [ ] CLI: Suggest closest matches on invalid recipe
-- [ ] CLI: `--version` flag to display or target pack version
-- [ ] CLI: `--packs` to filter recipes by pack
+- [x] CLI: Suggest closest matches on invalid recipe
+- [x] CLI: `--version` flag to filter recipes by pack version  
+- [x] CLI: `--pack` flag to filter recipes by pack
 - [ ] Server: Pluggable pack lists; support additional languages (Kotlin/Gradle) later
 
 ## Phase 5 — Observability & Docs

@@ -26,14 +26,14 @@ const (
 
 // ArchiveMetadata contains metadata about an archive
 type ArchiveMetadata struct {
-	Version      string            `json:"version"`
-	CreatedAt    time.Time         `json:"created_at"`
-	CreatedBy    string            `json:"created_by"`
-	Description  string            `json:"description"`
-	RecipeCount  int               `json:"recipe_count"`
-	Format       string            `json:"format"`
-	Checksums    map[string]string `json:"checksums,omitempty"`
-	Filters      RecipeFilter      `json:"filters,omitempty"`
+	Version     string            `json:"version"`
+	CreatedAt   time.Time         `json:"created_at"`
+	CreatedBy   string            `json:"created_by"`
+	Description string            `json:"description"`
+	RecipeCount int               `json:"recipe_count"`
+	Format      string            `json:"format"`
+	Checksums   map[string]string `json:"checksums,omitempty"`
+	Filters     RecipeFilter      `json:"filters,omitempty"`
 }
 
 // ImportResult represents the result of an import operation
@@ -49,11 +49,11 @@ type ImportResult struct {
 
 // ExportResult represents the result of an export operation
 type ExportResult struct {
-	ArchiveFile     string `json:"archive_file"`
-	RecipeCount     int    `json:"recipe_count"`
-	ArchiveSize     int64  `json:"archive_size"`
-	Format          string `json:"format"`
-	Compression     string `json:"compression,omitempty"`
+	ArchiveFile string `json:"archive_file"`
+	RecipeCount int    `json:"recipe_count"`
+	ArchiveSize int64  `json:"archive_size"`
+	Format      string `json:"format"`
+	Compression string `json:"compression,omitempty"`
 }
 
 // importRecipes imports recipes from an archive file
@@ -116,7 +116,7 @@ func exportRecipes(flags CommandFlags) error {
 
 	// Parse export filter from flags (TODO: implement proper flag parsing)
 	filter := RecipeFilter{}
-	
+
 	PrintInfo(fmt.Sprintf("Exporting recipes to %s (%s format)...", flags.OutputFile, format))
 
 	// Retrieve recipes to export
