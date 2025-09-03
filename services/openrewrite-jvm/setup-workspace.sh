@@ -15,12 +15,14 @@ ls -la
 
 echo "[SETUP] Checking for Nomad artifact locations..."
 
-# Check common Nomad artifact locations and look for tar files
-# Nomad places artifacts in /local when using Docker driver
-if [ -f "/local/input.tar" ]; then
-    echo "[SETUP] Found input.tar at /local/input.tar (Nomad artifact location)"
+# First, let's search for input.tar anywhere in the filesystem
+echo "[SETUP] Searching for input.tar file..."
+INPUT_TAR_FOUND=$(find / -name "input.tar" -type f 2>/dev/null | head -1)
+
+if [ -n "$INPUT_TAR_FOUND" ]; then
+    echo "[SETUP] Found input.tar at: $INPUT_TAR_FOUND"
     # Copy the tar file to workspace where runner script expects it
-    cp "/local/input.tar" "/workspace/input.tar"
+    cp "$INPUT_TAR_FOUND" "/workspace/input.tar"
     echo "[SETUP] Copied input.tar to /workspace/input.tar"
     ls -la /workspace/input.tar
     
@@ -28,14 +30,22 @@ if [ -f "/local/input.tar" ]; then
     echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
     echo "[SETUP] Starting OpenRewrite transformation..."
     exec /usr/local/bin/openrewrite
+fi
+
+# If not found by search, check common locations
+if [ -f "/local/input.tar" ]; then
+    echo "[SETUP] Found input.tar at /local/input.tar (Nomad artifact location)"
+    cp "/local/input.tar" "/workspace/input.tar"
+    echo "[SETUP] Copied input.tar to /workspace/input.tar"
+    ls -la /workspace/input.tar
+    echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
+    echo "[SETUP] Starting OpenRewrite transformation..."
+    exec /usr/local/bin/openrewrite
 elif [ -f "local/input.tar" ]; then
     echo "[SETUP] Found input.tar at local/input.tar"
-    # Copy the tar file to workspace where runner script expects it
     cp "local/input.tar" "/workspace/input.tar"
     echo "[SETUP] Copied input.tar to /workspace/input.tar"
     ls -la /workspace/input.tar
-    
-    # We're done - runner script will extract it
     echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
     echo "[SETUP] Starting OpenRewrite transformation..."
     exec /usr/local/bin/openrewrite
