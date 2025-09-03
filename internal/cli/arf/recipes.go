@@ -1,13 +1,14 @@
 package arf
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
+    "encoding/json"
+    "fmt"
+    "os"
+    "strings"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
-	"gopkg.in/yaml.v3"
+    "github.com/iw2rmb/ploy/api/arf/models"
+    "gopkg.in/yaml.v3"
+    "sort"
 )
 
 // Recipe management commands
@@ -435,6 +436,62 @@ func printCatalog(items []catalogRecipe, format string, verbose bool) error {
         fmt.Printf("Total: %d recipes\n", len(items))
         return nil
     }
+}
+
+// getCatalogSuggestions fetches catalog and returns top suggestion IDs for a given raw recipeID
+func getCatalogSuggestions(rawID string) ([]string, error) {
+    // Query by last segment to broaden matches
+    seg := rawID
+    if dot := strings.LastIndex(rawID, "."); dot != -1 && dot+1 < len(rawID) {
+        seg = rawID[dot+1:]
+    }
+    url := fmt.Sprintf("%s/arf/recipes?query=%s", arfControllerURL, seg)
+    response, err := makeAPIRequest("GET", url, nil)
+    if err != nil {
+        return nil, err
+    }
+    items, err := parseCatalogList(response)
+    if err != nil {
+        return nil, err
+    }
+    return generateRecipeSuggestions(rawID, items), nil
+}
+
+// generateRecipeSuggestions ranks simple suggestions from catalog items
+func generateRecipeSuggestions(rawID string, items []catalogRecipe) []string {
+    // Prefer exact ID match (should not happen if called on failure), then same pack/name family, then others
+    last := rawID
+    if dot := strings.LastIndex(rawID, "."); dot != -1 && dot+1 < len(rawID) {
+        last = rawID[dot+1:]
+    }
+    packHint := ""
+    if idx := strings.Index(rawID, "."); idx != -1 {
+        packHint = rawID[:idx]
+    }
+    // Score items
+    type scored struct{ id string; score int }
+    scores := make([]scored, 0, len(items))
+    for _, it := range items {
+        s := 0
+        if it.ID == rawID { s += 100 }
+        if strings.Contains(it.ID, last) { s += 20 }
+        if it.DisplayName != "" && strings.Contains(it.DisplayName, last) { s += 10 }
+        if packHint != "" && strings.Contains(it.ID, packHint) { s += 5 }
+        if s > 0 {
+            scores = append(scores, scored{id: it.ID, score: s})
+        }
+    }
+    sort.Slice(scores, func(i, j int) bool { return scores[i].score > scores[j].score })
+    out := []string{}
+    seen := map[string]bool{}
+    for _, sc := range scores {
+        if !seen[sc.id] {
+            out = append(out, sc.id)
+            seen[sc.id] = true
+            if len(out) >= 5 { break }
+        }
+    }
+    return out
 }
 
 func getRecipeStats(recipeID string, flags CommandFlags) error {
@@ -891,7 +948,5 @@ Examples:
   # Search for Java migration recipes
   ploy arf recipes unified search java`)
 }
-
-
 
 

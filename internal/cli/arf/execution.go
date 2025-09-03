@@ -83,10 +83,24 @@ func runRecipe(recipeID string, flags CommandFlags) error {
 		repository = "." // Default to current directory
 	}
 
-	// Create execution request
-	request := ExecutionRequest{
-		RecipeID:      recipeID,
-		Repository:    repository,
+    // If catalog mode is enabled, show suggestions early for better UX
+    if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
+        if sugg, err := getCatalogSuggestions(recipeID); err == nil {
+            exact := false
+            for _, s := range sugg { if s == recipeID { exact = true; break } }
+            if !exact && len(sugg) > 0 {
+                PrintError(NewCLIError("Unknown recipe_id", 1))
+                fmt.Println("Did you mean:")
+                for _, s := range sugg { fmt.Printf("  - %s\n", s) }
+                return fmt.Errorf("invalid recipe_id: %s", recipeID)
+            }
+        }
+    }
+
+    // Create execution request
+    request := ExecutionRequest{
+        RecipeID:      recipeID,
+        Repository:    repository,
 		Branch:        branch,
 		OutputDir:     outputDir,
 		WorkingDir:    workingDir,
