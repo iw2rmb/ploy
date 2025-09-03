@@ -607,13 +607,22 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 // getStorageClient creates a new storage client for each request (stateless with caching)
 // Now returns the new storage.Storage interface instead of *storage.StorageClient
 func (s *Server) getStorageClient() (internalStorage.Storage, error) {
-	// Always use the new factory pattern
-	start := time.Now()
-	storageClient, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
-	if s.dependencies.Metrics != nil {
-		s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
-	}
-	return storageClient, err
+    // Prefer centralized config service if available
+    start := time.Now()
+    if s.configService != nil {
+        if st, err := resolveStorageFromConfigService(s.configService, s.dependencies.StorageConfigPath); err == nil {
+            if s.dependencies.Metrics != nil {
+                s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
+            }
+            return st, nil
+        }
+        // fall through to factory on failure
+    }
+    st, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
+    if s.dependencies.Metrics != nil {
+        s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
+    }
+    return st, err
 }
 
 // setupRoutes configures all API routes with dependency injection
