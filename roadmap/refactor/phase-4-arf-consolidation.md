@@ -499,5 +499,5 @@ find . -name "*.go" -exec sed -i '' \
 - [x] Storage-backed registry Get by ID
 - [x] Server handlers: list + get (internal path for get to avoid overlay)
 - [x] Unit tests added for registry and handlers (RED→GREEN)
-- [ ] Replace legacy recipe routes with internal handlers
+- [x] Replace legacy recipe routes with internal handlers
 - [ ] Migrate catalog parsing/models into internal/arf/recipes
