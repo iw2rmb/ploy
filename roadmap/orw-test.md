@@ -159,7 +159,25 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 ## Test Execution Log
 
-_Test results will be recorded here during execution._
+### Test Run 1: Remove Unused Imports ✅ COMPLETED
+- **Date**: 2025-09-03
+- **Repository**: ploy-orw-test-java
+- **Recipe**: `org.openrewrite.java.RemoveUnusedImports`
+- **Transform ID**: 4c278a0e-50b0-44c0-a726-2e28a8c91398
+- **Status**: COMPLETED
+- **Changes Applied**: 1
+- **Duration**: 20 seconds
+- **Issues Found**: Diff not captured in status/report
+- **Notes**: Transformation executed successfully with 1 change applied, but diff was not captured in the status or report. This is a known issue that needs to be fixed in the OpenRewrite dispatcher.
+
+### Test Run 2: Java 8 to 11 Migration ✅ COMPLETED
+- **Date**: 2025-09-03
+- **Repository**: ploy-orw-test-java
+- **Recipe**: `org.openrewrite.java.migrate.Java8toJava11`
+- **Transform ID**: 250454d3-52af-4791-8274-3f6f30418acf
+- **Status**: COMPLETED
+- **Changes Applied**: 1
+- **Notes**: Similar result - transformation succeeded with changes but diff not captured
 
 ## Key Findings
 
@@ -169,14 +187,17 @@ _Test results will be recorded here during execution._
 3. **Status Tracking Works**: Can monitor transformation progress via status endpoint
 4. **Multiple Recipe Types Supported**: Java upgrades, cleanup, Spring Boot migrations work
 
-### ⚠️ Potential Issues to Watch
-1. **Transformation Details Cleanup**: The `/v1/arf/transforms/{id}` endpoint may return "not found" shortly after completion
+### ⚠️ Confirmed Issues
+1. **Diff Capture Not Working**: The transformation diff is not being captured or stored
+   - Transformations complete successfully with `changes_applied > 0`
+   - But `diff` field remains empty in status and transformation objects
+   - Report shows "No detailed file changes recorded" despite changes being made
+   - Issue likely in the OpenRewriteDispatcher's diff generation or storage
+2. **Transformation Details Cleanup**: The `/v1/arf/transforms/{id}` endpoint may return "not found" shortly after completion
    - Status endpoint continues to work
    - Need to capture diff immediately after completion
-2. **Recipe Behavior**: Some recipes modify pom.xml even when targeting Java files
+3. **Recipe Behavior**: Some recipes modify pom.xml even when targeting Java files
    - May be intentional OpenRewrite behavior for consistency
-3. **Diff Retrieval**: `/v1/arf/transforms/{id}/diff` endpoint may have issues
-   - Full transformation object includes diff field when available
 
 ## API Usage Documentation
 
@@ -209,7 +230,7 @@ curl https://api.dev.ployman.app/v1/arf/transforms/{id}/report
 - `org.openrewrite.java.migrate.Java8toJava11` - Upgrades Java 8 to 11
 - `org.openrewrite.java.migrate.UpgradeToJava17` - Upgrades to Java 17
 - `org.openrewrite.java.RemoveUnusedImports` - Removes unused imports
-- `org.openrewrite.staticanalysis.UnnecessaryParentheses` - Removes unnecessary parentheses
+- `org.openrewrite.java.cleanup.UnnecessaryParentheses` - Removes unnecessary parentheses
 - `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2` - Spring Boot upgrade
 
 ### Test Automation
