@@ -48,6 +48,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
+	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -70,6 +71,7 @@ type ServiceDependencies struct {
 	Metrics                 *metrics.Metrics
 	StorageConfigPath       string
 	StorageFactory          *config.OptimizedStorageClientFactory
+	ARFEngine               arfcore.Engine
 }
 
 // ControllerConfig holds configuration for controller initialization
@@ -322,8 +324,11 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		}
 	}
 
+	// Initialize ARF Engine (consolidation Phase 4 - initial slice)
+	arfEngine := arfcore.NewEngine(arfcore.EngineConfig{})
+
 	// Initialize ARF Handler
-	arfHandler, err := initializeARFHandler(cfg)
+	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize ARF handler: %v", err)
 	}
@@ -366,6 +371,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		Metrics:                 metricsInstance,
 		StorageConfigPath:       cfg.StorageConfigPath,
 		StorageFactory:          storageFactory,
+		ARFEngine:               arfEngine,
 	}
 
 	// Record startup time

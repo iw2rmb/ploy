@@ -4002,3 +4002,15 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
 
 ### Why
 - Ensures recipes like `RemoveUnusedImports` and Java migrations apply consistently without relying on catalog discovery.
+
+## [2025-09-03] - ARF Consolidation Slice 1 (Phase 4)
+
+### Added
+- internal/arf/core: Minimal Engine interface + DefaultEngine (noop) already present; wired into server dependencies.
+- api/server: Initializes ARF engine (internal/arf/core) and attaches to ServiceDependencies for future ARF consolidation.
+
+### Tests
+- api/server: verifies ARF engine is initialized and available in dependencies.
+
+### Notes
+- No behavior change; this enables incremental migration of ARF logic to internal/arf/core in next slices.
