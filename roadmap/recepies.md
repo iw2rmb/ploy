@@ -36,14 +36,14 @@ Server indexes OpenRewrite packs and serves a searchable catalog.
 Notes:
 - Implemented as dedicated `RecipesHandler` + `RecipesIndexer` with in-memory catalog; verified by unit tests. Wiring into the main server router and platform pack configuration is pending (see CHANGELOG 2025-09-03).
 
-## Phase 2 — CLI: Recipes List/Search
+## Phase 2 — CLI: Recipes List/Search (DONE)
 
 Expose recipe discovery to users via Ploy CLI.
 
-- [ ] `ploy arf recipes list` – list recipes (tabular/text/json)
-- [ ] `ploy arf recipes search <query>` – search by id/name/description
-- [ ] Flags: `--pack`, `--version`, `--limit`, `--format`
-- [ ] TDD: CLI unit/integration tests (mock server)
+- [x] `ploy arf recipes list` – list recipes (tabular/text/json)
+- [x] `ploy arf recipes search <query>` – search by id/name/description
+- [x] Flags: `--pack`, `--version`, `--limit`, `--format`
+- [x] TDD: CLI unit/integration tests (mock server)
 
 ## Phase 3 — API Validation in Transforms
 
@@ -112,6 +112,5 @@ Verified in repo:
 
 - [x] Wire `RecipesHandler` into main API router behind feature flag; configure default packs in platform config
 - [x] CLI `ploy arf recipes list/search` (consumes server catalog endpoints)
-- [ ] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
 - [x] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
 - [ ] Docs: add `docs/recipes.md` walkthrough; update CLI help and examples

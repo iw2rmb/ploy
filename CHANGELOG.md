@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [2025-09-03] - OpenRewrite Recipes CLI Commands (Phase 2 Complete)
+
+### Added
+- CLI: Complete recipe management commands (`ploy arf recipes`)
+  - `list` - List available recipes with filtering (language, category, tags)
+  - `search <query>` - Search recipes by name/description
+  - `show <recipe-id>` - Display recipe details
+  - `upload/download` - Manage recipe files
+  - `validate` - Validate recipe YAML files
+  - `stats` - View recipe usage statistics
+- CLI: Support for multiple output formats (table, json, yaml)
+- CLI: Comprehensive flag support (--verbose, --dry-run, --force, etc.)
+- Tests: Unit tests for CLI recipe commands with mock server
+
+### Updated
+- roadmap/recepies.md: Marked Phase 2 as complete
+
 ## [2025-09-03] - Recipes Catalog Wiring (Short)
 
 - Enabled feature-flagged recipes catalog routes (`PLOY_ENABLE_RECIPES_CATALOG=true`) and optional CLI catalog mode (`PLOY_RECIPES_CATALOG=true`) for `ploy arf recipe list/search`. Added minimal tests for server wiring and CLI parsing.
