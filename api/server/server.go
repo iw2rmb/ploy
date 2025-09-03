@@ -139,23 +139,27 @@ func (s *Server) resolveUnifiedStorage() (internalStorage.Storage, error) {
 func NewServer(config *ControllerConfig) (*Server, error) {
     log.Printf("Initializing Ploy Controller with configuration-driven setup")
 
-    // Initialize dependencies
-    deps, err := initializeDependencies(config)
-    if err != nil {
-        return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
+    // Initialize centralized configuration service (prefer file + env) first
+    var cfgService *cfgsvc.Service
+    if config != nil && config.StorageConfigPath != "" {
+        svc, err := cfgsvc.New(
+            cfgsvc.WithFile(config.StorageConfigPath),
+            cfgsvc.WithEnvironment("PLOY_"),
+            cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+            cfgsvc.WithCacheTTL(5*time.Minute),
+            cfgsvc.WithHotReload(500*time.Millisecond),
+        )
+        if err != nil {
+            log.Printf("Warning: failed to initialize config service: %v", err)
+        } else {
+            cfgService = svc
+        }
     }
 
-    // Initialize centralized configuration service (prefers file + env)
-    var cfgService *cfgsvc.Service
-    cfgService, err = cfgsvc.New(
-        cfgsvc.WithFile(config.StorageConfigPath),
-        cfgsvc.WithEnvironment("PLOY_"),
-        cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
-        cfgsvc.WithCacheTTL(5*time.Minute),
-        cfgsvc.WithHotReload(500*time.Millisecond),
-    )
+    // Initialize dependencies (prefer config service where applicable)
+    deps, err := initializeDependenciesWithService(config, cfgService)
     if err != nil {
-        log.Printf("Warning: failed to initialize config service: %v", err)
+        return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
     }
     if deps.HealthChecker != nil && cfgService != nil {
         deps.HealthChecker.SetConfigService(cfgService)
@@ -218,17 +222,32 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 
 // initializeDependencies initializes all external service dependencies
 func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error) {
-	startTime := time.Now()
-	log.Printf("Initializing service dependencies (caching: %v)", cfg.EnableCaching)
-	log.Printf("Configuration: Port=%s, ConsulAddr=%s, NomadAddr=%s", cfg.Port, cfg.ConsulAddr, cfg.NomadAddr)
+    return initializeDependenciesWithService(cfg, nil)
+}
 
-	// Validate storage configuration at startup
-	log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
-	if _, err := config.Load(cfg.StorageConfigPath); err != nil {
-		log.Printf("Warning: Storage configuration validation failed: %v", err)
-	} else {
-		log.Printf("✓ Storage configuration validated successfully")
-	}
+// initializeDependenciesWithService initializes dependencies, preferring a centralized
+// configuration service when provided for validation and health wiring.
+func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*ServiceDependencies, error) {
+    startTime := time.Now()
+    log.Printf("Initializing service dependencies (caching: %v)", cfg.EnableCaching)
+    log.Printf("Configuration: Port=%s, ConsulAddr=%s, NomadAddr=%s", cfg.Port, cfg.ConsulAddr, cfg.NomadAddr)
+
+    // Validate storage configuration at startup
+    if cfgService != nil {
+        // Prefer centralized service for validation
+        if err := cfgService.Reload(); err != nil {
+            log.Printf("Warning: Storage configuration validation via service failed: %v", err)
+        } else {
+            log.Printf("✓ Storage configuration validated via service")
+        }
+    } else {
+        log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
+        if _, err := config.Load(cfg.StorageConfigPath); err != nil {
+            log.Printf("Warning: Storage configuration validation failed: %v", err)
+        } else {
+            log.Printf("✓ Storage configuration validated successfully")
+        }
+    }
 
 	// Initialize environment store with fallback logic
 	log.Printf("Initializing environment store...")
@@ -250,7 +269,7 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 
 	// Initialize optimized storage factory early (before components that need it)
 	// Always create the factory - it's required for most components
-	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
+    storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
 
     // Initialize health checker
     log.Printf("Initializing health checker...")
