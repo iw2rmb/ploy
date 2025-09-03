@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## [2025-09-03] - Config Service: Storage Env Overrides (Phase 3)
+
+### Added
+- internal/config: Environment source now maps `PLOY_STORAGE_PROVIDER` and `PLOY_STORAGE_ENDPOINT` to `storage.provider` and `storage.endpoint`.
+
+### Tests
+- internal/config: Added focused unit test to verify env overrides create a valid storage client for SeaweedFS.
+
+### Notes
+- This extends the baseline env support beyond app fields, aligning with Phase 3 centralization goals.
+
+## [2025-09-03] - Fix Empty Diffs in OpenRewrite Transformations
+
+### Fixed
+- **OpenRewrite dispatcher now downloads and extracts output.tar after job completion**:
+  - Downloads transformed code from storage after Nomad job completes
+  - Extracts tar to temporary directory for diff generation
+  - Generates diff using git diff on extracted files
+  - Parses diff to count changed files accurately
+  - Returns diff and file list in TransformationResult
+  - Maintains backward compatibility if download fails
+
+### Added
+- Comprehensive tests for diff extraction logic
+- Test coverage for backward compatibility when output download fails
+
+### Changed
+- waitForAllocationCompletion now processes output to extract actual transformation results
+- Storage configuration now requires `endpoint` field for SeaweedFS provider
+
 ## [2025-09-03] - Config Service Hard Requirement + Flag Cleanup (Phase 3)
 
 ### Changed

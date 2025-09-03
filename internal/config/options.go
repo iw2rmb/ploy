@@ -17,7 +17,11 @@ func WithDefaults(defaults *Config) Option {
 }
 
 // WithEnvironment registers an environment source using the given prefix, e.g. "PLOY_".
-// This minimal slice supports APP_NAME -> app.name.
+// This slice supports basic overrides including:
+//   - APP_NAME -> app.name
+//   - APP_VERSION -> app.version
+//   - STORAGE_PROVIDER -> storage.provider
+//   - STORAGE_ENDPOINT -> storage.endpoint
 func WithEnvironment(prefix string) Option {
     return func(s *Service) error {
         if s.loader == nil {

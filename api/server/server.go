@@ -327,7 +327,17 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 
 	// Initialize ARF Engine (consolidation Phase 4 - initial slice)
 	arfEngine := arfcore.NewEngine(arfcore.EngineConfig{})
-	arfRecipes := tarfrecipes.NewInMemory()
+	// Prefer storage-backed recipes registry when storage is resolvable
+	var arfRecipes tarfrecipes.Registry = tarfrecipes.NewInMemory()
+    if cfgService != nil {
+        if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
+            arfRecipes = tarfrecipes.NewStorageBacked(st)
+        }
+    } else {
+        if st, err := config.CreateStorageFromFactory(cfg.StorageConfigPath); err == nil && st != nil {
+            arfRecipes = tarfrecipes.NewStorageBacked(st)
+        }
+    }
 
 	// Initialize ARF Handler
 	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
