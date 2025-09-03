@@ -29,12 +29,15 @@ type Service struct {
     mu     sync.RWMutex
     config *Config
     loader *CompositeLoader
+    cache  *Cache
+    // validators are executed after load
+    validators []Validator
 }
 
 // New creates a new configuration service, applying the provided options and
 // loading configuration from registered sources.
 func New(opts ...Option) (*Service, error) {
-    s := &Service{loader: &CompositeLoader{}}
+    s := &Service{loader: &CompositeLoader{}, cache: NewCache()}
     for _, opt := range opts {
         if err := opt(s); err != nil {
             return nil, err
@@ -43,6 +46,11 @@ func New(opts ...Option) (*Service, error) {
 
     cfg, err := s.loader.Load()
     if err != nil {
+        return nil, err
+    }
+
+    // Run validators if any
+    if err := s.validate(cfg); err != nil {
         return nil, err
     }
 
@@ -60,4 +68,32 @@ func (s *Service) Get() *Config {
         return &Config{}
     }
     return s.config.Clone()
+}
+
+// GetWithCache returns the configuration from an internal cache if present
+// for the provided key; otherwise stores the current snapshot under that key
+// and returns it along with a boolean indicating whether it was a cache hit.
+func (s *Service) GetWithCache(key string) (*Config, bool) {
+    if s.cache != nil {
+        if v, ok := s.cache.Get(key); ok {
+            if cfg, ok2 := v.(*Config); ok2 {
+                return cfg, true
+            }
+        }
+    }
+    cfg := s.Get()
+    if s.cache != nil {
+        s.cache.Set(key, cfg)
+    }
+    return cfg, false
+}
+
+// validate runs all registered validators.
+func (s *Service) validate(cfg *Config) error {
+    for _, v := range s.validators {
+        if err := v.Validate(cfg); err != nil {
+            return err
+        }
+    }
+    return nil
 }

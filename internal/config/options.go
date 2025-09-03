@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // Option configures the Service during construction.
 type Option func(*Service) error
 
@@ -33,6 +35,26 @@ func WithFile(path string) Option {
             s.loader = &CompositeLoader{}
         }
         s.loader.AddSource(&fileSource{path: path, priority: 50})
+        return nil
+    }
+}
+
+// WithValidation registers a configuration validator that will be executed
+// after loading configuration.
+func WithValidation(v Validator) Option {
+    return func(s *Service) error {
+        s.validators = append(s.validators, v)
+        return nil
+    }
+}
+
+// WithCacheTTL configures the internal cache TTL.
+func WithCacheTTL(ttl time.Duration) Option {
+    return func(s *Service) error {
+        if s.cache == nil {
+            s.cache = NewCache()
+        }
+        s.cache.SetTTL(ttl)
         return nil
     }
 }

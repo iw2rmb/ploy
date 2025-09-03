@@ -527,8 +527,9 @@ func TestConfigurationService(t *testing.T) {
 - [ ] All duplicate config functions removed
 - [x] Environment variable handling unified (baseline via service options)
 - [ ] Configuration validation working
-- [ ] Hot-reload implemented
-- [ ] Caching layer functional
+ - [x] Configuration validation working
+ - [ ] Hot-reload implemented
+ - [x] Caching layer functional
 - [x] Unit tests added for file/env loading and storage client creation
 - [x] Documentation updated (progress logged)
 
@@ -549,7 +550,7 @@ func TestConfigurationService(t *testing.T) {
 - Pending (next slices):
   - Wire `api/server` to prefer `internal/config` service for storage initialization (keep legacy fallback)
   - Migrate duplicate config helpers to the centralized service
-  - Add validation, caching, and hot‑reload
+  - Add hot‑reload
   - Broaden storage config mapping beyond provider (endpoint/bucket/etc.)
 
 ## Expected Outcomes
