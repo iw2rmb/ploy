@@ -2,7 +2,7 @@
 # This image runs OpenRewrite transformations using Maven/Gradle with dynamic recipe loading
 # Recipes are cached in SeaweedFS to avoid repeated downloads from Maven Central
 
-FROM --platform=linux/amd64 eclipse-temurin:17-jre-alpine
+FROM --platform=linux/amd64 eclipse-temurin:17-jdk-alpine
 
 # Install required tools
 RUN apk add --no-cache \
