@@ -89,6 +89,13 @@ func (e *envSource) Load() (map[string]interface{}, error) {
     if v := os.Getenv(e.prefix + "APP_VERSION"); v != "" {
         ensurePath(out, "app")["version"] = v
     }
+    // Storage overrides
+    if v := os.Getenv(e.prefix + "STORAGE_PROVIDER"); v != "" {
+        ensurePath(out, "storage")["provider"] = v
+    }
+    if v := os.Getenv(e.prefix + "STORAGE_ENDPOINT"); v != "" {
+        ensurePath(out, "storage")["endpoint"] = v
+    }
     return out, nil
 }
 
