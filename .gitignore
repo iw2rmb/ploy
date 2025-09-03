@@ -49,6 +49,5 @@ __pycache__/
 apps/
 test-template/
 
-.gocache
-.gocache_go*.gocache
+.gocache_go/
 .gocache/
