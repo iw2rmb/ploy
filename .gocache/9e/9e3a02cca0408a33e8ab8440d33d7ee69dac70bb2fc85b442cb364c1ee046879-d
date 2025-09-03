@@ -1,0 +1,487 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/handler_models.go:1:1
+package arf
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/hashicorp/consul/api"
+)
+
+// ModelConfig represents a single LLM model configuration
+type ModelConfig struct {
+	Name        string  `json:"name" yaml:"name"`
+	Provider    string  `json:"provider" yaml:"provider"`
+	Endpoint    string  `json:"endpoint" yaml:"endpoint"`
+	APIKey      string  `json:"api_key" yaml:"api_key"`
+	Model       string  `json:"model" yaml:"model"`
+	Default     bool    `json:"default,omitempty" yaml:"default,omitempty"`
+	MaxTokens   int     `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
+	Temperature float64 `json:"temperature,omitempty" yaml:"temperature,omitempty"`
+	CreatedAt   string  `json:"created_at,omitempty"`
+	UpdatedAt   string  `json:"updated_at,omitempty"`
+}
+
+// ModelRegistry represents the complete model registry
+type ModelRegistry struct {
+	Models []ModelConfig `json:"models" yaml:"models"`
+}
+
+const consulKVPath = "ploy/arf/models"
+
+// getConsulClient creates a Consul client
+func getConsulClient() (*api.Client, error) {goCover_faa45bc9dd83__192[0] = 3 ; goCover_faa45bc9dd83__192[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__192[2] = 192 ; goCover_faa45bc9dd83__192[3] = 1;
+	config := api.DefaultConfig()
+	// Use Consul service discovery if available
+	if consulAddr := "consul.service.consul:8500"; consulAddr != "" {goCover_faa45bc9dd83__192[5] = 1;
+		config.Address = consulAddr
+	}
+	goCover_faa45bc9dd83__192[4] = 1;return api.NewClient(config)
+}
+
+// GetModels handles GET /v1/arf/models
+func (h *Handler) GetModels(c *fiber.Ctx) error {goCover_faa45bc9dd83__193[0] = 8 ; goCover_faa45bc9dd83__193[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__193[2] = 193 ; goCover_faa45bc9dd83__193[3] = 1;
+	client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__193[7] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to connect to Consul",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__193[4] = 1;kv := client.KV()
+	pair, _, err := kv.Get(consulKVPath, nil)
+	if err != nil {goCover_faa45bc9dd83__193[8] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to fetch models from Consul",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__193[5] = 1;registry := ModelRegistry{Models: []ModelConfig{}}
+	if pair != nil && pair.Value != nil {goCover_faa45bc9dd83__193[9] = 1;
+		if err := json.Unmarshal(pair.Value, &registry); err != nil {goCover_faa45bc9dd83__193[10] = 1;
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to parse model registry",
+				"details": err.Error(),
+			})
+		}
+	}
+
+	goCover_faa45bc9dd83__193[6] = 1;return c.JSON(registry)
+}
+
+// AddModel handles POST /v1/arf/models
+func (h *Handler) AddModel(c *fiber.Ctx) error {goCover_faa45bc9dd83__194[0] = 28 ; goCover_faa45bc9dd83__194[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__194[2] = 194 ; goCover_faa45bc9dd83__194[3] = 1;
+	var newModel ModelConfig
+	if err := c.BodyParser(&newModel); err != nil {goCover_faa45bc9dd83__194[16] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+		})
+	}
+
+	// Validate required fields
+	goCover_faa45bc9dd83__194[4] = 1;if newModel.Name == "" || newModel.Provider == "" || newModel.Endpoint == "" {goCover_faa45bc9dd83__194[17] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Missing required fields",
+			"details": "name, provider, and endpoint are required",
+		})
+	}
+
+	// Set defaults
+	goCover_faa45bc9dd83__194[5] = 1;if newModel.MaxTokens == 0 {goCover_faa45bc9dd83__194[18] = 1;
+		newModel.MaxTokens = 4096
+	}
+	goCover_faa45bc9dd83__194[6] = 1;if newModel.Temperature == 0 {goCover_faa45bc9dd83__194[19] = 1;
+		newModel.Temperature = 0.1
+	}
+	goCover_faa45bc9dd83__194[7] = 1;newModel.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	newModel.UpdatedAt = newModel.CreatedAt
+
+	client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__194[20] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to connect to Consul",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__194[8] = 1;kv := client.KV()
+
+	// Get existing registry
+	pair, _, err := kv.Get(consulKVPath, nil)
+	if err != nil {goCover_faa45bc9dd83__194[21] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to fetch existing models",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__194[9] = 1;registry := ModelRegistry{Models: []ModelConfig{}}
+	if pair != nil && pair.Value != nil {goCover_faa45bc9dd83__194[22] = 1;
+		if err := json.Unmarshal(pair.Value, &registry); err != nil {goCover_faa45bc9dd83__194[23] = 1;
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to parse existing registry",
+				"details": err.Error(),
+			})
+		}
+	}
+
+	// Check for duplicate name
+	goCover_faa45bc9dd83__194[10] = 1;for i, model := range registry.Models {goCover_faa45bc9dd83__194[24] = 1;
+		if model.Name == newModel.Name {goCover_faa45bc9dd83__194[25] = 1;
+			// Update existing model
+			newModel.CreatedAt = model.CreatedAt
+			registry.Models[i] = newModel
+			goto save
+		}
+	}
+
+	// Add new model
+	goCover_faa45bc9dd83__194[11] = 1;registry.Models = append(registry.Models, newModel)
+
+save:
+	// If this model is set as default, unset others
+	goCover_faa45bc9dd83__194[12] = 1;if newModel.Default {goCover_faa45bc9dd83__194[26] = 1;
+		for i := range registry.Models {goCover_faa45bc9dd83__194[27] = 1;
+			if registry.Models[i].Name != newModel.Name {goCover_faa45bc9dd83__194[28] = 1;
+				registry.Models[i].Default = false
+			}
+		}
+	}
+
+	// Save updated registry
+	goCover_faa45bc9dd83__194[13] = 1;data, err := json.Marshal(registry)
+	if err != nil {goCover_faa45bc9dd83__194[29] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to marshal registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__194[14] = 1;p := &api.KVPair{Key: consulKVPath, Value: data}
+	_, err = kv.Put(p, nil)
+	if err != nil {goCover_faa45bc9dd83__194[30] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to save model registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__194[15] = 1;return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": fmt.Sprintf("Model '%s' added successfully", newModel.Name),
+		"model":   newModel,
+	})
+}
+
+// RemoveModel handles DELETE /v1/arf/models/:name
+func (h *Handler) RemoveModel(c *fiber.Ctx) error {goCover_faa45bc9dd83__195[0] = 21 ; goCover_faa45bc9dd83__195[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__195[2] = 195 ; goCover_faa45bc9dd83__195[3] = 1;
+	modelName := c.Params("name")
+	if modelName == "" {goCover_faa45bc9dd83__195[13] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Model name is required",
+		})
+	}
+
+	goCover_faa45bc9dd83__195[4] = 1;client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__195[14] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to connect to Consul",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__195[5] = 1;kv := client.KV()
+
+	// Get existing registry
+	pair, _, err := kv.Get(consulKVPath, nil)
+	if err != nil {goCover_faa45bc9dd83__195[15] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to fetch existing models",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__195[6] = 1;if pair == nil || pair.Value == nil {goCover_faa45bc9dd83__195[16] = 1;
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Model not found",
+		})
+	}
+
+	goCover_faa45bc9dd83__195[7] = 1;registry := ModelRegistry{Models: []ModelConfig{}}
+	if err := json.Unmarshal(pair.Value, &registry); err != nil {goCover_faa45bc9dd83__195[17] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to parse existing registry",
+			"details": err.Error(),
+		})
+	}
+
+	// Find and remove model
+	goCover_faa45bc9dd83__195[8] = 1;found := false
+	newModels := []ModelConfig{}
+	for _, model := range registry.Models {goCover_faa45bc9dd83__195[18] = 1;
+		if model.Name != modelName {goCover_faa45bc9dd83__195[19] = 1;
+			newModels = append(newModels, model)
+		} else{ goCover_faa45bc9dd83__195[20] = 1;{
+			found = true
+		}}
+	}
+
+	goCover_faa45bc9dd83__195[9] = 1;if !found {goCover_faa45bc9dd83__195[21] = 1;
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": fmt.Sprintf("Model '%s' not found", modelName),
+		})
+	}
+
+	goCover_faa45bc9dd83__195[10] = 1;registry.Models = newModels
+
+	// Save updated registry
+	data, err := json.Marshal(registry)
+	if err != nil {goCover_faa45bc9dd83__195[22] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to marshal registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__195[11] = 1;p := &api.KVPair{Key: consulKVPath, Value: data}
+	_, err = kv.Put(p, nil)
+	if err != nil {goCover_faa45bc9dd83__195[23] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to save model registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__195[12] = 1;return c.JSON(fiber.Map{
+		"message": fmt.Sprintf("Model '%s' removed successfully", modelName),
+	})
+}
+
+// SetDefaultModel handles POST /v1/arf/models/:name/set-default
+func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {goCover_faa45bc9dd83__196[0] = 21 ; goCover_faa45bc9dd83__196[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__196[2] = 196 ; goCover_faa45bc9dd83__196[3] = 1;
+	modelName := c.Params("name")
+	if modelName == "" {goCover_faa45bc9dd83__196[13] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Model name is required",
+		})
+	}
+
+	goCover_faa45bc9dd83__196[4] = 1;client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__196[14] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to connect to Consul",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__196[5] = 1;kv := client.KV()
+
+	// Get existing registry
+	pair, _, err := kv.Get(consulKVPath, nil)
+	if err != nil {goCover_faa45bc9dd83__196[15] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to fetch existing models",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__196[6] = 1;if pair == nil || pair.Value == nil {goCover_faa45bc9dd83__196[16] = 1;
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "No models configured",
+		})
+	}
+
+	goCover_faa45bc9dd83__196[7] = 1;registry := ModelRegistry{Models: []ModelConfig{}}
+	if err := json.Unmarshal(pair.Value, &registry); err != nil {goCover_faa45bc9dd83__196[17] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to parse existing registry",
+			"details": err.Error(),
+		})
+	}
+
+	// Find model and set as default
+	goCover_faa45bc9dd83__196[8] = 1;found := false
+	for i := range registry.Models {goCover_faa45bc9dd83__196[18] = 1;
+		if registry.Models[i].Name == modelName {goCover_faa45bc9dd83__196[19] = 1;
+			registry.Models[i].Default = true
+			registry.Models[i].UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+			found = true
+		} else{ goCover_faa45bc9dd83__196[20] = 1;{
+			registry.Models[i].Default = false
+		}}
+	}
+
+	goCover_faa45bc9dd83__196[9] = 1;if !found {goCover_faa45bc9dd83__196[21] = 1;
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": fmt.Sprintf("Model '%s' not found", modelName),
+		})
+	}
+
+	// Save updated registry
+	goCover_faa45bc9dd83__196[10] = 1;data, err := json.Marshal(registry)
+	if err != nil {goCover_faa45bc9dd83__196[22] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to marshal registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__196[11] = 1;p := &api.KVPair{Key: consulKVPath, Value: data}
+	_, err = kv.Put(p, nil)
+	if err != nil {goCover_faa45bc9dd83__196[23] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to save model registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__196[12] = 1;return c.JSON(fiber.Map{
+		"message": fmt.Sprintf("Model '%s' set as default", modelName),
+	})
+}
+
+// ImportModels handles PUT /v1/arf/models
+func (h *Handler) ImportModels(c *fiber.Ctx) error {goCover_faa45bc9dd83__197[0] = 17 ; goCover_faa45bc9dd83__197[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__197[2] = 197 ; goCover_faa45bc9dd83__197[3] = 1;
+	var registry ModelRegistry
+	if err := c.BodyParser(&registry); err != nil {goCover_faa45bc9dd83__197[9] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Invalid request body",
+			"details": err.Error(),
+		})
+	}
+
+	// Validate and set defaults for all models
+	goCover_faa45bc9dd83__197[4] = 1;now := time.Now().UTC().Format(time.RFC3339)
+	for i := range registry.Models {goCover_faa45bc9dd83__197[10] = 1;
+		if registry.Models[i].Name == "" || registry.Models[i].Provider == "" || registry.Models[i].Endpoint == "" {goCover_faa45bc9dd83__197[14] = 1;
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   fmt.Sprintf("Model at index %d missing required fields", i),
+				"details": "name, provider, and endpoint are required",
+			})
+		}
+		goCover_faa45bc9dd83__197[11] = 1;if registry.Models[i].MaxTokens == 0 {goCover_faa45bc9dd83__197[15] = 1;
+			registry.Models[i].MaxTokens = 4096
+		}
+		goCover_faa45bc9dd83__197[12] = 1;if registry.Models[i].Temperature == 0 {goCover_faa45bc9dd83__197[16] = 1;
+			registry.Models[i].Temperature = 0.1
+		}
+		goCover_faa45bc9dd83__197[13] = 1;registry.Models[i].CreatedAt = now
+		registry.Models[i].UpdatedAt = now
+	}
+
+	goCover_faa45bc9dd83__197[5] = 1;client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__197[17] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to connect to Consul",
+			"details": err.Error(),
+		})
+	}
+
+	// Save registry
+	goCover_faa45bc9dd83__197[6] = 1;data, err := json.Marshal(registry)
+	if err != nil {goCover_faa45bc9dd83__197[18] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to marshal registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__197[7] = 1;kv := client.KV()
+	p := &api.KVPair{Key: consulKVPath, Value: data}
+	_, err = kv.Put(p, nil)
+	if err != nil {goCover_faa45bc9dd83__197[19] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to save model registry",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__197[8] = 1;return c.JSON(fiber.Map{
+		"message": fmt.Sprintf("Imported %d models successfully", len(registry.Models)),
+		"models":  registry.Models,
+	})
+}
+
+// GetDefaultModel retrieves the default model configuration
+func GetDefaultModel(ctx context.Context) (*ModelConfig, error) {goCover_faa45bc9dd83__198[0] = 14 ; goCover_faa45bc9dd83__198[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__198[2] = 198 ; goCover_faa45bc9dd83__198[3] = 1;
+	client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__198[10] = 1;
+		return nil, fmt.Errorf("failed to connect to Consul: %w", err)
+	}
+
+	goCover_faa45bc9dd83__198[4] = 1;kv := client.KV()
+	pair, _, err := kv.Get(consulKVPath, nil)
+	if err != nil {goCover_faa45bc9dd83__198[11] = 1;
+		return nil, fmt.Errorf("failed to fetch models: %w", err)
+	}
+
+	goCover_faa45bc9dd83__198[5] = 1;if pair == nil || pair.Value == nil {goCover_faa45bc9dd83__198[12] = 1;
+		return nil, fmt.Errorf("no models configured")
+	}
+
+	goCover_faa45bc9dd83__198[6] = 1;registry := ModelRegistry{Models: []ModelConfig{}}
+	if err := json.Unmarshal(pair.Value, &registry); err != nil {goCover_faa45bc9dd83__198[13] = 1;
+		return nil, fmt.Errorf("failed to parse registry: %w", err)
+	}
+
+	// Find default model
+	goCover_faa45bc9dd83__198[7] = 1;for _, model := range registry.Models {goCover_faa45bc9dd83__198[14] = 1;
+		if model.Default {goCover_faa45bc9dd83__198[15] = 1;
+			return &model, nil
+		}
+	}
+
+	// Return first model if no default
+	goCover_faa45bc9dd83__198[8] = 1;if len(registry.Models) > 0 {goCover_faa45bc9dd83__198[16] = 1;
+		return &registry.Models[0], nil
+	}
+
+	goCover_faa45bc9dd83__198[9] = 1;return nil, fmt.Errorf("no models available")
+}
+
+// GetModelByName retrieves a specific model configuration
+func GetModelByName(ctx context.Context, name string) (*ModelConfig, error) {goCover_faa45bc9dd83__199[0] = 12 ; goCover_faa45bc9dd83__199[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__199[2] = 199 ; goCover_faa45bc9dd83__199[3] = 1;
+	client, err := getConsulClient()
+	if err != nil {goCover_faa45bc9dd83__199[9] = 1;
+		return nil, fmt.Errorf("failed to connect to Consul: %w", err)
+	}
+
+	goCover_faa45bc9dd83__199[4] = 1;kv := client.KV()
+	pair, _, err := kv.Get(consulKVPath, nil)
+	if err != nil {goCover_faa45bc9dd83__199[10] = 1;
+		return nil, fmt.Errorf("failed to fetch models: %w", err)
+	}
+
+	goCover_faa45bc9dd83__199[5] = 1;if pair == nil || pair.Value == nil {goCover_faa45bc9dd83__199[11] = 1;
+		return nil, fmt.Errorf("no models configured")
+	}
+
+	goCover_faa45bc9dd83__199[6] = 1;registry := ModelRegistry{Models: []ModelConfig{}}
+	if err := json.Unmarshal(pair.Value, &registry); err != nil {goCover_faa45bc9dd83__199[12] = 1;
+		return nil, fmt.Errorf("failed to parse registry: %w", err)
+	}
+
+	goCover_faa45bc9dd83__199[7] = 1;for _, model := range registry.Models {goCover_faa45bc9dd83__199[13] = 1;
+		if model.Name == name {goCover_faa45bc9dd83__199[14] = 1;
+			return &model, nil
+		}
+	}
+
+	goCover_faa45bc9dd83__199[8] = 1;return nil, fmt.Errorf("model '%s' not found", name)
+}
+
+// RegisterModelRoutes registers all model management routes
+func RegisterModelRoutes(app *fiber.App, handler *Handler) {goCover_faa45bc9dd83__200[0] = 1 ; goCover_faa45bc9dd83__200[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__200[2] = 200 ; goCover_faa45bc9dd83__200[3] = 1;
+	models := app.Group("/v1/arf/models")
+
+	models.Get("/", handler.GetModels)
+	models.Post("/", handler.AddModel)
+	models.Put("/", handler.ImportModels)
+	models.Delete("/:name", handler.RemoveModel)
+	models.Post("/:name/set-default", handler.SetDefaultModel)
+}

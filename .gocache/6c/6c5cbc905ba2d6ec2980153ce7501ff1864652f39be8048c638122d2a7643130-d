@@ -1,0 +1,470 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/healing_alerts.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
+)
+
+// AlertSeverity represents the severity level of an alert
+type AlertSeverity string
+
+const (
+	AlertSeverityWarning  AlertSeverity = "warning"
+	AlertSeverityCritical AlertSeverity = "critical"
+)
+
+// AlertType represents the type of healing alert
+type AlertType string
+
+const (
+	AlertTypeFailureRate    AlertType = "failure_rate"
+	AlertTypeDeepHierarchy  AlertType = "deep_hierarchy"
+	AlertTypeLongRunning    AlertType = "long_running"
+	AlertTypeCircuitBreaker AlertType = "circuit_breaker"
+	AlertTypeConsulError    AlertType = "consul_error"
+)
+
+// HealingAlert represents an alert triggered by healing workflow issues
+type HealingAlert struct {
+	ID         string                 `json:"id"`
+	Type       string                 `json:"type"`
+	Severity   string                 `json:"severity"`
+	Message    string                 `json:"message"`
+	Details    map[string]interface{} `json:"details,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Resolved   bool                   `json:"resolved"`
+	ResolvedAt *time.Time             `json:"resolved_at,omitempty"`
+}
+
+// AlertConfig configures the healing alert system
+type AlertConfig struct {
+	Enabled              bool          `json:"enabled"`
+	FailureRateThreshold float64       `json:"failure_rate_threshold"` // Default: 0.8 (80%)
+	MaxTreeDepth         int           `json:"max_tree_depth"`         // Default: 8
+	MaxDuration          time.Duration `json:"max_duration"`           // Default: 4h
+	EvaluationInterval   time.Duration `json:"evaluation_interval"`    // Default: 1m
+	DeduplicationWindow  time.Duration `json:"deduplication_window"`   // Default: 5m
+	MaxHistorySize       int           `json:"max_history_size"`       // Default: 100
+	WebhookURL           string        `json:"webhook_url,omitempty"`  // Optional webhook for alerts
+}
+
+// Validate checks if the alert configuration is valid
+func (c *AlertConfig) Validate() error {goCover_faa45bc9dd83__251[0] = 7 ; goCover_faa45bc9dd83__251[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__251[2] = 251 ; goCover_faa45bc9dd83__251[3] = 1;
+	if c.FailureRateThreshold < 0 || c.FailureRateThreshold > 1 {goCover_faa45bc9dd83__251[7] = 1;
+		return fmt.Errorf("failure rate threshold must be between 0 and 1")
+	}
+	goCover_faa45bc9dd83__251[4] = 1;if c.MaxTreeDepth < 0 {goCover_faa45bc9dd83__251[8] = 1;
+		return fmt.Errorf("max tree depth must be non-negative")
+	}
+	goCover_faa45bc9dd83__251[5] = 1;if c.MaxDuration < 0 {goCover_faa45bc9dd83__251[9] = 1;
+		return fmt.Errorf("max duration must be non-negative")
+	}
+	goCover_faa45bc9dd83__251[6] = 1;return nil
+}
+
+// HealingAlertManager manages alert evaluation and notification
+type HealingAlertManager struct {
+	config         *AlertConfig
+	activeAlerts   map[string]*HealingAlert
+	alertHistory   []*HealingAlert
+	alertCallbacks []func(*HealingAlert)
+	lastAlertTime  map[string]time.Time // For deduplication
+	treeDepths     map[string]int       // Track max depth per transformation
+	startTimes     map[string]time.Time // Track transformation start times
+
+	mu      sync.RWMutex
+	running int32 // atomic
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+
+	// Metrics for evaluation
+	lastMetrics HealingCoordinatorMetrics
+	metricsMu   sync.RWMutex
+}
+
+// NewHealingAlertManager creates a new alert manager
+func NewHealingAlertManager(config *AlertConfig) *HealingAlertManager {goCover_faa45bc9dd83__252[0] = 7 ; goCover_faa45bc9dd83__252[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__252[2] = 252 ; goCover_faa45bc9dd83__252[3] = 1;
+	if config == nil {goCover_faa45bc9dd83__252[7] = 1;
+		config = &AlertConfig{
+			Enabled:              true,
+			FailureRateThreshold: 0.8,
+			MaxTreeDepth:         8,
+			MaxDuration:          4 * time.Hour,
+			EvaluationInterval:   1 * time.Minute,
+			DeduplicationWindow:  5 * time.Minute,
+			MaxHistorySize:       100,
+		}
+	}
+
+	goCover_faa45bc9dd83__252[4] = 1;if config.MaxHistorySize == 0 {goCover_faa45bc9dd83__252[8] = 1;
+		config.MaxHistorySize = 100
+	}
+	goCover_faa45bc9dd83__252[5] = 1;if config.DeduplicationWindow == 0 {goCover_faa45bc9dd83__252[9] = 1;
+		config.DeduplicationWindow = 5 * time.Minute
+	}
+
+	goCover_faa45bc9dd83__252[6] = 1;return &HealingAlertManager{
+		config:         config,
+		activeAlerts:   make(map[string]*HealingAlert),
+		alertHistory:   make([]*HealingAlert, 0, config.MaxHistorySize),
+		alertCallbacks: make([]func(*HealingAlert), 0),
+		lastAlertTime:  make(map[string]time.Time),
+		treeDepths:     make(map[string]int),
+		startTimes:     make(map[string]time.Time),
+	}
+}
+
+// GetConfig returns the current alert configuration
+func (m *HealingAlertManager) GetConfig() *AlertConfig {goCover_faa45bc9dd83__253[0] = 1 ; goCover_faa45bc9dd83__253[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__253[2] = 253 ; goCover_faa45bc9dd83__253[3] = 1;
+	return m.config
+}
+
+// RegisterAlertCallback registers a callback for when alerts are triggered
+func (m *HealingAlertManager) RegisterAlertCallback(callback func(*HealingAlert)) {goCover_faa45bc9dd83__254[0] = 1 ; goCover_faa45bc9dd83__254[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__254[2] = 254 ; goCover_faa45bc9dd83__254[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.alertCallbacks = append(m.alertCallbacks, callback)
+}
+
+// EvaluateRules evaluates alert rules based on current metrics
+func (m *HealingAlertManager) EvaluateRules(metrics HealingCoordinatorMetrics) {goCover_faa45bc9dd83__255[0] = 3 ; goCover_faa45bc9dd83__255[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__255[2] = 255 ; goCover_faa45bc9dd83__255[3] = 1;
+	if !m.config.Enabled {goCover_faa45bc9dd83__255[5] = 1;
+		return
+	}
+
+	// Store metrics for evaluation
+	goCover_faa45bc9dd83__255[4] = 1;m.metricsMu.Lock()
+	m.lastMetrics = metrics
+	m.metricsMu.Unlock()
+
+	// Evaluate each rule
+	m.evaluateFailureRate(metrics)
+	m.evaluateDeepHierarchy()
+	m.evaluateLongRunning()
+	m.evaluateCircuitBreaker(metrics)
+
+	// Check for resolved alerts
+	m.checkResolvedAlerts(metrics)
+}
+
+// evaluateFailureRate checks if failure rate exceeds threshold
+func (m *HealingAlertManager) evaluateFailureRate(metrics HealingCoordinatorMetrics) {goCover_faa45bc9dd83__256[0] = 4 ; goCover_faa45bc9dd83__256[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__256[2] = 256 ; goCover_faa45bc9dd83__256[3] = 1;
+	total := metrics.CompletedTasks + metrics.FailedTasks
+	if total == 0 {goCover_faa45bc9dd83__256[5] = 1;
+		return
+	}
+
+	goCover_faa45bc9dd83__256[4] = 1;failureRate := float64(metrics.FailedTasks) / float64(total)
+
+	if failureRate > m.config.FailureRateThreshold {goCover_faa45bc9dd83__256[6] = 1;
+		alert := &HealingAlert{
+			ID:       "failure_rate_high",
+			Type:     string(AlertTypeFailureRate),
+			Severity: string(AlertSeverityCritical),
+			Message: fmt.Sprintf("Healing failure rate (%.1f%%) exceeds threshold (%.1f%%)",
+				failureRate*100, m.config.FailureRateThreshold*100),
+			Details: map[string]interface{}{
+				"failure_rate":    failureRate,
+				"failed_tasks":    metrics.FailedTasks,
+				"completed_tasks": metrics.CompletedTasks,
+				"threshold":       m.config.FailureRateThreshold,
+			},
+			Timestamp: time.Now(),
+			Resolved:  false,
+		}
+
+		m.triggerAlert(alert)
+	}
+}
+
+// evaluateDeepHierarchy checks for excessively deep healing trees
+func (m *HealingAlertManager) evaluateDeepHierarchy() {goCover_faa45bc9dd83__257[0] = 5 ; goCover_faa45bc9dd83__257[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__257[2] = 257 ; goCover_faa45bc9dd83__257[3] = 1;
+	m.mu.RLock()
+	depths := make(map[string]int)
+	for id, depth := range m.treeDepths {goCover_faa45bc9dd83__257[5] = 1;
+		depths[id] = depth
+	}
+	goCover_faa45bc9dd83__257[4] = 1;m.mu.RUnlock()
+
+	for transformID, depth := range depths {goCover_faa45bc9dd83__257[6] = 1;
+		if depth > m.config.MaxTreeDepth {goCover_faa45bc9dd83__257[7] = 1;
+			alert := &HealingAlert{
+				ID:       fmt.Sprintf("deep_hierarchy_%s", transformID),
+				Type:     string(AlertTypeDeepHierarchy),
+				Severity: string(AlertSeverityWarning),
+				Message: fmt.Sprintf("Healing tree depth (%d) exceeds maximum (%d) for transformation %s",
+					depth, m.config.MaxTreeDepth, transformID),
+				Details: map[string]interface{}{
+					"transformation_id": transformID,
+					"depth":             depth,
+					"max_depth":         m.config.MaxTreeDepth,
+				},
+				Timestamp: time.Now(),
+				Resolved:  false,
+			}
+
+			m.triggerAlert(alert)
+		}
+	}
+}
+
+// evaluateLongRunning checks for transformations running too long
+func (m *HealingAlertManager) evaluateLongRunning() {goCover_faa45bc9dd83__258[0] = 5 ; goCover_faa45bc9dd83__258[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__258[2] = 258 ; goCover_faa45bc9dd83__258[3] = 1;
+	m.mu.RLock()
+	startTimes := make(map[string]time.Time)
+	for id, start := range m.startTimes {goCover_faa45bc9dd83__258[5] = 1;
+		startTimes[id] = start
+	}
+	goCover_faa45bc9dd83__258[4] = 1;m.mu.RUnlock()
+
+	now := time.Now()
+	for transformID, startTime := range startTimes {goCover_faa45bc9dd83__258[6] = 1;
+		duration := now.Sub(startTime)
+		if duration > m.config.MaxDuration {goCover_faa45bc9dd83__258[7] = 1;
+			alert := &HealingAlert{
+				ID:       fmt.Sprintf("long_running_%s", transformID),
+				Type:     string(AlertTypeLongRunning),
+				Severity: string(AlertSeverityWarning),
+				Message: fmt.Sprintf("Transformation %s has been running for %v (max: %v)",
+					transformID, duration.Round(time.Minute), m.config.MaxDuration),
+				Details: map[string]interface{}{
+					"transformation_id": transformID,
+					"duration":          duration.String(),
+					"max_duration":      m.config.MaxDuration.String(),
+					"start_time":        startTime,
+				},
+				Timestamp: time.Now(),
+				Resolved:  false,
+			}
+
+			m.triggerAlert(alert)
+		}
+	}
+}
+
+// evaluateCircuitBreaker checks circuit breaker state
+func (m *HealingAlertManager) evaluateCircuitBreaker(metrics HealingCoordinatorMetrics) {goCover_faa45bc9dd83__259[0] = 2 ; goCover_faa45bc9dd83__259[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__259[2] = 259 ; goCover_faa45bc9dd83__259[3] = 1;
+	if metrics.CircuitBreakerState == "open" {goCover_faa45bc9dd83__259[4] = 1;
+		alert := &HealingAlert{
+			ID:       "circuit_breaker_open",
+			Type:     string(AlertTypeCircuitBreaker),
+			Severity: string(AlertSeverityWarning),
+			Message: fmt.Sprintf("Circuit breaker is open after %d consecutive failures",
+				metrics.ConsecutiveFailures),
+			Details: map[string]interface{}{
+				"state":                metrics.CircuitBreakerState,
+				"consecutive_failures": metrics.ConsecutiveFailures,
+				"open_until":           metrics.CircuitOpenUntil,
+			},
+			Timestamp: time.Now(),
+			Resolved:  false,
+		}
+
+		m.triggerAlert(alert)
+	}
+}
+
+// checkResolvedAlerts checks if any active alerts should be resolved
+func (m *HealingAlertManager) checkResolvedAlerts(metrics HealingCoordinatorMetrics) {goCover_faa45bc9dd83__260[0] = 7 ; goCover_faa45bc9dd83__260[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__260[2] = 260 ; goCover_faa45bc9dd83__260[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check failure rate alert
+	total := metrics.CompletedTasks + metrics.FailedTasks
+	if total > 0 {goCover_faa45bc9dd83__260[5] = 1;
+		failureRate := float64(metrics.FailedTasks) / float64(total)
+		if failureRate <= m.config.FailureRateThreshold {goCover_faa45bc9dd83__260[6] = 1;
+			if alert, exists := m.activeAlerts["failure_rate_high"]; exists && !alert.Resolved {goCover_faa45bc9dd83__260[7] = 1;
+				m.resolveAlert(alert)
+			}
+		}
+	}
+
+	// Check circuit breaker alert
+	goCover_faa45bc9dd83__260[4] = 1;if metrics.CircuitBreakerState != "open" {goCover_faa45bc9dd83__260[8] = 1;
+		if alert, exists := m.activeAlerts["circuit_breaker_open"]; exists && !alert.Resolved {goCover_faa45bc9dd83__260[9] = 1;
+			m.resolveAlert(alert)
+		}
+	}
+}
+
+// triggerAlert triggers an alert if not already active or deduplicated
+func (m *HealingAlertManager) triggerAlert(alert *HealingAlert) {goCover_faa45bc9dd83__261[0] = 7 ; goCover_faa45bc9dd83__261[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__261[2] = 261 ; goCover_faa45bc9dd83__261[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Check for deduplication
+	if lastTime, exists := m.lastAlertTime[alert.ID]; exists {goCover_faa45bc9dd83__261[6] = 1;
+		if time.Since(lastTime) < m.config.DeduplicationWindow {goCover_faa45bc9dd83__261[7] = 1;
+			return // Deduplicate
+		}
+	}
+
+	// Check if alert already active
+	goCover_faa45bc9dd83__261[4] = 1;if existing, exists := m.activeAlerts[alert.ID]; exists && !existing.Resolved {goCover_faa45bc9dd83__261[8] = 1;
+		return // Already active
+	}
+
+	// Record alert
+	goCover_faa45bc9dd83__261[5] = 1;m.activeAlerts[alert.ID] = alert
+	m.lastAlertTime[alert.ID] = time.Now()
+	m.addToHistory(alert)
+
+	// Trigger callbacks asynchronously
+	for _, callback := range m.alertCallbacks {goCover_faa45bc9dd83__261[9] = 1;
+		go callback(alert)
+	}
+}
+
+// resolveAlert marks an alert as resolved
+func (m *HealingAlertManager) resolveAlert(alert *HealingAlert) {goCover_faa45bc9dd83__262[0] = 2 ; goCover_faa45bc9dd83__262[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__262[2] = 262 ; goCover_faa45bc9dd83__262[3] = 1;
+	now := time.Now()
+	alert.Resolved = true
+	alert.ResolvedAt = &now
+
+	// Trigger resolution callbacks
+	for _, callback := range m.alertCallbacks {goCover_faa45bc9dd83__262[4] = 1;
+		go callback(alert)
+	}
+}
+
+// addToHistory adds an alert to history, maintaining max size
+func (m *HealingAlertManager) addToHistory(alert *HealingAlert) {goCover_faa45bc9dd83__263[0] = 2 ; goCover_faa45bc9dd83__263[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__263[2] = 263 ; goCover_faa45bc9dd83__263[3] = 1;
+	m.alertHistory = append(m.alertHistory, alert)
+
+	// Trim history if needed
+	if len(m.alertHistory) > m.config.MaxHistorySize {goCover_faa45bc9dd83__263[4] = 1;
+		// Keep the most recent alerts
+		start := len(m.alertHistory) - m.config.MaxHistorySize
+		m.alertHistory = m.alertHistory[start:]
+	}
+}
+
+// RecordTreeDepth records the depth of a healing tree
+func (m *HealingAlertManager) RecordTreeDepth(transformID string, depth int) {goCover_faa45bc9dd83__264[0] = 2 ; goCover_faa45bc9dd83__264[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__264[2] = 264 ; goCover_faa45bc9dd83__264[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Track maximum depth seen for this transformation
+	if currentDepth, exists := m.treeDepths[transformID]; !exists || depth > currentDepth {goCover_faa45bc9dd83__264[4] = 1;
+		m.treeDepths[transformID] = depth
+	}
+}
+
+// StartTracking starts tracking a transformation's duration
+func (m *HealingAlertManager) StartTracking(transformID string) {goCover_faa45bc9dd83__265[0] = 1 ; goCover_faa45bc9dd83__265[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__265[2] = 265 ; goCover_faa45bc9dd83__265[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.startTimes[transformID] = time.Now()
+}
+
+// StopTracking stops tracking a transformation and resolves any related alerts
+func (m *HealingAlertManager) StopTracking(transformID string) {goCover_faa45bc9dd83__266[0] = 4 ; goCover_faa45bc9dd83__266[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__266[2] = 266 ; goCover_faa45bc9dd83__266[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	delete(m.startTimes, transformID)
+	delete(m.treeDepths, transformID)
+
+	// Resolve any long-running alert for this transformation
+	alertID := fmt.Sprintf("long_running_%s", transformID)
+	if alert, exists := m.activeAlerts[alertID]; exists && !alert.Resolved {goCover_faa45bc9dd83__266[5] = 1;
+		m.resolveAlert(alert)
+	}
+
+	// Resolve any deep hierarchy alert for this transformation
+	goCover_faa45bc9dd83__266[4] = 1;alertID = fmt.Sprintf("deep_hierarchy_%s", transformID)
+	if alert, exists := m.activeAlerts[alertID]; exists && !alert.Resolved {goCover_faa45bc9dd83__266[6] = 1;
+		m.resolveAlert(alert)
+	}
+}
+
+// GetActiveAlerts returns all currently active alerts
+func (m *HealingAlertManager) GetActiveAlerts() []*HealingAlert {goCover_faa45bc9dd83__267[0] = 3 ; goCover_faa45bc9dd83__267[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__267[2] = 267 ; goCover_faa45bc9dd83__267[3] = 1;
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	alerts := make([]*HealingAlert, 0, len(m.activeAlerts))
+	for _, alert := range m.activeAlerts {goCover_faa45bc9dd83__267[5] = 1;
+		alerts = append(alerts, alert)
+	}
+	goCover_faa45bc9dd83__267[4] = 1;return alerts
+}
+
+// GetAlertHistory returns the alert history
+func (m *HealingAlertManager) GetAlertHistory() []*HealingAlert {goCover_faa45bc9dd83__268[0] = 1 ; goCover_faa45bc9dd83__268[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__268[2] = 268 ; goCover_faa45bc9dd83__268[3] = 1;
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	history := make([]*HealingAlert, len(m.alertHistory))
+	copy(history, m.alertHistory)
+	return history
+}
+
+// Start starts the alert manager's periodic evaluation
+func (m *HealingAlertManager) Start(ctx context.Context) error {goCover_faa45bc9dd83__269[0] = 3 ; goCover_faa45bc9dd83__269[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__269[2] = 269 ; goCover_faa45bc9dd83__269[3] = 1;
+	if !atomic.CompareAndSwapInt32(&m.running, 0, 1) {goCover_faa45bc9dd83__269[5] = 1;
+		return fmt.Errorf("alert manager already running")
+	}
+
+	goCover_faa45bc9dd83__269[4] = 1;m.ctx, m.cancel = context.WithCancel(ctx)
+
+	// Start evaluation loop
+	m.wg.Add(1)
+	go m.evaluationLoop()
+
+	return nil
+}
+
+// Stop stops the alert manager
+func (m *HealingAlertManager) Stop() {goCover_faa45bc9dd83__270[0] = 5 ; goCover_faa45bc9dd83__270[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__270[2] = 270 ; goCover_faa45bc9dd83__270[3] = 1;
+	if !atomic.CompareAndSwapInt32(&m.running, 1, 0) {goCover_faa45bc9dd83__270[6] = 1;
+		return
+	}
+
+	goCover_faa45bc9dd83__270[4] = 1;if m.cancel != nil {goCover_faa45bc9dd83__270[7] = 1;
+		m.cancel()
+	}
+	goCover_faa45bc9dd83__270[5] = 1;m.wg.Wait()
+}
+
+// IsRunning returns true if the alert manager is running
+func (m *HealingAlertManager) IsRunning() bool {goCover_faa45bc9dd83__271[0] = 1 ; goCover_faa45bc9dd83__271[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__271[2] = 271 ; goCover_faa45bc9dd83__271[3] = 1;
+	return atomic.LoadInt32(&m.running) == 1
+}
+
+// evaluationLoop periodically evaluates alert rules
+func (m *HealingAlertManager) evaluationLoop() {goCover_faa45bc9dd83__272[0] = 4 ; goCover_faa45bc9dd83__272[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__272[2] = 272 ; goCover_faa45bc9dd83__272[3] = 1;
+	defer m.wg.Done()
+
+	ticker := time.NewTicker(m.config.EvaluationInterval)
+	defer ticker.Stop()
+
+	for {goCover_faa45bc9dd83__272[4] = 1;
+		select {
+		case <-ticker.C:goCover_faa45bc9dd83__272[5] = 1;
+			m.metricsMu.RLock()
+			metrics := m.lastMetrics
+			m.metricsMu.RUnlock()
+
+			m.EvaluateRules(metrics)
+
+		case <-m.ctx.Done():goCover_faa45bc9dd83__272[6] = 1;
+			return
+		}
+	}
+}
+
+// ClearAlerts clears all active alerts (useful for testing)
+func (m *HealingAlertManager) ClearAlerts() {goCover_faa45bc9dd83__273[0] = 1 ; goCover_faa45bc9dd83__273[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__273[2] = 273 ; goCover_faa45bc9dd83__273[3] = 1;
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.activeAlerts = make(map[string]*HealingAlert)
+	m.lastAlertTime = make(map[string]time.Time)
+}

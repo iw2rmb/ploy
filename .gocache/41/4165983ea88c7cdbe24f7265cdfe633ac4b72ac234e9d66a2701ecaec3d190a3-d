@@ -1,0 +1,821 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/sbom_analyzer.go:1:1
+package arf
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"strings"
+	"time"
+)
+
+// SyftSBOMAnalyzer implements SBOMSecurityAnalyzer using syft-generated SBOMs
+type SyftSBOMAnalyzer struct {
+	cveDatabase     CVEDatabase
+	vulnerabilityDB VulnerabilityDatabase
+	licenseAnalyzer LicenseAnalyzer
+	riskCalculator  RiskCalculator
+}
+
+// VulnerabilityDatabase provides vulnerability lookup capabilities
+type VulnerabilityDatabase interface {
+	FindVulnerabilities(dep Dependency) ([]VulnerabilityInfo, error)
+	CheckOutdated(dep Dependency) (bool, string, error)
+}
+
+// LicenseAnalyzer analyzes software licenses for compliance issues
+type LicenseAnalyzer interface {
+	AnalyzeLicense(license string) LicenseAnalysis
+	CheckCompliance(licenses []string, policy LicensePolicy) ComplianceResult
+}
+
+// RiskCalculator calculates security risk scores
+type RiskCalculator interface {
+	CalculateSecurityScore(deps []Dependency, vulns []VulnerabilityMatch) float64
+	AssessRisk(analysis *SBOMSecurityAnalysis) RiskAssessment
+}
+
+// LicenseAnalysis represents license analysis results
+type LicenseAnalysis struct {
+	License      string   `json:"license"`
+	Type         string   `json:"type"` // permissive, copyleft, proprietary, unknown
+	Restrictions []string `json:"restrictions"`
+	Risks        []string `json:"risks"`
+	Compliance   string   `json:"compliance"` // compliant, non_compliant, review_required
+}
+
+// LicensePolicy defines license compliance policy
+type LicensePolicy struct {
+	AllowedLicenses   []string `json:"allowed_licenses"`
+	ForbiddenLicenses []string `json:"forbidden_licenses"`
+	RequireReview     []string `json:"require_review"`
+	CopyleftPolicy    string   `json:"copyleft_policy"` // allow, forbid, review
+}
+
+// ComplianceResult represents license compliance check results
+type ComplianceResult struct {
+	Compliant    bool               `json:"compliant"`
+	Violations   []LicenseViolation `json:"violations"`
+	ReviewNeeded []string           `json:"review_needed"`
+	Summary      string             `json:"summary"`
+}
+
+// LicenseViolation represents a license compliance violation
+type LicenseViolation struct {
+	Dependency string `json:"dependency"`
+	License    string `json:"license"`
+	Violation  string `json:"violation"`
+	Severity   string `json:"severity"`
+}
+
+// SyftSBOM represents the structure of syft-generated SBOMs
+type SyftSBOM struct {
+	Artifacts []struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		Version   string `json:"version"`
+		Type      string `json:"type"`
+		FoundBy   string `json:"foundBy"`
+		Locations []struct {
+			Path               string `json:"path"`
+			LayerID            string `json:"layerID,omitempty"`
+			AccessPath         string `json:"accessPath,omitempty"`
+			AnnotationsPresent bool   `json:"annotationsPresent,omitempty"`
+		} `json:"locations"`
+		Licenses []string `json:"licenses"`
+		Language string   `json:"language"`
+		Metadata struct {
+			VirtualPath   string `json:"virtualPath,omitempty"`
+			Architecture  string `json:"architecture,omitempty"`
+			OS            string `json:"os,omitempty"`
+			Size          int64  `json:"size,omitempty"`
+			ContentDigest string `json:"contentDigest,omitempty"`
+		} `json:"metadata"`
+	} `json:"artifacts"`
+	ArtifactRelationships []struct {
+		Parent string `json:"parent"`
+		Child  string `json:"child"`
+		Type   string `json:"type"`
+	} `json:"artifactRelationships"`
+	Files []struct {
+		ID       string `json:"id"`
+		Location struct {
+			Path               string `json:"path"`
+			LayerID            string `json:"layerID,omitempty"`
+			AccessPath         string `json:"accessPath,omitempty"`
+			AnnotationsPresent bool   `json:"annotationsPresent,omitempty"`
+		} `json:"location"`
+		Metadata struct {
+			Mode            int    `json:"mode"`
+			Type            string `json:"type"`
+			LinkDestination string `json:"linkDestination,omitempty"`
+			UserID          int    `json:"userID"`
+			GroupID         int    `json:"groupID"`
+			Size            int64  `json:"size"`
+			MIMEType        string `json:"mimeType"`
+			Digests         []struct {
+				Algorithm string `json:"algorithm"`
+				Value     string `json:"value"`
+			} `json:"digests"`
+		} `json:"metadata"`
+		Contents string `json:"contents,omitempty"`
+	} `json:"files,omitempty"`
+	Distro struct {
+		Name             string   `json:"name"`
+		Version          string   `json:"version"`
+		IDLike           []string `json:"idLike,omitempty"`
+		VersionCodename  string   `json:"versionCodename,omitempty"`
+		VersionID        string   `json:"versionID,omitempty"`
+		HomeURL          string   `json:"homeURL,omitempty"`
+		SupportURL       string   `json:"supportURL,omitempty"`
+		BugReportURL     string   `json:"bugReportURL,omitempty"`
+		PrivacyPolicyURL string   `json:"privacyPolicyURL,omitempty"`
+	} `json:"distro,omitempty"`
+	Descriptor struct {
+		Name          string `json:"name"`
+		Version       string `json:"version"`
+		Configuration struct {
+			ConfigPath        string   `json:"configPath"`
+			VerboseOutput     bool     `json:"verboseOutput"`
+			QuietOutput       bool     `json:"quietOutput"`
+			CheckForAppUpdate bool     `json:"checkForAppUpdate"`
+			OnlyFixed         bool     `json:"onlyFixed"`
+			OnlyNotFixed      bool     `json:"onlyNotFixed"`
+			OutputFormat      []string `json:"outputFormat"`
+			OutputFile        string   `json:"outputFile"`
+			FileMetadata      struct {
+				Cataloger struct {
+					Enabled bool `json:"enabled"`
+				} `json:"cataloger"`
+			} `json:"file-metadata"`
+		} `json:"configuration"`
+	} `json:"descriptor"`
+	Schema struct {
+		Version string `json:"version"`
+		URL     string `json:"url"`
+	} `json:"schema"`
+	Source struct {
+		Type   string `json:"type"`
+		Target string `json:"target"`
+	} `json:"source"`
+}
+
+// NewSyftSBOMAnalyzer creates a new syft SBOM analyzer
+func NewSyftSBOMAnalyzer() *SyftSBOMAnalyzer {goCover_faa45bc9dd83__680[0] = 1 ; goCover_faa45bc9dd83__680[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__680[2] = 680 ; goCover_faa45bc9dd83__680[3] = 1;
+	return &SyftSBOMAnalyzer{
+		cveDatabase:     NewNVDDatabase(),
+		vulnerabilityDB: nil, // OSV database integration placeholder
+		licenseAnalyzer: nil, // SPDX license analyzer placeholder
+		riskCalculator:  nil, // CVSS risk calculator placeholder
+	}
+}
+
+// AnalyzeSBOM analyzes an SBOM file for security issues
+func (s *SyftSBOMAnalyzer) AnalyzeSBOM(sbomPath string) (*SBOMSecurityAnalysis, error) {goCover_faa45bc9dd83__681[0] = 7 ; goCover_faa45bc9dd83__681[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__681[2] = 681 ; goCover_faa45bc9dd83__681[3] = 1;
+	// Read and parse SBOM file
+	sbomData, err := s.readSBOMFile(sbomPath)
+	if err != nil {goCover_faa45bc9dd83__681[7] = 1;
+		return nil, fmt.Errorf("failed to read SBOM: %w", err)
+	}
+
+	// Extract dependencies
+	goCover_faa45bc9dd83__681[4] = 1;dependencies, err := s.ExtractDependencies(sbomData)
+	if err != nil {goCover_faa45bc9dd83__681[8] = 1;
+		return nil, fmt.Errorf("failed to extract dependencies: %w", err)
+	}
+
+	// Find vulnerabilities
+	goCover_faa45bc9dd83__681[5] = 1;vulnerabilities, err := s.CorrelateVulnerabilities(dependencies)
+	if err != nil {goCover_faa45bc9dd83__681[9] = 1;
+		return nil, fmt.Errorf("failed to correlate vulnerabilities: %w", err)
+	}
+
+	// Calculate security metrics
+	goCover_faa45bc9dd83__681[6] = 1;metrics := s.calculateSecurityMetrics(dependencies, vulnerabilities)
+
+	// Generate risk assessment
+	riskAssessment := s.generateRiskAssessment(dependencies, vulnerabilities, metrics)
+
+	// Generate recommendations
+	recommendations := s.generateSecurityRecommendations(dependencies, vulnerabilities, riskAssessment)
+
+	analysis := &SBOMSecurityAnalysis{
+		Dependencies:    dependencies,
+		Vulnerabilities: vulnerabilities,
+		SecurityMetrics: metrics,
+		RiskAssessment:  riskAssessment,
+		Recommendations: recommendations,
+		AnalyzedAt:      time.Now(),
+	}
+
+	return analysis, nil
+}
+
+// ExtractDependencies extracts dependency information from SBOM data
+func (s *SyftSBOMAnalyzer) ExtractDependencies(sbomData map[string]interface{}) ([]Dependency, error) {goCover_faa45bc9dd83__682[0] = 7 ; goCover_faa45bc9dd83__682[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__682[2] = 682 ; goCover_faa45bc9dd83__682[3] = 1;
+	var dependencies []Dependency
+
+	// Handle different SBOM formats
+	if artifacts, ok := sbomData["artifacts"].([]interface{}); ok {goCover_faa45bc9dd83__682[7] = 1;
+		// Syft format
+		return s.extractSyftDependencies(artifacts)
+	}
+
+	goCover_faa45bc9dd83__682[4] = 1;if components, ok := sbomData["components"].([]interface{}); ok {goCover_faa45bc9dd83__682[8] = 1;
+		// CycloneDX format
+		return s.extractCycloneDXDependencies(components)
+	}
+
+	goCover_faa45bc9dd83__682[5] = 1;if packages, ok := sbomData["packages"].([]interface{}); ok {goCover_faa45bc9dd83__682[9] = 1;
+		// SPDX format
+		return s.extractSPDXDependencies(packages)
+	}
+
+	goCover_faa45bc9dd83__682[6] = 1;return dependencies, fmt.Errorf("unsupported SBOM format")
+}
+
+// extractSyftDependencies extracts dependencies from syft format
+func (s *SyftSBOMAnalyzer) extractSyftDependencies(artifacts []interface{}) ([]Dependency, error) {goCover_faa45bc9dd83__683[0] = 14 ; goCover_faa45bc9dd83__683[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__683[2] = 683 ; goCover_faa45bc9dd83__683[3] = 1;
+	var dependencies []Dependency
+
+	for _, artifact := range artifacts {goCover_faa45bc9dd83__683[5] = 1;
+		art, ok := artifact.(map[string]interface{})
+		if !ok {goCover_faa45bc9dd83__683[9] = 1;
+			continue
+		}
+
+		goCover_faa45bc9dd83__683[6] = 1;dep := Dependency{
+			Name:      s.getStringValue(art, "name"),
+			Version:   s.getStringValue(art, "version"),
+			Ecosystem: s.getStringValue(art, "language"),
+			Type:      s.getStringValue(art, "type"),
+			Metadata: map[string]interface{}{
+				"id":      s.getStringValue(art, "id"),
+				"foundBy": s.getStringValue(art, "foundBy"),
+			},
+		}
+
+		// Extract location information
+		if locations, ok := art["locations"].([]interface{}); ok && len(locations) > 0 {goCover_faa45bc9dd83__683[10] = 1;
+			if loc, ok := locations[0].(map[string]interface{}); ok {goCover_faa45bc9dd83__683[11] = 1;
+				dep.Path = s.getStringValue(loc, "path")
+			}
+		}
+
+		// Extract license information
+		goCover_faa45bc9dd83__683[7] = 1;if licenses, ok := art["licenses"].([]interface{}); ok {goCover_faa45bc9dd83__683[12] = 1;
+			var licenseList []string
+			for _, license := range licenses {goCover_faa45bc9dd83__683[14] = 1;
+				if licStr, ok := license.(string); ok {goCover_faa45bc9dd83__683[15] = 1;
+					licenseList = append(licenseList, licStr)
+				}
+			}
+			goCover_faa45bc9dd83__683[13] = 1;if len(licenseList) > 0 {goCover_faa45bc9dd83__683[16] = 1;
+				dep.Metadata["licenses"] = licenseList
+			}
+		}
+
+		// Map ecosystem names to standard values
+		goCover_faa45bc9dd83__683[8] = 1;dep.Ecosystem = s.normalizeEcosystem(dep.Ecosystem, dep.Type)
+
+		dependencies = append(dependencies, dep)
+	}
+
+	goCover_faa45bc9dd83__683[4] = 1;return dependencies, nil
+}
+
+// extractCycloneDXDependencies extracts dependencies from CycloneDX format
+func (s *SyftSBOMAnalyzer) extractCycloneDXDependencies(components []interface{}) ([]Dependency, error) {goCover_faa45bc9dd83__684[0] = 16 ; goCover_faa45bc9dd83__684[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__684[2] = 684 ; goCover_faa45bc9dd83__684[3] = 1;
+	var dependencies []Dependency
+
+	for _, component := range components {goCover_faa45bc9dd83__684[5] = 1;
+		comp, ok := component.(map[string]interface{})
+		if !ok {goCover_faa45bc9dd83__684[9] = 1;
+			continue
+		}
+
+		goCover_faa45bc9dd83__684[6] = 1;dep := Dependency{
+			Name:     s.getStringValue(comp, "name"),
+			Version:  s.getStringValue(comp, "version"),
+			Type:     s.getStringValue(comp, "type"),
+			Metadata: make(map[string]interface{}),
+		}
+
+		// Extract purl information for ecosystem
+		if purl := s.getStringValue(comp, "purl"); purl != "" {goCover_faa45bc9dd83__684[10] = 1;
+			dep.Ecosystem = s.extractEcosystemFromPURL(purl)
+			dep.Metadata["purl"] = purl
+		}
+
+		// Extract license information
+		goCover_faa45bc9dd83__684[7] = 1;if licenses, ok := comp["licenses"].([]interface{}); ok {goCover_faa45bc9dd83__684[11] = 1;
+			var licenseList []string
+			for _, license := range licenses {goCover_faa45bc9dd83__684[13] = 1;
+				if lic, ok := license.(map[string]interface{}); ok {goCover_faa45bc9dd83__684[14] = 1;
+					if id := s.getStringValue(lic, "id"); id != "" {goCover_faa45bc9dd83__684[15] = 1;
+						licenseList = append(licenseList, id)
+					} else{ goCover_faa45bc9dd83__684[16] = 1;if name := s.getStringValue(lic, "name"); name != "" {goCover_faa45bc9dd83__684[17] = 1;
+						licenseList = append(licenseList, name)
+					}}
+				}
+			}
+			goCover_faa45bc9dd83__684[12] = 1;if len(licenseList) > 0 {goCover_faa45bc9dd83__684[18] = 1;
+				dep.Metadata["licenses"] = licenseList
+			}
+		}
+
+		goCover_faa45bc9dd83__684[8] = 1;dependencies = append(dependencies, dep)
+	}
+
+	goCover_faa45bc9dd83__684[4] = 1;return dependencies, nil
+}
+
+// extractSPDXDependencies extracts dependencies from SPDX format
+func (s *SyftSBOMAnalyzer) extractSPDXDependencies(packages []interface{}) ([]Dependency, error) {goCover_faa45bc9dd83__685[0] = 9 ; goCover_faa45bc9dd83__685[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__685[2] = 685 ; goCover_faa45bc9dd83__685[3] = 1;
+	var dependencies []Dependency
+
+	for _, pkg := range packages {goCover_faa45bc9dd83__685[5] = 1;
+		p, ok := pkg.(map[string]interface{})
+		if !ok {goCover_faa45bc9dd83__685[9] = 1;
+			continue
+		}
+
+		goCover_faa45bc9dd83__685[6] = 1;dep := Dependency{
+			Name:     s.getStringValue(p, "name"),
+			Version:  s.getStringValue(p, "versionInfo"),
+			Metadata: make(map[string]interface{}),
+		}
+
+		// Extract download location for ecosystem detection
+		if downloadLocation := s.getStringValue(p, "downloadLocation"); downloadLocation != "" {goCover_faa45bc9dd83__685[10] = 1;
+			dep.Ecosystem = s.inferEcosystemFromURL(downloadLocation)
+			dep.Metadata["downloadLocation"] = downloadLocation
+		}
+
+		// Extract license information
+		goCover_faa45bc9dd83__685[7] = 1;if licenseConcluded := s.getStringValue(p, "licenseConcluded"); licenseConcluded != "" {goCover_faa45bc9dd83__685[11] = 1;
+			dep.Metadata["licenses"] = []string{licenseConcluded}
+		}
+
+		goCover_faa45bc9dd83__685[8] = 1;dependencies = append(dependencies, dep)
+	}
+
+	goCover_faa45bc9dd83__685[4] = 1;return dependencies, nil
+}
+
+// CorrelateVulnerabilities finds vulnerabilities for dependencies
+func (s *SyftSBOMAnalyzer) CorrelateVulnerabilities(deps []Dependency) ([]VulnerabilityMatch, error) {goCover_faa45bc9dd83__686[0] = 6 ; goCover_faa45bc9dd83__686[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__686[2] = 686 ; goCover_faa45bc9dd83__686[3] = 1;
+	var matches []VulnerabilityMatch
+
+	for _, dep := range deps {goCover_faa45bc9dd83__686[5] = 1;
+		vulns, err := s.vulnerabilityDB.FindVulnerabilities(dep)
+		if err != nil {goCover_faa45bc9dd83__686[7] = 1;
+			// Log error but continue processing
+			continue
+		}
+
+		goCover_faa45bc9dd83__686[6] = 1;for _, vuln := range vulns {goCover_faa45bc9dd83__686[8] = 1;
+			match := VulnerabilityMatch{
+				Dependency:      dep,
+				Vulnerability:   vuln,
+				MatchConfidence: s.calculateMatchConfidence(dep, vuln),
+				MatchReason:     s.determineMatchReason(dep, vuln),
+			}
+			matches = append(matches, match)
+		}
+	}
+
+	goCover_faa45bc9dd83__686[4] = 1;return matches, nil
+}
+
+// readSBOMFile reads and parses an SBOM file
+func (s *SyftSBOMAnalyzer) readSBOMFile(sbomPath string) (map[string]interface{}, error) {goCover_faa45bc9dd83__687[0] = 5 ; goCover_faa45bc9dd83__687[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__687[2] = 687 ; goCover_faa45bc9dd83__687[3] = 1;
+	data, err := ioutil.ReadFile(sbomPath)
+	if err != nil {goCover_faa45bc9dd83__687[6] = 1;
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	goCover_faa45bc9dd83__687[4] = 1;var sbomData map[string]interface{}
+	if err := json.Unmarshal(data, &sbomData); err != nil {goCover_faa45bc9dd83__687[7] = 1;
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	goCover_faa45bc9dd83__687[5] = 1;return sbomData, nil
+}
+
+// calculateSecurityMetrics calculates security metrics for the SBOM
+func (s *SyftSBOMAnalyzer) calculateSecurityMetrics(deps []Dependency, vulns []VulnerabilityMatch) SBOMSecurityMetrics {goCover_faa45bc9dd83__688[0] = 10 ; goCover_faa45bc9dd83__688[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__688[2] = 688 ; goCover_faa45bc9dd83__688[3] = 1;
+	vulnerableDeps := make(map[string]bool)
+	licenseIssues := 0
+	outdatedCount := 0
+
+	for _, vuln := range vulns {goCover_faa45bc9dd83__688[6] = 1;
+		vulnerableDeps[vuln.Dependency.Name] = true
+	}
+
+	// Count license issues and outdated dependencies
+	goCover_faa45bc9dd83__688[4] = 1;for _, dep := range deps {goCover_faa45bc9dd83__688[7] = 1;
+		if licenses, ok := dep.Metadata["licenses"].([]string); ok {goCover_faa45bc9dd83__688[9] = 1;
+			for _, license := range licenses {goCover_faa45bc9dd83__688[10] = 1;
+				if s.isProblematicLicense(license) {goCover_faa45bc9dd83__688[11] = 1;
+					licenseIssues++
+					break
+				}
+			}
+		}
+
+		goCover_faa45bc9dd83__688[8] = 1;if outdated, _, err := s.vulnerabilityDB.CheckOutdated(dep); err == nil && outdated {goCover_faa45bc9dd83__688[12] = 1;
+			outdatedCount++
+		}
+	}
+
+	goCover_faa45bc9dd83__688[5] = 1;securityScore := s.riskCalculator.CalculateSecurityScore(deps, vulns)
+
+	return SBOMSecurityMetrics{
+		TotalDependencies:      len(deps),
+		VulnerableDependencies: len(vulnerableDeps),
+		SecurityScore:          securityScore,
+		LicenseIssues:          licenseIssues,
+		OutdatedDependencies:   outdatedCount,
+	}
+}
+
+// generateRiskAssessment generates a risk assessment based on the analysis
+func (s *SyftSBOMAnalyzer) generateRiskAssessment(deps []Dependency, vulns []VulnerabilityMatch, metrics SBOMSecurityMetrics) RiskAssessment {goCover_faa45bc9dd83__689[0] = 21 ; goCover_faa45bc9dd83__689[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__689[2] = 689 ; goCover_faa45bc9dd83__689[3] = 1;
+	// Count vulnerabilities by severity
+	criticalCount := 0
+	highCount := 0
+	mediumCount := 0
+	lowCount := 0
+
+	for _, vuln := range vulns {goCover_faa45bc9dd83__689[8] = 1;
+		switch strings.ToLower(vuln.Vulnerability.Severity) {
+		case "critical":goCover_faa45bc9dd83__689[9] = 1;
+			criticalCount++
+		case "high":goCover_faa45bc9dd83__689[10] = 1;
+			highCount++
+		case "medium":goCover_faa45bc9dd83__689[11] = 1;
+			mediumCount++
+		case "low":goCover_faa45bc9dd83__689[12] = 1;
+			lowCount++
+		}
+	}
+
+	// Calculate overall risk score
+	goCover_faa45bc9dd83__689[4] = 1;riskScore := float64(criticalCount*10+highCount*7+mediumCount*4+lowCount*1) / float64(len(deps))
+	if riskScore > 10 {goCover_faa45bc9dd83__689[13] = 1;
+		riskScore = 10
+	}
+
+	// Determine overall risk level
+	goCover_faa45bc9dd83__689[5] = 1;overallRisk := "low"
+	if riskScore >= 8 {goCover_faa45bc9dd83__689[14] = 1;
+		overallRisk = "critical"
+	} else{ goCover_faa45bc9dd83__689[15] = 1;if riskScore >= 6 {goCover_faa45bc9dd83__689[16] = 1;
+		overallRisk = "high"
+	} else{ goCover_faa45bc9dd83__689[17] = 1;if riskScore >= 3 {goCover_faa45bc9dd83__689[18] = 1;
+		overallRisk = "medium"
+	}}}
+
+	// Generate recommendations
+	goCover_faa45bc9dd83__689[6] = 1;recommendations := s.generateRiskRecommendations(criticalCount, highCount, mediumCount, lowCount, metrics)
+
+	// Create timeline
+	timeline := RemediationTimeline{
+		Immediate: []string{},
+		Short:     []string{},
+		Medium:    []string{},
+		Long:      []string{},
+	}
+
+	for _, vuln := range vulns {goCover_faa45bc9dd83__689[19] = 1;
+		cveID := vuln.Vulnerability.CVE.ID
+		switch strings.ToLower(vuln.Vulnerability.Severity) {
+		case "critical":goCover_faa45bc9dd83__689[20] = 1;
+			timeline.Immediate = append(timeline.Immediate, cveID)
+		case "high":goCover_faa45bc9dd83__689[21] = 1;
+			timeline.Short = append(timeline.Short, cveID)
+		case "medium":goCover_faa45bc9dd83__689[22] = 1;
+			timeline.Medium = append(timeline.Medium, cveID)
+		default:goCover_faa45bc9dd83__689[23] = 1;
+			timeline.Long = append(timeline.Long, cveID)
+		}
+	}
+
+	goCover_faa45bc9dd83__689[7] = 1;return RiskAssessment{
+		OverallRisk:      overallRisk,
+		RiskScore:        riskScore,
+		CriticalCount:    criticalCount,
+		HighCount:        highCount,
+		MediumCount:      mediumCount,
+		LowCount:         lowCount,
+		Recommendations:  recommendations,
+		Timeline:         timeline,
+		ComplianceStatus: s.assessSBOMCompliance(deps, vulns, metrics),
+	}
+}
+
+// generateSecurityRecommendations generates actionable security recommendations
+func (s *SyftSBOMAnalyzer) generateSecurityRecommendations(deps []Dependency, vulns []VulnerabilityMatch, assessment RiskAssessment) []SecurityRecommendation {goCover_faa45bc9dd83__690[0] = 10 ; goCover_faa45bc9dd83__690[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__690[2] = 690 ; goCover_faa45bc9dd83__690[3] = 1;
+	var recommendations []SecurityRecommendation
+
+	if assessment.CriticalCount > 0 {goCover_faa45bc9dd83__690[8] = 1;
+		recommendations = append(recommendations, SecurityRecommendation{
+			Priority:    1,
+			Category:    "vulnerability_management",
+			Title:       "Address Critical Vulnerabilities",
+			Description: fmt.Sprintf("Found %d critical vulnerabilities requiring immediate remediation", assessment.CriticalCount),
+			Action:      "Apply security patches and updates for critical vulnerabilities",
+			Impact:      "High - Prevents potential system compromise",
+			Effort: EstimatedEffort{
+				Level:       "high",
+				TimeMinutes: assessment.CriticalCount * 45,
+				Complexity:  8,
+				Risk:        "high",
+				Resources:   []string{"security_team", "development_team"},
+			},
+			Urgency: "immediate",
+		})
+	}
+
+	goCover_faa45bc9dd83__690[4] = 1;if assessment.HighCount > 0 {goCover_faa45bc9dd83__690[9] = 1;
+		recommendations = append(recommendations, SecurityRecommendation{
+			Priority:    2,
+			Category:    "vulnerability_management",
+			Title:       "Remediate High-Severity Vulnerabilities",
+			Description: fmt.Sprintf("Address %d high-severity vulnerabilities", assessment.HighCount),
+			Action:      "Update affected dependencies to patched versions",
+			Impact:      "Medium-High - Reduces significant security risks",
+			Effort: EstimatedEffort{
+				Level:       "medium",
+				TimeMinutes: assessment.HighCount * 30,
+				Complexity:  6,
+				Risk:        "medium",
+				Resources:   []string{"development_team"},
+			},
+			Urgency: "short_term",
+		})
+	}
+
+	// Recommendation for outdated dependencies
+	goCover_faa45bc9dd83__690[5] = 1;outdatedCount := 0
+	for _, dep := range deps {goCover_faa45bc9dd83__690[10] = 1;
+		if outdated, _, _ := s.vulnerabilityDB.CheckOutdated(dep); outdated {goCover_faa45bc9dd83__690[11] = 1;
+			outdatedCount++
+		}
+	}
+
+	goCover_faa45bc9dd83__690[6] = 1;if outdatedCount > 0 {goCover_faa45bc9dd83__690[12] = 1;
+		recommendations = append(recommendations, SecurityRecommendation{
+			Priority:    3,
+			Category:    "maintenance",
+			Title:       "Update Outdated Dependencies",
+			Description: fmt.Sprintf("Update %d outdated dependencies to latest stable versions", outdatedCount),
+			Action:      "Review and update dependency versions",
+			Impact:      "Medium - Improves overall security posture",
+			Effort: EstimatedEffort{
+				Level:       "medium",
+				TimeMinutes: outdatedCount * 15,
+				Complexity:  4,
+				Risk:        "low",
+				Resources:   []string{"development_team"},
+			},
+			Urgency: "medium_term",
+		})
+	}
+
+	goCover_faa45bc9dd83__690[7] = 1;return recommendations
+}
+
+// Helper functions
+
+func (s *SyftSBOMAnalyzer) getStringValue(m map[string]interface{}, key string) string {goCover_faa45bc9dd83__691[0] = 4 ; goCover_faa45bc9dd83__691[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__691[2] = 691 ; goCover_faa45bc9dd83__691[3] = 1;
+	if val, ok := m[key]; ok {goCover_faa45bc9dd83__691[5] = 1;
+		if str, ok := val.(string); ok {goCover_faa45bc9dd83__691[6] = 1;
+			return str
+		}
+	}
+	goCover_faa45bc9dd83__691[4] = 1;return ""
+}
+
+func (s *SyftSBOMAnalyzer) normalizeEcosystem(language, pkgType string) string {goCover_faa45bc9dd83__692[0] = 14 ; goCover_faa45bc9dd83__692[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__692[2] = 692 ; goCover_faa45bc9dd83__692[3] = 1;
+	// Map language/type to standard ecosystem names
+	switch strings.ToLower(language) {
+	case "java":goCover_faa45bc9dd83__692[4] = 1;
+		return "maven"
+	case "javascript", "typescript":goCover_faa45bc9dd83__692[5] = 1;
+		return "npm"
+	case "python":goCover_faa45bc9dd83__692[6] = 1;
+		return "pypi"
+	case "go":goCover_faa45bc9dd83__692[7] = 1;
+		return "go"
+	case "rust":goCover_faa45bc9dd83__692[8] = 1;
+		return "cargo"
+	case "ruby":goCover_faa45bc9dd83__692[9] = 1;
+		return "gem"
+	case "php":goCover_faa45bc9dd83__692[10] = 1;
+		return "packagist"
+	case "c#", "csharp":goCover_faa45bc9dd83__692[11] = 1;
+		return "nuget"
+	default:goCover_faa45bc9dd83__692[12] = 1;
+		// Try to infer from package type
+		switch strings.ToLower(pkgType) {
+		case "jar":goCover_faa45bc9dd83__692[13] = 1;
+			return "maven"
+		case "wheel", "egg":goCover_faa45bc9dd83__692[14] = 1;
+			return "pypi"
+		case "gem":goCover_faa45bc9dd83__692[15] = 1;
+			return "gem"
+		default:goCover_faa45bc9dd83__692[16] = 1;
+			return strings.ToLower(language)
+		}
+	}
+}
+
+func (s *SyftSBOMAnalyzer) extractEcosystemFromPURL(purl string) string {goCover_faa45bc9dd83__693[0] = 3 ; goCover_faa45bc9dd83__693[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__693[2] = 693 ; goCover_faa45bc9dd83__693[3] = 1;
+	// Extract ecosystem from Package URL (purl)
+	// Format: pkg:type/namespace/name@version
+	parts := strings.Split(purl, ":")
+	if len(parts) >= 2 {goCover_faa45bc9dd83__693[5] = 1;
+		return parts[1]
+	}
+	goCover_faa45bc9dd83__693[4] = 1;return "unknown"
+}
+
+func (s *SyftSBOMAnalyzer) inferEcosystemFromURL(url string) string {goCover_faa45bc9dd83__694[0] = 9 ; goCover_faa45bc9dd83__694[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__694[2] = 694 ; goCover_faa45bc9dd83__694[3] = 1;
+	url = strings.ToLower(url)
+	if strings.Contains(url, "maven") {goCover_faa45bc9dd83__694[8] = 1;
+		return "maven"
+	}
+	goCover_faa45bc9dd83__694[4] = 1;if strings.Contains(url, "npmjs") || strings.Contains(url, "npm") {goCover_faa45bc9dd83__694[9] = 1;
+		return "npm"
+	}
+	goCover_faa45bc9dd83__694[5] = 1;if strings.Contains(url, "pypi") {goCover_faa45bc9dd83__694[10] = 1;
+		return "pypi"
+	}
+	goCover_faa45bc9dd83__694[6] = 1;if strings.Contains(url, "github.com") {goCover_faa45bc9dd83__694[11] = 1;
+		return "github"
+	}
+	goCover_faa45bc9dd83__694[7] = 1;return "unknown"
+}
+
+func (s *SyftSBOMAnalyzer) calculateMatchConfidence(dep Dependency, vuln VulnerabilityInfo) float64 {goCover_faa45bc9dd83__695[0] = 9 ; goCover_faa45bc9dd83__695[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__695[2] = 695 ; goCover_faa45bc9dd83__695[3] = 1;
+	confidence := 0.5 // Base confidence
+
+	// Exact name match
+	if dep.Name == vuln.Package.Name {goCover_faa45bc9dd83__695[8] = 1;
+		confidence += 0.3
+	}
+
+	// Exact version match
+	goCover_faa45bc9dd83__695[4] = 1;if dep.Version == vuln.Package.Version {goCover_faa45bc9dd83__695[9] = 1;
+		confidence += 0.2
+	}
+
+	// Ecosystem match
+	goCover_faa45bc9dd83__695[5] = 1;if dep.Ecosystem == vuln.Package.Ecosystem {goCover_faa45bc9dd83__695[10] = 1;
+		confidence += 0.2
+	}
+
+	goCover_faa45bc9dd83__695[6] = 1;if confidence > 1.0 {goCover_faa45bc9dd83__695[11] = 1;
+		confidence = 1.0
+	}
+
+	goCover_faa45bc9dd83__695[7] = 1;return confidence
+}
+
+func (s *SyftSBOMAnalyzer) determineMatchReason(dep Dependency, vuln VulnerabilityInfo) string {goCover_faa45bc9dd83__696[0] = 9 ; goCover_faa45bc9dd83__696[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__696[2] = 696 ; goCover_faa45bc9dd83__696[3] = 1;
+	reasons := []string{}
+
+	if dep.Name == vuln.Package.Name {goCover_faa45bc9dd83__696[8] = 1;
+		reasons = append(reasons, "exact_name_match")
+	}
+
+	goCover_faa45bc9dd83__696[4] = 1;if dep.Version == vuln.Package.Version {goCover_faa45bc9dd83__696[9] = 1;
+		reasons = append(reasons, "exact_version_match")
+	}
+
+	goCover_faa45bc9dd83__696[5] = 1;if dep.Ecosystem == vuln.Package.Ecosystem {goCover_faa45bc9dd83__696[10] = 1;
+		reasons = append(reasons, "ecosystem_match")
+	}
+
+	goCover_faa45bc9dd83__696[6] = 1;if len(reasons) == 0 {goCover_faa45bc9dd83__696[11] = 1;
+		reasons = append(reasons, "fuzzy_match")
+	}
+
+	goCover_faa45bc9dd83__696[7] = 1;return strings.Join(reasons, ",")
+}
+
+func (s *SyftSBOMAnalyzer) isProblematicLicense(license string) bool {goCover_faa45bc9dd83__697[0] = 4 ; goCover_faa45bc9dd83__697[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__697[2] = 697 ; goCover_faa45bc9dd83__697[3] = 1;
+	problematic := []string{
+		"AGPL", "GPL-2.0", "GPL-3.0", "LGPL",
+		"SSPL", "OSL", "EPL", "MPL-2.0",
+		"UNKNOWN", "NOASSERTION",
+	}
+
+	license = strings.ToUpper(license)
+	for _, p := range problematic {goCover_faa45bc9dd83__697[5] = 1;
+		if strings.Contains(license, p) {goCover_faa45bc9dd83__697[6] = 1;
+			return true
+		}
+	}
+	goCover_faa45bc9dd83__697[4] = 1;return false
+}
+
+func (s *SyftSBOMAnalyzer) generateRiskRecommendations(critical, high, medium, low int, metrics SBOMSecurityMetrics) []SecurityRecommendation {goCover_faa45bc9dd83__698[0] = 7 ; goCover_faa45bc9dd83__698[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__698[2] = 698 ; goCover_faa45bc9dd83__698[3] = 1;
+	var recommendations []SecurityRecommendation
+	priority := 1
+
+	if critical > 0 {goCover_faa45bc9dd83__698[7] = 1;
+		recommendations = append(recommendations, SecurityRecommendation{
+			Priority:    priority,
+			Category:    "critical_vulnerabilities",
+			Title:       "Immediate Action Required",
+			Description: fmt.Sprintf("Address %d critical vulnerabilities", critical),
+			Action:      "Apply emergency patches",
+			Impact:      "Critical - System at immediate risk",
+			Urgency:     "immediate",
+		})
+		priority++
+	}
+
+	goCover_faa45bc9dd83__698[4] = 1;if high > 0 {goCover_faa45bc9dd83__698[8] = 1;
+		recommendations = append(recommendations, SecurityRecommendation{
+			Priority:    priority,
+			Category:    "high_vulnerabilities",
+			Title:       "High Priority Security Updates",
+			Description: fmt.Sprintf("Address %d high-severity vulnerabilities", high),
+			Action:      "Schedule security updates within 48 hours",
+			Impact:      "High - Significant security risk reduction",
+			Urgency:     "short_term",
+		})
+		priority++
+	}
+
+	goCover_faa45bc9dd83__698[5] = 1;if metrics.OutdatedDependencies > 0 {goCover_faa45bc9dd83__698[9] = 1;
+		recommendations = append(recommendations, SecurityRecommendation{
+			Priority:    priority,
+			Category:    "maintenance",
+			Title:       "Dependency Maintenance",
+			Description: fmt.Sprintf("Update %d outdated dependencies", metrics.OutdatedDependencies),
+			Action:      "Regular dependency updates",
+			Impact:      "Medium - Improved security posture",
+			Urgency:     "medium_term",
+		})
+	}
+
+	goCover_faa45bc9dd83__698[6] = 1;return recommendations
+}
+
+func (s *SyftSBOMAnalyzer) assessSBOMCompliance(deps []Dependency, vulns []VulnerabilityMatch, metrics SBOMSecurityMetrics) ComplianceStatus {goCover_faa45bc9dd83__699[0] = 3 ; goCover_faa45bc9dd83__699[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__699[2] = 699 ; goCover_faa45bc9dd83__699[3] = 1;
+	frameworks := map[string]FrameworkCompliance{
+		"NIST": {
+			Name:    "NIST Secure Software Development Framework",
+			Version: "1.1",
+			Score:   s.calculateNISTComplianceScore(metrics),
+			Status:  "partial_compliance",
+		},
+		"OWASP": {
+			Name:    "OWASP Application Security Verification Standard",
+			Version: "4.0",
+			Score:   s.calculateOWASPComplianceScore(metrics),
+			Status:  "partial_compliance",
+		},
+	}
+
+	issues := []ComplianceIssue{}
+	if metrics.VulnerableDependencies > 0 {goCover_faa45bc9dd83__699[5] = 1;
+		issues = append(issues, ComplianceIssue{
+			Framework:   "NIST",
+			Requirement: "Vulnerability Management",
+			Description: fmt.Sprintf("%d vulnerable dependencies found", metrics.VulnerableDependencies),
+			Severity:    "high",
+			Actions:     []string{"Update vulnerable dependencies", "Implement vulnerability scanning"},
+		})
+	}
+
+	goCover_faa45bc9dd83__699[4] = 1;return ComplianceStatus{
+		Frameworks: frameworks,
+		Overall:    "requires_attention",
+		Issues:     issues,
+	}
+}
+
+func (s *SyftSBOMAnalyzer) calculateNISTComplianceScore(metrics SBOMSecurityMetrics) float64 {goCover_faa45bc9dd83__700[0] = 3 ; goCover_faa45bc9dd83__700[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__700[2] = 700 ; goCover_faa45bc9dd83__700[3] = 1;
+	score := 10.0
+
+	// Deduct points for security issues
+	score -= float64(metrics.VulnerableDependencies) * 0.5
+	score -= float64(metrics.LicenseIssues) * 0.2
+	score -= float64(metrics.OutdatedDependencies) * 0.1
+
+	if score < 0 {goCover_faa45bc9dd83__700[5] = 1;
+		score = 0
+	}
+
+	goCover_faa45bc9dd83__700[4] = 1;return score
+}
+
+func (s *SyftSBOMAnalyzer) calculateOWASPComplianceScore(metrics SBOMSecurityMetrics) float64 {goCover_faa45bc9dd83__701[0] = 1 ; goCover_faa45bc9dd83__701[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__701[2] = 701 ; goCover_faa45bc9dd83__701[3] = 1;
+	return s.calculateNISTComplianceScore(metrics) // Simplified
+}

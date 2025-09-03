@@ -1,0 +1,266 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/factory.go:1:1
+package arf
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
+	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
+)
+
+// Phase3Config contains configuration for ARF Phase 3 components
+type Phase3Config struct {
+	// LLM Configuration
+	LLMProvider    string  `yaml:"llm_provider"` // openai, anthropic, azure, ollama, cohere
+	LLMAPIKey      string  `yaml:"llm_api_key"`
+	LLMModel       string  `yaml:"llm_model"`
+	LLMTemperature float64 `yaml:"llm_temperature"`
+	LLMBaseURL     string  `yaml:"llm_base_url"` // For Ollama and custom endpoints
+
+	// Learning System Configuration
+	LearningDBURL     string        `yaml:"learning_db_url"`
+	PatternMinSamples int           `yaml:"pattern_min_samples"`
+	PatternTimeWindow time.Duration `yaml:"pattern_time_window"`
+
+	// Hybrid Pipeline Configuration
+	ConfidenceThresholds ConfidenceThresholds `yaml:"confidence_thresholds"`
+	EnhancementMode      EnhancementMode      `yaml:"enhancement_mode"`
+
+	// Multi-Language Configuration
+	TreeSitterPath string   `yaml:"tree_sitter_path"`
+	SupportedLangs []string `yaml:"supported_languages"`
+}
+
+// DefaultPhase3Config returns default configuration for Phase 3
+// Note: External model configuration is required - no defaults provided
+func DefaultPhase3Config() *Phase3Config {goCover_faa45bc9dd83__124[0] = 1 ; goCover_faa45bc9dd83__124[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__124[2] = 124 ; goCover_faa45bc9dd83__124[3] = 1;
+	return &Phase3Config{
+		// LLM configuration must be provided via environment or API
+		LLMProvider:    "", // Must be set explicitly
+		LLMModel:       "", // Must be set explicitly
+		LLMTemperature: 0.1,
+
+		PatternMinSamples: 10,
+		PatternTimeWindow: 30 * 24 * time.Hour, // 30 days
+
+		ConfidenceThresholds: ConfidenceThresholds{
+			MinOpenRewrite: 0.6,
+			MinLLM:         0.7,
+			MinHybrid:      0.8,
+			RequiredBuild:  0.9,
+		},
+
+		EnhancementMode: PostProcessing,
+
+		TreeSitterPath: "/usr/local/bin/tree-sitter",
+		SupportedLangs: []string{"java", "javascript", "python", "go", "rust"},
+	}
+}
+
+// LoadPhase3ConfigFromEnv loads configuration from environment variables
+func LoadPhase3ConfigFromEnv() *Phase3Config {goCover_faa45bc9dd83__125[0] = 11 ; goCover_faa45bc9dd83__125[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__125[2] = 125 ; goCover_faa45bc9dd83__125[3] = 1;
+	config := DefaultPhase3Config()
+
+	// Load from environment
+	if provider := os.Getenv("ARF_LLM_PROVIDER"); provider != "" {goCover_faa45bc9dd83__125[9] = 1;
+		config.LLMProvider = provider
+	}
+	goCover_faa45bc9dd83__125[4] = 1;if apiKey := os.Getenv("ARF_LLM_API_KEY"); apiKey != "" {goCover_faa45bc9dd83__125[10] = 1;
+		config.LLMAPIKey = apiKey
+	}
+	goCover_faa45bc9dd83__125[5] = 1;if model := os.Getenv("ARF_LLM_MODEL"); model != "" {goCover_faa45bc9dd83__125[11] = 1;
+		config.LLMModel = model
+	}
+	goCover_faa45bc9dd83__125[6] = 1;if dbURL := os.Getenv("ARF_LEARNING_DB_URL"); dbURL != "" {goCover_faa45bc9dd83__125[12] = 1;
+		config.LearningDBURL = dbURL
+	}
+	goCover_faa45bc9dd83__125[7] = 1;if treeSitter := os.Getenv("ARF_TREE_SITTER_PATH"); treeSitter != "" {goCover_faa45bc9dd83__125[13] = 1;
+		config.TreeSitterPath = treeSitter
+	}
+
+	// OpenRewrite always uses batch job dispatcher - no configuration needed
+
+	goCover_faa45bc9dd83__125[8] = 1;return config
+}
+
+// InitializePhase3Components initializes all ARF Phase 3 components
+func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error) {goCover_faa45bc9dd83__126[0] = 16 ; goCover_faa45bc9dd83__126[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__126[2] = 126 ; goCover_faa45bc9dd83__126[3] = 1;
+	var components Phase3Components
+	var err error
+
+	// Initialize LLM Generator - external model required
+	if config.LLMAPIKey == "" || config.LLMProvider == "" {goCover_faa45bc9dd83__126[8] = 1;
+		return nil, fmt.Errorf("external LLM configuration required: provider and API key must be set")
+	}
+
+	goCover_faa45bc9dd83__126[4] = 1;switch config.LLMProvider {
+	case "openai":goCover_faa45bc9dd83__126[9] = 1;
+		llmGen, err := NewOpenAILLMGenerator()
+		if err != nil {goCover_faa45bc9dd83__126[14] = 1;
+			return nil, fmt.Errorf("failed to initialize OpenAI LLM: %w", err)
+		}
+		goCover_faa45bc9dd83__126[10] = 1;components.LLMGenerator = llmGen
+	case "anthropic", "azure", "cohere":goCover_faa45bc9dd83__126[11] = 1;
+		// Use HTTP LLM generator for other external providers
+		llmGen, err := NewHTTPLLMGenerator("")
+		if err != nil {goCover_faa45bc9dd83__126[15] = 1;
+			return nil, fmt.Errorf("failed to initialize %s LLM: %w", config.LLMProvider, err)
+		}
+		goCover_faa45bc9dd83__126[12] = 1;components.LLMGenerator = llmGen
+	default:goCover_faa45bc9dd83__126[13] = 1;
+		return nil, fmt.Errorf("unsupported LLM provider: %s (only external models supported)", config.LLMProvider)
+	}
+
+	// Initialize Learning System
+	goCover_faa45bc9dd83__126[5] = 1;if config.LearningDBURL != "" {goCover_faa45bc9dd83__126[16] = 1;
+		components.LearningSystem, err = initializeLearningSystem(config.LearningDBURL)
+		if err != nil {goCover_faa45bc9dd83__126[17] = 1;
+			// Log error but continue with nil learning system
+			fmt.Printf("Warning: Failed to initialize learning system: %v\n", err)
+		}
+	}
+
+	// Initialize Multi-Language Engine
+	goCover_faa45bc9dd83__126[6] = 1;multiLang, err := NewTreeSitterMultiLanguageEngine()
+	if err != nil {goCover_faa45bc9dd83__126[18] = 1;
+		fmt.Printf("Warning: Failed to initialize multi-language engine: %v\n", err)
+		// Create a basic multi-language engine
+		multiLang = &TreeSitterMultiLanguageEngine{}
+	}
+	goCover_faa45bc9dd83__126[7] = 1;components.MultiLangEngine = multiLang
+
+	// Initialize Hybrid Pipeline
+	// Note: We need a proper RecipeExecutor, using nil for now
+	components.HybridPipeline = NewDefaultHybridPipeline(
+		nil, // RecipeExecutor - needs to be initialized separately
+		components.LLMGenerator,
+		components.MultiLangEngine,
+	)
+
+	// Initialize Strategy Selector
+	components.StrategySelector = NewDefaultStrategySelector()
+
+	return &components, nil
+}
+
+// Phase3Components contains all initialized Phase 3 components
+type Phase3Components struct {
+	LLMGenerator     LLMRecipeGenerator
+	LearningSystem   LearningSystem
+	HybridPipeline   HybridPipeline
+	MultiLangEngine  MultiLanguageEngine
+	StrategySelector StrategySelector
+}
+
+// initializeLearningSystem creates and initializes the learning system with database
+func initializeLearningSystem(dbURL string) (LearningSystem, error) {goCover_faa45bc9dd83__127[0] = 5 ; goCover_faa45bc9dd83__127[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__127[2] = 127 ; goCover_faa45bc9dd83__127[3] = 1;
+	db, err := sql.Open("pgx", dbURL)
+	if err != nil {goCover_faa45bc9dd83__127[6] = 1;
+		return nil, fmt.Errorf("failed to connect to learning database: %w", err)
+	}
+
+	// Test connection
+	goCover_faa45bc9dd83__127[4] = 1;ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {goCover_faa45bc9dd83__127[7] = 1;
+		return nil, fmt.Errorf("failed to ping learning database: %w", err)
+	}
+
+	// Create PostgreSQL learning system
+	goCover_faa45bc9dd83__127[5] = 1;return NewPostgreSQLLearningSystem()
+}
+
+// getDBFromLearningSystem extracts the database connection from learning system
+func getDBFromLearningSystem(ls LearningSystem) *sql.DB {goCover_faa45bc9dd83__128[0] = 3 ; goCover_faa45bc9dd83__128[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__128[2] = 128 ; goCover_faa45bc9dd83__128[3] = 1;
+	// Type assertion to get DB from PostgreSQL learning system
+	if pgls, ok := ls.(*PostgreSQLLearningSystem); ok {goCover_faa45bc9dd83__128[5] = 1;
+		return pgls.db
+	}
+	goCover_faa45bc9dd83__128[4] = 1;return nil
+}
+
+// Note: Mock LLM generator removed - only external models are supported
+
+// mockLLMGenerator is a mock implementation for testing
+type mockLLMGenerator struct {
+	generateRecipeFn  func(context.Context, RecipeGenerationRequest) (*GeneratedRecipe, error)
+	getCapabilitiesFn func() LLMCapabilities
+	isAvailableFn     func(context.Context) bool
+	validateFn        func(context.Context, GeneratedRecipe) (*EvolutionValidationResult, error)
+	optimizeFn        func(context.Context, interface{}, TransformationFeedback) (interface{}, error)
+}
+
+func (m *mockLLMGenerator) GenerateRecipe(ctx context.Context, request RecipeGenerationRequest) (*GeneratedRecipe, error) {goCover_faa45bc9dd83__129[0] = 1 ; goCover_faa45bc9dd83__129[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__129[2] = 129 ; goCover_faa45bc9dd83__129[3] = 1;
+	return &GeneratedRecipe{
+		ID:          fmt.Sprintf("mock-%d", time.Now().Unix()),
+		Name:        "Mock Generated Recipe",
+		Description: "This is a mock generated recipe",
+		Language:    request.Language,
+		Recipe:      map[string]interface{}{"mock": true},
+		Confidence:  0.5,
+		CreatedAt:   time.Now(),
+	}, nil
+}
+
+func (m *mockLLMGenerator) GetCapabilities() LLMCapabilities {goCover_faa45bc9dd83__130[0] = 1 ; goCover_faa45bc9dd83__130[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__130[2] = 130 ; goCover_faa45bc9dd83__130[3] = 1;
+	return LLMCapabilities{
+		SupportedLanguages: []string{"java", "python", "javascript", "go"},
+		MaxContextLength:   8192,
+		SupportsStreaming:  false,
+		SupportsFineTuning: false,
+	}
+}
+
+func (m *mockLLMGenerator) IsAvailable(ctx context.Context) bool {goCover_faa45bc9dd83__131[0] = 1 ; goCover_faa45bc9dd83__131[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__131[2] = 131 ; goCover_faa45bc9dd83__131[3] = 1;
+	return true
+}
+
+func (m *mockLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {goCover_faa45bc9dd83__132[0] = 1 ; goCover_faa45bc9dd83__132[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__132[2] = 132 ; goCover_faa45bc9dd83__132[3] = 1;
+	return &EvolutionValidationResult{
+		Valid:          true,
+		SafetyScore:    1.0,
+		Warnings:       []string{},
+		CriticalIssues: []string{},
+		TestResults:    []EvolutionValidationTest{},
+	}, nil
+}
+
+func (m *mockLLMGenerator) OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error) {goCover_faa45bc9dd83__133[0] = 1 ; goCover_faa45bc9dd83__133[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__133[2] = 133 ; goCover_faa45bc9dd83__133[3] = 1;
+	// For mock, just return the recipe as-is
+	return recipe, nil
+}
+
+// CreateOpenRewriteEngine creates OpenRewrite engine using batch job dispatcher
+func CreateOpenRewriteEngine(config *Phase3Config) interface{} {goCover_faa45bc9dd83__134[0] = 1 ; goCover_faa45bc9dd83__134[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__134[2] = 134 ; goCover_faa45bc9dd83__134[3] = 1;
+	// Always use embedded mode with batch job dispatcher
+	// Service mode has been deprecated in favor of batch jobs
+	return NewOpenRewriteEngine()
+}
+
+// CreateHandlerWithPhase3 creates a handler with all Phase 3 components initialized
+func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) (*Handler, error) {goCover_faa45bc9dd83__135[0] = 3 ; goCover_faa45bc9dd83__135[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__135[2] = 135 ; goCover_faa45bc9dd83__135[3] = 1;
+	// Load configuration
+	config := LoadPhase3ConfigFromEnv()
+
+	// Initialize Phase 3 components
+	components, err := InitializePhase3Components(config)
+	if err != nil {goCover_faa45bc9dd83__135[5] = 1;
+		return nil, fmt.Errorf("failed to initialize Phase 3 components: %w", err)
+	}
+
+	// Create handler with Phase 3 components
+	goCover_faa45bc9dd83__135[4] = 1;return NewHandlerWithPhase3(
+		executor,
+		catalog,
+		sandboxMgr,
+		components.LLMGenerator,
+		components.LearningSystem,
+		components.HybridPipeline,
+		components.MultiLangEngine,
+		components.StrategySelector,
+	), nil
+}

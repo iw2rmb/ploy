@@ -1,0 +1,494 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/sandbox_validation.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// BuildConfig contains configuration for build validation
+type BuildConfig struct {
+	BuildTool    string        `json:"build_tool"`
+	BuildCommand string        `json:"build_command"` // Optional custom command
+	Timeout      time.Duration `json:"timeout"`
+	MemoryLimit  string        `json:"memory_limit"` // e.g., "2G"
+	CPULimit     string        `json:"cpu_limit"`    // e.g., "2"
+	WorkingDir   string        `json:"working_dir"`
+	EnvVars      []string      `json:"env_vars"`
+}
+
+// TestConfig contains configuration for test execution
+type TestConfig struct {
+	TestFramework string        `json:"test_framework"`
+	TestCommand   string        `json:"test_command"` // Optional custom command
+	Timeout       time.Duration `json:"timeout"`
+	MemoryLimit   string        `json:"memory_limit"`
+	CPULimit      string        `json:"cpu_limit"`
+	WorkingDir    string        `json:"working_dir"`
+	EnvVars       []string      `json:"env_vars"`
+	Coverage      bool          `json:"coverage"` // Enable coverage reporting
+}
+
+// BuildValidationResult contains the results of build validation
+type BuildValidationResult struct {
+	Success      bool                   `json:"success"`
+	BuildTool    string                 `json:"build_tool"`
+	BuildCommand string                 `json:"build_command"`
+	Duration     time.Duration          `json:"duration"`
+	Output       string                 `json:"output"`
+	Errors       []ValidationBuildError `json:"errors,omitempty"`
+	Warnings     []string               `json:"warnings,omitempty"`
+	Artifacts    []string               `json:"artifacts,omitempty"` // Build artifacts produced
+}
+
+// TestValidationResult contains the results of test execution
+type TestValidationResult struct {
+	Success         bool          `json:"success"`
+	TestFramework   string        `json:"test_framework"`
+	TestCommand     string        `json:"test_command"`
+	Duration        time.Duration `json:"duration"`
+	TotalTests      int           `json:"total_tests"`
+	PassedTests     int           `json:"passed_tests"`
+	FailedTests     int           `json:"failed_tests"`
+	SkippedTests    int           `json:"skipped_tests"`
+	Output          string        `json:"output"`
+	Failures        []TestFailure `json:"failures,omitempty"`
+	CoveragePercent float64       `json:"coverage_percent,omitempty"`
+}
+
+// ValidationBuildError represents a build error with location details
+type ValidationBuildError struct {
+	Type    string `json:"type"` // compilation, dependency, configuration, etc.
+	File    string `json:"file"`
+	Line    int    `json:"line"`
+	Column  int    `json:"column"`
+	Message string `json:"message"`
+}
+
+// TestFailure represents a test failure
+type TestFailure struct {
+	TestName   string `json:"test_name"`
+	ClassName  string `json:"class_name,omitempty"`
+	Message    string `json:"message"`
+	StackTrace string `json:"stack_trace,omitempty"`
+}
+
+// SandboxValidator provides build and test validation in sandboxes
+type SandboxValidator struct {
+	sandboxMgr SandboxManager
+}
+
+// NewSandboxValidator creates a new sandbox validator
+func NewSandboxValidator(sandboxMgr SandboxManager) *SandboxValidator {goCover_faa45bc9dd83__660[0] = 1 ; goCover_faa45bc9dd83__660[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__660[2] = 660 ; goCover_faa45bc9dd83__660[3] = 1;
+	return &SandboxValidator{
+		sandboxMgr: sandboxMgr,
+	}
+}
+
+// ValidateBuild runs build validation in a sandbox
+func (v *SandboxValidator) ValidateBuild(ctx context.Context, sandboxID string, config BuildConfig) (*BuildValidationResult, error) {goCover_faa45bc9dd83__661[0] = 11 ; goCover_faa45bc9dd83__661[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__661[2] = 661 ; goCover_faa45bc9dd83__661[3] = 1;
+	startTime := time.Now()
+
+	// Set default timeout if not specified
+	if config.Timeout == 0 {goCover_faa45bc9dd83__661[7] = 1;
+		config.Timeout = 10 * time.Minute
+	}
+
+	// Create context with timeout
+	goCover_faa45bc9dd83__661[4] = 1;buildCtx, cancel := context.WithTimeout(ctx, config.Timeout)
+	defer cancel()
+
+	// Determine build command
+	buildCommand := config.BuildCommand
+	if buildCommand == "" {goCover_faa45bc9dd83__661[8] = 1;
+		buildCommand = v.getDefaultBuildCommand(config.BuildTool)
+	}
+
+	goCover_faa45bc9dd83__661[5] = 1;result := &BuildValidationResult{
+		BuildTool:    config.BuildTool,
+		BuildCommand: buildCommand,
+	}
+
+	// Execute build command in sandbox
+	output, err := v.ExecuteInSandbox(buildCtx, sandboxID, "sh", "-c", buildCommand)
+	result.Output = output
+	result.Duration = time.Since(startTime)
+
+	if err != nil {goCover_faa45bc9dd83__661[9] = 1;
+		// Check if it was a timeout
+		if buildCtx.Err() == context.DeadlineExceeded {goCover_faa45bc9dd83__661[11] = 1;
+			return nil, fmt.Errorf("build timeout after %v", config.Timeout)
+		}
+
+		// Parse build errors from output
+		goCover_faa45bc9dd83__661[10] = 1;result.Success = false
+		result.Errors = v.ParseBuildOutput(config.BuildTool, output)
+
+		// If no specific errors were parsed, create a generic one
+		if len(result.Errors) == 0 {goCover_faa45bc9dd83__661[12] = 1;
+			result.Errors = append(result.Errors, ValidationBuildError{
+				Type:    "build_failure",
+				Message: err.Error(),
+			})
+		}
+	} else{ goCover_faa45bc9dd83__661[13] = 1;{
+		// Check if build was successful based on output
+		result.Success = v.isBuildSuccessful(config.BuildTool, output)
+
+		// Even if exit code was 0, parse for any errors/warnings
+		result.Errors = v.ParseBuildOutput(config.BuildTool, output)
+		result.Warnings = v.parseBuildWarnings(config.BuildTool, output)
+
+		// Collect build artifacts
+		result.Artifacts = v.collectBuildArtifacts(sandboxID, config.BuildTool)
+	}}
+
+	goCover_faa45bc9dd83__661[6] = 1;return result, nil
+}
+
+// RunTests runs tests in a sandbox
+func (v *SandboxValidator) RunTests(ctx context.Context, sandboxID string, config TestConfig) (*TestValidationResult, error) {goCover_faa45bc9dd83__662[0] = 13 ; goCover_faa45bc9dd83__662[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__662[2] = 662 ; goCover_faa45bc9dd83__662[3] = 1;
+	startTime := time.Now()
+
+	// Set default timeout if not specified
+	if config.Timeout == 0 {goCover_faa45bc9dd83__662[8] = 1;
+		config.Timeout = 15 * time.Minute
+	}
+
+	// Create context with timeout
+	goCover_faa45bc9dd83__662[4] = 1;testCtx, cancel := context.WithTimeout(ctx, config.Timeout)
+	defer cancel()
+
+	// Determine test command
+	testCommand := config.TestCommand
+	if testCommand == "" {goCover_faa45bc9dd83__662[9] = 1;
+		testCommand = v.getDefaultTestCommand(config.TestFramework)
+	}
+
+	goCover_faa45bc9dd83__662[5] = 1;result := &TestValidationResult{
+		TestFramework: config.TestFramework,
+		TestCommand:   testCommand,
+	}
+
+	// Execute test command in sandbox
+	output, err := v.ExecuteInSandbox(testCtx, sandboxID, "sh", "-c", testCommand)
+	result.Output = output
+	result.Duration = time.Since(startTime)
+
+	// Parse test results from output
+	v.parseTestResults(config.TestFramework, output, result)
+
+	if err != nil {goCover_faa45bc9dd83__662[10] = 1;
+		// Check if it was a timeout
+		if testCtx.Err() == context.DeadlineExceeded {goCover_faa45bc9dd83__662[12] = 1;
+			return nil, fmt.Errorf("test timeout after %v", config.Timeout)
+		}
+
+		// Tests failed but we still have results
+		goCover_faa45bc9dd83__662[11] = 1;result.Success = false
+
+		// If we couldn't parse specific failures, add a generic one
+		if len(result.Failures) == 0 && result.FailedTests > 0 {goCover_faa45bc9dd83__662[13] = 1;
+			result.Failures = append(result.Failures, TestFailure{
+				TestName: "Unknown",
+				Message:  fmt.Sprintf("%d test failures, %d errors", result.FailedTests, result.FailedTests),
+			})
+		}
+	} else{ goCover_faa45bc9dd83__662[14] = 1;{
+		// Check if tests were successful based on results
+		result.Success = result.FailedTests == 0 && result.TotalTests > 0
+	}}
+
+	// Parse coverage if enabled
+	goCover_faa45bc9dd83__662[6] = 1;if config.Coverage {goCover_faa45bc9dd83__662[15] = 1;
+		result.CoveragePercent = v.parseCoverage(config.TestFramework, output)
+	}
+
+	goCover_faa45bc9dd83__662[7] = 1;return result, nil
+}
+
+// ExecuteInSandbox executes a command in a sandbox
+func (v *SandboxValidator) ExecuteInSandbox(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {goCover_faa45bc9dd83__663[0] = 3 ; goCover_faa45bc9dd83__663[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__663[2] = 663 ; goCover_faa45bc9dd83__663[3] = 1;
+	// Check if sandboxMgr supports command execution
+	if executor, ok := v.sandboxMgr.(interface {
+		ExecuteCommand(context.Context, string, string, ...string) (string, error)
+	}); ok {goCover_faa45bc9dd83__663[5] = 1;
+		return executor.ExecuteCommand(ctx, sandboxID, command, args...)
+	}
+
+	goCover_faa45bc9dd83__663[4] = 1;return "", fmt.Errorf("sandbox manager does not support command execution")
+}
+
+// ParseBuildOutput parses build output for errors
+func (v *SandboxValidator) ParseBuildOutput(buildTool string, output string) []ValidationBuildError {goCover_faa45bc9dd83__664[0] = 6 ; goCover_faa45bc9dd83__664[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__664[2] = 664 ; goCover_faa45bc9dd83__664[3] = 1;
+	var errors []ValidationBuildError
+
+	switch buildTool {
+	case "maven":goCover_faa45bc9dd83__664[5] = 1;
+		errors = v.parseMavenErrors(output)
+	case "gradle":goCover_faa45bc9dd83__664[6] = 1;
+		errors = v.parseGradleErrors(output)
+	case "npm":goCover_faa45bc9dd83__664[7] = 1;
+		errors = v.parseNpmErrors(output)
+	case "go":goCover_faa45bc9dd83__664[8] = 1;
+		errors = v.parseGoErrors(output)
+	}
+
+	goCover_faa45bc9dd83__664[4] = 1;return errors
+}
+
+// Helper methods for build commands
+func (v *SandboxValidator) getDefaultBuildCommand(buildTool string) string {goCover_faa45bc9dd83__665[0] = 6 ; goCover_faa45bc9dd83__665[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__665[2] = 665 ; goCover_faa45bc9dd83__665[3] = 1;
+	switch buildTool {
+	case "maven":goCover_faa45bc9dd83__665[4] = 1;
+		return "mvn clean compile"
+	case "gradle":goCover_faa45bc9dd83__665[5] = 1;
+		return "gradle build -x test"
+	case "npm":goCover_faa45bc9dd83__665[6] = 1;
+		return "npm run build"
+	case "go":goCover_faa45bc9dd83__665[7] = 1;
+		return "go build -v ./..."
+	default:goCover_faa45bc9dd83__665[8] = 1;
+		return "make build"
+	}
+}
+
+func (v *SandboxValidator) getDefaultTestCommand(testFramework string) string {goCover_faa45bc9dd83__666[0] = 6 ; goCover_faa45bc9dd83__666[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__666[2] = 666 ; goCover_faa45bc9dd83__666[3] = 1;
+	switch testFramework {
+	case "maven":goCover_faa45bc9dd83__666[4] = 1;
+		return "mvn test"
+	case "gradle":goCover_faa45bc9dd83__666[5] = 1;
+		return "gradle test"
+	case "npm":goCover_faa45bc9dd83__666[6] = 1;
+		return "npm test"
+	case "go":goCover_faa45bc9dd83__666[7] = 1;
+		return "go test -v ./..."
+	default:goCover_faa45bc9dd83__666[8] = 1;
+		return "make test"
+	}
+}
+
+func (v *SandboxValidator) isBuildSuccessful(buildTool string, output string) bool {goCover_faa45bc9dd83__667[0] = 6 ; goCover_faa45bc9dd83__667[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__667[2] = 667 ; goCover_faa45bc9dd83__667[3] = 1;
+	switch buildTool {
+	case "maven":goCover_faa45bc9dd83__667[4] = 1;
+		return strings.Contains(output, "BUILD SUCCESS")
+	case "gradle":goCover_faa45bc9dd83__667[5] = 1;
+		return strings.Contains(output, "BUILD SUCCESSFUL")
+	case "npm":goCover_faa45bc9dd83__667[6] = 1;
+		return strings.Contains(output, "Compiled successfully") ||
+			strings.Contains(output, "✓ Compiled")
+	case "go":goCover_faa45bc9dd83__667[7] = 1;
+		// Go build is successful if there are no error lines
+		return !strings.Contains(output, "error:") && !strings.Contains(output, "cannot")
+	default:goCover_faa45bc9dd83__667[8] = 1;
+		return !strings.Contains(strings.ToLower(output), "error") &&
+			!strings.Contains(strings.ToLower(output), "failed")
+	}
+}
+
+// Parse errors for different build tools
+func (v *SandboxValidator) parseMavenErrors(output string) []ValidationBuildError {goCover_faa45bc9dd83__668[0] = 4 ; goCover_faa45bc9dd83__668[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__668[2] = 668 ; goCover_faa45bc9dd83__668[3] = 1;
+	var errors []ValidationBuildError
+
+	// Pattern: [ERROR] /path/to/file.java:[line,column] error message
+	re := regexp.MustCompile(`\[ERROR\]\s+([^:]+):?\[(\d+),(\d+)\]\s+(.+)`)
+	matches := re.FindAllStringSubmatch(output, -1)
+
+	for _, match := range matches {goCover_faa45bc9dd83__668[5] = 1;
+		if len(match) >= 5 {goCover_faa45bc9dd83__668[6] = 1;
+			line, _ := strconv.Atoi(match[2])
+			column, _ := strconv.Atoi(match[3])
+			errors = append(errors, ValidationBuildError{
+				Type:    "compilation",
+				File:    match[1],
+				Line:    line,
+				Column:  column,
+				Message: match[4],
+			})
+		}
+	}
+
+	goCover_faa45bc9dd83__668[4] = 1;return errors
+}
+
+func (v *SandboxValidator) parseGradleErrors(output string) []ValidationBuildError {goCover_faa45bc9dd83__669[0] = 4 ; goCover_faa45bc9dd83__669[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__669[2] = 669 ; goCover_faa45bc9dd83__669[3] = 1;
+	var errors []ValidationBuildError
+
+	// Pattern: File.java:line: error: message
+	re := regexp.MustCompile(`([^:]+):(\d+):\s*(?:error:\s*)?(.+)`)
+	matches := re.FindAllStringSubmatch(output, -1)
+
+	for _, match := range matches {goCover_faa45bc9dd83__669[5] = 1;
+		if len(match) >= 4 && strings.Contains(match[0], "error") {goCover_faa45bc9dd83__669[6] = 1;
+			line, _ := strconv.Atoi(match[2])
+			errors = append(errors, ValidationBuildError{
+				Type:    "compilation",
+				File:    match[1],
+				Line:    line,
+				Message: match[3],
+			})
+		}
+	}
+
+	goCover_faa45bc9dd83__669[4] = 1;return errors
+}
+
+func (v *SandboxValidator) parseNpmErrors(output string) []ValidationBuildError {goCover_faa45bc9dd83__670[0] = 5 ; goCover_faa45bc9dd83__670[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__670[2] = 670 ; goCover_faa45bc9dd83__670[3] = 1;
+	var errors []ValidationBuildError
+
+	// Generic error parsing for npm
+	if strings.Contains(output, "ERROR in") {goCover_faa45bc9dd83__670[5] = 1;
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {goCover_faa45bc9dd83__670[6] = 1;
+			if strings.Contains(line, "ERROR in") {goCover_faa45bc9dd83__670[7] = 1;
+				errors = append(errors, ValidationBuildError{
+					Type:    "build",
+					Message: strings.TrimSpace(line),
+				})
+			}
+		}
+	}
+
+	goCover_faa45bc9dd83__670[4] = 1;return errors
+}
+
+func (v *SandboxValidator) parseGoErrors(output string) []ValidationBuildError {goCover_faa45bc9dd83__671[0] = 4 ; goCover_faa45bc9dd83__671[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__671[2] = 671 ; goCover_faa45bc9dd83__671[3] = 1;
+	var errors []ValidationBuildError
+
+	// Pattern: ./file.go:line:column: error message
+	re := regexp.MustCompile(`([^:]+):(\d+):(\d+):\s+(.+)`)
+	matches := re.FindAllStringSubmatch(output, -1)
+
+	for _, match := range matches {goCover_faa45bc9dd83__671[5] = 1;
+		if len(match) >= 5 {goCover_faa45bc9dd83__671[6] = 1;
+			line, _ := strconv.Atoi(match[2])
+			column, _ := strconv.Atoi(match[3])
+			errors = append(errors, ValidationBuildError{
+				Type:    "compilation",
+				File:    match[1],
+				Line:    line,
+				Column:  column,
+				Message: match[4],
+			})
+		}
+	}
+
+	goCover_faa45bc9dd83__671[4] = 1;return errors
+}
+
+func (v *SandboxValidator) parseBuildWarnings(buildTool string, output string) []string {goCover_faa45bc9dd83__672[0] = 4 ; goCover_faa45bc9dd83__672[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__672[2] = 672 ; goCover_faa45bc9dd83__672[3] = 1;
+	var warnings []string
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {goCover_faa45bc9dd83__672[5] = 1;
+		if strings.Contains(strings.ToLower(line), "warning") {goCover_faa45bc9dd83__672[6] = 1;
+			warnings = append(warnings, strings.TrimSpace(line))
+		}
+	}
+
+	goCover_faa45bc9dd83__672[4] = 1;return warnings
+}
+
+func (v *SandboxValidator) collectBuildArtifacts(sandboxID string, buildTool string) []string {goCover_faa45bc9dd83__673[0] = 6 ; goCover_faa45bc9dd83__673[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__673[2] = 673 ; goCover_faa45bc9dd83__673[3] = 1;
+	// This would normally check for build artifacts in the sandbox
+	// For now, return expected artifact paths
+	switch buildTool {
+	case "maven":goCover_faa45bc9dd83__673[4] = 1;
+		return []string{"target/classes"}
+	case "gradle":goCover_faa45bc9dd83__673[5] = 1;
+		return []string{"build/classes"}
+	case "npm":goCover_faa45bc9dd83__673[6] = 1;
+		return []string{"dist", "build"}
+	case "go":goCover_faa45bc9dd83__673[7] = 1;
+		return []string{"bin"}
+	default:goCover_faa45bc9dd83__673[8] = 1;
+		return []string{}
+	}
+}
+
+// Parse test results for different frameworks
+func (v *SandboxValidator) parseTestResults(framework string, output string, result *TestValidationResult) {goCover_faa45bc9dd83__674[0] = 5 ; goCover_faa45bc9dd83__674[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__674[2] = 674 ; goCover_faa45bc9dd83__674[3] = 1;
+	switch framework {
+	case "maven":goCover_faa45bc9dd83__674[4] = 1;
+		v.parseMavenTestResults(output, result)
+	case "gradle":goCover_faa45bc9dd83__674[5] = 1;
+		v.parseGradleTestResults(output, result)
+	case "npm":goCover_faa45bc9dd83__674[6] = 1;
+		v.parseNpmTestResults(output, result)
+	case "go":goCover_faa45bc9dd83__674[7] = 1;
+		v.parseGoTestResults(output, result)
+	}
+}
+
+func (v *SandboxValidator) parseMavenTestResults(output string, result *TestValidationResult) {goCover_faa45bc9dd83__675[0] = 2 ; goCover_faa45bc9dd83__675[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__675[2] = 675 ; goCover_faa45bc9dd83__675[3] = 1;
+	// Pattern: Tests run: X, Failures: Y, Errors: Z, Skipped: W
+	re := regexp.MustCompile(`Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)`)
+	match := re.FindStringSubmatch(output)
+
+	if len(match) >= 5 {goCover_faa45bc9dd83__675[4] = 1;
+		result.TotalTests, _ = strconv.Atoi(match[1])
+		failures, _ := strconv.Atoi(match[2])
+		errors, _ := strconv.Atoi(match[3])
+		result.SkippedTests, _ = strconv.Atoi(match[4])
+		result.FailedTests = failures + errors
+		result.PassedTests = result.TotalTests - result.FailedTests - result.SkippedTests
+	}
+}
+
+func (v *SandboxValidator) parseGradleTestResults(output string, result *TestValidationResult) {goCover_faa45bc9dd83__676[0] = 3 ; goCover_faa45bc9dd83__676[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__676[2] = 676 ; goCover_faa45bc9dd83__676[3] = 1;
+	// Pattern: X tests completed, Y passed, Z failed
+	re := regexp.MustCompile(`(\d+)\s+tests?\s+completed(?:,\s*(\d+)\s+passed)?`)
+	match := re.FindStringSubmatch(output)
+
+	if len(match) >= 2 {goCover_faa45bc9dd83__676[4] = 1;
+		result.TotalTests, _ = strconv.Atoi(match[1])
+		if len(match) >= 3 && match[2] != "" {goCover_faa45bc9dd83__676[5] = 1;
+			result.PassedTests, _ = strconv.Atoi(match[2])
+			result.FailedTests = result.TotalTests - result.PassedTests
+		}
+	}
+}
+
+func (v *SandboxValidator) parseNpmTestResults(output string, result *TestValidationResult) {goCover_faa45bc9dd83__677[0] = 3 ; goCover_faa45bc9dd83__677[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__677[2] = 677 ; goCover_faa45bc9dd83__677[3] = 1;
+	// Simple pass/fail detection for npm tests
+	if strings.Contains(output, "PASS") {goCover_faa45bc9dd83__677[4] = 1;
+		result.Success = true
+		// Try to extract test counts if available
+		re := regexp.MustCompile(`(\d+)\s+pass(?:ing|ed)`)
+		match := re.FindStringSubmatch(output)
+		if len(match) >= 2 {goCover_faa45bc9dd83__677[5] = 1;
+			result.PassedTests, _ = strconv.Atoi(match[1])
+			result.TotalTests = result.PassedTests
+		}
+	}
+}
+
+func (v *SandboxValidator) parseGoTestResults(output string, result *TestValidationResult) {goCover_faa45bc9dd83__678[0] = 6 ; goCover_faa45bc9dd83__678[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__678[2] = 678 ; goCover_faa45bc9dd83__678[3] = 1;
+	// Count PASS and FAIL lines
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {goCover_faa45bc9dd83__678[5] = 1;
+		if strings.HasPrefix(line, "ok") || strings.Contains(line, "PASS") {goCover_faa45bc9dd83__678[6] = 1;
+			result.PassedTests++
+		} else{ goCover_faa45bc9dd83__678[7] = 1;if strings.Contains(line, "FAIL") {goCover_faa45bc9dd83__678[8] = 1;
+			result.FailedTests++
+		}}
+	}
+	goCover_faa45bc9dd83__678[4] = 1;result.TotalTests = result.PassedTests + result.FailedTests
+}
+
+func (v *SandboxValidator) parseCoverage(framework string, output string) float64 {goCover_faa45bc9dd83__679[0] = 3 ; goCover_faa45bc9dd83__679[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__679[2] = 679 ; goCover_faa45bc9dd83__679[3] = 1;
+	// Generic coverage parsing
+	re := regexp.MustCompile(`coverage:\s*(\d+(?:\.\d+)?)\s*%`)
+	match := re.FindStringSubmatch(output)
+
+	if len(match) >= 2 {goCover_faa45bc9dd83__679[5] = 1;
+		coverage, _ := strconv.ParseFloat(match[1], 64)
+		return coverage
+	}
+
+	goCover_faa45bc9dd83__679[4] = 1;return 0.0
+}

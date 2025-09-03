@@ -1,0 +1,386 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/handler_transformation_async.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+)
+
+// ExecuteTransformationAsync handles POST /v1/arf/transform with async execution
+func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {goCover_faa45bc9dd83__238[0] = 15 ; goCover_faa45bc9dd83__238[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__238[2] = 238 ; goCover_faa45bc9dd83__238[3] = 1;
+	var req TransformRequest
+	if err := c.BodyParser(&req); err != nil {goCover_faa45bc9dd83__238[11] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Invalid request format",
+			"details": err.Error(),
+		})
+	}
+
+	// Validate required fields
+	goCover_faa45bc9dd83__238[4] = 1;if req.RecipeID == "" {goCover_faa45bc9dd83__238[12] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "recipe_id is required",
+		})
+	}
+
+	goCover_faa45bc9dd83__238[5] = 1;if req.Codebase.Repository == "" {goCover_faa45bc9dd83__238[13] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "codebase.repository is required",
+		})
+	}
+
+	// Set default branch if not specified
+	goCover_faa45bc9dd83__238[6] = 1;if req.Codebase.Branch == "" {goCover_faa45bc9dd83__238[14] = 1;
+		req.Codebase.Branch = "main"
+	}
+
+	// Require explicit type specification
+	goCover_faa45bc9dd83__238[7] = 1;if req.Type == "" {goCover_faa45bc9dd83__238[15] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "recipe type is required - specify 'openrewrite' or other valid type",
+		})
+	}
+
+	// Generate transformation ID
+	goCover_faa45bc9dd83__238[8] = 1;transformID := uuid.New().String()
+
+	// Consul store is required for async transformations
+	if h.consulStore == nil {goCover_faa45bc9dd83__238[16] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Async transformations require Consul store to be configured",
+		})
+	}
+
+	// Store initial status in Consul immediately
+	goCover_faa45bc9dd83__238[9] = 1;initialStatus := &TransformationStatus{
+		TransformationID: transformID,
+		Status:           "initiated",
+		WorkflowStage:    req.Type, // Start with recipe type as initial stage
+		StartTime:        time.Now(),
+		Children:         []HealingAttempt{},
+	}
+
+	if err := h.consulStore.StoreTransformationStatus(c.Context(), transformID, initialStatus); err != nil {goCover_faa45bc9dd83__238[17] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to initialize transformation",
+			"details": err.Error(),
+		})
+	}
+
+	// Start background execution
+	goCover_faa45bc9dd83__238[10] = 1;go h.executeTransformationBackground(transformID, &req)
+
+	// Return immediately with status link
+	return c.JSON(fiber.Map{
+		"transformation_id": transformID,
+		"status":            "initiated",
+		"status_url":        fmt.Sprintf("/v1/arf/transforms/%s/status", transformID),
+		"message":           "Transformation started, use status_url to monitor progress",
+	})
+}
+
+// executeTransformationBackground executes the transformation in the background
+func (h *Handler) executeTransformationBackground(transformID string, req *TransformRequest) {goCover_faa45bc9dd83__239[0] = 8 ; goCover_faa45bc9dd83__239[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__239[2] = 239 ; goCover_faa45bc9dd83__239[3] = 1;
+	ctx := context.Background()
+
+	// Update status to in_progress
+	status, _ := h.consulStore.GetTransformationStatus(ctx, transformID)
+	if status != nil {goCover_faa45bc9dd83__239[5] = 1;
+		status.Status = "in_progress"
+		status.WorkflowStage = "openrewrite"
+		h.consulStore.StoreTransformationStatus(ctx, transformID, status)
+	}
+
+	// Execute transformation using existing internal method
+	goCover_faa45bc9dd83__239[4] = 1;result, err := h.executeTransformationInternal(ctx, transformID, req)
+
+	// Update final status with all result data
+	if status != nil {goCover_faa45bc9dd83__239[6] = 1;
+		if err != nil {goCover_faa45bc9dd83__239[8] = 1;
+			status.Status = "failed"
+			status.Error = err.Error()
+		} else{ goCover_faa45bc9dd83__239[9] = 1;{
+			status.Status = "completed"
+			if result != nil {goCover_faa45bc9dd83__239[10] = 1;
+				// Store all result data directly in status
+				status.RecipeID = result.RecipeID
+				status.Diff = result.Diff
+				status.FilesModified = result.FilesModified
+				status.ChangesApplied = result.ChangesApplied
+				status.ValidationScore = result.ValidationScore
+			}
+		}}
+		goCover_faa45bc9dd83__239[7] = 1;status.EndTime = time.Now()
+		h.consulStore.StoreTransformationStatus(ctx, transformID, status)
+	}
+}
+
+// GetTransformationStatusAsync handles GET /v1/arf/transforms/:id/status with Consul
+func (h *Handler) GetTransformationStatusAsync(c *fiber.Ctx) error {goCover_faa45bc9dd83__240[0] = 18 ; goCover_faa45bc9dd83__240[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__240[2] = 240 ; goCover_faa45bc9dd83__240[3] = 1;
+	transformID := c.Params("id")
+	if transformID == "" {goCover_faa45bc9dd83__240[12] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "transformation_id is required",
+		})
+	}
+
+	// Consul store is required for async transformation status
+	goCover_faa45bc9dd83__240[4] = 1;if h.consulStore == nil {goCover_faa45bc9dd83__240[13] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Async transformation status requires Consul store to be configured",
+		})
+	}
+
+	// Get status from Consul
+	goCover_faa45bc9dd83__240[5] = 1;status, err := h.consulStore.GetTransformationStatus(c.Context(), transformID)
+	if err != nil {goCover_faa45bc9dd83__240[14] = 1;
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Failed to retrieve transformation status",
+			"details": err.Error(),
+		})
+	}
+
+	goCover_faa45bc9dd83__240[6] = 1;if status == nil {goCover_faa45bc9dd83__240[15] = 1;
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Transformation not found",
+		})
+	}
+
+	// Calculate and update healing summary
+	goCover_faa45bc9dd83__240[7] = 1;if len(status.Children) > 0 || status.WorkflowStage == "heal" {goCover_faa45bc9dd83__240[16] = 1;
+		status.HealingSummary = &HealingSummary{
+			TotalAttempts:   status.TotalHealingAttempts,
+			ActiveAttempts:  status.ActiveHealingCount,
+			SuccessfulHeals: countSuccessfulHeals(status.Children),
+			FailedHeals:     countFailedHeals(status.Children),
+			MaxDepthReached: calculateMaxDepth(status.Children, 1),
+		}
+
+		// Add LLM metrics if coordinator metrics are available
+		if status.CoordinatorMetrics != nil {goCover_faa45bc9dd83__240[17] = 1;
+			status.HealingSummary.TotalLLMCalls = status.CoordinatorMetrics.TotalLLMCalls
+			status.HealingSummary.TotalLLMTokens = status.CoordinatorMetrics.TotalLLMTokens
+			status.HealingSummary.TotalLLMCost = status.CoordinatorMetrics.TotalLLMCost
+			status.HealingSummary.LLMCacheHitRate = status.CoordinatorMetrics.LLMCacheHitRate
+		}
+	}
+
+	// Add progress information if in progress
+	goCover_faa45bc9dd83__240[8] = 1;if status.Status == "in_progress" && status.Progress == nil {goCover_faa45bc9dd83__240[18] = 1;
+		status.Progress = calculateProgress(status)
+	}
+
+	// Populate sandbox information
+	goCover_faa45bc9dd83__240[9] = 1;status.SandboxInfo = h.getSandboxInfo(c.Context(), transformID, status)
+
+	// Add active attempts if any
+	if status.ActiveHealingCount > 0 {goCover_faa45bc9dd83__240[19] = 1;
+		activeAttempts, _ := h.consulStore.GetActiveHealingAttempts(c.Context(), transformID)
+		// Enhance children with progress for active attempts
+		enhanceActiveAttempts(status.Children, activeAttempts)
+	}
+
+	// Add healing coordinator metrics if available
+	goCover_faa45bc9dd83__240[10] = 1;if h.healingCoordinator != nil && h.healingCoordinator.IsRunning() {goCover_faa45bc9dd83__240[20] = 1;
+		metrics := h.healingCoordinator.GetMetrics()
+		status.CoordinatorMetrics = &metrics
+	}
+
+	// Return the complete status structure
+	goCover_faa45bc9dd83__240[11] = 1;return c.JSON(status)
+}
+
+// Helper functions for healing metrics
+func countSuccessfulHeals(attempts []HealingAttempt) int {goCover_faa45bc9dd83__241[0] = 5 ; goCover_faa45bc9dd83__241[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__241[2] = 241 ; goCover_faa45bc9dd83__241[3] = 1;
+	count := 0
+	for _, attempt := range attempts {goCover_faa45bc9dd83__241[5] = 1;
+		if attempt.Status == "completed" && attempt.Result == "success" {goCover_faa45bc9dd83__241[7] = 1;
+			count++
+		}
+		goCover_faa45bc9dd83__241[6] = 1;count += countSuccessfulHeals(attempt.Children)
+	}
+	goCover_faa45bc9dd83__241[4] = 1;return count
+}
+
+func countFailedHeals(attempts []HealingAttempt) int {goCover_faa45bc9dd83__242[0] = 5 ; goCover_faa45bc9dd83__242[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__242[2] = 242 ; goCover_faa45bc9dd83__242[3] = 1;
+	count := 0
+	for _, attempt := range attempts {goCover_faa45bc9dd83__242[5] = 1;
+		if attempt.Status == "completed" && attempt.Result == "failed" {goCover_faa45bc9dd83__242[7] = 1;
+			count++
+		}
+		goCover_faa45bc9dd83__242[6] = 1;count += countFailedHeals(attempt.Children)
+	}
+	goCover_faa45bc9dd83__242[4] = 1;return count
+}
+
+func calculateMaxDepth(attempts []HealingAttempt, currentDepth int) int {goCover_faa45bc9dd83__243[0] = 6 ; goCover_faa45bc9dd83__243[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__243[2] = 243 ; goCover_faa45bc9dd83__243[3] = 1;
+	if len(attempts) == 0 {goCover_faa45bc9dd83__243[6] = 1;
+		return currentDepth - 1
+	}
+
+	goCover_faa45bc9dd83__243[4] = 1;maxDepth := currentDepth
+	for _, attempt := range attempts {goCover_faa45bc9dd83__243[7] = 1;
+		childDepth := calculateMaxDepth(attempt.Children, currentDepth+1)
+		if childDepth > maxDepth {goCover_faa45bc9dd83__243[8] = 1;
+			maxDepth = childDepth
+		}
+	}
+	goCover_faa45bc9dd83__243[5] = 1;return maxDepth
+}
+
+// calculateProgress determines the current progress percentage based on workflow stage
+func calculateProgress(status *TransformationStatus) *TransformationProgress {goCover_faa45bc9dd83__244[0] = 10 ; goCover_faa45bc9dd83__244[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__244[2] = 244 ; goCover_faa45bc9dd83__244[3] = 1;
+	progress := &TransformationProgress{
+		Stage: status.WorkflowStage,
+	}
+
+	// Calculate percentage based on workflow stage
+	switch status.WorkflowStage {
+	case "openrewrite":goCover_faa45bc9dd83__244[5] = 1;
+		progress.PercentComplete = 25
+		progress.Message = "Executing transformation recipe"
+	case "build":goCover_faa45bc9dd83__244[6] = 1;
+		progress.PercentComplete = 50
+		progress.Message = "Building transformed code"
+	case "deploy":goCover_faa45bc9dd83__244[7] = 1;
+		progress.PercentComplete = 60
+		progress.Message = "Deploying to sandbox environment"
+	case "test":goCover_faa45bc9dd83__244[8] = 1;
+		progress.PercentComplete = 75
+		progress.Message = "Running test suites"
+	case "heal":goCover_faa45bc9dd83__244[9] = 1;
+		// For healing, calculate based on completed attempts
+		if status.TotalHealingAttempts > 0 {goCover_faa45bc9dd83__244[11] = 1;
+			completedAttempts := countCompletedAttempts(status.Children)
+			progress.PercentComplete = 75 + (25 * completedAttempts / status.TotalHealingAttempts)
+			progress.Message = fmt.Sprintf("Healing in progress (%d/%d attempts)", completedAttempts, status.TotalHealingAttempts)
+		} else{ goCover_faa45bc9dd83__244[12] = 1;{
+			progress.PercentComplete = 80
+			progress.Message = "Analyzing errors for healing"
+		}}
+	default:goCover_faa45bc9dd83__244[10] = 1;
+		progress.PercentComplete = 10
+		progress.Message = "Initializing transformation"
+	}
+
+	goCover_faa45bc9dd83__244[4] = 1;return progress
+}
+
+// countCompletedAttempts counts all completed healing attempts recursively
+func countCompletedAttempts(attempts []HealingAttempt) int {goCover_faa45bc9dd83__245[0] = 5 ; goCover_faa45bc9dd83__245[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__245[2] = 245 ; goCover_faa45bc9dd83__245[3] = 1;
+	count := 0
+	for _, attempt := range attempts {goCover_faa45bc9dd83__245[5] = 1;
+		if attempt.Status == "completed" {goCover_faa45bc9dd83__245[7] = 1;
+			count++
+		}
+		goCover_faa45bc9dd83__245[6] = 1;count += countCompletedAttempts(attempt.Children)
+	}
+	goCover_faa45bc9dd83__245[4] = 1;return count
+}
+
+// getSandboxInfo retrieves sandbox deployment information for the transformation
+func (h *Handler) getSandboxInfo(ctx context.Context, transformID string, status *TransformationStatus) *TransformationSandboxInfo {goCover_faa45bc9dd83__246[0] = 10 ; goCover_faa45bc9dd83__246[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__246[2] = 246 ; goCover_faa45bc9dd83__246[3] = 1;
+	if h.sandboxMgr == nil {goCover_faa45bc9dd83__246[8] = 1;
+		return nil
+	}
+
+	goCover_faa45bc9dd83__246[4] = 1;info := &TransformationSandboxInfo{
+		HealingSandboxes: []SandboxDeployment{},
+	}
+
+	// Get primary sandbox if exists
+	if status.WorkflowStage != "openrewrite" && status.WorkflowStage != "" {goCover_faa45bc9dd83__246[9] = 1;
+		primarySandbox := h.getSandboxDeployment(ctx, transformID, "primary")
+		if primarySandbox != nil {goCover_faa45bc9dd83__246[10] = 1;
+			info.PrimarySandbox = primarySandbox
+		}
+	}
+
+	// Get healing sandboxes
+	goCover_faa45bc9dd83__246[5] = 1;if len(status.Children) > 0 {goCover_faa45bc9dd83__246[11] = 1;
+		info.HealingSandboxes = h.getHealingSandboxes(ctx, status.Children)
+	}
+
+	goCover_faa45bc9dd83__246[6] = 1;if info.PrimarySandbox == nil && len(info.HealingSandboxes) == 0 {goCover_faa45bc9dd83__246[12] = 1;
+		return nil
+	}
+
+	goCover_faa45bc9dd83__246[7] = 1;return info
+}
+
+// getSandboxDeployment retrieves deployment info for a specific sandbox
+func (h *Handler) getSandboxDeployment(ctx context.Context, transformID, sandboxType string) *SandboxDeployment {goCover_faa45bc9dd83__247[0] = 1 ; goCover_faa45bc9dd83__247[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__247[2] = 247 ; goCover_faa45bc9dd83__247[3] = 1;
+	// This is a placeholder - actual implementation would query sandbox manager
+	// For now, return mock data to demonstrate the structure
+	sandboxID := fmt.Sprintf("sandbox-%s-%s", transformID[:8], sandboxType)
+
+	return &SandboxDeployment{
+		TransformationID: transformID,
+		SandboxID:        sandboxID,
+		DeploymentURL:    fmt.Sprintf("https://%s.ployd.app", sandboxID),
+		BuildStatus:      "success",
+		TestStatus:       "in_progress",
+		CreatedAt:        time.Now().Add(-10 * time.Minute),
+		LastUpdated:      time.Now(),
+	}
+}
+
+// getHealingSandboxes retrieves sandbox info for healing attempts
+func (h *Handler) getHealingSandboxes(ctx context.Context, attempts []HealingAttempt) []SandboxDeployment {goCover_faa45bc9dd83__248[0] = 6 ; goCover_faa45bc9dd83__248[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__248[2] = 248 ; goCover_faa45bc9dd83__248[3] = 1;
+	var sandboxes []SandboxDeployment
+
+	for _, attempt := range attempts {goCover_faa45bc9dd83__248[5] = 1;
+		if attempt.Status == "in_progress" || attempt.Status == "completed" {goCover_faa45bc9dd83__248[7] = 1;
+			if attempt.SandboxID != "" {goCover_faa45bc9dd83__248[8] = 1;
+				sandbox := SandboxDeployment{
+					TransformationID: attempt.TransformationID,
+					SandboxID:        attempt.SandboxID,
+					DeploymentURL:    fmt.Sprintf("https://%s.ployd.app", attempt.SandboxID),
+					BuildStatus:      "success",
+					TestStatus:       attempt.Status,
+					CreatedAt:        attempt.StartTime,
+					LastUpdated:      time.Now(),
+				}
+				sandboxes = append(sandboxes, sandbox)
+			}
+		}
+
+		// Recursively get sandboxes from children
+		goCover_faa45bc9dd83__248[6] = 1;childSandboxes := h.getHealingSandboxes(ctx, attempt.Children)
+		sandboxes = append(sandboxes, childSandboxes...)
+	}
+
+	goCover_faa45bc9dd83__248[4] = 1;return sandboxes
+}
+
+// enhanceActiveAttempts adds progress information to active healing attempts
+func enhanceActiveAttempts(attempts []HealingAttempt, activeIDs []string) {goCover_faa45bc9dd83__249[0] = 3 ; goCover_faa45bc9dd83__249[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__249[2] = 249 ; goCover_faa45bc9dd83__249[3] = 1;
+	activeMap := make(map[string]bool)
+	for _, id := range activeIDs {goCover_faa45bc9dd83__249[5] = 1;
+		activeMap[id] = true
+	}
+
+	goCover_faa45bc9dd83__249[4] = 1;enhanceAttemptsRecursive(attempts, activeMap)
+}
+
+// enhanceAttemptsRecursive recursively adds progress to active attempts
+func enhanceAttemptsRecursive(attempts []HealingAttempt, activeMap map[string]bool) {goCover_faa45bc9dd83__250[0] = 5 ; goCover_faa45bc9dd83__250[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__250[2] = 250 ; goCover_faa45bc9dd83__250[3] = 1;
+	for i := range attempts {goCover_faa45bc9dd83__250[4] = 1;
+		if activeMap[attempts[i].TransformationID] && attempts[i].Status == "in_progress" {goCover_faa45bc9dd83__250[6] = 1;
+			// Add progress information for active attempts
+			if attempts[i].Progress == nil {goCover_faa45bc9dd83__250[7] = 1;
+				attempts[i].Progress = &TransformationProgress{
+					Stage:           "build_validation",
+					PercentComplete: 45,
+					Message:         "Validating healing transformation",
+				}
+			}
+		}
+		// Recursively enhance children
+		goCover_faa45bc9dd83__250[5] = 1;enhanceAttemptsRecursive(attempts[i].Children, activeMap)
+	}
+}

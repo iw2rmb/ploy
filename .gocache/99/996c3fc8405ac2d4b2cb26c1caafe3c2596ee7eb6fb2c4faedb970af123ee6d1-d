@@ -1,0 +1,117 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/transformation_internal.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+// GetTransformationResult handles GET /v1/arf/transforms/:id (legacy endpoint)
+func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {goCover_faa45bc9dd83__731[0] = 7 ; goCover_faa45bc9dd83__731[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__731[2] = 731 ; goCover_faa45bc9dd83__731[3] = 1;
+	transformID := c.Params("id")
+	if transformID == "" {goCover_faa45bc9dd83__731[7] = 1;
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "transformation_id is required",
+		})
+	}
+
+	// Get transformation status from Consul
+	goCover_faa45bc9dd83__731[4] = 1;status, err := h.consulStore.GetTransformationStatus(c.Context(), transformID)
+	if err != nil || status == nil {goCover_faa45bc9dd83__731[8] = 1;
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "transformation not found",
+		})
+	}
+
+	// Build TransformationResult from status
+	goCover_faa45bc9dd83__731[5] = 1;result := &TransformationResult{
+		TransformationID: status.TransformationID,
+		RecipeID:         status.RecipeID,
+		StartTime:        status.StartTime,
+		EndTime:          status.EndTime,
+		Success:          status.Status == "completed",
+		ChangesApplied:   status.ChangesApplied,
+		FilesModified:    status.FilesModified,
+		Diff:             status.Diff,
+		ValidationScore:  status.ValidationScore,
+		ExecutionTime:    status.EndTime.Sub(status.StartTime),
+	}
+
+	// Set TotalFiles based on FilesModified
+	if result.FilesModified != nil {goCover_faa45bc9dd83__731[9] = 1;
+		result.TotalFiles = len(result.FilesModified)
+	}
+
+	goCover_faa45bc9dd83__731[6] = 1;return c.JSON(result)
+}
+
+// executeTransformationInternal executes transformation with basic tracking
+func (h *Handler) executeTransformationInternal(ctx context.Context, transformID string, req *TransformRequest) (*TransformationResult, error) {goCover_faa45bc9dd83__732[0] = 13 ; goCover_faa45bc9dd83__732[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__732[2] = 732 ; goCover_faa45bc9dd83__732[3] = 1;
+	transformStartTime := time.Now()
+	fmt.Printf("[ARF Transform Internal] Starting internal transformation for ID: %s at %v\n", transformID, transformStartTime)
+
+	// Create workspace directory
+	workspaceDir := filepath.Join("/tmp", "arf-transformations", transformID)
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {goCover_faa45bc9dd83__732[9] = 1;
+		return nil, fmt.Errorf("failed to create workspace: %w", err)
+	}
+	goCover_faa45bc9dd83__732[4] = 1;defer func() {goCover_faa45bc9dd83__732[10] = 1;
+		// Clean up workspace after transformation
+		os.RemoveAll(workspaceDir)
+	}()
+
+	// Clone repository (simplified)
+	goCover_faa45bc9dd83__732[5] = 1;repoPath := filepath.Join(workspaceDir, "repository")
+	fmt.Printf("[DEBUG] [%s] Starting repository cloning stage\n", transformID)
+	fmt.Printf("[DEBUG] [%s] Repository URL: %s, Branch: %s, Target: %s\n", transformID, req.Codebase.Repository, req.Codebase.Branch, repoPath)
+	fmt.Printf("[DEBUG] [%s] About to call cloneRepositoryWithInfo...\n", transformID)
+
+	if err := h.cloneRepository(req.Codebase.Repository, req.Codebase.Branch, repoPath); err != nil {goCover_faa45bc9dd83__732[11] = 1;
+		return nil, fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	// Execute recipe using the recipe executor
+	goCover_faa45bc9dd83__732[6] = 1;if h.recipeExecutor == nil {goCover_faa45bc9dd83__732[12] = 1;
+		return nil, fmt.Errorf("recipe executor not available")
+	}
+
+	goCover_faa45bc9dd83__732[7] = 1;result, err := h.recipeExecutor.ExecuteRecipeByID(ctx, req.RecipeID, repoPath, req.Type, transformID)
+	if err != nil {goCover_faa45bc9dd83__732[13] = 1;
+		// Check if this is a "recipe not found" error and handle appropriately
+		if isNotFoundError(err) {goCover_faa45bc9dd83__732[15] = 1;
+			return nil, &NotFoundError{Message: fmt.Sprintf("recipe not found: %s", req.RecipeID)}
+		}
+		goCover_faa45bc9dd83__732[14] = 1;return nil, fmt.Errorf("recipe execution failed: %w", err)
+	}
+
+	goCover_faa45bc9dd83__732[8] = 1;return result, nil
+}
+
+// cloneRepository clones a git repository to the specified path
+func (h *Handler) cloneRepository(repoURL, branch, targetPath string) error {goCover_faa45bc9dd83__733[0] = 5 ; goCover_faa45bc9dd83__733[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__733[2] = 733 ; goCover_faa45bc9dd83__733[3] = 1;
+	args := []string{"clone", "--depth=1"}
+	if branch != "" {goCover_faa45bc9dd83__733[6] = 1;
+		args = append(args, "--branch", branch)
+	}
+	goCover_faa45bc9dd83__733[4] = 1;args = append(args, repoURL, targetPath)
+
+	fmt.Printf("[DEBUG] Git command: git %v\n", args)
+	cmd := exec.Command("git", args...)
+	if err := cmd.Run(); err != nil {goCover_faa45bc9dd83__733[7] = 1;
+		return fmt.Errorf("git clone failed: %w", err)
+	}
+	goCover_faa45bc9dd83__733[5] = 1;return nil
+}
+
+// Helper function to check if error is a not found error
+func isNotFoundError(err error) bool {goCover_faa45bc9dd83__734[0] = 1 ; goCover_faa45bc9dd83__734[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__734[2] = 734 ; goCover_faa45bc9dd83__734[3] = 1;
+	return err != nil && (err.Error() == "recipe not found" ||
+		err.Error() == "recipe not available" ||
+		err.Error() == "no matching recipe")
+}

@@ -1,0 +1,252 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/recipe_executor.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/iw2rmb/ploy/api/arf/models"
+	"gopkg.in/yaml.v3"
+)
+
+// RecipeExecutor executes transformation recipes
+type RecipeExecutor struct {
+	storage               RecipeStorage
+	sandboxMgr            SandboxManager
+	openRewriteEngine     *OpenRewriteEngine
+	openRewriteDispatcher *OpenRewriteDispatcher
+}
+
+// NewRecipeExecutor creates a new recipe executor
+// The dispatcher parameter is optional and can be nil if OpenRewrite support is not needed
+func NewRecipeExecutor(storage RecipeStorage, sandboxMgr SandboxManager, dispatcher *OpenRewriteDispatcher) *RecipeExecutor {goCover_faa45bc9dd83__595[0] = 1 ; goCover_faa45bc9dd83__595[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__595[2] = 595 ; goCover_faa45bc9dd83__595[3] = 1;
+	return &RecipeExecutor{
+		storage:               storage,
+		sandboxMgr:            sandboxMgr,
+		openRewriteEngine:     NewOpenRewriteEngine(),
+		openRewriteDispatcher: dispatcher,
+	}
+}
+
+// ExecuteRecipeByID executes a recipe by ID against a repository
+// Uses unified execution path based on recipe type
+func (e *RecipeExecutor) ExecuteRecipeByID(ctx context.Context, recipeID string, repoPath string, recipeType string, transformationID string) (*TransformationResult, error) {goCover_faa45bc9dd83__596[0] = 13 ; goCover_faa45bc9dd83__596[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__596[2] = 596 ; goCover_faa45bc9dd83__596[3] = 1;
+	fmt.Printf("[RecipeExecutor] Starting unified recipe execution: recipe=%s, type=%s, repoPath=%s\n", recipeID, recipeType, repoPath)
+
+	// Unified execution path: OpenRewrite recipes ALWAYS go through dispatcher
+	if recipeType == "openrewrite" {goCover_faa45bc9dd83__596[6] = 1;
+		if e.openRewriteDispatcher == nil {goCover_faa45bc9dd83__596[10] = 1;
+			fmt.Printf("[RecipeExecutor] ERROR: Recipe %s is OpenRewrite but dispatcher is nil - check server initialization\n", recipeID)
+			return nil, fmt.Errorf("OpenRewrite recipe %s cannot be executed: dispatcher not initialized (check Nomad/SeaweedFS connectivity)", recipeID)
+		}
+
+		goCover_faa45bc9dd83__596[7] = 1;fmt.Printf("[RecipeExecutor] OpenRewrite recipe - using unified dispatcher execution path\n")
+
+		// Parse OpenRewrite recipe ID to get Maven coordinates
+		req, parseErr := ParseOpenRewriteRecipeID(recipeID)
+		if parseErr != nil {goCover_faa45bc9dd83__596[11] = 1;
+			fmt.Printf("[RecipeExecutor] Failed to parse OpenRewrite recipe ID %s: %v\n", recipeID, parseErr)
+			return nil, fmt.Errorf("failed to parse OpenRewrite recipe ID %s: %w", recipeID, parseErr)
+		}
+
+		// Set the repository path and transformation ID
+		goCover_faa45bc9dd83__596[8] = 1;req.RepoPath = repoPath
+		req.TransformationID = transformationID
+
+		fmt.Printf("[RecipeExecutor] Dispatching recipe %s to OpenRewrite engine using openrewrite-jvm:latest (transformationID: %s)\n", recipeID, transformationID)
+
+		// Add timeout context for dispatcher call (inherit from parent context)
+		dispatcherCtx, cancel := context.WithTimeout(ctx, 25*time.Minute)
+		defer cancel()
+
+		dispatcherStart := time.Now()
+
+		// Dispatch to Nomad for unified execution using openrewrite-jvm:latest
+		result, execErr := e.openRewriteDispatcher.ExecuteOpenRewriteRecipe(dispatcherCtx, req)
+		if execErr != nil {goCover_faa45bc9dd83__596[12] = 1;
+			if dispatcherCtx.Err() == context.DeadlineExceeded {goCover_faa45bc9dd83__596[14] = 1;
+				fmt.Printf("[RecipeExecutor] OpenRewrite dispatcher timed out after 25m for recipe %s\n", recipeID)
+				return nil, fmt.Errorf("OpenRewrite dispatcher timed out for recipe %s after 25 minutes", recipeID)
+			}
+			goCover_faa45bc9dd83__596[13] = 1;fmt.Printf("[RecipeExecutor] Failed to execute recipe %s: %v\n", recipeID, execErr)
+			return nil, fmt.Errorf("failed to execute OpenRewrite recipe %s via dispatcher: %w", recipeID, execErr)
+		}
+
+		goCover_faa45bc9dd83__596[9] = 1;fmt.Printf("[RecipeExecutor] OpenRewrite recipe %s executed successfully after %v\n", recipeID, time.Since(dispatcherStart))
+		return result, nil
+	}
+
+	// Non-OpenRewrite recipes: try storage first
+	goCover_faa45bc9dd83__596[4] = 1;recipe, err := e.storage.GetRecipe(ctx, recipeID)
+	if err != nil {goCover_faa45bc9dd83__596[15] = 1;
+		fmt.Printf("[RecipeExecutor] Recipe %s not found in storage and not OpenRewrite type (type=%s)\n", recipeID, recipeType)
+		return nil, fmt.Errorf("failed to load recipe %s: %w", recipeID, err)
+	}
+
+	goCover_faa45bc9dd83__596[5] = 1;fmt.Printf("[RecipeExecutor] Non-OpenRewrite recipe %s found in storage, executing\n", recipeID)
+	return e.ExecuteRecipeObject(ctx, recipe, repoPath)
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {goCover_faa45bc9dd83__597[0] = 3 ; goCover_faa45bc9dd83__597[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__597[2] = 597 ; goCover_faa45bc9dd83__597[3] = 1;
+	if a < b {goCover_faa45bc9dd83__597[5] = 1;
+		return a
+	}
+	goCover_faa45bc9dd83__597[4] = 1;return b
+}
+
+// ExecuteRecipeObject executes a recipe object against a repository
+func (e *RecipeExecutor) ExecuteRecipeObject(ctx context.Context, recipe *models.Recipe, repoPath string) (*TransformationResult, error) {goCover_faa45bc9dd83__598[0] = 12 ; goCover_faa45bc9dd83__598[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__598[2] = 598 ; goCover_faa45bc9dd83__598[3] = 1;
+	startTime := time.Now()
+
+	result := &TransformationResult{
+		RecipeID:       recipe.ID,
+		Success:        true,
+		ChangesApplied: 0,
+		FilesModified:  []string{},
+	}
+
+	// Execute each step
+	for i, step := range recipe.Steps {goCover_faa45bc9dd83__598[5] = 1;
+		stepResult, err := e.executeStep(ctx, &step, repoPath)
+		if err != nil {goCover_faa45bc9dd83__598[7] = 1;
+			// Handle error based on step's error policy
+			switch step.OnError {
+			case models.ErrorActionFail:goCover_faa45bc9dd83__598[8] = 1;
+				result.Success = false
+				result.Errors = append(result.Errors, TransformationError{
+					Type:    "step_failure",
+					Message: fmt.Sprintf("Step %d (%s) failed: %v", i+1, step.Name, err),
+				})
+				return result, nil
+			case models.ErrorActionContinue:goCover_faa45bc9dd83__598[9] = 1;
+				// Log and continue
+				fmt.Printf("Warning: Step %d (%s) failed: %v\n", i+1, step.Name, err)
+				continue
+			case models.ErrorActionRollback:goCover_faa45bc9dd83__598[10] = 1;
+				// TODO: Implement rollback in Phase 5.3
+				result.Success = false
+				result.Errors = append(result.Errors, TransformationError{
+					Type:    "rollback_failed",
+					Message: fmt.Sprintf("Step %d (%s) failed, rollback not yet implemented: %v", i+1, step.Name, err),
+				})
+				return result, nil
+			}
+		}
+
+		// Aggregate results
+		goCover_faa45bc9dd83__598[6] = 1;if stepResult != nil {goCover_faa45bc9dd83__598[11] = 1;
+			result.ChangesApplied += stepResult.ChangesApplied
+			result.FilesModified = append(result.FilesModified, stepResult.FilesModified...)
+			if stepResult.Diff != "" {goCover_faa45bc9dd83__598[12] = 1;
+				if result.Diff != "" {goCover_faa45bc9dd83__598[14] = 1;
+					result.Diff += "\n"
+				}
+				goCover_faa45bc9dd83__598[13] = 1;result.Diff += stepResult.Diff
+			}
+		}
+	}
+
+	goCover_faa45bc9dd83__598[4] = 1;result.ExecutionTime = time.Since(startTime)
+	return result, nil
+}
+
+// executeStep executes a single recipe step
+func (e *RecipeExecutor) executeStep(ctx context.Context, step *models.RecipeStep, repoPath string) (*TransformationResult, error) {goCover_faa45bc9dd83__599[0] = 12 ; goCover_faa45bc9dd83__599[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__599[2] = 599 ; goCover_faa45bc9dd83__599[3] = 1;
+	// Check conditions
+	if !e.checkConditions(step.Conditions, repoPath) {goCover_faa45bc9dd83__599[6] = 1;
+		return nil, nil // Skip step
+	}
+
+	// Apply timeout if specified
+	goCover_faa45bc9dd83__599[4] = 1;if step.Timeout.Duration > 0 {goCover_faa45bc9dd83__599[7] = 1;
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, step.Timeout.Duration)
+		defer cancel()
+	}
+
+	// Execute based on step type
+	goCover_faa45bc9dd83__599[5] = 1;switch step.Type {
+	case models.StepTypeOpenRewrite:goCover_faa45bc9dd83__599[8] = 1;
+		// Use real OpenRewrite engine
+		return e.openRewriteEngine.Execute(ctx, step, repoPath)
+	case models.StepTypeShellScript:goCover_faa45bc9dd83__599[9] = 1;
+		// Shell script execution placeholder
+		return nil, fmt.Errorf("shell script execution not yet implemented")
+	case models.StepTypeFileOperation:goCover_faa45bc9dd83__599[10] = 1;
+		// File operation placeholder
+		return nil, fmt.Errorf("file operations not yet implemented")
+	case models.StepTypeRegexReplace:goCover_faa45bc9dd83__599[11] = 1;
+		// Regex replacement placeholder
+		return nil, fmt.Errorf("regex replacement not yet implemented")
+	case models.StepTypeASTTransform:goCover_faa45bc9dd83__599[12] = 1;
+		// AST transformation placeholder
+		return nil, fmt.Errorf("AST transformation not yet implemented")
+	case models.StepTypeComposite:goCover_faa45bc9dd83__599[13] = 1;
+		// Composite recipe placeholder
+		return nil, fmt.Errorf("composite recipes not yet implemented")
+	default:goCover_faa45bc9dd83__599[14] = 1;
+		return nil, fmt.Errorf("unknown step type: %s", step.Type)
+	}
+}
+
+// executeMockOpenRewrite provides temporary mock execution for OpenRewrite steps
+func (e *RecipeExecutor) executeMockOpenRewrite(ctx context.Context, step *models.RecipeStep, repoPath string) (*TransformationResult, error) {goCover_faa45bc9dd83__600[0] = 3 ; goCover_faa45bc9dd83__600[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__600[2] = 600 ; goCover_faa45bc9dd83__600[3] = 1;
+	recipe, ok := step.Config["recipe"].(string)
+	if !ok {goCover_faa45bc9dd83__600[5] = 1;
+		return nil, fmt.Errorf("OpenRewrite step missing recipe configuration")
+	}
+
+	// Return a simple mock result
+	goCover_faa45bc9dd83__600[4] = 1;result := &TransformationResult{
+		RecipeID:       recipe,
+		Success:        true,
+		ChangesApplied: 1,
+		FilesModified:  []string{"MockFile.java"},
+		Diff:           fmt.Sprintf("Applied mock transformation for recipe: %s", recipe),
+		ExecutionTime:  100 * time.Millisecond,
+	}
+
+	return result, nil
+}
+
+// checkConditions evaluates step execution conditions
+func (e *RecipeExecutor) checkConditions(conditions []models.ExecutionCondition, repoPath string) bool {goCover_faa45bc9dd83__601[0] = 7 ; goCover_faa45bc9dd83__601[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__601[2] = 601 ; goCover_faa45bc9dd83__601[3] = 1;
+	for _, condition := range conditions {goCover_faa45bc9dd83__601[5] = 1;
+		switch condition.Type {
+		case models.ConditionFileExists:goCover_faa45bc9dd83__601[6] = 1;
+			path := filepath.Join(repoPath, condition.Value.(string))
+			if _, err := os.Stat(path); os.IsNotExist(err) {goCover_faa45bc9dd83__601[8] = 1;
+				return false
+			}
+		case models.ConditionFileNotExists:goCover_faa45bc9dd83__601[7] = 1;
+			path := filepath.Join(repoPath, condition.Value.(string))
+			if _, err := os.Stat(path); err == nil {goCover_faa45bc9dd83__601[9] = 1;
+				return false
+			}
+			// Add more condition types as needed
+		}
+	}
+	goCover_faa45bc9dd83__601[4] = 1;return true
+}
+
+// LoadRecipeFromFile loads a recipe from a YAML file
+func LoadRecipeFromFile(path string) (*models.Recipe, error) {goCover_faa45bc9dd83__602[0] = 5 ; goCover_faa45bc9dd83__602[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__602[2] = 602 ; goCover_faa45bc9dd83__602[3] = 1;
+	data, err := os.ReadFile(path)
+	if err != nil {goCover_faa45bc9dd83__602[6] = 1;
+		return nil, fmt.Errorf("failed to read recipe file: %w", err)
+	}
+
+	goCover_faa45bc9dd83__602[4] = 1;var recipe models.Recipe
+	if err := yaml.Unmarshal(data, &recipe); err != nil {goCover_faa45bc9dd83__602[7] = 1;
+		return nil, fmt.Errorf("failed to parse recipe YAML: %w", err)
+	}
+
+	// Set system fields
+	goCover_faa45bc9dd83__602[5] = 1;recipe.SetSystemFields("system")
+
+	return &recipe, nil
+}

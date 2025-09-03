@@ -1,0 +1,392 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/transformation_workflow.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// TransformationWorkflow orchestrates the complete transformation → deployment → testing pipeline
+type TransformationWorkflow struct {
+	recipeExecutor *RecipeExecutor
+	sandboxMgr     SandboxManager
+	workspaceDir   string
+}
+
+// WorkflowConfig defines parameters for the complete transformation workflow
+type WorkflowConfig struct {
+	Repository    string            `json:"repository"`
+	Branch        string            `json:"branch"`
+	RecipeIDs     []string          `json:"recipe_ids"`
+	AppName       string            `json:"app_name"`
+	Lane          string            `json:"lane"`
+	DeployTimeout time.Duration     `json:"deploy_timeout"`
+	TestEndpoints []string          `json:"test_endpoints"`
+	CleanupAfter  bool              `json:"cleanup_after"`
+	Metadata      map[string]string `json:"metadata"`
+}
+
+// WorkflowResult contains the results of the complete transformation workflow
+type WorkflowResult struct {
+	WorkflowID       string                  `json:"workflow_id"`
+	Success          bool                    `json:"success"`
+	Transformations  []*TransformationResult `json:"transformations"`
+	DeploymentResult *DeploymentResult       `json:"deployment_result"`
+	TestResults      []*EndpointTestResult   `json:"test_results"`
+	ExecutionTime    time.Duration           `json:"execution_time"`
+	Errors           []WorkflowError         `json:"errors,omitempty"`
+	Warnings         []WorkflowError         `json:"warnings,omitempty"`
+	Metadata         map[string]interface{}  `json:"metadata"`
+}
+
+// DeploymentResult contains deployment-specific results
+type DeploymentResult struct {
+	AppName    string            `json:"app_name"`
+	AppURL     string            `json:"app_url"`
+	Lane       string            `json:"lane"`
+	DeployTime time.Duration     `json:"deploy_time"`
+	Status     string            `json:"status"`
+	BuildLogs  string            `json:"build_logs,omitempty"`
+	Metadata   map[string]string `json:"metadata"`
+}
+
+// EndpointTestResult contains HTTP endpoint testing results
+type EndpointTestResult struct {
+	Endpoint     string            `json:"endpoint"`
+	StatusCode   int               `json:"status_code"`
+	ResponseTime time.Duration     `json:"response_time"`
+	Success      bool              `json:"success"`
+	Error        string            `json:"error,omitempty"`
+	Headers      map[string]string `json:"headers,omitempty"`
+	BodyPreview  string            `json:"body_preview,omitempty"`
+}
+
+// WorkflowError represents errors and warnings in the workflow
+type WorkflowError struct {
+	Stage       string `json:"stage"` // transformation, deployment, testing
+	Type        string `json:"type"`
+	Message     string `json:"message"`
+	Recoverable bool   `json:"recoverable"`
+}
+
+// NewTransformationWorkflow creates a new transformation workflow orchestrator
+func NewTransformationWorkflow(executor *RecipeExecutor, sandboxMgr SandboxManager, workspaceDir string) *TransformationWorkflow {goCover_faa45bc9dd83__736[0] = 1 ; goCover_faa45bc9dd83__736[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__736[2] = 736 ; goCover_faa45bc9dd83__736[3] = 1;
+	return &TransformationWorkflow{
+		recipeExecutor: executor,
+		sandboxMgr:     sandboxMgr,
+		workspaceDir:   workspaceDir,
+	}
+}
+
+// ExecuteWorkflow runs the complete transformation → deployment → testing workflow
+func (w *TransformationWorkflow) ExecuteWorkflow(ctx context.Context, config WorkflowConfig) (*WorkflowResult, error) {goCover_faa45bc9dd83__737[0] = 17 ; goCover_faa45bc9dd83__737[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__737[2] = 737 ; goCover_faa45bc9dd83__737[3] = 1;
+	startTime := time.Now()
+
+	result := &WorkflowResult{
+		WorkflowID:      generateWorkflowID(),
+		Success:         false,
+		Transformations: []*TransformationResult{},
+		TestResults:     []*EndpointTestResult{},
+		Errors:          []WorkflowError{},
+		Warnings:        []WorkflowError{},
+		Metadata:        make(map[string]interface{}),
+	}
+
+	// Stage 1: Create sandbox with repository
+	sandbox, err := w.createWorkflowSandbox(ctx, config)
+	if err != nil {goCover_faa45bc9dd83__737[9] = 1;
+		result.Errors = append(result.Errors, WorkflowError{
+			Stage:       "sandbox_creation",
+			Type:        "sandbox_error",
+			Message:     fmt.Sprintf("Failed to create sandbox: %v", err),
+			Recoverable: false,
+		})
+		result.ExecutionTime = time.Since(startTime)
+		return result, nil
+	}
+
+	// Ensure cleanup
+	goCover_faa45bc9dd83__737[4] = 1;if config.CleanupAfter {goCover_faa45bc9dd83__737[10] = 1;
+		defer func() {goCover_faa45bc9dd83__737[11] = 1;
+			if err := w.sandboxMgr.DestroySandbox(ctx, sandbox.ID); err != nil {goCover_faa45bc9dd83__737[12] = 1;
+				result.Warnings = append(result.Warnings, WorkflowError{
+					Stage:       "cleanup",
+					Type:        "cleanup_warning",
+					Message:     fmt.Sprintf("Failed to cleanup sandbox: %v", err),
+					Recoverable: true,
+				})
+			}
+		}()
+	}
+
+	// Stage 2: Apply transformations
+	goCover_faa45bc9dd83__737[5] = 1;for _, recipeID := range config.RecipeIDs {goCover_faa45bc9dd83__737[13] = 1;
+		transformResult, err := w.executeTransformation(ctx, sandbox, recipeID)
+		if err != nil {goCover_faa45bc9dd83__737[15] = 1;
+			result.Errors = append(result.Errors, WorkflowError{
+				Stage:       "transformation",
+				Type:        "transformation_error",
+				Message:     fmt.Sprintf("Recipe %s failed: %v", recipeID, err),
+				Recoverable: len(config.RecipeIDs) > 1, // Recoverable if multiple recipes
+			})
+			continue
+		}
+
+		goCover_faa45bc9dd83__737[14] = 1;result.Transformations = append(result.Transformations, transformResult)
+
+		if !transformResult.Success {goCover_faa45bc9dd83__737[16] = 1;
+			result.Warnings = append(result.Warnings, WorkflowError{
+				Stage:       "transformation",
+				Type:        "transformation_warning",
+				Message:     fmt.Sprintf("Recipe %s completed with warnings", recipeID),
+				Recoverable: true,
+			})
+		}
+	}
+
+	// Stage 3: Commit transformed code and deploy
+	goCover_faa45bc9dd83__737[6] = 1;deployResult, err := w.deployTransformedCode(ctx, sandbox, config)
+	if err != nil {goCover_faa45bc9dd83__737[17] = 1;
+		result.Errors = append(result.Errors, WorkflowError{
+			Stage:       "deployment",
+			Type:        "deployment_error",
+			Message:     fmt.Sprintf("Deployment failed: %v", err),
+			Recoverable: false,
+		})
+		result.ExecutionTime = time.Since(startTime)
+		return result, nil
+	}
+
+	goCover_faa45bc9dd83__737[7] = 1;result.DeploymentResult = deployResult
+
+	// Stage 4: Test deployed application
+	testResults, err := w.testDeployedApplication(ctx, deployResult, config.TestEndpoints)
+	if err != nil {goCover_faa45bc9dd83__737[18] = 1;
+		result.Warnings = append(result.Warnings, WorkflowError{
+			Stage:       "testing",
+			Type:        "testing_warning",
+			Message:     fmt.Sprintf("Testing failed: %v", err),
+			Recoverable: true,
+		})
+	} else{ goCover_faa45bc9dd83__737[19] = 1;{
+		result.TestResults = testResults
+	}}
+
+	// Determine overall success
+	goCover_faa45bc9dd83__737[8] = 1;result.Success = len(result.Errors) == 0 && deployResult.Status == "running"
+	result.ExecutionTime = time.Since(startTime)
+
+	// Add workflow metadata
+	result.Metadata = map[string]interface{}{
+		"repository":      config.Repository,
+		"branch":          config.Branch,
+		"recipes_applied": len(result.Transformations),
+		"app_name":        config.AppName,
+		"lane":            config.Lane,
+		"total_changes":   w.sumChangesApplied(result.Transformations),
+		"deployment_url":  deployResult.AppURL,
+		"workflow_type":   "transformation_deployment",
+	}
+
+	return result, nil
+}
+
+// createWorkflowSandbox creates a sandbox for the workflow with the repository
+func (w *TransformationWorkflow) createWorkflowSandbox(ctx context.Context, config WorkflowConfig) (*Sandbox, error) {goCover_faa45bc9dd83__738[0] = 1 ; goCover_faa45bc9dd83__738[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__738[2] = 738 ; goCover_faa45bc9dd83__738[3] = 1;
+	sandboxConfig := SandboxConfig{
+		Repository:    config.Repository,
+		Branch:        config.Branch,
+		Language:      "java",  // Default to Java for now
+		BuildTool:     "maven", // Will be auto-detected
+		TTL:           config.DeployTimeout,
+		MemoryLimit:   "4G",
+		CPULimit:      "2",
+		NetworkAccess: true, // Needed for deployment
+		TempSpace:     "2G",
+	}
+
+	return w.sandboxMgr.CreateSandbox(ctx, sandboxConfig)
+}
+
+// executeTransformation applies a single transformation recipe
+func (w *TransformationWorkflow) executeTransformation(ctx context.Context, sandbox *Sandbox, recipeID string) (*TransformationResult, error) {goCover_faa45bc9dd83__739[0] = 3 ; goCover_faa45bc9dd83__739[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__739[2] = 739 ; goCover_faa45bc9dd83__739[3] = 1;
+	// Generate a transformation ID for this execution
+	transformationID := uuid.New().String()
+
+	// Execute the recipe directly using the executor
+	result, err := w.recipeExecutor.ExecuteRecipeByID(ctx, recipeID, sandbox.WorkingDir, "openrewrite", transformationID)
+	if err != nil {goCover_faa45bc9dd83__739[5] = 1;
+		return nil, fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
+	}
+
+	goCover_faa45bc9dd83__739[4] = 1;return result, nil
+}
+
+// deployTransformedCode commits the transformed code and deploys it
+func (w *TransformationWorkflow) deployTransformedCode(ctx context.Context, sandbox *Sandbox, config WorkflowConfig) (*DeploymentResult, error) {goCover_faa45bc9dd83__740[0] = 9 ; goCover_faa45bc9dd83__740[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__740[2] = 740 ; goCover_faa45bc9dd83__740[3] = 1;
+	startTime := time.Now()
+
+	// Commit transformed changes to a temporary branch
+	if err := w.commitTransformedCode(ctx, sandbox); err != nil {goCover_faa45bc9dd83__740[6] = 1;
+		return nil, fmt.Errorf("failed to commit transformed code: %w", err)
+	}
+
+	// Create deployment using DeploymentSandboxManager
+	goCover_faa45bc9dd83__740[4] = 1;deployConfig := SandboxConfig{
+		Repository:    sandbox.Config.Repository,
+		Branch:        sandbox.Config.Branch,
+		Language:      sandbox.Config.Language,
+		BuildTool:     sandbox.Config.BuildTool,
+		TTL:           config.DeployTimeout,
+		MemoryLimit:   "4G",
+		CPULimit:      "2",
+		NetworkAccess: true,
+		TempSpace:     "2G",
+	}
+
+	// If using DeploymentSandboxManager, it will handle the deployment
+	if deployMgr, ok := w.sandboxMgr.(*DeploymentSandboxManager); ok {goCover_faa45bc9dd83__740[7] = 1;
+		deploySandbox, err := deployMgr.CreateSandbox(ctx, deployConfig)
+		if err != nil {goCover_faa45bc9dd83__740[10] = 1;
+			return nil, fmt.Errorf("deployment failed: %w", err)
+		}
+
+		// Test the deployment
+		goCover_faa45bc9dd83__740[8] = 1;if err := deployMgr.TestSandbox(ctx, deploySandbox); err != nil {goCover_faa45bc9dd83__740[11] = 1;
+			return &DeploymentResult{
+				AppName:    deploySandbox.JailName,
+				AppURL:     deploySandbox.Metadata["app_url"],
+				Lane:       config.Lane,
+				DeployTime: time.Since(startTime),
+				Status:     "failed",
+				Metadata:   deploySandbox.Metadata,
+			}, nil
+		}
+
+		goCover_faa45bc9dd83__740[9] = 1;return &DeploymentResult{
+			AppName:    deploySandbox.JailName,
+			AppURL:     deploySandbox.Metadata["app_url"],
+			Lane:       config.Lane,
+			DeployTime: time.Since(startTime),
+			Status:     "running",
+			Metadata:   deploySandbox.Metadata,
+		}, nil
+	}
+
+	// Fallback for other sandbox managers
+	goCover_faa45bc9dd83__740[5] = 1;return &DeploymentResult{
+		AppName:    config.AppName,
+		AppURL:     fmt.Sprintf("http://localhost:8080"), // Mock URL
+		Lane:       config.Lane,
+		DeployTime: time.Since(startTime),
+		Status:     "running",
+		Metadata:   make(map[string]string),
+	}, nil
+}
+
+// commitTransformedCode commits the transformed code to prepare for deployment
+func (w *TransformationWorkflow) commitTransformedCode(ctx context.Context, sandbox *Sandbox) error {goCover_faa45bc9dd83__741[0] = 9 ; goCover_faa45bc9dd83__741[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__741[2] = 741 ; goCover_faa45bc9dd83__741[3] = 1;
+	workspaceDir := filepath.Join(sandbox.RootPath, "workspace")
+
+	// Check if there are any changes to commit
+	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	cmd.Dir = workspaceDir
+	output, err := cmd.Output()
+	if err != nil {goCover_faa45bc9dd83__741[8] = 1;
+		return fmt.Errorf("failed to check git status: %w", err)
+	}
+
+	goCover_faa45bc9dd83__741[4] = 1;if len(strings.TrimSpace(string(output))) == 0 {goCover_faa45bc9dd83__741[9] = 1;
+		// No changes to commit
+		return nil
+	}
+
+	// Add all changes
+	goCover_faa45bc9dd83__741[5] = 1;cmd = exec.CommandContext(ctx, "git", "add", ".")
+	cmd.Dir = workspaceDir
+	if err := cmd.Run(); err != nil {goCover_faa45bc9dd83__741[10] = 1;
+		return fmt.Errorf("failed to add changes: %w", err)
+	}
+
+	// Commit changes
+	goCover_faa45bc9dd83__741[6] = 1;commitMsg := fmt.Sprintf("ARF transformation applied at %s", time.Now().Format("2006-01-02 15:04:05"))
+	cmd = exec.CommandContext(ctx, "git", "commit", "-m", commitMsg)
+	cmd.Dir = workspaceDir
+	if err := cmd.Run(); err != nil {goCover_faa45bc9dd83__741[11] = 1;
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	goCover_faa45bc9dd83__741[7] = 1;return nil
+}
+
+// testDeployedApplication tests the deployed application endpoints
+func (w *TransformationWorkflow) testDeployedApplication(ctx context.Context, deployResult *DeploymentResult, testEndpoints []string) ([]*EndpointTestResult, error) {goCover_faa45bc9dd83__742[0] = 5 ; goCover_faa45bc9dd83__742[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__742[2] = 742 ; goCover_faa45bc9dd83__742[3] = 1;
+	if len(testEndpoints) == 0 {goCover_faa45bc9dd83__742[6] = 1;
+		testEndpoints = []string{"/", "/healthz", "/actuator/health"}
+	}
+
+	goCover_faa45bc9dd83__742[4] = 1;var results []*EndpointTestResult
+
+	for _, endpoint := range testEndpoints {goCover_faa45bc9dd83__742[7] = 1;
+		result := w.testEndpoint(ctx, deployResult.AppURL, endpoint)
+		results = append(results, result)
+	}
+
+	goCover_faa45bc9dd83__742[5] = 1;return results, nil
+}
+
+// testEndpoint tests a single HTTP endpoint
+func (w *TransformationWorkflow) testEndpoint(ctx context.Context, baseURL, endpoint string) *EndpointTestResult {goCover_faa45bc9dd83__743[0] = 7 ; goCover_faa45bc9dd83__743[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__743[2] = 743 ; goCover_faa45bc9dd83__743[3] = 1;
+	startTime := time.Now()
+
+	fullURL := baseURL + endpoint
+	if !strings.HasPrefix(endpoint, "/") {goCover_faa45bc9dd83__743[7] = 1;
+		fullURL = baseURL + "/" + endpoint
+	}
+
+	// Use curl for testing to avoid import dependencies
+	goCover_faa45bc9dd83__743[4] = 1;cmd := exec.CommandContext(ctx, "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", fullURL)
+	output, err := cmd.Output()
+
+	result := &EndpointTestResult{
+		Endpoint:     endpoint,
+		ResponseTime: time.Since(startTime),
+		Success:      false,
+	}
+
+	if err != nil {goCover_faa45bc9dd83__743[8] = 1;
+		result.Error = fmt.Sprintf("Request failed: %v", err)
+		result.StatusCode = 0
+		return result
+	}
+
+	goCover_faa45bc9dd83__743[5] = 1;statusCode := 0
+	if len(output) > 0 {goCover_faa45bc9dd83__743[9] = 1;
+		fmt.Sscanf(string(output), "%d", &statusCode)
+	}
+
+	goCover_faa45bc9dd83__743[6] = 1;result.StatusCode = statusCode
+	result.Success = statusCode >= 200 && statusCode < 400
+
+	return result
+}
+
+// Helper functions
+
+func generateWorkflowID() string {goCover_faa45bc9dd83__744[0] = 1 ; goCover_faa45bc9dd83__744[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__744[2] = 744 ; goCover_faa45bc9dd83__744[3] = 1;
+	return fmt.Sprintf("wf-%d", time.Now().UnixNano())
+}
+
+func (w *TransformationWorkflow) sumChangesApplied(transformations []*TransformationResult) int {goCover_faa45bc9dd83__745[0] = 3 ; goCover_faa45bc9dd83__745[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__745[2] = 745 ; goCover_faa45bc9dd83__745[3] = 1;
+	total := 0
+	for _, t := range transformations {goCover_faa45bc9dd83__745[5] = 1;
+		total += t.ChangesApplied
+	}
+	goCover_faa45bc9dd83__745[4] = 1;return total
+}

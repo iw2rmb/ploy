@@ -1,0 +1,4 @@
+=== RUN   TestRecipesIndexer_RefreshAndPersist
+--- PASS: TestRecipesIndexer_RefreshAndPersist (0.00s)
+PASS
+ok  	github.com/iw2rmb/ploy/api/arf	0.239s

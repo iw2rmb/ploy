@@ -1,0 +1,92 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/recipes_indexer.go:1:1
+package arf
+
+import (
+    "archive/zip"
+    "bytes"
+    "context"
+    "fmt"
+    "io"
+    "path/filepath"
+    "strings"
+)
+
+// PackSpec identifies an OpenRewrite recipe pack to index.
+type PackSpec struct {
+    Name    string `json:"name"`
+    Version string `json:"version"`
+}
+
+// RecipesFetcher abstracts obtaining a pack JAR by name/version.
+type RecipesFetcher interface {
+    Fetch(pack, version string) ([]byte, error)
+}
+
+// RecipesIndexer indexes OpenRewrite packs into a RecipesCatalog and persists a snapshot.
+type RecipesIndexer struct {
+    fetcher RecipesFetcher
+    store   StorageService
+}
+
+func NewRecipesIndexer(fetcher RecipesFetcher, store StorageService) *RecipesIndexer {goCover_faa45bc9dd83__630[0] = 1 ; goCover_faa45bc9dd83__630[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__630[2] = 630 ; goCover_faa45bc9dd83__630[3] = 1;
+    return &RecipesIndexer{fetcher: fetcher, store: store}
+}
+
+// Refresh downloads the specified packs, extracts META-INF/rewrite/*.yml entries,
+// builds a catalog, and persists a JSON snapshot for fast bootstrap.
+func (i *RecipesIndexer) Refresh(ctx context.Context, packs []PackSpec) (*RecipesCatalog, error) {goCover_faa45bc9dd83__631[0] = 15 ; goCover_faa45bc9dd83__631[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__631[2] = 631 ; goCover_faa45bc9dd83__631[3] = 1;
+    if i.fetcher == nil {goCover_faa45bc9dd83__631[7] = 1;
+        return nil, fmt.Errorf("fetcher not configured")
+    }
+    goCover_faa45bc9dd83__631[4] = 1;cat := NewRecipesCatalog()
+    for _, p := range packs {goCover_faa45bc9dd83__631[8] = 1;
+        if strings.TrimSpace(p.Name) == "" || strings.TrimSpace(p.Version) == "" {goCover_faa45bc9dd83__631[12] = 1;
+            continue
+        }
+        goCover_faa45bc9dd83__631[9] = 1;jar, err := i.fetcher.Fetch(p.Name, p.Version)
+        if err != nil {goCover_faa45bc9dd83__631[13] = 1;
+            return nil, fmt.Errorf("fetch %s:%s: %w", p.Name, p.Version, err)
+        }
+        goCover_faa45bc9dd83__631[10] = 1;yamls, err := extractRewriteYAMLs(bytes.NewReader(jar), int64(len(jar)))
+        if err != nil {goCover_faa45bc9dd83__631[14] = 1;
+            return nil, fmt.Errorf("parse %s:%s: %w", p.Name, p.Version, err)
+        }
+        goCover_faa45bc9dd83__631[11] = 1;if err := cat.BuildFromYAMLs(yamls, p.Name, p.Version); err != nil {goCover_faa45bc9dd83__631[15] = 1;
+            return nil, err
+        }
+    }
+    goCover_faa45bc9dd83__631[5] = 1;if i.store != nil {goCover_faa45bc9dd83__631[16] = 1;
+        if data, err := cat.Serialize(); err == nil {goCover_faa45bc9dd83__631[17] = 1;
+            // Persist to a known key for bootstrap
+            _ = i.store.Put(ctx, "artifacts/openrewrite/catalog.json", data)
+        }
+    }
+    goCover_faa45bc9dd83__631[6] = 1;return cat, nil
+}
+
+func extractRewriteYAMLs(r io.ReaderAt, size int64) ([][]byte, error) {goCover_faa45bc9dd83__632[0] = 12 ; goCover_faa45bc9dd83__632[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__632[2] = 632 ; goCover_faa45bc9dd83__632[3] = 1;
+    zr, err := zip.NewReader(r, size)
+    if err != nil {goCover_faa45bc9dd83__632[6] = 1;
+        return nil, err
+    }
+    goCover_faa45bc9dd83__632[4] = 1;var out [][]byte
+    for _, f := range zr.File {goCover_faa45bc9dd83__632[7] = 1;
+        if !strings.HasPrefix(f.Name, "META-INF/rewrite/") {goCover_faa45bc9dd83__632[11] = 1;
+            continue
+        }
+        goCover_faa45bc9dd83__632[8] = 1;if ext := strings.ToLower(filepath.Ext(f.Name)); ext != ".yml" && ext != ".yaml" {goCover_faa45bc9dd83__632[12] = 1;
+            continue
+        }
+        goCover_faa45bc9dd83__632[9] = 1;rc, err := f.Open()
+        if err != nil {goCover_faa45bc9dd83__632[13] = 1;
+            continue
+        }
+        goCover_faa45bc9dd83__632[10] = 1;b, _ := io.ReadAll(rc)
+        rc.Close()
+        if len(b) > 0 {goCover_faa45bc9dd83__632[14] = 1;
+            out = append(out, b)
+        }
+    }
+    goCover_faa45bc9dd83__632[5] = 1;return out, nil
+}
+

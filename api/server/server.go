@@ -157,6 +157,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
     if err != nil {
         log.Printf("Warning: failed to initialize config service: %v", err)
     }
+    if deps.HealthChecker != nil && cfgService != nil {
+        deps.HealthChecker.SetConfigService(cfgService)
+    }
 
     // Create Fiber app with middleware
     app := fiber.New(fiber.Config{
@@ -249,10 +252,10 @@ func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error)
 	// Always create the factory - it's required for most components
 	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
 
-	// Initialize health checker
-	log.Printf("Initializing health checker...")
-	healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
-	log.Printf("✓ Health checker initialized")
+    // Initialize health checker
+    log.Printf("Initializing health checker...")
+    healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
+    log.Printf("✓ Health checker initialized")
 
 	// Initialize TTL cleanup service
 	cleanupHandler, ttlService, err := initializeCleanupService(cfg)

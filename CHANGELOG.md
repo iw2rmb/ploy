@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [2025-09-03] - Recipes Catalog Wiring (Short)
+
+- Enabled feature-flagged recipes catalog routes (`PLOY_ENABLE_RECIPES_CATALOG=true`) and optional CLI catalog mode (`PLOY_RECIPES_CATALOG=true`) for `ploy arf recipe list/search`. Added minimal tests for server wiring and CLI parsing.
+
 ## [2025-09-03] - Config Service Validation & Caching (Phase 3)
 
 ### Added
@@ -27,14 +31,19 @@
     - `GET /v1/arf/recipes?query=&pack=&version=&limit=`
     - `GET /v1/arf/recipes/:id`
     - `POST /v1/arf/recipes/refresh` (rebuilds catalog from configured packs)
+  - Feature-flag wiring into main server (`PLOY_ENABLE_RECIPES_CATALOG=true`) overlays catalog routes
+  - CLI support toggle (`PLOY_RECIPES_CATALOG=true`) to consume catalog endpoints for `ploy arf recipes list/search`
 
 ### Testing
 - TDD: Unit tests for catalog build/list/search/get and refresh flow
   - In-memory JAR fixture with `META-INF/rewrite/*.yml`
   - Refresh persists snapshot and updates handler catalog
+  - Server wiring test ensures catalog routes register behind feature flag
+  - CLI parsing test validates catalog list payload parsing
 
 ### Notes
 - Routes are exposed via a dedicated `RecipesHandler` used in tests; wiring into the main server router can follow once pack fetch is integrated with platform config.
+ - Wiring added behind feature flag; by default, legacy registry-backed recipe routes remain.
 
 ## [2025-09-02] - ARF Controls & Optimization (Phase 5)
 

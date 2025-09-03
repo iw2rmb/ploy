@@ -5,6 +5,8 @@ import (
     "fmt"
     "sort"
     "strings"
+
+    "github.com/gofiber/fiber/v2"
 )
 
 // RecipeMeta describes a single OpenRewrite recipe entry in the catalog.
@@ -140,15 +142,19 @@ func parseYAMLList(src, key string) []string {
 
 type RecipesHandler struct {
     catalog *RecipesCatalog
+    indexer *RecipesIndexer
 }
 
 func NewRecipesHandler(cat *RecipesCatalog) *RecipesHandler {
     return &RecipesHandler{catalog: cat}
 }
 
+// SetIndexer injects an indexer instance for refresh operations (used in Phase 1).
+func (h *RecipesHandler) SetIndexer(idx *RecipesIndexer) { h.indexer = idx }
+
 // ListRecipes handles GET /v1/arf/recipes
 // Query params: query, pack, version, limit
-func (h *RecipesHandler) ListRecipes(c Ctx) error {
+func (h *RecipesHandler) ListRecipes(c *fiber.Ctx) error {
     q := c.Query("query")
     pack := c.Query("pack")
     version := c.Query("version")
@@ -164,7 +170,7 @@ func (h *RecipesHandler) ListRecipes(c Ctx) error {
 }
 
 // GetRecipe handles GET /v1/arf/recipes/:id
-func (h *RecipesHandler) GetRecipe(c Ctx) error {
+func (h *RecipesHandler) GetRecipe(c *fiber.Ctx) error {
     id := c.Params("id")
     if id == "" {
         return c.Status(400).JSON(map[string]string{"error": "id is required"})
@@ -176,14 +182,31 @@ func (h *RecipesHandler) GetRecipe(c Ctx) error {
     return c.JSON(r)
 }
 
-// Ctx is a tiny interface adapter to avoid importing fiber in the catalog code unit tests.
-// The handler_recipes_test wires this with fiber by using adapter methods present on *fiber.Ctx.
-type Ctx interface {
-    Query(key string, defaultValue ...string) string
-    Params(key string, defaultValue ...string) string
-    JSON(v interface{}) error
-    Status(status int) Ctx
+// RefreshRecipes handles POST /v1/arf/recipes/refresh
+// Body optional JSON: {"packs":[{"name":"rewrite-java","version":"2.20.0"}, ...]}
+func (h *RecipesHandler) RefreshRecipes(c *fiber.Ctx) error {
+    if h.indexer == nil {
+        return c.Status(500).JSON(map[string]string{"error": "indexer not configured"})
+    }
+    var req struct{
+        Packs []PackSpec `json:"packs"`
+    }
+    if err := c.BodyParser(&req); err != nil {
+        // Ignore body errors; proceed with defaults
+        req.Packs = nil
+    }
+    if len(req.Packs) == 0 {
+        req.Packs = []PackSpec{{Name: "rewrite-java", Version: "2.20.0"}}
+    }
+    cat, err := h.indexer.Refresh(c.Context(), req.Packs)
+    if err != nil {
+        return c.Status(500).JSON(map[string]string{"error": err.Error()})
+    }
+    h.catalog = cat
+    return c.JSON(map[string]interface{}{"status": "ok", "count": len(cat.List("", "", 0))})
 }
+
+// Note: Handlers use fiber.Ctx directly for compatibility with Fiber routing and tests.
 
 func atoiOrZero(s string) int {
     for _, ch := range s {

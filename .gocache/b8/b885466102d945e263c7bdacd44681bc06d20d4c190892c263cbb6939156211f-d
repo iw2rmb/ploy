@@ -1,0 +1,446 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/healing_logger.go:1:1
+package arf
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+)
+
+// LogLevel represents the severity of a log message
+type LogLevel int
+
+const (
+	LogLevelDebug LogLevel = iota
+	LogLevelInfo
+	LogLevelWarn
+	LogLevelError
+)
+
+func (l LogLevel) String() string {goCover_faa45bc9dd83__321[0] = 6 ; goCover_faa45bc9dd83__321[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__321[2] = 321 ; goCover_faa45bc9dd83__321[3] = 1;
+	switch l {
+	case LogLevelDebug:goCover_faa45bc9dd83__321[4] = 1;
+		return "DEBUG"
+	case LogLevelInfo:goCover_faa45bc9dd83__321[5] = 1;
+		return "INFO"
+	case LogLevelWarn:goCover_faa45bc9dd83__321[6] = 1;
+		return "WARN"
+	case LogLevelError:goCover_faa45bc9dd83__321[7] = 1;
+		return "ERROR"
+	default:goCover_faa45bc9dd83__321[8] = 1;
+		return "UNKNOWN"
+	}
+}
+
+// LogFormat represents the output format for logs
+type LogFormat string
+
+const (
+	LogFormatText LogFormat = "text"
+	LogFormatJSON LogFormat = "json"
+)
+
+// LogConfig configures the healing logger
+type LogConfig struct {
+	Level             LogLevel
+	Format            LogFormat
+	Output            io.Writer
+	BufferSize        int
+	IncludeStackTrace bool
+}
+
+// LogFields represents structured log fields
+type LogFields map[string]interface{}
+
+// HealingError represents an error with additional context
+type HealingError struct {
+	Message string
+	Code    string
+	Cause   error
+}
+
+func (e *HealingError) Error() string {goCover_faa45bc9dd83__322[0] = 3 ; goCover_faa45bc9dd83__322[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__322[2] = 322 ; goCover_faa45bc9dd83__322[3] = 1;
+	if e.Cause != nil {goCover_faa45bc9dd83__322[5] = 1;
+		return fmt.Sprintf("%s: %v", e.Message, e.Cause)
+	}
+	goCover_faa45bc9dd83__322[4] = 1;return e.Message
+}
+
+// HealingLogger provides structured logging for healing workflows
+type HealingLogger struct {
+	config   *LogConfig
+	logger   *log.Logger
+	fields   LogFields
+	mu       sync.RWMutex
+	buffer   chan logEntry
+	stopChan chan struct{}
+}
+
+type logEntry struct {
+	Level     LogLevel
+	Message   string
+	Fields    LogFields
+	Timestamp time.Time
+	Error     error
+}
+
+// NewHealingLogger creates a new healing logger
+func NewHealingLogger(config *LogConfig) *HealingLogger {goCover_faa45bc9dd83__323[0] = 7 ; goCover_faa45bc9dd83__323[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__323[2] = 323 ; goCover_faa45bc9dd83__323[3] = 1;
+	if config == nil {goCover_faa45bc9dd83__323[7] = 1;
+		config = &LogConfig{
+			Level:  LogLevelInfo,
+			Format: LogFormatJSON,
+			Output: os.Stdout,
+		}
+	}
+
+	goCover_faa45bc9dd83__323[4] = 1;if config.Output == nil {goCover_faa45bc9dd83__323[8] = 1;
+		config.Output = os.Stdout
+	}
+
+	goCover_faa45bc9dd83__323[5] = 1;if config.BufferSize == 0 {goCover_faa45bc9dd83__323[9] = 1;
+		config.BufferSize = 100
+	}
+
+	goCover_faa45bc9dd83__323[6] = 1;hl := &HealingLogger{
+		config:   config,
+		logger:   log.New(config.Output, "", 0),
+		fields:   make(LogFields),
+		buffer:   make(chan logEntry, config.BufferSize),
+		stopChan: make(chan struct{}),
+	}
+
+	// Start the log writer goroutine
+	go hl.writer()
+
+	return hl
+}
+
+// writer processes log entries from the buffer
+func (hl *HealingLogger) writer() {goCover_faa45bc9dd83__324[0] = 6 ; goCover_faa45bc9dd83__324[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__324[2] = 324 ; goCover_faa45bc9dd83__324[3] = 1;
+	for {goCover_faa45bc9dd83__324[4] = 1;
+		select {
+		case entry := <-hl.buffer:goCover_faa45bc9dd83__324[5] = 1;
+			hl.writeLog(entry)
+		case <-hl.stopChan:goCover_faa45bc9dd83__324[6] = 1;
+			// Flush remaining logs
+			for len(hl.buffer) > 0 {goCover_faa45bc9dd83__324[8] = 1;
+				entry := <-hl.buffer
+				hl.writeLog(entry)
+			}
+			goCover_faa45bc9dd83__324[7] = 1;return
+		}
+	}
+}
+
+// Flush waits for all buffered logs to be written
+func (hl *HealingLogger) Flush() {goCover_faa45bc9dd83__325[0] = 6 ; goCover_faa45bc9dd83__325[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__325[2] = 325 ; goCover_faa45bc9dd83__325[3] = 1;
+	// Wait for buffer to empty
+	timeout := time.After(100 * time.Millisecond)
+	for {goCover_faa45bc9dd83__325[4] = 1;
+		select {
+		case <-timeout:goCover_faa45bc9dd83__325[5] = 1;
+			return
+		default:goCover_faa45bc9dd83__325[6] = 1;
+			if len(hl.buffer) == 0 {goCover_faa45bc9dd83__325[8] = 1;
+				// Give writer goroutine a chance to finish
+				time.Sleep(1 * time.Millisecond)
+				return
+			}
+			goCover_faa45bc9dd83__325[7] = 1;time.Sleep(1 * time.Millisecond)
+		}
+	}
+}
+
+// writeLog writes a single log entry
+func (hl *HealingLogger) writeLog(entry logEntry) {goCover_faa45bc9dd83__326[0] = 14 ; goCover_faa45bc9dd83__326[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__326[2] = 326 ; goCover_faa45bc9dd83__326[3] = 1;
+	// Check log level (lower values = higher priority, so reverse the check)
+	if entry.Level < hl.config.Level {goCover_faa45bc9dd83__326[7] = 1;
+		return
+	}
+
+	// Merge fields
+	goCover_faa45bc9dd83__326[4] = 1;fields := make(LogFields)
+
+	// Only merge entry fields if they exist
+	if entry.Fields != nil {goCover_faa45bc9dd83__326[8] = 1;
+		for k, v := range entry.Fields {goCover_faa45bc9dd83__326[9] = 1;
+			fields[k] = v
+		}
+	}
+
+	// Add standard fields
+	goCover_faa45bc9dd83__326[5] = 1;fields["timestamp"] = entry.Timestamp.Format(time.RFC3339)
+	fields["level"] = entry.Level.String()
+	fields["message"] = entry.Message
+
+	// Add error details if present
+	if entry.Error != nil {goCover_faa45bc9dd83__326[10] = 1;
+		fields["error"] = entry.Error.Error()
+		if healErr, ok := entry.Error.(*HealingError); ok {goCover_faa45bc9dd83__326[12] = 1;
+			fields["error_code"] = healErr.Code
+			if healErr.Cause != nil {goCover_faa45bc9dd83__326[13] = 1;
+				fields["error_cause"] = healErr.Cause.Error()
+			}
+		}
+
+		// Add stack trace if configured and error level
+		goCover_faa45bc9dd83__326[11] = 1;if hl.config.IncludeStackTrace && entry.Level == LogLevelError {goCover_faa45bc9dd83__326[14] = 1;
+			fields["stack_trace"] = getStackTrace()
+		}
+	}
+
+	// Format and write
+	goCover_faa45bc9dd83__326[6] = 1;switch hl.config.Format {
+	case LogFormatJSON:goCover_faa45bc9dd83__326[15] = 1;
+		hl.writeJSON(fields)
+	case LogFormatText:goCover_faa45bc9dd83__326[16] = 1;
+		hl.writeText(fields)
+	}
+}
+
+// writeJSON writes a log entry in JSON format
+func (hl *HealingLogger) writeJSON(fields LogFields) {goCover_faa45bc9dd83__327[0] = 3 ; goCover_faa45bc9dd83__327[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__327[2] = 327 ; goCover_faa45bc9dd83__327[3] = 1;
+	data, err := json.Marshal(fields)
+	if err != nil {goCover_faa45bc9dd83__327[5] = 1;
+		// Fallback to text on JSON error
+		hl.logger.Printf("Failed to marshal log to JSON: %v", err)
+		return
+	}
+	goCover_faa45bc9dd83__327[4] = 1;hl.logger.Println(string(data))
+}
+
+// writeText writes a log entry in text format
+func (hl *HealingLogger) writeText(fields LogFields) {goCover_faa45bc9dd83__328[0] = 6 ; goCover_faa45bc9dd83__328[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__328[2] = 328 ; goCover_faa45bc9dd83__328[3] = 1;
+	// Format: TIMESTAMP [LEVEL] message key1=value1 key2=value2
+	parts := []string{
+		fields["timestamp"].(string),
+		fmt.Sprintf("[%s]", fields["level"]),
+		fields["message"].(string),
+	}
+
+	// Add other fields in sorted order for consistency
+	var fieldParts []string
+	for k, v := range fields {goCover_faa45bc9dd83__328[6] = 1;
+		if k != "timestamp" && k != "level" && k != "message" {goCover_faa45bc9dd83__328[7] = 1;
+			fieldParts = append(fieldParts, fmt.Sprintf("%s=%v", k, v))
+		}
+	}
+
+	goCover_faa45bc9dd83__328[4] = 1;if len(fieldParts) > 0 {goCover_faa45bc9dd83__328[8] = 1;
+		parts = append(parts, fieldParts...)
+	}
+
+	goCover_faa45bc9dd83__328[5] = 1;hl.logger.Println(strings.Join(parts, " "))
+}
+
+// WithFields creates a new logger with additional fields
+func (hl *HealingLogger) WithFields(fields LogFields) *HealingLogger {goCover_faa45bc9dd83__329[0] = 3 ; goCover_faa45bc9dd83__329[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__329[2] = 329 ; goCover_faa45bc9dd83__329[3] = 1;
+	hl.mu.Lock()
+	defer hl.mu.Unlock()
+
+	// Merge fields into current logger's fields
+	for k, v := range fields {goCover_faa45bc9dd83__329[5] = 1;
+		hl.fields[k] = v
+	}
+
+	goCover_faa45bc9dd83__329[4] = 1;return hl
+}
+
+// Log methods
+
+func (hl *HealingLogger) Debug(message string) {goCover_faa45bc9dd83__330[0] = 1 ; goCover_faa45bc9dd83__330[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__330[2] = 330 ; goCover_faa45bc9dd83__330[3] = 1;
+	hl.logWithFields(LogLevelDebug, message, nil)
+}
+
+func (hl *HealingLogger) Info(message string) {goCover_faa45bc9dd83__331[0] = 1 ; goCover_faa45bc9dd83__331[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__331[2] = 331 ; goCover_faa45bc9dd83__331[3] = 1;
+	hl.logWithFields(LogLevelInfo, message, nil)
+}
+
+func (hl *HealingLogger) Warn(message string) {goCover_faa45bc9dd83__332[0] = 1 ; goCover_faa45bc9dd83__332[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__332[2] = 332 ; goCover_faa45bc9dd83__332[3] = 1;
+	hl.logWithFields(LogLevelWarn, message, nil)
+}
+
+func (hl *HealingLogger) Error(message string, err error) {goCover_faa45bc9dd83__333[0] = 1 ; goCover_faa45bc9dd83__333[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__333[2] = 333 ; goCover_faa45bc9dd83__333[3] = 1;
+	hl.logWithFields(LogLevelError, message, err)
+}
+
+func (hl *HealingLogger) logWithFields(level LogLevel, message string, err error) {goCover_faa45bc9dd83__334[0] = 3 ; goCover_faa45bc9dd83__334[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__334[2] = 334 ; goCover_faa45bc9dd83__334[3] = 1;
+	hl.mu.RLock()
+	fields := make(LogFields)
+	for k, v := range hl.fields {goCover_faa45bc9dd83__334[5] = 1;
+		fields[k] = v
+	}
+	goCover_faa45bc9dd83__334[4] = 1;hl.mu.RUnlock()
+	hl.log(level, message, fields, err)
+}
+
+func (hl *HealingLogger) log(level LogLevel, message string, fields LogFields, err error) {goCover_faa45bc9dd83__335[0] = 3 ; goCover_faa45bc9dd83__335[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__335[2] = 335 ; goCover_faa45bc9dd83__335[3] = 1;
+	entry := logEntry{
+		Level:     level,
+		Message:   message,
+		Fields:    fields,
+		Timestamp: time.Now(),
+		Error:     err,
+	}
+
+	select {
+	case hl.buffer <- entry:goCover_faa45bc9dd83__335[4] = 1;
+	default:goCover_faa45bc9dd83__335[5] = 1;
+		// Buffer full, write directly (may block)
+		hl.writeLog(entry)
+	}
+}
+
+// Healing-specific logging methods
+
+// LogHealingStarted logs the start of a healing attempt
+func (hl *HealingLogger) LogHealingStarted(ctx context.Context, transformID, attemptPath, triggerReason string, errors []string) {goCover_faa45bc9dd83__336[0] = 1 ; goCover_faa45bc9dd83__336[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__336[2] = 336 ; goCover_faa45bc9dd83__336[3] = 1;
+	fields := LogFields{
+		"transformation_id": transformID,
+		"attempt_path":      attemptPath,
+		"trigger_reason":    triggerReason,
+		"error_count":       len(errors),
+		"errors":            errors,
+	}
+	hl.log(LogLevelInfo, "Healing started", fields, nil)
+}
+
+// LogHealingCompleted logs the completion of a healing attempt
+func (hl *HealingLogger) LogHealingCompleted(ctx context.Context, transformID, attemptPath, result string, duration time.Duration) {goCover_faa45bc9dd83__337[0] = 1 ; goCover_faa45bc9dd83__337[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__337[2] = 337 ; goCover_faa45bc9dd83__337[3] = 1;
+	fields := LogFields{
+		"transformation_id": transformID,
+		"attempt_path":      attemptPath,
+		"result":            result,
+		"duration_ms":       duration.Milliseconds(),
+	}
+	hl.log(LogLevelInfo, "Healing completed", fields, nil)
+}
+
+// LogHealingFailed logs a failed healing attempt
+func (hl *HealingLogger) LogHealingFailed(ctx context.Context, transformID, attemptPath string, err error) {goCover_faa45bc9dd83__338[0] = 1 ; goCover_faa45bc9dd83__338[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__338[2] = 338 ; goCover_faa45bc9dd83__338[3] = 1;
+	fields := LogFields{
+		"transformation_id": transformID,
+		"attempt_path":      attemptPath,
+	}
+	hl.log(LogLevelError, "Healing failed", fields, err)
+}
+
+// LogLLMAnalysis logs LLM error analysis
+func (hl *HealingLogger) LogLLMAnalysis(ctx context.Context, transformID, attemptPath string, analysis *LLMAnalysisResult) {goCover_faa45bc9dd83__339[0] = 1 ; goCover_faa45bc9dd83__339[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__339[2] = 339 ; goCover_faa45bc9dd83__339[3] = 1;
+	fields := LogFields{
+		"transformation_id": transformID,
+		"attempt_path":      attemptPath,
+		"error_type":        analysis.ErrorType,
+		"confidence":        analysis.Confidence,
+		"suggested_fix":     analysis.SuggestedFix,
+		"risk_assessment":   analysis.RiskAssessment,
+	}
+	hl.log(LogLevelInfo, "LLM analysis completed", fields, nil)
+}
+
+// LogChildSpawned logs when a child healing attempt is created
+func (hl *HealingLogger) LogChildSpawned(ctx context.Context, transformID, parentPath, childPath, reason string) {goCover_faa45bc9dd83__340[0] = 1 ; goCover_faa45bc9dd83__340[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__340[2] = 340 ; goCover_faa45bc9dd83__340[3] = 1;
+	fields := LogFields{
+		"transformation_id": transformID,
+		"parent_path":       parentPath,
+		"child_path":        childPath,
+		"spawn_reason":      reason,
+	}
+	hl.log(LogLevelInfo, "Child healing spawned", fields, nil)
+}
+
+// LogCircuitBreakerTrip logs circuit breaker state changes
+func (hl *HealingLogger) LogCircuitBreakerTrip(transformID, state string, failures int, cooldown time.Duration) {goCover_faa45bc9dd83__341[0] = 1 ; goCover_faa45bc9dd83__341[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__341[2] = 341 ; goCover_faa45bc9dd83__341[3] = 1;
+	fields := LogFields{
+		"transformation_id":    transformID,
+		"circuit_state":        state,
+		"consecutive_failures": failures,
+		"cooldown_seconds":     cooldown.Seconds(),
+	}
+	hl.log(LogLevelWarn, "Circuit breaker tripped", fields, nil)
+}
+
+// LogLLMCost logs LLM usage and costs
+func (hl *HealingLogger) LogLLMCost(transformID, model string, inputTokens, outputTokens int, cost float64, cacheHit bool) {goCover_faa45bc9dd83__342[0] = 3 ; goCover_faa45bc9dd83__342[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__342[2] = 342 ; goCover_faa45bc9dd83__342[3] = 1;
+	fields := LogFields{
+		"transformation_id": transformID,
+		"model":             model,
+		"input_tokens":      inputTokens,
+		"output_tokens":     outputTokens,
+		"total_tokens":      inputTokens + outputTokens,
+		"cost":              cost,
+		"cache_hit":         cacheHit,
+	}
+	level := LogLevelInfo
+	if cost > 1.0 {goCover_faa45bc9dd83__342[5] = 1; // Warn for expensive operations
+		level = LogLevelWarn
+	}
+	goCover_faa45bc9dd83__342[4] = 1;hl.log(level, "LLM usage recorded", fields, nil)
+}
+
+// LogBudgetAlert logs budget threshold alerts
+func (hl *HealingLogger) LogBudgetAlert(alert BudgetAlert) {goCover_faa45bc9dd83__343[0] = 1 ; goCover_faa45bc9dd83__343[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__343[2] = 343 ; goCover_faa45bc9dd83__343[3] = 1;
+	fields := LogFields{
+		"alert_type":  alert.Type,
+		"current":     alert.Current,
+		"limit":       alert.Limit,
+		"percentage":  alert.Percentage,
+		"recommended": alert.Recommended,
+	}
+	hl.log(LogLevelWarn, alert.Message, fields, nil)
+}
+
+// LogPerformanceMetrics logs healing performance metrics
+func (hl *HealingLogger) LogPerformanceMetrics(metrics HealingCoordinatorMetrics) {goCover_faa45bc9dd83__344[0] = 1 ; goCover_faa45bc9dd83__344[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__344[2] = 344 ; goCover_faa45bc9dd83__344[3] = 1;
+	fields := LogFields{
+		"total_attempts":      metrics.CompletedTasks,
+		"success_rate":        metrics.SuccessRate,
+		"average_duration_ms": metrics.AverageHealingDuration.Milliseconds(),
+		"circuit_state":       metrics.CircuitBreakerState,
+		"llm_calls":           metrics.TotalLLMCalls,
+		"llm_cost":            metrics.TotalLLMCost,
+		"cache_hit_rate":      metrics.LLMCacheHitRate,
+	}
+	hl.log(LogLevelInfo, "Performance metrics update", fields, nil)
+}
+
+// Close gracefully shuts down the logger
+func (hl *HealingLogger) Close() {goCover_faa45bc9dd83__345[0] = 1 ; goCover_faa45bc9dd83__345[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__345[2] = 345 ; goCover_faa45bc9dd83__345[3] = 1;
+	close(hl.stopChan)
+}
+
+// getStackTrace returns the current stack trace
+func getStackTrace() string {goCover_faa45bc9dd83__346[0] = 1 ; goCover_faa45bc9dd83__346[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__346[2] = 346 ; goCover_faa45bc9dd83__346[3] = 1;
+	buf := make([]byte, 4096)
+	n := runtime.Stack(buf, false)
+	return string(buf[:n])
+}
+
+// Global logger instance (can be replaced with custom implementation)
+var globalHealingLogger *HealingLogger
+
+func init() {goCover_faa45bc9dd83__347[0] = 1 ; goCover_faa45bc9dd83__347[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__347[2] = 347 ; goCover_faa45bc9dd83__347[3] = 1;
+	// Initialize with default config
+	globalHealingLogger = NewHealingLogger(nil)
+}
+
+// GetHealingLogger returns the global healing logger
+func GetHealingLogger() *HealingLogger {goCover_faa45bc9dd83__348[0] = 1 ; goCover_faa45bc9dd83__348[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__348[2] = 348 ; goCover_faa45bc9dd83__348[3] = 1;
+	return globalHealingLogger
+}
+
+// SetHealingLogger sets a custom global healing logger
+func SetHealingLogger(logger *HealingLogger) {goCover_faa45bc9dd83__349[0] = 3 ; goCover_faa45bc9dd83__349[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__349[2] = 349 ; goCover_faa45bc9dd83__349[3] = 1;
+	if globalHealingLogger != nil {goCover_faa45bc9dd83__349[5] = 1;
+		globalHealingLogger.Close()
+	}
+	goCover_faa45bc9dd83__349[4] = 1;globalHealingLogger = logger
+}

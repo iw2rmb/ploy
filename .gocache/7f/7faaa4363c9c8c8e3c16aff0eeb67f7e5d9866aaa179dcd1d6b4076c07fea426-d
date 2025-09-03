@@ -1,0 +1,283 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/healing_metrics.go:1:1
+package arf
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
+
+// HealingMetricsExporter exports healing workflow metrics to Prometheus
+type HealingMetricsExporter struct {
+	// Counters
+	transformationsTotal *prometheus.CounterVec
+	healingAttemptsTotal *prometheus.CounterVec
+	consulOperations     *prometheus.CounterVec
+	llmAPICalls          *prometheus.CounterVec
+	llmCostDollars       prometheus.Counter
+
+	// Histograms
+	childrenTreeDepth *prometheus.HistogramVec
+	healingDuration   *prometheus.HistogramVec
+
+	// Gauges
+	queueSize           prometheus.Gauge
+	activeWorkers       prometheus.Gauge
+	circuitBreakerState prometheus.Gauge
+	healingSuccessRate  prometheus.Gauge
+}
+
+// NewHealingMetricsExporter creates a new metrics exporter for healing workflows
+func NewHealingMetricsExporter() *HealingMetricsExporter {goCover_faa45bc9dd83__350[0] = 1 ; goCover_faa45bc9dd83__350[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__350[2] = 350 ; goCover_faa45bc9dd83__350[3] = 1;
+	return &HealingMetricsExporter{
+		// Total transformations counter
+		transformationsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "arf_transformations_total",
+				Help: "Total number of transformations started",
+			},
+			[]string{}, // No labels for total count
+		),
+
+		// Healing attempts by result and error type
+		healingAttemptsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "arf_healing_attempts_total",
+				Help: "Total healing attempts by result (success/failure/timeout) and error type",
+			},
+			[]string{"result", "error_type"},
+		),
+
+		// Children tree depth histogram
+		childrenTreeDepth: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "arf_children_tree_depth",
+				Help:    "Histogram of healing children tree depths",
+				Buckets: []float64{1, 2, 3, 4, 5, 6, 7, 8, 10, 15, 20},
+			},
+			[]string{},
+		),
+
+		// Healing duration histogram
+		healingDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Name:    "arf_healing_duration_seconds",
+				Help:    "Duration of healing workflows in seconds",
+				Buckets: prometheus.ExponentialBuckets(1, 2, 15), // 1s to ~32k seconds
+			},
+			[]string{},
+		),
+
+		// Consul operations counter
+		consulOperations: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "arf_consul_operations_total",
+				Help: "Total Consul KV operations by type and status",
+			},
+			[]string{"operation", "status"},
+		),
+
+		// LLM API calls counter
+		llmAPICalls: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "arf_llm_api_calls_total",
+				Help: "Total LLM API calls by model and cache hit status",
+			},
+			[]string{"model", "cache_hit"},
+		),
+
+		// LLM cost accumulator
+		llmCostDollars: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "arf_llm_cost_dollars",
+				Help: "Total accumulated LLM API costs in dollars",
+			},
+		),
+
+		// Queue size gauge
+		queueSize: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "arf_healing_queue_size",
+				Help: "Current number of queued healing tasks",
+			},
+		),
+
+		// Active workers gauge
+		activeWorkers: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "arf_healing_active_workers",
+				Help: "Current number of active healing workers",
+			},
+		),
+
+		// Circuit breaker state gauge
+		circuitBreakerState: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "arf_circuit_breaker_state",
+				Help: "Circuit breaker state: 0=closed, 1=open, 2=half-open",
+			},
+		),
+
+		// Success rate gauge
+		healingSuccessRate: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "arf_healing_success_rate",
+				Help: "Healing success rate as a percentage (0-100)",
+			},
+		),
+	}
+}
+
+// Register registers all metrics with the provided registry
+func (m *HealingMetricsExporter) Register(registry *prometheus.Registry) error {goCover_faa45bc9dd83__351[0] = 23 ; goCover_faa45bc9dd83__351[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__351[2] = 351 ; goCover_faa45bc9dd83__351[3] = 1;
+	// Register counters
+	if err := registry.Register(m.transformationsTotal); err != nil {goCover_faa45bc9dd83__351[15] = 1;
+		return fmt.Errorf("failed to register transformations_total: %w", err)
+	}
+	goCover_faa45bc9dd83__351[4] = 1;if err := registry.Register(m.healingAttemptsTotal); err != nil {goCover_faa45bc9dd83__351[16] = 1;
+		return fmt.Errorf("failed to register healing_attempts_total: %w", err)
+	}
+	goCover_faa45bc9dd83__351[5] = 1;if err := registry.Register(m.consulOperations); err != nil {goCover_faa45bc9dd83__351[17] = 1;
+		return fmt.Errorf("failed to register consul_operations: %w", err)
+	}
+	goCover_faa45bc9dd83__351[6] = 1;if err := registry.Register(m.llmAPICalls); err != nil {goCover_faa45bc9dd83__351[18] = 1;
+		return fmt.Errorf("failed to register llm_api_calls: %w", err)
+	}
+	goCover_faa45bc9dd83__351[7] = 1;if err := registry.Register(m.llmCostDollars); err != nil {goCover_faa45bc9dd83__351[19] = 1;
+		return fmt.Errorf("failed to register llm_cost_dollars: %w", err)
+	}
+
+	// Register histograms
+	goCover_faa45bc9dd83__351[8] = 1;if err := registry.Register(m.childrenTreeDepth); err != nil {goCover_faa45bc9dd83__351[20] = 1;
+		return fmt.Errorf("failed to register children_tree_depth: %w", err)
+	}
+	goCover_faa45bc9dd83__351[9] = 1;if err := registry.Register(m.healingDuration); err != nil {goCover_faa45bc9dd83__351[21] = 1;
+		return fmt.Errorf("failed to register healing_duration: %w", err)
+	}
+
+	// Register gauges
+	goCover_faa45bc9dd83__351[10] = 1;if err := registry.Register(m.queueSize); err != nil {goCover_faa45bc9dd83__351[22] = 1;
+		return fmt.Errorf("failed to register queue_size: %w", err)
+	}
+	goCover_faa45bc9dd83__351[11] = 1;if err := registry.Register(m.activeWorkers); err != nil {goCover_faa45bc9dd83__351[23] = 1;
+		return fmt.Errorf("failed to register active_workers: %w", err)
+	}
+	goCover_faa45bc9dd83__351[12] = 1;if err := registry.Register(m.circuitBreakerState); err != nil {goCover_faa45bc9dd83__351[24] = 1;
+		return fmt.Errorf("failed to register circuit_breaker_state: %w", err)
+	}
+	goCover_faa45bc9dd83__351[13] = 1;if err := registry.Register(m.healingSuccessRate); err != nil {goCover_faa45bc9dd83__351[25] = 1;
+		return fmt.Errorf("failed to register healing_success_rate: %w", err)
+	}
+
+	goCover_faa45bc9dd83__351[14] = 1;return nil
+}
+
+// RecordTransformationStarted increments the total transformations counter
+func (m *HealingMetricsExporter) RecordTransformationStarted(transformID string) {goCover_faa45bc9dd83__352[0] = 1 ; goCover_faa45bc9dd83__352[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__352[2] = 352 ; goCover_faa45bc9dd83__352[3] = 1;
+	m.transformationsTotal.WithLabelValues().Inc()
+}
+
+// RecordHealingAttempt records a healing attempt with its result and error type
+func (m *HealingMetricsExporter) RecordHealingAttempt(result, errorType string) {goCover_faa45bc9dd83__353[0] = 1 ; goCover_faa45bc9dd83__353[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__353[2] = 353 ; goCover_faa45bc9dd83__353[3] = 1;
+	m.healingAttemptsTotal.WithLabelValues(result, errorType).Inc()
+}
+
+// RecordTreeDepth records the depth of a healing tree
+func (m *HealingMetricsExporter) RecordTreeDepth(depth int) {goCover_faa45bc9dd83__354[0] = 1 ; goCover_faa45bc9dd83__354[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__354[2] = 354 ; goCover_faa45bc9dd83__354[3] = 1;
+	m.childrenTreeDepth.WithLabelValues().Observe(float64(depth))
+}
+
+// RecordHealingDuration records the duration of a healing workflow
+func (m *HealingMetricsExporter) RecordHealingDuration(duration time.Duration) {goCover_faa45bc9dd83__355[0] = 1 ; goCover_faa45bc9dd83__355[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__355[2] = 355 ; goCover_faa45bc9dd83__355[3] = 1;
+	m.healingDuration.WithLabelValues().Observe(duration.Seconds())
+}
+
+// RecordConsulOperation records a Consul KV operation
+func (m *HealingMetricsExporter) RecordConsulOperation(operation, status string) {goCover_faa45bc9dd83__356[0] = 1 ; goCover_faa45bc9dd83__356[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__356[2] = 356 ; goCover_faa45bc9dd83__356[3] = 1;
+	m.consulOperations.WithLabelValues(operation, status).Inc()
+}
+
+// RecordLLMCall records an LLM API call
+func (m *HealingMetricsExporter) RecordLLMCall(model string, cacheHit bool, cost float64) {goCover_faa45bc9dd83__357[0] = 4 ; goCover_faa45bc9dd83__357[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__357[2] = 357 ; goCover_faa45bc9dd83__357[3] = 1;
+	cacheHitStr := "false"
+	if cacheHit {goCover_faa45bc9dd83__357[5] = 1;
+		cacheHitStr = "true"
+	}
+	goCover_faa45bc9dd83__357[4] = 1;m.llmAPICalls.WithLabelValues(model, cacheHitStr).Inc()
+
+	// Only add cost for non-cached calls
+	if !cacheHit && cost > 0 {goCover_faa45bc9dd83__357[6] = 1;
+		m.llmCostDollars.Add(cost)
+	}
+}
+
+// SetQueueSize updates the current queue size
+func (m *HealingMetricsExporter) SetQueueSize(size int) {goCover_faa45bc9dd83__358[0] = 1 ; goCover_faa45bc9dd83__358[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__358[2] = 358 ; goCover_faa45bc9dd83__358[3] = 1;
+	m.queueSize.Set(float64(size))
+}
+
+// SetActiveWorkers updates the current number of active workers
+func (m *HealingMetricsExporter) SetActiveWorkers(count int) {goCover_faa45bc9dd83__359[0] = 1 ; goCover_faa45bc9dd83__359[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__359[2] = 359 ; goCover_faa45bc9dd83__359[3] = 1;
+	m.activeWorkers.Set(float64(count))
+}
+
+// SetCircuitBreakerState updates the circuit breaker state
+func (m *HealingMetricsExporter) SetCircuitBreakerState(state string) {goCover_faa45bc9dd83__360[0] = 6 ; goCover_faa45bc9dd83__360[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__360[2] = 360 ; goCover_faa45bc9dd83__360[3] = 1;
+	var value float64
+	switch state {
+	case "closed":goCover_faa45bc9dd83__360[5] = 1;
+		value = 0
+	case "open":goCover_faa45bc9dd83__360[6] = 1;
+		value = 1
+	case "half-open":goCover_faa45bc9dd83__360[7] = 1;
+		value = 2
+	default:goCover_faa45bc9dd83__360[8] = 1;
+		value = -1 // Unknown state
+	}
+	goCover_faa45bc9dd83__360[4] = 1;m.circuitBreakerState.Set(value)
+}
+
+// SetSuccessRate updates the healing success rate (as percentage 0-100)
+func (m *HealingMetricsExporter) SetSuccessRate(rate float64) {goCover_faa45bc9dd83__361[0] = 1 ; goCover_faa45bc9dd83__361[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__361[2] = 361 ; goCover_faa45bc9dd83__361[3] = 1;
+	// Convert from decimal (0.85) to percentage (85)
+	m.healingSuccessRate.Set(rate * 100)
+}
+
+// UpdateFromCoordinatorMetrics updates metrics from coordinator metrics struct
+func (m *HealingMetricsExporter) UpdateFromCoordinatorMetrics(metrics HealingCoordinatorMetrics) {goCover_faa45bc9dd83__362[0] = 1 ; goCover_faa45bc9dd83__362[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__362[2] = 362 ; goCover_faa45bc9dd83__362[3] = 1;
+	// Update gauges
+	m.SetQueueSize(metrics.QueuedTasks)
+	m.SetActiveWorkers(metrics.ActiveWorkers)
+	m.SetCircuitBreakerState(metrics.CircuitBreakerState)
+	m.SetSuccessRate(metrics.SuccessRate)
+
+	// Note: Counters and histograms should be updated incrementally during operations,
+	// not from periodic metrics snapshots
+}
+
+// RecordHealingCompleted records a completed healing with its result
+func (m *HealingMetricsExporter) RecordHealingCompleted(success bool, duration time.Duration, depth int) {goCover_faa45bc9dd83__363[0] = 3 ; goCover_faa45bc9dd83__363[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__363[2] = 363 ; goCover_faa45bc9dd83__363[3] = 1;
+	result := "failure"
+	if success {goCover_faa45bc9dd83__363[5] = 1;
+		result = "success"
+	}
+
+	goCover_faa45bc9dd83__363[4] = 1;m.RecordHealingAttempt(result, "")
+	m.RecordHealingDuration(duration)
+	m.RecordTreeDepth(depth)
+}
+
+// RecordHealingFailed records a failed healing with error type
+func (m *HealingMetricsExporter) RecordHealingFailed(errorType string, duration time.Duration, depth int) {goCover_faa45bc9dd83__364[0] = 1 ; goCover_faa45bc9dd83__364[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__364[2] = 364 ; goCover_faa45bc9dd83__364[3] = 1;
+	m.RecordHealingAttempt("failure", errorType)
+	m.RecordHealingDuration(duration)
+	m.RecordTreeDepth(depth)
+}
+
+// RecordHealingTimeout records a timed out healing
+func (m *HealingMetricsExporter) RecordHealingTimeout(duration time.Duration, depth int) {goCover_faa45bc9dd83__365[0] = 1 ; goCover_faa45bc9dd83__365[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__365[2] = 365 ; goCover_faa45bc9dd83__365[3] = 1;
+	m.RecordHealingAttempt("timeout", "")
+	m.RecordHealingDuration(duration)
+	m.RecordTreeDepth(depth)
+}

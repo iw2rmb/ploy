@@ -1,0 +1,200 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/inmemory_storage.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/iw2rmb/ploy/api/arf/models"
+)
+
+// InMemoryRecipeStorage provides a simple in-memory implementation of RecipeStorage
+// This is used for testing and as a temporary solution
+type InMemoryRecipeStorage struct {
+	recipes map[string]*models.Recipe
+	mu      sync.RWMutex
+}
+
+// NewInMemoryRecipeStorage creates a new in-memory recipe storage
+func NewInMemoryRecipeStorage() *InMemoryRecipeStorage {goCover_faa45bc9dd83__404[0] = 1 ; goCover_faa45bc9dd83__404[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__404[2] = 404 ; goCover_faa45bc9dd83__404[3] = 1;
+	return &InMemoryRecipeStorage{
+		recipes: make(map[string]*models.Recipe),
+	}
+}
+
+// CreateRecipe creates a new recipe in storage
+func (s *InMemoryRecipeStorage) CreateRecipe(ctx context.Context, recipe *models.Recipe) error {goCover_faa45bc9dd83__405[0] = 5 ; goCover_faa45bc9dd83__405[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__405[2] = 405 ; goCover_faa45bc9dd83__405[3] = 1;
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if recipe.ID == "" {goCover_faa45bc9dd83__405[6] = 1;
+		recipe.ID = recipe.GenerateID()
+	}
+
+	goCover_faa45bc9dd83__405[4] = 1;if _, exists := s.recipes[recipe.ID]; exists {goCover_faa45bc9dd83__405[7] = 1;
+		return fmt.Errorf("recipe %s already exists", recipe.ID)
+	}
+
+	goCover_faa45bc9dd83__405[5] = 1;recipe.CreatedAt = time.Now()
+	recipe.UpdatedAt = time.Now()
+	s.recipes[recipe.ID] = recipe
+	return nil
+}
+
+// GetRecipe retrieves a recipe by ID
+func (s *InMemoryRecipeStorage) GetRecipe(ctx context.Context, id string) (*models.Recipe, error) {goCover_faa45bc9dd83__406[0] = 3 ; goCover_faa45bc9dd83__406[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__406[2] = 406 ; goCover_faa45bc9dd83__406[3] = 1;
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	recipe, exists := s.recipes[id]
+	if !exists {goCover_faa45bc9dd83__406[5] = 1;
+		return nil, fmt.Errorf("recipe not found: %s", id)
+	}
+	goCover_faa45bc9dd83__406[4] = 1;return recipe, nil
+}
+
+// GetRecipeByNameAndVersion retrieves a recipe by name and version
+func (s *InMemoryRecipeStorage) GetRecipeByNameAndVersion(ctx context.Context, name, version string) (*models.Recipe, error) {goCover_faa45bc9dd83__407[0] = 4 ; goCover_faa45bc9dd83__407[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__407[2] = 407 ; goCover_faa45bc9dd83__407[3] = 1;
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, recipe := range s.recipes {goCover_faa45bc9dd83__407[5] = 1;
+		if recipe.Metadata.Name == name && recipe.Metadata.Version == version {goCover_faa45bc9dd83__407[6] = 1;
+			return recipe, nil
+		}
+	}
+	goCover_faa45bc9dd83__407[4] = 1;return nil, fmt.Errorf("recipe not found: %s@%s", name, version)
+}
+
+// UpdateRecipe updates an existing recipe
+func (s *InMemoryRecipeStorage) UpdateRecipe(ctx context.Context, id string, recipe *models.Recipe) error {goCover_faa45bc9dd83__408[0] = 3 ; goCover_faa45bc9dd83__408[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__408[2] = 408 ; goCover_faa45bc9dd83__408[3] = 1;
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.recipes[id]; !exists {goCover_faa45bc9dd83__408[5] = 1;
+		return fmt.Errorf("recipe %s not found", id)
+	}
+
+	goCover_faa45bc9dd83__408[4] = 1;recipe.ID = id
+	recipe.UpdatedAt = time.Now()
+	s.recipes[id] = recipe
+	return nil
+}
+
+// DeleteRecipe deletes a recipe
+func (s *InMemoryRecipeStorage) DeleteRecipe(ctx context.Context, id string) error {goCover_faa45bc9dd83__409[0] = 1 ; goCover_faa45bc9dd83__409[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__409[2] = 409 ; goCover_faa45bc9dd83__409[3] = 1;
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.recipes, id)
+	return nil
+}
+
+// ListRecipes lists recipes with filtering
+func (s *InMemoryRecipeStorage) ListRecipes(ctx context.Context, filter RecipeFilter) ([]*models.Recipe, error) {goCover_faa45bc9dd83__410[0] = 3 ; goCover_faa45bc9dd83__410[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__410[2] = 410 ; goCover_faa45bc9dd83__410[3] = 1;
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var results []*models.Recipe
+	for _, recipe := range s.recipes {goCover_faa45bc9dd83__410[5] = 1;
+		results = append(results, recipe)
+	}
+	goCover_faa45bc9dd83__410[4] = 1;return results, nil
+}
+
+// SearchRecipes performs full-text search
+func (s *InMemoryRecipeStorage) SearchRecipes(ctx context.Context, query string) ([]*RecipeSearchResult, error) {goCover_faa45bc9dd83__411[0] = 1 ; goCover_faa45bc9dd83__411[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__411[2] = 411 ; goCover_faa45bc9dd83__411[3] = 1;
+	return nil, fmt.Errorf("search not implemented in memory storage")
+}
+
+// GetRecipeVersions gets all versions of a recipe
+func (s *InMemoryRecipeStorage) GetRecipeVersions(ctx context.Context, name string) ([]*models.Recipe, error) {goCover_faa45bc9dd83__412[0] = 4 ; goCover_faa45bc9dd83__412[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__412[2] = 412 ; goCover_faa45bc9dd83__412[3] = 1;
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var results []*models.Recipe
+	for _, recipe := range s.recipes {goCover_faa45bc9dd83__412[5] = 1;
+		if recipe.Metadata.Name == name {goCover_faa45bc9dd83__412[6] = 1;
+			results = append(results, recipe)
+		}
+	}
+	goCover_faa45bc9dd83__412[4] = 1;return results, nil
+}
+
+// GetLatestRecipe gets the latest version of a recipe
+func (s *InMemoryRecipeStorage) GetLatestRecipe(ctx context.Context, name string) (*models.Recipe, error) {goCover_faa45bc9dd83__413[0] = 5 ; goCover_faa45bc9dd83__413[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__413[2] = 413 ; goCover_faa45bc9dd83__413[3] = 1;
+	versions, err := s.GetRecipeVersions(ctx, name)
+	if err != nil {goCover_faa45bc9dd83__413[6] = 1;
+		return nil, err
+	}
+	goCover_faa45bc9dd83__413[4] = 1;if len(versions) == 0 {goCover_faa45bc9dd83__413[7] = 1;
+		return nil, fmt.Errorf("no versions found for recipe %s", name)
+	}
+	goCover_faa45bc9dd83__413[5] = 1;return versions[0], nil
+}
+
+// ImportRecipes imports multiple recipes
+func (s *InMemoryRecipeStorage) ImportRecipes(ctx context.Context, recipes []*models.Recipe) error {goCover_faa45bc9dd83__414[0] = 4 ; goCover_faa45bc9dd83__414[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__414[2] = 414 ; goCover_faa45bc9dd83__414[3] = 1;
+	for _, recipe := range recipes {goCover_faa45bc9dd83__414[5] = 1;
+		if err := s.CreateRecipe(ctx, recipe); err != nil {goCover_faa45bc9dd83__414[6] = 1;
+			return err
+		}
+	}
+	goCover_faa45bc9dd83__414[4] = 1;return nil
+}
+
+// ExportRecipes exports recipes matching filter
+func (s *InMemoryRecipeStorage) ExportRecipes(ctx context.Context, filter RecipeFilter) ([]*models.Recipe, error) {goCover_faa45bc9dd83__415[0] = 1 ; goCover_faa45bc9dd83__415[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__415[2] = 415 ; goCover_faa45bc9dd83__415[3] = 1;
+	return s.ListRecipes(ctx, filter)
+}
+
+// ValidateRecipe validates a recipe
+func (s *InMemoryRecipeStorage) ValidateRecipe(ctx context.Context, recipe *models.Recipe) error {goCover_faa45bc9dd83__416[0] = 1 ; goCover_faa45bc9dd83__416[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__416[2] = 416 ; goCover_faa45bc9dd83__416[3] = 1;
+	return recipe.Validate()
+}
+
+// CheckRecipeIntegrity checks recipe integrity
+func (s *InMemoryRecipeStorage) CheckRecipeIntegrity(ctx context.Context, id string) error {goCover_faa45bc9dd83__417[0] = 7 ; goCover_faa45bc9dd83__417[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__417[2] = 417 ; goCover_faa45bc9dd83__417[3] = 1;
+	recipe, err := s.GetRecipe(ctx, id)
+	if err != nil {goCover_faa45bc9dd83__417[7] = 1;
+		return err
+	}
+
+	goCover_faa45bc9dd83__417[4] = 1;currentHash, err := recipe.CalculateHash()
+	if err != nil {goCover_faa45bc9dd83__417[8] = 1;
+		return err
+	}
+
+	goCover_faa45bc9dd83__417[5] = 1;if recipe.Hash != "" && recipe.Hash != currentHash {goCover_faa45bc9dd83__417[9] = 1;
+		return fmt.Errorf("integrity check failed")
+	}
+
+	goCover_faa45bc9dd83__417[6] = 1;return nil
+}
+
+// VerifyRecipeHash verifies recipe hash
+func (s *InMemoryRecipeStorage) VerifyRecipeHash(ctx context.Context, id string, expectedHash string) (bool, error) {goCover_faa45bc9dd83__418[0] = 5 ; goCover_faa45bc9dd83__418[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__418[2] = 418 ; goCover_faa45bc9dd83__418[3] = 1;
+	recipe, err := s.GetRecipe(ctx, id)
+	if err != nil {goCover_faa45bc9dd83__418[6] = 1;
+		return false, err
+	}
+
+	goCover_faa45bc9dd83__418[4] = 1;currentHash, err := recipe.CalculateHash()
+	if err != nil {goCover_faa45bc9dd83__418[7] = 1;
+		return false, err
+	}
+
+	goCover_faa45bc9dd83__418[5] = 1;return currentHash == expectedHash, nil
+}
+
+// RebuildIndex rebuilds the recipe index (no-op for in-memory)
+func (s *InMemoryRecipeStorage) RebuildIndex(ctx context.Context) error {goCover_faa45bc9dd83__419[0] = 1 ; goCover_faa45bc9dd83__419[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__419[2] = 419 ; goCover_faa45bc9dd83__419[3] = 1;
+	return nil
+}
+
+// UpdateIndex updates the recipe index (no-op for in-memory)
+func (s *InMemoryRecipeStorage) UpdateIndex(ctx context.Context, recipe *models.Recipe, action IndexAction) error {goCover_faa45bc9dd83__420[0] = 1 ; goCover_faa45bc9dd83__420[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__420[2] = 420 ; goCover_faa45bc9dd83__420[3] = 1;
+	return nil
+}

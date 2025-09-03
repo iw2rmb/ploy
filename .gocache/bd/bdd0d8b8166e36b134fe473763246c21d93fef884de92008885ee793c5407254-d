@@ -1,0 +1,203 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/security_engine.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+)
+
+// SecurityEngine handles vulnerability remediation and security analysis
+type SecurityEngine struct {
+	grypePath    string
+	cveDatabase  CVEDatabase
+	remediator   VulnerabilityRemediator
+	riskAnalyzer RiskAnalyzer
+	sbomAnalyzer SBOMSecurityAnalyzer
+	httpClient   *http.Client
+}
+
+// NewSecurityEngine creates a new security engine instance
+func NewSecurityEngine() *SecurityEngine {goCover_faa45bc9dd83__702[0] = 1 ; goCover_faa45bc9dd83__702[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__702[2] = 702 ; goCover_faa45bc9dd83__702[3] = 1;
+	return &SecurityEngine{
+		grypePath:    "grype",
+		cveDatabase:  nil, // Would be initialized with real implementation
+		remediator:   nil, // Would be initialized with real implementation
+		riskAnalyzer: nil, // Would be initialized with real implementation
+		sbomAnalyzer: nil, // Would be initialized with real implementation
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// ScanForVulnerabilities performs comprehensive vulnerability scanning
+func (s *SecurityEngine) ScanForVulnerabilities(ctx context.Context, target string, scanType string) (*SecurityReport, error) {goCover_faa45bc9dd83__703[0] = 1 ; goCover_faa45bc9dd83__703[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__703[2] = 703 ; goCover_faa45bc9dd83__703[3] = 1;
+	// Mock implementation for compilation
+	report := &SecurityReport{
+		Summary: SecuritySummary{
+			TotalVulnerabilities: 1,
+			RiskScore:            7.5,
+			FixableCount:         1,
+			ExploitableCount:     0,
+			Status:               "completed",
+		},
+		Vulnerabilities: []VulnerabilityInfo{
+			{
+				CVE: CVEInfo{
+					ID:          "CVE-2024-0001",
+					Description: "Example vulnerability for testing",
+					Severity:    "high",
+				},
+				Package: Dependency{
+					Name:      "example-package",
+					Version:   "1.0.0",
+					Ecosystem: "npm",
+				},
+				Severity:   "HIGH",
+				CVSS:       7.5,
+				FixVersion: "1.0.1",
+				HasFix:     true,
+			},
+		},
+		RiskAssessment: RiskAssessment{
+			OverallRisk:   "medium",
+			RiskScore:     5.5,
+			CriticalCount: 0,
+			HighCount:     1,
+			MediumCount:   2,
+			LowCount:      3,
+		},
+		GeneratedAt: time.Now(),
+	}
+
+	return report, nil
+}
+
+// GenerateRemediationPlan creates a comprehensive remediation plan
+func (s *SecurityEngine) GenerateRemediationPlan(ctx context.Context, vulns []VulnerabilityInfo, codebase Codebase) (*RemediationPlan, error) {goCover_faa45bc9dd83__704[0] = 1 ; goCover_faa45bc9dd83__704[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__704[2] = 704 ; goCover_faa45bc9dd83__704[3] = 1;
+	// Create prioritized vulnerabilities
+	priorities := s.prioritizeVulnerabilities(vulns)
+
+	// Create remediation timeline
+	timeline := s.createRemediationTimeline(priorities)
+
+	// Calculate estimated effort
+	effort := s.calculateEffort(vulns)
+
+	plan := &RemediationPlan{
+		ID:              generateID(),
+		Vulnerabilities: vulns,
+		Recipes:         []RemediationRecipe{},
+		Timeline:        timeline,
+		EstimatedEffort: effort,
+		CreatedAt:       time.Now(),
+		Metadata: map[string]interface{}{
+			"codebase": codebase.Repository,
+			"language": codebase.Language,
+		},
+	}
+
+	return plan, nil
+}
+
+// Helper methods
+
+func (s *SecurityEngine) prioritizeVulnerabilities(vulns []VulnerabilityInfo) []VulnerabilityPriority {goCover_faa45bc9dd83__705[0] = 10 ; goCover_faa45bc9dd83__705[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__705[2] = 705 ; goCover_faa45bc9dd83__705[3] = 1;
+	priorities := make([]VulnerabilityPriority, len(vulns))
+	for i, vuln := range vulns {goCover_faa45bc9dd83__705[5] = 1;
+		priority := 1
+		urgency := "medium"
+
+		if vuln.CVSS >= 9.0 {goCover_faa45bc9dd83__705[7] = 1;
+			priority = 1
+			urgency = "critical"
+		} else{ goCover_faa45bc9dd83__705[8] = 1;if vuln.CVSS >= 7.0 {goCover_faa45bc9dd83__705[9] = 1;
+			priority = 2
+			urgency = "high"
+		} else{ goCover_faa45bc9dd83__705[10] = 1;if vuln.CVSS >= 4.0 {goCover_faa45bc9dd83__705[11] = 1;
+			priority = 3
+			urgency = "medium"
+		} else{ goCover_faa45bc9dd83__705[12] = 1;{
+			priority = 4
+			urgency = "low"
+		}}}}
+
+		goCover_faa45bc9dd83__705[6] = 1;priorities[i] = VulnerabilityPriority{
+			Vulnerability: vuln,
+			Priority:      priority,
+			Urgency:       urgency,
+			Justification: fmt.Sprintf("CVSS score: %.1f", vuln.CVSS),
+			EstimatedFix:  s.estimateFixTime(vuln),
+		}
+	}
+
+	goCover_faa45bc9dd83__705[4] = 1;return priorities
+}
+
+func (s *SecurityEngine) createRemediationTimeline(priorities []VulnerabilityPriority) RemediationTimeline {goCover_faa45bc9dd83__706[0] = 7 ; goCover_faa45bc9dd83__706[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__706[2] = 706 ; goCover_faa45bc9dd83__706[3] = 1;
+	timeline := RemediationTimeline{
+		Immediate: []string{},
+		Short:     []string{},
+		Medium:    []string{},
+		Long:      []string{},
+	}
+
+	for _, priority := range priorities {goCover_faa45bc9dd83__706[5] = 1;
+		cveID := priority.Vulnerability.CVE.ID
+		switch priority.Urgency {
+		case "critical":goCover_faa45bc9dd83__706[6] = 1;
+			timeline.Immediate = append(timeline.Immediate, cveID)
+		case "high":goCover_faa45bc9dd83__706[7] = 1;
+			timeline.Short = append(timeline.Short, cveID)
+		case "medium":goCover_faa45bc9dd83__706[8] = 1;
+			timeline.Medium = append(timeline.Medium, cveID)
+		default:goCover_faa45bc9dd83__706[9] = 1;
+			timeline.Long = append(timeline.Long, cveID)
+		}
+	}
+
+	goCover_faa45bc9dd83__706[4] = 1;return timeline
+}
+
+func (s *SecurityEngine) calculateEffort(vulns []VulnerabilityInfo) EstimatedEffort {goCover_faa45bc9dd83__707[0] = 9 ; goCover_faa45bc9dd83__707[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__707[2] = 707 ; goCover_faa45bc9dd83__707[3] = 1;
+	totalTime := 0
+	complexity := 1
+
+	for _, vuln := range vulns {goCover_faa45bc9dd83__707[6] = 1;
+		if vuln.HasFix {goCover_faa45bc9dd83__707[7] = 1;
+			totalTime += 30 // 30 minutes per fixable vulnerability
+		} else{ goCover_faa45bc9dd83__707[8] = 1;{
+			totalTime += 120 // 2 hours for manual fixes
+			complexity = 5   // Higher complexity for manual fixes
+		}}
+	}
+
+	goCover_faa45bc9dd83__707[4] = 1;level := "low"
+	if totalTime > 240 {goCover_faa45bc9dd83__707[9] = 1; // > 4 hours
+		level = "high"
+	} else{ goCover_faa45bc9dd83__707[10] = 1;if totalTime > 120 {goCover_faa45bc9dd83__707[11] = 1; // > 2 hours
+		level = "medium"
+	}}
+
+	goCover_faa45bc9dd83__707[5] = 1;return EstimatedEffort{
+		Level:       level,
+		TimeMinutes: totalTime,
+		Complexity:  complexity,
+		Risk:        "minimal",
+		Resources:   []string{"security-engineer", "developer"},
+	}
+}
+
+func (s *SecurityEngine) estimateFixTime(vuln VulnerabilityInfo) time.Duration {goCover_faa45bc9dd83__708[0] = 3 ; goCover_faa45bc9dd83__708[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__708[2] = 708 ; goCover_faa45bc9dd83__708[3] = 1;
+	if vuln.HasFix {goCover_faa45bc9dd83__708[5] = 1;
+		return 30 * time.Minute // Automated fix
+	}
+	goCover_faa45bc9dd83__708[4] = 1;return 2 * time.Hour // Manual fix
+}
+
+// generateID creates a unique ID for security engine objects
+func generateID() string {goCover_faa45bc9dd83__709[0] = 1 ; goCover_faa45bc9dd83__709[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__709[2] = 709 ; goCover_faa45bc9dd83__709[3] = 1;
+	return fmt.Sprintf("arf-sec-%d", time.Now().Unix())
+}

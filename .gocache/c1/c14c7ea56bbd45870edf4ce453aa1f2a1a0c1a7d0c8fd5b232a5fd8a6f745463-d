@@ -1,0 +1,757 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/nvd_database.go:1:1
+package arf
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+)
+
+// NVDDatabase implements CVEDatabase using the National Vulnerability Database
+type NVDDatabase struct {
+	apiKey     string
+	baseURL    string
+	httpClient *http.Client
+	cache      map[string]*CVEInfo
+}
+
+// NVDResponse represents the NVD API response structure
+type NVDResponse struct {
+	ResultsPerPage  int    `json:"resultsPerPage"`
+	StartIndex      int    `json:"startIndex"`
+	TotalResults    int    `json:"totalResults"`
+	Format          string `json:"format"`
+	Version         string `json:"version"`
+	Timestamp       string `json:"timestamp"`
+	Vulnerabilities []struct {
+		CVE struct {
+			ID                 string `json:"id"`
+			SourceIdentifier   string `json:"sourceIdentifier"`
+			VulnStatus         string `json:"vulnStatus"`
+			Published          string `json:"published"`
+			LastModified       string `json:"lastModified"`
+			EvaluatorComment   string `json:"evaluatorComment,omitempty"`
+			EvaluatorSolution  string `json:"evaluatorSolution,omitempty"`
+			EvaluatorImpact    string `json:"evaluatorImpact,omitempty"`
+			CISAExploitAdd     string `json:"cisaExploitAdd,omitempty"`
+			CISAActionDue      string `json:"cisaActionDue,omitempty"`
+			CISARequiredAction string `json:"cisaRequiredAction,omitempty"`
+			CISAVulnName       string `json:"cisaVulnName,omitempty"`
+			Descriptions       []struct {
+				Lang  string `json:"lang"`
+				Value string `json:"value"`
+			} `json:"descriptions"`
+			References []struct {
+				URL    string   `json:"url"`
+				Source string   `json:"source"`
+				Tags   []string `json:"tags,omitempty"`
+			} `json:"references"`
+			Metrics struct {
+				CvssMetricV31 []struct {
+					Source   string `json:"source"`
+					Type     string `json:"type"`
+					CvssData struct {
+						Version               string  `json:"version"`
+						VectorString          string  `json:"vectorString"`
+						AttackVector          string  `json:"attackVector"`
+						AttackComplexity      string  `json:"attackComplexity"`
+						PrivilegesRequired    string  `json:"privilegesRequired"`
+						UserInteraction       string  `json:"userInteraction"`
+						Scope                 string  `json:"scope"`
+						ConfidentialityImpact string  `json:"confidentialityImpact"`
+						IntegrityImpact       string  `json:"integrityImpact"`
+						AvailabilityImpact    string  `json:"availabilityImpact"`
+						BaseScore             float64 `json:"baseScore"`
+						BaseSeverity          string  `json:"baseSeverity"`
+						ExploitabilityScore   float64 `json:"exploitabilityScore"`
+						ImpactScore           float64 `json:"impactScore"`
+					} `json:"cvssData"`
+					ExploitabilityScore float64 `json:"exploitabilityScore"`
+					ImpactScore         float64 `json:"impactScore"`
+				} `json:"cvssMetricV31"`
+				CvssMetricV30 []struct {
+					Source   string `json:"source"`
+					Type     string `json:"type"`
+					CvssData struct {
+						Version               string  `json:"version"`
+						VectorString          string  `json:"vectorString"`
+						AttackVector          string  `json:"attackVector"`
+						AttackComplexity      string  `json:"attackComplexity"`
+						PrivilegesRequired    string  `json:"privilegesRequired"`
+						UserInteraction       string  `json:"userInteraction"`
+						Scope                 string  `json:"scope"`
+						ConfidentialityImpact string  `json:"confidentialityImpact"`
+						IntegrityImpact       string  `json:"integrityImpact"`
+						AvailabilityImpact    string  `json:"availabilityImpact"`
+						BaseScore             float64 `json:"baseScore"`
+						BaseSeverity          string  `json:"baseSeverity"`
+						ExploitabilityScore   float64 `json:"exploitabilityScore"`
+						ImpactScore           float64 `json:"impactScore"`
+					} `json:"cvssData"`
+					ExploitabilityScore float64 `json:"exploitabilityScore"`
+					ImpactScore         float64 `json:"impactScore"`
+				} `json:"cvssMetricV30"`
+				CvssMetricV2 []struct {
+					Source   string `json:"source"`
+					Type     string `json:"type"`
+					CvssData struct {
+						Version               string  `json:"version"`
+						VectorString          string  `json:"vectorString"`
+						AccessVector          string  `json:"accessVector"`
+						AccessComplexity      string  `json:"accessComplexity"`
+						Authentication        string  `json:"authentication"`
+						ConfidentialityImpact string  `json:"confidentialityImpact"`
+						IntegrityImpact       string  `json:"integrityImpact"`
+						AvailabilityImpact    string  `json:"availabilityImpact"`
+						BaseScore             float64 `json:"baseScore"`
+					} `json:"cvssData"`
+					BaseSeverity            string  `json:"baseSeverity"`
+					ExploitabilityScore     float64 `json:"exploitabilityScore"`
+					ImpactScore             float64 `json:"impactScore"`
+					AcInsufInfo             bool    `json:"acInsufInfo"`
+					ObtainAllPrivilege      bool    `json:"obtainAllPrivilege"`
+					ObtainUserPrivilege     bool    `json:"obtainUserPrivilege"`
+					ObtainOtherPrivilege    bool    `json:"obtainOtherPrivilege"`
+					UserInteractionRequired bool    `json:"userInteractionRequired"`
+				} `json:"cvssMetricV2"`
+			} `json:"metrics"`
+			Weaknesses []struct {
+				Source      string `json:"source"`
+				Type        string `json:"type"`
+				Description []struct {
+					Lang  string `json:"lang"`
+					Value string `json:"value"`
+				} `json:"description"`
+			} `json:"weaknesses"`
+			Configurations []struct {
+				Nodes []struct {
+					Operator string `json:"operator"`
+					Negate   bool   `json:"negate"`
+					CpeMatch []struct {
+						Vulnerable            bool   `json:"vulnerable"`
+						Criteria              string `json:"criteria"`
+						VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+						VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+						VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+						VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+						MatchCriteriaId       string `json:"matchCriteriaId"`
+					} `json:"cpeMatch"`
+				} `json:"nodes"`
+			} `json:"configurations"`
+			VendorComments []struct {
+				Organization string `json:"organization"`
+				Comment      string `json:"comment"`
+				LastModified string `json:"lastModified"`
+			} `json:"vendorComments,omitempty"`
+		} `json:"cve"`
+	} `json:"vulnerabilities"`
+}
+
+// NewNVDDatabase creates a new NVD database client
+func NewNVDDatabase() *NVDDatabase {goCover_faa45bc9dd83__530[0] = 1 ; goCover_faa45bc9dd83__530[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__530[2] = 530 ; goCover_faa45bc9dd83__530[3] = 1;
+	return &NVDDatabase{
+		baseURL: "https://services.nvd.nist.gov/rest/json/cves/2.0",
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		cache: make(map[string]*CVEInfo),
+	}
+}
+
+// SetAPIKey sets the NVD API key for enhanced rate limits
+func (n *NVDDatabase) SetAPIKey(apiKey string) {goCover_faa45bc9dd83__531[0] = 1 ; goCover_faa45bc9dd83__531[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__531[2] = 531 ; goCover_faa45bc9dd83__531[3] = 1;
+	n.apiKey = apiKey
+}
+
+// LookupCVE retrieves detailed information for a specific CVE
+func (n *NVDDatabase) LookupCVE(cveID string) (*CVEInfo, error) {goCover_faa45bc9dd83__532[0] = 17 ; goCover_faa45bc9dd83__532[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__532[2] = 532 ; goCover_faa45bc9dd83__532[3] = 1;
+	// Check cache first
+	if cached, exists := n.cache[cveID]; exists {goCover_faa45bc9dd83__532[12] = 1;
+		return cached, nil
+	}
+
+	// Build request URL
+	goCover_faa45bc9dd83__532[4] = 1;url := fmt.Sprintf("%s?cveId=%s", n.baseURL, cveID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {goCover_faa45bc9dd83__532[13] = 1;
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add API key if available
+	goCover_faa45bc9dd83__532[5] = 1;if n.apiKey != "" {goCover_faa45bc9dd83__532[14] = 1;
+		req.Header.Set("apiKey", n.apiKey)
+	}
+
+	// Make request
+	goCover_faa45bc9dd83__532[6] = 1;resp, err := n.httpClient.Do(req)
+	if err != nil {goCover_faa45bc9dd83__532[15] = 1;
+		return nil, fmt.Errorf("NVD API request failed: %w", err)
+	}
+	goCover_faa45bc9dd83__532[7] = 1;defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {goCover_faa45bc9dd83__532[16] = 1;
+		return nil, fmt.Errorf("NVD API returned status %d", resp.StatusCode)
+	}
+
+	// Parse response
+	goCover_faa45bc9dd83__532[8] = 1;var nvdResp NVDResponse
+	if err := json.NewDecoder(resp.Body).Decode(&nvdResp); err != nil {goCover_faa45bc9dd83__532[17] = 1;
+		return nil, fmt.Errorf("failed to decode NVD response: %w", err)
+	}
+
+	goCover_faa45bc9dd83__532[9] = 1;if len(nvdResp.Vulnerabilities) == 0 {goCover_faa45bc9dd83__532[18] = 1;
+		return nil, fmt.Errorf("CVE %s not found", cveID)
+	}
+
+	// Convert to CVEInfo
+	goCover_faa45bc9dd83__532[10] = 1;cveInfo, err := n.convertToCVEInfo(nvdResp.Vulnerabilities[0])
+	if err != nil {goCover_faa45bc9dd83__532[19] = 1;
+		return nil, fmt.Errorf("failed to convert CVE data: %w", err)
+	}
+
+	// Cache result
+	goCover_faa45bc9dd83__532[11] = 1;n.cache[cveID] = cveInfo
+
+	return cveInfo, nil
+}
+
+// QueryVulnerabilities searches for vulnerabilities based on criteria
+func (n *NVDDatabase) QueryVulnerabilities(criteria VulnerabilityQuery) ([]VulnerabilityInfo, error) {goCover_faa45bc9dd83__533[0] = 27 ; goCover_faa45bc9dd83__533[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__533[2] = 533 ; goCover_faa45bc9dd83__533[3] = 1;
+	// Build query parameters
+	params := make(map[string]string)
+
+	if criteria.PackageName != "" {goCover_faa45bc9dd83__533[15] = 1;
+		params["keywordSearch"] = criteria.PackageName
+	}
+
+	goCover_faa45bc9dd83__533[4] = 1;if !criteria.DateRange.From.IsZero() {goCover_faa45bc9dd83__533[16] = 1;
+		params["pubStartDate"] = criteria.DateRange.From.Format("2006-01-02T15:04:05.000Z")
+	}
+
+	goCover_faa45bc9dd83__533[5] = 1;if !criteria.DateRange.To.IsZero() {goCover_faa45bc9dd83__533[17] = 1;
+		params["pubEndDate"] = criteria.DateRange.To.Format("2006-01-02T15:04:05.000Z")
+	}
+
+	goCover_faa45bc9dd83__533[6] = 1;if criteria.CVSS.Min > 0 {goCover_faa45bc9dd83__533[18] = 1;
+		params["cvssV3Severity"] = n.mapCVSSToSeverity(criteria.CVSS.Min)
+	}
+
+	// Build URL with parameters
+	goCover_faa45bc9dd83__533[7] = 1;url := n.baseURL
+	if len(params) > 0 {goCover_faa45bc9dd83__533[19] = 1;
+		url += "?"
+		var paramPairs []string
+		for key, value := range params {goCover_faa45bc9dd83__533[21] = 1;
+			paramPairs = append(paramPairs, fmt.Sprintf("%s=%s", key, value))
+		}
+		goCover_faa45bc9dd83__533[20] = 1;url += strings.Join(paramPairs, "&")
+	}
+
+	goCover_faa45bc9dd83__533[8] = 1;req, err := http.NewRequest("GET", url, nil)
+	if err != nil {goCover_faa45bc9dd83__533[22] = 1;
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	goCover_faa45bc9dd83__533[9] = 1;if n.apiKey != "" {goCover_faa45bc9dd83__533[23] = 1;
+		req.Header.Set("apiKey", n.apiKey)
+	}
+
+	goCover_faa45bc9dd83__533[10] = 1;resp, err := n.httpClient.Do(req)
+	if err != nil {goCover_faa45bc9dd83__533[24] = 1;
+		return nil, fmt.Errorf("NVD API request failed: %w", err)
+	}
+	goCover_faa45bc9dd83__533[11] = 1;defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {goCover_faa45bc9dd83__533[25] = 1;
+		return nil, fmt.Errorf("NVD API returned status %d", resp.StatusCode)
+	}
+
+	goCover_faa45bc9dd83__533[12] = 1;var nvdResp NVDResponse
+	if err := json.NewDecoder(resp.Body).Decode(&nvdResp); err != nil {goCover_faa45bc9dd83__533[26] = 1;
+		return nil, fmt.Errorf("failed to decode NVD response: %w", err)
+	}
+
+	// Convert to VulnerabilityInfo
+	goCover_faa45bc9dd83__533[13] = 1;vulns := make([]VulnerabilityInfo, 0, len(nvdResp.Vulnerabilities))
+	for _, nvdVuln := range nvdResp.Vulnerabilities {goCover_faa45bc9dd83__533[27] = 1;
+		cveInfo, err := n.convertToCVEInfo(nvdVuln)
+		if err != nil {goCover_faa45bc9dd83__533[29] = 1;
+			continue // Skip problematic entries
+		}
+
+		goCover_faa45bc9dd83__533[28] = 1;vuln := VulnerabilityInfo{
+			CVE:      *cveInfo,
+			Severity: cveInfo.Severity,
+			CVSS:     cveInfo.CVSS.BaseScore,
+			Discovery: VulnerabilityDiscovery{
+				Method:     "database_query",
+				Tool:       "nvd",
+				Timestamp:  time.Now(),
+				Confidence: 1.0,
+				Source:     "NVD",
+			},
+		}
+
+		vulns = append(vulns, vuln)
+	}
+
+	goCover_faa45bc9dd83__533[14] = 1;return vulns, nil
+}
+
+// UpdateDatabase updates the local CVE database
+func (n *NVDDatabase) UpdateDatabase(ctx context.Context) error {goCover_faa45bc9dd83__534[0] = 1 ; goCover_faa45bc9dd83__534[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__534[2] = 534 ; goCover_faa45bc9dd83__534[3] = 1;
+	// For NVD, we don't maintain a local database - we query in real time
+	// This method could be used to update cached data or local mirrors
+	return nil
+}
+
+// convertToCVEInfo converts NVD vulnerability data to CVEInfo
+func (n *NVDDatabase) convertToCVEInfo(nvdVuln struct {
+	CVE struct {
+		ID                 string `json:"id"`
+		SourceIdentifier   string `json:"sourceIdentifier"`
+		VulnStatus         string `json:"vulnStatus"`
+		Published          string `json:"published"`
+		LastModified       string `json:"lastModified"`
+		EvaluatorComment   string `json:"evaluatorComment,omitempty"`
+		EvaluatorSolution  string `json:"evaluatorSolution,omitempty"`
+		EvaluatorImpact    string `json:"evaluatorImpact,omitempty"`
+		CISAExploitAdd     string `json:"cisaExploitAdd,omitempty"`
+		CISAActionDue      string `json:"cisaActionDue,omitempty"`
+		CISARequiredAction string `json:"cisaRequiredAction,omitempty"`
+		CISAVulnName       string `json:"cisaVulnName,omitempty"`
+		Descriptions       []struct {
+			Lang  string `json:"lang"`
+			Value string `json:"value"`
+		} `json:"descriptions"`
+		References []struct {
+			URL    string   `json:"url"`
+			Source string   `json:"source"`
+			Tags   []string `json:"tags,omitempty"`
+		} `json:"references"`
+		Metrics struct {
+			CvssMetricV31 []struct {
+				Source   string `json:"source"`
+				Type     string `json:"type"`
+				CvssData struct {
+					Version               string  `json:"version"`
+					VectorString          string  `json:"vectorString"`
+					AttackVector          string  `json:"attackVector"`
+					AttackComplexity      string  `json:"attackComplexity"`
+					PrivilegesRequired    string  `json:"privilegesRequired"`
+					UserInteraction       string  `json:"userInteraction"`
+					Scope                 string  `json:"scope"`
+					ConfidentialityImpact string  `json:"confidentialityImpact"`
+					IntegrityImpact       string  `json:"integrityImpact"`
+					AvailabilityImpact    string  `json:"availabilityImpact"`
+					BaseScore             float64 `json:"baseScore"`
+					BaseSeverity          string  `json:"baseSeverity"`
+					ExploitabilityScore   float64 `json:"exploitabilityScore"`
+					ImpactScore           float64 `json:"impactScore"`
+				} `json:"cvssData"`
+				ExploitabilityScore float64 `json:"exploitabilityScore"`
+				ImpactScore         float64 `json:"impactScore"`
+			} `json:"cvssMetricV31"`
+			CvssMetricV30 []struct {
+				Source   string `json:"source"`
+				Type     string `json:"type"`
+				CvssData struct {
+					Version               string  `json:"version"`
+					VectorString          string  `json:"vectorString"`
+					AttackVector          string  `json:"attackVector"`
+					AttackComplexity      string  `json:"attackComplexity"`
+					PrivilegesRequired    string  `json:"privilegesRequired"`
+					UserInteraction       string  `json:"userInteraction"`
+					Scope                 string  `json:"scope"`
+					ConfidentialityImpact string  `json:"confidentialityImpact"`
+					IntegrityImpact       string  `json:"integrityImpact"`
+					AvailabilityImpact    string  `json:"availabilityImpact"`
+					BaseScore             float64 `json:"baseScore"`
+					BaseSeverity          string  `json:"baseSeverity"`
+					ExploitabilityScore   float64 `json:"exploitabilityScore"`
+					ImpactScore           float64 `json:"impactScore"`
+				} `json:"cvssData"`
+				ExploitabilityScore float64 `json:"exploitabilityScore"`
+				ImpactScore         float64 `json:"impactScore"`
+			} `json:"cvssMetricV30"`
+			CvssMetricV2 []struct {
+				Source   string `json:"source"`
+				Type     string `json:"type"`
+				CvssData struct {
+					Version               string  `json:"version"`
+					VectorString          string  `json:"vectorString"`
+					AccessVector          string  `json:"accessVector"`
+					AccessComplexity      string  `json:"accessComplexity"`
+					Authentication        string  `json:"authentication"`
+					ConfidentialityImpact string  `json:"confidentialityImpact"`
+					IntegrityImpact       string  `json:"integrityImpact"`
+					AvailabilityImpact    string  `json:"availabilityImpact"`
+					BaseScore             float64 `json:"baseScore"`
+				} `json:"cvssData"`
+				BaseSeverity            string  `json:"baseSeverity"`
+				ExploitabilityScore     float64 `json:"exploitabilityScore"`
+				ImpactScore             float64 `json:"impactScore"`
+				AcInsufInfo             bool    `json:"acInsufInfo"`
+				ObtainAllPrivilege      bool    `json:"obtainAllPrivilege"`
+				ObtainUserPrivilege     bool    `json:"obtainUserPrivilege"`
+				ObtainOtherPrivilege    bool    `json:"obtainOtherPrivilege"`
+				UserInteractionRequired bool    `json:"userInteractionRequired"`
+			} `json:"cvssMetricV2"`
+		} `json:"metrics"`
+		Weaknesses []struct {
+			Source      string `json:"source"`
+			Type        string `json:"type"`
+			Description []struct {
+				Lang  string `json:"lang"`
+				Value string `json:"value"`
+			} `json:"description"`
+		} `json:"weaknesses"`
+		Configurations []struct {
+			Nodes []struct {
+				Operator string `json:"operator"`
+				Negate   bool   `json:"negate"`
+				CpeMatch []struct {
+					Vulnerable            bool   `json:"vulnerable"`
+					Criteria              string `json:"criteria"`
+					VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+					VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+					VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+					VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+					MatchCriteriaId       string `json:"matchCriteriaId"`
+				} `json:"cpeMatch"`
+			} `json:"nodes"`
+		} `json:"configurations"`
+		VendorComments []struct {
+			Organization string `json:"organization"`
+			Comment      string `json:"comment"`
+			LastModified string `json:"lastModified"`
+		} `json:"vendorComments,omitempty"`
+	} `json:"cve"`
+}) (*CVEInfo, error) {goCover_faa45bc9dd83__535[0] = 20 ; goCover_faa45bc9dd83__535[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__535[2] = 535 ; goCover_faa45bc9dd83__535[3] = 1;
+	cve := nvdVuln.CVE
+
+	// Parse description
+	var description string
+	for _, desc := range cve.Descriptions {goCover_faa45bc9dd83__535[9] = 1;
+		if desc.Lang == "en" {goCover_faa45bc9dd83__535[10] = 1;
+			description = desc.Value
+			break
+		}
+	}
+	goCover_faa45bc9dd83__535[4] = 1;if description == "" && len(cve.Descriptions) > 0 {goCover_faa45bc9dd83__535[11] = 1;
+		description = cve.Descriptions[0].Value
+	}
+
+	// Parse references
+	goCover_faa45bc9dd83__535[5] = 1;refs := make([]CVEReference, len(cve.References))
+	for i, ref := range cve.References {goCover_faa45bc9dd83__535[12] = 1;
+		refs[i] = CVEReference{
+			Type: "external",
+			URL:  ref.URL,
+			Tags: ref.Tags,
+		}
+	}
+
+	// Parse published date
+	goCover_faa45bc9dd83__535[6] = 1;publishedDate, _ := time.Parse("2006-01-02T15:04:05.000Z", cve.Published)
+
+	// Determine CVSS score and version
+	var cvssScore CVSSScore
+	var severity string
+
+	// Prefer CVSS v3.1, then v3.0, then v2
+	if len(cve.Metrics.CvssMetricV31) > 0 {goCover_faa45bc9dd83__535[13] = 1;
+		cvss := cve.Metrics.CvssMetricV31[0]
+		cvssScore = CVSSScore{
+			Version:        cvss.CvssData.Version,
+			BaseScore:      cvss.CvssData.BaseScore,
+			Vector:         cvss.CvssData.VectorString,
+			Impact:         cvss.ImpactScore,
+			Exploitability: cvss.ExploitabilityScore,
+		}
+		severity = cvss.CvssData.BaseSeverity
+	} else{ goCover_faa45bc9dd83__535[14] = 1;if len(cve.Metrics.CvssMetricV30) > 0 {goCover_faa45bc9dd83__535[15] = 1;
+		cvss := cve.Metrics.CvssMetricV30[0]
+		cvssScore = CVSSScore{
+			Version:        cvss.CvssData.Version,
+			BaseScore:      cvss.CvssData.BaseScore,
+			Vector:         cvss.CvssData.VectorString,
+			Impact:         cvss.ImpactScore,
+			Exploitability: cvss.ExploitabilityScore,
+		}
+		severity = cvss.CvssData.BaseSeverity
+	} else{ goCover_faa45bc9dd83__535[16] = 1;if len(cve.Metrics.CvssMetricV2) > 0 {goCover_faa45bc9dd83__535[17] = 1;
+		cvss := cve.Metrics.CvssMetricV2[0]
+		cvssScore = CVSSScore{
+			Version:        cvss.CvssData.Version,
+			BaseScore:      cvss.CvssData.BaseScore,
+			Vector:         cvss.CvssData.VectorString,
+			Impact:         cvss.ImpactScore,
+			Exploitability: cvss.ExploitabilityScore,
+		}
+		severity = cvss.BaseSeverity
+	}}}
+
+	// Parse affected packages from configurations
+	goCover_faa45bc9dd83__535[7] = 1;var affectedPackages []AffectedPackage
+	for _, config := range cve.Configurations {goCover_faa45bc9dd83__535[18] = 1;
+		for _, node := range config.Nodes {goCover_faa45bc9dd83__535[19] = 1;
+			for _, cpeMatch := range node.CpeMatch {goCover_faa45bc9dd83__535[20] = 1;
+				if cpeMatch.Vulnerable {goCover_faa45bc9dd83__535[21] = 1;
+					pkg := n.parseCPEToPackage(cpeMatch.Criteria)
+					if pkg != nil {goCover_faa45bc9dd83__535[22] = 1;
+						affectedPackages = append(affectedPackages, *pkg)
+					}
+				}
+			}
+		}
+	}
+
+	// Determine exploitability
+	goCover_faa45bc9dd83__535[8] = 1;hasExploit := cve.CISAExploitAdd != ""
+	exploitability := ExploitabilityInfo{
+		HasExploit:       hasExploit,
+		ExploitMaturity:  "unknown",
+		AttackVector:     "network",
+		AttackComplexity: "low",
+	}
+
+	// Generate remediation guidance
+	remediation := n.generateRemediationGuidance(cve, affectedPackages)
+
+	cveInfo := &CVEInfo{
+		ID:               cve.ID,
+		Description:      description,
+		CVSS:             cvssScore,
+		AffectedPackages: affectedPackages,
+		References:       refs,
+		PublishedDate:    publishedDate,
+		Severity:         severity,
+		Remediation:      remediation,
+		Exploitability:   exploitability,
+		Metadata: map[string]interface{}{
+			"source_identifier": cve.SourceIdentifier,
+			"vuln_status":       cve.VulnStatus,
+			"last_modified":     cve.LastModified,
+		},
+	}
+
+	return cveInfo, nil
+}
+
+// parseCPEToPackage converts a CPE string to a package structure
+func (n *NVDDatabase) parseCPEToPackage(cpe string) *AffectedPackage {goCover_faa45bc9dd83__536[0] = 5 ; goCover_faa45bc9dd83__536[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__536[2] = 536 ; goCover_faa45bc9dd83__536[3] = 1;
+	// Simple CPE parsing - in practice, this would be more comprehensive
+	// CPE format: cpe:2.3:a:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
+	parts := strings.Split(cpe, ":")
+	if len(parts) < 5 {goCover_faa45bc9dd83__536[6] = 1;
+		return nil
+	}
+
+	goCover_faa45bc9dd83__536[4] = 1;vendor := parts[3]
+	product := parts[4]
+	version := "*"
+	if len(parts) > 5 && parts[5] != "*" {goCover_faa45bc9dd83__536[7] = 1;
+		version = parts[5]
+	}
+
+	goCover_faa45bc9dd83__536[5] = 1;return &AffectedPackage{
+		Name:             fmt.Sprintf("%s/%s", vendor, product),
+		Ecosystem:        "generic",
+		AffectedVersions: []string{version},
+		FixedVersions:    []string{}, // Would need additional data source
+		PatchAvailable:   false,      // Would need additional analysis
+	}
+}
+
+// generateRemediationGuidance creates remediation guidance for a CVE
+func (n *NVDDatabase) generateRemediationGuidance(cve struct {
+	ID                 string `json:"id"`
+	SourceIdentifier   string `json:"sourceIdentifier"`
+	VulnStatus         string `json:"vulnStatus"`
+	Published          string `json:"published"`
+	LastModified       string `json:"lastModified"`
+	EvaluatorComment   string `json:"evaluatorComment,omitempty"`
+	EvaluatorSolution  string `json:"evaluatorSolution,omitempty"`
+	EvaluatorImpact    string `json:"evaluatorImpact,omitempty"`
+	CISAExploitAdd     string `json:"cisaExploitAdd,omitempty"`
+	CISAActionDue      string `json:"cisaActionDue,omitempty"`
+	CISARequiredAction string `json:"cisaRequiredAction,omitempty"`
+	CISAVulnName       string `json:"cisaVulnName,omitempty"`
+	Descriptions       []struct {
+		Lang  string `json:"lang"`
+		Value string `json:"value"`
+	} `json:"descriptions"`
+	References []struct {
+		URL    string   `json:"url"`
+		Source string   `json:"source"`
+		Tags   []string `json:"tags,omitempty"`
+	} `json:"references"`
+	Metrics struct {
+		CvssMetricV31 []struct {
+			Source   string `json:"source"`
+			Type     string `json:"type"`
+			CvssData struct {
+				Version               string  `json:"version"`
+				VectorString          string  `json:"vectorString"`
+				AttackVector          string  `json:"attackVector"`
+				AttackComplexity      string  `json:"attackComplexity"`
+				PrivilegesRequired    string  `json:"privilegesRequired"`
+				UserInteraction       string  `json:"userInteraction"`
+				Scope                 string  `json:"scope"`
+				ConfidentialityImpact string  `json:"confidentialityImpact"`
+				IntegrityImpact       string  `json:"integrityImpact"`
+				AvailabilityImpact    string  `json:"availabilityImpact"`
+				BaseScore             float64 `json:"baseScore"`
+				BaseSeverity          string  `json:"baseSeverity"`
+				ExploitabilityScore   float64 `json:"exploitabilityScore"`
+				ImpactScore           float64 `json:"impactScore"`
+			} `json:"cvssData"`
+			ExploitabilityScore float64 `json:"exploitabilityScore"`
+			ImpactScore         float64 `json:"impactScore"`
+		} `json:"cvssMetricV31"`
+		CvssMetricV30 []struct {
+			Source   string `json:"source"`
+			Type     string `json:"type"`
+			CvssData struct {
+				Version               string  `json:"version"`
+				VectorString          string  `json:"vectorString"`
+				AttackVector          string  `json:"attackVector"`
+				AttackComplexity      string  `json:"attackComplexity"`
+				PrivilegesRequired    string  `json:"privilegesRequired"`
+				UserInteraction       string  `json:"userInteraction"`
+				Scope                 string  `json:"scope"`
+				ConfidentialityImpact string  `json:"confidentialityImpact"`
+				IntegrityImpact       string  `json:"integrityImpact"`
+				AvailabilityImpact    string  `json:"availabilityImpact"`
+				BaseScore             float64 `json:"baseScore"`
+				BaseSeverity          string  `json:"baseSeverity"`
+				ExploitabilityScore   float64 `json:"exploitabilityScore"`
+				ImpactScore           float64 `json:"impactScore"`
+			} `json:"cvssData"`
+			ExploitabilityScore float64 `json:"exploitabilityScore"`
+			ImpactScore         float64 `json:"impactScore"`
+		} `json:"cvssMetricV30"`
+		CvssMetricV2 []struct {
+			Source   string `json:"source"`
+			Type     string `json:"type"`
+			CvssData struct {
+				Version               string  `json:"version"`
+				VectorString          string  `json:"vectorString"`
+				AccessVector          string  `json:"accessVector"`
+				AccessComplexity      string  `json:"accessComplexity"`
+				Authentication        string  `json:"authentication"`
+				ConfidentialityImpact string  `json:"confidentialityImpact"`
+				IntegrityImpact       string  `json:"integrityImpact"`
+				AvailabilityImpact    string  `json:"availabilityImpact"`
+				BaseScore             float64 `json:"baseScore"`
+			} `json:"cvssData"`
+			BaseSeverity            string  `json:"baseSeverity"`
+			ExploitabilityScore     float64 `json:"exploitabilityScore"`
+			ImpactScore             float64 `json:"impactScore"`
+			AcInsufInfo             bool    `json:"acInsufInfo"`
+			ObtainAllPrivilege      bool    `json:"obtainAllPrivilege"`
+			ObtainUserPrivilege     bool    `json:"obtainUserPrivilege"`
+			ObtainOtherPrivilege    bool    `json:"obtainOtherPrivilege"`
+			UserInteractionRequired bool    `json:"userInteractionRequired"`
+		} `json:"cvssMetricV2"`
+	} `json:"metrics"`
+	Weaknesses []struct {
+		Source      string `json:"source"`
+		Type        string `json:"type"`
+		Description []struct {
+			Lang  string `json:"lang"`
+			Value string `json:"value"`
+		} `json:"description"`
+	} `json:"weaknesses"`
+	Configurations []struct {
+		Nodes []struct {
+			Operator string `json:"operator"`
+			Negate   bool   `json:"negate"`
+			CpeMatch []struct {
+				Vulnerable            bool   `json:"vulnerable"`
+				Criteria              string `json:"criteria"`
+				VersionStartIncluding string `json:"versionStartIncluding,omitempty"`
+				VersionStartExcluding string `json:"versionStartExcluding,omitempty"`
+				VersionEndIncluding   string `json:"versionEndIncluding,omitempty"`
+				VersionEndExcluding   string `json:"versionEndExcluding,omitempty"`
+				MatchCriteriaId       string `json:"matchCriteriaId"`
+			} `json:"cpeMatch"`
+		} `json:"nodes"`
+	} `json:"configurations"`
+	VendorComments []struct {
+		Organization string `json:"organization"`
+		Comment      string `json:"comment"`
+		LastModified string `json:"lastModified"`
+	} `json:"vendorComments,omitempty"`
+}, affectedPackages []AffectedPackage) RemediationGuidance {goCover_faa45bc9dd83__537[0] = 11 ; goCover_faa45bc9dd83__537[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__537[2] = 537 ; goCover_faa45bc9dd83__537[3] = 1;
+	remediationType := "upgrade"
+	instructions := "Update affected components to latest secure versions"
+	autoApplicable := true
+	confidence := 0.7
+
+	// Use evaluator solution if available
+	if cve.EvaluatorSolution != "" {goCover_faa45bc9dd83__537[8] = 1;
+		instructions = cve.EvaluatorSolution
+		confidence = 0.9
+	}
+
+	// Use CISA required action if available
+	goCover_faa45bc9dd83__537[4] = 1;if cve.CISARequiredAction != "" {goCover_faa45bc9dd83__537[9] = 1;
+		instructions = cve.CISARequiredAction
+		confidence = 1.0
+	}
+
+	// Determine if auto-applicable based on references and tags
+	goCover_faa45bc9dd83__537[5] = 1;for _, ref := range cve.References {goCover_faa45bc9dd83__537[10] = 1;
+		for _, tag := range ref.Tags {goCover_faa45bc9dd83__537[11] = 1;
+			if tag == "Patch" || tag == "Vendor Advisory" {goCover_faa45bc9dd83__537[12] = 1;
+				autoApplicable = true
+				confidence = 0.8
+				break
+			}
+		}
+	}
+
+	// Estimate effort based on CVSS score and complexity
+	goCover_faa45bc9dd83__537[6] = 1;effort := EstimatedEffort{
+		Level:       "medium",
+		TimeMinutes: 60,
+		Complexity:  5,
+		Risk:        "medium",
+		Resources:   []string{"development", "testing"},
+	}
+
+	if len(cve.Metrics.CvssMetricV31) > 0 && cve.Metrics.CvssMetricV31[0].CvssData.BaseScore >= 7.0 {goCover_faa45bc9dd83__537[13] = 1;
+		effort.Level = "high"
+		effort.TimeMinutes = 120
+		effort.Complexity = 7
+		effort.Risk = "high"
+	}
+
+	goCover_faa45bc9dd83__537[7] = 1;return RemediationGuidance{
+		Type:           remediationType,
+		Instructions:   instructions,
+		AutoApplicable: autoApplicable,
+		Confidence:     confidence,
+		Effort:         effort,
+	}
+}
+
+// mapCVSSToSeverity maps CVSS scores to severity levels for NVD API
+func (n *NVDDatabase) mapCVSSToSeverity(score float64) string {goCover_faa45bc9dd83__538[0] = 5 ; goCover_faa45bc9dd83__538[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__538[2] = 538 ; goCover_faa45bc9dd83__538[3] = 1;
+	switch {
+	case score >= 9.0:goCover_faa45bc9dd83__538[4] = 1;
+		return "CRITICAL"
+	case score >= 7.0:goCover_faa45bc9dd83__538[5] = 1;
+		return "HIGH"
+	case score >= 4.0:goCover_faa45bc9dd83__538[6] = 1;
+		return "MEDIUM"
+	default:goCover_faa45bc9dd83__538[7] = 1;
+		return "LOW"
+	}
+}

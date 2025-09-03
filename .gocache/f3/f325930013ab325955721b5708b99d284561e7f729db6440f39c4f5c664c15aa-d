@@ -1,0 +1,597 @@
+//line /Users/vk/@iw2rmb/ploy/api/arf/sandbox.go:1:1
+package arf
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// SandboxManager provides secure isolated environments for transformations
+type SandboxManager interface {
+	CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error)
+	DestroySandbox(ctx context.Context, sandboxID string) error
+	ListSandboxes(ctx context.Context) ([]SandboxInfo, error)
+	CleanupExpiredSandboxes(ctx context.Context) error
+
+	// ExecuteCommand executes a command in a sandbox and returns output
+	ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error)
+}
+
+// Sandbox represents an isolated environment for transformations
+type Sandbox struct {
+	ID         string            `json:"id"`
+	JailName   string            `json:"jail_name"`
+	RootPath   string            `json:"root_path"`
+	WorkingDir string            `json:"working_dir"`
+	CreatedAt  time.Time         `json:"created_at"`
+	ExpiresAt  time.Time         `json:"expires_at"`
+	Status     SandboxStatus     `json:"status"`
+	Config     SandboxConfig     `json:"config"`
+	Metadata   map[string]string `json:"metadata"`
+}
+
+// SandboxConfig defines sandbox creation parameters
+type SandboxConfig struct {
+	Repository    string        `json:"repository"`
+	Branch        string        `json:"branch"`
+	LocalPath     string        `json:"local_path"` // Path to transformed code (if already cloned/modified)
+	Language      string        `json:"language"`
+	BuildTool     string        `json:"build_tool"`
+	TTL           time.Duration `json:"ttl"`
+	MemoryLimit   string        `json:"memory_limit"` // e.g., "2G"
+	CPULimit      string        `json:"cpu_limit"`    // e.g., "2"
+	NetworkAccess bool          `json:"network_access"`
+	TempSpace     string        `json:"temp_space"` // e.g., "1G"
+}
+
+// SandboxStatus represents the current state of a sandbox
+type SandboxStatus string
+
+const (
+	SandboxStatusCreating SandboxStatus = "creating"
+	SandboxStatusReady    SandboxStatus = "ready"
+	SandboxStatusRunning  SandboxStatus = "running"
+	SandboxStatusStopped  SandboxStatus = "stopped"
+	SandboxStatusError    SandboxStatus = "error"
+	SandboxStatusExpired  SandboxStatus = "expired"
+)
+
+// SandboxInfo provides summary information about a sandbox
+type SandboxInfo struct {
+	ID         string        `json:"id"`
+	JailName   string        `json:"jail_name"`
+	Status     SandboxStatus `json:"status"`
+	CreatedAt  time.Time     `json:"created_at"`
+	ExpiresAt  time.Time     `json:"expires_at"`
+	Repository string        `json:"repository"`
+}
+
+// FreeBSDJailManager implements SandboxManager using FreeBSD jails
+type FreeBSDJailManager struct {
+	jailBaseDir   string
+	templateDir   string
+	maxSandboxes  int
+	defaultTTL    time.Duration
+	jailInterface string // Network interface for jails
+}
+
+// NewFreeBSDJailManager creates a new FreeBSD jail-based sandbox manager
+func NewFreeBSDJailManager(baseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) *FreeBSDJailManager {goCover_faa45bc9dd83__633[0] = 1 ; goCover_faa45bc9dd83__633[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__633[2] = 633 ; goCover_faa45bc9dd83__633[3] = 1;
+	return &FreeBSDJailManager{
+		jailBaseDir:   baseDir,
+		templateDir:   templateDir,
+		maxSandboxes:  maxSandboxes,
+		defaultTTL:    defaultTTL,
+		jailInterface: jailInterface,
+	}
+}
+
+// CreateSandbox creates a new FreeBSD jail sandbox
+func (m *FreeBSDJailManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {goCover_faa45bc9dd83__634[0] = 18 ; goCover_faa45bc9dd83__634[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__634[2] = 634 ; goCover_faa45bc9dd83__634[3] = 1;
+	// Check if jail system is available
+	if _, err := exec.LookPath("jail"); err != nil {goCover_faa45bc9dd83__634[12] = 1;
+		return nil, fmt.Errorf("FreeBSD jail system not available: %w", err)
+	}
+
+	// Generate unique sandbox ID
+	goCover_faa45bc9dd83__634[4] = 1;sandboxID := fmt.Sprintf("arf-%d", time.Now().UnixNano())
+	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:14]) // Use last 10 chars
+
+	// Set default TTL if not specified
+	ttl := config.TTL
+	if ttl == 0 {goCover_faa45bc9dd83__634[13] = 1;
+		ttl = m.defaultTTL
+	}
+
+	goCover_faa45bc9dd83__634[5] = 1;sandbox := &Sandbox{
+		ID:         sandboxID,
+		JailName:   jailName,
+		RootPath:   filepath.Join(m.jailBaseDir, jailName),
+		WorkingDir: "/workspace",
+		CreatedAt:  time.Now(),
+		ExpiresAt:  time.Now().Add(ttl),
+		Status:     SandboxStatusCreating,
+		Config:     config,
+		Metadata:   make(map[string]string),
+	}
+
+	// Create jail root directory
+	if err := os.MkdirAll(sandbox.RootPath, 0755); err != nil {goCover_faa45bc9dd83__634[14] = 1;
+		return nil, fmt.Errorf("failed to create jail root: %w", err)
+	}
+
+	// Copy base template to jail root
+	goCover_faa45bc9dd83__634[6] = 1;if err := m.copyTemplate(sandbox.RootPath); err != nil {goCover_faa45bc9dd83__634[15] = 1;
+		os.RemoveAll(sandbox.RootPath)
+		return nil, fmt.Errorf("failed to copy jail template: %w", err)
+	}
+
+	// Create workspace directory
+	goCover_faa45bc9dd83__634[7] = 1;workspaceDir := filepath.Join(sandbox.RootPath, "workspace")
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {goCover_faa45bc9dd83__634[16] = 1;
+		os.RemoveAll(sandbox.RootPath)
+		return nil, fmt.Errorf("failed to create workspace: %w", err)
+	}
+
+	// Clone repository into workspace
+	goCover_faa45bc9dd83__634[8] = 1;if config.Repository != "" {goCover_faa45bc9dd83__634[17] = 1;
+		if err := m.cloneRepository(ctx, config.Repository, config.Branch, workspaceDir); err != nil {goCover_faa45bc9dd83__634[18] = 1;
+			os.RemoveAll(sandbox.RootPath)
+			return nil, fmt.Errorf("failed to clone repository: %w", err)
+		}
+	}
+
+	// Create jail configuration
+	goCover_faa45bc9dd83__634[9] = 1;jailConf := m.generateJailConfig(sandbox, config)
+	if err := m.writeJailConfig(jailName, jailConf); err != nil {goCover_faa45bc9dd83__634[19] = 1;
+		os.RemoveAll(sandbox.RootPath)
+		return nil, fmt.Errorf("failed to write jail config: %w", err)
+	}
+
+	// Start the jail
+	goCover_faa45bc9dd83__634[10] = 1;if err := m.startJail(ctx, jailName); err != nil {goCover_faa45bc9dd83__634[20] = 1;
+		os.RemoveAll(sandbox.RootPath)
+		m.removeJailConfig(jailName)
+		return nil, fmt.Errorf("failed to start jail: %w", err)
+	}
+
+	goCover_faa45bc9dd83__634[11] = 1;sandbox.Status = SandboxStatusReady
+	return sandbox, nil
+}
+
+// DestroySandbox removes a sandbox and its jail
+func (m *FreeBSDJailManager) DestroySandbox(ctx context.Context, sandboxID string) error {goCover_faa45bc9dd83__635[0] = 14 ; goCover_faa45bc9dd83__635[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__635[2] = 635 ; goCover_faa45bc9dd83__635[3] = 1;
+	// Find sandbox by ID (in production, this would be stored in a database)
+	sandboxes, err := m.ListSandboxes(ctx)
+	if err != nil {goCover_faa45bc9dd83__635[10] = 1;
+		return fmt.Errorf("failed to list sandboxes: %w", err)
+	}
+
+	goCover_faa45bc9dd83__635[4] = 1;var targetJail string
+	for _, sb := range sandboxes {goCover_faa45bc9dd83__635[11] = 1;
+		if sb.ID == sandboxID {goCover_faa45bc9dd83__635[12] = 1;
+			targetJail = sb.JailName
+			break
+		}
+	}
+
+	goCover_faa45bc9dd83__635[5] = 1;if targetJail == "" {goCover_faa45bc9dd83__635[13] = 1;
+		return fmt.Errorf("sandbox %s not found", sandboxID)
+	}
+
+	// Stop and remove jail
+	goCover_faa45bc9dd83__635[6] = 1;if err := m.stopJail(ctx, targetJail); err != nil {goCover_faa45bc9dd83__635[14] = 1;
+		return fmt.Errorf("failed to stop jail: %w", err)
+	}
+
+	// Remove jail configuration
+	goCover_faa45bc9dd83__635[7] = 1;if err := m.removeJailConfig(targetJail); err != nil {goCover_faa45bc9dd83__635[15] = 1;
+		return fmt.Errorf("failed to remove jail config: %w", err)
+	}
+
+	// Remove jail root directory
+	goCover_faa45bc9dd83__635[8] = 1;jailRoot := filepath.Join(m.jailBaseDir, targetJail)
+	if err := os.RemoveAll(jailRoot); err != nil {goCover_faa45bc9dd83__635[16] = 1;
+		return fmt.Errorf("failed to remove jail root: %w", err)
+	}
+
+	goCover_faa45bc9dd83__635[9] = 1;return nil
+}
+
+// ListSandboxes returns information about all active sandboxes
+func (m *FreeBSDJailManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {goCover_faa45bc9dd83__636[0] = 8 ; goCover_faa45bc9dd83__636[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__636[2] = 636 ; goCover_faa45bc9dd83__636[3] = 1;
+	cmd := exec.CommandContext(ctx, "jls", "-h", "jid", "name", "path")
+	output, err := cmd.Output()
+	if err != nil {goCover_faa45bc9dd83__636[6] = 1;
+		// If jls command fails, return empty list instead of error
+		// This allows the API to work even if jail system is not configured
+		return []SandboxInfo{}, nil
+	}
+
+	goCover_faa45bc9dd83__636[4] = 1;var sandboxes []SandboxInfo
+	lines := strings.Split(string(output), "\n")
+
+	for i, line := range lines {goCover_faa45bc9dd83__636[7] = 1;
+		if i == 0 || strings.TrimSpace(line) == "" {goCover_faa45bc9dd83__636[9] = 1;
+			continue // Skip header and empty lines
+		}
+
+		goCover_faa45bc9dd83__636[8] = 1;fields := strings.Fields(line)
+		if len(fields) >= 3 && strings.HasPrefix(fields[1], "arf-sandbox-") {goCover_faa45bc9dd83__636[10] = 1;
+			// Extract sandbox ID from jail name
+			sandboxID := "arf-" + fields[1][12:] // Remove "arf-sandbox-" prefix
+
+			// Get creation and expiration times (would be from database in production)
+			now := time.Now()
+			sandboxes = append(sandboxes, SandboxInfo{
+				ID:        sandboxID,
+				JailName:  fields[1],
+				Status:    SandboxStatusReady,  // Would query actual status
+				CreatedAt: now.Add(-time.Hour), // Placeholder
+				ExpiresAt: now.Add(time.Hour),  // Placeholder
+			})
+		}
+	}
+
+	goCover_faa45bc9dd83__636[5] = 1;return sandboxes, nil
+}
+
+// CleanupExpiredSandboxes removes sandboxes that have exceeded their TTL
+func (m *FreeBSDJailManager) CleanupExpiredSandboxes(ctx context.Context) error {goCover_faa45bc9dd83__637[0] = 7 ; goCover_faa45bc9dd83__637[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__637[2] = 637 ; goCover_faa45bc9dd83__637[3] = 1;
+	sandboxes, err := m.ListSandboxes(ctx)
+	if err != nil {goCover_faa45bc9dd83__637[6] = 1;
+		return fmt.Errorf("failed to list sandboxes: %w", err)
+	}
+
+	goCover_faa45bc9dd83__637[4] = 1;now := time.Now()
+	for _, sandbox := range sandboxes {goCover_faa45bc9dd83__637[7] = 1;
+		if now.After(sandbox.ExpiresAt) {goCover_faa45bc9dd83__637[8] = 1;
+			if err := m.DestroySandbox(ctx, sandbox.ID); err != nil {goCover_faa45bc9dd83__637[9] = 1;
+				// Log error but continue cleanup
+				fmt.Printf("Failed to cleanup expired sandbox %s: %v\n", sandbox.ID, err)
+			}
+		}
+	}
+
+	goCover_faa45bc9dd83__637[5] = 1;return nil
+}
+
+// Helper methods
+
+func (m *FreeBSDJailManager) copyTemplate(destPath string) error {goCover_faa45bc9dd83__638[0] = 1 ; goCover_faa45bc9dd83__638[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__638[2] = 638 ; goCover_faa45bc9dd83__638[3] = 1;
+	cmd := exec.Command("cp", "-R", m.templateDir+"/.", destPath)
+	return cmd.Run()
+}
+
+func (m *FreeBSDJailManager) cloneRepository(ctx context.Context, repo, branch, destPath string) error {goCover_faa45bc9dd83__639[0] = 3 ; goCover_faa45bc9dd83__639[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__639[2] = 639 ; goCover_faa45bc9dd83__639[3] = 1;
+	args := []string{"clone"}
+	if branch != "" {goCover_faa45bc9dd83__639[5] = 1;
+		args = append(args, "-b", branch)
+	}
+	goCover_faa45bc9dd83__639[4] = 1;args = append(args, repo, destPath)
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	return cmd.Run()
+}
+
+func (m *FreeBSDJailManager) generateJailConfig(sandbox *Sandbox, config SandboxConfig) string {goCover_faa45bc9dd83__640[0] = 1 ; goCover_faa45bc9dd83__640[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__640[2] = 640 ; goCover_faa45bc9dd83__640[3] = 1;
+	conf := fmt.Sprintf(`%s {
+    path = "%s";
+    host.hostname = "%s";
+    ip4.addr = "%s";
+    interface = "%s";
+    exec.start = "/bin/sh /etc/rc";
+    exec.stop = "/bin/sh /etc/rc.shutdown";
+    exec.clean;
+    mount.devfs;
+    allow.raw_sockets = 0;
+    securelevel = 3;
+}`, sandbox.JailName, sandbox.RootPath, sandbox.JailName, "inherit", m.jailInterface)
+
+	return conf
+}
+
+func (m *FreeBSDJailManager) writeJailConfig(jailName, config string) error {goCover_faa45bc9dd83__641[0] = 1 ; goCover_faa45bc9dd83__641[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__641[2] = 641 ; goCover_faa45bc9dd83__641[3] = 1;
+	confPath := fmt.Sprintf("/etc/jail.conf.d/%s.conf", jailName)
+	return os.WriteFile(confPath, []byte(config), 0644)
+}
+
+func (m *FreeBSDJailManager) removeJailConfig(jailName string) error {goCover_faa45bc9dd83__642[0] = 1 ; goCover_faa45bc9dd83__642[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__642[2] = 642 ; goCover_faa45bc9dd83__642[3] = 1;
+	confPath := fmt.Sprintf("/etc/jail.conf.d/%s.conf", jailName)
+	return os.Remove(confPath)
+}
+
+func (m *FreeBSDJailManager) startJail(ctx context.Context, jailName string) error {goCover_faa45bc9dd83__643[0] = 1 ; goCover_faa45bc9dd83__643[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__643[2] = 643 ; goCover_faa45bc9dd83__643[3] = 1;
+	cmd := exec.CommandContext(ctx, "jail", "-c", jailName)
+	return cmd.Run()
+}
+
+func (m *FreeBSDJailManager) stopJail(ctx context.Context, jailName string) error {goCover_faa45bc9dd83__644[0] = 1 ; goCover_faa45bc9dd83__644[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__644[2] = 644 ; goCover_faa45bc9dd83__644[3] = 1;
+	cmd := exec.CommandContext(ctx, "jail", "-r", jailName)
+	return cmd.Run()
+}
+
+// ExecuteCommand executes a command in a FreeBSD jail sandbox
+func (m *FreeBSDJailManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {goCover_faa45bc9dd83__645[0] = 1 ; goCover_faa45bc9dd83__645[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__645[2] = 645 ; goCover_faa45bc9dd83__645[3] = 1;
+	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:])
+
+	// Build the jexec command
+	jexecArgs := []string{jailName, command}
+	jexecArgs = append(jexecArgs, args...)
+
+	cmd := exec.CommandContext(ctx, "jexec", jexecArgs...)
+	output, err := cmd.CombinedOutput()
+
+	return string(output), err
+}
+
+// MockSandboxManager provides a mock implementation for non-FreeBSD systems
+type MockSandboxManager struct {
+	sandboxes map[string]*Sandbox
+}
+
+// NewMockSandboxManager creates a new mock sandbox manager for development/testing
+func NewMockSandboxManager() *MockSandboxManager {goCover_faa45bc9dd83__646[0] = 1 ; goCover_faa45bc9dd83__646[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__646[2] = 646 ; goCover_faa45bc9dd83__646[3] = 1;
+	return &MockSandboxManager{
+		sandboxes: make(map[string]*Sandbox),
+	}
+}
+
+// CreateSandbox creates a mock sandbox for testing
+func (m *MockSandboxManager) CreateSandbox(ctx context.Context, config SandboxConfig) (*Sandbox, error) {goCover_faa45bc9dd83__647[0] = 5 ; goCover_faa45bc9dd83__647[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__647[2] = 647 ; goCover_faa45bc9dd83__647[3] = 1;
+	sandboxID := fmt.Sprintf("mock-%d", time.Now().UnixNano())
+
+	ttl := config.TTL
+	if ttl == 0 {goCover_faa45bc9dd83__647[6] = 1;
+		ttl = 30 * time.Minute
+	}
+
+	goCover_faa45bc9dd83__647[4] = 1;rootPath := fmt.Sprintf("/tmp/mock-sandbox-%s", sandboxID[5:15])
+	workspacePath := filepath.Join(rootPath, "workspace")
+
+	sandbox := &Sandbox{
+		ID:         sandboxID,
+		JailName:   fmt.Sprintf("mock-sandbox-%s", sandboxID[5:15]),
+		RootPath:   rootPath,
+		WorkingDir: "/workspace",
+		CreatedAt:  time.Now(),
+		ExpiresAt:  time.Now().Add(ttl),
+		Status:     SandboxStatusReady,
+		Config:     config,
+		Metadata:   make(map[string]string),
+	}
+
+	// Create mock sandbox directory structure
+	if err := os.MkdirAll(workspacePath, 0755); err != nil {goCover_faa45bc9dd83__647[7] = 1;
+		return nil, fmt.Errorf("failed to create mock sandbox workspace: %w", err)
+	}
+
+	goCover_faa45bc9dd83__647[5] = 1;m.sandboxes[sandboxID] = sandbox
+	return sandbox, nil
+}
+
+// DestroySandbox removes a mock sandbox
+func (m *MockSandboxManager) DestroySandbox(ctx context.Context, sandboxID string) error {goCover_faa45bc9dd83__648[0] = 5 ; goCover_faa45bc9dd83__648[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__648[2] = 648 ; goCover_faa45bc9dd83__648[3] = 1;
+	sandbox, exists := m.sandboxes[sandboxID]
+	if !exists {goCover_faa45bc9dd83__648[6] = 1;
+		return fmt.Errorf("sandbox %s not found", sandboxID)
+	}
+
+	// Clean up mock sandbox directory
+	goCover_faa45bc9dd83__648[4] = 1;if err := os.RemoveAll(sandbox.RootPath); err != nil {goCover_faa45bc9dd83__648[7] = 1;
+		// Log error but don't fail - this is a mock sandbox
+		fmt.Printf("Warning: Failed to clean up mock sandbox directory %s: %v\n", sandbox.RootPath, err)
+	}
+
+	goCover_faa45bc9dd83__648[5] = 1;delete(m.sandboxes, sandboxID)
+	return nil
+}
+
+// ListSandboxes returns all mock sandboxes
+func (m *MockSandboxManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {goCover_faa45bc9dd83__649[0] = 3 ; goCover_faa45bc9dd83__649[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__649[2] = 649 ; goCover_faa45bc9dd83__649[3] = 1;
+	var sandboxes []SandboxInfo
+
+	for _, sb := range m.sandboxes {goCover_faa45bc9dd83__649[5] = 1;
+		sandboxes = append(sandboxes, SandboxInfo{
+			ID:         sb.ID,
+			JailName:   sb.JailName,
+			Status:     sb.Status,
+			CreatedAt:  sb.CreatedAt,
+			ExpiresAt:  sb.ExpiresAt,
+			Repository: sb.Config.Repository,
+		})
+	}
+
+	goCover_faa45bc9dd83__649[4] = 1;return sandboxes, nil
+}
+
+// CleanupExpiredSandboxes removes expired mock sandboxes
+func (m *MockSandboxManager) CleanupExpiredSandboxes(ctx context.Context) error {goCover_faa45bc9dd83__650[0] = 4 ; goCover_faa45bc9dd83__650[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__650[2] = 650 ; goCover_faa45bc9dd83__650[3] = 1;
+	now := time.Now()
+
+	for id, sandbox := range m.sandboxes {goCover_faa45bc9dd83__650[5] = 1;
+		if now.After(sandbox.ExpiresAt) {goCover_faa45bc9dd83__650[6] = 1;
+			delete(m.sandboxes, id)
+		}
+	}
+
+	goCover_faa45bc9dd83__650[4] = 1;return nil
+}
+
+// ExecuteCommand executes a command in a mock sandbox
+func (m *MockSandboxManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {goCover_faa45bc9dd83__651[0] = 3 ; goCover_faa45bc9dd83__651[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__651[2] = 651 ; goCover_faa45bc9dd83__651[3] = 1;
+	sandbox, exists := m.sandboxes[sandboxID]
+	if !exists {goCover_faa45bc9dd83__651[5] = 1;
+		return "", fmt.Errorf("sandbox %s not found", sandboxID)
+	}
+
+	// Build the command
+	goCover_faa45bc9dd83__651[4] = 1;cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Dir = filepath.Join(sandbox.RootPath, "workspace")
+
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
+
+// NewSandboxManagerForOS creates appropriate sandbox manager for the current OS
+func NewSandboxManagerForOS(jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) SandboxManager {goCover_faa45bc9dd83__652[0] = 12 ; goCover_faa45bc9dd83__652[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__652[2] = 652 ; goCover_faa45bc9dd83__652[3] = 1;
+	// Check if we're running inside the controller itself
+	// The controller sets PORT environment variable and also has PLOY_VERSION set by Nomad
+	port := os.Getenv("PORT")
+	ployVersion := os.Getenv("PLOY_VERSION")
+
+	// If we have both PORT and PLOY_VERSION, we're running inside the controller
+	if port != "" && ployVersion != "" {goCover_faa45bc9dd83__652[9] = 1;
+		// Even inside the controller, use the public HTTPS endpoint for better reliability
+		controllerURL := "https://api.dev.ployman.app/v1"
+		fmt.Printf("Running inside controller (version %s), using public endpoint for reliability: %s\n", ployVersion, controllerURL)
+		return NewDeploymentSandboxManager(controllerURL, nil)
+	}
+
+	// Check if we have a controller URL configured (for external clients)
+	goCover_faa45bc9dd83__652[4] = 1;if controllerURL := os.Getenv("PLOY_CONTROLLER"); controllerURL != "" {goCover_faa45bc9dd83__652[10] = 1;
+		fmt.Printf("Using deployment sandbox manager with controller: %s\n", controllerURL)
+		return NewDeploymentSandboxManager(controllerURL, nil)
+	}
+
+	// Check for default environment (ploy CLI available)
+	goCover_faa45bc9dd83__652[5] = 1;if _, err := exec.LookPath("ploy"); err == nil {goCover_faa45bc9dd83__652[11] = 1;
+		fmt.Println("Using deployment sandbox manager with default controller")
+		// Use default controller URL
+		return NewDeploymentSandboxManager("https://api.dev.ployman.app/v1", nil)
+	}
+
+	// Check for remote FreeBSD jail host configuration
+	goCover_faa45bc9dd83__652[6] = 1;freebsdHost := os.Getenv("ARF_FREEBSD_HOST")
+	if freebsdHost != "" {goCover_faa45bc9dd83__652[12] = 1;
+		return NewRemoteFreeBSDJailManager(freebsdHost, jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
+	}
+
+	goCover_faa45bc9dd83__652[7] = 1;if runtime.GOOS == "freebsd" {goCover_faa45bc9dd83__652[13] = 1;
+		// Check if jail command is available
+		if _, err := exec.LookPath("jail"); err == nil {goCover_faa45bc9dd83__652[14] = 1;
+			return NewFreeBSDJailManager(jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
+		}
+	}
+
+	// Fallback to mock sandbox manager for development/testing
+	goCover_faa45bc9dd83__652[8] = 1;fmt.Println("Warning: Using mock sandbox manager. Set PLOY_CONTROLLER env var for deployment integration.")
+	return NewMockSandboxManager()
+}
+
+// RemoteFreeBSDJailManager manages jails on a remote FreeBSD host via SSH
+type RemoteFreeBSDJailManager struct {
+	*FreeBSDJailManager
+	host string
+	user string
+	port int
+}
+
+// NewRemoteFreeBSDJailManager creates a new remote FreeBSD jail manager
+func NewRemoteFreeBSDJailManager(host, jailBaseDir, templateDir string, maxSandboxes int, defaultTTL time.Duration, jailInterface string) *RemoteFreeBSDJailManager {goCover_faa45bc9dd83__653[0] = 6 ; goCover_faa45bc9dd83__653[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__653[2] = 653 ; goCover_faa45bc9dd83__653[3] = 1;
+	baseMgr := NewFreeBSDJailManager(jailBaseDir, templateDir, maxSandboxes, defaultTTL, jailInterface)
+
+	user := os.Getenv("ARF_FREEBSD_USER")
+	if user == "" {goCover_faa45bc9dd83__653[6] = 1;
+		user = "root"
+	}
+
+	goCover_faa45bc9dd83__653[4] = 1;port := 22
+	if portStr := os.Getenv("ARF_FREEBSD_PORT"); portStr != "" {goCover_faa45bc9dd83__653[7] = 1;
+		if p, err := strconv.Atoi(portStr); err == nil {goCover_faa45bc9dd83__653[8] = 1;
+			port = p
+		}
+	}
+
+	goCover_faa45bc9dd83__653[5] = 1;return &RemoteFreeBSDJailManager{
+		FreeBSDJailManager: baseMgr,
+		host:               host,
+		user:               user,
+		port:               port,
+	}
+}
+
+// executeRemoteCommand executes a command on the remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) executeRemoteCommand(ctx context.Context, command string) error {goCover_faa45bc9dd83__654[0] = 1 ; goCover_faa45bc9dd83__654[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__654[2] = 654 ; goCover_faa45bc9dd83__654[3] = 1;
+	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -p %d %s@%s '%s'", m.port, m.user, m.host, command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", sshCmd)
+	return cmd.Run()
+}
+
+// executeRemoteCommandWithOutput executes a command on the remote FreeBSD host and returns output
+func (m *RemoteFreeBSDJailManager) executeRemoteCommandWithOutput(ctx context.Context, command string) ([]byte, error) {goCover_faa45bc9dd83__655[0] = 1 ; goCover_faa45bc9dd83__655[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__655[2] = 655 ; goCover_faa45bc9dd83__655[3] = 1;
+	sshCmd := fmt.Sprintf("ssh -o StrictHostKeyChecking=no -p %d %s@%s '%s'", m.port, m.user, m.host, command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", sshCmd)
+	return cmd.Output()
+}
+
+// ListSandboxes returns information about all active sandboxes on remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) ListSandboxes(ctx context.Context) ([]SandboxInfo, error) {goCover_faa45bc9dd83__656[0] = 8 ; goCover_faa45bc9dd83__656[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__656[2] = 656 ; goCover_faa45bc9dd83__656[3] = 1;
+	output, err := m.executeRemoteCommandWithOutput(ctx, "jls -h jid name path")
+	if err != nil {goCover_faa45bc9dd83__656[6] = 1;
+		// If remote command fails, return empty list to allow API to work
+		return []SandboxInfo{}, nil
+	}
+
+	goCover_faa45bc9dd83__656[4] = 1;var sandboxes []SandboxInfo
+	lines := strings.Split(string(output), "\n")
+
+	for i, line := range lines {goCover_faa45bc9dd83__656[7] = 1;
+		if i == 0 || strings.TrimSpace(line) == "" {goCover_faa45bc9dd83__656[9] = 1;
+			continue // Skip header and empty lines
+		}
+
+		goCover_faa45bc9dd83__656[8] = 1;fields := strings.Fields(line)
+		if len(fields) >= 3 && strings.HasPrefix(fields[1], "arf-sandbox-") {goCover_faa45bc9dd83__656[10] = 1;
+			// Extract sandbox ID from jail name
+			sandboxID := "arf-" + fields[1][12:] // Remove "arf-sandbox-" prefix
+
+			// Get creation and expiration times (would be from database in production)
+			now := time.Now()
+			sandboxes = append(sandboxes, SandboxInfo{
+				ID:        sandboxID,
+				JailName:  fields[1],
+				Status:    SandboxStatusReady,  // Would query actual status
+				CreatedAt: now.Add(-time.Hour), // Placeholder
+				ExpiresAt: now.Add(time.Hour),  // Placeholder
+			})
+		}
+	}
+
+	goCover_faa45bc9dd83__656[5] = 1;return sandboxes, nil
+}
+
+// startJail starts a jail on the remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) startJail(ctx context.Context, jailName string) error {goCover_faa45bc9dd83__657[0] = 1 ; goCover_faa45bc9dd83__657[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__657[2] = 657 ; goCover_faa45bc9dd83__657[3] = 1;
+	command := fmt.Sprintf("jail -c %s", jailName)
+	return m.executeRemoteCommand(ctx, command)
+}
+
+// stopJail stops a jail on the remote FreeBSD host
+func (m *RemoteFreeBSDJailManager) stopJail(ctx context.Context, jailName string) error {goCover_faa45bc9dd83__658[0] = 1 ; goCover_faa45bc9dd83__658[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__658[2] = 658 ; goCover_faa45bc9dd83__658[3] = 1;
+	command := fmt.Sprintf("jail -r %s", jailName)
+	return m.executeRemoteCommand(ctx, command)
+}
+
+// ExecuteCommand executes a command in a remote FreeBSD jail sandbox
+func (m *RemoteFreeBSDJailManager) ExecuteCommand(ctx context.Context, sandboxID string, command string, args ...string) (string, error) {goCover_faa45bc9dd83__659[0] = 3 ; goCover_faa45bc9dd83__659[1] = goCover_faa45bc9dd83_P ; goCover_faa45bc9dd83__659[2] = 659 ; goCover_faa45bc9dd83__659[3] = 1;
+	jailName := fmt.Sprintf("arf-sandbox-%s", sandboxID[4:])
+
+	// Build the jexec command with proper escaping
+	quotedArgs := make([]string, len(args))
+	for i, arg := range args {goCover_faa45bc9dd83__659[5] = 1;
+		quotedArgs[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\\''"))
+	}
+
+	goCover_faa45bc9dd83__659[4] = 1;jexecCmd := fmt.Sprintf("jexec %s %s %s", jailName, command, strings.Join(quotedArgs, " "))
+	output, err := m.executeRemoteCommandWithOutput(ctx, jexecCmd)
+
+	return string(output), err
+}

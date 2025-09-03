@@ -1,0 +1,4 @@
+=== RUN   TestRecipesHandlers_ListAndGet
+--- PASS: TestRecipesHandlers_ListAndGet (0.00s)
+PASS
+ok  	github.com/iw2rmb/ploy/api/arf	0.483s
