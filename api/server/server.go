@@ -48,6 +48,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
+    trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
     arfcore "github.com/iw2rmb/ploy/internal/arf/core"
     tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	"github.com/iw2rmb/ploy/internal/utils"
@@ -87,7 +88,11 @@ type ControllerConfig struct {
 	EnvStorePath      string
 	CleanupAutoStart  bool
 	ShutdownTimeout   time.Duration
-	EnableCaching     bool
+    EnableCaching     bool
+    // ARF default packs (e.g., "rewrite-java:8.1.0,rewrite-spring:5.0.0"). If set, indexer runs at startup.
+    ArfDefaultPacks   string
+    // Optional Fetcher for ARF indexer (used in tests). When nil, indexing is skipped.
+    ArfFetcher        trecipes.Fetcher
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -131,6 +136,7 @@ type Server struct {
     coordinationCtx    context.Context
     coordinationCancel context.CancelFunc
     configService      *cfgsvc.Service
+    indexerStorage     internalStorage.Storage
 }
 
 // resolveUnifiedStorage prefers the config service if available, otherwise
@@ -230,7 +236,41 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	// Setup routes
 	server.setupRoutes()
 
-	return server, nil
+    // Optional: run ARF recipes indexer at startup if default packs configured
+    if config != nil && strings.TrimSpace(config.ArfDefaultPacks) != "" {
+        // Resolve unified storage via config service if available
+        var store internalStorage.Storage
+        if cfgService != nil {
+            if st, err := resolveStorageFromConfigService(cfgService); err == nil {
+                store = st
+            }
+        } else if deps != nil && deps.StorageFactory != nil {
+            if st, err := deps.StorageFactory.CreateClient(); err == nil {
+                store = st
+            }
+        }
+        if store != nil && config.ArfFetcher != nil {
+            idx := trecipes.NewIndexer(config.ArfFetcher, store)
+            // Parse packs spec: name:version[,name:version]
+            specs := []trecipes.PackSpec{}
+            for _, part := range strings.Split(config.ArfDefaultPacks, ",") {
+                if part = strings.TrimSpace(part); part != "" {
+                    nv := strings.SplitN(part, ":", 2)
+                    if len(nv) == 2 {
+                        specs = append(specs, trecipes.PackSpec{Name: nv[0], Version: nv[1]})
+                    }
+                }
+            }
+            if len(specs) > 0 {
+                server.indexerStorage = store
+                go idx.Refresh(context.Background(), specs)
+            }
+        } else {
+            log.Printf("ARF indexer skipped: storage or fetcher unavailable")
+        }
+    }
+
+    return server, nil
 }
 
 // initializeDependencies initializes all external service dependencies
