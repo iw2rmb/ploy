@@ -568,8 +568,8 @@ func TestConfigurationService(t *testing.T) {
   - Ansible iac/dev generates storage.endpoint alongside legacy master/filer for bare‑metal installs
   - Tests added for server handler service-preferred behavior and config retry/cache mapping
 - Pending:
-  - Reorder server startup validation to prefer Service (initialize Service early in NewServer)
-  - Optional Consul source for configuration (feature-flagged)
+  - Reorder server startup validation to prefer Service (initialize Service early in NewServer) ✅ Completed
+  - Optional Consul source for configuration (feature-flagged) ✅ Completed
 
 ## Expected Outcomes
 
