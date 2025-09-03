@@ -26,10 +26,9 @@ ENV PATH="/opt/gradle/bin:${PATH}"
 WORKDIR /workspace
 RUN mkdir -p /workspace/.m2/repository
 
-# Create the OpenRewrite runner script and workspace setup
+# Create the OpenRewrite runner script
 COPY runner.sh /usr/local/bin/openrewrite
-COPY setup-workspace.sh /usr/local/bin/setup-workspace
-RUN chmod 755 /usr/local/bin/openrewrite /usr/local/bin/setup-workspace
+RUN chmod 755 /usr/local/bin/openrewrite
 
 # Set up Maven settings for better performance
 RUN mkdir -p /root/.m2 && \
@@ -43,5 +42,5 @@ RUN mkdir -p /root/.m2 && \
 RUN mvn org.openrewrite.maven:rewrite-maven-plugin:6.17.0:help \
     -Ddetail=true -DskipTests 2>/dev/null || true
 
-# Use setup script as entrypoint (which then calls openrewrite)
-ENTRYPOINT ["/usr/local/bin/setup-workspace"]
+# Use runner script as entrypoint
+ENTRYPOINT ["/usr/local/bin/openrewrite"]
