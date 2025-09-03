@@ -98,6 +98,9 @@ internal/arf/
 
 ## Core Interfaces
 
+Status (2025-09-03): Initial slice scaffolding added under `internal/arf/core` with
+Engine interface and a minimal DefaultEngine implementation to enable gradual migration.
+
 ```go
 // internal/arf/core/types.go
 package core
