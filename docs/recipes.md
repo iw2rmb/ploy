@@ -39,7 +39,9 @@ This guide shows how to discover OpenRewrite recipes and how the API validates a
 
 - Clients can surface these suggestions to users or retry with the corrected `recipe_id`.
 
+CLI behavior:
+- With `PLOY_RECIPES_CATALOG=true`, `ploy arf recipe run <id>` preflights your `recipe_id`. If unknown, it prints “Did you mean:” with up to 5 candidates and exits without running.
+
 ## Refreshing the Catalog
 
 Use `POST /v1/arf/recipes/refresh` to rebuild the catalog. By default the server indexes a pinned set of packs. Platform configuration can extend this list.
-

@@ -264,7 +264,21 @@ func executeTransformation(recipeID, repository, branch, language string) error 
 	fmt.Println()
 
 	// Check if this is an OpenRewrite recipe
-	if isOpenRewriteRecipe(recipeID) {
+    if isOpenRewriteRecipe(recipeID) {
+        // If catalog mode is enabled, preflight for suggestions to give fast feedback
+        if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
+            if sugg, err := getCatalogSuggestions(recipeID); err == nil {
+                // If the exact ID is not among suggestions and there are candidates, show them
+                exact := false
+                for _, s := range sugg { if s == recipeID { exact = true; break } }
+                if !exact && len(sugg) > 0 {
+                    PrintError(NewCLIError("Unknown recipe_id", 1))
+                    fmt.Println("Did you mean:")
+                    for _, s := range sugg { fmt.Printf("  - %s\n", s) }
+                    return fmt.Errorf("invalid recipe_id: %s", recipeID)
+                }
+            }
+        }
 		// Use OpenRewrite-specific endpoint for better integration
 		request := map[string]interface{}{
 			"project_url":     repository,
@@ -280,7 +294,7 @@ func executeTransformation(recipeID, repository, branch, language string) error 
 		}
 
 		// Use standard transform endpoint (which handles OpenRewrite internally)
-		url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
+    url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
 		response, err := makeAPIRequest("POST", url, data)
 		if err != nil {
 			return fmt.Errorf("OpenRewrite transformation failed: %w", err)
