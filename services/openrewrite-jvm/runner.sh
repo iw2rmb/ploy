@@ -360,8 +360,8 @@ ls -la "${OUTPUT_TAR}"
 if [ -n "${OUTPUT_KEY}" ]; then
     echo "[OpenRewrite] Uploading output to SeaweedFS..."
     echo "[OpenRewrite] Job ID: ${JOB_ID}"
-    # Use OUTPUT_KEY directly - unified storage layer handles bucket/collection path construction
-    UPLOAD_URL="${SEAWEEDFS_URL}/${OUTPUT_KEY}"
+    # Add artifacts prefix for SeaweedFS collection
+    UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
     echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
     
     echo "[OpenRewrite] Attempting to upload $(ls -lh ${OUTPUT_TAR} | awk '{print $5}') file to SeaweedFS..."
