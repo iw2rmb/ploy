@@ -142,6 +142,22 @@ func TestCreateStorageClient_MemoryProvider(t *testing.T) {
     _ = istorage.StorageMetrics{}
 }
 
+func TestCreateStorageClient_SeaweedFSMapping(t *testing.T) {
+    t.Parallel()
+
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n  bucket: test-collection\n")
+    require.NoError(t, os.WriteFile(path, content, 0o644))
+
+    svc, err := cfg.New(cfg.WithFile(path), cfg.WithValidation(cfg.NewStructValidator()))
+    require.NoError(t, err)
+
+    stor, err := svc.Get().CreateStorageClient()
+    require.NoError(t, err)
+    require.NotNil(t, stor)
+}
+
 func TestConfigurationService_ValidationFails(t *testing.T) {
     // This test ensures that when validators are provided,
     // invalid configuration causes New() to return an error.
