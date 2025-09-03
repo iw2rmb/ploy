@@ -283,85 +283,8 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	assert.Equal(t, true, config.EnableCaching)
 }
 
-func TestServer_HandleStorageConfig(t *testing.T) {
-	tests := []struct {
-		name           string
-		configPath     string
-		expectedStatus int
-		expectError    bool
-	}{
-		{
-			name:           "valid config load",
-			configPath:     "/tmp/valid-config.yaml",
-			expectedStatus: 200,
-			expectError:    false,
-		},
-		{
-			name:           "missing config file",
-			configPath:     "/tmp/nonexistent-config.yaml",
-			expectedStatus: 500,
-			expectError:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := createMockServer()
-			server.dependencies.StorageConfigPath = tt.configPath
-
-			// Create a temporary config file for the valid test case
-			if !tt.expectError {
-				configContent := `storage:
-  provider: seaweedfs
-  master: "http://localhost:9333"
-  filer: "http://localhost:8888"
-  collection: "ploy"
-  replication: "001"
-  timeout: 30
-  datacenter: "dc1"
-  rack: "rack1"
-  collections:
-    artifacts: "artifacts"
-    metadata: "ploy-metadata" 
-    debug: "ploy-debug"
-  client:
-    enable_metrics: true
-    enable_health_check: true
-    max_operation_time: "5m"`
-
-				err := os.WriteFile(tt.configPath, []byte(configContent), 0644)
-				require.NoError(t, err)
-				defer os.Remove(tt.configPath)
-			}
-
-			// Set up route using actual handler method
-			server.app.Get("/storage/config", server.handleGetStorageConfig)
-
-			// Test request
-			req := httptest.NewRequest("GET", "/storage/config", nil)
-			resp, err := server.app.Test(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
-
-			var response map[string]interface{}
-			err = json.NewDecoder(resp.Body).Decode(&response)
-			require.NoError(t, err)
-
-			if tt.expectError {
-				assert.Contains(t, response, "error")
-			} else {
-				// The response should contain the entire root config structure
-				assert.Contains(t, response, "Storage")
-				storage, ok := response["Storage"].(map[string]interface{})
-				require.True(t, ok)
-				assert.Equal(t, "seaweedfs", storage["Provider"])
-				assert.Equal(t, "http://localhost:9333", storage["Master"])
-			}
-		})
-	}
-}
+// Removed legacy file-based storage config tests. Configuration now requires
+// centralized config service; see TestServer_HandleGetStorageConfig_UsesConfigService.
 
 func TestServer_HandleValidateStorageConfig(t *testing.T) {
 	tests := []struct {
@@ -468,66 +391,8 @@ func TestServer_HandleGetStorageConfig_UsesConfigService(t *testing.T) {
     assert.Equal(t, "http://localhost:9333", storageObj["Master"])
 }
 
-func TestServer_HandleReloadStorageConfig(t *testing.T) {
-	t.Run("successful config reload", func(t *testing.T) {
-		server := createMockServer()
-		configPath := "/tmp/reload-config.yaml"
-		server.dependencies.StorageConfigPath = configPath
-
-		// Create initial config file
-		configContent := `storage:
-  provider: seaweedfs
-  master: "http://localhost:9333"
-  filer: "http://localhost:8888"
-  collection: "ploy"
-  replication: "001"`
-
-		err := os.WriteFile(configPath, []byte(configContent), 0644)
-		require.NoError(t, err)
-		defer os.Remove(configPath)
-
-		// Set up route using actual handler method
-		server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
-
-		// Test request
-		req := httptest.NewRequest("POST", "/storage/config/reload", nil)
-		resp, err := server.app.Test(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, 200, resp.StatusCode)
-
-		var response map[string]interface{}
-		err = json.NewDecoder(resp.Body).Decode(&response)
-		require.NoError(t, err)
-
-		assert.Contains(t, response, "reloaded")
-		assert.Contains(t, response, "config")
-		assert.Equal(t, "Configuration reload completed", response["message"])
-	})
-
-	t.Run("config reload with missing file", func(t *testing.T) {
-		server := createMockServer()
-		server.dependencies.StorageConfigPath = "/tmp/nonexistent-reload-config.yaml"
-
-		// Set up route using actual handler method
-		server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
-
-		// Test request
-		req := httptest.NewRequest("POST", "/storage/config/reload", nil)
-		resp, err := server.app.Test(req)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, 500, resp.StatusCode)
-
-		var response map[string]interface{}
-		err = json.NewDecoder(resp.Body).Decode(&response)
-		require.NoError(t, err)
-
-		assert.Equal(t, "Failed to reload storage config", response["error"])
-	})
-}
+// Removed legacy file-based reload tests. Reload is handled via config service;
+// see TestServer_HandleReloadStorageConfig_UsesConfigService.
 
 func TestServer_HandleStorageHealth(t *testing.T) {
 	t.Run("storage client initialization error", func(t *testing.T) {

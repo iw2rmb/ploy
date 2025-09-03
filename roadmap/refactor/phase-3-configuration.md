@@ -524,7 +524,7 @@ func TestConfigurationService(t *testing.T) {
 ## Validation Checklist
 
 - [x] Initial configuration service slice implemented (defaults, env, file loaders)
-- [x] All direct usages of duplicate config functions removed (legacy kept for compatibility)
+- [x] All direct usages of duplicate config functions removed (legacy fallbacks removed)
 - [x] Environment variable handling unified (baseline via service options)
 - [x] Configuration validation working
 - [x] Hot-reload implemented
@@ -548,29 +548,27 @@ func TestConfigurationService(t *testing.T) {
   - Unit tests for file loading, env override, and storage client creation
 - Pending (next slices):
   - Broaden storage config mapping beyond provider (deeper provider options)
-  - Migrate remaining legacy config call sites to injected `internal/config.Service`
-  - Add optional Consul/remote source behind feature flag
   - Expand validation with richer rules and schema checks
 
 ## Next Steps
 
 - Replace remaining `CreateStorageClientFromConfig` usages with `cfg.CreateStorageClient()` via injected service
 - Extend `internal/config/schemas` to cover app, metrics, ARF, and Nomad sections
-- Add `WithConsul` source (optional) and document operational guidance
+- Document operational guidance for optional `WithConsul` source
 - Tighten validator coverage and add JSON-schema based checks where valuable
 - Update API wiring to pass `config.Service` into subsystems that currently resolve from disk
 
 ## Progress Update (2025-09-03, slice 2)
 
 - Completed:
-  - GET/POST storage config handlers prefer centralized Service (validate/reload + get); legacy fallbacks preserved
+  - GET/POST storage config handlers now require centralized Service (validate/reload + get); legacy fallbacks removed
   - `CreateStorageClient` now maps retry/cache settings into storage factory
   - Ansible iac/dev generates storage.endpoint alongside legacy master/filer for bare‑metal installs
   - Tests added for server handler service-preferred behavior and config retry/cache mapping
 - Pending:
   - Reorder server startup validation to prefer Service (initialize Service early in NewServer) ✅ Completed
-  - Optional Consul source for configuration (feature-flagged) ✅ Completed
-  - Continue migrating remaining file-based reads to injected Service where practical (partial)
+  - Optional Consul source for configuration ✅ Completed
+  - Recipes catalog routes always enabled (feature flag removed) ✅ Completed
 
 ## Expected Outcomes
 
