@@ -501,6 +501,15 @@ find . -name "*.go" -exec sed -i '' \
 - [x] Server handlers: list + get (internal path used in tests initially; now wired by default)
 - [x] Server handler: search endpoint (/v1/arf/recipes/search)
 - [x] Response payload includes description, pack, version
+
+## Progress Update (2025-09-03, slice 4)
+
+- Completed:
+  - Added internal `recipes.Indexer` to replace legacy indexer, with pack fetch support and snapshot persistence to unified storage.
+  - Added unit test verifying snapshot persistence.
+- Pending:
+  - Enhance YAML parsing to populate CatalogEntry fields (ID, display_name, tags) from OpenRewrite packs.
+  - Identify and remove remaining `api/arf` catalog/indexer usages.
 - [x] Unit tests added for registry and handlers (RED→GREEN)
 - [x] Replace legacy recipe routes with internal handlers
 - [ ] Migrate catalog parsing/models into internal/arf/recipes
