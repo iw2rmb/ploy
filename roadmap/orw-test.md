@@ -91,7 +91,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 4. **Retrieve Results**
    - Download transformed code from storage
-   - Location: `jobs/{job-id}/output.tar`
+   - Location: `artifacts/jobs/{job-name}/output.tar` where job-name format is `openrewrite-{timestamp}`
 
 5. **Verify Changes**
    - Compare before/after files
@@ -125,14 +125,14 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    - Confirm recipe artifacts are accessible
 
 2. **Check Nomad Job Execution**
-   - Verify job starts and completes
-   - Check job logs for errors
-   - Confirm OpenRewrite container is used
+   - Get JobID: `nomad job status | grep openrewrite | tail -1`
+   - Get allocation: `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job {job-name}`
+   - Check logs: `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id {alloc-id} --task openrewrite`
 
 3. **Validate Storage Operations**
-   - Confirm input.tar is uploaded
-   - Check if output.tar is created
-   - Verify storage keys are correct
+   - Confirm input.tar is uploaded to `artifacts/jobs/{job-name}/input.tar`
+   - Check if output.tar is created at `artifacts/jobs/{job-name}/output.tar`
+   - Verify storage uses `artifacts` bucket
 
 4. **Trace Transformation Flow**
    - Repository clone → Success?
@@ -159,45 +159,25 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 ## Test Execution Log
 
-### Test Run 1: Remove Unused Imports ✅ COMPLETED
-- **Date**: 2025-09-03
-- **Repository**: ploy-orw-test-java
-- **Recipe**: `org.openrewrite.java.RemoveUnusedImports`
-- **Transform ID**: 4c278a0e-50b0-44c0-a726-2e28a8c91398
-- **Status**: COMPLETED
-- **Changes Applied**: 1
-- **Duration**: 20 seconds
-- **Issues Found**: Diff not captured in status/report
-- **Notes**: Transformation executed successfully with 1 change applied, but diff was not captured in the status or report. This is a known issue that needs to be fixed in the OpenRewrite dispatcher.
-
-### Test Run 2: Java 8 to 11 Migration ✅ COMPLETED
-- **Date**: 2025-09-03
-- **Repository**: ploy-orw-test-java
-- **Recipe**: `org.openrewrite.java.migrate.Java8toJava11`
-- **Transform ID**: 250454d3-52af-4791-8274-3f6f30418acf
-- **Status**: COMPLETED
-- **Changes Applied**: 1
-- **Notes**: Similar result - transformation succeeded with changes but diff not captured
+*Results will be documented here after enhanced logging deployment*
 
 ## Key Findings
 
-### ✅ Expected Successes
-1. **Transformations Execute Successfully**: OpenRewrite recipes run to completion
-2. **Actual Code Changes Applied**: Diffs show real modifications to files
-3. **Status Tracking Works**: Can monitor transformation progress via status endpoint
-4. **Multiple Recipe Types Supported**: Java upgrades, cleanup, Spring Boot migrations work
+### ✅ Working Components
+1. **OpenRewrite Execution**: Recipes run successfully in containers with correct change detection
+2. **Nomad Job Management**: Jobs submit, execute, and complete properly
+3. **Status Tracking**: Can monitor transformation progress via status endpoint
+4. **Recipe Support**: Multiple recipe types execute successfully
 
-### ⚠️ Confirmed Issues
-1. **Diff Capture Not Working**: The transformation diff is not being captured or stored
-   - Transformations complete successfully with `changes_applied > 0`
-   - But `diff` field remains empty in status and transformation objects
-   - Report shows "No detailed file changes recorded" despite changes being made
-   - Issue likely in the OpenRewriteDispatcher's diff generation or storage
-2. **Transformation Details Cleanup**: The `/v1/arf/transforms/{id}` endpoint may return "not found" shortly after completion
-   - Status endpoint continues to work
-   - Need to capture diff immediately after completion
-3. **Recipe Behavior**: Some recipes modify pom.xml even when targeting Java files
-   - May be intentional OpenRewrite behavior for consistency
+### ⚠️ Critical Issues Identified
+1. **Storage Upload/Download Failure**: Transformations report success but files are not persisted
+   - Container uploads succeed with HTTP 201 but files disappear from SeaweedFS
+   - API download fails silently, causing empty diffs
+   - JobID (format: `openrewrite-{timestamp}`) must be used for storage paths, not transformation ID
+2. **Architectural Flaw**: Success status determined by Nomad job completion, not storage operations
+   - Transformation reports `success: true` even when storage fails
+   - `changes_applied > 0` based on OpenRewrite output parsing, not actual file persistence
+3. **Storage Bucket Configuration**: Must use `artifacts` collection consistently
 
 ## API Usage Documentation
 

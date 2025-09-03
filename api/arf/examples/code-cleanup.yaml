@@ -25,7 +25,7 @@ steps:
   - name: Remove Unused Imports
     type: openrewrite
     config:
-      recipe: org.openrewrite.java.cleanup.RemoveUnusedImports
+      recipe: org.openrewrite.java.RemoveUnusedImports
       description: Remove all unused import statements
     on_error: continue
     timeout: 5m

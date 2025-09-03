@@ -198,6 +198,15 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 
 	// Create and submit Nomad job
 	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
+	
+	// Log environment configuration for debugging
+	log.Printf("[OpenRewrite Dispatcher] Container environment:")
+	log.Printf("[OpenRewrite Dispatcher]   JOB_ID: %s", req.JobID)
+	log.Printf("[OpenRewrite Dispatcher]   SEAWEEDFS_URL: %s", "http://45.12.75.241:8888")
+	log.Printf("[OpenRewrite Dispatcher]   OUTPUT_KEY: %s", fmt.Sprintf("jobs/%s/output.tar", req.JobID))
+	log.Printf("[OpenRewrite Dispatcher]   Expected UPLOAD_URL: %s/artifacts/%s", "http://45.12.75.241:8888", fmt.Sprintf("jobs/%s/output.tar", req.JobID))
+	log.Printf("[OpenRewrite Dispatcher]   Storage bucket: artifacts")
+	
 	job := d.createNomadJob(req, nomadJobName)
 
 	// Log the download URL that will be used
@@ -238,9 +247,18 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	outputTarPath := fmt.Sprintf("/tmp/%s-output.tar", req.JobID)
 	defer os.Remove(outputTarPath)
 
+	log.Printf("[OpenRewrite Dispatcher] Downloading output from storage:")
+	log.Printf("[OpenRewrite Dispatcher]   Storage key: %s", outputStorageKey)
+	log.Printf("[OpenRewrite Dispatcher]   Storage bucket: artifacts")
+	log.Printf("[OpenRewrite Dispatcher]   Expected full path: %s/artifacts/%s", d.seaweedfsURL, outputStorageKey)
+	log.Printf("[OpenRewrite Dispatcher]   Local path: %s", outputTarPath)
+
 	if err := d.downloadFromStorage(ctx, outputStorageKey, outputTarPath); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Download failed for key=%s: %v", outputStorageKey, err)
 		return nil, fmt.Errorf("failed to download output tar: %w", err)
 	}
+	
+	log.Printf("[OpenRewrite Dispatcher] Output download successful")
 
 	// Extract output back to repo
 	if err := d.extractTarToRepo(outputTarPath, req.RepoPath); err != nil {
