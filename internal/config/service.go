@@ -1,6 +1,11 @@
 package config
 
-import "sync"
+import (
+    "log"
+    "os"
+    "sync"
+    "time"
+)
 
 // AppConfig holds basic application configuration used in tests and core flows.
 type AppConfig struct {
@@ -32,6 +37,10 @@ type Service struct {
     cache  *Cache
     // validators are executed after load
     validators []Validator
+    // onChange callbacks invoked after successful reload
+    onChange []func(*Config)
+    // hot-reload control
+    hotReloadStop chan struct{}
 }
 
 // New creates a new configuration service, applying the provided options and
@@ -96,4 +105,76 @@ func (s *Service) validate(cfg *Config) error {
         }
     }
     return nil
+}
+
+// Reload reloads configuration from loader, validates, swaps, and notifies.
+func (s *Service) Reload() error {
+    cfg, err := s.loader.Load()
+    if err != nil {
+        return err
+    }
+    if err := s.validate(cfg); err != nil {
+        return err
+    }
+    s.mu.Lock()
+    s.config = cfg
+    s.mu.Unlock()
+    for _, fn := range s.onChange {
+        // invoke callbacks asynchronously
+        go fn(cfg.Clone())
+    }
+    return nil
+}
+
+// Watch registers a callback to be called after successful reloads.
+func (s *Service) Watch(fn func(*Config)) {
+    s.mu.Lock()
+    s.onChange = append(s.onChange, fn)
+    s.mu.Unlock()
+}
+
+// startHotReload starts a polling loop watching file sources' mtime.
+func (s *Service) startHotReload(interval time.Duration) {
+    if interval <= 0 {
+        return
+    }
+    stop := make(chan struct{})
+    s.hotReloadStop = stop
+    // Build initial modtime map
+    mtimes := map[string]time.Time{}
+    for _, src := range s.loader.sources {
+        if fs, ok := src.(*fileSource); ok {
+            if st, err := os.Stat(fs.path); err == nil {
+                mtimes[fs.path] = st.ModTime()
+            }
+        }
+    }
+    go func() {
+        ticker := time.NewTicker(interval)
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ticker.C:
+                changed := false
+                for _, src := range s.loader.sources {
+                    if fs, ok := src.(*fileSource); ok {
+                        if st, err := os.Stat(fs.path); err == nil {
+                            prev := mtimes[fs.path]
+                            if st.ModTime().After(prev) {
+                                mtimes[fs.path] = st.ModTime()
+                                changed = true
+                            }
+                        }
+                    }
+                }
+                if changed {
+                    if err := s.Reload(); err != nil {
+                        log.Printf("config hot-reload failed: %v", err)
+                    }
+                }
+            case <-stop:
+                return
+            }
+        }
+    }()
 }
