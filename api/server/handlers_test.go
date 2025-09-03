@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iw2rmb/ploy/api/envstore"
+	cfg "github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
 
@@ -62,15 +63,81 @@ func (ts *TestableServer) getStorageClient() (interface{}, error) {
 }
 
 func createMockServer() *TestableServer {
-	server := &Server{
-		app:    createTestApp(),
-		config: &ControllerConfig{},
-		dependencies: &ServiceDependencies{
-			EnvStore:          mocks.NewEnvStore(),
-			StorageConfigPath: "/test/config",
-		},
-	}
-	return &TestableServer{Server: server}
+    server := &Server{
+        app:    createTestApp(),
+        config: &ControllerConfig{},
+        dependencies: &ServiceDependencies{
+            EnvStore:          mocks.NewEnvStore(),
+            StorageConfigPath: "/test/config",
+        },
+    }
+    return &TestableServer{Server: server}
+}
+
+func TestServer_HandleValidateStorageConfig_UsesConfigService(t *testing.T) {
+    // Create a temporary valid config file for the config service
+    dir := t.TempDir()
+    validPath := dir + "/config.yaml"
+    // Minimal storage config for service validator (seaweedfs requires endpoint per validator in internal/config)
+    // Our internal validator in this repo checks seaweedfs endpoint via StructValidator in internal/config.
+    content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n")
+    require.NoError(t, os.WriteFile(validPath, content, 0o644))
+
+    // Build a config service on that path
+    svc, err := cfg.New(
+        cfg.WithFile(validPath),
+        cfg.WithValidation(cfg.NewStructValidator()),
+    )
+    require.NoError(t, err)
+
+    // Server with a bogus path (would fail if legacy path was used)
+    server := createMockServer()
+    server.dependencies.StorageConfigPath = "/tmp/definitely-missing.yaml"
+    server.configService = svc
+
+    server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
+
+    req := httptest.NewRequest("POST", "/storage/config/validate", nil)
+    resp, err := server.app.Test(req)
+    require.NoError(t, err)
+    defer resp.Body.Close()
+
+    assert.Equal(t, 200, resp.StatusCode)
+    var body map[string]interface{}
+    require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+    assert.Equal(t, true, body["valid"])
+}
+
+func TestServer_HandleReloadStorageConfig_UsesConfigService(t *testing.T) {
+    // Create a temporary valid config file for the config service
+    dir := t.TempDir()
+    validPath := dir + "/config.yaml"
+    content := []byte("app:\n  name: test\nstorage:\n  provider: memory\n")
+    require.NoError(t, os.WriteFile(validPath, content, 0o644))
+
+    svc, err := cfg.New(
+        cfg.WithFile(validPath),
+    )
+    require.NoError(t, err)
+
+    server := createMockServer()
+    server.dependencies.StorageConfigPath = "/tmp/missing-config.yaml"
+    server.configService = svc
+
+    server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
+
+    req := httptest.NewRequest("POST", "/storage/config/reload", nil)
+    resp, err := server.app.Test(req)
+    require.NoError(t, err)
+    defer resp.Body.Close()
+
+    assert.Equal(t, 200, resp.StatusCode)
+    var body map[string]interface{}
+    require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+    assert.Equal(t, true, body["reloaded"])
+    // We returned config from the config service; just ensure it's present
+    _, ok := body["config"]
+    assert.True(t, ok)
 }
 
 func TestParseIntEnv(t *testing.T) {
