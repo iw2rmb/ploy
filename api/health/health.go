@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/api/config"
     "github.com/iw2rmb/ploy/api/consul_envstore"
     cfgsvc "github.com/iw2rmb/ploy/internal/config"
+    istorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -367,12 +368,12 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 		Latency: time.Since(start),
 	}
 
-    var storageClient interface{ Health(context.Context) error }
+    var storageClient interface{ Health(context.Context) error; Metrics() *istorage.StorageMetrics }
     var err error
     if h.configService != nil {
         // Use unified storage from service
         cfg := h.configService.Get()
-        var st interface{ Health(context.Context) error }
+        var st interface{ Health(context.Context) error; Metrics() *istorage.StorageMetrics }
         if cfg != nil {
             st, err = cfg.CreateStorageClient()
         }
