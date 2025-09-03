@@ -501,6 +501,7 @@ find . -name "*.go" -exec sed -i '' \
 - [x] Server handlers: list + get (internal path used in tests initially; now wired by default)
 - [x] Server handler: search endpoint (/v1/arf/recipes/search)
 - [x] Response payload includes description, pack, version
+- [x] All explicit usages of legacy api/arf RecipesIndexer removed from server
 
 ## Progress Update (2025-09-03, slice 4)
 
