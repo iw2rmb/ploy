@@ -547,7 +547,7 @@ func TestConfigurationService(t *testing.T) {
   - Minimal storage schema in `internal/config` and adapter method `Config.CreateStorageClient()` using unified storage factory (memory provider for this slice)
   - Unit tests for file loading, env override, and storage client creation
 - Pending (next slices):
-  - Broaden storage config mapping beyond provider (deeper provider options, retry/cache knobs)
+  - Broaden storage config mapping beyond provider (deeper provider options)
   - Migrate remaining legacy config call sites to injected `internal/config.Service`
   - Add optional Consul/remote source behind feature flag
   - Expand validation with richer rules and schema checks
@@ -559,6 +559,17 @@ func TestConfigurationService(t *testing.T) {
 - Add `WithConsul` source (optional) and document operational guidance
 - Tighten validator coverage and add JSON-schema based checks where valuable
 - Update API wiring to pass `config.Service` into subsystems that currently resolve from disk
+
+## Progress Update (2025-09-03, slice 2)
+
+- Completed:
+  - GET/POST storage config handlers prefer centralized Service (validate/reload + get); legacy fallbacks preserved
+  - `CreateStorageClient` now maps retry/cache settings into storage factory
+  - Ansible iac/dev generates storage.endpoint alongside legacy master/filer for bare‑metal installs
+  - Tests added for server handler service-preferred behavior and config retry/cache mapping
+- Pending:
+  - Reorder server startup validation to prefer Service (initialize Service early in NewServer)
+  - Optional Consul source for configuration (feature-flagged)
 
 ## Expected Outcomes
 
