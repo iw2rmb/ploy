@@ -437,60 +437,53 @@ func CreateStorageClientFromConfig(configPath string) (*storage.StorageClient, e
 	return storage.NewStorageClient(provider, clientConfig), nil
 }
 
+// convertRootToFactoryConfig builds a factory config from Root
+func convertRootToFactoryConfig(config Root) factory.FactoryConfig {
+    factoryConfig := factory.FactoryConfig{
+        Provider: config.Storage.Provider,
+        Endpoint: config.Storage.Master,
+        Bucket:   config.Storage.Collection,
+        Region:   "",
+    }
+    if factoryConfig.Provider == "" {
+        factoryConfig.Provider = "seaweedfs"
+    }
+    if factoryConfig.Provider == "seaweedfs" {
+        factoryConfig.Extra = map[string]interface{}{
+            "filer":       config.Storage.Filer,
+            "replication": config.Storage.Replication,
+            "timeout":     config.Storage.Timeout,
+        }
+    }
+    if config.Storage.Client.RetryConfig.MaxRetries > 0 {
+        initialDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.InitialDelay)
+        maxDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.MaxDelay)
+        factoryConfig.Retry = factory.RetryConfig{
+            Enabled:           true,
+            MaxAttempts:       config.Storage.Client.RetryConfig.MaxRetries,
+            InitialDelay:      initialDelay,
+            MaxDelay:          maxDelay,
+            BackoffMultiplier: config.Storage.Client.RetryConfig.Multiplier,
+        }
+    }
+    if config.Storage.Client.EnableMetrics {
+        factoryConfig.Monitoring = factory.MonitoringConfig{Enabled: true}
+    }
+    return factoryConfig
+}
+
 // CreateStorageFromFactory creates a storage instance using the new factory pattern
 // This is the recommended way to create storage instances going forward
 func CreateStorageFromFactory(configPath string) (storage.Storage, error) {
-	// Load configuration
-	config, err := Load(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load storage config: %w", err)
-	}
+    // Load configuration
+    config, err := Load(configPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to load storage config: %w", err)
+    }
+    factoryConfig := convertRootToFactoryConfig(config)
 
-	// Convert to factory config
-	factoryConfig := factory.FactoryConfig{
-		Provider: config.Storage.Provider,
-		Endpoint: config.Storage.Master, // For SeaweedFS, endpoint is the master
-		Bucket:   config.Storage.Collection,
-		Region:   "", // Not used for SeaweedFS
-	}
-
-	// If provider is empty, default to seaweedfs
-	if factoryConfig.Provider == "" {
-		factoryConfig.Provider = "seaweedfs"
-	}
-
-	// Add extra configuration for SeaweedFS
-	if factoryConfig.Provider == "seaweedfs" {
-		factoryConfig.Extra = map[string]interface{}{
-			"filer":       config.Storage.Filer,
-			"replication": config.Storage.Replication,
-			"timeout":     config.Storage.Timeout,
-		}
-	}
-
-	// Configure retry middleware
-	if config.Storage.Client.RetryConfig.MaxRetries > 0 {
-		initialDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.InitialDelay)
-		maxDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.MaxDelay)
-
-		factoryConfig.Retry = factory.RetryConfig{
-			Enabled:           true,
-			MaxAttempts:       config.Storage.Client.RetryConfig.MaxRetries,
-			InitialDelay:      initialDelay,
-			MaxDelay:          maxDelay,
-			BackoffMultiplier: config.Storage.Client.RetryConfig.Multiplier,
-		}
-	}
-
-	// Configure monitoring middleware
-	if config.Storage.Client.EnableMetrics {
-		factoryConfig.Monitoring = factory.MonitoringConfig{
-			Enabled: true,
-		}
-	}
-
-	// Create storage instance with factory
-	return factory.New(factoryConfig)
+    // Create storage instance with factory
+    return factory.New(factoryConfig)
 }
 
 // GetStorageConfigPath returns the storage configuration path with fallback logic
