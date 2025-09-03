@@ -34,7 +34,7 @@ Server indexes OpenRewrite packs and serves a searchable catalog.
   - [x] Handler tests for list/search/detail/refresh endpoints
 
 Notes:
-- Implemented as dedicated `RecipesHandler` + `RecipesIndexer` with in-memory catalog; verified by unit tests. Wiring into the main server router and platform pack configuration is pending (see CHANGELOG 2025-09-03).
+- Legacy `RecipesHandler` + in-memory `RecipesCatalog` retired. Internal `internal/arf/recipes` registry and indexer are the source of truth; server routes are wired to internal handlers by default.
 
 ## Phase 2 — CLI: Recipes List/Search (DONE)
 
@@ -110,7 +110,7 @@ Verified in repo:
 
 ## Immediate Next Steps
 
-- [x] Wire `RecipesHandler` into main API router behind feature flag; configure default packs in platform config
+- [x] Wire internal recipes handlers into main API router; configure default packs via platform config (future enhancement)
 - [x] CLI `ploy arf recipes list/search` (consumes server catalog endpoints)
 - [x] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
 - [x] Docs: add `docs/recipes.md` walkthrough; update CLI help and examples
