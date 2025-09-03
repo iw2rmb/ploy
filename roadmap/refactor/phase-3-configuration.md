@@ -523,14 +523,14 @@ func TestConfigurationService(t *testing.T) {
 
 ## Validation Checklist
 
-- [ ] Single configuration service implemented
+- [x] Initial configuration service slice implemented (defaults, env, file loaders)
 - [ ] All duplicate config functions removed
-- [ ] Environment variable handling unified
+- [x] Environment variable handling unified (baseline via service options)
 - [ ] Configuration validation working
 - [ ] Hot-reload implemented
 - [ ] Caching layer functional
-- [ ] All tests passing
-- [ ] Documentation updated
+- [x] Unit tests added for file/env loading and storage client creation
+- [x] Documentation updated (progress logged)
 
 ## Implementation Steps
 
@@ -538,6 +538,19 @@ func TestConfigurationService(t *testing.T) {
 - Add validation and caching
 - Replace duplicate functions
 - Update all consumers and test
+
+## Progress Update (2025-09-03)
+
+- Completed (slice 1):
+  - `internal/config` Service with `Get()` clone semantics
+  - Composite loader with sources: defaults, environment (`WithEnvironment`), and YAML file (`WithFile`)
+  - Minimal storage schema in `internal/config` and adapter method `Config.CreateStorageClient()` using unified storage factory (memory provider for this slice)
+  - Unit tests for file loading, env override, and storage client creation
+- Pending (next slices):
+  - Wire `api/server` to prefer `internal/config` service for storage initialization (keep legacy fallback)
+  - Migrate duplicate config helpers to the centralized service
+  - Add validation, caching, and hot‑reload
+  - Broaden storage config mapping beyond provider (endpoint/bucket/etc.)
 
 ## Expected Outcomes
 

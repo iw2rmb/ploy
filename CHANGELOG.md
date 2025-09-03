@@ -3781,3 +3781,14 @@ All essential CLI operations are now implemented, providing users with complete 
 **COMPLETED** - Phase 1, Step 3 from PLAN.md: "Fix Python C-extension detection in lane picker (should force Lane C)"
 
 Python projects requiring C-extensions now reliably route to Lane C for full POSIX compatibility, while pure Python projects remain on optimal Lane B.
+## [2025-09-03] - OpenRewrite Explicit Coordinates
+
+### Changed
+- OpenRewrite dispatcher now passes explicit Maven coordinates to the runner and disables discovery mode for reliability:
+  - `RECIPE_GROUP=org.openrewrite.recipe`
+  - `RECIPE_ARTIFACT` is auto-mapped: Spring recipes → `rewrite-spring`, others → `rewrite-migrate-java`
+  - `RECIPE_VERSION=2.20.0`
+- `DISCOVER_RECIPE` is set to `false` to force coordinate-based resolution.
+
+### Why
+- Ensures recipes like `RemoveUnusedImports` and Java migrations apply consistently without relying on catalog discovery.

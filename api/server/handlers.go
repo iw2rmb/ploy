@@ -1,18 +1,18 @@
 package server
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/config"
-	"github.com/iw2rmb/ploy/internal/build"
-	"github.com/iw2rmb/ploy/internal/debug"
-	"github.com/iw2rmb/ploy/internal/env"
-	"github.com/iw2rmb/ploy/internal/lifecycle"
+    "github.com/gofiber/fiber/v2"
+    "github.com/iw2rmb/ploy/api/config"
+    "github.com/iw2rmb/ploy/internal/build"
+    "github.com/iw2rmb/ploy/internal/debug"
+    "github.com/iw2rmb/ploy/internal/env"
+    "github.com/iw2rmb/ploy/internal/lifecycle"
 )
 
 // handleTriggerBuild handles build trigger requests with request-scoped storage
 func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
+    unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
@@ -22,7 +22,7 @@ func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
 // handleTriggerPlatformBuild handles platform service builds with Harbor platform namespace
 func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
+    unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
@@ -32,7 +32,7 @@ func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
 // handleTriggerAppBuild handles user application builds with Harbor apps namespace
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
+    unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
@@ -42,7 +42,7 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 // handleDestroyApp handles app destruction with request-scoped storage
 func (s *Server) handleDestroyApp(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-	unifiedStorage, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
+    unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}

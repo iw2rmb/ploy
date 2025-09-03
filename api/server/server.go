@@ -47,6 +47,7 @@ import (
 	// internal_openrewrite "github.com/iw2rmb/ploy/internal/openrewrite"
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
+	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -125,6 +126,13 @@ type Server struct {
 	shutdownChan       chan os.Signal
 	coordinationCtx    context.Context
 	coordinationCancel context.CancelFunc
+	configService      *cfgsvc.Service
+}
+
+// resolveUnifiedStorage prefers the config service if available, otherwise
+// falls back to the existing factory helper with a file path.
+func (s *Server) resolveUnifiedStorage() (internalStorage.Storage, error) {
+    return resolveStorageFromConfigService(s.configService, s.dependencies.StorageConfigPath)
 }
 
 // NewServer creates a new controller server with dependency injection

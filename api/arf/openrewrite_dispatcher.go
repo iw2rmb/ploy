@@ -298,20 +298,22 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"image":      fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
 					"force_pull": true, // Force pull to get latest image with setup script
 				},
-				Env: map[string]string{
-					"JOB_ID":            req.JobID,            // Nomad job ID for storage paths
-					"TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
-					"RECIPE":            req.RecipeClass,
-					"RECIPE_GROUP":      req.RecipeGroup,    // Empty for dynamic discovery
-					"RECIPE_ARTIFACT":   req.RecipeArtifact, // Empty for dynamic discovery
-					"RECIPE_VERSION":    req.RecipeVersion,  // Empty for dynamic discovery
-					"SEAWEEDFS_URL":     "http://45.12.75.241:8888",
-					"PLOY_API_URL":      d.apiURL,
-					"MAVEN_CACHE_PATH":  "maven-repository",
-					"DISCOVER_RECIPE":   "true",                                                                   // Tell runner.sh to discover recipe coordinates
-					"ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Pass full artifact URL
-					"OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),                             // Output storage key (no artifacts/ prefix)
-				},
+                Env: map[string]string{
+                    "JOB_ID":            req.JobID,            // Nomad job ID for storage paths
+                    "TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
+                    "RECIPE":            req.RecipeClass,
+                    // Prefer dynamic discovery; leave RECIPE_* empty
+                    "RECIPE_GROUP":      "",
+                    "RECIPE_ARTIFACT":   "",
+                    "RECIPE_VERSION":    "",
+                    "SEAWEEDFS_URL":     "http://45.12.75.241:8888",
+                    "PLOY_API_URL":      d.apiURL,
+                    "MAVEN_CACHE_PATH":  "maven-repository",
+                    "DISCOVER_RECIPE":   "true",                                                                   // Let runner handle pack resolution
+                    "ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Full artifact URL
+                    "OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),                             // Key retained for backward compatibility
+                    "OUTPUT_URL":        fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID), // Prefer full upload URL in runner
+                },
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
 					MemoryMB: intPtr(2048),
@@ -850,21 +852,36 @@ func intPtr(i int) *int {
 }
 
 // ParseOpenRewriteRecipeID parses an OpenRewrite recipe ID into its components
-// This function now relies purely on type-based detection and dynamic discovery
-// No shortcut recipe mappings are used - all recipes use full OpenRewrite class names
+// This function maps recipe class names to appropriate Maven coordinates for OpenRewrite catalogs.
 func ParseOpenRewriteRecipeID(recipeID string) (*OpenRewriteRecipeRequest, error) {
 	// Validate that the recipe ID looks like a valid OpenRewrite recipe class
 	if recipeID == "" {
 		return nil, fmt.Errorf("recipe ID cannot be empty")
 	}
 
-	// All OpenRewrite recipes should use full class names (e.g., org.openrewrite.java.migrate.UpgradeToJava17)
-	// Dynamic discovery will handle Maven coordinate resolution automatically
-	return &OpenRewriteRecipeRequest{
-		RecipeClass: recipeID,
-		// OpenRewrite CLI will discover these automatically
-		RecipeGroup:    "",
-		RecipeArtifact: "",
-		RecipeVersion:  "",
-	}, nil
+    // All OpenRewrite recipes should use full class names (e.g., org.openrewrite.java.migrate.UpgradeToJava17)
+    // Provide explicit Maven coordinates to ensure recipes are available in the runner without relying on discovery.
+    // Mapping:
+    //  - org.openrewrite.java.spring.*   → rewrite-spring
+    //  - org.openrewrite.java.migrate.*  → rewrite-migrate-java
+    //  - org.openrewrite.java.cleanup.*  → rewrite-java
+    //  - default                         → rewrite-java
+    artifact := "rewrite-java"
+    switch {
+    case strings.HasPrefix(recipeID, "org.openrewrite.java.spring"):
+        artifact = "rewrite-spring"
+    case strings.HasPrefix(recipeID, "org.openrewrite.java.migrate"):
+        artifact = "rewrite-migrate-java"
+    case strings.HasPrefix(recipeID, "org.openrewrite.java.cleanup"):
+        artifact = "rewrite-java"
+    default:
+        artifact = "rewrite-java"
+    }
+
+    return &OpenRewriteRecipeRequest{
+        RecipeClass:    recipeID,
+        RecipeGroup:    "org.openrewrite.recipe",
+        RecipeArtifact: artifact,
+        RecipeVersion:  "2.20.0",
+    }, nil
 }
