@@ -27,8 +27,9 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/.m2/repository
 
 # Create the OpenRewrite runner script and workspace setup
-COPY --chmod=755 runner.sh /usr/local/bin/openrewrite
-COPY --chmod=755 setup-workspace.sh /usr/local/bin/setup-workspace
+COPY runner.sh /usr/local/bin/openrewrite
+COPY setup-workspace.sh /usr/local/bin/setup-workspace
+RUN chmod 755 /usr/local/bin/openrewrite /usr/local/bin/setup-workspace
 
 # Set up Maven settings for better performance
 RUN mkdir -p /root/.m2 && \
