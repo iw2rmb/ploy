@@ -1,5 +1,0 @@
-./execution_config.go
-./recipe.go
-./recipe_metadata.go
-./recipe_step.go
-./validation_rules.go

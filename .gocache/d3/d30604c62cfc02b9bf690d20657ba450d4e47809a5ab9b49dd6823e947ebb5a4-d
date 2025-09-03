@@ -1,8 +1,0 @@
-./apps.go
-./handler.go
-./logs.go
-./repository.go
-./resources.go
-./signing.go
-./status.go
-./trigger.go

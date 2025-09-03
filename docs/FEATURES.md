@@ -145,6 +145,8 @@ Auto-classified lanes:
   - **Dual Wildcard Certificates**: Separate wildcard certificates for user apps and platform services
   - **Certificate Storage**: Secure storage in `/opt/ploy/traefik-data/` with proper permissions
   - **Automatic Renewal**: Traefik handles certificate renewal before expiration
+  - **Consul Catalog ACL Support** (Sep 2025): Traefik provider accepts Consul ACL tokens via `CONSUL_HTTP_TOKEN` (Nomad + Ansible wired)
+  - **Fast Health Routing** (Sep 2025): Consul checks use lightweight `/live`; readiness stays on `/ready` for deep validation
 - ✅ **Platform CLI Separation** (Aug 2025):
   - **ploy CLI**: Deploys user apps to `<app-name>.ployd.app`
   - **ployman CLI**: Deploys platform services to `<service-name>.ployman.app`

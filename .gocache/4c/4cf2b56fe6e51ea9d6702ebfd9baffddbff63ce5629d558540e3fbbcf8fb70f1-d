@@ -1,6 +1,0 @@
-./binary.go
-./errors.go
-./metadata.go
-./pipeline.go
-./rollback.go
-./system.go

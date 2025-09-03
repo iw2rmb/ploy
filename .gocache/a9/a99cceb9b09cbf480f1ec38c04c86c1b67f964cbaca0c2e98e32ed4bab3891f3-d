@@ -1,9 +1,0 @@
-./adapter.go
-./client.go
-./errors.go
-./integrity.go
-./interface.go
-./monitoring.go
-./retry.go
-./seaweedfs.go
-./storage.go

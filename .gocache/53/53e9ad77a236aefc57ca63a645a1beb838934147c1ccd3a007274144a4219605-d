@@ -1,8 +1,0 @@
-./cname.go
-./dns_challenge.go
-./dns_challenge_manual.go
-./domain.go
-./fqdn.go
-./nameserver.go
-./nameserver_unix.go
-./precheck.go

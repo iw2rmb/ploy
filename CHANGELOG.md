@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [2025-09-03] - Traefik Consul Catalog ACL + Fast Health Checks
+
+### Added
+- Traefik Consul Catalog provider now supports Consul ACL tokens in all deployment paths:
+  - platform/nomad/traefik.hcl: `--providers.consulcatalog.endpoint.token=${CONSUL_HTTP_TOKEN}`
+  - iac/common/templates/nomad-traefik-system.hcl.j2: token flag + `CONSUL_HTTP_TOKEN` env passthrough
+  - iac/dev/playbooks/traefik.yml: `providers.consulCatalog.endpoint.token` for Ansible static config
+- Tests: `tests/unit/traefik_consul_token_test.go` enforces token wiring across Nomad + Ansible configs.
+
+### Changed
+- API service health checks tuned for speed and reliability:
+  - Consul service checks now target the lightweight `/live` endpoint
+  - Increased timeouts/intervals to accommodate dependent backends when needed (timeout=20s, interval=30s)
+  - Readiness `/ready` remains comprehensive for deeper dependency validation
+
+### Notes
+- With Consul ACLs enabled (production), set `CONSUL_HTTP_TOKEN` for Traefik to discover services.
+- Traefik discovery confirmed via dashboard rawdata; Consul shows `ploy-api` as passing, enabling routing.
+
 ## [2025-09-03] - Config Service: Storage Env Overrides (Phase 3)
 
 ### Added
