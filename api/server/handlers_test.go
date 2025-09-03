@@ -433,6 +433,41 @@ func TestServer_HandleValidateStorageConfig(t *testing.T) {
 	}
 }
 
+func TestServer_HandleGetStorageConfig_UsesConfigService(t *testing.T) {
+    // Build a config service with seaweedfs endpoint to verify mapping
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n  bucket: test-collection\n")
+    require.NoError(t, os.WriteFile(path, content, 0o644))
+
+    svc, err := cfg.New(
+        cfg.WithFile(path),
+        cfg.WithValidation(cfg.NewStructValidator()),
+    )
+    require.NoError(t, err)
+
+    server := createMockServer()
+    server.dependencies.StorageConfigPath = "/tmp/missing-config.yaml"
+    server.configService = svc
+
+    server.app.Get("/storage/config", server.handleGetStorageConfig)
+
+    req := httptest.NewRequest("GET", "/storage/config", nil)
+    resp, err := server.app.Test(req)
+    require.NoError(t, err)
+    defer resp.Body.Close()
+
+    assert.Equal(t, 200, resp.StatusCode)
+
+    var body map[string]interface{}
+    require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+    // Legacy shape: top-level has Storage with Provider and Master
+    storageObj, ok := body["Storage"].(map[string]interface{})
+    require.True(t, ok)
+    assert.Equal(t, "seaweedfs", storageObj["Provider"])
+    assert.Equal(t, "http://localhost:9333", storageObj["Master"])
+}
+
 func TestServer_HandleReloadStorageConfig(t *testing.T) {
 	t.Run("successful config reload", func(t *testing.T) {
 		server := createMockServer()

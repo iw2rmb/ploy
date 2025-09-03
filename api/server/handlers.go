@@ -77,12 +77,31 @@ func (s *Server) handleStorageMetrics(c *fiber.Ctx) error {
 
 // handleGetStorageConfig handles storage configuration retrieval
 func (s *Server) handleGetStorageConfig(c *fiber.Ctx) error {
-	configManager := config.NewConfigManager(s.dependencies.StorageConfigPath)
-	rootConfig, err := configManager.LoadConfig()
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": err.Error()})
-	}
-	return c.JSON(rootConfig)
+    // Prefer centralized config service if available, mapping to legacy Root shape
+    if s.configService != nil {
+        cfg := s.configService.Get()
+        if cfg == nil {
+            return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service returned nil"})
+        }
+        // Map internal config to legacy Root structure for backward compatibility
+        legacy := config.Root{
+            Storage: config.StorageConfig{
+                Provider:   cfg.Storage.Provider,
+                Master:     cfg.Storage.Endpoint,
+                Filer:      cfg.Storage.Endpoint,
+                Collection: cfg.Storage.Bucket,
+            },
+        }
+        return c.JSON(legacy)
+    }
+
+    // Fallback to legacy file-based manager
+    configManager := config.NewConfigManager(s.dependencies.StorageConfigPath)
+    rootConfig, err := configManager.LoadConfig()
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": err.Error()})
+    }
+    return c.JSON(rootConfig)
 }
 
 // handleReloadStorageConfig handles storage configuration reload
