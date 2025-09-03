@@ -215,9 +215,18 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	}
 	log.Printf("[OpenRewrite Dispatcher] Job submitted successfully: EvalID=%s", jobResp.EvalID)
 
-	// Wait for job completion
-	log.Printf("[OpenRewrite Dispatcher] Waiting for job completion: %s", req.JobID)
-	result, err := d.waitForJobCompletion(ctx, req.JobID)
+	// Wait for evaluation to complete and get allocation ID
+	log.Printf("[OpenRewrite Dispatcher] Waiting for evaluation to create allocation...")
+	allocationID, err := d.waitForAllocationFromEval(ctx, jobResp.EvalID, req.JobID)
+	if err != nil {
+		log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to get allocation from evaluation: %v", err)
+		return nil, fmt.Errorf("failed to get allocation from evaluation: %w", err)
+	}
+	log.Printf("[OpenRewrite Dispatcher] Got allocation ID: %s", allocationID)
+
+	// Wait for job completion using specific allocation
+	log.Printf("[OpenRewrite Dispatcher] Waiting for allocation %s to complete", allocationID)
+	result, err := d.waitForAllocationCompletion(ctx, allocationID, req.JobID)
 	if err != nil {
 		log.Printf("[OpenRewrite Dispatcher] ERROR: Job execution failed: %v", err)
 		return nil, fmt.Errorf("job execution failed: %w", err)
@@ -321,21 +330,51 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 	return job
 }
 
-// waitForJobCompletion waits for Nomad job to complete
-func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID string) (*TransformationResult, error) {
+// waitForAllocationFromEval waits for an evaluation to create an allocation
+func (d *OpenRewriteDispatcher) waitForAllocationFromEval(ctx context.Context, evalID, jobID string) (string, error) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	timeout := time.After(30 * time.Second) // Should be quick
+
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-timeout:
+			return "", fmt.Errorf("timeout waiting for allocation from eval %s", evalID)
+		case <-ticker.C:
+			// Get allocations created by this evaluation
+			allocs, _, err := d.nomadClient.Evaluations().Allocations(evalID, nil)
+			if err != nil {
+				log.Printf("[OpenRewrite Dispatcher] Warning: Failed to get allocations for eval %s: %v", evalID, err)
+				continue
+			}
+
+			// Find allocation for our job
+			for _, alloc := range allocs {
+				if alloc.JobID == jobID {
+					log.Printf("[OpenRewrite Dispatcher] Found allocation %s for job %s", alloc.ID, jobID)
+					return alloc.ID, nil
+				}
+			}
+		}
+	}
+}
+
+// waitForAllocationCompletion waits for a specific allocation to complete
+func (d *OpenRewriteDispatcher) waitForAllocationCompletion(ctx context.Context, allocationID, jobID string) (*TransformationResult, error) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	// 4-minute timeout allows proper job completion while staying under handler timeout
-	timeout := time.After(4 * time.Minute)
+	// Increase timeout to 10 minutes for longer transformations
+	timeout := time.After(10 * time.Minute)
 	startTime := time.Now()
 	lastStatus := ""
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[OpenRewrite Dispatcher] Context cancelled while waiting for job %s - performing cleanup", jobID)
-
+			log.Printf("[OpenRewrite Dispatcher] Context cancelled while waiting for allocation %s - performing cleanup", allocationID)
 			// Attempt to stop the job to free resources
 			go func() {
 				_, _, stopErr := d.nomadClient.Jobs().Deregister(jobID, false, nil)
@@ -345,117 +384,91 @@ func (d *OpenRewriteDispatcher) waitForJobCompletion(ctx context.Context, jobID 
 					log.Printf("[OpenRewrite Dispatcher] Job %s stopped successfully after context cancellation", jobID)
 				}
 			}()
-
 			return nil, ctx.Err()
+
 		case <-timeout:
-			log.Printf("[OpenRewrite Dispatcher] Job %s timed out after 4 minutes", jobID)
-			return nil, fmt.Errorf("job execution timeout after 4 minutes")
+			log.Printf("[OpenRewrite Dispatcher] Allocation %s timed out after 10 minutes", allocationID)
+			return nil, fmt.Errorf("job execution timeout after 10 minutes")
+
 		case <-ticker.C:
-			job, _, err := d.nomadClient.Jobs().Info(jobID, nil)
+			// Get specific allocation info
+			alloc, _, err := d.nomadClient.Allocations().Info(allocationID, nil)
 			if err != nil {
-				log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to get job info for %s: %v", jobID, err)
-				// Don't fail immediately, could be transient
+				log.Printf("[OpenRewrite Dispatcher] ERROR: Failed to get allocation info for %s: %v", allocationID, err)
 				continue
 			}
 
 			// Log status changes
-			currentStatus := ""
-			if job.Status != nil {
-				currentStatus = *job.Status
-				if currentStatus != lastStatus {
-					log.Printf("[OpenRewrite Dispatcher] Job %s status: %s (elapsed: %v)",
-						jobID, currentStatus, time.Since(startTime))
-					lastStatus = currentStatus
+			currentStatus := alloc.ClientStatus
+			if currentStatus != lastStatus {
+				log.Printf("[OpenRewrite Dispatcher] Allocation %s status: %s (elapsed: %v)",
+					allocationID, currentStatus, time.Since(startTime))
+				lastStatus = currentStatus
 
-					// Also check allocations for more details
-					allocs, _, err := d.nomadClient.Jobs().Allocations(jobID, false, nil)
-					if err == nil && len(allocs) > 0 {
-						alloc := allocs[0]
-						log.Printf("[OpenRewrite Dispatcher] Allocation %s: Status=%s, DesiredStatus=%s",
-							alloc.ID, alloc.ClientStatus, alloc.DesiredStatus)
-
-						// Check task states
-						if alloc.TaskStates != nil {
-							for taskName, taskState := range alloc.TaskStates {
-								log.Printf("[OpenRewrite Dispatcher] Task %s: State=%s, Failed=%v",
-									taskName, taskState.State, taskState.Failed)
-								// Log any events
-								for _, event := range taskState.Events {
-									if event.DisplayMessage != "" {
-										log.Printf("[OpenRewrite Dispatcher] Task event: %s", event.DisplayMessage)
-									}
-								}
-							}
-						}
+				// Log task states
+				if alloc.TaskStates != nil {
+					for taskName, taskState := range alloc.TaskStates {
+						log.Printf("[OpenRewrite Dispatcher] Task %s: State=%s, Failed=%v, Restarts=%d",
+							taskName, taskState.State, taskState.Failed, taskState.Restarts)
 					}
 				}
 			}
 
-			if job.Status != nil && *job.Status == "dead" {
-				// Enhanced failure detection - check allocations for actual task status
-				allocs, _, allocErr := d.nomadClient.Jobs().Allocations(jobID, false, nil)
-				if allocErr == nil && len(allocs) > 0 {
-					alloc := allocs[0]
-					log.Printf("[OpenRewrite Dispatcher] Analyzing allocation %s: Status=%s", alloc.ID, alloc.ClientStatus)
-
-					// Check for explicit task failures
-					if alloc.TaskStates != nil {
-						for taskName, taskState := range alloc.TaskStates {
-							if taskState.Failed {
-								log.Printf("[OpenRewrite Dispatcher] Task %s failed: State=%s", taskName, taskState.State)
-								// Check for specific failure reasons in events
-								var failureReason string
-								for _, event := range taskState.Events {
-									if event.Type == "Driver Failure" || event.Type == "Task Setup" {
-										failureReason = event.DisplayMessage
-										break
-									}
-								}
-								if failureReason == "" {
-									failureReason = "Task execution failed"
-								}
-								return nil, fmt.Errorf("job failed: %s", failureReason)
+			// Check for completion
+			if alloc.ClientStatus == "complete" {
+				log.Printf("[OpenRewrite Dispatcher] Allocation %s completed successfully", allocationID)
+				// Check task exit codes
+				success := true
+				for taskName, taskState := range alloc.TaskStates {
+					if taskState.Failed {
+						// Check if the exit code is actually 0 (success)
+						for _, event := range taskState.Events {
+							if event.Type == "Terminated" && event.ExitCode == 0 {
+								log.Printf("[OpenRewrite Dispatcher] Task %s exited with code 0 (success)", taskName)
+								success = true
+								break
 							}
+						}
+						if !success {
+							log.Printf("[OpenRewrite Dispatcher] Task %s failed", taskName)
+							return nil, fmt.Errorf("task %s failed", taskName)
+						}
+					}
+				}
+				return &TransformationResult{
+					Success:        true,
+					ExecutionTime:  time.Since(startTime),
+					ChangesApplied: 1, // This should be populated from actual results
+				}, nil
+			}
 
-							// Check for successful completion
-							if taskState.State == "dead" && !taskState.Failed {
-								log.Printf("[OpenRewrite Dispatcher] Job %s completed successfully", jobID)
-								return &TransformationResult{
-									Success:        true,
-									ExecutionTime:  time.Since(startTime),
-									ChangesApplied: 1,
-								}, nil
+			// Check for failure
+			if alloc.ClientStatus == "failed" {
+				log.Printf("[OpenRewrite Dispatcher] Allocation %s failed", allocationID)
+				// Get failure reason from task states
+				failureReason := "unknown failure"
+				if alloc.TaskStates != nil {
+					for taskName, taskState := range alloc.TaskStates {
+						for _, event := range taskState.Events {
+							if event.Type == "Driver Failure" || event.Type == "Task Setup" || event.DisplayMessage != "" {
+								failureReason = fmt.Sprintf("%s: %s", taskName, event.DisplayMessage)
+								break
 							}
 						}
 					}
-
-					// Fall back to allocation status for failure detection
-					if alloc.ClientStatus == "failed" {
-						log.Printf("[OpenRewrite Dispatcher] Job %s failed: Allocation failed", jobID)
-						return nil, fmt.Errorf("job failed: allocation status failed")
-					}
 				}
+				return nil, fmt.Errorf("allocation failed: %s", failureReason)
+			}
 
-				// Original logic as fallback
-				if job.StatusDescription != nil && strings.Contains(*job.StatusDescription, "completed") {
-					log.Printf("[OpenRewrite Dispatcher] Job %s completed successfully", jobID)
-					return &TransformationResult{
-						Success:        true,
-						ExecutionTime:  time.Since(startTime),
-						ChangesApplied: 1,
-					}, nil
-				}
-
-				statusDesc := "unknown failure"
-				if job.StatusDescription != nil {
-					statusDesc = *job.StatusDescription
-				}
-				log.Printf("[OpenRewrite Dispatcher] Job %s failed: %s", jobID, statusDesc)
-				return nil, fmt.Errorf("job failed: %s", statusDesc)
+			// Check for lost allocation
+			if alloc.ClientStatus == "lost" {
+				log.Printf("[OpenRewrite Dispatcher] Allocation %s was lost", allocationID)
+				return nil, fmt.Errorf("allocation lost")
 			}
 		}
 	}
 }
+
 
 // Helper functions for tar operations and storage
 func (d *OpenRewriteDispatcher) createTarFromRepo(repoPath, tarPath string) error {
