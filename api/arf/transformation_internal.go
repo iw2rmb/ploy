@@ -6,35 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
-
-// transformationStore holds transformation results in memory (for backward compatibility)
-type transformationStore struct {
-	mu      sync.RWMutex
-	results map[string]*TransformationResult
-}
-
-func (s *transformationStore) store(id string, result *TransformationResult) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.results[id] = result
-}
-
-func (s *transformationStore) get(id string) (*TransformationResult, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	result, exists := s.results[id]
-	return result, exists
-}
-
-// Global store for backward compatibility
-var globalTransformStore = &transformationStore{
-	results: make(map[string]*TransformationResult),
-}
 
 // GetTransformationResult handles GET /v1/arf/transforms/:id (legacy endpoint)
 func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
@@ -45,11 +20,31 @@ func (h *Handler) GetTransformationResult(c *fiber.Ctx) error {
 		})
 	}
 
-	result, exists := globalTransformStore.get(transformID)
-	if !exists {
+	// Get transformation status from Consul
+	status, err := h.consulStore.GetTransformationStatus(c.Context(), transformID)
+	if err != nil || status == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "transformation not found",
 		})
+	}
+
+	// Build TransformationResult from status
+	result := &TransformationResult{
+		TransformationID: status.TransformationID,
+		RecipeID:         status.RecipeID,
+		StartTime:        status.StartTime,
+		EndTime:          status.EndTime,
+		Success:          status.Status == "completed",
+		ChangesApplied:   status.ChangesApplied,
+		FilesModified:    status.FilesModified,
+		Diff:             status.Diff,
+		ValidationScore:  status.ValidationScore,
+		ExecutionTime:    status.EndTime.Sub(status.StartTime),
+	}
+
+	// Set TotalFiles based on FilesModified
+	if result.FilesModified != nil {
+		result.TotalFiles = len(result.FilesModified)
 	}
 
 	return c.JSON(result)

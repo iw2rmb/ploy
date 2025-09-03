@@ -97,7 +97,7 @@ func (h *Handler) executeTransformationBackground(transformID string, req *Trans
 	// Execute transformation using existing internal method
 	result, err := h.executeTransformationInternal(ctx, transformID, req)
 
-	// Update final status
+	// Update final status with all result data
 	if status != nil {
 		if err != nil {
 			status.Status = "failed"
@@ -105,18 +105,16 @@ func (h *Handler) executeTransformationBackground(transformID string, req *Trans
 		} else {
 			status.Status = "completed"
 			if result != nil {
-				// Store result details in status
-				status.EndTime = time.Now()
-				// Could also store result in a separate key if needed
+				// Store all result data directly in status
+				status.RecipeID = result.RecipeID
+				status.Diff = result.Diff
+				status.FilesModified = result.FilesModified
+				status.ChangesApplied = result.ChangesApplied
+				status.ValidationScore = result.ValidationScore
 			}
 		}
 		status.EndTime = time.Now()
 		h.consulStore.StoreTransformationStatus(ctx, transformID, status)
-	}
-
-	// Store result in global store for backward compatibility
-	if result != nil {
-		globalTransformStore.store(transformID, result)
 	}
 }
 

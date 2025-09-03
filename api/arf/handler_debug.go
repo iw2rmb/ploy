@@ -214,14 +214,8 @@ func (h *Handler) GetTransformationReport(c *fiber.Ctx) error {
 		})
 	}
 
-	// Try to get transformation result for diff data
-	var diff string
-	if result, exists := globalTransformStore.get(transformID); exists && result != nil {
-		diff = result.Diff
-	}
-
-	// Generate markdown report with diff if available
-	report := generateMarkdownReport(status, diff)
+	// Generate markdown report with diff from status
+	report := generateMarkdownReport(status, status.Diff)
 	contentType := "text/markdown; charset=utf-8"
 
 	c.Set("Content-Type", contentType)
