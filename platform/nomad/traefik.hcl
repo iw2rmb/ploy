@@ -114,6 +114,7 @@ job "traefik-system" {
           "--providers.consulcatalog.exposedByDefault=false",
           "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
+          "--providers.consulcatalog.endpoint.token=${CONSUL_HTTP_TOKEN}",
           "--providers.file.filename=/etc/traefik/dynamic-configs/dynamic-config.yml",
           "--providers.file.watch=true",
           "--metrics.prometheus=true",

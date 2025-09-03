@@ -312,3 +312,23 @@ ansible-playbook site.yml -i inventory/hosts.yml
 - **High Availability**: Multi-node production deployment with redundancy
 
 See `iac/README.md` for complete infrastructure documentation.
+### Health & Readiness
+
+The API exposes three endpoints with distinct purposes and cost profiles:
+
+- /live: Lightweight liveness probe.
+  - Purpose: Fast Consul/Nomad health checks and load balancer gating.
+  - Behavior: Minimal dependencies; returns quickly when the process is alive.
+
+- /ready: Comprehensive readiness probe.
+  - Purpose: Validates critical dependencies (Consul, Nomad, storage, env store, etc.).
+  - Behavior: May take longer due to external checks; used to gate traffic during rollouts.
+
+- /health: Basic health overview.
+  - Purpose: Summarized health including non-critical components; suitable for external monitoring.
+  - Behavior: Intermediate cost (fewer checks than /ready, more context than /live).
+
+Recommended usage:
+- Consul service checks -> /live (fast, keeps routing responsive).
+- Readiness checks during deployment -> /ready (deep verification).
+- External status dashboards/alerts -> /health.

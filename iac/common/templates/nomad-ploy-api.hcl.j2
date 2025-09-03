@@ -207,9 +207,9 @@ EOF
         # Health check endpoint - simplified configuration
         check {
           type = "http"
-          path = "/health"
-          interval = "10s"
-          timeout = "5s"
+          path = "/live"
+          interval = "30s"
+          timeout = "20s"
           port = "http"
         }
 
@@ -218,8 +218,8 @@ EOF
           name = "readiness"
           type = "http"
           path = "/ready"
-          interval = "15s"
-          timeout = "5s"
+          interval = "30s"
+          timeout = "20s"
           port = "http"
         }
         

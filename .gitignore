@@ -48,3 +48,7 @@ __pycache__/
 # Test artifacts
 apps/
 test-template/
+
+.gocache
+.gocache_go*.gocache
+.gocache/
