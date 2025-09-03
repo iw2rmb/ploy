@@ -139,3 +139,57 @@ func TestCreateStorageClient_MemoryProvider(t *testing.T) {
     // Ensure factory accepts provider field at least
     _ = istorage.StorageMetrics{}
 }
+
+func TestConfigurationService_ValidationFails(t *testing.T) {
+    // This test ensures that when validators are provided,
+    // invalid configuration causes New() to return an error.
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    // Missing region for s3 provider should fail validation
+    content := []byte("storage:\n  provider: s3\n  bucket: test-bucket\n")
+    if err := os.WriteFile(path, content, 0o644); err != nil {
+        t.Fatalf("failed writing test config: %v", err)
+    }
+
+    _, err := cfg.New(
+        cfg.WithFile(path),
+        cfg.WithValidation(cfg.NewStructValidator()),
+    )
+    if err == nil {
+        t.Fatalf("expected validation error, got nil")
+    }
+}
+
+func TestConfigurationService_GetWithCache(t *testing.T) {
+    t.Parallel()
+
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    content := []byte("app:\n  name: cached-app\n")
+    if err := os.WriteFile(path, content, 0o644); err != nil {
+        t.Fatalf("failed writing config: %v", err)
+    }
+
+    svc, err := cfg.New(cfg.WithFile(path))
+    if err != nil {
+        t.Fatalf("unexpected error creating service: %v", err)
+    }
+
+    // First call should populate cache and report miss
+    got1, fromCache := svc.GetWithCache("test")
+    if fromCache {
+        t.Fatalf("expected cache miss on first call")
+    }
+    if got1.App.Name != "cached-app" {
+        t.Fatalf("expected app.name=cached-app, got %q", got1.App.Name)
+    }
+
+    // Second call with same key should be cache hit
+    got2, fromCache2 := svc.GetWithCache("test")
+    if !fromCache2 {
+        t.Fatalf("expected cache hit on second call")
+    }
+    if got2.App.Name != "cached-app" {
+        t.Fatalf("expected cached app.name=cached-app, got %q", got2.App.Name)
+    }
+}
