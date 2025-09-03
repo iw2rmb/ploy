@@ -239,7 +239,7 @@ func (c *Config) InitializeStorage() (RecipeStorage, error) {
 			Master:      c.Storage.SeaweedFS.MasterURL,
 			Filer:       c.Storage.SeaweedFS.FilerURL,
 			Collection:  c.Storage.BucketName,
-			Replication: "001",
+			Replication: "000", // Use 000 for single-node dev environment
 			Timeout:     int(c.Storage.Timeout.Seconds()),
 		}
 
