@@ -1,6 +1,7 @@
 package server
 
 import (
+    "encoding/json"
     "net/http/httptest"
     "strings"
     "testing"
@@ -71,6 +72,41 @@ func TestARFRecipesList_StorageBacked_OK(t *testing.T) {
     }
     if resp.StatusCode != 200 {
         t.Fatalf("unexpected status: %d", resp.StatusCode)
+    }
+}
+
+func TestARFRecipesList_StorageBacked_LanguageFilter(t *testing.T) {
+    t.Parallel()
+
+    mem := providers_memory.NewMemoryStorage(0)
+    catalog := `[
+      {"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","tags":["cleanup","java"]},
+      {"id":"org.openrewrite.kotlin.cleanup.Cleanup","display_name":"Kotlin Cleanup","tags":["cleanup","kotlin"]}
+    ]`
+    _ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+
+    srv, err := NewServer(&ControllerConfig{})
+    if err != nil {
+        t.Fatalf("NewServer error: %v", err)
+    }
+    srv.dependencies.ARFRecipes = recipes.NewStorageBacked(mem)
+
+    srv.app.Get("/v1/arf/recipes", srv.handleARFRecipesList)
+    req := httptest.NewRequest("GET", "/v1/arf/recipes?language=java", nil)
+    resp, err := srv.app.Test(req)
+    if err != nil {
+        t.Fatalf("request failed: %v", err)
+    }
+    if resp.StatusCode != 200 {
+        t.Fatalf("unexpected status: %d", resp.StatusCode)
+    }
+    var body map[string]interface{}
+    if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+        t.Fatalf("decode: %v", err)
+    }
+    arr, _ := body["recipes"].([]interface{})
+    if len(arr) != 1 {
+        t.Fatalf("expected 1 recipe for language=java, got %d", len(arr))
     }
 }
 
