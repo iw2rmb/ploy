@@ -12,9 +12,13 @@ type StructValidator struct{}
 func NewStructValidator() *StructValidator { return &StructValidator{} }
 
 func (sv *StructValidator) Validate(cfg *Config) error {
-    // Example: if S3 provider is selected, require Region
+    // If S3 provider is selected, require Region
     if cfg != nil && cfg.Storage.Provider == "s3" && cfg.Storage.Region == "" {
         return ErrValidation("s3 region is required when provider is s3")
+    }
+    // If SeaweedFS provider is selected, require Endpoint (master/filer base)
+    if cfg != nil && cfg.Storage.Provider == "seaweedfs" && cfg.Storage.Endpoint == "" {
+        return ErrValidation("seaweedfs endpoint is required when provider is seaweedfs")
     }
     return nil
 }
@@ -23,4 +27,3 @@ func (sv *StructValidator) Validate(cfg *Config) error {
 type ErrValidation string
 
 func (e ErrValidation) Error() string { return string(e) }
-

@@ -1,18 +1,20 @@
 package arf
 
 import (
-	"context"
-	"fmt"
-	"time"
+    "context"
+    "fmt"
+    "time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
+    "github.com/gofiber/fiber/v2"
+    "github.com/google/uuid"
+    "github.com/iw2rmb/ploy/api/arf/models"
+    "strings"
 )
 
 // ExecuteTransformationAsync handles POST /v1/arf/transform with async execution
 func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
-	var req TransformRequest
-	if err := c.BodyParser(&req); err != nil {
+    var req TransformRequest
+    if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   "Invalid request format",
 			"details": err.Error(),
@@ -42,10 +44,65 @@ func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "recipe type is required - specify 'openrewrite' or other valid type",
 		})
-	}
+    }
 
-	// Generate transformation ID
-	transformID := uuid.New().String()
+    // Optional: Validate recipe_id against catalog (suggestions on 400)
+    if h.catalog != nil && req.Type == "openrewrite" {
+        if _, err := h.catalog.GetRecipe(c.Context(), req.RecipeID); err != nil {
+            // Build suggestions using catalog search (by full ID and last segment)
+            suggestions := []string{}
+            collect := func(items []*models.Recipe) {
+                for _, r := range items {
+                    id := r.ID
+                    // Fallback if ID missing
+                    if id == "" {
+                        id = r.Metadata.Name
+                    }
+                    if id == "" {
+                        continue
+                    }
+                    // Deduplicate
+                    exists := false
+                    for _, s := range suggestions {
+                        if s == id {
+                            exists = true
+                            break
+                        }
+                    }
+                    if !exists {
+                        suggestions = append(suggestions, id)
+                        if len(suggestions) >= 5 {
+                            return
+                        }
+                    }
+                }
+            }
+
+            // Search by full value
+            if list, e := h.catalog.SearchRecipes(c.Context(), req.RecipeID); e == nil {
+                collect(list)
+            }
+            // Search by last segment (after last dot)
+            if dot := strings.LastIndex(req.RecipeID, "."); dot != -1 {
+                seg := req.RecipeID[dot+1:]
+                if seg != "" {
+                    if list, e := h.catalog.SearchRecipes(c.Context(), seg); e == nil {
+                        collect(list)
+                    }
+                }
+            }
+
+            return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+                "error":       "invalid recipe_id",
+                "message":     "Recipe not found in catalog",
+                "recipe_id":   req.RecipeID,
+                "suggestions": suggestions,
+            })
+        }
+    }
+
+    // Generate transformation ID
+    transformID := uuid.New().String()
 
 	// Consul store is required for async transformations
 	if h.consulStore == nil {

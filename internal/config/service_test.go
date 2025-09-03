@@ -196,6 +196,23 @@ func TestConfigurationService_GetWithCache(t *testing.T) {
     }
 }
 
+func TestStructValidator_SeaweedFSEndpointRequired(t *testing.T) {
+    t.Parallel()
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    // Provider seaweedfs but no endpoint should fail validation
+    content := []byte("storage:\n  provider: seaweedfs\n  bucket: test\n")
+    require.NoError(t, os.WriteFile(path, content, 0o644))
+
+    _, err := cfg.New(
+        cfg.WithFile(path),
+        cfg.WithValidation(cfg.NewStructValidator()),
+    )
+    if err == nil {
+        t.Fatalf("expected validation error for missing seaweedfs endpoint, got nil")
+    }
+}
+
 func TestHotReload_FromFileChange(t *testing.T) {
     t.Parallel()
 

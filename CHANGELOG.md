@@ -3,6 +3,7 @@
 ## [2025-09-03] - Recipes Catalog Wiring (Short)
 
 - Enabled feature-flagged recipes catalog routes (`PLOY_ENABLE_RECIPES_CATALOG=true`) and optional CLI catalog mode (`PLOY_RECIPES_CATALOG=true`) for `ploy arf recipe list/search`. Added minimal tests for server wiring and CLI parsing.
+ - Added transform-time validation: `/v1/arf/transforms` returns 400 with recipe suggestions when `recipe_id` is unknown (uses catalog when available).
 
 ## [2025-09-03] - Config Service Validation & Caching (Phase 3)
 
@@ -19,6 +20,20 @@
 
 ### Notes
 - Hot-reload is planned in the next slice per roadmap; not included in this change
+
+## [2025-09-03] - Config Service Hot-Reload & Server Wiring (Phase 3)
+
+### Added
+- internal/config: Polling-based hot-reload with `WithHotReload(interval)` and `Watch` callbacks
+- api/server: Initializes centralized config service (file + env + validation + cache + hot-reload)
+- api/health: Accepts optional config service and prefers it for storage checks and config validation
+- api/server: Added unit test to ensure configService init and storage resolution
+
+### Changed
+- api/config: Factored shared factory-config builder to reduce duplication between helpers
+
+### Notes
+- Backward compatibility kept (legacy file-based paths and compatibility tests still pass)
 
 ## [2025-09-03] - ARF OpenRewrite Recipes Catalog (Phase 1)
 
