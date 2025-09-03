@@ -113,4 +113,5 @@ Verified in repo:
 - [x] Wire `RecipesHandler` into main API router behind feature flag; configure default packs in platform config
 - [x] CLI `ploy arf recipes list/search` (consumes server catalog endpoints)
 - [ ] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
+- [x] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
 - [ ] Docs: add `docs/recipes.md` walkthrough; update CLI help and examples
