@@ -25,6 +25,16 @@
 ### Documentation
 - roadmap/refactor/phase-3-configuration.md: Cleaned up validation checklist (marked validation, hot-reload, caching as complete), added concrete next steps and clarified pending items for subsequent slices.
 
+## [2025-09-03] - Server Uses Config Service for Validation/Reload (Phase 3)
+
+### Changed
+- api/server: storage config endpoints now prefer centralized configuration service when available:
+  - POST /storage/config/validate uses injected config service Reload() for validation, falls back to file-based config otherwise.
+  - POST /storage/config/reload uses injected config service Reload() and returns current service config, falls back to file-based manager otherwise.
+
+### Tests
+- api/server: added tests to assert service-preferred behavior when a config.Service is injected.
+
 ## [2025-09-03] - OpenRewrite Recipes CLI Commands (Phase 2 Complete)
 
 ### Added
