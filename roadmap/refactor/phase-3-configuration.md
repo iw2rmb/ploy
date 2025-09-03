@@ -526,10 +526,9 @@ func TestConfigurationService(t *testing.T) {
 - [x] Initial configuration service slice implemented (defaults, env, file loaders)
 - [x] All direct usages of duplicate config functions removed (legacy kept for compatibility)
 - [x] Environment variable handling unified (baseline via service options)
-- [ ] Configuration validation working
- - [x] Configuration validation working
- - [ ] Hot-reload implemented
- - [x] Caching layer functional
+- [x] Configuration validation working
+- [x] Hot-reload implemented
+- [x] Caching layer functional
 - [x] Unit tests added for file/env loading and storage client creation
 - [x] Documentation updated (progress logged)
 
@@ -548,11 +547,18 @@ func TestConfigurationService(t *testing.T) {
   - Minimal storage schema in `internal/config` and adapter method `Config.CreateStorageClient()` using unified storage factory (memory provider for this slice)
   - Unit tests for file loading, env override, and storage client creation
 - Pending (next slices):
-  - Wire `api/server` to prefer `internal/config` service for storage initialization (keep legacy fallback) ✅ Completed
-  - Health checker wired to centralized config service (uses service if available) ✅ Completed
-  - Reduce duplication in factory mapping via shared builder in `api/config` ✅ Completed
-  - Add hot‑reload ✅ Completed (file polling)
-  - Broaden storage config mapping beyond provider (endpoint/bucket/etc.) ✅ Initial slice (endpoint/bucket/region fields added)
+  - Broaden storage config mapping beyond provider (deeper provider options, retry/cache knobs)
+  - Migrate remaining legacy config call sites to injected `internal/config.Service`
+  - Add optional Consul/remote source behind feature flag
+  - Expand validation with richer rules and schema checks
+
+## Next Steps
+
+- Replace remaining `CreateStorageClientFromConfig` usages with `cfg.CreateStorageClient()` via injected service
+- Extend `internal/config/schemas` to cover app, metrics, ARF, and Nomad sections
+- Add `WithConsul` source (optional) and document operational guidance
+- Tighten validator coverage and add JSON-schema based checks where valuable
+- Update API wiring to pass `config.Service` into subsystems that currently resolve from disk
 
 ## Expected Outcomes
 
