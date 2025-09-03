@@ -22,6 +22,8 @@ type Registry interface {
     Ping(ctx context.Context) error
     // List returns a list of recipes matching filters.
     List(ctx context.Context, f Filters) ([]Recipe, error)
+    // Get returns a single recipe by ID.
+    Get(ctx context.Context, id string) (*Recipe, error)
 }
 
 // InMemoryRegistry is a no-op implementation used for initial wiring.
@@ -34,4 +36,9 @@ func (r *InMemoryRegistry) Ping(ctx context.Context) error { return nil }
 func (r *InMemoryRegistry) List(ctx context.Context, f Filters) ([]Recipe, error) {
     // Empty initial slice; future slices can adapt from storage-backed catalog
     return []Recipe{}, nil
+}
+
+func (r *InMemoryRegistry) Get(ctx context.Context, id string) (*Recipe, error) {
+    // No data in in-memory initial slice
+    return nil, nil
 }

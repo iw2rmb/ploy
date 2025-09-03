@@ -68,3 +68,29 @@ func (r *StorageBackedRegistry) List(ctx context.Context, f Filters) ([]Recipe, 
     }
     return out, nil
 }
+
+func (r *StorageBackedRegistry) Get(ctx context.Context, id string) (*Recipe, error) {
+    if r.storage == nil {
+        return nil, nil
+    }
+    rc, err := r.storage.Get(ctx, catalogKey)
+    if err != nil {
+        return nil, nil
+    }
+    defer rc.Close()
+    var metas []recipeMeta
+    if err := json.NewDecoder(rc).Decode(&metas); err != nil {
+        return nil, nil
+    }
+    for _, m := range metas {
+        if m.ID == id {
+            name := m.DisplayName
+            if name == "" {
+                name = m.ID
+            }
+            rec := &Recipe{ID: m.ID, Name: name, Tags: m.Tags}
+            return rec, nil
+        }
+    }
+    return nil, nil
+}
