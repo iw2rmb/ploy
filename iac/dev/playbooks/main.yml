@@ -1884,6 +1884,9 @@
           
           storage:
             provider: seaweedfs
+            # New centralized config Service expects an endpoint; keep master/filer for
+            # backward compatibility and legacy helpers during transition.
+            endpoint: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
             
             # SeaweedFS Configuration
             master: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
