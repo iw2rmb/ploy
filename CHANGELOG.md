@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [2025-09-03] - Config Service Validation & Caching (Phase 3)
+
+### Added
+- internal/config: Basic validation framework with `Validator` interface and `NewStructValidator()`
+  - Enforces minimal cross-field rule: S3 provider requires `region`
+- internal/config: Lightweight TTL cache for configuration snapshots
+  - `Service.GetWithCache(key)` returns cached config on subsequent calls
+- internal/config: Options `WithValidation(...)` and `WithCacheTTL(...)`
+
+### Tests
+- internal/config: Unit tests for validation failure on invalid S3 config
+- internal/config: Unit tests for cache hit/miss behavior
+
+### Notes
+- Hot-reload is planned in the next slice per roadmap; not included in this change
+
+## [2025-09-03] - ARF OpenRewrite Recipes Catalog (Phase 1)
+
+### Added
+- Server-side recipes catalog with minimal indexer and endpoints
+  - Indexes OpenRewrite packs by parsing `META-INF/rewrite/*.yml` from JARs
+  - In-memory `RecipesCatalog` with list/search/detail by ID
+  - Snapshot persistence to storage at `artifacts/openrewrite/catalog.json`
+  - HTTP endpoints (scoped handler) for:
+    - `GET /v1/arf/recipes?query=&pack=&version=&limit=`
+    - `GET /v1/arf/recipes/:id`
+    - `POST /v1/arf/recipes/refresh` (rebuilds catalog from configured packs)
+
+### Testing
+- TDD: Unit tests for catalog build/list/search/get and refresh flow
+  - In-memory JAR fixture with `META-INF/rewrite/*.yml`
+  - Refresh persists snapshot and updates handler catalog
+
+### Notes
+- Routes are exposed via a dedicated `RecipesHandler` used in tests; wiring into the main server router can follow once pack fetch is integrated with platform config.
+
 ## [2025-09-02] - ARF Controls & Optimization (Phase 5)
 
 ### Added
