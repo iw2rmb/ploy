@@ -1,10 +1,10 @@
 package health
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"time"
+    "context"
+    "fmt"
+    "log"
+    "time"
 
 	"github.com/gofiber/fiber/v2"
 	consul "github.com/hashicorp/consul/api"
@@ -12,7 +12,8 @@ import (
 	vault "github.com/hashicorp/vault/api"
 
 	"github.com/iw2rmb/ploy/api/config"
-	"github.com/iw2rmb/ploy/api/consul_envstore"
+    "github.com/iw2rmb/ploy/api/consul_envstore"
+    cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -69,11 +70,12 @@ type DeploymentStatus struct {
 
 // HealthChecker provides health and readiness checking functionality
 type HealthChecker struct {
-	storageConfigPath string
-	consulAddr        string
-	nomadAddr         string
-	vaultAddr         string
-	metricsCollector  *HealthMetrics
+    storageConfigPath string
+    consulAddr        string
+    nomadAddr         string
+    vaultAddr         string
+    metricsCollector  *HealthMetrics
+    configService     *cfgsvc.Service
 }
 
 // NewHealthChecker creates a new health checker instance
@@ -93,6 +95,11 @@ func NewHealthChecker(storageConfigPath, consulAddr, nomadAddr string) *HealthCh
 			AverageResponseTime: make(map[string]time.Duration),
 		},
 	}
+}
+
+// SetConfigService optionally injects centralized config service.
+func (h *HealthChecker) SetConfigService(svc *cfgsvc.Service) {
+    h.configService = svc
 }
 
 // GetHealthStatus performs basic health checks
@@ -200,21 +207,31 @@ func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 
 // checkStorageConfig validates storage configuration
 func (h *HealthChecker) checkStorageConfig() DependencyHealth {
-	start := time.Now()
-	dep := DependencyHealth{
-		Status:  "healthy",
-		Latency: time.Since(start),
-	}
-
-	_, err := config.Load(h.storageConfigPath)
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Storage config validation failed: %v", err)
-	} else {
-		dep.Details = map[string]interface{}{
-			"config_path": h.storageConfigPath,
-		}
-	}
+    start := time.Now()
+    dep := DependencyHealth{
+        Status:  "healthy",
+        Latency: time.Since(start),
+    }
+    // Prefer centralized service if available
+    if h.configService != nil {
+        cfg := h.configService.Get()
+        if cfg == nil {
+            dep.Status = "unhealthy"
+            dep.Error = "config service returned nil config"
+        } else {
+            dep.Details = map[string]interface{}{"source": "service"}
+        }
+    } else {
+        // Fallback to file-based validation
+        if _, err := config.Load(h.storageConfigPath); err != nil {
+            dep.Status = "unhealthy"
+            dep.Error = fmt.Sprintf("Storage config validation failed: %v", err)
+        } else {
+            dep.Details = map[string]interface{}{
+                "config_path": h.storageConfigPath,
+            }
+        }
+    }
 
 	dep.Latency = time.Since(start)
 	return dep
@@ -350,21 +367,33 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 		Latency: time.Since(start),
 	}
 
-	// Try to create storage client using factory pattern
-	storageClient, err := config.CreateStorageFromFactory(h.storageConfigPath)
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Failed to create storage client: %v", err)
-		dep.Latency = time.Since(start)
-		return dep
-	}
+    var storageClient interface{ Health(context.Context) error }
+    var err error
+    if h.configService != nil {
+        // Use unified storage from service
+        cfg := h.configService.Get()
+        var st interface{ Health(context.Context) error }
+        if cfg != nil {
+            st, err = cfg.CreateStorageClient()
+        }
+        storageClient = st
+    } else {
+        // Fallback to factory path
+        storageClient, err = config.CreateStorageFromFactory(h.storageConfigPath)
+    }
+    if err != nil {
+        dep.Status = "unhealthy"
+        dep.Error = fmt.Sprintf("Failed to create storage client: %v", err)
+        dep.Latency = time.Since(start)
+        return dep
+    }
 
-	// Test storage health using new interface
-	ctx := context.Background()
-	if err := storageClient.Health(ctx); err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Storage health check failed: %v", err)
-	} else {
+    // Test storage health using new interface
+    ctx := context.Background()
+    if err := storageClient.Health(ctx); err != nil {
+        dep.Status = "unhealthy"
+        dep.Error = fmt.Sprintf("Storage health check failed: %v", err)
+    } else {
 		// Get metrics for additional details
 		metrics := storageClient.Metrics()
 		dep.Details = map[string]interface{}{

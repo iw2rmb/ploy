@@ -247,6 +247,12 @@ func handleRecipeList(args []string) error {
 }
 
 func listRecipes(filter RecipeFilter, outputFormat string, verbose bool) error {
+	// If catalog mode enabled, use lightweight catalog endpoints
+	if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
+		return listCatalogRecipes(outputFormat)
+	}
+
+	// Default: use unified registry endpoint
 	// Build API query
 	queryString := BuildAPIQuery(filter)
 	url := fmt.Sprintf("%s/arf/recipes%s", arfControllerURL, queryString)
@@ -324,6 +330,11 @@ func showRecipe(recipeID string, flags CommandFlags) error {
 }
 
 func searchRecipes(query string, flags CommandFlags) error {
+	// Catalog mode: use query parameter with new endpoint and simple presentation
+	if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
+		return searchCatalogRecipes(query, flags.OutputFormat, flags.Verbose)
+	}
+
 	url := fmt.Sprintf("%s/arf/recipes/search?q=%s", arfControllerURL, query)
 	response, err := makeAPIRequest("GET", url, nil)
 	if err != nil {
@@ -348,6 +359,82 @@ func searchRecipes(query string, flags CommandFlags) error {
 
 	// Use formatting utility
 	return FormatSearchResults(recipes, data.Query, flags.OutputFormat, flags.Verbose)
+}
+
+// Catalog client types and helpers (lightweight endpoints)
+type catalogRecipe struct {
+    ID          string   `json:"id"`
+    DisplayName string   `json:"display_name"`
+    Description string   `json:"description"`
+    Tags        []string `json:"tags"`
+    Pack        string   `json:"pack"`
+    Version     string   `json:"version"`
+}
+
+func listCatalogRecipes(outputFormat string) error {
+    url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
+    response, err := makeAPIRequest("GET", url, nil)
+    if err != nil {
+        return fmt.Errorf("failed to retrieve catalog: %w", err)
+    }
+    items, err := parseCatalogList(response)
+    if err != nil {
+        return err
+    }
+    return printCatalog(items, outputFormat, false)
+}
+
+func searchCatalogRecipes(query, outputFormat string, verbose bool) error {
+    url := fmt.Sprintf("%s/arf/recipes?query=%s", arfControllerURL, query)
+    response, err := makeAPIRequest("GET", url, nil)
+    if err != nil {
+        return fmt.Errorf("failed to search catalog: %w", err)
+    }
+    items, err := parseCatalogList(response)
+    if err != nil {
+        return err
+    }
+    return printCatalog(items, outputFormat, verbose)
+}
+
+// parseCatalogList parses the catalog array payload (used in tests)
+func parseCatalogList(data []byte) ([]catalogRecipe, error) {
+    var items []catalogRecipe
+    if err := json.Unmarshal(data, &items); err != nil {
+        return nil, fmt.Errorf("failed to parse catalog list: %w", err)
+    }
+    return items, nil
+}
+
+func printCatalog(items []catalogRecipe, format string, verbose bool) error {
+    switch format {
+    case "json":
+        out, _ := json.MarshalIndent(items, "", "  ")
+        fmt.Println(string(out))
+        return nil
+    case "yaml":
+        // minimal YAML via json2yaml-style is not available; fallback to json for now
+        out, _ := json.MarshalIndent(items, "", "  ")
+        fmt.Println(string(out))
+        return nil
+    default:
+        if len(items) == 0 {
+            fmt.Println("No recipes found")
+            return nil
+        }
+        // simple table-like output
+        fmt.Printf("ID\tPACK\tVERSION\tNAME\n")
+        for _, it := range items {
+            name := it.DisplayName
+            if name == "" { name = it.ID }
+            fmt.Printf("%s\t%s\t%s\t%s\n", it.ID, it.Pack, it.Version, name)
+            if verbose && it.Description != "" {
+                fmt.Printf("  %s\n", it.Description)
+            }
+        }
+        fmt.Printf("Total: %d recipes\n", len(items))
+        return nil
+    }
 }
 
 func getRecipeStats(recipeID string, flags CommandFlags) error {
@@ -804,7 +891,6 @@ Examples:
   # Search for Java migration recipes
   ploy arf recipes unified search java`)
 }
-
 
 
 
