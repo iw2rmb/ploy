@@ -570,6 +570,14 @@ func TestConfigurationService(t *testing.T) {
   - Optional Consul source for configuration ✅ Completed
   - Recipes catalog routes always enabled (feature flag removed) ✅ Completed
 
+## Progress Update (2025-09-03, slice 3)
+
+- Completed:
+  - Environment source now maps storage overrides: `PLOY_STORAGE_PROVIDER`, `PLOY_STORAGE_ENDPOINT`
+  - Unit test verifying env overrides create a valid storage client
+- Pending:
+  - Expand env mappings for storage retry/cache knobs and provider-specific options
+
 ## Expected Outcomes
 
 ### Before

@@ -285,3 +285,28 @@ func TestHotReload_FromFileChange(t *testing.T) {
     got2 := svc.Get()
     require.Equal(t, "v2", got2.App.Name)
 }
+
+func TestEnvironmentOverrides_StorageProviderAndEndpoint(t *testing.T) {
+
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    // File sets provider to memory; env should override to seaweedfs and set endpoint
+    content := []byte("app:\n  name: test-app\nstorage:\n  provider: memory\n")
+    require.NoError(t, os.WriteFile(path, content, 0o644))
+
+    // Set environment overrides
+    t.Setenv("PLOY_STORAGE_PROVIDER", "seaweedfs")
+    t.Setenv("PLOY_STORAGE_ENDPOINT", "http://localhost:9333")
+
+    svc, err := cfg.New(cfg.WithFile(path), cfg.WithEnvironment("PLOY_"), cfg.WithValidation(cfg.NewStructValidator()))
+    require.NoError(t, err)
+
+    cfgNow := svc.Get()
+    require.Equal(t, "seaweedfs", cfgNow.Storage.Provider)
+    require.Equal(t, "http://localhost:9333", cfgNow.Storage.Endpoint)
+
+    // Ensure we can create a storage client with the overridden settings
+    st, err := cfgNow.CreateStorageClient()
+    require.NoError(t, err)
+    require.NotNil(t, st)
+}
