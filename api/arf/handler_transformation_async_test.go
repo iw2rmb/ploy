@@ -1,19 +1,20 @@
 package arf
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+    "time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+    "github.com/gofiber/fiber/v2"
+    "github.com/google/uuid"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/iw2rmb/ploy/api/arf/models"
 )
 
 // MockRecipeExecutor for testing
@@ -271,6 +272,76 @@ func TestExecuteTransformation_Async(t *testing.T) {
 		json.NewDecoder(resp.Body).Decode(&result)
 		assert.Contains(t, result["error"], "not found")
 	})
+}
+
+func TestExecuteTransformation_ValidationSuggestions(t *testing.T) {
+    // Setup mock catalog with a couple of recipes
+    cat := NewMockRecipeCatalog()
+    ctx := context.Background()
+    _ = cat.StoreRecipe(ctx, &models.Recipe{
+        ID: "org.openrewrite.java.RemoveUnusedImports",
+        Metadata: models.RecipeMetadata{
+            Name:        "RemoveUnusedImports",
+            Description: "Removes unused imports",
+            Tags:        []string{"RemoveUnusedImport"}, // allow equality match in mock search
+            Languages:   []string{"java"},
+        },
+    })
+    _ = cat.StoreRecipe(ctx, &models.Recipe{
+        ID: "org.openrewrite.java.migrate.UpgradeToJava17",
+        Metadata: models.RecipeMetadata{
+            Name:        "UpgradeToJava17",
+            Description: "Upgrades Java version",
+            Tags:        []string{"UpgradeToJava"},
+            Languages:   []string{"java"},
+        },
+    })
+
+    // Mock Consul store to satisfy handler
+    mockStore := &MockConsulHealingStore{MockConsulStore: MockConsulStore{data: make(map[string]*TransformationStatus)}}
+
+    handler := &Handler{
+        consulStore: mockStore,
+        catalog:     cat,
+    }
+
+    app := fiber.New()
+    app.Post("/v1/arf/transforms", handler.ExecuteTransformationAsync)
+
+    // Submit request with slight typo to trigger suggestions
+    request := map[string]interface{}{
+        "recipe_id": "org.openrewrite.java.RemoveUnusedImport", // missing 's'
+        "type":      "openrewrite",
+        "codebase": map[string]interface{}{
+            "repository": "https://github.com/example/test-repo",
+        },
+    }
+    body, _ := json.Marshal(request)
+    req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := app.Test(req)
+    require.NoError(t, err)
+    assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+    var result map[string]interface{}
+    _ = json.NewDecoder(resp.Body).Decode(&result)
+    assert.Equal(t, "invalid recipe_id", result["error"])
+    assert.Equal(t, "org.openrewrite.java.RemoveUnusedImport", result["recipe_id"])
+
+    // Suggestions should include the correct recipe ID
+    if arr, ok := result["suggestions"].([]interface{}); ok {
+        found := false
+        for _, v := range arr {
+            if s, ok := v.(string); ok && s == "org.openrewrite.java.RemoveUnusedImports" {
+                found = true
+                break
+            }
+        }
+        assert.True(t, found, "expected suggestions to include RemoveUnusedImports")
+    } else {
+        t.Fatalf("expected suggestions array in response")
+    }
 }
 
 func TestBackgroundExecution(t *testing.T) {

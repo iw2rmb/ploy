@@ -549,9 +549,10 @@ func TestConfigurationService(t *testing.T) {
   - Unit tests for file loading, env override, and storage client creation
 - Pending (next slices):
   - Wire `api/server` to prefer `internal/config` service for storage initialization (keep legacy fallback) ✅ Completed
-  - Migrate duplicate config helpers to the centralized service
+  - Health checker wired to centralized config service (uses service if available) ✅ Completed
+  - Reduce duplication in factory mapping via shared builder in `api/config` ✅ Completed
   - Add hot‑reload ✅ Completed (file polling)
-  - Broaden storage config mapping beyond provider (endpoint/bucket/etc.)
+  - Broaden storage config mapping beyond provider (endpoint/bucket/etc.) ✅ Initial slice (endpoint/bucket/region fields added)
 
 ## Expected Outcomes
 
