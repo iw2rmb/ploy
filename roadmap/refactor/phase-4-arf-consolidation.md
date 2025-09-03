@@ -480,3 +480,12 @@ find . -name "*.go" -exec sed -i '' \
 - Pending:
   - Expand registry to provide recipe details by ID and optional search filters.
   - Migrate catalog parsing from `api/arf` into `internal/arf/recipes` package (single source of truth).
+
+## Progress Update (2025-09-03, slice 3)
+
+- Completed:
+  - Added `Get(ctx, id)` to `internal/arf/recipes.Registry` with storage-backed implementation.
+  - Added server handler `handleARFRecipesGet` and a focused test verifying 200 with memory-backed catalog.
+- Pending:
+  - Wire `GET /v1/arf/recipes/:id` into primary router once legacy overlay is removed.
+  - Extend result shape (description, pack, version) once internal models are unified.

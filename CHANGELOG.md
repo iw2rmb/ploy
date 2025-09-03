@@ -11,6 +11,18 @@
 ### Notes
 - This extends the baseline env support beyond app fields, aligning with Phase 3 centralization goals.
 
+## [2025-09-03] - ARF Consolidation: Recipe By ID (Phase 4)
+
+### Added
+- internal/arf/recipes: `Registry.Get(ctx, id)` with storage-backed implementation reading the catalog snapshot.
+- api/server: `handleARFRecipesGet` handler for retrieving a single recipe by ID.
+
+### Tests
+- api/server: Added focused test for storage-backed get-by-id using in-memory storage and a minimal catalog.
+
+### Notes
+- Route wiring remains shadowed by legacy catalog overlay; internal handler used in tests. Full swap planned in a later slice.
+
 ## [2025-09-03] - Fix Empty Diffs in OpenRewrite Transformations
 
 ### Fixed
