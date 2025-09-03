@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [2025-09-03] - Roadmap Phase 3 Docs Sync
+
+### Documentation
+- roadmap/refactor/phase-3-configuration.md: Cleaned up validation checklist (marked validation, hot-reload, caching as complete), added concrete next steps and clarified pending items for subsequent slices.
+
 ## [2025-09-03] - OpenRewrite Recipes CLI Commands (Phase 2 Complete)
 
 ### Added
