@@ -158,6 +158,22 @@ func TestCreateStorageClient_SeaweedFSMapping(t *testing.T) {
     require.NotNil(t, stor)
 }
 
+func TestCreateStorageClient_WithRetryAndCache(t *testing.T) {
+    t.Parallel()
+
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    content := []byte("storage:\n  provider: memory\n  retry:\n    enabled: true\n    max_attempts: 2\n    initial_delay: 50ms\n    max_delay: 200ms\n    backoff_multiplier: 1.5\n  cache:\n    enabled: true\n    max_size: 10\n    ttl: 1s\n")
+    require.NoError(t, os.WriteFile(path, content, 0o644))
+
+    svc, err := cfg.New(cfg.WithFile(path))
+    require.NoError(t, err)
+
+    stor, err := svc.Get().CreateStorageClient()
+    require.NoError(t, err)
+    require.NotNil(t, stor)
+}
+
 func TestConfigurationService_ValidationFails(t *testing.T) {
     // This test ensures that when validators are provided,
     // invalid configuration causes New() to return an error.
