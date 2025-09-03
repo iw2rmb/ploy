@@ -25,6 +25,27 @@ echo "[OpenRewrite]   OUTPUT_KEY: ${OUTPUT_KEY}"
 echo "[OpenRewrite]   Discovery mode: ${DISCOVER_RECIPE}"
 echo "[OpenRewrite] SeaweedFS: ${SEAWEEDFS_URL}"
 
+# Sanity check Java toolchain
+echo "[OpenRewrite] Java toolchain diagnostics:"
+if command -v java >/dev/null 2>&1; then
+  java -version || true
+else
+  echo "[OpenRewrite] ERROR: 'java' not found in PATH" >&2
+fi
+if command -v javac >/dev/null 2>&1; then
+  javac -version || true
+else
+  echo "[OpenRewrite] ERROR: 'javac' (Java compiler) not found. A JDK is required, not a JRE." >&2
+  echo "[OpenRewrite] Please ensure JAVA_HOME points to a JDK and PATH includes \"$JAVA_HOME/bin\"." >&2
+  exit 1
+fi
+if command -v mvn >/dev/null 2>&1; then
+  mvn -version || true
+else
+  echo "[OpenRewrite] ERROR: 'mvn' (Maven) not found in PATH" >&2
+  exit 1
+fi
+
 # Check if we need to discover recipe coordinates
 if [ "${DISCOVER_RECIPE}" = "true" ] || [ -z "${RECIPE_GROUP}" ]; then
     echo "[OpenRewrite] Dynamic recipe discovery enabled - OpenRewrite will find coordinates automatically"
@@ -206,7 +227,7 @@ if [ -f "pom.xml" ]; then
         echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
         echo "[OpenRewrite] Recipe coordinates: ${RECIPE_COORDS}"
         
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
+    mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
@@ -220,10 +241,10 @@ if [ -f "pom.xml" ]; then
             }
         
         echo "[OpenRewrite] Transformation completed successfully"
-    else
-        # Let OpenRewrite discover recipe from its catalog
-        echo "[OpenRewrite] Running Maven command for dynamic discovery..."
-        echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
+else
+    # Let OpenRewrite discover recipe from its catalog
+    echo "[OpenRewrite] Running Maven command for dynamic discovery..."
+    echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
         
         # First, try to discover available recipes
         echo "[OpenRewrite] Step 1: Discovering available recipes..."
@@ -244,11 +265,42 @@ if [ -f "pom.xml" ]; then
                 echo "[Error] Exit code: $?"
                 echo "[Error] Last 100 lines of output:"
                 tail -100 /tmp/transform.log
-                exit 1
+                # If recipe not found, try dynamic pack resolution
+                if grep -q "Recipe(s) not found" /tmp/transform.log; then
+                    echo "[Resolver] Recipe not found in current environment. Attempting dynamic pack resolution..."
+                    CANDIDATES=${RECIPE_PACK_CANDIDATES:-rewrite-java,rewrite-migrate-java,rewrite-spring}
+                    RESOLVE_VERSION=${RECIPE_VERSION:-2.20.0}
+                    IFS=',' read -r -a PACKS <<< "$CANDIDATES"
+                    RESOLVED=false
+                    for ART in "${PACKS[@]}"; do
+                        COORDS="org.openrewrite.recipe:${ART}:${RESOLVE_VERSION}"
+                        echo "[Resolver] Trying pack: ${COORDS}"
+                        mvn -B dependency:get -DgroupId=org.openrewrite.recipe -DartifactId="${ART}" -Dversion="${RESOLVE_VERSION}" -Dtransitive=true || true
+                        echo "[Resolver] Re-running transformation with coordinates: ${COORDS}"
+                        if mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
+                            -Drewrite.recipe="${RECIPE_CLASS}" \
+                            -Drewrite.activeRecipes="${RECIPE_CLASS}" \
+                            -Drewrite.recipeArtifactCoordinates="${COORDS}" \
+                            -DskipTests \
+                            -X 2>&1 | tee /tmp/transform.log; then
+                            echo "[Resolver] Transformation succeeded with pack ${COORDS}"
+                            # Register for caching at API level
+                            register_recipe_metadata "${RECIPE_CLASS}" "org.openrewrite.recipe" "${ART}" "${RESOLVE_VERSION}" "maven-repository/org/openrewrite/recipe/${ART}/${RESOLVE_VERSION}/${ART}-${RESOLVE_VERSION}.jar"
+                            RESOLVED=true
+                            break
+                        fi
+                    done
+                    if [ "${RESOLVED}" != "true" ]; then
+                        echo "[Resolver] ERROR: Could not resolve recipe ${RECIPE_CLASS} using candidate packs: ${CANDIDATES}" >&2
+                        exit 1
+                    fi
+                else
+                    exit 1
+                fi
             }
-        
+
         echo "[OpenRewrite] Transformation completed successfully"
-        
+
         # Check what Maven/OpenRewrite created
         echo "[OpenRewrite] Post-transformation directory check:"
         echo "[OpenRewrite] Current directory: $(pwd)"
@@ -361,12 +413,16 @@ tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclu
 echo "[OpenRewrite] Output tar created successfully"
 ls -la "${OUTPUT_TAR}"
 
-# Step 6: Upload output to SeaweedFS (if OUTPUT_KEY is provided)
-if [ -n "${OUTPUT_KEY}" ]; then
+# Step 6: Upload output to SeaweedFS (if OUTPUT_KEY or OUTPUT_URL is provided)
+if [ -n "${OUTPUT_KEY}" ] || [ -n "${OUTPUT_URL}" ]; then
     echo "[OpenRewrite] Uploading output to SeaweedFS..."
     echo "[OpenRewrite] Job ID: ${JOB_ID}"
-    # Add artifacts prefix for SeaweedFS collection
-    UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
+    # Prefer full OUTPUT_URL if provided; otherwise construct from SEAWEEDFS_URL + artifacts + OUTPUT_KEY
+    if [ -n "${OUTPUT_URL}" ]; then
+        UPLOAD_URL="${OUTPUT_URL}"
+    else
+        UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
+    fi
     echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
     
     echo "[OpenRewrite] Attempting to upload $(ls -lh ${OUTPUT_TAR} | awk '{print $5}') file to SeaweedFS..."
@@ -389,7 +445,7 @@ if [ -n "${OUTPUT_KEY}" ]; then
     echo "[OpenRewrite] Upload exit code: ${UPLOAD_EXIT_CODE}"
     
     if [ $UPLOAD_EXIT_CODE -eq 0 ] && echo "$UPLOAD_RESPONSE" | grep -q "HTTP_CODE:2[0-9][0-9]"; then
-        echo "[OpenRewrite] Output uploaded successfully to ${OUTPUT_KEY}"
+        echo "[OpenRewrite] Output uploaded successfully to ${UPLOAD_URL}"
     else
         echo "[OpenRewrite] ERROR: Failed to upload output to SeaweedFS"
         echo "[OpenRewrite] Exit code: ${UPLOAD_EXIT_CODE}"
@@ -397,7 +453,7 @@ if [ -n "${OUTPUT_KEY}" ]; then
         # Continue anyway - transformation was successful
     fi
 else
-    echo "[OpenRewrite] No OUTPUT_KEY provided, skipping upload"
+    echo "[OpenRewrite] No OUTPUT_KEY/OUTPUT_URL provided, skipping upload"
 fi
 
 # Step 7: Generate transformation report

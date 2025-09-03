@@ -1,0 +1,3 @@
+./sbom.go
+./signing.go
+./verify.go

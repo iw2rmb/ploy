@@ -26,9 +26,19 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 
 ## Commands
 
-**LOCAL**: `make test-unit`, `make test-coverage-threshold`, build verification  
-**VPS**: `./bin/ployman api deploy --monitor`  
-**NEVER**: Run API locally, integration tests locally, direct Nomad commands
+**LOCAL**: 
+- `make test-unit`, `make test-coverage-threshold`, build verification
+- Deploy API: `./bin/ployman api deploy --monitor` (run on workstation)
+
+Notes:
+- Run `./bin/ployman api deploy --monitor` on your workstation. Do not run it on the VPS.
+- Never use direct Nomad commands; if needed remotely, only via `/opt/hashicorp/bin/nomad-job-manager.sh` as invoked by platform tooling.
+
+**VPS**:
+- Use for runtime inspection and logs only (e.g., `ssh root@$TARGET_HOST`, then `su - ploy`).
+- Do not run `ployman` deploys directly on the VPS.
+
+**NEVER**: Integration tests locally, direct Nomad commands
 
 ## Mandatory Update Protocol (CRITICAL)
 
@@ -45,4 +55,3 @@ For EVERY code change:
 ## Specialized Agents
 
 Use Task tool for complex domain-specific tasks. Available agents in `.claude/agents.json`.
-

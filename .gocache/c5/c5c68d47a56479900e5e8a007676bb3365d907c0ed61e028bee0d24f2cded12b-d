@@ -1,0 +1,14 @@
+./doc.go
+./ifaddr.go
+./ifaddrs.go
+./ifattr.go
+./ipaddr.go
+./ipaddrs.go
+./ipv4addr.go
+./ipv6addr.go
+./rfc.go
+./route_info.go
+./route_info_bsd.go
+./sockaddr.go
+./sockaddrs.go
+./unixsock.go
