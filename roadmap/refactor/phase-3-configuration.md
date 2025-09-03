@@ -524,7 +524,7 @@ func TestConfigurationService(t *testing.T) {
 ## Validation Checklist
 
 - [x] Initial configuration service slice implemented (defaults, env, file loaders)
-- [ ] All duplicate config functions removed
+- [x] All direct usages of duplicate config functions removed (legacy kept for compatibility)
 - [x] Environment variable handling unified (baseline via service options)
 - [ ] Configuration validation working
  - [x] Configuration validation working
