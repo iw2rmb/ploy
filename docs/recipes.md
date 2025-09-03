@@ -49,6 +49,15 @@ ploy arf recipes list --language java
 # Filter by category
 ploy arf recipes list --category migration
 
+# Filter by pack
+ploy arf recipes list --pack rewrite-spring
+
+# Filter by version
+ploy arf recipes list --version 5.0.0
+
+# Combine pack and version filters
+ploy arf recipes list --pack rewrite-java --version 8.1.0
+
 # Pagination
 ploy arf recipes list --limit 20 --offset 40
 ```

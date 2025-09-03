@@ -1,29 +1,32 @@
 package arf
 
 import (
-    "encoding/json"
-    "fmt"
-    "os"
-    "strings"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 
-    "github.com/iw2rmb/ploy/api/arf/models"
-    "gopkg.in/yaml.v3"
-    "sort"
+	"sort"
+
+	"github.com/iw2rmb/ploy/api/arf/models"
+	"gopkg.in/yaml.v3"
 )
 
 // Recipe management commands
 
 // RecipeFilter contains filtering options for recipe listing
 type RecipeFilter struct {
-	Language   string
-	Category   string
-	Tags       []string
-	Author     string
-	Limit      int
-	Offset     int
-	MinRating  float64
-	SortBy     string
-	SortOrder  string
+	Language  string
+	Category  string
+	Tags      []string
+	Author    string
+	Pack      string
+	Version   string
+	Limit     int
+	Offset    int
+	MinRating float64
+	SortBy    string
+	SortOrder string
 }
 
 // CommandFlags contains common flags for recipe commands
@@ -74,7 +77,7 @@ func handleARFRecipesCommand(args []string) error {
 			}
 		}
 		query = strings.Join(queryArgs, " ")
-		
+
 		flags := parseCommonFlags(args[len(queryArgs)+1:])
 		return searchRecipes(query, flags)
 	case "upload", "u":
@@ -213,6 +216,8 @@ func printRecipesUsage() {
 	fmt.Println("  --category <cat>                 Filter by category")
 	fmt.Println("  --tag <tag>                      Filter by tag (can be used multiple times)")
 	fmt.Println("  --author <author>                Filter by author")
+	fmt.Println("  --pack, -p <pack>                Filter by recipe pack")
+	fmt.Println("  --version, -V <version>          Filter by pack version")
 	fmt.Println("  --limit <n>                      Maximum number of results (default: 20)")
 	fmt.Println("  --offset <n>                     Offset for pagination (default: 0)")
 	fmt.Println("  --sort-by <field>                Sort by: name, created, updated, rating")
@@ -220,6 +225,7 @@ func printRecipesUsage() {
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  ploy arf recipe list --language java --output json")
+	fmt.Println("  ploy arf recipe list --pack rewrite-spring --version 5.0.0")
 	fmt.Println("  ploy arf recipe upload my-recipe.yaml --dry-run")
 	fmt.Println("  ploy arf recipe search 'spring migration' --limit 5")
 	fmt.Println("  ploy arf recipe run java11to17 --repo https://github.com/user/repo")
@@ -231,19 +237,19 @@ func handleRecipeList(args []string) error {
 	// Parse filter and common flags
 	filter, remainingArgs := ParseFilterFlags(args)
 	flags := parseCommonFlags(remainingArgs)
-	
+
 	// Validate filter values
 	if err := ValidateFilterValues(filter); err != nil {
 		PrintError(err)
 		return err
 	}
-	
+
 	// Validate output format
 	if err := ValidateOutputFormat(flags.OutputFormat); err != nil {
 		PrintError(err)
 		return err
 	}
-	
+
 	return listRecipes(filter, flags.OutputFormat, flags.Verbose)
 }
 
@@ -295,13 +301,13 @@ func listRecipes(filter RecipeFilter, outputFormat string, verbose bool) error {
 	if totalCount == 0 {
 		totalCount = data.Count
 	}
-	
+
 	page := (filter.Offset / filter.Limit) + 1
 	if page < 1 {
 		page = 1
 	}
 	paginationInfo := NewPaginationInfo(page, filter.Limit, totalCount)
-	
+
 	result := PaginatedResult{
 		Recipes:    recipes,
 		Pagination: paginationInfo,
@@ -364,134 +370,149 @@ func searchRecipes(query string, flags CommandFlags) error {
 
 // Catalog client types and helpers (lightweight endpoints)
 type catalogRecipe struct {
-    ID          string   `json:"id"`
-    DisplayName string   `json:"display_name"`
-    Description string   `json:"description"`
-    Tags        []string `json:"tags"`
-    Pack        string   `json:"pack"`
-    Version     string   `json:"version"`
+	ID          string   `json:"id"`
+	DisplayName string   `json:"display_name"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	Pack        string   `json:"pack"`
+	Version     string   `json:"version"`
 }
 
 func listCatalogRecipes(outputFormat string) error {
-    url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
-    response, err := makeAPIRequest("GET", url, nil)
-    if err != nil {
-        return fmt.Errorf("failed to retrieve catalog: %w", err)
-    }
-    items, err := parseCatalogList(response)
-    if err != nil {
-        return err
-    }
-    return printCatalog(items, outputFormat, false)
+	url := fmt.Sprintf("%s/arf/recipes", arfControllerURL)
+	response, err := makeAPIRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve catalog: %w", err)
+	}
+	items, err := parseCatalogList(response)
+	if err != nil {
+		return err
+	}
+	return printCatalog(items, outputFormat, false)
 }
 
 func searchCatalogRecipes(query, outputFormat string, verbose bool) error {
-    url := fmt.Sprintf("%s/arf/recipes?query=%s", arfControllerURL, query)
-    response, err := makeAPIRequest("GET", url, nil)
-    if err != nil {
-        return fmt.Errorf("failed to search catalog: %w", err)
-    }
-    items, err := parseCatalogList(response)
-    if err != nil {
-        return err
-    }
-    return printCatalog(items, outputFormat, verbose)
+	url := fmt.Sprintf("%s/arf/recipes?query=%s", arfControllerURL, query)
+	response, err := makeAPIRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to search catalog: %w", err)
+	}
+	items, err := parseCatalogList(response)
+	if err != nil {
+		return err
+	}
+	return printCatalog(items, outputFormat, verbose)
 }
 
 // parseCatalogList parses the catalog array payload (used in tests)
 func parseCatalogList(data []byte) ([]catalogRecipe, error) {
-    var items []catalogRecipe
-    if err := json.Unmarshal(data, &items); err != nil {
-        return nil, fmt.Errorf("failed to parse catalog list: %w", err)
-    }
-    return items, nil
+	var items []catalogRecipe
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil, fmt.Errorf("failed to parse catalog list: %w", err)
+	}
+	return items, nil
 }
 
 func printCatalog(items []catalogRecipe, format string, verbose bool) error {
-    switch format {
-    case "json":
-        out, _ := json.MarshalIndent(items, "", "  ")
-        fmt.Println(string(out))
-        return nil
-    case "yaml":
-        // minimal YAML via json2yaml-style is not available; fallback to json for now
-        out, _ := json.MarshalIndent(items, "", "  ")
-        fmt.Println(string(out))
-        return nil
-    default:
-        if len(items) == 0 {
-            fmt.Println("No recipes found")
-            return nil
-        }
-        // simple table-like output
-        fmt.Printf("ID\tPACK\tVERSION\tNAME\n")
-        for _, it := range items {
-            name := it.DisplayName
-            if name == "" { name = it.ID }
-            fmt.Printf("%s\t%s\t%s\t%s\n", it.ID, it.Pack, it.Version, name)
-            if verbose && it.Description != "" {
-                fmt.Printf("  %s\n", it.Description)
-            }
-        }
-        fmt.Printf("Total: %d recipes\n", len(items))
-        return nil
-    }
+	switch format {
+	case "json":
+		out, _ := json.MarshalIndent(items, "", "  ")
+		fmt.Println(string(out))
+		return nil
+	case "yaml":
+		// minimal YAML via json2yaml-style is not available; fallback to json for now
+		out, _ := json.MarshalIndent(items, "", "  ")
+		fmt.Println(string(out))
+		return nil
+	default:
+		if len(items) == 0 {
+			fmt.Println("No recipes found")
+			return nil
+		}
+		// simple table-like output
+		fmt.Printf("ID\tPACK\tVERSION\tNAME\n")
+		for _, it := range items {
+			name := it.DisplayName
+			if name == "" {
+				name = it.ID
+			}
+			fmt.Printf("%s\t%s\t%s\t%s\n", it.ID, it.Pack, it.Version, name)
+			if verbose && it.Description != "" {
+				fmt.Printf("  %s\n", it.Description)
+			}
+		}
+		fmt.Printf("Total: %d recipes\n", len(items))
+		return nil
+	}
 }
 
 // getCatalogSuggestions fetches catalog and returns top suggestion IDs for a given raw recipeID
 func getCatalogSuggestions(rawID string) ([]string, error) {
-    // Query by last segment to broaden matches
-    seg := rawID
-    if dot := strings.LastIndex(rawID, "."); dot != -1 && dot+1 < len(rawID) {
-        seg = rawID[dot+1:]
-    }
-    url := fmt.Sprintf("%s/arf/recipes?query=%s", arfControllerURL, seg)
-    response, err := makeAPIRequest("GET", url, nil)
-    if err != nil {
-        return nil, err
-    }
-    items, err := parseCatalogList(response)
-    if err != nil {
-        return nil, err
-    }
-    return generateRecipeSuggestions(rawID, items), nil
+	// Query by last segment to broaden matches
+	seg := rawID
+	if dot := strings.LastIndex(rawID, "."); dot != -1 && dot+1 < len(rawID) {
+		seg = rawID[dot+1:]
+	}
+	url := fmt.Sprintf("%s/arf/recipes?query=%s", arfControllerURL, seg)
+	response, err := makeAPIRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	items, err := parseCatalogList(response)
+	if err != nil {
+		return nil, err
+	}
+	return generateRecipeSuggestions(rawID, items), nil
 }
 
 // generateRecipeSuggestions ranks simple suggestions from catalog items
 func generateRecipeSuggestions(rawID string, items []catalogRecipe) []string {
-    // Prefer exact ID match (should not happen if called on failure), then same pack/name family, then others
-    last := rawID
-    if dot := strings.LastIndex(rawID, "."); dot != -1 && dot+1 < len(rawID) {
-        last = rawID[dot+1:]
-    }
-    packHint := ""
-    if idx := strings.Index(rawID, "."); idx != -1 {
-        packHint = rawID[:idx]
-    }
-    // Score items
-    type scored struct{ id string; score int }
-    scores := make([]scored, 0, len(items))
-    for _, it := range items {
-        s := 0
-        if it.ID == rawID { s += 100 }
-        if strings.Contains(it.ID, last) { s += 20 }
-        if it.DisplayName != "" && strings.Contains(it.DisplayName, last) { s += 10 }
-        if packHint != "" && strings.Contains(it.ID, packHint) { s += 5 }
-        if s > 0 {
-            scores = append(scores, scored{id: it.ID, score: s})
-        }
-    }
-    sort.Slice(scores, func(i, j int) bool { return scores[i].score > scores[j].score })
-    out := []string{}
-    seen := map[string]bool{}
-    for _, sc := range scores {
-        if !seen[sc.id] {
-            out = append(out, sc.id)
-            seen[sc.id] = true
-            if len(out) >= 5 { break }
-        }
-    }
-    return out
+	// Prefer exact ID match (should not happen if called on failure), then same pack/name family, then others
+	last := rawID
+	if dot := strings.LastIndex(rawID, "."); dot != -1 && dot+1 < len(rawID) {
+		last = rawID[dot+1:]
+	}
+	packHint := ""
+	if idx := strings.Index(rawID, "."); idx != -1 {
+		packHint = rawID[:idx]
+	}
+	// Score items
+	type scored struct {
+		id    string
+		score int
+	}
+	scores := make([]scored, 0, len(items))
+	for _, it := range items {
+		s := 0
+		if it.ID == rawID {
+			s += 100
+		}
+		if strings.Contains(it.ID, last) {
+			s += 20
+		}
+		if it.DisplayName != "" && strings.Contains(it.DisplayName, last) {
+			s += 10
+		}
+		if packHint != "" && strings.Contains(it.ID, packHint) {
+			s += 5
+		}
+		if s > 0 {
+			scores = append(scores, scored{id: it.ID, score: s})
+		}
+	}
+	sort.Slice(scores, func(i, j int) bool { return scores[i].score > scores[j].score })
+	out := []string{}
+	seen := map[string]bool{}
+	for _, sc := range scores {
+		if !seen[sc.id] {
+			out = append(out, sc.id)
+			seen[sc.id] = true
+			if len(out) >= 5 {
+				break
+			}
+		}
+	}
+	return out
 }
 
 func getRecipeStats(recipeID string, flags CommandFlags) error {
@@ -552,18 +573,18 @@ func uploadRecipe(recipePath string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to read recipe file: %w", err)
 	}
-	
+
 	// Parse YAML
 	var recipe models.Recipe
 	if err := yaml.Unmarshal(data, &recipe); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-	
+
 	// Override name if specified
 	if flags.Name != "" {
 		recipe.Metadata.Name = flags.Name
 	}
-	
+
 	// Validate recipe
 	if err := recipe.Validate(); err != nil {
 		if !flags.Force {
@@ -571,31 +592,31 @@ func uploadRecipe(recipePath string, flags CommandFlags) error {
 		}
 		fmt.Printf("Warning: %v (continuing due to --force)\n", err)
 	}
-	
+
 	// Dry run mode
 	if flags.DryRun {
 		fmt.Printf("Recipe '%s' is valid and ready for upload\n", recipe.Metadata.Name)
 		return nil
 	}
-	
+
 	// Send to API
 	recipeJSON, err := json.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to serialize recipe: %w", err)
 	}
-	
+
 	url := fmt.Sprintf("%s/arf/recipes/upload", arfControllerURL)
 	response, err := makeAPIRequest("POST", url, recipeJSON)
 	if err != nil {
 		return fmt.Errorf("upload failed: %w", err)
 	}
-	
+
 	var result struct {
 		ID      string `json:"id"`
 		Message string `json:"message"`
 	}
 	json.Unmarshal(response, &result)
-	
+
 	fmt.Printf("Recipe '%s' uploaded successfully (ID: %s)\n", recipe.Metadata.Name, result.ID)
 	return nil
 }
@@ -607,30 +628,30 @@ func updateRecipe(recipeID, recipePath string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to read recipe file: %w", err)
 	}
-	
+
 	// Parse YAML
 	var recipe models.Recipe
 	if err := yaml.Unmarshal(data, &recipe); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-	
+
 	// Validate recipe
 	if err := recipe.Validate(); err != nil {
 		return fmt.Errorf("recipe validation failed: %w", err)
 	}
-	
+
 	// Send to API
 	recipeJSON, err := json.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to serialize recipe: %w", err)
 	}
-	
+
 	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
 	_, err = makeAPIRequest("PUT", url, recipeJSON)
 	if err != nil {
 		return fmt.Errorf("update failed: %w", err)
 	}
-	
+
 	fmt.Printf("Recipe '%s' updated successfully\n", recipeID)
 	return nil
 }
@@ -647,13 +668,13 @@ func deleteRecipe(recipeID string, flags CommandFlags) error {
 			return nil
 		}
 	}
-	
+
 	url := fmt.Sprintf("%s/arf/recipes/%s", arfControllerURL, recipeID)
 	_, err := makeAPIRequest("DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("deletion failed: %w", err)
 	}
-	
+
 	fmt.Printf("Recipe '%s' deleted successfully\n", recipeID)
 	return nil
 }
@@ -666,29 +687,29 @@ func downloadRecipe(recipeID string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch recipe: %w", err)
 	}
-	
+
 	var recipe models.Recipe
 	if err := json.Unmarshal(response, &recipe); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
-	
+
 	// Convert to YAML
 	yamlData, err := yaml.Marshal(recipe)
 	if err != nil {
 		return fmt.Errorf("failed to convert to YAML: %w", err)
 	}
-	
+
 	// Determine output file name
 	outputFile := flags.OutputFile
 	if outputFile == "" {
 		outputFile = fmt.Sprintf("%s.yaml", recipeID)
 	}
-	
+
 	// Write to file
 	if err := os.WriteFile(outputFile, yamlData, 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
-	
+
 	fmt.Printf("Recipe downloaded to %s\n", outputFile)
 	return nil
 }
@@ -700,23 +721,23 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 	if err != nil {
 		return fmt.Errorf("failed to read recipe file: %w", err)
 	}
-	
+
 	// Parse YAML
 	var recipe models.Recipe
 	if err := yaml.Unmarshal(data, &recipe); err != nil {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
-	
+
 	// Basic validation
 	if err := recipe.Validate(); err != nil {
 		fmt.Printf("❌ Recipe validation failed: %v\n", err)
 		return nil
 	}
-	
+
 	// Additional strict validation
 	if flags.Strict {
 		warnings := []string{}
-		
+
 		// Check for missing optional but recommended fields
 		if recipe.Metadata.MinPlatform == "" {
 			warnings = append(warnings, "Missing minimum platform version")
@@ -727,14 +748,14 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 		if recipe.Metadata.License == "" {
 			warnings = append(warnings, "No license specified")
 		}
-		
+
 		// Check step configurations
 		for i, step := range recipe.Steps {
 			if step.Timeout.Duration == 0 {
 				warnings = append(warnings, fmt.Sprintf("Step %d (%s) has no timeout specified", i+1, step.Name))
 			}
 		}
-		
+
 		if len(warnings) > 0 {
 			fmt.Println("⚠️  Warnings (strict mode):")
 			for _, warning := range warnings {
@@ -742,9 +763,9 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 			}
 		}
 	}
-	
+
 	fmt.Printf("✅ Recipe '%s' is valid\n", recipe.Metadata.Name)
-	
+
 	// Display recipe summary
 	fmt.Printf("\nRecipe Summary:\n")
 	fmt.Printf("  Name: %s\n", recipe.Metadata.Name)
@@ -752,7 +773,7 @@ func validateRecipe(recipePath string, flags CommandFlags) error {
 	fmt.Printf("  Steps: %d\n", len(recipe.Steps))
 	fmt.Printf("  Languages: %s\n", strings.Join(recipe.Metadata.Languages, ", "))
 	fmt.Printf("  Categories: %s\n", strings.Join(recipe.Metadata.Categories, ", "))
-	
+
 	return nil
 }
 
@@ -768,7 +789,7 @@ func parseCommonFlags(args []string) CommandFlags {
 	flags := CommandFlags{
 		OutputFormat: "table", // Default output format
 	}
-	
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--dry-run", "-n":
@@ -871,7 +892,7 @@ func listUnifiedRecipes(args []string) error {
 	// Parse filter arguments
 	recipeType := ""
 	source := ""
-	
+
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--type", "-t":
@@ -899,7 +920,7 @@ func listUnifiedRecipes(args []string) error {
 			queryParams += "&source=" + source
 		}
 	}
-	
+
 	// List recipes
 	filter := RecipeFilter{}
 	return listRecipes(filter, "table", false)
@@ -948,5 +969,3 @@ Examples:
   # Search for Java migration recipes
   ploy arf recipes unified search java`)
 }
-
-

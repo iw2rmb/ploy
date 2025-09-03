@@ -20,25 +20,25 @@ type TransformRequest struct {
 	Repository  string
 	ArchivePath string
 	Branch      string
-	
+
 	// Transformation specifications
 	RecipeIDs  []string
 	LLMPrompts []string
-	
+
 	// LLM configuration
 	PlanModel string
 	ExecModel string
-	
+
 	// Execution parameters
 	MaxIterations int
 	ParallelTries int
 	Timeout       time.Duration
-	
+
 	// Output configuration
 	OutputFormat string // archive, diff, mr
 	OutputPath   string
 	ReportLevel  string // minimal, standard, detailed
-	
+
 	// Legacy fields for compatibility
 	Language string
 	AppName  string
@@ -76,16 +76,16 @@ func handleARFTransformCommand(args []string) error {
 // parseTransformArgs parses command line arguments into a transform request
 func parseTransformArgs(args []string) *TransformRequest {
 	req := &TransformRequest{
-		Branch:         "main",
-		PlanModel:      "", // Must be set explicitly - no Ollama fallback
-		ExecModel:      "", // Must be set explicitly - no Ollama fallback
-		MaxIterations:  3,
-		ParallelTries:  3,
-		OutputFormat:   "diff",
-		ReportLevel:    "standard",
-		Timeout:        5 * time.Minute,
-		RecipeIDs:      []string{},
-		LLMPrompts:     []string{},
+		Branch:        "main",
+		PlanModel:     "", // Must be set explicitly - no Ollama fallback
+		ExecModel:     "", // Must be set explicitly - no Ollama fallback
+		MaxIterations: 3,
+		ParallelTries: 3,
+		OutputFormat:  "diff",
+		ReportLevel:   "standard",
+		Timeout:       5 * time.Minute,
+		RecipeIDs:     []string{},
+		LLMPrompts:    []string{},
 	}
 
 	for i := 0; i < len(args); i++ {
@@ -264,21 +264,28 @@ func executeTransformation(recipeID, repository, branch, language string) error 
 	fmt.Println()
 
 	// Check if this is an OpenRewrite recipe
-    if isOpenRewriteRecipe(recipeID) {
-        // If catalog mode is enabled, preflight for suggestions to give fast feedback
-        if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
-            if sugg, err := getCatalogSuggestions(recipeID); err == nil {
-                // If the exact ID is not among suggestions and there are candidates, show them
-                exact := false
-                for _, s := range sugg { if s == recipeID { exact = true; break } }
-                if !exact && len(sugg) > 0 {
-                    PrintError(NewCLIError("Unknown recipe_id", 1))
-                    fmt.Println("Did you mean:")
-                    for _, s := range sugg { fmt.Printf("  - %s\n", s) }
-                    return fmt.Errorf("invalid recipe_id: %s", recipeID)
-                }
-            }
-        }
+	if isOpenRewriteRecipe(recipeID) {
+		// If catalog mode is enabled, preflight for suggestions to give fast feedback
+		if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
+			if sugg, err := getCatalogSuggestions(recipeID); err == nil {
+				// If the exact ID is not among suggestions and there are candidates, show them
+				exact := false
+				for _, s := range sugg {
+					if s == recipeID {
+						exact = true
+						break
+					}
+				}
+				if !exact && len(sugg) > 0 {
+					PrintError(NewCLIError("Unknown recipe_id", 1))
+					fmt.Println("Did you mean:")
+					for _, s := range sugg {
+						fmt.Printf("  - %s\n", s)
+					}
+					return fmt.Errorf("invalid recipe_id: %s", recipeID)
+				}
+			}
+		}
 		// Use OpenRewrite-specific endpoint for better integration
 		request := map[string]interface{}{
 			"project_url":     repository,
@@ -294,7 +301,7 @@ func executeTransformation(recipeID, repository, branch, language string) error 
 		}
 
 		// Use standard transform endpoint (which handles OpenRewrite internally)
-    url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
+		url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
 		response, err := makeAPIRequest("POST", url, data)
 		if err != nil {
 			return fmt.Errorf("OpenRewrite transformation failed: %w", err)
@@ -396,14 +403,14 @@ func isOpenRewriteRecipe(recipeID string) bool {
 		"junit5", "mockito", "assertj",
 		"slf4j", "log4j2",
 	}
-	
+
 	recipeLower := strings.ToLower(recipeID)
 	for _, pattern := range openRewritePatterns {
 		if strings.Contains(recipeLower, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -431,11 +438,11 @@ func detectJDKVersion(language string) string {
 // executeRobustTransformation executes a transformation with self-healing capabilities
 func executeRobustTransformation(req *TransformRequest) error {
 	ctx := context.Background()
-	
+
 	fmt.Println("═══════════════════════════════════════════════════════════")
 	fmt.Println(" ARF Robust Transformation Engine")
 	fmt.Println("═══════════════════════════════════════════════════════════")
-	
+
 	// Display configuration
 	fmt.Printf("\n📋 Configuration:\n")
 	if req.Repository != "" {
@@ -443,11 +450,11 @@ func executeRobustTransformation(req *TransformRequest) error {
 	} else if req.ArchivePath != "" {
 		fmt.Printf("  • Archive: %s\n", req.ArchivePath)
 	}
-	
+
 	if len(req.RecipeIDs) > 0 {
 		fmt.Printf("  • Recipes: %s\n", strings.Join(req.RecipeIDs, ", "))
 	}
-	
+
 	if len(req.LLMPrompts) > 0 {
 		fmt.Printf("  • LLM Prompts: %d prompts\n", len(req.LLMPrompts))
 		for i, prompt := range req.LLMPrompts {
@@ -458,12 +465,12 @@ func executeRobustTransformation(req *TransformRequest) error {
 			fmt.Printf("    %d. %s\n", i+1, preview)
 		}
 	}
-	
+
 	fmt.Printf("  • Max Iterations: %d\n", req.MaxIterations)
 	fmt.Printf("  • Parallel Tries: %d\n", req.ParallelTries)
 	fmt.Printf("  • Output Format: %s\n", req.OutputFormat)
 	fmt.Printf("  • Report Level: %s\n", req.ReportLevel)
-	
+
 	// Prepare the API request
 	apiRequest := map[string]interface{}{
 		"input_source": map[string]interface{}{
@@ -476,11 +483,11 @@ func executeRobustTransformation(req *TransformRequest) error {
 			"llm_prompts": req.LLMPrompts,
 		},
 		"execution": map[string]interface{}{
-			"max_iterations":  req.MaxIterations,
-			"parallel_tries":  req.ParallelTries,
-			"timeout":         req.Timeout.String(),
-			"plan_model":      req.PlanModel,
-			"exec_model":      req.ExecModel,
+			"max_iterations": req.MaxIterations,
+			"parallel_tries": req.ParallelTries,
+			"timeout":        req.Timeout.String(),
+			"plan_model":     req.PlanModel,
+			"exec_model":     req.ExecModel,
 		},
 		"output": map[string]interface{}{
 			"format":       req.OutputFormat,
@@ -488,7 +495,7 @@ func executeRobustTransformation(req *TransformRequest) error {
 			"report_level": req.ReportLevel,
 		},
 	}
-	
+
 	// Add legacy fields if provided
 	if req.AppName != "" {
 		apiRequest["app_name"] = req.AppName
@@ -496,20 +503,20 @@ func executeRobustTransformation(req *TransformRequest) error {
 	if req.Lane != "" {
 		apiRequest["lane"] = req.Lane
 	}
-	
+
 	// Serialize request
 	data, err := json.Marshal(apiRequest)
 	if err != nil {
 		return fmt.Errorf("failed to serialize request: %w", err)
 	}
-	
+
 	// Log request details
 	if req.ReportLevel == "detailed" {
 		fmt.Printf("\n📤 API Request Details:\n")
 		fmt.Printf("  • Endpoint: %s/arf/transform\n", arfControllerURL)
 		fmt.Printf("  • Request Size: %d bytes\n", len(data))
 		fmt.Printf("  • Timeout: 30 minutes\n")
-		
+
 		// Log request body structure (without full data)
 		fmt.Printf("  • Request Structure:\n")
 		if req.Repository != "" {
@@ -523,12 +530,12 @@ func executeRobustTransformation(req *TransformRequest) error {
 		fmt.Printf("    - Max Iterations: %d\n", req.MaxIterations)
 		fmt.Printf("    - Parallel Tries: %d\n", req.ParallelTries)
 	}
-	
+
 	// Call the transformation endpoint
 	url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
-	
+
 	fmt.Printf("\n🚀 Starting transformation...\n")
-	
+
 	// Log the actual request being sent
 	if req.ReportLevel == "detailed" {
 		fmt.Printf("\n🔍 Sending request to: %s\n", url)
@@ -539,23 +546,23 @@ func executeRobustTransformation(req *TransformRequest) error {
 		}
 		fmt.Printf("%s\n", preview)
 	}
-	
+
 	// Make API request with longer timeout for complex transformations
 	startTime := time.Now()
 	response, err := makeAPIRequestWithContext(ctx, "POST", url, data, 30*time.Minute)
 	elapsed := time.Since(startTime)
-	
+
 	if req.ReportLevel == "detailed" {
 		fmt.Printf("\n⏱️  API call completed in: %v\n", elapsed)
 	}
-	
+
 	if err != nil {
 		if req.ReportLevel == "detailed" {
 			fmt.Printf("❌ API Error Details: %v\n", err)
 		}
 		return fmt.Errorf("transformation failed: %w", err)
 	}
-	
+
 	// Log response details
 	if req.ReportLevel == "detailed" {
 		fmt.Printf("📥 Response received: %d bytes\n", len(response))
@@ -566,7 +573,7 @@ func executeRobustTransformation(req *TransformRequest) error {
 		}
 		fmt.Printf("%s\n", preview)
 	}
-	
+
 	// Parse the response
 	var result map[string]interface{}
 	if err := json.Unmarshal(response, &result); err != nil {
@@ -575,7 +582,7 @@ func executeRobustTransformation(req *TransformRequest) error {
 		}
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
-	
+
 	// Log parsed result structure
 	if req.ReportLevel == "detailed" {
 		fmt.Printf("\n📋 Parsed Response Structure:\n")
@@ -583,10 +590,10 @@ func executeRobustTransformation(req *TransformRequest) error {
 			fmt.Printf("  • %s\n", key)
 		}
 	}
-	
+
 	// Display results
 	displayTransformationResults(result)
-	
+
 	// Save output if path specified
 	if req.OutputPath != "" {
 		if err := saveTransformationOutput(result, req.OutputPath, req.OutputFormat); err != nil {
@@ -595,7 +602,7 @@ func executeRobustTransformation(req *TransformRequest) error {
 			fmt.Printf("\n💾 Output saved to: %s\n", req.OutputPath)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -604,7 +611,7 @@ func displayTransformationResults(result map[string]interface{}) {
 	fmt.Println("═══════════════════════════════════════════════════════════")
 	fmt.Println(" Transformation Results")
 	fmt.Println("═══════════════════════════════════════════════════════════")
-	
+
 	// Log all result keys for debugging
 	fmt.Printf("\n🔍 Result contains %d keys:\n", len(result))
 	for key, value := range result {
@@ -627,7 +634,7 @@ func displayTransformationResults(result map[string]interface{}) {
 			fmt.Printf("  • %s: (%T)\n", key, v)
 		}
 	}
-	
+
 	// Success status
 	if success, ok := result["success"].(bool); ok {
 		if success {
@@ -638,17 +645,17 @@ func displayTransformationResults(result map[string]interface{}) {
 	} else {
 		fmt.Printf("\n⚠️  Status: UNKNOWN (no 'success' field in response)\n")
 	}
-	
+
 	// Check for error field
 	if errMsg, ok := result["error"].(string); ok {
 		fmt.Printf("\n❌ Error: %s\n", errMsg)
 	}
-	
+
 	// Check for message field
 	if msg, ok := result["message"].(string); ok {
 		fmt.Printf("\n📝 Message: %s\n", msg)
 	}
-	
+
 	// Report summary
 	if report, ok := result["report"].(map[string]interface{}); ok {
 		if summary, ok := report["summary"].(map[string]interface{}); ok {
@@ -663,7 +670,7 @@ func displayTransformationResults(result map[string]interface{}) {
 				fmt.Printf("  • Duration: %s\n", duration)
 			}
 		}
-		
+
 		// Timeline of stages
 		if timeline, ok := report["timeline"].([]interface{}); ok && len(timeline) > 0 {
 			fmt.Printf("\n📈 Execution Timeline:\n")
@@ -672,17 +679,17 @@ func displayTransformationResults(result map[string]interface{}) {
 					name := s["name"].(string)
 					status := s["status"].(string)
 					duration := s["duration"].(string)
-					
+
 					statusIcon := "✅"
 					if status != "success" {
 						statusIcon = "❌"
 					}
-					
+
 					fmt.Printf("  %d. %s %s (%s)\n", i+1, statusIcon, name, duration)
 				}
 			}
 		}
-		
+
 		// Errors if any
 		if errors, ok := report["errors"].([]interface{}); ok && len(errors) > 0 {
 			fmt.Printf("\n⚠️  Errors Encountered:\n")
@@ -697,7 +704,7 @@ func displayTransformationResults(result map[string]interface{}) {
 				}
 			}
 		}
-		
+
 		// Changed files
 		if changes, ok := report["changes"].([]interface{}); ok && len(changes) > 0 {
 			fmt.Printf("\n📝 Modified Files:\n")
@@ -718,7 +725,7 @@ func displayTransformationResults(result map[string]interface{}) {
 			}
 		}
 	}
-	
+
 	// Output location
 	if output, ok := result["output"].(map[string]interface{}); ok {
 		if location, ok := output["location"].(string); ok {
@@ -730,16 +737,16 @@ func displayTransformationResults(result map[string]interface{}) {
 // saveTransformationOutput saves the transformation output to a file
 func saveTransformationOutput(result map[string]interface{}, outputPath, format string) error {
 	fmt.Printf("\n📁 Attempting to save output as %s format to %s\n", format, outputPath)
-	
+
 	// Create output directory if needed
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
-	
+
 	// Get the output data based on format
 	var outputData []byte
-	
+
 	switch format {
 	case "archive":
 		// Save tar archive if provided
@@ -756,7 +763,7 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 		} else {
 			fmt.Printf("  • No 'output' field in result\n")
 		}
-		
+
 	case "diff":
 		// Generate unified diff from changes
 		fmt.Printf("🔍 Looking for diff data in response...\n")
@@ -783,14 +790,14 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 		} else {
 			fmt.Printf("  • No 'report' field in result\n")
 		}
-		
+
 	case "mr":
 		// Generate merge request description
 		if report, ok := result["report"].(map[string]interface{}); ok {
 			mrContent := generateMergeRequestDescription(report)
 			outputData = []byte(mrContent)
 		}
-		
+
 	default:
 		// Save full JSON result as default
 		data, err := json.MarshalIndent(result, "", "  ")
@@ -799,7 +806,7 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 		}
 		outputData = data
 	}
-	
+
 	// Check if output is base64 encoded (for archive format)
 	if format == "archive" {
 		if encoding, ok := result["encoding"].(string); ok && encoding == "base64" {
@@ -814,7 +821,7 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 			}
 		}
 	}
-	
+
 	// Log what we're about to write
 	fmt.Printf("\n💾 Writing output:\n")
 	fmt.Printf("  • File: %s\n", outputPath)
@@ -822,23 +829,23 @@ func saveTransformationOutput(result map[string]interface{}, outputPath, format 
 	if len(outputData) == 0 {
 		fmt.Printf("  ⚠️  WARNING: Output data is empty!\n")
 	}
-	
+
 	// Write to file
 	if err := os.WriteFile(outputPath, outputData, 0644); err != nil {
 		return fmt.Errorf("failed to write output file: %w", err)
 	}
-	
+
 	fmt.Printf("  ✅ File written successfully\n")
-	
+
 	return nil
 }
 
 // generateMergeRequestDescription generates a merge request description
 func generateMergeRequestDescription(report map[string]interface{}) string {
 	var mr strings.Builder
-	
+
 	mr.WriteString("## ARF Transformation Merge Request\n\n")
-	
+
 	// Summary
 	if summary, ok := report["summary"].(map[string]interface{}); ok {
 		mr.WriteString("### Summary\n\n")
@@ -850,7 +857,7 @@ func generateMergeRequestDescription(report map[string]interface{}) string {
 		}
 		mr.WriteString("\n")
 	}
-	
+
 	// Changes
 	if changes, ok := report["changes"].([]interface{}); ok && len(changes) > 0 {
 		mr.WriteString("### Changes\n\n")
@@ -862,7 +869,7 @@ func generateMergeRequestDescription(report map[string]interface{}) string {
 		}
 		mr.WriteString("\n")
 	}
-	
+
 	// Testing checklist
 	mr.WriteString("### Testing Checklist\n\n")
 	mr.WriteString("- [ ] Code compiles successfully\n")
@@ -870,10 +877,10 @@ func generateMergeRequestDescription(report map[string]interface{}) string {
 	mr.WriteString("- [ ] Integration tests pass\n")
 	mr.WriteString("- [ ] Application deploys successfully\n")
 	mr.WriteString("- [ ] No regressions identified\n\n")
-	
+
 	mr.WriteString("---\n")
 	mr.WriteString("*Generated by Ploy ARF Transformation Engine*\n")
-	
+
 	return mr.String()
 }
 

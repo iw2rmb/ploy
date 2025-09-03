@@ -17,6 +17,9 @@ func (c *Config) CreateStorageClient() (storage.Storage, error) {
     }
     cfg := factory.FactoryConfig{
         Provider: provider,
+        Endpoint: c.Storage.Endpoint,
+        Bucket:   c.Storage.Bucket,
+        Region:   c.Storage.Region,
     }
     s, err := factory.New(cfg)
     if err != nil {
