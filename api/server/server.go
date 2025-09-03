@@ -762,30 +762,7 @@ func (s *Server) setupRoutes() {
 //  - GET /v1/arf/recipes/:id
 //  - POST /v1/arf/recipes/refresh
 // onto the main router using the dedicated RecipesHandler.
-func (s *Server) setupRecipesCatalogRoutes() {
-    // Initialize empty catalog and optional indexer
-    cat := arf.NewRecipesCatalog()
-
-    // Storage factory might be unavailable; indexer can work with nil store
-    var store arf.StorageService
-    if s.dependencies != nil && s.dependencies.StorageFactory != nil {
-        if client, err := s.dependencies.StorageFactory.CreateClient(); err == nil {
-            if svc, err2 := arf.NewARFService(client); err2 == nil {
-                store = svc
-            }
-        }
-    }
-    idx := arf.NewRecipesIndexer(nil, store)
-
-    rh := arf.NewRecipesHandler(cat)
-    rh.SetIndexer(idx)
-
-    // Register routes last to shadow any existing recipe endpoints
-    s.app.Post("/v1/arf/recipes/refresh", rh.RefreshRecipes)
-    s.app.Get("/v1/arf/recipes", rh.ListRecipes)
-    s.app.Get("/v1/arf/recipes/:id", rh.GetRecipe)
-    log.Printf("Recipes catalog routes enabled")
-}
+// Legacy recipes catalog overlay removed in Phase 4; internal handlers are now default.
 
 // setupDomainRoutes configures domain management routes
 func (s *Server) setupDomainRoutes(api fiber.Router) {
