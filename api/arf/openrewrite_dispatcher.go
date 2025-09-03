@@ -150,7 +150,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	}
 
 	// Test storage connectivity first
-	testKey := fmt.Sprintf("openrewrite/connectivity-test-%d", time.Now().Unix())
+	testKey := fmt.Sprintf("connectivity-test-%d", time.Now().Unix())
 	testData := []byte("connectivity-test")
 	log.Printf("[OpenRewrite Dispatcher] Testing storage connectivity with key: %s", testKey)
 	if err := d.storageClient.Put(ctx, testKey, testData); err != nil {
@@ -160,7 +160,9 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	log.Printf("[OpenRewrite Dispatcher] Storage connectivity test successful")
 
 	// Clean up test file
-	d.storageClient.Delete(ctx, testKey)
+	if err := d.storageClient.Delete(ctx, testKey); err != nil {
+		log.Printf("[OpenRewrite Dispatcher] WARNING: Failed to delete connectivity test file %s: %v", testKey, err)
+	}
 
 	// For now, we'll use the nomadJobName as the storage key since Nomad job names are unique
 	// The actual Nomad job ID will be the same as the name we provide
