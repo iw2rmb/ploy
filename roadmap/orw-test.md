@@ -12,56 +12,22 @@ Verify that ARF transformations with OpenRewrite actually modify code and produc
 
 ### Sample Code Issues to Fix
 
-#### 1. Application.java
-```java
-package com.example;
+The test repositories contain various Java code issues that OpenRewrite recipes can fix:
 
-// Issues present:
-// - Unused imports (ArrayList, HashMap, Set, HashSet, IOException, File)
-// - StringBuffer usage instead of StringBuilder
-// - Missing diamond operators in generics
-// - Inefficient string concatenation in loops
-// - Unused private methods
+#### Application.java Issues
+- Unused imports (ArrayList, HashMap, Set, HashSet, IOException, File)
+- StringBuffer usage instead of StringBuilder
+- Missing diamond operators in generics
+- Inefficient string concatenation in loops
+- Unused private methods
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
-import java.io.IOException;
-import java.io.File;
-
-public class Application {
-    private StringBuffer buffer = new StringBuffer(); // Should be StringBuilder
-    private List<String> items = new ArrayList<String>(); // Missing diamond operator
-    
-    // ... rest of code with issues
-}
-```
-
-#### 2. DataProcessor.java
-```java
-package com.example;
-
-// Issues present:
-// - Wildcard imports (java.util.*, java.io.*, etc.)
-// - Legacy collections (Vector, Hashtable, Enumeration)
-// - Unnecessary boxing (new Integer(42))
-// - String comparison using == instead of equals()
-// - Missing try-with-resources
-// - Inefficient string replace operations
-
-import java.util.*;
-import java.io.*;
-
-public class DataProcessor {
-    private Vector<String> data = new Vector<String>(); // Legacy collection
-    private Hashtable<String, Object> cache = new Hashtable<String, Object>(); // Legacy
-    
-    // ... rest of code with issues
-}
-```
+#### DataProcessor.java Issues
+- Wildcard imports (java.util.*, java.io.*, etc.)
+- Legacy collections (Vector, Hashtable, Enumeration)
+- Unnecessary boxing (new Integer(42))
+- String comparison using == instead of equals()
+- Missing try-with-resources
+- Inefficient string replace operations
 
 ## Test Scenarios
 
@@ -91,7 +57,7 @@ public class DataProcessor {
   "recipe_id": "org.openrewrite.java.cleanup.RemoveUnusedImports",
   "type": "openrewrite",
   "codebase": {
-    "repository": "file:///tmp/test-java-project",
+    "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
     "branch": "main"
   }
 }
@@ -112,7 +78,7 @@ public class DataProcessor {
        "recipe_id": "org.openrewrite.java.cleanup.RemoveUnusedImports",
        "type": "openrewrite",
        "codebase": {
-         "repository": "file:///tmp/test-java-project",
+         "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
          "branch": "main"
        }
      }'
@@ -180,15 +146,15 @@ public class DataProcessor {
 
 ### GitHub Repositories
 1. **ploy-orw-test-java** - Basic Java project with common code issues
-   - URL: https://github.com/iw2rmb/ploy-orw-test-java
+   - URL: https://github.com/iw2rmb/ploy-orw-test-java.git
    - Issues: Unused imports, StringBuffer usage, missing diamond operators, inefficient loops
 
 2. **ploy-orw-test-legacy** - Legacy Java 7 project with deprecated patterns
-   - URL: https://github.com/iw2rmb/ploy-orw-test-legacy
+   - URL: https://github.com/iw2rmb/ploy-orw-test-legacy.git
    - Issues: Deprecated Date API, finalize methods, manual array operations, old thread patterns
 
 3. **ploy-orw-test-spring** - Spring Boot project with outdated patterns
-   - URL: https://github.com/iw2rmb/ploy-orw-test-spring
+   - URL: https://github.com/iw2rmb/ploy-orw-test-spring.git
    - Issues: Field injection, old RequestMapping annotations, Spring Boot 2.3 (outdated)
 
 ## Test Execution Log
@@ -306,7 +272,7 @@ curl -X POST https://api.dev.ployman.app/v1/arf/transforms \
     "recipe_id": "org.openrewrite.java.migrate.Java8toJava11",
     "type": "openrewrite",
     "codebase": {
-      "repository": "https://github.com/user/repo.git",
+      "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
       "branch": "main"
     }
   }'
