@@ -214,8 +214,14 @@ func (h *Handler) GetTransformationReport(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate markdown report
-	report := generateMarkdownReport(status)
+	// Try to get transformation result for diff data
+	var diff string
+	if result, exists := globalTransformStore.get(transformID); exists && result != nil {
+		diff = result.Diff
+	}
+
+	// Generate markdown report with diff if available
+	report := generateMarkdownReport(status, diff)
 	contentType := "text/markdown; charset=utf-8"
 
 	c.Set("Content-Type", contentType)
@@ -1009,7 +1015,7 @@ func formatDuration(d time.Duration) string {
 }
 
 // generateMarkdownReport creates a comprehensive markdown report
-func generateMarkdownReport(status *TransformationStatus) string {
+func generateMarkdownReport(status *TransformationStatus, diff string) string {
 	var report strings.Builder
 
 	// Header
@@ -1044,7 +1050,7 @@ func generateMarkdownReport(status *TransformationStatus) string {
 
 	// Code Changes section
 	report.WriteString("## 📝 Code Changes\n")
-	report.WriteString(formatCodeChangesMarkdown(status.Children))
+	report.WriteString(formatCodeChangesMarkdown(status.Children, diff))
 	report.WriteString("\n")
 
 	// Cost Analysis section
@@ -1116,28 +1122,96 @@ func formatHealingAttemptsMarkdown(attempts []HealingAttempt) string {
 }
 
 // formatCodeChangesMarkdown formats code changes as markdown
-func formatCodeChangesMarkdown(attempts []HealingAttempt) string {
+func formatCodeChangesMarkdown(attempts []HealingAttempt, diff string) string {
 	var md strings.Builder
 
-	md.WriteString("### Files Modified\n")
+	// If we have a diff from OpenRewrite, display it
+	if diff != "" {
+		md.WriteString("### Transformation Diff\n")
+		md.WriteString("```diff\n")
 
-	var collectChanges func([]HealingAttempt)
-	collectChanges = func(attempts []HealingAttempt) {
-		for _, attempt := range attempts {
-			if attempt.LLMAnalysis != nil && attempt.LLMAnalysis.SuggestedFix != "" {
-				md.WriteString(fmt.Sprintf("- **Change**: %s\n", attempt.LLMAnalysis.SuggestedFix))
+		// Limit diff output to reasonable size for report
+		lines := strings.Split(diff, "\n")
+		maxLines := 100
+		if len(lines) > maxLines {
+			md.WriteString(strings.Join(lines[:maxLines], "\n"))
+			md.WriteString("\n... (truncated, showing first 100 lines)\n")
+		} else {
+			md.WriteString(diff)
+		}
+
+		md.WriteString("\n```\n\n")
+
+		// Extract file list from diff
+		md.WriteString("### Files Modified\n")
+		filesModified := extractFilesFromDiff(diff)
+		if len(filesModified) > 0 {
+			for _, file := range filesModified {
+				md.WriteString(fmt.Sprintf("- %s\n", file))
 			}
-			collectChanges(attempt.Children)
+		} else {
+			md.WriteString("- Changes detected in transformation\n")
+		}
+	} else {
+		// Fall back to healing attempt changes if no diff
+		md.WriteString("### Files Modified\n")
+
+		var hasChanges bool
+		var collectChanges func([]HealingAttempt)
+		collectChanges = func(attempts []HealingAttempt) {
+			for _, attempt := range attempts {
+				if attempt.LLMAnalysis != nil && attempt.LLMAnalysis.SuggestedFix != "" {
+					md.WriteString(fmt.Sprintf("- **Change**: %s\n", attempt.LLMAnalysis.SuggestedFix))
+					hasChanges = true
+				}
+				collectChanges(attempt.Children)
+			}
+		}
+
+		collectChanges(attempts)
+
+		if !hasChanges {
+			md.WriteString("- No detailed file changes recorded\n")
 		}
 	}
 
-	collectChanges(attempts)
+	return md.String()
+}
 
-	if md.Len() == len("### Files Modified\n") {
-		md.WriteString("- No detailed file changes recorded\n")
+// extractFilesFromDiff parses a unified diff to extract modified file names
+func extractFilesFromDiff(diff string) []string {
+	var files []string
+	seenFiles := make(map[string]bool)
+
+	lines := strings.Split(diff, "\n")
+	for _, line := range lines {
+		// Look for diff headers like "diff --git a/file.java b/file.java"
+		if strings.HasPrefix(line, "diff --git") {
+			parts := strings.Fields(line)
+			if len(parts) >= 4 {
+				// Extract filename from a/filename format
+				file := strings.TrimPrefix(parts[2], "a/")
+				if !seenFiles[file] {
+					files = append(files, file)
+					seenFiles[file] = true
+				}
+			}
+		}
+		// Also look for +++ and --- lines
+		if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 && parts[1] != "/dev/null" {
+				file := strings.TrimPrefix(parts[1], "b/")
+				file = strings.TrimPrefix(file, "a/")
+				if !seenFiles[file] && file != "" {
+					files = append(files, file)
+					seenFiles[file] = true
+				}
+			}
+		}
 	}
 
-	return md.String()
+	return files
 }
 
 // formatCostAnalysisMarkdown formats cost analysis as markdown
