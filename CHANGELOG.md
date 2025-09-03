@@ -118,6 +118,10 @@
 - api/server: tests to ensure deps init with Service works even when file path is invalid; ARF init prefers Service.
 - internal/config: test for optional Consul source (unreachable tolerated).
 
+### Env Flags
+- PLOY_CONFIG_CONSUL_ADDR / PLOY_CONFIG_CONSUL_KEY: enable Consul KV source for centralized config Service.
+- PLOY_CONFIG_CONSUL_REQUIRED: if set to "true", Service initialization fails on Consul errors (default tolerant).
+
 ## [2025-09-03] - OpenRewrite Recipes CLI Commands (Phase 2 Complete)
 
 ### Added
