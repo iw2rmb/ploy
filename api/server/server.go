@@ -702,6 +702,7 @@ func (s *Server) setupRoutes() {
 	// ARF recipes minimal facade endpoint (Phase 4 initial slice)
 	api.Get("/arf/recipes/ping", s.handleARFRecipesPing)
 	api.Get("/arf/recipes", s.handleARFRecipesList)
+	api.Get("/arf/recipes/:id", s.handleARFRecipesGet)
 
 	// TTL cleanup endpoints with dependency injection
 	if s.dependencies.CleanupHandler != nil {
@@ -724,8 +725,7 @@ func (s *Server) setupRoutes() {
 		log.Printf("ARF routes registered successfully")
 	}
 
-	// Optional: overlay lightweight recipes catalog endpoints behind feature flag
-	s.setupRecipesCatalogRoutes()
+	// Internal ARF recipes handlers are now the default; legacy overlay removed
 
 	// Static Analysis endpoints
 	if s.dependencies.AnalysisHandler != nil {

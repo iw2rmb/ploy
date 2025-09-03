@@ -21,7 +21,10 @@
 - api/server: Added focused test for storage-backed get-by-id using in-memory storage and a minimal catalog.
 
 ### Notes
-- Route wiring remains shadowed by legacy catalog overlay; internal handler used in tests. Full swap planned in a later slice.
+- Replaced legacy catalog overlay with internal handlers in server router:
+  - GET /v1/arf/recipes (list)
+  - GET /v1/arf/recipes/:id (get by id)
+  Legacy refresh endpoint is removed from routing; no production behavior change expected for list/get.
 
 ## [2025-09-03] - Fix Empty Diffs in OpenRewrite Transformations
 
