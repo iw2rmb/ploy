@@ -32,6 +32,7 @@
 
 ### Changed
 - api/config: Factored shared factory-config builder to reduce duplication between helpers
+ - Removed direct usages of legacy duplicate config helpers across server/health; retained compatibility function for tests/backward-compat
 
 ### Notes
 - Backward compatibility kept (legacy file-based paths and compatibility tests still pass)
