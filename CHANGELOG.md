@@ -60,6 +60,14 @@
 ### Tests
 - api/server: added tests to assert service-preferred behavior when a config.Service is injected.
 
+## [2025-09-03] - Server GET /storage/config Uses Config Service (Phase 3)
+
+### Changed
+- api/server: GET /storage/config now prefers the centralized configuration Service when available and maps service config to the legacy Root shape (Provider/Master/Filer/Collection) for backward compatibility. Falls back to file-based loader otherwise.
+
+### Tests
+- api/server: added test to verify service-preferred behavior and legacy-shaped response.
+
 ## [2025-09-03] - OpenRewrite Recipes CLI Commands (Phase 2 Complete)
 
 ### Added
