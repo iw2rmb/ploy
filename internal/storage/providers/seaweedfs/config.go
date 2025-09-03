@@ -7,7 +7,7 @@ type Config struct {
 	Master      string `yaml:"master" json:"master"`           // master server address (e.g., "localhost:9333")
 	Filer       string `yaml:"filer" json:"filer"`             // filer server address (e.g., "localhost:8888")
 	Collection  string `yaml:"collection" json:"collection"`   // collection name for artifacts
-	Replication string `yaml:"replication" json:"replication"` // replication strategy (e.g., "001")
+	Replication string `yaml:"replication" json:"replication"` // replication strategy (e.g., "000" for dev, "001" for prod)
 	Timeout     int    `yaml:"timeout" json:"timeout"`         // timeout in seconds
 	DataCenter  string `yaml:"datacenter" json:"datacenter"`   // data center identifier
 	Rack        string `yaml:"rack" json:"rack"`               // rack identifier
@@ -19,7 +19,7 @@ func DefaultConfig() Config {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "artifacts",
-		Replication: "001",
+		Replication: "000", // Changed to 000 for single-node dev environment
 		Timeout:     30,
 	}
 }
