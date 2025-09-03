@@ -87,6 +87,21 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 
 **Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Vault 1.20.2, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
 
+### Storage Configuration (Centralized Config Service)
+
+The controller now uses a centralized configuration Service. For fresh installs and bare‑metal bootstrap, the Ansible playbooks generate `/etc/ploy/storage/config.yaml` including both legacy SeaweedFS fields and the new endpoint:
+
+```
+storage:
+  provider: seaweedfs
+  endpoint: http://localhost:9333   # NEW: used by the centralized config Service
+  master:   localhost:9333          # legacy
+  filer:    localhost:8888          # legacy
+  collection: artifacts
+```
+
+Keeping both ensures backward compatibility while allowing the controller to prefer the new Service immediately.
+
 ## Template System (Aug 2025)
 
 **Unified Templates**: All development environment configurations use shared templates from `../common/templates/` for consistency with production.

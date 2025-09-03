@@ -3,11 +3,20 @@ package arf
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// CatalogMetrics interface for tracking catalog metrics
+type CatalogMetrics interface {
+	RecordHit()
+	RecordMiss()
+	RecordValidationFailure()
+	RecordSearch(duration time.Duration)
+}
 
 // Handler provides HTTP endpoints for ARF operations
 type Handler struct {
@@ -30,6 +39,8 @@ type Handler struct {
 	consulStore ConsulStoreInterface
 	// Healing coordination for parallel attempts
 	healingCoordinator *HealingCoordinator
+	// Metrics for catalog operations
+	metrics CatalogMetrics
 }
 
 // NewHandler creates a new ARF HTTP handler

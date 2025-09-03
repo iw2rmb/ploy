@@ -5,8 +5,8 @@ Goal: Users can discover available OpenRewrite recipes via the Ploy CLI and run 
 ## Outcomes
 
 - [x] Transforms endpoint reliably runs OpenRewrite and applies code changes.
-- [ ] Ploy CLI lists/searches available recipes from the server catalog.
-- [ ] API validates recipe names in POST /v1/arf/transforms; returns 400 + suggestions if missing.
+- [x] Ploy CLI lists/searches available recipes from the server catalog.
+- [x] API validates recipe names in POST /v1/arf/transforms; returns 400 + suggestions if missing.
 
 ## Phase 0 — Foundation (DONE)
 
@@ -61,13 +61,13 @@ Validate recipe names passed to transforms.
 - [x] CLI: `--pack` flag to filter recipes by pack
 - [ ] Server: Pluggable pack lists; support additional languages (Kotlin/Gradle) later
 
-## Phase 5 — Observability & Docs
+## Phase 5 — Observability & Docs (DONE)
 
-- [ ] Log catalog size, index time, resolution decisions
-- [ ] Metrics: catalog hits/misses, transform validation failures
-- [ ] Documentation:
-  - [ ] `docs/recipes.md` – how to discover and run recipes
-  - [ ] `CHANGELOG.md` – catalog + validation release notes
+- [x] Log catalog size, index time, resolution decisions
+- [x] Metrics: catalog hits/misses, transform validation failures
+- [x] Documentation:
+  - [x] `docs/recipes.md` – how to discover and run recipes
+  - [x] `CHANGELOG.md` – catalog + validation release notes
 
 ---
 
