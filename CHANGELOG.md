@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [2025-09-03] - OpenRewrite Recipes Phase 3 Complete & Documentation
+
+### Completed
+- Phase 3: API Validation in Transforms
+  - ExecuteTransformationAsync validates recipe_id against catalog
+  - Returns 400 with fuzzy-matched suggestions when recipe not found
+  - Comprehensive tests in handler_transformation_async_test.go
+  
+### Added
+- docs/recipes.md: Comprehensive guide for OpenRewrite recipes
+  - Recipe discovery and management via CLI
+  - API reference for all recipe endpoints
+  - Common recipes and best practices
+  - Troubleshooting guide
+  - Transform-time validation documentation
+
+### Updated
+- roadmap/recepies.md: Marked Phase 3 as complete
+- roadmap/recepies.md: Marked documentation task as complete
+
 ## [2025-09-03] - Roadmap Phase 3 Docs Sync
 
 ### Documentation
