@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [2025-09-03] - OpenRewrite Recipes Phase 5 - Observability & Metrics (COMPLETE)
+
+### Added
+- **Logging for catalog operations**:
+  - RecipesIndexer logs catalog size, index time, and pack details
+  - Format: `catalog_size=N, index_time=Xms, pack_count=Y`
+  - Per-pack indexing logs with recipe count
+
+- **Metrics collection system**:
+  - Added MetricsCollector interface for pluggable metrics backends
+  - RecipesIndexer records: catalog.refresh.duration, catalog.recipe.count, catalog.pack.count
+  - Handler tracks catalog access patterns
+
+- **Catalog hit/miss tracking**:
+  - ExecuteTransformationAsync records catalog hits on valid recipes
+  - Records catalog misses and validation failures on invalid recipes
+  - Tracks search duration for performance monitoring
+  - CatalogMetrics interface: RecordHit(), RecordMiss(), RecordValidationFailure(), RecordSearch()
+
+### Implementation Details
+- Added SetLogger() and SetMetricsCollector() to RecipesIndexer
+- Handler.metrics field for catalog metrics tracking
+- Comprehensive test coverage with mock collectors
+- Following TDD protocol: RED (failing tests) → GREEN (implementation) → verified
+
+### Updated
+- roadmap/recepies.md: Marked all Outcomes as complete
+- roadmap/recepies.md: Marked Phase 5 as DONE
+- api/arf/recipes_indexer.go: Added logging and metrics support
+- api/arf/handler.go: Added CatalogMetrics interface and metrics field
+- api/arf/handler_transformation_async.go: Integrated metrics recording
+
+### Tests
+- TestRecipesIndexer_LogsCatalogMetrics: Verifies logging output
+- TestRecipesIndexer_CollectsMetrics: Verifies metrics collection
+- TestHandler_TracksCatalogMetrics: Verifies catalog hit/miss tracking
+
 ## [2025-09-03] - OpenRewrite Recipes Phase 4 UX Polish (Partial)
 
 ### Added

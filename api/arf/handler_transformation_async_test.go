@@ -1,20 +1,21 @@
 package arf
 
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "net/http/httptest"
-    "testing"
-    "time"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
 
-    "github.com/gofiber/fiber/v2"
-    "github.com/google/uuid"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-    "github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockRecipeExecutor for testing
@@ -275,73 +276,73 @@ func TestExecuteTransformation_Async(t *testing.T) {
 }
 
 func TestExecuteTransformation_ValidationSuggestions(t *testing.T) {
-    // Setup mock catalog with a couple of recipes
-    cat := NewMockRecipeCatalog()
-    ctx := context.Background()
-    _ = cat.StoreRecipe(ctx, &models.Recipe{
-        ID: "org.openrewrite.java.RemoveUnusedImports",
-        Metadata: models.RecipeMetadata{
-            Name:        "RemoveUnusedImports",
-            Description: "Removes unused imports",
-            Tags:        []string{"RemoveUnusedImport"}, // allow equality match in mock search
-            Languages:   []string{"java"},
-        },
-    })
-    _ = cat.StoreRecipe(ctx, &models.Recipe{
-        ID: "org.openrewrite.java.migrate.UpgradeToJava17",
-        Metadata: models.RecipeMetadata{
-            Name:        "UpgradeToJava17",
-            Description: "Upgrades Java version",
-            Tags:        []string{"UpgradeToJava"},
-            Languages:   []string{"java"},
-        },
-    })
+	// Setup mock catalog with a couple of recipes
+	cat := NewMockRecipeCatalog()
+	ctx := context.Background()
+	_ = cat.StoreRecipe(ctx, &models.Recipe{
+		ID: "org.openrewrite.java.RemoveUnusedImports",
+		Metadata: models.RecipeMetadata{
+			Name:        "RemoveUnusedImports",
+			Description: "Removes unused imports",
+			Tags:        []string{"RemoveUnusedImport"}, // allow equality match in mock search
+			Languages:   []string{"java"},
+		},
+	})
+	_ = cat.StoreRecipe(ctx, &models.Recipe{
+		ID: "org.openrewrite.java.migrate.UpgradeToJava17",
+		Metadata: models.RecipeMetadata{
+			Name:        "UpgradeToJava17",
+			Description: "Upgrades Java version",
+			Tags:        []string{"UpgradeToJava"},
+			Languages:   []string{"java"},
+		},
+	})
 
-    // Mock Consul store to satisfy handler
-    mockStore := &MockConsulHealingStore{MockConsulStore: MockConsulStore{data: make(map[string]*TransformationStatus)}}
+	// Mock Consul store to satisfy handler
+	mockStore := &MockConsulHealingStore{MockConsulStore: MockConsulStore{data: make(map[string]*TransformationStatus)}}
 
-    handler := &Handler{
-        consulStore: mockStore,
-        catalog:     cat,
-    }
+	handler := &Handler{
+		consulStore: mockStore,
+		catalog:     cat,
+	}
 
-    app := fiber.New()
-    app.Post("/v1/arf/transforms", handler.ExecuteTransformationAsync)
+	app := fiber.New()
+	app.Post("/v1/arf/transforms", handler.ExecuteTransformationAsync)
 
-    // Submit request with slight typo to trigger suggestions
-    request := map[string]interface{}{
-        "recipe_id": "org.openrewrite.java.RemoveUnusedImport", // missing 's'
-        "type":      "openrewrite",
-        "codebase": map[string]interface{}{
-            "repository": "https://github.com/example/test-repo",
-        },
-    }
-    body, _ := json.Marshal(request)
-    req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
-    req.Header.Set("Content-Type", "application/json")
+	// Submit request with slight typo to trigger suggestions
+	request := map[string]interface{}{
+		"recipe_id": "org.openrewrite.java.RemoveUnusedImport", // missing 's'
+		"type":      "openrewrite",
+		"codebase": map[string]interface{}{
+			"repository": "https://github.com/example/test-repo",
+		},
+	}
+	body, _ := json.Marshal(request)
+	req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 
-    resp, err := app.Test(req)
-    require.NoError(t, err)
-    assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	resp, err := app.Test(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
-    var result map[string]interface{}
-    _ = json.NewDecoder(resp.Body).Decode(&result)
-    assert.Equal(t, "invalid recipe_id", result["error"])
-    assert.Equal(t, "org.openrewrite.java.RemoveUnusedImport", result["recipe_id"])
+	var result map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&result)
+	assert.Equal(t, "invalid recipe_id", result["error"])
+	assert.Equal(t, "org.openrewrite.java.RemoveUnusedImport", result["recipe_id"])
 
-    // Suggestions should include the correct recipe ID
-    if arr, ok := result["suggestions"].([]interface{}); ok {
-        found := false
-        for _, v := range arr {
-            if s, ok := v.(string); ok && s == "org.openrewrite.java.RemoveUnusedImports" {
-                found = true
-                break
-            }
-        }
-        assert.True(t, found, "expected suggestions to include RemoveUnusedImports")
-    } else {
-        t.Fatalf("expected suggestions array in response")
-    }
+	// Suggestions should include the correct recipe ID
+	if arr, ok := result["suggestions"].([]interface{}); ok {
+		found := false
+		for _, v := range arr {
+			if s, ok := v.(string); ok && s == "org.openrewrite.java.RemoveUnusedImports" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected suggestions to include RemoveUnusedImports")
+	} else {
+		t.Fatalf("expected suggestions array in response")
+	}
 }
 
 func TestBackgroundExecution(t *testing.T) {
@@ -609,4 +610,143 @@ func TestGetTransformationStatusEnhanced(t *testing.T) {
 		json.NewDecoder(resp.Body).Decode(&result)
 		assert.Equal(t, "Transformation not found", result["error"])
 	})
+}
+
+// Test that catalog hits and misses are tracked
+func TestHandler_TracksCatalogMetrics(t *testing.T) {
+	// Create handler with mock catalog and metrics
+	mockCatalog := NewMockRecipeCatalog()
+	mockMetrics := &MockCatalogMetrics{}
+	mockStore := NewMockConsulStore()
+
+	handler := &Handler{
+		catalog:        mockCatalog,
+		consulStore:    mockStore,
+		recipeExecutor: &RecipeExecutor{}, // Use actual RecipeExecutor type
+		metrics:        mockMetrics,
+	}
+
+	app := fiber.New()
+	app.Post("/v1/arf/transforms", handler.ExecuteTransformationAsync)
+
+	// Add a known recipe to catalog
+	ctx := context.Background()
+	_ = mockCatalog.StoreRecipe(ctx, &models.Recipe{
+		ID: "org.openrewrite.java.RemoveUnusedImports",
+		Metadata: models.RecipeMetadata{
+			Name: "Remove Unused Imports",
+		},
+	})
+
+	t.Run("tracks catalog hit on valid recipe", func(t *testing.T) {
+		request := map[string]interface{}{
+			"recipe_id": "org.openrewrite.java.RemoveUnusedImports",
+			"type":      "openrewrite",
+			"codebase": map[string]interface{}{
+				"repository": "https://github.com/example/test",
+				"branch":     "main",
+			},
+		}
+
+		body, _ := json.Marshal(request)
+		req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		// Verify catalog hit was recorded
+		assert.Equal(t, int64(1), mockMetrics.hits.Load())
+		assert.Equal(t, int64(0), mockMetrics.misses.Load())
+	})
+
+	t.Run("tracks catalog miss on invalid recipe", func(t *testing.T) {
+		// Reset metrics
+		mockMetrics.Reset()
+
+		request := map[string]interface{}{
+			"recipe_id": "org.openrewrite.java.NonExistentRecipe",
+			"type":      "openrewrite",
+			"codebase": map[string]interface{}{
+				"repository": "https://github.com/example/test",
+				"branch":     "main",
+			},
+		}
+
+		body, _ := json.Marshal(request)
+		req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := app.Test(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		// Verify catalog miss was recorded
+		assert.Equal(t, int64(0), mockMetrics.hits.Load())
+		assert.Equal(t, int64(1), mockMetrics.misses.Load())
+
+		// Verify validation failure was recorded
+		assert.Equal(t, int64(1), mockMetrics.validationFailures.Load())
+	})
+
+	t.Run("tracks search performance", func(t *testing.T) {
+		// Reset metrics
+		mockMetrics.Reset()
+
+		// Simulate multiple searches
+		for i := 0; i < 5; i++ {
+			request := map[string]interface{}{
+				"recipe_id": fmt.Sprintf("org.openrewrite.test.Recipe%d", i),
+				"type":      "openrewrite",
+				"codebase": map[string]interface{}{
+					"repository": "https://github.com/example/test",
+					"branch":     "main",
+				},
+			}
+
+			body, _ := json.Marshal(request)
+			req := httptest.NewRequest("POST", "/v1/arf/transforms", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			_, _ = app.Test(req)
+		}
+
+		// Verify search count
+		assert.Equal(t, int64(5), mockMetrics.searchCount.Load())
+	})
+}
+
+// MockCatalogMetrics tracks catalog access metrics
+type MockCatalogMetrics struct {
+	hits               atomic.Int64
+	misses             atomic.Int64
+	validationFailures atomic.Int64
+	searchCount        atomic.Int64
+	searchDuration     atomic.Int64
+}
+
+func (m *MockCatalogMetrics) RecordHit() {
+	m.hits.Add(1)
+}
+
+func (m *MockCatalogMetrics) RecordMiss() {
+	m.misses.Add(1)
+}
+
+func (m *MockCatalogMetrics) RecordValidationFailure() {
+	m.validationFailures.Add(1)
+}
+
+func (m *MockCatalogMetrics) RecordSearch(duration time.Duration) {
+	m.searchCount.Add(1)
+	m.searchDuration.Store(int64(duration))
+}
+
+func (m *MockCatalogMetrics) Reset() {
+	m.hits.Store(0)
+	m.misses.Store(0)
+	m.validationFailures.Store(0)
+	m.searchCount.Store(0)
+	m.searchDuration.Store(0)
 }
