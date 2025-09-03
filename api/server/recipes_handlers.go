@@ -36,3 +36,19 @@ func (s *Server) handleARFRecipesList(c *fiber.Ctx) error {
     }
     return c.JSON(fiber.Map{"recipes": list})
 }
+
+// handleARFRecipesGet returns a single recipe by ID via the internal ARF facade.
+func (s *Server) handleARFRecipesGet(c *fiber.Ctx) error {
+    if s.dependencies == nil || s.dependencies.ARFRecipes == nil {
+        return c.Status(503).JSON(fiber.Map{"error": "recipes registry unavailable"})
+    }
+    id := c.Params("id")
+    rec, err := s.dependencies.ARFRecipes.Get(c.Context(), id)
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{"error": "get failed", "details": err.Error()})
+    }
+    if rec == nil {
+        return c.Status(404).JSON(fiber.Map{"error": "recipe not found"})
+    }
+    return c.JSON(fiber.Map{"recipe": rec})
+}

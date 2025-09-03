@@ -73,3 +73,32 @@ func TestARFRecipesList_StorageBacked_OK(t *testing.T) {
         t.Fatalf("unexpected status: %d", resp.StatusCode)
     }
 }
+
+func TestARFRecipesGet_StorageBacked_OK(t *testing.T) {
+    t.Parallel()
+
+    mem := providers_memory.NewMemoryStorage(0)
+    catalog := `[
+      {"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","description":"Cleanup rules","tags":["cleanup","java"],"pack":"rewrite-java","version":"1.2.3"},
+      {"id":"org.openrewrite.java.format.AutoFormat","display_name":"Auto Format","description":"Formatting","tags":["format","java"],"pack":"rewrite-java","version":"1.0.0"}
+    ]`
+    _ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+
+    srv, err := NewServer(&ControllerConfig{})
+    if err != nil {
+        t.Fatalf("NewServer error: %v", err)
+    }
+    srv.dependencies.ARFRecipes = recipes.NewStorageBacked(mem)
+
+    // Register our internal handler on a test path to avoid overlay
+    srv.app.Get("/v1/arf/recipes/_test/:id", srv.handleARFRecipesGet)
+
+    req := httptest.NewRequest("GET", "/v1/arf/recipes/_test/org.openrewrite.java.cleanup.Cleanup", nil)
+    resp, err := srv.app.Test(req)
+    if err != nil {
+        t.Fatalf("request failed: %v", err)
+    }
+    if resp.StatusCode != 200 {
+        t.Fatalf("unexpected status: %d", resp.StatusCode)
+    }
+}
