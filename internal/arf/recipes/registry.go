@@ -2,10 +2,26 @@ package recipes
 
 import "context"
 
+// Recipe represents a minimal recipe descriptor for listing endpoints.
+type Recipe struct {
+    ID       string   `json:"id"`
+    Name     string   `json:"name"`
+    Language string   `json:"language,omitempty"`
+    Tags     []string `json:"tags,omitempty"`
+}
+
+// Filters for listing/searching recipes (initial slice)
+type Filters struct {
+    Language string
+    Tag      string
+}
+
 // Registry is a minimal facade for ARF recipes to enable gradual consolidation.
 type Registry interface {
     // Ping verifies registry availability.
     Ping(ctx context.Context) error
+    // List returns a list of recipes matching filters.
+    List(ctx context.Context, f Filters) ([]Recipe, error)
 }
 
 // InMemoryRegistry is a no-op implementation used for initial wiring.
@@ -15,3 +31,7 @@ func NewInMemory() *InMemoryRegistry { return &InMemoryRegistry{} }
 
 func (r *InMemoryRegistry) Ping(ctx context.Context) error { return nil }
 
+func (r *InMemoryRegistry) List(ctx context.Context, f Filters) ([]Recipe, error) {
+    // Empty initial slice; future slices can adapt from storage-backed catalog
+    return []Recipe{}, nil
+}
