@@ -102,6 +102,20 @@ storage:
 
 Keeping both ensures backward compatibility while allowing the controller to prefer the new Service immediately.
 
+Optional Consul-backed config source (feature-flag):
+
+Set these environment variables on the controller host to enable merging a YAML document from Consul KV into the centralized config Service:
+
+```
+export PLOY_CONFIG_CONSUL_ADDR="http://127.0.0.1:8500"   # Consul address
+export PLOY_CONFIG_CONSUL_KEY="ploy/config"              # KV key containing YAML
+export PLOY_CONFIG_CONSUL_REQUIRED="false"               # If "true", fail startup on Consul errors
+```
+
+Notes:
+- When `PLOY_CONFIG_CONSUL_REQUIRED` is not set or not "true", Consul connectivity or parse errors are logged and ignored (file/env sources still load).
+- Use this to overlay secrets or operational toggles without changing files on disk.
+
 ## Template System (Aug 2025)
 
 **Unified Templates**: All development environment configurations use shared templates from `../common/templates/` for consistency with production.

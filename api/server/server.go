@@ -152,8 +152,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
         }
         if addr := os.Getenv("PLOY_CONFIG_CONSUL_ADDR"); addr != "" {
             if key := os.Getenv("PLOY_CONFIG_CONSUL_KEY"); key != "" {
-                // Optional source: tolerant to connectivity errors
-                opts = append(opts, cfgsvc.WithConsul(addr, key, false))
+                // Optional or required Consul source depending on toggle
+                required := strings.EqualFold(os.Getenv("PLOY_CONFIG_CONSUL_REQUIRED"), "true")
+                opts = append(opts, cfgsvc.WithConsul(addr, key, required))
             }
         }
 
