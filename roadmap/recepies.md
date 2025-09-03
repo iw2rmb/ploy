@@ -45,14 +45,14 @@ Expose recipe discovery to users via Ploy CLI.
 - [x] Flags: `--pack`, `--version`, `--limit`, `--format`
 - [x] TDD: CLI unit/integration tests (mock server)
 
-## Phase 3 — API Validation in Transforms
+## Phase 3 — API Validation in Transforms (DONE)
 
 Validate recipe names passed to transforms.
 
-- [ ] On `POST /v1/arf/transforms`, validate `recipe_id` against catalog
-- [ ] If missing, return 400 with top N fuzzy suggestions (no Nomad job submission)
-- [ ] If found, optionally pass `RECIPE_GROUP/ARTIFACT/VERSION` to speed resolution (runner still supports discovery)
-- [ ] TDD: handler tests for happy path + suggestions
+- [x] On `POST /v1/arf/transforms`, validate `recipe_id` against catalog
+- [x] If missing, return 400 with top N fuzzy suggestions (no Nomad job submission)
+- [x] If found, optionally pass `RECIPE_GROUP/ARTIFACT/VERSION` to speed resolution (runner still supports discovery)
+- [x] TDD: handler tests for happy path + suggestions
 
 ## Phase 4 — UX Polish
 
