@@ -16,8 +16,13 @@ PLOY_API_URL="${PLOY_API_URL:-http://api.service.consul:8081}"
 DISCOVER_RECIPE="${DISCOVER_RECIPE:-false}"
 
 echo "[OpenRewrite] Starting transformation"
-echo "[OpenRewrite] Recipe: ${RECIPE_CLASS}"
-echo "[OpenRewrite] Discovery mode: ${DISCOVER_RECIPE}"
+echo "[OpenRewrite] Environment variables:"
+echo "[OpenRewrite]   JOB_ID: ${JOB_ID}"
+echo "[OpenRewrite]   TRANSFORMATION_ID: ${TRANSFORMATION_ID}"
+echo "[OpenRewrite]   RECIPE: ${RECIPE_CLASS}"
+echo "[OpenRewrite]   SEAWEEDFS_URL: ${SEAWEEDFS_URL}"
+echo "[OpenRewrite]   OUTPUT_KEY: ${OUTPUT_KEY}"
+echo "[OpenRewrite]   Discovery mode: ${DISCOVER_RECIPE}"
 echo "[OpenRewrite] SeaweedFS: ${SEAWEEDFS_URL}"
 
 # Check if we need to discover recipe coordinates
