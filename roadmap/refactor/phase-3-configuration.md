@@ -570,6 +570,7 @@ func TestConfigurationService(t *testing.T) {
 - Pending:
   - Reorder server startup validation to prefer Service (initialize Service early in NewServer) ✅ Completed
   - Optional Consul source for configuration (feature-flagged) ✅ Completed
+  - Continue migrating remaining file-based reads to injected Service where practical (partial)
 
 ## Expected Outcomes
 

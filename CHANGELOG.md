@@ -105,6 +105,19 @@
 ### Tests
 - api/server: added test to verify service-preferred behavior and legacy-shaped response.
 
+## [2025-09-03] - Config Service First + Consul Source + ARF Prefers Service (Phase 3)
+
+### Changed
+- api/server: NewServer initializes centralized config Service before dependencies; startup validation prefers Service.
+- api/server: initializeDependenciesWithService introduced; initializeDependencies delegates to it for compatibility.
+- api/server: ARF initialization prefers unified storage resolved via Service, with file-based factory fallback.
+- internal/config: optional Consul KV source via `WithConsul(addr, key, required)`; tolerant when not required.
+- internal/config: storage retry/cache configuration supported and mapped into storage factory.
+
+### Tests
+- api/server: tests to ensure deps init with Service works even when file path is invalid; ARF init prefers Service.
+- internal/config: test for optional Consul source (unreachable tolerated).
+
 ## [2025-09-03] - OpenRewrite Recipes CLI Commands (Phase 2 Complete)
 
 ### Added

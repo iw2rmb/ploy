@@ -142,13 +142,22 @@ func NewServer(config *ControllerConfig) (*Server, error) {
     // Initialize centralized configuration service (prefer file + env) first
     var cfgService *cfgsvc.Service
     if config != nil && config.StorageConfigPath != "" {
-        svc, err := cfgsvc.New(
+        // Build options dynamically and enable Consul source if env flags present
+        opts := []cfgsvc.Option{
             cfgsvc.WithFile(config.StorageConfigPath),
             cfgsvc.WithEnvironment("PLOY_"),
             cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
-            cfgsvc.WithCacheTTL(5*time.Minute),
-            cfgsvc.WithHotReload(500*time.Millisecond),
-        )
+            cfgsvc.WithCacheTTL(5 * time.Minute),
+            cfgsvc.WithHotReload(500 * time.Millisecond),
+        }
+        if addr := os.Getenv("PLOY_CONFIG_CONSUL_ADDR"); addr != "" {
+            if key := os.Getenv("PLOY_CONFIG_CONSUL_KEY"); key != "" {
+                // Optional source: tolerant to connectivity errors
+                opts = append(opts, cfgsvc.WithConsul(addr, key, false))
+            }
+        }
+
+        svc, err := cfgsvc.New(opts...)
         if err != nil {
             log.Printf("Warning: failed to initialize config service: %v", err)
         } else {
@@ -1185,7 +1194,13 @@ func (s *Server) handlePlatformCertificateHealth(c *fiber.Ctx) error {
 
 // initializeARFHandler initializes the Automated Remediation Framework handler
 func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
-	log.Printf("Initializing ARF (Automated Remediation Framework)")
+    return initializeARFHandlerWithService(cfg, nil)
+}
+
+// initializeARFHandlerWithService prefers unified storage resolved from the centralized
+// config service when provided, with file-based factory as a fallback.
+func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*arf.Handler, error) {
+    log.Printf("Initializing ARF (Automated Remediation Framework)")
 
 	// Load ARF configuration from environment
 	arfConfig := arf.LoadConfigFromEnv()
@@ -1249,25 +1264,37 @@ func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
 		storageProvider = seaweedClient
 	}
 
-	if storageProvider != nil {
-		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
-			nomadAddr, registryURL, seaweedfsURL, apiURL)
+    if storageProvider != nil {
+        log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
+            nomadAddr, registryURL, seaweedfsURL, apiURL)
 
-		// Create ARF service with unified storage interface
-		// Storage already has "artifacts" bucket configured via collection in storage config
-		// ARFService should not add any bucket prefix - storage handles it internally
-		storageClient, err := config.CreateStorageFromFactory(cfg.StorageConfigPath)
-		if err != nil {
-			log.Printf("ERROR: Failed to create unified storage for ARF: %v", err)
-			return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
-		}
+        // Create ARF service with unified storage interface
+        // Storage already has "artifacts" bucket configured via collection in storage config
+        // ARFService should not add any bucket prefix - storage handles it internally
+        var unifiedStorage internalStorage.Storage
+        // Prefer centralized config service if provided
+        if cfgService != nil {
+            if st, err := resolveStorageFromConfigService(cfgService, cfg.StorageConfigPath); err == nil {
+                unifiedStorage = st
+            } else {
+                log.Printf("Warning: resolve storage via service failed, falling back: %v", err)
+            }
+        }
+        if unifiedStorage == nil {
+            st, err := config.CreateStorageFromFactory(cfg.StorageConfigPath)
+            if err != nil {
+                log.Printf("ERROR: Failed to create unified storage for ARF: %v", err)
+                return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
+            }
+            unifiedStorage = st
+        }
 
-		arfStorageService, err := arf.NewARFService(storageClient)
-		if err != nil {
-			log.Printf("ERROR: Failed to create ARF service: %v", err)
-			return nil, fmt.Errorf("failed to create ARF service: %w", err)
-		}
-		log.Printf("ARF service created with unified storage (bucket handled by storage layer)")
+        arfStorageService, err := arf.NewARFService(unifiedStorage)
+        if err != nil {
+            log.Printf("ERROR: Failed to create ARF service: %v", err)
+            return nil, fmt.Errorf("failed to create ARF service: %w", err)
+        }
+        log.Printf("ARF service created with unified storage (bucket handled by storage layer)")
 
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
 			nomadAddr,
