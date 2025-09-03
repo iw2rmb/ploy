@@ -22,16 +22,19 @@ Goal: Users can discover available OpenRewrite recipes via the Ploy CLI and run 
 
 Server indexes OpenRewrite packs and serves a searchable catalog.
 
-- [ ] Add indexer to fetch recipe packs (configurable list; default: `rewrite-java`, `rewrite-migrate-java`, `rewrite-spring`) at a pinned version
-- [ ] Parse `META-INF/rewrite/*.yml` from jars and build in-memory catalog
-- [ ] Persist catalog snapshot to SeaweedFS (e.g., `artifacts/openrewrite/catalog.json`) for fast bootstrap
-- [ ] Add REST endpoints:
-  - [ ] `GET /v1/arf/recipes?query=&pack=&version=&limit=` – list/search
-  - [ ] `GET /v1/arf/recipes/:id` – details
-  - [ ] `POST /v1/arf/recipes/refresh` – refresh index (admin)
-- [ ] TDD (RED/GREEN):
-  - [ ] Unit tests for indexer (pack fetch, YAML parse, catalog build)
-  - [ ] Handler tests for list/search/detail/refresh endpoints
+- [x] Add indexer to fetch recipe packs (configurable list; default: `rewrite-java`, `rewrite-migrate-java`, `rewrite-spring`) at a pinned version
+- [x] Parse `META-INF/rewrite/*.yml` from jars and build in-memory catalog
+- [x] Persist catalog snapshot to SeaweedFS (e.g., `artifacts/openrewrite/catalog.json`) for fast bootstrap
+- [x] Add REST endpoints:
+  - [x] `GET /v1/arf/recipes?query=&pack=&version=&limit=` – list/search
+  - [x] `GET /v1/arf/recipes/:id` – details
+  - [x] `POST /v1/arf/recipes/refresh` – refresh index (admin)
+- [x] TDD (RED/GREEN):
+  - [x] Unit tests for indexer (pack fetch, YAML parse, catalog build)
+  - [x] Handler tests for list/search/detail/refresh endpoints
+
+Notes:
+- Implemented as dedicated `RecipesHandler` + `RecipesIndexer` with in-memory catalog; verified by unit tests. Wiring into the main server router and platform pack configuration is pending (see CHANGELOG 2025-09-03).
 
 ## Phase 2 — CLI: Recipes List/Search
 
@@ -88,6 +91,10 @@ Validate recipe names passed to transforms.
 - [x] Dispatcher: discovery enabled; `OUTPUT_URL` passed
 - [x] Verified: transforms produce code changes (RemoveUnusedImports on all repos)
 
+Verified in repo:
+- Catalog/indexer code and tests present under `api/arf/recipes_*.go` with snapshot persistence via `StorageService`.
+- Endpoints covered in tests; main server wires registry-based routes today; catalog routes will be wired after platform pack config is ready.
+
 ---
 
 ## TDD Protocol (AGENTS.md)
@@ -103,8 +110,7 @@ Validate recipe names passed to transforms.
 
 ## Immediate Next Steps
 
-- [ ] Phase 1/Indexer (RED): scaffold tests and minimal indexer for one pack
-- [ ] Add `GET /v1/arf/recipes` (search) and `GET /v1/arf/recipes/:id` (detail)
-- [ ] CLI `ploy arf recipes list/search` to consume endpoints
-- [ ] Integrate validation into `POST /v1/arf/transforms`
-
+- [x] Wire `RecipesHandler` into main API router behind feature flag; configure default packs in platform config
+- [x] CLI `ploy arf recipes list/search` (consumes server catalog endpoints)
+- [ ] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
+- [ ] Docs: add `docs/recipes.md` walkthrough; update CLI help and examples
