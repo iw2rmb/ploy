@@ -24,7 +24,7 @@ REPO_LEGACY="https://github.com/iw2rmb/ploy-orw-test-legacy.git"
 REPO_SPRING="https://github.com/iw2rmb/ploy-orw-test-spring.git"
 
 # Test recipes
-RECIPE_CLEANUP="org.openrewrite.java.cleanup.RemoveUnusedImports"
+RECIPE_CLEANUP="org.openrewrite.java.RemoveUnusedImports"
 RECIPE_JAVA11="org.openrewrite.java.migrate.Java8toJava11"
 RECIPE_JAVA17="org.openrewrite.java.migrate.UpgradeToJava17"
 RECIPE_SPRINGBOOT="org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2"

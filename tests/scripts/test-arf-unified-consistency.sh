@@ -163,7 +163,7 @@ test_full_recipe_names() {
     # Test 2a: Submit OpenRewrite transformation
     log_info "Submitting OpenRewrite transformation job..."
     local transform_response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
-        -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
+        -d '{"recipe_id":"org.openrewrite.java.RemoveUnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
         "$CONTROLLER_URL/arf/transform" || echo '{"error":"request_failed"}')
     
     # Check if transformation was accepted (even if it times out waiting)
@@ -296,7 +296,7 @@ test_unified_arf_system() {
 verify_openrewrite_dispatcher_path() {
     # Submit an OpenRewrite transformation and check logs/behavior
     local response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
-        -d '{"recipe_id":"org.openrewrite.java.cleanup.UnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
+        -d '{"recipe_id":"org.openrewrite.java.RemoveUnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
         "$CONTROLLER_URL/arf/transform")
     
     if echo "$response" | jq -e '.transformation_id' >/dev/null 2>&1; then
@@ -328,7 +328,7 @@ test_container_consistency() {
 verify_unified_container_usage() {
     # Submit multiple different OpenRewrite recipes and verify they all process consistently
     local recipes=(
-        "org.openrewrite.java.cleanup.UnusedImports"
+        "org.openrewrite.java.RemoveUnusedImports"
         "org.openrewrite.java.cleanup.UnnecessaryParentheses"
     )
     
