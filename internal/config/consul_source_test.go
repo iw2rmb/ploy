@@ -25,3 +25,14 @@ func TestWithConsul_Optional_Unreachable_OK(t *testing.T) {
     }
 }
 
+// Ensures required Consul source causes error when unreachable
+func TestWithConsul_Required_Unreachable_Fails(t *testing.T) {
+    t.Parallel()
+
+    _, err := cfg.New(
+        cfg.WithConsul("127.0.0.1:9", "ploy/config", true),
+    )
+    if err == nil {
+        t.Fatalf("expected error when consul source is required and unreachable")
+    }
+}
