@@ -20,16 +20,6 @@ func NewStorageBacked(st istorage.Storage) *StorageBackedRegistry {
 
 func (r *StorageBackedRegistry) Ping(ctx context.Context) error { return nil }
 
-// recipeMeta mirrors the persisted catalog schema from api/arf/recipes_catalog.go
-type recipeMeta struct {
-    ID          string   `json:"id"`
-    DisplayName string   `json:"display_name"`
-    Description string   `json:"description"`
-    Tags        []string `json:"tags"`
-    Pack        string   `json:"pack"`
-    Version     string   `json:"version"`
-}
-
 func (r *StorageBackedRegistry) List(ctx context.Context, f Filters) ([]Recipe, error) {
     if r.storage == nil {
         return []Recipe{}, nil
@@ -40,12 +30,25 @@ func (r *StorageBackedRegistry) List(ctx context.Context, f Filters) ([]Recipe, 
         return []Recipe{}, nil
     }
     defer rc.Close()
-    var metas []recipeMeta
+    var metas []CatalogEntry
     if err := json.NewDecoder(rc).Decode(&metas); err != nil {
         return []Recipe{}, nil
     }
     out := make([]Recipe, 0, len(metas))
     for _, m := range metas {
+        // Filter by language if specified (use tags as language hints)
+        if f.Language != "" {
+            langMatch := false
+            for _, t := range m.Tags {
+                if t == f.Language {
+                    langMatch = true
+                    break
+                }
+            }
+            if !langMatch {
+                continue
+            }
+        }
         // Filter by tag if specified
         if f.Tag != "" {
             match := false
@@ -64,7 +67,15 @@ func (r *StorageBackedRegistry) List(ctx context.Context, f Filters) ([]Recipe, 
         if name == "" {
             name = m.ID
         }
-        out = append(out, Recipe{ID: m.ID, Name: name, Tags: m.Tags})
+        // Fill language best-effort from tags
+        lang := ""
+        for _, t := range m.Tags {
+            switch t {
+            case "java", "kotlin", "scala", "go", "node", "javascript", "typescript", "python":
+                lang = t
+            }
+        }
+        out = append(out, Recipe{ID: m.ID, Name: name, Language: lang, Tags: m.Tags})
     }
     return out, nil
 }
@@ -78,7 +89,7 @@ func (r *StorageBackedRegistry) Get(ctx context.Context, id string) (*Recipe, er
         return nil, nil
     }
     defer rc.Close()
-    var metas []recipeMeta
+    var metas []CatalogEntry
     if err := json.NewDecoder(rc).Decode(&metas); err != nil {
         return nil, nil
     }

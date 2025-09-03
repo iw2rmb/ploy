@@ -54,12 +54,11 @@
               endpoint:
                 address: "127.0.0.1:8500"
                 scheme: http
-              exposedByDefault: false
+                datacenter: dc1
+              exposedByDefault: true
               prefix: traefik
               watch: true
-              refreshInterval: 30s
-              stale: true
-              cache: true
+              refreshInterval: 15s
 
             file:
               directory: /etc/traefik/dynamic

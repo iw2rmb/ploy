@@ -487,6 +487,7 @@ find . -name "*.go" -exec sed -i '' \
   - Added `Get(ctx, id)` to `internal/arf/recipes.Registry` with storage-backed implementation.
   - Added server handler `handleARFRecipesGet` and a focused test verifying 200 with memory-backed catalog.
   - Added unit tests for `StorageBackedRegistry` covering list by tag and get by ID.
+  - Language filtering supported via tags in storage-backed registry; server test asserts language filter.
 - Pending:
   - Wire `GET /v1/arf/recipes/:id` into primary router once legacy overlay is removed.
   - Extend result shape (description, pack, version) once internal models are unified.
