@@ -48,8 +48,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
-	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
-	arfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
+    arfcore "github.com/iw2rmb/ploy/internal/arf/core"
+    tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -691,6 +691,7 @@ func (s *Server) setupRoutes() {
 
 	// ARF recipes minimal facade endpoint (Phase 4 initial slice)
 	api.Get("/arf/recipes/ping", s.handleARFRecipesPing)
+	api.Get("/arf/recipes", s.handleARFRecipesList)
 
 	// TTL cleanup endpoints with dependency injection
 	if s.dependencies.CleanupHandler != nil {

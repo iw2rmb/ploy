@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [2025-09-03] - Config Service Hard Requirement + Flag Cleanup (Phase 3)
+
+### Changed
+- api/server: Removed all legacy file-based fallbacks for storage configuration in handlers and request-scoped client resolution. Centralized `internal/config.Service` is now required.
+- api/server: `setupRecipesCatalogRoutes` is always enabled; removed `PLOY_ENABLE_RECIPES_CATALOG` feature flag gate.
+- api/server: `NewServer` fails fast if config service initialization fails.
+- api/server: ARF unified storage now resolves strictly via the config service.
+
+### Tests
+- Updated server tests to assert no legacy fallback and routes enabled without env flags.
+- Added enforcement test for `getStorageClient` requiring config service.
+
+### Docs
+- Updated roadmap/refactor/phase-3-configuration.md to mark migration complete and note fallback removal.
+
 ## [2025-09-03] - OpenRewrite Recipes Phase 5 - Observability & Metrics (COMPLETE)
 
 ### Added
@@ -4014,3 +4029,17 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
 
 ### Notes
 - No behavior change; this enables incremental migration of ARF logic to internal/arf/core in next slices.
+
+## [2025-09-03] - ARF Consolidation Slice 2 (Phase 4)
+
+### Added
+- internal/arf/recipes: Minimal Registry facade with List and Ping; in-memory implementation.
+- api/server: Exposed new read-only endpoints powered by the facade:
+  - GET /v1/arf/recipes/ping
+  - GET /v1/arf/recipes?language=&tag=
+
+### Tests
+- api/server: tests for ping and list endpoints.
+
+### Notes
+- Currently returns an empty list via in-memory implementation; next slices will adapt storage-backed catalog into internal/arf to provide real data.
