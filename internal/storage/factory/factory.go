@@ -103,7 +103,7 @@ func createSeaweedFSProvider(cfg FactoryConfig) (storage.Storage, error) {
 		Master:      cfg.Endpoint,
 		Filer:       cfg.Endpoint, // Will be adjusted in the provider
 		Collection:  cfg.Bucket,
-		Replication: "001", // Default replication
+		Replication: "000", // Default replication (000 for single-node dev)
 		Timeout:     30,
 	}
 
