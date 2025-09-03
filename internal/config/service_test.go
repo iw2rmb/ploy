@@ -3,9 +3,11 @@ package config_test
 import (
     "os"
     "testing"
+    "time"
 
     cfg "github.com/iw2rmb/ploy/internal/config"
     istorage "github.com/iw2rmb/ploy/internal/storage"
+    "github.com/stretchr/testify/require"
 )
 
 func TestNew_WithDefaults_LoadsAndGetReturnsClone(t *testing.T) {
@@ -192,4 +194,45 @@ func TestConfigurationService_GetWithCache(t *testing.T) {
     if got2.App.Name != "cached-app" {
         t.Fatalf("expected cached app.name=cached-app, got %q", got2.App.Name)
     }
+}
+
+func TestHotReload_FromFileChange(t *testing.T) {
+    t.Parallel()
+
+    dir := t.TempDir()
+    path := dir + "/config.yaml"
+    // initial config
+    require.NoError(t, os.WriteFile(path, []byte("app:\n  name: v1\n"), 0o644))
+
+    svc, err := cfg.New(
+        cfg.WithFile(path),
+        cfg.WithHotReload(25*time.Millisecond),
+    )
+    require.NoError(t, err)
+
+    got := svc.Get()
+    require.Equal(t, "v1", got.App.Name)
+
+    // Watch callback to observe change
+    changed := make(chan struct{}, 1)
+    svc.Watch(func(c *cfg.Config) {
+        if c.App.Name == "v2" {
+            changed <- struct{}{}
+        }
+    })
+
+    // mutate the file
+    require.NoError(t, os.WriteFile(path, []byte("app:\n  name: v2\n"), 0o644))
+
+    // wait for callback or timeout
+    select {
+    case <-changed:
+        // ok
+    case <-time.After(500 * time.Millisecond):
+        t.Fatalf("hot reload did not trigger within timeout")
+    }
+
+    // ensure Get reflects new value
+    got2 := svc.Get()
+    require.Equal(t, "v2", got2.App.Name)
 }
