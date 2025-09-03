@@ -18,7 +18,7 @@ type SeaweedFSConfig struct {
 	Master      string `yaml:"master"`      // master server address (e.g., "localhost:9333")
 	Filer       string `yaml:"filer"`       // filer server address (e.g., "localhost:8888")
 	Collection  string `yaml:"collection"`  // collection name for artifacts
-	Replication string `yaml:"replication"` // replication strategy (e.g., "001")
+	Replication string `yaml:"replication"` // replication strategy (e.g., "000" for dev, "001" for prod)
 	Timeout     int    `yaml:"timeout"`     // timeout in seconds
 	DataCenter  string `yaml:"datacenter"`  // data center identifier
 	Rack        string `yaml:"rack"`        // rack identifier
