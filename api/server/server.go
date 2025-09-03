@@ -49,6 +49,7 @@ import (
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
+	arfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -72,6 +73,7 @@ type ServiceDependencies struct {
 	StorageConfigPath       string
 	StorageFactory          *config.OptimizedStorageClientFactory
 	ARFEngine               arfcore.Engine
+	ARFRecipes              tarfrecipes.Registry
 }
 
 // ControllerConfig holds configuration for controller initialization
@@ -122,19 +124,19 @@ func LoadConfigFromEnv() *ControllerConfig {
 
 // Server represents the stateless controller server
 type Server struct {
-	app                *fiber.App
-	config             *ControllerConfig
-	dependencies       *ServiceDependencies
-	shutdownChan       chan os.Signal
-	coordinationCtx    context.Context
-	coordinationCancel context.CancelFunc
-	configService      *cfgsvc.Service
+    app                *fiber.App
+    config             *ControllerConfig
+    dependencies       *ServiceDependencies
+    shutdownChan       chan os.Signal
+    coordinationCtx    context.Context
+    coordinationCancel context.CancelFunc
+    configService      *cfgsvc.Service
 }
 
 // resolveUnifiedStorage prefers the config service if available, otherwise
 // falls back to the existing factory helper with a file path.
 func (s *Server) resolveUnifiedStorage() (internalStorage.Storage, error) {
-    return resolveStorageFromConfigService(s.configService, s.dependencies.StorageConfigPath)
+    return resolveStorageFromConfigService(s.configService)
 }
 
 // NewServer creates a new controller server with dependency injection
@@ -162,10 +164,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 
         svc, err := cfgsvc.New(opts...)
         if err != nil {
-            log.Printf("Warning: failed to initialize config service: %v", err)
-        } else {
-            cfgService = svc
+            return nil, fmt.Errorf("failed to initialize config service: %w", err)
         }
+        cfgService = svc
     }
 
     // Initialize dependencies (prefer config service where applicable)
@@ -326,6 +327,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 
 	// Initialize ARF Engine (consolidation Phase 4 - initial slice)
 	arfEngine := arfcore.NewEngine(arfcore.EngineConfig{})
+	arfRecipes := tarfrecipes.NewInMemory()
 
 	// Initialize ARF Handler
 	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
@@ -372,6 +374,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		StorageConfigPath:       cfg.StorageConfigPath,
 		StorageFactory:          storageFactory,
 		ARFEngine:               arfEngine,
+		ARFRecipes:              arfRecipes,
 	}
 
 	// Record startup time
@@ -613,20 +616,11 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 // getStorageClient creates a new storage client for each request (stateless with caching)
 // Now returns the new storage.Storage interface instead of *storage.StorageClient
 func (s *Server) getStorageClient() (internalStorage.Storage, error) {
-    // Prefer centralized config service if available
+    // Centralized config service is required
     start := time.Now()
-    if s.configService != nil {
-        if st, err := resolveStorageFromConfigService(s.configService, s.dependencies.StorageConfigPath); err == nil {
-            if s.dependencies.Metrics != nil {
-                s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
-            }
-            return st, nil
-        }
-        // fall through to factory on failure
-    }
-    st, err := config.CreateStorageFromFactory(s.dependencies.StorageConfigPath)
+    st, err := resolveStorageFromConfigService(s.configService)
     if s.dependencies.Metrics != nil {
-        s.dependencies.Metrics.RecordConfigLoadTime("storage", true, time.Since(start))
+        s.dependencies.Metrics.RecordConfigLoadTime("storage", err == nil, time.Since(start))
     }
     return st, err
 }
@@ -695,6 +689,9 @@ func (s *Server) setupRoutes() {
 	api.Post("/storage/config/reload", s.handleReloadStorageConfig)
 	api.Post("/storage/config/validate", s.handleValidateStorageConfig)
 
+	// ARF recipes minimal facade endpoint (Phase 4 initial slice)
+	api.Get("/arf/recipes/ping", s.handleARFRecipesPing)
+
 	// TTL cleanup endpoints with dependency injection
 	if s.dependencies.CleanupHandler != nil {
 		cleanup.SetupRoutes(s.app, s.dependencies.CleanupHandler)
@@ -747,17 +744,13 @@ func (s *Server) setupRoutes() {
 	log.Printf("API routes configured with dependency injection")
 }
 
-// setupRecipesCatalogRoutes conditionally wires the lightweight recipes catalog endpoints
-// behind the environment flag PLOY_ENABLE_RECIPES_CATALOG=true. It overlays:
+// setupRecipesCatalogRoutes wires the lightweight recipes catalog endpoints.
+// It overlays:
 //  - GET /v1/arf/recipes
 //  - GET /v1/arf/recipes/:id
 //  - POST /v1/arf/recipes/refresh
 // onto the main router using the dedicated RecipesHandler.
 func (s *Server) setupRecipesCatalogRoutes() {
-    if os.Getenv("PLOY_ENABLE_RECIPES_CATALOG") != "true" {
-        return
-    }
-
     // Initialize empty catalog and optional indexer
     cat := arf.NewRecipesCatalog()
 
@@ -779,7 +772,7 @@ func (s *Server) setupRecipesCatalogRoutes() {
     s.app.Post("/v1/arf/recipes/refresh", rh.RefreshRecipes)
     s.app.Get("/v1/arf/recipes", rh.ListRecipes)
     s.app.Get("/v1/arf/recipes/:id", rh.GetRecipe)
-    log.Printf("Recipes catalog routes enabled via PLOY_ENABLE_RECIPES_CATALOG=true")
+    log.Printf("Recipes catalog routes enabled")
 }
 
 // setupDomainRoutes configures domain management routes
@@ -1287,22 +1280,14 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
         // Create ARF service with unified storage interface
         // Storage already has "artifacts" bucket configured via collection in storage config
         // ARFService should not add any bucket prefix - storage handles it internally
-        var unifiedStorage internalStorage.Storage
-        // Prefer centralized config service if provided
-        if cfgService != nil {
-            if st, err := resolveStorageFromConfigService(cfgService, cfg.StorageConfigPath); err == nil {
-                unifiedStorage = st
-            } else {
-                log.Printf("Warning: resolve storage via service failed, falling back: %v", err)
-            }
+        // Centralized config service is required for unified storage
+        if cfgService == nil {
+            return nil, fmt.Errorf("config service is required for ARF unified storage")
         }
-        if unifiedStorage == nil {
-            st, err := config.CreateStorageFromFactory(cfg.StorageConfigPath)
-            if err != nil {
-                log.Printf("ERROR: Failed to create unified storage for ARF: %v", err)
-                return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
-            }
-            unifiedStorage = st
+        unifiedStorage, err := resolveStorageFromConfigService(cfgService)
+        if err != nil {
+            log.Printf("ERROR: Failed to create unified storage for ARF via config service: %v", err)
+            return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
         }
 
         arfStorageService, err := arf.NewARFService(unifiedStorage)

@@ -22,12 +22,11 @@ func TestResolveStorageFromConfigService_UsesServiceWhenProvided(t *testing.T) {
     svc, err := cfgsvc.New(cfgsvc.WithFile(path))
     require.NoError(t, err)
 
-    // Exercise resolver (should prefer service over fallback path)
-    st, err := resolveStorageFromConfigService(svc, "")
+    // Exercise resolver (service is required)
+    st, err := resolveStorageFromConfigService(svc)
     require.NoError(t, err)
     require.NotNil(t, st)
 
     // Basic smoke: Metrics() should be callable
     _ = st.Metrics()
 }
-
