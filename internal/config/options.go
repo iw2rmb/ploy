@@ -66,3 +66,15 @@ func WithHotReload(interval time.Duration) Option {
         return nil
     }
 }
+
+// WithConsul adds a Consul KV source. The key is expected to point to a YAML document.
+// If required is false, connectivity or read failures are logged and ignored.
+func WithConsul(addr, key string, required bool) Option {
+    return func(s *Service) error {
+        if s.loader == nil {
+            s.loader = &CompositeLoader{}
+        }
+        s.loader.AddSource(&consulSource{addr: addr, key: key, priority: 75, required: required})
+        return nil
+    }
+}
