@@ -486,6 +486,18 @@ find . -name "*.go" -exec sed -i '' \
 - Completed:
   - Added `Get(ctx, id)` to `internal/arf/recipes.Registry` with storage-backed implementation.
   - Added server handler `handleARFRecipesGet` and a focused test verifying 200 with memory-backed catalog.
+  - Added unit tests for `StorageBackedRegistry` covering list by tag and get by ID.
 - Pending:
   - Wire `GET /v1/arf/recipes/:id` into primary router once legacy overlay is removed.
   - Extend result shape (description, pack, version) once internal models are unified.
+
+## Slice Checklist
+
+- [x] Minimal internal ARF engine scaffold present
+- [x] Recipes registry facade with in-memory impl
+- [x] Storage-backed registry List by tag
+- [x] Storage-backed registry Get by ID
+- [x] Server handlers: list + get (internal path for get to avoid overlay)
+- [x] Unit tests added for registry and handlers (RED→GREEN)
+- [ ] Replace legacy recipe routes with internal handlers
+- [ ] Migrate catalog parsing/models into internal/arf/recipes
