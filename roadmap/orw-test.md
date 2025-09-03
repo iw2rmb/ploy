@@ -32,7 +32,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 ## Test Scenarios
 
 ### Scenario 1: Remove Unused Imports
-**Recipe**: `org.openrewrite.java.cleanup.RemoveUnusedImports`
+**Recipe**: `org.openrewrite.java.RemoveUnusedImports`
 **Expected Changes**:
 - Remove unused imports from Application.java (Set, HashSet, IOException, File)
 - Clean up wildcard imports in DataProcessor.java
@@ -54,7 +54,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 ```json
 {
-  "recipe_id": "org.openrewrite.java.cleanup.RemoveUnusedImports",
+  "recipe_id": "org.openrewrite.java.RemoveUnusedImports",
   "type": "openrewrite",
   "codebase": {
     "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
@@ -75,7 +75,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    curl -X POST https://api.dev.ployman.app/v1/arf/transforms \
      -H "Content-Type: application/json" \
      -d '{
-       "recipe_id": "org.openrewrite.java.cleanup.RemoveUnusedImports",
+       "recipe_id": "org.openrewrite.java.RemoveUnusedImports",
        "type": "openrewrite",
        "codebase": {
          "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
@@ -208,8 +208,8 @@ curl https://api.dev.ployman.app/v1/arf/transforms/{id}/report
 ### Tested Recipe IDs That Work
 - `org.openrewrite.java.migrate.Java8toJava11` - Upgrades Java 8 to 11
 - `org.openrewrite.java.migrate.UpgradeToJava17` - Upgrades to Java 17
-- `org.openrewrite.java.cleanup.RemoveUnusedImports` - Removes unused imports
-- `org.openrewrite.java.cleanup.UnnecessaryParentheses` - Removes unnecessary parentheses
+- `org.openrewrite.java.RemoveUnusedImports` - Removes unused imports
+- `org.openrewrite.staticanalysis.UnnecessaryParentheses` - Removes unnecessary parentheses
 - `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2` - Spring Boot upgrade
 
 ### Test Automation
