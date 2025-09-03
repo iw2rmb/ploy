@@ -35,12 +35,15 @@
 ### Added
 - internal/arf/recipes: `Registry.Get(ctx, id)` with storage-backed implementation reading the catalog snapshot.
 - api/server: `handleARFRecipesGet` handler for retrieving a single recipe by ID.
- - Language filter support in storage-backed registry (best-effort via tags).
+- Language filter support in storage-backed registry (best-effort via tags).
+- api/server: Added `/v1/arf/recipes/search?q=` endpoint with substring match over id, name, and tags.
+- internal/arf/recipes: Catalog model consolidated to `CatalogEntry` (id, display_name, description, tags, pack, version).
 
 ### Tests
 - api/server: Added focused test for storage-backed get-by-id using in-memory storage and a minimal catalog.
- - api/server: Added test asserting language filter reduces list results.
- - internal/arf/recipes: Added list/get test for `StorageBackedRegistry`.
+- api/server: Added test asserting language filter reduces list results.
+- internal/arf/recipes: Added list/get test for `StorageBackedRegistry`.
+- api/server: Added search endpoint test.
 
 ### Notes
 - Replaced legacy catalog overlay with internal handlers in server router:
