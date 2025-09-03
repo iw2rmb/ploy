@@ -498,7 +498,9 @@ find . -name "*.go" -exec sed -i '' \
 - [x] Recipes registry facade with in-memory impl
 - [x] Storage-backed registry List by tag
 - [x] Storage-backed registry Get by ID
-- [x] Server handlers: list + get (internal path for get to avoid overlay)
+- [x] Server handlers: list + get (internal path used in tests initially; now wired by default)
+- [x] Server handler: search endpoint (/v1/arf/recipes/search)
+- [x] Response payload includes description, pack, version
 - [x] Unit tests added for registry and handlers (RED→GREEN)
 - [x] Replace legacy recipe routes with internal handlers
 - [ ] Migrate catalog parsing/models into internal/arf/recipes

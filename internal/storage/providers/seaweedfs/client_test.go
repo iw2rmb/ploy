@@ -34,7 +34,7 @@ func TestSeaweedFSProvider_ImplementsStorageInterface(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -49,7 +49,7 @@ func TestSeaweedFSProvider_Get(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -75,7 +75,7 @@ func TestSeaweedFSProvider_Put(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -100,7 +100,7 @@ func TestSeaweedFSProvider_Delete(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -119,7 +119,7 @@ func TestSeaweedFSProvider_Exists(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -141,7 +141,7 @@ func TestSeaweedFSProvider_List(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -165,7 +165,7 @@ func TestSeaweedFSProvider_Head(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -189,7 +189,7 @@ func TestSeaweedFSProvider_Health(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -208,7 +208,7 @@ func TestSeaweedFSProvider_Metrics(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -227,7 +227,7 @@ func TestSeaweedFSProvider_BatchOperations(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -247,7 +247,7 @@ func TestSeaweedFSProvider_MetadataOperations(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -269,7 +269,7 @@ func TestSeaweedFSProvider_AdvancedOperations(t *testing.T) {
 		Master:      "localhost:9333",
 		Filer:       "localhost:8888",
 		Collection:  "test-collection",
-		Replication: "001",
+		Replication: "000",
 	}
 
 	provider, err := New(cfg)
@@ -300,7 +300,7 @@ func TestConfig_Validation(t *testing.T) {
 				Master:      "localhost:9333",
 				Filer:       "localhost:8888",
 				Collection:  "test",
-				Replication: "001",
+				Replication: "000",
 			},
 			wantErr: false,
 		},
@@ -309,7 +309,7 @@ func TestConfig_Validation(t *testing.T) {
 			config: Config{
 				Filer:       "localhost:8888",
 				Collection:  "test",
-				Replication: "001",
+				Replication: "000",
 			},
 			wantErr: true,
 		},
@@ -318,7 +318,7 @@ func TestConfig_Validation(t *testing.T) {
 			config: Config{
 				Master:      "localhost:9333",
 				Collection:  "test",
-				Replication: "001",
+				Replication: "000",
 			},
 			wantErr: true,
 		},

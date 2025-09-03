@@ -702,6 +702,7 @@ func (s *Server) setupRoutes() {
 	// ARF recipes minimal facade endpoint (Phase 4 initial slice)
 	api.Get("/arf/recipes/ping", s.handleARFRecipesPing)
 	api.Get("/arf/recipes", s.handleARFRecipesList)
+	api.Get("/arf/recipes/search", s.handleARFRecipesSearch)
 	api.Get("/arf/recipes/:id", s.handleARFRecipesGet)
 
 	// TTL cleanup endpoints with dependency injection

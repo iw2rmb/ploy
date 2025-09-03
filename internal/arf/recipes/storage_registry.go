@@ -75,7 +75,15 @@ func (r *StorageBackedRegistry) List(ctx context.Context, f Filters) ([]Recipe, 
                 lang = t
             }
         }
-        out = append(out, Recipe{ID: m.ID, Name: name, Language: lang, Tags: m.Tags})
+        out = append(out, Recipe{
+            ID:          m.ID,
+            Name:        name,
+            Language:    lang,
+            Description: m.Description,
+            Pack:        m.Pack,
+            Version:     m.Version,
+            Tags:        m.Tags,
+        })
     }
     return out, nil
 }
@@ -99,7 +107,23 @@ func (r *StorageBackedRegistry) Get(ctx context.Context, id string) (*Recipe, er
             if name == "" {
                 name = m.ID
             }
-            rec := &Recipe{ID: m.ID, Name: name, Tags: m.Tags}
+            // derive language from tags
+            lang := ""
+            for _, t := range m.Tags {
+                switch t {
+                case "java", "kotlin", "scala", "go", "node", "javascript", "typescript", "python":
+                    lang = t
+                }
+            }
+            rec := &Recipe{
+                ID:          m.ID,
+                Name:        name,
+                Language:    lang,
+                Description: m.Description,
+                Pack:        m.Pack,
+                Version:     m.Version,
+                Tags:        m.Tags,
+            }
             return rec, nil
         }
     }
