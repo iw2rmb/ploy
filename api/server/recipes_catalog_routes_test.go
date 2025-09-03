@@ -8,18 +8,17 @@ import (
     "github.com/gofiber/fiber/v2"
 )
 
-// Test that catalog routes can be registered behind a feature flag and respond.
-func TestSetupRecipesCatalogRoutes_FeatureFlag(t *testing.T) {
-    // Enable feature flag
-    os.Setenv("PLOY_ENABLE_RECIPES_CATALOG", "true")
-    defer os.Unsetenv("PLOY_ENABLE_RECIPES_CATALOG")
+// Recipes catalog routes should be always enabled; no feature flag required.
+func TestSetupRecipesCatalogRoutes_AlwaysOn(t *testing.T) {
+    // Ensure no environment flag is set
+    os.Unsetenv("PLOY_ENABLE_RECIPES_CATALOG")
 
     s := &Server{app: fiber.New()}
 
-    // Register only the catalog routes for this test
+    // Register the catalog routes
     s.setupRecipesCatalogRoutes()
 
-    // Expect GET /v1/arf/recipes to respond 200 with JSON (array or object)
+    // Expect GET /v1/arf/recipes to respond 200 with JSON
     req := httptest.NewRequest("GET", "/v1/arf/recipes", nil)
     resp, err := s.app.Test(req, -1)
     if err != nil {
@@ -29,4 +28,3 @@ func TestSetupRecipesCatalogRoutes_FeatureFlag(t *testing.T) {
         t.Fatalf("expected 200, got %d", resp.StatusCode)
     }
 }
-

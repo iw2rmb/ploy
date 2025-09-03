@@ -77,74 +77,47 @@ func (s *Server) handleStorageMetrics(c *fiber.Ctx) error {
 
 // handleGetStorageConfig handles storage configuration retrieval
 func (s *Server) handleGetStorageConfig(c *fiber.Ctx) error {
-    // Prefer centralized config service if available, mapping to legacy Root shape
-    if s.configService != nil {
-        cfg := s.configService.Get()
-        if cfg == nil {
-            return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service returned nil"})
-        }
-        // Map internal config to legacy Root structure for backward compatibility
-        legacy := config.Root{
-            Storage: config.StorageConfig{
-                Provider:   cfg.Storage.Provider,
-                Master:     cfg.Storage.Endpoint,
-                Filer:      cfg.Storage.Endpoint,
-                Collection: cfg.Storage.Bucket,
-            },
-        }
-        return c.JSON(legacy)
+    // Centralized config service is required; map to legacy Root shape for clients
+    if s.configService == nil {
+        return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service not initialized"})
     }
-
-    // Fallback to legacy file-based manager
-    configManager := config.NewConfigManager(s.dependencies.StorageConfigPath)
-    rootConfig, err := configManager.LoadConfig()
-    if err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": err.Error()})
+    cfg := s.configService.Get()
+    if cfg == nil {
+        return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service returned nil"})
     }
-    return c.JSON(rootConfig)
+    legacy := config.Root{
+        Storage: config.StorageConfig{
+            Provider:   cfg.Storage.Provider,
+            Master:     cfg.Storage.Endpoint,
+            Filer:      cfg.Storage.Endpoint,
+            Collection: cfg.Storage.Bucket,
+        },
+    }
+    return c.JSON(legacy)
 }
 
 // handleReloadStorageConfig handles storage configuration reload
 func (s *Server) handleReloadStorageConfig(c *fiber.Ctx) error {
-    // Prefer centralized config service if available
-    if s.configService != nil {
-        if err := s.configService.Reload(); err != nil {
-            return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
-        }
-        cfg := s.configService.Get()
-        return c.JSON(fiber.Map{
-            "reloaded": true,
-            "config":   cfg,
-            "message":  "Configuration reload completed",
-        })
+    if s.configService == nil {
+        return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": "config service not initialized"})
     }
-
-    // Fallback to legacy file-based manager
-    configManager := config.NewConfigManager(s.dependencies.StorageConfigPath)
-    rootConfig, reloaded, err := configManager.ReloadIfChanged()
-    if err != nil {
+    if err := s.configService.Reload(); err != nil {
         return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
     }
+    cfg := s.configService.Get()
     return c.JSON(fiber.Map{
-        "reloaded": reloaded,
-        "config":   rootConfig,
+        "reloaded": true,
+        "config":   cfg,
         "message":  "Configuration reload completed",
     })
 }
 
 // handleValidateStorageConfig handles storage configuration validation
 func (s *Server) handleValidateStorageConfig(c *fiber.Ctx) error {
-    // Prefer centralized config service if available
-    if s.configService != nil {
-        if err := s.configService.Reload(); err != nil {
-            return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
-        }
-        return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
+    if s.configService == nil {
+        return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": "config service not initialized"})
     }
-
-    // Fallback to legacy file-based validation
-    _, err := config.Load(s.dependencies.StorageConfigPath)
-    if err != nil {
+    if err := s.configService.Reload(); err != nil {
         return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
     }
     return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
