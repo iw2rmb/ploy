@@ -7,6 +7,9 @@ type Recipe struct {
     ID       string   `json:"id"`
     Name     string   `json:"name"`
     Language string   `json:"language,omitempty"`
+    Description string `json:"description,omitempty"`
+    Pack        string `json:"pack,omitempty"`
+    Version     string `json:"version,omitempty"`
     Tags     []string `json:"tags,omitempty"`
 }
 
