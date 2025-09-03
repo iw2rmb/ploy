@@ -55,6 +55,7 @@
                 address: "127.0.0.1:8500"
                 scheme: http
                 datacenter: dc1
+                token: "{{ consul_http_token | default('') }}"
               exposedByDefault: true
               prefix: traefik
               watch: true

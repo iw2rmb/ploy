@@ -114,6 +114,7 @@ job "traefik-system" {
           "--providers.consulcatalog.exposedByDefault=false",
           "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
+          "--providers.consulcatalog.endpoint.token=${CONSUL_HTTP_TOKEN}",
           "--providers.file.filename=/etc/traefik/dynamic-configs/dynamic-config.yml",
           "--providers.file.watch=true",
           "--metrics.prometheus=true",
@@ -168,6 +169,8 @@ job "traefik-system" {
       env {
         # Consul configuration
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
+        # Optional: Consul ACL token for Consul Catalog provider (production)
+        CONSUL_HTTP_TOKEN = "{{ vault_consul_http_token | default(lookup('env', 'CONSUL_HTTP_TOKEN') | default('')) }}"
         
         # Namecheap DNS provider for Let's Encrypt ACME challenges
         NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default('') }}"
