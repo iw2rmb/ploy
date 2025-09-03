@@ -472,3 +472,11 @@ find . -name "*.go" -exec sed -i '' \
 - ARF-related LOC: ~7,000 (53% reduction)
 - Architecture: Clean, maintainable, testable
 - Performance: 20% improvement in ARF operations
+## Progress Update (2025-09-03, slice 2)
+
+- Completed:
+  - Server’s ARF recipes list endpoint can use a storage-backed registry via the new `internal/arf/recipes.StorageBackedRegistry` when storage is available.
+  - Unit test verifies the handler returns 200 using a memory storage populated with a minimal catalog snapshot.
+- Pending:
+  - Expand registry to provide recipe details by ID and optional search filters.
+  - Migrate catalog parsing from `api/arf` into `internal/arf/recipes` package (single source of truth).
