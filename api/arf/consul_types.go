@@ -17,6 +17,13 @@ type TransformationStatus struct {
 	Error                string                     `json:"error,omitempty"`
 	SandboxInfo          *TransformationSandboxInfo `json:"sandbox_info,omitempty"`
 	HealingSummary       *HealingSummary            `json:"healing_summary,omitempty"`
+
+	// Transformation result fields (previously in TransformationResult)
+	RecipeID        string   `json:"recipe_id,omitempty"`
+	Diff            string   `json:"diff,omitempty"`
+	FilesModified   []string `json:"files_modified,omitempty"`
+	ChangesApplied  int      `json:"changes_applied,omitempty"`
+	ValidationScore float64  `json:"validation_score,omitempty"`
 }
 
 // TransformationProgress represents the progress of a transformation
