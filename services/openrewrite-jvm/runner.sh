@@ -102,7 +102,7 @@ echo "[OpenRewrite] Directory tree (max depth 2):"
 find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
 
-# Step 2: Detect project type and create minimal POM if needed
+# Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
 if [ -f "pom.xml" ]; then
     echo "[OpenRewrite] Found pom.xml"
@@ -114,26 +114,12 @@ elif [ -f "build.gradle.kts" ]; then
     echo "[OpenRewrite] Found build.gradle.kts"
     head -20 build.gradle.kts
 else
-    echo "[OpenRewrite] No build file found, creating minimal pom.xml..."
-    cat > pom.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
-         http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    
-    <groupId>org.example</groupId>
-    <artifactId>openrewrite-project</artifactId>
-    <version>1.0.0</version>
-    
-    <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-</project>
-EOF
+    echo "[OpenRewrite] ERROR: No build file found (pom.xml, build.gradle, or build.gradle.kts)"
+    echo "[OpenRewrite] OpenRewrite requires a valid build configuration to run transformations"
+    echo "[OpenRewrite] Please ensure your project has one of the following:"
+    echo "[OpenRewrite]   - pom.xml for Maven projects"
+    echo "[OpenRewrite]   - build.gradle or build.gradle.kts for Gradle projects"
+    exit 1
 fi
 
 # Step 3: Handle caching based on discovery mode
