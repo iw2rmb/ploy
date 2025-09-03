@@ -548,9 +548,9 @@ func TestConfigurationService(t *testing.T) {
   - Minimal storage schema in `internal/config` and adapter method `Config.CreateStorageClient()` using unified storage factory (memory provider for this slice)
   - Unit tests for file loading, env override, and storage client creation
 - Pending (next slices):
-  - Wire `api/server` to prefer `internal/config` service for storage initialization (keep legacy fallback)
+  - Wire `api/server` to prefer `internal/config` service for storage initialization (keep legacy fallback) ✅ Completed
   - Migrate duplicate config helpers to the centralized service
-  - Add hot‑reload
+  - Add hot‑reload ✅ Completed (file polling)
   - Broaden storage config mapping beyond provider (endpoint/bucket/etc.)
 
 ## Expected Outcomes

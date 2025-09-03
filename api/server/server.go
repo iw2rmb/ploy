@@ -1,15 +1,15 @@
 package server
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"syscall"
-	"time"
+    "context"
+    "fmt"
+    "log"
+    "os"
+    "os/signal"
+    "strconv"
+    "strings"
+    "syscall"
+    "time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -137,16 +137,29 @@ func (s *Server) resolveUnifiedStorage() (internalStorage.Storage, error) {
 
 // NewServer creates a new controller server with dependency injection
 func NewServer(config *ControllerConfig) (*Server, error) {
-	log.Printf("Initializing Ploy Controller with configuration-driven setup")
+    log.Printf("Initializing Ploy Controller with configuration-driven setup")
 
-	// Initialize dependencies
-	deps, err := initializeDependencies(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
-	}
+    // Initialize dependencies
+    deps, err := initializeDependencies(config)
+    if err != nil {
+        return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
+    }
 
-	// Create Fiber app with middleware
-	app := fiber.New(fiber.Config{
+    // Initialize centralized configuration service (prefers file + env)
+    var cfgService *cfgsvc.Service
+    cfgService, err = cfgsvc.New(
+        cfgsvc.WithFile(config.StorageConfigPath),
+        cfgsvc.WithEnvironment("PLOY_"),
+        cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+        cfgsvc.WithCacheTTL(5*time.Minute),
+        cfgsvc.WithHotReload(500*time.Millisecond),
+    )
+    if err != nil {
+        log.Printf("Warning: failed to initialize config service: %v", err)
+    }
+
+    // Create Fiber app with middleware
+    app := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
 		ReadTimeout:           10 * time.Minute, // 10-minute request timeout
 		WriteTimeout:          10 * time.Minute, // 10-minute response timeout
@@ -184,14 +197,15 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	// Create coordination context
 	coordinationCtx, coordinationCancel := context.WithCancel(context.Background())
 
-	server := &Server{
-		app:                app,
-		config:             config,
-		dependencies:       deps,
-		shutdownChan:       make(chan os.Signal, 1),
-		coordinationCtx:    coordinationCtx,
-		coordinationCancel: coordinationCancel,
-	}
+    server := &Server{
+        app:                app,
+        config:             config,
+        dependencies:       deps,
+        shutdownChan:       make(chan os.Signal, 1),
+        coordinationCtx:    coordinationCtx,
+        coordinationCancel: coordinationCancel,
+        configService:      cfgService,
+    }
 
 	// Setup routes
 	server.setupRoutes()
@@ -655,6 +669,9 @@ func (s *Server) setupRoutes() {
 		log.Printf("ARF routes registered successfully")
 	}
 
+	// Optional: overlay lightweight recipes catalog endpoints behind feature flag
+	s.setupRecipesCatalogRoutes()
+
 	// Static Analysis endpoints
 	if s.dependencies.AnalysisHandler != nil {
 		s.dependencies.AnalysisHandler.RegisterRoutes(s.app)
@@ -681,6 +698,41 @@ func (s *Server) setupRoutes() {
 	api.Get("/health/deployment", s.dependencies.HealthChecker.DeploymentStatusHandler)
 
 	log.Printf("API routes configured with dependency injection")
+}
+
+// setupRecipesCatalogRoutes conditionally wires the lightweight recipes catalog endpoints
+// behind the environment flag PLOY_ENABLE_RECIPES_CATALOG=true. It overlays:
+//  - GET /v1/arf/recipes
+//  - GET /v1/arf/recipes/:id
+//  - POST /v1/arf/recipes/refresh
+// onto the main router using the dedicated RecipesHandler.
+func (s *Server) setupRecipesCatalogRoutes() {
+    if os.Getenv("PLOY_ENABLE_RECIPES_CATALOG") != "true" {
+        return
+    }
+
+    // Initialize empty catalog and optional indexer
+    cat := arf.NewRecipesCatalog()
+
+    // Storage factory might be unavailable; indexer can work with nil store
+    var store arf.StorageService
+    if s.dependencies != nil && s.dependencies.StorageFactory != nil {
+        if client, err := s.dependencies.StorageFactory.CreateClient(); err == nil {
+            if svc, err2 := arf.NewARFService(client); err2 == nil {
+                store = svc
+            }
+        }
+    }
+    idx := arf.NewRecipesIndexer(nil, store)
+
+    rh := arf.NewRecipesHandler(cat)
+    rh.SetIndexer(idx)
+
+    // Register routes last to shadow any existing recipe endpoints
+    s.app.Post("/v1/arf/recipes/refresh", rh.RefreshRecipes)
+    s.app.Get("/v1/arf/recipes", rh.ListRecipes)
+    s.app.Get("/v1/arf/recipes/:id", rh.GetRecipe)
+    log.Printf("Recipes catalog routes enabled via PLOY_ENABLE_RECIPES_CATALOG=true")
 }
 
 // setupDomainRoutes configures domain management routes

@@ -58,3 +58,11 @@ func WithCacheTTL(ttl time.Duration) Option {
         return nil
     }
 }
+
+// WithHotReload enables periodic reloads by polling file sources' mtime.
+func WithHotReload(interval time.Duration) Option {
+    return func(s *Service) error {
+        s.startHotReload(interval)
+        return nil
+    }
+}
