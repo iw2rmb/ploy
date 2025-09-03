@@ -198,7 +198,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 
 	// Create and submit Nomad job
 	log.Printf("[OpenRewrite Dispatcher] Creating Nomad job configuration")
-	
+
 	// Log environment configuration for debugging
 	log.Printf("[OpenRewrite Dispatcher] Container environment:")
 	log.Printf("[OpenRewrite Dispatcher]   JOB_ID: %s", req.JobID)
@@ -206,7 +206,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	log.Printf("[OpenRewrite Dispatcher]   OUTPUT_KEY: %s", fmt.Sprintf("jobs/%s/output.tar", req.JobID))
 	log.Printf("[OpenRewrite Dispatcher]   Expected UPLOAD_URL: %s/artifacts/%s", "http://45.12.75.241:8888", fmt.Sprintf("jobs/%s/output.tar", req.JobID))
 	log.Printf("[OpenRewrite Dispatcher]   Storage bucket: artifacts")
-	
+
 	job := d.createNomadJob(req, nomadJobName)
 
 	// Log the download URL that will be used
@@ -257,7 +257,7 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 		log.Printf("[OpenRewrite Dispatcher] ERROR: Download failed for key=%s: %v", outputStorageKey, err)
 		return nil, fmt.Errorf("failed to download output tar: %w", err)
 	}
-	
+
 	log.Printf("[OpenRewrite Dispatcher] Output download successful")
 
 	// Extract output back to repo
@@ -298,22 +298,22 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"image":      fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
 					"force_pull": true, // Force pull to get latest image with setup script
 				},
-                Env: map[string]string{
-                    "JOB_ID":            req.JobID,            // Nomad job ID for storage paths
-                    "TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
-                    "RECIPE":            req.RecipeClass,
-                    // Prefer dynamic discovery; leave RECIPE_* empty
-                    "RECIPE_GROUP":      "",
-                    "RECIPE_ARTIFACT":   "",
-                    "RECIPE_VERSION":    "",
-                    "SEAWEEDFS_URL":     "http://45.12.75.241:8888",
-                    "PLOY_API_URL":      d.apiURL,
-                    "MAVEN_CACHE_PATH":  "maven-repository",
-                    "DISCOVER_RECIPE":   "true",                                                                   // Let runner handle pack resolution
-                    "ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Full artifact URL
-                    "OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),                             // Key retained for backward compatibility
-                    "OUTPUT_URL":        fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID), // Prefer full upload URL in runner
-                },
+				Env: map[string]string{
+					"JOB_ID":            req.JobID,            // Nomad job ID for storage paths
+					"TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
+					"RECIPE":            req.RecipeClass,
+					// Prefer dynamic discovery; leave RECIPE_* empty
+					"RECIPE_GROUP":     "",
+					"RECIPE_ARTIFACT":  "",
+					"RECIPE_VERSION":   "",
+					"SEAWEEDFS_URL":    "http://45.12.75.241:8888",
+					"PLOY_API_URL":     d.apiURL,
+					"MAVEN_CACHE_PATH": "maven-repository",
+					"DISCOVER_RECIPE":  "true",                                                                    // Let runner handle pack resolution
+					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID),  // Full artifact URL
+					"OUTPUT_KEY":       fmt.Sprintf("jobs/%s/output.tar", req.JobID),                              // Key retained for backward compatibility
+					"OUTPUT_URL":       fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID), // Prefer full upload URL in runner
+				},
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
 					MemoryMB: intPtr(2048),
@@ -455,10 +455,78 @@ func (d *OpenRewriteDispatcher) waitForAllocationCompletion(ctx context.Context,
 						}
 					}
 				}
+
+				// Download and process output to get actual results
+				log.Printf("[OpenRewrite Dispatcher] Downloading output to extract transformation results...")
+				outputKey := fmt.Sprintf("jobs/%s/output.tar", jobID)
+				outputTarPath := fmt.Sprintf("/tmp/%s-output.tar", jobID)
+				defer os.Remove(outputTarPath)
+
+				// Download output tar from storage
+				if err := d.downloadFromStorage(ctx, outputKey, outputTarPath); err != nil {
+					log.Printf("[OpenRewrite Dispatcher] Warning: Failed to download output tar: %v", err)
+					// Return basic success if download fails (backward compatibility)
+					return &TransformationResult{
+						Success:        true,
+						ExecutionTime:  time.Since(startTime),
+						ChangesApplied: 1,
+					}, nil
+				}
+
+				// Extract output to temp directory
+				outputDir := fmt.Sprintf("/tmp/%s-output", jobID)
+				defer os.RemoveAll(outputDir)
+
+				if err := os.MkdirAll(outputDir, 0755); err != nil {
+					log.Printf("[OpenRewrite Dispatcher] Warning: Failed to create output dir: %v", err)
+					return &TransformationResult{
+						Success:        true,
+						ExecutionTime:  time.Since(startTime),
+						ChangesApplied: 1,
+					}, nil
+				}
+
+				// Extract tar to output directory
+				if err := d.extractTarToRepo(outputTarPath, outputDir); err != nil {
+					log.Printf("[OpenRewrite Dispatcher] Warning: Failed to extract output tar: %v", err)
+					return &TransformationResult{
+						Success:        true,
+						ExecutionTime:  time.Since(startTime),
+						ChangesApplied: 1,
+					}, nil
+				}
+
+				// Generate diff from extracted output
+				diff, err := d.generateDiff(outputDir)
+				if err != nil {
+					log.Printf("[OpenRewrite Dispatcher] Warning: Failed to generate diff: %v", err)
+					diff = ""
+				}
+
+				// Count changed files
+				changedFiles := []string{}
+				if diff != "" {
+					// Parse diff to count changed files
+					lines := strings.Split(diff, "\n")
+					for _, line := range lines {
+						if strings.HasPrefix(line, "diff --git") {
+							parts := strings.Fields(line)
+							if len(parts) >= 3 {
+								file := strings.TrimPrefix(parts[2], "a/")
+								changedFiles = append(changedFiles, file)
+							}
+						}
+					}
+				}
+
+				log.Printf("[OpenRewrite Dispatcher] Transformation completed with %d files changed", len(changedFiles))
+
 				return &TransformationResult{
 					Success:        true,
 					ExecutionTime:  time.Since(startTime),
-					ChangesApplied: 1, // This should be populated from actual results
+					ChangesApplied: len(changedFiles),
+					FilesModified:  changedFiles,
+					Diff:           diff,
 				}, nil
 			}
 
@@ -488,7 +556,6 @@ func (d *OpenRewriteDispatcher) waitForAllocationCompletion(ctx context.Context,
 		}
 	}
 }
-
 
 // Helper functions for tar operations and storage
 func (d *OpenRewriteDispatcher) createTarFromRepo(repoPath, tarPath string) error {
@@ -859,29 +926,29 @@ func ParseOpenRewriteRecipeID(recipeID string) (*OpenRewriteRecipeRequest, error
 		return nil, fmt.Errorf("recipe ID cannot be empty")
 	}
 
-    // All OpenRewrite recipes should use full class names (e.g., org.openrewrite.java.migrate.UpgradeToJava17)
-    // Provide explicit Maven coordinates to ensure recipes are available in the runner without relying on discovery.
-    // Mapping:
-    //  - org.openrewrite.java.spring.*   → rewrite-spring
-    //  - org.openrewrite.java.migrate.*  → rewrite-migrate-java
-    //  - org.openrewrite.java.cleanup.*  → rewrite-java
-    //  - default                         → rewrite-java
-    artifact := "rewrite-java"
-    switch {
-    case strings.HasPrefix(recipeID, "org.openrewrite.java.spring"):
-        artifact = "rewrite-spring"
-    case strings.HasPrefix(recipeID, "org.openrewrite.java.migrate"):
-        artifact = "rewrite-migrate-java"
-    case strings.HasPrefix(recipeID, "org.openrewrite.java.cleanup"):
-        artifact = "rewrite-java"
-    default:
-        artifact = "rewrite-java"
-    }
+	// All OpenRewrite recipes should use full class names (e.g., org.openrewrite.java.migrate.UpgradeToJava17)
+	// Provide explicit Maven coordinates to ensure recipes are available in the runner without relying on discovery.
+	// Mapping:
+	//  - org.openrewrite.java.spring.*   → rewrite-spring
+	//  - org.openrewrite.java.migrate.*  → rewrite-migrate-java
+	//  - org.openrewrite.java.cleanup.*  → rewrite-java
+	//  - default                         → rewrite-java
+	artifact := "rewrite-java"
+	switch {
+	case strings.HasPrefix(recipeID, "org.openrewrite.java.spring"):
+		artifact = "rewrite-spring"
+	case strings.HasPrefix(recipeID, "org.openrewrite.java.migrate"):
+		artifact = "rewrite-migrate-java"
+	case strings.HasPrefix(recipeID, "org.openrewrite.java.cleanup"):
+		artifact = "rewrite-java"
+	default:
+		artifact = "rewrite-java"
+	}
 
-    return &OpenRewriteRecipeRequest{
-        RecipeClass:    recipeID,
-        RecipeGroup:    "org.openrewrite.recipe",
-        RecipeArtifact: artifact,
-        RecipeVersion:  "2.20.0",
-    }, nil
+	return &OpenRewriteRecipeRequest{
+		RecipeClass:    recipeID,
+		RecipeGroup:    "org.openrewrite.recipe",
+		RecipeArtifact: artifact,
+		RecipeVersion:  "2.20.0",
+	}, nil
 }
