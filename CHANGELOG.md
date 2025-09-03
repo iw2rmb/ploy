@@ -277,7 +277,7 @@
 ### Added
 - Server-side recipes catalog with minimal indexer and endpoints
   - Indexes OpenRewrite packs by parsing `META-INF/rewrite/*.yml` from JARs
-  - In-memory `RecipesCatalog` with list/search/detail by ID
+  - Legacy in-memory `RecipesCatalog` retired in favor of internal `recipes` registry
   - Snapshot persistence to storage at `artifacts/openrewrite/catalog.json`
   - HTTP endpoints (scoped handler) for:
     - `GET /v1/arf/recipes?query=&pack=&version=&limit=`
@@ -294,7 +294,7 @@
   - CLI parsing test validates catalog list payload parsing
 
 ### Notes
-- Routes are exposed via a dedicated `RecipesHandler` used in tests; wiring into the main server router can follow once pack fetch is integrated with platform config.
+- Server routes now use internal handlers by default; legacy overlay removed
  - Wiring added behind feature flag; by default, legacy registry-backed recipe routes remain.
 
 ## [2025-09-02] - ARF Controls & Optimization (Phase 5)
