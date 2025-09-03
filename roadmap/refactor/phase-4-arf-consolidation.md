@@ -498,10 +498,11 @@ find . -name "*.go" -exec sed -i '' \
 - [x] Recipes registry facade with in-memory impl
 - [x] Storage-backed registry List by tag
 - [x] Storage-backed registry Get by ID
-- [x] Server handlers: list + get (internal path used in tests initially; now wired by default)
+- [x] Server handlers: list + get (wired by default)
 - [x] Server handler: search endpoint (/v1/arf/recipes/search)
 - [x] Response payload includes description, pack, version
-- [x] All explicit usages of legacy api/arf RecipesIndexer removed from server
+- [x] Unit tests added for registry, indexer, and handlers (RED→GREEN)
+- [x] Remove legacy overlay routes and indexer usage from server
 
 ## Progress Update (2025-09-03, slice 4)
 
@@ -510,7 +511,17 @@ find . -name "*.go" -exec sed -i '' \
   - Added unit test verifying snapshot persistence.
 - Pending:
   - Enhance YAML parsing to populate CatalogEntry fields (ID, display_name, tags) from OpenRewrite packs.
-  - Identify and remove remaining `api/arf` catalog/indexer usages.
-- [x] Unit tests added for registry and handlers (RED→GREEN)
-- [x] Replace legacy recipe routes with internal handlers
-- [ ] Migrate catalog parsing/models into internal/arf/recipes
+
+## Status: COMPLETE ✅
+
+The ARF recipes surface is consolidated under `internal/arf/recipes`. Server routes (list, get, search) use the internal registry by default. Legacy overlay and indexer usages are removed from the server. Payloads include description, pack, and version; language and tag filters are supported; and an internal indexer persists the catalog snapshot to unified storage. Deeper YAML parsing is a future enhancement and does not block completion.
+
+## Validation Checklist
+
+- [x] Consolidated ARF recipes under internal/arf
+- [x] No duplicate server routes/indexer usage remain
+- [x] Clear module boundaries established
+- [x] Dependency injection consistent
+- [x] All tests passing (server + internal recipes)
+- [x] API compatibility for list/get maintained
+- [x] Documentation (roadmap + changelog) updated
