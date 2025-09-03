@@ -87,25 +87,48 @@ func (s *Server) handleGetStorageConfig(c *fiber.Ctx) error {
 
 // handleReloadStorageConfig handles storage configuration reload
 func (s *Server) handleReloadStorageConfig(c *fiber.Ctx) error {
-	configManager := config.NewConfigManager(s.dependencies.StorageConfigPath)
-	rootConfig, reloaded, err := configManager.ReloadIfChanged()
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
-	}
-	return c.JSON(fiber.Map{
-		"reloaded": reloaded,
-		"config":   rootConfig,
-		"message":  "Configuration reload completed",
-	})
+    // Prefer centralized config service if available
+    if s.configService != nil {
+        if err := s.configService.Reload(); err != nil {
+            return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
+        }
+        cfg := s.configService.Get()
+        return c.JSON(fiber.Map{
+            "reloaded": true,
+            "config":   cfg,
+            "message":  "Configuration reload completed",
+        })
+    }
+
+    // Fallback to legacy file-based manager
+    configManager := config.NewConfigManager(s.dependencies.StorageConfigPath)
+    rootConfig, reloaded, err := configManager.ReloadIfChanged()
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
+    }
+    return c.JSON(fiber.Map{
+        "reloaded": reloaded,
+        "config":   rootConfig,
+        "message":  "Configuration reload completed",
+    })
 }
 
 // handleValidateStorageConfig handles storage configuration validation
 func (s *Server) handleValidateStorageConfig(c *fiber.Ctx) error {
-	_, err := config.Load(s.dependencies.StorageConfigPath)
-	if err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
-	}
-	return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
+    // Prefer centralized config service if available
+    if s.configService != nil {
+        if err := s.configService.Reload(); err != nil {
+            return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
+        }
+        return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
+    }
+
+    // Fallback to legacy file-based validation
+    _, err := config.Load(s.dependencies.StorageConfigPath)
+    if err != nil {
+        return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
+    }
+    return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
 }
 
 // handleSetEnvVars handles setting environment variables with injected env store
