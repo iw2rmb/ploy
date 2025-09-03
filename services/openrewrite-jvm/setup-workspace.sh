@@ -16,25 +16,33 @@ ls -la
 echo "[SETUP] Checking for Nomad artifact locations..."
 
 # Check common Nomad artifact locations and look for tar files
-if [ -d "local" ]; then
-    echo "[SETUP] Found 'local' directory (Nomad default artifact location)"
+# Nomad places artifacts in /local when using Docker driver
+if [ -f "/local/input.tar" ]; then
+    echo "[SETUP] Found input.tar at /local/input.tar (Nomad artifact location)"
+    # Copy the tar file to workspace where runner script expects it
+    cp "/local/input.tar" "/workspace/input.tar"
+    echo "[SETUP] Copied input.tar to /workspace/input.tar"
+    ls -la /workspace/input.tar
+    
+    # We're done - runner script will extract it
+    echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
+    echo "[SETUP] Starting OpenRewrite transformation..."
+    exec /usr/local/bin/openrewrite
+elif [ -f "local/input.tar" ]; then
+    echo "[SETUP] Found input.tar at local/input.tar"
+    # Copy the tar file to workspace where runner script expects it
+    cp "local/input.tar" "/workspace/input.tar"
+    echo "[SETUP] Copied input.tar to /workspace/input.tar"
+    ls -la /workspace/input.tar
+    
+    # We're done - runner script will extract it
+    echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
+    echo "[SETUP] Starting OpenRewrite transformation..."
+    exec /usr/local/bin/openrewrite
+elif [ -d "local" ]; then
+    echo "[SETUP] Found 'local' directory but no input.tar"
     ls -la local/
     ARTIFACT_DIR="local"
-    
-    # Check if there's a tar file in the artifact directory
-    if [ -f "local/input.tar" ]; then
-        echo "[SETUP] Found input.tar in local directory, using it directly"
-        # Copy the tar file to workspace where runner script expects it
-        cp "local/input.tar" "/workspace/input.tar"
-        echo "[SETUP] Copied input.tar to /workspace/input.tar"
-        ls -la /workspace/input.tar
-        
-        # We're done - runner script will extract it
-        echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
-        echo "[SETUP] Starting OpenRewrite transformation..."
-        exec /usr/local/bin/openrewrite
-    fi
-    
 elif [ -d "artifacts" ]; then
     echo "[SETUP] Found 'artifacts' directory"
     ls -la artifacts/
