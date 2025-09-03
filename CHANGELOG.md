@@ -35,6 +35,15 @@
 ### Notes
 - Backward compatibility kept (legacy file-based paths and compatibility tests still pass)
 
+## [2025-09-03] - ARF Consolidation Skeleton (Phase 4)
+
+### Added
+- internal/arf/core: Introduced core Engine interface and a minimal DefaultEngine implementation
+- internal/arf/README.md describing the consolidation target and gradual migration plan
+
+### Notes
+- No behavior change in API handlers yet; this is scaffolding to enable incremental, non-breaking migration from api/arf
+
 ## [2025-09-03] - ARF OpenRewrite Recipes Catalog (Phase 1)
 
 ### Added
