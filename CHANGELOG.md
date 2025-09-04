@@ -25,7 +25,8 @@
 - internal/orchestration: Health monitor refactored to use Nomad SDK via injectable adapter (no raw HTTP). Tests can inject a fake adapter.
   - Consul service health now uses Consul SDK with injectable adapter (no raw HTTP). Tests cover adapter injection.
 - Routing: Extracted domain KV helpers to `internal/routing/kv.go`; API routes persist mappings via shared helper.
- - API server: Storage resolution switched to `internal/config.Service` exclusively (no `api/config` factory). Added adapter to bridge unified `Storage` to legacy provider in self-update.
+- API server: Storage resolution switched to `internal/config.Service` exclusively (no `api/config` factory). Added adapter to bridge unified `Storage` to legacy provider in self-update.
+ - Config: Retry/cache types unified across `internal/config` and `internal/storage/factory`; mapping covered by tests.
 - api/server: Error handling standardized through `internal/errors` with JSON envelope; tests in `api/server/error_handler_test.go` validate contract.
 - internal/cli/arf: formatting, pagination, composition, import/export, and tests now import internal ARF models; remaining template generation still uses API models (to be migrated).
 
