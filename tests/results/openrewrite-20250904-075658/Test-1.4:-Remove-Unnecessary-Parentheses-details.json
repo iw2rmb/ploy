@@ -1,0 +1,21 @@
+{
+  "transformation_id": "eb20ad69-c7a5-4923-bd31-b5fc204ff560",
+  "recipe_id": "org.openrewrite.java.cleanup.UnnecessaryParentheses",
+  "start_time": "2025-09-04T04:58:28.284477857Z",
+  "end_time": "2025-09-04T04:58:54.16016447Z",
+  "success": true,
+  "changes_applied": 5,
+  "total_files": 5,
+  "files_modified": [
+    "target/classes/com/example/Application.class",
+    "target/classes/com/example/DataProcessor.class",
+    "target/classes/com/example/Main.class",
+    "target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst",
+    "target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst"
+  ],
+  "diff": "",
+  "validation_score": 0,
+  "execution_time": 25875686613,
+  "last_updated": "0001-01-01T00:00:00Z",
+  "metadata": null
+}

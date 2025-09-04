@@ -1,0 +1,17 @@
+{
+  "transformation_id": "6e8ecf3b-b802-4d9a-bcaf-3c09893b543b",
+  "recipe_id": "org.openrewrite.java.RemoveUnusedImports",
+  "start_time": "2025-09-04T05:00:28.248434491Z",
+  "end_time": "2025-09-04T05:01:06.083250516Z",
+  "success": true,
+  "changes_applied": 1,
+  "total_files": 1,
+  "files_modified": [
+    "src/main/java/com/example/UserController.java"
+  ],
+  "diff": "diff --git a/src/main/java/com/example/UserController.java b/src/main/java/com/example/UserController.java\nindex 5e4cc01..ea8f972 100644\n--- a/src/main/java/com/example/UserController.java\n+++ b/src/main/java/com/example/UserController.java\n@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.RequestParam;\n import org.springframework.web.bind.annotation.PathVariable;\n \n import javax.servlet.http.HttpServletRequest;\n-import javax.servlet.http.HttpServletResponse;\n import java.util.List;\n import java.util.ArrayList;\n \n",
+  "validation_score": 0,
+  "execution_time": 37834816025,
+  "last_updated": "0001-01-01T00:00:00Z",
+  "metadata": null
+}

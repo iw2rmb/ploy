@@ -1,0 +1,21 @@
+{
+  "transformation_id": "2d3744b5-6654-40b7-966d-d28824b395fc",
+  "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
+  "start_time": "2025-09-04T04:57:58.44027126Z",
+  "end_time": "2025-09-04T04:58:24.323852415Z",
+  "success": true,
+  "changes_applied": 5,
+  "total_files": 5,
+  "files_modified": [
+    "target/classes/com/example/Application.class",
+    "target/classes/com/example/DataProcessor.class",
+    "target/classes/com/example/Main.class",
+    "target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst",
+    "target/maven-status/maven-compiler-plugin/compile/default-compile/inputFiles.lst"
+  ],
+  "diff": "",
+  "validation_score": 0,
+  "execution_time": 25883581155,
+  "last_updated": "0001-01-01T00:00:00Z",
+  "metadata": null
+}

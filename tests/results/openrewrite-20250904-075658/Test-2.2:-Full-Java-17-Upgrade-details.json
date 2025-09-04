@@ -1,0 +1,15 @@
+{
+  "transformation_id": "2df43ccb-57e4-44cb-b974-ed135e4ebdb2",
+  "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
+  "start_time": "2025-09-04T04:59:26.564599892Z",
+  "end_time": "2025-09-04T04:59:50.404793223Z",
+  "success": true,
+  "changes_applied": 0,
+  "total_files": 0,
+  "files_modified": null,
+  "diff": "",
+  "validation_score": 0,
+  "execution_time": 23840193331,
+  "last_updated": "0001-01-01T00:00:00Z",
+  "metadata": null
+}

@@ -1,0 +1,15 @@
+OpenRewrite Transformation Test Results
+Generated: Thu Sep  4 08:01:09 MSK 2025
+
+Total Tests: 8
+Passed: 5
+Failed: 3
+
+Success Rate: 62.50%
+
+Test Details:
+- Test Repository 1 (ploy-orw-test-java): Basic Java project
+- Test Repository 2 (ploy-orw-test-legacy): Legacy Java 7 project
+- Test Repository 3 (ploy-orw-test-spring): Spring Boot project
+
+Results saved to: tests/results/openrewrite-20250904-075658
