@@ -3,7 +3,6 @@ package orchestration
 import (
     "encoding/json"
     "fmt"
-    "net/http"
     "time"
 )
 
@@ -52,61 +51,37 @@ type TaskEvent struct {
 }
 
 // HealthMonitor provides basic health queries for Nomad jobs
-type HealthMonitor struct {
-    nomadAddr  string
-    httpClient *http.Client
+type HealthMonitor struct { client nomadAdapter }
+
+// nomadAdapter is a small interface wrapper to allow testing/mocking and SDK usage
+type nomadAdapter interface {
+    ListAllocations(jobID string) ([]*AllocationStatus, error)
+    AllocationEndpoint(allocID string) (string, error)
 }
 
 // NewHealthMonitor creates a new health monitor instance reading env defaults
 func NewHealthMonitor() *HealthMonitor {
-    return &HealthMonitor{
-        nomadAddr:  getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
-        httpClient: &http.Client{Timeout: 10 * time.Second},
-    }
+    return &HealthMonitor{ client: newSDKNomadAdapter() }
 }
+
+// NewHealthMonitorWithClient constructs a monitor with a provided adapter (used in tests)
+func NewHealthMonitorWithClient(adapter nomadAdapter) *HealthMonitor { return &HealthMonitor{client: adapter} }
 
 // GetJobStatus fetches the current status of a job
 func (h *HealthMonitor) GetJobStatus(jobID string) (*JobStatus, error) {
-    url := fmt.Sprintf("%s/v1/job/%s", h.nomadAddr, jobID)
-    resp, err := h.httpClient.Get(url)
-    if err != nil {
-        return nil, fmt.Errorf("failed to fetch job status: %w", err)
+    // Minimal status derived from allocations list for SDK path
+    allocs, err := h.client.ListAllocations(jobID)
+    if err != nil { return nil, err }
+    status := &JobStatus{ID: jobID, Name: jobID, Status: "unknown"}
+    for _, a := range allocs {
+        if a.ClientStatus == "running" { status.Status = "running"; break }
+        status.Status = a.ClientStatus
     }
-    defer resp.Body.Close()
-
-    if resp.StatusCode == http.StatusNotFound {
-        return nil, fmt.Errorf("job %s not found", jobID)
-    }
-    if resp.StatusCode != http.StatusOK {
-        return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-    }
-
-    var status JobStatus
-    if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-        return nil, fmt.Errorf("failed to decode job status: %w", err)
-    }
-    return &status, nil
+    return status, nil
 }
 
 // GetJobAllocations fetches all allocations for a job
-func (h *HealthMonitor) GetJobAllocations(jobID string) ([]*AllocationStatus, error) {
-    url := fmt.Sprintf("%s/v1/job/%s/allocations", h.nomadAddr, jobID)
-    resp, err := h.httpClient.Get(url)
-    if err != nil {
-        return nil, fmt.Errorf("failed to fetch allocations: %w", err)
-    }
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-    }
-
-    var allocations []*AllocationStatus
-    if err := json.NewDecoder(resp.Body).Decode(&allocations); err != nil {
-        return nil, fmt.Errorf("failed to decode allocations: %w", err)
-    }
-    return allocations, nil
-}
+func (h *HealthMonitor) GetJobAllocations(jobID string) ([]*AllocationStatus, error) { return h.client.ListAllocations(jobID) }
 
 // IsJobHealthy returns true if at least one running allocation is present
 func (h *HealthMonitor) IsJobHealthy(jobID string) bool {
@@ -147,39 +122,34 @@ func (h *HealthMonitor) GetJobEndpoint(jobID string) (string, error) {
     return "", fmt.Errorf("no running allocation found for job %s", jobID)
 }
 
-// getAllocationEndpoint fetches allocation details and extracts IP:port
-func (h *HealthMonitor) getAllocationEndpoint(allocID string) (string, error) {
-    url := fmt.Sprintf("%s/v1/allocation/%s", h.nomadAddr, allocID)
-    resp, err := h.httpClient.Get(url)
-    if err != nil {
-        return "", err
-    }
-    defer resp.Body.Close()
-    if resp.StatusCode != http.StatusOK {
-        return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-    }
-    var allocData map[string]interface{}
-    if err := json.NewDecoder(resp.Body).Decode(&allocData); err != nil {
-        return "", err
-    }
-    // Traverse Resources -> Networks[0] -> IP, DynamicPorts[0].Value
-    if resources, ok := allocData["Resources"].(map[string]interface{}); ok {
-        if networks, ok := resources["Networks"].([]interface{}); ok && len(networks) > 0 {
-            if network, ok := networks[0].(map[string]interface{}); ok {
-                if ip, ok := network["IP"].(string); ok {
-                    if ports, ok := network["DynamicPorts"].([]interface{}); ok && len(ports) > 0 {
-                        if port, ok := ports[0].(map[string]interface{}); ok {
-                            if portNum, ok := port["Value"].(float64); ok {
-                                return fmt.Sprintf("http://%s:%.0f", ip, portNum), nil
-                            }
-                        }
-                    }
+// WaitForHealthyAllocations waits until at least minHealthy allocations are running/healthy for the job.
+func (h *HealthMonitor) WaitForHealthyAllocations(jobID string, minHealthy int, timeout time.Duration) error {
+    if minHealthy <= 0 { minHealthy = 1 }
+    deadline := time.Now().Add(timeout)
+    for time.Now().Before(deadline) {
+        allocs, err := h.GetJobAllocations(jobID)
+        if err != nil {
+            time.Sleep(2 * time.Second)
+            continue
+        }
+        healthy := 0
+        for _, a := range allocs {
+            if a.ClientStatus == "running" {
+                if a.DeploymentStatus != nil && a.DeploymentStatus.Healthy != nil {
+                    if *a.DeploymentStatus.Healthy { healthy++ }
+                } else {
+                    healthy++
                 }
             }
         }
+        if healthy >= minHealthy { return nil }
+        time.Sleep(2 * time.Second)
     }
-    return "", fmt.Errorf("allocation %s has no endpoint", allocID)
+    return fmt.Errorf("timeout waiting for %d healthy allocations for job %s", minHealthy, jobID)
 }
+
+// getAllocationEndpoint fetches allocation details and extracts IP:port
+func (h *HealthMonitor) getAllocationEndpoint(allocID string) (string, error) { return h.client.AllocationEndpoint(allocID) }
 
 func getenv(k, d string) string { if v := getEnv(k); v != "" { return v }; return d }
 
