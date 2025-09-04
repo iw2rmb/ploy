@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul/api"
-	"github.com/iw2rmb/ploy/api/envstore"
+    "github.com/hashicorp/consul/api"
+    envstore "github.com/iw2rmb/ploy/internal/envstore"
 )
 
 // CacheEntry represents a cached value with expiration

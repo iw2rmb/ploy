@@ -6,12 +6,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iw2rmb/ploy/api/envstore"
+    envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -289,4 +289,3 @@ func TestDestroyAppDualStorageSupport(t *testing.T) {
 	mockEnvStore.AssertExpectations(t)
 	mockStorage.AssertExpectations(t)
 }
-
