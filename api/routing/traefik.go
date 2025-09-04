@@ -8,8 +8,9 @@ import (
 	"strings"
 	"time"
 
-	consulapi "github.com/hashicorp/consul/api"
+    consulapi "github.com/hashicorp/consul/api"
     irouting "github.com/iw2rmb/ploy/internal/routing"
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 // TraefikRouter handles app routing via Traefik and Consul integration
@@ -30,12 +31,12 @@ func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
 
-	// Get platform apps domain from environment
-	platformAppsDomain := os.Getenv("PLOY_APPS_DOMAIN")
-	if platformAppsDomain == "" {
-		platformAppsDomain = "ployd.app" // Default fallback
-		log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
-	}
+    // Get platform apps domain from environment
+    platformAppsDomain := utils.Getenv("PLOY_APPS_DOMAIN", "")
+    if platformAppsDomain == "" {
+        platformAppsDomain = "ployd.app" // Default fallback
+        log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
+    }
 
 	return &TraefikRouter{
 		consul:             client,
