@@ -152,6 +152,7 @@ Auto-classified lanes:
   - **Automatic Renewal**: Traefik handles certificate renewal before expiration
   - **Consul Catalog ACL Support** (Sep 2025): Traefik provider accepts Consul ACL tokens via `CONSUL_HTTP_TOKEN` (Nomad + Ansible wired)
   - **Fast Health Routing** (Sep 2025): Consul checks use lightweight `/live`; readiness stays on `/ready` for deep validation
+  - **Tag Consolidation (in progress, Sep 2025)**: Shared `internal/routing` tag builder (`BuildTraefikTags`) to standardize Traefik configuration across components
 - ✅ **Platform CLI Separation** (Aug 2025):
   - **ploy CLI**: Deploys user apps to `<app-name>.ployd.app`
   - **ployman CLI**: Deploys platform services to `<service-name>.ployman.app`
