@@ -7,11 +7,12 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 // TTLConfig configures the TTL cleanup service
@@ -25,13 +26,13 @@ type TTLConfig struct {
 
 // DefaultTTLConfig returns sensible defaults for TTL cleanup
 func DefaultTTLConfig() *TTLConfig {
-	return &TTLConfig{
-		PreviewTTL:      24 * time.Hour,  // Preview allocations live for 24 hours
-		CleanupInterval: 6 * time.Hour,   // Cleanup runs every 6 hours
-		NomadAddr:       getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
-		DryRun:          false,
-		MaxAge:          7 * 24 * time.Hour, // Hard limit: 7 days
-	}
+    return &TTLConfig{
+        PreviewTTL:      24 * time.Hour,  // Preview allocations live for 24 hours
+        CleanupInterval: 6 * time.Hour,   // Cleanup runs every 6 hours
+        NomadAddr:       utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
+        DryRun:          false,
+        MaxAge:          7 * 24 * time.Hour, // Hard limit: 7 days
+    }
 }
 
 // TTLCleanupService manages TTL cleanup for preview allocations
@@ -389,9 +390,4 @@ func (s *TTLCleanupService) IsRunning() bool {
 	return s.running
 }
 
-func getenv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
+// local getenv removed; unified on internal/utils.Getenv

@@ -5,6 +5,8 @@ import (
     "fmt"
     "net/http"
     "time"
+
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 // ServiceHealth represents Consul service health check status
@@ -24,7 +26,7 @@ type ConsulHealth struct {
 // NewConsulHealth returns a health client using CONSUL_ADDR or default
 func NewConsulHealth() *ConsulHealth {
     return &ConsulHealth{
-        consulAddr: getenv("CONSUL_ADDR", "http://127.0.0.1:8500"),
+        consulAddr: utils.Getenv("CONSUL_ADDR", "http://127.0.0.1:8500"),
         httpClient: &http.Client{Timeout: 10 * time.Second},
     }
 }
@@ -75,4 +77,3 @@ func (h *ConsulHealth) WaitForServiceHealth(serviceName string, timeout time.Dur
     }
     return fmt.Errorf("timeout waiting for service %s to be healthy", serviceName)
 }
-
