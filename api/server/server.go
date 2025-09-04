@@ -346,14 +346,19 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		} else {
 			log.Printf("✓ Storage configuration validated via service")
 		}
-	} else {
-		log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
-		if _, err := config.Load(cfg.StorageConfigPath); err != nil {
-			log.Printf("Warning: Storage configuration validation failed: %v", err)
-		} else {
-			log.Printf("✓ Storage configuration validated successfully")
-		}
-	}
+    } else {
+        log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
+        if cfg.StorageConfigPath != "" {
+            if _, err := cfgsvc.New(
+                cfgsvc.WithFile(cfg.StorageConfigPath),
+                cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+            ); err != nil {
+                log.Printf("Warning: Storage configuration validation failed: %v", err)
+            } else {
+                log.Printf("✓ Storage configuration validated successfully")
+            }
+        }
+    }
 
 	// Initialize environment store with fallback logic
 	log.Printf("Initializing environment store...")
@@ -373,9 +378,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		log.Printf("✓ Traefik router initialized successfully")
 	}
 
-	// Initialize optimized storage factory early (before components that need it)
-	// Always create the factory - it's required for most components
-	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
+	// Storage factory removed; using centralized config service for storage resolution
 
 	// Initialize health checker
 	log.Printf("Initializing health checker...")
