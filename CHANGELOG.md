@@ -24,6 +24,7 @@
   - Added guardrail test `internal/no_api_imports_test.go` to prevent regressions.
 - internal/orchestration: Health monitor refactored to use Nomad SDK via injectable adapter (no raw HTTP). Tests can inject a fake adapter.
   - Consul service health now uses Consul SDK with injectable adapter (no raw HTTP). Tests cover adapter injection.
+ - Routing: Extracted domain KV helpers to `internal/routing/kv.go`; API routes persist mappings via shared helper.
 - api/server: Error handling standardized through `internal/errors` with JSON envelope; tests in `api/server/error_handler_test.go` validate contract.
 - internal/cli/arf: formatting, pagination, composition, import/export, and tests now import internal ARF models; remaining template generation still uses API models (to be migrated).
 
