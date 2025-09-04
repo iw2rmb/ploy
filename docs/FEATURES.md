@@ -17,6 +17,10 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
 
+✅ **API Error Contract** (Sep 2025):
+- Standardized JSON error envelope via `internal/errors` across API server
+- Unit tests assert codes and shape (`api/server/error_handler_test.go`)
+
 ✅ **Testing Standards & Quality** (Aug 2025):
 - **golangci-lint**: 40+ linters configured for comprehensive code quality enforcement
 - **Security Testing**: Automated vulnerability scanning with gosec and govulncheck
@@ -70,6 +74,7 @@ Auto-classified lanes:
 - ✅ **Lane D** – FreeBSD Jails
   - `<app>-<sha>-jail.tar` rootfs
   - Lightweight isolation for legacy apps
+  - Preview router health/endpoint discovery via unified `internal/orchestration` facade
 - ✅ **Lane E** – OCI + Kontain
   - `harbor.local/ploy/<app>:<sha>` images
   - `io.kontain` runtime for VM isolation

@@ -4,12 +4,12 @@ import (
     "fmt"
     "io"
     "net/http"
-    "os"
     "regexp"
     "strings"
 
     "github.com/gofiber/fiber/v2"
     orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 var previewHostRe = regexp.MustCompile(`^(?P<sha>[a-f0-9]{7,40})\.(?P<app>[a-z0-9-]+)\.ployd\.app(?::\d+)?$`)
@@ -25,7 +25,7 @@ func Router(c *fiber.Ctx) error {
 	app := m[2]
 
 	payload := strings.NewReader("")
-	req, _ := http.NewRequest("POST", fmt.Sprintf("http://localhost:%s/v1/apps/%s/builds?sha=%s", getenv("PORT","8081"), app, sha), payload)
+    req, _ := http.NewRequest("POST", fmt.Sprintf("http://localhost:%s/v1/apps/%s/builds?sha=%s", utils.Getenv("PORT","8081"), app, sha), payload)
 	req.Header.Set("Content-Type","application/x-tar")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil { 
@@ -48,9 +48,4 @@ func Router(c *fiber.Ctx) error {
 	return c.Status(resp.StatusCode).Send(b)
 }
 
-func getenv(k, d string) string { 
-	if v := os.Getenv(k); v != "" { 
-		return v 
-	}
-	return d 
-}
+// Removed local getenv helper in favor of shared utils.Getenv

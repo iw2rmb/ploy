@@ -166,9 +166,9 @@ Recommendation:
   - Keep a compatibility shim only in tests if necessary.
 
 4) Error Contract Standardization (Phase 6.4)
-- Add an HTTP error middleware mapping `internal/errors.Error` → JSON envelope.
-- Refactor `api/server/*` handlers to return typed errors; remove ad‑hoc `fiber.Map` error payloads.
-- Add unit tests asserting shape and codes.
+- [x] Add an HTTP error middleware mapping `internal/errors.Error` → JSON envelope.
+- [x] Refactor `api/server/*` handlers to return typed errors; reduce ad‑hoc `fiber.Map` error payloads.
+- [x] Add unit tests asserting shape and codes.
 
 5) Routing Consolidation (Phase 6.5)
 - Extract Traefik tag generation to `internal/routing/tags.go`.
@@ -176,9 +176,10 @@ Recommendation:
 - Use the same helpers from blue/green and controller/app registration.
 
 6) Cleanup and Dedupe (Phase 6.6)
-- Introduce `internal/utils/env.go` and replace scattered `getenv`.
-- Remove deprecated cert endpoints under `internal/cert/*` after migration window.
-- Unify small config types (retry/cache) on the `internal/config` + `internal/storage/factory` axis.
+- [x] Introduce shared env utilities in `internal/utils` (e.g., `Getenv`).
+- [ ] Replace scattered inline `getenv` usages (preview/orchestration/cleanup) with shared helper.
+- [ ] Remove deprecated cert endpoints under `internal/cert/*` after migration window.
+- [ ] Unify small config types (retry/cache) on the `internal/config` + `internal/storage/factory` axis.
 
 ## Prioritization (Risk x Blast Radius)
 
@@ -205,11 +206,19 @@ Recommendation:
 
 ## Acceptance Criteria
 
-- No `internal/*` package imports any path under `api/*`.
-- All Nomad/Consul operations go through `internal/orchestration` with SDK clients.
-- API server and CLI resolve storage via `internal/config.Service` only.
-- HTTP errors use a single envelope with typed codes; tests assert shape.
-- Traefik tags and domain KV are generated via shared helpers.
+- [ ] No `internal/*` package imports any path under `api/*`.
+- [ ] All Nomad/Consul operations go through `internal/orchestration` with SDK clients.
+- [ ] API server and CLI resolve storage via `internal/config.Service` only.
+- [x] HTTP errors use a single envelope with typed codes; tests assert shape.
+- [ ] Traefik tags and domain KV are generated via shared helpers.
+
+## Progress (Sep 4, 2025)
+
+- [x] Preview router migrated to `internal/orchestration` facade (no `api/nomad` dependency).
+- [x] Standardized HTTP error envelope in API server via `internal/errors` with unit tests (`api/server/error_handler_test.go`).
+- [ ] `internal/*` still imports `api/*` in a few packages (`internal/debug`, `internal/build`, `internal/cli/*`).
+- [ ] Raw HTTP helpers still in `api/nomad/*`; migration to facade pending.
+- [ ] Traefik tag builders remain in `api/routing`; shared helpers under `internal/routing/*` not yet extracted.
 
 ## Notes and Constraints
 
