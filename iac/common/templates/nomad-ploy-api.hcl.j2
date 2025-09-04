@@ -110,6 +110,11 @@ job "ploy-api" {
         ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
         TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
         
+        # Internal ARF Recipes Indexer
+        PLOY_ARF_REGISTRY = "{{ ploy.arf_registry | default('https://repo1.maven.org/maven2') }}"
+        PLOY_ARF_MAVEN_GROUP = "{{ ploy.arf_maven_group | default('org.openrewrite') }}"
+        PLOY_ARF_DEFAULT_PACKS = "{{ ploy.arf_default_packs | default('') }}"
+
         # LLM API Configuration (use Vault secrets in production)
         LLM_PROVIDER = "{{ llm_provider | default('openai') }}"
         LLM_MODEL = "{{ llm_model | default('gpt-4') }}"
