@@ -115,18 +115,20 @@ func LoadConfigFromEnv() *ControllerConfig {
 		port = utils.Getenv("PORT", "8081")
 	}
 
-	return &ControllerConfig{
-		Port:              port,
-		ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
-		NomadAddr:         utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
-		StorageConfigPath: config.GetStorageConfigPath(),
-		CleanupConfigPath: utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
-		UseConsulEnv:      utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
-		EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
-		CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
-		ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
-		EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
-	}
+    return &ControllerConfig{
+        Port:              port,
+        ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
+        NomadAddr:         utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
+        StorageConfigPath: config.GetStorageConfigPath(),
+        CleanupConfigPath: utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
+        UseConsulEnv:      utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
+        EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
+        CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
+        ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
+        EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
+        ArfDefaultPacks:  utils.Getenv("PLOY_ARF_DEFAULT_PACKS", ""),
+        ArfRegistryURL:   utils.Getenv("PLOY_ARF_REGISTRY", ""),
+    }
 }
 
 // Server represents the stateless controller server

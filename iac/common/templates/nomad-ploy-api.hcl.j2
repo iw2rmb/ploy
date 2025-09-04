@@ -89,6 +89,8 @@ job "ploy-api" {
         SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
 
         # ARF (Automated Remediation Framework) configuration
+        ARF_SEAWEEDFS_MASTER_URL = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
+        ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
         ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"
         ARF_FREEBSD_USER = "root"
         ARF_FREEBSD_PORT = "22"
