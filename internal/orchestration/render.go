@@ -7,6 +7,8 @@ import (
     "regexp"
     "strings"
     "time"
+
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 // RenderData represents inputs to the job template rendering
@@ -137,7 +139,7 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
     possiblePaths := []string{
         templatePath,
     }
-    if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
+    if templateDir := utils.Getenv("PLOY_TEMPLATE_DIR", ""); templateDir != "" {
         possiblePaths = append(possiblePaths, filepath.Join(templateDir, templatePath))
     }
     possiblePaths = append(possiblePaths,
@@ -177,11 +179,9 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
     domainSuffix := data.DomainSuffix
     if domainSuffix == "" {
         if isPlatformService(data) {
-            domainSuffix = os.Getenv("PLOY_PLATFORM_DOMAIN")
-            if domainSuffix == "" { domainSuffix = "ployman.app" }
+            domainSuffix = utils.Getenv("PLOY_PLATFORM_DOMAIN", "ployman.app")
         } else {
-            domainSuffix = os.Getenv("PLOY_APPS_DOMAIN")
-            if domainSuffix == "" { domainSuffix = "ployd.app" }
+            domainSuffix = utils.Getenv("PLOY_APPS_DOMAIN", "ployd.app")
         }
     }
     s = strings.ReplaceAll(s, "{{DOMAIN_SUFFIX}}", domainSuffix)
@@ -320,4 +320,3 @@ func isPlatformService(data RenderData) bool {
     }
     return false
 }
-
