@@ -258,6 +258,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
         }
         // Determine fetcher
         fetcher := config.ArfFetcher
+        // Track chosen registry and group for logging
+        registryBase := ""
+        mavenGroup := ""
         // Prefer MavenFetcher if group configured
         if fetcher == nil {
             base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
@@ -266,6 +269,8 @@ func NewServer(config *ControllerConfig) (*Server, error) {
             }
             if strings.TrimSpace(config.ArfMavenGroup) != "" && base != "" {
                 fetcher = trecipes.MavenFetcher{BaseURL: base, GroupID: config.ArfMavenGroup}
+                registryBase = base
+                mavenGroup = config.ArfMavenGroup
             }
         }
         // Fallback to HTTPFetcher if no Maven group provided
@@ -276,6 +281,7 @@ func NewServer(config *ControllerConfig) (*Server, error) {
             }
             if base != "" {
                 fetcher = trecipes.HTTPFetcher{BaseURL: base}
+                registryBase = base
             }
         }
         if store != nil && fetcher != nil {
@@ -291,12 +297,23 @@ func NewServer(config *ControllerConfig) (*Server, error) {
                 }
             }
             if len(specs) > 0 {
+                // Log which fetcher and packs are configured
+                fetcherType := "custom"
+                switch fetcher.(type) {
+                case trecipes.MavenFetcher:
+                    fetcherType = "maven"
+                case trecipes.HTTPFetcher:
+                    fetcherType = "http"
+                }
+                log.Printf("ARF indexer configured: fetcher=%s base=%s group=%s packs=%s", fetcherType, registryBase, mavenGroup, config.ArfDefaultPacks)
                 server.indexerStorage = store
                 go idx.Refresh(context.Background(), specs)
             }
         } else {
-            log.Printf("ARF indexer skipped: storage or fetcher unavailable")
+            log.Printf("ARF indexer skipped: storage or fetcher unavailable (base=%s group=%s packs=%s)", registryBase, mavenGroup, config.ArfDefaultPacks)
         }
+    } else {
+        log.Printf("ARF indexer disabled: no default packs configured")
     }
 
     return server, nil
