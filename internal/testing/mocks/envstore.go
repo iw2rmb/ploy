@@ -1,8 +1,8 @@
 package mocks
 
 import (
-	"github.com/iw2rmb/ploy/api/envstore"
-	"github.com/stretchr/testify/mock"
+    envstore "github.com/iw2rmb/ploy/internal/envstore"
+    "github.com/stretchr/testify/mock"
 )
 
 // EnvStore provides a mock implementation of envstore.EnvStoreInterface

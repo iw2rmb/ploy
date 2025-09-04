@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/builders"
-	"github.com/iw2rmb/ploy/api/envstore"
-	"github.com/iw2rmb/ploy/api/nomad"
-	"github.com/iw2rmb/ploy/api/opa"
-	"github.com/iw2rmb/ploy/internal/utils"
+    "github.com/gofiber/fiber/v2"
+    "github.com/iw2rmb/ploy/api/builders"
+    envstore "github.com/iw2rmb/ploy/internal/envstore"
+    "github.com/iw2rmb/ploy/api/nomad"
+    "github.com/iw2rmb/ploy/api/opa"
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {

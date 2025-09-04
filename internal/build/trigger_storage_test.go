@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/envstore"
+    "github.com/gofiber/fiber/v2"
+    envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
 	"github.com/stretchr/testify/assert"
@@ -155,4 +155,3 @@ func TestBuildDependenciesWithUnifiedStorage(t *testing.T) {
 
 	assert.NotNil(t, buildCtx)
 }
-

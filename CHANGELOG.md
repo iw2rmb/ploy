@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [2025-09-04] - Phase 6: API/Internal Audit (Codex)
+
+### Added
+- Roadmap report `roadmap/refactor/phase-6-codex.md` documenting redundant code and architecture issues across `api/*` and `internal/*`.
+
+### Highlights
+- Identified layering inversion where `internal/*` imports from `api/*` (critical).
+- Noted duplication/inconsistency in Nomad/Consul integrations (raw HTTP vs SDK clients).
+- Flagged configuration split-brain between `api/config` and `internal/config` and recommended convergence.
+- Proposed a concrete, staged refactor plan with acceptance criteria.
+
 ## [2025-09-04] - OpenRewrite Transformation Testing & SeaweedFS Fix
 
 ### Fixed

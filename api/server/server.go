@@ -29,7 +29,7 @@ import (
 	"github.com/iw2rmb/ploy/api/coordination"
 	"github.com/iw2rmb/ploy/api/dns"
 	"github.com/iw2rmb/ploy/api/domains"
-	"github.com/iw2rmb/ploy/api/envstore"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/api/health"
 	"github.com/iw2rmb/ploy/api/metrics"
 	"github.com/iw2rmb/ploy/api/routing"
