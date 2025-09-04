@@ -1,11 +1,11 @@
 package arf
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
+    "fmt"
+    "strconv"
+    "strings"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+    models "github.com/iw2rmb/ploy/internal/arf/models"
 )
 
 // PaginationInfo contains pagination metadata

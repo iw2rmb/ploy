@@ -1,18 +1,18 @@
 package arf
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"strings"
-	"testing"
+    "bytes"
+    "encoding/json"
+    "io"
+    "net/http"
+    "net/http/httptest"
+    "os"
+    "strings"
+    "testing"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+    models "github.com/iw2rmb/ploy/internal/arf/models"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
 )
 
 // mockHTTPClient creates a test HTTP client that returns predefined responses
