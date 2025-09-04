@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iw2rmb/ploy/api/envstore"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	cfg "github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
@@ -552,7 +552,7 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 
 func TestServer_HandleGetEnvVars(t *testing.T) {
 	// Create mock environment store
-	mockEnvStore := mocks.NewEnvStore()
+mockEnvStore := mocks.NewEnvStore()
 	expectedVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",
@@ -601,7 +601,7 @@ func TestServer_HandleGetEnvVars(t *testing.T) {
 
 func TestServer_HandleGetEnvVars_Error(t *testing.T) {
 	// Create mock environment store that returns error
-	mockEnvStore := mocks.NewEnvStore()
+mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("GetAll", "testapp").Return(nil, fmt.Errorf("environment store error"))
 
 	server := createMockServer()
@@ -741,7 +741,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-			mockEnvStore := mocks.NewEnvStore()
+            mockEnvStore := mocks.NewEnvStore()
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockEnvStore)
 			}
@@ -912,7 +912,7 @@ func TestServer_HandleSetEnvVars_InvalidJSON(t *testing.T) {
 
 func TestServer_HandleSetEnvVar(t *testing.T) {
 	// Create mock environment store
-	mockEnvStore := mocks.NewEnvStore()
+mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Set", "testapp", "NEW_VAR", "new-value").Return(nil)
 
 	server := createMockServer()
@@ -968,7 +968,7 @@ func TestServer_HandleSetEnvVar(t *testing.T) {
 
 func TestServer_HandleDeleteEnvVar(t *testing.T) {
 	// Create mock environment store
-	mockEnvStore := mocks.NewEnvStore()
+mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Delete", "testapp", "OLD_VAR").Return(nil)
 
 	server := createMockServer()
@@ -1043,7 +1043,7 @@ func TestServer_HandleSetEnvVar_InvalidBody(t *testing.T) {
 
 func TestServer_HandleDeleteEnvVar_Error(t *testing.T) {
 	// Create mock environment store that returns error
-	mockEnvStore := mocks.NewEnvStore()
+mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Delete", "testapp", "NONEXISTENT_VAR").Return(fmt.Errorf("variable not found"))
 
 	server := createMockServer()
@@ -1116,7 +1116,7 @@ func BenchmarkServer_HandleStorageHealth(b *testing.B) {
 }
 
 func BenchmarkServer_HandleGetEnvVars(b *testing.B) {
-	mockEnvStore := mocks.NewEnvStore()
+mockEnvStore := mocks.NewEnvStore()
 	envVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",

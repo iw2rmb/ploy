@@ -11,7 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/hashicorp/nomad/api"
 	"github.com/iw2rmb/ploy/api/builders"
-	"github.com/iw2rmb/ploy/api/envstore"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
 )

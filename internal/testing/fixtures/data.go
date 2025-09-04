@@ -1,9 +1,9 @@
 package fixtures
 
 import (
-	"time"
+    "time"
 
-	"github.com/iw2rmb/ploy/api/envstore"
+    envstore "github.com/iw2rmb/ploy/internal/envstore"
 )
 
 // TestDataRepository provides comprehensive test data
