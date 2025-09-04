@@ -159,7 +159,34 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 ## Test Execution Log
 
-*Results will be documented here after enhanced logging deployment*
+### 2025-09-04: Comprehensive Testing Completed
+
+**Test Environment**: api.dev.ployman.app
+**Test Script**: `/tests/scripts/test-openrewrite-comprehensive.sh`
+**Results Directory**: `tests/results/openrewrite-20250904-075658/`
+
+**Summary**:
+- Total Tests: 8
+- Passed: 5 (62.5%)
+- Failed: 3 (37.5%)
+- Duration: ~4 minutes
+
+**Detailed Results**:
+1. **ploy-orw-test-java** (4 tests, 3 passed):
+   - ✅ RemoveUnusedImports: 7 changes applied
+   - ✅ UseStringReplace: Completed (no changes needed)
+   - ❌ UpgradeToJava17: 0 changes (expected changes)
+   - ✅ UnnecessaryParentheses: Completed (no changes needed)
+
+2. **ploy-orw-test-legacy** (2 tests, 0 passed):
+   - ❌ Java8toJava11: 0 changes (expected migration changes)
+   - ❌ UpgradeToJava17: 0 changes (expected migration changes)
+
+3. **ploy-orw-test-spring** (2 tests, 1 passed):
+   - ❌ UpgradeSpringBoot_3_2: 0 changes (expected upgrade changes)
+   - ✅ RemoveUnusedImports: Completed
+
+**Critical Fix Applied**: SeaweedFS Filer URL corrected from port 9333 to 8888
 
 ## Key Findings
 

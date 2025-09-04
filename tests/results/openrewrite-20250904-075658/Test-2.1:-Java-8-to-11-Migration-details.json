@@ -1,0 +1,15 @@
+{
+  "transformation_id": "58d336bf-4627-4372-9ab3-99cb1ada698f",
+  "recipe_id": "org.openrewrite.java.migrate.Java8toJava11",
+  "start_time": "2025-09-04T04:58:57.625062241Z",
+  "end_time": "2025-09-04T04:59:23.483715861Z",
+  "success": true,
+  "changes_applied": 0,
+  "total_files": 0,
+  "files_modified": null,
+  "diff": "",
+  "validation_score": 0,
+  "execution_time": 25858653620,
+  "last_updated": "0001-01-01T00:00:00Z",
+  "metadata": null
+}

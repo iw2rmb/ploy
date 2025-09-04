@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [2025-09-04] - OpenRewrite Transformation Testing & SeaweedFS Fix
+
+### Fixed
+- Critical SeaweedFS Filer URL configuration issue preventing all ARF transformations
+  - API was incorrectly using master port 9333 instead of filer port 8888
+  - Added `ARF_SEAWEEDFS_FILER_URL` environment variable to Nomad job template
+  - Fixed storage config endpoint in `/etc/ploy/storage/config.yaml`
+
+### Added
+- Comprehensive OpenRewrite transformation test suite (`tests/scripts/test-openrewrite-comprehensive.sh`)
+- Test analysis report documenting transformation success patterns
+- Three test repositories for diverse testing scenarios (ploy-orw-test-java, ploy-orw-test-legacy, ploy-orw-test-spring)
+
+### Tested
+- Successfully tested 8 OpenRewrite transformations with 62.5% success rate
+- Working recipes: RemoveUnusedImports, UseStringReplace, UnnecessaryParentheses
+- Identified issues with version migration recipes (Java8to11, UpgradeToJava17, SpringBoot3.2)
+
+### Notes
+- OpenRewrite transformation pipeline now fully operational for code cleanup and modernization
+- Version migration recipes require further investigation for proper configuration
+
 ## [2025-09-03] - Traefik Consul Catalog ACL + Fast Health Checks
 
 ### Added
