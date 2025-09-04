@@ -4,7 +4,8 @@
 
 ### Added
 - Roadmap report `roadmap/refactor/phase-6-codex.md` documenting redundant code and architecture issues across `api/*` and `internal/*`.
- - Progress markers and acceptance criteria checkboxes reflecting current status (error contract DONE; preview router migrated).
+- Progress markers and acceptance criteria checkboxes reflecting current status (error contract DONE; preview router migrated).
+- internal/routing: Introduced `BuildTraefikTags` helper with unit tests to begin Traefik tag consolidation (Phase 6.5).
 
 ### Highlights
 - Identified layering inversion where `internal/*` imports from `api/*` (critical).
