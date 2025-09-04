@@ -222,8 +222,9 @@ Progress (Sep 4):
   - Added constructor for injection in tests (`NewHealthMonitorWithClient`).
 - [ ] API server and CLI resolve storage via `internal/config.Service` only.
 - [x] HTTP errors use a single envelope with typed codes; tests assert shape.
-- [ ] Traefik tags and domain KV are generated via shared helpers.
-  - Tags now centralized via `internal/routing/BuildTraefikTags` and used by API routing. Domain KV helpers pending.
+- [x] Traefik tags and domain KV are generated via shared helpers.
+  - Tags centralized via `internal/routing/BuildTraefikTags` and used by API routing.
+  - Domain KV helpers extracted to `internal/routing/kv.go`; API calls `SaveAppRoute`.
 
 ## Progress (Sep 4, 2025)
 
