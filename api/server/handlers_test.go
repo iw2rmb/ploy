@@ -220,7 +220,8 @@ func TestLoadConfigFromEnv(t *testing.T) {
         "PLOY_CLEANUP_AUTO_START": "false",
         "PLOY_ENABLE_CACHING":     "false",
         "PLOY_ARF_DEFAULT_PACKS":  "rewrite-java:8.1.0,rewrite-spring:5.0.0",
-        "PLOY_ARF_REGISTRY":       "https://registry.example/openrewrite",
+        "PLOY_ARF_REGISTRY":       "https://repo1.maven.org/maven2",
+        "PLOY_ARF_MAVEN_GROUP":    "org.openrewrite",
     }
 
 	// Store original values and set test values
@@ -251,7 +252,8 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	assert.Equal(t, false, config.EnableCaching)
     assert.Equal(t, 30*time.Second, config.ShutdownTimeout)
     assert.Equal(t, "rewrite-java:8.1.0,rewrite-spring:5.0.0", config.ArfDefaultPacks)
-    assert.Equal(t, "https://registry.example/openrewrite", config.ArfRegistryURL)
+    assert.Equal(t, "https://repo1.maven.org/maven2", config.ArfRegistryURL)
+    assert.Equal(t, "org.openrewrite", config.ArfMavenGroup)
 }
 
 func TestLoadConfigFromEnvDefaults(t *testing.T) {
