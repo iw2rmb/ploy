@@ -108,6 +108,79 @@ func (h *HealthMonitor) GetJobAllocations(jobID string) ([]*AllocationStatus, er
     return allocations, nil
 }
 
+// IsJobHealthy returns true if at least one running allocation is present
+func (h *HealthMonitor) IsJobHealthy(jobID string) bool {
+    allocs, err := h.GetJobAllocations(jobID)
+    if err != nil {
+        return false
+    }
+    for _, a := range allocs {
+        if a.ClientStatus == "running" {
+            // consider deployment status if provided
+            if a.DeploymentStatus != nil && a.DeploymentStatus.Healthy != nil {
+                if *a.DeploymentStatus.Healthy {
+                    return true
+                }
+            } else {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// GetJobEndpoint attempts to discover an endpoint for a running allocation (http://IP:DynamicPort)
+func (h *HealthMonitor) GetJobEndpoint(jobID string) (string, error) {
+    allocs, err := h.GetJobAllocations(jobID)
+    if err != nil {
+        return "", err
+    }
+    for _, a := range allocs {
+        if a.ClientStatus == "running" {
+            // fetch detailed allocation to inspect resources
+            endpoint, err := h.getAllocationEndpoint(a.ID)
+            if err == nil && endpoint != "" {
+                return endpoint, nil
+            }
+        }
+    }
+    return "", fmt.Errorf("no running allocation found for job %s", jobID)
+}
+
+// getAllocationEndpoint fetches allocation details and extracts IP:port
+func (h *HealthMonitor) getAllocationEndpoint(allocID string) (string, error) {
+    url := fmt.Sprintf("%s/v1/allocation/%s", h.nomadAddr, allocID)
+    resp, err := h.httpClient.Get(url)
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+    if resp.StatusCode != http.StatusOK {
+        return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+    }
+    var allocData map[string]interface{}
+    if err := json.NewDecoder(resp.Body).Decode(&allocData); err != nil {
+        return "", err
+    }
+    // Traverse Resources -> Networks[0] -> IP, DynamicPorts[0].Value
+    if resources, ok := allocData["Resources"].(map[string]interface{}); ok {
+        if networks, ok := resources["Networks"].([]interface{}); ok && len(networks) > 0 {
+            if network, ok := networks[0].(map[string]interface{}); ok {
+                if ip, ok := network["IP"].(string); ok {
+                    if ports, ok := network["DynamicPorts"].([]interface{}); ok && len(ports) > 0 {
+                        if port, ok := ports[0].(map[string]interface{}); ok {
+                            if portNum, ok := port["Value"].(float64); ok {
+                                return fmt.Sprintf("http://%s:%.0f", ip, portNum), nil
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return "", fmt.Errorf("allocation %s has no endpoint", allocID)
+}
+
 func getenv(k, d string) string { if v := getEnv(k); v != "" { return v }; return d }
 
 // getEnv is split for testability
@@ -124,4 +197,3 @@ var lookupEnv = func(k string) string {
 }
 
 // mapGetenv is replaced at build via another file (stub) to call os.Getenv
-
