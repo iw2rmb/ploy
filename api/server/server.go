@@ -93,6 +93,8 @@ type ControllerConfig struct {
     ArfDefaultPacks   string
     // Optional Fetcher for ARF indexer (used in tests). When nil, indexing is skipped.
     ArfFetcher        trecipes.Fetcher
+    // Optional ARF registry URL for HTTPFetcher. Used only if ArfFetcher is nil.
+    ArfRegistryURL    string
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -249,8 +251,16 @@ func NewServer(config *ControllerConfig) (*Server, error) {
                 store = st
             }
         }
-        if store != nil && config.ArfFetcher != nil {
-            idx := trecipes.NewIndexer(config.ArfFetcher, store)
+        // Determine fetcher
+        fetcher := config.ArfFetcher
+        if fetcher == nil && strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY")) != "" {
+            fetcher = trecipes.HTTPFetcher{BaseURL: os.Getenv("PLOY_ARF_REGISTRY")}
+        }
+        if fetcher == nil && strings.TrimSpace(config.ArfRegistryURL) != "" {
+            fetcher = trecipes.HTTPFetcher{BaseURL: config.ArfRegistryURL}
+        }
+        if store != nil && fetcher != nil {
+            idx := trecipes.NewIndexer(fetcher, store)
             // Parse packs spec: name:version[,name:version]
             specs := []trecipes.PackSpec{}
             for _, part := range strings.Split(config.ArfDefaultPacks, ",") {
