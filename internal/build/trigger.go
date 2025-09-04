@@ -10,15 +10,14 @@ import (
 	"strings"
 	"time"
 
-    "github.com/gofiber/fiber/v2"
-    "github.com/iw2rmb/ploy/api/builders"
-    envstore "github.com/iw2rmb/ploy/internal/envstore"
-    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
-    "github.com/iw2rmb/ploy/api/opa"
-    "github.com/iw2rmb/ploy/api/supply"
+	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/api/builders"
+	"github.com/iw2rmb/ploy/api/opa"
+	"github.com/iw2rmb/ploy/api/supply"
 	"github.com/iw2rmb/ploy/internal/config"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
-	"github.com/iw2rmb/ploy/internal/harbor"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/security"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
@@ -32,7 +31,7 @@ type BuildDependencies struct {
 	EnvStore      envstore.EnvStoreInterface
 }
 
-// BuildContext represents the build context for Harbor namespace routing
+// BuildContext represents the build context for container namespace routing
 type BuildContext struct {
 	APIContext string // "platform" or "apps" based on endpoint
 	AppType    config.AppType
@@ -52,7 +51,7 @@ func TriggerBuild(c *fiber.Ctx, storeClient *storage.StorageClient, envStore env
 	return triggerBuildWithDependencies(c, deps, buildCtx)
 }
 
-// TriggerBuildWithContext handles context-aware build requests for Harbor namespace routing
+// TriggerBuildWithContext handles context-aware build requests for container namespace routing
 func TriggerBuildWithContext(c *fiber.Ctx, storeClient *storage.StorageClient, envStore envstore.EnvStoreInterface, apiContext string) error {
 	deps := &BuildDependencies{
 		StorageClient: storeClient,
@@ -185,7 +184,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 		imagePath = img
 	case "E":
-		// Use Harbor registry with namespace-aware routing and RBAC credentials
+		// Use container registry with namespace-aware routing and RBAC credentials
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
@@ -202,7 +201,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	case "G":
 		// For now, Lane G WASM applications should use OCI containers as fallback
 		// TODO: Implement proper WASM runtime integration
-		// Use Harbor registry with namespace-aware routing and RBAC credentials
+		// Use container registry with namespace-aware routing and RBAC credentials
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 		img, err := builders.BuildOCI(appName, srcDir, tag, appEnvVars)
@@ -328,22 +327,18 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
 	}
 
-	// Harbor authentication and vulnerability scanning with RBAC credentials
+	// Vulnerability scanning (stub implementation - Harbor removed)
 	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 	vulnScanPassed := false
 	var scanResult *security.ScanResult
 	var scanner *security.VulnerabilityScanner
 
-	// Only perform Harbor integration for container images (Lane E, G)
+	// Only perform vulnerability scanning for container images (Lane E, G)
 	if dockerImage != "" {
-		// Harbor authentication is mandatory for container images
-		if err := registry.MustAuthenticate(); err != nil {
-			return utils.ErrJSON(c, 500, fmt.Errorf("Harbor authentication failed: %w", err))
-		}
+		// Skip authentication (Harbor removed)
 
-		// Harbor vulnerability scanning with context-specific thresholds
-		harborClient := harbor.NewClient(registry.GetFullEndpoint(), registry.Username, registry.Password)
-		scanner = security.NewVulnerabilityScanner(harborClient)
+		// Vulnerability scanning with context-specific thresholds (stub implementation)
+		scanner = security.NewVulnerabilityScanner()
 
 		// Extract repository name from Docker image tag
 		parts := strings.Split(dockerImage, "/")
@@ -367,13 +362,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 					// For non-production environments, log warning but don't fail
 					env := c.Query("env", "dev")
 					if env == "prod" || env == "staging" {
-						return utils.ErrJSON(c, 500, fmt.Errorf("Harbor vulnerability scan failed: %w", err))
+						return utils.ErrJSON(c, 500, fmt.Errorf("Vulnerability scan failed: %w", err))
 					} else {
-						fmt.Printf("Warning: Harbor vulnerability scan failed (non-prod environment): %v\n", err)
+						fmt.Printf("Warning: Vulnerability scan failed (non-prod environment): %v\n", err)
 					}
 				} else {
 					vulnScanPassed = scanResult.Passed
-					fmt.Printf("Harbor vulnerability scan: %s\n", scanner.GetVulnerabilitySummary(scanResult))
+					fmt.Printf("Vulnerability scan: %s\n", scanner.GetVulnerabilitySummary(scanResult))
 
 					// Log scan results for monitoring
 					if scanResult.HighSeverity {
@@ -443,7 +438,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Use enhanced templates with comprehensive configuration
-    jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
+	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
 		App:         appName,
 		ImagePath:   imagePath,
 		DockerImage: dockerImage,
@@ -480,11 +475,11 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		return utils.ErrJSON(c, 500, err)
 	}
 
-    if err := orchestration.Submit(jobFile); err != nil {
-        return utils.ErrJSON(c, 500, err)
-    }
+	if err := orchestration.Submit(jobFile); err != nil {
+		return utils.ErrJSON(c, 500, err)
+	}
 
-    _ = orchestration.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
+	_ = orchestration.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
 
 	// Prefer unified storage interface if available, fallback to legacy StorageClient
 	if deps.Storage != nil {
@@ -590,7 +585,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 	}
 
-	// Include Harbor namespace information in response
+	// Include container registry information in response
 	response := fiber.Map{
 		"status":      "deployed",
 		"lane":        lane,
@@ -600,9 +595,9 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		"appType":     string(buildCtx.AppType),
 	}
 
-	// Add Harbor registry information for container images
+	// Add container registry information for container images
 	if dockerImage != "" {
-		response["harbor"] = fiber.Map{
+		response["registry"] = fiber.Map{
 			"endpoint": registry.Endpoint,
 			"project":  registry.GetProject(buildCtx.AppType),
 			"imageTag": dockerImage,
