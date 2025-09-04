@@ -44,19 +44,6 @@ func OpenURL(u string) {
 }
 
 func DefaultDomainFor(app string) string {
-	b, err := os.ReadFile(filepath.Join("manifests", app+".yaml"))
-	if err == nil {
-		lines := strings.Split(string(b), "\n")
-		for _, ln := range lines {
-			ln = strings.TrimSpace(ln)
-			if strings.HasPrefix(ln, "- host:") {
-				parts := strings.SplitN(ln, ":", 2)
-				if len(parts) == 2 {
-					return strings.TrimSpace(parts[1])
-				}
-			}
-		}
-	}
 	return app + ".ployd.app"
 }
 
