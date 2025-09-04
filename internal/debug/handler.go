@@ -8,11 +8,11 @@ import (
 	"time"
 
     "github.com/gofiber/fiber/v2"
-    "github.com/iw2rmb/ploy/api/builders"
     envstore "github.com/iw2rmb/ploy/internal/envstore"
     orchestration "github.com/iw2rmb/ploy/internal/orchestration"
-    "github.com/iw2rmb/ploy/api/opa"
     "github.com/iw2rmb/ploy/internal/utils"
+    ibuilders "github.com/iw2rmb/ploy/internal/builders"
+    ipolicy "github.com/iw2rmb/ploy/internal/policy"
 )
 
 func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
@@ -33,18 +33,18 @@ func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	breakGlass := c.Query("break_glass", "false") == "true"
 	
 	// Debug builds always have potential for SSH access, require policy validation
-	if err := opa.Enforce(opa.ArtifactInput{
-		Signed:      true,  // Debug builds are considered signed for policy purposes
-		SBOMPresent: true,  // Debug builds are considered to have SBOM for policy purposes  
-		Env:         env,
-		SSHEnabled:  req.SSHEnabled,
-		BreakGlass:  breakGlass,
-		App:         app,
-		Lane:        lane,
-		Debug:       true,
-	}); err != nil {
-		return utils.ErrJSON(c, 403, fmt.Errorf("debug build policy enforcement failed: %w", err))
-	}
+    if err := ipolicy.DefaultEnforcer.Enforce(ipolicy.ArtifactInput{
+        Signed:      true,  // Debug builds are considered signed for policy purposes
+        SBOMPresent: true,  // Debug builds are considered to have SBOM for policy purposes  
+        Env:         env,
+        SSHEnabled:  req.SSHEnabled,
+        BreakGlass:  breakGlass,
+        App:         app,
+        Lane:        lane,
+        Debug:       true,
+    }); err != nil {
+        return utils.ErrJSON(c, 403, fmt.Errorf("debug build policy enforcement failed: %w", err))
+    }
 	
 	srcDir := filepath.Join(os.TempDir(), fmt.Sprintf("debug-src-%s-%d", app, time.Now().Unix()))
 	outDir := filepath.Join(os.TempDir(), fmt.Sprintf("debug-out-%s-%d", app, time.Now().Unix()))
@@ -67,30 +67,30 @@ func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 		envVars[k] = v
 	}
 	
-	debugResult, err := builders.BuildDebugInstance(app, lane, srcDir, sha, outDir, envVars, req.SSHEnabled)
+    debugResult, err := ibuilders.DefaultDebugBuilder.BuildDebugInstance(app, lane, srcDir, sha, outDir, envVars, req.SSHEnabled)
 	if err != nil {
 		return utils.ErrJSON(c, 500, fmt.Errorf("debug build failed: %v", err))
 	}
 	
-	debugInstanceName := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
-    renderData := orchestration.RenderData{
-        App:         debugInstanceName,
-        ImagePath:   debugResult.ImagePath,
-        DockerImage: debugResult.DockerImage,
-        EnvVars:     envVars,
-        IsDebug:     true,
-    }
+    debugInstanceName := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
 
-    templatePath, err := orchestration.RenderTemplate(lane, renderData)
-    if err != nil {
-        return utils.ErrJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))
+    if utils.Getenv("PLOY_SKIP_DEPLOY", "false") != "true" {
+        renderData := orchestration.RenderData{
+            App:         debugInstanceName,
+            ImagePath:   debugResult.ImagePath,
+            DockerImage: debugResult.DockerImage,
+            EnvVars:     envVars,
+            IsDebug:     true,
+        }
+        templatePath, err := orchestration.RenderTemplate(lane, renderData)
+        if err != nil {
+            return utils.ErrJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))
+        }
+        if err := orchestration.Submit(templatePath); err != nil {
+            return utils.ErrJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
+        }
+        os.Remove(templatePath)
     }
-
-    if err := orchestration.Submit(templatePath); err != nil {
-        return utils.ErrJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
-    }
-	
-	os.Remove(templatePath)
 	
 	response := fiber.Map{
 		"status":      "debug_created",
