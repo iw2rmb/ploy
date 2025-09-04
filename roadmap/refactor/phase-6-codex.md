@@ -216,7 +216,9 @@ Progress (Sep 4):
     - `internal/builders/facade.go` no longer imports `api/builders`.
     - `internal/supply/facade.go` no longer imports `api/supply`.
   - Added guardrail test `internal/no_api_imports_test.go`.
-- [ ] All Nomad/Consul operations go through `internal/orchestration` with SDK clients.
+- [x] All Nomad/Consul operations go through `internal/orchestration` with SDK clients.
+  - Health monitor now uses Nomad SDK via injectable adapter; HTTP calls removed.
+  - Added constructor for injection in tests (`NewHealthMonitorWithClient`).
 - [ ] API server and CLI resolve storage via `internal/config.Service` only.
 - [x] HTTP errors use a single envelope with typed codes; tests assert shape.
 - [ ] Traefik tags and domain KV are generated via shared helpers.
