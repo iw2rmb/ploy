@@ -211,15 +211,17 @@ func TestParseIntEnv(t *testing.T) {
 func TestLoadConfigFromEnv(t *testing.T) {
 	// Set some environment variables for testing
 	originalValues := make(map[string]string)
-	testEnvVars := map[string]string{
-		"PORT":                    "9090",
-		"CONSUL_HTTP_ADDR":        "192.168.1.100:8500",
-		"NOMAD_ADDR":              "http://192.168.1.100:4646",
-		"PLOY_USE_CONSUL_ENV":     "false",
-		"PLOY_ENV_STORE_PATH":     "/custom/env/path",
-		"PLOY_CLEANUP_AUTO_START": "false",
-		"PLOY_ENABLE_CACHING":     "false",
-	}
+    testEnvVars := map[string]string{
+        "PORT":                    "9090",
+        "CONSUL_HTTP_ADDR":        "192.168.1.100:8500",
+        "NOMAD_ADDR":              "http://192.168.1.100:4646",
+        "PLOY_USE_CONSUL_ENV":     "false",
+        "PLOY_ENV_STORE_PATH":     "/custom/env/path",
+        "PLOY_CLEANUP_AUTO_START": "false",
+        "PLOY_ENABLE_CACHING":     "false",
+        "PLOY_ARF_DEFAULT_PACKS":  "rewrite-java:8.1.0,rewrite-spring:5.0.0",
+        "PLOY_ARF_REGISTRY":       "https://registry.example/openrewrite",
+    }
 
 	// Store original values and set test values
 	for key, value := range testEnvVars {
@@ -247,7 +249,9 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	assert.Equal(t, "/custom/env/path", config.EnvStorePath)
 	assert.Equal(t, false, config.CleanupAutoStart)
 	assert.Equal(t, false, config.EnableCaching)
-	assert.Equal(t, 30*time.Second, config.ShutdownTimeout)
+    assert.Equal(t, 30*time.Second, config.ShutdownTimeout)
+    assert.Equal(t, "rewrite-java:8.1.0,rewrite-spring:5.0.0", config.ArfDefaultPacks)
+    assert.Equal(t, "https://registry.example/openrewrite", config.ArfRegistryURL)
 }
 
 func TestLoadConfigFromEnvDefaults(t *testing.T) {
