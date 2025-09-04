@@ -1,15 +1,15 @@
 package preview
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"regexp"
-	"strings"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "regexp"
+    "strings"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/nomad"
+    "github.com/gofiber/fiber/v2"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 var previewHostRe = regexp.MustCompile(`^(?P<sha>[a-f0-9]{7,40})\.(?P<app>[a-z0-9-]+)\.ployd\.app(?::\d+)?$`)
@@ -35,12 +35,13 @@ func Router(c *fiber.Ctx) error {
 	b, _ := io.ReadAll(resp.Body)
 
 	jobName := fmt.Sprintf("%s-%s", app, sha)
-	if nomad.IsJobHealthy(jobName) {
-		endpoint, err := nomad.GetJobEndpoint(jobName)
-		if err == nil {
-			return c.Redirect(endpoint)
-		}
-	}
+    monitor := orchestration.NewHealthMonitor()
+    if monitor.IsJobHealthy(jobName) {
+        endpoint, err := monitor.GetJobEndpoint(jobName)
+        if err == nil {
+            return c.Redirect(endpoint)
+        }
+    }
 	
 	c.Set("Content-Type","application/json")
 	c.Set("Retry-After","3")
