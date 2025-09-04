@@ -51,3 +51,13 @@ func newNomadClient() (*nomadapi.Client, error) {
     return nomadapi.NewClient(cfg)
 }
 
+// DeregisterJob deregisters a job by name; if purge is true, allocations are purged
+func DeregisterJob(jobName string, purge bool) error {
+    client, err := newNomadClient()
+    if err != nil { return err }
+    _, _, err = client.Jobs().Deregister(jobName, purge, nil)
+    if err != nil {
+        return fmt.Errorf("deregister job: %w", err)
+    }
+    return nil
+}
