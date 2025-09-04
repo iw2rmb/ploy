@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	models "github.com/iw2rmb/ploy/internal/arf/models"
 	"gopkg.in/yaml.v3"
 )
 
@@ -75,7 +75,7 @@ var builtInTemplates = map[string]RecipeTemplate{
 			Steps: []models.RecipeStep{
 				{
 					Name: "Apply OpenRewrite Recipe",
-					Type: models.StepTypeOpenRewrite,
+					Type: "openrewrite",
 					Config: map[string]interface{}{
 						"recipe":    "{{.OpenRewriteRecipe}}",
 						"dataTable": map[string]interface{}{},
@@ -134,7 +134,7 @@ var builtInTemplates = map[string]RecipeTemplate{
 			Steps: []models.RecipeStep{
 				{
 					Name: "Execute Shell Script",
-					Type: models.StepTypeShellScript,
+					Type: "shell",
 					Config: map[string]interface{}{
 						"script":      "{{.Script}}",
 						"interpreter": "{{.Interpreter}}",
