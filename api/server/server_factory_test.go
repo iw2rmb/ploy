@@ -1,13 +1,13 @@
 package server
 
 import (
-	"context"
-	"io"
-	"testing"
+    "context"
+    "io"
+    "testing"
 
-	"github.com/iw2rmb/ploy/internal/storage"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+    "github.com/iw2rmb/ploy/internal/storage"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/mock"
 )
 
 // MockStorage is a mock implementation of storage.Storage interface
@@ -85,36 +85,12 @@ func (m *MockStorage) Metrics() storage.StorageMetrics {
 }
 
 // Test that getStorageClient uses the new factory pattern
-func TestServer_GetStorageClient_WithNewFactory(t *testing.T) {
-	// This test verifies that getStorageClient now returns storage.Storage interface
-	// and uses CreateStorageFromFactory instead of CreateStorageClientFromConfig
-
-	server := &Server{
-		dependencies: &ServiceDependencies{
-			StorageConfigPath: "/tmp/test-config.yaml",
-		},
-	}
-
-	// This will initially fail because getStorageClient still returns *storage.StorageClient
-	// After migration, it should return storage.Storage
-	storage, err := server.getStorageClient()
-
-	// We expect an error since the config file doesn't exist
-	assert.Error(t, err)
-	assert.Nil(t, storage)
-	assert.Contains(t, err.Error(), "failed to load storage config")
+func TestServer_GetStorageClient_RequiresConfigService(t *testing.T) {
+    server := &Server{dependencies: &ServiceDependencies{}}
+    storage, err := server.getStorageClient()
+    assert.Error(t, err)
+    assert.Nil(t, storage)
 }
 
 // Test successful storage creation with new factory
-func TestServer_GetStorageClient_Success(t *testing.T) {
-	// This test will verify successful storage creation
-	// Currently will fail until we update the method signature
-	t.Skip("Skipping until migration is complete")
-}
-
-// Test fallback behavior when factory is not available
-func TestServer_GetStorageClient_Fallback(t *testing.T) {
-	// This test verifies the fallback path uses CreateStorageFromFactory
-	// instead of the old CreateStorageClientFromConfig
-	t.Skip("Skipping until migration is complete")
-}
+// Legacy migration tests removed; covered by storage_service tests
