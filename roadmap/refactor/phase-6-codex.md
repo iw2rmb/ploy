@@ -20,7 +20,7 @@ Core packages inside `internal/*` import `api/*` symbols, reversing the intended
 
 - Examples (imports from `internal/*` to `api/*`):
   - `internal/build/*.go` → `github.com/iw2rmb/ploy/api/builders`, `api/envstore`, `api/nomad`, `api/opa`, `api/supply`
-  - `internal/preview/router.go` → `github.com/iw2rmb/ploy/api/nomad`
+- `internal/preview/router.go` → now uses `internal/orchestration` facade (Nomad health + endpoint)
   - `internal/debug/handler.go` → `github.com/iw2rmb/ploy/api/*`
   - `internal/cli/*` → `github.com/iw2rmb/ploy/api/analysis`, `api/arf/*`
 
@@ -216,4 +216,3 @@ Recommendation:
 - VPS and deployment flows must continue to use the platform’s Nomad invocation rules; do not introduce direct Nomad CLI usage.
 - API deployment lanes remain auto‑selected; ensure the refactor keeps the Lane G (WASM) rules intact.
 - Keep unit tests humming locally (≥60% coverage; 90% for critical paths), then exercise E2E on VPS per CLAUDE.md.
-
