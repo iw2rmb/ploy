@@ -6,18 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/nomad"
+    "github.com/gofiber/fiber/v2"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // Handler manages template operations
-type Handler struct {
-	consulClient *nomad.ConsulTemplateClient
-}
+type Handler struct { consulClient *orchestration.ConsulTemplateClient }
 
 // NewHandler creates a new template handler
 func NewHandler() (*Handler, error) {
-	consulClient, err := nomad.NewConsulTemplateClient()
+    consulClient, err := orchestration.NewConsulTemplateClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consul template client: %w", err)
 	}
