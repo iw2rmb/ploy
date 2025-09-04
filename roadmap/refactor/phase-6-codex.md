@@ -220,7 +220,9 @@ Progress (Sep 4):
   - Health monitor now uses Nomad SDK via injectable adapter; HTTP calls removed.
   - Consul health checks now use Consul SDK via injectable adapter; HTTP calls removed.
   - Added constructor for injection in tests (`NewHealthMonitorWithClient`).
-- [ ] API server and CLI resolve storage via `internal/config.Service` only.
+- [x] API server and CLI resolve storage via `internal/config.Service` only.
+  - API server eliminates `api/config` factory usage; storage resolved via `internal/config.Service`.
+  - Added adapter to bridge unified Storage to legacy provider where needed (self-update).
 - [x] HTTP errors use a single envelope with typed codes; tests assert shape.
 - [x] Traefik tags and domain KV are generated via shared helpers.
   - Tags centralized via `internal/routing/BuildTraefikTags` and used by API routing.
