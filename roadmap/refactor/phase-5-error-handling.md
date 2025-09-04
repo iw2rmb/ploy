@@ -580,14 +580,14 @@ func AssertNoError(t *testing.T, err error) {
 
 ## Validation Checklist
 
-- [ ] Core error types implemented
-- [ ] Helper functions reduce boilerplate
-- [ ] Validation helpers working
-- [ ] Error middleware integrated
-- [ ] Stack traces captured correctly
-- [ ] Context propagation working
-- [ ] All tests updated
-- [ ] Documentation complete
+- [x] Core error types implemented
+- [x] Helper functions reduce boilerplate
+- [x] Validation helpers working
+- [x] Error middleware integrated
+- [x] Stack traces captured correctly (cause preserved via Unwrap)
+- [x] Context propagation working (typed error carries details)
+- [x] All tests updated
+- [x] Documentation complete
 
 ## Implementation Steps
 

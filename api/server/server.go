@@ -51,7 +51,8 @@ import (
     trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
     arfcore "github.com/iw2rmb/ploy/internal/arf/core"
     tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
-	"github.com/iw2rmb/ploy/internal/utils"
+    "github.com/iw2rmb/ploy/internal/utils"
+    apperr "github.com/iw2rmb/ploy/internal/errors"
 )
 
 // ServiceDependencies holds all external service dependencies
@@ -198,11 +199,18 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 		WriteTimeout:          10 * time.Minute, // 10-minute response timeout
 		IdleTimeout:           60 * time.Second, // Connection idle timeout
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			log.Printf("Request error: %v", err)
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Internal server error",
-			})
-		},
+                // Map to typed error
+                te := apperr.From(err)
+                // Log server-side
+                log.Printf("Request error: code=%s status=%d msg=%s cause=%v", te.Code, te.HTTPStatus, te.Message, te.Unwrap())
+                return c.Status(te.HTTPStatus).JSON(fiber.Map{
+                    "error": fiber.Map{
+                        "code":    te.Code,
+                        "message": te.Message,
+                        "details": te.Details,
+                    },
+                })
+            },
 	})
 
 	// Add middleware with detailed panic recovery
