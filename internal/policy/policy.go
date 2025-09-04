@@ -10,6 +10,13 @@ type ArtifactInput struct {
     App         string
     Lane        string
     Debug       bool
+    ImageSizeMB    float64
+    ImagePath      string
+    DockerImage    string
+    VulnScanPassed bool
+    SigningMethod  string
+    BuildTime      int64
+    SourceRepo     string
 }
 
 // Enforcer defines policy enforcement behavior
@@ -23,4 +30,3 @@ var DefaultEnforcer Enforcer = allowAll{}
 type allowAll struct{}
 
 func (allowAll) Enforce(ArtifactInput) error { return nil }
-

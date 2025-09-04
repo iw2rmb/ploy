@@ -6,7 +6,9 @@
 - Roadmap report `roadmap/refactor/phase-6-codex.md` documenting redundant code and architecture issues across `api/*` and `internal/*`.
 - Progress markers and acceptance criteria checkboxes reflecting current status (error contract DONE; preview router migrated).
 - internal/routing: Introduced `BuildTraefikTags` helper with unit tests to begin Traefik tag consolidation (Phase 6.5).
- - internal/arf/models: New minimal models to decouple CLI from API models; CLI switched to internal models where practical (Phase 6.1 slice).
+- internal/arf/models: New minimal models to decouple CLI from API models; CLI switched to internal models where practical (Phase 6.1 slice).
+ - internal/policy: Configurable enforcer (env-driven) with size caps per lane, signature/SBOM checks for strict envs, and vuln-scan requirement for images; unit tests added.
+ - internal/builders and internal/supply facades: adapters around api/builders and api/supply to remove internal→api imports from build flow.
 
 ### Highlights
 - Identified layering inversion where `internal/*` imports from `api/*` (critical).
