@@ -38,28 +38,12 @@ func TestServerMustUseFactoryPattern(t *testing.T) {
 
 // TestHealthCheckerUsesFactoryPattern verifies health.go uses factory pattern
 // TODO: This will be addressed in the next migration step
-func TestHealthCheckerUsesFactoryPattern(t *testing.T) {
-	t.Skip("Skipping - health.go migration will be done in next step")
-	
-	// Read health.go source code
-	healthCode, err := os.ReadFile("../health/health.go")
-	require.NoError(t, err)
-
-	healthStr := string(healthCode)
-
-	// Count occurrences of CreateStorageClientFromConfig in health.go
-	// Should be 0 after migration
-	count := 0
-	searchStr := "CreateStorageClientFromConfig"
-	for i := 0; i < len(healthStr); i++ {
-		if i+len(searchStr) <= len(healthStr) && healthStr[i:i+len(searchStr)] == searchStr {
-			count++
-			i += len(searchStr) - 1
-		}
-	}
-
-	// This test will fail until we complete the migration
-	assert.Equal(t, 0, count, "health.go should use factory pattern, not CreateStorageClientFromConfig. Found %d occurrences", count)
+func TestHealthChecker_NoLegacyFactoryUsage(t *testing.T) {
+    healthCode, err := os.ReadFile("../health/health.go")
+    require.NoError(t, err)
+    s := string(healthCode)
+    assert.NotContains(t, s, "CreateStorageClientFromConfig")
+    assert.NotContains(t, s, "CreateStorageFromFactory")
 }
 
 // Helper to write test config
