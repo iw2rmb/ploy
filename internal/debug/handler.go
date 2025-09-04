@@ -10,7 +10,7 @@ import (
     "github.com/gofiber/fiber/v2"
     "github.com/iw2rmb/ploy/api/builders"
     envstore "github.com/iw2rmb/ploy/internal/envstore"
-    "github.com/iw2rmb/ploy/api/nomad"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
     "github.com/iw2rmb/ploy/api/opa"
     "github.com/iw2rmb/ploy/internal/utils"
 )
@@ -73,22 +73,22 @@ func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	}
 	
 	debugInstanceName := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
-	renderData := nomad.RenderData{
-		App:         debugInstanceName,
-		ImagePath:   debugResult.ImagePath,
-		DockerImage: debugResult.DockerImage,
-		EnvVars:     envVars,
-		IsDebug:     true,
-	}
-	
-	templatePath, err := nomad.RenderTemplate(lane, renderData)
-	if err != nil {
-		return utils.ErrJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))
-	}
-	
-	if err := nomad.Submit(templatePath); err != nil {
-		return utils.ErrJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
-	}
+    renderData := orchestration.RenderData{
+        App:         debugInstanceName,
+        ImagePath:   debugResult.ImagePath,
+        DockerImage: debugResult.DockerImage,
+        EnvVars:     envVars,
+        IsDebug:     true,
+    }
+
+    templatePath, err := orchestration.RenderTemplate(lane, renderData)
+    if err != nil {
+        return utils.ErrJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))
+    }
+
+    if err := orchestration.Submit(templatePath); err != nil {
+        return utils.ErrJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
+    }
 	
 	os.Remove(templatePath)
 	

@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+    "github.com/gofiber/fiber/v2"
     "github.com/iw2rmb/ploy/api/builders"
     envstore "github.com/iw2rmb/ploy/internal/envstore"
-	"github.com/iw2rmb/ploy/api/nomad"
-	"github.com/iw2rmb/ploy/api/opa"
-	"github.com/iw2rmb/ploy/api/supply"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "github.com/iw2rmb/ploy/api/opa"
+    "github.com/iw2rmb/ploy/api/supply"
 	"github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/git"
 	"github.com/iw2rmb/ploy/internal/harbor"
@@ -443,7 +443,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Use enhanced templates with comprehensive configuration
-	jobFile, err := nomad.RenderTemplate(lane, nomad.RenderData{
+    jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
 		App:         appName,
 		ImagePath:   imagePath,
 		DockerImage: dockerImage,
@@ -480,11 +480,11 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		return utils.ErrJSON(c, 500, err)
 	}
 
-	if err := nomad.Submit(jobFile); err != nil {
-		return utils.ErrJSON(c, 500, err)
-	}
+    if err := orchestration.Submit(jobFile); err != nil {
+        return utils.ErrJSON(c, 500, err)
+    }
 
-	_ = nomad.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
+    _ = orchestration.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
 
 	// Prefer unified storage interface if available, fallback to legacy StorageClient
 	if deps.Storage != nil {
