@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	consulapi "github.com/hashicorp/consul/api"
-	nomadapi "github.com/hashicorp/nomad/api"
-	"github.com/iw2rmb/ploy/internal/storage"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    istorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
 // AnalysisJob represents a code analysis job
@@ -34,48 +33,26 @@ type AnalysisJob struct {
 
 // AnalysisDispatcher handles job dispatch and monitoring for code analysis
 type AnalysisDispatcher struct {
-	nomadClient    *nomadapi.Client
-	consulClient   *consulapi.Client
-	storageClient  *storage.StorageClient
-	jobTemplates   map[string]*template.Template
-	storageBaseURL string
+    kv             orchestration.KV
+    storage        istorage.Storage
+    jobTemplates   map[string]*template.Template
+    storageBaseURL string
 }
 
 // NewAnalysisDispatcher creates a new dispatcher
-func NewAnalysisDispatcher(nomadAddr, consulAddr string, storageClient *storage.StorageClient) (*AnalysisDispatcher, error) {
-	// Create Nomad client
-	nomadConfig := nomadapi.DefaultConfig()
-	if nomadAddr != "" {
-		nomadConfig.Address = nomadAddr
-	}
-	nomadClient, err := nomadapi.NewClient(nomadConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Nomad client: %w", err)
-	}
-
-	// Create Consul client
-	consulConfig := consulapi.DefaultConfig()
-	if consulAddr != "" {
-		consulConfig.Address = consulAddr
-	}
-	consulClient, err := consulapi.NewClient(consulConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Consul client: %w", err)
-	}
-
+func NewAnalysisDispatcherOrchestration(storage istorage.Storage) (*AnalysisDispatcher, error) {
 	// Get storage base URL from environment
 	storageBaseURL := "http://seaweedfs-filer.service.consul:8888"
 	if url := os.Getenv("SEAWEEDFS_URL"); url != "" {
 		storageBaseURL = url
 	}
 
-	dispatcher := &AnalysisDispatcher{
-		nomadClient:    nomadClient,
-		consulClient:   consulClient,
-		storageClient:  storageClient,
-		jobTemplates:   make(map[string]*template.Template),
-		storageBaseURL: storageBaseURL,
-	}
+    dispatcher := &AnalysisDispatcher{
+        kv:             orchestration.NewKV(),
+        storage:        storage,
+        jobTemplates:   make(map[string]*template.Template),
+        storageBaseURL: storageBaseURL,
+    }
 
 	// Load job templates for different analyzers
 	if err := dispatcher.loadJobTemplates(); err != nil {
@@ -446,27 +423,22 @@ func (d *AnalysisDispatcher) SubmitJob(ctx context.Context, analyzer string, inp
 
 // GetJob retrieves job status from Consul
 func (d *AnalysisDispatcher) GetJob(ctx context.Context, jobID string) (*AnalysisJob, error) {
-	kv := d.consulClient.KV()
+    // Get job data
+    data, err := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s", jobID))
+    if err != nil { return nil, fmt.Errorf("failed to get job from Consul: %w", err) }
+    if data == nil {
+        return nil, fmt.Errorf("job not found: %s", jobID)
+    }
 
-	// Get job data
-	pair, _, err := kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s", jobID), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job from Consul: %w", err)
-	}
-	if pair == nil {
-		return nil, fmt.Errorf("job not found: %s", jobID)
-	}
+    var job AnalysisJob
+    if err := json.Unmarshal(data, &job); err != nil {
+        return nil, fmt.Errorf("failed to unmarshal job: %w", err)
+    }
 
-	var job AnalysisJob
-	if err := json.Unmarshal(pair.Value, &job); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
-	}
-
-	// Check for completion
-	statusPair, _, _ := kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/status", jobID), nil)
-	if statusPair != nil {
-		job.Status = string(statusPair.Value)
-	}
+    // Check for completion
+    if status, _ := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/status", jobID)); status != nil {
+        job.Status = string(status)
+    }
 
 	// Get result if completed
 	if job.Status == "completed" {
@@ -513,8 +485,8 @@ func (d *AnalysisDispatcher) WaitForCompletion(ctx context.Context, jobID string
 func (d *AnalysisDispatcher) ListJobs(ctx context.Context, limit int) ([]*AnalysisJob, error) {
 	kv := d.consulClient.KV()
 
-	// List all job keys
-	keys, _, err := kv.Keys("ploy/analysis/jobs/", "/", nil)
+    // List all job keys
+    keys, err := d.kv.Keys("ploy/analysis/jobs/", "/")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
@@ -557,8 +529,8 @@ func (d *AnalysisDispatcher) uploadInput(ctx context.Context, jobID string, inpu
 	}
 
 	// Upload to storage
-	reader := bytes.NewReader(buf.Bytes())
-	_, err := d.storageClient.PutObject(bucket, key, reader, "application/gzip")
+    reader := bytes.NewReader(buf.Bytes())
+    err := d.storage.Put(ctx, fmt.Sprintf("%s/%s", bucket, key), reader)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload to storage: %w", err)
 	}
@@ -568,20 +540,11 @@ func (d *AnalysisDispatcher) uploadInput(ctx context.Context, jobID string, inpu
 
 // storeJob stores job in Consul KV
 func (d *AnalysisDispatcher) storeJob(job *AnalysisJob) error {
-	kv := d.consulClient.KV()
-
-	data, err := json.Marshal(job)
-	if err != nil {
-		return fmt.Errorf("failed to marshal job: %w", err)
-	}
-
-	p := &consulapi.KVPair{
-		Key:   fmt.Sprintf("ploy/analysis/jobs/%s", job.ID),
-		Value: data,
-	}
-
-	_, err = kv.Put(p, nil)
-	return err
+    data, err := json.Marshal(job)
+    if err != nil {
+        return fmt.Errorf("failed to marshal job: %w", err)
+    }
+    return d.kv.Put(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID), data)
 }
 
 // submitToNomad submits the job to Nomad
@@ -619,19 +582,13 @@ func (d *AnalysisDispatcher) submitToNomad(job *AnalysisJob) error {
 		return fmt.Errorf("failed to generate job HCL: %w", err)
 	}
 
-	// Parse HCL to Job struct
-	nomadJob, err := d.nomadClient.Jobs().ParseHCL(buf.String(), true)
-	if err != nil {
-		return fmt.Errorf("failed to parse job HCL: %w", err)
-	}
-
-	// Submit job
-	_, _, err = d.nomadClient.Jobs().Register(nomadJob, nil)
-	if err != nil {
-		return fmt.Errorf("failed to register job with Nomad: %w", err)
-	}
-
-	return nil
+    hcl := buf.String()
+    tmp, err := os.CreateTemp("", "analysis-*.hcl")
+    if err != nil { return err }
+    defer os.Remove(tmp.Name())
+    if _, err := tmp.WriteString(hcl); err != nil { return err }
+    tmp.Close()
+    return orchestration.Submit(tmp.Name())
 }
 
 // getLanguageForAnalyzer returns the language associated with an analyzer
