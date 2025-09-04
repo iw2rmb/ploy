@@ -177,8 +177,10 @@ Recommendation:
 
 6) Cleanup and Dedupe (Phase 6.6)
 - [x] Introduce shared env utilities in `internal/utils` (e.g., `Getenv`).
-- [ ] Replace scattered inline `getenv` usages (preview/orchestration/cleanup) with shared helper.
-- [ ] Remove deprecated cert endpoints under `internal/cert/*` after migration window.
+- [x] Replace scattered inline `getenv` usages (preview/orchestration/cleanup) with shared helper.
+  - Implemented in `internal/orchestration/render.go` and `internal/cleanup/config.go`; preview already used helpers.
+- [x] Remove deprecated cert endpoints under `internal/cert/*` after migration window.
+  - Deleted `internal/cert/handler.go` (legacy stubs). No active routes referenced it.
 - [ ] Unify small config types (retry/cache) on the `internal/config` + `internal/storage/factory` axis.
 
 ## Prioritization (Risk x Blast Radius)
@@ -214,6 +216,7 @@ Progress (Sep 4):
 - [ ] API server and CLI resolve storage via `internal/config.Service` only.
 - [x] HTTP errors use a single envelope with typed codes; tests assert shape.
 - [ ] Traefik tags and domain KV are generated via shared helpers.
+  - Tags now centralized via `internal/routing/BuildTraefikTags` and used by API routing. Domain KV helpers pending.
 
 ## Progress (Sep 4, 2025)
 
