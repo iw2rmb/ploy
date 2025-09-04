@@ -65,6 +65,15 @@ type Recipe struct {
     Execution  ExecutionConfig `json:"execution,omitempty"`
 }
 
+// ASTCacheStats used by CLI health endpoint
+type ASTCacheStats struct {
+    Hits        int     `json:"hits"`
+    Misses      int     `json:"misses"`
+    HitRate     float64 `json:"hit_rate"`
+    Size        int     `json:"size"`
+    MemoryUsage int     `json:"memory_usage"`
+}
+
 // Duration mirrors common duration wrapper used by API models
 type Duration struct { Duration time.Duration }
 
