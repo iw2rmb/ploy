@@ -1,11 +1,10 @@
 package orchestration
 
 import (
-    "encoding/json"
     "fmt"
-    "net/http"
     "time"
 
+    consulapi "github.com/hashicorp/consul/api"
     "github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -18,39 +17,18 @@ type ServiceHealth struct {
 }
 
 // ConsulHealth provides service health queries via Consul HTTP API
-type ConsulHealth struct {
-    consulAddr string
-    httpClient *http.Client
-}
+type consulAdapter interface { Checks(service string) ([]*ServiceHealth, error) }
+
+type ConsulHealth struct { client consulAdapter }
 
 // NewConsulHealth returns a health client using CONSUL_ADDR or default
-func NewConsulHealth() *ConsulHealth {
-    return &ConsulHealth{
-        consulAddr: utils.Getenv("CONSUL_ADDR", "http://127.0.0.1:8500"),
-        httpClient: &http.Client{Timeout: 10 * time.Second},
-    }
-}
+func NewConsulHealth() *ConsulHealth { return &ConsulHealth{client: newConsulSDKAdapter()} }
+
+// NewConsulHealthWithClient constructs a Consul health with provided adapter (tests)
+func NewConsulHealthWithClient(adapter consulAdapter) *ConsulHealth { return &ConsulHealth{client: adapter} }
 
 // CheckServiceHealth gets health checks for a service
-func (h *ConsulHealth) CheckServiceHealth(serviceName string) ([]*ServiceHealth, error) {
-    url := fmt.Sprintf("%s/v1/health/checks/%s", h.consulAddr, serviceName)
-    resp, err := h.httpClient.Get(url)
-    if err != nil {
-        return nil, fmt.Errorf("failed to fetch service health: %w", err)
-    }
-    defer resp.Body.Close()
-    if resp.StatusCode == http.StatusNotFound {
-        return nil, nil
-    }
-    if resp.StatusCode != http.StatusOK {
-        return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-    }
-    var checks []*ServiceHealth
-    if err := json.NewDecoder(resp.Body).Decode(&checks); err != nil {
-        return nil, fmt.Errorf("failed to decode service health: %w", err)
-    }
-    return checks, nil
-}
+func (h *ConsulHealth) CheckServiceHealth(serviceName string) ([]*ServiceHealth, error) { return h.client.Checks(serviceName) }
 
 // WaitForServiceHealth waits until all checks are passing or timeout
 func (h *ConsulHealth) WaitForServiceHealth(serviceName string, timeout time.Duration) error {
@@ -76,4 +54,25 @@ func (h *ConsulHealth) WaitForServiceHealth(serviceName string, timeout time.Dur
         time.Sleep(2 * time.Second)
     }
     return fmt.Errorf("timeout waiting for service %s to be healthy", serviceName)
+}
+
+// SDK adapter
+type consulSDKAdapter struct { client *consulapi.Client }
+
+func newConsulSDKAdapter() *consulSDKAdapter {
+    cfg := consulapi.DefaultConfig()
+    if addr := utils.Getenv("CONSUL_ADDR", ""); addr != "" { cfg.Address = addr }
+    c, _ := consulapi.NewClient(cfg)
+    return &consulSDKAdapter{client: c}
+}
+
+func (a *consulSDKAdapter) Checks(service string) ([]*ServiceHealth, error) {
+    if a.client == nil { return nil, fmt.Errorf("consul client unavailable") }
+    checks, _, err := a.client.Health().Checks(service, nil)
+    if err != nil { return nil, err }
+    out := make([]*ServiceHealth, 0, len(checks))
+    for _, hc := range checks {
+        out = append(out, &ServiceHealth{ServiceName: hc.ServiceName, CheckID: hc.CheckID, Status: hc.Status, Output: hc.Output})
+    }
+    return out, nil
 }
