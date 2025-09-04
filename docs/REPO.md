@@ -495,14 +495,6 @@ lanes/
     └── kraft.yaml              # Kraft configuration
 ```
 
-### `/manifests/` - Application Manifests
-Application deployment configuration examples.
-
-```
-manifests/
-└── java-ordersvc.yaml          # Java order service manifest example
-```
-
 ### `/policies/` - Security Policies
 Open Policy Agent security policies.
 
