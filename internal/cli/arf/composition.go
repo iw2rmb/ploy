@@ -1,12 +1,11 @@
 package arf
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
-	"time"
-
-	"github.com/iw2rmb/ploy/api/arf/models"
+    "encoding/json"
+    "fmt"
+    "strings"
+    "time"
+    models "github.com/iw2rmb/ploy/internal/arf/models"
 )
 
 // RecipeComposition represents a composition of multiple recipes

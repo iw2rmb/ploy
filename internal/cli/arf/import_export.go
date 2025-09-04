@@ -1,18 +1,18 @@
 package arf
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"compress/gzip"
-	"encoding/json"
-	"fmt"
-	"io"
-	"os"
-	"strings"
-	"time"
+    "archive/tar"
+    "archive/zip"
+    "compress/gzip"
+    "encoding/json"
+    "fmt"
+    "io"
+    "os"
+    "strings"
+    "time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
-	"gopkg.in/yaml.v3"
+    models "github.com/iw2rmb/ploy/internal/arf/models"
+    "gopkg.in/yaml.v3"
 )
 
 // ArchiveFormat represents supported archive formats
