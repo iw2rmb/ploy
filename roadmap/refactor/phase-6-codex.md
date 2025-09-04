@@ -181,7 +181,8 @@ Recommendation:
   - Implemented in `internal/orchestration/render.go` and `internal/cleanup/config.go`; preview already used helpers.
 - [x] Remove deprecated cert endpoints under `internal/cert/*` after migration window.
   - Deleted `internal/cert/handler.go` (legacy stubs). No active routes referenced it.
-- [ ] Unify small config types (retry/cache) on the `internal/config` + `internal/storage/factory` axis.
+- [x] Unify small config types (retry/cache) on the `internal/config` + `internal/storage/factory` axis.
+  - Mapping verified via `internal/config/factory_mapping_test.go`; server uses only `internal/config.Service`.
 
 ## Prioritization (Risk x Blast Radius)
 
