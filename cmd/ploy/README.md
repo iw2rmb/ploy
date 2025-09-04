@@ -26,7 +26,7 @@ Streams a tar of the working tree (respects `.gitignore`) to the api, which lane
 ```
 ploy open <app>
 ```
-Opens the app domain from `manifests/<app>.yaml` or falls back to `<app>.ployd.app`.
+Opens the app domain at `<app>.ployd.app`.
 
 ### `ploy domains` (implemented)
 ```
