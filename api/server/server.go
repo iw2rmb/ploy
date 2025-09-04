@@ -24,7 +24,6 @@ import (
 	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/certificates"
-    // "github.com/iw2rmb/ploy/api/config" // deprecated
 	"github.com/iw2rmb/ploy/api/consul_envstore"
 	"github.com/iw2rmb/ploy/api/coordination"
 	"github.com/iw2rmb/ploy/api/dns"
@@ -1746,14 +1745,22 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, c
     if analysisMode == "nomad" {
         if cfgService == nil {
             log.Printf("Analysis nomad mode requested but config service unavailable; falling back to legacy mode")
+            analysisMode = "legacy"
         } else {
-            log.Printf("Analysis nomad mode enabled; using centralized configuration for job dispatch")
-            // For now, fall back to legacy local analyzers to avoid api/config factory.
-            // A future slice can introduce a dispatcher using unified storage.
+            // Create Nomad‑based dispatcher using unified storage from config service
+            st, err := cfgService.Get().CreateStorageClient()
+            if err != nil {
+                return nil, fmt.Errorf("failed to create storage for analysis: %w", err)
+            }
+            dispatcher, err := analysis.NewAnalysisDispatcherOrchestration(st)
+            if err != nil {
+                return nil, fmt.Errorf("failed to create analysis dispatcher: %w", err)
+            }
+            engine = analysis.NewEngineWithDispatcher(logger, dispatcher)
+            log.Printf("Initialized Nomad-based analysis engine with unified storage")
         }
-        analysisMode = "legacy"
     }
-    if analysisMode == "legacy" {
+    if analysisMode == "legacy" || engine == nil {
 		// Create legacy engine with local analyzers
 		engine = analysis.NewEngine(logger)
 
