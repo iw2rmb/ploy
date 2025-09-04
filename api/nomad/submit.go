@@ -1,27 +1,15 @@
 package nomad
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
-// Submit submits a job with basic monitoring (backward compatible)
+// Submit submits a job using the unified internal orchestration client.
 func Submit(jobPath string) error {
-	// Validate job first
-	if err := ValidateJob(jobPath); err != nil {
-		return fmt.Errorf("job validation failed: %w", err)
-	}
-	
-	// Use robust submission with monitoring
-	// Default to 2 instances and 3 retries
-	return RobustSubmit(jobPath, 2, 3)
+    return orchestration.Submit(jobPath)
 }
 
-// SubmitBasic performs basic job submission without monitoring (original behavior)
+// SubmitBasic delegates to the same unified submission path.
 func SubmitBasic(jobPath string) error {
-	cmd := exec.Command("nomad", "job", "run", jobPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+    return orchestration.Submit(jobPath)
 }
