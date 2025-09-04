@@ -1,11 +1,13 @@
 package cleanup
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
-	"time"
+    "encoding/json"
+    "fmt"
+    "os"
+    "path/filepath"
+    "time"
+
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 // ConfigManager manages TTL cleanup configuration
@@ -165,31 +167,31 @@ func LoadConfigFromEnv() *TTLConfig {
 	config := DefaultTTLConfig()
 	
 	// Override with environment variables if present
-	if ttl := os.Getenv("PLOY_PREVIEW_TTL"); ttl != "" {
-		if duration, err := time.ParseDuration(ttl); err == nil {
-			config.PreviewTTL = duration
-		}
-	}
-	
-	if interval := os.Getenv("PLOY_CLEANUP_INTERVAL"); interval != "" {
-		if duration, err := time.ParseDuration(interval); err == nil {
-			config.CleanupInterval = duration
-		}
-	}
-	
-	if maxAge := os.Getenv("PLOY_MAX_PREVIEW_AGE"); maxAge != "" {
-		if duration, err := time.ParseDuration(maxAge); err == nil {
-			config.MaxAge = duration
-		}
-	}
-	
-	if dryRun := os.Getenv("PLOY_CLEANUP_DRY_RUN"); dryRun == "true" {
-		config.DryRun = true
-	}
-	
-	if nomadAddr := os.Getenv("NOMAD_ADDR"); nomadAddr != "" {
-		config.NomadAddr = nomadAddr
-	}
+    if ttl := utils.Getenv("PLOY_PREVIEW_TTL", ""); ttl != "" {
+        if duration, err := time.ParseDuration(ttl); err == nil {
+            config.PreviewTTL = duration
+        }
+    }
+
+    if interval := utils.Getenv("PLOY_CLEANUP_INTERVAL", ""); interval != "" {
+        if duration, err := time.ParseDuration(interval); err == nil {
+            config.CleanupInterval = duration
+        }
+    }
+
+    if maxAge := utils.Getenv("PLOY_MAX_PREVIEW_AGE", ""); maxAge != "" {
+        if duration, err := time.ParseDuration(maxAge); err == nil {
+            config.MaxAge = duration
+        }
+    }
+
+    if dryRun := utils.Getenv("PLOY_CLEANUP_DRY_RUN", ""); dryRun == "true" {
+        config.DryRun = true
+    }
+
+    if nomadAddr := utils.Getenv("NOMAD_ADDR", ""); nomadAddr != "" {
+        config.NomadAddr = nomadAddr
+    }
 	
 	return config
 }
