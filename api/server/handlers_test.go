@@ -284,7 +284,9 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	assert.Equal(t, true, config.UseConsulEnv)
 	assert.Equal(t, "/tmp/ploy-env-store", config.EnvStorePath)
 	assert.Equal(t, true, config.CleanupAutoStart)
-	assert.Equal(t, true, config.EnableCaching)
+    assert.Equal(t, true, config.EnableCaching)
+    assert.Equal(t, "", config.ArfDefaultPacks)
+    assert.Equal(t, "https://registry.dev.ployman.app", config.ArfRegistryURL)
 }
 
 // Removed legacy file-based storage config tests. Configuration now requires
