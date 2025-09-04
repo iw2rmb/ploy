@@ -4170,3 +4170,8 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
 
 ### Notes
 - Currently returns an empty list via in-memory implementation; next slices will adapt storage-backed catalog into internal/arf to provide real data.
+### Added (Transflow Roadmap)
+- roadmap/transflow/: New multi‑stream plan focused on reusing existing features
+  - Stream 1 MVP: OpenRewrite + self‑healing build (phase‑1)
+  - Stream 2: LLM‑Plan + LLM‑Exec (phase‑1)
+  - Stream 3: GitLab MR creation (phase‑1)
