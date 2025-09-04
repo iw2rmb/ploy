@@ -1,89 +1,41 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"strings"
+    "fmt"
+    "io"
+    "log"
+    "os"
 
-	"github.com/iw2rmb/ploy/api/config"
-	"github.com/iw2rmb/ploy/internal/storage"
+    cfgsvc "github.com/iw2rmb/ploy/internal/config"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		log.Fatal("Usage: test-upload <binary-path>")
-	}
+    if len(os.Args) < 2 {
+        log.Fatal("Usage: test-upload <binary-path>")
+    }
+    binaryPath := os.Args[1]
 
-	binaryPath := os.Args[1]
+    svc, err := cfgsvc.New(
+        cfgsvc.WithFile(cfgsvc.Getenv("PLOY_STORAGE_CONFIG", "")),
+        cfgsvc.WithEnvironment("PLOY_"),
+        cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+    )
+    if err != nil { log.Fatalf("failed to init config: %v", err) }
+    cfg := svc.Get()
+    store, err := cfg.CreateStorageClient()
+    if err != nil { log.Fatalf("failed to create storage: %v", err) }
 
-	// Load config
-	configPath := config.GetStorageConfigPath()
-	cfg, err := config.Load(configPath)
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
+    file, err := os.Open(binaryPath)
+    if err != nil { log.Fatalf("failed to open file: %v", err) }
+    defer file.Close()
 
-	// Create client
-	seaweedfsConfig := storage.SeaweedFSConfig{
-		Master:      cfg.Storage.Master,
-		Filer:       cfg.Storage.Filer,
-		Collection:  cfg.Storage.Collection,
-		Replication: cfg.Storage.Replication,
-		Timeout:     cfg.Storage.Timeout,
-		DataCenter:  cfg.Storage.DataCenter,
-		Rack:        cfg.Storage.Rack,
-	}
+    key := fmt.Sprintf("%s/%s", cfg.Storage.Bucket, "api-binaries/test/api")
+    if err := store.Put(nil, key, file); err != nil { log.Fatalf("upload failed: %v", err) }
 
-	client, err := storage.NewSeaweedFSClient(seaweedfsConfig)
-	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
-	}
-
-	// Open binary file
-	file, err := os.Open(binaryPath)
-	if err != nil {
-		log.Fatalf("Failed to open binary: %v", err)
-	}
-	defer file.Close()
-
-	// Upload to simple path
-	bucket := cfg.Storage.Collections.Artifacts
-	key := "api-binaries/test/api"
-
-	fmt.Printf("Uploading %s to %s/%s...\n", binaryPath, bucket, key)
-	result, err := client.PutObject(bucket, key, file, "application/octet-stream")
-	if err != nil {
-		log.Fatalf("Upload failed: %v", err)
-	}
-
-	fmt.Printf("Upload successful!\n")
-	fmt.Printf("ETag: %s\n", result.ETag)
-	fmt.Printf("Location: %s\n", result.Location)
-	fmt.Printf("Size: %d\n", result.Size)
-
-	// Test retrieval
-	fmt.Printf("\nTesting retrieval...\n")
-	reader, err := client.GetObject(bucket, key)
-	if err != nil {
-		log.Fatalf("Retrieval failed: %v", err)
-	}
-	defer reader.Close()
-
-	// Read first few bytes to verify
-	buf := make([]byte, 100)
-	n, err := reader.Read(buf)
-	if err != nil && !strings.Contains(err.Error(), "EOF") {
-		log.Fatalf("Read failed: %v", err)
-	}
-
-	fmt.Printf("Retrieved %d bytes successfully\n", n)
-	fmt.Printf("First few bytes: %x...\n", buf[:min(16, n)])
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+    reader, err := store.Get(nil, key)
+    if err != nil { log.Fatalf("download failed: %v", err) }
+    defer reader.Close()
+    buf := make([]byte, 16)
+    n, _ := io.ReadFull(reader, buf)
+    fmt.Printf("Uploaded and retrieved %d bytes successfully\n", n)
 }

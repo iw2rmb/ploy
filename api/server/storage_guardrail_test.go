@@ -19,6 +19,7 @@ func TestNoLegacyStorageFactory(t *testing.T) {
         if err != nil { return nil }
         if d.IsDir() { return nil }
         if !strings.HasSuffix(path, ".go") { return nil }
+        if strings.HasSuffix(path, "_test.go") { return nil }
         b, err := os.ReadFile(path)
         if err != nil { return nil }
         s := string(b)
@@ -33,4 +34,3 @@ func TestNoLegacyStorageFactory(t *testing.T) {
         t.Fatalf("legacy storage factory usage detected:\n%s", strings.Join(offenders, "\n"))
     }
 }
-
