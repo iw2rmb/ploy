@@ -183,9 +183,19 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 	}
 
 	// Store domain mapping for persistence
-	if err := tr.storeDomainMapping(route); err != nil {
-		log.Printf("Warning: failed to store domain mapping for %s: %v", route.App, err)
-	}
+    if err := irouting.SaveAppRoute(tr.consul, irouting.DomainRoute{
+        App:        route.App,
+        Domain:     route.Domain,
+        Port:       route.Port,
+        AllocID:    route.AllocID,
+        AllocIP:    route.AllocIP,
+        HealthPath: route.HealthPath,
+        Aliases:    route.Aliases,
+        TLSEnabled: route.TLSEnabled,
+        CreatedAt:  route.CreatedAt,
+    }); err != nil {
+        log.Printf("Warning: failed to store domain mapping for %s: %v", route.App, err)
+    }
 
 	return nil
 }
@@ -357,57 +367,7 @@ func (tr *TraefikRouter) GetAppRoutes(appName string) ([]*AppRoute, error) {
 }
 
 // storeDomainMapping stores domain mapping in Consul KV for persistence
-func (tr *TraefikRouter) storeDomainMapping(route *AppRoute) error {
-	key := fmt.Sprintf("ploy/domains/%s", route.App)
-
-	// Get existing mappings
-	existing, err := tr.getDomainMappings(route.App)
-	if err != nil {
-		existing = make(map[string]*AppRoute)
-	}
-
-	// Add/update current route
-	existing[route.Domain] = route
-
-	// Store updated mappings
-	data, err := json.Marshal(existing)
-	if err != nil {
-		return fmt.Errorf("failed to marshal domain mappings: %w", err)
-	}
-
-	pair := &consulapi.KVPair{
-		Key:   key,
-		Value: data,
-	}
-
-	_, err = tr.consul.KV().Put(pair, nil)
-	if err != nil {
-		return fmt.Errorf("failed to store domain mapping in Consul KV: %w", err)
-	}
-
-	return nil
-}
-
-// getDomainMappings retrieves domain mappings from Consul KV
-func (tr *TraefikRouter) getDomainMappings(appName string) (map[string]*AppRoute, error) {
-	key := fmt.Sprintf("ploy/domains/%s", appName)
-
-	pair, _, err := tr.consul.KV().Get(key, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get domain mappings: %w", err)
-	}
-
-	if pair == nil {
-		return make(map[string]*AppRoute), nil
-	}
-
-	var mappings map[string]*AppRoute
-	if err := json.Unmarshal(pair.Value, &mappings); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal domain mappings: %w", err)
-	}
-
-	return mappings, nil
-}
+// Domain mapping storage moved to internal/routing helpers (SaveAppRoute/GetAppRoutes)
 
 // HealthCheck verifies Traefik service is running and accessible
 func (tr *TraefikRouter) HealthCheck() error {
