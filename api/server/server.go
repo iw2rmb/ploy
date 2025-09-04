@@ -95,6 +95,8 @@ type ControllerConfig struct {
     ArfFetcher        trecipes.Fetcher
     // Optional ARF registry URL for HTTPFetcher. Used only if ArfFetcher is nil.
     ArfRegistryURL    string
+    // Optional Maven group for MavenFetcher. If set, MavenFetcher is used.
+    ArfMavenGroup     string
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -127,7 +129,8 @@ func LoadConfigFromEnv() *ControllerConfig {
         ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
         EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
         ArfDefaultPacks:  utils.Getenv("PLOY_ARF_DEFAULT_PACKS", ""),
-        ArfRegistryURL:   utils.Getenv("PLOY_ARF_REGISTRY", ""),
+        ArfRegistryURL:   utils.Getenv("PLOY_ARF_REGISTRY", "https://registry.dev.ployman.app"),
+        ArfMavenGroup:    utils.Getenv("PLOY_ARF_MAVEN_GROUP", ""),
     }
 }
 
@@ -255,11 +258,25 @@ func NewServer(config *ControllerConfig) (*Server, error) {
         }
         // Determine fetcher
         fetcher := config.ArfFetcher
-        if fetcher == nil && strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY")) != "" {
-            fetcher = trecipes.HTTPFetcher{BaseURL: os.Getenv("PLOY_ARF_REGISTRY")}
+        // Prefer MavenFetcher if group configured
+        if fetcher == nil {
+            base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
+            if base == "" {
+                base = strings.TrimSpace(config.ArfRegistryURL)
+            }
+            if strings.TrimSpace(config.ArfMavenGroup) != "" && base != "" {
+                fetcher = trecipes.MavenFetcher{BaseURL: base, GroupID: config.ArfMavenGroup}
+            }
         }
-        if fetcher == nil && strings.TrimSpace(config.ArfRegistryURL) != "" {
-            fetcher = trecipes.HTTPFetcher{BaseURL: config.ArfRegistryURL}
+        // Fallback to HTTPFetcher if no Maven group provided
+        if fetcher == nil {
+            base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
+            if base == "" {
+                base = strings.TrimSpace(config.ArfRegistryURL)
+            }
+            if base != "" {
+                fetcher = trecipes.HTTPFetcher{BaseURL: base}
+            }
         }
         if store != nil && fetcher != nil {
             idx := trecipes.NewIndexer(fetcher, store)
