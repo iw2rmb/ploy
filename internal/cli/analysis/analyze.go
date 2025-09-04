@@ -11,8 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
-	
-	"github.com/iw2rmb/ploy/api/analysis"
+    amodels "github.com/iw2rmb/ploy/internal/analysis/models"
 )
 
 // AnalyzeCmd handles the analyze command
@@ -145,20 +144,20 @@ func analyzeRepository(args []string, controllerURL string) {
 		repoName = filepath.Base(repository)
 	}
 	
-	req := analysis.AnalysisRequest{
-		Repository: analysis.Repository{
-			Name: repoName,
-			URL:  repository, // Use URL field for local path
-		},
-		Config: analysis.AnalysisConfig{
-			Enabled:        true,
-			FailOnCritical: false,
-			ARFIntegration: fix,
-			Timeout:        30 * time.Minute,
-		},
-		FixIssues: fix,
-		DryRun:    dryRun,
-	}
+    req := amodels.AnalysisRequest{
+        Repository: amodels.Repository{
+            Name: repoName,
+            URL:  repository, // Use URL field for local path
+        },
+        Config: amodels.AnalysisConfig{
+            Enabled:        true,
+            FailOnCritical: false,
+            ARFIntegration: fix,
+            Timeout:        30 * time.Minute,
+        },
+        FixIssues: fix,
+        DryRun:    dryRun,
+    }
 	
 	if language != "" {
 		req.Config.Languages = map[string]interface{}{
@@ -199,7 +198,7 @@ func analyzeRepository(args []string, controllerURL string) {
 	}
 	
 	// Parse response
-	var result analysis.AnalysisResult
+    var result amodels.AnalysisResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
@@ -234,7 +233,7 @@ func getAnalysisStatus(analysisID, controllerURL string) {
 		os.Exit(1)
 	}
 	
-	var result analysis.AnalysisResult
+    var result amodels.AnalysisResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
@@ -270,7 +269,7 @@ func getAnalysisResults(analysisID, controllerURL string) {
 		os.Exit(1)
 	}
 	
-	var result analysis.AnalysisResult
+    var result amodels.AnalysisResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
@@ -318,10 +317,10 @@ func listAnalyses(args []string, controllerURL string) {
 		os.Exit(1)
 	}
 	
-	var response struct {
-		Results []*analysis.AnalysisResult `json:"results"`
-		Count   int                         `json:"count"`
-	}
+    var response struct {
+        Results []*amodels.AnalysisResult `json:"results"`
+        Count   int                      `json:"count"`
+    }
 	
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
@@ -399,7 +398,7 @@ func showConfig(controllerURL string) {
 		os.Exit(1)
 	}
 	
-	var config analysis.AnalysisConfig
+    var config amodels.AnalysisConfig
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
@@ -585,7 +584,7 @@ func getStatusString(success bool, errorMsg string) string {
 	return "Failed"
 }
 
-func displayAnalysisResult(result *analysis.AnalysisResult, format string) {
+func displayAnalysisResult(result *amodels.AnalysisResult, format string) {
 	switch format {
 	case "json":
 		output, _ := json.MarshalIndent(result, "", "  ")
@@ -597,7 +596,7 @@ func displayAnalysisResult(result *analysis.AnalysisResult, format string) {
 	}
 }
 
-func displayResultTable(result *analysis.AnalysisResult) {
+func displayResultTable(result *amodels.AnalysisResult) {
 	fmt.Println("\n=== ANALYSIS RESULTS ===")
 	fmt.Printf("ID: %s\n", result.ID)
 	fmt.Printf("Repository: %s\n", result.Repository.Name)
