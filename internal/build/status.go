@@ -3,9 +3,9 @@ package build
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/nomad"
-	"github.com/iw2rmb/ploy/internal/validation"
+    "github.com/gofiber/fiber/v2"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "github.com/iw2rmb/ploy/internal/validation"
 )
 
 // Status retrieves the deployment status of an application
@@ -25,7 +25,7 @@ func Status(c *fiber.Ctx) error {
 	var activeJob *nomad.JobStatus
 	var lastError error
 	
-	monitor := nomad.NewHealthMonitor()
+    monitor := orchestration.NewHealthMonitor()
 	
 	for _, lane := range lanes {
 		jobName := appName + "-lane-" + lane

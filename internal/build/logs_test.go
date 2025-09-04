@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
 	
-	"github.com/iw2rmb/ploy/api/nomad"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // MockHealthMonitor provides a mock implementation for testing logs functionality
@@ -22,25 +22,25 @@ type MockHealthMonitor struct {
 	mock.Mock
 }
 
-func (m *MockHealthMonitor) GetJobStatus(jobID string) (*nomad.JobStatus, error) {
+func (m *MockHealthMonitor) GetJobStatus(jobID string) (*orchestration.JobStatus, error) {
 	args := m.Called(jobID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*nomad.JobStatus), args.Error(1)
+	return args.Get(0).(*orchestration.JobStatus), args.Error(1)
 }
 
-func (m *MockHealthMonitor) GetJobAllocations(jobID string) ([]*nomad.AllocationStatus, error) {
+func (m *MockHealthMonitor) GetJobAllocations(jobID string) ([]*orchestration.AllocationStatus, error) {
 	args := m.Called(jobID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*nomad.AllocationStatus), args.Error(1)
+	return args.Get(0).([]*orchestration.AllocationStatus), args.Error(1)
 }
 
 // Helper methods for easier mock setup
 func (m *MockHealthMonitor) WithJobFound(jobID string, status string) *MockHealthMonitor {
-	job := &nomad.JobStatus{
+    job := &orchestration.JobStatus{
 		ID:          jobID,
 		Name:        jobID,
 		Status:      status,
@@ -59,14 +59,14 @@ func (m *MockHealthMonitor) WithJobNotFound(jobID string) *MockHealthMonitor {
 }
 
 func (m *MockHealthMonitor) WithAllocations(jobID string, allocCount int) *MockHealthMonitor {
-	allocs := make([]*nomad.AllocationStatus, allocCount)
+    allocs := make([]*orchestration.AllocationStatus, allocCount)
 	for i := 0; i < allocCount; i++ {
 		healthy := true
-		allocs[i] = &nomad.AllocationStatus{
+        allocs[i] = &orchestration.AllocationStatus{
 			ID:           fmt.Sprintf("alloc-%d", i+1),
 			ClientStatus: "running",
 			DesiredStatus: "run",
-			DeploymentStatus: &nomad.AllocDeploymentStatus{
+            DeploymentStatus: &orchestration.AllocDeploymentStatus{
 				Healthy:   &healthy,
 				Timestamp: time.Now().Format(time.RFC3339),
 			},
@@ -82,7 +82,7 @@ func (m *MockHealthMonitor) WithAllocationsError(jobID string, err error) *MockH
 }
 
 func (m *MockHealthMonitor) WithNoAllocations(jobID string) *MockHealthMonitor {
-	m.On("GetJobAllocations", jobID).Return([]*nomad.AllocationStatus{}, nil)
+    m.On("GetJobAllocations", jobID).Return([]*orchestration.AllocationStatus{}, nil)
 	return m
 }
 
