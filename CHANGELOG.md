@@ -4,12 +4,17 @@
 
 ### Added
 - Roadmap report `roadmap/refactor/phase-6-codex.md` documenting redundant code and architecture issues across `api/*` and `internal/*`.
+ - Progress markers and acceptance criteria checkboxes reflecting current status (error contract DONE; preview router migrated).
 
 ### Highlights
 - Identified layering inversion where `internal/*` imports from `api/*` (critical).
 - Noted duplication/inconsistency in Nomad/Consul integrations (raw HTTP vs SDK clients).
 - Flagged configuration split-brain between `api/config` and `internal/config` and recommended convergence.
 - Proposed a concrete, staged refactor plan with acceptance criteria.
+
+### Changed
+- internal/preview: Replaced local `getenv` with `internal/utils.Getenv`; continues unification of env helpers.
+- api/server: Error handling standardized through `internal/errors` with JSON envelope; tests in `api/server/error_handler_test.go` validate contract.
 
 ## [2025-09-04] - OpenRewrite Transformation Testing & SeaweedFS Fix
 
