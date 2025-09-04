@@ -20,6 +20,8 @@
 - internal/preview: Replaced local `getenv` with `internal/utils.Getenv`; continues unification of env helpers.
 - internal/orchestration: Switched to `internal/utils.Getenv` for template dir and domain suffix resolution; improves consistency with env access patterns.
 - internal/cleanup: `LoadConfigFromEnv` now reads via `internal/utils.Getenv` and preserves existing behavior; unit tests added.
+- internal/builders & internal/supply: Removed `api/*` dependencies by adding internal implementations; enforces layering.
+  - Added guardrail test `internal/no_api_imports_test.go` to prevent regressions.
 - api/server: Error handling standardized through `internal/errors` with JSON envelope; tests in `api/server/error_handler_test.go` validate contract.
 - internal/cli/arf: formatting, pagination, composition, import/export, and tests now import internal ARF models; remaining template generation still uses API models (to be migrated).
 
