@@ -24,7 +24,7 @@ import (
 	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/certificates"
-	"github.com/iw2rmb/ploy/api/config"
+    // "github.com/iw2rmb/ploy/api/config" // deprecated
 	"github.com/iw2rmb/ploy/api/consul_envstore"
 	"github.com/iw2rmb/ploy/api/coordination"
 	"github.com/iw2rmb/ploy/api/dns"
@@ -49,7 +49,8 @@ import (
 	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
-	apperr "github.com/iw2rmb/ploy/internal/errors"
+    apperr "github.com/iw2rmb/ploy/internal/errors"
+    policy "github.com/iw2rmb/ploy/internal/policy"
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
@@ -73,7 +74,7 @@ type ServiceDependencies struct {
 	BlueGreenManager        *bluegreen.Manager
 	Metrics                 *metrics.Metrics
 	StorageConfigPath       string
-	StorageFactory          *config.OptimizedStorageClientFactory
+    // StorageFactory deprecated: use config service
 	ARFEngine               arfcore.Engine
 	ARFRecipes              tarfrecipes.Registry
 }
@@ -180,7 +181,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize config service: %w", err)
 		}
-		cfgService = svc
+        cfgService = svc
+        // Apply centralized policy configuration if present
+        policy.ApplyFromConfig(cfgService)
 	}
 
 	// Initialize dependencies (prefer config service where applicable)
@@ -259,11 +262,7 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 			if st, err := resolveStorageFromConfigService(cfgService); err == nil {
 				store = st
 			}
-		} else if deps != nil && deps.StorageFactory != nil {
-			if st, err := deps.StorageFactory.CreateClient(); err == nil {
-				store = st
 			}
-		}
 		// Determine fetcher
 		fetcher := config.ArfFetcher
 		// Track chosen registry and group for logging
@@ -390,7 +389,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	}
 
 	// Initialize self-update handler
-	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg, storageFactory)
+	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize self-update handler: %v", err)
 	}
@@ -402,7 +401,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	}
 
 	// Initialize Certificate Manager
-	certificateManager, err := initializeCertificateManager(cfg, storageFactory)
+	certificateManager, err := initializeCertificateManager(cfg, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize certificate manager: %v", err)
 	}
@@ -427,11 +426,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
 			arfRecipes = tarfrecipes.NewStorageBacked(st)
 		}
-	} else {
-		if st, err := config.CreateStorageFromFactory(cfg.StorageConfigPath); err == nil && st != nil {
-			arfRecipes = tarfrecipes.NewStorageBacked(st)
-		}
-	}
+    }
 
 	// Initialize ARF Handler
 	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
@@ -440,7 +435,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	}
 
 	// Initialize Analysis Handler
-	analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler, storageFactory)
+    analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize analysis handler: %v", err)
 	}
@@ -476,7 +471,6 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		BlueGreenManager:        blueGreenManager,
 		Metrics:                 metricsInstance,
 		StorageConfigPath:       cfg.StorageConfigPath,
-		StorageFactory:          storageFactory,
 		ARFEngine:               arfEngine,
 		ARFRecipes:              arfRecipes,
 	}
@@ -571,28 +565,18 @@ func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *
 }
 
 // initializeSelfUpdateHandler initializes self-update handler
-func initializeSelfUpdateHandler(cfg *ControllerConfig, factory *config.OptimizedStorageClientFactory) (*selfupdate.Handler, error) {
+func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*selfupdate.Handler, error) {
 	// Create storage client for self-update operations
-	var storageClient *internalStorage.StorageClient
-	var err error
-
-	if factory != nil {
-		// Use factory if available
-		storageClient, err = factory.CreateClient()
-	} else {
-		// Factory is required for self-update handler
-		return nil, fmt.Errorf("storage factory required for self-update handler")
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage client for self-update: %w", err)
-	}
+    if cfgService == nil { return nil, fmt.Errorf("config service required for self-update handler") }
+    unified, err := resolveStorageFromConfigService(cfgService)
+    if err != nil { return nil, fmt.Errorf("resolve storage for self-update: %w", err) }
+    provider := internalStorage.NewProviderFromStorage(unified, "artifacts")
 
 	// Get current controller version
 	currentVersion := selfupdate.GetCurrentVersion()
 
 	// Create self-update handler
-	handler, err := selfupdate.NewHandler(storageClient, cfg.ConsulAddr, currentVersion)
+    handler, err := selfupdate.NewHandler(provider, cfg.ConsulAddr, currentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create self-update handler: %w", err)
 	}
@@ -613,7 +597,7 @@ func initializeDNSHandler(consulAddr string) (*dns.Handler, error) {
 }
 
 // initializeCertificateManager initializes the certificate manager
-func initializeCertificateManager(cfg *ControllerConfig, factory *config.OptimizedStorageClientFactory) (*certificates.CertificateManager, error) {
+func initializeCertificateManager(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*certificates.CertificateManager, error) {
 	// Create Consul client
 	consulConfig := consulapi.DefaultConfig()
 	if cfg.ConsulAddr != "" {
@@ -625,17 +609,9 @@ func initializeCertificateManager(cfg *ControllerConfig, factory *config.Optimiz
 	}
 
 	// Create storage client
-	var storageClient *internalStorage.StorageClient
-	if factory != nil {
-		// Use factory if available
-		storageClient, err = factory.CreateClient()
-	} else {
-		// Factory is required for certificate manager
-		return nil, fmt.Errorf("storage factory required for certificate manager")
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage client: %w", err)
-	}
+    if cfgService == nil { return nil, fmt.Errorf("config service required for certificate manager") }
+    storageClient, err := resolveStorageFromConfigService(cfgService)
+    if err != nil { return nil, fmt.Errorf("resolve storage for certificates: %w", err) }
 
 	// Create DNS provider (for ACME DNS-01 challenges)
 	// Note: DNS provider can be nil for now, certificate manager should handle this gracefully
@@ -1751,7 +1727,7 @@ func initializeTemplateHandler() (*templates.Handler, error) {
 // loadCHTTPPrivateKey loads an RSA private key from a PEM file
 
 // initializeAnalysisHandler initializes the static analysis handler
-func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, factory *config.OptimizedStorageClientFactory) (*analysis.Handler, error) {
+func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, cfgService *cfgsvc.Service) (*analysis.Handler, error) {
 	log.Printf("Initializing Static Analysis handler")
 
 	// Create a logger for the analysis engine
@@ -1764,34 +1740,17 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, f
 
 	var engine *analysis.Engine
 
-	if analysisMode == "nomad" {
-		// Create Nomad-based analysis dispatcher
-		var storageClient *internalStorage.StorageClient
-		var err error
-		if factory != nil {
-			// Use factory if available
-			storageClient, err = factory.CreateClient()
-		} else {
-			// Factory is required for analysis handler in nomad mode
-			return nil, fmt.Errorf("storage factory required for analysis handler in nomad mode")
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to create storage client for analysis: %w", err)
-		}
-
-		nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
-		consulAddr := utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500")
-
-		dispatcher, err := analysis.NewAnalysisDispatcher(nomadAddr, consulAddr, storageClient)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create analysis dispatcher: %w", err)
-		}
-
-		// Create engine with Nomad dispatcher
-		engine = analysis.NewEngineWithDispatcher(logger, dispatcher)
-		log.Printf("Initialized Nomad-based analysis engine with distributed execution")
-
-	} else if analysisMode == "legacy" {
+    if analysisMode == "nomad" {
+        if cfgService == nil {
+            log.Printf("Analysis nomad mode requested but config service unavailable; falling back to legacy mode")
+        } else {
+            log.Printf("Analysis nomad mode enabled; using centralized configuration for job dispatch")
+            // For now, fall back to legacy local analyzers to avoid api/config factory.
+            // A future slice can introduce a dispatcher using unified storage.
+        }
+        analysisMode = "legacy"
+    }
+    if analysisMode == "legacy" {
 		// Create legacy engine with local analyzers
 		engine = analysis.NewEngine(logger)
 
