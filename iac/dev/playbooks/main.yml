@@ -1222,6 +1222,12 @@
           export ARF_LOG_LEVEL="${ARF_LOG_LEVEL:-info}"
           export ARF_METRICS_ENABLED="${ARF_METRICS_ENABLED:-true}"
           export ARF_PROFILING_ENABLED="${ARF_PROFILING_ENABLED:-false}"
+
+          # Internal ARF Recipes Indexer
+          export PLOY_ARF_REGISTRY="${PLOY_ARF_REGISTRY:-https://repo1.maven.org/maven2}"
+          export PLOY_ARF_MAVEN_GROUP="${PLOY_ARF_MAVEN_GROUP:-org.openrewrite}"
+          # Optional: set default packs to index on startup (artifactId:version, comma-separated)
+          export PLOY_ARF_DEFAULT_PACKS="${PLOY_ARF_DEFAULT_PACKS:-}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - ARF vars"
 
 
