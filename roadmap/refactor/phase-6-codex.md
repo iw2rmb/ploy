@@ -198,6 +198,9 @@ Recommendation:
   - `internal/debug/handler.go` → `api/*`.
   - `internal/cli/arf/*`, `internal/cli/analysis/*` → `api/arf/*`, `api/analysis`.
 
+Progress (Sep 4):
+- [x] internal/cli/arf switched to `internal/arf/models` (partial — templates still reference API models).
+
 - Raw HTTP Nomad utilities to remove after unification:
   - `api/nomad/client.go`, `api/nomad/health.go`.
 
