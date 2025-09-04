@@ -18,8 +18,13 @@
 
 ### Changed
 - internal/preview: Replaced local `getenv` with `internal/utils.Getenv`; continues unification of env helpers.
+- internal/orchestration: Switched to `internal/utils.Getenv` for template dir and domain suffix resolution; improves consistency with env access patterns.
+- internal/cleanup: `LoadConfigFromEnv` now reads via `internal/utils.Getenv` and preserves existing behavior; unit tests added.
 - api/server: Error handling standardized through `internal/errors` with JSON envelope; tests in `api/server/error_handler_test.go` validate contract.
- - internal/cli/arf: formatting, pagination, composition, import/export, and tests now import internal ARF models; remaining template generation still uses API models (to be migrated).
+- internal/cli/arf: formatting, pagination, composition, import/export, and tests now import internal ARF models; remaining template generation still uses API models (to be migrated).
+
+### Removed
+- internal/cert: Deleted deprecated legacy handlers after migration window; ACME endpoints under `/v1/certs/*` fully replace them.
 
 ## [2025-09-04] - OpenRewrite Transformation Testing & SeaweedFS Fix
 
