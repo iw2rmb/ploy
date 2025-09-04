@@ -6,6 +6,7 @@ import (
     "time"
 
     nomadapi "github.com/hashicorp/nomad/api"
+    "github.com/iw2rmb/ploy/internal/utils"
 )
 
 // Submit reads an HCL job file, parses and registers it via Nomad API.
@@ -45,7 +46,7 @@ func WaitHealthy(jobName string, timeout time.Duration) error {
 
 func newNomadClient() (*nomadapi.Client, error) {
     cfg := nomadapi.DefaultConfig()
-    if addr := getenv("NOMAD_ADDR", ""); addr != "" {
+    if addr := utils.Getenv("NOMAD_ADDR", ""); addr != "" {
         cfg.Address = addr
     }
     return nomadapi.NewClient(cfg)
