@@ -205,7 +205,7 @@ Progress (Sep 4):
 - [x] internal/cli/arf switched to `internal/arf/models` (partial — templates still reference API models).
 
 - Raw HTTP Nomad utilities to remove after unification:
-  - `api/nomad/client.go`, `api/nomad/health.go`.
+  - `api/nomad/health.go` removed; `api/nomad/client.go` delegates to `internal/orchestration`.
 
 - Config dual paths to remove:
   - `api/config/config.go`: `CreateStorageClientFromConfig`, `CreateStorageFromFactory` and bespoke config types.
@@ -233,9 +233,11 @@ Progress (Sep 4):
 
 - [x] Preview router migrated to `internal/orchestration` facade (no `api/nomad` dependency).
 - [x] Standardized HTTP error envelope in API server via `internal/errors` with unit tests (`api/server/error_handler_test.go`).
-- [ ] `internal/*` still imports `api/*` in a few packages (`internal/debug`, `internal/build`).
+- [x] `internal/*` still imports `api/*` in a few packages (`internal/debug`, `internal/build`).
+  - Guardrail test enforced; current codebase has no internal→api imports.
 - [x] Raw HTTP helpers deprecated in `api/nomad/client.go` by delegating to `internal/orchestration` monitor.
-- [ ] Traefik tag builders remain in `api/routing`; shared helpers under `internal/routing/*` not yet extracted.
+- [x] Traefik tag builders remain in `api/routing`; shared helpers under `internal/routing/*` not yet extracted.
+  - Tags consolidated; domain KV helpers extracted; API uses shared helpers.
 
 ## Notes and Constraints
 
