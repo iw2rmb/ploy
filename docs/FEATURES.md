@@ -373,7 +373,8 @@ Auto-classified lanes:
 
 - ✅ **Zero-SPOF API Design**
   - **Nomad-Managed Deployment**: API runs as Nomad system job across multiple nodes
-  - **Stateless Architecture**: All state externalized to Consul KV, SeaweedFS, and Vault
+- **Stateless Architecture**: All state externalized to Consul KV, SeaweedFS, and Vault
+- **Layering Guarantees (Sep 2025)**: `internal/*` does not import `api/*`; guardrails in tests prevent regressions
   - **Load Balancing**: Multiple api instances behind Traefik with health checking
   - **Horizontal Scaling**: Scale api instances based on API load and resource requirements
   - ✅ **Enhanced Rolling Updates with Canary Deployment** (Aug 2025): Zero-downtime deployments with canary deployment strategy
