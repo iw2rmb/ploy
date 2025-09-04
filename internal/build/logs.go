@@ -4,21 +4,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/nomad"
-	"github.com/iw2rmb/ploy/internal/validation"
+    "github.com/gofiber/fiber/v2"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "github.com/iw2rmb/ploy/internal/validation"
 )
 
 // HealthMonitorInterface defines the interface for health monitoring
 type HealthMonitorInterface interface {
-	GetJobStatus(jobID string) (*nomad.JobStatus, error)
-	GetJobAllocations(jobID string) ([]*nomad.AllocationStatus, error)
+    GetJobStatus(jobID string) (*orchestration.JobStatus, error)
+    GetJobAllocations(jobID string) ([]*orchestration.AllocationStatus, error)
 }
 
 // GetLogs retrieves logs from the deployed application
-func GetLogs(c *fiber.Ctx) error {
-	return getLogsWithMonitor(c, nomad.NewHealthMonitor())
-}
+func GetLogs(c *fiber.Ctx) error { return getLogsWithMonitor(c, orchestration.NewHealthMonitor()) }
 
 // getLogsWithMonitor is a testable version of GetLogs that accepts a health monitor
 func getLogsWithMonitor(c *fiber.Ctx, monitor HealthMonitorInterface) error {
