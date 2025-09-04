@@ -11,7 +11,6 @@ import (
 	nomad "github.com/hashicorp/nomad/api"
 	vault "github.com/hashicorp/vault/api"
 
-	"github.com/iw2rmb/ploy/api/config"
     "github.com/iw2rmb/ploy/api/consul_envstore"
     cfgsvc "github.com/iw2rmb/ploy/internal/config"
     istorage "github.com/iw2rmb/ploy/internal/storage"
@@ -223,14 +222,22 @@ func (h *HealthChecker) checkStorageConfig() DependencyHealth {
             dep.Details = map[string]interface{}{"source": "service"}
         }
     } else {
-        // Fallback to file-based validation
-        if _, err := config.Load(h.storageConfigPath); err != nil {
-            dep.Status = "unhealthy"
-            dep.Error = fmt.Sprintf("Storage config validation failed: %v", err)
-        } else {
-            dep.Details = map[string]interface{}{
-                "config_path": h.storageConfigPath,
+        // Fallback to file-based validation via internal config service
+        if h.storageConfigPath != "" {
+            if _, err := cfgsvc.New(
+                cfgsvc.WithFile(h.storageConfigPath),
+                cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+            ); err != nil {
+                dep.Status = "unhealthy"
+                dep.Error = fmt.Sprintf("Storage config validation failed: %v", err)
+            } else {
+                dep.Details = map[string]interface{}{
+                    "config_path": h.storageConfigPath,
+                }
             }
+        } else {
+            dep.Status = "unhealthy"
+            dep.Error = "no storage config path"
         }
     }
 
@@ -379,8 +386,21 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
         }
         storageClient = st
     } else {
-        // Fallback to factory path
-        storageClient, err = config.CreateStorageFromFactory(h.storageConfigPath)
+        // Fallback: build a temporary service from file and create a storage client
+        if h.storageConfigPath != "" {
+            if svc, e := cfgsvc.New(cfgsvc.WithFile(h.storageConfigPath), cfgsvc.WithValidation(cfgsvc.NewStructValidator())); e == nil {
+                cfg := svc.Get()
+                if cfg != nil {
+                    storageClient, err = cfg.CreateStorageClient()
+                } else {
+                    err = fmt.Errorf("nil config from service")
+                }
+            } else {
+                err = e
+            }
+        } else {
+            err = fmt.Errorf("no storage config path")
+        }
     }
     if err != nil {
         dep.Status = "unhealthy"

@@ -1,12 +1,11 @@
 package server
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/config"
-	"github.com/iw2rmb/ploy/internal/build"
-	"github.com/iw2rmb/ploy/internal/debug"
-	"github.com/iw2rmb/ploy/internal/env"
-	"github.com/iw2rmb/ploy/internal/lifecycle"
+    "github.com/gofiber/fiber/v2"
+    "github.com/iw2rmb/ploy/internal/build"
+    "github.com/iw2rmb/ploy/internal/debug"
+    "github.com/iw2rmb/ploy/internal/env"
+    "github.com/iw2rmb/ploy/internal/lifecycle"
 )
 
 // handleTriggerBuild handles build trigger requests with request-scoped storage
@@ -85,15 +84,20 @@ func (s *Server) handleGetStorageConfig(c *fiber.Ctx) error {
 	if cfg == nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service returned nil"})
 	}
-	legacy := config.Root{
-		Storage: config.StorageConfig{
-			Provider:   cfg.Storage.Provider,
-			Master:     cfg.Storage.Endpoint,
-			Filer:      cfg.Storage.Endpoint,
-			Collection: cfg.Storage.Bucket,
-		},
-	}
-	return c.JSON(legacy)
+    type legacyStorage struct {
+        Provider   string `json:"provider"`
+        Master     string `json:"master"`
+        Filer      string `json:"filer"`
+        Collection string `json:"collection"`
+    }
+    type legacyRoot struct { Storage legacyStorage `json:"storage"` }
+    resp := legacyRoot{Storage: legacyStorage{
+        Provider:   cfg.Storage.Provider,
+        Master:     cfg.Storage.Endpoint,
+        Filer:      cfg.Storage.Endpoint,
+        Collection: cfg.Storage.Bucket,
+    }}
+    return c.JSON(resp)
 }
 
 // handleReloadStorageConfig handles storage configuration reload
