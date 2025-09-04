@@ -211,7 +211,11 @@ Progress (Sep 4):
 
 ## Acceptance Criteria
 
-- [ ] No `internal/*` package imports any path under `api/*`.
+- [x] No `internal/*` package imports any path under `api/*`.
+  - Replaced facades with internal implementations:
+    - `internal/builders/facade.go` no longer imports `api/builders`.
+    - `internal/supply/facade.go` no longer imports `api/supply`.
+  - Added guardrail test `internal/no_api_imports_test.go`.
 - [ ] All Nomad/Consul operations go through `internal/orchestration` with SDK clients.
 - [ ] API server and CLI resolve storage via `internal/config.Service` only.
 - [x] HTTP errors use a single envelope with typed codes; tests assert shape.
