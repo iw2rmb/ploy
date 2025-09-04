@@ -218,6 +218,7 @@ Progress (Sep 4):
   - Added guardrail test `internal/no_api_imports_test.go`.
 - [x] All Nomad/Consul operations go through `internal/orchestration` with SDK clients.
   - Health monitor now uses Nomad SDK via injectable adapter; HTTP calls removed.
+  - Consul health checks now use Consul SDK via injectable adapter; HTTP calls removed.
   - Added constructor for injection in tests (`NewHealthMonitorWithClient`).
 - [ ] API server and CLI resolve storage via `internal/config.Service` only.
 - [x] HTTP errors use a single envelope with typed codes; tests assert shape.
