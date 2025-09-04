@@ -9,6 +9,7 @@ import (
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
+    irouting "github.com/iw2rmb/ploy/internal/routing"
 )
 
 // TraefikRouter handles app routing via Traefik and Consul integration
@@ -256,104 +257,57 @@ func (tr *TraefikRouter) RegisterAppWithPlatformDomain(appName, allocID, allocIP
 
 // buildTraefikTags constructs Traefik configuration tags
 func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) []string {
-	tags := []string{
-		"traefik.enable=true",
-	}
+    base := irouting.BuildTraefikTags(
+        &irouting.AppRoute{
+            App:        route.App,
+            Domain:     route.Domain,
+            Port:       route.Port,
+            AllocID:    route.AllocID,
+            AllocIP:    route.AllocIP,
+            HealthPath: route.HealthPath,
+            Aliases:    route.Aliases,
+        },
+        &irouting.RouteConfig{
+            EnableTLS:           config.EnableTLS,
+            CertResolver:        config.CertResolver,
+            HealthPath:          config.HealthPath,
+            HealthCheckInterval: config.HealthCheckInterval,
+            HealthCheckTimeout:  config.HealthCheckTimeout,
+            LoadBalanceMode:     config.LoadBalanceMode,
+            StickySession:       config.StickySession,
+            Middlewares:         config.Middlewares,
+            RetryAttempts:       config.RetryAttempts,
+            RateLimit:           config.RateLimit,
+            SecurityHeaders:     config.SecurityHeaders,
+        },
+    )
 
-	// Router configuration
-	routerName := fmt.Sprintf("%s-router", route.App)
-	tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.rule=Host(`%s`)", routerName, route.Domain))
-	tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.entrypoints=websecure", routerName))
-
-	// Add domain aliases if provided
-	if len(route.Aliases) > 0 {
-		domains := append([]string{route.Domain}, route.Aliases...)
-		hostsRule := fmt.Sprintf("Host(`%s`)", strings.Join(domains, "`,`"))
-		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.rule=%s", routerName, hostsRule))
-	}
-
-	// TLS configuration
-	if config.EnableTLS {
-		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.tls=true", routerName))
-		if config.CertResolver != "" {
-			tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.tls.certresolver=%s", routerName, config.CertResolver))
-		}
-	}
-
-	// Service configuration
-	serviceName := fmt.Sprintf("%s-service", route.App)
-	tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port=%d", serviceName, route.Port))
-
-	// Advanced health check configuration
-	if config.HealthPath != "" {
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.path=%s", serviceName, config.HealthPath))
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.interval=%s", serviceName, config.HealthCheckInterval))
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.timeout=%s", serviceName, config.HealthCheckTimeout))
-		// Note: Traefik doesn't have a 'retries' field for health checks - removed invalid configuration
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.scheme=http", serviceName))
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.healthcheck.headers.X-Health-Check=traefik", serviceName))
-	}
-
-	// Load balancing configuration
-	if config.LoadBalanceMode != "" {
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.strategy=%s", serviceName, config.LoadBalanceMode))
-	}
-
-	// Sticky sessions
-	if config.StickySession {
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.sticky.cookie=true", serviceName))
-		tags = append(tags, fmt.Sprintf("traefik.http.services.%s.loadbalancer.sticky.cookie.name=%s-session", serviceName, route.App))
-	}
-
-	// Build dynamic middleware chain
-	middlewares := make([]string, 0, len(config.Middlewares)+5)
-	middlewares = append(middlewares, config.Middlewares...)
-
-	// Add rate limiting if configured
-	if config.RateLimit > 0 {
-		rateLimitName := fmt.Sprintf("%s-ratelimit", route.App)
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.burst=%d", rateLimitName, config.RateLimit*2))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.average=%d", rateLimitName, config.RateLimit))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.ratelimit.period=1m", rateLimitName))
-		middlewares = append(middlewares, rateLimitName)
-	}
-
-	// Add security headers if enabled
-	if config.SecurityHeaders {
-		securityName := fmt.Sprintf("%s-security", route.App)
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.sslredirect=true", securityName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.forcestsheader=true", securityName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.stsincludesubdomains=true", securityName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.stsseconds=63072000", securityName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.customresponseheaders.X-Content-Type-Options=nosniff", securityName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.headers.customresponseheaders.X-Frame-Options=DENY", securityName))
-		middlewares = append(middlewares, securityName)
-	}
-
-	// Add circuit breaker if enabled
-	if config.CircuitBreaker {
-		circuitBreakerName := fmt.Sprintf("%s-circuitbreaker", route.App)
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.expression=NetworkErrorRatio() > 0.30", circuitBreakerName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.checkperiod=10s", circuitBreakerName))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.fallbackduration=30s", circuitBreakerName))
-		middlewares = append(middlewares, circuitBreakerName)
-	}
-
-	// Add retry middleware if configured
-	if config.RetryAttempts > 0 {
-		retryName := fmt.Sprintf("%s-retry", route.App)
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.retry.attempts=%d", retryName, config.RetryAttempts))
-		tags = append(tags, fmt.Sprintf("traefik.http.middlewares.%s.retry.initialinterval=100ms", retryName))
-		middlewares = append(middlewares, retryName)
-	}
-
-	// Apply middleware chain to router
-	if len(middlewares) > 0 {
-		middlewareChain := strings.Join(middlewares, ",")
-		tags = append(tags, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, middlewareChain))
-	}
-
-	return tags
+    // Compose router middleware chain tag (if any)
+    routerName := fmt.Sprintf("%s-router", route.App)
+    middlewares := make([]string, 0, len(config.Middlewares)+5)
+    middlewares = append(middlewares, config.Middlewares...)
+    if config.RateLimit > 0 {
+        middlewares = append(middlewares, fmt.Sprintf("%s-ratelimit", route.App))
+    }
+    if config.SecurityHeaders {
+        middlewares = append(middlewares, fmt.Sprintf("%s-security", route.App))
+    }
+    if config.CircuitBreaker {
+        middlewares = append(middlewares, fmt.Sprintf("%s-circuitbreaker", route.App))
+        // circuit breaker definitions remain local to API build for now
+        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.expression=NetworkErrorRatio() > 0.30", route.App+"-circuitbreaker"))
+        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.checkperiod=10s", route.App+"-circuitbreaker"))
+        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.fallbackduration=30s", route.App+"-circuitbreaker"))
+    }
+    if config.RetryAttempts > 0 {
+        middlewares = append(middlewares, fmt.Sprintf("%s-retry", route.App))
+        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.retry.attempts=%d", route.App+"-retry", config.RetryAttempts))
+        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.retry.initialinterval=100ms", route.App+"-retry"))
+    }
+    if len(middlewares) > 0 {
+        base = append(base, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, strings.Join(middlewares, ",")))
+    }
+    return base
 }
 
 // UnregisterApp removes app routing from Traefik
