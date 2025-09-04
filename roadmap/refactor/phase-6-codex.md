@@ -220,7 +220,7 @@ Progress (Sep 4):
 - [x] Preview router migrated to `internal/orchestration` facade (no `api/nomad` dependency).
 - [x] Standardized HTTP error envelope in API server via `internal/errors` with unit tests (`api/server/error_handler_test.go`).
 - [ ] `internal/*` still imports `api/*` in a few packages (`internal/debug`, `internal/build`).
-- [ ] Raw HTTP helpers still in `api/nomad/*`; migration to facade pending.
+- [x] Raw HTTP helpers deprecated in `api/nomad/client.go` by delegating to `internal/orchestration` monitor.
 - [ ] Traefik tag builders remain in `api/routing`; shared helpers under `internal/routing/*` not yet extracted.
 
 ## Notes and Constraints
