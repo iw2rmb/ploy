@@ -1,15 +1,15 @@
 package server
 
 import (
-    "context"
-    "fmt"
-    "log"
-    "os"
-    "os/signal"
-    "strconv"
-    "strings"
-    "syscall"
-    "time"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -29,12 +29,12 @@ import (
 	"github.com/iw2rmb/ploy/api/coordination"
 	"github.com/iw2rmb/ploy/api/dns"
 	"github.com/iw2rmb/ploy/api/domains"
-	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/api/health"
 	"github.com/iw2rmb/ploy/api/metrics"
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/api/selfupdate"
 	"github.com/iw2rmb/ploy/api/templates"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 
 	// "github.com/iw2rmb/ploy/api/openrewrite"
 	"github.com/iw2rmb/ploy/api/version"
@@ -45,14 +45,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain"
 
 	// internal_openrewrite "github.com/iw2rmb/ploy/internal/openrewrite"
+	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
+	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
+	trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
+	cfgsvc "github.com/iw2rmb/ploy/internal/config"
+	apperr "github.com/iw2rmb/ploy/internal/errors"
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
-	cfgsvc "github.com/iw2rmb/ploy/internal/config"
-    trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
-    arfcore "github.com/iw2rmb/ploy/internal/arf/core"
-    tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
-    "github.com/iw2rmb/ploy/internal/utils"
-    apperr "github.com/iw2rmb/ploy/internal/errors"
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 // ServiceDependencies holds all external service dependencies
@@ -89,15 +89,15 @@ type ControllerConfig struct {
 	EnvStorePath      string
 	CleanupAutoStart  bool
 	ShutdownTimeout   time.Duration
-    EnableCaching     bool
-    // ARF default packs (e.g., "rewrite-java:8.1.0,rewrite-spring:5.0.0"). If set, indexer runs at startup.
-    ArfDefaultPacks   string
-    // Optional Fetcher for ARF indexer (used in tests). When nil, indexing is skipped.
-    ArfFetcher        trecipes.Fetcher
-    // Optional ARF registry URL for HTTPFetcher. Used only if ArfFetcher is nil.
-    ArfRegistryURL    string
-    // Optional Maven group for MavenFetcher. If set, MavenFetcher is used.
-    ArfMavenGroup     string
+	EnableCaching     bool
+	// ARF default packs (e.g., "rewrite-java:8.1.0,rewrite-spring:5.0.0"). If set, indexer runs at startup.
+	ArfDefaultPacks string
+	// Optional Fetcher for ARF indexer (used in tests). When nil, indexing is skipped.
+	ArfFetcher trecipes.Fetcher
+	// Optional ARF registry URL for HTTPFetcher. Used only if ArfFetcher is nil.
+	ArfRegistryURL string
+	// Optional Maven group for MavenFetcher. If set, MavenFetcher is used.
+	ArfMavenGroup string
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -118,99 +118,99 @@ func LoadConfigFromEnv() *ControllerConfig {
 		port = utils.Getenv("PORT", "8081")
 	}
 
-    return &ControllerConfig{
-        Port:              port,
-        ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
-        NomadAddr:         utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
-        StorageConfigPath: config.GetStorageConfigPath(),
-        CleanupConfigPath: utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
-        UseConsulEnv:      utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
-        EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
-        CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
-        ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
-        EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
-        ArfDefaultPacks:  utils.Getenv("PLOY_ARF_DEFAULT_PACKS", ""),
-        ArfRegistryURL:   utils.Getenv("PLOY_ARF_REGISTRY", "https://registry.dev.ployman.app"),
-        ArfMavenGroup:    utils.Getenv("PLOY_ARF_MAVEN_GROUP", ""),
-    }
+	return &ControllerConfig{
+		Port:              port,
+		ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
+		NomadAddr:         utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
+		StorageConfigPath: config.GetStorageConfigPath(),
+		CleanupConfigPath: utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
+		UseConsulEnv:      utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
+		EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
+		CleanupAutoStart:  utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
+		ShutdownTimeout:   30 * time.Second, // Graceful shutdown timeout
+		EnableCaching:     utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
+		ArfDefaultPacks:   utils.Getenv("PLOY_ARF_DEFAULT_PACKS", ""),
+		ArfRegistryURL:    utils.Getenv("PLOY_ARF_REGISTRY", "https://registry.dev.ployman.app"),
+		ArfMavenGroup:     utils.Getenv("PLOY_ARF_MAVEN_GROUP", ""),
+	}
 }
 
 // Server represents the stateless controller server
 type Server struct {
-    app                *fiber.App
-    config             *ControllerConfig
-    dependencies       *ServiceDependencies
-    shutdownChan       chan os.Signal
-    coordinationCtx    context.Context
-    coordinationCancel context.CancelFunc
-    configService      *cfgsvc.Service
-    indexerStorage     internalStorage.Storage
+	app                *fiber.App
+	config             *ControllerConfig
+	dependencies       *ServiceDependencies
+	shutdownChan       chan os.Signal
+	coordinationCtx    context.Context
+	coordinationCancel context.CancelFunc
+	configService      *cfgsvc.Service
+	indexerStorage     internalStorage.Storage
 }
 
 // resolveUnifiedStorage prefers the config service if available, otherwise
 // falls back to the existing factory helper with a file path.
 func (s *Server) resolveUnifiedStorage() (internalStorage.Storage, error) {
-    return resolveStorageFromConfigService(s.configService)
+	return resolveStorageFromConfigService(s.configService)
 }
 
 // NewServer creates a new controller server with dependency injection
 func NewServer(config *ControllerConfig) (*Server, error) {
-    log.Printf("Initializing Ploy Controller with configuration-driven setup")
+	log.Printf("Initializing Ploy Controller with configuration-driven setup")
 
-    // Initialize centralized configuration service (prefer file + env) first
-    var cfgService *cfgsvc.Service
-    if config != nil && config.StorageConfigPath != "" {
-        // Build options dynamically and enable Consul source if env flags present
-        opts := []cfgsvc.Option{
-            cfgsvc.WithFile(config.StorageConfigPath),
-            cfgsvc.WithEnvironment("PLOY_"),
-            cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
-            cfgsvc.WithCacheTTL(5 * time.Minute),
-            cfgsvc.WithHotReload(500 * time.Millisecond),
-        }
-        if addr := os.Getenv("PLOY_CONFIG_CONSUL_ADDR"); addr != "" {
-            if key := os.Getenv("PLOY_CONFIG_CONSUL_KEY"); key != "" {
-                // Optional or required Consul source depending on toggle
-                required := strings.EqualFold(os.Getenv("PLOY_CONFIG_CONSUL_REQUIRED"), "true")
-                opts = append(opts, cfgsvc.WithConsul(addr, key, required))
-            }
-        }
+	// Initialize centralized configuration service (prefer file + env) first
+	var cfgService *cfgsvc.Service
+	if config != nil && config.StorageConfigPath != "" {
+		// Build options dynamically and enable Consul source if env flags present
+		opts := []cfgsvc.Option{
+			cfgsvc.WithFile(config.StorageConfigPath),
+			cfgsvc.WithEnvironment("PLOY_"),
+			cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+			cfgsvc.WithCacheTTL(5 * time.Minute),
+			cfgsvc.WithHotReload(500 * time.Millisecond),
+		}
+		if addr := os.Getenv("PLOY_CONFIG_CONSUL_ADDR"); addr != "" {
+			if key := os.Getenv("PLOY_CONFIG_CONSUL_KEY"); key != "" {
+				// Optional or required Consul source depending on toggle
+				required := strings.EqualFold(os.Getenv("PLOY_CONFIG_CONSUL_REQUIRED"), "true")
+				opts = append(opts, cfgsvc.WithConsul(addr, key, required))
+			}
+		}
 
-        svc, err := cfgsvc.New(opts...)
-        if err != nil {
-            return nil, fmt.Errorf("failed to initialize config service: %w", err)
-        }
-        cfgService = svc
-    }
+		svc, err := cfgsvc.New(opts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize config service: %w", err)
+		}
+		cfgService = svc
+	}
 
-    // Initialize dependencies (prefer config service where applicable)
-    deps, err := initializeDependenciesWithService(config, cfgService)
-    if err != nil {
-        return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
-    }
-    if deps.HealthChecker != nil && cfgService != nil {
-        deps.HealthChecker.SetConfigService(cfgService)
-    }
+	// Initialize dependencies (prefer config service where applicable)
+	deps, err := initializeDependenciesWithService(config, cfgService)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
+	}
+	if deps.HealthChecker != nil && cfgService != nil {
+		deps.HealthChecker.SetConfigService(cfgService)
+	}
 
-    // Create Fiber app with middleware
-    app := fiber.New(fiber.Config{
+	// Create Fiber app with middleware
+	app := fiber.New(fiber.Config{
 		DisableStartupMessage: false,
 		ReadTimeout:           10 * time.Minute, // 10-minute request timeout
 		WriteTimeout:          10 * time.Minute, // 10-minute response timeout
 		IdleTimeout:           60 * time.Second, // Connection idle timeout
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-                // Map to typed error
-                te := apperr.From(err)
-                // Log server-side
-                log.Printf("Request error: code=%s status=%d msg=%s cause=%v", te.Code, te.HTTPStatus, te.Message, te.Unwrap())
-                return c.Status(te.HTTPStatus).JSON(fiber.Map{
-                    "error": fiber.Map{
-                        "code":    te.Code,
-                        "message": te.Message,
-                        "details": te.Details,
-                    },
-                })
-            },
+			// Map to typed error
+			te := apperr.From(err)
+			// Log server-side
+			log.Printf("Request error: code=%s status=%d msg=%s cause=%v", te.Code, te.HTTPStatus, te.Message, te.Unwrap())
+			return c.Status(te.HTTPStatus).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    te.Code,
+					"message": te.Message,
+					"details": te.Details,
+				},
+			})
+		},
 	})
 
 	// Add middleware with detailed panic recovery
@@ -238,123 +238,123 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	// Create coordination context
 	coordinationCtx, coordinationCancel := context.WithCancel(context.Background())
 
-    server := &Server{
-        app:                app,
-        config:             config,
-        dependencies:       deps,
-        shutdownChan:       make(chan os.Signal, 1),
-        coordinationCtx:    coordinationCtx,
-        coordinationCancel: coordinationCancel,
-        configService:      cfgService,
-    }
+	server := &Server{
+		app:                app,
+		config:             config,
+		dependencies:       deps,
+		shutdownChan:       make(chan os.Signal, 1),
+		coordinationCtx:    coordinationCtx,
+		coordinationCancel: coordinationCancel,
+		configService:      cfgService,
+	}
 
 	// Setup routes
 	server.setupRoutes()
 
-    // Optional: run ARF recipes indexer at startup if default packs configured
-    if config != nil && strings.TrimSpace(config.ArfDefaultPacks) != "" {
-        // Resolve unified storage via config service if available
-        var store internalStorage.Storage
-        if cfgService != nil {
-            if st, err := resolveStorageFromConfigService(cfgService); err == nil {
-                store = st
-            }
-        } else if deps != nil && deps.StorageFactory != nil {
-            if st, err := deps.StorageFactory.CreateClient(); err == nil {
-                store = st
-            }
-        }
-        // Determine fetcher
-        fetcher := config.ArfFetcher
-        // Track chosen registry and group for logging
-        registryBase := ""
-        mavenGroup := ""
-        // Prefer MavenFetcher if group configured
-        if fetcher == nil {
-            base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
-            if base == "" {
-                base = strings.TrimSpace(config.ArfRegistryURL)
-            }
-            if strings.TrimSpace(config.ArfMavenGroup) != "" && base != "" {
-                fetcher = trecipes.MavenFetcher{BaseURL: base, GroupID: config.ArfMavenGroup}
-                registryBase = base
-                mavenGroup = config.ArfMavenGroup
-            }
-        }
-        // Fallback to HTTPFetcher if no Maven group provided
-        if fetcher == nil {
-            base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
-            if base == "" {
-                base = strings.TrimSpace(config.ArfRegistryURL)
-            }
-            if base != "" {
-                fetcher = trecipes.HTTPFetcher{BaseURL: base}
-                registryBase = base
-            }
-        }
-        if store != nil && fetcher != nil {
-            idx := trecipes.NewIndexer(fetcher, store)
-            // Parse packs spec: name:version[,name:version]
-            specs := []trecipes.PackSpec{}
-            for _, part := range strings.Split(config.ArfDefaultPacks, ",") {
-                if part = strings.TrimSpace(part); part != "" {
-                    nv := strings.SplitN(part, ":", 2)
-                    if len(nv) == 2 {
-                        specs = append(specs, trecipes.PackSpec{Name: nv[0], Version: nv[1]})
-                    }
-                }
-            }
-            if len(specs) > 0 {
-                // Log which fetcher and packs are configured
-                fetcherType := "custom"
-                switch fetcher.(type) {
-                case trecipes.MavenFetcher:
-                    fetcherType = "maven"
-                case trecipes.HTTPFetcher:
-                    fetcherType = "http"
-                }
-                log.Printf("ARF indexer configured: fetcher=%s base=%s group=%s packs=%s", fetcherType, registryBase, mavenGroup, config.ArfDefaultPacks)
-                server.indexerStorage = store
-                go idx.Refresh(context.Background(), specs)
-            }
-        } else {
-            log.Printf("ARF indexer skipped: storage or fetcher unavailable (base=%s group=%s packs=%s)", registryBase, mavenGroup, config.ArfDefaultPacks)
-        }
-    } else {
-        log.Printf("ARF indexer disabled: no default packs configured")
-    }
+	// Optional: run ARF recipes indexer at startup if default packs configured
+	if config != nil && strings.TrimSpace(config.ArfDefaultPacks) != "" {
+		// Resolve unified storage via config service if available
+		var store internalStorage.Storage
+		if cfgService != nil {
+			if st, err := resolveStorageFromConfigService(cfgService); err == nil {
+				store = st
+			}
+		} else if deps != nil && deps.StorageFactory != nil {
+			if st, err := deps.StorageFactory.CreateClient(); err == nil {
+				store = st
+			}
+		}
+		// Determine fetcher
+		fetcher := config.ArfFetcher
+		// Track chosen registry and group for logging
+		registryBase := ""
+		mavenGroup := ""
+		// Prefer MavenFetcher if group configured
+		if fetcher == nil {
+			base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
+			if base == "" {
+				base = strings.TrimSpace(config.ArfRegistryURL)
+			}
+			if strings.TrimSpace(config.ArfMavenGroup) != "" && base != "" {
+				fetcher = trecipes.MavenFetcher{BaseURL: base, GroupID: config.ArfMavenGroup}
+				registryBase = base
+				mavenGroup = config.ArfMavenGroup
+			}
+		}
+		// Fallback to HTTPFetcher if no Maven group provided
+		if fetcher == nil {
+			base := strings.TrimSpace(os.Getenv("PLOY_ARF_REGISTRY"))
+			if base == "" {
+				base = strings.TrimSpace(config.ArfRegistryURL)
+			}
+			if base != "" {
+				fetcher = trecipes.HTTPFetcher{BaseURL: base}
+				registryBase = base
+			}
+		}
+		if store != nil && fetcher != nil {
+			idx := trecipes.NewIndexer(fetcher, store)
+			// Parse packs spec: name:version[,name:version]
+			specs := []trecipes.PackSpec{}
+			for _, part := range strings.Split(config.ArfDefaultPacks, ",") {
+				if part = strings.TrimSpace(part); part != "" {
+					nv := strings.SplitN(part, ":", 2)
+					if len(nv) == 2 {
+						specs = append(specs, trecipes.PackSpec{Name: nv[0], Version: nv[1]})
+					}
+				}
+			}
+			if len(specs) > 0 {
+				// Log which fetcher and packs are configured
+				fetcherType := "custom"
+				switch fetcher.(type) {
+				case trecipes.MavenFetcher:
+					fetcherType = "maven"
+				case trecipes.HTTPFetcher:
+					fetcherType = "http"
+				}
+				log.Printf("ARF indexer configured: fetcher=%s base=%s group=%s packs=%s", fetcherType, registryBase, mavenGroup, config.ArfDefaultPacks)
+				server.indexerStorage = store
+				go idx.Refresh(context.Background(), specs)
+			}
+		} else {
+			log.Printf("ARF indexer skipped: storage or fetcher unavailable (base=%s group=%s packs=%s)", registryBase, mavenGroup, config.ArfDefaultPacks)
+		}
+	} else {
+		log.Printf("ARF indexer disabled: no default packs configured")
+	}
 
-    return server, nil
+	return server, nil
 }
 
 // initializeDependencies initializes all external service dependencies
 func initializeDependencies(cfg *ControllerConfig) (*ServiceDependencies, error) {
-    return initializeDependenciesWithService(cfg, nil)
+	return initializeDependenciesWithService(cfg, nil)
 }
 
 // initializeDependenciesWithService initializes dependencies, preferring a centralized
 // configuration service when provided for validation and health wiring.
 func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*ServiceDependencies, error) {
-    startTime := time.Now()
-    log.Printf("Initializing service dependencies (caching: %v)", cfg.EnableCaching)
-    log.Printf("Configuration: Port=%s, ConsulAddr=%s, NomadAddr=%s", cfg.Port, cfg.ConsulAddr, cfg.NomadAddr)
+	startTime := time.Now()
+	log.Printf("Initializing service dependencies (caching: %v)", cfg.EnableCaching)
+	log.Printf("Configuration: Port=%s, ConsulAddr=%s, NomadAddr=%s", cfg.Port, cfg.ConsulAddr, cfg.NomadAddr)
 
-    // Validate storage configuration at startup
-    if cfgService != nil {
-        // Prefer centralized service for validation
-        if err := cfgService.Reload(); err != nil {
-            log.Printf("Warning: Storage configuration validation via service failed: %v", err)
-        } else {
-            log.Printf("✓ Storage configuration validated via service")
-        }
-    } else {
-        log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
-        if _, err := config.Load(cfg.StorageConfigPath); err != nil {
-            log.Printf("Warning: Storage configuration validation failed: %v", err)
-        } else {
-            log.Printf("✓ Storage configuration validated successfully")
-        }
-    }
+	// Validate storage configuration at startup
+	if cfgService != nil {
+		// Prefer centralized service for validation
+		if err := cfgService.Reload(); err != nil {
+			log.Printf("Warning: Storage configuration validation via service failed: %v", err)
+		} else {
+			log.Printf("✓ Storage configuration validated via service")
+		}
+	} else {
+		log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
+		if _, err := config.Load(cfg.StorageConfigPath); err != nil {
+			log.Printf("Warning: Storage configuration validation failed: %v", err)
+		} else {
+			log.Printf("✓ Storage configuration validated successfully")
+		}
+	}
 
 	// Initialize environment store with fallback logic
 	log.Printf("Initializing environment store...")
@@ -376,12 +376,12 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 
 	// Initialize optimized storage factory early (before components that need it)
 	// Always create the factory - it's required for most components
-    storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
+	storageFactory := config.NewOptimizedStorageClientFactory(cfg.StorageConfigPath)
 
-    // Initialize health checker
-    log.Printf("Initializing health checker...")
-    healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
-    log.Printf("✓ Health checker initialized")
+	// Initialize health checker
+	log.Printf("Initializing health checker...")
+	healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
+	log.Printf("✓ Health checker initialized")
 
 	// Initialize TTL cleanup service
 	cleanupHandler, ttlService, err := initializeCleanupService(cfg)
@@ -423,15 +423,15 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	arfEngine := arfcore.NewEngine(arfcore.EngineConfig{})
 	// Prefer storage-backed recipes registry when storage is resolvable
 	var arfRecipes tarfrecipes.Registry = tarfrecipes.NewInMemory()
-    if cfgService != nil {
-        if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
-            arfRecipes = tarfrecipes.NewStorageBacked(st)
-        }
-    } else {
-        if st, err := config.CreateStorageFromFactory(cfg.StorageConfigPath); err == nil && st != nil {
-            arfRecipes = tarfrecipes.NewStorageBacked(st)
-        }
-    }
+	if cfgService != nil {
+		if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
+			arfRecipes = tarfrecipes.NewStorageBacked(st)
+		}
+	} else {
+		if st, err := config.CreateStorageFromFactory(cfg.StorageConfigPath); err == nil && st != nil {
+			arfRecipes = tarfrecipes.NewStorageBacked(st)
+		}
+	}
 
 	// Initialize ARF Handler
 	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
@@ -720,13 +720,13 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 // getStorageClient creates a new storage client for each request (stateless with caching)
 // Now returns the new storage.Storage interface instead of *storage.StorageClient
 func (s *Server) getStorageClient() (internalStorage.Storage, error) {
-    // Centralized config service is required
-    start := time.Now()
-    st, err := resolveStorageFromConfigService(s.configService)
-    if s.dependencies.Metrics != nil {
-        s.dependencies.Metrics.RecordConfigLoadTime("storage", err == nil, time.Since(start))
-    }
-    return st, err
+	// Centralized config service is required
+	start := time.Now()
+	st, err := resolveStorageFromConfigService(s.configService)
+	if s.dependencies.Metrics != nil {
+		s.dependencies.Metrics.RecordConfigLoadTime("storage", err == nil, time.Since(start))
+	}
+	return st, err
 }
 
 // setupRoutes configures all API routes with dependency injection
@@ -750,12 +750,12 @@ func (s *Server) setupRoutes() {
 	api := s.app.Group("/v1")
 
 	// Application build endpoints with request-scoped storage
-	api.Post("/apps/:app/builds", s.handleTriggerAppBuild) // Harbor apps namespace
+	api.Post("/apps/:app/builds", s.handleTriggerAppBuild) // apps namespace
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)
 
-	// Platform service endpoints with Harbor platform namespace
+	// Platform service endpoints with platform namespace
 	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)
 
 	// Legacy build endpoint (backward compatibility - defaults to apps namespace)
@@ -1286,13 +1286,13 @@ func (s *Server) handlePlatformCertificateHealth(c *fiber.Ctx) error {
 
 // initializeARFHandler initializes the Automated Remediation Framework handler
 func initializeARFHandler(cfg *ControllerConfig) (*arf.Handler, error) {
-    return initializeARFHandlerWithService(cfg, nil)
+	return initializeARFHandlerWithService(cfg, nil)
 }
 
 // initializeARFHandlerWithService prefers unified storage resolved from the centralized
 // config service when provided, with file-based factory as a fallback.
 func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*arf.Handler, error) {
-    log.Printf("Initializing ARF (Automated Remediation Framework)")
+	log.Printf("Initializing ARF (Automated Remediation Framework)")
 
 	// Load ARF configuration from environment
 	arfConfig := arf.LoadConfigFromEnv()
@@ -1356,29 +1356,29 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 		storageProvider = seaweedClient
 	}
 
-    if storageProvider != nil {
-        log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
-            nomadAddr, registryURL, seaweedfsURL, apiURL)
+	if storageProvider != nil {
+		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
+			nomadAddr, registryURL, seaweedfsURL, apiURL)
 
-        // Create ARF service with unified storage interface
-        // Storage already has "artifacts" bucket configured via collection in storage config
-        // ARFService should not add any bucket prefix - storage handles it internally
-        // Centralized config service is required for unified storage
-        if cfgService == nil {
-            return nil, fmt.Errorf("config service is required for ARF unified storage")
-        }
-        unifiedStorage, err := resolveStorageFromConfigService(cfgService)
-        if err != nil {
-            log.Printf("ERROR: Failed to create unified storage for ARF via config service: %v", err)
-            return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
-        }
+		// Create ARF service with unified storage interface
+		// Storage already has "artifacts" bucket configured via collection in storage config
+		// ARFService should not add any bucket prefix - storage handles it internally
+		// Centralized config service is required for unified storage
+		if cfgService == nil {
+			return nil, fmt.Errorf("config service is required for ARF unified storage")
+		}
+		unifiedStorage, err := resolveStorageFromConfigService(cfgService)
+		if err != nil {
+			log.Printf("ERROR: Failed to create unified storage for ARF via config service: %v", err)
+			return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
+		}
 
-        arfStorageService, err := arf.NewARFService(unifiedStorage)
-        if err != nil {
-            log.Printf("ERROR: Failed to create ARF service: %v", err)
-            return nil, fmt.Errorf("failed to create ARF service: %w", err)
-        }
-        log.Printf("ARF service created with unified storage (bucket handled by storage layer)")
+		arfStorageService, err := arf.NewARFService(unifiedStorage)
+		if err != nil {
+			log.Printf("ERROR: Failed to create ARF service: %v", err)
+			return nil, fmt.Errorf("failed to create ARF service: %w", err)
+		}
+		log.Printf("ARF service created with unified storage (bucket handled by storage layer)")
 
 		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
 			nomadAddr,

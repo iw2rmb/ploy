@@ -1,38 +1,38 @@
 package server
 
 import (
-    "github.com/gofiber/fiber/v2"
-    "github.com/iw2rmb/ploy/api/config"
-    "github.com/iw2rmb/ploy/internal/build"
-    "github.com/iw2rmb/ploy/internal/debug"
-    "github.com/iw2rmb/ploy/internal/env"
-    "github.com/iw2rmb/ploy/internal/lifecycle"
+	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/api/config"
+	"github.com/iw2rmb/ploy/internal/build"
+	"github.com/iw2rmb/ploy/internal/debug"
+	"github.com/iw2rmb/ploy/internal/env"
+	"github.com/iw2rmb/ploy/internal/lifecycle"
 )
 
 // handleTriggerBuild handles build trigger requests with request-scoped storage
 func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-    unifiedStorage, err := s.resolveUnifiedStorage()
+	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
 	return build.TriggerBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
-// handleTriggerPlatformBuild handles platform service builds with Harbor platform namespace
+// handleTriggerPlatformBuild handles platform service builds with platform namespace
 func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-    unifiedStorage, err := s.resolveUnifiedStorage()
+	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
 	return build.TriggerPlatformBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
-// handleTriggerAppBuild handles user application builds with Harbor apps namespace
+// handleTriggerAppBuild handles user application builds with apps namespace
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-    unifiedStorage, err := s.resolveUnifiedStorage()
+	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
@@ -42,7 +42,7 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 // handleDestroyApp handles app destruction with request-scoped storage
 func (s *Server) handleDestroyApp(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-    unifiedStorage, err := s.resolveUnifiedStorage()
+	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
@@ -77,50 +77,50 @@ func (s *Server) handleStorageMetrics(c *fiber.Ctx) error {
 
 // handleGetStorageConfig handles storage configuration retrieval
 func (s *Server) handleGetStorageConfig(c *fiber.Ctx) error {
-    // Centralized config service is required; map to legacy Root shape for clients
-    if s.configService == nil {
-        return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service not initialized"})
-    }
-    cfg := s.configService.Get()
-    if cfg == nil {
-        return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service returned nil"})
-    }
-    legacy := config.Root{
-        Storage: config.StorageConfig{
-            Provider:   cfg.Storage.Provider,
-            Master:     cfg.Storage.Endpoint,
-            Filer:      cfg.Storage.Endpoint,
-            Collection: cfg.Storage.Bucket,
-        },
-    }
-    return c.JSON(legacy)
+	// Centralized config service is required; map to legacy Root shape for clients
+	if s.configService == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service not initialized"})
+	}
+	cfg := s.configService.Get()
+	if cfg == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to load storage config", "details": "config service returned nil"})
+	}
+	legacy := config.Root{
+		Storage: config.StorageConfig{
+			Provider:   cfg.Storage.Provider,
+			Master:     cfg.Storage.Endpoint,
+			Filer:      cfg.Storage.Endpoint,
+			Collection: cfg.Storage.Bucket,
+		},
+	}
+	return c.JSON(legacy)
 }
 
 // handleReloadStorageConfig handles storage configuration reload
 func (s *Server) handleReloadStorageConfig(c *fiber.Ctx) error {
-    if s.configService == nil {
-        return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": "config service not initialized"})
-    }
-    if err := s.configService.Reload(); err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
-    }
-    cfg := s.configService.Get()
-    return c.JSON(fiber.Map{
-        "reloaded": true,
-        "config":   cfg,
-        "message":  "Configuration reload completed",
-    })
+	if s.configService == nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": "config service not initialized"})
+	}
+	if err := s.configService.Reload(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to reload storage config", "details": err.Error()})
+	}
+	cfg := s.configService.Get()
+	return c.JSON(fiber.Map{
+		"reloaded": true,
+		"config":   cfg,
+		"message":  "Configuration reload completed",
+	})
 }
 
 // handleValidateStorageConfig handles storage configuration validation
 func (s *Server) handleValidateStorageConfig(c *fiber.Ctx) error {
-    if s.configService == nil {
-        return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": "config service not initialized"})
-    }
-    if err := s.configService.Reload(); err != nil {
-        return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
-    }
-    return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
+	if s.configService == nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": "config service not initialized"})
+	}
+	if err := s.configService.Reload(); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Configuration validation failed", "details": err.Error()})
+	}
+	return c.JSON(fiber.Map{"valid": true, "message": "Configuration is valid"})
 }
 
 // handleSetEnvVars handles setting environment variables with injected env store
