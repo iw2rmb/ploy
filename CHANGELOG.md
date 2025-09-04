@@ -6,6 +6,7 @@
 - Roadmap report `roadmap/refactor/phase-6-codex.md` documenting redundant code and architecture issues across `api/*` and `internal/*`.
 - Progress markers and acceptance criteria checkboxes reflecting current status (error contract DONE; preview router migrated).
 - internal/routing: Introduced `BuildTraefikTags` helper with unit tests to begin Traefik tag consolidation (Phase 6.5).
+ - internal/arf/models: New minimal models to decouple CLI from API models; CLI switched to internal models where practical (Phase 6.1 slice).
 
 ### Highlights
 - Identified layering inversion where `internal/*` imports from `api/*` (critical).
@@ -16,6 +17,7 @@
 ### Changed
 - internal/preview: Replaced local `getenv` with `internal/utils.Getenv`; continues unification of env helpers.
 - api/server: Error handling standardized through `internal/errors` with JSON envelope; tests in `api/server/error_handler_test.go` validate contract.
+ - internal/cli/arf: formatting, pagination, composition, import/export, and tests now import internal ARF models; remaining template generation still uses API models (to be migrated).
 
 ## [2025-09-04] - OpenRewrite Transformation Testing & SeaweedFS Fix
 
