@@ -23,7 +23,7 @@ type ProductionJobSubmitter interface {
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface
 type jobSubmissionHelper struct {
-	submitter interface{} // MockJobSubmitter in tests, real submitter in production
+	submitter interface{}            // MockJobSubmitter in tests, real submitter in production
 	runner    ProductionJobSubmitter // For accessing asset rendering methods in production
 }
 
@@ -55,12 +55,12 @@ func substituteHCLTemplate(hclPath string, runID string) (string, error) {
 	if model == "" {
 		model = "gpt-4o-mini@2024-08-06"
 	}
-	
+
 	toolsJSON := os.Getenv("TRANSFLOW_TOOLS")
 	if toolsJSON == "" {
 		toolsJSON = `{"file":{"allow":["src/**","pom.xml"]},"search":{"provider":"rg","allow":["src/**"]}}`
 	}
-	
+
 	limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
 	if limitsJSON == "" {
 		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
@@ -89,11 +89,11 @@ func readJobArtifact(artifactPath string, target interface{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to read artifact %s: %w", artifactPath, err)
 	}
-	
+
 	if err := json.Unmarshal(data, target); err != nil {
 		return fmt.Errorf("failed to parse artifact JSON: %w", err)
 	}
-	
+
 	return nil
 }
 

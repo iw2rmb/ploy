@@ -1,6 +1,6 @@
 {
-  "task": "m-implement-wire-production-nomad-job-submission",
-  "branch": "feature/implement-wire-production-nomad-job-submission",
-  "services": ["internal/cli/transflow", "internal/orchestration", "roadmap/transflow/jobs"],
+  "task": null,
+  "branch": null,
+  "services": [],
   "updated": "2025-09-05"
 }
