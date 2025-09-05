@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
@@ -325,12 +326,37 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 		{Success: true, Message: "build successful", Version: "healed-v1.0.0"},
 	}
 
+	// Create mock job submitter for healing workflow
+	mockJobSubmitter := &MockJobSubmitter{
+		JobResults: map[string]JobResult{
+			"planner": {
+				JobID:    "planner-job-1",
+				Status:   "completed",
+				Duration: 10 * time.Second,
+				Output:   `{"plan_id": "plan-123", "options": [{"id": "option-1", "type": "llm-exec"}]}`,
+			},
+			"llm-exec": {
+				JobID:    "llm-exec-job-1",
+				Status:   "completed",
+				Duration: 30 * time.Second,
+				Output:   `{"diff": "successful patch applied"}`,
+			},
+			"reducer": {
+				JobID:    "reducer-job-1",
+				Status:   "completed",
+				Duration: 5 * time.Second,
+				Output:   `{"action": "stop", "notes": "healing succeeded"}`,
+			},
+		},
+	}
+
 	runner, err := NewTransflowRunner(config, "/tmp/test")
 	require.NoError(t, err)
 	
 	runner.SetGitOperations(mockGit)
 	runner.SetRecipeExecutor(mockRecipe)
 	runner.SetBuildChecker(mockBuild)
+	runner.SetJobSubmitter(mockJobSubmitter)
 
 	// This should trigger self-healing
 	ctx := context.Background()
@@ -343,6 +369,18 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	assert.NotNil(t, result.HealingSummary)
 	assert.True(t, result.HealingSummary.Enabled)
 	assert.Greater(t, result.HealingSummary.AttemptsCount, 0)
+	
+	// Debug: print healing summary details
+	if result.HealingSummary != nil {
+		t.Logf("Healing Summary: Enabled=%t, AttemptsCount=%d, FinalSuccess=%t, Winner=%v",
+			result.HealingSummary.Enabled, result.HealingSummary.AttemptsCount, 
+			result.HealingSummary.FinalSuccess, result.HealingSummary.Winner != nil)
+		if result.HealingSummary.Winner != nil {
+			t.Logf("Winner: %+v", *result.HealingSummary.Winner)
+		}
+		t.Logf("All results count: %d", len(result.HealingSummary.AllResults))
+	}
+	
 	assert.True(t, result.HealingSummary.FinalSuccess)
 }
 
@@ -364,12 +402,18 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 	mockBuild := NewHealingMockBuildChecker()
 	mockBuild.BuildError = errors.New("persistent build failure")
 
+	// Create mock job submitter that always fails
+	mockJobSubmitter := &MockJobSubmitter{
+		SubmitError: errors.New("healing job failed"),
+	}
+
 	runner, err := NewTransflowRunner(config, "/tmp/test")
 	require.NoError(t, err)
 	
 	runner.SetGitOperations(&MockGitOperations{})
 	runner.SetRecipeExecutor(&MockRecipeExecutor{})
 	runner.SetBuildChecker(mockBuild)
+	runner.SetJobSubmitter(mockJobSubmitter)
 
 	ctx := context.Background()
 	result, err := runner.Run(ctx)
