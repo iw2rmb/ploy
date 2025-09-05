@@ -12,6 +12,7 @@
 - Helpers: validate_artifacts.py to check artifacts against schemas; example runner and compactor pseudocode.
 - Orchestration: `SubmitAndWaitTerminal` helper for batch jobs (planner/reducer) to wait for terminal state.
 - CLI: `ploy transflow run --render-planner` renders planner inputs and HCL (dry-run) into the workspace to prepare for planner submission.
+- CLI: `ploy transflow run --plan` renders planner assets, substitutes env placeholders (MODEL, TOOLS, LIMITS, RUN_ID), and optionally submits the planner job when `TRANSFLOW_SUBMIT=1`.
 
 ### Changed
 - internal/cli/common/deploy.go: DeployConfig now includes Timeout; SharedPush honors per-call timeout.
