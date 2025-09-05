@@ -101,6 +101,11 @@ type TransflowHealingSummary struct {
 	FinalSuccess  bool                         `json:"final_success"`
 	TotalHealed   int                          `json:"total_healed"`
 	TotalDuration time.Duration                `json:"total_duration"`
+	
+	// Job-based healing workflow fields
+	PlanID     string         `json:"plan_id,omitempty"`
+	Winner     *BranchResult  `json:"winner,omitempty"`
+	AllResults []BranchResult `json:"all_results,omitempty"`
 }
 
 // NewTransflowHealingSummary creates a new healing summary

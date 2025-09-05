@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [2025-01-09] - Transflow: Job Submission Infrastructure Implementation (MVP Complete)
+
+### Added  
+- **Job Submission Infrastructure**: Complete TDD implementation of healing workflow orchestration for transflow MVP.
+  - `JobSubmissionHelper`: Interface and implementation for planner and reducer job submission with test mocks.
+  - `FanoutOrchestrator`: Parallel branch execution with first-success-wins semantics, configurable parallelism limits, and context-based cancellation.
+  - `TransflowRunner` integration: Automatic healing trigger on build failures when `SelfHeal.Enabled=true` and job submitter is configured.
+- **Healing Workflow Types**: Complete type system for job-based healing including `JobSpec`, `JobResult`, `BranchSpec`, `BranchResult`, `PlanResult`, and `NextAction`.
+- **Test Coverage**: Comprehensive test suite covering planner submission, reducer workflows, fanout orchestration, and end-to-end runner integration.
+- **Schema Integration**: Fixed JSON schema validation in `schema.go` using proper `io.Reader` interface for jsonschema compiler.
+
+### Enhanced
+- **TransflowHealingSummary**: Extended existing healing summary struct to support both ARF-based healing and new job-based workflows with `PlanID`, `Winner`, and `AllResults` fields.
+- **TransflowRunner**: Added `SetJobSubmitter()` method and `attemptHealing()` workflow that orchestrates planner → fanout → reducer sequence on build failures.
+- **Error Handling**: Graceful fallback when healing fails - continues with standard error reporting if no job submitter or healing disabled.
+
+### Technical Details
+- **TDD Approach**: Full RED-GREEN-REFACTOR cycle with failing tests driving implementation.
+- **Interface Design**: Type-safe interfaces allowing both test mocks and production implementations.
+- **Concurrency**: Proper goroutine management with semaphore-based parallelism control and context cancellation.
+- **Architecture**: Clean separation of concerns between job submission helpers, fanout orchestration, and runner integration.
+
+### Notes
+- This completes the critical MVP blocker identified in transflow roadmap. 
+- Job submission infrastructure now ready for integration with actual orchestration backend (Nomad job submission).
+- Healing workflow supports both existing ARF-based healing and new LangGraph planner/reducer patterns.
+- All new job submission tests pass; some existing config tests need adjustment for SelfHeal initialization changes.
+
 ## [2025-09-04] - Transflow: LangGraph Jobs + Schemas + CLI integration (MVP groundwork)
 
 ### Added
