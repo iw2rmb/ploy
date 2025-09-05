@@ -603,7 +603,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 	}
 
 	// Step 1: Submit planner job to analyze the build error
-	jobHelper := NewJobSubmissionHelper(r.jobSubmitter)
+	jobHelper := NewJobSubmissionHelperWithRunner(r.jobSubmitter, r)
 	planResult, err := jobHelper.SubmitPlannerJob(ctx, r.config, buildError, r.workspaceDir)
 	if err != nil {
 		return summary, fmt.Errorf("planner job failed: %w", err)
@@ -632,7 +632,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 	}
 
 	// Step 3: Execute fanout orchestration
-	orchestrator := NewFanoutOrchestrator(r.jobSubmitter)
+	orchestrator := NewFanoutOrchestratorWithRunner(r.jobSubmitter, r)
 	maxParallel := 3 // Default parallelism
 	if r.config.SelfHeal.MaxRetries > 0 {
 		maxParallel = r.config.SelfHeal.MaxRetries
