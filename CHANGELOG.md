@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [2025-09-05] - Transflow: GitLab Merge Request Integration (Stream 3, Phase 1)
+
+### Added
+- **GitLab MR Integration**: Complete GitLab merge request creation and update functionality for transflow workflows.
+  - `internal/git/provider`: New provider package with GitLab REST API client supporting project inference from HTTPS URLs.
+  - `GitProvider` interface: Clean abstraction supporting multiple git forge providers (GitLab now, GitHub future).
+  - `CreateOrUpdateMR`: GitLab API integration with automatic MR creation/updates using deterministic branch names.
+  - Environment-based authentication: `GITLAB_URL` and `GITLAB_TOKEN` configuration following established patterns.
+- **TransflowRunner Integration**: Seamless MR creation after successful workflow builds.
+  - Optional MR step: Failures don't break the workflow, successful builds can still complete without MRs.
+  - Rich MR descriptions: Automatic generation with workflow details, applied transformations, and self-healing summaries.
+  - Default labeling: Consistent `ploy` and `tfl` labels for workflow identification and filtering.
+- **Test Coverage**: Comprehensive unit and integration tests with mocked GitLab API responses.
+  - Unit tests: GitLab API client, URL parsing, configuration validation, error handling.
+  - Integration tests: End-to-end transflow workflow with GitLab provider integration.
+  - TDD implementation: Full RED-GREEN-REFACTOR cycle with proper build validation.
+
+### Enhanced
+- **TransflowResult**: Extended with `MRURL` field to capture created merge request URLs in workflow results.
+- **Result Summary**: Updated to include merge request URLs in human-readable workflow summaries.
+- **Branch Reuse**: Deterministic branch naming (`workflow/{id}/{timestamp}`) enables MR updates on subsequent runs.
+- **Error Resilience**: MR creation failures are logged but don't fail the entire workflow, maintaining robustness.
+
+### Technical Details
+- **Provider Pattern**: Follows existing DNS provider abstraction for clean multi-provider support.
+- **GitLab API**: RESTful integration using standard HTTP client with proper error handling and response parsing.
+- **URL Inference**: Smart project extraction from HTTPS repository URLs supporting nested namespaces.
+- **Configuration**: Zero-config defaults (GitLab SaaS) with environment variable overrides for self-hosted instances.
+- **Integration Points**: Clean dependency injection in `TransflowRunner` with proper interface boundaries.
+
+### Notes
+- Completes Stream 3, Phase 1 requirements from transflow MVP roadmap.
+- Ready for GitHub provider implementation (Stream 3, Phase 2) using same interface pattern.
+- MR integration is optional and gracefully degrades when GitLab is unavailable or misconfigured.
+- Supports both GitLab SaaS and self-hosted instances through `GITLAB_URL` configuration.
+
 ## [2025-01-09] - Transflow: Job Submission Infrastructure Implementation (MVP Complete)
 
 ### Added  

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/git/provider"
 )
 
 // GitOperationsInterface defines the Git operations needed by the runner
@@ -48,6 +49,7 @@ type TransflowResult struct {
 	ErrorMessage   string
 	Duration       time.Duration
 	HealingSummary *TransflowHealingSummary
+	MRURL          string // GitLab merge request URL if created
 }
 
 // Summary returns a human-readable summary of the transflow execution
@@ -94,13 +96,13 @@ func (r *TransflowResult) Summary() string {
 			sb.WriteString(fmt.Sprintf("  Attempts: %d/%d\n", r.HealingSummary.AttemptsCount, r.HealingSummary.MaxRetries))
 			sb.WriteString(fmt.Sprintf("  Successful fixes: %d\n", r.HealingSummary.TotalHealed))
 			sb.WriteString(fmt.Sprintf("  Final result: %s\n", map[bool]string{true: "SUCCESS", false: "FAILED"}[r.HealingSummary.FinalSuccess]))
-			
+
 			for _, attempt := range r.HealingSummary.Attempts {
 				status := "✗"
 				if attempt.Success {
 					status = "✓"
 				}
-				sb.WriteString(fmt.Sprintf("    %s Attempt %d: %s\n", status, attempt.AttemptNumber, 
+				sb.WriteString(fmt.Sprintf("    %s Attempt %d: %s\n", status, attempt.AttemptNumber,
 					func() string {
 						if attempt.Success {
 							return fmt.Sprintf("Applied %d recipe(s)", len(attempt.AppliedRecipes))
@@ -113,17 +115,23 @@ func (r *TransflowResult) Summary() string {
 		}
 	}
 
+	// Include MR URL if available
+	if r.MRURL != "" {
+		sb.WriteString(fmt.Sprintf("\nMerge Request: %s\n", r.MRURL))
+	}
+
 	return sb.String()
 }
 
 // TransflowRunner orchestrates the execution of transflow steps
 type TransflowRunner struct {
-    config         *TransflowConfig
-    workspaceDir   string
-    gitOps         GitOperationsInterface
-    recipeExecutor RecipeExecutorInterface
-    buildChecker   BuildCheckerInterface
-    jobSubmitter   interface{} // For healing workflows
+	config         *TransflowConfig
+	workspaceDir   string
+	gitOps         GitOperationsInterface
+	recipeExecutor RecipeExecutorInterface
+	buildChecker   BuildCheckerInterface
+	jobSubmitter   interface{}          // For healing workflows
+	gitProvider    provider.GitProvider // For MR creation
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -150,132 +158,159 @@ func (r *TransflowRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
 
 // SetBuildChecker sets the build checker implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
-    r.buildChecker = checker
+	r.buildChecker = checker
 }
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
 func (r *TransflowRunner) SetJobSubmitter(submitter interface{}) {
-    r.jobSubmitter = submitter
+	r.jobSubmitter = submitter
+}
+
+// SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
+func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
+	r.gitProvider = provider
 }
 
 // PlannerAssets holds file paths for rendered planner inputs and HCL
 type PlannerAssets struct {
-    InputsPath string
-    HCLPath    string
+	InputsPath string
+	HCLPath    string
 }
 
 // RenderPlannerAssets writes minimal inputs.json and a rendered planner.hcl (with placeholders) into the workspace.
 // This is a dry-run helper to prepare artifacts for planner submission later.
 func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
-    inputsDir := filepath.Join(r.workspaceDir, "planner", "context")
-    outDir := filepath.Join(r.workspaceDir, "planner", "out")
-    if err := os.MkdirAll(inputsDir, 0755); err != nil {
-        return nil, err
-    }
-    if err := os.MkdirAll(outDir, 0755); err != nil {
-        return nil, err
-    }
-    // Minimal inputs.json
-    inputsPath := filepath.Join(inputsDir, "inputs.json")
-    inputs := fmt.Sprintf(`{
+	inputsDir := filepath.Join(r.workspaceDir, "planner", "context")
+	outDir := filepath.Join(r.workspaceDir, "planner", "out")
+	if err := os.MkdirAll(inputsDir, 0755); err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return nil, err
+	}
+	// Minimal inputs.json
+	inputsPath := filepath.Join(inputsDir, "inputs.json")
+	inputs := fmt.Sprintf(`{
   "language": "java",
   "lane": %q,
   "last_error": {"stdout": "", "stderr": ""},
   "deps": {}
 }`, r.config.Lane)
-    
-    if err := os.WriteFile(inputsPath, []byte(inputs), 0644); err != nil {
-        return nil, err
-    }
-    
-    // Copy HCL template
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
-    hclBytes, err := os.ReadFile(hclTemplate)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
-    }
-    
-    hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
-    if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
-        return nil, err
-    }
-    
-    return &PlannerAssets{InputsPath: inputsPath, HCLPath: hclPath}, nil
+
+	if err := os.WriteFile(inputsPath, []byte(inputs), 0644); err != nil {
+		return nil, err
+	}
+
+	// Copy HCL template
+	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
+	hclBytes, err := os.ReadFile(hclTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
+	}
+
+	hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
+	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
+		return nil, err
+	}
+
+	return &PlannerAssets{InputsPath: inputsPath, HCLPath: hclPath}, nil
 }
 
 // RenderLLMExecAssets writes a rendered llm_exec.hcl for the given option ID.
 func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
-    dir := filepath.Join(r.workspaceDir, "llm-exec", optionID)
-    if err := os.MkdirAll(dir, 0755); err != nil { return "", err }
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "llm_exec.hcl")
-    hclBytes, err := os.ReadFile(hclTemplate)
-    if err != nil { return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err) }
-    renderedPath := filepath.Join(dir, "llm_exec.rendered.hcl")
-    // Defer env substitution to caller (same as planner/reducer), we just copy template here
-    if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil { return "", err }
-    return renderedPath, nil
+	dir := filepath.Join(r.workspaceDir, "llm-exec", optionID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "llm_exec.hcl")
+	hclBytes, err := os.ReadFile(hclTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err)
+	}
+	renderedPath := filepath.Join(dir, "llm_exec.rendered.hcl")
+	// Defer env substitution to caller (same as planner/reducer), we just copy template here
+	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
+		return "", err
+	}
+	return renderedPath, nil
 }
 
 // RenderORWApplyAssets writes a rendered orw_apply.hcl for the given option ID.
 func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) {
-    dir := filepath.Join(r.workspaceDir, "orw-apply", optionID)
-    if err := os.MkdirAll(dir, 0755); err != nil { return "", err }
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
-    hclBytes, err := os.ReadFile(hclTemplate)
-    if err != nil { return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err) }
-    renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
-    if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil { return "", err }
-    return renderedPath, nil
+	dir := filepath.Join(r.workspaceDir, "orw-apply", optionID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
+	hclBytes, err := os.ReadFile(hclTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
+	}
+	renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
+	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
+		return "", err
+	}
+	return renderedPath, nil
 }
 
 // PrepareRepo clones the target repository and creates a workflow branch; returns the repo path and branch name.
 func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, error) {
-    repoPath := filepath.Join(r.workspaceDir, "repo-apply")
-    if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
-        return "", "", fmt.Errorf("clone failed: %w", err)
-    }
-    branchName := GenerateBranchName(r.config.ID)
-    if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
-        return "", "", fmt.Errorf("branch failed: %w", err)
-    }
-    return repoPath, branchName, nil
+	repoPath := filepath.Join(r.workspaceDir, "repo-apply")
+	if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+		return "", "", fmt.Errorf("clone failed: %w", err)
+	}
+	branchName := GenerateBranchName(r.config.ID)
+	if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
+		return "", "", fmt.Errorf("branch failed: %w", err)
+	}
+	return repoPath, branchName, nil
 }
 
 // ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
 func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
-    // Validate paths first (allowlist)
-    allow := []string{"src/**", "pom.xml"}
-    if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" { allow = strings.Split(v, ",") }
-    if err := ValidateDiffPaths(diffPath, allow); err != nil { return err }
-    if err := ValidateUnifiedDiff(ctx, repoPath, diffPath); err != nil {
-        return err
-    }
-    if err := ApplyUnifiedDiff(ctx, repoPath, diffPath); err != nil {
-        return err
-    }
-    if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
-        return fmt.Errorf("commit failed: %w", err)
-    }
-    // Build gate
-    timeout, err := r.config.ParseBuildTimeout()
-    if err != nil { return err }
-    appName := GenerateAppName(r.config.ID)
-    buildCfg := common.DeployConfig{
-        App:         appName,
-        Lane:        r.config.Lane,
-        Environment: "dev",
-        Timeout:     timeout,
-    }
-    res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
-    if err != nil { return fmt.Errorf("build gate failed: %w", err) }
-    if res != nil && !res.Success { return fmt.Errorf("build gate failed: %s", res.Message) }
-    return nil
+	// Validate paths first (allowlist)
+	allow := []string{"src/**", "pom.xml"}
+	if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" {
+		allow = strings.Split(v, ",")
+	}
+	if err := ValidateDiffPaths(diffPath, allow); err != nil {
+		return err
+	}
+	if err := ValidateUnifiedDiff(ctx, repoPath, diffPath); err != nil {
+		return err
+	}
+	if err := ApplyUnifiedDiff(ctx, repoPath, diffPath); err != nil {
+		return err
+	}
+	if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+	// Build gate
+	timeout, err := r.config.ParseBuildTimeout()
+	if err != nil {
+		return err
+	}
+	appName := GenerateAppName(r.config.ID)
+	buildCfg := common.DeployConfig{
+		App:         appName,
+		Lane:        r.config.Lane,
+		Environment: "dev",
+		Timeout:     timeout,
+	}
+	res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
+	if err != nil {
+		return fmt.Errorf("build gate failed: %w", err)
+	}
+	if res != nil && !res.Success {
+		return fmt.Errorf("build gate failed: %s", res.Message)
+	}
+	return nil
 }
 
 // ReducerAssets holds file paths for rendered reducer inputs and HCL
 type ReducerAssets struct {
-    HistoryPath string
-    HCLPath     string
+	HistoryPath string
+	HCLPath     string
 }
 
 // RenderReducerAssets writes a minimal history.json and a rendered reducer.hcl (with placeholders) into the workspace.
@@ -284,26 +319,26 @@ func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
 	if err := os.MkdirAll(ctxDir, 0755); err != nil {
 		return nil, err
 	}
-	
+
 	// Minimal history.json
 	historyPath := filepath.Join(ctxDir, "history.json")
 	history := "{\n  \"plan_id\": \"\",\n  \"branches\": [],\n  \"winner\": \"\"\n}"
 	if err := os.WriteFile(historyPath, []byte(history), 0644); err != nil {
 		return nil, err
 	}
-	
+
 	// Copy HCL template
 	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "reducer.hcl")
 	hclBytes, err := os.ReadFile(hclTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err)
 	}
-	
+
 	hclPath := filepath.Join(r.workspaceDir, "reducer", "reducer.hcl")
 	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
 		return nil, err
 	}
-	
+
 	return &ReducerAssets{HistoryPath: historyPath, HCLPath: hclPath}, nil
 }
 
@@ -420,7 +455,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Attempt healing workflow
 			healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
 			result.HealingSummary = healingSummary
-			
+
 			if healingErr == nil && healingSummary.Winner != nil {
 				// Healing succeeded! Continue with the healed version
 				result.StepResults = append(result.StepResults, StepResult{
@@ -471,10 +506,93 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		Message: fmt.Sprintf("Pushed branch %s", branchName),
 	})
 
+	// Step 7: Create or update GitLab merge request (if GitProvider is configured)
+	if r.gitProvider != nil {
+		mrStart := time.Now()
+		if err := r.gitProvider.ValidateConfiguration(); err != nil {
+			// MR creation is optional - log but don't fail the workflow
+			result.StepResults = append(result.StepResults, StepResult{
+				StepID:   "mr",
+				Success:  false,
+				Message:  fmt.Sprintf("MR creation skipped - configuration invalid: %v", err),
+				Duration: time.Since(mrStart),
+			})
+		} else {
+			mrConfig := provider.MRConfig{
+				RepoURL:      r.config.TargetRepo,
+				SourceBranch: branchName,
+				TargetBranch: r.config.BaseRef,
+				Title:        fmt.Sprintf("Transflow: %s", r.config.ID),
+				Description:  r.generateMRDescription(result),
+				Labels:       []string{"ploy", "tfl"},
+			}
+
+			mrResult, err := r.gitProvider.CreateOrUpdateMR(ctx, mrConfig)
+			if err != nil {
+				// MR creation is optional - log but don't fail the workflow
+				result.StepResults = append(result.StepResults, StepResult{
+					StepID:   "mr",
+					Success:  false,
+					Message:  fmt.Sprintf("MR creation failed: %v", err),
+					Duration: time.Since(mrStart),
+				})
+			} else {
+				action := "created"
+				if !mrResult.Created {
+					action = "updated"
+				}
+				result.StepResults = append(result.StepResults, StepResult{
+					StepID:   "mr",
+					Success:  true,
+					Message:  fmt.Sprintf("MR %s: %s", action, mrResult.MRURL),
+					Duration: time.Since(mrStart),
+				})
+				result.MRURL = mrResult.MRURL
+			}
+		}
+	}
+
 	// Success!
 	result.Success = true
 	result.Duration = time.Since(startTime)
 	return result, nil
+}
+
+// generateMRDescription creates a descriptive merge request body based on workflow results
+func (r *TransflowRunner) generateMRDescription(result *TransflowResult) string {
+	var description strings.Builder
+
+	description.WriteString(fmt.Sprintf("## Transflow Workflow: %s\n\n", r.config.ID))
+
+	// Add basic workflow information
+	description.WriteString(fmt.Sprintf("**Branch:** %s\n", result.BranchName))
+	if result.BuildVersion != "" {
+		description.WriteString(fmt.Sprintf("**Build Version:** %s\n", result.BuildVersion))
+	}
+	description.WriteString(fmt.Sprintf("**Duration:** %s\n\n", result.Duration.String()))
+
+	// Add applied transformations
+	description.WriteString("## Applied Transformations\n\n")
+	for _, step := range result.StepResults {
+		if step.StepID != "mr" && step.Success {
+			description.WriteString(fmt.Sprintf("- ✅ **%s**: %s\n", strings.Title(step.StepID), step.Message))
+		}
+	}
+
+	// Add healing information if present
+	if result.HealingSummary != nil && result.HealingSummary.Winner != nil {
+		description.WriteString("\n## Self-Healing Applied\n\n")
+		description.WriteString(fmt.Sprintf("- **Plan ID:** %s\n", result.HealingSummary.PlanID))
+		description.WriteString(fmt.Sprintf("- **Winning Strategy:** %s\n", result.HealingSummary.Winner.ID))
+		description.WriteString(fmt.Sprintf("- **Attempts:** %d\n", result.HealingSummary.AttemptsCount))
+	}
+
+	// Add footer with automation info
+	description.WriteString("\n---\n")
+	description.WriteString("🤖 *This merge request was automatically created by Ploy Transflow*\n")
+	description.WriteString("📝 *Labels: ploy, tfl*")
+
+	return description.String()
 }
 
 // attemptHealing orchestrates the healing workflow: planner → fanout → reducer
@@ -490,7 +608,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 	if err != nil {
 		return summary, fmt.Errorf("planner job failed: %w", err)
 	}
-	
+
 	summary.PlanID = planResult.PlanID
 
 	// Step 2: Convert planner options to branch specs
@@ -500,7 +618,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 		if id, ok := option["id"].(string); ok {
 			branchID = id
 		}
-		
+
 		branchType := "llm-exec" // default
 		if t, ok := option["type"].(string); ok {
 			branchType = t
@@ -522,7 +640,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 
 	winner, allResults, err := orchestrator.RunHealingFanout(ctx, nil, branches, maxParallel)
 	summary.AllResults = allResults
-	
+
 	if err != nil {
 		// Fanout failed, but continue to reducer anyway
 		summary.Winner = nil

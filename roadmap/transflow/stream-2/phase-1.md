@@ -1,4 +1,4 @@
-# Stream 2 · Phase 1 — LLM‑Exec (Sequential) + MCP Context
+# Stream 2 · Phase 1 — LLM‑Exec (Sequential) + MCP Context ⚠️ Partially Implemented
 
 Goal: introduce `llm-exec` step that can produce deterministic patches, sequential only, executed as Nomad jobs via internal/orchestration. Used as a healing branch in Stream 1 Phase 2.
 
@@ -31,3 +31,18 @@ Implementation Steps
 - ployman CLI: implement `models list|get|add|update|delete` storing JSON blobs under `llms/` bucket (artifacts storage), schema: {name, version, provider, params}.
 - Job HCL: add minimal Nomad job template for `llm-exec` that mounts a workspace volume, injects MCP envs, and writes unified diff to stdout.
 - Runner: resolve model via ployman registry; prefetch context files/URLs to a temp path; submit job via `internal/orchestration.SubmitAndWaitHealthy`; capture logs; parse diff; apply via git; commit; run build step.
+
+## Implementation Status
+
+✅ **Completed:**
+- Job template for `llm-exec` execution (`llm_exec.hcl`)
+- Integration hooks in transflow runner for LLM execution branches
+- Diff validation and application utilities (reused from Stream 1)
+
+⚠️ **In Progress:**
+- Job submission via `internal/orchestration.SubmitAndWaitHealthy`
+
+❌ **Pending:**
+- Model registry CRUD operations in `ployman` CLI (`models list|get|add|update|delete`)
+- MCP context injection and environment setup
+- Model resolution and context prefetching logic
