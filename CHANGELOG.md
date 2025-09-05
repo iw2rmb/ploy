@@ -16,6 +16,7 @@
 - CLI: after planner submission, attempts to read `plan.json` (from `TRANSFLOW_PLAN_PATH` or workspace out dir), performs minimal validation, and prints option IDs/types.
 - CLI: supports `TRANSFLOW_PLAN_URL` to fetch plan.json via HTTP; supports `TRANSFLOW_NEXT_URL`/`TRANSFLOW_NEXT_PATH` to print reducer next actions. Adds `--execute-first` stub to indicate the first plan option that would run (sequential).
 - CLI: `--reduce` renders and optionally submits reducer job; prints next actions. Added SeaweedFS filer fetch for plan.json via `TRANSFLOW_FILER`/`TRANSFLOW_BUCKET`/`TRANSFLOW_PLAN_KEY`.
+- CLI: plan/next JSON validated against schemas (santhosh-tekuri/jsonschema). Sequential stub renders `llm_exec.hcl` template for the first option.
 
 ### Changed
 - internal/cli/common/deploy.go: DeployConfig now includes Timeout; SharedPush honors per-call timeout.
