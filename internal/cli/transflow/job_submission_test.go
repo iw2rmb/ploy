@@ -38,6 +38,7 @@ type MockProductionBranchRunner struct {
 	GitProviderMock     provider.GitProvider
 	BuildCheckerMock    BuildCheckerInterface
 	WorkspaceDir        string
+	TargetRepo          string
 }
 
 func (m *MockProductionBranchRunner) RenderLLMExecAssets(optionID string) (string, error) {
@@ -67,6 +68,13 @@ func (m *MockProductionBranchRunner) GetWorkspaceDir() string {
 		return "/tmp/test-workspace"
 	}
 	return m.WorkspaceDir
+}
+
+func (m *MockProductionBranchRunner) GetTargetRepo() string {
+	if m.TargetRepo == "" {
+		return "https://gitlab.com/test/repo.git"
+	}
+	return m.TargetRepo
 }
 
 func (m *MockJobSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error) {
@@ -441,6 +449,182 @@ func TestHumanStepBranchCurrentBehavior(t *testing.T) {
 	// TODO: human-step should validate build after manual changes
 	// TODO: human-step should return "completed" when human fixes the build
 	// TODO: human-step should return "timeout" when no fix within time limit
+}
+
+// Test human-step branch full workflow (RED phase - failing tests for expected behavior)
+func TestHumanStepBranchFullWorkflow(t *testing.T) {
+	t.Run("human-step creates MR with correct configuration", func(t *testing.T) {
+		// This test documents expected MR creation behavior - will fail until production integration
+		mockGitProvider := &MockGitProvider{
+			MRResult: &provider.MRResult{
+				MRURL:   "https://gitlab.com/test/repo/-/merge_requests/42",
+				MRID:    42,
+				Created: true,
+			},
+		}
+
+		orchestrator := &fanoutOrchestrator{
+			runner: &MockProductionBranchRunner{
+				GitProviderMock:  mockGitProvider,
+				BuildCheckerMock: &MockBuildChecker{},
+				TargetRepo:       "https://gitlab.com/test/repo.git",
+			},
+		}
+
+		branchSpec := BranchSpec{
+			ID:   "human-fix-001",
+			Type: "human-step",
+			Inputs: map[string]interface{}{
+				"timeout":    "15m",
+				"buildError": "Compilation failed: undefined method 'getFoo()'",
+			},
+		}
+
+		result := BranchResult{
+			ID:        branchSpec.ID,
+			StartedAt: time.Now(),
+			Status:    "pending",
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+
+		actualResult := orchestrator.executeHumanStepBranch(ctx, branchSpec, result)
+
+		// Expected behavior - MR should be created
+		assert.True(t, mockGitProvider.MRCalled, "MR should be created")
+		assert.Equal(t, "https://gitlab.com/test/repo.git", mockGitProvider.MRConfig.RepoURL, "should use correct repo URL")
+		assert.Equal(t, "human-intervention-human-fix-001", mockGitProvider.MRConfig.SourceBranch, "should create intervention branch")
+		assert.Equal(t, "main", mockGitProvider.MRConfig.TargetBranch, "should target main branch")
+		assert.Contains(t, mockGitProvider.MRConfig.Title, "Human Intervention Required", "MR title should indicate intervention needed")
+		assert.Contains(t, mockGitProvider.MRConfig.Description, "getFoo()", "MR description should contain build error")
+		assert.Contains(t, mockGitProvider.MRConfig.Labels, "human-intervention", "should have human-intervention label")
+
+		// Will timeout since no human fixes the build in test mode
+		assert.Equal(t, "timeout", actualResult.Status, "should timeout waiting for human fix")
+		assert.Contains(t, actualResult.Notes, "timed out", "should indicate timeout occurred")
+	})
+
+	t.Run("human-step detects successful manual fix", func(t *testing.T) {
+		// This test documents expected success behavior - will fail until production integration
+		mockBuildChecker := &MockBuildChecker{
+			BuildResult: &common.DeployResult{Success: true}, // Simulate human fixing the build
+		}
+
+		mockGitProvider := &MockGitProvider{
+			MRResult: &provider.MRResult{
+				MRURL:   "https://gitlab.com/test/repo/-/merge_requests/43",
+				MRID:    43,
+				Created: true,
+			},
+		}
+
+		orchestrator := &fanoutOrchestrator{
+			runner: &MockProductionBranchRunner{
+				GitProviderMock:  mockGitProvider,
+				BuildCheckerMock: mockBuildChecker,
+				TargetRepo:       "https://gitlab.com/test/repo.git",
+			},
+		}
+
+		branchSpec := BranchSpec{
+			ID:   "human-fix-002",
+			Type: "human-step",
+			Inputs: map[string]interface{}{
+				"timeout":    "30s", // Short timeout for test
+				"buildError": "Build failed: missing dependency",
+			},
+		}
+
+		result := BranchResult{
+			ID:        branchSpec.ID,
+			StartedAt: time.Now(),
+			Status:    "pending",
+		}
+
+		ctx := context.Background()
+		actualResult := orchestrator.executeHumanStepBranch(ctx, branchSpec, result)
+
+		// Expected behavior - should detect successful fix
+		assert.Equal(t, "completed", actualResult.Status, "should complete when build succeeds")
+		assert.Contains(t, actualResult.Notes, "Human intervention successful", "should indicate success")
+		assert.Contains(t, actualResult.Notes, mockGitProvider.MRResult.MRURL, "should reference MR URL")
+		assert.True(t, actualResult.Duration > 0, "should record execution duration")
+		assert.False(t, actualResult.FinishedAt.IsZero(), "should record finish time")
+	})
+
+	t.Run("human-step handles MR creation failure", func(t *testing.T) {
+		// This test documents expected error handling - will fail until production integration
+		mockGitProvider := &MockGitProvider{
+			MRError: fmt.Errorf("failed to create MR: repository not found"),
+		}
+
+		orchestrator := &fanoutOrchestrator{
+			runner: &MockProductionBranchRunner{
+				GitProviderMock:  mockGitProvider,
+				BuildCheckerMock: &MockBuildChecker{},
+				TargetRepo:       "https://gitlab.com/invalid/repo.git",
+			},
+		}
+
+		branchSpec := BranchSpec{
+			ID:   "human-fix-003",
+			Type: "human-step",
+			Inputs: map[string]interface{}{
+				"buildError": "Test error",
+			},
+		}
+
+		result := BranchResult{
+			ID:        branchSpec.ID,
+			StartedAt: time.Now(),
+			Status:    "pending",
+		}
+
+		ctx := context.Background()
+		actualResult := orchestrator.executeHumanStepBranch(ctx, branchSpec, result)
+
+		// Expected behavior - should fail gracefully when MR creation fails
+		assert.Equal(t, "failed", actualResult.Status, "should fail when MR creation fails")
+		assert.Contains(t, actualResult.Notes, "Failed to create human intervention MR", "should indicate MR creation failure")
+		assert.Contains(t, actualResult.Notes, "repository not found", "should include underlying error")
+	})
+
+	t.Run("human-step respects timeout configuration", func(t *testing.T) {
+		// This test documents expected timeout behavior - will fail until production integration
+		orchestrator := &fanoutOrchestrator{
+			runner: &MockProductionBranchRunner{
+				GitProviderMock: &MockGitProvider{
+					MRResult: &provider.MRResult{MRURL: "https://gitlab.com/test/repo/-/merge_requests/44", MRID: 44, Created: true},
+				},
+				BuildCheckerMock: &MockBuildChecker{BuildResult: &common.DeployResult{Success: false}}, // Build never succeeds
+				TargetRepo:       "https://gitlab.com/test/repo.git",
+			},
+		}
+
+		branchSpec := BranchSpec{
+			ID:   "human-fix-004",
+			Type: "human-step",
+			Inputs: map[string]interface{}{
+				"timeout":    "100ms", // Very short timeout for quick test
+				"buildError": "Timeout test error",
+			},
+		}
+
+		result := BranchResult{
+			ID:        branchSpec.ID,
+			StartedAt: time.Now(),
+			Status:    "pending",
+		}
+
+		ctx := context.Background()
+		actualResult := orchestrator.executeHumanStepBranch(ctx, branchSpec, result)
+
+		// Expected behavior - should timeout after configured duration
+		assert.Equal(t, "timeout", actualResult.Status, "should timeout after configured duration")
+		assert.Contains(t, actualResult.Notes, "Human intervention timed out", "should indicate timeout occurred")
+		assert.Contains(t, actualResult.Notes, "100ms", "should mention the timeout duration")
+	})
 }
 
 // Test llm-exec branch validation (RED phase - failing tests)
