@@ -11,7 +11,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
-    amodels "github.com/iw2rmb/ploy/internal/analysis/models"
+
+	amodels "github.com/iw2rmb/ploy/internal/analysis/models"
 )
 
 // AnalyzeCmd handles the analyze command
@@ -20,7 +21,7 @@ func AnalyzeCmd(args []string, controllerURL string) {
 		usage()
 		return
 	}
-	
+
 	switch args[0] {
 	case "help", "--help", "-h":
 		usage()
@@ -96,7 +97,7 @@ func analyzeRepository(args []string, controllerURL string) {
 		dryRun     bool
 		format     = "table"
 	)
-	
+
 	// Parse command line arguments
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -131,55 +132,55 @@ func analyzeRepository(args []string, controllerURL string) {
 			}
 		}
 	}
-	
+
 	if appName == "" && repository == "" {
 		fmt.Println("Error: Either --app or --repository must be specified")
 		usage()
 		return
 	}
-	
+
 	// Prepare request
 	repoName := appName
 	if repoName == "" && repository != "" {
 		repoName = filepath.Base(repository)
 	}
-	
-    req := amodels.AnalysisRequest{
-        Repository: amodels.Repository{
-            Name: repoName,
-            URL:  repository, // Use URL field for local path
-        },
-        Config: amodels.AnalysisConfig{
-            Enabled:        true,
-            FailOnCritical: false,
-            ARFIntegration: fix,
-            Timeout:        30 * time.Minute,
-        },
-        FixIssues: fix,
-        DryRun:    dryRun,
-    }
-	
+
+	req := amodels.AnalysisRequest{
+		Repository: amodels.Repository{
+			Name: repoName,
+			URL:  repository, // Use URL field for local path
+		},
+		Config: amodels.AnalysisConfig{
+			Enabled:        true,
+			FailOnCritical: false,
+			ARFIntegration: fix,
+			Timeout:        30 * time.Minute,
+		},
+		FixIssues: fix,
+		DryRun:    dryRun,
+	}
+
 	if language != "" {
 		req.Config.Languages = map[string]interface{}{
 			language: map[string]bool{"enabled": true},
 		}
 	}
-	
+
 	// Load custom configuration if provided
 	if configFile != "" {
 		// TODO: Load configuration from file
 		fmt.Printf("Loading configuration from %s\n", configFile)
 	}
-	
+
 	// Make API request
 	fmt.Printf("Starting analysis for %s...\n", getTargetName(appName, repository))
-	
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		fmt.Printf("Error: Failed to prepare request: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	resp, err := http.Post(
 		fmt.Sprintf("%s/analysis/analyze", controllerURL),
 		"application/json",
@@ -190,23 +191,23 @@ func analyzeRepository(args []string, controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Error: Analysis failed with status %d: %s\n", resp.StatusCode, string(bodyBytes))
 		os.Exit(1)
 	}
-	
+
 	// Parse response
-    var result amodels.AnalysisResult
+	var result amodels.AnalysisResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Display results
 	displayAnalysisResult(&result, format)
-	
+
 	if fix && len(result.ARFTriggers) > 0 {
 		fmt.Printf("\n%d issues queued for automatic remediation\n", len(result.ARFTriggers))
 		if dryRun {
@@ -222,30 +223,30 @@ func getAnalysisStatus(analysisID, controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode == http.StatusNotFound {
 		fmt.Printf("Analysis %s not found\n", analysisID)
 		os.Exit(1)
 	}
-	
+
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
 		os.Exit(1)
 	}
-	
-    var result amodels.AnalysisResult
+
+	var result amodels.AnalysisResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Printf("Analysis ID: %s\n", result.ID)
 	fmt.Printf("Status: %s\n", getStatusString(result.Success, result.Error))
 	fmt.Printf("Repository: %s\n", result.Repository.Name)
 	fmt.Printf("Timestamp: %s\n", result.Timestamp.Format(time.RFC3339))
 	fmt.Printf("Overall Score: %.1f/100\n", result.OverallScore)
 	fmt.Printf("Total Issues: %d\n", len(result.Issues))
-	
+
 	if result.Metrics.AnalysisTime > 0 {
 		fmt.Printf("Analysis Time: %v\n", result.Metrics.AnalysisTime)
 	}
@@ -258,30 +259,30 @@ func getAnalysisResults(analysisID, controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode == http.StatusNotFound {
 		fmt.Printf("Analysis %s not found\n", analysisID)
 		os.Exit(1)
 	}
-	
+
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
 		os.Exit(1)
 	}
-	
-    var result amodels.AnalysisResult
+
+	var result amodels.AnalysisResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	displayAnalysisResult(&result, "table")
 }
 
 func listAnalyses(args []string, controllerURL string) {
 	var appName string
 	limit := "10"
-	
+
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -297,13 +298,13 @@ func listAnalyses(args []string, controllerURL string) {
 			}
 		}
 	}
-	
+
 	if appName == "" {
 		fmt.Println("Error: --app is required")
 		fmt.Println("Usage: ploy analyze list --app <appname> [--limit N]")
 		os.Exit(1)
 	}
-	
+
 	url := fmt.Sprintf("%s/analysis/results?repository_id=%s&limit=%s", controllerURL, appName, limit)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -311,32 +312,32 @@ func listAnalyses(args []string, controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
 		os.Exit(1)
 	}
-	
-    var response struct {
-        Results []*amodels.AnalysisResult `json:"results"`
-        Count   int                      `json:"count"`
-    }
-	
+
+	var response struct {
+		Results []*amodels.AnalysisResult `json:"results"`
+		Count   int                       `json:"count"`
+	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	if response.Count == 0 {
 		fmt.Printf("No analyses found for app: %s\n", appName)
 		return
 	}
-	
+
 	// Display results in table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "ID\tTIMESTAMP\tSCORE\tISSUES\tSTATUS")
 	fmt.Fprintln(w, strings.Repeat("-", 60))
-	
+
 	for _, result := range response.Results {
 		status := "Success"
 		if !result.Success {
@@ -351,7 +352,7 @@ func listAnalyses(args []string, controllerURL string) {
 		)
 	}
 	w.Flush()
-	
+
 	fmt.Printf("\nTotal: %d analyses\n", response.Count)
 }
 
@@ -361,7 +362,7 @@ func handleConfig(args []string, controllerURL string) {
 		fmt.Println("Usage: ploy analyze config [--show|--validate|--update]")
 		os.Exit(1)
 	}
-	
+
 	switch args[0] {
 	case "--show", "show":
 		showConfig(controllerURL)
@@ -392,18 +393,18 @@ func showConfig(controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
 		os.Exit(1)
 	}
-	
-    var config amodels.AnalysisConfig
+
+	var config amodels.AnalysisConfig
 	if err := json.NewDecoder(resp.Body).Decode(&config); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Display configuration
 	configJSON, _ := json.MarshalIndent(config, "", "  ")
 	fmt.Println(string(configJSON))
@@ -416,7 +417,7 @@ func validateConfig(configFile, controllerURL string) {
 		fmt.Printf("Error: Failed to read config file: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Validate via API
 	resp, err := http.Post(
 		fmt.Sprintf("%s/analysis/config/validate", controllerURL),
@@ -428,17 +429,17 @@ func validateConfig(configFile, controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	var result struct {
 		Valid bool   `json:"valid"`
 		Error string `json:"error,omitempty"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	if result.Valid {
 		fmt.Println("Configuration is valid")
 	} else {
@@ -454,7 +455,7 @@ func updateConfig(configFile, controllerURL string) {
 		fmt.Printf("Error: Failed to read config file: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Update via API
 	req, _ := http.NewRequest(
 		http.MethodPut,
@@ -462,7 +463,7 @@ func updateConfig(configFile, controllerURL string) {
 		bytes.NewBuffer(data),
 	)
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -470,13 +471,13 @@ func updateConfig(configFile, controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		fmt.Printf("Error: Failed to update configuration: %s\n", string(bodyBytes))
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("Configuration updated successfully")
 }
 
@@ -487,7 +488,7 @@ func generateReport(args []string, controllerURL string) {
 		timeframe  string
 		format     = "html"
 	)
-	
+
 	// Parse arguments
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -513,13 +514,13 @@ func generateReport(args []string, controllerURL string) {
 			}
 		}
 	}
-	
+
 	if appName == "" && analysisID == "" {
 		fmt.Println("Error: Either --app or --analysis-id required")
 		fmt.Println("Usage: ploy analyze report [--app <app> | --analysis-id <id>] [--format html|json]")
 		os.Exit(1)
 	}
-	
+
 	// TODO: Implement report generation
 	fmt.Printf("Generating %s report", format)
 	if appName != "" {
@@ -542,22 +543,22 @@ func listSupportedLanguages(controllerURL string) {
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
 		os.Exit(1)
 	}
-	
+
 	var response struct {
 		Languages []string `json:"languages"`
 		Count     int      `json:"count"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		fmt.Printf("Error: Failed to parse response: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("Supported Languages:")
 	for _, lang := range response.Languages {
 		fmt.Printf("  - %s\n", lang)
@@ -602,7 +603,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 	fmt.Printf("Repository: %s\n", result.Repository.Name)
 	fmt.Printf("Timestamp: %s\n", result.Timestamp.Format(time.RFC3339))
 	fmt.Printf("Overall Score: %.1f/100\n", result.OverallScore)
-	
+
 	// Display metrics
 	if result.Metrics.AnalysisTime > 0 {
 		fmt.Printf("\n=== METRICS ===\n")
@@ -611,7 +612,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 		fmt.Printf("Analyzed Files: %d\n", result.Metrics.AnalyzedFiles)
 		fmt.Printf("Total Issues: %d\n", result.Metrics.TotalIssues)
 	}
-	
+
 	// Display issues by severity
 	if len(result.Metrics.IssuesBySeverity) > 0 {
 		fmt.Printf("\n=== ISSUES BY SEVERITY ===\n")
@@ -619,7 +620,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 			fmt.Printf("  %s: %d\n", severity, count)
 		}
 	}
-	
+
 	// Display language results
 	if len(result.LanguageResults) > 0 {
 		fmt.Printf("\n=== LANGUAGE ANALYSIS ===\n")
@@ -633,7 +634,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 			}
 		}
 	}
-	
+
 	// Display top issues (first 10)
 	if len(result.Issues) > 0 {
 		fmt.Printf("\n=== TOP ISSUES ===\n")
@@ -641,11 +642,11 @@ func displayResultTable(result *amodels.AnalysisResult) {
 		if len(result.Issues) < displayCount {
 			displayCount = len(result.Issues)
 		}
-		
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "SEVERITY\tCATEGORY\tFILE\tLINE\tMESSAGE")
 		fmt.Fprintln(w, strings.Repeat("-", 80))
-		
+
 		for i := 0; i < displayCount; i++ {
 			issue := result.Issues[i]
 			file := filepath.Base(issue.File)
@@ -665,7 +666,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 			)
 		}
 		w.Flush()
-		
+
 		if len(result.Issues) > displayCount {
 			fmt.Printf("\n... and %d more issues\n", len(result.Issues)-displayCount)
 		}

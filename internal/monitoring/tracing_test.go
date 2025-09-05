@@ -19,11 +19,11 @@ import (
 
 func TestNewTracingProvider(t *testing.T) {
 	tests := []struct {
-		name        string
-		endpoint    string
-		wantError   bool
-		errorMsg    string
-		validate    func(t *testing.T, tp *TracingProvider)
+		name      string
+		endpoint  string
+		wantError bool
+		errorMsg  string
+		validate  func(t *testing.T, tp *TracingProvider)
 	}{
 		{
 			name:      "successful initialization with valid endpoint",
@@ -82,10 +82,10 @@ func TestTracingProvider_TraceJob(t *testing.T) {
 	tp.tracer = tp.provider.Tracer("test-tracer")
 
 	tests := []struct {
-		name      string
-		jobID     string
-		recipe    string
-		validate  func(t *testing.T, spans tracetest.SpanStubs)
+		name     string
+		jobID    string
+		recipe   string
+		validate func(t *testing.T, spans tracetest.SpanStubs)
 	}{
 		{
 			name:   "traces job with correct attributes",
@@ -94,9 +94,9 @@ func TestTracingProvider_TraceJob(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				assert.Equal(t, "process_job", span.Name)
-				
+
 				// Check attributes
 				attrs := spanAttributesToMap(span.Attributes)
 				assert.Equal(t, "job-123", attrs["job.id"])
@@ -110,9 +110,9 @@ func TestTracingProvider_TraceJob(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				assert.Equal(t, "process_job", span.Name)
-				
+
 				// Check attributes exist even with empty values
 				attrs := spanAttributesToMap(span.Attributes)
 				assert.Equal(t, "", attrs["job.id"])
@@ -125,16 +125,16 @@ func TestTracingProvider_TraceJob(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear previous spans
 			exporter.Reset()
-			
+
 			ctx := context.Background()
 			ctx, done := tp.TraceJob(ctx, tt.jobID, tt.recipe)
-			
+
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// End the span
 			done()
-			
+
 			// Get recorded spans
 			spans := exporter.GetSpans()
 			if tt.validate != nil {
@@ -168,10 +168,10 @@ func TestTracingProvider_TraceTransformation(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				assert.Equal(t, "execute_transformation", span.Name)
 				assert.Equal(t, codes.Unset, span.Status.Code)
-				
+
 				// Check attributes
 				attrs := spanAttributesToMap(span.Attributes)
 				assert.Equal(t, "maven", attrs["build.system"])
@@ -184,7 +184,7 @@ func TestTracingProvider_TraceTransformation(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				attrs := spanAttributesToMap(span.Attributes)
 				assert.Equal(t, "gradle", attrs["build.system"])
 			},
@@ -196,15 +196,15 @@ func TestTracingProvider_TraceTransformation(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				assert.Equal(t, "execute_transformation", span.Name)
 				assert.Equal(t, codes.Error, span.Status.Code)
 				assert.Equal(t, "transformation failed", span.Status.Description)
-				
+
 				// Check that error event was recorded
 				events := span.Events
 				assert.Greater(t, len(events), 0)
-				
+
 				// Find the error event
 				var errorEventFound bool
 				for _, event := range events {
@@ -222,16 +222,16 @@ func TestTracingProvider_TraceTransformation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear previous spans
 			exporter.Reset()
-			
+
 			ctx := context.Background()
 			ctx, done := tp.TraceTransformation(ctx, tt.buildSystem)
-			
+
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// End the span with error if provided
 			done(tt.simulateErr)
-			
+
 			// Get recorded spans
 			spans := exporter.GetSpans()
 			if tt.validate != nil {
@@ -267,10 +267,10 @@ func TestTracingProvider_TraceStorage(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				assert.Equal(t, "storage_operation", span.Name)
 				assert.Equal(t, codes.Unset, span.Status.Code)
-				
+
 				attrs := spanAttributesToMap(span.Attributes)
 				assert.Equal(t, "consul", attrs["storage.system"])
 				assert.Equal(t, "get", attrs["storage.operation"])
@@ -284,9 +284,9 @@ func TestTracingProvider_TraceStorage(t *testing.T) {
 			validate: func(t *testing.T, spans tracetest.SpanStubs) {
 				require.Len(t, spans, 1)
 				span := spans[0]
-				
+
 				assert.Equal(t, codes.Error, span.Status.Code)
-				
+
 				attrs := spanAttributesToMap(span.Attributes)
 				assert.Equal(t, "seaweedfs", attrs["storage.system"])
 				assert.Equal(t, "upload", attrs["storage.operation"])
@@ -298,16 +298,16 @@ func TestTracingProvider_TraceStorage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear previous spans
 			exporter.Reset()
-			
+
 			ctx := context.Background()
 			ctx, done := tp.TraceStorage(ctx, tt.storage, tt.operation)
-			
+
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// End the span with error if provided
 			done(tt.simulateErr)
-			
+
 			// Get recorded spans
 			spans := exporter.GetSpans()
 			if tt.validate != nil {
@@ -330,29 +330,29 @@ func TestTracingProvider_NestedSpans(t *testing.T) {
 
 	// Create nested spans
 	ctx := context.Background()
-	
+
 	// Start job span
 	ctx, jobDone := tp.TraceJob(ctx, "nested-job", "test.recipe")
-	
+
 	// Start transformation span within job
 	_, transDone := tp.TraceTransformation(ctx, "maven")
 	time.Sleep(5 * time.Millisecond)
 	transDone(nil)
-	
+
 	// Start storage span within job
 	_, storageDone := tp.TraceStorage(ctx, "consul", "put")
 	time.Sleep(5 * time.Millisecond)
 	storageDone(nil)
-	
+
 	// End job span
 	jobDone()
-	
+
 	// Get recorded spans
 	spans := exporter.GetSpans()
-	
+
 	// Should have 3 spans
 	assert.Len(t, spans, 3)
-	
+
 	// Find the parent span (job)
 	var jobSpan *tracetest.SpanStub
 	for i := range spans {
@@ -362,12 +362,12 @@ func TestTracingProvider_NestedSpans(t *testing.T) {
 		}
 	}
 	require.NotNil(t, jobSpan)
-	
+
 	// Check that other spans have the job as parent
 	jobSpanID := jobSpan.SpanContext.SpanID()
 	for _, span := range spans {
 		if span.Name != "process_job" {
-			assert.Equal(t, jobSpanID, span.Parent.SpanID(), 
+			assert.Equal(t, jobSpanID, span.Parent.SpanID(),
 				"Child span %s should have job span as parent", span.Name)
 		}
 	}
@@ -386,23 +386,23 @@ func TestTracingProvider_ContextCancellation(t *testing.T) {
 
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Start a span
 	ctx, done := tp.TraceJob(ctx, "cancelled-job", "test.recipe")
-	
+
 	// Cancel the context
 	cancel()
-	
+
 	// Try to start another span with cancelled context
 	_, transDone := tp.TraceTransformation(ctx, "maven")
 	transDone(nil)
-	
+
 	// End the job span
 	done()
-	
+
 	// Get recorded spans
 	spans := exporter.GetSpans()
-	
+
 	// Both spans should still be recorded despite cancellation
 	assert.GreaterOrEqual(t, len(spans), 1)
 }
@@ -421,35 +421,35 @@ func TestTracingProvider_ConcurrentTracing(t *testing.T) {
 	// Run concurrent traces
 	numGoroutines := 10
 	done := make(chan bool, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			ctx := context.Background()
 			jobID := fmt.Sprintf("job-%d", id)
-			
+
 			// Start job trace
 			ctx, jobDone := tp.TraceJob(ctx, jobID, "concurrent.recipe")
-			
+
 			// Simulate work
 			time.Sleep(time.Duration(id) * time.Millisecond)
-			
+
 			// End trace
 			jobDone()
 			done <- true
 		}(i)
 	}
-	
+
 	// Wait for all goroutines
 	for i := 0; i < numGoroutines; i++ {
 		<-done
 	}
-	
+
 	// Get recorded spans
 	spans := exporter.GetSpans()
-	
+
 	// Should have one span per goroutine
 	assert.Len(t, spans, numGoroutines)
-	
+
 	// Verify each span has unique job ID
 	jobIDs := make(map[string]bool)
 	for _, span := range spans {
@@ -517,7 +517,7 @@ func TestTracingProvider_AddEvent(t *testing.T) {
 
 	// Add event to current span
 	tp.AddEvent(ctx, "job.started", map[string]string{
-		"worker.id": "worker-1",
+		"worker.id":   "worker-1",
 		"queue.depth": "10",
 	})
 
@@ -552,27 +552,27 @@ func TestTracingProvider_SetStatus(t *testing.T) {
 	tp.tracer = tp.provider.Tracer("test-tracer")
 
 	tests := []struct {
-		name               string
-		statusCode         codes.Code
-		description        string
+		name                string
+		statusCode          codes.Code
+		description         string
 		expectedDescription string // OK status doesn't preserve description
 	}{
 		{
-			name:               "set ok status",
-			statusCode:         codes.Ok,
-			description:        "Operation completed successfully",
+			name:                "set ok status",
+			statusCode:          codes.Ok,
+			description:         "Operation completed successfully",
 			expectedDescription: "", // OK status description is not preserved
 		},
 		{
-			name:               "set error status",
-			statusCode:         codes.Error,
-			description:        "Operation failed",
+			name:                "set error status",
+			statusCode:          codes.Error,
+			description:         "Operation failed",
 			expectedDescription: "Operation failed",
 		},
 		{
-			name:               "set unset status",
-			statusCode:         codes.Unset,
-			description:        "",
+			name:                "set unset status",
+			statusCode:          codes.Unset,
+			description:         "",
 			expectedDescription: "",
 		},
 	}
@@ -580,19 +580,19 @@ func TestTracingProvider_SetStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exporter.Reset()
-			
+
 			ctx := context.Background()
 			ctx, done := tp.TraceJob(ctx, "status-job", "test.recipe")
-			
+
 			// Set status
 			tp.SetStatus(ctx, tt.statusCode, tt.description)
-			
+
 			done()
-			
+
 			// Get recorded spans
 			spans := exporter.GetSpans()
 			require.Len(t, spans, 1)
-			
+
 			assert.Equal(t, tt.statusCode, spans[0].Status.Code)
 			assert.Equal(t, tt.expectedDescription, spans[0].Status.Description)
 		})

@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-    "github.com/gofiber/fiber/v2"
-    envstore "github.com/iw2rmb/ploy/internal/envstore"
+	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/internal/config"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

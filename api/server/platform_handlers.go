@@ -1,14 +1,14 @@
 package server
 
 import (
-    "github.com/gofiber/fiber/v2"
-    "github.com/iw2rmb/ploy/api/platform"
+	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/api/platform"
 )
 
 // handlePlatformDeploy handles platform service deployment
 func (s *Server) handlePlatformDeploy(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-    storage, err := s.resolveUnifiedStorage()
+	storage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{
 			"error":   "Storage initialization failed",
@@ -23,7 +23,7 @@ func (s *Server) handlePlatformDeploy(c *fiber.Ctx) error {
 // handlePlatformStatus handles platform service status requests
 func (s *Server) handlePlatformStatus(c *fiber.Ctx) error {
 	// Use factory pattern to get unified storage interface
-    storage, err := s.resolveUnifiedStorage()
+	storage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		return c.Status(503).JSON(fiber.Map{
 			"error":   "Storage initialization failed",

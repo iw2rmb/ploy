@@ -24,46 +24,46 @@ func TestDetermineSigningMethod(t *testing.T) {
 		expectedMethod string
 	}{
 		{
-			name:        "keyless OIDC with certificate file",
-			env:         "prod",
+			name: "keyless OIDC with certificate file",
+			env:  "prod",
 			setupFiles: func() string {
 				imgPath := filepath.Join(tmpDir, "image.bin")
 				certPath := imgPath + ".cert"
-				
+
 				// Create dummy files
 				os.WriteFile(imgPath, []byte("dummy image"), 0644)
 				os.WriteFile(certPath, []byte("dummy certificate"), 0644)
-				
+
 				return imgPath
 			},
 			expectedMethod: "keyless-oidc",
 		},
 		{
-			name:        "development signing with development signature",
-			env:         "dev",
+			name: "development signing with development signature",
+			env:  "dev",
 			setupFiles: func() string {
 				imgPath := filepath.Join(tmpDir, "dev-image.bin")
 				sigPath := imgPath + ".sig"
-				
+
 				// Create dummy files
 				os.WriteFile(imgPath, []byte("dummy image"), 0644)
 				os.WriteFile(sigPath, []byte("development signature"), 0644)
-				
+
 				return imgPath
 			},
 			expectedMethod: "development",
 		},
 		{
-			name:        "key-based signing with regular signature",
-			env:         "prod",
+			name: "key-based signing with regular signature",
+			env:  "prod",
 			setupFiles: func() string {
 				imgPath := filepath.Join(tmpDir, "key-image.bin")
 				sigPath := imgPath + ".sig"
-				
+
 				// Create dummy files
 				os.WriteFile(imgPath, []byte("dummy image"), 0644)
 				os.WriteFile(sigPath, []byte("regular signature content"), 0644)
-				
+
 				return imgPath
 			},
 			expectedMethod: "key-based",
@@ -101,7 +101,7 @@ func TestDetermineSigningMethod(t *testing.T) {
 			} else {
 				imagePath = tt.imagePath
 			}
-			
+
 			result := determineSigningMethod(imagePath, tt.dockerImage, tt.env)
 			assert.Equal(t, tt.expectedMethod, result)
 		})
@@ -117,28 +117,28 @@ func TestPerformVulnerabilityScanning(t *testing.T) {
 		expected    bool
 	}{
 		{
-			name:        "skip scanning in dev environment",
-			imagePath:   "/path/to/image.bin",
-			env:         "dev",
-			expected:    false,
+			name:      "skip scanning in dev environment",
+			imagePath: "/path/to/image.bin",
+			env:       "dev",
+			expected:  false,
 		},
 		{
-			name:        "skip scanning in development environment",
-			imagePath:   "/path/to/image.bin",
-			env:         "development",
-			expected:    false,
+			name:      "skip scanning in development environment",
+			imagePath: "/path/to/image.bin",
+			env:       "development",
+			expected:  false,
 		},
 		{
-			name:        "skip scanning with empty environment",
-			imagePath:   "/path/to/image.bin",
-			env:         "",
-			expected:    false,
+			name:      "skip scanning with empty environment",
+			imagePath: "/path/to/image.bin",
+			env:       "",
+			expected:  false,
 		},
 		{
-			name:        "attempt scanning in production (will fail without grype)",
-			imagePath:   "/path/to/image.bin",
-			env:         "production",
-			expected:    false, // Will fail because grype is not installed
+			name:      "attempt scanning in production (will fail without grype)",
+			imagePath: "/path/to/image.bin",
+			env:       "production",
+			expected:  false, // Will fail because grype is not installed
 		},
 		{
 			name:        "attempt scanning in staging (will fail without grype)",

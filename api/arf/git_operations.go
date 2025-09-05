@@ -13,54 +13,54 @@ import (
 
 // GitOperations provides Git functionality for ARF transformations
 type GitOperations struct {
-    workDir string
+	workDir string
 }
 
 // NewGitOperations creates a new Git operations handler
 func NewGitOperations(workDir string) *GitOperations {
-    return &GitOperations{
-        workDir: workDir,
-    }
+	return &GitOperations{
+		workDir: workDir,
+	}
 }
 
 // CreateBranchAndCheckout creates a new branch and switches to it (or just checks out if exists)
 func (g *GitOperations) CreateBranchAndCheckout(ctx context.Context, repoPath, branchName string) error {
-    // Try to create new branch
-    cmd := exec.CommandContext(ctx, "git", "checkout", "-b", branchName)
-    cmd.Dir = repoPath
-    if err := cmd.Run(); err != nil {
-        // If branch exists, just checkout
-        co := exec.CommandContext(ctx, "git", "checkout", branchName)
-        co.Dir = repoPath
-        if err2 := co.Run(); err2 != nil {
-            return fmt.Errorf("failed to checkout branch %s: %w", branchName, err2)
-        }
-    }
-    return nil
+	// Try to create new branch
+	cmd := exec.CommandContext(ctx, "git", "checkout", "-b", branchName)
+	cmd.Dir = repoPath
+	if err := cmd.Run(); err != nil {
+		// If branch exists, just checkout
+		co := exec.CommandContext(ctx, "git", "checkout", branchName)
+		co.Dir = repoPath
+		if err2 := co.Run(); err2 != nil {
+			return fmt.Errorf("failed to checkout branch %s: %w", branchName, err2)
+		}
+	}
+	return nil
 }
 
 // PushBranch pushes the current HEAD to the given remote URL and branch (HTTPS with token recommended)
 func (g *GitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
-    // Set remote named 'origin' to provided URL
-    rm := exec.CommandContext(ctx, "git", "remote", "remove", "origin")
-    rm.Dir = repoPath
-    _ = rm.Run() // ignore error; remote may not exist
+	// Set remote named 'origin' to provided URL
+	rm := exec.CommandContext(ctx, "git", "remote", "remove", "origin")
+	rm.Dir = repoPath
+	_ = rm.Run() // ignore error; remote may not exist
 
-    add := exec.CommandContext(ctx, "git", "remote", "add", "origin", remoteURL)
-    add.Dir = repoPath
-    if err := add.Run(); err != nil {
-        return fmt.Errorf("failed to set remote origin: %w", err)
-    }
+	add := exec.CommandContext(ctx, "git", "remote", "add", "origin", remoteURL)
+	add.Dir = repoPath
+	if err := add.Run(); err != nil {
+		return fmt.Errorf("failed to set remote origin: %w", err)
+	}
 
-    // Push branch with upstream set
-    push := exec.CommandContext(ctx, "git", "push", "-u", "origin", branchName)
-    push.Dir = repoPath
-    var stderr bytes.Buffer
-    push.Stderr = &stderr
-    if err := push.Run(); err != nil {
-        return fmt.Errorf("git push failed: %v - %s", err, stderr.String())
-    }
-    return nil
+	// Push branch with upstream set
+	push := exec.CommandContext(ctx, "git", "push", "-u", "origin", branchName)
+	push.Dir = repoPath
+	var stderr bytes.Buffer
+	push.Stderr = &stderr
+	if err := push.Run(); err != nil {
+		return fmt.Errorf("git push failed: %v - %s", err, stderr.String())
+	}
+	return nil
 }
 
 // checkGitAvailable verifies that git is installed and accessible

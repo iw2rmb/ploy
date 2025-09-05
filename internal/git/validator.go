@@ -75,20 +75,20 @@ func (v *Validator) ValidateRepository(repoPath string) (*ValidationResult, erro
 	repo, err := NewRepository(repoPath)
 	if err != nil {
 		return &ValidationResult{
-			Valid: false,
+			Valid:  false,
 			Errors: []string{fmt.Sprintf("Failed to initialize repository: %v", err)},
 		}, err
 	}
-	
+
 	// Perform basic validation
 	result := repo.ValidateRepository()
-	
+
 	// Apply configuration-specific validation
 	v.applyConfigValidation(repo, result)
-	
+
 	// Final validation based on level
 	v.finalizeValidation(result)
-	
+
 	return result, nil
 }
 
@@ -103,14 +103,14 @@ func (v *Validator) applyConfigValidation(repo *Repository, result *ValidationRe
 			result.Errors = append(result.Errors, "Repository must not have untracked files")
 		}
 	}
-	
+
 	// Validate commit signing
 	if v.config.RequireSignedCommits && repo.LastCommit != nil {
 		if !repo.LastCommit.GPGSigned {
 			result.Errors = append(result.Errors, "Last commit must be GPG signed")
 		}
 	}
-	
+
 	// Validate repository origin
 	if v.config.RequireTrustedOrigin {
 		if repo.URL == "" {
@@ -128,7 +128,7 @@ func (v *Validator) applyConfigValidation(repo *Repository, result *ValidationRe
 			}
 		}
 	}
-	
+
 	// Validate branch
 	if len(v.config.AllowedBranches) > 0 {
 		branchAllowed := false
@@ -146,7 +146,7 @@ func (v *Validator) applyConfigValidation(repo *Repository, result *ValidationRe
 			}
 		}
 	}
-	
+
 	// Validate repository size
 	if v.config.MaxRepoSizeMB > 0 {
 		if repoSize, err := v.getRepositorySize(repo.Path); err == nil {
@@ -170,11 +170,11 @@ func (v *Validator) finalizeValidation(result *ValidationResult) {
 		result.Errors = []string{}
 		result.Warnings = []string{}
 		result.Valid = len(result.SecurityIssues) == 0
-		
+
 	case ValidationLevelWarning:
 		// Errors make it invalid, warnings and security issues are just reported
 		result.Valid = len(result.Errors) == 0
-		
+
 	case ValidationLevelStrict:
 		// Any issue makes it invalid
 		result.Valid = len(result.Errors) == 0 && len(result.SecurityIssues) == 0
@@ -188,19 +188,19 @@ func (v *Validator) finalizeValidation(result *ValidationResult) {
 // getRepositorySize calculates the total size of a repository
 func (v *Validator) getRepositorySize(repoPath string) (int64, error) {
 	var size int64
-	
+
 	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip files we can't access
 		}
-		
+
 		if !info.IsDir() {
 			size += info.Size()
 		}
-		
+
 		return nil
 	})
-	
+
 	return size, err
 }
 
@@ -208,7 +208,7 @@ func (v *Validator) getRepositorySize(repoPath string) (int64, error) {
 func (v *Validator) ValidateForEnvironment(repoPath string, environment string) (*ValidationResult, error) {
 	// Adjust configuration based on environment
 	originalConfig := v.config
-	
+
 	switch strings.ToLower(environment) {
 	case "production", "prod", "live":
 		v.config = ProductionValidatorConfig()
@@ -223,13 +223,13 @@ func (v *Validator) ValidateForEnvironment(repoPath string, environment string) 
 	default:
 		// Use current configuration
 	}
-	
+
 	// Perform validation
 	result, err := v.ValidateRepository(repoPath)
-	
+
 	// Restore original configuration
 	v.config = originalConfig
-	
+
 	return result, err
 }
 
@@ -239,65 +239,65 @@ func (v *Validator) GetRepositorySummary(repoPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	info, err := repo.GetRepositoryInfo()
 	if err != nil {
 		return "", err
 	}
-	
+
 	var summary strings.Builder
-	
+
 	// Repository basic info
 	summary.WriteString(fmt.Sprintf("Repository: %s\n", repo.URL))
 	summary.WriteString(fmt.Sprintf("Branch: %s\n", repo.Branch))
 	summary.WriteString(fmt.Sprintf("SHA: %s\n", repo.GetShortSHA()))
 	summary.WriteString(fmt.Sprintf("Clean: %t\n", repo.IsClean))
-	
+
 	// Commit information
 	if repo.LastCommit != nil {
 		summary.WriteString(fmt.Sprintf("Last Commit: %s\n", repo.LastCommit.Message))
 		summary.WriteString(fmt.Sprintf("Author: %s <%s>\n", repo.LastCommit.Author, repo.LastCommit.Email))
 		summary.WriteString(fmt.Sprintf("GPG Signed: %t\n", repo.LastCommit.GPGSigned))
 	}
-	
+
 	// Repository statistics
 	summary.WriteString(fmt.Sprintf("Contributors: %d\n", len(info.Contributors)))
 	summary.WriteString(fmt.Sprintf("Branches: %d\n", info.BranchCount))
 	summary.WriteString(fmt.Sprintf("Tags: %d\n", info.TagCount))
 	summary.WriteString(fmt.Sprintf("Commits: %d\n", info.CommitCount))
-	
+
 	// Validation results
 	result := info.Validation
 	summary.WriteString(fmt.Sprintf("\nValidation: %t\n", result.Valid))
-	
+
 	if len(result.Errors) > 0 {
 		summary.WriteString(fmt.Sprintf("Errors (%d):\n", len(result.Errors)))
 		for _, err := range result.Errors {
 			summary.WriteString(fmt.Sprintf("  - %s\n", err))
 		}
 	}
-	
+
 	if len(result.Warnings) > 0 {
 		summary.WriteString(fmt.Sprintf("Warnings (%d):\n", len(result.Warnings)))
 		for _, warning := range result.Warnings {
 			summary.WriteString(fmt.Sprintf("  - %s\n", warning))
 		}
 	}
-	
+
 	if len(result.SecurityIssues) > 0 {
 		summary.WriteString(fmt.Sprintf("Security Issues (%d):\n", len(result.SecurityIssues)))
 		for _, issue := range result.SecurityIssues {
 			summary.WriteString(fmt.Sprintf("  - %s\n", issue))
 		}
 	}
-	
+
 	if len(result.Suggestions) > 0 {
 		summary.WriteString(fmt.Sprintf("Suggestions (%d):\n", len(result.Suggestions)))
 		for _, suggestion := range result.Suggestions {
 			summary.WriteString(fmt.Sprintf("  - %s\n", suggestion))
 		}
 	}
-	
+
 	return summary.String(), nil
 }
 
@@ -316,18 +316,18 @@ func (v *Validator) GetRepositoryHealth(repoPath string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	
+
 	score := 100
-	
+
 	// Deduct points for issues
-	score -= len(result.Errors) * 20      // Major issues
-	score -= len(result.SecurityIssues) * 15  // Security issues
-	score -= len(result.Warnings) * 5    // Minor issues
-	
+	score -= len(result.Errors) * 20         // Major issues
+	score -= len(result.SecurityIssues) * 15 // Security issues
+	score -= len(result.Warnings) * 5        // Minor issues
+
 	// Ensure score doesn't go below 0
 	if score < 0 {
 		score = 0
 	}
-	
+
 	return score, nil
 }

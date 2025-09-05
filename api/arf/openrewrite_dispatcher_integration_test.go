@@ -315,75 +315,75 @@ func TestOpenRewriteDispatcher_VerifyFixedPaths(t *testing.T) {
 // TestCreateNomadJob_PassesRecipeCoordinates ensures dispatcher provides explicit
 // Maven coordinates to the container env and disables discovery mode.
 func TestCreateNomadJob_PassesRecipeCoordinates(t *testing.T) {
-    mockStorage := &MockStorageService{}
+	mockStorage := &MockStorageService{}
 
-    dispatcher, err := NewOpenRewriteDispatcher(
-        "http://localhost:4646",
-        "registry.dev.ployman.app",
-        "http://45.12.75.241:8888",
-        "https://api.dev.ployman.app/v1",
-        mockStorage,
-    )
-    require.NoError(t, err)
-    require.NotNil(t, dispatcher)
+	dispatcher, err := NewOpenRewriteDispatcher(
+		"http://localhost:4646",
+		"registry.dev.ployman.app",
+		"http://45.12.75.241:8888",
+		"https://api.dev.ployman.app/v1",
+		mockStorage,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, dispatcher)
 
-    // Use a common Java recipe and expect rewrite-migrate-java coordinates
-    req, err := ParseOpenRewriteRecipeID("org.openrewrite.java.RemoveUnusedImports")
-    require.NoError(t, err)
-    require.NotNil(t, req)
-    req.RepoPath = "/tmp/test-repo"
-    req.TransformationID = "t-123"
+	// Use a common Java recipe and expect rewrite-migrate-java coordinates
+	req, err := ParseOpenRewriteRecipeID("org.openrewrite.java.RemoveUnusedImports")
+	require.NoError(t, err)
+	require.NotNil(t, req)
+	req.RepoPath = "/tmp/test-repo"
+	req.TransformationID = "t-123"
 
-    job := dispatcher.createNomadJob(req, "openrewrite-123")
-    require.NotNil(t, job)
-    require.GreaterOrEqual(t, len(job.TaskGroups), 1)
-    tg := job.TaskGroups[0]
-    require.GreaterOrEqual(t, len(tg.Tasks), 1)
-    task := tg.Tasks[0]
+	job := dispatcher.createNomadJob(req, "openrewrite-123")
+	require.NotNil(t, job)
+	require.GreaterOrEqual(t, len(job.TaskGroups), 1)
+	tg := job.TaskGroups[0]
+	require.GreaterOrEqual(t, len(tg.Tasks), 1)
+	task := tg.Tasks[0]
 
-    // Validate env vars
-    env := task.Env
-    require.NotNil(t, env)
+	// Validate env vars
+	env := task.Env
+	require.NotNil(t, env)
 
-    // Discovery should be disabled when explicit coordinates are provided
-    assert.Equal(t, "false", env["DISCOVER_RECIPE"], "DISCOVER_RECIPE should be disabled when coords are set")
+	// Discovery should be disabled when explicit coordinates are provided
+	assert.Equal(t, "false", env["DISCOVER_RECIPE"], "DISCOVER_RECIPE should be disabled when coords are set")
 
-    // Coordinates should be set
-    assert.Equal(t, "org.openrewrite.recipe", env["RECIPE_GROUP"])
-    assert.Equal(t, "rewrite-migrate-java", env["RECIPE_ARTIFACT"])
-    assert.NotEmpty(t, env["RECIPE_VERSION"])
+	// Coordinates should be set
+	assert.Equal(t, "org.openrewrite.recipe", env["RECIPE_GROUP"])
+	assert.Equal(t, "rewrite-migrate-java", env["RECIPE_ARTIFACT"])
+	assert.NotEmpty(t, env["RECIPE_VERSION"])
 }
 
 // TestCreateNomadJob_PassesSpringRecipeCoordinates verifies mapping for Spring recipes
 func TestCreateNomadJob_PassesSpringRecipeCoordinates(t *testing.T) {
-    mockStorage := &MockStorageService{}
+	mockStorage := &MockStorageService{}
 
-    dispatcher, err := NewOpenRewriteDispatcher(
-        "http://localhost:4646",
-        "registry.dev.ployman.app",
-        "http://45.12.75.241:8888",
-        "https://api.dev.ployman.app/v1",
-        mockStorage,
-    )
-    require.NoError(t, err)
-    require.NotNil(t, dispatcher)
+	dispatcher, err := NewOpenRewriteDispatcher(
+		"http://localhost:4646",
+		"registry.dev.ployman.app",
+		"http://45.12.75.241:8888",
+		"https://api.dev.ployman.app/v1",
+		mockStorage,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, dispatcher)
 
-    // Spring Boot upgrade recipe (should map to rewrite-spring)
-    req, err := ParseOpenRewriteRecipeID("org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2")
-    require.NoError(t, err)
-    require.NotNil(t, req)
-    req.RepoPath = "/tmp/test-repo"
-    req.TransformationID = "t-456"
+	// Spring Boot upgrade recipe (should map to rewrite-spring)
+	req, err := ParseOpenRewriteRecipeID("org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2")
+	require.NoError(t, err)
+	require.NotNil(t, req)
+	req.RepoPath = "/tmp/test-repo"
+	req.TransformationID = "t-456"
 
-    job := dispatcher.createNomadJob(req, "openrewrite-456")
-    require.NotNil(t, job)
-    tg := job.TaskGroups[0]
-    task := tg.Tasks[0]
-    env := task.Env
+	job := dispatcher.createNomadJob(req, "openrewrite-456")
+	require.NotNil(t, job)
+	tg := job.TaskGroups[0]
+	task := tg.Tasks[0]
+	env := task.Env
 
-    // Discovery should be disabled and spring artifact provided
-    assert.Equal(t, "false", env["DISCOVER_RECIPE"]) 
-    assert.Equal(t, "org.openrewrite.recipe", env["RECIPE_GROUP"]) 
-    assert.Equal(t, "rewrite-spring", env["RECIPE_ARTIFACT"]) 
-    assert.NotEmpty(t, env["RECIPE_VERSION"]) 
+	// Discovery should be disabled and spring artifact provided
+	assert.Equal(t, "false", env["DISCOVER_RECIPE"])
+	assert.Equal(t, "org.openrewrite.recipe", env["RECIPE_GROUP"])
+	assert.Equal(t, "rewrite-spring", env["RECIPE_ARTIFACT"])
+	assert.NotEmpty(t, env["RECIPE_VERSION"])
 }

@@ -81,10 +81,10 @@ func createTestRepoWithFiles(t *testing.T, files map[string]string) string {
 	for filename, content := range files {
 		fullPath := filepath.Join(tmpDir, filename)
 		dir := filepath.Dir(fullPath)
-		
+
 		err = os.MkdirAll(dir, 0755)
 		require.NoError(t, err)
-		
+
 		err = os.WriteFile(fullPath, []byte(content), 0644)
 		require.NoError(t, err)
 	}
@@ -129,7 +129,7 @@ func TestProductionValidatorConfig(t *testing.T) {
 	assert.NotContains(t, config.AllowedBranches, "develop") // Stricter for production
 	assert.Contains(t, config.TrustedDomains, "github.com")
 	assert.NotContains(t, config.TrustedDomains, "bitbucket.org") // Stricter for production
-	assert.Equal(t, int64(100), config.MaxRepoSizeMB) // Smaller limit for production
+	assert.Equal(t, int64(100), config.MaxRepoSizeMB)             // Smaller limit for production
 	assert.True(t, config.ScanForSecrets)
 }
 
@@ -158,7 +158,7 @@ func TestNewValidator(t *testing.T) {
 
 			assert.NotNil(t, validator)
 			assert.NotNil(t, validator.config)
-			
+
 			if tt.config != nil {
 				assert.Equal(t, tt.expectedConfig.Level, validator.config.Level)
 			} else {
@@ -286,11 +286,11 @@ func TestValidator_applyConfigValidation(t *testing.T) {
 			validator := NewValidator(tt.config)
 			repo := createMockRepository(tt.repoConfig)
 			result := &ValidationResult{
-				Valid:         true,
-				Warnings:      []string{},
-				Errors:        []string{},
+				Valid:          true,
+				Warnings:       []string{},
+				Errors:         []string{},
 				SecurityIssues: []string{},
-				Suggestions:   []string{},
+				Suggestions:    []string{},
 			}
 
 			validator.applyConfigValidation(repo, result)
@@ -315,8 +315,8 @@ func TestValidator_finalizeValidation(t *testing.T) {
 			name:  "none level - only security issues matter",
 			level: ValidationLevelNone,
 			initialResult: &ValidationResult{
-				Errors:        []string{"error1"},
-				Warnings:      []string{"warning1"},
+				Errors:         []string{"error1"},
+				Warnings:       []string{"warning1"},
 				SecurityIssues: []string{},
 			},
 			expectedValid:  true, // Errors and warnings cleared
@@ -326,8 +326,8 @@ func TestValidator_finalizeValidation(t *testing.T) {
 			name:  "warning level - errors make it invalid",
 			level: ValidationLevelWarning,
 			initialResult: &ValidationResult{
-				Errors:        []string{"error1"},
-				Warnings:      []string{"warning1"},
+				Errors:         []string{"error1"},
+				Warnings:       []string{"warning1"},
 				SecurityIssues: []string{"security1"},
 			},
 			expectedValid:  false, // Has errors
@@ -337,8 +337,8 @@ func TestValidator_finalizeValidation(t *testing.T) {
 			name:  "strict level - any issue makes it invalid",
 			level: ValidationLevelStrict,
 			initialResult: &ValidationResult{
-				Errors:        []string{},
-				Warnings:      []string{"warning1"},
+				Errors:         []string{},
+				Warnings:       []string{"warning1"},
 				SecurityIssues: []string{"security1"},
 			},
 			expectedValid:  false, // Has security issues
@@ -348,8 +348,8 @@ func TestValidator_finalizeValidation(t *testing.T) {
 			name:  "strict level - valid when no issues",
 			level: ValidationLevelStrict,
 			initialResult: &ValidationResult{
-				Errors:        []string{},
-				Warnings:      []string{},
+				Errors:         []string{},
+				Warnings:       []string{},
 				SecurityIssues: []string{},
 			},
 			expectedValid:  true,
@@ -379,8 +379,8 @@ func TestValidator_ValidateForEnvironment(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	tests := []struct {
-		name        string
-		environment string
+		name         string
+		environment  string
 		expectStrict bool
 	}{
 		{
@@ -447,7 +447,7 @@ func TestValidator_GetRepositorySummary(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	validator := NewValidator(DefaultValidatorConfig())
-	
+
 	// This test verifies the function runs without error
 	// Actual content depends on git command execution which is mocked/limited in tests
 	summary, err := validator.GetRepositorySummary(tmpDir)
@@ -516,7 +516,7 @@ func TestValidator_GetRepositoryHealth(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	validator := NewValidator(DefaultValidatorConfig())
-	
+
 	health, err := validator.GetRepositoryHealth(tmpDir)
 
 	if err != nil {
@@ -545,7 +545,7 @@ func TestValidator_getRepositorySize(t *testing.T) {
 				// Create files with known sizes
 				err = os.WriteFile(filepath.Join(tmpDir, "file1.txt"), make([]byte, 100), 0644)
 				require.NoError(t, err)
-				
+
 				err = os.WriteFile(filepath.Join(tmpDir, "file2.txt"), make([]byte, 200), 0644)
 				require.NoError(t, err)
 
@@ -597,7 +597,7 @@ func TestValidator_Integration(t *testing.T) {
 			"main.go":   "package main\n\nfunc main() {\n\tpassword := \"secret123\"\n\tprintln(password)\n}",
 			".env":      "API_KEY=secret123\nDATABASE_URL=postgres://user:pass@host/db",
 		}
-		
+
 		tmpDir := createTestRepoWithFiles(t, files)
 		defer os.RemoveAll(tmpDir)
 
@@ -646,7 +646,7 @@ func TestValidator_Integration(t *testing.T) {
 		for _, env := range environments {
 			t.Run("env_"+env, func(t *testing.T) {
 				result, err := validator.ValidateForEnvironment(tmpDir, env)
-				
+
 				if err != nil {
 					// Git command failures are expected in test environment
 					return
@@ -706,7 +706,7 @@ func BenchmarkValidator_GetRepositoryHealth(b *testing.B) {
 func BenchmarkValidator_applyConfigValidation(b *testing.B) {
 	config := DefaultValidatorConfig()
 	validator := NewValidator(config)
-	
+
 	repo := createMockRepository(mockRepoConfig{
 		Path:         "/test/path",
 		URL:          "https://github.com/user/repo",
@@ -722,11 +722,11 @@ func BenchmarkValidator_applyConfigValidation(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		result := &ValidationResult{
-			Valid:         true,
-			Warnings:      []string{},
-			Errors:        []string{},
+			Valid:          true,
+			Warnings:       []string{},
+			Errors:         []string{},
 			SecurityIssues: []string{},
-			Suggestions:   []string{},
+			Suggestions:    []string{},
 		}
 		validator.applyConfigValidation(repo, result)
 	}

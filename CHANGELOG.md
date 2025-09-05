@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## [2025-09-05] - Transflow: Complete Healing Branch Types Implementation
+
+### Added
+- **Complete Healing Branch Types Implementation**: Full production-ready implementation of all three self-healing strategies with comprehensive test coverage.
+  - **human-step branch**: Git-based manual intervention workflow with MR creation, commit polling, build validation, and configurable timeouts.
+  - **llm-exec branch**: HCL template rendering with environment variable substitution, production Nomad job submission, and diff.patch artifact processing.
+  - **orw-gen branch**: Recipe configuration extraction from branch inputs, template variable substitution (RECIPE_CLASS, RECIPE_COORDS, RECIPE_TIMEOUT), and OpenRewrite job execution.
+- **Production Job Submission Integration**: Real Nomad job orchestration via orchestration.SubmitAndWaitTerminal() with HCL template processing.
+  - Environment variable substitution for TRANSFLOW_MODEL, TRANSFLOW_TOOLS, TRANSFLOW_LIMITS, and RUN_ID in job templates.
+  - Artifact collection and JSON parsing for planner/reducer job outputs (plan.json, next.json, diff.patch).
+  - Timeout handling and proper error propagation from job execution to branch results.
+- **Fanout Orchestration System**: First-success-wins parallel execution with context cancellation and resource cleanup.
+  - Semaphore-based parallelism control with configurable maximum concurrent branches.
+  - Automatic cancellation of remaining branches when first branch succeeds.
+  - Comprehensive timeout and error handling with proper status tracking and duration recording.
+- **Extended ProductionBranchRunner Interface**: Enhanced interface for production healing branch execution.
+  - RenderLLMExecAssets() and RenderORWApplyAssets() methods for HCL template generation.
+  - GetGitProvider(), GetBuildChecker(), and GetWorkspaceDir() methods for human-step branch access.
+  - Integration with existing TransflowRunner infrastructure for production deployments.
+- **Comprehensive Test Coverage**: Complete TDD implementation with RED/GREEN phases for all branch types.
+  - MockProductionBranchRunner for testing branch execution without external dependencies.
+  - Timeout and error handling test scenarios including context cancellation and resource cleanup.
+  - Asset rendering error tests, malformed configuration handling, and edge case validation.
+  - Integration tests for fanout orchestration behavior and first-success-wins semantics.
+
+### Enhanced
+- **TransflowRunner Integration**: Extended runner with getter methods to support ProductionBranchRunner interface requirements.
+- **Error Handling**: Robust error management with detailed error messages and proper status tracking for all failure modes.
+- **Test Infrastructure**: Enhanced mock implementations with configurable error injection and realistic behavior simulation.
+
+### Fixed
+- **Interface Compatibility**: Resolved interface mismatches between provider.MRConfig and test expectations.
+- **Import Dependencies**: Added missing imports for provider and common packages in test files.
+- **Build Checker Interface**: Updated to use common.DeployConfig parameter structure instead of individual parameters.
+- **Unused Variables**: Cleaned up test code to eliminate compilation warnings and ensure clean builds.
+
 ## [2025-09-05] - Transflow: Complete CLI Integration MVP
 
 ### Added
