@@ -191,6 +191,18 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
     return renderedPath, nil
 }
 
+// RenderORWApplyAssets writes a rendered orw_apply.hcl for the given option ID.
+func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) {
+    dir := filepath.Join(r.workspaceDir, "orw-apply", optionID)
+    if err := os.MkdirAll(dir, 0755); err != nil { return "", err }
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil { return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err) }
+    renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
+    if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil { return "", err }
+    return renderedPath, nil
+}
+
 // ReducerAssets holds file paths for rendered reducer inputs and HCL
 type ReducerAssets struct {
     HistoryPath string
