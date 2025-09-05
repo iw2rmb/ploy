@@ -3,6 +3,7 @@ package transflow
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/iw2rmb/ploy/api/arf"
@@ -39,14 +40,20 @@ func (e *ARFRecipeExecutor) ExecuteRecipes(ctx context.Context, workspacePath st
 	// For MVP, we'll invoke the ploy arf command directly
 	// This reuses the existing ARF pipeline without duplicating logic
 
+	// Get current executable path to avoid PATH dependency issues
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get current executable path: %w", err)
+	}
+
 	for _, recipeID := range recipeIDs {
 		args := []string{"arf", "recipes", "transform", "--recipe", recipeID}
 		if e.controllerURL != "" {
 			args = append(args, "--controller", e.controllerURL)
 		}
 
-		// Execute ploy arf transform command
-		cmd := exec.CommandContext(ctx, "ploy", args...)
+		// Execute ploy arf transform command using full executable path
+		cmd := exec.CommandContext(ctx, execPath, args...)
 		cmd.Dir = workspacePath
 
 		if err := cmd.Run(); err != nil {
@@ -85,10 +92,74 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	return result, nil
 }
 
+// TestModeBuildChecker implements build checking for testing without external dependencies
+type TestModeBuildChecker struct {
+	shouldFail bool
+}
+
+// NewTestModeBuildChecker creates a new test mode build checker
+func NewTestModeBuildChecker(shouldFail bool) *TestModeBuildChecker {
+	return &TestModeBuildChecker{
+		shouldFail: shouldFail,
+	}
+}
+
+// CheckBuild performs a mock build check
+func (m *TestModeBuildChecker) CheckBuild(ctx context.Context, config common.DeployConfig) (*common.DeployResult, error) {
+	if m.shouldFail {
+		return &common.DeployResult{
+			Success: false,
+			Message: "Mock build failed for testing",
+		}, nil
+	}
+
+	return &common.DeployResult{
+		Success:      true,
+		Message:      "Mock build succeeded",
+		Version:      "mock-v1.0.0",
+		DeploymentID: "mock-deployment-123",
+		URL:          "mock://test-image:latest",
+	}, nil
+}
+
+// MockGitProvider implements GitProvider for testing without external API calls
+type MockGitProvider struct {
+	shouldFail bool
+}
+
+// NewMockGitProvider creates a new mock git provider
+func NewMockGitProvider(shouldFail bool) *MockGitProvider {
+	return &MockGitProvider{
+		shouldFail: shouldFail,
+	}
+}
+
+// CreateOrUpdateMR performs a mock merge request creation
+func (m *MockGitProvider) CreateOrUpdateMR(ctx context.Context, config provider.MRConfig) (*provider.MRResult, error) {
+	if m.shouldFail {
+		return nil, fmt.Errorf("mock MR creation failed for testing")
+	}
+
+	return &provider.MRResult{
+		MRURL:   "https://gitlab.example.com/test/project/-/merge_requests/123",
+		MRID:    123,
+		Created: true,
+	}, nil
+}
+
+// ValidateConfiguration performs mock configuration validation
+func (m *MockGitProvider) ValidateConfiguration() error {
+	if m.shouldFail {
+		return fmt.Errorf("mock git provider configuration invalid")
+	}
+	return nil
+}
+
 // TransflowIntegrations provides factory methods for creating concrete implementations
 type TransflowIntegrations struct {
 	ControllerURL string
 	WorkDir       string
+	TestMode      bool // Use mock implementations when true
 }
 
 // NewTransflowIntegrations creates a new integrations factory
@@ -96,6 +167,16 @@ func NewTransflowIntegrations(controllerURL, workDir string) *TransflowIntegrati
 	return &TransflowIntegrations{
 		ControllerURL: controllerURL,
 		WorkDir:       workDir,
+		TestMode:      false,
+	}
+}
+
+// NewTransflowIntegrationsWithTestMode creates a new integrations factory with test mode option
+func NewTransflowIntegrationsWithTestMode(controllerURL, workDir string, testMode bool) *TransflowIntegrations {
+	return &TransflowIntegrations{
+		ControllerURL: controllerURL,
+		WorkDir:       workDir,
+		TestMode:      testMode,
 	}
 }
 
@@ -111,11 +192,17 @@ func (i *TransflowIntegrations) CreateRecipeExecutor() RecipeExecutorInterface {
 
 // CreateBuildChecker creates a build checker implementation
 func (i *TransflowIntegrations) CreateBuildChecker() BuildCheckerInterface {
+	if i.TestMode {
+		return NewTestModeBuildChecker(false) // Default to successful mock builds
+	}
 	return NewSharedPushBuildChecker(i.ControllerURL)
 }
 
 // CreateGitProvider creates a Git provider implementation for MR operations
 func (i *TransflowIntegrations) CreateGitProvider() provider.GitProvider {
+	if i.TestMode {
+		return NewMockGitProvider(false) // Default to successful mock MR creation
+	}
 	return provider.NewGitLabProvider()
 }
 

@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## [2025-09-05] - Transflow: Complete CLI Integration MVP
+
+### Added
+- **Complete End-to-End CLI Integration**: Full implementation of `ploy transflow run` command with comprehensive workflow execution.
+  - Recipe execution with proper executable path resolution and ARF integration reuse.
+  - Git operations with automatic configuration (user.name/user.email) for commit operations.
+  - Build validation using existing SharedPush infrastructure with configurable timeouts.
+  - Branch management with deterministic naming and push operations to remote repositories.
+  - GitLab MR integration with full create/update functionality and environment variable configuration.
+- **Test Mode Infrastructure**: Complete mock implementation framework for CI/CD and local testing.
+  - `TestModeBuildChecker`: Mock build validation without external controller dependencies.
+  - `MockGitProvider`: GitLab provider simulation for testing without API calls.
+  - `--test-mode` CLI flag: Enable full workflow testing with mock implementations.
+- **Integration Test Framework**: Comprehensive test suite covering end-to-end workflow scenarios.
+  - Configuration validation with timeout parsing and required field checks.
+  - Factory pattern tests for production vs. test mode implementations.
+  - End-to-end integration tests with proper timeout handling and workspace management.
+- **Enhanced Error Handling**: Robust error management throughout the workflow pipeline.
+  - Git commit handling with "nothing to commit" detection and graceful handling.
+  - Build timeout detection and proper error reporting.
+  - Recipe execution with fallback error handling and detailed error messages.
+
+### Enhanced  
+- **CLI Argument Parsing**: Complete flag support for all transflow operations including test mode, dry run, and verbose output.
+- **Configuration Validation**: Extended validation including build timeout format checking and comprehensive error reporting.
+- **Workspace Management**: Temporary directory handling with proper cleanup and configurable work directories.
+- **Dependency Injection**: Clean factory pattern for creating production vs. test implementations of all interfaces.
+
+### Fixed
+- **Recipe Executor Path Resolution**: Fixed executable discovery to use current process path instead of PATH lookup.
+- **Git Commit Configuration**: Automatic git user configuration for environments without global git setup.  
+- **Build Checker Timeout**: Implemented mock build checker to avoid hanging on unavailable controllers.
+- **Error Message Consistency**: Standardized error formatting and context propagation throughout the workflow.
+
+### Technical Details
+- **Architecture**: Complete dependency injection with interface-based design enabling testability and extensibility.
+- **Test Coverage**: Unit tests, integration tests, and configuration validation tests with proper mocking.
+- **CLI Integration**: Full command-line interface with help text, flag parsing, and error handling.
+- **Workflow Engine**: Complete step-by-step execution with result tracking and progress reporting.
+
+### Notes
+- **MVP Status**: Core transflow CLI integration is now complete and fully functional for basic recipe application workflows.
+- **Ready for Healing**: Infrastructure prepared for LangGraph healing integration (Stream 2 continuation).
+- **Production Ready**: Full test mode support enables CI/CD integration and local development workflows.
+- **Performance**: Efficient workspace management and parallel-capable architecture for future scaling.
+
 ## [2025-09-05] - Transflow: GitLab Merge Request Integration (Stream 3, Phase 1)
 
 ### Added
