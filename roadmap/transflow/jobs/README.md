@@ -34,6 +34,7 @@ This doc specifies the contract for running LangGraph as short‑lived Nomad job
   - `OUTPUT_DIR/plan.json`: validated plan schema:
     `{ "plan_id": "...", "options": [ {"id": "human-1", "type": "human"}, {"id": "llm-1", "type": "llm-exec", "inputs": {...}}, {"id": "orw-1", "type": "orw-gen", "inputs": {...}} ] }`.
   - `OUTPUT_DIR/manifest.json`: run manifest (prompts/version/checksums/timing).
+  - Optional upload: job may upload `plan.json` to storage and print a URL in stdout (e.g., `{ "ok": true, "plan_url": "https://filer/..../plan.json" }`). The CLI can read via `TRANSFLOW_PLAN_URL`.
 - Exit codes
   - `0`: success with `plan.json`
   - `2`: planner could not propose options (escalate to human-step)

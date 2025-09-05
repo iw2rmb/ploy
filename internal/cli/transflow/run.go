@@ -2,6 +2,7 @@ package transflow
 
 import (
     "context"
+    "io"
     "flag"
     "fmt"
     "os"
@@ -11,11 +12,29 @@ import (
 
     orchestration "github.com/iw2rmb/ploy/internal/orchestration"
     "encoding/json"
+    "net/http"
 )
 // lightweight JSON unmarshal to avoid adding deps
 func jsonUnmarshal(b []byte, v any) error {
     // use stdlib encoding/json
     return json.Unmarshal(b, v)
+}
+
+func printPlanSummary(b []byte) {
+    var parsed struct{
+        PlanID string `json:"plan_id"`
+        Options []map[string]any `json:"options"`
+    }
+    if err := jsonUnmarshal(b, &parsed); err == nil && parsed.PlanID != "" && len(parsed.Options) > 0 {
+        fmt.Printf("Planner produced plan (id=%s) with %d option(s):\n", parsed.PlanID, len(parsed.Options))
+        for i, o := range parsed.Options {
+            id, _ := o["id"].(string)
+            typ, _ := o["type"].(string)
+            fmt.Printf("  %d) %s (%s)\n", i+1, id, typ)
+        }
+    } else {
+        fmt.Printf("Planner finished but plan.json validation failed or missing keys: %v\n", err)
+    }
 }
 
 // TransflowCmd provides the CLI entrypoint to run transflows
@@ -138,6 +157,17 @@ func runTransflow(args []string, controllerURL string) error {
             if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
                 return fmt.Errorf("planner job failed: %w", err)
             }
+            // Attempt to read plan.json from URL or locally
+            if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
+                resp, err := http.Get(url)
+                if err == nil && resp.StatusCode == 200 {
+                    defer resp.Body.Close()
+                    b, _ := io.ReadAll(resp.Body)
+                    printPlanSummary(b)
+                } else {
+                    if err != nil { fmt.Printf("Failed to fetch plan URL: %v\n", err) } else { fmt.Printf("Failed to fetch plan URL: %s\n", resp.Status) }
+                }
+            }
             // Attempt to read plan.json locally if provided
             planPath := os.Getenv("TRANSFLOW_PLAN_PATH")
             if planPath == "" {
@@ -145,25 +175,9 @@ func runTransflow(args []string, controllerURL string) error {
                 planPath = filepath.Join(filepath.Dir(renderedPath), "out", "plan.json")
             }
             if b, err := os.ReadFile(planPath); err == nil {
-                // Minimal validation and summary (avoid external deps)
-                // Expect keys: plan_id (string), options (array)
-                type opt struct{ ID, Type string }
-                var parsed struct{
-                    PlanID string `json:"plan_id"`
-                    Options []map[string]any `json:"options"`
-                }
-                if err := jsonUnmarshal(b, &parsed); err == nil && parsed.PlanID != "" && len(parsed.Options) > 0 {
-                    fmt.Printf("Planner produced plan (id=%s) with %d option(s):\n", parsed.PlanID, len(parsed.Options))
-                    for i, o := range parsed.Options {
-                        id, _ := o["id"].(string)
-                        typ, _ := o["type"].(string)
-                        fmt.Printf("  %d) %s (%s)\n", i+1, id, typ)
-                    }
-                } else {
-                    fmt.Printf("Planner finished but plan.json validation failed or missing keys: %v\n", err)
-                }
+                printPlanSummary(b)
             } else {
-                fmt.Println("Planner job completed. Could not read plan.json locally; set TRANSFLOW_PLAN_PATH to its location on host.")
+                fmt.Println("Planner job completed. Could not read plan.json locally; set TRANSFLOW_PLAN_PATH or TRANSFLOW_PLAN_URL.")
             }
         } else {
             fmt.Println("Skipping submission (unset TRANSFLOW_SUBMIT).")
