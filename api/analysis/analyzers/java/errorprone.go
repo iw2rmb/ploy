@@ -24,14 +24,14 @@ type ErrorProneAnalyzer struct {
 
 // ErrorProneConfig contains configuration for Error Prone analyzer
 type ErrorProneConfig struct {
-	Enabled         bool     `json:"enabled" yaml:"enabled"`
-	JavacPath       string   `json:"javac_path" yaml:"javac_path"`
-	ErrorPronePath  string   `json:"errorprone_path" yaml:"errorprone_path"`
-	CheckerOptions  []string `json:"checker_options" yaml:"checker_options"`
-	DisabledChecks  []string `json:"disabled_checks" yaml:"disabled_checks"`
+	Enabled         bool              `json:"enabled" yaml:"enabled"`
+	JavacPath       string            `json:"javac_path" yaml:"javac_path"`
+	ErrorPronePath  string            `json:"errorprone_path" yaml:"errorprone_path"`
+	CheckerOptions  []string          `json:"checker_options" yaml:"checker_options"`
+	DisabledChecks  []string          `json:"disabled_checks" yaml:"disabled_checks"`
 	SeverityMapping map[string]string `json:"severity_mapping" yaml:"severity_mapping"`
-	CustomPatterns  []string `json:"custom_patterns" yaml:"custom_patterns"`
-	MaxHeapSize     string   `json:"max_heap_size" yaml:"max_heap_size"`
+	CustomPatterns  []string          `json:"custom_patterns" yaml:"custom_patterns"`
+	MaxHeapSize     string            `json:"max_heap_size" yaml:"max_heap_size"`
 }
 
 // DefaultErrorProneConfig returns the default Error Prone configuration
@@ -72,7 +72,7 @@ func NewErrorProneAnalyzer(logger *logrus.Logger) *ErrorProneAnalyzer {
 // Analyze performs Java analysis using Error Prone
 func (a *ErrorProneAnalyzer) Analyze(ctx context.Context, codebase analysis.Codebase) (*analysis.LanguageAnalysisResult, error) {
 	startTime := time.Now()
-	
+
 	result := &analysis.LanguageAnalysisResult{
 		Language:  "java",
 		Analyzer:  "error-prone",
@@ -80,21 +80,21 @@ func (a *ErrorProneAnalyzer) Analyze(ctx context.Context, codebase analysis.Code
 		StartTime: startTime,
 		Success:   true,
 	}
-	
+
 	// Find Java files
 	javaFiles := a.findJavaFiles(codebase)
 	if len(javaFiles) == 0 {
 		result.EndTime = time.Now()
 		return result, nil
 	}
-	
+
 	// Detect build system
 	buildSystem := a.detectBuildSystem(codebase.RootPath)
-	
+
 	// Run Error Prone based on build system
 	var issues []analysis.Issue
 	var err error
-	
+
 	switch buildSystem {
 	case "maven":
 		issues, err = a.analyzeMavenProject(ctx, codebase.RootPath)
@@ -103,15 +103,15 @@ func (a *ErrorProneAnalyzer) Analyze(ctx context.Context, codebase analysis.Code
 	default:
 		issues, err = a.analyzeStandalone(ctx, codebase.RootPath, javaFiles)
 	}
-	
+
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()
 	}
-	
+
 	result.Issues = issues
 	result.EndTime = time.Now()
-	
+
 	// Calculate metrics
 	result.Metrics = analysis.AnalysisMetrics{
 		TotalFiles:       len(javaFiles),
@@ -121,7 +121,7 @@ func (a *ErrorProneAnalyzer) Analyze(ctx context.Context, codebase analysis.Code
 		IssuesByCategory: a.countByCategory(issues),
 		AnalysisTime:     time.Since(startTime),
 	}
-	
+
 	return result, nil
 }
 
@@ -164,14 +164,14 @@ func (a *ErrorProneAnalyzer) ValidateConfiguration(config interface{}) error {
 			return fmt.Errorf("invalid configuration type")
 		}
 	}
-	
+
 	// Check if Error Prone JAR exists
 	if epConfig.ErrorPronePath != "" {
 		if _, err := os.Stat(epConfig.ErrorPronePath); os.IsNotExist(err) {
 			return fmt.Errorf("Error Prone JAR not found at %s", epConfig.ErrorPronePath)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (a *ErrorProneAnalyzer) Configure(config interface{}) error {
 	if err := a.ValidateConfiguration(config); err != nil {
 		return err
 	}
-	
+
 	if epConfig, ok := config.(*ErrorProneConfig); ok {
 		a.config = epConfig
 	} else if mapConfig, ok := config.(map[string]interface{}); ok {
@@ -190,26 +190,26 @@ func (a *ErrorProneAnalyzer) Configure(config interface{}) error {
 		}
 		a.config = epConfig
 	}
-	
+
 	return nil
 }
 
 // GenerateFixSuggestions generates fix suggestions for an issue
 func (a *ErrorProneAnalyzer) GenerateFixSuggestions(issue analysis.Issue) ([]analysis.FixSuggestion, error) {
 	suggestions := []analysis.FixSuggestion{}
-	
+
 	// Map Error Prone patterns to fixes
 	fixPatterns := map[string]string{
-		"NullAway": "Add @Nullable annotation or null check",
-		"UnusedVariable": "Remove unused variable declaration",
-		"UnusedMethod": "Remove unused method or mark with @SuppressWarnings",
-		"EqualsIncompatibleType": "Fix type mismatch in equals comparison",
+		"NullAway":                   "Add @Nullable annotation or null check",
+		"UnusedVariable":             "Remove unused variable declaration",
+		"UnusedMethod":               "Remove unused method or mark with @SuppressWarnings",
+		"EqualsIncompatibleType":     "Fix type mismatch in equals comparison",
 		"CollectionIncompatibleType": "Fix type parameter in collection operation",
-		"MissingOverride": "Add @Override annotation",
-		"DefaultCharset": "Specify explicit charset",
-		"DoubleCheckedLocking": "Use volatile or proper synchronization",
+		"MissingOverride":            "Add @Override annotation",
+		"DefaultCharset":             "Specify explicit charset",
+		"DoubleCheckedLocking":       "Use volatile or proper synchronization",
 	}
-	
+
 	for pattern, fix := range fixPatterns {
 		if strings.Contains(issue.RuleName, pattern) {
 			suggestion := analysis.FixSuggestion{
@@ -221,7 +221,7 @@ func (a *ErrorProneAnalyzer) GenerateFixSuggestions(issue analysis.Issue) ([]ana
 			break
 		}
 	}
-	
+
 	return suggestions, nil
 }
 
@@ -237,20 +237,20 @@ func (a *ErrorProneAnalyzer) CanAutoFix(issue analysis.Issue) bool {
 		"EmptyBlock",
 		"FallThrough",
 	}
-	
+
 	for _, pattern := range autoFixablePatterns {
 		if strings.Contains(issue.RuleName, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
 // GetARFRecipes returns ARF recipes for an issue
 func (a *ErrorProneAnalyzer) GetARFRecipes(issue analysis.Issue) []string {
 	recipes := []string{}
-	
+
 	// Map Error Prone checks to OpenRewrite recipes
 	recipeMap := map[string][]string{
 		"NullAway": {
@@ -276,26 +276,26 @@ func (a *ErrorProneAnalyzer) GetARFRecipes(issue analysis.Issue) []string {
 			"org.openrewrite.java.cleanup.EmptyBlock",
 		},
 	}
-	
+
 	for pattern, recipeList := range recipeMap {
 		if strings.Contains(issue.RuleName, pattern) {
 			recipes = append(recipes, recipeList...)
 		}
 	}
-	
+
 	return recipes
 }
 
 // findJavaFiles finds all Java files in the codebase
 func (a *ErrorProneAnalyzer) findJavaFiles(codebase analysis.Codebase) []string {
 	javaFiles := []string{}
-	
+
 	for _, file := range codebase.Files {
 		if strings.HasSuffix(file, ".java") {
 			javaFiles = append(javaFiles, file)
 		}
 	}
-	
+
 	// If no files provided, walk the directory
 	if len(javaFiles) == 0 && codebase.RootPath != "" {
 		filepath.Walk(codebase.RootPath, func(path string, info os.FileInfo, err error) error {
@@ -308,7 +308,7 @@ func (a *ErrorProneAnalyzer) findJavaFiles(codebase analysis.Codebase) []string 
 			return nil
 		})
 	}
-	
+
 	return javaFiles
 }
 
@@ -317,15 +317,15 @@ func (a *ErrorProneAnalyzer) detectBuildSystem(rootPath string) string {
 	if _, err := os.Stat(filepath.Join(rootPath, "pom.xml")); err == nil {
 		return "maven"
 	}
-	
+
 	if _, err := os.Stat(filepath.Join(rootPath, "build.gradle")); err == nil {
 		return "gradle"
 	}
-	
+
 	if _, err := os.Stat(filepath.Join(rootPath, "build.gradle.kts")); err == nil {
 		return "gradle"
 	}
-	
+
 	return "standalone"
 }
 
@@ -337,13 +337,13 @@ func (a *ErrorProneAnalyzer) analyzeMavenProject(ctx context.Context, rootPath s
 		fmt.Sprintf("-Dmaven.compiler.compilerArgs=-XDcompilePolicy=simple -processorpath %s", a.config.ErrorPronePath),
 	)
 	cmd.Dir = rootPath
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Parse output even if compilation fails (Error Prone reports issues as compilation errors)
 		return a.parseErrorProneOutput(string(output)), nil
 	}
-	
+
 	return a.parseErrorProneOutput(string(output)), nil
 }
 
@@ -355,13 +355,13 @@ func (a *ErrorProneAnalyzer) analyzeGradleProject(ctx context.Context, rootPath 
 		"-PerrorProneJar="+a.config.ErrorPronePath,
 	)
 	cmd.Dir = rootPath
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Parse output even if compilation fails
 		return a.parseErrorProneOutput(string(output)), nil
 	}
-	
+
 	return a.parseErrorProneOutput(string(output)), nil
 }
 
@@ -374,44 +374,44 @@ func (a *ErrorProneAnalyzer) analyzeStandalone(ctx context.Context, rootPath str
 		"-processorpath", a.config.ErrorPronePath,
 		"-Xplugin:ErrorProne",
 	}
-	
+
 	// Add checker options
 	args = append(args, a.config.CheckerOptions...)
-	
+
 	// Add disabled checks
 	for _, check := range a.config.DisabledChecks {
 		args = append(args, "-Xep:"+check+":OFF")
 	}
-	
+
 	// Add source files
 	args = append(args, files...)
-	
+
 	cmd := exec.CommandContext(ctx, a.config.JavacPath, args...)
 	cmd.Dir = rootPath
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Parse output even if compilation fails
 		return a.parseErrorProneOutput(string(output)), nil
 	}
-	
+
 	return a.parseErrorProneOutput(string(output)), nil
 }
 
 // parseErrorProneOutput parses Error Prone output into issues
 func (a *ErrorProneAnalyzer) parseErrorProneOutput(output string) []analysis.Issue {
 	issues := []analysis.Issue{}
-	
+
 	// Error Prone output format: file.java:line: severity: [CheckName] message
 	pattern := regexp.MustCompile(`([^:]+):(\d+):\s*(\w+):\s*\[([^\]]+)\]\s*(.+)`)
-	
+
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	issueID := 0
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		matches := pattern.FindStringSubmatch(line)
-		
+
 		if len(matches) == 6 {
 			file := matches[1]
 			lineNum := 0
@@ -419,23 +419,23 @@ func (a *ErrorProneAnalyzer) parseErrorProneOutput(output string) []analysis.Iss
 			severity := matches[3]
 			checkName := matches[4]
 			message := matches[5]
-			
+
 			issue := analysis.Issue{
-				ID:       fmt.Sprintf("ep-%d", issueID),
-				Severity: a.mapSeverity(severity),
-				Category: a.categorizeCheck(checkName),
-				RuleName: checkName,
-				Message:  message,
-				File:     file,
-				Line:     lineNum,
+				ID:            fmt.Sprintf("ep-%d", issueID),
+				Severity:      a.mapSeverity(severity),
+				Category:      a.categorizeCheck(checkName),
+				RuleName:      checkName,
+				Message:       message,
+				File:          file,
+				Line:          lineNum,
 				ARFCompatible: a.CanAutoFix(analysis.Issue{RuleName: checkName}),
 			}
-			
+
 			issues = append(issues, issue)
 			issueID++
 		}
 	}
-	
+
 	return issues
 }
 
@@ -455,7 +455,7 @@ func (a *ErrorProneAnalyzer) mapSeverity(epSeverity string) analysis.SeverityLev
 			return analysis.SeverityInfo
 		}
 	}
-	
+
 	// Default mapping
 	switch strings.ToUpper(epSeverity) {
 	case "ERROR":
@@ -483,13 +483,13 @@ func (a *ErrorProneAnalyzer) categorizeCheck(checkName string) analysis.IssueCat
 		"Override":   analysis.CategoryStyle,
 		"Deprecated": analysis.CategoryDeprecation,
 	}
-	
+
 	for pattern, category := range categories {
 		if strings.Contains(checkName, pattern) {
 			return category
 		}
 	}
-	
+
 	return analysis.CategoryBug
 }
 

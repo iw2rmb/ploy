@@ -41,12 +41,12 @@ func NewEngine(logger *logrus.Logger) *Engine {
 func NewEngineWithDispatcher(logger *logrus.Logger, dispatcher *AnalysisDispatcher) *Engine {
 	engine := NewEngine(logger)
 	engine.dispatcher = dispatcher
-	
+
 	// Register Nomad-based analyzers
 	engine.RegisterAnalyzer("python", NewNomadPylintAnalyzer(dispatcher))
 	engine.RegisterAnalyzer("javascript", NewNomadESLintAnalyzer(dispatcher))
 	engine.RegisterAnalyzer("go", NewNomadGolangCIAnalyzer(dispatcher))
-	
+
 	return engine
 }
 
@@ -84,7 +84,7 @@ func (e *Engine) RegisterAnalyzer(language string, analyzer LanguageAnalyzer) er
 	language = strings.ToLower(language)
 	e.analyzers[language] = analyzer
 	e.logger.WithField("language", language).Info("Registered analyzer")
-	
+
 	return nil
 }
 
@@ -106,7 +106,7 @@ func (e *Engine) RegisterFallbackAnalyzer(language string, analyzer LanguageAnal
 	language = strings.ToLower(language)
 	e.fallbackAnalyzers[language] = analyzer
 	e.logger.WithField("language", language).Info("Registered fallback analyzer")
-	
+
 	return nil
 }
 
@@ -120,7 +120,7 @@ func (e *Engine) GetAnalyzer(language string) (LanguageAnalyzer, error) {
 	if !ok {
 		return nil, fmt.Errorf("no analyzer registered for language: %s", language)
 	}
-	
+
 	return analyzer, nil
 }
 
@@ -134,7 +134,7 @@ func (e *Engine) GetSupportedLanguages() []string {
 		languages = append(languages, lang)
 	}
 	sort.Strings(languages)
-	
+
 	return languages
 }
 
@@ -146,9 +146,9 @@ func (e *Engine) ConfigureAnalysis(config AnalysisConfig) error {
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	e.config = config
-	
+
 	// Configure individual analyzers if language-specific config exists
 	for lang, cfg := range config.Languages {
 		if analyzer, ok := e.analyzers[lang]; ok {
@@ -157,7 +157,7 @@ func (e *Engine) ConfigureAnalysis(config AnalysisConfig) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -165,7 +165,7 @@ func (e *Engine) ConfigureAnalysis(config AnalysisConfig) error {
 func (e *Engine) GetConfiguration() AnalysisConfig {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	return e.config
 }
 
@@ -174,15 +174,15 @@ func (e *Engine) ValidateConfiguration(config AnalysisConfig) error {
 	if config.MaxIssues < 0 {
 		return fmt.Errorf("max_issues must be non-negative")
 	}
-	
+
 	if config.Timeout <= 0 {
 		return fmt.Errorf("timeout must be positive")
 	}
-	
+
 	if config.CacheTTL < 0 {
 		return fmt.Errorf("cache_ttl must be non-negative")
 	}
-	
+
 	return nil
 }
 
@@ -195,20 +195,20 @@ func (e *Engine) AnalyzeRepository(ctx context.Context, repo Repository) (*Analy
 		Languages:  make(map[string]int),
 		Metadata:   repo.Metadata,
 	}
-	
+
 	// TODO: Clone repository and detect files
 	// For now, we'll use a placeholder implementation
-	
+
 	return e.AnalyzeCodebase(ctx, codebase, e.config)
 }
 
 // AnalyzeCodebase analyzes a codebase with the given configuration
 func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config AnalysisConfig) (*AnalysisResult, error) {
 	startTime := time.Now()
-	
+
 	// Generate cache key
 	cacheKey := e.generateCacheKey(codebase, config)
-	
+
 	// Check cache if enabled
 	if config.CacheEnabled && e.cache != nil {
 		if cached, found := e.cache.Get(cacheKey); found {
@@ -216,7 +216,7 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			return cached, nil
 		}
 	}
-	
+
 	// Create result
 	result := &AnalysisResult{
 		ID:              uuid.New().String(),
@@ -227,14 +227,14 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 		ARFTriggers:     []ARFTrigger{},
 		Success:         true,
 	}
-	
+
 	// Detect languages in codebase
 	languages := e.detectLanguages(codebase)
-	
+
 	// Create wait group for parallel analysis
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	
+
 	// Analyze each language in parallel
 	for _, lang := range languages {
 		analyzer, err := e.GetAnalyzer(lang)
@@ -242,20 +242,20 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			e.logger.WithField("language", lang).Warn("No analyzer available")
 			continue
 		}
-		
+
 		wg.Add(1)
 		go func(language string, analyzer LanguageAnalyzer) {
 			defer wg.Done()
-			
+
 			// Create timeout context for this analyzer
 			analyzerCtx, cancel := context.WithTimeout(ctx, config.Timeout)
 			defer cancel()
-			
+
 			var langResult *LanguageAnalysisResult
 			// Perform analysis using the registered analyzer
 			e.logger.WithField("language", language).Debug("Starting analysis")
 			langResult, analysisErr := analyzer.Analyze(analyzerCtx, codebase)
-			
+
 			// Handle analysis errors
 			if analysisErr != nil {
 				e.logger.WithError(analysisErr).WithField("language", language).Error("Analysis failed")
@@ -266,7 +266,7 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 					Error:    analysisErr.Error(),
 				}
 			}
-			
+
 			// Store result
 			mu.Lock()
 			result.LanguageResults[language] = langResult
@@ -276,36 +276,36 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			mu.Unlock()
 		}(lang, analyzer)
 	}
-	
+
 	// Wait for all analyzers to complete
 	wg.Wait()
-	
+
 	// Calculate metrics
 	result.Metrics = e.calculateMetrics(result, time.Since(startTime))
-	
+
 	// Calculate overall score
 	result.OverallScore = e.calculateScore(result)
-	
+
 	// Generate ARF triggers if integration is enabled
 	if config.ARFIntegration {
 		result.ARFTriggers = e.generateARFTriggers(result)
 	}
-	
+
 	// Sort issues by severity and file
 	e.sortIssues(result.Issues)
-	
+
 	// Limit issues if configured
 	if config.MaxIssues > 0 && len(result.Issues) > config.MaxIssues {
 		result.Issues = result.Issues[:config.MaxIssues]
 	}
-	
+
 	// Cache result if enabled
 	if config.CacheEnabled && e.cache != nil {
 		if err := e.cache.Set(cacheKey, result, config.CacheTTL); err != nil {
 			e.logger.WithError(err).Warn("Failed to cache result")
 		}
 	}
-	
+
 	// Check if we should fail
 	if config.FailOnCritical {
 		for _, issue := range result.Issues {
@@ -316,7 +316,7 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			}
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -343,14 +343,14 @@ func (e *Engine) ClearCache(repo Repository) error {
 // detectLanguages detects languages in the codebase
 func (e *Engine) detectLanguages(codebase Codebase) []string {
 	languages := make(map[string]bool)
-	
+
 	// Use provided languages if available
 	if len(codebase.Languages) > 0 {
 		for lang := range codebase.Languages {
 			languages[strings.ToLower(lang)] = true
 		}
 	}
-	
+
 	// Detect from files
 	for _, file := range codebase.Files {
 		ext := filepath.Ext(file)
@@ -371,13 +371,13 @@ func (e *Engine) detectLanguages(codebase Codebase) []string {
 			languages["cpp"] = true
 		}
 	}
-	
+
 	// Convert to slice
 	result := make([]string, 0, len(languages))
 	for lang := range languages {
 		result = append(result, lang)
 	}
-	
+
 	return result
 }
 
@@ -398,13 +398,13 @@ func (e *Engine) calculateMetrics(result *AnalysisResult, duration time.Duration
 		IssuesByCategory: make(map[string]int),
 		AnalysisTime:     duration,
 	}
-	
+
 	// Count issues by severity and category
 	for _, issue := range result.Issues {
 		metrics.IssuesBySeverity[string(issue.Severity)]++
 		metrics.IssuesByCategory[string(issue.Category)]++
 	}
-	
+
 	// Aggregate language metrics
 	for _, langResult := range result.LanguageResults {
 		if langResult.Metrics.TotalFiles > 0 {
@@ -415,7 +415,7 @@ func (e *Engine) calculateMetrics(result *AnalysisResult, duration time.Duration
 			metrics.CacheMisses += langResult.Metrics.CacheMisses
 		}
 	}
-	
+
 	return metrics
 }
 
@@ -424,7 +424,7 @@ func (e *Engine) calculateScore(result *AnalysisResult) float64 {
 	if len(result.Issues) == 0 {
 		return 100.0
 	}
-	
+
 	// Weight issues by severity
 	weights := map[SeverityLevel]float64{
 		SeverityCritical: 10.0,
@@ -433,37 +433,37 @@ func (e *Engine) calculateScore(result *AnalysisResult) float64 {
 		SeverityLow:      1.0,
 		SeverityInfo:     0.5,
 	}
-	
+
 	totalWeight := 0.0
 	for _, issue := range result.Issues {
 		totalWeight += weights[issue.Severity]
 	}
-	
+
 	// Calculate score (100 - weighted issues, min 0)
 	score := 100.0 - totalWeight
 	if score < 0 {
 		score = 0
 	}
-	
+
 	return score
 }
 
 // generateARFTriggers generates ARF triggers from issues
 func (e *Engine) generateARFTriggers(result *AnalysisResult) []ARFTrigger {
 	triggers := []ARFTrigger{}
-	
+
 	for _, issue := range result.Issues {
 		if !issue.ARFCompatible {
 			continue
 		}
-		
+
 		// Check if analyzer can provide ARF recipes
 		for lang, langResult := range result.LanguageResults {
 			analyzer, err := e.GetAnalyzer(lang)
 			if err != nil {
 				continue
 			}
-			
+
 			// Check if this issue belongs to this language
 			found := false
 			for _, langIssue := range langResult.Issues {
@@ -472,11 +472,11 @@ func (e *Engine) generateARFTriggers(result *AnalysisResult) []ARFTrigger {
 					break
 				}
 			}
-			
+
 			if !found {
 				continue
 			}
-			
+
 			// Get ARF recipes for this issue
 			recipes := analyzer.GetARFRecipes(issue)
 			for _, recipe := range recipes {
@@ -490,7 +490,7 @@ func (e *Engine) generateARFTriggers(result *AnalysisResult) []ARFTrigger {
 			}
 		}
 	}
-	
+
 	return triggers
 }
 
@@ -527,4 +527,3 @@ func (e *Engine) sortIssues(issues []Issue) {
 		return issues[i].Line < issues[j].Line
 	})
 }
-
