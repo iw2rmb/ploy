@@ -79,6 +79,13 @@ func (c *TransflowConfig) Validate() error {
 		}
 	}
 	
+	// Validate build timeout if provided
+	if c.BuildTimeout != "" {
+		if _, err := c.ParseBuildTimeout(); err != nil {
+			return fmt.Errorf("invalid build_timeout: %w", err)
+		}
+	}
+	
 	return nil
 }
 

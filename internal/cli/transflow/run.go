@@ -75,14 +75,15 @@ func runTransflow(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("transflow run", flag.ContinueOnError)
 	file := fs.String("f", "", "transflow YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
-    dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
-    renderPlanner := fs.Bool("render-planner", false, "render planner inputs and HCL (no submission)")
-    submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set TRANSFLOW_SUBMIT=1 to submit.")
-    submitReducer := fs.Bool("reduce", false, "render and (optionally) submit reducer job; prints next actions. Set TRANSFLOW_SUBMIT=1 to submit.")
-    execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
-    execLLM := fs.Bool("exec-llm-first", false, "render and optionally submit llm-exec job for the first plan option of type llm-exec")
-    execORW := fs.Bool("exec-orw-first", false, "render and optionally submit orw-apply job for the first plan option of type orw-gen (requires recipe envs)")
-    applyFirst := fs.Bool("apply-first", false, "after fetching diff (TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
+	dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
+	testMode := fs.Bool("test-mode", false, "use mock implementations for testing (no real builds/pushes)")
+	renderPlanner := fs.Bool("render-planner", false, "render planner inputs and HCL (no submission)")
+	submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set TRANSFLOW_SUBMIT=1 to submit.")
+	submitReducer := fs.Bool("reduce", false, "render and (optionally) submit reducer job; prints next actions. Set TRANSFLOW_SUBMIT=1 to submit.")
+	execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
+	execLLM := fs.Bool("exec-llm-first", false, "render and optionally submit llm-exec job for the first plan option of type llm-exec")
+	execORW := fs.Bool("exec-orw-first", false, "render and optionally submit orw-apply job for the first plan option of type orw-gen (requires recipe envs)")
+	applyFirst := fs.Bool("apply-first", false, "after fetching diff (TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
 	verbose := fs.Bool("v", false, "verbose output")
 
 	if err := fs.Parse(args); err != nil {
@@ -103,10 +104,10 @@ func runTransflow(args []string, controllerURL string) error {
 		fmt.Printf("Loaded transflow config: %s\n", config.ID)
 	}
 
-    if *dryRun {
-        fmt.Println("Configuration is valid")
-        return nil
-    }
+	if *dryRun {
+		fmt.Println("Configuration is valid")
+		return nil
+	}
 
 	// Create working directory
 	var workspaceDir string
@@ -127,12 +128,12 @@ func runTransflow(args []string, controllerURL string) error {
 		fmt.Printf("Using workspace: %s\n", workspaceDir)
 	}
 
-    // Create integrations and runner
-    integrations := NewTransflowIntegrations(controllerURL, workspaceDir)
-    runner, err := integrations.CreateConfiguredRunner(config)
-    if err != nil {
-        return fmt.Errorf("failed to create runner: %w", err)
-    }
+	// Create integrations and runner
+	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, workspaceDir, *testMode)
+	runner, err := integrations.CreateConfiguredRunner(config)
+	if err != nil {
+		return fmt.Errorf("failed to create runner: %w", err)
+	}
 
     if *renderPlanner {
         // Prepare minimal planner inputs/HCL without submitting

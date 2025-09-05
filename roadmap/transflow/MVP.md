@@ -8,8 +8,11 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - OpenRewrite recipe execution with ARF integration
 - Build check via `/v1/apps/:app/builds` (sandbox mode, no deploy)
 - YAML configuration parsing and validation
-- Git operations (clone, branch, commit)
+- Git operations (clone, branch, commit, push)
 - Diff validation and application utilities
+- GitLab MR integration with environment variable configuration
+- Complete CLI integration (`ploy transflow run`) with full end-to-end workflow
+- Test mode infrastructure with mock implementations for CI/testing
 
 ⚠️ **Partially Implemented:**
 - LangGraph healing (planner/reducer infrastructure exists, orchestration in progress)
@@ -17,9 +20,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - Job templates for healing branches (human-step, llm-exec, orw-generated)
 
 ❌ **Not Implemented:**
-- GitLab MR integration
 - Model registry in `ployman` CLI
-- Complete CLI integration (`ploy transflow run`)
 - KB (knowledge base) read/write for learning
 
 ### In-Scope (Must Work)
