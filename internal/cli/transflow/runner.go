@@ -118,11 +118,11 @@ func (r *TransflowResult) Summary() string {
 
 // TransflowRunner orchestrates the execution of transflow steps
 type TransflowRunner struct {
-	config         *TransflowConfig
-	workspaceDir   string
-	gitOps         GitOperationsInterface
-	recipeExecutor RecipeExecutorInterface
-	buildChecker   BuildCheckerInterface
+    config         *TransflowConfig
+    workspaceDir   string
+    gitOps         GitOperationsInterface
+    recipeExecutor RecipeExecutorInterface
+    buildChecker   BuildCheckerInterface
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -149,7 +149,50 @@ func (r *TransflowRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
 
 // SetBuildChecker sets the build checker implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
-	r.buildChecker = checker
+    r.buildChecker = checker
+}
+
+// PlannerAssets holds file paths for rendered planner inputs and HCL
+type PlannerAssets struct {
+    InputsPath string
+    HCLPath    string
+}
+
+// RenderPlannerAssets writes minimal inputs.json and a rendered planner.hcl (with placeholders) into the workspace.
+// This is a dry-run helper to prepare artifacts for planner submission later.
+func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
+    inputsDir := filepath.Join(r.workspaceDir, "planner", "context")
+    outDir := filepath.Join(r.workspaceDir, "planner", "out")
+    if err := os.MkdirAll(inputsDir, 0755); err != nil {
+        return nil, err
+    }
+    if err := os.MkdirAll(outDir, 0755); err != nil {
+        return nil, err
+    }
+    // Minimal inputs.json
+    inputsPath := filepath.Join(inputsDir, "inputs.json")
+    inputs := fmt.Sprintf(`{
+  "language": "java",
+  "lane": %q,
+  "last_error": {"stdout": "", "stderr": ""},
+  "deps": {}
+}
+`, r.config.Lane)
+    if err := os.WriteFile(inputsPath, []byte(inputs), 0644); err != nil {
+        return nil, err
+    }
+    // Render HCL by copying the template path and leaving placeholders for envs
+    // Use the roadmap template as a source; in production this should come from a packaged template
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
+    }
+    hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
+    if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
+        return nil, err
+    }
+    return &PlannerAssets{InputsPath: inputsPath, HCLPath: hclPath}, nil
 }
 
 // Run executes the complete transflow workflow

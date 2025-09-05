@@ -32,7 +32,8 @@ func runTransflow(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("transflow run", flag.ContinueOnError)
 	file := fs.String("f", "", "transflow YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
-	dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
+    dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
+    renderPlanner := fs.Bool("render-planner", false, "render planner inputs and HCL (no submission)")
 	verbose := fs.Bool("v", false, "verbose output")
 
 	if err := fs.Parse(args); err != nil {
@@ -53,10 +54,10 @@ func runTransflow(args []string, controllerURL string) error {
 		fmt.Printf("Loaded transflow config: %s\n", config.ID)
 	}
 
-	if *dryRun {
-		fmt.Println("Configuration is valid")
-		return nil
-	}
+    if *dryRun {
+        fmt.Println("Configuration is valid")
+        return nil
+    }
 
 	// Create working directory
 	var workspaceDir string
@@ -77,12 +78,22 @@ func runTransflow(args []string, controllerURL string) error {
 		fmt.Printf("Using workspace: %s\n", workspaceDir)
 	}
 
-	// Create integrations and runner
-	integrations := NewTransflowIntegrations(controllerURL, workspaceDir)
-	runner, err := integrations.CreateConfiguredRunner(config)
-	if err != nil {
-		return fmt.Errorf("failed to create runner: %w", err)
-	}
+    // Create integrations and runner
+    integrations := NewTransflowIntegrations(controllerURL, workspaceDir)
+    runner, err := integrations.CreateConfiguredRunner(config)
+    if err != nil {
+        return fmt.Errorf("failed to create runner: %w", err)
+    }
+
+    if *renderPlanner {
+        // Prepare minimal planner inputs/HCL without submitting
+        assets, err := runner.RenderPlannerAssets()
+        if err != nil {
+            return fmt.Errorf("failed to render planner assets: %w", err)
+        }
+        fmt.Printf("Planner assets rendered:\n  inputs: %s\n  hcl:    %s\n", assets.InputsPath, assets.HCLPath)
+        return nil
+    }
 
 	// Execute the transflow
 	ctx := context.Background()
