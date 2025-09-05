@@ -1,12 +1,14 @@
 # Orchestration Module CLAUDE.md
 
 ## Purpose
-Provides orchestration primitives including Consul KV operations, health monitoring, Nomad job rendering and submission for distributed system coordination.
+Provides orchestration primitives including Consul KV operations, health monitoring, Nomad job rendering and submission for distributed system coordination and Knowledge Base maintenance job scheduling.
 
 ## Narrative Summary
 The orchestration module provides essential infrastructure services for distributed coordination and job management. It centers around minimal but effective abstractions for key-value storage via Consul, health monitoring with configurable checks, and Nomad job template rendering and submission workflows.
 
-Core functionality includes the KV interface for distributed configuration and locking, health monitoring with both direct Consul health checks and SDK-based monitoring, and comprehensive Nomad job management with template rendering and submission workflows. The module emphasizes simplicity and reliability for production orchestration needs, with specialized capabilities for transflow healing workflows.
+Core functionality includes the KV interface for distributed configuration and locking, health monitoring with both direct Consul health checks and SDK-based monitoring, and comprehensive Nomad job management with template rendering and submission workflows. The module emphasizes simplicity and reliability for production orchestration needs, with specialized capabilities for transflow healing workflows and Knowledge Base maintenance job scheduling.
+
+**KB Maintenance Integration**: The orchestration layer provides critical support for the transflow Knowledge Base deduplication system through Consul-based distributed locking for concurrent KB access and Nomad job submission for automated maintenance tasks including storage compaction, summary rebuilding, and performance monitoring.
 
 ## Key Files
 - `kv.go:10-16` - KV interface for Consul key-value operations
@@ -40,6 +42,8 @@ Core functionality includes the KV interface for distributed configuration and l
 - Job Management: Nomad job rendering, submission, and monitoring
 - Template Rendering: Dynamic job configuration with variable substitution
 - Terminal Monitoring: Batch job completion detection for transflow healing workflows
+- KB Maintenance Jobs: Scheduled Nomad job submission for Knowledge Base deduplication tasks
+- Distributed Locking: Consul-based coordination for concurrent KB operations
 - Monitoring SDK: Pluggable monitoring implementations
 
 ## Configuration
@@ -60,6 +64,7 @@ Environment variables:
 - Terminal state detection for batch job workflows (transflow healing)
 
 ## Related Documentation
-- `../cli/transflow/CLAUDE.md` - Transflow KB locking integration
+- `../cli/transflow/CLAUDE.md` - Transflow KB persistence, deduplication, and maintenance job integration
+- `../storage/CLAUDE.md` - Storage backend for KB deduplication operations
 - `../../platform/nomad/` - Nomad cluster configuration and deployment
 - `../../platform/consul/` - Consul cluster setup and configuration

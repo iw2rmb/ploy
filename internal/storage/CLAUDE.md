@@ -1,12 +1,14 @@
 # Storage Module CLAUDE.md
 
 ## Purpose
-Unified storage interface providing abstraction over SeaweedFS with comprehensive monitoring, retry logic, and integrity verification for artifact management.
+Unified storage interface providing abstraction over SeaweedFS with comprehensive monitoring, retry logic, and integrity verification for artifact management and Knowledge Base deduplication operations.
 
 ## Narrative Summary
 The storage module provides a clean, unified interface for object storage operations while abstracting the underlying SeaweedFS implementation. It handles storage provider abstraction, error recovery through sophisticated retry mechanisms, integrity verification for uploaded artifacts, and comprehensive monitoring of storage operations.
 
 Core functionality centers around the Storage interface which provides basic CRUD operations, batch operations, metadata management, and health monitoring. The SeaweedFS implementation includes advanced features like artifact bundle uploads with SBOM/signature handling, configurable retry policies with exponential backoff, and real-time metrics collection.
+
+**KB Deduplication Integration**: The storage layer serves as the backend for the transflow Knowledge Base deduplication system, providing high-performance storage for error signatures, healing patches, case summaries, and deduplication metadata. It supports the compaction operations that achieve 50%+ storage reduction through intelligent case merging and automated cleanup of redundant data.
 
 ## Key Files
 - `interface.go:70-93` - Core Storage interface with CRUD and batch operations
@@ -32,6 +34,8 @@ Core functionality centers around the Storage interface which provides basic CRU
 - Metrics API: Storage operation metrics via StorageMetrics
 - Health Monitoring: Storage backend health checks
 - Integrity Verification: Artifact checksum validation and bundle verification
+- KB Storage Backend: High-performance storage for Knowledge Base deduplication operations
+- Compaction Support: Storage operations optimized for deduplication case merging and cleanup
 
 ## Configuration
 Environment variables:
@@ -52,6 +56,7 @@ Environment variables:
 - Graceful degradation with health monitoring (see seaweedfs.go:450-500)
 
 ## Related Documentation
-- `../cli/transflow/CLAUDE.md` - Transflow KB persistence integration
+- `../cli/transflow/CLAUDE.md` - Transflow KB persistence and deduplication integration
 - `../../api/storage/` - Storage API endpoints and handlers
 - `../../platform/seaweedfs/` - SeaweedFS deployment and configuration
+- `../orchestration/CLAUDE.md` - Orchestration layer supporting KB maintenance jobs

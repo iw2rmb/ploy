@@ -1,6 +1,7 @@
 package transflow
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"regexp"
@@ -12,6 +13,51 @@ import (
 type SignatureGenerator interface {
 	GenerateSignature(lang, compiler string, stdout, stderr []byte) string
 	NormalizePatch(patch []byte) ([]byte, string) // returns normalized patch and fingerprint
+}
+
+// EnhancedSignatureGenerator extends SignatureGenerator with similarity detection capabilities
+type EnhancedSignatureGenerator interface {
+	SignatureGenerator
+
+	// Similarity detection for error signatures
+	ComputeSignatureSimilarity(sig1, sig2 string, lang, compiler string) float64
+	FindSimilarSignatures(targetSig string, candidateSigs []string, lang, compiler string, threshold float64) []SimilarSignature
+
+	// Enhanced patch similarity
+	ComputePatchSimilarity(patch1, patch2 []byte) float64
+	FindSimilarPatches(targetFingerprint string, candidateFingerprints []string, patches map[string][]byte, threshold float64) []SimilarPatch
+}
+
+// SimilarSignature represents a signature with similarity score
+type SimilarSignature struct {
+	Signature  string  `json:"signature"`
+	Similarity float64 `json:"similarity"`
+	Language   string  `json:"language"`
+	Compiler   string  `json:"compiler"`
+}
+
+// SimilarPatch represents a patch with similarity score
+type SimilarPatch struct {
+	Fingerprint string  `json:"fingerprint"`
+	Similarity  float64 `json:"similarity"`
+	PatchSize   int     `json:"patch_size"`
+}
+
+// DeduplicationConfig contains configuration for deduplication algorithms
+type DeduplicationConfig struct {
+	// Error signature similarity thresholds
+	ErrorSimilarityThreshold   float64 `json:"error_similarity_threshold"`   // 0.8
+	PatchSimilarityThreshold   float64 `json:"patch_similarity_threshold"`   // 0.85
+	ContextSimilarityThreshold float64 `json:"context_similarity_threshold"` // 0.9
+
+	// Similarity algorithm weights
+	LexicalSimilarityWeight    float64 `json:"lexical_similarity_weight"`    // 0.4
+	StructuralSimilarityWeight float64 `json:"structural_similarity_weight"` // 0.3
+	SemanticSimilarityWeight   float64 `json:"semantic_similarity_weight"`   // 0.3
+
+	// Performance limits
+	MaxCandidatesForSimilarity int `json:"max_candidates_for_similarity"` // 1000
+	MaxSimilarResults          int `json:"max_similar_results"`           // 50
 }
 
 // DefaultSignatureGenerator implements SignatureGenerator with content-addressed normalization
@@ -329,4 +375,336 @@ func ValidateSignature(signature string) bool {
 	}
 
 	return true
+}
+
+// DefaultEnhancedSignatureGenerator implements both basic and enhanced signature generation
+type DefaultEnhancedSignatureGenerator struct {
+	*DefaultSignatureGenerator
+	config *DeduplicationConfig
+}
+
+// NewEnhancedSignatureGenerator creates a new enhanced signature generator
+func NewEnhancedSignatureGenerator(config *DeduplicationConfig) *DefaultEnhancedSignatureGenerator {
+	if config == nil {
+		config = DefaultDeduplicationConfig()
+	}
+
+	return &DefaultEnhancedSignatureGenerator{
+		DefaultSignatureGenerator: NewDefaultSignatureGenerator(),
+		config:                    config,
+	}
+}
+
+// DefaultDeduplicationConfig returns reasonable defaults for deduplication
+func DefaultDeduplicationConfig() *DeduplicationConfig {
+	return &DeduplicationConfig{
+		ErrorSimilarityThreshold:   0.8,
+		PatchSimilarityThreshold:   0.85,
+		ContextSimilarityThreshold: 0.9,
+		LexicalSimilarityWeight:    0.4,
+		StructuralSimilarityWeight: 0.3,
+		SemanticSimilarityWeight:   0.3,
+		MaxCandidatesForSimilarity: 1000,
+		MaxSimilarResults:          50,
+	}
+}
+
+// ComputeSignatureSimilarity calculates similarity between two error signatures
+func (esg *DefaultEnhancedSignatureGenerator) ComputeSignatureSimilarity(sig1, sig2 string, lang, compiler string) float64 {
+	if sig1 == sig2 {
+		return 1.0
+	}
+
+	// Reconstruct normalized error text from stored signatures for comparison
+	// Since signatures are hashes, we can't reverse them, so this would need to work
+	// with the original error text. For now, we'll implement based on signature patterns.
+
+	// Simple Hamming distance for hex signatures as a baseline
+	return esg.computeHammingSimilarity(sig1, sig2)
+}
+
+// computeHammingSimilarity computes similarity based on Hamming distance of hex signatures
+func (esg *DefaultEnhancedSignatureGenerator) computeHammingSimilarity(sig1, sig2 string) float64 {
+	if len(sig1) != len(sig2) {
+		return 0.0
+	}
+
+	matches := 0
+	for i := 0; i < len(sig1); i++ {
+		if sig1[i] == sig2[i] {
+			matches++
+		}
+	}
+
+	return float64(matches) / float64(len(sig1))
+}
+
+// FindSimilarSignatures finds signatures similar to the target
+func (esg *DefaultEnhancedSignatureGenerator) FindSimilarSignatures(targetSig string, candidateSigs []string, lang, compiler string, threshold float64) []SimilarSignature {
+	var results []SimilarSignature
+
+	for _, candidateSig := range candidateSigs {
+		if len(results) >= esg.config.MaxSimilarResults {
+			break
+		}
+
+		similarity := esg.ComputeSignatureSimilarity(targetSig, candidateSig, lang, compiler)
+		if similarity >= threshold && candidateSig != targetSig {
+			results = append(results, SimilarSignature{
+				Signature:  candidateSig,
+				Similarity: similarity,
+				Language:   lang,
+				Compiler:   compiler,
+			})
+		}
+	}
+
+	// Sort by similarity descending
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	return results
+}
+
+// ComputePatchSimilarity calculates similarity between two patches
+func (esg *DefaultEnhancedSignatureGenerator) ComputePatchSimilarity(patch1, patch2 []byte) float64 {
+	if bytes.Equal(patch1, patch2) {
+		return 1.0
+	}
+
+	// Normalize both patches first
+	norm1, _ := esg.NormalizePatch(patch1)
+	norm2, _ := esg.NormalizePatch(patch2)
+
+	if bytes.Equal(norm1, norm2) {
+		return 1.0
+	}
+
+	// Compute similarity based on multiple factors
+	lexicalSim := esg.computeLexicalSimilarity(norm1, norm2)
+	structuralSim := esg.computeStructuralSimilarity(norm1, norm2)
+	semanticSim := esg.computeSemanticSimilarity(norm1, norm2)
+
+	// Weighted combination
+	totalSim := esg.config.LexicalSimilarityWeight*lexicalSim +
+		esg.config.StructuralSimilarityWeight*structuralSim +
+		esg.config.SemanticSimilarityWeight*semanticSim
+
+	return totalSim
+}
+
+// computeLexicalSimilarity uses Levenshtein-based similarity
+func (esg *DefaultEnhancedSignatureGenerator) computeLexicalSimilarity(patch1, patch2 []byte) float64 {
+	s1, s2 := string(patch1), string(patch2)
+
+	// Simple implementation using longest common subsequence ratio
+	lcs := esg.longestCommonSubsequence(s1, s2)
+	maxLen := len(s1)
+	if len(s2) > maxLen {
+		maxLen = len(s2)
+	}
+
+	if maxLen == 0 {
+		return 1.0
+	}
+
+	return float64(lcs) / float64(maxLen)
+}
+
+// computeStructuralSimilarity analyzes diff structure patterns
+func (esg *DefaultEnhancedSignatureGenerator) computeStructuralSimilarity(patch1, patch2 []byte) float64 {
+	lines1 := strings.Split(string(patch1), "\n")
+	lines2 := strings.Split(string(patch2), "\n")
+
+	// Count additions, deletions, and context lines
+	struct1 := esg.analyzePatchStructure(lines1)
+	struct2 := esg.analyzePatchStructure(lines2)
+
+	// Compare structural patterns
+	addSim := 1.0 - float64(abs(struct1.additions-struct2.additions))/float64(max(struct1.additions, struct2.additions, 1))
+	delSim := 1.0 - float64(abs(struct1.deletions-struct2.deletions))/float64(max(struct1.deletions, struct2.deletions, 1))
+	ctxSim := 1.0 - float64(abs(struct1.context-struct2.context))/float64(max(struct1.context, struct2.context, 1))
+
+	return (addSim + delSim + ctxSim) / 3.0
+}
+
+// computeSemanticSimilarity analyzes the semantic content of changes
+func (esg *DefaultEnhancedSignatureGenerator) computeSemanticSimilarity(patch1, patch2 []byte) float64 {
+	// Extract added/modified code tokens from patches
+	tokens1 := esg.extractChangeTokens(patch1)
+	tokens2 := esg.extractChangeTokens(patch2)
+
+	// Compute token overlap
+	return esg.computeTokenOverlap(tokens1, tokens2)
+}
+
+// patchStructure represents the structure of a patch
+type patchStructure struct {
+	additions int
+	deletions int
+	context   int
+}
+
+// analyzePatchStructure extracts structural information from patch lines
+func (esg *DefaultEnhancedSignatureGenerator) analyzePatchStructure(lines []string) patchStructure {
+	var struct_ patchStructure
+
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+
+		switch line[0] {
+		case '+':
+			struct_.additions++
+		case '-':
+			struct_.deletions++
+		case ' ':
+			struct_.context++
+		}
+	}
+
+	return struct_
+}
+
+// extractChangeTokens extracts meaningful tokens from patch changes
+func (esg *DefaultEnhancedSignatureGenerator) extractChangeTokens(patch []byte) []string {
+	lines := strings.Split(string(patch), "\n")
+	var tokens []string
+
+	// Simple tokenization of added/removed lines
+	tokenPattern := regexp.MustCompile(`\b\w+\b`)
+
+	for _, line := range lines {
+		if len(line) > 0 && (line[0] == '+' || line[0] == '-') {
+			content := line[1:] // Remove +/- prefix
+			lineTokens := tokenPattern.FindAllString(content, -1)
+			tokens = append(tokens, lineTokens...)
+		}
+	}
+
+	return tokens
+}
+
+// computeTokenOverlap computes overlap between two token sets
+func (esg *DefaultEnhancedSignatureGenerator) computeTokenOverlap(tokens1, tokens2 []string) float64 {
+	if len(tokens1) == 0 && len(tokens2) == 0 {
+		return 1.0
+	}
+
+	set1 := make(map[string]bool)
+	for _, token := range tokens1 {
+		set1[token] = true
+	}
+
+	set2 := make(map[string]bool)
+	for _, token := range tokens2 {
+		set2[token] = true
+	}
+
+	// Compute Jaccard similarity
+	intersection := 0
+	for token := range set1 {
+		if set2[token] {
+			intersection++
+		}
+	}
+
+	union := len(set1) + len(set2) - intersection
+	if union == 0 {
+		return 1.0
+	}
+
+	return float64(intersection) / float64(union)
+}
+
+// FindSimilarPatches finds patches similar to the target
+func (esg *DefaultEnhancedSignatureGenerator) FindSimilarPatches(targetFingerprint string, candidateFingerprints []string, patches map[string][]byte, threshold float64) []SimilarPatch {
+	targetPatch, exists := patches[targetFingerprint]
+	if !exists {
+		return nil
+	}
+
+	var results []SimilarPatch
+
+	for _, candidateFingerprint := range candidateFingerprints {
+		if len(results) >= esg.config.MaxSimilarResults {
+			break
+		}
+
+		if candidateFingerprint == targetFingerprint {
+			continue
+		}
+
+		candidatePatch, exists := patches[candidateFingerprint]
+		if !exists {
+			continue
+		}
+
+		similarity := esg.ComputePatchSimilarity(targetPatch, candidatePatch)
+		if similarity >= threshold {
+			results = append(results, SimilarPatch{
+				Fingerprint: candidateFingerprint,
+				Similarity:  similarity,
+				PatchSize:   len(candidatePatch),
+			})
+		}
+	}
+
+	// Sort by similarity descending
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	return results
+}
+
+// Helper functions
+
+func (esg *DefaultEnhancedSignatureGenerator) longestCommonSubsequence(s1, s2 string) int {
+	m, n := len(s1), len(s2)
+	if m == 0 || n == 0 {
+		return 0
+	}
+
+	// Dynamic programming approach
+	dp := make([][]int, m+1)
+	for i := range dp {
+		dp[i] = make([]int, n+1)
+	}
+
+	for i := 1; i <= m; i++ {
+		for j := 1; j <= n; j++ {
+			if s1[i-1] == s2[j-1] {
+				dp[i][j] = dp[i-1][j-1] + 1
+			} else {
+				if dp[i-1][j] > dp[i][j-1] {
+					dp[i][j] = dp[i-1][j]
+				} else {
+					dp[i][j] = dp[i][j-1]
+				}
+			}
+		}
+	}
+
+	return dp[m][n]
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func max(a, b, c int) int {
+	result := a
+	if b > result {
+		result = b
+	}
+	if c > result {
+		result = c
+	}
+	return result
 }
