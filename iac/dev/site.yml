@@ -26,6 +26,7 @@
 - import_playbook: playbooks/docker-registry.yml
 - import_playbook: playbooks/openrewrite-jvm.yml
 - import_playbook: playbooks/api.yml
+- import_playbook: playbooks/gitlab-token.yml
 - import_playbook: playbooks/freebsd.yml
 - import_playbook: playbooks/testing.yml
 - import_playbook: playbooks/validation.yml
