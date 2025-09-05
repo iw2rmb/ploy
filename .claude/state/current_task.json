@@ -1,6 +1,1 @@
-{
-  "task": "m-implement-complete-healing-branch-types",
-  "branch": "feature/implement-complete-healing-branch-types",
-  "services": ["internal/cli/transflow", "roadmap/transflow", "tests"],
-  "updated": "2025-09-05"
-}
+{"task":"m-implement-mcp-integration-llm-exec","branch":"feature/mcp-llm-exec-integration","services":["transflow","llm-exec","mcp-infrastructure"],"updated":"2025-09-05"}
