@@ -7,6 +7,7 @@ import (
 
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/git/provider"
 )
 
 // ARFGitOperations wraps the existing ARF Git operations
@@ -113,6 +114,11 @@ func (i *TransflowIntegrations) CreateBuildChecker() BuildCheckerInterface {
 	return NewSharedPushBuildChecker(i.ControllerURL)
 }
 
+// CreateGitProvider creates a Git provider implementation for MR operations
+func (i *TransflowIntegrations) CreateGitProvider() provider.GitProvider {
+	return provider.NewGitLabProvider()
+}
+
 // CreateConfiguredRunner creates a fully configured TransflowRunner with real integrations
 func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) (*TransflowRunner, error) {
 	runner, err := NewTransflowRunner(config, i.WorkDir)
@@ -124,6 +130,7 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	runner.SetGitOperations(i.CreateGitOperations())
 	runner.SetRecipeExecutor(i.CreateRecipeExecutor())
 	runner.SetBuildChecker(i.CreateBuildChecker())
+	runner.SetGitProvider(i.CreateGitProvider())
 
 	return runner, nil
 }

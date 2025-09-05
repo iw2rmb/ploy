@@ -2,6 +2,26 @@
 
 Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, heal build errors via LangGraph planner/reducer jobs with parallel options, and open a GitLab MR.
 
+## Implementation Status
+
+✅ **Fully Implemented:**
+- OpenRewrite recipe execution with ARF integration
+- Build check via `/v1/apps/:app/builds` (sandbox mode, no deploy)
+- YAML configuration parsing and validation
+- Git operations (clone, branch, commit)
+- Diff validation and application utilities
+
+⚠️ **Partially Implemented:**
+- LangGraph healing (planner/reducer infrastructure exists, orchestration in progress)
+- Self-healing config parsing and data structures
+- Job templates for healing branches (human-step, llm-exec, orw-generated)
+
+❌ **Not Implemented:**
+- GitLab MR integration
+- Model registry in `ployman` CLI
+- Complete CLI integration (`ploy transflow run`)
+- KB (knowledge base) read/write for learning
+
 ### In-Scope (Must Work)
 
 - OpenRewrite recipe execution

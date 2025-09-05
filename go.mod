@@ -14,12 +14,13 @@ require (
 	github.com/hashicorp/nomad/api v0.0.0-20250820214743-694e0ac2e3e4
 	github.com/hashicorp/vault/api v1.20.0
 	github.com/jackc/pgx/v5 v5.6.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.2
 	github.com/prometheus/client_golang v1.23.0
 	github.com/prometheus/client_model v0.6.2
-	github.com/sirupsen/logrus v1.9.3
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	github.com/tetratelabs/wazero v1.5.0
 	go.opentelemetry.io/otel v1.37.0
@@ -79,7 +80,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/miekg/dns v1.1.67 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
