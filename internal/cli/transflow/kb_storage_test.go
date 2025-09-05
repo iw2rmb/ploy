@@ -202,7 +202,6 @@ func TestSeaweedFSKBStorage_ReadCases(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test data
-	caseRecord := createTestCaseRecord()
 	caseJSON := `{
 		"run_id": "test-run-123",
 		"timestamp": "2023-12-01T10:00:00Z",
