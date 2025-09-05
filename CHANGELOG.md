@@ -14,6 +14,7 @@
 - CLI: `ploy transflow run --render-planner` renders planner inputs and HCL (dry-run) into the workspace to prepare for planner submission.
 - CLI: `ploy transflow run --plan` renders planner assets, substitutes env placeholders (MODEL, TOOLS, LIMITS, RUN_ID), and optionally submits the planner job when `TRANSFLOW_SUBMIT=1`.
 - CLI: after planner submission, attempts to read `plan.json` (from `TRANSFLOW_PLAN_PATH` or workspace out dir), performs minimal validation, and prints option IDs/types.
+- CLI: supports `TRANSFLOW_PLAN_URL` to fetch plan.json via HTTP; supports `TRANSFLOW_NEXT_URL`/`TRANSFLOW_NEXT_PATH` to print reducer next actions. Adds `--execute-first` stub to indicate the first plan option that would run (sequential).
 
 ### Changed
 - internal/cli/common/deploy.go: DeployConfig now includes Timeout; SharedPush honors per-call timeout.
