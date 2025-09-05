@@ -123,6 +123,7 @@ type TransflowRunner struct {
     gitOps         GitOperationsInterface
     recipeExecutor RecipeExecutorInterface
     buildChecker   BuildCheckerInterface
+    jobSubmitter   interface{} // For healing workflows
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -152,6 +153,11 @@ func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
     r.buildChecker = checker
 }
 
+// SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
+func (r *TransflowRunner) SetJobSubmitter(submitter interface{}) {
+    r.jobSubmitter = submitter
+}
+
 // PlannerAssets holds file paths for rendered planner inputs and HCL
 type PlannerAssets struct {
     InputsPath string
@@ -176,6 +182,25 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
   "lane": %q,
   "last_error": {"stdout": "", "stderr": ""},
   "deps": {}
+}`, r.config.Lane)
+    
+    if err := os.WriteFile(inputsPath, []byte(inputs), 0644); err != nil {
+        return nil, err
+    }
+    
+    // Copy HCL template
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
+    }
+    
+    hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
+    if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
+        return nil, err
+    }
+    
+    return &PlannerAssets{InputsPath: inputsPath, HCLPath: hclPath}, nil
 }
 
 // RenderLLMExecAssets writes a rendered llm_exec.hcl for the given option ID.
@@ -218,6 +243,10 @@ func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, erro
 
 // ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
 func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
+    // Validate paths first (allowlist)
+    allow := []string{"src/**", "pom.xml"}
+    if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" { allow = strings.Split(v, ",") }
+    if err := ValidateDiffPaths(diffPath, allow); err != nil { return err }
     if err := ValidateUnifiedDiff(ctx, repoPath, diffPath); err != nil {
         return err
     }
@@ -231,7 +260,12 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
     timeout, err := r.config.ParseBuildTimeout()
     if err != nil { return err }
     appName := GenerateAppName(r.config.ID)
-    buildCfg := common.DeployConfig{ App: appName, Lane: r.config.Lane, Environment: "dev", Timeout: timeout }
+    buildCfg := common.DeployConfig{
+        App:         appName,
+        Lane:        r.config.Lane,
+        Environment: "dev",
+        Timeout:     timeout,
+    }
     res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
     if err != nil { return fmt.Errorf("build gate failed: %w", err) }
     if res != nil && !res.Success { return fmt.Errorf("build gate failed: %s", res.Message) }
@@ -246,40 +280,31 @@ type ReducerAssets struct {
 
 // RenderReducerAssets writes a minimal history.json and a rendered reducer.hcl (with placeholders) into the workspace.
 func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
-    ctxDir := filepath.Join(r.workspaceDir, "reducer", "context")
-    if err := os.MkdirAll(ctxDir, 0755); err != nil { return nil, err }
-    // Minimal history.json
-    historyPath := filepath.Join(ctxDir, "history.json")
-    history := `{
-  "plan_id": "",
-  "branches": [],
-  "winner": ""
-}`
-    if err := os.WriteFile(historyPath, []byte(history), 0644); err != nil { return nil, err }
-    // Copy HCL template
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "reducer.hcl")
-    hclBytes, err := os.ReadFile(hclTemplate)
-    if err != nil { return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err) }
-    hclPath := filepath.Join(r.workspaceDir, "reducer", "reducer.hcl")
-    if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil { return nil, err }
-    return &ReducerAssets{HistoryPath: historyPath, HCLPath: hclPath}, nil
-}
-`, r.config.Lane)
-    if err := os.WriteFile(inputsPath, []byte(inputs), 0644); err != nil {
-        return nil, err
-    }
-    // Render HCL by copying the template path and leaving placeholders for envs
-    // Use the roadmap template as a source; in production this should come from a packaged template
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
-    hclBytes, err := os.ReadFile(hclTemplate)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
-    }
-    hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
-    if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
-        return nil, err
-    }
-    return &PlannerAssets{InputsPath: inputsPath, HCLPath: hclPath}, nil
+	ctxDir := filepath.Join(r.workspaceDir, "reducer", "context")
+	if err := os.MkdirAll(ctxDir, 0755); err != nil {
+		return nil, err
+	}
+	
+	// Minimal history.json
+	historyPath := filepath.Join(ctxDir, "history.json")
+	history := "{\n  \"plan_id\": \"\",\n  \"branches\": [],\n  \"winner\": \"\"\n}"
+	if err := os.WriteFile(historyPath, []byte(history), 0644); err != nil {
+		return nil, err
+	}
+	
+	// Copy HCL template
+	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "reducer.hcl")
+	hclBytes, err := os.ReadFile(hclTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err)
+	}
+	
+	hclPath := filepath.Join(r.workspaceDir, "reducer", "reducer.hcl")
+	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
+		return nil, err
+	}
+	
+	return &ReducerAssets{HistoryPath: historyPath, HCLPath: hclPath}, nil
 }
 
 // Run executes the complete transflow workflow
@@ -389,9 +414,34 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			Message:  message,
 			Duration: time.Since(buildStart),
 		})
-		result.ErrorMessage = "build check failed"
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("build check failed: %s", message)
+
+		// Check if self-healing is enabled
+		if r.config.SelfHeal != nil && r.config.SelfHeal.Enabled && r.jobSubmitter != nil {
+			// Attempt healing workflow
+			healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
+			result.HealingSummary = healingSummary
+			
+			if healingErr == nil && healingSummary.Winner != nil {
+				// Healing succeeded! Continue with the healed version
+				result.StepResults = append(result.StepResults, StepResult{
+					StepID:   "healing",
+					Success:  true,
+					Message:  fmt.Sprintf("Healing succeeded with plan %s", healingSummary.PlanID),
+					Duration: time.Since(buildStart),
+				})
+				// Continue with normal workflow (push, etc.)
+			} else {
+				// Healing also failed
+				result.ErrorMessage = "build check failed and healing failed"
+				result.Duration = time.Since(startTime)
+				return nil, fmt.Errorf("build check failed: %s (healing also failed: %v)", message, healingErr)
+			}
+		} else {
+			// No healing enabled, fail immediately
+			result.ErrorMessage = "build check failed"
+			result.Duration = time.Since(startTime)
+			return nil, fmt.Errorf("build check failed: %s", message)
+		}
 	}
 
 	if buildResult != nil {
@@ -425,6 +475,74 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	result.Success = true
 	result.Duration = time.Since(startTime)
 	return result, nil
+}
+
+// attemptHealing orchestrates the healing workflow: planner → fanout → reducer
+func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*TransflowHealingSummary, error) {
+	summary := &TransflowHealingSummary{
+		Enabled:       true,
+		AttemptsCount: 1,
+	}
+
+	// Step 1: Submit planner job to analyze the build error
+	jobHelper := NewJobSubmissionHelper(r.jobSubmitter)
+	planResult, err := jobHelper.SubmitPlannerJob(ctx, r.config, buildError, r.workspaceDir)
+	if err != nil {
+		return summary, fmt.Errorf("planner job failed: %w", err)
+	}
+	
+	summary.PlanID = planResult.PlanID
+
+	// Step 2: Convert planner options to branch specs
+	var branches []BranchSpec
+	for i, option := range planResult.Options {
+		branchID := fmt.Sprintf("option-%d", i)
+		if id, ok := option["id"].(string); ok {
+			branchID = id
+		}
+		
+		branchType := "llm-exec" // default
+		if t, ok := option["type"].(string); ok {
+			branchType = t
+		}
+
+		branches = append(branches, BranchSpec{
+			ID:     branchID,
+			Type:   branchType,
+			Inputs: option,
+		})
+	}
+
+	// Step 3: Execute fanout orchestration
+	orchestrator := NewFanoutOrchestrator(r.jobSubmitter)
+	maxParallel := 3 // Default parallelism
+	if r.config.SelfHeal.MaxRetries > 0 {
+		maxParallel = r.config.SelfHeal.MaxRetries
+	}
+
+	winner, allResults, err := orchestrator.RunHealingFanout(ctx, nil, branches, maxParallel)
+	summary.AllResults = allResults
+	
+	if err != nil {
+		// Fanout failed, but continue to reducer anyway
+		summary.Winner = nil
+	} else {
+		summary.Winner = &winner
+	}
+
+	// Step 4: Submit reducer job to determine next action
+	nextAction, reducerErr := jobHelper.SubmitReducerJob(ctx, planResult.PlanID, allResults, summary.Winner, r.workspaceDir)
+	if reducerErr != nil {
+		return summary, fmt.Errorf("reducer job failed: %w", reducerErr)
+	}
+
+	// If reducer says to stop and we have a winner, healing succeeded
+	if nextAction.Action == "stop" && summary.Winner != nil {
+		return summary, nil
+	}
+
+	// Otherwise, healing failed
+	return summary, fmt.Errorf("healing failed: %s", nextAction.Notes)
 }
 
 // CleanupWorkspace removes the temporary workspace directory
