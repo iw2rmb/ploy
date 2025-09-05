@@ -26,7 +26,7 @@ func TestExtractSourceRepository(t *testing.T) {
 			setupFiles: func() string {
 				dir := filepath.Join(tmpDir, "obj-repo")
 				os.MkdirAll(dir, 0755)
-				
+
 				packageJSON := map[string]interface{}{
 					"name": "test-app",
 					"repository": map[string]interface{}{
@@ -34,10 +34,10 @@ func TestExtractSourceRepository(t *testing.T) {
 						"url":  "https://github.com/user/repo.git",
 					},
 				}
-				
+
 				data, _ := json.Marshal(packageJSON)
 				os.WriteFile(filepath.Join(dir, "package.json"), data, 0644)
-				
+
 				return dir
 			},
 			expectedURL: "https://github.com/user/repo.git",
@@ -47,15 +47,15 @@ func TestExtractSourceRepository(t *testing.T) {
 			setupFiles: func() string {
 				dir := filepath.Join(tmpDir, "str-repo")
 				os.MkdirAll(dir, 0755)
-				
+
 				packageJSON := map[string]interface{}{
 					"name":       "test-app",
 					"repository": "https://github.com/user/another-repo.git",
 				}
-				
+
 				data, _ := json.Marshal(packageJSON)
 				os.WriteFile(filepath.Join(dir, "package.json"), data, 0644)
-				
+
 				return dir
 			},
 			expectedURL: "https://github.com/user/another-repo.git",
@@ -74,15 +74,15 @@ func TestExtractSourceRepository(t *testing.T) {
 			setupFiles: func() string {
 				dir := filepath.Join(tmpDir, "no-repo-field")
 				os.MkdirAll(dir, 0755)
-				
+
 				packageJSON := map[string]interface{}{
-					"name": "test-app",
+					"name":    "test-app",
 					"version": "1.0.0",
 				}
-				
+
 				data, _ := json.Marshal(packageJSON)
 				os.WriteFile(filepath.Join(dir, "package.json"), data, 0644)
-				
+
 				return dir
 			},
 			expectedURL: "",
@@ -92,9 +92,9 @@ func TestExtractSourceRepository(t *testing.T) {
 			setupFiles: func() string {
 				dir := filepath.Join(tmpDir, "invalid-json")
 				os.MkdirAll(dir, 0755)
-				
+
 				os.WriteFile(filepath.Join(dir, "package.json"), []byte("invalid json"), 0644)
-				
+
 				return dir
 			},
 			expectedURL: "",

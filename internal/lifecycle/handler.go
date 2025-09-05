@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-    "github.com/gofiber/fiber/v2"
-    envstore "github.com/iw2rmb/ploy/internal/envstore"
+	"github.com/gofiber/fiber/v2"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
