@@ -1,6 +1,6 @@
 {
-  "task": null,
-  "branch": null,
-  "services": [],
+  "task": "h-implement-complete-cli-integration",
+  "branch": "feature/complete-cli-integration",
+  "services": ["transflow", "cli", "orchestration"],
   "updated": "2025-09-05"
 }

@@ -221,6 +221,11 @@ func (g *GitOperations) GetDiff(ctx context.Context, repoPath string) ([]DiffCap
 
 // CommitChanges creates a commit with the current changes
 func (g *GitOperations) CommitChanges(ctx context.Context, repoPath, message string) error {
+	// Ensure git is configured for commits
+	if err := g.ensureGitConfig(ctx, repoPath); err != nil {
+		return fmt.Errorf("failed to configure git: %w", err)
+	}
+
 	// Stage all changes
 	addCmd := exec.CommandContext(ctx, "git", "add", "-A")
 	addCmd.Dir = repoPath
@@ -233,14 +238,46 @@ func (g *GitOperations) CommitChanges(ctx context.Context, repoPath, message str
 	commitCmd.Dir = repoPath
 
 	var stderr bytes.Buffer
+	var stdout bytes.Buffer
 	commitCmd.Stderr = &stderr
+	commitCmd.Stdout = &stdout
 
 	if err := commitCmd.Run(); err != nil {
-		// Check if there were no changes to commit
-		if strings.Contains(stderr.String(), "nothing to commit") {
+		// Check if there were no changes to commit (can appear in stderr or stdout)
+		output := stderr.String() + " " + stdout.String()
+		if strings.Contains(output, "nothing to commit") || strings.Contains(output, "working tree clean") {
 			return nil
 		}
-		return fmt.Errorf("failed to commit changes: %v - %s", err, stderr.String())
+		return fmt.Errorf("failed to commit changes: %v - stderr: %s - stdout: %s", err, stderr.String(), stdout.String())
+	}
+
+	return nil
+}
+
+// ensureGitConfig ensures git is configured with default user info for commits
+func (g *GitOperations) ensureGitConfig(ctx context.Context, repoPath string) error {
+	// Check if user.name is already configured
+	nameCmd := exec.CommandContext(ctx, "git", "config", "user.name")
+	nameCmd.Dir = repoPath
+	if err := nameCmd.Run(); err != nil {
+		// Set default user.name
+		setNameCmd := exec.CommandContext(ctx, "git", "config", "user.name", "Ploy Transflow")
+		setNameCmd.Dir = repoPath
+		if err := setNameCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set git user.name: %w", err)
+		}
+	}
+
+	// Check if user.email is already configured
+	emailCmd := exec.CommandContext(ctx, "git", "config", "user.email")
+	emailCmd.Dir = repoPath
+	if err := emailCmd.Run(); err != nil {
+		// Set default user.email
+		setEmailCmd := exec.CommandContext(ctx, "git", "config", "user.email", "transflow@ploy.automation")
+		setEmailCmd.Dir = repoPath
+		if err := setEmailCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set git user.email: %w", err)
+		}
 	}
 
 	return nil
