@@ -78,6 +78,7 @@ func runTransflow(args []string, controllerURL string) error {
     dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
     renderPlanner := fs.Bool("render-planner", false, "render planner inputs and HCL (no submission)")
     submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set TRANSFLOW_SUBMIT=1 to submit.")
+    submitReducer := fs.Bool("reduce", false, "render and (optionally) submit reducer job; prints next actions. Set TRANSFLOW_SUBMIT=1 to submit.")
     execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
 	verbose := fs.Bool("v", false, "verbose output")
 
@@ -172,7 +173,7 @@ func runTransflow(args []string, controllerURL string) error {
             if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
                 return fmt.Errorf("planner job failed: %w", err)
             }
-            // Attempt to read plan.json from URL or locally
+            // Attempt to read plan.json from URL or locally (also support SeaweedFS filer via bucket/key)
             if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
                 resp, err := http.Get(url)
                 if err == nil && resp.StatusCode == 200 {
@@ -181,6 +182,17 @@ func runTransflow(args []string, controllerURL string) error {
                     printPlanSummary(b)
                 } else {
                     if err != nil { fmt.Printf("Failed to fetch plan URL: %v\n", err) } else { fmt.Printf("Failed to fetch plan URL: %s\n", resp.Status) }
+                }
+            }
+            if filer := os.Getenv("TRANSFLOW_FILER"); filer != "" {
+                if bucket := os.Getenv("TRANSFLOW_BUCKET"); bucket != "" {
+                    if key := os.Getenv("TRANSFLOW_PLAN_KEY"); key != "" {
+                        url := strings.TrimRight(filer, "/") + "/" + strings.TrimLeft(bucket, "/") + "/" + strings.TrimLeft(key, "/")
+                        if resp, err := http.Get(url); err == nil && resp.StatusCode == 200 {
+                            defer resp.Body.Close()
+                            if b, err := io.ReadAll(resp.Body); err == nil { printPlanSummary(b) }
+                        }
+                    }
                 }
             }
             // Attempt to read plan.json locally if provided
@@ -220,6 +232,57 @@ func runTransflow(args []string, controllerURL string) error {
             }
         } else {
             fmt.Println("Skipping submission (unset TRANSFLOW_SUBMIT).")
+        }
+        return nil
+    }
+
+    if *submitReducer {
+        assets, err := runner.RenderReducerAssets()
+        if err != nil {
+            return fmt.Errorf("failed to render reducer assets: %w", err)
+        }
+        // Substitute placeholders
+        hclBytes, err := os.ReadFile(assets.HCLPath)
+        if err != nil { return fmt.Errorf("failed to read reducer HCL: %w", err) }
+        model := os.Getenv("TRANSFLOW_MODEL")
+        if model == "" { model = "gpt-4o-mini@2024-08-06" }
+        toolsJSON := os.Getenv("TRANSFLOW_TOOLS")
+        if toolsJSON == "" { toolsJSON = `{"file":{"allow":["src/**","pom.xml"]}}` }
+        limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
+        if limitsJSON == "" { limitsJSON = `{"max_steps":4,"max_tool_calls":8,"timeout":"15m"}` }
+        runID := fmt.Sprintf("%s-%d", runner.config.ID, time.Now().Unix())
+        rendered := strings.NewReplacer(
+            "${MODEL}", model,
+            "${TOOLS_JSON}", toolsJSON,
+            "${LIMITS_JSON}", limitsJSON,
+            "${RUN_ID}", runID,
+        ).Replace(string(hclBytes))
+        renderedPath := filepath.Join(filepath.Dir(assets.HCLPath), "reducer.rendered.hcl")
+        if err := os.WriteFile(renderedPath, []byte(rendered), 0644); err != nil {
+            return fmt.Errorf("failed to write rendered HCL: %w", err)
+        }
+        fmt.Printf("Reducer HCL rendered: %s\n", renderedPath)
+        if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+            timeout := 15 * time.Minute
+            if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
+                return fmt.Errorf("reducer job failed: %w", err)
+            }
+            // Fetch next.json via URL or local path
+            if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
+                resp, err := http.Get(url)
+                if err == nil && resp.StatusCode == 200 {
+                    defer resp.Body.Close()
+                    b, _ := io.ReadAll(resp.Body)
+                    printNextSummary(b)
+                } else if err != nil {
+                    fmt.Printf("Failed to fetch next URL: %v\n", err)
+                }
+            }
+            np := os.Getenv("TRANSFLOW_NEXT_PATH")
+            if np == "" { np = filepath.Join(filepath.Dir(renderedPath), "out", "next.json") }
+            if b, err := os.ReadFile(np); err == nil { printNextSummary(b) } else { fmt.Println("Reducer job completed. Could not read next.json; set TRANSFLOW_NEXT_PATH or TRANSFLOW_NEXT_URL.") }
+        } else {
+            fmt.Println("Skipping reducer submission (unset TRANSFLOW_SUBMIT).")
         }
         return nil
     }
