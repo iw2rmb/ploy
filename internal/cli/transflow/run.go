@@ -37,6 +37,20 @@ func printPlanSummary(b []byte) {
     }
 }
 
+func printNextSummary(b []byte) {
+    var parsed struct{
+        Action string `json:"action"`
+        Notes  string `json:"notes"`
+    }
+    if err := jsonUnmarshal(b, &parsed); err == nil && parsed.Action != "" {
+        fmt.Printf("Reducer next action: %s", parsed.Action)
+        if parsed.Notes != "" { fmt.Printf(" (%s)", parsed.Notes) }
+        fmt.Println()
+    } else {
+        fmt.Printf("Reducer output invalid or missing keys: %v\n", err)
+    }
+}
+
 // TransflowCmd provides the CLI entrypoint to run transflows
 func TransflowCmd(args []string, controllerURL string) {
 	if len(args) == 0 {
@@ -64,6 +78,7 @@ func runTransflow(args []string, controllerURL string) error {
     dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
     renderPlanner := fs.Bool("render-planner", false, "render planner inputs and HCL (no submission)")
     submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set TRANSFLOW_SUBMIT=1 to submit.")
+    execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
 	verbose := fs.Bool("v", false, "verbose output")
 
 	if err := fs.Parse(args); err != nil {
@@ -174,10 +189,34 @@ func runTransflow(args []string, controllerURL string) error {
                 // Fallback to workspace/planner/out/plan.json (works if out volume maps locally)
                 planPath = filepath.Join(filepath.Dir(renderedPath), "out", "plan.json")
             }
+            var planBytes []byte
             if b, err := os.ReadFile(planPath); err == nil {
-                printPlanSummary(b)
+                planBytes = b
+                printPlanSummary(planBytes)
             } else {
                 fmt.Println("Planner job completed. Could not read plan.json locally; set TRANSFLOW_PLAN_PATH or TRANSFLOW_PLAN_URL.")
+            }
+            // Optional reducer artifact print (if provided externally)
+            if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
+                resp, err := http.Get(url)
+                if err == nil && resp.StatusCode == 200 {
+                    defer resp.Body.Close()
+                    b, _ := io.ReadAll(resp.Body)
+                    printNextSummary(b)
+                }
+            }
+            if np := os.Getenv("TRANSFLOW_NEXT_PATH"); np != "" {
+                if b, err := os.ReadFile(np); err == nil { printNextSummary(b) }
+            }
+            if *execFirst && len(planBytes) > 0 {
+                // Sequential stub: select first option and print intended action
+                var parsed struct{ PlanID string `json:"plan_id"`; Options []map[string]any `json:"options"` }
+                if err := jsonUnmarshal(planBytes, &parsed); err == nil && len(parsed.Options) > 0 {
+                    o := parsed.Options[0]
+                    id, _ := o["id"].(string)
+                    typ, _ := o["type"].(string)
+                    fmt.Printf("Sequential stub: would execute first option %s (%s) next.\n", id, typ)
+                }
             }
         } else {
             fmt.Println("Skipping submission (unset TRANSFLOW_SUBMIT).")
