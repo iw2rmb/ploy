@@ -23,6 +23,7 @@ type ProductionBranchRunner interface {
 	GetGitProvider() provider.GitProvider
 	GetBuildChecker() BuildCheckerInterface
 	GetWorkspaceDir() string
+	GetTargetRepo() string
 }
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
@@ -355,7 +356,7 @@ func (o *fanoutOrchestrator) executeHumanStepBranch(ctx context.Context, branch 
 	// Check if runner is available for production mode
 	if o.runner == nil {
 		result.Status = "failed"
-		result.Notes = "human-step branches require production runner (not available in test mode)"
+		result.Notes = "human-step branches requires production runner (not available in test mode)"
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result
@@ -378,7 +379,7 @@ func (o *fanoutOrchestrator) executeHumanStepBranch(ctx context.Context, branch 
 
 	// Step 2: Create MR for human intervention
 	mrConfig := provider.MRConfig{
-		RepoURL:      "https://gitlab.com/placeholder/repo.git", // TODO: Get from runner context
+		RepoURL:      o.runner.GetTargetRepo(),
 		SourceBranch: interventionBranch,
 		TargetBranch: "main",
 		Title:        fmt.Sprintf("Human Intervention Required: %s", branch.ID),
