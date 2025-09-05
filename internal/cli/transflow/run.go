@@ -80,6 +80,8 @@ func runTransflow(args []string, controllerURL string) error {
     submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set TRANSFLOW_SUBMIT=1 to submit.")
     submitReducer := fs.Bool("reduce", false, "render and (optionally) submit reducer job; prints next actions. Set TRANSFLOW_SUBMIT=1 to submit.")
     execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
+    execLLM := fs.Bool("exec-llm-first", false, "render and optionally submit llm-exec job for the first plan option of type llm-exec")
+    execORW := fs.Bool("exec-orw-first", false, "render and optionally submit orw-apply job for the first plan option of type orw-gen (requires recipe envs)")
 	verbose := fs.Bool("v", false, "verbose output")
 
 	if err := fs.Parse(args); err != nil {
@@ -220,19 +222,91 @@ func runTransflow(args []string, controllerURL string) error {
             if np := os.Getenv("TRANSFLOW_NEXT_PATH"); np != "" {
                 if b, err := os.ReadFile(np); err == nil { if err := validateNextJSON(b); err != nil { fmt.Printf("next.json schema invalid: %v\n", err) } else { printNextSummary(b) } }
             }
-            if *execFirst && len(planBytes) > 0 {
+            if (*execFirst || *execLLM || *execORW) && len(planBytes) > 0 {
                 // Sequential stub: select first option and print intended action
                 var parsed struct{ PlanID string `json:"plan_id"`; Options []map[string]any `json:"options"` }
                 if err := jsonUnmarshal(planBytes, &parsed); err == nil && len(parsed.Options) > 0 {
-                    o := parsed.Options[0]
-                    id, _ := o["id"].(string)
-                    typ, _ := o["type"].(string)
-                    fmt.Printf("Sequential stub: would execute first option %s (%s) next.\n", id, typ)
-                    if typ == "llm-exec" {
-                        // Render llm_exec template to illustrate next step
-                        path, err := runner.RenderLLMExecAssets(id)
-                        if err == nil {
-                            fmt.Printf("Rendered llm_exec HCL template: %s (substitute placeholders before submission)\n", path)
+                    // Find first matching option for each request
+                    var first = parsed.Options[0]
+                    id, _ := first["id"].(string)
+                    typ, _ := first["type"].(string)
+                    if *execFirst {
+                        fmt.Printf("Sequential stub: would execute first option %s (%s) next.\n", id, typ)
+                        if typ == "llm-exec" {
+                            if path, err := runner.RenderLLMExecAssets(id); err == nil { fmt.Printf("Rendered llm_exec HCL: %s\n", path) }
+                        }
+                    }
+                    if *execLLM {
+                        // Find first llm-exec
+                        for _, o := range parsed.Options {
+                            if t, _ := o["type"].(string); t == "llm-exec" {
+                                lid, _ := o["id"].(string)
+                                if hcl, err := runner.RenderLLMExecAssets(lid); err == nil {
+                                    fmt.Printf("Rendered llm_exec HCL: %s\n", hcl)
+                                    // Substitute envs
+                                    hb, _ := os.ReadFile(hcl)
+                                    model := os.Getenv("TRANSFLOW_MODEL"); if model == "" { model = "gpt-4o-mini@2024-08-06" }
+                                    tools := os.Getenv("TRANSFLOW_TOOLS"); if tools == "" { tools = `{"file":{"allow":["src/**","pom.xml"]}}` }
+                                    limits := os.Getenv("TRANSFLOW_LIMITS"); if limits == "" { limits = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}` }
+                                    runID := fmt.Sprintf("%s-%d", runner.config.ID, time.Now().Unix())
+                                    rendered := strings.NewReplacer(
+                                        "${MODEL}", model,
+                                        "${TOOLS_JSON}", tools,
+                                        "${LIMITS_JSON}", limits,
+                                        "${RUN_ID}", runID,
+                                    ).Replace(string(hb))
+                                    renderedPath := strings.ReplaceAll(hcl, ".rendered.hcl", ".rendered.submitted.hcl")
+                                    _ = os.WriteFile(renderedPath, []byte(rendered), 0644)
+                                    fmt.Printf("Rendered llm_exec HCL (substituted): %s\n", renderedPath)
+                                    if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+                                        if err := orchestration.SubmitAndWaitTerminal(renderedPath, 30*time.Minute); err != nil {
+                                            fmt.Printf("llm-exec job failed: %v\n", err)
+                                        } else {
+                                            // Show where diff.patch would be
+                                            diffPath := filepath.Join(filepath.Dir(renderedPath), "out", "diff.patch")
+                                            fmt.Printf("llm-exec completed. diff.patch expected at: %s (or via TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH).\n", diffPath)
+                                        }
+                                    } else {
+                                        fmt.Println("Skipping llm-exec submission (unset TRANSFLOW_SUBMIT).")
+                                    }
+                                }
+                                break
+                            }
+                        }
+                    }
+                    if *execORW {
+                        // Find first orw-gen
+                        for _, o := range parsed.Options {
+                            if t, _ := o["type"].(string); t == "orw-gen" {
+                                oid, _ := o["id"].(string)
+                                if hcl, err := runner.RenderORWApplyAssets(oid); err == nil {
+                                    fmt.Printf("Rendered orw_apply HCL: %s\n", hcl)
+                                    hb, _ := os.ReadFile(hcl)
+                                    // Recipe envs required: TRANSFLOW_RECIPE_CLASS / TRANSFLOW_RECIPE_COORDS
+                                    rclass := os.Getenv("TRANSFLOW_RECIPE_CLASS"); if rclass == "" { rclass = "org.openrewrite.java.migrate.Java11toJava17" }
+                                    rcoords := os.Getenv("TRANSFLOW_RECIPE_COORDS")
+                                    rtimeout := os.Getenv("TRANSFLOW_RECIPE_TIMEOUT"); if rtimeout == "" { rtimeout = "10m" }
+                                    rendered := strings.NewReplacer(
+                                        "${RECIPE_CLASS}", rclass,
+                                        "${RECIPE_COORDS}", rcoords,
+                                        "${RECIPE_TIMEOUT}", rtimeout,
+                                    ).Replace(string(hb))
+                                    renderedPath := strings.ReplaceAll(hcl, ".rendered.hcl", ".rendered.submitted.hcl")
+                                    _ = os.WriteFile(renderedPath, []byte(rendered), 0644)
+                                    fmt.Printf("Rendered orw_apply HCL (substituted): %s\n", renderedPath)
+                                    if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+                                        if err := orchestration.SubmitAndWaitTerminal(renderedPath, 30*time.Minute); err != nil {
+                                            fmt.Printf("orw-apply job failed: %v\n", err)
+                                        } else {
+                                            diffPath := filepath.Join(filepath.Dir(renderedPath), "out", "diff.patch")
+                                            fmt.Printf("orw-apply completed. diff.patch expected at: %s\n", diffPath)
+                                        }
+                                    } else {
+                                        fmt.Println("Skipping orw-apply submission (unset TRANSFLOW_SUBMIT).")
+                                    }
+                                }
+                                break
+                            }
                         }
                     }
                 }
