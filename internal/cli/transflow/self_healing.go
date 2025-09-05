@@ -187,6 +187,10 @@ func (a *TransflowErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors
 			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes, 
 				"org.openrewrite.java.cleanup.SimplifyBooleanExpression",
 				"org.openrewrite.java.cleanup.UnnecessaryParentheses")
+		} else if language == "go" {
+			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes,
+				"org.openrewrite.go.format.AutoFormat",
+				"org.openrewrite.go.cleanup.UnnecessaryParentheses")
 		}
 		analysis.Confidence = 0.6
 		
