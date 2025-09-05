@@ -1,31 +1,35 @@
-# Stream 3 / Phase 1 — GitLab Merge Request (MR)
+# Stream 3 · Phase 1 — Merge Requests (Provider: GitLab)
 
-Objective: Create a GitLab MR with diffs, summary, and metadata, reusing internal git utilities and centralized config.
+Goal: create/update an MR on GitLab for the workflow branch.
 
-## Reuse First
+Reuse First
+- Git ops: reuse `api/arf/git_operations.go` for clone/commit; extend with push.
+- MR body: adapt existing MR description pattern from ARF CLI.
 
-- Git utils: `internal/git` for repo detection/normalization
-- Config: `internal/config.Service` for GitLab endpoint/token/project mapping
-- Storage: attach links to artifacts (from Streams 1–2) in MR description
+Scope
+- Provider abstraction: `git_provider = gitlab` (default) with envs `GITLAB_URL`, `GITLAB_TOKEN` (no secrets in YAML).
+- Infer GitLab project (namespace/name) from `target_repo` URL in transflow.yaml.
+- MR target branch is always `base_ref`.
+- Create workflow branch at start; push commits; create MR (title/body from step summaries); update MR on new commits.
 
-## Scope
+Implementation Steps
+- Add `internal/git/provider` with minimal `CreateOrUpdateMR` for GitLab: infer project from `target_repo` HTTPS.
+- Extend CLI runner to push branch (HTTPS URL with token) and call provider to create/update MR.
+- Include MR URL in final transflow summary.
+- Set default MR labels/scope to `ploy` and `tfl` when GitLab instance supports labels; otherwise include them in MR description body.
+ - Reuse `workflow/<id>/<timestamp>` branch name across runs to update the same MR.
 
-- HTTP entrypoint: `/v1/transflow/gitlab/mr`
-- Flow:
-  1) Accept repo URL/branch, base/target, title/description
-  2) Compute diff (using internal/git or provided patch)
-  3) Create MR via GitLab API; add description with links to artifacts
-  4) Return MR URL/ID and status
+Deliverables
+- `mr` output field in transflow result with MR URL/ID.
+- Minimal GitLab REST calls: create/update MR (project from `target_repo`, source branch, target `base_ref`, title, description).
 
-## Acceptance Criteria
+Acceptance
+- After successful build, branch is pushed and an MR is opened on GitLab; subsequent runs against same branch update the MR.
 
-- Unit tests with HTTP mock for GitLab API
-- Uses config service (no hardcoded creds)
-- Returns stable MR link
+Out of scope
+- Reviewers/labels automation; provider=github (Phase 2).
 
-## TDD Plan
-
-1) RED: MR creation request/response tests with mock server
-2) GREEN: Implement minimal GitLab client + handler
-3) REFACTOR: Add optional labels/reviewers in Phase 2
-
+TDD Plan
+1) RED: GitLab API mocks for create/update MR.
+2) GREEN: implement minimal client and wiring from transflow runner.
+3) REFACTOR: shared provider interface for Phase 2.

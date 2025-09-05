@@ -440,16 +440,15 @@ func (d *AnalysisDispatcher) GetJob(ctx context.Context, jobID string) (*Analysi
         job.Status = string(status)
     }
 
-	// Get result if completed
-	if job.Status == "completed" {
-		resultPair, _, _ := kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/result", jobID), nil)
-		if resultPair != nil {
-			var result LanguageAnalysisResult
-			if err := json.Unmarshal(resultPair.Value, &result); err == nil {
-				job.Result = &result
-			}
-		}
-	}
+    // Get result if completed
+    if job.Status == "completed" {
+        if resultBytes, _ := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/result", jobID)); resultBytes != nil {
+            var result LanguageAnalysisResult
+            if err := json.Unmarshal(resultBytes, &result); err == nil {
+                job.Result = &result
+            }
+        }
+    }
 
 	return &job, nil
 }
@@ -483,8 +482,6 @@ func (d *AnalysisDispatcher) WaitForCompletion(ctx context.Context, jobID string
 
 // ListJobs lists all analysis jobs from Consul
 func (d *AnalysisDispatcher) ListJobs(ctx context.Context, limit int) ([]*AnalysisJob, error) {
-	kv := d.consulClient.KV()
-
     // List all job keys
     keys, err := d.kv.Keys("ploy/analysis/jobs/", "/")
 	if err != nil {
@@ -618,21 +615,19 @@ func (d *AnalysisDispatcher) CleanupOldJobs(ctx context.Context, maxAge time.Dur
 		return err
 	}
 
-	kv := d.consulClient.KV()
-	cutoff := time.Now().Add(-maxAge)
+    cutoff := time.Now().Add(-maxAge)
 
 	for _, job := range jobs {
 		if job.Status == "completed" || job.Status == "failed" {
 			if job.CompletedAt != nil && job.CompletedAt.Before(cutoff) {
-				// Delete from Consul
-				_, err := kv.Delete(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID), nil)
-				if err != nil {
-					return fmt.Errorf("failed to delete job %s: %w", job.ID, err)
-				}
+                // Delete from Consul
+                if err := d.kv.Delete(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID)); err != nil {
+                    return fmt.Errorf("failed to delete job %s: %w", job.ID, err)
+                }
 
-				// Stop Nomad job if still exists
-				jobName := fmt.Sprintf("analysis-%s-%s", job.Analyzer, job.ID)
-				_, _, _ = d.nomadClient.Jobs().Deregister(jobName, false, nil)
+                // Best-effort: attempt to deregister Nomad job via orchestration facade
+                jobName := fmt.Sprintf("analysis-%s-%s", job.Analyzer, job.ID)
+                _ = orchestration.DeregisterJob(jobName, false)
 			}
 		}
 	}

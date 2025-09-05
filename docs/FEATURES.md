@@ -154,6 +154,7 @@ Auto-classified lanes:
 - **Fast Health Routing** (Sep 2025): Consul checks use lightweight `/live`; readiness stays on `/ready` for deep validation
 - **Tag Consolidation (in progress, Sep 2025)**: Shared `internal/routing` tag builder (`BuildTraefikTags`) to standardize Traefik configuration across components
  - **Env Helper Unification (Sep 2025)**: API, orchestration, and cleanup flows consistently read env via `internal/utils.Getenv` for predictable defaults
+ - **Config Path Decoupling (Sep 2025)**: API server resolves storage config path internally (env → external → embedded) without `api/config` dependency; unit tests cover behavior
 - ✅ **Platform CLI Separation** (Aug 2025):
   - **ploy CLI**: Deploys user apps to `<app-name>.ployd.app`
   - **ployman CLI**: Deploys platform services to `<service-name>.ployman.app`

@@ -122,7 +122,7 @@ func LoadConfigFromEnv() *ControllerConfig {
 		Port:              port,
 		ConsulAddr:        utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
 		NomadAddr:         utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
-		StorageConfigPath: config.GetStorageConfigPath(),
+		StorageConfigPath: getStorageConfigPath(),
 		CleanupConfigPath: utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
 		UseConsulEnv:      utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
 		EnvStorePath:      utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
@@ -133,6 +133,24 @@ func LoadConfigFromEnv() *ControllerConfig {
 		ArfRegistryURL:    utils.Getenv("PLOY_ARF_REGISTRY", "https://registry.dev.ployman.app"),
 		ArfMavenGroup:     utils.Getenv("PLOY_ARF_MAVEN_GROUP", ""),
 	}
+}
+
+// getStorageConfigPath resolves the storage configuration path without depending on api/config.
+// Order: env override -> common external paths -> embedded default.
+func getStorageConfigPath() string {
+    if path := os.Getenv("PLOY_STORAGE_CONFIG"); path != "" {
+        return path
+    }
+    externalPaths := []string{
+        "/etc/ploy/storage/config.yaml",
+        "/etc/ploy/config.yaml",
+    }
+    for _, p := range externalPaths {
+        if _, err := os.Stat(p); err == nil {
+            return p
+        }
+    }
+    return "configs/storage-config.yaml"
 }
 
 // Server represents the stateless controller server

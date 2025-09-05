@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/transflow/inputs.schema.json",
+  "title": "Planner Inputs",
+  "type": "object",
+  "required": ["language", "lane", "last_error"],
+  "properties": {
+    "language": { "type": "string" },
+    "lane": { "type": "string" },
+    "last_error": {
+      "type": "object",
+      "required": ["stdout", "stderr"],
+      "properties": {
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "deps": { "type": "object", "additionalProperties": { "type": "string" } },
+    "context_hash": { "type": "string" }
+  },
+  "additionalProperties": false
+}
+

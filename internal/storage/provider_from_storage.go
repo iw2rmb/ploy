@@ -3,6 +3,7 @@ package storage
 import (
     "bytes"
     "context"
+    "fmt"
     "io"
 )
 
@@ -41,8 +42,12 @@ func (p *ProviderFromStorage) UploadArtifactBundleWithVerification(keyPrefix, ar
 
 func (p *ProviderFromStorage) VerifyUpload(key string) error {
     ok, err := p.s.Exists(context.Background(), key)
-    if err != nil { return err }
-    if !ok { return NewStorageError("not found", nil).WithClassification(ClassificationNotFound) }
+    if err != nil {
+        return NewStorageError("verify", err, ErrorContext{Key: key})
+    }
+    if !ok {
+        return NewStorageError("verify", fmt.Errorf("object not found"), ErrorContext{Key: key, HTTPStatus: 404})
+    }
     return nil
 }
 
@@ -71,4 +76,3 @@ func (p *ProviderFromStorage) GetArtifactsBucket() string { return p.bucket }
 
 // helper for creating ReadSeeker from bytes
 type bytesReadSeeker struct{ *bytes.Reader }
-

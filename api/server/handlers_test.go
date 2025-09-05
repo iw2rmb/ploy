@@ -328,20 +328,45 @@ func TestServer_HandleValidateStorageConfig(t *testing.T) {
 				require.NoError(t, err)
 				defer os.Remove(tt.configPath)
 			} else {
-				// Create valid config
-				validConfig := `storage:
+                // Create valid config (internal/config format)
+                validConfig := `storage:
   provider: seaweedfs
-  master: "http://localhost:9333"
-  filer: "http://localhost:8888"
-  collection: "ploy"
-  replication: "001"`
+  endpoint: "http://localhost:8888"
+  bucket: "ploy"`
 				err := os.WriteFile(tt.configPath, []byte(validConfig), 0644)
 				require.NoError(t, err)
 				defer os.Remove(tt.configPath)
 			}
 
-			// Set up route using actual handler method
-			server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
+            // Inject config service for validation
+            // For invalid case, initialize service with a valid file, then corrupt it to trigger Reload error.
+            var (
+                svc *cfg.Service
+                err error
+            )
+            if tt.expectError {
+                // Write a valid config first so service can be created
+                validBootstrap := []byte("storage:\n  provider: seaweedfs\n  endpoint: \"http://localhost:8888\"\n  bucket: \"ploy\"\n")
+                require.NoError(t, os.WriteFile(tt.configPath, validBootstrap, 0o644))
+                svc, err = cfg.New(
+                    cfg.WithFile(tt.configPath),
+                    cfg.WithValidation(cfg.NewStructValidator()),
+                )
+                require.NoError(t, err)
+                // Now corrupt the file to simulate invalid configuration on reload
+                invalidConfig := `invalid yaml content: [`
+                require.NoError(t, os.WriteFile(tt.configPath, []byte(invalidConfig), 0o644))
+            } else {
+                svc, err = cfg.New(
+                    cfg.WithFile(tt.configPath),
+                    cfg.WithValidation(cfg.NewStructValidator()),
+                )
+                require.NoError(t, err)
+            }
+            server.configService = svc
+
+            // Set up route using actual handler method
+            server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
 
 			// Test request
 			req := httptest.NewRequest("POST", "/storage/config/validate", nil)
@@ -392,11 +417,11 @@ func TestServer_HandleGetStorageConfig_UsesConfigService(t *testing.T) {
 
     var body map[string]interface{}
     require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-    // Legacy shape: top-level has Storage with Provider and Master
-    storageObj, ok := body["Storage"].(map[string]interface{})
+    // Legacy-compatible shape: top-level has storage with Provider and Master fields
+    storageObj, ok := body["storage"].(map[string]interface{})
     require.True(t, ok)
-    assert.Equal(t, "seaweedfs", storageObj["Provider"])
-    assert.Equal(t, "http://localhost:9333", storageObj["Master"])
+    assert.Equal(t, "seaweedfs", storageObj["provider"])
+    assert.Equal(t, "http://localhost:9333", storageObj["master"])
 }
 
 // Removed legacy file-based reload tests. Reload is handled via config service;
