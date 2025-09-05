@@ -1,10 +1,10 @@
 package arf
 
 import (
-    "encoding/json"
-    "fmt"
+	"encoding/json"
+	"fmt"
 
-    amodels "github.com/iw2rmb/ploy/internal/arf/models"
+	amodels "github.com/iw2rmb/ploy/internal/arf/models"
 )
 
 // Health and cache commands
@@ -60,7 +60,7 @@ func getCacheStats() error {
 		return fmt.Errorf("failed to get cache stats: %w", err)
 	}
 
-    var stats amodels.ASTCacheStats
+	var stats amodels.ASTCacheStats
 	if err := json.Unmarshal(response, &stats); err != nil {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}

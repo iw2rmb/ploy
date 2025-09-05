@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
-    istorage "github.com/iw2rmb/ploy/internal/storage"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+	istorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
 // AnalysisJob represents a code analysis job
@@ -33,10 +33,10 @@ type AnalysisJob struct {
 
 // AnalysisDispatcher handles job dispatch and monitoring for code analysis
 type AnalysisDispatcher struct {
-    kv             orchestration.KV
-    storage        istorage.Storage
-    jobTemplates   map[string]*template.Template
-    storageBaseURL string
+	kv             orchestration.KV
+	storage        istorage.Storage
+	jobTemplates   map[string]*template.Template
+	storageBaseURL string
 }
 
 // NewAnalysisDispatcher creates a new dispatcher
@@ -47,12 +47,12 @@ func NewAnalysisDispatcherOrchestration(storage istorage.Storage) (*AnalysisDisp
 		storageBaseURL = url
 	}
 
-    dispatcher := &AnalysisDispatcher{
-        kv:             orchestration.NewKV(),
-        storage:        storage,
-        jobTemplates:   make(map[string]*template.Template),
-        storageBaseURL: storageBaseURL,
-    }
+	dispatcher := &AnalysisDispatcher{
+		kv:             orchestration.NewKV(),
+		storage:        storage,
+		jobTemplates:   make(map[string]*template.Template),
+		storageBaseURL: storageBaseURL,
+	}
 
 	// Load job templates for different analyzers
 	if err := dispatcher.loadJobTemplates(); err != nil {
@@ -423,32 +423,34 @@ func (d *AnalysisDispatcher) SubmitJob(ctx context.Context, analyzer string, inp
 
 // GetJob retrieves job status from Consul
 func (d *AnalysisDispatcher) GetJob(ctx context.Context, jobID string) (*AnalysisJob, error) {
-    // Get job data
-    data, err := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s", jobID))
-    if err != nil { return nil, fmt.Errorf("failed to get job from Consul: %w", err) }
-    if data == nil {
-        return nil, fmt.Errorf("job not found: %s", jobID)
-    }
+	// Get job data
+	data, err := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s", jobID))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job from Consul: %w", err)
+	}
+	if data == nil {
+		return nil, fmt.Errorf("job not found: %s", jobID)
+	}
 
-    var job AnalysisJob
-    if err := json.Unmarshal(data, &job); err != nil {
-        return nil, fmt.Errorf("failed to unmarshal job: %w", err)
-    }
+	var job AnalysisJob
+	if err := json.Unmarshal(data, &job); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
+	}
 
-    // Check for completion
-    if status, _ := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/status", jobID)); status != nil {
-        job.Status = string(status)
-    }
+	// Check for completion
+	if status, _ := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/status", jobID)); status != nil {
+		job.Status = string(status)
+	}
 
-    // Get result if completed
-    if job.Status == "completed" {
-        if resultBytes, _ := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/result", jobID)); resultBytes != nil {
-            var result LanguageAnalysisResult
-            if err := json.Unmarshal(resultBytes, &result); err == nil {
-                job.Result = &result
-            }
-        }
-    }
+	// Get result if completed
+	if job.Status == "completed" {
+		if resultBytes, _ := d.kv.Get(fmt.Sprintf("ploy/analysis/jobs/%s/result", jobID)); resultBytes != nil {
+			var result LanguageAnalysisResult
+			if err := json.Unmarshal(resultBytes, &result); err == nil {
+				job.Result = &result
+			}
+		}
+	}
 
 	return &job, nil
 }
@@ -482,8 +484,8 @@ func (d *AnalysisDispatcher) WaitForCompletion(ctx context.Context, jobID string
 
 // ListJobs lists all analysis jobs from Consul
 func (d *AnalysisDispatcher) ListJobs(ctx context.Context, limit int) ([]*AnalysisJob, error) {
-    // List all job keys
-    keys, err := d.kv.Keys("ploy/analysis/jobs/", "/")
+	// List all job keys
+	keys, err := d.kv.Keys("ploy/analysis/jobs/", "/")
 	if err != nil {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
@@ -526,8 +528,8 @@ func (d *AnalysisDispatcher) uploadInput(ctx context.Context, jobID string, inpu
 	}
 
 	// Upload to storage
-    reader := bytes.NewReader(buf.Bytes())
-    err := d.storage.Put(ctx, fmt.Sprintf("%s/%s", bucket, key), reader)
+	reader := bytes.NewReader(buf.Bytes())
+	err := d.storage.Put(ctx, fmt.Sprintf("%s/%s", bucket, key), reader)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload to storage: %w", err)
 	}
@@ -537,11 +539,11 @@ func (d *AnalysisDispatcher) uploadInput(ctx context.Context, jobID string, inpu
 
 // storeJob stores job in Consul KV
 func (d *AnalysisDispatcher) storeJob(job *AnalysisJob) error {
-    data, err := json.Marshal(job)
-    if err != nil {
-        return fmt.Errorf("failed to marshal job: %w", err)
-    }
-    return d.kv.Put(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID), data)
+	data, err := json.Marshal(job)
+	if err != nil {
+		return fmt.Errorf("failed to marshal job: %w", err)
+	}
+	return d.kv.Put(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID), data)
 }
 
 // submitToNomad submits the job to Nomad
@@ -579,13 +581,17 @@ func (d *AnalysisDispatcher) submitToNomad(job *AnalysisJob) error {
 		return fmt.Errorf("failed to generate job HCL: %w", err)
 	}
 
-    hcl := buf.String()
-    tmp, err := os.CreateTemp("", "analysis-*.hcl")
-    if err != nil { return err }
-    defer os.Remove(tmp.Name())
-    if _, err := tmp.WriteString(hcl); err != nil { return err }
-    tmp.Close()
-    return orchestration.Submit(tmp.Name())
+	hcl := buf.String()
+	tmp, err := os.CreateTemp("", "analysis-*.hcl")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(hcl); err != nil {
+		return err
+	}
+	tmp.Close()
+	return orchestration.Submit(tmp.Name())
 }
 
 // getLanguageForAnalyzer returns the language associated with an analyzer
@@ -615,19 +621,19 @@ func (d *AnalysisDispatcher) CleanupOldJobs(ctx context.Context, maxAge time.Dur
 		return err
 	}
 
-    cutoff := time.Now().Add(-maxAge)
+	cutoff := time.Now().Add(-maxAge)
 
 	for _, job := range jobs {
 		if job.Status == "completed" || job.Status == "failed" {
 			if job.CompletedAt != nil && job.CompletedAt.Before(cutoff) {
-                // Delete from Consul
-                if err := d.kv.Delete(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID)); err != nil {
-                    return fmt.Errorf("failed to delete job %s: %w", job.ID, err)
-                }
+				// Delete from Consul
+				if err := d.kv.Delete(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID)); err != nil {
+					return fmt.Errorf("failed to delete job %s: %w", job.ID, err)
+				}
 
-                // Best-effort: attempt to deregister Nomad job via orchestration facade
-                jobName := fmt.Sprintf("analysis-%s-%s", job.Analyzer, job.ID)
-                _ = orchestration.DeregisterJob(jobName, false)
+				// Best-effort: attempt to deregister Nomad job via orchestration facade
+				jobName := fmt.Sprintf("analysis-%s-%s", job.Analyzer, job.ID)
+				_ = orchestration.DeregisterJob(jobName, false)
 			}
 		}
 	}

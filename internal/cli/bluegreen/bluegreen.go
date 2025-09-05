@@ -86,7 +86,7 @@ func handleDeploy(args []string, controllerURL string) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 201 {
 		fmt.Printf("Error: Blue-green deployment failed: %s\n", string(body))
 		return
@@ -124,7 +124,7 @@ func handleStatus(args []string, controllerURL string) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 200 {
 		fmt.Printf("Error: Failed to get deployment status: %s\n", string(body))
 		return
@@ -135,21 +135,21 @@ func handleStatus(args []string, controllerURL string) {
 
 	if deployment, ok := result["deployment"].(map[string]interface{}); ok {
 		fmt.Printf("📊 Blue-Green Deployment Status for %s\n\n", appName)
-		
+
 		fmt.Printf("Status: %v\n", deployment["status"])
 		fmt.Printf("Active Color: %v\n", deployment["active_color"])
-		
+
 		if blueVersion, ok := deployment["blue_version"]; ok && blueVersion != nil {
 			fmt.Printf("Blue Version: %v\n", blueVersion)
 		}
 		if greenVersion, ok := deployment["green_version"]; ok && greenVersion != nil {
 			fmt.Printf("Green Version: %v\n", greenVersion)
 		}
-		
+
 		fmt.Printf("Traffic Distribution:\n")
 		fmt.Printf("  🔵 Blue:  %.0f%%\n", deployment["blue_weight"])
 		fmt.Printf("  🟢 Green: %.0f%%\n", deployment["green_weight"])
-		
+
 		if lastShift, ok := deployment["last_shift_time"]; ok {
 			if shiftTime, err := time.Parse(time.RFC3339, lastShift.(string)); err == nil {
 				fmt.Printf("Last Shift: %s\n", shiftTime.Format("2006-01-02 15:04:05"))
@@ -168,7 +168,7 @@ func handleShift(args []string, controllerURL string) {
 
 	appName := args[0]
 	weightStr := args[1]
-	
+
 	weight, err := strconv.Atoi(weightStr)
 	if err != nil || weight < 0 || weight > 100 {
 		fmt.Println("Error: Target weight must be a number between 0 and 100")
@@ -193,7 +193,7 @@ func handleShift(args []string, controllerURL string) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 200 {
 		fmt.Printf("Error: Traffic shift failed: %s\n", string(body))
 		return
@@ -224,7 +224,7 @@ func handleAutoShift(args []string, controllerURL string) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 200 {
 		fmt.Printf("Error: Auto shift failed: %s\n", string(body))
 		return
@@ -257,7 +257,7 @@ func handleComplete(args []string, controllerURL string) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 200 {
 		fmt.Printf("Error: Complete deployment failed: %s\n", string(body))
 		return
@@ -299,7 +299,7 @@ func handleRollback(args []string, controllerURL string) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	
+
 	if resp.StatusCode != 200 {
 		fmt.Printf("Error: Rollback failed: %s\n", string(body))
 		return
