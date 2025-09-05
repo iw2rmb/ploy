@@ -1,7 +1,7 @@
 # Git Provider Module CLAUDE.md
 
 ## Purpose
-Provides GitLab REST API integration for automated merge request creation and management in transflow workflows with comprehensive test infrastructure.
+Provides Git forge provider integration for automated merge request creation and management in transflow workflows. Currently implements GitLab REST API with GitHub support infrastructure ready.
 
 ## Narrative Summary
 The git provider module implements a clean interface for interacting with Git forge providers (currently GitLab, extensible to GitHub). It handles authentication, project URL parsing, merge request lifecycle management, and comprehensive error handling. The module supports both creating new merge requests and updating existing ones based on source branch matching.
@@ -43,6 +43,10 @@ Required environment variables:
 - `GITLAB_TOKEN` - GitLab API token with project access (API scope required)
 - `GITLAB_URL` - GitLab instance URL (optional, defaults to https://gitlab.com)
 
+GitHub support infrastructure (via VPS Ansible setup):
+- `GITHUB_PLOY_DEV_USERNAME` - GitHub username for development authentication
+- `GITHUB_PLOY_DEV_PAT` - GitHub personal access token for API access
+
 Supported repository URL formats:
 - `https://gitlab.example.com/namespace/project.git`
 - `https://gitlab.com/group/subgroup/project.git`
@@ -65,5 +69,6 @@ Supported repository URL formats:
 
 ## Related Documentation
 - `../../cli/transflow/CLAUDE.md` - Main consumer module with complete workflow integration
+- `../../../iac/CLAUDE.md` - VPS GitHub authentication setup for future GitHub provider support
 - GitLab REST API documentation for projects and merge requests endpoints
 - Test repository: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
