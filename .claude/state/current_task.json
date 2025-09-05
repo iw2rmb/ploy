@@ -1,6 +1,6 @@
 {
-  "task": null,
-  "branch": null,
-  "services": [],
+  "task": "m-setup-github-token-ansible",
+  "branch": "feature/setup-github-token-ansible", 
+  "services": ["ansible", "vps-config"],
   "updated": "2025-09-05"
 }
