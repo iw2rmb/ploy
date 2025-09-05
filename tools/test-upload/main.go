@@ -16,7 +16,7 @@ func main() {
     binaryPath := os.Args[1]
 
     svc, err := cfgsvc.New(
-        cfgsvc.WithFile(cfgsvc.Getenv("PLOY_STORAGE_CONFIG", "")),
+        cfgsvc.WithFile(os.Getenv("PLOY_STORAGE_CONFIG")),
         cfgsvc.WithEnvironment("PLOY_"),
         cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
     )

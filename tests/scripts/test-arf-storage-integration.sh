@@ -7,30 +7,14 @@ set -e
 SCRIPT_DIR=$(dirname "$0")
 ROOT_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 
+# Source common utilities
+source "$SCRIPT_DIR/common/test-utils.sh"
+
 # Configuration
 CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEST_RECIPE_ID="test-storage-integration-$(date +%s)"
 TEMP_DIR="/tmp/arf-storage-test"
 RESULTS_FILE="$TEMP_DIR/test-results.json"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Logging functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
 
 # Setup test environment
 setup_test() {

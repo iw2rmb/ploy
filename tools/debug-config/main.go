@@ -3,13 +3,14 @@ package main
 import (
     "fmt"
     "log"
+    "os"
 
     cfgsvc "github.com/iw2rmb/ploy/internal/config"
 )
 
 func main() {
     svc, err := cfgsvc.New(
-        cfgsvc.WithFile(cfgsvc.Getenv("PLOY_STORAGE_CONFIG", "")),
+        cfgsvc.WithFile(os.Getenv("PLOY_STORAGE_CONFIG")),
         cfgsvc.WithEnvironment("PLOY_"),
         cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
     )

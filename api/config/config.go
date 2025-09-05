@@ -9,7 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/iw2rmb/ploy/internal/storage"
-	"github.com/iw2rmb/ploy/internal/storage/factory"
 )
 
 // ConfigCacheEntry represents a cached configuration with expiration
@@ -410,81 +409,7 @@ func (cc *ClientConfig) ToClientConfig() (*storage.ClientConfig, error) {
 	}, nil
 }
 
-// CreateStorageClientFromConfig creates a storage client from configuration (per-request initialization)
-func CreateStorageClientFromConfig(configPath string) (*storage.StorageClient, error) {
-	// Load configuration fresh for each request (stateless)
-	config, err := Load(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load storage config: %w", err)
-	}
-
-	// Convert to storage config format
-	storageConfig := config.Storage.ToStorageConfig()
-
-	// Create storage provider
-	provider, err := storage.New(storageConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage provider: %w", err)
-	}
-
-	// Convert client config
-	clientConfig, err := config.Storage.Client.ToClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert client config: %w", err)
-	}
-
-	// Create enhanced storage client
-	return storage.NewStorageClient(provider, clientConfig), nil
-}
-
-// convertRootToFactoryConfig builds a factory config from Root
-func convertRootToFactoryConfig(config Root) factory.FactoryConfig {
-    factoryConfig := factory.FactoryConfig{
-        Provider: config.Storage.Provider,
-        Endpoint: config.Storage.Master,
-        Bucket:   config.Storage.Collection,
-        Region:   "",
-    }
-    if factoryConfig.Provider == "" {
-        factoryConfig.Provider = "seaweedfs"
-    }
-    if factoryConfig.Provider == "seaweedfs" {
-        factoryConfig.Extra = map[string]interface{}{
-            "filer":       config.Storage.Filer,
-            "replication": config.Storage.Replication,
-            "timeout":     config.Storage.Timeout,
-        }
-    }
-    if config.Storage.Client.RetryConfig.MaxRetries > 0 {
-        initialDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.InitialDelay)
-        maxDelay, _ := time.ParseDuration(config.Storage.Client.RetryConfig.MaxDelay)
-        factoryConfig.Retry = factory.RetryConfig{
-            Enabled:           true,
-            MaxAttempts:       config.Storage.Client.RetryConfig.MaxRetries,
-            InitialDelay:      initialDelay,
-            MaxDelay:          maxDelay,
-            BackoffMultiplier: config.Storage.Client.RetryConfig.Multiplier,
-        }
-    }
-    if config.Storage.Client.EnableMetrics {
-        factoryConfig.Monitoring = factory.MonitoringConfig{Enabled: true}
-    }
-    return factoryConfig
-}
-
-// CreateStorageFromFactory creates a storage instance using the new factory pattern
-// This is the recommended way to create storage instances going forward
-func CreateStorageFromFactory(configPath string) (storage.Storage, error) {
-    // Load configuration
-    config, err := Load(configPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to load storage config: %w", err)
-    }
-    factoryConfig := convertRootToFactoryConfig(config)
-
-    // Create storage instance with factory
-    return factory.New(factoryConfig)
-}
+// Deprecated helpers removed: storage clients must be created via internal/config.Service
 
 // GetStorageConfigPath returns the storage configuration path with fallback logic
 func GetStorageConfigPath() string {

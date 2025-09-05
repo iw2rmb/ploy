@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // SubmitResult contains the result of a job submission
@@ -33,12 +35,12 @@ func SubmitWithMonitoring(jobPath string, timeout time.Duration) (*SubmitResult,
 	fmt.Printf("Job submitted successfully: ID=%s, Deployment=%s\n", result.JobID, result.DeploymentID)
 	
 	// Monitor the deployment if we have a deployment ID
-	if result.DeploymentID != "" {
-		monitor := NewHealthMonitor()
-		if err := monitor.MonitorDeployment(result.DeploymentID, timeout); err != nil {
-			return result, fmt.Errorf("deployment monitoring failed: %w", err)
-		}
-	}
+    if result.DeploymentID != "" {
+        // Simplified: wait for job health instead of deployment monitoring via SDK facade
+        if err := orchestration.WaitHealthy(result.JobID, timeout); err != nil {
+            return result, fmt.Errorf("health wait failed: %w", err)
+        }
+    }
 	
 	return result, nil
 }
@@ -105,48 +107,11 @@ func SubmitAndWaitHealthy(jobPath string, expectedCount int, timeout time.Durati
 	
 	fmt.Printf("Submitted job %s (deployment: %s)\n", result.JobID, result.DeploymentID)
 	
-	// Create health monitor
-	monitor := NewHealthMonitor()
+    // Wait for job to be healthy using unified orchestration facade
 	
 	// If we have a deployment ID, monitor it
-	if result.DeploymentID != "" {
-		deploymentComplete := make(chan error, 1)
-		
-		// Monitor deployment in background
-		go func() {
-			deploymentComplete <- monitor.MonitorDeployment(result.DeploymentID, timeout)
-		}()
-		
-		// Also monitor job health
-		healthComplete := make(chan error, 1)
-		go func() {
-			// Give deployment a moment to start
-			time.Sleep(2 * time.Second)
-			healthComplete <- monitor.MonitorJobHealth(result.JobID, expectedCount, timeout)
-		}()
-		
-		// Wait for both to complete
-		var deploymentErr, healthErr error
-		
-		select {
-		case deploymentErr = <-deploymentComplete:
-			healthErr = <-healthComplete
-		case healthErr = <-healthComplete:
-			deploymentErr = <-deploymentComplete
-		}
-		
-		if deploymentErr != nil {
-			return fmt.Errorf("deployment failed: %w", deploymentErr)
-		}
-		if healthErr != nil {
-			return fmt.Errorf("health check failed: %w", healthErr)
-		}
-		
-		return nil
-	}
-	
-	// No deployment ID, just monitor job health
-	return monitor.MonitorJobHealth(result.JobID, expectedCount, timeout)
+    // Regardless of deployment ID presence, wait for healthy allocations
+    return orchestration.SubmitAndWaitHealthy(jobPath, expectedCount, timeout)
 }
 
 // RobustSubmit submits a job with retry logic and comprehensive monitoring
@@ -225,7 +190,7 @@ func isRetryableError(err error) bool {
 
 // StreamJobLogs streams logs from a job's allocations
 func StreamJobLogs(jobID string, follow bool) error {
-	monitor := NewHealthMonitor()
+    monitor := orchestration.NewHealthMonitor()
 	
 	// Get allocations
 	allocations, err := monitor.GetJobAllocations(jobID)

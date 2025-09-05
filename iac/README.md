@@ -24,38 +24,87 @@ Ploy's infrastructure supports multi-lane deployment capabilities with specializ
 
 ```
 iac/
+├── README.md                       # This file - infrastructure documentation
 ├── common/                         # Shared infrastructure components
 │   ├── playbooks/                  # Reusable playbooks
-│   │   ├── controller.yml          # Controller deployment logic
+│   │   ├── api.yml                 # API deployment logic
 │   │   ├── seaweedfs.yml          # SeaweedFS storage deployment
 │   │   └── hashicorp.yml          # Nomad/Consul/Vault deployment
-│   └── templates/                  # Unified Jinja2 templates
+│   ├── scripts/                    # Shared utility scripts
+│   │   ├── consul-service-monitor.sh  # Consul service monitoring
+│   │   └── nomad-job-manager.sh    # Nomad job management wrapper
+│   └── templates/                  # Unified Jinja2 templates (36 files)
+│       ├── api-status.sh.j2       # API status monitoring script
 │       ├── consul-server.hcl.j2   # Linux Consul server configuration
 │       ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
+│       ├── consul.service.j2       # Consul systemd service
+│       ├── docker-daemon.json.j2   # Docker daemon configuration
+│       ├── freebsd-*.yml.j2       # FreeBSD cloud-init configurations
+│       ├── migrate-api.sh.j2      # API migration scripts
+│       ├── node-exporter.service.j2 # Prometheus node exporter
 │       ├── nomad-server.hcl.j2    # Linux Nomad server configuration
 │       ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
-│       ├── nomad-ploy-api.hcl.j2  # Controller Nomad job
+│       ├── nomad-ploy-api.hcl.j2  # API Nomad job
+│       ├── nomad-traefik-system.hcl.j2 # Traefik system job
+│       ├── nomad.service.j2        # Nomad systemd service
+│       ├── ploy-*.yaml.j2          # Ploy configuration templates
+│       ├── rollback-api.sh.j2      # API rollback scripts
 │       ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
-│       └── *.j2                    # Additional service templates
+│       ├── setup-env.sh.j2         # Environment setup script
+│       ├── test-*.sh.j2            # Various test scripts
+│       ├── traefik-*.yml.j2        # Traefik configurations
+│       ├── update-api.sh.j2        # API update scripts
+│       ├── validate-dns-records.sh.j2 # DNS validation script
+│       ├── vault.hcl.j2             # Vault configuration
+│       └── vault.service.j2         # Vault systemd service
 ├── dev/                            # Development environment
 │   ├── README.md                   # Development setup guide
 │   ├── site.yml                    # Main orchestration playbook
-│   ├── inventory/hosts.yml         # Target hosts configuration  
-│   ├── playbooks/                  # Environment-specific playbooks
-│   │   ├── main.yml               # Dev system setup with wildcard SSL
-│   │   ├── seaweedfs.yml          # Dev SeaweedFS (mode 000)
-│   │   ├── hashicorp.yml          # Dev HashiCorp stack
-│   │   ├── controller.yml         # Dev controller deployment
+│   ├── ansible.cfg                 # Ansible configuration
+│   ├── inventory/                  
+│   │   └── hosts.yml              # Target hosts configuration  
+│   ├── playbooks/                  # Environment-specific playbooks (11 files)
+│   │   ├── api.yml                # API deployment
+│   │   ├── arf-openrewrite-recipes.yml # ARF OpenRewrite recipes setup
+│   │   ├── docker-registry.yml    # Docker registry deployment
+│   │   ├── freebsd.yml            # FreeBSD VM deployment
+│   │   ├── hashicorp.yml          # HashiCorp stack deployment
+│   │   ├── main.yml               # Main dev setup with wildcard SSL
+│   │   ├── openrewrite-jvm.yml    # OpenRewrite JVM configuration
+│   │   ├── seaweedfs.yml          # SeaweedFS deployment (mode 000)
 │   │   ├── testing.yml            # Test environment setup
-│   │   └── freebsd.yml            # FreeBSD VM deployment
+│   │   ├── traefik.yml            # Traefik load balancer
+│   │   └── validation.yml         # Deployment validation
+│   ├── scripts/                    
+│   │   └── validate-deployment.sh  # Deployment validation script
 │   └── vars/
 │       ├── main.yml               # Dev configuration variables
 │       └── dev-wildcard.yml       # Dev wildcard certificate config
+├── local/                          # Local development environment
+│   ├── README.md                   # Local setup documentation
+│   ├── ansible.cfg                 # Local Ansible configuration
+│   ├── docker-compose.yml          # Local service stack
+│   ├── inventory/
+│   │   └── localhost.yml          # Local host inventory
+│   ├── playbooks/
+│   │   └── setup-macos.yml        # macOS development setup
+│   ├── config/                     # Local service configurations
+│   │   ├── consul.hcl              # Local Consul configuration
+│   │   ├── dynamic.yml             # Dynamic configuration
+│   │   ├── nomad.hcl               # Local Nomad configuration
+│   │   ├── postgres-init.sql       # PostgreSQL initialization
+│   │   └── traefik.yml             # Local Traefik configuration
+│   └── scripts/                    # Local development scripts
+│       ├── cleanup.sh              # Local cleanup
+│       ├── setup.sh                # Local environment setup
+│       └── wait-for-services.sh    # Service startup coordination
 └── prod/                           # Production environment
     ├── README.md                   # Production deployment guide
     ├── site.yml                    # Production orchestration playbook
-    ├── inventory/hosts.yml         # Production hosts configuration
-    ├── playbooks/main.yml          # Production system setup
+    ├── inventory/
+    │   └── hosts.yml              # Production hosts configuration
+    ├── playbooks/
+    │   └── main.yml               # Production system setup
     └── vars/
         ├── main.yml               # Production configuration variables
         └── prod-wildcard.yml      # Production wildcard certificate config

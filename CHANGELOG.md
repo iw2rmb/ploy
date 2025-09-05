@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [2025-09-04] - Transflow: LangGraph Jobs + Schemas + CLI integration (MVP groundwork)
+
+### Added
+- Transflow roadmap expanded with LangGraph planner/reducer job model, parallel healing options (human-step, llm-exec, orw-gen→openrewrite), and orchestrator fan‑out sketch.
+- Job interfaces and HCL templates: planner.hcl, reducer.hcl, llm_exec.hcl, orw_apply.hcl.
+- JSON Schemas for artifacts: plan, next, inputs, history, branch_record, run_manifest, kb_summary, kb_snapshot.
+- KB design (kb.md) with consistent learning, locks/CAS, sanitization, compactor job (compactor.hcl) and examples.
+- Orchestrator docs: submit/wait terminal guidance, diff validator, cancellation/idempotency, watcher and branch contracts.
+- Java 11→17 scenario (java11-17.md) with dependency-issue strategies and test case flow.
+- Helpers: validate_artifacts.py to check artifacts against schemas; example runner and compactor pseudocode.
+
+### Changed
+- internal/cli/common/deploy.go: DeployConfig now includes Timeout; SharedPush honors per-call timeout.
+- cmd/ploy: transflow command wired to internal CLI; transflow runner present (implementation continues in phases).
+
+### Notes
+- This lays the foundation for MVP: sequential run is supported by contracts; parallel healing is enabled via orchestrator fan‑out. Next steps: wire runner to jobs and implement fan‑out loop with first‑success‑wins.
+
 ## [2025-09-04] - Phase 6: API/Internal Audit (Codex)
 
 ### Added
@@ -17,6 +35,7 @@
 - Proposed a concrete, staged refactor plan with acceptance criteria.
 
 ### Changed
+- api/server: Removed dependency on `api/config.GetStorageConfigPath()`; server now resolves storage config path locally (env → external → embedded). Added unit tests in `api/server/server_config_path_test.go`.
 - internal/preview: Replaced local `getenv` with `internal/utils.Getenv`; continues unification of env helpers.
 - internal/orchestration: Switched to `internal/utils.Getenv` for template dir and domain suffix resolution; improves consistency with env access patterns.
 - internal/cleanup: `LoadConfigFromEnv` now reads via `internal/utils.Getenv` and preserves existing behavior; unit tests added.
@@ -32,6 +51,7 @@
 
 ### Removed
 - internal/cert: Deleted deprecated legacy handlers after migration window; ACME endpoints under `/v1/certs/*` fully replace them.
+- api/config: Removed legacy helpers `CreateStorageClientFromConfig` and `CreateStorageFromFactory`; all code now uses `internal/config.Service` for storage.
 
 ## [2025-09-04] - OpenRewrite Transformation Testing & SeaweedFS Fix
 

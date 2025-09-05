@@ -1,0 +1,133 @@
+## MVP: transflow (Minimal Viable Implementation)
+
+Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, heal build errors via LangGraph planner/reducer jobs with parallel options, and open a GitLab MR.
+
+### In-Scope (Must Work)
+
+- OpenRewrite recipe execution
+  - Reuse existing ARF/OpenRewrite pipeline (services/openrewrite-jvm, API/CLI `ploy arf transform`).
+  - Input: repo URL + branch, ordered recipe IDs. Output: local patch/commit applied to a workflow branch.
+
+ - LLM plan and exec
+  - `llm-exec` (Stream 2/Phase 1): run model with prompts + prefetched context (repo paths, HTTPS URLs), apply generated patch, commit; execute as Nomad jobs via internal/orchestration.
+  - `llm-plan` (Stream 2/Phase 2): produce a list of `llm-exec` steps (sequential only in MVP) from repo state + last error.
+  - Model registry: minimal CRUD in `ployman` CLI with schema validation; stored under `llms` namespace.
+  - MCP tools: declare per-step (MCP spec), env-only config; prefetch context per execution (no cache/persist).
+
+- Build check (sandbox mode, no deploy)
+  - Use existing build API to verify the code builds without deploying.
+  - Client: `internal/cli/common/deploy.go::SharedPush` (POST tarball to controller `POST /v1/apps/:app/builds?sha=...&env=dev[&lane=...]`).
+  - Server handler: `internal/build/trigger.go` performs lane detection (if lane not provided), builds artifacts (Unikraft/OSv/OCI/etc.), signs, generates SBOM, uploads to storage; it does not deploy to Nomad.
+  - Success criteria: HTTP 200; response includes `lane`, `image` or `dockerImage`. For logs, optional `GET /v1/apps/:app/logs`.
+  - Status endpoint (optional): `GET /v1/apps/:app/status` for additional visibility.
+  - App naming: derive unique app name `tfw-<transflow-id>-<timestamp>` unless explicitly provided.
+  - Lane override: allow explicit `lane` in transflow; fallback to auto-detect when absent.
+  - Timeout: request timeout configurable per run; default 10m for build check.
+
+ - Git operations + MR (Stream 3)
+  - Create a workflow branch at start; commit changes from steps; push branch to origin using provided token envs.
+  - GitLab MR: infer project from `target_repo`, target branch is `base_ref`; envs `GITLAB_URL`, `GITLAB_TOKEN`.
+  - Apply default MR labels/scope: `ploy`, `tfl` (if available).
+
+- LangGraph healing (planner/reducer as jobs)
+  - Planner job: Input = repo metadata + last_error + KB snapshot; Output = `plan.json` with parallel options: human‑step, llm‑exec, orw‑generated.
+  - Orchestrator fan‑out: run each option as an independent Nomad job (branch); first success wins; cancel others.
+  - Reducer job: Input = branch results + winner; Output = next actions (usually stop; else new `plan.json`).
+  - KB: cases and summaries persisted in SeaweedFS; locks via Consul KV; error/patch dedup via normalized signatures/fingerprints.
+  - Consistent learning & dedup: see `roadmap/transflow/kb.md`. Planner reads `summary.json`; branches write `cases/` and patch blobs; compactor maintains summaries and optional vector bundles.
+  - Job types:
+    - human-step: wait for human MR/commit; runner polls branch; success if build passes afterward.
+    - llm-exec: generate diff-only patch (MCP tools allowed); apply and build-check.
+    - orw-gen → openrewrite: generate ORW recipe (class/coords) via LLM; run OpenRewrite job; build-check.
+
+- Transflow runner (orchestrator)
+  - Parse `roadmap/transflow/transflow.yaml` and run steps sequentially: recipe → llm-plan → llm-exec → MR.
+  - Minimal logging; write per-step logs and final summary.
+
+### What Already Exists (Leverage)
+
+- OpenRewrite execution: `services/openrewrite-jvm`, ARF endpoints and CLI (`internal/cli/arf/*`, `api/arf/*`).
+- Git clone/diff/commit helpers: `api/arf/git_operations.go` (extend with push).
+- Lane/build/deploy system (not used in MVP flow): lane detection, Nomad templates, push deploy (`internal/cli/common/deploy.go`).
+- Git provider envs expected for MR (GitLab): set via environment variables.
+
+### New Work (Minimal)
+
+- New `transflow` orchestrator
+  - CLI entry: `ploy transflow run -f transflow.yaml`.
+  - Step engine: call existing ARF recipe execution; implement LLM plan/exec runners; manage workflow branch lifecycle; run Build check before MR.
+
+- LLM runners
+  - `llm-exec`: container/job that receives model+prompts+context; produces unified diff or patch; apply and commit (used in parallel healing options).
+  - MCP injection via env; context prefetcher for repo files and HTTPS URLs.
+
+- Model registry
+  - `ployman models {list|get|add|update|delete}` with basic schema validation; stored alongside existing recipe metadata.
+
+ - MR integration (GitLab)
+  - Push branch using token env; call GitLab REST to create/update MR (project inferred from `target_repo` URL, source branch, target=`base_ref`), adding default labels `ploy`,`tfl` when supported.
+
+- Build check integration
+  - Implement a `build` step that tars the workspace and invokes `SharedPush` with `IsPlatform=false`, `Environment=dev`, and optional lane override from transflow.
+  - Expand `DeployConfig` to include `Timeout time.Duration`; `SharedPush` honors `config.Timeout` sourced from transflow's global `build_timeout`.
+  - Treat non-200 as build failure; record response JSON in step logs for diagnostics.
+
+ - LangGraph planner/reducer integration
+  - Add job templates and CLI/orchestrator glue to invoke planner after a failing build, and reducer after branch completion.
+  - Persist `plan.json`, branch job results, and a compact run manifest; first‑success‑wins cancellation.
+
+### Interfaces (High-Level)
+
+- Input: `roadmap/transflow/transflow.yaml` (id, repo, branch, steps; global lane/build_timeout).
+- Output: GitLab MR link, `plan.json`/branch results, step logs, final summary JSON.
+- Env: `GITLAB_URL`, `GITLAB_TOKEN` for MR; model/MCP creds via env only.
+
+### Out of Scope (MVP)
+
+- Parallel execution and branch-per-exec merging.
+- Secure network policy and allowlists.
+- Budgets/limits (tokens, cost, time).
+- Static analysis, vulnerability scans, compile gates.
+- Deploy/test gates and lane-driven runtime checks.
+- SeaweedFS/Consul KV persistence beyond what ARF already uses implicitly.
+- Auto-formatters outside of step-specific behavior.
+- End-to-end integration tests; coverage thresholds.
+
+### Risks and Mitigations
+
+- LLM determinism: constrain outputs to unified diff/patch; validate before apply.
+- Context quality: ensure prefetch resolves globs/URLs deterministically at run time; log sources.
+- MR creation: handle idempotency (update existing MR for same branch).
+
+### Next Steps
+
+1) Add `ploy transflow run` CLI + YAML parser. 2) Wire recipe step to ARF. 3) Implement LangGraph planner/reducer jobs and orchestrator fan‑out logic. 4) Implement LLM‑exec runner with MCP/env/context prefetch (for branch options). 5) Implement git push + GitLab MR creation. 6) Minimal logs and summary output.
+### Test Case: JDK 11 → 17 Migration
+
+- Minimal transform request (single OpenRewrite recipe step):
+
+POST /v1/transforms
+Content-Type: application/json
+
+{
+  "id": "java11to17",
+  "target_repo": "https://git.example.com/org/app.git",
+  "base_ref": "refs/heads/main",
+  "target_branch": "refs/heads/main",
+  "lane": "C",
+  "steps": [
+    {
+      "type": "recipe",
+      "engine": "openrewrite",
+      "recipes": [
+        "org.openrewrite.java.migrate.Java11toJava17"
+      ]
+    }
+  ]
+}
+
+- Expected flow:
+  1) Apply ORW recipe; commit on workflow/<id>/<timestamp>.
+  2) Build check via /v1/apps/:app/builds (no deploy).
+  3) If build fails, run LangGraph planner job; branches: human-step, llm-exec, orw-gen→openrewrite.
+  4) First success wins; reducer finalizes next actions (usually stop).

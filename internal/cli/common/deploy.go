@@ -12,15 +12,16 @@ import (
 
 // DeployConfig contains all deployment parameters
 type DeployConfig struct {
-	App           string
-	Lane          string
-	MainClass     string
-	SHA           string
-	IsPlatform    bool   // true for ployman, false for ploy
-	BlueGreen     bool
-	Environment   string // dev, staging, prod
-	ControllerURL string
-	Metadata      map[string]string
+    App           string
+    Lane          string
+    MainClass     string
+    SHA           string
+    IsPlatform    bool   // true for ployman, false for ploy
+    BlueGreen     bool
+    Environment   string // dev, staging, prod
+    ControllerURL string
+    Metadata      map[string]string
+    Timeout       time.Duration
 }
 
 // DeployResult contains deployment outcome information
@@ -76,8 +77,12 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 		req.Header.Set("X-Environment", config.Environment)
 	}
 
-	// Execute request
-	resp, err := http.DefaultClient.Do(req)
+    // Execute request with optional timeout
+    client := &http.Client{}
+    if config.Timeout > 0 {
+        client.Timeout = config.Timeout
+    }
+    resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("deployment request failed: %w", err)
 	}

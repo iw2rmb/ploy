@@ -1,42 +1,40 @@
-# Stream 1 / Phase 1 — MVP Transflow: OpenRewrite + Self‑Healing from Build
+# Stream 1 / Phase 1 — MVP Transflow: OpenRewrite + Build Check (Implemented)
 
-Objective: Run an OpenRewrite recipe against a repo, build the app, and if the build fails, trigger a self‑healing pass, then re‑build. Ship a runnable path ASAP by composing existing capabilities.
+Goal: Run an OpenRewrite recipe against a repo and verify the code builds (no deploy). Ship a runnable CLI first. Status: Implemented.
 
-## Reuse First
+Reuse First
+- Transform: `internal/arf` engine + recipes (services/openrewrite-jvm, internal/cli/arf).
+- Build: `internal/cli/common/deploy.go::SharedPush` → API `/v1/apps/:app/builds` handled by `internal/build/trigger.go`.
+- Git: `api/arf/git_operations.go` (clone/diff/commit) — extend with push and branch helpers.
 
-- Transform: `internal/arf` engine + recipes (storage‑backed registry available).
-- Orchestration: `internal/orchestration` Nomad SDK adapter for dispatch/health.
-- Build: `internal/build` endpoints and unified storage resolution (via config service).
-- Self‑healing: `api/arf` healing manager and internal healing utilities (already tested); wire as a remediation step.
-- Config + Storage: `internal/config.Service` + unified `internal/storage`.
-- Errors + Routing: `internal/errors` envelope; `internal/routing` tags + KV.
+Scope
+- CLI entry: `ploy transflow run -f transflow.yaml`.
+- YAML: `roadmap/transflow/transflow.yaml` with global `lane` and `build_timeout` (default 10m), steps: `recipe`, `build`.
+- Branching: create `workflow/<id>/<timestamp>`; commit after each step.
+- Build-only check: generate app name `tfw-<id>-<timestamp>`; POST tar to `/v1/apps/:app/builds?env=dev[&lane=...]` and honor `build_timeout` (client-side).
 
-## Scope
+Detailed Steps (small, verifiable)
+- CLI entrypoint: add `transflow` command in `cmd/ploy/main.go` → `internal/cli/transflow/run.go`.
+- YAML parsing: `internal/cli/transflow/config.go` → struct with `id`, `target_repo`, `base_ref`, `target_branch`, `lane`, `build_timeout`, `steps`.
+- Git operations:
+  - Use `CloneRepository` to clone `target_repo@base_ref`.
+  - Add `CreateBranchAndCheckout(repoPath, branch)` and `PushBranch(remote, branch)` to `api/arf/git_operations.go`.
+  - Use `CommitChanges` after recipe/build steps.
+- Recipe step: call ARF transform via local CLI invocation (existing command) or API call; capture patch and commit.
+- Build step:
+  - Tar working tree (reuse `internal/cli/utils.TarDir` with `.gitignore`).
+  - Call `SharedPush` with lane override from YAML if set; change `SharedPush` signature to accept a `timeout time.Duration` and honor `build_timeout`.
+  - Fail step on non-200; surface response JSON in logs.
+- Push branch to origin at the end (no MR yet).
 
-- HTTP entrypoint: `/v1/transflow/orw` (controller) accepting:
-  - repo URL (or archive), branch, recipe ID, app name, lane (optional), build main (optional)
-- Flow:
-  1) Resolve recipe → download source → apply ORW recipe
-  2) Build via existing build handlers (lane auto‑select if omitted)
-  3) If build fails → invoke healing step (use ARF healing primitives) → re‑build once
-  4) Persist outputs (diffs, logs, artifact) to unified storage; return JSON with links + status
+Acceptance Criteria
+- Given a repo + recipe, the runner applies recipe, commits to `workflow/<id>/<timestamp>`, build returns 200 with `lane` and `image|dockerImage`.
 
-## Acceptance Criteria
+Post‑implementation notes (for Phase 2 compatibility)
+- Ensure build error capture (stdout/stderr) is persisted to feed the LangGraph planner job.
+- Persist a compact run manifest (repo metadata, lane, timing) for planner inputs.
 
-- Provide a minimal end‑to‑end run on VPS: recipe applied and a build artifact produced or a clear failure with error envelope.
-- On initial build failure, a single healing attempt is made; second attempt outcome is reflected in response.
-- All new code uses config service and unified storage; no raw HTTP orchestration.
-- Unit tests cover request validation, happy path, and failing build → healing path.
-
-## TDD Plan
-
-1) RED: Unit tests for controller handler stubs (validate input, call sequence)
-2) GREEN: Implement minimal handler composing existing modules; mock ARF/build/orchestration in tests
-3) REFACTOR: Extract minimal helper struct for orchestration of steps
-
-## Milestones
-
-- M1 (day 1–2): Handler skeleton + request validation + mocked tests
-- M2 (day 3–4): Integration with ARF apply → build; storage of outputs
-- M3 (day 5): Healing hook + re‑build + final response schema
-
+TDD Plan
+1) RED: unit tests for YAML parsing and app name/branch generation; fake `SharedPush` client; verify call shape.
+2) GREEN: implement CLI flow and minimal glue; integrate ARF recipe apply; add timeout support.
+3) REFACTOR: pare down duplication with existing CLI utilities.

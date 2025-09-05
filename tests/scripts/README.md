@@ -2,6 +2,31 @@
 
 This directory contains all test scripts for the Ploy platform. Tests are organized by functional area.
 
+## Recent Consolidation (September 2024)
+
+The test suite has been refactored to eliminate redundancy and improve maintainability:
+
+### Key Changes:
+1. **Common Utilities**: Created `common/test-utils.sh` with shared functions
+   - Color definitions, logging functions, assertions, and API helpers
+   - All scripts now source this file to avoid code duplication
+   
+2. **Consolidated Tests**:
+   - **ARF Storage**: Multiple storage tests now managed by `test-arf-storage-comprehensive.sh`
+   - **Version Detection**: Individual language tests consolidated into `test-version-detection-comprehensive.sh`
+   - **OpenRewrite**: Renamed from `orw-*` prefix to `openrewrite-*` for consistency
+
+3. **Archived Scripts**: 
+   - Obsolete scripts moved to `archive/` directory
+   - Individual version detection scripts (replaced by comprehensive version)
+   - Deprecated features (e.g., Heroku certificate integration)
+
+### Using Common Utilities:
+```bash
+# All test scripts should now start with:
+source "$(dirname "$0")/common/test-utils.sh"
+```
+
 ## Test Execution
 
 Run tests from the VPS environment:

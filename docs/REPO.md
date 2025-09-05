@@ -78,162 +78,18 @@ cmd/
 ```
 
 ### `/internal/` - Shared Libraries
-Reusable modules used by both API and CLI applications.
+Reusable modules used by both API and CLI applications. These packages provide core functionality and abstractions shared across the Ploy platform.
 
-```
-internal/
-├── storage/                  # Object storage abstraction
-│   ├── storage.go            # Storage provider interface
-│   ├── client.go             # Enhanced storage client with retry/metrics
-│   ├── client_test.go        # Storage client tests
-│   ├── seaweedfs.go          # SeaweedFS implementation
-│   ├── seaweedfs_test.go     # SeaweedFS tests
-│   ├── interface.go          # Storage interface definitions
-│   ├── interface_test.go     # Interface tests
-│   ├── retry.go              # Retry logic and backoff
-│   ├── retry_test.go         # Retry mechanism tests
-│   ├── monitoring.go         # Storage operation metrics
-│   ├── errors.go             # Storage error types
-│   ├── errors_test.go        # Error handling tests
-│   ├── integrity.go          # Data integrity verification
-│   └── integrity_test.go     # Integrity tests
-├── cli/                      # CLI-specific modules
-│   ├── apps/                 # Application management commands
-│   │   └── handler.go        # App command handlers
-│   ├── common/               # Common CLI functionality
-│   │   ├── deploy.go         # Shared deployment logic
-│   │   └── deploy_test.go    # Deployment tests
-│   ├── deploy/               # Deployment operations
-│   │   ├── handler.go        # Deployment command handlers
-│   │   └── handler_test.go   # Deployment handler tests
-│   ├── platform/             # Platform management commands
-│   │   ├── handler.go        # Platform command handlers
-│   │   └── handler_test.go   # Platform handler tests
-│   ├── domains/              # Domain operations
-│   │   └── handler.go        # Domain command handlers
-│   ├── certs/                # Certificate management
-│   │   └── handler.go        # Certificate command handlers
-│   ├── debug/                # Debug operations
-│   │   └── handler.go        # Debug command handlers
-│   ├── bluegreen/            # Blue-green deployment commands
-│   │   └── bluegreen.go      # Blue-green deployment logic
-│   ├── analysis/             # Static analysis CLI commands ✅ Aug 2025
-│   │   └── handler.go        # Analysis command handlers
-│   ├── analyze/              # Code analysis commands
-│   │   └── analyze.go        # Analysis execution logic
-│   ├── ui/                   # User interface components
-│   │   └── interface.go      # CLI UI interface definitions
-│   ├── utils/                # CLI utilities
-│   │   └── helpers.go        # CLI helper functions
-│   ├── version/              # Version information
-│   │   └── version.go        # Version command implementation
-│   └── arf/                  # ARF CLI commands ✅ Aug 2025
-│       ├── benchmark.go      # Benchmark testing commands
-│       ├── composition.go    # Recipe composition utilities
-│       ├── config.go         # ARF configuration management
-│       ├── config_handler.go # Configuration command handlers
-│       ├── errors.go         # ARF-specific error handling
-│       ├── execution.go      # Recipe execution commands
-│       ├── formatting.go     # Output formatting utilities
-│       ├── handler.go        # Main ARF command handlers
-│       ├── health.go         # Health check commands
-│       ├── help.go           # Help and documentation commands
-│       ├── import_export.go  # Recipe import/export functionality
-│       ├── pagination.go     # Result pagination utilities
-│       ├── recipes.go        # Recipe management commands
-│       ├── sandbox.go        # Sandbox management commands
-│       ├── templates.go      # Template management commands
-│       ├── transform.go      # Transformation commands
-│       ├── utils.go          # ARF utility functions
-│       └── workflow.go       # Workflow management commands
-├── preview/                  # Preview host routing
-│   └── router.go             # SHA-based preview URL handling
-├── build/                    # Build scripts and management (empty directory)
-├── domain/                   # Domain management
-│   └── handler.go            # Domain configuration handlers
-├── cert/                     # Certificate management
-│   └── handler.go            # SSL/TLS certificate operations
-├── env/                      # Environment variables (empty directory)
-├── debug/                    # Debug operations
-│   └── handler.go            # Application debugging utilities
-├── lifecycle/                # Application lifecycle
-│   ├── handler.go            # App creation, destruction, rollback
-│   └── handler_test.go       # Lifecycle handler tests
-├── cleanup/                  # TTL cleanup service
-│   ├── config.go             # Cleanup configuration
-│   ├── handler.go            # Cleanup HTTP handlers
-│   └── ttl.go                # TTL-based resource cleanup
-├── git/                      # Git repository integration
-│   ├── repository.go         # Git repository analysis
-│   ├── repository_test.go    # Repository tests
-│   ├── utils.go              # Git utilities
-│   ├── utils_test.go         # Git utility tests
-│   ├── validator.go          # Repository validation
-│   └── validator_test.go     # Validation tests
-├── lane/                     # Lane detection system
-│   ├── detector.go           # Automatic lane detection
-│   └── detector_test.go      # Lane detection tests
-├── bluegreen/                # Blue-green deployment
-│   ├── bluegreen.go          # Blue-green deployment logic
-│   └── traefik.go            # Traefik integration for blue-green
-├── chttp/                    # CHTTP client integration
-│   ├── client.go             # CHTTP service client
-│   └── client_test.go        # CHTTP client tests
-├── distribution/             # Binary distribution system
-│   ├── binary.go             # Binary management
-│   ├── errors.go             # Distribution error types
-│   ├── metadata.go           # Binary metadata handling
-│   ├── pipeline.go           # Distribution pipeline
-│   ├── rollback.go           # Rollback functionality
-│   └── system.go             # System integration
-├── monitoring/               # System monitoring
-│   ├── health.go             # Health monitoring
-│   ├── health_test.go        # Health check tests
-│   ├── metrics.go            # Metrics collection
-│   ├── metrics_test.go       # Metrics tests
-│   ├── tracing.go            # Distributed tracing
-│   └── tracing_test.go       # Tracing tests
-├── openrewrite/              # OpenRewrite integration (empty directory)
-├── testutil/                 # Test utilities
-│   ├── api/                  # API testing utilities
-│   │   ├── client.go         # Test API client
-│   │   ├── client_test.go    # API client tests
-│   │   └── scenarios.go      # Test scenarios
-│   ├── builders.go           # Test builders
-│   ├── fixtures.go           # Test fixtures
-│   ├── helpers.go            # Test helper functions
-│   ├── mocks.go              # Mock implementations
-│   ├── resource_monitor.go   # Resource monitoring for tests
-│   └── testutil_test.go      # Test utility tests
-├── testutils/                # Enhanced test utilities
-│   ├── assertions.go         # Custom assertions
-│   ├── builders/             # Test data builders
-│   │   └── builders.go       # Builder implementations
-│   ├── database.go           # Database test utilities
-│   ├── fixtures/             # Test fixtures
-│   │   └── fixtures.go       # Fixture implementations
-│   ├── integration/          # Integration test utilities
-│   │   └── integration.go    # Integration test helpers
-│   ├── mocks/                # Mock implementations
-│   │   ├── consul_mock.go    # Consul mock
-│   │   ├── nomad_mock.go     # Nomad mock
-│   │   └── storage_mock.go   # Storage mock
-│   └── testutils.go          # Main test utilities
-├── utils/                    # Shared utilities
-│   ├── helpers.go            # Common utility functions
-│   ├── helpers_test.go       # Utility function tests
-│   ├── image_size.go         # Container image size utilities
-│   └── image_size_test.go    # Image size tests
-├── validation/               # Input validation
-│   ├── app_name.go           # Application name validation
-│   ├── app_name_test.go      # App name validation tests
-│   ├── env_vars.go           # Environment variable validation
-│   ├── env_vars_test.go      # Environment variable tests
-│   ├── resources.go          # Resource constraint validation
-│   └── resources_test.go     # Resource validation tests
-└── version/                  # Version information
-    └── version.go            # Version constants and utilities
-```
+**For detailed internal package structure and documentation, see [`internal/README.md`](../internal/README.md).**
+
+Key packages include:
+- **storage/** - Object storage abstraction (SeaweedFS implementation)
+- **cli/** - CLI-specific modules and command handlers
+- **git/** - Git repository integration and validation
+- **lane/** - Automatic lane detection system
+- **monitoring/** - Health checks, metrics, and tracing
+- **validation/** - Input validation utilities
+- **testutil/** & **testutils/** - Testing infrastructure and mocks
 
 ## Configuration and Infrastructure
 
@@ -255,76 +111,13 @@ configs/
 ### `/iac/` - Infrastructure as Code
 Ansible playbooks and configuration for deployment environments.
 
-```
-iac/
-├── README.md                       # Infrastructure documentation
-├── common/                         # Shared infrastructure components
-│   ├── playbooks/                  # Reusable playbooks
-│   │   ├── api.yml                 # API deployment logic
-│   │   ├── seaweedfs.yml           # SeaweedFS storage deployment
-│   │   └── hashicorp.yml           # Nomad/Consul/Vault deployment
-│   └── templates/                  # Unified Jinja2 templates
-│       ├── consul-server.hcl.j2    # Linux Consul server configuration
-│       ├── consul-freebsd.hcl.j2   # FreeBSD Consul client configuration
-│       ├── nomad-server.hcl.j2     # Linux Nomad server configuration
-│       ├── nomad-freebsd.hcl.j2    # FreeBSD Nomad client configuration
-│       ├── nomad-ploy-api.hcl.j2   # API Nomad job
-│       ├── nomad-traefik-system.hcl.j2 # Traefik system job
-│       ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
-│       ├── api-status.sh.j2        # API status monitoring script
-│       ├── migrate-api.sh.j2       # API migration scripts
-│       ├── rollback-api.sh.j2      # API rollback scripts
-│       ├── setup-env.sh.j2         # Environment setup
-│       ├── test-*.sh.j2            # Various test scripts
-│       ├── update-api.sh.j2        # API update scripts
-│       ├── chttp-*.j2              # CHTTP service templates
-│       ├── traefik-*.yml.j2        # Traefik configuration templates
-│       ├── validate-dns-records.sh.j2 # DNS validation script
-│       └── [additional templates]  # Platform service templates
-├── dev/                            # Development environment
-│   ├── site.yml                    # Main orchestration playbook
-│   ├── ansible.cfg                 # Ansible configuration
-│   ├── README.md                   # Development environment documentation
-│   ├── inventory/hosts.yml         # Target hosts configuration  
-│   ├── playbooks/                  # Environment-specific playbooks
-│   │   ├── main.yml                # Dev system setup with wildcard SSL
-│   │   ├── seaweedfs.yml           # Dev SeaweedFS (mode 000)
-│   │   ├── hashicorp.yml           # Dev HashiCorp stack
-│   │   ├── api.yml                 # Dev API deployment
-│   │   ├── chttp.yml               # CHTTP service deployment ✅ Aug 2025
-│   │   ├── traefik.yml             # Traefik configuration
-│   │   ├── testing.yml             # Test environment setup
-│   │   └── freebsd.yml             # FreeBSD VM deployment
-│   ├── scripts/                    # Development scripts
-│   │   └── validate-deployment.sh  # Deployment validation
-│   └── vars/
-│       ├── main.yml                # Dev configuration variables
-│       └── dev-wildcard.yml        # Dev wildcard certificate config
-├── local/                          # Local development environment
-│   ├── README.md                   # Local setup documentation
-│   ├── ansible.cfg                 # Local Ansible configuration
-│   ├── docker-compose.yml          # Local service stack
-│   ├── inventory/localhost.yml     # Local host inventory
-│   ├── playbooks/setup-macos.yml   # macOS development setup
-│   ├── config/                     # Local service configurations
-│   │   ├── consul.hcl              # Local Consul configuration
-│   │   ├── dynamic.yml             # Dynamic configuration
-│   │   ├── nomad.hcl               # Local Nomad configuration
-│   │   ├── postgres-init.sql       # PostgreSQL initialization
-│   │   └── traefik.yml             # Local Traefik configuration
-│   └── scripts/                    # Local development scripts
-│       ├── cleanup.sh              # Local cleanup
-│       ├── setup.sh                # Local environment setup
-│       └── wait-for-services.sh    # Service startup coordination
-└── prod/                           # Production environment
-    ├── site.yml                    # Production orchestration playbook
-    ├── README.md                   # Production documentation
-    ├── inventory/hosts.yml         # Production hosts configuration
-    ├── playbooks/main.yml          # Production system setup
-    └── vars/
-        ├── main.yml                # Production configuration variables
-        └── prod-wildcard.yml       # Production wildcard certificate config
-```
+**For detailed infrastructure structure and documentation, see [`iac/README.md`](../iac/README.md).**
+
+Key components:
+- **common/** - Shared playbooks, scripts, and 40+ Jinja2 templates
+- **dev/** - Development environment with 11 playbooks including ARF and OpenRewrite support
+- **local/** - Local development setup with Docker Compose
+- **prod/** - Production environment configuration
 
 ### `/platform/` - Platform Configuration
 Platform-specific deployment configurations.
@@ -455,22 +248,6 @@ tests/
 ```
 
 ## Results and Artifacts
-
-### `/test-results/` - Test Execution Results
-Stored test execution results and reports.
-
-```
-test-results/
-└── arf-phase4/                 # ARF Phase 4 test results
-    ├── compliance-status.json
-    ├── container-scan.json
-    ├── security-report.json
-    ├── sbom-*.json
-    ├── optimization-*.json
-    ├── workflow-*.json
-    ├── results-*.log
-    └── summary-*.txt
-```
 
 ### `/coverage/` - Code Coverage Reports
 Test coverage data and reports.

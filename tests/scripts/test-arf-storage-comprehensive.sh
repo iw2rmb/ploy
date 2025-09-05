@@ -7,39 +7,18 @@ set -e
 SCRIPT_DIR=$(dirname "$0")
 ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 
+# Source common utilities
+source "$SCRIPT_DIR/common/test-utils.sh"
+
 # Configuration
 CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 TEMP_DIR="/tmp/arf-comprehensive-test"
 MASTER_RESULTS_FILE="$TEMP_DIR/comprehensive-results.json"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-NC='\033[0m' # No Color
-
-# Logging functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
+# Additional logging functions specific to comprehensive tests
 log_suite() {
     echo -e "${PURPLE}[SUITE]${NC} $1"
-}
-
-log_separator() {
-    echo -e "${BLUE}=================================================================${NC}"
 }
 
 # Test suite definitions

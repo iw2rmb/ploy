@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/transflow/plan.schema.json",
+  "title": "Transflow Planner Plan",
+  "type": "object",
+  "required": ["plan_id", "options"],
+  "properties": {
+    "plan_id": { "type": "string" },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["human", "llm-exec", "orw-gen"] },
+          "inputs": { "type": "object", "additionalProperties": true },
+          "success_criteria": { "type": "string" },
+          "max_duration": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
+
