@@ -17,6 +17,13 @@ type AppConfig struct {
 type Config struct {
     App     AppConfig     `yaml:"app" json:"app"`
     Storage StorageConfig `yaml:"storage" json:"storage"`
+    Policy  PolicyConfig  `yaml:"policy" json:"policy"`
+}
+
+// PolicyConfig defines optional policy settings
+type PolicyConfig struct {
+    StrictEnvs []string           `yaml:"strict_envs" json:"strict_envs"`
+    SizeCapsMB map[string]float64 `yaml:"size_caps_mb" json:"size_caps_mb"`
 }
 
 // Clone returns a deep copy safe for external mutation.

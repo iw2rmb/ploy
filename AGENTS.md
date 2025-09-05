@@ -55,3 +55,7 @@ For EVERY code change:
 ## Specialized Agents
 
 Use Task tool for complex domain-specific tasks. Available agents in `.claude/agents.json`.
+
+## Sessions System Behaviors
+
+@CLAUDE.sessions.md
