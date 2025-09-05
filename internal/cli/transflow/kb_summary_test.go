@@ -352,7 +352,7 @@ func TestSummaryComputer_ComputeAndUpdateSummary(t *testing.T) {
 	cases := createTestCases()
 
 	// Mock lock acquisition
-	testLock := &Lock{Key: lockKey, SessionID: "test-session"}
+	_ = &Lock{Key: lockKey, SessionID: "test-session"} // testLock created but not used in this test
 	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*transflow.LockConfig"), mock.AnythingOfType("func() error")).
 		Return(nil).
 		Run(func(args mock.Arguments) {

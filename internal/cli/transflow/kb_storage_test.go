@@ -90,32 +90,7 @@ func (m *MockStorage) Metrics() *storage.StorageMetrics {
 	return args.Get(0).(*storage.StorageMetrics)
 }
 
-type MockLockManager struct {
-	mock.Mock
-}
-
-func (m *MockLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
-	args := m.Called(ctx, key, ttl)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*Lock), args.Error(1)
-}
-
-func (m *MockLockManager) ReleaseLock(ctx context.Context, lock *Lock) error {
-	args := m.Called(ctx, lock)
-	return args.Error(0)
-}
-
-func (m *MockLockManager) IsLocked(ctx context.Context, key string) (bool, error) {
-	args := m.Called(ctx, key)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockLockManager) TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error {
-	args := m.Called(ctx, key, config, fn)
-	return args.Error(0)
-}
+// MockLockManager is defined in kb_summary_test.go to avoid duplicate declarations
 
 // Test data
 
@@ -202,7 +177,7 @@ func TestSeaweedFSKBStorage_ReadCases(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test data
-	caseRecord := createTestCaseRecord()
+	_ = createTestCaseRecord() // Create but don't use since we're using inline JSON
 	caseJSON := `{
 		"run_id": "test-run-123",
 		"timestamp": "2023-12-01T10:00:00Z",
