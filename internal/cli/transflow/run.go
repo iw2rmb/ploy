@@ -10,7 +10,13 @@ import (
     "time"
 
     orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "encoding/json"
 )
+// lightweight JSON unmarshal to avoid adding deps
+func jsonUnmarshal(b []byte, v any) error {
+    // use stdlib encoding/json
+    return json.Unmarshal(b, v)
+}
 
 // TransflowCmd provides the CLI entrypoint to run transflows
 func TransflowCmd(args []string, controllerURL string) {
@@ -132,7 +138,33 @@ func runTransflow(args []string, controllerURL string) error {
             if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
                 return fmt.Errorf("planner job failed: %w", err)
             }
-            fmt.Println("Planner job completed. Check mounted out dir on the cluster for out/plan.json.")
+            // Attempt to read plan.json locally if provided
+            planPath := os.Getenv("TRANSFLOW_PLAN_PATH")
+            if planPath == "" {
+                // Fallback to workspace/planner/out/plan.json (works if out volume maps locally)
+                planPath = filepath.Join(filepath.Dir(renderedPath), "out", "plan.json")
+            }
+            if b, err := os.ReadFile(planPath); err == nil {
+                // Minimal validation and summary (avoid external deps)
+                // Expect keys: plan_id (string), options (array)
+                type opt struct{ ID, Type string }
+                var parsed struct{
+                    PlanID string `json:"plan_id"`
+                    Options []map[string]any `json:"options"`
+                }
+                if err := jsonUnmarshal(b, &parsed); err == nil && parsed.PlanID != "" && len(parsed.Options) > 0 {
+                    fmt.Printf("Planner produced plan (id=%s) with %d option(s):\n", parsed.PlanID, len(parsed.Options))
+                    for i, o := range parsed.Options {
+                        id, _ := o["id"].(string)
+                        typ, _ := o["type"].(string)
+                        fmt.Printf("  %d) %s (%s)\n", i+1, id, typ)
+                    }
+                } else {
+                    fmt.Printf("Planner finished but plan.json validation failed or missing keys: %v\n", err)
+                }
+            } else {
+                fmt.Println("Planner job completed. Could not read plan.json locally; set TRANSFLOW_PLAN_PATH to its location on host.")
+            }
         } else {
             fmt.Println("Skipping submission (unset TRANSFLOW_SUBMIT).")
         }
