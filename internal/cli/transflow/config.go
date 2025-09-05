@@ -71,21 +71,21 @@ func (c *TransflowConfig) Validate() error {
 	if len(c.Steps) == 0 {
 		return errors.New("at least one step is required")
 	}
-	
+
 	// Validate self-heal configuration if provided
 	if c.SelfHeal != nil {
 		if err := c.SelfHeal.Validate(); err != nil {
 			return fmt.Errorf("invalid self_heal config: %w", err)
 		}
 	}
-	
+
 	// Validate build timeout if provided
 	if c.BuildTimeout != "" {
 		if _, err := c.ParseBuildTimeout(); err != nil {
 			return fmt.Errorf("invalid build_timeout: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 

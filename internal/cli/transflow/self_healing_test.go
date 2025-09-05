@@ -24,7 +24,7 @@ func TestSelfHealConfig_Parsing(t *testing.T) {
 			name: "valid self heal config",
 			yamlContent: `version: v1alpha1
 id: test-workflow
-target_repo: https://github.com/org/project
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 base_ref: refs/heads/main
 self_heal:
   max_retries: 3
@@ -47,7 +47,7 @@ steps:
 			name: "self heal disabled",
 			yamlContent: `version: v1alpha1
 id: test-workflow
-target_repo: https://github.com/org/project
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 base_ref: refs/heads/main
 self_heal:
   enabled: false
@@ -58,7 +58,7 @@ steps:
     recipes:
       - com.acme.Recipe`,
 			expected: &SelfHealConfig{
-				MaxRetries: 1, // default
+				MaxRetries: 1,  // default
 				Cooldown:   "", // default
 				Enabled:    false,
 			},
@@ -68,7 +68,7 @@ steps:
 			name: "no self heal config uses defaults",
 			yamlContent: `version: v1alpha1
 id: test-workflow
-target_repo: https://github.com/org/project
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 base_ref: refs/heads/main
 steps:
   - type: recipe
@@ -77,8 +77,8 @@ steps:
     recipes:
       - com.acme.Recipe`,
 			expected: &SelfHealConfig{
-				MaxRetries: 1, // default
-				Cooldown:   "", // default
+				MaxRetries: 1,    // default
+				Cooldown:   "",   // default
 				Enabled:    true, // default
 			},
 			expectError: false,
@@ -87,7 +87,7 @@ steps:
 			name: "invalid max_retries",
 			yamlContent: `version: v1alpha1
 id: test-workflow
-target_repo: https://github.com/org/project
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 base_ref: refs/heads/main
 self_heal:
   max_retries: -1
@@ -105,7 +105,7 @@ steps:
 			name: "invalid cooldown format",
 			yamlContent: `version: v1alpha1
 id: test-workflow
-target_repo: https://github.com/org/project
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 base_ref: refs/heads/main
 self_heal:
   max_retries: 2
@@ -126,7 +126,7 @@ steps:
 		t.Run(tt.name, func(t *testing.T) {
 			// This will fail until we implement the parsing
 			config, err := parseTestConfigYAML(tt.yamlContent)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Nil(t, config)
@@ -203,11 +203,11 @@ func TestSelfHealConfig_Validation(t *testing.T) {
 
 func TestTransflowHealingAttempt_Creation(t *testing.T) {
 	tests := []struct {
-		name           string
-		attemptNumber  int
-		errorContext   arf.ErrorContext
+		name             string
+		attemptNumber    int
+		errorContext     arf.ErrorContext
 		suggestedRecipes []string
-		expected       *TransflowHealingAttempt
+		expected         *TransflowHealingAttempt
 	}{
 		{
 			name:          "simple healing attempt",
@@ -219,8 +219,8 @@ func TestTransflowHealingAttempt_Creation(t *testing.T) {
 			},
 			suggestedRecipes: []string{"com.acme.FixCompilation"},
 			expected: &TransflowHealingAttempt{
-				AttemptNumber:    1,
-				ErrorContext:     arf.ErrorContext{
+				AttemptNumber: 1,
+				ErrorContext: arf.ErrorContext{
 					ErrorMessage: "compilation failed",
 					ErrorType:    "compilation",
 					SourceFile:   "Main.java",
@@ -236,7 +236,7 @@ func TestTransflowHealingAttempt_Creation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			attempt := NewTransflowHealingAttempt(tt.attemptNumber, tt.errorContext, tt.suggestedRecipes)
-			
+
 			assert.Equal(t, tt.expected.AttemptNumber, attempt.AttemptNumber)
 			assert.Equal(t, tt.expected.ErrorContext.ErrorMessage, attempt.ErrorContext.ErrorMessage)
 			assert.Equal(t, tt.expected.SuggestedRecipes, attempt.SuggestedRecipes)
@@ -248,7 +248,7 @@ func TestTransflowHealingAttempt_Creation(t *testing.T) {
 
 func TestTransflowHealingSummary_Tracking(t *testing.T) {
 	summary := NewTransflowHealingSummary(true, 2)
-	
+
 	// Test initial state
 	assert.True(t, summary.Enabled)
 	assert.Equal(t, 2, summary.MaxRetries)
@@ -265,7 +265,7 @@ func TestTransflowHealingSummary_Tracking(t *testing.T) {
 		Success:          false,
 		ErrorMessage:     "still failing",
 	}
-	
+
 	attempt2 := &TransflowHealingAttempt{
 		AttemptNumber:    2,
 		SuggestedRecipes: []string{"com.acme.FixSyntax"},
@@ -295,7 +295,7 @@ func TestErrorAnalysisIntegration(t *testing.T) {
 
 	analyzer := NewTransflowErrorAnalyzer()
 	suggestions, err := analyzer.AnalyzeBuildFailure(context.Background(), buildErrors, "go")
-	
+
 	require.NoError(t, err)
 	require.NotNil(t, suggestions)
 	assert.NotEmpty(t, suggestions.SuggestedRecipes)
@@ -306,7 +306,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	// Test the complete self-healing flow (will fail until implemented)
 	config := &TransflowConfig{
 		ID:         "test-healing",
-		TargetRepo: "https://github.com/test/repo",
+		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		BaseRef:    "refs/heads/main",
 		SelfHeal: &SelfHealConfig{
 			MaxRetries: 2,
@@ -352,7 +352,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 
 	runner, err := NewTransflowRunner(config, "/tmp/test")
 	require.NoError(t, err)
-	
+
 	runner.SetGitOperations(mockGit)
 	runner.SetRecipeExecutor(mockRecipe)
 	runner.SetBuildChecker(mockBuild)
@@ -369,18 +369,18 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	assert.NotNil(t, result.HealingSummary)
 	assert.True(t, result.HealingSummary.Enabled)
 	assert.Greater(t, result.HealingSummary.AttemptsCount, 0)
-	
+
 	// Debug: print healing summary details
 	if result.HealingSummary != nil {
 		t.Logf("Healing Summary: Enabled=%t, AttemptsCount=%d, FinalSuccess=%t, Winner=%v",
-			result.HealingSummary.Enabled, result.HealingSummary.AttemptsCount, 
+			result.HealingSummary.Enabled, result.HealingSummary.AttemptsCount,
 			result.HealingSummary.FinalSuccess, result.HealingSummary.Winner != nil)
 		if result.HealingSummary.Winner != nil {
 			t.Logf("Winner: %+v", *result.HealingSummary.Winner)
 		}
 		t.Logf("All results count: %d", len(result.HealingSummary.AllResults))
 	}
-	
+
 	assert.True(t, result.HealingSummary.FinalSuccess)
 }
 
@@ -388,7 +388,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 	// Test that healing respects max_retries limit
 	config := &TransflowConfig{
 		ID:         "test-bounded",
-		TargetRepo: "https://github.com/test/repo", 
+		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		BaseRef:    "refs/heads/main",
 		SelfHeal: &SelfHealConfig{
 			MaxRetries: 1, // Only one retry allowed
@@ -409,7 +409,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 
 	runner, err := NewTransflowRunner(config, "/tmp/test")
 	require.NoError(t, err)
-	
+
 	runner.SetGitOperations(&MockGitOperations{})
 	runner.SetRecipeExecutor(&MockRecipeExecutor{})
 	runner.SetBuildChecker(mockBuild)
@@ -436,14 +436,13 @@ func parseTestConfigYAML(yamlContent string) (*TransflowConfig, error) {
 		return nil, err
 	}
 	defer os.Remove(tmpFile.Name())
-	
+
 	if err := os.WriteFile(tmpFile.Name(), []byte(yamlContent), 0644); err != nil {
 		return nil, err
 	}
-	
+
 	return LoadConfig(tmpFile.Name())
 }
-
 
 // Enhanced MockBuildChecker for healing tests (extends the one from runner_test.go)
 type HealingMockBuildChecker struct {
@@ -461,7 +460,7 @@ func NewHealingMockBuildChecker() *HealingMockBuildChecker {
 func (m *HealingMockBuildChecker) CheckBuild(ctx context.Context, config common.DeployConfig) (*common.DeployResult, error) {
 	m.BuildCalled = true
 	m.BuildConfig = config
-	
+
 	if m.buildResults != nil && m.callCount < len(m.buildResults) {
 		result := m.buildResults[m.callCount]
 		m.callCount++
@@ -470,7 +469,7 @@ func (m *HealingMockBuildChecker) CheckBuild(ctx context.Context, config common.
 		}
 		return result, nil
 	}
-	
+
 	// Fall back to base MockBuildChecker behavior
 	return m.MockBuildChecker.CheckBuild(ctx, config)
 }

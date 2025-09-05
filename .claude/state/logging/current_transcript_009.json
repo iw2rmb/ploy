@@ -1,0 +1,15 @@
+[
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01MEk2t7LSMSQGGD5R4Mh7kf",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/.claude/state/logging/current_transcript_006.json"
+        }
+      }
+    ]
+  }
+]
