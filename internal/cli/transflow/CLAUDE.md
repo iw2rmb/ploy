@@ -10,30 +10,34 @@ Core workflow: clone repository → create branch → apply transformations → 
 
 ## Key Files
 - `run.go:1-250` - CLI command entry point and flag parsing
-- `runner.go:1-650` - Complete orchestration logic with healing integration
+- `runner.go:1-650` - Complete orchestration logic with healing integration and ProductionBranchRunner interface implementation
 - `runner.go:126-172` - Main dependency injection and initialization
 - `runner.go:174-280` - Core workflow execution (Run method)
 - `runner.go:282-380` - Build validation and error handling
-- `runner.go:441-500` - Self-healing workflow integration
+- `runner.go:189-191` - GetTargetRepo() method implementation for human-step branch support
+- `runner.go:441-500` - Self-healing workflow integration with complete three-branch fanout support
 - `runner.go:509-553` - GitLab MR creation and updates
 - `config.go:1-150` - Configuration loading, validation, and timeout parsing
 - `integrations.go:87-200` - Factory pattern for production vs test implementations
-- `types.go:1-72` - Complete job submission type system with ProductionBranchRunner interface
-- `types.go:17-26` - ProductionBranchRunner interface for asset rendering and dependency access
+- `types.go:1-72` - Complete job submission type system with interface definitions
+- `fanout_orchestrator.go:17-27` - ProductionBranchRunner interface for asset rendering and dependency access with GetTargetRepo() method
 - `types.go:60-72` - JobSubmissionHelper and FanoutOrchestrator interfaces
 - `job_submission.go:1-250` - Production JobSubmissionHelper with HCL rendering and artifact parsing
 - `job_submission.go:47-84` - Environment variable substitution for HCL templates
 - `job_submission.go:86-98` - JSON artifact retrieval and parsing
 - `job_submission.go:100-180` - Real planner/reducer job submission with SubmitAndWaitTerminal
-- `fanout_orchestrator.go:1-300` - Production parallel healing branch orchestration with three branch types
-- `fanout_orchestrator.go:44-120` - First-success-wins fanout execution with context cancellation and timeout handling
-- `fanout_orchestrator.go:127-198` - Branch execution dispatcher and context management
-- `fanout_orchestrator.go:200-246` - LLM-exec branch with HCL rendering, environment substitution, and diff.patch processing
-- `fanout_orchestrator.go:248-333` - ORW-gen branch with recipe configuration extraction and template substitution
-- `fanout_orchestrator.go:335-420` - Human-step branch with MR creation, commit polling, and build validation
+- `fanout_orchestrator.go:1-420` - Production parallel healing branch orchestration with complete three branch type implementation
+- `fanout_orchestrator.go:50-120` - First-success-wins fanout execution with proper context cancellation and timeout handling
+- `fanout_orchestrator.go:127-198` - Branch execution dispatcher with comprehensive error handling and context management
+- `fanout_orchestrator.go:200-246` - LLM-exec branch with HCL rendering, environment substitution, and diff.patch artifact processing
+- `fanout_orchestrator.go:248-333` - ORW-gen branch with recipe configuration extraction and complete template substitution
+- `fanout_orchestrator.go:335-420` - Complete human-step branch implementation with Git MR workflow, commit polling, and build validation
 - `self_healing.go:1-250` - Self-healing configuration and result tracking
 - `mocks.go:1-200` - Complete mock implementation framework
 - `integration_test.go:1-300` - End-to-end integration test suite
+- `job_submission_test.go:1-1400` - Comprehensive test coverage for all three healing branch types with complete error handling scenarios
+- `job_submission_test.go:32-77` - MockProductionBranchRunner implementation with GetTargetRepo() method support
+- `job_submission_test.go:450-1400` - Complete test suites covering human-step, llm-exec, and orw-gen branches with production job submission scenarios
 
 ## Integration Points
 ### Consumes
@@ -47,13 +51,14 @@ Core workflow: clone repository → create branch → apply transformations → 
 
 ### Provides
 - CLI Commands: `ploy transflow run -f <config>` with complete flag support
-- Workflow Execution: End-to-end transformation pipeline with result tracking
-- Self-Healing: Production LangGraph-based healing with real planner/reducer jobs and parallel branch execution
-- MR Integration: GitLab merge request creation/updates with rich descriptions
-- Test Mode: Complete mock infrastructure for CI/CD and local testing
+- Workflow Execution: End-to-end transformation pipeline with comprehensive result tracking
+- Self-Healing: Production LangGraph-based healing with complete three-branch implementation and parallel execution
+- MR Integration: GitLab merge request creation/updates with rich descriptions and human-step branch support
+- Test Mode: Complete mock infrastructure for CI/CD and local testing with comprehensive branch type coverage
 - Job Orchestration: Production Nomad job submission with HCL template rendering and artifact processing
 - Artifact Processing: JSON parsing of plan.json, next.json, and diff.patch from completed jobs
-- Branch Type Implementation: Complete support for human-step (Git+MR workflow), llm-exec (HCL job submission), and orw-gen (recipe generation) healing strategies
+- Complete Branch Type System: Full implementation of human-step (Git+MR workflow with commit polling), llm-exec (HCL job submission with diff processing), and orw-gen (recipe generation with template substitution) healing strategies
+- Production Interface Implementation: ProductionBranchRunner interface with GetTargetRepo() method for comprehensive dependency access
 
 ## Configuration
 Required files:
@@ -78,18 +83,18 @@ CLI flags:
 ## Key Patterns
 - Complete dependency injection with interface-based design (see runner.go:126-172, integrations.go:87-200)
 - Factory pattern for production vs test implementations (see integrations.go)
-- Test mode infrastructure with comprehensive mocking (see mocks.go:1-200)
+- Test mode infrastructure with comprehensive mocking and complete branch type coverage (see job_submission_test.go:32-77)
 - Production job submission with HCL template rendering and environment substitution (see job_submission.go:47-84)
 - Real artifact processing with JSON parsing for job outputs (see job_submission.go:86-98)
 - Type-safe job submission interfaces supporting planner/reducer/branch workflows (see types.go:60-72)
-- Production fanout orchestration with first-success-wins semantics and real Nomad jobs (see fanout_orchestrator.go:50-120)
-- Complete three-branch healing system: human-step (MR+build validation), llm-exec (HCL+diff processing), orw-gen (recipe generation)
-- Context-aware cancellation and timeout handling for parallel branch execution
+- Production fanout orchestration with first-success-wins semantics and complete three-branch implementation (see fanout_orchestrator.go:50-420)
+- Complete healing branch type system: human-step (Git MR workflow with commit polling and build validation), llm-exec (HCL job submission with diff.patch processing), orw-gen (recipe generation with comprehensive template substitution)
+- ProductionBranchRunner interface implementation with GetTargetRepo() method for human-step branch Git operations (see runner.go:189-191, fanout_orchestrator.go:17-27)
+- Context-aware cancellation and timeout handling for parallel branch execution with proper resource cleanup
 - HCL template processing with environment variable substitution for job definitions
 - Graceful error handling with optional MR creation (see runner.go:509-553)
-- Self-healing workflow with production LangGraph integration and parallel branch execution via first-success-wins fanout orchestration
-- Complete healing branch type system supporting three distinct healing strategies with production Nomad job orchestration
-- Context-aware cancellation ensuring resources are freed when first branch succeeds or timeout occurs
+- Comprehensive test coverage with mock implementations supporting all interface methods and error scenarios (see job_submission_test.go:450-1400)
+- Self-healing workflow with production LangGraph integration and complete parallel branch execution via first-success-wins fanout orchestration
 - Configuration validation with timeout parsing and comprehensive error reporting
 
 ## Related Documentation

@@ -186,6 +186,11 @@ func (r *TransflowRunner) GetWorkspaceDir() string {
 	return r.workspaceDir
 }
 
+// GetTargetRepo returns the target repository URL for human-step branch operations
+func (r *TransflowRunner) GetTargetRepo() string {
+	return r.config.TargetRepo
+}
+
 // PlannerAssets holds file paths for rendered planner inputs and HCL
 type PlannerAssets struct {
 	InputsPath string

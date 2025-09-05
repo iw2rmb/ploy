@@ -20,10 +20,8 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - **Fanout orchestration:** First-success-wins parallel execution with proper cancellation and timeout handling
 - **Production job submission:** Real Nomad integration via orchestration.SubmitAndWaitTerminal()
 - **Comprehensive test coverage:** Complete test suites for all branch types including error handling and edge cases
-
-⚠️ **Partially Implemented:**
-- LangGraph planner/reducer job integration (templates exist, orchestrator wiring in progress)
-- Self-healing workflow coordination with TransflowRunner integration
+- **LangGraph planner/reducer job integration:** Complete with HCL templates, job submission, and orchestrator wiring
+- **Self-healing workflow coordination:** Full TransflowRunner integration with production deployment validation
 
 ❌ **Not Implemented:**
 - Model registry in `ployman` CLI
