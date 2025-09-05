@@ -178,6 +178,19 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
   "deps": {}
 }
 
+// RenderLLMExecAssets writes a rendered llm_exec.hcl for the given option ID.
+func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
+    dir := filepath.Join(r.workspaceDir, "llm-exec", optionID)
+    if err := os.MkdirAll(dir, 0755); err != nil { return "", err }
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "llm_exec.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil { return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err) }
+    renderedPath := filepath.Join(dir, "llm_exec.rendered.hcl")
+    // Defer env substitution to caller (same as planner/reducer), we just copy template here
+    if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil { return "", err }
+    return renderedPath, nil
+}
+
 // ReducerAssets holds file paths for rendered reducer inputs and HCL
 type ReducerAssets struct {
     HistoryPath string
