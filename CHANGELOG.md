@@ -10,6 +10,7 @@
 - Orchestrator docs: submit/wait terminal guidance, diff validator, cancellation/idempotency, watcher and branch contracts.
 - Java 11→17 scenario (java11-17.md) with dependency-issue strategies and test case flow.
 - Helpers: validate_artifacts.py to check artifacts against schemas; example runner and compactor pseudocode.
+- Orchestration: `SubmitAndWaitTerminal` helper for batch jobs (planner/reducer) to wait for terminal state.
 
 ### Changed
 - internal/cli/common/deploy.go: DeployConfig now includes Timeout; SharedPush honors per-call timeout.
