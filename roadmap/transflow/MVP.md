@@ -13,11 +13,15 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - GitLab MR integration with environment variable configuration
 - Complete CLI integration (`ploy transflow run`) with full end-to-end workflow
 - Test mode infrastructure with mock implementations for CI/testing
-
-⚠️ **Partially Implemented:**
-- LangGraph healing (planner/reducer infrastructure exists, orchestration in progress)
-- Self-healing config parsing and data structures
-- Job templates for healing branches (human-step, llm-exec, orw-generated)
+- **LangGraph healing branch types:** complete implementation of all three healing strategies
+  - **human-step:** Git-based manual intervention with MR creation, commit polling, and build validation
+  - **llm-exec:** HCL template rendering, environment substitution, Nomad job submission, and diff.patch artifact processing
+  - **orw-gen:** Recipe configuration extraction, template substitution, and OpenRewrite job execution
+- **Fanout orchestration:** First-success-wins parallel execution with proper cancellation and timeout handling
+- **Production job submission:** Real Nomad integration via orchestration.SubmitAndWaitTerminal()
+- **Comprehensive test coverage:** Complete test suites for all branch types including error handling and edge cases
+- **LangGraph planner/reducer job integration:** Complete with HCL templates, job submission, and orchestrator wiring
+- **Self-healing workflow coordination:** Full TransflowRunner integration with production deployment validation
 
 ❌ **Not Implemented:**
 - Model registry in `ployman` CLI

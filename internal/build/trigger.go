@@ -10,16 +10,16 @@ import (
 	"strings"
 	"time"
 
-    "github.com/gofiber/fiber/v2"
-    ibuilders "github.com/iw2rmb/ploy/internal/builders"
-    supply "github.com/iw2rmb/ploy/internal/supply"
-    ipolicy "github.com/iw2rmb/ploy/internal/policy"
+	"github.com/gofiber/fiber/v2"
+	ibuilders "github.com/iw2rmb/ploy/internal/builders"
 	"github.com/iw2rmb/ploy/internal/config"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+	ipolicy "github.com/iw2rmb/ploy/internal/policy"
 	"github.com/iw2rmb/ploy/internal/security"
 	"github.com/iw2rmb/ploy/internal/storage"
+	supply "github.com/iw2rmb/ploy/internal/supply"
 	"github.com/iw2rmb/ploy/internal/utils"
 	"github.com/iw2rmb/ploy/internal/validation"
 )
@@ -159,13 +159,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	var imagePath, dockerImage string
 	switch strings.ToUpper(lane) {
 	case "A", "B":
-    img, err := ibuilders.BuildUnikraft(appName, lane, srcDir, sha, tmpDir, appEnvVars)
+		img, err := ibuilders.BuildUnikraft(appName, lane, srcDir, sha, tmpDir, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
 		imagePath = img
 	case "C":
-    img, err := ibuilders.BuildOSVJava(ibuilders.JavaOSVRequest{
+		img, err := ibuilders.BuildOSVJava(ibuilders.JavaOSVRequest{
 			App:       appName,
 			MainClass: mainClass,
 			SrcDir:    srcDir,
@@ -178,7 +178,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 		imagePath = img
 	case "D":
-    img, err := ibuilders.BuildJail(appName, srcDir, sha, tmpDir, appEnvVars)
+		img, err := ibuilders.BuildJail(appName, srcDir, sha, tmpDir, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
@@ -187,13 +187,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		// Use container registry with namespace-aware routing and RBAC credentials
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
-    img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
+		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
 		dockerImage = img
 	case "F":
-    img, err := ibuilders.BuildVM(appName, sha, tmpDir, appEnvVars)
+		img, err := ibuilders.BuildVM(appName, sha, tmpDir, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
@@ -204,14 +204,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		// Use container registry with namespace-aware routing and RBAC credentials
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
-            img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
+		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
 		dockerImage = img
 	default:
 		lane = "C"
-    img, err := ibuilders.BuildOSVJava(ibuilders.JavaOSVRequest{
+		img, err := ibuilders.BuildOSVJava(ibuilders.JavaOSVRequest{
 			App:       appName,
 			MainClass: mainClass,
 			SrcDir:    srcDir,
@@ -261,14 +261,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	if imagePath != "" {
 		// Generate SBOM for file-based artifacts (Lanes A, B, C, D, F)
 		if !utils.FileExists(imagePath + ".sbom.json") {
-            if err := supply.GenerateSBOM(imagePath, lane, appName, sha); err != nil {
+			if err := supply.GenerateSBOM(imagePath, lane, appName, sha); err != nil {
 				// Log error but don't fail the build - SBOM generation is best effort
 				fmt.Printf("Warning: SBOM generation failed for %s: %v\n", imagePath, err)
 			}
 		}
 	} else if dockerImage != "" {
 		// Generate SBOM for container images (Lane E)
-        if err := supply.GenerateSBOM(dockerImage, lane, appName, sha); err != nil {
+		if err := supply.GenerateSBOM(dockerImage, lane, appName, sha); err != nil {
 			// Log error but don't fail the build - SBOM generation is best effort
 			fmt.Printf("Warning: SBOM generation failed for container %s: %v\n", dockerImage, err)
 		}
@@ -276,8 +276,8 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	// Also generate source code SBOM for dependency analysis
 	if !utils.FileExists(filepath.Join(srcDir, ".sbom.json")) {
-        generator := supply.NewSBOMGenerator()
-        options := supply.DefaultSBOMOptions()
+		generator := supply.NewSBOMGenerator()
+		options := supply.DefaultSBOMOptions()
 		options.Lane = lane
 		options.AppName = appName
 		options.SHA = sha
@@ -290,13 +290,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	// Sign the built artifact if not already signed
 	if imagePath != "" && !utils.FileExists(imagePath+".sig") {
 		// Sign file-based artifacts (Lanes A, B, C, D, F)
-        if err := supply.SignArtifact(imagePath); err != nil {
+		if err := supply.SignArtifact(imagePath); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("artifact signing failed: %w", err))
 		}
 	} else if dockerImage != "" {
 		// Sign Docker images (Lane E)
 		// Note: Docker image signing verification is more complex and handled by the registry
-        if err := supply.SignDockerImage(dockerImage); err != nil {
+		if err := supply.SignDockerImage(dockerImage); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("docker image signing failed: %w", err))
 		}
 	}
@@ -308,7 +308,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		// Check for file-based artifact signatures
 		signed = utils.FileExists(imagePath + ".sig")
 		if signed {
-            _ = supply.VerifySignature(imagePath, imagePath+".sig")
+			_ = supply.VerifySignature(imagePath, imagePath+".sig")
 		}
 	} else if dockerImage != "" {
 		// For Docker images, assume signed if signing was successful
@@ -417,23 +417,23 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 	}
 
-    if err := ipolicy.DefaultEnforcer.Enforce(ipolicy.ArtifactInput{
-        Signed:         signed,
-        SBOMPresent:    sbom,
-        Env:            env,
-        SSHEnabled:     debug, // SSH is enabled for debug builds
-        BreakGlass:     breakGlass,
-        App:            appName,
-        Lane:           lane,
-        Debug:          debug,
-        ImageSizeMB:    imageSizeMB,
-        ImagePath:      imagePath,
-        DockerImage:    dockerImage,
-        VulnScanPassed: vulnScanPassed,
-        SigningMethod:  signingMethod,
-        BuildTime:      time.Now().Unix(),
-        SourceRepo:     sourceRepo,
-    }); err != nil {
+	if err := ipolicy.DefaultEnforcer.Enforce(ipolicy.ArtifactInput{
+		Signed:         signed,
+		SBOMPresent:    sbom,
+		Env:            env,
+		SSHEnabled:     debug, // SSH is enabled for debug builds
+		BreakGlass:     breakGlass,
+		App:            appName,
+		Lane:           lane,
+		Debug:          debug,
+		ImageSizeMB:    imageSizeMB,
+		ImagePath:      imagePath,
+		DockerImage:    dockerImage,
+		VulnScanPassed: vulnScanPassed,
+		SigningMethod:  signingMethod,
+		BuildTime:      time.Now().Unix(),
+		SourceRepo:     sourceRepo,
+	}); err != nil {
 		return utils.ErrJSON(c, 403, fmt.Errorf("OPA policy enforcement failed: %w", err))
 	}
 

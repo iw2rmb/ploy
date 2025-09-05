@@ -21,16 +21,16 @@ type WASMRuntime struct {
 
 // WASMConfig configures the WASM runtime environment
 type WASMConfig struct {
-	MaxMemoryPages uint32        // 64KB pages, max 4GB
-	MaxExecTime    time.Duration // Maximum execution time
-	AllowedSyscalls []string     // Allowed system calls (future use)
-	FilesystemRoot  string       // Root directory for filesystem access
+	MaxMemoryPages  uint32        // 64KB pages, max 4GB
+	MaxExecTime     time.Duration // Maximum execution time
+	AllowedSyscalls []string      // Allowed system calls (future use)
+	FilesystemRoot  string        // Root directory for filesystem access
 }
 
 // DefaultWASMConfig returns a secure default configuration
 func DefaultWASMConfig() WASMConfig {
 	return WASMConfig{
-		MaxMemoryPages: 256,           // 16MB default
+		MaxMemoryPages: 256,              // 16MB default
 		MaxExecTime:    30 * time.Second, // 30 second timeout
 		FilesystemRoot: "/tmp/wasm-sandbox",
 	}
@@ -195,12 +195,12 @@ func DefaultModuleConfig() wazero.ModuleConfig {
 
 // WASIConfig configures WASI (WebAssembly System Interface) settings
 type WASIConfig struct {
-	Args     []string               // Command line arguments
-	Env      map[string]string      // Environment variables
-	Preopens map[string]string      // guest_path -> host_path mappings
-	Stdin    io.Reader             // Standard input
-	Stdout   io.Writer             // Standard output
-	Stderr   io.Writer             // Standard error
+	Args     []string          // Command line arguments
+	Env      map[string]string // Environment variables
+	Preopens map[string]string // guest_path -> host_path mappings
+	Stdin    io.Reader         // Standard input
+	Stdout   io.Writer         // Standard output
+	Stderr   io.Writer         // Standard error
 }
 
 // DefaultWebWASIConfig returns a configuration suitable for web applications

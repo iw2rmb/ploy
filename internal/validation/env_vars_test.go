@@ -21,7 +21,7 @@ func TestValidateEnvVarName(t *testing.T) {
 		{"valid mixed case", "MyVariable", false, ""},
 		{"valid single char", "X", false, ""},
 		{"valid underscore start", "_PRIVATE", false, ""},
-		
+
 		// Invalid names
 		{"empty name", "", true, "empty"},
 		{"spaces in name", "MY VAR", true, "invalid character"},
@@ -33,7 +33,7 @@ func TestValidateEnvVarName(t *testing.T) {
 		{"dots", "my.var", true, "invalid character"},
 		{"command injection", "VAR;rm -rf", true, "invalid character"},
 		{"null byte", "VAR\x00", true, "invalid character"},
-		
+
 		// Reserved names that should be rejected
 		{"reserved PATH", "PATH", true, "reserved"},
 		{"reserved HOME", "HOME", true, "reserved"},
@@ -42,7 +42,7 @@ func TestValidateEnvVarName(t *testing.T) {
 		{"reserved PWD", "PWD", true, "reserved"},
 		{"reserved LD_PRELOAD", "LD_PRELOAD", true, "reserved"},
 		{"reserved LD_LIBRARY_PATH", "LD_LIBRARY_PATH", true, "reserved"},
-		
+
 		// Length limits
 		{"too long", strings.Repeat("A", 256), true, "too long"},
 		{"max length valid", strings.Repeat("A", 255), false, ""},
@@ -51,7 +51,7 @@ func TestValidateEnvVarName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateEnvVarName(tt.varName)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("ValidateEnvVarName(%q) expected error but got none", tt.varName)
@@ -84,17 +84,17 @@ func TestValidateEnvVarValue(t *testing.T) {
 		{"valid base64", "dGVzdCBkYXRhCg==", false, ""},
 		{"valid empty", "", false, ""},
 		{"valid special chars", "!@#$%^&*()_+-=[]{}|;:,.<>?", false, ""},
-		
+
 		// Invalid values
 		{"null byte", "value\x00data", true, "null byte"},
 		{"control char", "value\x01data", true, "control character"},
 		{"too long", strings.Repeat("x", 65537), true, "too long"},
-		
+
 		// Values that look like injection but should be allowed (escaped/quoted properly)
 		{"looks like command", "rm -rf /", false, ""},
 		{"SQL-like", "'; DROP TABLE users; --", false, ""},
 		{"script tags", "<script>alert('xss')</script>", false, ""},
-		
+
 		// Maximum valid length
 		{"max length", strings.Repeat("x", 65536), false, ""},
 	}
@@ -102,7 +102,7 @@ func TestValidateEnvVarValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateEnvVarValue(tt.value)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("ValidateEnvVarValue() expected error but got none")
@@ -189,7 +189,7 @@ func TestValidateEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateEnvVars(tt.envVars)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("ValidateEnvVars() expected error but got none")
@@ -226,13 +226,13 @@ func TestIsReservedEnvVar(t *testing.T) {
 		{"CDPATH", "CDPATH", true},
 		{"ENV", "ENV", true},
 		{"BASH_ENV", "BASH_ENV", true},
-		
+
 		// Not reserved
 		{"CUSTOM_PATH", "CUSTOM_PATH", false},
 		{"MY_HOME", "MY_HOME", false},
 		{"DATABASE_URL", "DATABASE_URL", false},
 		{"API_KEY", "API_KEY", false},
-		
+
 		// Case sensitive check
 		{"path lowercase", "path", false},
 		{"Path mixed", "Path", false},

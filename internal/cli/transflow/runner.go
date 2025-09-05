@@ -171,6 +171,26 @@ func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
 	r.gitProvider = provider
 }
 
+// GetGitProvider returns the Git provider for human-step branch operations
+func (r *TransflowRunner) GetGitProvider() provider.GitProvider {
+	return r.gitProvider
+}
+
+// GetBuildChecker returns the build checker for human-step branch operations
+func (r *TransflowRunner) GetBuildChecker() BuildCheckerInterface {
+	return r.buildChecker
+}
+
+// GetWorkspaceDir returns the workspace directory for human-step branch operations
+func (r *TransflowRunner) GetWorkspaceDir() string {
+	return r.workspaceDir
+}
+
+// GetTargetRepo returns the target repository URL for human-step branch operations
+func (r *TransflowRunner) GetTargetRepo() string {
+	return r.config.TargetRepo
+}
+
 // PlannerAssets holds file paths for rendered planner inputs and HCL
 type PlannerAssets struct {
 	InputsPath string

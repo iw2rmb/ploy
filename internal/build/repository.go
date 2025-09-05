@@ -17,7 +17,7 @@ func extractSourceRepository(srcDir string) string {
 			return url
 		}
 	}
-	
+
 	// Fallback to original implementation for non-Git projects
 	// Try to read from package.json for Node.js projects
 	packageJSONPath := filepath.Join(srcDir, "package.json")
@@ -35,6 +35,6 @@ func extractSourceRepository(srcDir string) string {
 			}
 		}
 	}
-	
+
 	return ""
 }

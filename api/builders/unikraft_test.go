@@ -218,19 +218,19 @@ func TestBuildUnikraftEnvironmentVariables(t *testing.T) {
 func BuildUnikraftWithMock(app, lane, srcDir, sha, outDir string, envVars map[string]string, commandExecutor func(string, ...string) *exec.Cmd) (string, error) {
 	args := []string{"--app", app, "--app-dir", srcDir, "--lane", lane, "--sha", sha, "--out-dir", outDir}
 	cmd := commandExecutor("./scripts/build/kraft/build_unikraft.sh", args...)
-	
+
 	// Add environment variables to the build process
 	env := os.Environ()
 	for k, v := range envVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	cmd.Env = env
-	
+
 	b, err := cmd.CombinedOutput()
-	if err != nil { 
-		return "", fmt.Errorf("unikraft build failed: %v: %s", err, string(b)) 
+	if err != nil {
+		return "", fmt.Errorf("unikraft build failed: %v: %s", err, string(b))
 	}
-	
+
 	// Extract the artifact path from the output (should be the last line that looks like a file path)
 	output := string(b)
 	lines := strings.Split(output, "\n")
@@ -240,7 +240,7 @@ func BuildUnikraftWithMock(app, lane, srcDir, sha, outDir string, envVars map[st
 			return line, nil
 		}
 	}
-	
+
 	// Fallback to trimming the entire output
 	return strings.TrimSpace(output), nil
 }

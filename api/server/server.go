@@ -48,8 +48,8 @@ import (
 	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
-    apperr "github.com/iw2rmb/ploy/internal/errors"
-    policy "github.com/iw2rmb/ploy/internal/policy"
+	apperr "github.com/iw2rmb/ploy/internal/errors"
+	policy "github.com/iw2rmb/ploy/internal/policy"
 	"github.com/iw2rmb/ploy/internal/preview"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
@@ -73,9 +73,9 @@ type ServiceDependencies struct {
 	BlueGreenManager        *bluegreen.Manager
 	Metrics                 *metrics.Metrics
 	StorageConfigPath       string
-    // StorageFactory deprecated: use config service
-	ARFEngine               arfcore.Engine
-	ARFRecipes              tarfrecipes.Registry
+	// StorageFactory deprecated: use config service
+	ARFEngine  arfcore.Engine
+	ARFRecipes tarfrecipes.Registry
 }
 
 // ControllerConfig holds configuration for controller initialization
@@ -138,19 +138,19 @@ func LoadConfigFromEnv() *ControllerConfig {
 // getStorageConfigPath resolves the storage configuration path without depending on api/config.
 // Order: env override -> common external paths -> embedded default.
 func getStorageConfigPath() string {
-    if path := os.Getenv("PLOY_STORAGE_CONFIG"); path != "" {
-        return path
-    }
-    externalPaths := []string{
-        "/etc/ploy/storage/config.yaml",
-        "/etc/ploy/config.yaml",
-    }
-    for _, p := range externalPaths {
-        if _, err := os.Stat(p); err == nil {
-            return p
-        }
-    }
-    return "configs/storage-config.yaml"
+	if path := os.Getenv("PLOY_STORAGE_CONFIG"); path != "" {
+		return path
+	}
+	externalPaths := []string{
+		"/etc/ploy/storage/config.yaml",
+		"/etc/ploy/config.yaml",
+	}
+	for _, p := range externalPaths {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "configs/storage-config.yaml"
 }
 
 // Server represents the stateless controller server
@@ -198,9 +198,9 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize config service: %w", err)
 		}
-        cfgService = svc
-        // Apply centralized policy configuration if present
-        policy.ApplyFromConfig(cfgService)
+		cfgService = svc
+		// Apply centralized policy configuration if present
+		policy.ApplyFromConfig(cfgService)
 	}
 
 	// Initialize dependencies (prefer config service where applicable)
@@ -279,7 +279,7 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 			if st, err := resolveStorageFromConfigService(cfgService); err == nil {
 				store = st
 			}
-			}
+		}
 		// Determine fetcher
 		fetcher := config.ArfFetcher
 		// Track chosen registry and group for logging
@@ -363,19 +363,19 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		} else {
 			log.Printf("✓ Storage configuration validated via service")
 		}
-    } else {
-        log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
-        if cfg.StorageConfigPath != "" {
-            if _, err := cfgsvc.New(
-                cfgsvc.WithFile(cfg.StorageConfigPath),
-                cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
-            ); err != nil {
-                log.Printf("Warning: Storage configuration validation failed: %v", err)
-            } else {
-                log.Printf("✓ Storage configuration validated successfully")
-            }
-        }
-    }
+	} else {
+		log.Printf("Validating storage configuration from: %s", cfg.StorageConfigPath)
+		if cfg.StorageConfigPath != "" {
+			if _, err := cfgsvc.New(
+				cfgsvc.WithFile(cfg.StorageConfigPath),
+				cfgsvc.WithValidation(cfgsvc.NewStructValidator()),
+			); err != nil {
+				log.Printf("Warning: Storage configuration validation failed: %v", err)
+			} else {
+				log.Printf("✓ Storage configuration validated successfully")
+			}
+		}
+	}
 
 	// Initialize environment store with fallback logic
 	log.Printf("Initializing environment store...")
@@ -446,7 +446,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
 			arfRecipes = tarfrecipes.NewStorageBacked(st)
 		}
-    }
+	}
 
 	// Initialize ARF Handler
 	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
@@ -455,7 +455,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	}
 
 	// Initialize Analysis Handler
-    analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler, cfgService)
+	analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize analysis handler: %v", err)
 	}
@@ -587,16 +587,20 @@ func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *
 // initializeSelfUpdateHandler initializes self-update handler
 func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*selfupdate.Handler, error) {
 	// Create storage client for self-update operations
-    if cfgService == nil { return nil, fmt.Errorf("config service required for self-update handler") }
-    unified, err := resolveStorageFromConfigService(cfgService)
-    if err != nil { return nil, fmt.Errorf("resolve storage for self-update: %w", err) }
-    provider := internalStorage.NewProviderFromStorage(unified, "artifacts")
+	if cfgService == nil {
+		return nil, fmt.Errorf("config service required for self-update handler")
+	}
+	unified, err := resolveStorageFromConfigService(cfgService)
+	if err != nil {
+		return nil, fmt.Errorf("resolve storage for self-update: %w", err)
+	}
+	provider := internalStorage.NewProviderFromStorage(unified, "artifacts")
 
 	// Get current controller version
 	currentVersion := selfupdate.GetCurrentVersion()
 
 	// Create self-update handler
-    handler, err := selfupdate.NewHandler(provider, cfg.ConsulAddr, currentVersion)
+	handler, err := selfupdate.NewHandler(provider, cfg.ConsulAddr, currentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create self-update handler: %w", err)
 	}
@@ -629,9 +633,13 @@ func initializeCertificateManager(cfg *ControllerConfig, cfgService *cfgsvc.Serv
 	}
 
 	// Create storage client
-    if cfgService == nil { return nil, fmt.Errorf("config service required for certificate manager") }
-    storageClient, err := resolveStorageFromConfigService(cfgService)
-    if err != nil { return nil, fmt.Errorf("resolve storage for certificates: %w", err) }
+	if cfgService == nil {
+		return nil, fmt.Errorf("config service required for certificate manager")
+	}
+	storageClient, err := resolveStorageFromConfigService(cfgService)
+	if err != nil {
+		return nil, fmt.Errorf("resolve storage for certificates: %w", err)
+	}
 
 	// Create DNS provider (for ACME DNS-01 challenges)
 	// Note: DNS provider can be nil for now, certificate manager should handle this gracefully
@@ -1760,25 +1768,25 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, c
 
 	var engine *analysis.Engine
 
-    if analysisMode == "nomad" {
-        if cfgService == nil {
-            log.Printf("Analysis nomad mode requested but config service unavailable; falling back to legacy mode")
-            analysisMode = "legacy"
-        } else {
-            // Create Nomad‑based dispatcher using unified storage from config service
-            st, err := cfgService.Get().CreateStorageClient()
-            if err != nil {
-                return nil, fmt.Errorf("failed to create storage for analysis: %w", err)
-            }
-            dispatcher, err := analysis.NewAnalysisDispatcherOrchestration(st)
-            if err != nil {
-                return nil, fmt.Errorf("failed to create analysis dispatcher: %w", err)
-            }
-            engine = analysis.NewEngineWithDispatcher(logger, dispatcher)
-            log.Printf("Initialized Nomad-based analysis engine with unified storage")
-        }
-    }
-    if analysisMode == "legacy" || engine == nil {
+	if analysisMode == "nomad" {
+		if cfgService == nil {
+			log.Printf("Analysis nomad mode requested but config service unavailable; falling back to legacy mode")
+			analysisMode = "legacy"
+		} else {
+			// Create Nomad‑based dispatcher using unified storage from config service
+			st, err := cfgService.Get().CreateStorageClient()
+			if err != nil {
+				return nil, fmt.Errorf("failed to create storage for analysis: %w", err)
+			}
+			dispatcher, err := analysis.NewAnalysisDispatcherOrchestration(st)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create analysis dispatcher: %w", err)
+			}
+			engine = analysis.NewEngineWithDispatcher(logger, dispatcher)
+			log.Printf("Initialized Nomad-based analysis engine with unified storage")
+		}
+	}
+	if analysisMode == "legacy" || engine == nil {
 		// Create legacy engine with local analyzers
 		engine = analysis.NewEngine(logger)
 

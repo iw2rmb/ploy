@@ -105,9 +105,9 @@ func TestMetricsCollector_RecordJobComplete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			initialCount := testutil.ToFloat64(JobsCompleted.WithLabelValues(tt.status, tt.recipe))
-			
+
 			m.RecordJobComplete(tt.status, tt.recipe)
-			
+
 			newCount := testutil.ToFloat64(JobsCompleted.WithLabelValues(tt.status, tt.recipe))
 			assert.Equal(t, initialCount+1, newCount)
 		})
@@ -124,7 +124,7 @@ func TestMetricsCollector_RecordTransformationSize(t *testing.T) {
 	}{
 		{
 			name:        "small maven project",
-			size:        1024 * 1024,     // 1MB
+			size:        1024 * 1024, // 1MB
 			buildSystem: "maven",
 		},
 		{
@@ -142,7 +142,7 @@ func TestMetricsCollector_RecordTransformationSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m.RecordTransformationSize(tt.size, tt.buildSystem)
-			
+
 			// Verify histogram recorded the value
 			// The histogram will have recorded the observation
 			// We verify by ensuring no panic occurred during recording
@@ -160,7 +160,7 @@ func TestMetricsCollector_RecordDiffSize(t *testing.T) {
 	}{
 		{
 			name:   "small diff",
-			size:   1024,       // 1KB
+			size:   1024, // 1KB
 			recipe: "org.openrewrite.java.migrate.UpgradeToJava17",
 		},
 		{
@@ -178,7 +178,7 @@ func TestMetricsCollector_RecordDiffSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m.RecordDiffSize(tt.size, tt.recipe)
-			
+
 			// Verify histogram recorded the value
 			// The histogram will have recorded the observation
 			// We verify by ensuring no panic occurred during recording
@@ -229,16 +229,16 @@ func TestMetricsCollector_RecordStorageOperation(t *testing.T) {
 			} else {
 				initialCount = testutil.ToFloat64(SeaweedFSOperations.WithLabelValues(tt.operation, tt.status))
 			}
-			
+
 			m.RecordStorageOperation(tt.storage, tt.operation, tt.status)
-			
+
 			var newCount float64
 			if tt.storage == "consul" {
 				newCount = testutil.ToFloat64(ConsulOperations.WithLabelValues(tt.operation, tt.status))
 			} else {
 				newCount = testutil.ToFloat64(SeaweedFSOperations.WithLabelValues(tt.operation, tt.status))
 			}
-			
+
 			assert.Equal(t, initialCount+1, newCount)
 		})
 	}
@@ -349,9 +349,9 @@ func TestMetricsCollector_RecordScalingEvent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			initialCount := testutil.ToFloat64(ScalingEvents.WithLabelValues(tt.direction, tt.reason))
-			
+
 			m.RecordScalingEvent(tt.direction, tt.reason)
-			
+
 			newCount := testutil.ToFloat64(ScalingEvents.WithLabelValues(tt.direction, tt.reason))
 			assert.Equal(t, initialCount+1, newCount)
 		})

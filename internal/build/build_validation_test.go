@@ -10,14 +10,14 @@ import (
 // TestBuildConfigurationValidation tests build configuration validation
 func TestBuildConfigurationValidation(t *testing.T) {
 	tests := []struct {
-		name           string
-		lane           string
-		appName        string
-		sha            string
-		mainClass      string
-		expectedLane   string
-		expectedError  bool
-		description    string
+		name          string
+		lane          string
+		appName       string
+		sha           string
+		mainClass     string
+		expectedLane  string
+		expectedError bool
+		description   string
 	}{
 		{
 			name:         "lane A (Unikraft Go)",
@@ -30,7 +30,7 @@ func TestBuildConfigurationValidation(t *testing.T) {
 		},
 		{
 			name:         "lane B (Unikraft Node)",
-			lane:         "B", 
+			lane:         "B",
 			appName:      "node-app",
 			sha:          "def456",
 			mainClass:    "", // Not used for Node.js
@@ -98,7 +98,7 @@ func TestBuildConfigurationValidation(t *testing.T) {
 			// Validate that the lane configuration is acceptable
 			normalizedLane := strings.ToUpper(tt.lane)
 			validLanes := []string{"A", "B", "C", "D", "E", "F", "G"}
-			
+
 			if tt.lane != "" { // Only test if lane is specified
 				if tt.expectedLane == "C" && tt.lane == "Z" {
 					// Special case: invalid lanes should default to C
@@ -130,10 +130,10 @@ func TestBuildConfigurationValidation(t *testing.T) {
 // TestLaneNormalization tests lane string normalization
 func TestLaneNormalization(t *testing.T) {
 	tests := []struct {
-		name         string
-		input        string
-		expected     string
-		description  string
+		name        string
+		input       string
+		expected    string
+		description string
 	}{
 		{
 			name:        "uppercase lane A",
@@ -150,7 +150,7 @@ func TestLaneNormalization(t *testing.T) {
 		{
 			name:        "mixed case lane",
 			input:       "c",
-			expected:    "C", 
+			expected:    "C",
 			description: "Mixed case should be normalized to uppercase",
 		},
 		{
@@ -174,7 +174,7 @@ func TestLaneNormalization(t *testing.T) {
 		{
 			name:        "special character lane",
 			input:       "@",
-			expected:    "C", // Default fallback 
+			expected:    "C", // Default fallback
 			description: "Special character lane should fallback to default",
 		},
 	}
@@ -191,7 +191,7 @@ func TestLaneNormalization(t *testing.T) {
 			default:
 				normalized = "C" // Default fallback
 			}
-			
+
 			assert.Equal(t, tt.expected, normalized, tt.description)
 		})
 	}
@@ -203,55 +203,55 @@ func TestBuildParameterValidation(t *testing.T) {
 		validNames := []string{
 			"my-app", "test123", "hello-world", "api-service", "worker-v2",
 		}
-		
+
 		invalidNames := []string{
-			"", "x", "MyApp", "my_app", "api", "dev", "controller", 
+			"", "x", "MyApp", "my_app", "api", "dev", "controller",
 			"app-", "-app", "my--app", "app@domain", "123app",
 		}
-		
+
 		for _, name := range validNames {
 			t.Run("valid_"+name, func(t *testing.T) {
 				// Basic validation pattern
-				isValid := len(name) >= 2 && len(name) <= 63 && 
-					strings.ToLower(name) == name &&
-					!strings.HasPrefix(name, "-") && !strings.HasSuffix(name, "-") &&
-					!strings.Contains(name, "--") &&
-					name != "api" && name != "dev" && name != "controller"
-				
-				assert.True(t, isValid, "Name should be valid: %s", name)
-			})
-		}
-		
-		for _, name := range invalidNames {
-			t.Run("invalid_"+name, func(t *testing.T) {
-				// Basic validation pattern 
 				isValid := len(name) >= 2 && len(name) <= 63 &&
 					strings.ToLower(name) == name &&
 					!strings.HasPrefix(name, "-") && !strings.HasSuffix(name, "-") &&
 					!strings.Contains(name, "--") &&
 					name != "api" && name != "dev" && name != "controller"
-				
+
+				assert.True(t, isValid, "Name should be valid: %s", name)
+			})
+		}
+
+		for _, name := range invalidNames {
+			t.Run("invalid_"+name, func(t *testing.T) {
+				// Basic validation pattern
+				isValid := len(name) >= 2 && len(name) <= 63 &&
+					strings.ToLower(name) == name &&
+					!strings.HasPrefix(name, "-") && !strings.HasSuffix(name, "-") &&
+					!strings.Contains(name, "--") &&
+					name != "api" && name != "dev" && name != "controller"
+
 				assert.False(t, isValid, "Name should be invalid: %s", name)
 			})
 		}
 	})
-	
+
 	t.Run("SHA validation", func(t *testing.T) {
 		validSHAs := []string{
 			"abc123", "def456", "1234567890abcdef", "main", "dev", "feature-branch",
 		}
-		
+
 		invalidSHAs := []string{
 			"", "ab", // Too short
 		}
-		
+
 		for _, sha := range validSHAs {
 			t.Run("valid_"+sha, func(t *testing.T) {
 				isValid := len(sha) >= 3 && len(sha) <= 64
 				assert.True(t, isValid, "SHA should be valid: %s", sha)
 			})
 		}
-		
+
 		for _, sha := range invalidSHAs {
 			t.Run("invalid_"+sha, func(t *testing.T) {
 				isValid := len(sha) >= 3 && len(sha) <= 64
@@ -259,33 +259,33 @@ func TestBuildParameterValidation(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("main class validation", func(t *testing.T) {
 		validMainClasses := []string{
 			"com.example.Main", "org.springframework.boot.Application",
 			"io.ploy.service.MainClass", "my.package.App",
 		}
-		
+
 		invalidMainClasses := []string{
 			"Main", "main", "com", "com.", ".Main", "com..example.Main",
 		}
-		
+
 		for _, mainClass := range validMainClasses {
 			t.Run("valid_"+strings.ReplaceAll(mainClass, ".", "_"), func(t *testing.T) {
 				isValid := len(mainClass) > 0 && strings.Contains(mainClass, ".") &&
 					!strings.HasPrefix(mainClass, ".") && !strings.HasSuffix(mainClass, ".") &&
 					!strings.Contains(mainClass, "..")
-				
+
 				assert.True(t, isValid, "Main class should be valid: %s", mainClass)
 			})
 		}
-		
+
 		for _, mainClass := range invalidMainClasses {
 			t.Run("invalid_"+strings.ReplaceAll(mainClass, ".", "_"), func(t *testing.T) {
 				isValid := len(mainClass) > 0 && strings.Contains(mainClass, ".") &&
 					!strings.HasPrefix(mainClass, ".") && !strings.HasSuffix(mainClass, ".") &&
 					!strings.Contains(mainClass, "..")
-				
+
 				assert.False(t, isValid, "Main class should be invalid: %s", mainClass)
 			})
 		}

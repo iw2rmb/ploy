@@ -23,13 +23,13 @@ const (
 
 // SigningOptions configures the signing process
 type SigningOptions struct {
-	Mode          SigningMode
-	KeyPath       string
-	OIDCProvider  string
-	OIDCClientID  string
-	Environment   string
-	TlogUpload    bool
-	Timeout       time.Duration
+	Mode         SigningMode
+	KeyPath      string
+	OIDCProvider string
+	OIDCClientID string
+	Environment  string
+	TlogUpload   bool
+	Timeout      time.Duration
 }
 
 // SigningResult contains information about the signing operation
@@ -263,7 +263,7 @@ func (s *Signer) signContainerWithKey(ctx context.Context, imageRef string) (*Si
 // signBlobDevelopment creates a dummy signature for development environments
 func (s *Signer) signBlobDevelopment(filePath, signatureFile string) (*SigningResult, error) {
 	dummySignature := fmt.Sprintf("dev-signature-%d", time.Now().Unix())
-	
+
 	if err := os.WriteFile(signatureFile, []byte(dummySignature), 0644); err != nil {
 		return nil, fmt.Errorf("failed to create development signature: %w", err)
 	}

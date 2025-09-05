@@ -141,7 +141,7 @@ func grep(root, needle string) bool {
 		if err == nil && !d.IsDir() {
 			// Get base filename for specific file checks
 			baseName := filepath.Base(p)
-			
+
 			// Search in source code files and build scripts
 			if strings.HasSuffix(p, ".c") || strings.HasSuffix(p, ".cc") ||
 				strings.HasSuffix(p, ".cpp") || strings.HasSuffix(p, ".cxx") ||

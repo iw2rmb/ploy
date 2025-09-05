@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	cfg "github.com/iw2rmb/ploy/internal/config"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
 
@@ -63,81 +63,81 @@ func (ts *TestableServer) getStorageClient() (interface{}, error) {
 }
 
 func createMockServer() *TestableServer {
-    server := &Server{
-        app:    createTestApp(),
-        config: &ControllerConfig{},
-        dependencies: &ServiceDependencies{
-            EnvStore:          mocks.NewEnvStore(),
-            StorageConfigPath: "/test/config",
-        },
-    }
-    return &TestableServer{Server: server}
+	server := &Server{
+		app:    createTestApp(),
+		config: &ControllerConfig{},
+		dependencies: &ServiceDependencies{
+			EnvStore:          mocks.NewEnvStore(),
+			StorageConfigPath: "/test/config",
+		},
+	}
+	return &TestableServer{Server: server}
 }
 
 func TestServer_HandleValidateStorageConfig_UsesConfigService(t *testing.T) {
-    // Create a temporary valid config file for the config service
-    dir := t.TempDir()
-    validPath := dir + "/config.yaml"
-    // Minimal storage config for service validator (seaweedfs requires endpoint per validator in internal/config)
-    // Our internal validator in this repo checks seaweedfs endpoint via StructValidator in internal/config.
-    content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n")
-    require.NoError(t, os.WriteFile(validPath, content, 0o644))
+	// Create a temporary valid config file for the config service
+	dir := t.TempDir()
+	validPath := dir + "/config.yaml"
+	// Minimal storage config for service validator (seaweedfs requires endpoint per validator in internal/config)
+	// Our internal validator in this repo checks seaweedfs endpoint via StructValidator in internal/config.
+	content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n")
+	require.NoError(t, os.WriteFile(validPath, content, 0o644))
 
-    // Build a config service on that path
-    svc, err := cfg.New(
-        cfg.WithFile(validPath),
-        cfg.WithValidation(cfg.NewStructValidator()),
-    )
-    require.NoError(t, err)
+	// Build a config service on that path
+	svc, err := cfg.New(
+		cfg.WithFile(validPath),
+		cfg.WithValidation(cfg.NewStructValidator()),
+	)
+	require.NoError(t, err)
 
-    // Server with a bogus path (would fail if legacy path was used)
-    server := createMockServer()
-    server.dependencies.StorageConfigPath = "/tmp/definitely-missing.yaml"
-    server.configService = svc
+	// Server with a bogus path (would fail if legacy path was used)
+	server := createMockServer()
+	server.dependencies.StorageConfigPath = "/tmp/definitely-missing.yaml"
+	server.configService = svc
 
-    server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
+	server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
 
-    req := httptest.NewRequest("POST", "/storage/config/validate", nil)
-    resp, err := server.app.Test(req)
-    require.NoError(t, err)
-    defer resp.Body.Close()
+	req := httptest.NewRequest("POST", "/storage/config/validate", nil)
+	resp, err := server.app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-    assert.Equal(t, 200, resp.StatusCode)
-    var body map[string]interface{}
-    require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-    assert.Equal(t, true, body["valid"])
+	assert.Equal(t, 200, resp.StatusCode)
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, true, body["valid"])
 }
 
 func TestServer_HandleReloadStorageConfig_UsesConfigService(t *testing.T) {
-    // Create a temporary valid config file for the config service
-    dir := t.TempDir()
-    validPath := dir + "/config.yaml"
-    content := []byte("app:\n  name: test\nstorage:\n  provider: memory\n")
-    require.NoError(t, os.WriteFile(validPath, content, 0o644))
+	// Create a temporary valid config file for the config service
+	dir := t.TempDir()
+	validPath := dir + "/config.yaml"
+	content := []byte("app:\n  name: test\nstorage:\n  provider: memory\n")
+	require.NoError(t, os.WriteFile(validPath, content, 0o644))
 
-    svc, err := cfg.New(
-        cfg.WithFile(validPath),
-    )
-    require.NoError(t, err)
+	svc, err := cfg.New(
+		cfg.WithFile(validPath),
+	)
+	require.NoError(t, err)
 
-    server := createMockServer()
-    server.dependencies.StorageConfigPath = "/tmp/missing-config.yaml"
-    server.configService = svc
+	server := createMockServer()
+	server.dependencies.StorageConfigPath = "/tmp/missing-config.yaml"
+	server.configService = svc
 
-    server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
+	server.app.Post("/storage/config/reload", server.handleReloadStorageConfig)
 
-    req := httptest.NewRequest("POST", "/storage/config/reload", nil)
-    resp, err := server.app.Test(req)
-    require.NoError(t, err)
-    defer resp.Body.Close()
+	req := httptest.NewRequest("POST", "/storage/config/reload", nil)
+	resp, err := server.app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-    assert.Equal(t, 200, resp.StatusCode)
-    var body map[string]interface{}
-    require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-    assert.Equal(t, true, body["reloaded"])
-    // We returned config from the config service; just ensure it's present
-    _, ok := body["config"]
-    assert.True(t, ok)
+	assert.Equal(t, 200, resp.StatusCode)
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, true, body["reloaded"])
+	// We returned config from the config service; just ensure it's present
+	_, ok := body["config"]
+	assert.True(t, ok)
 }
 
 func TestParseIntEnv(t *testing.T) {
@@ -211,18 +211,18 @@ func TestParseIntEnv(t *testing.T) {
 func TestLoadConfigFromEnv(t *testing.T) {
 	// Set some environment variables for testing
 	originalValues := make(map[string]string)
-    testEnvVars := map[string]string{
-        "PORT":                    "9090",
-        "CONSUL_HTTP_ADDR":        "192.168.1.100:8500",
-        "NOMAD_ADDR":              "http://192.168.1.100:4646",
-        "PLOY_USE_CONSUL_ENV":     "false",
-        "PLOY_ENV_STORE_PATH":     "/custom/env/path",
-        "PLOY_CLEANUP_AUTO_START": "false",
-        "PLOY_ENABLE_CACHING":     "false",
-        "PLOY_ARF_DEFAULT_PACKS":  "rewrite-java:8.1.0,rewrite-spring:5.0.0",
-        "PLOY_ARF_REGISTRY":       "https://repo1.maven.org/maven2",
-        "PLOY_ARF_MAVEN_GROUP":    "org.openrewrite",
-    }
+	testEnvVars := map[string]string{
+		"PORT":                    "9090",
+		"CONSUL_HTTP_ADDR":        "192.168.1.100:8500",
+		"NOMAD_ADDR":              "http://192.168.1.100:4646",
+		"PLOY_USE_CONSUL_ENV":     "false",
+		"PLOY_ENV_STORE_PATH":     "/custom/env/path",
+		"PLOY_CLEANUP_AUTO_START": "false",
+		"PLOY_ENABLE_CACHING":     "false",
+		"PLOY_ARF_DEFAULT_PACKS":  "rewrite-java:8.1.0,rewrite-spring:5.0.0",
+		"PLOY_ARF_REGISTRY":       "https://repo1.maven.org/maven2",
+		"PLOY_ARF_MAVEN_GROUP":    "org.openrewrite",
+	}
 
 	// Store original values and set test values
 	for key, value := range testEnvVars {
@@ -250,10 +250,10 @@ func TestLoadConfigFromEnv(t *testing.T) {
 	assert.Equal(t, "/custom/env/path", config.EnvStorePath)
 	assert.Equal(t, false, config.CleanupAutoStart)
 	assert.Equal(t, false, config.EnableCaching)
-    assert.Equal(t, 30*time.Second, config.ShutdownTimeout)
-    assert.Equal(t, "rewrite-java:8.1.0,rewrite-spring:5.0.0", config.ArfDefaultPacks)
-    assert.Equal(t, "https://repo1.maven.org/maven2", config.ArfRegistryURL)
-    assert.Equal(t, "org.openrewrite", config.ArfMavenGroup)
+	assert.Equal(t, 30*time.Second, config.ShutdownTimeout)
+	assert.Equal(t, "rewrite-java:8.1.0,rewrite-spring:5.0.0", config.ArfDefaultPacks)
+	assert.Equal(t, "https://repo1.maven.org/maven2", config.ArfRegistryURL)
+	assert.Equal(t, "org.openrewrite", config.ArfMavenGroup)
 }
 
 func TestLoadConfigFromEnvDefaults(t *testing.T) {
@@ -286,9 +286,9 @@ func TestLoadConfigFromEnvDefaults(t *testing.T) {
 	assert.Equal(t, true, config.UseConsulEnv)
 	assert.Equal(t, "/tmp/ploy-env-store", config.EnvStorePath)
 	assert.Equal(t, true, config.CleanupAutoStart)
-    assert.Equal(t, true, config.EnableCaching)
-    assert.Equal(t, "", config.ArfDefaultPacks)
-    assert.Equal(t, "https://registry.dev.ployman.app", config.ArfRegistryURL)
+	assert.Equal(t, true, config.EnableCaching)
+	assert.Equal(t, "", config.ArfDefaultPacks)
+	assert.Equal(t, "https://registry.dev.ployman.app", config.ArfRegistryURL)
 }
 
 // Removed legacy file-based storage config tests. Configuration now requires
@@ -328,8 +328,8 @@ func TestServer_HandleValidateStorageConfig(t *testing.T) {
 				require.NoError(t, err)
 				defer os.Remove(tt.configPath)
 			} else {
-                // Create valid config (internal/config format)
-                validConfig := `storage:
+				// Create valid config (internal/config format)
+				validConfig := `storage:
   provider: seaweedfs
   endpoint: "http://localhost:8888"
   bucket: "ploy"`
@@ -338,35 +338,35 @@ func TestServer_HandleValidateStorageConfig(t *testing.T) {
 				defer os.Remove(tt.configPath)
 			}
 
-            // Inject config service for validation
-            // For invalid case, initialize service with a valid file, then corrupt it to trigger Reload error.
-            var (
-                svc *cfg.Service
-                err error
-            )
-            if tt.expectError {
-                // Write a valid config first so service can be created
-                validBootstrap := []byte("storage:\n  provider: seaweedfs\n  endpoint: \"http://localhost:8888\"\n  bucket: \"ploy\"\n")
-                require.NoError(t, os.WriteFile(tt.configPath, validBootstrap, 0o644))
-                svc, err = cfg.New(
-                    cfg.WithFile(tt.configPath),
-                    cfg.WithValidation(cfg.NewStructValidator()),
-                )
-                require.NoError(t, err)
-                // Now corrupt the file to simulate invalid configuration on reload
-                invalidConfig := `invalid yaml content: [`
-                require.NoError(t, os.WriteFile(tt.configPath, []byte(invalidConfig), 0o644))
-            } else {
-                svc, err = cfg.New(
-                    cfg.WithFile(tt.configPath),
-                    cfg.WithValidation(cfg.NewStructValidator()),
-                )
-                require.NoError(t, err)
-            }
-            server.configService = svc
+			// Inject config service for validation
+			// For invalid case, initialize service with a valid file, then corrupt it to trigger Reload error.
+			var (
+				svc *cfg.Service
+				err error
+			)
+			if tt.expectError {
+				// Write a valid config first so service can be created
+				validBootstrap := []byte("storage:\n  provider: seaweedfs\n  endpoint: \"http://localhost:8888\"\n  bucket: \"ploy\"\n")
+				require.NoError(t, os.WriteFile(tt.configPath, validBootstrap, 0o644))
+				svc, err = cfg.New(
+					cfg.WithFile(tt.configPath),
+					cfg.WithValidation(cfg.NewStructValidator()),
+				)
+				require.NoError(t, err)
+				// Now corrupt the file to simulate invalid configuration on reload
+				invalidConfig := `invalid yaml content: [`
+				require.NoError(t, os.WriteFile(tt.configPath, []byte(invalidConfig), 0o644))
+			} else {
+				svc, err = cfg.New(
+					cfg.WithFile(tt.configPath),
+					cfg.WithValidation(cfg.NewStructValidator()),
+				)
+				require.NoError(t, err)
+			}
+			server.configService = svc
 
-            // Set up route using actual handler method
-            server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
+			// Set up route using actual handler method
+			server.app.Post("/storage/config/validate", server.handleValidateStorageConfig)
 
 			// Test request
 			req := httptest.NewRequest("POST", "/storage/config/validate", nil)
@@ -390,38 +390,38 @@ func TestServer_HandleValidateStorageConfig(t *testing.T) {
 }
 
 func TestServer_HandleGetStorageConfig_UsesConfigService(t *testing.T) {
-    // Build a config service with seaweedfs endpoint to verify mapping
-    dir := t.TempDir()
-    path := dir + "/config.yaml"
-    content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n  bucket: test-collection\n")
-    require.NoError(t, os.WriteFile(path, content, 0o644))
+	// Build a config service with seaweedfs endpoint to verify mapping
+	dir := t.TempDir()
+	path := dir + "/config.yaml"
+	content := []byte("storage:\n  provider: seaweedfs\n  endpoint: http://localhost:9333\n  bucket: test-collection\n")
+	require.NoError(t, os.WriteFile(path, content, 0o644))
 
-    svc, err := cfg.New(
-        cfg.WithFile(path),
-        cfg.WithValidation(cfg.NewStructValidator()),
-    )
-    require.NoError(t, err)
+	svc, err := cfg.New(
+		cfg.WithFile(path),
+		cfg.WithValidation(cfg.NewStructValidator()),
+	)
+	require.NoError(t, err)
 
-    server := createMockServer()
-    server.dependencies.StorageConfigPath = "/tmp/missing-config.yaml"
-    server.configService = svc
+	server := createMockServer()
+	server.dependencies.StorageConfigPath = "/tmp/missing-config.yaml"
+	server.configService = svc
 
-    server.app.Get("/storage/config", server.handleGetStorageConfig)
+	server.app.Get("/storage/config", server.handleGetStorageConfig)
 
-    req := httptest.NewRequest("GET", "/storage/config", nil)
-    resp, err := server.app.Test(req)
-    require.NoError(t, err)
-    defer resp.Body.Close()
+	req := httptest.NewRequest("GET", "/storage/config", nil)
+	resp, err := server.app.Test(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
 
-    assert.Equal(t, 200, resp.StatusCode)
+	assert.Equal(t, 200, resp.StatusCode)
 
-    var body map[string]interface{}
-    require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-    // Legacy-compatible shape: top-level has storage with Provider and Master fields
-    storageObj, ok := body["storage"].(map[string]interface{})
-    require.True(t, ok)
-    assert.Equal(t, "seaweedfs", storageObj["provider"])
-    assert.Equal(t, "http://localhost:9333", storageObj["master"])
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	// Legacy-compatible shape: top-level has storage with Provider and Master fields
+	storageObj, ok := body["storage"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "seaweedfs", storageObj["provider"])
+	assert.Equal(t, "http://localhost:9333", storageObj["master"])
 }
 
 // Removed legacy file-based reload tests. Reload is handled via config service;
@@ -577,7 +577,7 @@ func TestServer_HandleStorageMetrics(t *testing.T) {
 
 func TestServer_HandleGetEnvVars(t *testing.T) {
 	// Create mock environment store
-mockEnvStore := mocks.NewEnvStore()
+	mockEnvStore := mocks.NewEnvStore()
 	expectedVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",
@@ -626,7 +626,7 @@ mockEnvStore := mocks.NewEnvStore()
 
 func TestServer_HandleGetEnvVars_Error(t *testing.T) {
 	// Create mock environment store that returns error
-mockEnvStore := mocks.NewEnvStore()
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("GetAll", "testapp").Return(nil, fmt.Errorf("environment store error"))
 
 	server := createMockServer()
@@ -766,7 +766,7 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock environment store
-            mockEnvStore := mocks.NewEnvStore()
+			mockEnvStore := mocks.NewEnvStore()
 			if tt.mockSetup != nil {
 				tt.mockSetup(mockEnvStore)
 			}
@@ -937,7 +937,7 @@ func TestServer_HandleSetEnvVars_InvalidJSON(t *testing.T) {
 
 func TestServer_HandleSetEnvVar(t *testing.T) {
 	// Create mock environment store
-mockEnvStore := mocks.NewEnvStore()
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Set", "testapp", "NEW_VAR", "new-value").Return(nil)
 
 	server := createMockServer()
@@ -993,7 +993,7 @@ mockEnvStore := mocks.NewEnvStore()
 
 func TestServer_HandleDeleteEnvVar(t *testing.T) {
 	// Create mock environment store
-mockEnvStore := mocks.NewEnvStore()
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Delete", "testapp", "OLD_VAR").Return(nil)
 
 	server := createMockServer()
@@ -1068,7 +1068,7 @@ func TestServer_HandleSetEnvVar_InvalidBody(t *testing.T) {
 
 func TestServer_HandleDeleteEnvVar_Error(t *testing.T) {
 	// Create mock environment store that returns error
-mockEnvStore := mocks.NewEnvStore()
+	mockEnvStore := mocks.NewEnvStore()
 	mockEnvStore.On("Delete", "testapp", "NONEXISTENT_VAR").Return(fmt.Errorf("variable not found"))
 
 	server := createMockServer()
@@ -1141,7 +1141,7 @@ func BenchmarkServer_HandleStorageHealth(b *testing.B) {
 }
 
 func BenchmarkServer_HandleGetEnvVars(b *testing.B) {
-mockEnvStore := mocks.NewEnvStore()
+	mockEnvStore := mocks.NewEnvStore()
 	envVars := envstore.AppEnvVars{
 		"DATABASE_URL": "postgresql://localhost/myapp",
 		"API_KEY":      "secret-key-value",

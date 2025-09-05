@@ -1,20 +1,20 @@
 package env
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "net/http/httptest"
-    "net/url"
-    "testing"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
 
-    "github.com/gofiber/fiber/v2"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
+	"github.com/gofiber/fiber/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-    envstore "github.com/iw2rmb/ploy/internal/envstore"
-    "github.com/iw2rmb/ploy/internal/testing/mocks"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
+	"github.com/iw2rmb/ploy/internal/testing/mocks"
 )
 
 // Test utility functions

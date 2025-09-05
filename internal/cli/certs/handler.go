@@ -68,7 +68,7 @@ func handleIssue(args []string, controllerURL string) {
 	domains := args
 	domainsJSON := `["` + strings.Join(domains, `","`) + `"]`
 	payload := fmt.Sprintf(`{"domains":%s}`, domainsJSON)
-	
+
 	url := fmt.Sprintf("%s/v1/certs/issue", controllerURL)
 	makeRequest("POST", url, payload)
 }
@@ -81,7 +81,7 @@ func handleIssueWildcard(args []string, controllerURL string) {
 
 	domain := args[0]
 	payload := fmt.Sprintf(`{"domain":"%s"}`, domain)
-	
+
 	url := fmt.Sprintf("%s/v1/certs/issue/wildcard", controllerURL)
 	makeRequest("POST", url, payload)
 }
@@ -131,7 +131,7 @@ func handleRenew(args []string, controllerURL string) {
 
 func handleCheck(args []string, controllerURL string) {
 	days := "30" // default
-	
+
 	// Parse --days flag
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "--days=") {
