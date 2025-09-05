@@ -179,7 +179,7 @@ func runTransflow(args []string, controllerURL string) error {
                 if err == nil && resp.StatusCode == 200 {
                     defer resp.Body.Close()
                     b, _ := io.ReadAll(resp.Body)
-                    printPlanSummary(b)
+                    if err := validatePlanJSON(b); err != nil { fmt.Printf("plan.json schema invalid: %v\n", err) } else { printPlanSummary(b) }
                 } else {
                     if err != nil { fmt.Printf("Failed to fetch plan URL: %v\n", err) } else { fmt.Printf("Failed to fetch plan URL: %s\n", resp.Status) }
                 }
@@ -190,7 +190,7 @@ func runTransflow(args []string, controllerURL string) error {
                         url := strings.TrimRight(filer, "/") + "/" + strings.TrimLeft(bucket, "/") + "/" + strings.TrimLeft(key, "/")
                         if resp, err := http.Get(url); err == nil && resp.StatusCode == 200 {
                             defer resp.Body.Close()
-                            if b, err := io.ReadAll(resp.Body); err == nil { printPlanSummary(b) }
+                            if b, err := io.ReadAll(resp.Body); err == nil { if err := validatePlanJSON(b); err != nil { fmt.Printf("plan.json schema invalid: %v\n", err) } else { printPlanSummary(b) } }
                         }
                     }
                 }
@@ -204,7 +204,7 @@ func runTransflow(args []string, controllerURL string) error {
             var planBytes []byte
             if b, err := os.ReadFile(planPath); err == nil {
                 planBytes = b
-                printPlanSummary(planBytes)
+                if err := validatePlanJSON(planBytes); err != nil { fmt.Printf("plan.json schema invalid: %v\n", err) } else { printPlanSummary(planBytes) }
             } else {
                 fmt.Println("Planner job completed. Could not read plan.json locally; set TRANSFLOW_PLAN_PATH or TRANSFLOW_PLAN_URL.")
             }
@@ -214,11 +214,11 @@ func runTransflow(args []string, controllerURL string) error {
                 if err == nil && resp.StatusCode == 200 {
                     defer resp.Body.Close()
                     b, _ := io.ReadAll(resp.Body)
-                    printNextSummary(b)
+                    if err := validateNextJSON(b); err != nil { fmt.Printf("next.json schema invalid: %v\n", err) } else { printNextSummary(b) }
                 }
             }
             if np := os.Getenv("TRANSFLOW_NEXT_PATH"); np != "" {
-                if b, err := os.ReadFile(np); err == nil { printNextSummary(b) }
+                if b, err := os.ReadFile(np); err == nil { if err := validateNextJSON(b); err != nil { fmt.Printf("next.json schema invalid: %v\n", err) } else { printNextSummary(b) } }
             }
             if *execFirst && len(planBytes) > 0 {
                 // Sequential stub: select first option and print intended action
@@ -228,6 +228,13 @@ func runTransflow(args []string, controllerURL string) error {
                     id, _ := o["id"].(string)
                     typ, _ := o["type"].(string)
                     fmt.Printf("Sequential stub: would execute first option %s (%s) next.\n", id, typ)
+                    if typ == "llm-exec" {
+                        // Render llm_exec template to illustrate next step
+                        path, err := runner.RenderLLMExecAssets(id)
+                        if err == nil {
+                            fmt.Printf("Rendered llm_exec HCL template: %s (substitute placeholders before submission)\n", path)
+                        }
+                    }
                 }
             }
         } else {
