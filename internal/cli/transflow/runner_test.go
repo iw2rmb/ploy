@@ -10,85 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Mock interfaces for testing
-type MockGitOperations struct {
-	CloneError         error
-	CreateBranchError  error
-	CommitError        error
-	PushError          error
-	CloneCalled        bool
-	CreateBranchCalled bool
-	CommitCalled       bool
-	PushCalled         bool
-	CloneRepo          string
-	CloneBranch        string
-	ClonePath          string
-	BranchName         string
-	CommitMessage      string
-	PushRemoteURL      string
-	PushBranchName     string
-}
-
-func (m *MockGitOperations) CloneRepository(ctx context.Context, repoURL, branch, targetPath string) error {
-	m.CloneCalled = true
-	m.CloneRepo = repoURL
-	m.CloneBranch = branch
-	m.ClonePath = targetPath
-	return m.CloneError
-}
-
-func (m *MockGitOperations) CreateBranchAndCheckout(ctx context.Context, repoPath, branchName string) error {
-	m.CreateBranchCalled = true
-	m.BranchName = branchName
-	return m.CreateBranchError
-}
-
-func (m *MockGitOperations) CommitChanges(ctx context.Context, repoPath, message string) error {
-	m.CommitCalled = true
-	m.CommitMessage = message
-	return m.CommitError
-}
-
-func (m *MockGitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
-	m.PushCalled = true
-	m.PushRemoteURL = remoteURL
-	m.PushBranchName = branchName
-	return m.PushError
-}
-
-type MockRecipeExecutor struct {
-	ExecuteError  error
-	ExecuteCalled bool
-	RecipeIDs     []string
-	WorkspacePath string
-}
-
-func (m *MockRecipeExecutor) ExecuteRecipes(ctx context.Context, workspacePath string, recipeIDs []string) error {
-	m.ExecuteCalled = true
-	m.RecipeIDs = recipeIDs
-	m.WorkspacePath = workspacePath
-	return m.ExecuteError
-}
-
-type MockBuildChecker struct {
-	BuildError  error
-	BuildCalled bool
-	BuildConfig common.DeployConfig
-	BuildResult *common.DeployResult
-}
-
-func (m *MockBuildChecker) CheckBuild(ctx context.Context, config common.DeployConfig) (*common.DeployResult, error) {
-	m.BuildCalled = true
-	m.BuildConfig = config
-	if m.BuildResult == nil {
-		m.BuildResult = &common.DeployResult{
-			Success: m.BuildError == nil,
-			Version: "test-version",
-			Message: "Build completed",
-		}
-	}
-	return m.BuildResult, m.BuildError
-}
+// Mock interfaces for testing are now in mocks.go
 
 func TestTransflowRunner_Run(t *testing.T) {
 	tests := []struct {
@@ -282,9 +204,9 @@ func TestTransflowRunner_Run(t *testing.T) {
 			workspaceDir := t.TempDir()
 
 			// Setup mocks
-			mockGit := &MockGitOperations{}
-			mockRecipe := &MockRecipeExecutor{}
-			mockBuild := &MockBuildChecker{}
+			mockGit := NewMockGitOperations()
+			mockRecipe := NewMockRecipeExecutor()
+			mockBuild := NewMockBuildChecker()
 			tt.setupMocks(mockGit, mockRecipe, mockBuild)
 
 			// Create runner with mocks

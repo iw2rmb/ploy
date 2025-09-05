@@ -9,10 +9,21 @@
   - Build validation using existing SharedPush infrastructure with configurable timeouts.
   - Branch management with deterministic naming and push operations to remote repositories.
   - GitLab MR integration with full create/update functionality and environment variable configuration.
+- **Comprehensive CLI Documentation**: Complete usage guide with examples and configuration patterns.
+  - Basic workflow examples for Java 11→17 migration and multi-step transformations.
+  - Advanced execution modes including specialized healing workflows and debugging options.
+  - Environment configuration guide with required and optional variables.
+  - Expected output examples for successful workflows and self-healing scenarios.
+  - Integration guide showing how transflow CLI leverages existing Ploy infrastructure.
 - **Test Mode Infrastructure**: Complete mock implementation framework for CI/CD and local testing.
   - `TestModeBuildChecker`: Mock build validation without external controller dependencies.
   - `MockGitProvider`: GitLab provider simulation for testing without API calls.
   - `--test-mode` CLI flag: Enable full workflow testing with mock implementations.
+- **Real Test Repository**: Created `ploy-orw-java11-maven` Java 11 Maven project for realistic testing.
+  - Java 11 codebase with OpenRewrite-transformable patterns (string operations, Optional usage, stream processing).
+  - Pre-configured OpenRewrite Maven plugin for Java 11→17 migration testing.
+  - Published to GitLab (https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git) for integration test scenarios.
+  - Replaces fake repository URLs in all test configurations with real, working repository.
 - **Integration Test Framework**: Comprehensive test suite covering end-to-end workflow scenarios.
   - Configuration validation with timeout parsing and required field checks.
   - Factory pattern tests for production vs. test mode implementations.
@@ -32,6 +43,10 @@
 - **Recipe Executor Path Resolution**: Fixed executable discovery to use current process path instead of PATH lookup.
 - **Git Commit Configuration**: Automatic git user configuration for environments without global git setup.  
 - **Build Checker Timeout**: Implemented mock build checker to avoid hanging on unavailable controllers.
+- **Self-Healing Test Infrastructure**: Fixed failing self-healing tests by using real repository URLs and proper success tracking.
+  - Updated all test configurations to use real GitLab repository instead of fake URLs.
+  - Fixed missing `SetFinalResult(true)` call in healing success workflow path.
+  - Resolved integration test timeouts with unified mock implementation framework.
 - **Error Message Consistency**: Standardized error formatting and context propagation throughout the workflow.
 
 ### Technical Details

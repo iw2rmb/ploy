@@ -24,13 +24,13 @@ func (c *SelfHealConfig) Validate() error {
 	if c.MaxRetries > 5 {
 		return errors.New("max_retries cannot exceed 5")
 	}
-	
+
 	if c.Cooldown != "" {
 		if _, err := time.ParseDuration(c.Cooldown); err != nil {
 			return fmt.Errorf("invalid cooldown format: %v", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -54,14 +54,14 @@ func GetDefaultSelfHealConfig() *SelfHealConfig {
 // TransflowHealingAttempt represents a single healing attempt in the transflow context
 // This is simpler than the complex ARF HealingAttempt and focused on transflow needs
 type TransflowHealingAttempt struct {
-	AttemptNumber    int                `json:"attempt_number"`
-	ErrorContext     arf.ErrorContext   `json:"error_context"`
-	SuggestedRecipes []string           `json:"suggested_recipes"`
-	AppliedRecipes   []string           `json:"applied_recipes"`
-	Success          bool               `json:"success"`
-	ErrorMessage     string             `json:"error_message,omitempty"`
-	Duration         time.Duration      `json:"duration"`
-	Timestamp        time.Time          `json:"timestamp"`
+	AttemptNumber    int              `json:"attempt_number"`
+	ErrorContext     arf.ErrorContext `json:"error_context"`
+	SuggestedRecipes []string         `json:"suggested_recipes"`
+	AppliedRecipes   []string         `json:"applied_recipes"`
+	Success          bool             `json:"success"`
+	ErrorMessage     string           `json:"error_message,omitempty"`
+	Duration         time.Duration    `json:"duration"`
+	Timestamp        time.Time        `json:"timestamp"`
 }
 
 // NewTransflowHealingAttempt creates a new healing attempt
@@ -94,14 +94,14 @@ func (a *TransflowHealingAttempt) MarkFailure(appliedRecipes []string, errorMsg 
 
 // TransflowHealingSummary tracks the overall healing process for a transflow run
 type TransflowHealingSummary struct {
-	Enabled       bool                         `json:"enabled"`
-	AttemptsCount int                          `json:"attempts_count"`
-	MaxRetries    int                          `json:"max_retries"`
-	Attempts      []*TransflowHealingAttempt   `json:"attempts"`
-	FinalSuccess  bool                         `json:"final_success"`
-	TotalHealed   int                          `json:"total_healed"`
-	TotalDuration time.Duration                `json:"total_duration"`
-	
+	Enabled       bool                       `json:"enabled"`
+	AttemptsCount int                        `json:"attempts_count"`
+	MaxRetries    int                        `json:"max_retries"`
+	Attempts      []*TransflowHealingAttempt `json:"attempts"`
+	FinalSuccess  bool                       `json:"final_success"`
+	TotalHealed   int                        `json:"total_healed"`
+	TotalDuration time.Duration              `json:"total_duration"`
+
 	// Job-based healing workflow fields
 	PlanID     string         `json:"plan_id,omitempty"`
 	Winner     *BranchResult  `json:"winner,omitempty"`
@@ -125,7 +125,7 @@ func (s *TransflowHealingSummary) AddAttempt(attempt *TransflowHealingAttempt) {
 	s.Attempts = append(s.Attempts, attempt)
 	s.AttemptsCount++
 	s.TotalDuration += attempt.Duration
-	
+
 	if attempt.Success {
 		s.TotalHealed++
 	}
@@ -143,11 +143,11 @@ func (s *TransflowHealingSummary) HasReachedMaxRetries() bool {
 
 // BuildFailureAnalysis represents the analysis of build failure for recipe suggestions
 type BuildFailureAnalysis struct {
-	SuggestedRecipes []string  `json:"suggested_recipes"`
-	Confidence       float64   `json:"confidence"`
-	ErrorType        string    `json:"error_type"`
-	Language         string    `json:"language,omitempty"`
-	SourceFiles      []string  `json:"source_files,omitempty"`
+	SuggestedRecipes []string `json:"suggested_recipes"`
+	Confidence       float64  `json:"confidence"`
+	ErrorType        string   `json:"error_type"`
+	Language         string   `json:"language,omitempty"`
+	SourceFiles      []string `json:"source_files,omitempty"`
 }
 
 // TransflowErrorAnalyzer analyzes build failures and suggests healing recipes
@@ -165,26 +165,26 @@ func NewTransflowErrorAnalyzer() *TransflowErrorAnalyzer {
 func (a *TransflowErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors []string, language string) (*BuildFailureAnalysis, error) {
 	// For MVP, use simple error pattern matching to suggest common recipes
 	// In the future, integrate with the full ARF LLM analyzer
-	
+
 	errorContext := arf.ExtractErrorContext(errors, language)
-	
+
 	analysis := &BuildFailureAnalysis{
 		ErrorType:        errorContext.ErrorType,
 		Language:         language,
 		Confidence:       0.7, // Default confidence for pattern matching
 		SuggestedRecipes: []string{},
 	}
-	
+
 	// Simple pattern-based recipe suggestions
 	switch errorContext.ErrorType {
 	case "import":
 		analysis.SuggestedRecipes = append(analysis.SuggestedRecipes, "org.openrewrite.java.RemoveUnusedImports")
 		analysis.Confidence = 0.8
-		
+
 	case "compilation":
 		// Suggest common compilation fixes
 		if language == "java" {
-			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes, 
+			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes,
 				"org.openrewrite.java.cleanup.SimplifyBooleanExpression",
 				"org.openrewrite.java.cleanup.UnnecessaryParentheses")
 		} else if language == "go" {
@@ -193,24 +193,24 @@ func (a *TransflowErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors
 				"org.openrewrite.go.cleanup.UnnecessaryParentheses")
 		}
 		analysis.Confidence = 0.6
-		
+
 	case "dependency":
 		analysis.SuggestedRecipes = append(analysis.SuggestedRecipes, "org.openrewrite.java.dependencies.DependencyVulnerabilityCheck")
 		analysis.Confidence = 0.5
-		
+
 	default:
 		// For unknown errors, suggest general cleanup recipes
 		if language == "java" {
-			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes, 
+			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes,
 				"org.openrewrite.java.cleanup.CommonStaticAnalysis")
 		}
 		analysis.Confidence = 0.4
 	}
-	
+
 	// Extract source files if available
 	if errorContext.SourceFile != "" {
 		analysis.SourceFiles = []string{errorContext.SourceFile}
 	}
-	
+
 	return analysis, nil
 }

@@ -10,18 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Mock job submission interfaces for testing - move these to top of file 
+// Mock job submission interfaces for testing - move these to top of file
 // to be available to all parts of the package
 type MockJobSubmitter struct {
-	SubmitError       error
-	WaitError         error
-	CollectError      error
-	SubmitCalled      bool
-	WaitCalled        bool
-	CollectCalled     bool
-	SubmittedJobs     []JobSpec
-	JobResults        map[string]JobResult
-	ArtifactPaths     map[string]string
+	SubmitError   error
+	WaitError     error
+	CollectError  error
+	SubmitCalled  bool
+	WaitCalled    bool
+	CollectCalled bool
+	SubmittedJobs []JobSpec
+	JobResults    map[string]JobResult
+	ArtifactPaths map[string]string
 }
 
 // JobSpec and JobResult types are now defined in types.go
@@ -29,47 +29,47 @@ type MockJobSubmitter struct {
 func (m *MockJobSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error) {
 	m.SubmitCalled = true
 	m.SubmittedJobs = append(m.SubmittedJobs, spec)
-	
+
 	if m.SubmitError != nil {
 		return JobResult{}, m.SubmitError
 	}
-	
+
 	// Return mock result
 	result := JobResult{
 		JobID:    fmt.Sprintf("job-%s-%d", spec.Name, time.Now().Unix()),
 		Status:   "completed",
 		Duration: 30 * time.Second,
 	}
-	
+
 	if mockResult, exists := m.JobResults[spec.Name]; exists {
 		result = mockResult
 	}
-	
+
 	return result, m.WaitError
 }
 
 func (m *MockJobSubmitter) CollectArtifacts(ctx context.Context, jobID string, outputDir string) (map[string]string, error) {
 	m.CollectCalled = true
-	
+
 	if m.CollectError != nil {
 		return nil, m.CollectError
 	}
-	
+
 	if artifacts, exists := m.ArtifactPaths[jobID]; exists {
 		return map[string]string{"plan.json": artifacts}, nil
 	}
-	
+
 	return map[string]string{}, nil
 }
 
 // Test job submission helpers
 func TestSubmitPlannerJob(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         *TransflowConfig
-		buildError     string
-		expectError    bool
-		expectJobType  string
+		name          string
+		config        *TransflowConfig
+		buildError    string
+		expectError   bool
+		expectJobType string
 	}{
 		{
 			name: "successful planner submission",
@@ -85,7 +85,7 @@ func TestSubmitPlannerJob(t *testing.T) {
 		{
 			name: "planner submission with job failure",
 			config: &TransflowConfig{
-				ID:         "failing-workflow", 
+				ID:         "failing-workflow",
 				TargetRepo: "https://github.com/test/repo",
 				BaseRef:    "main",
 			},
@@ -103,7 +103,7 @@ func TestSubmitPlannerJob(t *testing.T) {
 				JobResults:    make(map[string]JobResult),
 				ArtifactPaths: make(map[string]string),
 			}
-			
+
 			if tt.expectError {
 				mockSubmitter.SubmitError = fmt.Errorf("job submission failed")
 			} else {
@@ -116,10 +116,10 @@ func TestSubmitPlannerJob(t *testing.T) {
 			}
 
 			submitter := NewJobSubmissionHelper(mockSubmitter)
-			
+
 			// This function doesn't exist yet - will cause compilation failure
 			plan, err := submitter.SubmitPlannerJob(ctx, tt.config, tt.buildError, "/tmp/workspace")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Nil(t, plan)
@@ -129,7 +129,7 @@ func TestSubmitPlannerJob(t *testing.T) {
 				assert.Equal(t, "test-plan", plan.PlanID)
 				assert.Len(t, plan.Options, 1)
 			}
-			
+
 			assert.True(t, mockSubmitter.SubmitCalled)
 			require.Len(t, mockSubmitter.SubmittedJobs, 1)
 			assert.Equal(t, tt.expectJobType, mockSubmitter.SubmittedJobs[0].Type)
@@ -152,7 +152,7 @@ func TestSubmitReducerJob(t *testing.T) {
 				{ID: "branch-1", Status: "completed", Notes: "success"},
 				{ID: "branch-2", Status: "failed", Notes: "timeout"},
 			},
-			winner: &BranchResult{ID: "branch-1", Status: "completed"},
+			winner:      &BranchResult{ID: "branch-1", Status: "completed"},
 			expectError: false,
 		},
 		{
@@ -174,7 +174,7 @@ func TestSubmitReducerJob(t *testing.T) {
 				JobResults:    make(map[string]JobResult),
 				ArtifactPaths: make(map[string]string),
 			}
-			
+
 			// Mock reducer result
 			mockSubmitter.JobResults["reducer"] = JobResult{
 				JobID:  "reducer-789",
@@ -184,10 +184,10 @@ func TestSubmitReducerJob(t *testing.T) {
 			mockSubmitter.ArtifactPaths["reducer-789"] = "/tmp/next.json"
 
 			submitter := NewJobSubmissionHelper(mockSubmitter)
-			
-			// This function doesn't exist yet - will cause compilation failure  
+
+			// This function doesn't exist yet - will cause compilation failure
 			nextAction, err := submitter.SubmitReducerJob(ctx, tt.planID, tt.branchResults, tt.winner, "/tmp/workspace")
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -195,7 +195,7 @@ func TestSubmitReducerJob(t *testing.T) {
 				assert.NotNil(t, nextAction)
 				assert.Equal(t, "stop", nextAction.Action)
 			}
-			
+
 			assert.True(t, mockSubmitter.SubmitCalled)
 			require.Len(t, mockSubmitter.SubmittedJobs, 1)
 			assert.Equal(t, "reducer", mockSubmitter.SubmittedJobs[0].Type)
@@ -206,11 +206,11 @@ func TestSubmitReducerJob(t *testing.T) {
 // Test fanout orchestration
 func TestRunHealingFanout(t *testing.T) {
 	tests := []struct {
-		name          string
-		branches      []BranchSpec
-		maxParallel   int
-		expectWinner  bool
-		expectError   bool
+		name         string
+		branches     []BranchSpec
+		maxParallel  int
+		expectWinner bool
+		expectError  bool
 	}{
 		{
 			name: "successful fanout with winner",
@@ -275,10 +275,10 @@ func TestRunHealingFanout(t *testing.T) {
 			}
 
 			orchestrator := NewFanoutOrchestrator(mockSubmitter)
-			
+
 			// This function doesn't exist yet - will cause compilation failure
 			winner, results, err := orchestrator.RunHealingFanout(ctx, nil, tt.branches, tt.maxParallel)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Equal(t, BranchResult{}, winner)
@@ -289,9 +289,9 @@ func TestRunHealingFanout(t *testing.T) {
 					assert.Equal(t, "completed", winner.Status)
 				}
 			}
-			
+
 			assert.Len(t, results, len(tt.branches))
-			
+
 			// Verify parallelism was respected
 			if len(tt.branches) > tt.maxParallel {
 				// Should have submitted at most maxParallel jobs
@@ -301,7 +301,7 @@ func TestRunHealingFanout(t *testing.T) {
 	}
 }
 
-// Test runner integration 
+// Test runner integration
 func TestTransflowRunnerWithHealing(t *testing.T) {
 	t.Run("healing triggered on build failure", func(t *testing.T) {
 		// Setup
@@ -335,25 +335,25 @@ func TestTransflowRunnerWithHealing(t *testing.T) {
 
 		runner, err := NewTransflowRunner(config, "/tmp/workspace")
 		require.NoError(t, err)
-		
+
 		runner.SetGitOperations(mockGit)
 		runner.SetRecipeExecutor(mockRecipe)
 		runner.SetBuildChecker(mockBuild)
-		
+
 		// This integration doesn't exist yet - will need to add healing to runner
 		runner.SetJobSubmitter(mockJobSubmitter)
-		
+
 		// Execute
 		ctx := context.Background()
 		result, err := runner.Run(ctx)
-		
+
 		// Verify healing was attempted
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.NotNil(t, result.HealingSummary)
 		assert.True(t, result.HealingSummary.Enabled)
 		assert.Greater(t, result.HealingSummary.AttemptsCount, 0)
-		
+
 		// Verify job submissions happened
 		assert.True(t, mockJobSubmitter.SubmitCalled)
 		assert.Greater(t, len(mockJobSubmitter.SubmittedJobs), 0)
