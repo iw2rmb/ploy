@@ -203,6 +203,41 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
     return renderedPath, nil
 }
 
+// PrepareRepo clones the target repository and creates a workflow branch; returns the repo path and branch name.
+func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, error) {
+    repoPath := filepath.Join(r.workspaceDir, "repo-apply")
+    if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+        return "", "", fmt.Errorf("clone failed: %w", err)
+    }
+    branchName := GenerateBranchName(r.config.ID)
+    if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
+        return "", "", fmt.Errorf("branch failed: %w", err)
+    }
+    return repoPath, branchName, nil
+}
+
+// ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
+func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
+    if err := ValidateUnifiedDiff(ctx, repoPath, diffPath); err != nil {
+        return err
+    }
+    if err := ApplyUnifiedDiff(ctx, repoPath, diffPath); err != nil {
+        return err
+    }
+    if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+        return fmt.Errorf("commit failed: %w", err)
+    }
+    // Build gate
+    timeout, err := r.config.ParseBuildTimeout()
+    if err != nil { return err }
+    appName := GenerateAppName(r.config.ID)
+    buildCfg := common.DeployConfig{ App: appName, Lane: r.config.Lane, Environment: "dev", Timeout: timeout }
+    res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
+    if err != nil { return fmt.Errorf("build gate failed: %w", err) }
+    if res != nil && !res.Success { return fmt.Errorf("build gate failed: %s", res.Message) }
+    return nil
+}
+
 // ReducerAssets holds file paths for rendered reducer inputs and HCL
 type ReducerAssets struct {
     HistoryPath string

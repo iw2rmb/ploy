@@ -82,6 +82,7 @@ func runTransflow(args []string, controllerURL string) error {
     execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
     execLLM := fs.Bool("exec-llm-first", false, "render and optionally submit llm-exec job for the first plan option of type llm-exec")
     execORW := fs.Bool("exec-orw-first", false, "render and optionally submit orw-apply job for the first plan option of type orw-gen (requires recipe envs)")
+    applyFirst := fs.Bool("apply-first", false, "after fetching diff (TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
 	verbose := fs.Bool("v", false, "verbose output")
 
 	if err := fs.Parse(args); err != nil {
@@ -222,7 +223,7 @@ func runTransflow(args []string, controllerURL string) error {
             if np := os.Getenv("TRANSFLOW_NEXT_PATH"); np != "" {
                 if b, err := os.ReadFile(np); err == nil { if err := validateNextJSON(b); err != nil { fmt.Printf("next.json schema invalid: %v\n", err) } else { printNextSummary(b) } }
             }
-            if (*execFirst || *execLLM || *execORW) && len(planBytes) > 0 {
+            if (*execFirst || *execLLM || *execORW || *applyFirst) && len(planBytes) > 0 {
                 // Sequential stub: select first option and print intended action
                 var parsed struct{ PlanID string `json:"plan_id"`; Options []map[string]any `json:"options"` }
                 if err := jsonUnmarshal(planBytes, &parsed); err == nil && len(parsed.Options) > 0 {
@@ -306,6 +307,36 @@ func runTransflow(args []string, controllerURL string) error {
                                     }
                                 }
                                 break
+                            }
+                        }
+                    }
+                    if *applyFirst {
+                        // Fetch diff content path or URL
+                        var diffPath string
+                        if url := os.Getenv("TRANSFLOW_DIFF_URL"); url != "" {
+                            if resp, err := http.Get(url); err == nil && resp.StatusCode == 200 {
+                                b, _ := io.ReadAll(resp.Body); _ = resp.Body.Close()
+                                // Write to temp file in workspace
+                                dp := filepath.Join(runner.workspaceDir, "apply", "diff.patch")
+                                _ = os.MkdirAll(filepath.Dir(dp), 0755)
+                                _ = os.WriteFile(dp, b, 0644)
+                                diffPath = dp
+                            }
+                        }
+                        if diffPath == "" {
+                            if p := os.Getenv("TRANSFLOW_DIFF_PATH"); p != "" { diffPath = p }
+                        }
+                        if diffPath == "" {
+                            fmt.Println("Missing TRANSFLOW_DIFF_URL or TRANSFLOW_DIFF_PATH for --apply-first")
+                        } else {
+                            // Prepare repo and apply diff
+                            repoPath, _, err := runner.PrepareRepo(context.Background())
+                            if err != nil { fmt.Printf("PrepareRepo failed: %v\n", err) } else {
+                                if err := runner.ApplyDiffAndBuild(context.Background(), repoPath, diffPath); err != nil {
+                                    fmt.Printf("Apply/build failed: %v\n", err)
+                                } else {
+                                    fmt.Println("Apply/build succeeded")
+                                }
                             }
                         }
                     }
