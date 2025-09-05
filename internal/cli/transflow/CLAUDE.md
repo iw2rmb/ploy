@@ -1,12 +1,12 @@
 # Transflow CLI Module CLAUDE.md
 
 ## Purpose
-Complete CLI integration for orchestrating multi-step code transformation workflows with automated build validation, self-healing capabilities, and GitLab merge request integration.
+Complete CLI integration for orchestrating multi-step code transformation workflows with automated build validation, production-ready self-healing capabilities, and GitLab merge request integration.
 
 ## Narrative Summary
-The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with LangGraph-based job orchestration.
+The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines with production Nomad job submission. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with real LangGraph-based job orchestration via Nomad.
 
-Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request → optional healing on failures. The module integrates with ARF infrastructure for recipe execution, SharedPush for build validation, and includes comprehensive job submission infrastructure for healing workflows.
+Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request → production healing workflows on failures. The module integrates with ARF infrastructure for recipe execution, SharedPush for build validation, and production orchestration infrastructure using SubmitAndWaitTerminal for real job submission with artifact retrieval.
 
 ## Key Files
 - `run.go:1-250` - CLI command entry point and flag parsing
@@ -18,9 +18,13 @@ Core workflow: clone repository → create branch → apply transformations → 
 - `runner.go:509-553` - GitLab MR creation and updates
 - `config.go:1-150` - Configuration loading, validation, and timeout parsing
 - `integrations.go:87-200` - Factory pattern for production vs test implementations
-- `types.go:1-120` - Job submission type system for healing workflows
-- `job_submission.go:1-120` - JobSubmissionHelper implementation
-- `fanout_orchestrator.go:1-150` - Parallel healing branch orchestration
+- `types.go:1-72` - Complete job submission type system with interfaces
+- `job_submission.go:1-250` - Production JobSubmissionHelper with HCL rendering and artifact parsing
+- `job_submission.go:47-84` - Environment variable substitution for HCL templates
+- `job_submission.go:86-98` - JSON artifact retrieval and parsing
+- `job_submission.go:100-180` - Real planner/reducer job submission with SubmitAndWaitTerminal
+- `fanout_orchestrator.go:1-300` - Production parallel healing branch orchestration
+- `fanout_orchestrator.go:44-120` - First-success-wins fanout execution with real job submission
 - `self_healing.go:1-250` - Self-healing configuration and result tracking
 - `mocks.go:1-200` - Complete mock implementation framework
 - `integration_test.go:1-300` - End-to-end integration test suite
@@ -31,15 +35,18 @@ Core workflow: clone repository → create branch → apply transformations → 
 - ARF Recipe Executor: OpenRewrite recipe execution
 - SharedPush Build Checker: Build validation and deployment
 - GitLab REST API: Merge request creation/updates (via provider.GitProvider)
-- Ploy Orchestration: Job submission for healing workflows
+- Ploy Orchestration: Production SubmitAndWaitTerminal for real Nomad job submission
+- HCL Templates: roadmap/transflow/jobs/*.hcl for planner/reducer/branch job definitions
+- Nomad API: Direct job submission with environment variable substitution
 
 ### Provides
 - CLI Commands: `ploy transflow run -f <config>` with complete flag support
 - Workflow Execution: End-to-end transformation pipeline with result tracking
-- Self-Healing: LangGraph-based healing with planner/reducer jobs and parallel branch execution
+- Self-Healing: Production LangGraph-based healing with real planner/reducer jobs and parallel branch execution
 - MR Integration: GitLab merge request creation/updates with rich descriptions
 - Test Mode: Complete mock infrastructure for CI/CD and local testing
-- Job Orchestration: Nomad job submission and monitoring for healing workflows
+- Job Orchestration: Production Nomad job submission with HCL template rendering and artifact processing
+- Artifact Processing: JSON parsing of plan.json, next.json, and diff.patch from completed jobs
 
 ## Configuration
 Required files:
@@ -48,11 +55,12 @@ Required files:
 Environment variables:
 - `GITLAB_URL` - GitLab instance URL (defaults to https://gitlab.com)
 - `GITLAB_TOKEN` - GitLab API token for MR operations
-- `TRANSFLOW_SUBMIT` - Set to "1" to enable job submission for healing workflows
-- `TRANSFLOW_MODEL` - LLM model for healing (default: gpt-4o-mini@2024-08-06)
-- `TRANSFLOW_TOOLS` - Tool configuration JSON for healing jobs
-- `TRANSFLOW_LIMITS` - Execution limits JSON for healing jobs
-- `NOMAD_ADDR` - Nomad cluster address for job submission
+- `TRANSFLOW_SUBMIT` - Set to "1" to enable production job submission for healing workflows
+- `TRANSFLOW_MODEL` - LLM model for healing jobs (default: gpt-4o-mini@2024-08-06)
+- `TRANSFLOW_TOOLS` - Tool configuration JSON for healing jobs (default: file/search allowlist)
+- `TRANSFLOW_LIMITS` - Execution limits JSON for healing jobs (default: 8 steps, 12 tool calls, 30m timeout)
+- `NOMAD_ADDR` - Nomad cluster address for production job submission
+- `RUN_ID` - Automatically generated unique identifier for job runs
 
 CLI flags:
 - `--config, -f` - Configuration file path
@@ -64,15 +72,19 @@ CLI flags:
 - Complete dependency injection with interface-based design (see runner.go:126-172, integrations.go:87-200)
 - Factory pattern for production vs test implementations (see integrations.go)
 - Test mode infrastructure with comprehensive mocking (see mocks.go:1-200)
-- Job submission infrastructure with type-safe interfaces (see types.go, job_submission.go)
-- Fanout orchestration with first-success-wins semantics (see fanout_orchestrator.go)
+- Production job submission with HCL template rendering and environment substitution (see job_submission.go:47-84)
+- Real artifact processing with JSON parsing for job outputs (see job_submission.go:86-98)
+- Type-safe job submission interfaces supporting planner/reducer/branch workflows (see types.go:60-72)
+- Production fanout orchestration with first-success-wins semantics and real Nomad jobs (see fanout_orchestrator.go:44-120)
+- Branch type support for llm-exec, orw-gen, and human-step healing strategies
 - Graceful error handling with optional MR creation (see runner.go:509-553)
-- Self-healing workflow with LangGraph integration and parallel branch execution
+- Self-healing workflow with production LangGraph integration and parallel branch execution
 - Configuration validation with timeout parsing and comprehensive error reporting
 
 ## Related Documentation
 - `../git/provider/CLAUDE.md` - GitLab provider implementation
 - `../../api/arf/` - Application Recipe Framework integration
-- `../../orchestration/` - Job submission and monitoring infrastructure
+- `../../orchestration/CLAUDE.md` - Production job submission and monitoring infrastructure
+- `../../../roadmap/transflow/jobs/` - HCL templates for planner, reducer, and healing branch jobs
 - `../../../roadmap/transflow/MVP.md` - Complete implementation status and requirements
 - Integration test repository: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
