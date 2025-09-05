@@ -66,31 +66,31 @@ func TestPushCmd(t *testing.T) {
 				if tt.wantBlueGreen {
 					t.Error("Server should not be called for blue-green deployment")
 				}
-				
+
 				// Verify headers
 				if r.Header.Get("X-Target-Domain") != "ployd.app" {
 					t.Errorf("Expected X-Target-Domain to be ployd.app, got %s", r.Header.Get("X-Target-Domain"))
 				}
-				
+
 				// Verify URL parameters
 				if !strings.Contains(r.URL.Path, tt.wantApp) {
 					t.Errorf("URL path should contain app name %s", tt.wantApp)
 				}
-				
+
 				if tt.wantLane != "" && !strings.Contains(r.URL.Query().Get("lane"), tt.wantLane) {
 					t.Errorf("URL should contain lane=%s", tt.wantLane)
 				}
-				
+
 				if tt.wantEnv != "" && !strings.Contains(r.URL.Query().Get("env"), tt.wantEnv) {
 					t.Errorf("URL should contain env=%s", tt.wantEnv)
 				}
-				
+
 				w.Header().Set("X-Deployment-ID", "test-deploy-123")
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(`{"status": "success"}`))
 			}))
 			defer server.Close()
-			
+
 			// Note: In actual implementation, we'll need to mock or refactor
 			// PushCmd to be testable. For now, this shows the test structure
 			_ = capturedConfig
@@ -125,7 +125,7 @@ func TestPushCmdValidation(t *testing.T) {
 			wantError: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// This test will validate app names against reserved names

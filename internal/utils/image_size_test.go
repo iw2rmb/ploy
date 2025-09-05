@@ -16,12 +16,12 @@ func TestGetImageSize(t *testing.T) {
 	defer cleanupTestTempDir(t, tmpDir)
 
 	tests := []struct {
-		name        string
-		imagePath   string
-		dockerImage string
-		lane        string
-		setup       func() string // Returns actual path to use
-		expectError bool
+		name           string
+		imagePath      string
+		dockerImage    string
+		lane           string
+		setup          func() string // Returns actual path to use
+		expectError    bool
 		expectedFields map[string]interface{}
 	}{
 		{
@@ -40,8 +40,8 @@ func TestGetImageSize(t *testing.T) {
 			expectError: false,
 			expectedFields: map[string]interface{}{
 				"measurement_type": "file",
-				"lane":            "A",
-				"size_mb":         float64(1.0), // Approximately 1MB
+				"lane":             "A",
+				"size_mb":          float64(1.0), // Approximately 1MB
 			},
 		},
 		{
@@ -57,7 +57,7 @@ func TestGetImageSize(t *testing.T) {
 			expectError: false,
 			expectedFields: map[string]interface{}{
 				"measurement_type": "file",
-				"lane":            "B",
+				"lane":             "B",
 			},
 		},
 		{
@@ -84,7 +84,7 @@ func TestGetImageSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var imagePath, dockerImage string
-			
+
 			if tt.setup != nil {
 				imagePath = tt.setup()
 			} else {
@@ -288,9 +288,9 @@ func TestGetLaneSizeLimits(t *testing.T) {
 // Tests for GetLaneSizeLimit function
 func TestGetLaneSizeLimit(t *testing.T) {
 	tests := []struct {
-		name        string
-		lane        string
-		expectError bool
+		name         string
+		lane         string
+		expectError  bool
 		expectedLane string
 	}{
 		{"valid lane A", "A", false, "A"},
@@ -484,7 +484,7 @@ func TestImageSizeIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the file exceeds Lane A limit
-		assert.Greater(t, sizeInfo.SizeMB, float64(laneLimit.MaxSizeMB), 
+		assert.Greater(t, sizeInfo.SizeMB, float64(laneLimit.MaxSizeMB),
 			"File should exceed Lane A limit")
 
 		// Check if it fits in Lane E
@@ -512,9 +512,9 @@ func BenchmarkParseDockerSize(b *testing.B) {
 
 func BenchmarkFormatSize(b *testing.B) {
 	testSizes := []int64{
-		1024,                    // 1KB
-		1024 * 1024,            // 1MB
-		1024 * 1024 * 1024,     // 1GB
+		1024,                      // 1KB
+		1024 * 1024,               // 1MB
+		1024 * 1024 * 1024,        // 1GB
 		1024 * 1024 * 1024 * 1024, // 1TB
 	}
 

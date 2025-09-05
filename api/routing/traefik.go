@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-    consulapi "github.com/hashicorp/consul/api"
-    irouting "github.com/iw2rmb/ploy/internal/routing"
-    "github.com/iw2rmb/ploy/internal/utils"
+	consulapi "github.com/hashicorp/consul/api"
+	irouting "github.com/iw2rmb/ploy/internal/routing"
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 // TraefikRouter handles app routing via Traefik and Consul integration
@@ -29,12 +29,12 @@ func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
 
-    // Get platform apps domain from environment
-    platformAppsDomain := utils.Getenv("PLOY_APPS_DOMAIN", "")
-    if platformAppsDomain == "" {
-        platformAppsDomain = "ployd.app" // Default fallback
-        log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
-    }
+	// Get platform apps domain from environment
+	platformAppsDomain := utils.Getenv("PLOY_APPS_DOMAIN", "")
+	if platformAppsDomain == "" {
+		platformAppsDomain = "ployd.app" // Default fallback
+		log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
+	}
 
 	return &TraefikRouter{
 		consul:             client,
@@ -182,19 +182,19 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 	}
 
 	// Store domain mapping for persistence
-    if err := irouting.SaveAppRoute(tr.consul, irouting.DomainRoute{
-        App:        route.App,
-        Domain:     route.Domain,
-        Port:       route.Port,
-        AllocID:    route.AllocID,
-        AllocIP:    route.AllocIP,
-        HealthPath: route.HealthPath,
-        Aliases:    route.Aliases,
-        TLSEnabled: route.TLSEnabled,
-        CreatedAt:  route.CreatedAt,
-    }); err != nil {
-        log.Printf("Warning: failed to store domain mapping for %s: %v", route.App, err)
-    }
+	if err := irouting.SaveAppRoute(tr.consul, irouting.DomainRoute{
+		App:        route.App,
+		Domain:     route.Domain,
+		Port:       route.Port,
+		AllocID:    route.AllocID,
+		AllocIP:    route.AllocIP,
+		HealthPath: route.HealthPath,
+		Aliases:    route.Aliases,
+		TLSEnabled: route.TLSEnabled,
+		CreatedAt:  route.CreatedAt,
+	}); err != nil {
+		log.Printf("Warning: failed to store domain mapping for %s: %v", route.App, err)
+	}
 
 	return nil
 }
@@ -266,57 +266,57 @@ func (tr *TraefikRouter) RegisterAppWithPlatformDomain(appName, allocID, allocIP
 
 // buildTraefikTags constructs Traefik configuration tags
 func (tr *TraefikRouter) buildTraefikTags(route *AppRoute, config *RouteConfig) []string {
-    base := irouting.BuildTraefikTags(
-        &irouting.AppRoute{
-            App:        route.App,
-            Domain:     route.Domain,
-            Port:       route.Port,
-            AllocID:    route.AllocID,
-            AllocIP:    route.AllocIP,
-            HealthPath: route.HealthPath,
-            Aliases:    route.Aliases,
-        },
-        &irouting.RouteConfig{
-            EnableTLS:           config.EnableTLS,
-            CertResolver:        config.CertResolver,
-            HealthPath:          config.HealthPath,
-            HealthCheckInterval: config.HealthCheckInterval,
-            HealthCheckTimeout:  config.HealthCheckTimeout,
-            LoadBalanceMode:     config.LoadBalanceMode,
-            StickySession:       config.StickySession,
-            Middlewares:         config.Middlewares,
-            RetryAttempts:       config.RetryAttempts,
-            RateLimit:           config.RateLimit,
-            SecurityHeaders:     config.SecurityHeaders,
-        },
-    )
+	base := irouting.BuildTraefikTags(
+		&irouting.AppRoute{
+			App:        route.App,
+			Domain:     route.Domain,
+			Port:       route.Port,
+			AllocID:    route.AllocID,
+			AllocIP:    route.AllocIP,
+			HealthPath: route.HealthPath,
+			Aliases:    route.Aliases,
+		},
+		&irouting.RouteConfig{
+			EnableTLS:           config.EnableTLS,
+			CertResolver:        config.CertResolver,
+			HealthPath:          config.HealthPath,
+			HealthCheckInterval: config.HealthCheckInterval,
+			HealthCheckTimeout:  config.HealthCheckTimeout,
+			LoadBalanceMode:     config.LoadBalanceMode,
+			StickySession:       config.StickySession,
+			Middlewares:         config.Middlewares,
+			RetryAttempts:       config.RetryAttempts,
+			RateLimit:           config.RateLimit,
+			SecurityHeaders:     config.SecurityHeaders,
+		},
+	)
 
-    // Compose router middleware chain tag (if any)
-    routerName := fmt.Sprintf("%s-router", route.App)
-    middlewares := make([]string, 0, len(config.Middlewares)+5)
-    middlewares = append(middlewares, config.Middlewares...)
-    if config.RateLimit > 0 {
-        middlewares = append(middlewares, fmt.Sprintf("%s-ratelimit", route.App))
-    }
-    if config.SecurityHeaders {
-        middlewares = append(middlewares, fmt.Sprintf("%s-security", route.App))
-    }
-    if config.CircuitBreaker {
-        middlewares = append(middlewares, fmt.Sprintf("%s-circuitbreaker", route.App))
-        // circuit breaker definitions remain local to API build for now
-        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.expression=NetworkErrorRatio() > 0.30", route.App+"-circuitbreaker"))
-        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.checkperiod=10s", route.App+"-circuitbreaker"))
-        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.fallbackduration=30s", route.App+"-circuitbreaker"))
-    }
-    if config.RetryAttempts > 0 {
-        middlewares = append(middlewares, fmt.Sprintf("%s-retry", route.App))
-        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.retry.attempts=%d", route.App+"-retry", config.RetryAttempts))
-        base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.retry.initialinterval=100ms", route.App+"-retry"))
-    }
-    if len(middlewares) > 0 {
-        base = append(base, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, strings.Join(middlewares, ",")))
-    }
-    return base
+	// Compose router middleware chain tag (if any)
+	routerName := fmt.Sprintf("%s-router", route.App)
+	middlewares := make([]string, 0, len(config.Middlewares)+5)
+	middlewares = append(middlewares, config.Middlewares...)
+	if config.RateLimit > 0 {
+		middlewares = append(middlewares, fmt.Sprintf("%s-ratelimit", route.App))
+	}
+	if config.SecurityHeaders {
+		middlewares = append(middlewares, fmt.Sprintf("%s-security", route.App))
+	}
+	if config.CircuitBreaker {
+		middlewares = append(middlewares, fmt.Sprintf("%s-circuitbreaker", route.App))
+		// circuit breaker definitions remain local to API build for now
+		base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.expression=NetworkErrorRatio() > 0.30", route.App+"-circuitbreaker"))
+		base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.checkperiod=10s", route.App+"-circuitbreaker"))
+		base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.circuitbreaker.fallbackduration=30s", route.App+"-circuitbreaker"))
+	}
+	if config.RetryAttempts > 0 {
+		middlewares = append(middlewares, fmt.Sprintf("%s-retry", route.App))
+		base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.retry.attempts=%d", route.App+"-retry", config.RetryAttempts))
+		base = append(base, fmt.Sprintf("traefik.http.middlewares.%s.retry.initialinterval=100ms", route.App+"-retry"))
+	}
+	if len(middlewares) > 0 {
+		base = append(base, fmt.Sprintf("traefik.http.routers.%s.middlewares=%s", routerName, strings.Join(middlewares, ",")))
+	}
+	return base
 }
 
 // UnregisterApp removes app routing from Traefik

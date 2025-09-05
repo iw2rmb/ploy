@@ -9,7 +9,7 @@ import (
 func TestPhase5CleanupCompleted(t *testing.T) {
 	// This test documents that Phase 5 cleanup has been completed
 	// and verifies that obsolete tools have been properly removed
-	
+
 	tests := []struct {
 		name        string
 		path        string
@@ -33,7 +33,7 @@ func TestPhase5CleanupCompleted(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fullPath := filepath.Join(repoRoot, tt.path)
-			
+
 			if _, err := os.Stat(fullPath); !os.IsNotExist(err) {
 				t.Errorf("Obsolete tool %s should be removed: %s", tt.path, tt.description)
 			} else {
@@ -54,7 +54,7 @@ func TestObsoleteToolsRemovedAfterCleanup(t *testing.T) {
 			path: "tools/api-dist",
 		},
 		{
-			name: "deploy.sh script removed", 
+			name: "deploy.sh script removed",
 			path: "scripts/deploy.sh",
 		},
 	}
@@ -65,7 +65,7 @@ func TestObsoleteToolsRemovedAfterCleanup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fullPath := filepath.Join(repoRoot, tt.path)
-			
+
 			if _, err := os.Stat(fullPath); !os.IsNotExist(err) {
 				t.Errorf("Obsolete tool %s should be removed but still exists", tt.path)
 			} else {
@@ -78,18 +78,18 @@ func TestObsoleteToolsRemovedAfterCleanup(t *testing.T) {
 // findRepoRoot walks up the directory tree to find the repository root
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
-	
+
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get working directory: %v", err)
 	}
-	
+
 	// Walk up until we find .git or reach filesystem root
 	for {
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 			return dir
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			// Reached filesystem root
@@ -97,7 +97,7 @@ func findRepoRoot(t *testing.T) string {
 		}
 		dir = parent
 	}
-	
+
 	t.Fatalf("Could not find repository root (no .git directory found)")
 	return ""
 }

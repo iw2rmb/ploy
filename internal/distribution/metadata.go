@@ -24,16 +24,16 @@ func GetCurrentPlatformInfo() (platform, architecture string) {
 // CreateBinaryInfo creates BinaryInfo for a binary file
 func CreateBinaryInfo(version, gitCommit string, metadata map[string]string) BinaryInfo {
 	platform, arch := GetCurrentPlatformInfo()
-	
+
 	if metadata == nil {
 		metadata = make(map[string]string)
 	}
-	
+
 	// Add build metadata
 	metadata["go_version"] = runtime.Version()
 	metadata["build_host"] = getHostname()
 	metadata["build_user"] = getUsername()
-	
+
 	return BinaryInfo{
 		Version:      version,
 		BuildTime:    time.Now(),

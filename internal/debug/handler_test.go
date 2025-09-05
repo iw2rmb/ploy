@@ -1,10 +1,10 @@
 package debug
 
 import (
-    "encoding/json"
-    "net/http/httptest"
-    "testing"
-    "strings"
+	"encoding/json"
+	"net/http/httptest"
+	"strings"
+	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
@@ -51,8 +51,8 @@ func TestDebugApp_UsesPolicyAndBuilder(t *testing.T) {
 	app := fiber.New()
 	app.Post("/debug/:app", func(c *fiber.Ctx) error { return DebugApp(c, fakeEnvStore{}) })
 
-    req := httptest.NewRequest("POST", "/debug/myapp?lane=c&env=dev", strings.NewReader("{}"))
-    req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest("POST", "/debug/myapp?lane=c&env=dev", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request err: %v", err)

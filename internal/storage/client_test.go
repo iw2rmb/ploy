@@ -108,7 +108,7 @@ func TestNewStorageClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := NewStorageClient(tt.provider, tt.config)
-			
+
 			if tt.wantNil {
 				assert.Nil(t, client)
 			} else {
@@ -116,12 +116,12 @@ func TestNewStorageClient(t *testing.T) {
 				assert.NotNil(t, client.client)
 				assert.NotNil(t, client.retryClient)
 				assert.NotNil(t, client.config)
-				
+
 				// Check metrics initialization
 				if tt.config == nil || tt.config.EnableMetrics {
 					assert.NotNil(t, client.metrics)
 				}
-				
+
 				// Check health checker initialization
 				if tt.config != nil && tt.config.EnableHealthCheck && client.metrics != nil {
 					assert.NotNil(t, client.healthChecker)
@@ -133,7 +133,7 @@ func TestNewStorageClient(t *testing.T) {
 
 func TestDefaultClientConfig(t *testing.T) {
 	config := DefaultClientConfig()
-	
+
 	assert.NotNil(t, config)
 	assert.NotNil(t, config.RetryConfig)
 	assert.NotNil(t, config.HealthCheckConfig)
@@ -185,7 +185,7 @@ func TestStorageClient_PutObject(t *testing.T) {
 				// First call fails with network error
 				m.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").
 					Return(nil, errors.New("connection refused")).Once()
-				
+
 				// Second call succeeds
 				m.On("PutObject", "test-bucket", "test-key", mock.Anything, "text/plain").
 					Return(&PutObjectResult{
@@ -300,7 +300,7 @@ func TestStorageClient_GetObject(t *testing.T) {
 				// First call fails with network error
 				m.On("GetObject", "test-bucket", "test-key").
 					Return(nil, errors.New("connection timeout")).Once()
-				
+
 				// Second call succeeds
 				data := "test content"
 				reader := io.NopCloser(strings.NewReader(data))
@@ -405,8 +405,8 @@ func TestStorageClient_UploadArtifactBundle(t *testing.T) {
 			config := DefaultClientConfig()
 			config.RetryConfig = &RetryConfig{
 				MaxAttempts:       3,
-				InitialDelay:      1 * time.Millisecond,  // Fast for unit tests
-				MaxDelay:          5 * time.Millisecond,  // Keep very short
+				InitialDelay:      1 * time.Millisecond, // Fast for unit tests
+				MaxDelay:          5 * time.Millisecond, // Keep very short
 				BackoffMultiplier: 2.0,
 				RetryableErrors: []ErrorType{
 					ErrorTypeNetwork,
@@ -507,13 +507,13 @@ func TestStorageClient_VerifyUpload(t *testing.T) {
 
 func TestStorageClient_ListObjects(t *testing.T) {
 	tests := []struct {
-		name           string
-		bucket         string
-		prefix         string
-		setupMock      func(*MockStorageProvider)
+		name            string
+		bucket          string
+		prefix          string
+		setupMock       func(*MockStorageProvider)
 		expectedObjects []ObjectInfo
-		expectError    bool
-		errorContains  string
+		expectError     bool
+		errorContains   string
 	}{
 		{
 			name:   "successful list",
@@ -606,26 +606,26 @@ func TestStorageClient_GetArtifactsBucket(t *testing.T) {
 
 func TestStorageClient_GetMetrics(t *testing.T) {
 	mockProvider := &MockStorageProvider{}
-	
+
 	// Test with metrics enabled
 	t.Run("metrics enabled", func(t *testing.T) {
 		config := DefaultClientConfig()
 		config.EnableMetrics = true
-		
+
 		client := NewStorageClient(mockProvider, config)
 		metrics := client.GetMetrics()
-		
+
 		assert.NotNil(t, metrics)
 	})
-	
+
 	// Test with metrics disabled
 	t.Run("metrics disabled", func(t *testing.T) {
 		config := DefaultClientConfig()
 		config.EnableMetrics = false
-		
+
 		client := NewStorageClient(mockProvider, config)
 		metrics := client.GetMetrics()
-		
+
 		assert.Nil(t, metrics)
 	})
 }
@@ -634,36 +634,36 @@ func TestStorageClient_GetHealthStatus(t *testing.T) {
 	// Test with health check enabled
 	t.Run("health check enabled", func(t *testing.T) {
 		mockProvider := &MockStorageProvider{}
-		
+
 		// Set up mock expectations for health check - use mock.Anything for flexible matching
 		mockProvider.On("ListObjects", mock.Anything, mock.Anything).Return([]ObjectInfo{}, nil).Maybe()
 		mockProvider.On("GetProviderType").Return("mock").Maybe()
 		mockProvider.On("GetArtifactsBucket").Return("test-bucket").Maybe()
 		mockProvider.On("PutObject", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&PutObjectResult{Size: 100}, nil).Maybe()
 		mockProvider.On("GetObject", mock.Anything, mock.Anything).Return(io.NopCloser(strings.NewReader("test")), nil).Maybe()
-		
+
 		config := DefaultClientConfig()
 		config.EnableHealthCheck = true
 		config.EnableMetrics = true // Health check requires metrics
-		
+
 		client := NewStorageClient(mockProvider, config)
 		status := client.GetHealthStatus()
-		
+
 		assert.NotNil(t, status)
 		// Health check should return a status
 		assert.Contains(t, []HealthStatus{HealthStatusHealthy, HealthStatusDegraded, HealthStatusUnhealthy, HealthStatusUnknown}, status.Status)
 	})
-	
+
 	// Test with health check disabled
 	t.Run("health check disabled", func(t *testing.T) {
 		mockProvider := &MockStorageProvider{}
-		
+
 		config := DefaultClientConfig()
 		config.EnableHealthCheck = false
-		
+
 		client := NewStorageClient(mockProvider, config)
 		status := client.GetHealthStatus()
-		
+
 		assert.NotNil(t, status)
 		assert.Equal(t, HealthStatusUnknown, status.Status)
 		assert.Contains(t, status.Summary, "Health checking disabled")
@@ -676,23 +676,23 @@ func TestFileReadSeekerResetter(t *testing.T) {
 	content := "test content for seeking"
 	reader := strings.NewReader(content)
 	resetter := &fileReadSeekerResetter{readSeeker: reader}
-	
+
 	// Test Read
 	buf := make([]byte, 4)
 	n, err := resetter.Read(buf)
 	assert.NoError(t, err)
 	assert.Equal(t, 4, n)
 	assert.Equal(t, "test", string(buf))
-	
+
 	// Test Seek
 	pos, err := resetter.Seek(0, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), pos)
-	
+
 	// Test Reset
 	err = resetter.Reset()
 	assert.NoError(t, err)
-	
+
 	// Verify reset worked by reading again
 	n, err = resetter.Read(buf)
 	assert.NoError(t, err)
@@ -705,24 +705,24 @@ func TestMetricsTrackingReadCloser(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(content))
 	metrics := NewStorageMetrics()
 	var bytesRead int64
-	
+
 	tracker := &metricsTrackingReadCloser{
 		readCloser: reader,
 		metrics:    metrics,
 		startTime:  time.Now(),
 		bytesRead:  &bytesRead,
 	}
-	
+
 	// Read all content
 	data, err := io.ReadAll(tracker)
 	assert.NoError(t, err)
 	assert.Equal(t, content, string(data))
 	assert.Equal(t, int64(len(content)), bytesRead)
-	
+
 	// Close and check metrics recording
 	err = tracker.Close()
 	assert.NoError(t, err)
-	
+
 	// Verify metrics were recorded
 	snapshot := metrics.GetSnapshot()
 	assert.Equal(t, int64(1), snapshot.TotalDownloads)
@@ -755,7 +755,7 @@ func BenchmarkStorageClient_PutObject(b *testing.B) {
 func BenchmarkStorageClient_GetObject(b *testing.B) {
 	mockProvider := &MockStorageProvider{}
 	content := "test content for benchmark"
-	
+
 	mockProvider.On("GetObject", mock.Anything, mock.Anything).Return(
 		func(bucket, key string) io.ReadCloser {
 			return io.NopCloser(strings.NewReader(content))
@@ -775,13 +775,13 @@ func BenchmarkStorageClient_GetObject(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		// Read and close to simulate real usage
 		_, err = io.ReadAll(reader)
 		if err != nil {
 			b.Fatal(err)
 		}
-		
+
 		reader.Close()
 	}
 }

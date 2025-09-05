@@ -12,10 +12,10 @@ import (
 
 // ARFIntegration handles integration with the Automated Remediation Framework
 type ARFIntegration struct {
-	arfHandler      *arf.Handler
-	recipeExecutor  *arf.RecipeExecutor
-	sandboxManager  arf.SandboxManager
-	logger          *logrus.Logger
+	arfHandler     *arf.Handler
+	recipeExecutor *arf.RecipeExecutor
+	sandboxManager arf.SandboxManager
+	logger         *logrus.Logger
 }
 
 // NewARFIntegration creates a new ARF integration
@@ -183,8 +183,8 @@ func (a *ARFIntegration) processRecipeGroup(ctx context.Context, repo Repository
 func (a *ARFIntegration) filterCriticalIssues(issues []Issue) []Issue {
 	critical := []Issue{}
 	for _, issue := range issues {
-		if issue.Severity == SeverityCritical || 
-		   (issue.Severity == SeverityHigh && issue.Category == CategorySecurity) {
+		if issue.Severity == SeverityCritical ||
+			(issue.Severity == SeverityHigh && issue.Category == CategorySecurity) {
 			critical = append(critical, issue)
 		}
 	}
@@ -210,14 +210,14 @@ func (a *ARFIntegration) createWorkflowSteps(issues []Issue) []arf.WorkflowStep 
 // generateRecipeSteps generates recipe steps from issues
 func (a *ARFIntegration) generateRecipeSteps(issues []Issue, language string) []*models.RecipeStep {
 	steps := []*models.RecipeStep{}
-	
+
 	// Group similar issues
 	issueGroups := a.groupSimilarIssues(issues)
-	
+
 	for groupName, groupIssues := range issueGroups {
 		step := &models.RecipeStep{
-			Name:   fmt.Sprintf("Fix %s", groupName),
-			Type:   models.StepTypeRegexReplace,
+			Name: fmt.Sprintf("Fix %s", groupName),
+			Type: models.StepTypeRegexReplace,
 			Config: map[string]interface{}{
 				"pattern":     fmt.Sprintf("(%s issues pattern)", groupName),
 				"replacement": "fixed version",
@@ -236,20 +236,20 @@ func (a *ARFIntegration) generateValidationRules(issues []Issue) models.Validati
 		RequiredFiles: []string{},
 		FilePatterns:  []string{},
 	}
-	
+
 	// Add basic file requirements based on issues
 	for _, issue := range issues {
 		if issue.File != "" {
 			// Add the file that has issues to required files for validation
 			rules.RequiredFiles = append(rules.RequiredFiles, issue.File)
 		}
-		
+
 		// Add patterns based on issue categories
 		if issue.Category == "compilation" {
 			rules.FilePatterns = append(rules.FilePatterns, "*.java", "*.go", "*.py")
 		}
 	}
-	
+
 	return rules
 }
 
@@ -259,15 +259,15 @@ func (a *ARFIntegration) calculateConfidence(issues []Issue) float64 {
 	if len(issues) == 0 {
 		return 1.0
 	}
-	
+
 	// Calculate confidence based on issue severity distribution
 	var totalWeight float64
 	var confidenceSum float64
-	
+
 	for _, issue := range issues {
 		weight := 1.0
 		confidence := 0.5 // Base confidence
-		
+
 		switch issue.Severity {
 		case SeverityCritical:
 			weight = 3.0
@@ -285,22 +285,22 @@ func (a *ARFIntegration) calculateConfidence(issues []Issue) float64 {
 			weight = 0.5
 			confidence = 0.9
 		}
-		
+
 		totalWeight += weight
 		confidenceSum += confidence * weight
 	}
-	
+
 	if totalWeight == 0 {
 		return 0.5
 	}
-	
+
 	return confidenceSum / totalWeight
 }
 
 func (a *ARFIntegration) assessRiskLevel(issues []Issue) string {
 	criticalCount := 0
 	highCount := 0
-	
+
 	for _, issue := range issues {
 		switch issue.Severity {
 		case SeverityCritical:
@@ -309,7 +309,7 @@ func (a *ARFIntegration) assessRiskLevel(issues []Issue) string {
 			highCount++
 		}
 	}
-	
+
 	if criticalCount > 0 {
 		return "critical"
 	} else if highCount > 2 {
@@ -317,7 +317,7 @@ func (a *ARFIntegration) assessRiskLevel(issues []Issue) string {
 	} else if highCount > 0 {
 		return "medium"
 	}
-	
+
 	return "low"
 }
 
@@ -325,8 +325,8 @@ func (a *ARFIntegration) matchesPattern(issue Issue, pattern string) bool {
 	// Simple pattern matching - can be enhanced with more sophisticated logic
 	switch pattern {
 	case "NullPointer":
-		return issue.Category == CategoryBug && 
-			   (contains(issue.RuleName, "Null") || contains(issue.Message, "null"))
+		return issue.Category == CategoryBug &&
+			(contains(issue.RuleName, "Null") || contains(issue.Message, "null"))
 	case "UnusedCode":
 		return contains(issue.RuleName, "Unused") || contains(issue.Message, "unused")
 	case "Security":
@@ -340,12 +340,12 @@ func (a *ARFIntegration) matchesPattern(issue Issue, pattern string) bool {
 
 func (a *ARFIntegration) groupSimilarIssues(issues []Issue) map[string][]Issue {
 	groups := make(map[string][]Issue)
-	
+
 	for _, issue := range issues {
 		key := fmt.Sprintf("%s-%s", issue.Category, issue.RuleName)
 		groups[key] = append(groups[key], issue)
 	}
-	
+
 	return groups
 }
 
@@ -359,10 +359,10 @@ func (a *ARFIntegration) getIssueIDs(issues []Issue) []string {
 
 // contains is a helper function for string containment
 func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && 
-		   (s == substr || len(s) > len(substr) && 
-		   (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		   len(substr) < len(s) && findSubstring(s, substr)))
+	return len(s) > 0 && len(substr) > 0 &&
+		(s == substr || len(s) > len(substr) &&
+			(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+				len(substr) < len(s) && findSubstring(s, substr)))
 }
 
 func findSubstring(s, substr string) bool {
@@ -373,4 +373,3 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
-

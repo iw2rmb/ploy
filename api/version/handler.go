@@ -10,7 +10,7 @@ func RegisterRoutes(app *fiber.App) {
 	// Version endpoints (no /v1 prefix for version)
 	app.Get("/version", GetVersion)
 	app.Get("/version/detailed", GetDetailedVersion)
-	
+
 	// Also register under /v1 for consistency
 	v1 := app.Group("/v1")
 	v1.Get("/version", GetVersion)

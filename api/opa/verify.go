@@ -5,23 +5,23 @@ import (
 	"log"
 	"strings"
 	"time"
-	
+
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 type ArtifactInput struct {
-	Signed       bool   `json:"signed"`
-	SBOMPresent  bool   `json:"sbom"`
-	Env          string `json:"env"`
-	SSHEnabled   bool   `json:"ssh_enabled"`
-	BreakGlass   bool   `json:"break_glass_approval"`
-	App          string `json:"app"`
-	Lane         string `json:"lane"`
-	Debug        bool   `json:"debug"`
+	Signed      bool   `json:"signed"`
+	SBOMPresent bool   `json:"sbom"`
+	Env         string `json:"env"`
+	SSHEnabled  bool   `json:"ssh_enabled"`
+	BreakGlass  bool   `json:"break_glass_approval"`
+	App         string `json:"app"`
+	Lane        string `json:"lane"`
+	Debug       bool   `json:"debug"`
 	// Image size information
-	ImageSizeMB  float64 `json:"image_size_mb,omitempty"`
-	ImagePath    string  `json:"image_path,omitempty"`
-	DockerImage  string  `json:"docker_image,omitempty"`
+	ImageSizeMB float64 `json:"image_size_mb,omitempty"`
+	ImagePath   string  `json:"image_path,omitempty"`
+	DockerImage string  `json:"docker_image,omitempty"`
 	// Enhanced environment-specific fields
 	VulnScanPassed bool   `json:"vuln_scan_passed,omitempty"`
 	SigningMethod  string `json:"signing_method,omitempty"` // key-based, keyless-oidc, development
@@ -31,7 +31,7 @@ type ArtifactInput struct {
 
 // Enforce validates deployment policies for artifacts with environment-specific rules
 func Enforce(input ArtifactInput) error {
-	log.Printf("OPA Policy Enforcement: app=%s, lane=%s, env=%s, signed=%v, sbom=%v, ssh=%v, debug=%v, size=%.1fMB, vuln_scan=%v, signing_method=%s", 
+	log.Printf("OPA Policy Enforcement: app=%s, lane=%s, env=%s, signed=%v, sbom=%v, ssh=%v, debug=%v, size=%.1fMB, vuln_scan=%v, signing_method=%s",
 		input.App, input.Lane, input.Env, input.Signed, input.SBOMPresent, input.SSHEnabled, input.Debug, input.ImageSizeMB, input.VulnScanPassed, input.SigningMethod)
 
 	// Environment-specific policy enforcement
@@ -56,7 +56,7 @@ func EnforceWithBypass(input ArtifactInput, bypassDev bool) error {
 		log.Printf("OPA Policy Enforcement: BYPASSED for development environment - app %s", input.App)
 		return nil
 	}
-	
+
 	return Enforce(input)
 }
 
@@ -79,17 +79,17 @@ func enforceSizeCaps(input ArtifactInput) error {
 	if input.ImageSizeMB > float64(sizeLimit.MaxSizeMB) {
 		// Allow break-glass override for size caps
 		if input.BreakGlass {
-			log.Printf("OPA Size Cap Enforcement: BYPASSED with break-glass - app %s size %.1fMB exceeds lane %s limit %dMB", 
+			log.Printf("OPA Size Cap Enforcement: BYPASSED with break-glass - app %s size %.1fMB exceeds lane %s limit %dMB",
 				input.App, input.ImageSizeMB, input.Lane, sizeLimit.MaxSizeMB)
 			return nil
 		}
-		
-		return fmt.Errorf("image size %.1fMB exceeds lane %s limit of %dMB (%s). Actual: %s, Limit: %dMB", 
-			input.ImageSizeMB, input.Lane, sizeLimit.MaxSizeMB, sizeLimit.Description, 
-			utils.FormatSize(int64(input.ImageSizeMB * 1024 * 1024)), sizeLimit.MaxSizeMB)
+
+		return fmt.Errorf("image size %.1fMB exceeds lane %s limit of %dMB (%s). Actual: %s, Limit: %dMB",
+			input.ImageSizeMB, input.Lane, sizeLimit.MaxSizeMB, sizeLimit.Description,
+			utils.FormatSize(int64(input.ImageSizeMB*1024*1024)), sizeLimit.MaxSizeMB)
 	}
 
-	log.Printf("OPA Size Cap Enforcement: PASSED - app %s size %.1fMB within lane %s limit %dMB", 
+	log.Printf("OPA Size Cap Enforcement: PASSED - app %s size %.1fMB within lane %s limit %dMB",
 		input.App, input.ImageSizeMB, input.Lane, sizeLimit.MaxSizeMB)
 	return nil
 }
@@ -116,12 +116,12 @@ func normalizeEnvironment(env string) string {
 // enforceProductionPolicies implements strict security policies for production
 func enforceProductionPolicies(input ArtifactInput) error {
 	log.Printf("OPA Policy Enforcement: Applying PRODUCTION policies for app %s", input.App)
-	
+
 	// Strict supply chain security requirements
 	if !input.Signed {
 		return fmt.Errorf("PRODUCTION POLICY VIOLATION: artifact must be cryptographically signed")
 	}
-	
+
 	if !input.SBOMPresent {
 		return fmt.Errorf("PRODUCTION POLICY VIOLATION: Software Bill of Materials (SBOM) required")
 	}
@@ -163,12 +163,12 @@ func enforceProductionPolicies(input ArtifactInput) error {
 // enforceStagingPolicies implements moderate security policies for staging
 func enforceStagingPolicies(input ArtifactInput) error {
 	log.Printf("OPA Policy Enforcement: Applying STAGING policies for app %s", input.App)
-	
+
 	// Core supply chain security requirements (same as production)
 	if !input.Signed {
 		return fmt.Errorf("STAGING POLICY VIOLATION: artifact must be cryptographically signed")
 	}
-	
+
 	if !input.SBOMPresent {
 		return fmt.Errorf("STAGING POLICY VIOLATION: Software Bill of Materials (SBOM) required")
 	}
@@ -205,12 +205,12 @@ func enforceStagingPolicies(input ArtifactInput) error {
 // enforceDevelopmentPolicies implements relaxed policies for development
 func enforceDevelopmentPolicies(input ArtifactInput) error {
 	log.Printf("OPA Policy Enforcement: Applying DEVELOPMENT policies for app %s", input.App)
-	
+
 	// Relaxed requirements for development - log warnings instead of blocking
 	if !input.Signed {
 		log.Printf("OPA Policy Enforcement: WARNING - unsigned artifact in development for app %s", input.App)
 	}
-	
+
 	if !input.SBOMPresent {
 		log.Printf("OPA Policy Enforcement: WARNING - missing SBOM in development for app %s", input.App)
 	}
@@ -260,7 +260,7 @@ func enforceProductionArtifactValidation(input ArtifactInput) error {
 	if input.BuildTime > 0 {
 		buildAge := time.Now().Unix() - input.BuildTime
 		maxAge := int64(30 * 24 * 60 * 60) // 30 days in seconds
-		
+
 		if buildAge > maxAge {
 			return fmt.Errorf("artifact build time too old: %d days (max 30 days for production)", buildAge/(24*60*60))
 		}
@@ -276,18 +276,18 @@ func isValidSourceRepository(repo string) bool {
 	if strings.Contains(repo, "github.com") {
 		return true
 	}
-	
+
 	// Add your organization's trusted repository patterns here
 	trustedPatterns := []string{
 		"gitlab.company.com",
 		"bitbucket.company.com",
 	}
-	
+
 	for _, pattern := range trustedPatterns {
 		if strings.Contains(repo, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }

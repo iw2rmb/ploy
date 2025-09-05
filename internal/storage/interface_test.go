@@ -532,7 +532,7 @@ func TestPutOptions(t *testing.T) {
 
 func TestStorageMetrics(t *testing.T) {
 	metrics := NewStorageMetrics()
-	
+
 	// Test that we get a valid StorageMetrics instance
 	assert.NotNil(t, metrics)
 	assert.Equal(t, int64(0), metrics.TotalUploads)

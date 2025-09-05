@@ -130,7 +130,7 @@ func TestBuildOSVJava(t *testing.T) {
 			if tt.request.SrcDir != "" && tt.setupFiles != nil {
 				tmpDir := t.TempDir()
 				tt.request.SrcDir = tmpDir
-				
+
 				// Create test files
 				for filename, content := range tt.setupFiles {
 					filePath := filepath.Join(tmpDir, filename)
@@ -167,10 +167,10 @@ func TestBuildOSVJava(t *testing.T) {
 // TestDetectJavaVersion tests the Java version detection logic
 func TestDetectJavaVersion(t *testing.T) {
 	tests := []struct {
-		name         string
-		files        map[string]string
-		expectedVer  string
-		expectError  bool
+		name        string
+		files       map[string]string
+		expectedVer string
+		expectError bool
 	}{
 		{
 			name: "Gradle with sourceCompatibility",
@@ -361,7 +361,7 @@ func testBuildOSVJava(req JavaOSVRequest, mockJibOutput string, mockJibError err
 	if req.SrcDir == "" && req.JibTar == "" {
 		return "", errors.New("either SrcDir or JibTar must be provided")
 	}
-	
+
 	// Detect Java version if not provided
 	javaVersion := req.JavaVersion
 	if javaVersion == "" && req.SrcDir != "" {
@@ -373,7 +373,7 @@ func testBuildOSVJava(req JavaOSVRequest, mockJibOutput string, mockJibError err
 	} else if javaVersion == "" {
 		javaVersion = "21" // Default fallback
 	}
-	
+
 	jibTar := req.JibTar
 	if jibTar == "" {
 		// Mock Jib build
@@ -382,12 +382,12 @@ func testBuildOSVJava(req JavaOSVRequest, mockJibOutput string, mockJibError err
 		}
 		jibTar = mockJibOutput
 	}
-	
+
 	// Mock OSv build
 	if mockOSvError != nil {
 		return "", fmt.Errorf("failed to build OSv image: %w", mockOSvError)
 	}
-	
+
 	// Generate expected output path
 	out := filepath.Join(req.OutDir, fmt.Sprintf("%s-%s.qcow2", req.App, testShort(req.GitSHA)))
 	return out, nil

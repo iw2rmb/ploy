@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-    "github.com/hashicorp/consul/api"
-    envstore "github.com/iw2rmb/ploy/internal/envstore"
+	"github.com/hashicorp/consul/api"
+	envstore "github.com/iw2rmb/ploy/internal/envstore"
 )
 
 // CacheEntry represents a cached value with expiration
@@ -32,10 +32,10 @@ func NewSimpleCache(ttl time.Duration) *SimpleCache {
 		entries: make(map[string]*CacheEntry),
 		ttl:     ttl,
 	}
-	
+
 	// Start cleanup goroutine
 	go cache.cleanup()
-	
+
 	return cache
 }
 
@@ -43,20 +43,20 @@ func NewSimpleCache(ttl time.Duration) *SimpleCache {
 func (c *SimpleCache) Get(key string) (interface{}, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	entry, exists := c.entries[key]
 	if !exists {
 		c.misses++
 		return nil, false
 	}
-	
+
 	// Check if entry has expired
 	if time.Now().After(entry.ExpiresAt) {
 		delete(c.entries, key)
 		c.misses++
 		return nil, false
 	}
-	
+
 	c.hits++
 	return entry.Value, true
 }
@@ -65,7 +65,7 @@ func (c *SimpleCache) Get(key string) (interface{}, bool) {
 func (c *SimpleCache) Set(key string, value interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.entries[key] = &CacheEntry{
 		Value:     value,
 		ExpiresAt: time.Now().Add(c.ttl),
@@ -76,7 +76,7 @@ func (c *SimpleCache) Set(key string, value interface{}) {
 func (c *SimpleCache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	delete(c.entries, key)
 }
 
@@ -84,7 +84,7 @@ func (c *SimpleCache) Delete(key string) {
 func (c *SimpleCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.entries = make(map[string]*CacheEntry)
 }
 
@@ -92,7 +92,7 @@ func (c *SimpleCache) Clear() {
 func (c *SimpleCache) cleanup() {
 	ticker := time.NewTicker(c.ttl / 2) // Cleanup at half the TTL interval
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		c.mu.Lock()
 		now := time.Now()
@@ -117,13 +117,13 @@ type CacheStats struct {
 func (c *SimpleCache) GetCacheStats() CacheStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	total := c.hits + c.misses
 	var hitRate float64
 	if total > 0 {
 		hitRate = float64(c.hits) / float64(total)
 	}
-	
+
 	return CacheStats{
 		Size:    len(c.entries),
 		Hits:    c.hits,
@@ -133,11 +133,11 @@ func (c *SimpleCache) GetCacheStats() CacheStats {
 }
 
 type ConsulEnvStore struct {
-	client     *api.Client
-	keyPrefix  string
-	mu         sync.RWMutex
-	cache      *SimpleCache
-	batchSize  int
+	client    *api.Client
+	keyPrefix string
+	mu        sync.RWMutex
+	cache     *SimpleCache
+	batchSize int
 }
 
 // Ensure ConsulEnvStore implements the EnvStoreInterface
@@ -148,24 +148,24 @@ func New(consulAddr, keyPrefix string) (*ConsulEnvStore, error) {
 	if consulAddr != "" {
 		config.Address = consulAddr
 	}
-	
+
 	client, err := api.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
-	
+
 	if keyPrefix == "" {
 		keyPrefix = "ploy/apps"
 	}
-	
+
 	// Create cache with 5-minute TTL for environment variables
 	cache := NewSimpleCache(5 * time.Minute)
-	
+
 	return &ConsulEnvStore{
-		client:     client,
-		keyPrefix:  keyPrefix,
-		cache:      cache,
-		batchSize:  10,
+		client:    client,
+		keyPrefix: keyPrefix,
+		cache:     cache,
+		batchSize: 10,
 	}, nil
 }
 
@@ -181,28 +181,28 @@ func (s *ConsulEnvStore) GetAll(app string) (envstore.AppEnvVars, error) {
 			return envVars, nil
 		}
 	}
-	
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	key := s.appEnvKey(app)
-	
+
 	// Use direct client
 	kv := s.client.KV()
 	pair, _, err := kv.Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get from Consul: %w", err)
 	}
-	
+
 	if pair == nil {
 		return envstore.AppEnvVars{}, nil
 	}
-	
+
 	var envVars envstore.AppEnvVars
 	if err := json.Unmarshal(pair.Value, &envVars); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
 	}
-	
+
 	// Cache the result
 	s.cache.Set(cacheKey, envVars)
 	log.Printf("[ConsulEnvStore] Retrieved and cached %d environment variables for app %s", len(envVars), app)
@@ -212,21 +212,21 @@ func (s *ConsulEnvStore) GetAll(app string) (envstore.AppEnvVars, error) {
 func (s *ConsulEnvStore) Set(app, key, value string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Invalidate cache when setting
 	cacheKey := fmt.Sprintf("app:%s:env", app)
 	s.cache.Delete(cacheKey)
-	
+
 	// Get current env vars
 	envVars, err := s.getUnsafe(app)
 	if err != nil {
 		return err
 	}
-	
+
 	if envVars == nil {
 		envVars = make(envstore.AppEnvVars)
 	}
-	
+
 	envVars[key] = value
 	return s.saveUnsafe(app, envVars)
 }
@@ -234,11 +234,11 @@ func (s *ConsulEnvStore) Set(app, key, value string) error {
 func (s *ConsulEnvStore) SetAll(app string, envVars envstore.AppEnvVars) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Invalidate cache when setting
 	cacheKey := fmt.Sprintf("app:%s:env", app)
 	s.cache.Delete(cacheKey)
-	
+
 	return s.saveUnsafe(app, envVars)
 }
 
@@ -247,7 +247,7 @@ func (s *ConsulEnvStore) Get(app, key string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	
+
 	value, exists := envVars[key]
 	return value, exists, nil
 }
@@ -255,20 +255,20 @@ func (s *ConsulEnvStore) Get(app, key string) (string, bool, error) {
 func (s *ConsulEnvStore) Delete(app, key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Invalidate cache when deleting
 	cacheKey := fmt.Sprintf("app:%s:env", app)
 	s.cache.Delete(cacheKey)
-	
+
 	envVars, err := s.getUnsafe(app)
 	if err != nil {
 		return err
 	}
-	
+
 	if envVars == nil {
 		return nil // Nothing to delete
 	}
-	
+
 	delete(envVars, key)
 	return s.saveUnsafe(app, envVars)
 }
@@ -276,21 +276,21 @@ func (s *ConsulEnvStore) Delete(app, key string) error {
 func (s *ConsulEnvStore) getUnsafe(app string) (envstore.AppEnvVars, error) {
 	key := s.appEnvKey(app)
 	kv := s.client.KV()
-	
+
 	pair, _, err := kv.Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get from Consul: %w", err)
 	}
-	
+
 	if pair == nil {
 		return nil, nil // No data exists
 	}
-	
+
 	var envVars envstore.AppEnvVars
 	if err := json.Unmarshal(pair.Value, &envVars); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
 	}
-	
+
 	return envVars, nil
 }
 
@@ -299,20 +299,20 @@ func (s *ConsulEnvStore) saveUnsafe(app string, envVars envstore.AppEnvVars) err
 	if err != nil {
 		return fmt.Errorf("failed to marshal environment variables: %w", err)
 	}
-	
+
 	key := s.appEnvKey(app)
 	kv := s.client.KV()
-	
+
 	pair := &api.KVPair{
 		Key:   key,
 		Value: data,
 	}
-	
+
 	_, err = kv.Put(pair, nil)
 	if err != nil {
 		return fmt.Errorf("failed to save to Consul: %w", err)
 	}
-	
+
 	log.Printf("[ConsulEnvStore] Saved %d environment variables for app %s to key %s", len(envVars), app, key)
 	return nil
 }
@@ -322,12 +322,12 @@ func (s *ConsulEnvStore) ToStringArray(app string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var result []string
 	for key, value := range envVars {
 		result = append(result, fmt.Sprintf("%s=%s", key, value))
 	}
-	
+
 	return result, nil
 }
 

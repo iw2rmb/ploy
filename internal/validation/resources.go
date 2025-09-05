@@ -17,19 +17,19 @@ type ResourceConstraints struct {
 const (
 	// MinCPUMillicores is the minimum CPU in millicores (1m)
 	MinCPUMillicores = 1
-	
+
 	// MaxCPUCores is the maximum CPU in cores
 	MaxCPUCores = 256
-	
+
 	// MinMemoryBytes is the minimum memory in bytes (4MB)
 	MinMemoryBytes = 4 * 1024 * 1024
-	
+
 	// MaxMemoryBytes is the maximum memory in bytes (1TB)
 	MaxMemoryBytes = 1024 * 1024 * 1024 * 1024
-	
+
 	// MinDiskBytes is the minimum disk space in bytes (10MB)
 	MinDiskBytes = 10 * 1024 * 1024
-	
+
 	// MaxDiskBytes is the maximum disk space in bytes (10TB)
 	MaxDiskBytes = 10 * 1024 * 1024 * 1024 * 1024
 )
@@ -48,18 +48,18 @@ func ValidateCPULimit(cpu string) error {
 	if cpu == "" {
 		return fmt.Errorf("CPU limit cannot be empty")
 	}
-	
+
 	// Check format
 	if !cpuRegex.MatchString(cpu) {
 		return fmt.Errorf("invalid CPU limit format: %s (use number for cores or number with 'm' for millicores)", cpu)
 	}
-	
+
 	// Parse value
 	value, err := ParseCPUValue(cpu)
 	if err != nil {
 		return fmt.Errorf("invalid CPU limit: %w", err)
 	}
-	
+
 	// Check for negative or zero
 	if value <= 0 {
 		if value < 0 {
@@ -67,20 +67,20 @@ func ValidateCPULimit(cpu string) error {
 		}
 		return fmt.Errorf("CPU limit must be greater than zero")
 	}
-	
+
 	// Convert to millicores for range check
 	millicores := int(value * 1000)
-	
+
 	// Check minimum
 	if millicores < MinCPUMillicores {
 		return fmt.Errorf("CPU limit %s is below minimum (%dm)", cpu, MinCPUMillicores)
 	}
-	
+
 	// Check maximum
 	if value > MaxCPUCores {
 		return fmt.Errorf("CPU limit %s exceeds maximum (%d cores)", cpu, MaxCPUCores)
 	}
-	
+
 	return nil
 }
 
@@ -89,12 +89,12 @@ func ValidateMemoryLimit(memory string) error {
 	if memory == "" {
 		return fmt.Errorf("memory limit cannot be empty")
 	}
-	
+
 	// Check for negative
 	if strings.HasPrefix(memory, "-") {
 		return fmt.Errorf("memory limit cannot be negative")
 	}
-	
+
 	// Special handling for raw bytes (no suffix)
 	if regexp.MustCompile(`^\d+$`).MatchString(memory) {
 		// For raw bytes, don't allow decimal
@@ -113,38 +113,38 @@ func ValidateMemoryLimit(memory string) error {
 		}
 		return nil
 	}
-	
+
 	// Check format with units
 	if !memoryRegex.MatchString(memory) {
 		return fmt.Errorf("invalid memory limit format: %s (use number with optional unit K, Ki, M, Mi, G, Gi, T, Ti)", memory)
 	}
-	
+
 	// Check for decimals (not allowed with units)
 	if strings.Contains(memory, ".") {
 		return fmt.Errorf("decimal not allowed in memory limit with units: %s", memory)
 	}
-	
+
 	// Parse value
 	bytes, err := ParseMemoryValue(memory)
 	if err != nil {
 		return fmt.Errorf("invalid memory limit: %w", err)
 	}
-	
+
 	// Check for zero
 	if bytes <= 0 {
 		return fmt.Errorf("memory limit must be greater than zero")
 	}
-	
+
 	// Check minimum
 	if bytes < MinMemoryBytes {
 		return fmt.Errorf("memory limit %s is below minimum (4M)", memory)
 	}
-	
+
 	// Check maximum
 	if bytes > MaxMemoryBytes {
 		return fmt.Errorf("memory limit %s exceeds maximum (1T)", memory)
 	}
-	
+
 	return nil
 }
 
@@ -153,43 +153,43 @@ func ValidateDiskLimit(disk string) error {
 	if disk == "" {
 		return fmt.Errorf("disk limit cannot be empty")
 	}
-	
+
 	// Check for negative
 	if strings.HasPrefix(disk, "-") {
 		return fmt.Errorf("disk limit cannot be negative")
 	}
-	
+
 	// Disk must have a unit (no raw bytes)
 	if regexp.MustCompile(`^\d+$`).MatchString(disk) {
 		return fmt.Errorf("disk limit must specify unit (K, Ki, M, Mi, G, Gi, T, Ti)")
 	}
-	
+
 	// Check format
 	if !diskRegex.MatchString(disk) {
 		return fmt.Errorf("invalid disk limit format: %s (use number with unit K, Ki, M, Mi, G, Gi, T, Ti)", disk)
 	}
-	
+
 	// Parse value
 	bytes, err := ParseMemoryValue(disk) // Same parsing as memory
 	if err != nil {
 		return fmt.Errorf("invalid disk limit: %w", err)
 	}
-	
+
 	// Check for zero
 	if bytes <= 0 {
 		return fmt.Errorf("disk limit must be greater than zero")
 	}
-	
+
 	// Check minimum
 	if bytes < MinDiskBytes {
 		return fmt.Errorf("disk limit %s is below minimum (10M)", disk)
 	}
-	
+
 	// Check maximum
 	if bytes > MaxDiskBytes {
 		return fmt.Errorf("disk limit %s exceeds maximum (10T)", disk)
 	}
-	
+
 	return nil
 }
 
@@ -199,28 +199,28 @@ func ValidateResourceConstraints(constraints ResourceConstraints) error {
 	if constraints.CPU == "" && constraints.Memory == "" && constraints.Disk == "" {
 		return nil
 	}
-	
+
 	// Validate CPU if specified
 	if constraints.CPU != "" {
 		if err := ValidateCPULimit(constraints.CPU); err != nil {
 			return fmt.Errorf("invalid CPU constraint: %w", err)
 		}
 	}
-	
+
 	// Validate memory if specified
 	if constraints.Memory != "" {
 		if err := ValidateMemoryLimit(constraints.Memory); err != nil {
 			return fmt.Errorf("invalid memory constraint: %w", err)
 		}
 	}
-	
+
 	// Validate disk if specified
 	if constraints.Disk != "" {
 		if err := ValidateDiskLimit(constraints.Disk); err != nil {
 			return fmt.Errorf("invalid disk constraint: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -229,7 +229,7 @@ func ParseCPUValue(cpu string) (float64, error) {
 	if cpu == "" {
 		return 0, fmt.Errorf("empty CPU value")
 	}
-	
+
 	// Check if it's millicores
 	if strings.HasSuffix(cpu, "m") {
 		millicoresStr := strings.TrimSuffix(cpu, "m")
@@ -239,13 +239,13 @@ func ParseCPUValue(cpu string) (float64, error) {
 		}
 		return millicores / 1000, nil
 	}
-	
+
 	// Otherwise it's cores
 	cores, err := strconv.ParseFloat(cpu, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid cores value: %s", cpu)
 	}
-	
+
 	return cores, nil
 }
 
@@ -254,7 +254,7 @@ func ParseMemoryValue(memory string) (int64, error) {
 	if memory == "" {
 		return 0, fmt.Errorf("empty memory value")
 	}
-	
+
 	// Try to match with units
 	matches := memoryRegex.FindStringSubmatch(memory)
 	if matches == nil {
@@ -265,22 +265,22 @@ func ParseMemoryValue(memory string) (int64, error) {
 		}
 		return bytes, nil
 	}
-	
+
 	// Parse number part
 	value, err := strconv.ParseInt(matches[1], 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid memory value: %s", matches[1])
 	}
-	
+
 	// No unit means bytes
 	if len(matches) < 3 || matches[2] == "" {
 		return value, nil
 	}
-	
+
 	// Parse unit and convert to bytes
 	unit := strings.ToLower(matches[2])
 	var multiplier int64
-	
+
 	switch unit {
 	case "k":
 		multiplier = 1024
@@ -301,6 +301,6 @@ func ParseMemoryValue(memory string) (int64, error) {
 	default:
 		return 0, fmt.Errorf("unknown memory unit: %s", matches[2])
 	}
-	
+
 	return value * multiplier, nil
 }

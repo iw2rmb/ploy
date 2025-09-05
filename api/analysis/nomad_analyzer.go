@@ -102,8 +102,8 @@ func (a *NomadPylintAnalyzer) GenerateFixSuggestions(issue Issue) ([]FixSuggesti
 func (a *NomadPylintAnalyzer) CanAutoFix(issue Issue) bool {
 	// Auto-fix capabilities can be implemented via Nomad jobs
 	autoFixableRules := map[string]bool{
-		"unused-import":       true,
-		"trailing-whitespace": true,
+		"unused-import":         true,
+		"trailing-whitespace":   true,
 		"missing-final-newline": true,
 	}
 	return autoFixableRules[issue.RuleName]
@@ -112,7 +112,7 @@ func (a *NomadPylintAnalyzer) CanAutoFix(issue Issue) bool {
 // GetARFRecipes returns ARF recipes for automatic remediation
 func (a *NomadPylintAnalyzer) GetARFRecipes(issue Issue) []string {
 	recipes := make([]string, 0)
-	
+
 	switch issue.RuleName {
 	case "unused-import":
 		recipes = append(recipes, "org.openrewrite.python.cleanup.RemoveUnusedImports")
@@ -123,26 +123,26 @@ func (a *NomadPylintAnalyzer) GetARFRecipes(issue Issue) []string {
 	case "trailing-whitespace":
 		recipes = append(recipes, "org.openrewrite.python.format.RemoveTrailingWhitespace")
 	}
-	
+
 	return recipes
 }
 
 // createCodebaseArchive creates a gzipped tar archive of Python files
 func (a *NomadPylintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, error) {
 	var buf bytes.Buffer
-	
+
 	// Create gzip writer
 	gzWriter := gzip.NewWriter(&buf)
 	defer gzWriter.Close()
-	
+
 	// Create tar writer
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
-	
+
 	// Filter Python files
 	pythonFiles := make([]string, 0)
 	supportedExts := a.GetSupportedFileTypes()
-	
+
 	for _, file := range codebase.Files {
 		for _, ext := range supportedExts {
 			if strings.HasSuffix(file, ext) {
@@ -151,11 +151,11 @@ func (a *NomadPylintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 			}
 		}
 	}
-	
+
 	if len(pythonFiles) == 0 {
 		return nil, fmt.Errorf("no Python files found in codebase")
 	}
-	
+
 	// Add each Python file to the archive
 	for _, file := range pythonFiles {
 		// Create tar header
@@ -165,31 +165,31 @@ func (a *NomadPylintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 			Size:    0, // Will be set based on content
 			ModTime: time.Now(),
 		}
-		
+
 		// For actual implementation, would read file content
 		// For now, using placeholder
 		content := []byte("# Python file content")
 		header.Size = int64(len(content))
-		
+
 		// Write header and content
 		if err := tarWriter.WriteHeader(header); err != nil {
 			return nil, fmt.Errorf("failed to write tar header for %s: %w", file, err)
 		}
-		
+
 		if _, err := tarWriter.Write(content); err != nil {
 			return nil, fmt.Errorf("failed to write file contents for %s: %w", file, err)
 		}
 	}
-	
+
 	// Close writers to flush data
 	if err := tarWriter.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close tar writer: %w", err)
 	}
-	
+
 	if err := gzWriter.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close gzip writer: %w", err)
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -291,7 +291,7 @@ func (a *NomadESLintAnalyzer) CanAutoFix(issue Issue) bool {
 // GetARFRecipes returns ARF recipes for issue remediation
 func (a *NomadESLintAnalyzer) GetARFRecipes(issue Issue) []string {
 	recipes := make([]string, 0)
-	
+
 	switch issue.RuleName {
 	case "no-unused-vars":
 		recipes = append(recipes, "org.openrewrite.javascript.cleanup.RemoveUnusedVariables")
@@ -300,24 +300,24 @@ func (a *NomadESLintAnalyzer) GetARFRecipes(issue Issue) []string {
 	case "prefer-const":
 		recipes = append(recipes, "org.openrewrite.javascript.modernize.UseConst")
 	}
-	
+
 	return recipes
 }
 
 // createCodebaseArchive creates archive of JavaScript/TypeScript files
 func (a *NomadESLintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, error) {
 	var buf bytes.Buffer
-	
+
 	gzWriter := gzip.NewWriter(&buf)
 	defer gzWriter.Close()
-	
+
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
-	
+
 	// Filter JavaScript/TypeScript files
 	jsFiles := make([]string, 0)
 	supportedExts := a.GetSupportedFileTypes()
-	
+
 	for _, file := range codebase.Files {
 		for _, ext := range supportedExts {
 			if strings.HasSuffix(file, ext) {
@@ -326,11 +326,11 @@ func (a *NomadESLintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 			}
 		}
 	}
-	
+
 	if len(jsFiles) == 0 {
 		return nil, fmt.Errorf("no JavaScript/TypeScript files found")
 	}
-	
+
 	// Add files to archive
 	for _, file := range jsFiles {
 		header := &tar.Header{
@@ -339,23 +339,23 @@ func (a *NomadESLintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 			Size:    0,
 			ModTime: time.Now(),
 		}
-		
+
 		// Placeholder content
 		content := []byte("// JavaScript file content")
 		header.Size = int64(len(content))
-		
+
 		if err := tarWriter.WriteHeader(header); err != nil {
 			return nil, err
 		}
-		
+
 		if _, err := tarWriter.Write(content); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	tarWriter.Close()
 	gzWriter.Close()
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -441,7 +441,7 @@ func (a *NomadGolangCIAnalyzer) Analyze(ctx context.Context, codebase Codebase) 
 func (a *NomadGolangCIAnalyzer) GenerateFixSuggestions(issue Issue) ([]FixSuggestion, error) {
 	// Go has gofmt and goimports for automatic fixes
 	suggestions := []FixSuggestion{}
-	
+
 	if issue.RuleName == "gofmt" || issue.RuleName == "goimports" {
 		suggestions = append(suggestions, FixSuggestion{
 			Description: "Run gofmt -w or goimports -w to fix formatting",
@@ -449,7 +449,7 @@ func (a *NomadGolangCIAnalyzer) GenerateFixSuggestions(issue Issue) ([]FixSugges
 			Confidence:  0.9,
 		})
 	}
-	
+
 	return suggestions, nil
 }
 
@@ -467,7 +467,7 @@ func (a *NomadGolangCIAnalyzer) CanAutoFix(issue Issue) bool {
 // GetARFRecipes returns ARF recipes
 func (a *NomadGolangCIAnalyzer) GetARFRecipes(issue Issue) []string {
 	recipes := make([]string, 0)
-	
+
 	switch issue.RuleName {
 	case "unused":
 		recipes = append(recipes, "org.openrewrite.go.cleanup.RemoveUnusedVariables")
@@ -476,34 +476,34 @@ func (a *NomadGolangCIAnalyzer) GetARFRecipes(issue Issue) []string {
 	case "errcheck":
 		recipes = append(recipes, "org.openrewrite.go.errors.AddErrorChecking")
 	}
-	
+
 	return recipes
 }
 
 // createCodebaseArchive creates archive of Go files
 func (a *NomadGolangCIAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, error) {
 	var buf bytes.Buffer
-	
+
 	gzWriter := gzip.NewWriter(&buf)
 	defer gzWriter.Close()
-	
+
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
-	
+
 	// Include Go files and module files
 	goFiles := make([]string, 0)
 	for _, file := range codebase.Files {
 		if strings.HasSuffix(file, ".go") ||
-		   filepath.Base(file) == "go.mod" ||
-		   filepath.Base(file) == "go.sum" {
+			filepath.Base(file) == "go.mod" ||
+			filepath.Base(file) == "go.sum" {
 			goFiles = append(goFiles, file)
 		}
 	}
-	
+
 	if len(goFiles) == 0 {
 		return nil, fmt.Errorf("no Go files found")
 	}
-	
+
 	// Add files to archive
 	for _, file := range goFiles {
 		header := &tar.Header{
@@ -512,25 +512,25 @@ func (a *NomadGolangCIAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte
 			Size:    0,
 			ModTime: time.Now(),
 		}
-		
+
 		// Placeholder content
 		content := []byte("// Go file content")
 		if filepath.Base(file) == "go.mod" {
 			content = []byte("module example\n\ngo 1.21")
 		}
 		header.Size = int64(len(content))
-		
+
 		if err := tarWriter.WriteHeader(header); err != nil {
 			return nil, err
 		}
-		
+
 		if _, err := tarWriter.Write(content); err != nil {
 			return nil, err
 		}
 	}
-	
+
 	tarWriter.Close()
 	gzWriter.Close()
-	
+
 	return buf.Bytes(), nil
 }

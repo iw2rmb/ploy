@@ -85,9 +85,9 @@ func TestBuildOCI(t *testing.T) {
 			srcDir: "/tmp/src",
 			tag:    "v2.0.0",
 			envVars: map[string]string{
-				"DOCKER_BUILDKIT": "1",
+				"DOCKER_BUILDKIT":   "1",
 				"BUILD_ARG_VERSION": "2.0.0",
-				"BUILD_ARG_ENV": "production",
+				"BUILD_ARG_ENV":     "production",
 			},
 			mockOutput:     "test-app:v2.0.0",
 			mockError:      nil,
@@ -228,11 +228,11 @@ func TestBuildOCICommandArguments(t *testing.T) {
 // TestBuildOCIEnvironmentVariables tests environment variable propagation
 func TestBuildOCIEnvironmentVariables(t *testing.T) {
 	envVars := map[string]string{
-		"DOCKER_HOST":       "tcp://localhost:2375",
-		"DOCKER_REGISTRY":   "registry.example.com",
-		"DOCKER_BUILDKIT":   "1",
-		"BUILD_CACHE":       "true",
-		"CUSTOM_VAR":        "custom_value",
+		"DOCKER_HOST":     "tcp://localhost:2375",
+		"DOCKER_REGISTRY": "registry.example.com",
+		"DOCKER_BUILDKIT": "1",
+		"BUILD_CACHE":     "true",
+		"CUSTOM_VAR":      "custom_value",
 	}
 
 	var capturedEnv []string
@@ -278,14 +278,14 @@ func testBuildOCI(app, srcDir, tag string, envVars map[string]string, mockOutput
 func BuildOCIWithMock(app, srcDir, tag string, envVars map[string]string, commandExecutor func(string, ...string) *exec.Cmd) (string, error) {
 	args := []string{"--app", app, "--src", srcDir, "--tag", tag}
 	cmd := commandExecutor("./scripts/build/oci/build_oci.sh", args...)
-	
+
 	// Add environment variables
 	env := os.Environ()
 	for k, v := range envVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 	cmd.Env = env
-	
+
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("oci build failed: %v: %s", err, string(b))

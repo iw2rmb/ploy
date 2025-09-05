@@ -53,7 +53,7 @@ index 789..abc 100644
 			expectedFiles: []string{},
 		},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Parse diff to count changed files (same logic as in the fix)
@@ -70,7 +70,7 @@ index 789..abc 100644
 					}
 				}
 			}
-			
+
 			assert.Equal(t, tc.expectedCount, len(changedFiles))
 			assert.Equal(t, tc.expectedFiles, changedFiles)
 		})
@@ -86,29 +86,29 @@ func TestOpenRewriteDispatcher_ProcessOutputWithDiff(t *testing.T) {
 	// 2. Extracts the tar to get transformed files
 	// 3. Generates a diff from the transformed files
 	// 4. Returns the diff in the TransformationResult
-	
+
 	mockStorage := new(MockUnifiedStorageService)
-	
+
 	dispatcher := &OpenRewriteDispatcher{
 		storageClient: mockStorage,
 		seaweedfsURL:  "http://localhost:8888",
 		// nomadClient will be mocked separately in integration tests
 	}
-	
+
 	ctx := context.Background()
 	jobID := "openrewrite-test-789"
 	outputKey := "jobs/" + jobID + "/output.tar"
-	
+
 	// Mock the output.tar content (simplified)
 	mockTarContent := []byte("mock tar file content")
-	
+
 	// Setup expectations
 	mockStorage.On("Get", ctx, outputKey).Return(mockTarContent, nil).Once()
-	
+
 	// Test that downloadFromStorage is called correctly
 	outputPath := "/tmp/test-output.tar"
 	err := dispatcher.downloadFromStorage(ctx, outputKey, outputPath)
-	
+
 	// The actual download will fail since we're mocking, but we verify the call was made
 	assert.Error(t, err) // Expected since mock returns raw bytes, not actual file write
 	mockStorage.AssertCalled(t, "Get", ctx, outputKey)
@@ -118,27 +118,27 @@ func TestOpenRewriteDispatcher_ProcessOutputWithDiff(t *testing.T) {
 // when output download fails (maintains backward compatibility)
 func TestOpenRewriteDispatcher_BackwardCompatibility(t *testing.T) {
 	mockStorage := new(MockUnifiedStorageService)
-	
+
 	dispatcher := &OpenRewriteDispatcher{
 		storageClient: mockStorage,
 		seaweedfsURL:  "http://localhost:8888",
 	}
-	
+
 	ctx := context.Background()
 	jobID := "openrewrite-test-fail"
 	outputKey := "jobs/" + jobID + "/output.tar"
-	
+
 	// Mock storage failure
 	mockStorage.On("Get", ctx, outputKey).Return([]byte{}, io.EOF).Once()
-	
+
 	// Test download failure handling
 	outputPath := "/tmp/test-fail-output.tar"
 	err := dispatcher.downloadFromStorage(ctx, outputKey, outputPath)
-	
+
 	// Should return error but not panic
 	assert.Error(t, err)
 	assert.Equal(t, io.EOF, err)
-	
+
 	// Verify attempt was made
 	mockStorage.AssertCalled(t, "Get", ctx, outputKey)
 }

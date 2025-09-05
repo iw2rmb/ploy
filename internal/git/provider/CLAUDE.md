@@ -1,7 +1,7 @@
 # Git Provider Module CLAUDE.md
 
 ## Purpose
-Provides Git forge provider integration for automated merge request creation and management in transflow workflows. Currently implements GitLab REST API with GitHub support infrastructure ready.
+Provides Git forge provider integration for automated merge request creation and management in transflow workflows, with specialized support for human-step healing branch workflows. Currently implements GitLab REST API with GitHub support infrastructure ready.
 
 ## Narrative Summary
 The git provider module implements a clean interface for interacting with Git forge providers (currently GitLab, extensible to GitHub). It handles authentication, project URL parsing, merge request lifecycle management, and comprehensive error handling. The module supports both creating new merge requests and updating existing ones based on source branch matching.
@@ -34,6 +34,7 @@ The provider follows the principle of graceful degradation - MR creation failure
 
 ### Provides
 - Merge request creation/updates for transflow workflows with rich MR descriptions
+- Human-step healing branch support with MR-based manual intervention workflows
 - Project URL validation and parsing supporting nested GitLab namespaces
 - Authentication validation with pre-flight token checking
 - Mock implementations for comprehensive testing infrastructure

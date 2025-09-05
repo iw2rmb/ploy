@@ -1,12 +1,12 @@
 # Transflow CLI Module CLAUDE.md
 
 ## Purpose
-Complete CLI integration for orchestrating multi-step code transformation workflows with automated build validation, production-ready self-healing capabilities, and GitLab merge request integration.
+Complete CLI integration for orchestrating multi-step code transformation workflows with comprehensive self-healing capabilities using three distinct branch types (human-step, llm-exec, orw-gen), production Nomad job orchestration, and GitLab merge request integration.
 
 ## Narrative Summary
-The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines with production Nomad job submission. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with real LangGraph-based job orchestration via Nomad.
+The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines with production-ready self-healing capabilities. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with three distinct healing branch types executed via production Nomad job orchestration.
 
-Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request → production healing workflows on failures. The module integrates with ARF infrastructure for recipe execution, SharedPush for build validation, and production orchestration infrastructure using SubmitAndWaitTerminal for real job submission with artifact retrieval.
+Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request → on build failures, triggers self-healing via parallel fanout orchestration with first-success-wins semantics. The healing system supports human-step (MR-based manual intervention), llm-exec (LLM-powered code fixes), and orw-gen (OpenRewrite recipe generation) branches. Production orchestration uses SubmitAndWaitTerminal for real Nomad job submission with HCL template rendering and artifact processing.
 
 ## Key Files
 - `run.go:1-250` - CLI command entry point and flag parsing
@@ -18,13 +18,19 @@ Core workflow: clone repository → create branch → apply transformations → 
 - `runner.go:509-553` - GitLab MR creation and updates
 - `config.go:1-150` - Configuration loading, validation, and timeout parsing
 - `integrations.go:87-200` - Factory pattern for production vs test implementations
-- `types.go:1-72` - Complete job submission type system with interfaces
+- `types.go:1-72` - Complete job submission type system with ProductionBranchRunner interface
+- `types.go:17-26` - ProductionBranchRunner interface for asset rendering and dependency access
+- `types.go:60-72` - JobSubmissionHelper and FanoutOrchestrator interfaces
 - `job_submission.go:1-250` - Production JobSubmissionHelper with HCL rendering and artifact parsing
 - `job_submission.go:47-84` - Environment variable substitution for HCL templates
 - `job_submission.go:86-98` - JSON artifact retrieval and parsing
 - `job_submission.go:100-180` - Real planner/reducer job submission with SubmitAndWaitTerminal
-- `fanout_orchestrator.go:1-300` - Production parallel healing branch orchestration
-- `fanout_orchestrator.go:44-120` - First-success-wins fanout execution with real job submission
+- `fanout_orchestrator.go:1-300` - Production parallel healing branch orchestration with three branch types
+- `fanout_orchestrator.go:44-120` - First-success-wins fanout execution with context cancellation and timeout handling
+- `fanout_orchestrator.go:127-198` - Branch execution dispatcher and context management
+- `fanout_orchestrator.go:200-246` - LLM-exec branch with HCL rendering, environment substitution, and diff.patch processing
+- `fanout_orchestrator.go:248-333` - ORW-gen branch with recipe configuration extraction and template substitution
+- `fanout_orchestrator.go:335-420` - Human-step branch with MR creation, commit polling, and build validation
 - `self_healing.go:1-250` - Self-healing configuration and result tracking
 - `mocks.go:1-200` - Complete mock implementation framework
 - `integration_test.go:1-300` - End-to-end integration test suite
@@ -47,6 +53,7 @@ Core workflow: clone repository → create branch → apply transformations → 
 - Test Mode: Complete mock infrastructure for CI/CD and local testing
 - Job Orchestration: Production Nomad job submission with HCL template rendering and artifact processing
 - Artifact Processing: JSON parsing of plan.json, next.json, and diff.patch from completed jobs
+- Branch Type Implementation: Complete support for human-step (Git+MR workflow), llm-exec (HCL job submission), and orw-gen (recipe generation) healing strategies
 
 ## Configuration
 Required files:
@@ -75,10 +82,14 @@ CLI flags:
 - Production job submission with HCL template rendering and environment substitution (see job_submission.go:47-84)
 - Real artifact processing with JSON parsing for job outputs (see job_submission.go:86-98)
 - Type-safe job submission interfaces supporting planner/reducer/branch workflows (see types.go:60-72)
-- Production fanout orchestration with first-success-wins semantics and real Nomad jobs (see fanout_orchestrator.go:44-120)
-- Branch type support for llm-exec, orw-gen, and human-step healing strategies
+- Production fanout orchestration with first-success-wins semantics and real Nomad jobs (see fanout_orchestrator.go:50-120)
+- Complete three-branch healing system: human-step (MR+build validation), llm-exec (HCL+diff processing), orw-gen (recipe generation)
+- Context-aware cancellation and timeout handling for parallel branch execution
+- HCL template processing with environment variable substitution for job definitions
 - Graceful error handling with optional MR creation (see runner.go:509-553)
-- Self-healing workflow with production LangGraph integration and parallel branch execution
+- Self-healing workflow with production LangGraph integration and parallel branch execution via first-success-wins fanout orchestration
+- Complete healing branch type system supporting three distinct healing strategies with production Nomad job orchestration
+- Context-aware cancellation ensuring resources are freed when first branch succeeds or timeout occurs
 - Configuration validation with timeout parsing and comprehensive error reporting
 
 ## Related Documentation

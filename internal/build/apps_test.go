@@ -27,7 +27,7 @@ func TestListApps(t *testing.T) {
 
 	apps, ok := response["apps"]
 	assert.True(t, ok)
-	
+
 	// Should return empty array
 	appsArray, ok := apps.([]interface{})
 	assert.True(t, ok)

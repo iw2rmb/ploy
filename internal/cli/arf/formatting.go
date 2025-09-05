@@ -1,16 +1,16 @@
 package arf
 
 import (
-    "encoding/json"
-    "fmt"
-    "os"
-    "sort"
-    "strings"
-    "text/tabwriter"
-    "time"
+	"encoding/json"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"text/tabwriter"
+	"time"
 
-    models "github.com/iw2rmb/ploy/internal/arf/models"
-    "gopkg.in/yaml.v3"
+	models "github.com/iw2rmb/ploy/internal/arf/models"
+	"gopkg.in/yaml.v3"
 )
 
 // TableColumn represents a column in a table output
