@@ -20,7 +20,7 @@ type ProductionBranchRunner interface {
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
 type fanoutOrchestrator struct {
-	submitter interface{} // MockJobSubmitter in tests, real submitter in production
+	submitter interface{}            // MockJobSubmitter in tests, real submitter in production
 	runner    ProductionBranchRunner // For accessing asset rendering methods in production
 }
 
@@ -268,7 +268,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	rclass := ""
 	rcoords := ""
 	rtimeout := "10m"
-	
+
 	if inputs, ok := branch.Inputs["recipe_config"].(map[string]interface{}); ok {
 		if class, ok := inputs["class"].(string); ok {
 			rclass = class
