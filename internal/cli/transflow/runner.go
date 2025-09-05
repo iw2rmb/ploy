@@ -656,6 +656,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 
 	// If reducer says to stop and we have a winner, healing succeeded
 	if nextAction.Action == "stop" && summary.Winner != nil {
+		summary.SetFinalResult(true)
 		return summary, nil
 	}
 

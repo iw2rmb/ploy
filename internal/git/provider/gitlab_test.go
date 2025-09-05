@@ -122,13 +122,13 @@ func TestGitLabProvider_CreateOrUpdateMR(t *testing.T) {
 			} else {
 				os.Unsetenv("GITLAB_URL")
 			}
-			
+
 			if tt.envToken != "" {
 				os.Setenv("GITLAB_TOKEN", tt.envToken)
 			} else {
 				os.Unsetenv("GITLAB_TOKEN")
 			}
-			
+
 			defer func() {
 				os.Unsetenv("GITLAB_URL")
 				os.Unsetenv("GITLAB_TOKEN")
@@ -244,13 +244,13 @@ func TestGitLabProvider_ValidateConfiguration(t *testing.T) {
 			} else {
 				os.Unsetenv("GITLAB_URL")
 			}
-			
+
 			if tt.envToken != "" {
 				os.Setenv("GITLAB_TOKEN", tt.envToken)
 			} else {
 				os.Unsetenv("GITLAB_TOKEN")
 			}
-			
+
 			defer func() {
 				os.Unsetenv("GITLAB_URL")
 				os.Unsetenv("GITLAB_TOKEN")

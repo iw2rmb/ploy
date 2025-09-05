@@ -152,3 +152,191 @@ Content-Type: application/json
   2) Build check via /v1/apps/:app/builds (no deploy).
   3) If build fails, run LangGraph planner job; branches: human-step, llm-exec, orw-gen→openrewrite.
   4) First success wins; reducer finalizes next actions (usually stop).
+
+## Test Repository
+
+**Java 11 Maven Test Repository for OpenRewrite Migration Testing:**
+- **URL**: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
+- **Purpose**: Real Java 11 codebase with OpenRewrite-transformable patterns for testing complete transflow workflows
+- **Contains**: Maven project structure, Java 11 code patterns (string operations, Optional usage, stream processing), JUnit 5 tests
+- **Used by**: Self-healing tests, integration tests, CLI validation with real repository scenarios
+- **Configuration**: Pre-configured with OpenRewrite Maven plugin for Java 11→17 migration recipes
+
+## CLI Usage and Examples
+
+### Basic Usage
+
+```bash
+# Run a complete transflow workflow
+ploy transflow run -f transflow.yaml
+
+# Run with verbose output
+ploy transflow run -f transflow.yaml --verbose
+
+# Dry run to validate configuration
+ploy transflow run -f transflow.yaml --dry-run
+
+# Use test mode for development/CI
+ploy transflow run -f transflow.yaml --test-mode
+```
+
+### Configuration Examples
+
+**Basic Java 11→17 Migration:**
+```yaml
+# transflow.yaml
+version: v1alpha1
+id: java11-to-17-migration
+target_repo: https://gitlab.com/your-org/your-java-project.git
+target_branch: refs/heads/main
+base_ref: refs/heads/main
+lane: C
+build_timeout: 15m
+
+steps:
+  - type: recipe
+    id: java-migration
+    engine: openrewrite
+    recipes:
+      - org.openrewrite.java.migrate.Java11toJava17
+      - org.openrewrite.java.cleanup.CommonStaticAnalysis
+      - org.openrewrite.java.RemoveUnusedImports
+
+self_heal:
+  enabled: true
+  max_retries: 2
+  cooldown: 30s
+```
+
+**With GitLab MR Creation:**
+```bash
+# Set GitLab environment variables
+export GITLAB_URL=https://gitlab.com
+export GITLAB_TOKEN=your-gitlab-token
+
+# Run workflow with MR creation
+ploy transflow run -f transflow.yaml
+```
+
+**Multiple Recipe Steps:**
+```yaml
+version: v1alpha1
+id: comprehensive-cleanup
+target_repo: https://gitlab.com/your-org/legacy-project.git
+target_branch: refs/heads/modernization
+base_ref: refs/heads/main
+
+steps:
+  - type: recipe
+    id: import-cleanup
+    engine: openrewrite
+    recipes:
+      - org.openrewrite.java.RemoveUnusedImports
+      - org.openrewrite.java.OrderImports
+
+  - type: recipe
+    id: code-modernization
+    engine: openrewrite
+    recipes:
+      - org.openrewrite.java.cleanup.SimplifyBooleanExpression
+      - org.openrewrite.java.cleanup.UnnecessaryParentheses
+      - org.openrewrite.java.migrate.Java11toJava17
+
+self_heal:
+  enabled: true
+  max_retries: 3
+```
+
+### Advanced Options
+
+**Specialized Execution Modes:**
+```bash
+# Execute only planner step (for debugging healing workflows)
+ploy transflow run -f transflow.yaml --render-planner
+
+# Execute only LLM step with custom model
+TRANSFLOW_MODEL=gpt-4o-mini@2024-08-06 \
+ploy transflow run -f transflow.yaml --exec-llm-first
+
+# Execute OpenRewrite application step
+ploy transflow run -f transflow.yaml --exec-orw-first
+
+# Apply first successful transformation and stop
+ploy transflow run -f transflow.yaml --apply-first
+```
+
+**Testing and Development:**
+```bash
+# Test mode - uses mock implementations for all external services
+ploy transflow run -f transflow.yaml --test-mode
+
+# Plan mode - shows execution plan without running
+ploy transflow run -f transflow.yaml --plan
+
+# Reduce mode - processes healing results
+ploy transflow run -f transflow.yaml --reduce
+```
+
+### Expected Workflow Output
+
+```
+Starting Transflow: java11-to-17-migration
+✓ Cloning repository: https://gitlab.com/your-org/your-java-project.git
+✓ Creating branch: workflow/java11-to-17-migration/20250905151234
+✓ Executing recipe: org.openrewrite.java.migrate.Java11toJava17
+✓ Committing changes: Apply Java 11 to 17 migration recipes
+✓ Building project: tfw-java11-to-17-migration-20250905151234
+✓ Pushing branch to remote
+✓ Creating GitLab MR: https://gitlab.com/your-org/your-java-project/-/merge_requests/42
+
+Workflow completed successfully!
+  Branch: workflow/java11-to-17-migration/20250905151234
+  Build Version: 20250905151234-abc123
+  Duration: 2m 34s
+  MR URL: https://gitlab.com/your-org/your-java-project/-/merge_requests/42
+```
+
+### Error Handling and Self-Healing
+
+When builds fail and self-healing is enabled, the system will:
+
+1. **Analyze the failure** using LangGraph planner
+2. **Generate healing options** (human intervention, LLM fixes, additional recipes)
+3. **Execute options in parallel** with first-success-wins logic
+4. **Apply successful fix** and continue workflow
+5. **Create MR** with healing summary included
+
+**Self-Healing Output Example:**
+```
+⚠ Build failed: compilation errors in Main.java:15
+🔧 Self-healing enabled, starting recovery...
+✓ Planner job completed: 3 healing options generated
+  → Option 1: llm-exec (confidence: 0.8)
+  → Option 2: org.openrewrite.java.cleanup.UnnecessaryParentheses
+  → Option 3: human-step
+✓ Executing healing options in parallel...
+✓ llm-exec option succeeded after 45s
+✓ Retrying build with healed changes...
+✓ Build successful: tfw-java11-to-17-migration-20250905151234-healed
+✓ Continuing workflow...
+```
+
+### Environment Configuration
+
+**Required Environment Variables:**
+- `GITLAB_TOKEN`: GitLab personal access token for MR creation
+- `GITLAB_URL`: GitLab instance URL (default: https://gitlab.com)
+
+**Optional Environment Variables:**
+- `TRANSFLOW_MODEL`: LLM model for healing (default: gpt-4o-mini@2024-08-06)
+- `TRANSFLOW_TOOLS`: MCP tools configuration JSON
+- `TRANSFLOW_LIMITS`: Execution limits configuration JSON
+- `NOMAD_ADDR`: Nomad cluster address for job submission
+
+### Integration with Existing Systems
+
+The transflow CLI integrates seamlessly with existing Ploy infrastructure:
+- **ARF Pipeline**: Reuses `ploy arf transform` for recipe execution
+- **Build System**: Uses existing `/v1/apps/:app/builds` API for validation
+- **Git Operations**: Leverages ARF git handling with automatic configuration
+- **Job Orchestration**: Uses existing Nomad job submission infrastructure

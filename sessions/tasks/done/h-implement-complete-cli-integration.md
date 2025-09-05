@@ -1,8 +1,9 @@
 ---
 task: h-implement-complete-cli-integration
 branch: feature/complete-cli-integration
-status: pending
+status: in-progress
 created: 2025-09-05
+started: 2025-09-05
 modules: [internal/cli/transflow, cmd/ploy, internal/orchestration]
 ---
 
@@ -22,6 +23,7 @@ The goal is to ensure `ploy transflow run -f transflow.yaml` executes the comple
 - [ ] Comprehensive CLI argument parsing and validation
 - [ ] Support for all documented CLI flags and options
 - [ ] Unit tests for CLI command parsing and workflow orchestration
+- [ ] Create `ploy-orw-java11-maven` test repository, push to GitLab, and update tests to use real repo URL instead of fake test/repo URLs
 - [ ] Integration tests demonstrating full workflow functionality
 - [ ] Error handling that follows project patterns (graceful failures)
 - [ ] Verbose and quiet output modes working correctly

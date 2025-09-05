@@ -9,22 +9,22 @@ import (
 
 // JobSpec describes a job to be submitted to the orchestrator
 type JobSpec struct {
-	Name       string                 `json:"name"`
-	Type       string                 `json:"type"`
-	HCLPath    string                 `json:"hcl_path"`
-	EnvVars    map[string]string      `json:"env_vars"`
-	Timeout    time.Duration          `json:"timeout"`
-	Inputs     map[string]interface{} `json:"inputs"`
+	Name    string                 `json:"name"`
+	Type    string                 `json:"type"`
+	HCLPath string                 `json:"hcl_path"`
+	EnvVars map[string]string      `json:"env_vars"`
+	Timeout time.Duration          `json:"timeout"`
+	Inputs  map[string]interface{} `json:"inputs"`
 }
 
 // JobResult contains the result of a completed job
 type JobResult struct {
-	JobID     string                 `json:"job_id"`
-	Status    string                 `json:"status"` // "completed", "failed", "timeout"
-	Output    string                 `json:"output"`
-	Error     string                 `json:"error"`
-	Duration  time.Duration          `json:"duration"`
-	Artifacts map[string]string      `json:"artifacts"`
+	JobID     string            `json:"job_id"`
+	Status    string            `json:"status"` // "completed", "failed", "timeout"
+	Output    string            `json:"output"`
+	Error     string            `json:"error"`
+	Duration  time.Duration     `json:"duration"`
+	Artifacts map[string]string `json:"artifacts"`
 }
 
 // PlanResult contains the output from a planner job

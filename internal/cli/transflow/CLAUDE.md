@@ -1,23 +1,29 @@
-# Transflow Service CLAUDE.md
+# Transflow CLI Module CLAUDE.md
 
 ## Purpose
-Orchestrates multi-step code transformation workflows with automated build validation and GitLab merge request integration.
+Complete CLI integration for orchestrating multi-step code transformation workflows with automated build validation, self-healing capabilities, and GitLab merge request integration.
 
 ## Narrative Summary
-The transflow service provides a complete pipeline for applying code transformations (via OpenRewrite recipes) to target repositories, validating the results through automated builds, and optionally creating GitLab merge requests for review. The service supports self-healing workflows that can automatically retry failed transformations with alternative strategies.
+The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with LangGraph-based job orchestration.
 
-Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request. The service integrates with existing ARF (Application Recipe Framework) infrastructure for recipe execution and SharedPush for build validation.
+Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request → optional healing on failures. The module integrates with ARF infrastructure for recipe execution, SharedPush for build validation, and includes comprehensive job submission infrastructure for healing workflows.
 
 ## Key Files
-- `runner.go:126-597` - Main transflow orchestration logic
-- `runner.go:509-553` - GitLab MR integration implementation
-- `types.go:1-75` - Core data structures and configuration
-- `config.go:1-120` - Configuration loading and validation
-- `integrations.go:87-140` - Dependency injection and service factories
-- `integrations.go:117-120` - GitLab provider factory method
-- `integrations.go:133` - GitLab provider injection in runner configuration
-- `job_submission.go:1-95` - Healing workflow job submission
-- `self_healing.go:1-200` - Self-healing orchestration logic
+- `run.go:1-250` - CLI command entry point and flag parsing
+- `runner.go:1-650` - Complete orchestration logic with healing integration
+- `runner.go:126-172` - Main dependency injection and initialization
+- `runner.go:174-280` - Core workflow execution (Run method)
+- `runner.go:282-380` - Build validation and error handling
+- `runner.go:441-500` - Self-healing workflow integration
+- `runner.go:509-553` - GitLab MR creation and updates
+- `config.go:1-150` - Configuration loading, validation, and timeout parsing
+- `integrations.go:87-200` - Factory pattern for production vs test implementations
+- `types.go:1-120` - Job submission type system for healing workflows
+- `job_submission.go:1-120` - JobSubmissionHelper implementation
+- `fanout_orchestrator.go:1-150` - Parallel healing branch orchestration
+- `self_healing.go:1-250` - Self-healing configuration and result tracking
+- `mocks.go:1-200` - Complete mock implementation framework
+- `integration_test.go:1-300` - End-to-end integration test suite
 
 ## Integration Points
 ### Consumes
@@ -28,10 +34,12 @@ Core workflow: clone repository → create branch → apply transformations → 
 - Ploy Orchestration: Job submission for healing workflows
 
 ### Provides
-- CLI Commands: `ploy transflow run -f <config>`
-- Workflow Execution: Complete transformation pipeline
-- Self-Healing: Automatic retry with alternative strategies
-- MR Integration: Automated GitLab merge request management
+- CLI Commands: `ploy transflow run -f <config>` with complete flag support
+- Workflow Execution: End-to-end transformation pipeline with result tracking
+- Self-Healing: LangGraph-based healing with planner/reducer jobs and parallel branch execution
+- MR Integration: GitLab merge request creation/updates with rich descriptions
+- Test Mode: Complete mock infrastructure for CI/CD and local testing
+- Job Orchestration: Nomad job submission and monitoring for healing workflows
 
 ## Configuration
 Required files:
@@ -44,14 +52,27 @@ Environment variables:
 - `TRANSFLOW_MODEL` - LLM model for healing (default: gpt-4o-mini@2024-08-06)
 - `TRANSFLOW_TOOLS` - Tool configuration JSON for healing jobs
 - `TRANSFLOW_LIMITS` - Execution limits JSON for healing jobs
+- `NOMAD_ADDR` - Nomad cluster address for job submission
+
+CLI flags:
+- `--config, -f` - Configuration file path
+- `--test-mode` - Enable mock implementations for testing
+- `--dry-run` - Show what would be done without execution
+- `--verbose` - Detailed output during workflow execution
 
 ## Key Patterns
-- Dependency injection pattern for testability (see runner.go:149-172)
-- Factory pattern for service integration (see integrations.go:87-137)
-- Optional failure pattern for MR creation (see runner.go:509-553)
-- Self-healing orchestration with planner/fanout/reducer workflow
+- Complete dependency injection with interface-based design (see runner.go:126-172, integrations.go:87-200)
+- Factory pattern for production vs test implementations (see integrations.go)
+- Test mode infrastructure with comprehensive mocking (see mocks.go:1-200)
+- Job submission infrastructure with type-safe interfaces (see types.go, job_submission.go)
+- Fanout orchestration with first-success-wins semantics (see fanout_orchestrator.go)
+- Graceful error handling with optional MR creation (see runner.go:509-553)
+- Self-healing workflow with LangGraph integration and parallel branch execution
+- Configuration validation with timeout parsing and comprehensive error reporting
 
 ## Related Documentation
-- `../git/provider/CLAUDE.md` - GitLab provider service
-- `../../api/arf/` - Application Recipe Framework
-- `../orchestration/` - Job submission infrastructure
+- `../git/provider/CLAUDE.md` - GitLab provider implementation
+- `../../api/arf/` - Application Recipe Framework integration
+- `../../orchestration/` - Job submission and monitoring infrastructure
+- `../../../roadmap/transflow/MVP.md` - Complete implementation status and requirements
+- Integration test repository: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git

@@ -122,39 +122,6 @@ func (m *TestModeBuildChecker) CheckBuild(ctx context.Context, config common.Dep
 	}, nil
 }
 
-// MockGitProvider implements GitProvider for testing without external API calls
-type MockGitProvider struct {
-	shouldFail bool
-}
-
-// NewMockGitProvider creates a new mock git provider
-func NewMockGitProvider(shouldFail bool) *MockGitProvider {
-	return &MockGitProvider{
-		shouldFail: shouldFail,
-	}
-}
-
-// CreateOrUpdateMR performs a mock merge request creation
-func (m *MockGitProvider) CreateOrUpdateMR(ctx context.Context, config provider.MRConfig) (*provider.MRResult, error) {
-	if m.shouldFail {
-		return nil, fmt.Errorf("mock MR creation failed for testing")
-	}
-
-	return &provider.MRResult{
-		MRURL:   "https://gitlab.example.com/test/project/-/merge_requests/123",
-		MRID:    123,
-		Created: true,
-	}, nil
-}
-
-// ValidateConfiguration performs mock configuration validation
-func (m *MockGitProvider) ValidateConfiguration() error {
-	if m.shouldFail {
-		return fmt.Errorf("mock git provider configuration invalid")
-	}
-	return nil
-}
-
 // TransflowIntegrations provides factory methods for creating concrete implementations
 type TransflowIntegrations struct {
 	ControllerURL string
@@ -182,18 +149,24 @@ func NewTransflowIntegrationsWithTestMode(controllerURL, workDir string, testMod
 
 // CreateGitOperations creates a Git operations implementation
 func (i *TransflowIntegrations) CreateGitOperations() GitOperationsInterface {
+	if i.TestMode {
+		return NewMockGitOperations() // Use mock implementation for testing
+	}
 	return NewARFGitOperations(i.WorkDir)
 }
 
 // CreateRecipeExecutor creates a recipe executor implementation
 func (i *TransflowIntegrations) CreateRecipeExecutor() RecipeExecutorInterface {
+	if i.TestMode {
+		return NewMockRecipeExecutor() // Use mock implementation for testing
+	}
 	return NewARFRecipeExecutor(i.ControllerURL)
 }
 
 // CreateBuildChecker creates a build checker implementation
 func (i *TransflowIntegrations) CreateBuildChecker() BuildCheckerInterface {
 	if i.TestMode {
-		return NewTestModeBuildChecker(false) // Default to successful mock builds
+		return NewMockBuildChecker() // Use mock implementation for testing
 	}
 	return NewSharedPushBuildChecker(i.ControllerURL)
 }
@@ -201,7 +174,7 @@ func (i *TransflowIntegrations) CreateBuildChecker() BuildCheckerInterface {
 // CreateGitProvider creates a Git provider implementation for MR operations
 func (i *TransflowIntegrations) CreateGitProvider() provider.GitProvider {
 	if i.TestMode {
-		return NewMockGitProvider(false) // Default to successful mock MR creation
+		return NewMockGitProvider() // Use mock implementation for testing
 	}
 	return provider.NewGitLabProvider()
 }

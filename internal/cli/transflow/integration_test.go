@@ -26,7 +26,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 			config: &TransflowConfig{
 				Version:      "v1alpha1",
 				ID:           "test-integration-success",
-				TargetRepo:   "https://github.com/iw2rmb/ploy.git",
+				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				BaseRef:      "main",
 				Lane:         "C",
@@ -49,7 +49,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 			config: &TransflowConfig{
 				Version:      "v1alpha1",
 				ID:           "test-integration-fail",
-				TargetRepo:   "https://github.com/iw2rmb/ploy.git",
+				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				BaseRef:      "main",
 				Lane:         "C",
@@ -80,7 +80,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 
 			// Create integrations with test mode
 			integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, tt.testMode)
-			
+
 			// For build failure test, override with failing mock
 			if tt.name == "workflow_with_build_failure" {
 				integrations.TestMode = true
@@ -94,14 +94,14 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to create runner: %v", err)
 				}
-				
+
 				// Override with failing build checker
 				runner.SetBuildChecker(NewTestModeBuildChecker(true))
-				
+
 				// Execute workflow
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				defer cancel()
-				
+
 				result, err := runner.Run(ctx)
 				if !tt.expectError {
 					t.Errorf("expected error but got none, result: %v", result)
@@ -150,7 +150,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 			}
 
 			if result.BuildVersion == "" {
-				t.Error("expected build version but got empty string")  
+				t.Error("expected build version but got empty string")
 			}
 
 			// Check that all expected steps completed
@@ -190,7 +190,7 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 			config: &TransflowConfig{
 				Version:      "v1alpha1",
 				ID:           "test-valid",
-				TargetRepo:   "https://github.com/test/repo.git",
+				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				BaseRef:      "main",
 				Steps: []TransflowStep{
@@ -217,7 +217,7 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 			config: &TransflowConfig{
 				Version:      "v1alpha1",
 				ID:           "test-timeout",
-				TargetRepo:   "https://github.com/test/repo.git",
+				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				BaseRef:      "main",
 				BuildTimeout: "invalid-timeout",
@@ -225,7 +225,7 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 					{
 						Type:    "recipe",
 						ID:      "test",
-						Engine:  "openrewrite",  
+						Engine:  "openrewrite",
 						Recipes: []string{"org.test.Recipe"},
 					},
 				},
@@ -237,7 +237,7 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("expected validation error but got none")
@@ -260,7 +260,7 @@ func TestTransflowIntegrationsFactory(t *testing.T) {
 
 	t.Run("production_mode_integrations", func(t *testing.T) {
 		integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
-		
+
 		if integrations.TestMode {
 			t.Error("expected TestMode to be false")
 		}
@@ -289,7 +289,7 @@ func TestTransflowIntegrationsFactory(t *testing.T) {
 
 	t.Run("test_mode_integrations", func(t *testing.T) {
 		integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)
-		
+
 		if !integrations.TestMode {
 			t.Error("expected TestMode to be true")
 		}
@@ -299,7 +299,7 @@ func TestTransflowIntegrationsFactory(t *testing.T) {
 		if buildChecker == nil {
 			t.Error("expected build checker but got nil")
 		}
-		
+
 		// Verify it's a mock by testing behavior
 		ctx := context.Background()
 		result, err := buildChecker.CheckBuild(ctx, common.DeployConfig{
@@ -307,11 +307,11 @@ func TestTransflowIntegrationsFactory(t *testing.T) {
 			Lane:        "C",
 			Environment: "dev",
 		})
-		
+
 		if err != nil {
 			t.Errorf("mock build checker should not fail: %v", err)
 		}
-		
+
 		if result == nil || !result.Success {
 			t.Error("mock build checker should return successful result")
 		}
@@ -321,7 +321,7 @@ func TestTransflowIntegrationsFactory(t *testing.T) {
 		if gitProvider == nil {
 			t.Error("expected git provider but got nil")
 		}
-		
+
 		// Verify it's a mock
 		if err := gitProvider.ValidateConfiguration(); err != nil {
 			t.Errorf("mock git provider validation should succeed: %v", err)

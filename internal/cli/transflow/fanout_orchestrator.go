@@ -80,7 +80,7 @@ func (o *fanoutOrchestrator) RunHealingFanout(ctx context.Context, runCtx interf
 
 	for result := range resultCh {
 		allResults = append(allResults, result)
-		
+
 		// First successful result becomes the winner
 		if result.Status == "completed" && !foundWinner {
 			winner = result
@@ -98,7 +98,7 @@ func (o *fanoutOrchestrator) RunHealingFanout(ctx context.Context, runCtx interf
 // executeBranch executes a single branch and returns the result
 func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpec) BranchResult {
 	startTime := time.Now()
-	
+
 	result := BranchResult{
 		ID:        branch.ID,
 		Status:    "failed", // Default to failed

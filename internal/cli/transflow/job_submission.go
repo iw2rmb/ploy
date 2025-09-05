@@ -70,7 +70,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 	}); ok {
 		spec := JobSpec{
 			Name:    "reducer",
-			Type:    "reducer", 
+			Type:    "reducer",
 			HCLPath: "", // Would be set from rendered assets
 			EnvVars: map[string]string{
 				"PLAN_ID": planID,
