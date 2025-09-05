@@ -1,6 +1,6 @@
 {
-  "task": "m-implement-complete-healing-branch-types",
-  "branch": "feature/implement-complete-healing-branch-types",
-  "services": ["internal/cli/transflow", "roadmap/transflow", "tests"],
+  "task": null,
+  "branch": null,
+  "services": [],
   "updated": "2025-09-05"
 }
