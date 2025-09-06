@@ -73,11 +73,11 @@ func (m *MockKBStorage) Health(ctx context.Context) error {
 }
 
 // Mock Lock Manager for testing
-type MockLockManager struct {
+type SummaryMockLockManager struct {
 	mock.Mock
 }
 
-func (m *MockLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
+func (m *SummaryMockLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
 	args := m.Called(ctx, key, ttl)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -85,17 +85,17 @@ func (m *MockLockManager) AcquireLock(ctx context.Context, key string, ttl time.
 	return args.Get(0).(*Lock), args.Error(1)
 }
 
-func (m *MockLockManager) ReleaseLock(ctx context.Context, lock *Lock) error {
+func (m *SummaryMockLockManager) ReleaseLock(ctx context.Context, lock *Lock) error {
 	args := m.Called(ctx, lock)
 	return args.Error(0)
 }
 
-func (m *MockLockManager) IsLocked(ctx context.Context, key string) (bool, error) {
+func (m *SummaryMockLockManager) IsLocked(ctx context.Context, key string) (bool, error) {
 	args := m.Called(ctx, key)
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *MockLockManager) TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error {
+func (m *SummaryMockLockManager) TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error {
 	args := m.Called(ctx, key, config, fn)
 	return args.Error(0)
 }
@@ -212,7 +212,7 @@ func createTestCases() []*CaseRecord {
 
 func TestSummaryComputer_AnalyzeCases(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	config := DefaultSummaryConfig()
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, config)
 
@@ -251,7 +251,7 @@ func TestSummaryComputer_AnalyzeCases(t *testing.T) {
 
 func TestSummaryComputer_ScoreCandidates(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	config := DefaultSummaryConfig()
 	config.MinCasesForPromotion = 1 // Lower threshold for testing
 	config.MinSuccessRate = 0.5
@@ -318,7 +318,7 @@ func TestSummaryComputer_ScoreCandidates(t *testing.T) {
 
 func TestSummaryComputer_ComputeStats(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	config := DefaultSummaryConfig()
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, config)
 
@@ -338,7 +338,7 @@ func TestSummaryComputer_ComputeStats(t *testing.T) {
 
 func TestSummaryComputer_ComputeAndUpdateSummary(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	config := DefaultSummaryConfig()
 	config.MinCasesForPromotion = 1 // Lower threshold for testing
 	config.MaxPromotedFixes = 2     // Limit for testing
@@ -352,7 +352,6 @@ func TestSummaryComputer_ComputeAndUpdateSummary(t *testing.T) {
 	cases := createTestCases()
 
 	// Mock lock acquisition
-	_ = &Lock{Key: lockKey, SessionID: "test-session"} // testLock created but not used in this test
 	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*transflow.LockConfig"), mock.AnythingOfType("func() error")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
@@ -374,7 +373,7 @@ func TestSummaryComputer_ComputeAndUpdateSummary(t *testing.T) {
 
 func TestSummaryComputer_GetRecommendedFixes(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, DefaultSummaryConfig())
 
 	ctx := context.Background()
@@ -434,7 +433,7 @@ func TestSummaryComputer_GetRecommendedFixes(t *testing.T) {
 
 func TestSummaryComputer_UpdateSummaryAfterCase(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, DefaultSummaryConfig())
 
 	ctx := context.Background()
@@ -464,7 +463,7 @@ func TestSummaryComputer_UpdateSummaryAfterCase(t *testing.T) {
 
 func TestSummaryComputer_UpdateSummaryAfterCase_LockFailure(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, DefaultSummaryConfig())
 
 	ctx := context.Background()
@@ -502,7 +501,7 @@ func TestDefaultSummaryConfig(t *testing.T) {
 
 func TestPromoteTopCandidates(t *testing.T) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	config := DefaultSummaryConfig()
 	config.MaxPromotedFixes = 2 // Limit for testing
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, config)
@@ -550,7 +549,7 @@ func TestPromoteTopCandidates(t *testing.T) {
 // Benchmark tests
 func BenchmarkAnalyzeCases(b *testing.B) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, DefaultSummaryConfig())
 
 	cases := createTestCases()
@@ -563,7 +562,7 @@ func BenchmarkAnalyzeCases(b *testing.B) {
 
 func BenchmarkScoreCandidates(b *testing.B) {
 	mockStorage := new(MockKBStorage)
-	mockLockMgr := new(MockLockManager)
+	mockLockMgr := new(SummaryMockLockManager)
 	computer := NewSummaryComputer(mockStorage, mockLockMgr, DefaultSummaryConfig())
 
 	// Create more candidates for realistic benchmarking
