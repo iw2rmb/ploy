@@ -205,8 +205,19 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	// Step 2: Generate unique run ID for this branch
 	runID := fmt.Sprintf("llm-exec-%s-%d", branch.ID, time.Now().Unix())
 
-	// Step 3: Substitute environment variables in HCL template
-	renderedHCLPath, err := substituteHCLTemplate(hclPath, runID)
+	// Step 3: Extract MCP configuration from branch inputs
+	var mcpConfig *MCPConfig = nil
+	if mcpData, ok := branch.Inputs["mcp_config"]; ok {
+		if mcpConfigMap, ok := mcpData.(map[string]interface{}); ok {
+			// Convert map to MCPConfig struct
+			if parsedMCP, err := parseMCPFromInputs(mcpConfigMap); err == nil {
+				mcpConfig = parsedMCP
+			}
+		}
+	}
+
+	// Step 4: Substitute environment variables in HCL template with MCP support
+	renderedHCLPath, err := substituteHCLTemplateWithMCP(hclPath, runID, mcpConfig)
 	if err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("failed to substitute HCL template: %v", err)
@@ -240,6 +251,81 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	result.FinishedAt = time.Now()
 	result.Duration = time.Since(result.StartedAt)
 	return result
+}
+
+// parseMCPFromInputs converts map[string]interface{} to MCPConfig struct
+func parseMCPFromInputs(inputs map[string]interface{}) (*MCPConfig, error) {
+	config := &MCPConfig{}
+
+	// Parse tools
+	if toolsData, ok := inputs["tools"]; ok {
+		if toolsList, ok := toolsData.([]interface{}); ok {
+			for _, toolData := range toolsList {
+				if toolMap, ok := toolData.(map[string]interface{}); ok {
+					tool := MCPTool{}
+					if name, ok := toolMap["name"].(string); ok {
+						tool.Name = name
+					}
+					if endpoint, ok := toolMap["endpoint"].(string); ok {
+						tool.Endpoint = endpoint
+					}
+					if configData, ok := toolMap["config"].(map[string]interface{}); ok {
+						tool.Config = make(map[string]string)
+						for k, v := range configData {
+							if vStr, ok := v.(string); ok {
+								tool.Config[k] = vStr
+							}
+						}
+					}
+					config.Tools = append(config.Tools, tool)
+				}
+			}
+		}
+	}
+
+	// Parse context
+	if contextData, ok := inputs["context"]; ok {
+		if contextList, ok := contextData.([]interface{}); ok {
+			for _, ctxData := range contextList {
+				if ctxStr, ok := ctxData.(string); ok {
+					config.Context = append(config.Context, ctxStr)
+				}
+			}
+		}
+	}
+
+	// Parse prompts
+	if promptsData, ok := inputs["prompts"]; ok {
+		if promptsList, ok := promptsData.([]interface{}); ok {
+			for _, promptData := range promptsList {
+				if promptStr, ok := promptData.(string); ok {
+					config.Prompts = append(config.Prompts, promptStr)
+				}
+			}
+		}
+	}
+
+	// Parse model
+	if model, ok := inputs["model"].(string); ok {
+		config.Model = model
+	}
+
+	// Parse budgets
+	if budgetsData, ok := inputs["budgets"]; ok {
+		if budgetsMap, ok := budgetsData.(map[string]interface{}); ok {
+			if maxTokens, ok := budgetsMap["max_tokens"].(int); ok {
+				config.Budgets.MaxTokens = maxTokens
+			}
+			if maxCost, ok := budgetsMap["max_cost"].(int); ok {
+				config.Budgets.MaxCost = maxCost
+			}
+			if timeout, ok := budgetsMap["timeout"].(string); ok {
+				config.Budgets.Timeout = timeout
+			}
+		}
+	}
+
+	return config, nil
 }
 
 // executeORWGenBranch executes an OpenRewrite recipe generation and application branch
