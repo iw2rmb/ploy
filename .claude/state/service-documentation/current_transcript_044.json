@@ -1,0 +1,530 @@
+[
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "Let me first create a new file specifically for MCP integration to keep the code organized, then I'll extend the existing config structures.",
+        "signature": "ErkCCkYIBxgCKkC+FbNVWSzq+hGwSCk/RaQKNH30Mr+aMT9YmMrbp4hQ7UOmkPEcNX1SsrTTCfNvC5P41lgUZDwinNicxrbm6cMYEgzFGgOeumXayeIN0RUaDIXVXvBqcLDzBJHfSCIwFbFjfKyIZksWoQ/mkZJapM0Mnvis5L7/RlNUdmjDvT9hOkNFKGMZ++fHlPlS10c1KqABrWM9NWrqeIY+avqDKUg3cazHofxiyZ08fg9A5VKPQJXr3T18ZLc73+TzZihOsZdHWNiiTRqWkteIWcRqYb4rDMRooCgMceUCTkEwwBG7MwXVoa5jhnHPzSEaEjy/+wgak4czp0eQJwNCfGBB2hldftz+dzG/oEjTSW//KYvEmLBSsrFFI4wrK9YSbGMRJmd3wnaa648dCJV8fJi7iQCuThgB"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01JC7iAe4dGG4wEK6qzzQy8e",
+        "name": "Write",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration.go",
+          "content": "package transflow\n\nimport (\n\t\"encoding/json\"\n\t\"fmt\"\n\t\"time\"\n)\n\n// MCPTool represents a Model Context Protocol tool configuration\ntype MCPTool struct {\n\tName     string            `yaml:\"name\" json:\"name\"`\n\tEndpoint string            `yaml:\"endpoint\" json:\"endpoint\"`\n\tConfig   map[string]string `yaml:\"config,omitempty\" json:\"config,omitempty\"`\n}\n\n// MCPBudgets represents resource limits for MCP-enabled LLM execution\ntype MCPBudgets struct {\n\tMaxTokens int    `yaml:\"max_tokens,omitempty\" json:\"max_tokens,omitempty\"`\n\tMaxCost   int    `yaml:\"max_cost,omitempty\" json:\"max_cost,omitempty\"`\n\tTimeout   string `yaml:\"timeout,omitempty\" json:\"timeout,omitempty\"`\n}\n\n// MCPConfig represents the complete MCP configuration for a workflow step\ntype MCPConfig struct {\n\tTools     []MCPTool  `yaml:\"tools,omitempty\" json:\"tools,omitempty\"`\n\tContext   []string   `yaml:\"context,omitempty\" json:\"context,omitempty\"`\n\tBudgets   MCPBudgets `yaml:\"budgets,omitempty\" json:\"budgets,omitempty\"`\n\tModel     string     `yaml:\"model,omitempty\" json:\"model,omitempty\"`\n\tPrompts   []string   `yaml:\"prompts,omitempty\" json:\"prompts,omitempty\"`\n}\n\n// MCPEnvironmentConfig represents the environment variables for MCP integration\ntype MCPEnvironmentConfig struct {\n\tMCPToolsJSON      string `json:\"mcp_tools_json\"`\n\tMCPContextJSON    string `json:\"mcp_context_json\"`\n\tMCPEndpointsJSON  string `json:\"mcp_endpoints_json\"`\n\tMCPBudgetsJSON    string `json:\"mcp_budgets_json\"`\n\tMCPPromptsJSON    string `json:\"mcp_prompts_json\"`\n\tMCPTimeout        string `json:\"mcp_timeout\"`\n\tMCPSecurityMode   string `json:\"mcp_security_mode\"`\n}\n\n// ValidateTimeout validates a timeout string and returns the parsed duration\nfunc (m *MCPBudgets) ValidateTimeout() (time.Duration, error) {\n\tif m.Timeout == \"\" {\n\t\treturn 30 * time.Minute, nil // default timeout\n\t}\n\n\tduration, err := time.ParseDuration(m.Timeout)\n\tif err != nil {\n\t\treturn 0, fmt.Errorf(\"invalid MCP timeout format: %v\", err)\n\t}\n\n\tif duration <= 0 {\n\t\treturn 0, fmt.Errorf(\"MCP timeout must be positive\")\n\t}\n\n\treturn duration, nil\n}\n\n// ValidateEndpoint validates an MCP endpoint URL\nfunc (m *MCPTool) ValidateEndpoint() error {\n\tif m.Endpoint == \"\" {\n\t\treturn fmt.Errorf(\"MCP tool '%s' must have an endpoint\", m.Name)\n\t}\n\n\t// Basic endpoint format validation\n\tif m.Endpoint[:6] != \"mcp://\" && m.Endpoint[:7] != \"http://\" && m.Endpoint[:8] != \"https://\" {\n\t\treturn fmt.Errorf(\"MCP tool '%s' endpoint must start with mcp://, http://, or https://\", m.Name)\n\t}\n\n\treturn nil\n}\n\n// Validate validates the complete MCP configuration\nfunc (m *MCPConfig) Validate() error {\n\t// Validate each MCP tool\n\tfor _, tool := range m.Tools {\n\t\tif tool.Name == \"\" {\n\t\t\treturn fmt.Errorf(\"MCP tool must have a name\")\n\t\t}\n\n\t\tif err := tool.ValidateEndpoint(); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n\n\t// Validate budgets timeout if provided\n\tif _, err := m.Budgets.ValidateTimeout(); err != nil {\n\t\treturn fmt.Errorf(\"invalid MCP budgets: %w\", err)\n\t}\n\n\treturn nil\n}\n\n// ToEnvironmentConfig converts MCP configuration to environment variables\nfunc (m *MCPConfig) ToEnvironmentConfig() (*MCPEnvironmentConfig, error) {\n\tconfig := &MCPEnvironmentConfig{\n\t\tMCPSecurityMode: \"allowlist\", // default security mode\n\t}\n\n\t// Marshal tools to JSON\n\tif len(m.Tools) > 0 {\n\t\ttoolsJSON, err := json.Marshal(m.Tools)\n\t\tif err != nil {\n\t\t\treturn nil, fmt.Errorf(\"failed to marshal MCP tools: %w\", err)\n\t\t}\n\t\tconfig.MCPToolsJSON = string(toolsJSON)\n\n\t\t// Create endpoints mapping\n\t\tendpoints := make(map[string]string)\n\t\tfor _, tool := range m.Tools {\n\t\t\tendpoints[tool.Name] = tool.Endpoint\n\t\t}\n\t\tendpointsJSON, err := json.Marshal(endpoints)\n\t\tif err != nil {\n\t\t\treturn nil, fmt.Errorf(\"failed to marshal MCP endpoints: %w\", err)\n\t\t}\n\t\tconfig.MCPEndpointsJSON = string(endpointsJSON)\n\t}\n\n\t// Marshal context to JSON\n\tif len(m.Context) > 0 {\n\t\tcontextJSON, err := json.Marshal(m.Context)\n\t\tif err != nil {\n\t\t\treturn nil, fmt.Errorf(\"failed to marshal MCP context: %w\", err)\n\t\t}\n\t\tconfig.MCPContextJSON = string(contextJSON)\n\t}\n\n\t// Marshal budgets to JSON\n\tbudgetsJSON, err := json.Marshal(m.Budgets)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"failed to marshal MCP budgets: %w\", err)\n\t}\n\tconfig.MCPBudgetsJSON = string(budgetsJSON)\n\n\t// Marshal prompts to JSON\n\tif len(m.Prompts) > 0 {\n\t\tpromptsJSON, err := json.Marshal(m.Prompts)\n\t\tif err != nil {\n\t\t\treturn nil, fmt.Errorf(\"failed to marshal MCP prompts: %w\", err)\n\t\t}\n\t\tconfig.MCPPromptsJSON = string(promptsJSON)\n\t}\n\n\t// Set timeout\n\tconfig.MCPTimeout = m.Budgets.Timeout\n\tif config.MCPTimeout == \"\" {\n\t\tconfig.MCPTimeout = \"30m\"\n\t}\n\n\treturn config, nil\n}\n\n// GetDefaultMCPConfig returns default MCP configuration\nfunc GetDefaultMCPConfig() *MCPConfig {\n\treturn &MCPConfig{\n\t\tTools: []MCPTool{\n\t\t\t{\n\t\t\t\tName:     \"file-system\",\n\t\t\t\tEndpoint: \"mcp://fs\",\n\t\t\t},\n\t\t\t{\n\t\t\t\tName:     \"search\",\n\t\t\t\tEndpoint: \"mcp://rg\",\n\t\t\t},\n\t\t},\n\t\tContext: []string{\n\t\t\t\"src/**\",\n\t\t\t\"pom.xml\",\n\t\t\t\"package.json\",\n\t\t},\n\t\tBudgets: MCPBudgets{\n\t\t\tMaxTokens: 0, // unlimited\n\t\t\tMaxCost:   0, // unlimited\n\t\t\tTimeout:   \"30m\",\n\t\t},\n\t}\n}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01JC7iAe4dGG4wEK6qzzQy8e",
+        "type": "tool_result",
+        "content": "File created successfully at: /Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration.go"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I need to extend the existing config structures to include the MCP configuration. Let me update the config.go file to include the new MCP fields in the TransflowStep structure.",
+        "signature": "EuICCkYIBxgCKkBl8Z9LUAgnCj2Oxhgou1e27JfgcrFKfU8rXqtnWUHR3E8597UuNs91hTaZ/C5OnUuCb5aBjZcwjHij9quJlOIlEgyYu07I2Su7kORkVucaDE6BWopG19VB6PSinyIwu0s5ZYIk3/04x5YHGPSa2hTEHwHyZ3lAIxZIjac2sc3zfPI7Dc/zdloRWqn2gvdlKskBd+3QSx5bIkREru/CrIL8nsRVusIZ9efEFUaGCCDOixI85NtpUCTJlGrjOBYjJlZjpgQMVLovuYaeXrL5RKHu8HIBRl9UtvdqsTjCD9YDvbpYxxKAqUSLv7hKmowlQPSXEPmkOuwtvrlIb3CEcjG5+lzg955mHoMpKVmQXEsgBL4/fRCTgSGRKix8luV79fnqXr8Gu3Nqz0WtPmTuwq7OqoYw0pgediATHA3mbuwkY+yiK7xJz4G3TwwatuqBwZvksqqvZp6vQXhzGAE="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01XhVzNQA2i9E52pJRBkfEEq",
+        "name": "Edit",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go",
+          "old_string": "type TransflowStep struct {\n\tType    string   `yaml:\"type\"`\n\tID      string   `yaml:\"id\"`\n\tEngine  string   `yaml:\"engine\"`\n\tRecipes []string `yaml:\"recipes\"`\n}",
+          "new_string": "type TransflowStep struct {\n\tType      string     `yaml:\"type\"`\n\tID        string     `yaml:\"id\"`\n\tEngine    string     `yaml:\"engine\"`\n\tRecipes   []string   `yaml:\"recipes\"`\n\tModel     string     `yaml:\"model,omitempty\"`\n\tPrompts   []string   `yaml:\"prompts,omitempty\"`\n\tMCPTools  []MCPTool  `yaml:\"mcp_tools,omitempty\"`\n\tContext   []string   `yaml:\"context,omitempty\"`\n\tBudgets   MCPBudgets `yaml:\"budgets,omitempty\"`\n\tParallel  bool       `yaml:\"parallel,omitempty\"`\n\tMaxParallel int      `yaml:\"max_parallel_execs,omitempty\"`\n}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01XhVzNQA2i9E52pJRBkfEEq",
+        "type": "tool_result",
+        "content": "The file /Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n     9→\n    10→\t\"gopkg.in/yaml.v3\"\n    11→)\n    12→\n    13→type TransflowStep struct {\n    14→\tType      string     `yaml:\"type\"`\n    15→\tID        string     `yaml:\"id\"`\n    16→\tEngine    string     `yaml:\"engine\"`\n    17→\tRecipes   []string   `yaml:\"recipes\"`\n    18→\tModel     string     `yaml:\"model,omitempty\"`\n    19→\tPrompts   []string   `yaml:\"prompts,omitempty\"`\n    20→\tMCPTools  []MCPTool  `yaml:\"mcp_tools,omitempty\"`\n    21→\tContext   []string   `yaml:\"context,omitempty\"`\n    22→\tBudgets   MCPBudgets `yaml:\"budgets,omitempty\"`\n    23→\tParallel  bool       `yaml:\"parallel,omitempty\"`\n    24→\tMaxParallel int      `yaml:\"max_parallel_execs,omitempty\"`\n    25→}\n    26→\n    27→type TransflowConfig struct {\n    28→\tVersion      string          `yaml:\"version\"`\n    29→\tID           string          `yaml:\"id\"`"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I need to add validation for the MCP configuration in the existing validation function.",
+        "signature": "EokCCkYIBxgCKkCcS46/RR4+L3F/QQK3TywjX2n72k97iLXFOkHo524HceF2XiWqvtCoJQozRuGZdlpEnARC68LGT73ZS5roGEllEgxfkMlri+kPdBCmkCYaDEo7vgIPuc8Fh5x8PCIw40I3qIlugYUTonGAQOqdiAEBrgATetUCrkGZlOkNwRXmAkv8mlE+yN2G8GbLeyC+KnEFKFTT+hRyGTaHa6C5BINT5zi6rmnKj0aLHPcOxDpH3SU3MaIpzWZKOL41XbZwJ9KrOvBknNxsdXMn57j629Iue65K6rSNA6oGU6QoF1j14AzUZQeNu6KzvQlf5rB7poWBXH3E/FhU3HM3oAOpa/odNRgB"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01CpafoBN2Xds6WVDM8kqCQ4",
+        "name": "Edit",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go",
+          "old_string": "func (c *TransflowConfig) Validate() error {\n\tif c.ID == \"\" {\n\t\treturn errors.New(\"id is required\")\n\t}\n\tif c.TargetRepo == \"\" {\n\t\treturn errors.New(\"target_repo is required\")\n\t}\n\tif c.BaseRef == \"\" {\n\t\treturn errors.New(\"base_ref is required\")\n\t}\n\tif len(c.Steps) == 0 {\n\t\treturn errors.New(\"at least one step is required\")\n\t}\n\n\t// Validate self-heal configuration if provided\n\tif c.SelfHeal != nil {\n\t\tif err := c.SelfHeal.Validate(); err != nil {\n\t\t\treturn fmt.Errorf(\"invalid self_heal config: %w\", err)\n\t\t}\n\t}\n\n\t// Validate build timeout if provided\n\tif c.BuildTimeout != \"\" {\n\t\tif _, err := c.ParseBuildTimeout(); err != nil {\n\t\t\treturn fmt.Errorf(\"invalid build_timeout: %w\", err)\n\t\t}\n\t}\n\n\treturn nil\n}",
+          "new_string": "func (c *TransflowConfig) Validate() error {\n\tif c.ID == \"\" {\n\t\treturn errors.New(\"id is required\")\n\t}\n\tif c.TargetRepo == \"\" {\n\t\treturn errors.New(\"target_repo is required\")\n\t}\n\tif c.BaseRef == \"\" {\n\t\treturn errors.New(\"base_ref is required\")\n\t}\n\tif len(c.Steps) == 0 {\n\t\treturn errors.New(\"at least one step is required\")\n\t}\n\n\t// Validate each step\n\tfor i, step := range c.Steps {\n\t\tif step.ID == \"\" {\n\t\t\treturn fmt.Errorf(\"step %d must have an id\", i)\n\t\t}\n\t\tif step.Type == \"\" {\n\t\t\treturn fmt.Errorf(\"step %d (%s) must have a type\", i, step.ID)\n\t\t}\n\n\t\t// Validate MCP configuration for steps that have it\n\t\tif len(step.MCPTools) > 0 || len(step.Context) > 0 {\n\t\t\tmcpConfig := MCPConfig{\n\t\t\t\tTools:   step.MCPTools,\n\t\t\t\tContext: step.Context,\n\t\t\t\tBudgets: step.Budgets,\n\t\t\t\tModel:   step.Model,\n\t\t\t\tPrompts: step.Prompts,\n\t\t\t}\n\t\t\tif err := mcpConfig.Validate(); err != nil {\n\t\t\t\treturn fmt.Errorf(\"invalid MCP config for step %s: %w\", step.ID, err)\n\t\t\t}\n\t\t}\n\t}\n\n\t// Validate self-heal configuration if provided\n\tif c.SelfHeal != nil {\n\t\tif err := c.SelfHeal.Validate(); err != nil {\n\t\t\treturn fmt.Errorf(\"invalid self_heal config: %w\", err)\n\t\t}\n\t}\n\n\t// Validate build timeout if provided\n\tif c.BuildTimeout != \"\" {\n\t\tif _, err := c.ParseBuildTimeout(); err != nil {\n\t\t\treturn fmt.Errorf(\"invalid build_timeout: %w\", err)\n\t\t}\n\t}\n\n\treturn nil\n}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01CpafoBN2Xds6WVDM8kqCQ4",
+        "type": "tool_result",
+        "content": "The file /Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n    64→\n    65→\treturn &cfg, nil\n    66→}\n    67→\n    68→func (c *TransflowConfig) Validate() error {\n    69→\tif c.ID == \"\" {\n    70→\t\treturn errors.New(\"id is required\")\n    71→\t}\n    72→\tif c.TargetRepo == \"\" {\n    73→\t\treturn errors.New(\"target_repo is required\")\n    74→\t}\n    75→\tif c.BaseRef == \"\" {\n    76→\t\treturn errors.New(\"base_ref is required\")\n    77→\t}\n    78→\tif len(c.Steps) == 0 {\n    79→\t\treturn errors.New(\"at least one step is required\")\n    80→\t}\n    81→\n    82→\t// Validate each step\n    83→\tfor i, step := range c.Steps {\n    84→\t\tif step.ID == \"\" {\n    85→\t\t\treturn fmt.Errorf(\"step %d must have an id\", i)\n    86→\t\t}\n    87→\t\tif step.Type == \"\" {\n    88→\t\t\treturn fmt.Errorf(\"step %d (%s) must have a type\", i, step.ID)\n    89→\t\t}\n    90→\n    91→\t\t// Validate MCP configuration for steps that have it\n    92→\t\tif len(step.MCPTools) > 0 || len(step.Context) > 0 {\n    93→\t\t\tmcpConfig := MCPConfig{\n    94→\t\t\t\tTools:   step.MCPTools,\n    95→\t\t\t\tContext: step.Context,\n    96→\t\t\t\tBudgets: step.Budgets,\n    97→\t\t\t\tModel:   step.Model,\n    98→\t\t\t\tPrompts: step.Prompts,\n    99→\t\t\t}\n   100→\t\t\tif err := mcpConfig.Validate(); err != nil {\n   101→\t\t\t\treturn fmt.Errorf(\"invalid MCP config for step %s: %w\", step.ID, err)\n   102→\t\t\t}\n   103→\t\t}\n   104→\t}\n   105→\n   106→\t// Validate self-heal configuration if provided\n   107→\tif c.SelfHeal != nil {\n   108→\t\tif err := c.SelfHeal.Validate(); err != nil {\n   109→\t\t\treturn fmt.Errorf(\"invalid self_heal config: %w\", err)\n   110→\t\t}\n   111→\t}\n   112→\n   113→\t// Validate build timeout if provided\n   114→\tif c.BuildTimeout != \"\" {\n   115→\t\tif _, err := c.ParseBuildTimeout(); err != nil {\n   116→\t\t\treturn fmt.Errorf(\"invalid build_timeout: %w\", err)\n   117→\t\t}\n   118→\t}\n   119→\n   120→\treturn nil\n   121→}\n   122→\n   123→func (c *TransflowConfig) ParseBuildTimeout() (time.Duration, error) {\n   124→\tif c.BuildTimeout == \"\" {\n   125→\t\treturn 10 * time.Minute, nil // default"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nGreat! I've successfully designed and implemented the MCP tool configuration data structures. Let me update the todo list to reflect that this task is completed and move on to updating the HCL template with MCP environment variables.",
+        "signature": "EpgDCkYIBxgCKkD4ZCcaE1ivTvEELOTz28lzkHVNBCGoATpgrUwcxhaJwILm8kDJ2biJXOlFqR5Y88BAluOepOULM++i8+lKKYcVEgx6DZyO6QWRIQ97IakaDOM61jP3JcXd2orjciIwCDU6ZTEfA1kiUc3KiC/7J83M8qV0m+oZ7cmuXQQajpZqApRTv6aXW2OgYFO4ZcISKv8BlqioyHAg10lw/lVmHZGUQqdAbfIiaV4oUNrKR+g3R7r8xINzBbHQZ+/wBHBkgyPboNwIaa30NKVEslO+gaub4gXphywoTyWFt4S9l2qLZ4NfCBet277x6WVFAYUvTvfHmSWclolhre4vf6vEXFl83qomYO+AgX1WPp5687DGjDfGtgEdfNianU1lU9adA5u5cmaLWANnHCrWckPUzmGZxaWAGXTCUz+OQOGdiuqyL4NgfPB3gXrZyTuOCbM4FaEYhHU3VyRuv7UQVzdchekcN2r9sCwmZ+KlQAreSVAcs4IQvIAR82iCNBFvq524xPF3qpd+QvaK8tMJH+rnJALRGAE="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01SZC2FnKzZsfpsFWfivEdke",
+        "name": "TodoWrite",
+        "input": {
+          "todos": [
+            {
+              "content": "Analyze existing LLM-exec HCL template structure",
+              "status": "completed",
+              "activeForm": "Analyzing existing LLM-exec HCL template structure"
+            },
+            {
+              "content": "Design MCP tool configuration data structures",
+              "status": "completed",
+              "activeForm": "Designing MCP tool configuration data structures"
+            },
+            {
+              "content": "Extend transflow config parsing for MCP tools",
+              "status": "completed",
+              "activeForm": "Extending transflow config parsing for MCP tools"
+            },
+            {
+              "content": "Update HCL template with MCP environment variables",
+              "status": "in_progress",
+              "activeForm": "Updating HCL template with MCP environment variables"
+            },
+            {
+              "content": "Modify job submission helper for MCP support",
+              "status": "pending",
+              "activeForm": "Modifying job submission helper for MCP support"
+            },
+            {
+              "content": "Implement MCP context prefetching functionality",
+              "status": "pending",
+              "activeForm": "Implementing MCP context prefetching functionality"
+            },
+            {
+              "content": "Create comprehensive test suite for MCP integration",
+              "status": "pending",
+              "activeForm": "Creating comprehensive test suite for MCP integration"
+            },
+            {
+              "content": "Add configuration validation and error handling",
+              "status": "completed",
+              "activeForm": "Adding configuration validation and error handling"
+            },
+            {
+              "content": "Create documentation and usage examples",
+              "status": "pending",
+              "activeForm": "Creating documentation and usage examples"
+            },
+            {
+              "content": "Performance testing and benchmarking",
+              "status": "pending",
+              "activeForm": "Performance testing and benchmarking"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01SZC2FnKzZsfpsFWfivEdke",
+        "type": "tool_result",
+        "content": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I need to update the HCL template to include the MCP environment variables. Let me modify the llm_exec.hcl file to add the MCP-related environment variables.",
+        "signature": "EtACCkYIBxgCKkBvHr/b+6+cDVf4RL6lQsSF0btS0n/aewqA90MATjxjVOGAsAAuSTHm+ameqHbPNeKBFcx1ZcsKGMz+UYIcNKOrEgwZjH1rmL2a9GOApAQaDPjuGwr1ODpNdaxo3CIwP/70hkTQ4YkjlzqE6kkFkf5AiwKxRP7pFzNhgi8ySWTdWifDmY8O68KoV7XeM1H/KrcBr3990GbNue9UaHuVKrSI37IrjdHltI6xbtgVkOpajFQ0sAh92cnZ3jn8RaCb0zy6tHI+U8vG3hul2VOVH18n/B2YVCc8Qkk2WJtfefefQLReYcI08t4M6z6LfGJmX2m5XQTsQOEFwsm65yRP3xDyYb1RPNcx//ppHQOejDOTnYgvyVMw8j9fe0esKQToI3g9qD+jyFb937V5X9DMOfhxulEk2zJ1gZyVRmZzqP6IbVayh8siZJaYGAE="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01CszDzRJxD4u7VtwWhZrBUX",
+        "name": "Edit",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl",
+          "old_string": "      env = {\n        MODEL       = \"${MODEL}\"\n        TOOLS       = \"${TOOLS_JSON}\"\n        LIMITS      = \"${LIMITS_JSON}\"\n        CONTEXT_DIR = \"/workspace/context\"\n        OUTPUT_DIR  = \"/workspace/out\"\n        RUN_ID      = \"${RUN_ID}\"\n      }",
+          "new_string": "      env = {\n        # Core LLM configuration\n        MODEL       = \"${MODEL}\"\n        TOOLS       = \"${TOOLS_JSON}\"\n        LIMITS      = \"${LIMITS_JSON}\"\n        CONTEXT_DIR = \"/workspace/context\"\n        OUTPUT_DIR  = \"/workspace/out\"\n        RUN_ID      = \"${RUN_ID}\"\n        \n        # MCP integration configuration\n        MCP_TOOLS_JSON      = \"${MCP_TOOLS_JSON}\"\n        MCP_CONTEXT_JSON    = \"${MCP_CONTEXT_JSON}\"\n        MCP_ENDPOINTS_JSON  = \"${MCP_ENDPOINTS_JSON}\"\n        MCP_BUDGETS_JSON    = \"${MCP_BUDGETS_JSON}\"\n        MCP_PROMPTS_JSON    = \"${MCP_PROMPTS_JSON}\"\n        MCP_TIMEOUT         = \"${MCP_TIMEOUT}\"\n        MCP_SECURITY_MODE   = \"${MCP_SECURITY_MODE}\"\n        \n        # Python runtime configuration\n        PYTHONDONTWRITEBYTECODE = \"1\"\n        PYTHONUNBUFFERED        = \"1\"\n      }"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01CszDzRJxD4u7VtwWhZrBUX",
+        "type": "tool_result",
+        "content": "The file /Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n    11→        command = \"python\"\n    12→        args    = [\"-m\", \"runner\", \"--mode\", \"exec\"]\n    13→      }\n    14→\n    15→      env = {\n    16→        # Core LLM configuration\n    17→        MODEL       = \"${MODEL}\"\n    18→        TOOLS       = \"${TOOLS_JSON}\"\n    19→        LIMITS      = \"${LIMITS_JSON}\"\n    20→        CONTEXT_DIR = \"/workspace/context\"\n    21→        OUTPUT_DIR  = \"/workspace/out\"\n    22→        RUN_ID      = \"${RUN_ID}\"\n    23→        \n    24→        # MCP integration configuration\n    25→        MCP_TOOLS_JSON      = \"${MCP_TOOLS_JSON}\"\n    26→        MCP_CONTEXT_JSON    = \"${MCP_CONTEXT_JSON}\"\n    27→        MCP_ENDPOINTS_JSON  = \"${MCP_ENDPOINTS_JSON}\"\n    28→        MCP_BUDGETS_JSON    = \"${MCP_BUDGETS_JSON}\"\n    29→        MCP_PROMPTS_JSON    = \"${MCP_PROMPTS_JSON}\"\n    30→        MCP_TIMEOUT         = \"${MCP_TIMEOUT}\"\n    31→        MCP_SECURITY_MODE   = \"${MCP_SECURITY_MODE}\"\n    32→        \n    33→        # Python runtime configuration\n    34→        PYTHONDONTWRITEBYTECODE = \"1\"\n    35→        PYTHONUNBUFFERED        = \"1\"\n    36→      }\n    37→\n    38→      resources {\n    39→        cpu    = 700\n    40→        memory = 1024"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I also need to add network configuration to allow MCP endpoint access, as mentioned in the transflow.yaml that has `allow_mcp_endpoints: true`.",
+        "signature": "EsICCkYIBxgCKkDtqrGqGmTFybS34KN0sRMRXR8xAWf6rDm+NJE/V08AiZxxUpBVejv37PgSv1oHCRqFL1uy/2iSvbKphTNhsLhfEgwP2/SIKWGQjavbjboaDJql47ZeGE6MITLJtSIwNz6md51tp8mkHh+4G17R8AiKQmAcXF+iqnGNvz0x6lwo+ANMjzJzkKx67GeSI2UDKqkB2N2CgHio0CgMIpKgBJAJfnxZSfizmMho1Vg5712+G2NiV/CjiN2iP6thxqhpB+IWi4TFJq+2k4xNvwvQ6f+C6nVLdC5JIdU6IwM+rXVVRRZ3olZ/05yLzPxVKzp6sG35dg96O00amqj95NDgl8RwKPnXVRBjli6qfkdW/ztqct07/yC2J1bnJipjvrekvS9e4rUKf+ol4nUCBZYtFLU82B9PdNRmIpTCAxgB"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_014QPyDoQtgomgdNCAPU8wco",
+        "name": "Edit",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl",
+          "old_string": "      resources {\n        cpu    = 700\n        memory = 1024\n      }",
+          "new_string": "      resources {\n        cpu    = 700\n        memory = 1024\n      }\n\n      network {\n        # Allow outbound connections for MCP endpoints\n        mode = \"bridge\"\n        port \"http\" {\n          to = 8080\n        }\n        dns {\n          servers = [\"8.8.8.8\", \"1.1.1.1\"]\n        }\n      }"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_014QPyDoQtgomgdNCAPU8wco",
+        "type": "tool_result",
+        "content": "The file /Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n    34→        PYTHONDONTWRITEBYTECODE = \"1\"\n    35→        PYTHONUNBUFFERED        = \"1\"\n    36→      }\n    37→\n    38→      resources {\n    39→        cpu    = 700\n    40→        memory = 1024\n    41→      }\n    42→\n    43→      network {\n    44→        # Allow outbound connections for MCP endpoints\n    45→        mode = \"bridge\"\n    46→        port \"http\" {\n    47→          to = 8080\n    48→        }\n    49→        dns {\n    50→          servers = [\"8.8.8.8\", \"1.1.1.1\"]\n    51→        }\n    52→      }\n    53→\n    54→      volume_mount {\n    55→        volume      = \"context\"\n    56→        destination = \"/workspace/context\""
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nPerfect! Now I need to update the job submission helper to support MCP. Let me modify the `substituteHCLTemplate` function to handle the new MCP environment variables.",
+        "signature": "EtgCCkYIBxgCKkDkIsutzItmyNt593Oge0RcUrukOj958gYLCU9up/66sJ0E6/ciiX9IQ3+iDtsGprIBPV0aJUVqYJH/vEnPtskyEgy9/CNrj6MAH8s+89caDMPum3ADqEgJu9o3nyIwNZs9kvuFB3IcVh3cBhvL//wNB7hChKnYBNZrXr6qFZVXVgLlvho7VkkOxQRwqAGeKr8BQSbSp2V0X7NRhhwkQ37A4VZ3lCGHSSAsziiYWPYCX6rj5RjpazuWky3J4OusMIN35JjYfyCOfP0srvwj+HqHMZSbwS+6PMn9afFKKNA48lPJ3vfQa80e0FB/4QhW49NZwoDIWFC154xm03UuRznqc09qy1hW4qFsLiozevin87aET/SKDGrCM3NgIvq3iISbLjiCftPCs8UyY0Of58AXAKXodzWFaizrNvikQfkpPjAywkimMJ7E/Ie3/hZt7OAYAQ=="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01RcQzeek2f1NBDtxau6uM31",
+        "name": "TodoWrite",
+        "input": {
+          "todos": [
+            {
+              "content": "Analyze existing LLM-exec HCL template structure",
+              "status": "completed",
+              "activeForm": "Analyzing existing LLM-exec HCL template structure"
+            },
+            {
+              "content": "Design MCP tool configuration data structures",
+              "status": "completed",
+              "activeForm": "Designing MCP tool configuration data structures"
+            },
+            {
+              "content": "Extend transflow config parsing for MCP tools",
+              "status": "completed",
+              "activeForm": "Extending transflow config parsing for MCP tools"
+            },
+            {
+              "content": "Update HCL template with MCP environment variables",
+              "status": "completed",
+              "activeForm": "Updating HCL template with MCP environment variables"
+            },
+            {
+              "content": "Modify job submission helper for MCP support",
+              "status": "in_progress",
+              "activeForm": "Modifying job submission helper for MCP support"
+            },
+            {
+              "content": "Implement MCP context prefetching functionality",
+              "status": "pending",
+              "activeForm": "Implementing MCP context prefetching functionality"
+            },
+            {
+              "content": "Create comprehensive test suite for MCP integration",
+              "status": "pending",
+              "activeForm": "Creating comprehensive test suite for MCP integration"
+            },
+            {
+              "content": "Add configuration validation and error handling",
+              "status": "completed",
+              "activeForm": "Adding configuration validation and error handling"
+            },
+            {
+              "content": "Create documentation and usage examples",
+              "status": "pending",
+              "activeForm": "Creating documentation and usage examples"
+            },
+            {
+              "content": "Performance testing and benchmarking",
+              "status": "pending",
+              "activeForm": "Performance testing and benchmarking"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01RcQzeek2f1NBDtxau6uM31",
+        "type": "tool_result",
+        "content": "Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I need to modify the job submission helper to support MCP. Let me update the `substituteHCLTemplate` function to handle the new MCP environment variables, and also create functions to support LLM-exec branch execution with MCP configuration.",
+        "signature": "EqYDCkYIBxgCKkD0++nzQSKwGENQOLcyq/ZADUWvZ1HG8Uh80qb5quRFDQzlZI/1GTsvH3D2wwDZFe3jXpy2iIsestQR2OAH5nsyEgzmeSc7/ARQhJMm/28aDE335BQt3zC9gegwxyIwZs1JuLAXQyeQMN5swzN0FAjsSfKzJ76hOPieC2q09LZEgkonEKK91mLQs+LqbSPQKo0CEHYht4zknm4xvAjmprzPfwZKmN2Gcw+PYXVX0FvpXw5zZ53i+2G9EzTJNwD3K2TtB+n6ubzitgXsH8AaEd1J/dA235zU0uC3YkX0iXLwSmQ51JEId4kcLZ/475FZ7ayySqbX2gSUOvmqOiy58pkBcqTMElhxPH66+6WBFZMMpfE2feTRjGNXkOqaQQwT5S1IDlrh/tG1FdZduiZlgi4be2ubkjuxmO2yZzpaETWWzaSH8P/idl08fyd1NX2mHh5VGnGqFaxzjyO3hNpFFW57g6TkBGKwae4YuDoxDZZl2bv8WLZB7gm8RusyKrmX95ar2ybX9dXCUB2coT9acfY8H7WEPtyxqkPIZBJEGf8YAQ=="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_017ZrmJLxZZeyKVJFPXfLQdq",
+        "name": "Edit",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission.go",
+          "old_string": "// substituteHCLTemplate performs environment variable substitution in HCL templates\nfunc substituteHCLTemplate(hclPath string, runID string) (string, error) {\n\thclBytes, err := os.ReadFile(hclPath)\n\tif err != nil {\n\t\treturn \"\", fmt.Errorf(\"failed to read HCL template: %w\", err)\n\t}\n\n\t// Get environment variables with defaults\n\tmodel := os.Getenv(\"TRANSFLOW_MODEL\")\n\tif model == \"\" {\n\t\tmodel = \"gpt-4o-mini@2024-08-06\"\n\t}\n\n\ttoolsJSON := os.Getenv(\"TRANSFLOW_TOOLS\")\n\tif toolsJSON == \"\" {\n\t\ttoolsJSON = `{\"file\":{\"allow\":[\"src/**\",\"pom.xml\"]},\"search\":{\"provider\":\"rg\",\"allow\":[\"src/**\"]}}`\n\t}\n\n\tlimitsJSON := os.Getenv(\"TRANSFLOW_LIMITS\")\n\tif limitsJSON == \"\" {\n\t\tlimitsJSON = `{\"max_steps\":8,\"max_tool_calls\":12,\"timeout\":\"30m\"}`\n\t}\n\n\t// Perform substitution\n\trendered := strings.NewReplacer(\n\t\t\"${MODEL}\", model,\n\t\t\"${TOOLS_JSON}\", toolsJSON,\n\t\t\"${LIMITS_JSON}\", limitsJSON,\n\t\t\"${RUN_ID}\", runID,\n\t).Replace(string(hclBytes))\n\n\t// Write substituted HCL to a new file\n\trenderedPath := strings.ReplaceAll(hclPath, \".hcl\", \".rendered.submitted.hcl\")\n\tif err := os.WriteFile(renderedPath, []byte(rendered), 0644); err != nil {\n\t\treturn \"\", fmt.Errorf(\"failed to write substituted HCL: %w\", err)\n\t}\n\n\treturn renderedPath, nil\n}",
+          "new_string": "// substituteHCLTemplate performs environment variable substitution in HCL templates\nfunc substituteHCLTemplate(hclPath string, runID string) (string, error) {\n\treturn substituteHCLTemplateWithMCP(hclPath, runID, nil)\n}\n\n// substituteHCLTemplateWithMCP performs environment variable substitution with MCP support\nfunc substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPConfig) (string, error) {\n\thclBytes, err := os.ReadFile(hclPath)\n\tif err != nil {\n\t\treturn \"\", fmt.Errorf(\"failed to read HCL template: %w\", err)\n\t}\n\n\t// Get core environment variables with defaults\n\tmodel := os.Getenv(\"TRANSFLOW_MODEL\")\n\tif model == \"\" {\n\t\tmodel = \"gpt-4o-mini@2024-08-06\"\n\t}\n\n\ttoolsJSON := os.Getenv(\"TRANSFLOW_TOOLS\")\n\tif toolsJSON == \"\" {\n\t\ttoolsJSON = `{\"file\":{\"allow\":[\"src/**\",\"pom.xml\"]},\"search\":{\"provider\":\"rg\",\"allow\":[\"src/**\"]}}`\n\t}\n\n\tlimitsJSON := os.Getenv(\"TRANSFLOW_LIMITS\")\n\tif limitsJSON == \"\" {\n\t\tlimitsJSON = `{\"max_steps\":8,\"max_tool_calls\":12,\"timeout\":\"30m\"}`\n\t}\n\n\t// Get MCP environment variables\n\tmcpEnvConfig := getMCPEnvironmentConfig(mcpConfig)\n\n\t// Perform substitution\n\treplacer := strings.NewReplacer(\n\t\t\"${MODEL}\", model,\n\t\t\"${TOOLS_JSON}\", toolsJSON,\n\t\t\"${LIMITS_JSON}\", limitsJSON,\n\t\t\"${RUN_ID}\", runID,\n\t\t\"${MCP_TOOLS_JSON}\", mcpEnvConfig.MCPToolsJSON,\n\t\t\"${MCP_CONTEXT_JSON}\", mcpEnvConfig.MCPContextJSON,\n\t\t\"${MCP_ENDPOINTS_JSON}\", mcpEnvConfig.MCPEndpointsJSON,\n\t\t\"${MCP_BUDGETS_JSON}\", mcpEnvConfig.MCPBudgetsJSON,\n\t\t\"${MCP_PROMPTS_JSON}\", mcpEnvConfig.MCPPromptsJSON,\n\t\t\"${MCP_TIMEOUT}\", mcpEnvConfig.MCPTimeout,\n\t\t\"${MCP_SECURITY_MODE}\", mcpEnvConfig.MCPSecurityMode,\n\t)\n\trendered := replacer.Replace(string(hclBytes))\n\n\t// Write substituted HCL to a new file\n\trenderedPath := strings.ReplaceAll(hclPath, \".hcl\", \".rendered.submitted.hcl\")\n\tif err := os.WriteFile(renderedPath, []byte(rendered), 0644); err != nil {\n\t\treturn \"\", fmt.Errorf(\"failed to write substituted HCL: %w\", err)\n\t}\n\n\treturn renderedPath, nil\n}\n\n// getMCPEnvironmentConfig generates MCP environment configuration from MCP config\nfunc getMCPEnvironmentConfig(mcpConfig *MCPConfig) *MCPEnvironmentConfig {\n\t// If no MCP config provided, return empty environment\n\tif mcpConfig == nil {\n\t\treturn &MCPEnvironmentConfig{\n\t\t\tMCPToolsJSON:      \"[]\",\n\t\t\tMCPContextJSON:    \"[]\",\n\t\t\tMCPEndpointsJSON:  \"{}\",\n\t\t\tMCPBudgetsJSON:    `{\"max_tokens\":0,\"max_cost\":0,\"timeout\":\"30m\"}`,\n\t\t\tMCPPromptsJSON:    \"[]\",\n\t\t\tMCPTimeout:        \"30m\",\n\t\t\tMCPSecurityMode:   \"allowlist\",\n\t\t}\n\t}\n\n\t// Convert MCP config to environment config\n\tenvConfig, err := mcpConfig.ToEnvironmentConfig()\n\tif err != nil {\n\t\t// If conversion fails, return safe defaults\n\t\treturn &MCPEnvironmentConfig{\n\t\t\tMCPToolsJSON:      \"[]\",\n\t\t\tMCPContextJSON:    \"[]\",\n\t\t\tMCPEndpointsJSON:  \"{}\",\n\t\t\tMCPBudgetsJSON:    `{\"max_tokens\":0,\"max_cost\":0,\"timeout\":\"30m\"}`,\n\t\t\tMCPPromptsJSON:    \"[]\",\n\t\t\tMCPTimeout:        \"30m\",\n\t\t\tMCPSecurityMode:   \"allowlist\",\n\t\t}\n\t}\n\n\treturn envConfig\n}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_017ZrmJLxZZeyKVJFPXfLQdq",
+        "type": "tool_result",
+        "content": "The file /Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission.go has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n    42→\t\trunner:    runner,\n    43→\t}\n    44→}\n    45→\n    46→// substituteHCLTemplate performs environment variable substitution in HCL templates\n    47→func substituteHCLTemplate(hclPath string, runID string) (string, error) {\n    48→\treturn substituteHCLTemplateWithMCP(hclPath, runID, nil)\n    49→}\n    50→\n    51→// substituteHCLTemplateWithMCP performs environment variable substitution with MCP support\n    52→func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPConfig) (string, error) {\n    53→\thclBytes, err := os.ReadFile(hclPath)\n    54→\tif err != nil {\n    55→\t\treturn \"\", fmt.Errorf(\"failed to read HCL template: %w\", err)\n    56→\t}\n    57→\n    58→\t// Get core environment variables with defaults\n    59→\tmodel := os.Getenv(\"TRANSFLOW_MODEL\")\n    60→\tif model == \"\" {\n    61→\t\tmodel = \"gpt-4o-mini@2024-08-06\"\n    62→\t}\n    63→\n    64→\ttoolsJSON := os.Getenv(\"TRANSFLOW_TOOLS\")\n    65→\tif toolsJSON == \"\" {\n    66→\t\ttoolsJSON = `{\"file\":{\"allow\":[\"src/**\",\"pom.xml\"]},\"search\":{\"provider\":\"rg\",\"allow\":[\"src/**\"]}}`\n    67→\t}\n    68→\n    69→\tlimitsJSON := os.Getenv(\"TRANSFLOW_LIMITS\")\n    70→\tif limitsJSON == \"\" {\n    71→\t\tlimitsJSON = `{\"max_steps\":8,\"max_tool_calls\":12,\"timeout\":\"30m\"}`\n    72→\t}\n    73→\n    74→\t// Get MCP environment variables\n    75→\tmcpEnvConfig := getMCPEnvironmentConfig(mcpConfig)\n    76→\n    77→\t// Perform substitution\n    78→\treplacer := strings.NewReplacer(\n    79→\t\t\"${MODEL}\", model,\n    80→\t\t\"${TOOLS_JSON}\", toolsJSON,\n    81→\t\t\"${LIMITS_JSON}\", limitsJSON,\n    82→\t\t\"${RUN_ID}\", runID,\n    83→\t\t\"${MCP_TOOLS_JSON}\", mcpEnvConfig.MCPToolsJSON,\n    84→\t\t\"${MCP_CONTEXT_JSON}\", mcpEnvConfig.MCPContextJSON,\n    85→\t\t\"${MCP_ENDPOINTS_JSON}\", mcpEnvConfig.MCPEndpointsJSON,\n    86→\t\t\"${MCP_BUDGETS_JSON}\", mcpEnvConfig.MCPBudgetsJSON,\n    87→\t\t\"${MCP_PROMPTS_JSON}\", mcpEnvConfig.MCPPromptsJSON,\n    88→\t\t\"${MCP_TIMEOUT}\", mcpEnvConfig.MCPTimeout,\n    89→\t\t\"${MCP_SECURITY_MODE}\", mcpEnvConfig.MCPSecurityMode,\n    90→\t)\n    91→\trendered := replacer.Replace(string(hclBytes))\n    92→\n    93→\t// Write substituted HCL to a new file\n    94→\trenderedPath := strings.ReplaceAll(hclPath, \".hcl\", \".rendered.submitted.hcl\")\n    95→\tif err := os.WriteFile(renderedPath, []byte(rendered), 0644); err != nil {\n    96→\t\treturn \"\", fmt.Errorf(\"failed to write substituted HCL: %w\", err)\n    97→\t}\n    98→\n    99→\treturn renderedPath, nil\n   100→}\n   101→\n   102→// getMCPEnvironmentConfig generates MCP environment configuration from MCP config\n   103→func getMCPEnvironmentConfig(mcpConfig *MCPConfig) *MCPEnvironmentConfig {\n   104→\t// If no MCP config provided, return empty environment\n   105→\tif mcpConfig == nil {\n   106→\t\treturn &MCPEnvironmentConfig{\n   107→\t\t\tMCPToolsJSON:      \"[]\",\n   108→\t\t\tMCPContextJSON:    \"[]\",\n   109→\t\t\tMCPEndpointsJSON:  \"{}\",\n   110→\t\t\tMCPBudgetsJSON:    `{\"max_tokens\":0,\"max_cost\":0,\"timeout\":\"30m\"}`,\n   111→\t\t\tMCPPromptsJSON:    \"[]\",\n   112→\t\t\tMCPTimeout:        \"30m\",\n   113→\t\t\tMCPSecurityMode:   \"allowlist\",\n   114→\t\t}\n   115→\t}\n   116→\n   117→\t// Convert MCP config to environment config\n   118→\tenvConfig, err := mcpConfig.ToEnvironmentConfig()\n   119→\tif err != nil {\n   120→\t\t// If conversion fails, return safe defaults\n   121→\t\treturn &MCPEnvironmentConfig{\n   122→\t\t\tMCPToolsJSON:      \"[]\",\n   123→\t\t\tMCPContextJSON:    \"[]\",\n   124→\t\t\tMCPEndpointsJSON:  \"{}\",\n   125→\t\t\tMCPBudgetsJSON:    `{\"max_tokens\":0,\"max_cost\":0,\"timeout\":\"30m\"}`,\n   126→\t\t\tMCPPromptsJSON:    \"[]\",\n   127→\t\t\tMCPTimeout:        \"30m\",\n   128→\t\t\tMCPSecurityMode:   \"allowlist\",\n   129→\t\t}\n   130→\t}\n   131→\n   132→\treturn envConfig\n   133→}\n   134→\n   135→// readJobArtifact reads and parses a JSON artifact from a job execution\n   136→func readJobArtifact(artifactPath string, target interface{}) error {\n   137→\tdata, err := os.ReadFile(artifactPath)"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I need to check if there are any existing LLM-exec branch execution methods that need to be updated. Let me check the fanout orchestrator to see how LLM-exec branches are currently executed.",
+        "signature": "EvICCkYIBxgCKkDBTu1m15BZuX9h8wRdP1+b4c8OtwfYakB+R0z6ccOPW6Q7API3pVIpT0MNsLYqldWEEqWGsioAxXmibo4qmdkAEgw1TAN3uIOSKMiqsPgaDD7/17R5mPXWQgPd/iIwipKxHH5o6EvyAmVh4Chj8YM12gKQ5lmeZ0a3gVfidWxr+De5HDe71tHhnKBsM1pYKtkBDkwqet7SmifC/0jZfvLTUzAP9iHDW5mHwAsRppeMnQs7cu7kuLSBV1coCKqDkKSVBKz5JGnNsQTENzCGcEYMypEaar0UclFvGNluBASyBv4Ppqm8mpv42oJpSyIsBncvafMB3x7oYHKzU9RYAJ4c+FOnXEu450PHn20zHQyCuqTkizdlweJ19To7rLemfpZ1IXeBAc8YsE0EmArZvZ91UU4txg7krODfJu577xFcqJIIOzi9OC3s0pQ8rb2AQhmUWGN9flzuCqkcwNcjRg98Y4kor+E0itt8xRgB"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01KYWhYSu4FfWeniLmWAsZJy",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/fanout_orchestrator.go",
+          "offset": 200,
+          "limit": 60
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01KYWhYSu4FfWeniLmWAsZJy",
+        "type": "tool_result",
+        "content": "   200→\t\tresult.FinishedAt = time.Now()\n   201→\t\tresult.Duration = time.Since(result.StartedAt)\n   202→\t\treturn result\n   203→\t}\n   204→\n   205→\t// Step 2: Generate unique run ID for this branch\n   206→\trunID := fmt.Sprintf(\"llm-exec-%s-%d\", branch.ID, time.Now().Unix())\n   207→\n   208→\t// Step 3: Substitute environment variables in HCL template\n   209→\trenderedHCLPath, err := substituteHCLTemplate(hclPath, runID)\n   210→\tif err != nil {\n   211→\t\tresult.Status = \"failed\"\n   212→\t\tresult.Notes = fmt.Sprintf(\"failed to substitute HCL template: %v\", err)\n   213→\t\tresult.FinishedAt = time.Now()\n   214→\t\tresult.Duration = time.Since(result.StartedAt)\n   215→\t\treturn result\n   216→\t}\n   217→\n   218→\t// Step 4: Submit job to Nomad and wait for completion\n   219→\ttimeout := 30 * time.Minute\n   220→\tif err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {\n   221→\t\tresult.Status = \"failed\"\n   222→\t\tresult.Notes = fmt.Sprintf(\"LLM exec job failed: %v\", err)\n   223→\t\tresult.FinishedAt = time.Now()\n   224→\t\tresult.Duration = time.Since(result.StartedAt)\n   225→\t\treturn result\n   226→\t}\n   227→\n   228→\t// Step 5: Check for generated diff.patch artifact\n   229→\tdiffPath := filepath.Join(filepath.Dir(renderedHCLPath), \"out\", \"diff.patch\")\n   230→\tif _, err := os.Stat(diffPath); err != nil {\n   231→\t\tresult.Status = \"failed\"\n   232→\t\tresult.Notes = fmt.Sprintf(\"LLM exec job completed but no diff.patch found: %v\", err)\n   233→\t\tresult.FinishedAt = time.Now()\n   234→\t\tresult.Duration = time.Since(result.StartedAt)\n   235→\t\treturn result\n   236→\t}\n   237→\n   238→\tresult.Status = \"completed\"\n   239→\tresult.Notes = fmt.Sprintf(\"LLM exec job completed successfully, diff.patch at: %s\", diffPath)\n   240→\tresult.FinishedAt = time.Now()\n   241→\tresult.Duration = time.Since(result.StartedAt)\n   242→\treturn result\n   243→}\n   244→\n   245→// executeORWGenBranch executes an OpenRewrite recipe generation and application branch\n   246→func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch BranchSpec, result BranchResult) BranchResult {\n   247→\t// Step 1: Render ORW apply assets\n   248→\thclPath, err := o.runner.RenderORWApplyAssets(branch.ID)\n   249→\tif err != nil {\n   250→\t\tresult.Status = \"failed\"\n   251→\t\tresult.Notes = fmt.Sprintf(\"failed to render ORW apply assets: %v\", err)\n   252→\t\tresult.FinishedAt = time.Now()\n   253→\t\tresult.Duration = time.Since(result.StartedAt)\n   254→\t\treturn result\n   255→\t}\n   256→\n   257→\t// Step 2: Read HCL template and substitute recipe-specific variables\n   258→\thclBytes, err := os.ReadFile(hclPath)\n   259→\tif err != nil {\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nI can see that the LLM-exec branch execution in the fanout orchestrator is currently using the basic `substituteHCLTemplate` function. I need to modify it to support MCP configuration. Let me also check if there's a way to pass MCP configuration through the BranchSpec to the fanout orchestrator.\n\nLet me look at how BranchSpec is defined and if it can carry MCP configuration.",
+        "signature": "EqoECkYIBxgCKkAtOcGXd5klUzNAv8HYN2y0KPMSk92cO9wNzyl/h6zCCFpfhQZefq080dHiiE18+bIjNiZWGKVaJ2+ehqmslmPNEgx32otTODHVMvG6wdYaDAdPyXERtB8XYYCioCIwZXEQRnBCAvn4z2vvQGVtvvbZxm76PGNNYdDsS1E1s9pMVRNTzBW97vm6xyg3pi9XKpEDW+nA1XCIF0OvfuFdzpLZdw0WCiI5+d6gRLaoam/H1xUgE6xluzjEZHKqgiOGbHwPEbSasYUePff/2nIocKU6S1mBNo/ZcAj6RDv/lcjFQTmsaGWD5cmuQxxFAqqIR0uj/Rv6aUrVPTep3C1j7bQFe9sX9sPYuh/Jc4o5+eVzHJjQsMPMg5f1wOt0GAHB8EjZSsiRT8lTAQonkEx4l3JFcGSoUcYuRCJp+HOdQTZKSkEUwU7EoYniAlfpcRgIumZhXtqwIPwCLhB79qOJwhIlBWDvy+Sf+mkW3qZDiZcBLT3gqtGyMd0HWwlsLoQB1Wo52uEEIhw5JqF7v1Rhldr4jRwuII+vXzYUzIaKjZlkGBpX8f82vZdPJ/T17Mxqkf+QS8ixRDsG4jyll0pjH82EndOXDqpUvr4peOT8z3+1D8Q5irlOPYhER1RRODyJIRnOuQKAFdp2pRd7XmJUbwuS8rk3PFyBOUDM/MWQwGml0/Q2mXka3ebn84RRKyE0aTsnWW8BqF1oK4rwjJCyLlf7V94YAQ=="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01PeKEAzesSqcYNyxnN4Tm8h",
+        "name": "Grep",
+        "input": {
+          "pattern": "type BranchSpec struct",
+          "path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow",
+          "output_mode": "content",
+          "-n": true
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01PeKEAzesSqcYNyxnN4Tm8h",
+        "type": "tool_result",
+        "content": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/types.go:43:type BranchSpec struct {"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nLet me check the BranchSpec definition to understand how to pass MCP configuration.",
+        "signature": "EoECCkYIBxgCKkCIgEQqH/heX4n7D7xh/dUrPfJ6ODexyFDCBAPjpm88Y7K3hY8wSfe3xSpIOFk07F3KwTwPVEwy7NauQqgT9mpfEgz4Gk1nTiCfmwJ3rz8aDMtz+rZOKLxR1C19uSIww1eOzFq7vGa8VnIjjy1ggWh/mggkdYQzvtnTQWCMYZD6u+mljYYFCbOq0zEBOmG9KmnER6JYw9Ly3m98wpi+Mb1Re3I+bftJaU4AcYnoWgXMqfho4knTKOf1vQxnmPot7CcaAyUe86A5DJUYNU2u7S++QJFdVph7lacoHeSECXQg+kLChqfwxJnDx9aFxm3FqXW3S4GcWTqB07AYAQ=="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01F41D19wkN6UcqzamzvAjmE",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/types.go",
+          "offset": 40,
+          "limit": 15
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01F41D19wkN6UcqzamzvAjmE",
+        "type": "tool_result",
+        "content": "    40→}\n    41→\n    42→// BranchSpec describes a healing branch to execute\n    43→type BranchSpec struct {\n    44→\tID     string                 `json:\"id\"`\n    45→\tType   string                 `json:\"type\"`\n    46→\tInputs map[string]interface{} `json:\"inputs\"`\n    47→}\n    48→\n    49→// BranchResult contains the result of executing a healing branch\n    50→type BranchResult struct {\n    51→\tID         string        `json:\"id\"`\n    52→\tStatus     string        `json:\"status\"`\n    53→\tJobID      string        `json:\"job_id\"`\n    54→\tNotes      string        `json:\"notes\"`\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nPerfect! The BranchSpec has an `Inputs` field which is a `map[string]interface{}`. This means I can pass MCP configuration through this field. \n\nNow I need to modify the `executeLLMExecBranch` function to extract MCP configuration from the branch inputs and use it with the new `substituteHCLTemplateWithMCP` function.",
+        "signature": "EvADCkYIBxgCKkAP8T+q0bVmdc4fQsyn01Du2R9hAWU3Nb45ZJaQMQtGRPpaRbmnZR8diLx5zjNxSnuKoKdhIALsZwgkdcOg3WR2EgzdGaugbCHisZsmr5MaDPLzngixirXrk2ciayIwuJh2m2zBHwoWUCUYmrAN0/JAVpXcbOKZBFZEFVy8hhUEANhoqhb8Nj3JKSfrPIkAKtcCtlK2wUvplBoP0WqokClwfsLem7Bf41a4DjwIK/cF7ySS0LJhHIs+Lqm3i7GWAVLOv3soN8w3vGBIGvJKjsMrBNRZyhYtTLgvf2r9FHhA4CWTF8sxe4j7eRGqulbMXzKML6IWdNn2ZR5mZubT3KkqJFT8knLwxSBIgsffrUphDmeTNh7bXwCHqspawNRqiYzpDic0tC2yoMI7yjoIVoqmWH/BaWAxDwmIq2E9BrEOhiu3aAVVdPdBxMdoJzZXqi2KdoC1szDfZodeKzqIl2POHpUxauwIiEWCkbKLyXzSmTti3cd+kKfr0Edv2eWAJG4EuBHgrfUNolCz4M6uqKns78kAyRL1S1tq6nBOCcrPHbAleTEdGSASimb7qv3zf2imxCsrgFGnUMoEp/ANbHQGA7hgouuh/7iTrY+rkSaRyesOQLtSCnbNdaAtvjkccjpQeyeFxL1ajhgB"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01EJLVsD7HSfn7jDFMvNCATC",
+        "name": "Edit",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/fanout_orchestrator.go",
+          "old_string": "\t// Step 3: Substitute environment variables in HCL template\n\trenderedHCLPath, err := substituteHCLTemplate(hclPath, runID)\n\tif err != nil {\n\t\tresult.Status = \"failed\"\n\t\tresult.Notes = fmt.Sprintf(\"failed to substitute HCL template: %v\", err)\n\t\tresult.FinishedAt = time.Now()\n\t\tresult.Duration = time.Since(result.StartedAt)\n\t\treturn result\n\t}",
+          "new_string": "\t// Step 3: Extract MCP configuration from branch inputs\n\tvar mcpConfig *MCPConfig = nil\n\tif mcpData, ok := branch.Inputs[\"mcp_config\"]; ok {\n\t\tif mcpConfigMap, ok := mcpData.(map[string]interface{}); ok {\n\t\t\t// Convert map to MCPConfig struct\n\t\t\tif parsedMCP, err := parseMCPFromInputs(mcpConfigMap); err == nil {\n\t\t\t\tmcpConfig = parsedMCP\n\t\t\t}\n\t\t}\n\t}\n\n\t// Step 4: Substitute environment variables in HCL template with MCP support\n\trenderedHCLPath, err := substituteHCLTemplateWithMCP(hclPath, runID, mcpConfig)\n\tif err != nil {\n\t\tresult.Status = \"failed\"\n\t\tresult.Notes = fmt.Sprintf(\"failed to substitute HCL template: %v\", err)\n\t\tresult.FinishedAt = time.Now()\n\t\tresult.Duration = time.Since(result.StartedAt)\n\t\treturn result\n\t}"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01EJLVsD7HSfn7jDFMvNCATC",
+        "type": "tool_result",
+        "content": "The file /Users/vk/@iw2rmb/ploy/internal/cli/transflow/fanout_orchestrator.go has been updated. Here's the result of running `cat -n` on a snippet of the edited file:\n   204→\n   205→\t// Step 2: Generate unique run ID for this branch\n   206→\trunID := fmt.Sprintf(\"llm-exec-%s-%d\", branch.ID, time.Now().Unix())\n   207→\n   208→\t// Step 3: Extract MCP configuration from branch inputs\n   209→\tvar mcpConfig *MCPConfig = nil\n   210→\tif mcpData, ok := branch.Inputs[\"mcp_config\"]; ok {\n   211→\t\tif mcpConfigMap, ok := mcpData.(map[string]interface{}); ok {\n   212→\t\t\t// Convert map to MCPConfig struct\n   213→\t\t\tif parsedMCP, err := parseMCPFromInputs(mcpConfigMap); err == nil {\n   214→\t\t\t\tmcpConfig = parsedMCP\n   215→\t\t\t}\n   216→\t\t}\n   217→\t}\n   218→\n   219→\t// Step 4: Substitute environment variables in HCL template with MCP support\n   220→\trenderedHCLPath, err := substituteHCLTemplateWithMCP(hclPath, runID, mcpConfig)\n   221→\tif err != nil {\n   222→\t\tresult.Status = \"failed\"\n   223→\t\tresult.Notes = fmt.Sprintf(\"failed to substitute HCL template: %v\", err)\n   224→\t\tresult.FinishedAt = time.Now()\n   225→\t\tresult.Duration = time.Since(result.StartedAt)\n   226→\t\treturn result\n   227→\t}\n   228→\n   229→\t// Step 4: Submit job to Nomad and wait for completion\n   230→\ttimeout := 30 * time.Minute\n   231→\tif err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "\n\n\n\nNow I need to create the `parseMCPFromInputs` function that I referenced. Let me add this to the fanout_orchestrator.go file.",
+        "signature": "EqwCCkYIBxgCKkAkC62HW9nFzOhCCJ1GqIzddOPIxSPSSA5p1bBge2CXx7jsA3jg5UwllJjlVgjmn53sCZkfkk67QlYC/6qGh8JTEgxhC12H2gBpM43WfgkaDPvE9oivebiYnp9lLiIwQe/Vper21rI4EfCcFXlh0oKf/dpNhpmHDYvMpORuRt57eSc0kO9Pw50ESvqzvMAQKpMBBmrT2Z4KzNqocgFrHqwssjxarY0BLjssX1ZTPDFMda6X0RwFl30l1sBoajfhQTcQUayIAmz4SecTMxDpHKJ1i35pHNzXQLU+5nuq8UMFN4h33vekocb3wZ5QvlNewuSuKhJtrPaRlEUH/+wJw7pbKgW1W+c7Pj6fE6tVZ5XPFL9Sk+QEISGyqxKW+Jlk3JCf33CTGAE="
+      }
+    ]
+  }
+]

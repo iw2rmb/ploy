@@ -1,1 +1,6 @@
-{"task":"m-implement-mcp-integration-llm-exec","branch":"feature/mcp-llm-exec-integration","services":["transflow","llm-exec","mcp-infrastructure"],"updated":"2025-09-05"}
+{
+  "task": null,
+  "branch": null,
+  "services": [],
+  "updated": "2025-09-06"
+}
