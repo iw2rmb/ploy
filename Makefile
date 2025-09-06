@@ -236,6 +236,38 @@ test-vps-production: ## Run VPS production readiness tests
 test-vps-all: test-vps-environment test-vps-integration test-vps-production ## Run complete VPS test suite
 	@echo "$(GREEN)Complete VPS test suite passed!$(NC)"
 
+.PHONY: test-e2e-local
+test-e2e-local: ## Run E2E tests locally with Docker services
+	@echo "$(BLUE)Running local E2E tests...$(NC)"
+	@echo "$(YELLOW)Checking Docker services...$(NC)"
+	@$(IAC_DIR)/local/scripts/wait-for-services.sh || (echo "$(RED)Docker services not available$(NC)" && exit 1)
+	@mkdir -p $(TEST_RESULTS_DIR)
+	go test $(TEST_FLAGS) -tags=e2e -timeout=20m -coverprofile=$(COVERAGE_DIR)/e2e-coverage.out ./tests/e2e/...
+	@echo "$(GREEN)Local E2E tests passed!$(NC)"
+
+.PHONY: test-e2e-vps
+test-e2e-vps: ## Run E2E tests on VPS with production services
+	@echo "$(BLUE)Running VPS E2E tests...$(NC)"
+	@if [ -z "$(TARGET_HOST)" ]; then \
+		echo "$(RED)TARGET_HOST environment variable not set$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Running E2E tests on VPS: $(TARGET_HOST)$(NC)"
+	@mkdir -p $(TEST_RESULTS_DIR)
+	TARGET_HOST=$(TARGET_HOST) go test $(TEST_FLAGS) -tags=e2e -timeout=30m -coverprofile=$(COVERAGE_DIR)/vps-e2e-coverage.out ./tests/e2e/...
+	@echo "$(GREEN)VPS E2E tests passed!$(NC)"
+
+.PHONY: test-e2e-quick
+test-e2e-quick: ## Run quick E2E tests (essential workflows only)
+	@echo "$(BLUE)Running quick E2E tests...$(NC)"
+	@mkdir -p $(TEST_RESULTS_DIR)
+	go test $(TEST_FLAGS) -short -tags=e2e -timeout=10m -run=TestTransflowE2E_JavaMigrationComplete ./tests/e2e/...
+	@echo "$(GREEN)Quick E2E tests passed!$(NC)"
+
+.PHONY: test-e2e-all
+test-e2e-all: test-e2e-local test-e2e-vps ## Run complete E2E test suite locally and on VPS
+	@echo "$(GREEN)Complete E2E test suite passed!$(NC)"
+
 .PHONY: test-benchmark
 test-benchmark: ## Run benchmark tests
 	@echo "$(BLUE)Running benchmark tests...$(NC)"
