@@ -31,6 +31,14 @@ func (t *Time) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON converts Time to JSON string
+func (t Time) MarshalJSON() ([]byte, error) {
+	if time.Time(t).IsZero() {
+		return []byte("null"), nil
+	}
+	return []byte(`"` + time.Time(t).Format(time.RFC3339) + `"`), nil
+}
+
 // RecipeMetadata contains human-readable recipe info (subset for CLI)
 type RecipeMetadata struct {
 	Name        string   `json:"name"`

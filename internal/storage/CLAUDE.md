@@ -21,6 +21,7 @@ Core functionality centers around the Storage interface which provides basic CRU
 - `monitoring.go:1-500` - Real-time metrics collection and health monitoring
 - `adapter.go:1-150` - Storage provider adapter for legacy compatibility
 - `storage.go:1-80` - Package initialization and configuration
+- `llm_models.go:1-319` - LLM model registry storage operations with CRUD, filtering, search, backup/restore
 
 ## Integration Points
 ### Consumes
@@ -36,6 +37,7 @@ Core functionality centers around the Storage interface which provides basic CRU
 - Integrity Verification: Artifact checksum validation and bundle verification
 - KB Storage Backend: High-performance storage for Knowledge Base deduplication operations
 - Compaction Support: Storage operations optimized for deduplication case merging and cleanup
+- LLM Model Storage: Registry operations for LLM models under `llms/models/` namespace with filtering, search, backup/restore
 
 ## Configuration
 Environment variables:
@@ -58,5 +60,7 @@ Environment variables:
 ## Related Documentation
 - `../cli/transflow/CLAUDE.md` - Transflow KB persistence and deduplication integration
 - `../../api/storage/` - Storage API endpoints and handlers
+- `../../api/llms/` - LLM model registry API endpoints
 - `../../platform/seaweedfs/` - SeaweedFS deployment and configuration
 - `../orchestration/CLAUDE.md` - Orchestration layer supporting KB maintenance jobs
+- `../../cmd/ployman/` - CLI tool for LLM model management
