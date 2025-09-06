@@ -11,10 +11,17 @@ import (
 )
 
 type TransflowStep struct {
-	Type    string   `yaml:"type"`
-	ID      string   `yaml:"id"`
-	Engine  string   `yaml:"engine"`
-	Recipes []string `yaml:"recipes"`
+	Type        string     `yaml:"type"`
+	ID          string     `yaml:"id"`
+	Engine      string     `yaml:"engine"`
+	Recipes     []string   `yaml:"recipes"`
+	Model       string     `yaml:"model,omitempty"`
+	Prompts     []string   `yaml:"prompts,omitempty"`
+	MCPTools    []MCPTool  `yaml:"mcp_tools,omitempty"`
+	Context     []string   `yaml:"context,omitempty"`
+	Budgets     MCPBudgets `yaml:"budgets,omitempty"`
+	Parallel    bool       `yaml:"parallel,omitempty"`
+	MaxParallel int        `yaml:"max_parallel_execs,omitempty"`
 }
 
 type TransflowConfig struct {
@@ -70,6 +77,30 @@ func (c *TransflowConfig) Validate() error {
 	}
 	if len(c.Steps) == 0 {
 		return errors.New("at least one step is required")
+	}
+
+	// Validate each step
+	for i, step := range c.Steps {
+		if step.ID == "" {
+			return fmt.Errorf("step %d must have an id", i)
+		}
+		if step.Type == "" {
+			return fmt.Errorf("step %d (%s) must have a type", i, step.ID)
+		}
+
+		// Validate MCP configuration for steps that have it
+		if len(step.MCPTools) > 0 || len(step.Context) > 0 {
+			mcpConfig := MCPConfig{
+				Tools:   step.MCPTools,
+				Context: step.Context,
+				Budgets: step.Budgets,
+				Model:   step.Model,
+				Prompts: step.Prompts,
+			}
+			if err := mcpConfig.Validate(); err != nil {
+				return fmt.Errorf("invalid MCP config for step %s: %w", step.ID, err)
+			}
+		}
 	}
 
 	// Validate self-heal configuration if provided
