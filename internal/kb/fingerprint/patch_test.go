@@ -191,10 +191,10 @@ func TestPatchFingerprinter_SimilarityScore(t *testing.T) {
 +    Optional<String> value = Optional.ofNullable(getValue());`)
 
 	tests := []struct {
-		name            string
-		comparePatch    []byte
-		expectedScore   float64
-		description     string
+		name          string
+		comparePatch  []byte
+		expectedScore float64
+		description   string
 	}{
 		{
 			name:          "identical patches",
@@ -229,7 +229,7 @@ func TestPatchFingerprinter_SimilarityScore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// This should fail - CalculateSimilarity doesn't exist yet
 			score := fingerprinter.CalculateSimilarity(basePatch, tt.comparePatch)
-			
+
 			assert.True(t, score >= 0.0 && score <= 1.0, "Similarity score should be between 0.0 and 1.0")
 			assert.InDelta(t, tt.expectedScore, score, 0.1, tt.description)
 		})
