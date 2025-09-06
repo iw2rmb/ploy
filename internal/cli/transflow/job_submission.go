@@ -45,12 +45,17 @@ func NewJobSubmissionHelperWithRunner(submitter interface{}, runner ProductionJo
 
 // substituteHCLTemplate performs environment variable substitution in HCL templates
 func substituteHCLTemplate(hclPath string, runID string) (string, error) {
+	return substituteHCLTemplateWithMCP(hclPath, runID, nil)
+}
+
+// substituteHCLTemplateWithMCP performs environment variable substitution with MCP support
+func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPConfig) (string, error) {
 	hclBytes, err := os.ReadFile(hclPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read HCL template: %w", err)
 	}
 
-	// Get environment variables with defaults
+	// Get core environment variables with defaults
 	model := os.Getenv("TRANSFLOW_MODEL")
 	if model == "" {
 		model = "gpt-4o-mini@2024-08-06"
@@ -66,13 +71,24 @@ func substituteHCLTemplate(hclPath string, runID string) (string, error) {
 		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
 	}
 
+	// Get MCP environment variables
+	mcpEnvConfig := getMCPEnvironmentConfig(mcpConfig)
+
 	// Perform substitution
-	rendered := strings.NewReplacer(
+	replacer := strings.NewReplacer(
 		"${MODEL}", model,
 		"${TOOLS_JSON}", toolsJSON,
 		"${LIMITS_JSON}", limitsJSON,
 		"${RUN_ID}", runID,
-	).Replace(string(hclBytes))
+		"${MCP_TOOLS_JSON}", mcpEnvConfig.MCPToolsJSON,
+		"${MCP_CONTEXT_JSON}", mcpEnvConfig.MCPContextJSON,
+		"${MCP_ENDPOINTS_JSON}", mcpEnvConfig.MCPEndpointsJSON,
+		"${MCP_BUDGETS_JSON}", mcpEnvConfig.MCPBudgetsJSON,
+		"${MCP_PROMPTS_JSON}", mcpEnvConfig.MCPPromptsJSON,
+		"${MCP_TIMEOUT}", mcpEnvConfig.MCPTimeout,
+		"${MCP_SECURITY_MODE}", mcpEnvConfig.MCPSecurityMode,
+	)
+	rendered := replacer.Replace(string(hclBytes))
 
 	// Write substituted HCL to a new file
 	renderedPath := strings.ReplaceAll(hclPath, ".hcl", ".rendered.submitted.hcl")
@@ -81,6 +97,39 @@ func substituteHCLTemplate(hclPath string, runID string) (string, error) {
 	}
 
 	return renderedPath, nil
+}
+
+// getMCPEnvironmentConfig generates MCP environment configuration from MCP config
+func getMCPEnvironmentConfig(mcpConfig *MCPConfig) *MCPEnvironmentConfig {
+	// If no MCP config provided, return empty environment
+	if mcpConfig == nil {
+		return &MCPEnvironmentConfig{
+			MCPToolsJSON:     "[]",
+			MCPContextJSON:   "[]",
+			MCPEndpointsJSON: "{}",
+			MCPBudgetsJSON:   `{"max_tokens":0,"max_cost":0,"timeout":"30m"}`,
+			MCPPromptsJSON:   "[]",
+			MCPTimeout:       "30m",
+			MCPSecurityMode:  "allowlist",
+		}
+	}
+
+	// Convert MCP config to environment config
+	envConfig, err := mcpConfig.ToEnvironmentConfig()
+	if err != nil {
+		// If conversion fails, return safe defaults
+		return &MCPEnvironmentConfig{
+			MCPToolsJSON:     "[]",
+			MCPContextJSON:   "[]",
+			MCPEndpointsJSON: "{}",
+			MCPBudgetsJSON:   `{"max_tokens":0,"max_cost":0,"timeout":"30m"}`,
+			MCPPromptsJSON:   "[]",
+			MCPTimeout:       "30m",
+			MCPSecurityMode:  "allowlist",
+		}
+	}
+
+	return envConfig
 }
 
 // readJobArtifact reads and parses a JSON artifact from a job execution

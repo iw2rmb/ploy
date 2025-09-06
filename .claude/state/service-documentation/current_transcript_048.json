@@ -1,0 +1,304 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01HfbX2LVzwkFJ5EcuiU3z8y",
+        "type": "tool_result",
+        "content": "     1→# Task Completion Protocol\n     2→\n     3→When a task meets its success criteria:\n     4→\n     5→## 1. Pre-Completion Checks\n     6→\n     7→Verify before proceeding:\n     8→- [ ] All success criteria checked off in task file\n     9→- [ ] No unaddressed work remaining\n    10→\n    11→**NOTE**: Do NOT commit yet - agents will modify files\n    12→\n    13→## 2. Run Completion Agents\n    14→\n    15→Delegate to specialized agents in this order:\n    16→```\n    17→1. code-review agent - Review all implemented code for security/quality\n    18→   Include: Changed files, task context, implementation approach\n    19→   \n    20→2. service-documentation agent - Update CLAUDE.md files \n    21→   Include: List of services modified during task\n    22→   \n    23→3. logging agent - Finalize task documentation\n    24→   Include: Task completion summary, final status\n    25→```\n    26→\n    27→## 3. Task Archival\n    28→\n    29→After agents complete:\n    30→```bash\n    31→# Update task file status to 'completed'\n    32→# Move to done/ directory\n    33→mv sessions/tasks/[priority]-[task-name].md sessions/tasks/done/\n    34→# or for directories:\n    35→mv sessions/tasks/[priority]-[task-name]/ sessions/tasks/done/\n    36→```\n    37→\n    38→## 4. Clear Task State\n    39→\n    40→```bash\n    41→# Clear task state (but keep file)\n    42→cat > .claude/state/current_task.json << 'EOF'\n    43→{\n    44→  \"task\": null,\n    45→  \"branch\": null,\n    46→  \"services\": [],\n    47→  \"updated\": \"$(date +%Y-%m-%d)\"\n    48→}\n    49→EOF\n    50→```\n    51→\n    52→## 5. Git Operations (Commit & Merge)\n    53→\n    54→### Step 1: Review Unstaged Changes\n    55→\n    56→```bash\n    57→# Check for any unstaged changes\n    58→git status\n    59→\n    60→# If changes exist, present them to user:\n    61→# \"I found the following unstaged changes: [list]\n    62→# Would you like to:\n    63→# 1. Commit all changes (git add -A)\n    64→# 2. Select specific changes to commit\n    65→# 3. Review changes first\"\n    66→```\n    67→\n    68→### Step 2: Determine Branch Type\n    69→\n    70→1. Check the current branch name\n    71→2. Determine if this is a subtask or regular task:\n    72→   - **Subtask**: Branch name has pattern like `tt\\d+[a-z]` (e.g., tt1a, tt234b)\n    73→   - **Regular task**: Branch name like `feature/*`, `fix/*`, or `tt\\d+` (no letter)\n    74→\n    75→### Step 3: Check for Super-repo Structure\n    76→\n    77→```bash\n    78→# Check if we're in a super-repo with submodules\n    79→if [ -f .gitmodules ]; then\n    80→  echo \"Super-repo detected with submodules\"\n    81→  # Follow submodule commit ordering below\n    82→else\n    83→  echo \"Standard repository\"\n    84→  # Skip to step 4\n    85→fi\n    86→```\n    87→\n    88→### Step 4: Commit and Merge (Conditional on Structure)\n    89→\n    90→**IF SUPER-REPO**: Process from deepest submodules to super-repo\n    91→\n    92→#### A. Deepest Submodules First (Depth 2+)\n    93→For any submodules within submodules:\n    94→1. Navigate to each modified deep submodule\n    95→2. Stage changes based on user preference from Step 1\n    96→3. Commit all changes with descriptive message\n    97→4. Merge based on branch type:\n    98→   - Subtask → merge into parent task branch\n    99→   - Regular task → merge into main\n   100→5. Push the merged branch\n   101→\n   102→#### B. Direct Submodules (Depth 1)\n   103→For all modified direct submodules:\n   104→1. Navigate to each modified submodule\n   105→2. Stage changes based on user preference\n   106→3. Commit all changes with descriptive message\n   107→4. Merge based on branch type:\n   108→   - Subtask → merge into parent task branch\n   109→   - Regular task → merge into main\n   110→5. Push the merged branch\n   111→\n   112→#### C. Super-repo (Root)\n   113→After ALL submodules are committed and merged:\n   114→1. Return to super-repo root\n   115→2. Stage changes based on user preference\n   116→3. Commit all changes with descriptive message\n   117→4. Merge based on branch type:\n   118→   - Subtask → merge into parent task branch\n   119→   - Regular task → merge into main\n   120→5. Push the merged branch\n   121→\n   122→**IF STANDARD REPO**: Simple commit and merge\n   123→1. Stage changes based on user preference\n   124→2. Commit with descriptive message\n   125→3. Merge based on branch type (subtask → parent, regular → main)\n   126→4. Push the merged branch\n   127→\n   128→### Special Cases\n   129→\n   130→**Experiment branches:**\n   131→- Ask user whether to keep the experimental branch for reference\n   132→- If keeping: Just push branches without merging\n   133→- If not: Document findings first, then delete branches\n   134→\n   135→**Research tasks (no branch):**\n   136→- No merging needed\n   137→- Just ensure findings are documented in task file\n   138→\n   139→## 6. Select Next Task\n   140→\n   141→Immediately after archival:\n   142→```bash\n   143→# List all tasks (simple and reliable)\n   144→ls -la sessions/tasks/\n   145→\n   146→# Present the list to user\n   147→echo \"Task complete! Here are the remaining tasks:\"\n   148→# User can see which are .md files vs directories vs symlinks\n   149→```\n   150→\n   151→User selects next task:\n   152→- Switch to task branch: `git checkout [branch-name]`\n   153→- Update task state: Edit `.claude/state/current_task.json` with new task, branch, and services\n   154→- Follow task-startup.md protocol\n   155→\n   156→If no tasks remain:\n   157→- Celebrate completion!\n   158→- Ask user what they want to tackle next\n   159→- Create new task following task-creation.md\n   160→\n   161→## Important Notes\n   162→\n   163→- NEVER skip the agent steps - they maintain system integrity\n   164→- Task files in done/ serve as historical record\n   165→- Completed experiments should document learnings even if code is discarded\n   166→- If task is abandoned incomplete, document why in task file before archiving\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "I need to follow the task completion protocol. Let me verify the pre-completion checks first by looking at the task file.",
+        "signature": "EqMCCkYIBxgCKkAJo+5BXPOQjBMi2Z+jyJRkiGhtgVOTyGOTLh6iA7nBlhVUZgq/4EtW8RR6LVIObBwdSLF04tssT3NQBFo3TaJtEgwIvTbj3lBdln9gOz8aDKshGHDOWF4swA3hECIw5ZN9vrnU+WEc5k7XxuHZc/Z0GrI/6iTxmXH/tY8zN6ZjjRwMqGIPu3UsLs0vQfJ1KooBjjaqNwl/7o/5DwTNrr+viQad59O1dn/xJRC9BHBvq6rCVrrsRUV5UIKMB8UweqFCG1+RcE1lB0ugMJpxtYyD0SBApzNc/bn1fnh63r1mxGAwrtrms6krbRA3NWiBD6f/Inqz1m3+G70B90h8/OvqKaC3LoIYztnQaSrRKxsPwXhyeDna5fM97+7qGAE="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_018cYQS3fvebu3Ucuqj6AEAc",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/sessions/tasks/m-implement-mcp-integration-llm-exec.md",
+          "offset": 15,
+          "limit": 10
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_018cYQS3fvebu3Ucuqj6AEAc",
+        "type": "tool_result",
+        "content": "    15→## Success Criteria\n    16→- [x] MCP tool configuration successfully integrated into LLM-exec HCL job templates\n    17→- [x] Environment variable management system for MCP tools and context configuration\n    18→- [x] Context prefetching and processing functionality for repository files and HTTPS URLs\n    19→- [x] Seamless integration with existing LLM-exec branch execution pipeline\n    20→- [x] Comprehensive testing infrastructure for MCP-enabled LLM jobs\n    21→- [x] Configuration validation and error handling for MCP tool failures\n    22→- [x] Documentation and examples for MCP tool usage in LLM-exec workflows\n    23→- [x] Performance benchmarking showing acceptable overhead from MCP integration\n    24→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "Good, I can see that all success criteria are checked off ([x]). Now I need to run the completion agents in the specified order:\n\n1. code-review agent\n2. service-documentation agent  \n3. logging agent\n\nAfter that, I'll handle task archival, clear state, and git operations.",
+        "signature": "ErwDCkYIBxgCKkDdTIo0Yu7ujBI9yF3CuvOzPh58WG0pkcwqS1fchlGe0LK8caAy3do05Fw/oly5LT5X3bqt54sHp+ZdsOHzsnY4Egz6SnHMb6dZiuvrm20aDG9aqU/1FFinzL0R4CIwhihS6vwJyvkJ/g3k7WVw64rms6l2P+r5OBgAOpW2/98zqfoafeTtU4GUKGHVsai6KqMC2mAW6HunnwtKKlLAKj5LE+clYwkFSZn8BmOClWhf3H6FIq87T0omk33ps0hjLI1VEuXUFKUPYHD5l/Xzgazddy1IhTSMQu4sRYLBKJbcTWSg0ME+24XLUXK/ZcHVRAfn5NJtWpEGk6cUPP5G9phX+/eJgps1zKfMhikzW6UNoM/T55qLwrjpZKt9/LvbVpollOICmDTtHEHw962mMfMPyNYhcJBcvJ/C3L2lObrIJAh1L/HFHAc3F41TFRS+qhMkrCIVGhMKFSbu9SyjWOoq3/7g6kdz/o9/yR7qI8wt5grTZga78bvsq7ZyMGn5XDuyD35MGYil5uTT2/IKAgjaNhc1yZ9/JvjPne5rzaSKlppyvgGJUaODToisycKs5B3ihhVrGAE="
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Perfect! All success criteria are completed. Following the task completion protocol:\n\n## 1. Pre-Completion Checks ✅\n- [x] All success criteria checked off in task file\n- [x] No unaddressed work remaining\n\n## 2. Running Completion Agents"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01W8BVsPQHMj83mHLKCTY1nN",
+        "name": "Task",
+        "input": {
+          "subagent_type": "code-review",
+          "description": "Review MCP integration code",
+          "prompt": "Please review the MCP integration implementation for the task m-implement-mcp-integration-llm-exec.\n\n**Changed Files:**\n- internal/cli/transflow/mcp_integration.go (NEW)\n- internal/cli/transflow/mcp_integration_test.go (NEW) \n- internal/cli/transflow/config.go (MODIFIED)\n- internal/cli/transflow/job_submission.go (MODIFIED)\n- internal/cli/transflow/fanout_orchestrator.go (MODIFIED)\n- roadmap/transflow/jobs/llm_exec.hcl (MODIFIED)\n- roadmap/transflow/jobs/MCP_INTEGRATION.md (NEW)\n\n**Implementation Approach:**\n- Added comprehensive MCP tool configuration system with validation\n- Extended existing LLM-exec pipeline with MCP support via environment variables\n- Implemented context prefetching for files and URLs\n- Added network configuration to Nomad job templates for MCP endpoint access\n- Comprehensive test suite with performance benchmarks\n- Backward compatibility maintained - existing jobs work without MCP config\n\n**Task Context:**\nThis integration enables LLM-exec healing branches to use Model Context Protocol tools for enhanced context gathering (file system, search, web scraping) during code transformation workflows.\n\nPlease review for:\n1. Security vulnerabilities (endpoint validation, input sanitization)\n2. Performance issues (memory usage, allocation patterns)\n3. Error handling and graceful degradation\n4. Code quality and consistency with existing patterns"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Please review the MCP integration implementation for the task m-implement-mcp-integration-llm-exec.\n\n**Changed Files:**\n- internal/cli/transflow/mcp_integration.go (NEW)\n- internal/cli/transflow/mcp_integration_test.go (NEW) \n- internal/cli/transflow/config.go (MODIFIED)\n- internal/cli/transflow/job_submission.go (MODIFIED)\n- internal/cli/transflow/fanout_orchestrator.go (MODIFIED)\n- roadmap/transflow/jobs/llm_exec.hcl (MODIFIED)\n- roadmap/transflow/jobs/MCP_INTEGRATION.md (NEW)\n\n**Implementation Approach:**\n- Added comprehensive MCP tool configuration system with validation\n- Extended existing LLM-exec pipeline with MCP support via environment variables\n- Implemented context prefetching for files and URLs\n- Added network configuration to Nomad job templates for MCP endpoint access\n- Comprehensive test suite with performance benchmarks\n- Backward compatibility maintained - existing jobs work without MCP config\n\n**Task Context:**\nThis integration enables LLM-exec healing branches to use Model Context Protocol tools for enhanced context gathering (file system, search, web scraping) during code transformation workflows.\n\nPlease review for:\n1. Security vulnerabilities (endpoint validation, input sanitization)\n2. Performance issues (memory usage, allocation patterns)\n3. Error handling and graceful degradation\n4. Code quality and consistency with existing patterns"
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll review the MCP integration implementation for security, performance, error handling, and code quality. Let me start by examining the changes and understanding the current state."
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01Dt2Q6PqB9gTdpCGLqMRq1A",
+        "name": "Bash",
+        "input": {
+          "command": "git diff HEAD~1 --name-only",
+          "description": "List files changed in recent commit"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01Dt2Q6PqB9gTdpCGLqMRq1A",
+        "type": "tool_result",
+        "content": ".claude/state/code-review/current_transcript_001.json\n.claude/state/code-review/current_transcript_002.json\n.claude/state/code-review/current_transcript_003.json\n.claude/state/code-review/current_transcript_004.json\n.claude/state/code-review/current_transcript_005.json\n.claude/state/code-review/current_transcript_006.json\n.claude/state/code-review/current_transcript_007.json\n.claude/state/code-review/current_transcript_008.json\n.claude/state/context-gathering/current_transcript_001.json\n.claude/state/context-gathering/current_transcript_002.json\n.claude/state/context-gathering/current_transcript_003.json\n.claude/state/context-gathering/current_transcript_004.json\n.claude/state/context-gathering/current_transcript_005.json\n.claude/state/context-gathering/current_transcript_006.json\n.claude/state/context-gathering/current_transcript_007.json\n.claude/state/context-gathering/current_transcript_008.json\n.claude/state/context-gathering/current_transcript_009.json\n.claude/state/context-gathering/current_transcript_010.json\n.claude/state/context-gathering/current_transcript_011.json\n.claude/state/context-gathering/current_transcript_012.json\n.claude/state/context-gathering/current_transcript_013.json\n.claude/state/context-gathering/current_transcript_014.json\n.claude/state/current_task.json\ninternal/cli/transflow/config.go\ninternal/cli/transflow/fanout_orchestrator.go\ninternal/cli/transflow/job_submission.go\nroadmap/transflow/jobs/llm_exec.hcl\nsessions/tasks/m-implement-mcp-integration-llm-exec.md",
+        "is_error": false
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Let me check the current task and examine the actual implementation files:"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01EWuqBbsNvEbPzdDVLc52cn",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/.claude/state/current_task.json"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01EWuqBbsNvEbPzdDVLc52cn",
+        "type": "tool_result",
+        "content": "     1→{\"task\":\"m-implement-mcp-integration-llm-exec\",\"branch\":\"feature/mcp-llm-exec-integration\",\"services\":[\"transflow\",\"llm-exec\",\"mcp-infrastructure\"],\"updated\":\"2025-09-05\"}\n     2→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01GEerRaq7E1gJzpCijgWzS7",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/sessions/tasks/m-implement-mcp-integration-llm-exec.md"
+        }
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01S1mFbym9hjAUSDT2uTbZx9",
+        "name": "Glob",
+        "input": {
+          "pattern": "internal/cli/transflow/mcp_integration*"
+        }
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01FKim3MbxEudoGrfQrd1QVv",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go"
+        }
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_013u5VbXs1TLd9Jx2BQPHEbK",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission.go"
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01GEerRaq7E1gJzpCijgWzS7",
+        "type": "tool_result",
+        "content": "     1→---\n     2→task: m-implement-mcp-integration-llm-exec\n     3→branch: feature/mcp-llm-exec-integration\n     4→status: in-progress\n     5→created: 2025-09-05\n     6→started: 2025-09-05\n     7→modules: [transflow, llm-exec, mcp-infrastructure]\n     8→---\n     9→\n    10→# MCP Integration for LLM-exec\n    11→\n    12→## Problem/Goal\n    13→Integrate Model Context Protocol (MCP) capabilities into the existing LLM-exec branch functionality within the transflow healing infrastructure. This will enable LLM-exec jobs to access and utilize MCP tools for enhanced context gathering and processing during repository analysis and code generation workflows.\n    14→\n    15→## Success Criteria\n    16→- [x] MCP tool configuration successfully integrated into LLM-exec HCL job templates\n    17→- [x] Environment variable management system for MCP tools and context configuration\n    18→- [x] Context prefetching and processing functionality for repository files and HTTPS URLs\n    19→- [x] Seamless integration with existing LLM-exec branch execution pipeline\n    20→- [x] Comprehensive testing infrastructure for MCP-enabled LLM jobs\n    21→- [x] Configuration validation and error handling for MCP tool failures\n    22→- [x] Documentation and examples for MCP tool usage in LLM-exec workflows\n    23→- [x] Performance benchmarking showing acceptable overhead from MCP integration\n    24→\n    25→## Context Manifest\n    26→\n    27→### How This Currently Works: LLM-exec Branch and Transflow Healing Infrastructure\n    28→\n    29→The LLM-exec functionality operates as part of the broader transflow healing infrastructure, which orchestrates automated code transformation and build failure recovery workflows. When a transflow run encounters build failures, the system can invoke LLM-exec branches to generate code patches using Large Language Models.\n    30→\n    31→#### Current LLM-exec Architecture\n    32→\n    33→The existing LLM-exec implementation is defined in `/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl` as a Nomad batch job template. The job runs a containerized LangGraph runner (`ghcr.io/your-org/langchain-runner:py-0.1.0`) with specific environment variables and volume mounts for context and output. The current environment configuration includes:\n    34→\n    35→- `MODEL`: Resolved via LLM registry (e.g., `gpt-4o-mini@2024-08-06`)\n    36→- `TOOLS_JSON`: JSON allowlist config for tools (`file`, `search`, `build`, optional `openrewrite`)\n    37→- `LIMITS_JSON`: JSON limits (steps/tool_calls/timeout/tokens)\n    38→- `CONTEXT_DIR`: `/workspace/context` for prefetched files and URLs\n    39→- `OUTPUT_DIR`: `/workspace/out` for generated patches\n    40→- `RUN_ID`: Unique execution identifier\n    41→\n    42→The job specification includes resource limits (700 CPU, 1024 MB memory), timeout configuration (30m with 5m kill timeout), and volume mounts for context input and output artifacts. The expected output is a unified diff patch at `/workspace/out/diff.patch` that the orchestrator applies to the workflow branch.\n    43→\n    44→#### Transflow Healing Workflow Integration\n    45→\n    46→LLM-exec jobs are invoked through the healing workflow defined in `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/self_healing.go` and orchestrated by the runner in `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/runner.go`. The healing process follows a three-phase pattern:\n    47→\n    48→**Phase 1 - Planning**: When a build fails, the system captures the error output and submits a planner job via `SubmitPlannerJob()` in the job submission helper. The planner analyzes the error context and generates healing options, including potential LLM-exec branches. These options are returned as a `PlanResult` containing branch specifications.\n    49→\n    50→**Phase 2 - Fanout Execution**: The `FanoutOrchestrator` (implemented in `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/fanout_orchestrator.go`) executes healing branches in parallel. Each LLM-exec branch runs as an independent Nomad job with first-success-wins semantics. The orchestrator monitors all branches and cancels remaining jobs once a successful fix is found.\n    51→\n    52→**Phase 3 - Reduction**: A reducer job analyzes the results and determines next actions, typically resulting in \"stop\" (success) or \"new_plan\" (additional healing needed).\n    53→\n    54→#### Job Submission Infrastructure\n    55→\n    56→The job submission infrastructure in `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission.go` provides the `JobSubmissionHelper` interface with methods for submitting planner and reducer jobs. The implementation handles HCL template substitution using environment variables, with defaults defined for `TRANSFLOW_MODEL`, `TRANSFLOW_TOOLS`, and `TRANSFLOW_LIMITS`. \n    57→\n    58→The underlying orchestration layer in `/Users/vk/@iw2rmb/ploy/internal/orchestration/submit.go` provides Nomad API integration with functions like `SubmitAndWaitTerminal()` for batch jobs. This function parses HCL, registers jobs via Nomad API, and monitors execution until completion or timeout.\n    59→\n    60→#### Environment Management Patterns\n    61→\n    62→The codebase follows consistent patterns for environment variable management across Nomad job templates. Most jobs use `env` blocks with template substitution for dynamic values, combined with `template` blocks for complex configuration generation. Examples in existing LLM batch jobs show patterns like:\n    63→\n    64→- Static environment variables for runtime configuration (e.g., `PYTHONDONTWRITEBYTECODE`, `OLLAMA_HOST`)\n    65→- Template-interpolated values using `${VAR}` syntax for dynamic job parameters\n    66→- Base64-encoded prompts and configuration for complex data structures\n    67→- Consul KV integration for job status tracking and metadata storage\n    68→\n    69→### For MCP Integration Implementation: What Needs to Connect\n    70→\n    71→The MCP integration will extend the existing LLM-exec architecture by adding Model Context Protocol tool capabilities while maintaining backward compatibility with the current healing workflow.\n    72→\n    73→#### MCP Tool Configuration Integration\n    74→\n    75→The transflow YAML configuration in `/Users/vk/@iw2rmb/ploy/roadmap/transflow/transflow.yaml` already includes `mcp_tools` sections in step definitions, showing the intended structure:\n    76→\n    77→```yaml\n    78→mcp_tools:\n    79→  - name: file-system\n    80→    endpoint: mcp://fs\n    81→  - name: search  \n    82→    endpoint: mcp://rg\n    83→```\n    84→\n    85→The LLM-exec job template will need to be extended to support MCP tool configuration alongside the existing `TOOLS_JSON` environment variable. This will require parsing the MCP tools from the workflow configuration and translating them into environment variables or configuration files that the LangGraph runner can consume.\n    86→\n    87→#### Environment Variable Extensions\n    88→\n    89→The current job submission helper in `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission.go` defines default tool configuration as a JSON string. The MCP integration will need to extend this pattern to include MCP-specific configuration:\n    90→\n    91→- `MCP_TOOLS_JSON`: JSON configuration for available MCP tools and endpoints\n    92→- `MCP_ENDPOINTS_CONFIG`: Mapping of MCP endpoint URLs to connection details\n    93→- `MCP_CONTEXT_CONFIG`: Configuration for context prefetching from MCP sources\n    94→- Tool-specific environment variables following the pattern seen in existing batch jobs\n    95→\n    96→The substitution logic in `substituteHCLTemplate()` will need to be extended to handle MCP-related environment variables, similar to how it currently handles `TRANSFLOW_MODEL`, `TRANSFLOW_TOOLS`, and `TRANSFLOW_LIMITS`.\n    97→\n    98→#### Network Policy and Security Integration\n    99→\n   100→The transflow YAML configuration includes network policies with `allow_mcp_endpoints: true`, indicating the system expects MCP endpoint communication. The Nomad job templates will need network configuration to allow outbound connections to MCP servers while maintaining security boundaries.\n   101→\n   102→#### Context Prefetching Extensions\n   103→\n   104→The current system prefetches context files and URLs to the `CONTEXT_DIR` volume mount. MCP integration will require extending this capability to fetch context through MCP tools, potentially including:\n   105→\n   106→- Repository file access through MCP filesystem tools\n   107→- External URL content through MCP web scraping tools\n   108→- Database or API content through specialized MCP connectors\n   109→\n   110→This will likely require changes to the orchestration layer to invoke MCP tools during the prefetch phase before job submission.\n   111→\n   112→#### Testing Infrastructure Integration\n   113→\n   114→The existing test infrastructure in `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/` includes mock implementations like `MockJobSubmitter` and integration test patterns. The MCP integration will need similar testing infrastructure including:\n   115→\n   116→- Mock MCP server implementations for unit tests\n   117→- Integration tests that verify MCP tool invocation and response handling\n   118→- End-to-end tests that validate the complete LLM-exec + MCP workflow\n   119→- Performance tests to measure MCP tool overhead\n   120→\n   121→### Technical Reference Details\n   122→\n   123→#### Core Components to Modify\n   124→\n   125→**HCL Job Template** (`/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl`):\n   126→- Extend `env` block with MCP-related environment variables\n   127→- Add network configuration for MCP endpoint access\n   128→- Consider additional volume mounts for MCP tool configurations\n   129→\n   130→**Job Submission Helper** (`/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission.go`):\n   131→- Extend `substituteHCLTemplate()` to handle MCP variables\n   132→- Add MCP configuration parsing from transflow YAML\n   133→- Implement MCP endpoint validation and setup\n   134→\n   135→**Transflow Configuration** (`/Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go`):\n   136→- Add MCP tools parsing to `TransflowStep` structure\n   137→- Extend validation to check MCP endpoint reachability\n   138→- Support MCP tool allowlisting and security policies\n   139→\n   140→#### Data Structures\n   141→\n   142→**MCP Tool Configuration**:\n   143→```go\n   144→type MCPTool struct {\n   145→    Name     string            `yaml:\"name\"`\n   146→    Endpoint string            `yaml:\"endpoint\"`\n   147→    Config   map[string]string `yaml:\"config,omitempty\"`\n   148→}\n   149→\n   150→type MCPConfig struct {\n   151→    Tools     []MCPTool         `yaml:\"tools\"`\n   152→    Endpoints map[string]string `yaml:\"endpoints,omitempty\"`\n   153→    Timeout   string            `yaml:\"timeout,omitempty\"`\n   154→}\n   155→```\n   156→\n   157→**Environment Variable Structure**:\n   158→- `MCP_TOOLS_JSON`: `{\"file-system\": {\"endpoint\": \"mcp://fs\", \"config\": {...}}, ...}`\n   159→- `MCP_TIMEOUT`: Default timeout for MCP tool operations\n   160→- `MCP_SECURITY_MODE`: Allowlist/denylist policy enforcement\n   161→\n   162→#### Integration Points\n   163→\n   164→**Configuration Parsing** (`internal/cli/transflow/config.go:LoadConfig()`):\n   165→- Parse `mcp_tools` from YAML step definitions\n   166→- Validate MCP endpoint URLs and accessibility\n   167→- Merge with existing tool configuration patterns\n   168→\n   169→**Job Submission** (`internal/cli/transflow/job_submission.go:SubmitPlannerJob()`):\n   170→- Generate MCP environment variables from configuration\n   171→- Handle MCP-specific context prefetching requirements\n   172→- Integrate with existing artifact collection patterns\n   173→\n   174→**Network Policy** (Nomad job templates):\n   175→- Configure network blocks to allow MCP endpoint access\n   176→- Implement DNS resolution for MCP service discovery\n   177→- Maintain security boundaries for untrusted endpoints\n   178→\n   179→#### Testing Integration\n   180→\n   181→**Unit Tests**:\n   182→- `config_test.go`: Add MCP configuration parsing tests\n   183→- `job_submission_test.go`: Add MCP environment variable generation tests\n   184→- New test file: `mcp_integration_test.go` for MCP-specific functionality\n   185→\n   186→**Integration Tests**:\n   187→- Extend `integration_test.go` with MCP-enabled workflow tests\n   188→- Add mock MCP server implementations for reliable testing\n   189→- Test error handling for MCP tool failures and timeouts\n   190→\n   191→**Performance Benchmarks**:\n   192→- Measure overhead of MCP tool initialization\n   193→- Test context prefetching performance with MCP sources\n   194→- Validate acceptable latency impacts on healing workflow\n   195→\n   196→#### File Locations for Implementation\n   197→\n   198→- **Primary Implementation**: `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration.go`\n   199→- **Configuration Extensions**: `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go`\n   200→- **Job Template Updates**: `/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl`\n   201→- **Testing**: `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration_test.go`\n   202→- **Documentation**: `/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/mcp_tools.md`\n   203→\n   204→## User Notes\n   205→This task focuses on integrating Model Context Protocol (MCP) capabilities into the existing LLM-exec branch functionality. Key areas to address:\n   206→\n   207→1. **MCP Tool Configuration**: Add MCP tool definitions to LLM-exec HCL job templates, including tool discovery, initialization, and lifecycle management.\n   208→\n   209→2. **Environment Management**: Implement robust environment variable management for MCP tools, including context configuration, tool-specific settings, and secure credential handling.\n   210→\n   211→3. **Context Prefetching**: Build context prefetching and processing capabilities for repository files and HTTPS URLs, enabling LLM jobs to access external resources through MCP tools.\n   212→\n   213→4. **Pipeline Integration**: Ensure seamless integration with the existing LLM-exec branch execution pipeline without breaking existing functionality.\n   214→\n   215→5. **Testing Infrastructure**: Develop comprehensive testing infrastructure specifically for MCP-enabled LLM jobs, including unit tests, integration tests, and end-to-end validation.\n   216→\n   217→6. **Error Handling**: Implement robust configuration validation and error handling for MCP tool failures, including graceful degradation when MCP tools are unavailable.\n   218→\n   219→This integration should enhance the capabilities of LLM-exec jobs while maintaining backward compatibility and system stability.\n   220→\n   221→## Work Log\n   222→- [2025-09-05] Created task file, ready for context-gathering agent\n   223→- [2025-09-05] **IMPLEMENTATION COMPLETED** - Full MCP integration for LLM-exec branch functionality\n   224→\n   225→### Implementation Summary\n   226→\n   227→#### Core Components Implemented\n   228→1. **MCP Configuration System** (`mcp_integration.go`)\n   229→   - Complete MCP tool configuration data structures (MCPTool, MCPConfig, MCPBudgets)\n   230→   - Environment variable management system (MCPEnvironmentConfig)\n   231→   - Comprehensive validation framework with endpoint and timeout validation\n   232→\n   233→2. **HCL Template Integration** (`roadmap/transflow/jobs/llm_exec.hcl`)\n   234→   - Extended Nomad job template with MCP environment variables\n   235→   - Network configuration for MCP endpoint access\n   236→   - Python runtime configuration for containerized execution\n   237→\n   238→3. **Job Submission Enhancement** (`job_submission.go`)\n   239→   - MCP-aware HCL template substitution (substituteHCLTemplateWithMCP)\n   240→   - Environment variable generation from MCP configurations\n   241→   - Graceful fallback to default values when MCP config is unavailable\n   242→\n   243→4. **Fanout Orchestrator Integration** (`fanout_orchestrator.go`)\n   244→   - MCP configuration parsing from branch inputs (parseMCPFromInputs)\n   245→   - Integration with existing LLM-exec branch execution pipeline\n   246→   - Context-aware MCP config extraction and processing\n   247→\n   248→5. **Context Prefetching System** (`mcp_integration.go`)\n   249→   - MCPContextPrefetcher for repository files and HTTP/HTTPS URLs\n   250→   - File pattern processing with manifest generation\n   251→   - URL content fetching and context directory management\n   252→   - Comprehensive context manifest creation for containerized jobs\n   253→\n   254→6. **Configuration Extension** (`config.go`)\n   255→   - Extended TransflowStep struct with MCP fields (mcp_tools, context, budgets, etc.)\n   256→   - Integrated MCP validation into transflow configuration validation\n   257→   - Full YAML parsing support for MCP tool definitions\n   258→\n   259→#### Testing Infrastructure\n   260→- **Comprehensive Test Suite** (`mcp_integration_test.go`)\n   261→  - 13 unit tests covering all MCP functionality\n   262→  - Validation testing for endpoints, timeouts, and configurations\n   263→  - Context prefetching and manifest creation testing\n   264→  - Environment variable generation testing\n   265→  - Default configuration testing\n   266→\n   267→- **Performance Benchmarking Results**\n   268→  ```\n   269→  BenchmarkMCPConfig_Validate-8                     34,756,075 ops    36 ns/op    0 allocs\n   270→  BenchmarkMCPConfig_ToEnvironmentConfig-8          826,689 ops       1.4 μs/op   24 allocs\n   271→  BenchmarkMCPContextPrefetcher_PrefetchContext-8   2,001 ops         603 μs/op   101 allocs\n   272→  ```\n   273→  - **Validation**: Extremely fast at ~36ns per operation with zero allocations\n   274→  - **Environment Config**: Very efficient at ~1.4μs with minimal memory footprint (1.7KB)\n   275→  - **Context Prefetching**: Acceptable performance at ~603μs for I/O operations\n   276→\n   277→#### Documentation\n   278→- **Comprehensive User Guide** (`roadmap/transflow/jobs/MCP_INTEGRATION.md`)\n   279→  - Complete architecture overview and component descriptions\n   280→  - Detailed configuration examples for different MCP tool types\n   281→  - Usage examples for file processing, web integration, and search-enhanced analysis\n   282→  - Security considerations and error handling guidance\n   283→  - Performance characteristics and troubleshooting guide\n   284→\n   285→#### Key Features Delivered\n   286→- **Backward Compatibility**: Existing LLM-exec jobs continue working without MCP configuration\n   287→- **Graceful Degradation**: Jobs function normally if MCP tools are unavailable\n   288→- **Security-First**: Comprehensive endpoint validation and allowlisting support\n   289→- **Performance-Optimized**: Minimal overhead with efficient caching and processing\n   290→- **Developer-Friendly**: Rich error messages and comprehensive validation feedback\n   291→\n   292→#### Integration Points Verified\n   293→- ✅ Seamless integration with existing transflow healing workflows\n   294→- ✅ Compatible with production Nomad job submission infrastructure\n   295→- ✅ Full support for first-success-wins fanout orchestration\n   296→- ✅ Integration with existing build validation and error handling\n   297→- ✅ Compatible with GitLab merge request integration workflows\n   298→\n   299→**Status: COMPLETED** - All success criteria met, comprehensive implementation delivered\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01FKim3MbxEudoGrfQrd1QVv",
+        "type": "tool_result",
+        "content": "     1→package transflow\n     2→\n     3→import (\n     4→\t\"errors\"\n     5→\t\"fmt\"\n     6→\t\"io/ioutil\"\n     7→\t\"strconv\"\n     8→\t\"time\"\n     9→\n    10→\t\"gopkg.in/yaml.v3\"\n    11→)\n    12→\n    13→type TransflowStep struct {\n    14→\tType        string     `yaml:\"type\"`\n    15→\tID          string     `yaml:\"id\"`\n    16→\tEngine      string     `yaml:\"engine\"`\n    17→\tRecipes     []string   `yaml:\"recipes\"`\n    18→\tModel       string     `yaml:\"model,omitempty\"`\n    19→\tPrompts     []string   `yaml:\"prompts,omitempty\"`\n    20→\tMCPTools    []MCPTool  `yaml:\"mcp_tools,omitempty\"`\n    21→\tContext     []string   `yaml:\"context,omitempty\"`\n    22→\tBudgets     MCPBudgets `yaml:\"budgets,omitempty\"`\n    23→\tParallel    bool       `yaml:\"parallel,omitempty\"`\n    24→\tMaxParallel int        `yaml:\"max_parallel_execs,omitempty\"`\n    25→}\n    26→\n    27→type TransflowConfig struct {\n    28→\tVersion      string          `yaml:\"version\"`\n    29→\tID           string          `yaml:\"id\"`\n    30→\tTargetRepo   string          `yaml:\"target_repo\"`\n    31→\tTargetBranch string          `yaml:\"target_branch\"`\n    32→\tBaseRef      string          `yaml:\"base_ref\"`\n    33→\tLane         string          `yaml:\"lane\"`\n    34→\tBuildTimeout string          `yaml:\"build_timeout\"`\n    35→\tSteps        []TransflowStep `yaml:\"steps\"`\n    36→\tSelfHeal     *SelfHealConfig `yaml:\"self_heal\"`\n    37→}\n    38→\n    39→func LoadConfig(path string) (*TransflowConfig, error) {\n    40→\tb, err := ioutil.ReadFile(path)\n    41→\tif err != nil {\n    42→\t\treturn nil, err\n    43→\t}\n    44→\tvar cfg TransflowConfig\n    45→\tif err := yaml.Unmarshal(b, &cfg); err != nil {\n    46→\t\treturn nil, err\n    47→\t}\n    48→\n    49→\t// Set default self-heal config if not provided or apply defaults to existing config\n    50→\tif cfg.SelfHeal == nil {\n    51→\t\tcfg.SelfHeal = GetDefaultSelfHealConfig()\n    52→\t} else {\n    53→\t\t// Apply defaults for missing fields\n    54→\t\tif cfg.SelfHeal.MaxRetries == 0 {\n    55→\t\t\tcfg.SelfHeal.MaxRetries = GetDefaultSelfHealConfig().MaxRetries\n    56→\t\t}\n    57→\t\t// Cooldown defaults to empty string, so no need to set it\n    58→\t\t// For enabled field, explicit false should remain false, no default needed\n    59→\t}\n    60→\n    61→\tif err := cfg.Validate(); err != nil {\n    62→\t\treturn nil, err\n    63→\t}\n    64→\n    65→\treturn &cfg, nil\n    66→}\n    67→\n    68→func (c *TransflowConfig) Validate() error {\n    69→\tif c.ID == \"\" {\n    70→\t\treturn errors.New(\"id is required\")\n    71→\t}\n    72→\tif c.TargetRepo == \"\" {\n    73→\t\treturn errors.New(\"target_repo is required\")\n    74→\t}\n    75→\tif c.BaseRef == \"\" {\n    76→\t\treturn errors.New(\"base_ref is required\")\n    77→\t}\n    78→\tif len(c.Steps) == 0 {\n    79→\t\treturn errors.New(\"at least one step is required\")\n    80→\t}\n    81→\n    82→\t// Validate each step\n    83→\tfor i, step := range c.Steps {\n    84→\t\tif step.ID == \"\" {\n    85→\t\t\treturn fmt.Errorf(\"step %d must have an id\", i)\n    86→\t\t}\n    87→\t\tif step.Type == \"\" {\n    88→\t\t\treturn fmt.Errorf(\"step %d (%s) must have a type\", i, step.ID)\n    89→\t\t}\n    90→\n    91→\t\t// Validate MCP configuration for steps that have it\n    92→\t\tif len(step.MCPTools) > 0 || len(step.Context) > 0 {\n    93→\t\t\tmcpConfig := MCPConfig{\n    94→\t\t\t\tTools:   step.MCPTools,\n    95→\t\t\t\tContext: step.Context,\n    96→\t\t\t\tBudgets: step.Budgets,\n    97→\t\t\t\tModel:   step.Model,\n    98→\t\t\t\tPrompts: step.Prompts,\n    99→\t\t\t}\n   100→\t\t\tif err := mcpConfig.Validate(); err != nil {\n   101→\t\t\t\treturn fmt.Errorf(\"invalid MCP config for step %s: %w\", step.ID, err)\n   102→\t\t\t}\n   103→\t\t}\n   104→\t}\n   105→\n   106→\t// Validate self-heal configuration if provided\n   107→\tif c.SelfHeal != nil {\n   108→\t\tif err := c.SelfHeal.Validate(); err != nil {\n   109→\t\t\treturn fmt.Errorf(\"invalid self_heal config: %w\", err)\n   110→\t\t}\n   111→\t}\n   112→\n   113→\t// Validate build timeout if provided\n   114→\tif c.BuildTimeout != \"\" {\n   115→\t\tif _, err := c.ParseBuildTimeout(); err != nil {\n   116→\t\t\treturn fmt.Errorf(\"invalid build_timeout: %w\", err)\n   117→\t\t}\n   118→\t}\n   119→\n   120→\treturn nil\n   121→}\n   122→\n   123→func (c *TransflowConfig) ParseBuildTimeout() (time.Duration, error) {\n   124→\tif c.BuildTimeout == \"\" {\n   125→\t\treturn 10 * time.Minute, nil // default\n   126→\t}\n   127→\n   128→\tduration, err := time.ParseDuration(c.BuildTimeout)\n   129→\tif err != nil {\n   130→\t\treturn 0, fmt.Errorf(\"invalid build timeout format: %v\", err)\n   131→\t}\n   132→\n   133→\tif duration < 0 {\n   134→\t\treturn 0, errors.New(\"build timeout cannot be negative\")\n   135→\t}\n   136→\n   137→\treturn duration, nil\n   138→}\n   139→\n   140→func GenerateAppName(id string) string {\n   141→\ttimestamp := time.Now().Unix()\n   142→\treturn fmt.Sprintf(\"tfw-%s-%d\", id, timestamp)\n   143→}\n   144→\n   145→func GenerateBranchName(id string) string {\n   146→\ttimestamp := time.Now().Unix()\n   147→\treturn fmt.Sprintf(\"workflow/%s/%s\", id, strconv.FormatInt(timestamp, 10))\n   148→}\n   149→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_013u5VbXs1TLd9Jx2BQPHEbK",
+        "type": "tool_result",
+        "content": "     1→package transflow\n     2→\n     3→import (\n     4→\t\"context\"\n     5→\t\"encoding/json\"\n     6→\t\"fmt\"\n     7→\t\"os\"\n     8→\t\"path/filepath\"\n     9→\t\"strings\"\n    10→\t\"time\"\n    11→\n    12→\t\"github.com/iw2rmb/ploy/internal/orchestration\"\n    13→)\n    14→\n    15→// Implementation of job submission helpers for the transflow healing workflow.\n    16→// This provides the GREEN phase implementation for the failing tests.\n    17→\n    18→// ProductionJobSubmitter defines the interface for production job submission\n    19→type ProductionJobSubmitter interface {\n    20→\tRenderPlannerAssets() (*PlannerAssets, error)\n    21→\tRenderReducerAssets() (*ReducerAssets, error)\n    22→}\n    23→\n    24→// jobSubmissionHelper implements the JobSubmissionHelper interface\n    25→type jobSubmissionHelper struct {\n    26→\tsubmitter interface{}            // MockJobSubmitter in tests, real submitter in production\n    27→\trunner    ProductionJobSubmitter // For accessing asset rendering methods in production\n    28→}\n    29→\n    30→// NewJobSubmissionHelper creates a new job submission helper\n    31→func NewJobSubmissionHelper(submitter interface{}) JobSubmissionHelper {\n    32→\treturn &jobSubmissionHelper{\n    33→\t\tsubmitter: submitter,\n    34→\t\trunner:    nil, // Will be nil for mock tests\n    35→\t}\n    36→}\n    37→\n    38→// NewJobSubmissionHelperWithRunner creates a new job submission helper with runner access for production\n    39→func NewJobSubmissionHelperWithRunner(submitter interface{}, runner ProductionJobSubmitter) JobSubmissionHelper {\n    40→\treturn &jobSubmissionHelper{\n    41→\t\tsubmitter: submitter,\n    42→\t\trunner:    runner,\n    43→\t}\n    44→}\n    45→\n    46→// substituteHCLTemplate performs environment variable substitution in HCL templates\n    47→func substituteHCLTemplate(hclPath string, runID string) (string, error) {\n    48→\treturn substituteHCLTemplateWithMCP(hclPath, runID, nil)\n    49→}\n    50→\n    51→// substituteHCLTemplateWithMCP performs environment variable substitution with MCP support\n    52→func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPConfig) (string, error) {\n    53→\thclBytes, err := os.ReadFile(hclPath)\n    54→\tif err != nil {\n    55→\t\treturn \"\", fmt.Errorf(\"failed to read HCL template: %w\", err)\n    56→\t}\n    57→\n    58→\t// Get core environment variables with defaults\n    59→\tmodel := os.Getenv(\"TRANSFLOW_MODEL\")\n    60→\tif model == \"\" {\n    61→\t\tmodel = \"gpt-4o-mini@2024-08-06\"\n    62→\t}\n    63→\n    64→\ttoolsJSON := os.Getenv(\"TRANSFLOW_TOOLS\")\n    65→\tif toolsJSON == \"\" {\n    66→\t\ttoolsJSON = `{\"file\":{\"allow\":[\"src/**\",\"pom.xml\"]},\"search\":{\"provider\":\"rg\",\"allow\":[\"src/**\"]}}`\n    67→\t}\n    68→\n    69→\tlimitsJSON := os.Getenv(\"TRANSFLOW_LIMITS\")\n    70→\tif limitsJSON == \"\" {\n    71→\t\tlimitsJSON = `{\"max_steps\":8,\"max_tool_calls\":12,\"timeout\":\"30m\"}`\n    72→\t}\n    73→\n    74→\t// Get MCP environment variables\n    75→\tmcpEnvConfig := getMCPEnvironmentConfig(mcpConfig)\n    76→\n    77→\t// Perform substitution\n    78→\treplacer := strings.NewReplacer(\n    79→\t\t\"${MODEL}\", model,\n    80→\t\t\"${TOOLS_JSON}\", toolsJSON,\n    81→\t\t\"${LIMITS_JSON}\", limitsJSON,\n    82→\t\t\"${RUN_ID}\", runID,\n    83→\t\t\"${MCP_TOOLS_JSON}\", mcpEnvConfig.MCPToolsJSON,\n    84→\t\t\"${MCP_CONTEXT_JSON}\", mcpEnvConfig.MCPContextJSON,\n    85→\t\t\"${MCP_ENDPOINTS_JSON}\", mcpEnvConfig.MCPEndpointsJSON,\n    86→\t\t\"${MCP_BUDGETS_JSON}\", mcpEnvConfig.MCPBudgetsJSON,\n    87→\t\t\"${MCP_PROMPTS_JSON}\", mcpEnvConfig.MCPPromptsJSON,\n    88→\t\t\"${MCP_TIMEOUT}\", mcpEnvConfig.MCPTimeout,\n    89→\t\t\"${MCP_SECURITY_MODE}\", mcpEnvConfig.MCPSecurityMode,\n    90→\t)\n    91→\trendered := replacer.Replace(string(hclBytes))\n    92→\n    93→\t// Write substituted HCL to a new file\n    94→\trenderedPath := strings.ReplaceAll(hclPath, \".hcl\", \".rendered.submitted.hcl\")\n    95→\tif err := os.WriteFile(renderedPath, []byte(rendered), 0644); err != nil {\n    96→\t\treturn \"\", fmt.Errorf(\"failed to write substituted HCL: %w\", err)\n    97→\t}\n    98→\n    99→\treturn renderedPath, nil\n   100→}\n   101→\n   102→// getMCPEnvironmentConfig generates MCP environment configuration from MCP config\n   103→func getMCPEnvironmentConfig(mcpConfig *MCPConfig) *MCPEnvironmentConfig {\n   104→\t// If no MCP config provided, return empty environment\n   105→\tif mcpConfig == nil {\n   106→\t\treturn &MCPEnvironmentConfig{\n   107→\t\t\tMCPToolsJSON:     \"[]\",\n   108→\t\t\tMCPContextJSON:   \"[]\",\n   109→\t\t\tMCPEndpointsJSON: \"{}\",\n   110→\t\t\tMCPBudgetsJSON:   `{\"max_tokens\":0,\"max_cost\":0,\"timeout\":\"30m\"}`,\n   111→\t\t\tMCPPromptsJSON:   \"[]\",\n   112→\t\t\tMCPTimeout:       \"30m\",\n   113→\t\t\tMCPSecurityMode:  \"allowlist\",\n   114→\t\t}\n   115→\t}\n   116→\n   117→\t// Convert MCP config to environment config\n   118→\tenvConfig, err := mcpConfig.ToEnvironmentConfig()\n   119→\tif err != nil {\n   120→\t\t// If conversion fails, return safe defaults\n   121→\t\treturn &MCPEnvironmentConfig{\n   122→\t\t\tMCPToolsJSON:     \"[]\",\n   123→\t\t\tMCPContextJSON:   \"[]\",\n   124→\t\t\tMCPEndpointsJSON: \"{}\",\n   125→\t\t\tMCPBudgetsJSON:   `{\"max_tokens\":0,\"max_cost\":0,\"timeout\":\"30m\"}`,\n   126→\t\t\tMCPPromptsJSON:   \"[]\",\n   127→\t\t\tMCPTimeout:       \"30m\",\n   128→\t\t\tMCPSecurityMode:  \"allowlist\",\n   129→\t\t}\n   130→\t}\n   131→\n   132→\treturn envConfig\n   133→}\n   134→\n   135→// readJobArtifact reads and parses a JSON artifact from a job execution\n   136→func readJobArtifact(artifactPath string, target interface{}) error {\n   137→\tdata, err := os.ReadFile(artifactPath)\n   138→\tif err != nil {\n   139→\t\treturn fmt.Errorf(\"failed to read artifact %s: %w\", artifactPath, err)\n   140→\t}\n   141→\n   142→\tif err := json.Unmarshal(data, target); err != nil {\n   143→\t\treturn fmt.Errorf(\"failed to parse artifact JSON: %w\", err)\n   144→\t}\n   145→\n   146→\treturn nil\n   147→}\n   148→\n   149→// SubmitPlannerJob submits a planner job after a build failure\n   150→func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error) {\n   151→\t// Check if this is a test submitter (backward compatibility)\n   152→\tif testSubmitter, ok := h.submitter.(interface {\n   153→\t\tSubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)\n   154→\t}); ok {\n   155→\t\tspec := JobSpec{\n   156→\t\t\tName:    \"planner\",\n   157→\t\t\tType:    \"planner\",\n   158→\t\t\tHCLPath: \"\", // Would be set from rendered assets\n   159→\t\t\tEnvVars: map[string]string{\n   160→\t\t\t\t\"BUILD_ERROR\": buildError,\n   161→\t\t\t\t\"TARGET_REPO\": config.TargetRepo,\n   162→\t\t\t\t\"BASE_REF\":    config.BaseRef,\n   163→\t\t\t},\n   164→\t\t\tTimeout: 15 * time.Minute,\n   165→\t\t\tInputs: map[string]interface{}{\n   166→\t\t\t\t\"workspace\": workspace,\n   167→\t\t\t},\n   168→\t\t}\n   169→\n   170→\t\tresult, err := testSubmitter.SubmitAndWaitTerminal(ctx, spec)\n   171→\t\tif err != nil {\n   172→\t\t\treturn nil, fmt.Errorf(\"planner job failed: %w\", err)\n   173→\t\t}\n   174→\n   175→\t\t// Parse the planner output\n   176→\t\tvar planResult PlanResult\n   177→\t\tif err := json.Unmarshal([]byte(result.Output), &planResult); err != nil {\n   178→\t\t\treturn nil, fmt.Errorf(\"failed to parse planner output: %w\", err)\n   179→\t\t}\n   180→\n   181→\t\treturn &planResult, nil\n   182→\t}\n   183→\n   184→\t// Production implementation using real Nomad job submission\n   185→\tif h.runner != nil {\n   186→\t\t// Step 1: Render planner assets\n   187→\t\tassets, err := h.runner.RenderPlannerAssets()\n   188→\t\tif err != nil {\n   189→\t\t\treturn nil, fmt.Errorf(\"failed to render planner assets: %w\", err)\n   190→\t\t}\n   191→\n   192→\t\t// Step 2: Generate unique run ID for this planner job\n   193→\t\trunID := fmt.Sprintf(\"%s-planner-%d\", config.ID, time.Now().Unix())\n   194→\n   195→\t\t// Step 3: Substitute environment variables in HCL template\n   196→\t\trenderedHCLPath, err := substituteHCLTemplate(assets.HCLPath, runID)\n   197→\t\tif err != nil {\n   198→\t\t\treturn nil, fmt.Errorf(\"failed to substitute HCL template: %w\", err)\n   199→\t\t}\n   200→\n   201→\t\t// Step 4: Submit job to Nomad and wait for completion\n   202→\t\ttimeout := 15 * time.Minute\n   203→\t\tif err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {\n   204→\t\t\treturn nil, fmt.Errorf(\"planner job failed: %w\", err)\n   205→\t\t}\n   206→\n   207→\t\t// Step 5: Read and parse job output artifact\n   208→\t\t// The planner job should write plan.json to the output directory\n   209→\t\tartifactPath := filepath.Join(workspace, \"planner\", \"out\", \"plan.json\")\n   210→\t\tvar planResult PlanResult\n   211→\t\tif err := readJobArtifact(artifactPath, &planResult); err != nil {\n   212→\t\t\treturn nil, fmt.Errorf(\"failed to read planner output: %w\", err)\n   213→\t\t}\n   214→\n   215→\t\treturn &planResult, nil\n   216→\t}\n   217→\n   218→\t// No runner provided and not a test submitter\n   219→\treturn nil, fmt.Errorf(\"no production runner or test submitter available for job submission\")\n   220→}\n   221→\n   222→// SubmitReducerJob submits a reducer job to determine the next action\n   223→func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error) {\n   224→\t// Check if this is a test submitter (backward compatibility)\n   225→\tif testSubmitter, ok := h.submitter.(interface {\n   226→\t\tSubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)\n   227→\t}); ok {\n   228→\t\tspec := JobSpec{\n   229→\t\t\tName:    \"reducer\",\n   230→\t\t\tType:    \"reducer\",\n   231→\t\t\tHCLPath: \"\", // Would be set from rendered assets\n   232→\t\t\tEnvVars: map[string]string{\n   233→\t\t\t\t\"PLAN_ID\": planID,\n   234→\t\t\t},\n   235→\t\t\tTimeout: 10 * time.Minute,\n   236→\t\t\tInputs: map[string]interface{}{\n   237→\t\t\t\t\"workspace\": workspace,\n   238→\t\t\t\t\"results\":   results,\n   239→\t\t\t\t\"winner\":    winner,\n   240→\t\t\t},\n   241→\t\t}\n   242→\n   243→\t\tresult, err := testSubmitter.SubmitAndWaitTerminal(ctx, spec)\n   244→\t\tif err != nil {\n   245→\t\t\treturn nil, fmt.Errorf(\"reducer job failed: %w\", err)\n   246→\t\t}\n   247→\n   248→\t\t// Parse the reducer output\n   249→\t\tvar nextAction NextAction\n   250→\t\tif err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {\n   251→\t\t\treturn nil, fmt.Errorf(\"failed to parse reducer output: %w\", err)\n   252→\t\t}\n   253→\n   254→\t\treturn &nextAction, nil\n   255→\t}\n   256→\n   257→\t// Production implementation using real Nomad job submission\n   258→\tif h.runner != nil {\n   259→\t\t// Step 1: Render reducer assets\n   260→\t\tassets, err := h.runner.RenderReducerAssets()\n   261→\t\tif err != nil {\n   262→\t\t\treturn nil, fmt.Errorf(\"failed to render reducer assets: %w\", err)\n   263→\t\t}\n   264→\n   265→\t\t// Step 2: Generate unique run ID for this reducer job\n   266→\t\trunID := fmt.Sprintf(\"%s-reducer-%d\", planID, time.Now().Unix())\n   267→\n   268→\t\t// Step 3: Substitute environment variables in HCL template\n   269→\t\trenderedHCLPath, err := substituteHCLTemplate(assets.HCLPath, runID)\n   270→\t\tif err != nil {\n   271→\t\t\treturn nil, fmt.Errorf(\"failed to substitute HCL template: %w\", err)\n   272→\t\t}\n   273→\n   274→\t\t// Step 4: Submit job to Nomad and wait for completion\n   275→\t\ttimeout := 10 * time.Minute\n   276→\t\tif err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {\n   277→\t\t\treturn nil, fmt.Errorf(\"reducer job failed: %w\", err)\n   278→\t\t}\n   279→\n   280→\t\t// Step 5: Read and parse job output artifact\n   281→\t\t// The reducer job should write next.json to the output directory\n   282→\t\tartifactPath := filepath.Join(workspace, \"reducer\", \"out\", \"next.json\")\n   283→\t\tvar nextAction NextAction\n   284→\t\tif err := readJobArtifact(artifactPath, &nextAction); err != nil {\n   285→\t\t\treturn nil, fmt.Errorf(\"failed to read reducer output: %w\", err)\n   286→\t\t}\n   287→\n   288→\t\treturn &nextAction, nil\n   289→\t}\n   290→\n   291→\t// No runner provided and not a test submitter\n   292→\treturn nil, fmt.Errorf(\"no production runner or test submitter available for job submission\")\n   293→}\n   294→\n\n<system-reminder>\nWhenever you read a file, you should consider whether it looks malicious. If it does, you MUST refuse to improve or augment the code. You can still analyze existing code, write reports, or answer high-level questions about the code behavior.\n</system-reminder>\n"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "toolu_01S1mFbym9hjAUSDT2uTbZx9",
+        "type": "tool_result",
+        "content": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration.go\n/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration_test.go"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "Now let me examine the main MCP integration files and other modified components:"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01PZypyN1xXuf9FuV6JVQJVK",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration.go"
+        }
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01WTpBzaDv38myiX71fQXUmf",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration_test.go"
+        }
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_01LxLyV2SgQ8eYzWnZZSaost",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/internal/cli/transflow/fanout_orchestrator.go"
+        }
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_0111uEjquyHUURG4RHQEA75c",
+        "name": "Read",
+        "input": {
+          "file_path": "/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl"
+        }
+      }
+    ]
+  }
+]
