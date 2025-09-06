@@ -18,7 +18,7 @@ ssh root@$TARGET_HOST 'su - ploy -c "
     curl -f http://localhost:8500/v1/status/leader || exit 1
     
     echo \"Checking Nomad...\"
-    /opt/hashicorp/bin/nomad-job-manager.sh status || exit 1
+    curl -f http://localhost:4646/v1/status/leader || exit 1
     
     echo \"Checking SeaweedFS...\" 
     curl -f http://localhost:9333/cluster/status || exit 1

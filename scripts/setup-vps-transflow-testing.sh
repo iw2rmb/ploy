@@ -6,13 +6,10 @@ echo "Setting up transflow testing environment on: $TARGET_HOST"
 
 # Deploy latest transflow binary
 echo "Deploying transflow binary..."
-scp bin/ploy root@$TARGET_HOST:/opt/ploy/bin/ploy-new
+scp bin/ploy-linux root@$TARGET_HOST:/opt/ploy/bin/ploy
 ssh root@$TARGET_HOST '
-    su - ploy -c "
-        mv /opt/ploy/bin/ploy /opt/ploy/bin/ploy-backup-$(date +%s) || true
-        mv /opt/ploy/bin/ploy-new /opt/ploy/bin/ploy
-        chmod +x /opt/ploy/bin/ploy
-    "
+    chmod +x /opt/ploy/bin/ploy
+    chown ploy:ploy /opt/ploy/bin/ploy
 '
 
 # Setup KB storage namespace  
