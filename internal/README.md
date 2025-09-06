@@ -97,6 +97,24 @@ internal/
 │   ├── utils_test.go        # Git utility tests
 │   ├── validator.go         # Repository validation
 │   └── validator_test.go    # Validation tests
+├── kb/                      # Knowledge Base system ✅ Sep 2025
+│   ├── fingerprint/         # Patch analysis and similarity detection
+│   │   ├── patch.go         # Semantic fingerprinting and pattern extraction
+│   │   └── patch_test.go    # Fingerprint tests
+│   ├── learning/            # Learning pipeline orchestration
+│   │   ├── learner.go       # Main learning engine and recommendations
+│   │   └── learner_test.go  # Learning pipeline tests
+│   ├── models/              # Core KB data structures
+│   │   ├── case.go          # Learning case with patch and confidence
+│   │   ├── case_test.go     # Case model tests
+│   │   ├── error.go         # Error pattern representation
+│   │   ├── error_test.go    # Error model tests
+│   │   ├── summary.go       # Aggregated learning statistics
+│   │   └── summary_test.go  # Summary model tests
+│   └── storage/             # SeaweedFS-backed persistence
+│       ├── config.go        # Storage configuration
+│       ├── kb_storage.go    # Main storage operations
+│       └── kb_storage_test.go # Storage tests
 ├── lane/                    # Lane detection system
 │   ├── detector.go          # Automatic lane detection
 │   └── detector_test.go     # Lane detection tests
@@ -180,6 +198,9 @@ CLI-specific functionality organized by command groups. Contains handlers for al
 
 ### git
 Git repository integration providing repository analysis, validation, and utilities for working with git repositories during deployments.
+
+### kb
+Knowledge Base system for the transflow MVP providing intelligent error pattern recognition, patch similarity analysis, and automated remediation recommendations. Stores learning data using SeaweedFS and builds confidence scores from historical success rates.
 
 ### lane
 Automatic lane detection system that analyzes project structure to determine the appropriate deployment lane (A-G) based on technology stack and configuration files.
