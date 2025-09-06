@@ -6,10 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/iw2rmb/ploy/internal/testutils"
 )
 
 type TestEnvironment struct {
@@ -41,7 +40,6 @@ func (env *TestEnvironment) setupRealServices(t *testing.T) {
 	if os.Getenv("TARGET_HOST") != "" {
 		env.setupVPSServices(t)
 	} else {
-		testutils.RequireServices(t, "consul", "nomad", "seaweedfs")
 		env.setupLocalServices(t)
 	}
 }
@@ -50,10 +48,10 @@ func (env *TestEnvironment) setupLocalServices(t *testing.T) {
 	env.TransflowCLI = &TransflowCLI{
 		binaryPath: "./bin/ploy",
 		env: map[string]string{
-			"CONSUL_HTTP_ADDR":  "localhost:8500",
-			"NOMAD_ADDR":        "http://localhost:4646",
-			"SEAWEEDFS_MASTER":  "http://localhost:9333",
-			"SEAWEEDFS_FILER":   "http://localhost:8888",
+			"CONSUL_HTTP_ADDR": "localhost:8500",
+			"NOMAD_ADDR":       "http://localhost:4646",
+			"SEAWEEDFS_MASTER": "http://localhost:9333",
+			"SEAWEEDFS_FILER":  "http://localhost:8888",
 		},
 	}
 }
@@ -141,9 +139,9 @@ func (cli *TransflowCLI) runVPS(ctx context.Context, args ...string) (string, er
 	targetHost := os.Getenv("TARGET_HOST")
 	cmdArgs := append([]string{
 		fmt.Sprintf("root@%s", targetHost),
-		"su - ploy -c", 
+		"su - ploy -c",
 		fmt.Sprintf("'/opt/ploy/bin/ploy %s'", args[0])}, args[1:]...)
-	
+
 	if len(args) > 1 {
 		cmdArgs[2] = fmt.Sprintf("'/opt/ploy/bin/ploy %s'", fmt.Sprintf("%s %s", args[0], args[1]))
 		if len(args) > 2 {
@@ -152,7 +150,7 @@ func (cli *TransflowCLI) runVPS(ctx context.Context, args ...string) (string, er
 			}
 		}
 	}
-	
+
 	cmd := exec.CommandContext(ctx, "ssh", "-o", "ConnectTimeout=30", cmdArgs[0], cmdArgs[1], cmdArgs[2])
 	output, err := cmd.CombinedOutput()
 	return string(output), err
