@@ -61,8 +61,8 @@ func TestTransflowWithRealNomad(t *testing.T) {
     testutils.RequireServices(t, "nomad") // Hard requirement, no skip
     
     config := &transflow.Config{
-        NomadAddr: "http://localhost:4646", // Real Nomad
-        Storage:   "http://localhost:8888", // Real SeaweedFS
+        NomadAddr: "http://$TARGET_HOST:4646", // Real Nomad
+        Storage:   "http://$TARGET_HOST:8888", // Real SeaweedFS
     }
     
     // Create runner with real dependencies (should fail if mocks still used)
@@ -262,9 +262,9 @@ func SetupRealServiceEnvironment(t *testing.T) *Config {
     RequireServices(t, "consul", "nomad", "seaweedfs")
     
     return &Config{
-        ConsulAddr:      mustGetEnv("CONSUL_HTTP_ADDR", "localhost:8500"),
-        NomadAddr:       mustGetEnv("NOMAD_ADDR", "http://localhost:4646"),
-        SeaweedFiler:    mustGetEnv("SEAWEEDFS_FILER", "http://localhost:8888"),
+        ConsulAddr:      mustGetEnv("CONSUL_HTTP_ADDR", "$TARGET_HOST:8500"),
+        NomadAddr:       mustGetEnv("NOMAD_ADDR", "http://$TARGET_HOST:4646"),
+        SeaweedFiler:    mustGetEnv("SEAWEEDFS_FILER", "http://$TARGET_HOST:8888"),
         GitLabURL:       mustGetEnv("GITLAB_URL", "https://gitlab.com"),
         GitLabToken:     mustGetEnv("GITLAB_TOKEN"),
     }
@@ -273,7 +273,7 @@ func SetupRealServiceEnvironment(t *testing.T) *Config {
 func RequireServices(t *testing.T, services ...string) {
     for _, service := range services {
         if !isServiceHealthy(service) {
-            t.Fatalf("Required service %s is not healthy. Ensure Docker services are running.", service)
+            t.Fatalf("Required service %s is not healthy. Ensure VPS services are accessible at %s.", service, os.Getenv("TARGET_HOST"))
         }
     }
 }
@@ -331,13 +331,13 @@ func RequireServices(t *testing.T, services ...string) {
 
 **Environment Setup:**
 ```bash
-# Ensure Docker services running for integration tests
-docker-compose up -d consul nomad seaweedfs-master seaweedfs-filer
+# Ensure VPS services are accessible for integration tests
+export TARGET_HOST=45.12.75.241
 
 # Set required environment variables
-export NOMAD_ADDR=http://localhost:4646
-export CONSUL_HTTP_ADDR=localhost:8500  
-export SEAWEEDFS_FILER=http://localhost:8888
+export NOMAD_ADDR=http://$TARGET_HOST:4646
+export CONSUL_HTTP_ADDR=$TARGET_HOST:8500  
+export SEAWEEDFS_FILER=http://$TARGET_HOST:8888
 export GITLAB_URL=https://gitlab.com
 export GITLAB_TOKEN=your-integration-test-token
 

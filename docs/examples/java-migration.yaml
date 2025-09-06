@@ -1,0 +1,30 @@
+# Basic Java 11→17 Migration Example
+# This configuration demonstrates a simple Java migration workflow
+# using OpenRewrite recipes to migrate from Java 11 to Java 17.
+
+version: v1alpha1
+id: java-11-to-17-migration
+target_repo: https://gitlab.com/your-org/java-project.git
+target_branch: refs/heads/main
+base_ref: refs/heads/main
+lane: C                    # Force Lane C (OSv Java/Scala)
+build_timeout: 10m         # Allow 10 minutes for build validation
+
+# Single-step migration using OpenRewrite
+steps:
+  - type: recipe
+    id: java-migration
+    engine: openrewrite
+    recipes:
+      - org.openrewrite.java.migrate.Java11toJava17
+      - org.openrewrite.java.cleanup.CommonStaticAnalysis
+
+# Basic self-healing configuration
+self_heal:
+  enabled: true            # Enable automatic error recovery
+  kb_learning: true        # Learn from healing attempts
+  max_retries: 2           # Maximum healing attempts
+  cooldown: 30s           # Wait between retry attempts
+
+# Use GPT-4o Mini for LLM-based healing
+llm_model: gpt-4o-mini@2024-08-06
