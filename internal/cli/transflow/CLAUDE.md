@@ -12,6 +12,8 @@ Core workflow: clone repository → create branch → apply transformations → 
 
 **ACTIVE: KB Learning Pipeline** - Production-ready Knowledge Base learning system now actively integrated in the main transflow workflow. Every healing attempt (success or failure) is automatically recorded, analyzed, and added to the KB for future recommendations. The system provides intelligent fix suggestions based on historical success patterns, fuzzy error signature matching, and confidence scoring. Features comprehensive deduplication with Hamming distance similarity, multi-factor patch similarity detection, automated storage compaction, and distributed coordination via Consul locking.
 
+**E2E Test Framework** - Complete end-to-end validation framework providing comprehensive testing of entire transflow workflows from CLI invocation through GitLab MR creation. Framework validates Java migration workflows, self-healing capabilities, KB learning integration, and production Nomad job orchestration. Supports VPS production environment testing with real GitLab integration, enabling full workflow validation including repository cloning, code transformation, build validation, healing branch execution, and merge request operations.
+
 ## Key Files
 - `run.go:1-250` - CLI command entry point and flag parsing
 - `runner.go:1-650` - Complete orchestration logic with healing integration and ProductionBranchRunner interface implementation
@@ -93,6 +95,7 @@ Core workflow: clone repository → create branch → apply transformations → 
 - Orchestration KV: Consul key-value store for distributed locking (via orchestration.KV)
 - MCP Endpoints: File system tools (mcp://fs), search tools (mcp://rg), and HTTP/HTTPS context sources
 - Context Prefetching: File pattern matching and URL content retrieval for LLM context enhancement
+- E2E Test Framework: Complete workflow validation from CLI to GitLab MR creation with VPS testing support
 
 ### Provides
 - CLI Commands: `ploy transflow run -f <config>` with complete flag support
@@ -112,6 +115,8 @@ Core workflow: clone repository → create branch → apply transformations → 
 - Context Enhancement: File and URL content prefetching for improved LLM context awareness
 - MCP Configuration: Dynamic environment variable generation from YAML configuration with validation
 - Default MCP Configuration: Pre-configured file-system and search tools for enhanced LLM capabilities
+- E2E Workflow Validation: Complete testing infrastructure for Java migration, self-healing, and GitLab integration
+- VPS Testing Support: Production environment validation with real repository operations and job orchestration
 
 ## Configuration
 Required files:
