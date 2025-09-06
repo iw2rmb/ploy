@@ -1,6 +1,6 @@
 {
-  "task": null,
-  "branch": null,
-  "services": [],
-  "updated": "2025-09-06"
+  "task": "h-implement-transflow-mvp",
+  "branch": "feature/transflow-mvp-completion",
+  "services": ["transflow", "kb", "ployman", "api", "storage", "orchestration", "testing"],
+  "updated": "2025-01-09"
 }
