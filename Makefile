@@ -197,6 +197,45 @@ test-fuzz: ## Run fuzzing tests (Go 1.18+)
 	@echo "$(YELLOW)Fuzzing for 30 seconds per function...$(NC)"
 	go test -fuzz=. -fuzztime=30s ./...
 
+.PHONY: test-vps-environment
+test-vps-environment: ## Run VPS environment validation tests
+	@echo "$(BLUE)Running VPS environment validation tests...$(NC)"
+	@if [ -z "$(TARGET_HOST)" ]; then \
+		echo "$(RED)TARGET_HOST environment variable not set$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Testing VPS environment: $(TARGET_HOST)$(NC)"
+	@./tests/vps/environment_validation_test.sh
+	@echo "$(GREEN)VPS environment validation passed!$(NC)"
+
+.PHONY: test-vps-integration  
+test-vps-integration: ## Run VPS integration tests
+	@echo "$(BLUE)Running VPS integration tests...$(NC)"
+	@if [ -z "$(TARGET_HOST)" ]; then \
+		echo "$(RED)TARGET_HOST environment variable not set$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Testing VPS integration: $(TARGET_HOST)$(NC)"
+	@mkdir -p $(TEST_RESULTS_DIR)
+	TARGET_HOST=$(TARGET_HOST) go test $(TEST_FLAGS) -tags=vps -coverprofile=$(COVERAGE_DIR)/vps-coverage.out ./tests/vps/...
+	@echo "$(GREEN)VPS integration tests passed!$(NC)"
+
+.PHONY: test-vps-production
+test-vps-production: ## Run VPS production readiness tests  
+	@echo "$(BLUE)Running VPS production validation tests...$(NC)"
+	@if [ -z "$(TARGET_HOST)" ]; then \
+		echo "$(RED)TARGET_HOST environment variable not set$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Testing VPS production readiness: $(TARGET_HOST)$(NC)"
+	@mkdir -p $(TEST_RESULTS_DIR)
+	TARGET_HOST=$(TARGET_HOST) go test $(TEST_FLAGS) -run=TestVPSProductionReadiness -tags=vps ./tests/vps/...
+	@echo "$(GREEN)VPS production validation passed!$(NC)"
+
+.PHONY: test-vps-all
+test-vps-all: test-vps-environment test-vps-integration test-vps-production ## Run complete VPS test suite
+	@echo "$(GREEN)Complete VPS test suite passed!$(NC)"
+
 .PHONY: test-benchmark
 test-benchmark: ## Run benchmark tests
 	@echo "$(BLUE)Running benchmark tests...$(NC)"
