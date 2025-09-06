@@ -44,6 +44,14 @@ type KBContext struct {
 	MatchConfidence  float64
 }
 
+// KBIntegrator defines the interface for KB integration functionality
+type KBIntegrator interface {
+	LoadKBContext(ctx context.Context, lang string, stdout, stderr []byte) (*KBContext, error)
+	WriteHealingCase(ctx context.Context, kbCtx *KBContext, attempt *HealingAttempt, outcome *HealingOutcome, stdout, stderr string) error
+	ShouldUseKBSuggestions(kbCtx *KBContext) bool
+	ConvertKBFixesToBranchSpecs(fixes []PromotedFix) []BranchSpec
+}
+
 // KBIntegration provides KB functionality for the transflow healing workflow
 type KBIntegration struct {
 	storage KBStorage
@@ -52,6 +60,9 @@ type KBIntegration struct {
 	summary *SummaryComputer
 	config  *KBConfig
 }
+
+// Ensure KBIntegration implements KBIntegrator
+var _ KBIntegrator = (*KBIntegration)(nil)
 
 // NewKBIntegration creates a new KB integration with SeaweedFS and Consul backends
 func NewKBIntegration(storageBackend storage.Storage, kvStore orchestration.KV, config *KBConfig) *KBIntegration {
@@ -210,11 +221,11 @@ func (kb *KBIntegration) ConvertKBFixesToBranchSpecs(fixes []PromotedFix) []Bran
 // ExtendedJobSubmissionHelper extends the job submission helper with KB capabilities
 type ExtendedJobSubmissionHelper struct {
 	original JobSubmissionHelper
-	kb       *KBIntegration
+	kb       KBIntegrator
 }
 
 // NewExtendedJobSubmissionHelper creates a job submission helper with KB integration
-func NewExtendedJobSubmissionHelper(original JobSubmissionHelper, kb *KBIntegration) *ExtendedJobSubmissionHelper {
+func NewExtendedJobSubmissionHelper(original JobSubmissionHelper, kb KBIntegrator) *ExtendedJobSubmissionHelper {
 	return &ExtendedJobSubmissionHelper{
 		original: original,
 		kb:       kb,
@@ -299,11 +310,11 @@ func containsAny(text string, substrings ...string) bool {
 // KBTransflowRunner wraps the standard TransflowRunner with KB capabilities
 type KBTransflowRunner struct {
 	*TransflowRunner
-	kb *KBIntegration
+	kb KBIntegrator
 }
 
 // NewKBTransflowRunner creates a transflow runner with KB integration
-func NewKBTransflowRunner(config *TransflowConfig, workspaceDir string, kb *KBIntegration) (*KBTransflowRunner, error) {
+func NewKBTransflowRunner(config *TransflowConfig, workspaceDir string, kb KBIntegrator) (*KBTransflowRunner, error) {
 	runner, err := NewTransflowRunner(config, workspaceDir)
 	if err != nil {
 		return nil, err
@@ -322,6 +333,11 @@ func (kr *KBTransflowRunner) SetJobSubmitter(submitter interface{}) {
 
 	// The attemptHealing method will need to be overridden or extended
 	// to use the KB-enhanced job submission helper
+}
+
+// attemptHealing overrides the base implementation to use KB-enhanced healing
+func (kr *KBTransflowRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*TransflowHealingSummary, error) {
+	return kr.attemptHealingWithKB(ctx, repoPath, buildError)
 }
 
 // attemptHealingWithKB is an enhanced version of attemptHealing that uses KB
