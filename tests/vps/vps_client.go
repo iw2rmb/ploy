@@ -36,7 +36,7 @@ func (c *VPSClient) CheckServiceHealth(service string) (bool, error) {
 	case "consul":
 		checkCmd = `su - ploy -c "curl -f http://localhost:8500/v1/status/leader"`
 	case "nomad":
-		checkCmd = `su - ploy -c "/opt/hashicorp/bin/nomad-job-manager.sh status"`
+		checkCmd = `su - ploy -c "curl -f http://localhost:4646/v1/status/leader"`
 	case "seaweedfs-master":
 		checkCmd = `su - ploy -c "curl -f http://localhost:9333/cluster/status"`
 	case "seaweedfs-filer":
