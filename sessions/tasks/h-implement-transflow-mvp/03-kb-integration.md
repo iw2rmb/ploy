@@ -256,8 +256,8 @@ type KBConfig struct {
 # transflow.yaml
 kb:
   enabled: true
-  storage_url: "http://localhost:8888"  # SeaweedFS filer
-  consul_addr: "localhost:8500"         # Distributed locking
+  storage_url: "http://$TARGET_HOST:8888"  # SeaweedFS filer
+  consul_addr: "$TARGET_HOST:8500"         # Distributed locking
   timeout: 5s                           # Max lookup time
   max_retries: 3                        # Retry failed operations
   
