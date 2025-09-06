@@ -1,4 +1,4 @@
-# Stream 2 · Phase 1 — LLM‑Exec (Sequential) + MCP Context ⚠️ Partially Implemented
+# Stream 2 · Phase 1 — LLM‑Exec (Sequential) + MCP Context ⚠️ Partially Implemented (Model Registry ✅)
 
 Goal: introduce `llm-exec` step that can produce deterministic patches, sequential only, executed as Nomad jobs via internal/orchestration. Used as a healing branch in Stream 1 Phase 2.
 
@@ -8,13 +8,13 @@ Reuse First
 - Git: reuse repo checkout and commit utilities; extend for applying validated diffs.
 
 Scope
-- Model registry (CRUD) in `ployman` CLI (schema validation only), stored under `llms` bucket.
+- ✅ Model registry (CRUD) in `ployman` CLI with comprehensive schema validation, stored under `llms` namespace.
 - `llm-exec` runner: `model@version`, `prompts[]`, `context[]` (repo files/globs + HTTPS URLs prefetched per run), `mcp_tools[]` (env-only per MCP spec).
 - Output must be unified diff or no-op; validate and apply; then commit.
 - Build check after exec using global `lane` and `build_timeout`.
 
 Implementation Steps
-- Add `ployman models` commands: `list|get|add|update|delete` storing JSON under `llms/` in configured artifacts storage.
+- ✅ Add `ployman models` commands: `list|get|add|update|delete` storing JSON under `llms/` namespace in SeaweedFS.
 - Define a minimal job template (HCL) for `llm-exec` that mounts workspace snapshot and injects MCP env.
 - Submit job via `internal/orchestration.SubmitAndWaitHealthy` (facade). Collect logs via unified storage or job logs stub.
 - Validate diff output (reject non-diff responses); apply using git utilities; commit; run build step.
@@ -28,7 +28,7 @@ TDD Plan
 3) REFACTOR: clean interfaces for job submissions and model registry lookup.
 
 Implementation Steps
-- ployman CLI: implement `models list|get|add|update|delete` storing JSON blobs under `llms/` bucket (artifacts storage), schema: {name, version, provider, params}.
+- ✅ ployman CLI: implement `models list|get|add|update|delete` storing JSON blobs under `llms/` namespace (SeaweedFS), schema: {id, name, provider, version, capabilities, config, max_tokens, cost_per_token, created, updated}.
 - Job HCL: add minimal Nomad job template for `llm-exec` that mounts a workspace volume, injects MCP envs, and writes unified diff to stdout.
 - Runner: resolve model via ployman registry; prefetch context files/URLs to a temp path; submit job via `internal/orchestration.SubmitAndWaitHealthy`; capture logs; parse diff; apply via git; commit; run build step.
 
@@ -42,7 +42,9 @@ Implementation Steps
 ⚠️ **In Progress:**
 - Job submission via `internal/orchestration.SubmitAndWaitHealthy`
 
+✅ **Recently Completed:**
+- Model registry CRUD operations in `ployman` CLI (`models list|get|add|update|delete`) with comprehensive schema validation
+
 ❌ **Pending:**
-- Model registry CRUD operations in `ployman` CLI (`models list|get|add|update|delete`)
 - MCP context injection and environment setup
 - Model resolution and context prefetching logic
