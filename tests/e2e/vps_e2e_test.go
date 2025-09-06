@@ -32,9 +32,9 @@ func TestVPSE2E_ProductionWorkflows(t *testing.T) {
 		TargetBranch: "main",
 		Steps: []WorkflowStep{
 			{
-				Type:    "recipe",
-				ID:      "vps-java-migration",
-				Engine:  "openrewrite",
+				Type:   "recipe",
+				ID:     "vps-java-migration",
+				Engine: "openrewrite",
 				Recipes: []string{
 					"org.openrewrite.java.migrate.Java11toJava17",
 					"org.openrewrite.java.cleanup.CommonStaticAnalysis",
@@ -53,11 +53,11 @@ func TestVPSE2E_ProductionWorkflows(t *testing.T) {
 	defer cancel()
 
 	result, err := env.ExecuteWorkflow(ctx, workflow)
-	
+
 	// Log VPS execution details
 	t.Logf("VPS E2E Result: Success=%t, Duration=%v", result.Success, result.Duration)
 	t.Logf("VPS Output: %s", result.Output)
-	
+
 	if err != nil {
 		t.Logf("VPS E2E Error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestVPSE2E_ProductionWorkflows(t *testing.T) {
 
 	// VPS-specific validations will be expanded in REFACTOR phase
 	if result.ResourceUsage != nil {
-		t.Logf("VPS Resource Usage: Memory=%dMB, CPU=%.1f%%", 
+		t.Logf("VPS Resource Usage: Memory=%dMB, CPU=%.1f%%",
 			result.ResourceUsage.MaxMemoryMB, result.ResourceUsage.CPUPercent)
 	}
 }
@@ -100,7 +100,7 @@ func TestVPSE2E_ConcurrentWorkflows(t *testing.T) {
 
 			workflow := &TransflowWorkflow{
 				ID:           fmt.Sprintf("concurrent-%d-%d", time.Now().Unix(), workflowNum),
-				Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", 
+				Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				Steps: []WorkflowStep{
 					{
@@ -141,7 +141,7 @@ func TestVPSE2E_ConcurrentWorkflows(t *testing.T) {
 	}
 
 	// Log concurrent execution results
-	t.Logf("Concurrent Workflows: Completed=%d, Errors=%d", 
+	t.Logf("Concurrent Workflows: Completed=%d, Errors=%d",
 		len(completedResults), len(workflowErrors))
 
 	for i, result := range completedResults {
@@ -156,7 +156,7 @@ func TestVPSE2E_ConcurrentWorkflows(t *testing.T) {
 	if len(workflowErrors) == 0 && len(completedResults) == concurrentWorkflows {
 		for i, result := range completedResults {
 			assert.True(t, result.Success, "Concurrent workflow %d should succeed", i)
-			assert.True(t, result.Duration < 12*time.Minute, 
+			assert.True(t, result.Duration < 12*time.Minute,
 				"Concurrent workflow %d should complete in reasonable time", i)
 		}
 	} else {

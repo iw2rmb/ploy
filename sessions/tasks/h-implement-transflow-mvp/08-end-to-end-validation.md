@@ -27,7 +27,7 @@ Validate complete transflow workflows from CLI invocation through GitLab MR crea
 - [x] Complete service documentation updated
 
 ### GREEN Phase (E2E Workflows Pass Locally)
-- [ ] Complete Java migration workflow passes with Docker services
+- [ ] Complete Java migration workflow passes with VPS services
 - [ ] Self-healing workflows demonstrate real error recovery
 - [ ] KB learning demonstrates case accumulation and confidence improvement
 - [ ] GitLab integration creates real MRs in test repositories
@@ -238,7 +238,7 @@ func SetupTestEnvironment(t *testing.T, config Config) *TestEnvironment {
     env := &TestEnvironment{Config: config}
     
     if config.UseRealServices {
-        // Setup with real services (Docker locally, VPS services on VPS)
+        // Setup with real services (VPS services)
         env.setupRealServices(t)
     } else {
         // Setup with mocks for isolated testing
@@ -254,7 +254,7 @@ func (env *TestEnvironment) setupRealServices(t *testing.T) {
         // VPS testing
         env.setupVPSServices(t)
     } else {
-        // Local Docker testing
+        // VPS testing only
         testutils.RequireServices(t, "consul", "nomad", "seaweedfs")
         env.setupLocalServices(t)
     }
@@ -455,7 +455,7 @@ func TestVPSE2E_ConcurrentWorkflows(t *testing.T) {
 
 **E2E Test Execution:**
 ```bash
-# Local E2E tests with Docker services
+# Local E2E tests with VPS services
 make test-e2e-local
 
 # VPS E2E tests with production services  
@@ -475,7 +475,7 @@ go test -v ./tests/e2e -run TestVPSE2E_ConcurrentWorkflows -timeout 30m
 - `ploy-test-consistent-error`: Repository with predictable errors for KB learning
 
 **Environment Requirements:**
-- **Local**: Docker services (consul, nomad, seaweedfs) running
+- **Local**: Not supported - use VPS services only for consul, nomad, seaweedfs testing
 - **VPS**: Full production service stack, SSH access, GitLab integration tokens
 - **GitLab**: Test repositories, integration tokens, MR creation permissions
 

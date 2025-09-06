@@ -30,7 +30,7 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 		Steps: []WorkflowStep{
 			{
 				Type:    "recipe",
-				ID:      "java-migration", 
+				ID:      "java-migration",
 				Engine:  "openrewrite",
 				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
 			},
@@ -48,18 +48,18 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 	defer cancel()
 
 	result, err := env.ExecuteWorkflow(ctx, workflow)
-	
+
 	// These assertions will initially fail - this is expected for RED phase
 	assert.NoError(t, err, "E2E workflow should complete without errors")
 	assert.True(t, result.Success, "Workflow should succeed")
 	assert.NotEmpty(t, result.WorkflowBranch, "Should create workflow branch")
 	assert.NotEmpty(t, result.BuildVersion, "Should produce build version")
-	
+
 	// Skip MR validation in initial RED phase - will be implemented in GREEN
 	if result.MRUrl != "" {
 		t.Logf("MR Created: %s", result.MRUrl)
 	}
-	
+
 	// Log results for debugging
 	t.Logf("Workflow Duration: %v", result.Duration)
 	t.Logf("Workflow Output: %s", result.Output)
@@ -69,7 +69,7 @@ func TestTransflowE2E_SelfHealingScenario(t *testing.T) {
 	// Should fail initially - healing integration not complete
 
 	if testing.Short() {
-		t.Skip("skipping E2E test in short mode") 
+		t.Skip("skipping E2E test in short mode")
 	}
 
 	env := SetupTestEnvironment(t, Config{
@@ -80,14 +80,14 @@ func TestTransflowE2E_SelfHealingScenario(t *testing.T) {
 	defer env.Cleanup()
 
 	workflow := &TransflowWorkflow{
-		ID:         fmt.Sprintf("e2e-healing-%d", time.Now().Unix()),
-		Repository: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", // Use standard repo for now
+		ID:           fmt.Sprintf("e2e-healing-%d", time.Now().Unix()),
+		Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", // Use standard repo for now
 		TargetBranch: "main",
 		Steps: []WorkflowStep{
 			{
-				Type:    "recipe",
-				ID:      "healing-test",
-				Engine:  "openrewrite", 
+				Type:   "recipe",
+				ID:     "healing-test",
+				Engine: "openrewrite",
 				Recipes: []string{
 					"org.openrewrite.java.migrate.Java11toJava17",
 					"org.openrewrite.java.cleanup.UnnecessaryParentheses",
@@ -107,15 +107,15 @@ func TestTransflowE2E_SelfHealingScenario(t *testing.T) {
 	defer cancel()
 
 	result, err := env.ExecuteWorkflow(ctx, workflow)
-	
-	// Basic completion check - may fail initially 
+
+	// Basic completion check - may fail initially
 	assert.NoError(t, err, "Healing workflow should complete")
-	
+
 	// Log healing attempts for analysis
 	t.Logf("Healing Attempted: %t", result.HealingAttempted)
 	t.Logf("Healing Attempts: %d", len(result.HealingAttempts))
 	t.Logf("Final Success: %t", result.Success)
-	
+
 	if len(result.HealingAttempts) > 0 {
 		for i, attempt := range result.HealingAttempts {
 			t.Logf("Attempt %d: Success=%t, Error=%s", i+1, attempt.Success, attempt.ErrorSignature)
@@ -164,19 +164,19 @@ func TestTransflowE2E_KBLearningProgression(t *testing.T) {
 		workflow.ID = fmt.Sprintf("e2e-learning-%d-run-%d", time.Now().Unix(), i+1)
 
 		ctx, cancel := context.WithTimeout(context.Background(), workflow.MaxDuration)
-		
+
 		result, err := env.ExecuteWorkflow(ctx, &workflow)
 		cancel()
-		
+
 		// Log each run
 		t.Logf("Run %d: Success=%t, Duration=%v, Error=%s", i+1, result.Success, result.Duration, result.Error)
-		
+
 		if err != nil {
 			t.Logf("Run %d error: %v", i+1, err)
 		}
-		
+
 		results = append(results, result)
-		
+
 		// Small delay between runs
 		time.Sleep(5 * time.Second)
 	}

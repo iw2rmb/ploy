@@ -39,18 +39,18 @@ const (
 )
 
 type WorkflowResult struct {
-	ID                   string
-	Duration             time.Duration
-	Success              bool
-	Output               string
-	Error                string
-	WorkflowBranch       string
-	BuildVersion         string
-	MRUrl                string
-	InitialBuildSuccess  bool
-	HealingAttempted     bool
-	HealingAttempts      []HealingAttempt
-	ResourceUsage        *ResourceStats
+	ID                  string
+	Duration            time.Duration
+	Success             bool
+	Output              string
+	Error               string
+	WorkflowBranch      string
+	BuildVersion        string
+	MRUrl               string
+	InitialBuildSuccess bool
+	HealingAttempted    bool
+	HealingAttempts     []HealingAttempt
+	ResourceUsage       *ResourceStats
 }
 
 type HealingAttempt struct {
@@ -83,7 +83,7 @@ steps:
     engine: %s
     recipes:
 `, step.Type, step.ID, step.Engine)
-		
+
 		for _, recipe := range step.Recipes {
 			yaml += fmt.Sprintf(`      - %s
 `, recipe)
