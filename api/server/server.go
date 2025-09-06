@@ -29,6 +29,7 @@ import (
 	"github.com/iw2rmb/ploy/api/dns"
 	"github.com/iw2rmb/ploy/api/domains"
 	"github.com/iw2rmb/ploy/api/health"
+	"github.com/iw2rmb/ploy/api/llms"
 	"github.com/iw2rmb/ploy/api/metrics"
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/api/selfupdate"
@@ -69,6 +70,7 @@ type ServiceDependencies struct {
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
 	ARFHandler              *arf.Handler
 	AnalysisHandler         *analysis.Handler
+	LLMHandler              *llms.Handler
 	CoordinationManager     *coordination.CoordinationManager
 	BlueGreenManager        *bluegreen.Manager
 	Metrics                 *metrics.Metrics
@@ -460,6 +462,12 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		log.Printf("Warning: Failed to initialize analysis handler: %v", err)
 	}
 
+	// Initialize LLM Handler
+	llmHandler, err := initializeLLMHandler(cfgService)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize LLM handler: %v", err)
+	}
+
 	// Initialize Metrics
 	metricsInstance := metrics.NewMetrics()
 
@@ -487,6 +495,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		PlatformWildcardManager: platformWildcardManager,
 		ARFHandler:              arfHandler,
 		AnalysisHandler:         analysisHandler,
+		LLMHandler:              llmHandler,
 		CoordinationManager:     coordinationManager,
 		BlueGreenManager:        blueGreenManager,
 		Metrics:                 metricsInstance,
@@ -830,6 +839,12 @@ func (s *Server) setupRoutes() {
 	if s.dependencies.AnalysisHandler != nil {
 		s.dependencies.AnalysisHandler.RegisterRoutes(s.app)
 		log.Printf("Static Analysis routes registered successfully")
+	}
+
+	// LLM Model Registry endpoints
+	if s.dependencies.LLMHandler != nil {
+		s.dependencies.LLMHandler.RegisterRoutes(s.app)
+		log.Printf("LLM model registry routes registered successfully")
 	}
 
 	// Template management endpoints
@@ -1820,6 +1835,26 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, c
 
 	log.Printf("Static Analysis handler initialized with %d language analyzers (mode: %s)",
 		len(engine.GetSupportedLanguages()), analysisMode)
+	return handler, nil
+}
+
+// initializeLLMHandler initializes the LLM model registry handler
+func initializeLLMHandler(cfgService *cfgsvc.Service) (*llms.Handler, error) {
+	log.Printf("Initializing LLM model registry handler")
+
+	// Resolve unified storage from config service
+	if cfgService == nil {
+		return nil, fmt.Errorf("config service is required for LLM handler")
+	}
+
+	storage, err := resolveStorageFromConfigService(cfgService)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve storage for LLM handler: %w", err)
+	}
+
+	// Create LLM handler
+	handler := llms.NewHandler(storage)
+	log.Printf("LLM model registry handler initialized successfully")
 	return handler, nil
 }
 
