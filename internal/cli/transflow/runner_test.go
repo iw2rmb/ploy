@@ -3,6 +3,8 @@ package transflow
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -269,4 +271,228 @@ func TestTransflowResult_Summary(t *testing.T) {
 	summary = result.Summary()
 	assert.Contains(t, summary, "Status: FAILED")
 	assert.Contains(t, summary, "Error: Build failed")
+}
+
+// Test individual function coverage for runner methods
+func TestTransflowRunner_Setters(t *testing.T) {
+	config := &TransflowConfig{
+		ID:         "test",
+		TargetRepo: "https://github.com/org/repo",
+		BaseRef:    "main",
+		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+	}
+
+	runner, err := NewTransflowRunner(config, t.TempDir())
+	assert.NoError(t, err)
+
+	// Test setters
+	mockGit := NewMockGitOperations()
+	mockRecipe := NewMockRecipeExecutor()
+	mockBuild := NewMockBuildChecker()
+	mockProvider := NewMockGitProvider()
+
+	runner.SetGitOperations(mockGit)
+	runner.SetRecipeExecutor(mockRecipe)
+	runner.SetBuildChecker(mockBuild)
+	runner.SetGitProvider(mockProvider)
+	runner.SetJobSubmitter("mock-submitter")
+
+	// Test getters
+	assert.Equal(t, mockProvider, runner.GetGitProvider())
+	assert.Equal(t, mockBuild, runner.GetBuildChecker())
+	assert.NotEmpty(t, runner.GetWorkspaceDir())
+	assert.Equal(t, config.TargetRepo, runner.GetTargetRepo())
+}
+
+func TestTransflowRunner_PrepareRepo(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupMocks  func(*MockGitOperations)
+		expectError bool
+	}{
+		{
+			name: "successful preparation",
+			setupMocks: func(git *MockGitOperations) {
+				// Success case - no errors
+			},
+			expectError: false,
+		},
+		{
+			name: "clone failure",
+			setupMocks: func(git *MockGitOperations) {
+				git.CloneError = errors.New("clone failed")
+			},
+			expectError: true,
+		},
+		{
+			name: "branch creation failure",
+			setupMocks: func(git *MockGitOperations) {
+				git.CreateBranchError = errors.New("branch creation failed")
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &TransflowConfig{
+				ID:         "test",
+				TargetRepo: "https://github.com/org/repo",
+				BaseRef:    "main",
+				Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+			}
+
+			runner, err := NewTransflowRunner(config, t.TempDir())
+			assert.NoError(t, err)
+
+			mockGit := NewMockGitOperations()
+			tt.setupMocks(mockGit)
+			runner.SetGitOperations(mockGit)
+
+			ctx := context.Background()
+			repoPath, branchName, err := runner.PrepareRepo(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Empty(t, repoPath)
+				assert.Empty(t, branchName)
+			} else {
+				assert.NoError(t, err)
+				assert.NotEmpty(t, repoPath)
+				assert.Contains(t, branchName, "workflow/test/")
+			}
+		})
+	}
+}
+
+func TestTransflowRunner_ApplyDiffAndBuild(t *testing.T) {
+	// Test basic function error paths - we don't test full functionality as it depends on external files
+	config := &TransflowConfig{
+		ID:         "test",
+		TargetRepo: "https://github.com/org/repo",
+		BaseRef:    "main",
+		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+	}
+
+	runner, err := NewTransflowRunner(config, t.TempDir())
+	assert.NoError(t, err)
+
+	mockRecipe := NewMockRecipeExecutor()
+	mockGit := NewMockGitOperations()
+	mockBuild := NewMockBuildChecker()
+
+	runner.SetRecipeExecutor(mockRecipe)
+	runner.SetGitOperations(mockGit)
+	runner.SetBuildChecker(mockBuild)
+
+	ctx := context.Background()
+
+	// Test with non-existent diff file to get coverage of error path
+	err = runner.ApplyDiffAndBuild(ctx, "/nonexistent/path", "/nonexistent/diff.patch")
+	assert.Error(t, err) // Should fail to read diff file
+}
+
+func TestTransflowRunner_RenderAssets(t *testing.T) {
+	config := &TransflowConfig{
+		ID:         "test-workflow",
+		TargetRepo: "https://github.com/org/repo",
+		BaseRef:    "main",
+		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+	}
+
+	runner, err := NewTransflowRunner(config, t.TempDir())
+	assert.NoError(t, err)
+
+	// These tests just verify the functions can be called - they'll error due to missing template files
+	// but that's expected and still provides coverage for error handling paths
+
+	t.Run("RenderPlannerAssets", func(t *testing.T) {
+		assets, err := runner.RenderPlannerAssets()
+		// Expected to fail due to missing template files
+		assert.Error(t, err)
+		assert.Nil(t, assets)
+	})
+
+	t.Run("RenderLLMExecAssets", func(t *testing.T) {
+		jobSpec, err := runner.RenderLLMExecAssets("test-option")
+		// Expected to fail due to missing template files
+		assert.Error(t, err)
+		assert.Empty(t, jobSpec)
+	})
+
+	t.Run("RenderORWApplyAssets", func(t *testing.T) {
+		jobSpec, err := runner.RenderORWApplyAssets("test-option")
+		// Expected to fail due to missing template files
+		assert.Error(t, err)
+		assert.Empty(t, jobSpec)
+	})
+
+	t.Run("RenderReducerAssets", func(t *testing.T) {
+		assets, err := runner.RenderReducerAssets()
+		// Expected to fail due to missing template files
+		assert.Error(t, err)
+		assert.Nil(t, assets)
+	})
+}
+
+func TestTransflowRunner_GenerateMRDescription(t *testing.T) {
+	config := &TransflowConfig{
+		ID:         "test-workflow",
+		TargetRepo: "https://github.com/org/repo",
+		BaseRef:    "main",
+		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+	}
+
+	runner, err := NewTransflowRunner(config, t.TempDir())
+	assert.NoError(t, err)
+
+	result := &TransflowResult{
+		Success:      true,
+		WorkflowID:   "test-workflow",
+		BranchName:   "workflow/test/12345",
+		BuildVersion: "v1.0.0",
+		StepResults: []StepResult{
+			{StepID: "recipe", Success: true, Message: "Applied successfully"},
+		},
+	}
+
+	description := runner.generateMRDescription(result)
+	assert.Contains(t, description, "Transflow Workflow")
+	assert.Contains(t, description, "test-workflow")
+	assert.Contains(t, description, "Applied successfully")
+}
+
+func TestTransflowRunner_CleanupWorkspace(t *testing.T) {
+	// Create a temporary directory structure
+	tempDir := t.TempDir()
+	workspaceDir := filepath.Join(tempDir, "workspace")
+	err := os.MkdirAll(workspaceDir, 0755)
+	assert.NoError(t, err)
+
+	// Create a test file
+	testFile := filepath.Join(workspaceDir, "test.txt")
+	err = os.WriteFile(testFile, []byte("test"), 0644)
+	assert.NoError(t, err)
+
+	config := &TransflowConfig{
+		ID:         "test",
+		TargetRepo: "https://github.com/org/repo",
+		BaseRef:    "main",
+		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+	}
+
+	runner, err := NewTransflowRunner(config, workspaceDir)
+	assert.NoError(t, err)
+
+	// Verify file exists before cleanup
+	_, err = os.Stat(testFile)
+	assert.NoError(t, err)
+
+	// Cleanup
+	err = runner.CleanupWorkspace()
+	assert.NoError(t, err)
+
+	// Verify file is removed after cleanup
+	_, err = os.Stat(testFile)
+	assert.True(t, os.IsNotExist(err))
 }

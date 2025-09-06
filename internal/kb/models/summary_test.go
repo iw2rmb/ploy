@@ -85,14 +85,14 @@ func TestSummary_GenerateTopPatches(t *testing.T) {
 		s.GenerateTopPatches(cases, 2) // Limit to top 2 patches
 
 		assert.Len(t, s.TopPatches, 2)
-		
+
 		// Should be sorted by success rate, hash-3 should be first (1.0 > 0.67)
 		topPatch := s.TopPatches[0]
 		assert.Equal(t, "hash-3", topPatch.Hash)
 		assert.Equal(t, 1.0, topPatch.SuccessRate) // 1 success out of 1 attempt
 		assert.Equal(t, 1, topPatch.AttemptCount)
 		assert.Equal(t, 0.7, topPatch.AvgConfidence) // Average of 0.7
-		
+
 		// Second patch should be hash-1
 		secondPatch := s.TopPatches[1]
 		assert.Equal(t, "hash-1", secondPatch.Hash)
@@ -103,9 +103,9 @@ func TestSummary_GenerateTopPatches(t *testing.T) {
 
 	t.Run("empty cases should result in empty patches", func(t *testing.T) {
 		s := &Summary{ErrorID: "test-error"}
-		
+
 		s.GenerateTopPatches([]Case{}, 5)
-		
+
 		assert.Empty(t, s.TopPatches)
 	})
 }

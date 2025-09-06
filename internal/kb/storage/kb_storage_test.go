@@ -48,7 +48,7 @@ func TestKBStorage_StoreRetrieveError(t *testing.T) {
 				StorageURL: "http://localhost:8888",
 				Timeout:    10 * time.Second,
 			}
-			
+
 			storage := NewKBStorage(config)
 			require.NotNil(t, storage)
 
@@ -62,7 +62,7 @@ func TestKBStorage_StoreRetrieveError(t *testing.T) {
 			retrievedError, err := storage.RetrieveError(ctx, tt.error.Signature)
 			assert.NoError(t, err, "Should retrieve error without error")
 			assert.NotNil(t, retrievedError)
-			
+
 			// Verify data integrity
 			assert.Equal(t, tt.error.ID, retrievedError.ID)
 			assert.Equal(t, tt.error.Signature, retrievedError.Signature)

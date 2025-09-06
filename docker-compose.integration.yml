@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  consul:
+    image: hashicorp/consul:1.16
+    ports:
+      - "8500:8500"
+    command: "consul agent -dev -client=0.0.0.0 -ui"
+    environment:
+      - CONSUL_LOCAL_CONFIG={"ui_config":{"enabled":true},"connect":{"enabled":true}}
+
+  nomad:
+    image: hashicorp/nomad:1.6
+    ports:
+      - "4646:4646"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    environment:
+      - NOMAD_LOCAL_CONFIG={"server":{"enabled":true,"bootstrap_expect":1},"client":{"enabled":true},"ui_config":{"enabled":true}}
+    command: ["nomad", "agent", "-dev", "-bind=0.0.0.0", "-log-level=INFO"]
+    depends_on:
+      - consul
+
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:3.57
+    ports:
+      - "9333:9333" 
+      - "19333:19333"
+    command: "master -ip=seaweedfs-master -mdir=/data"
+    volumes:
+      - seaweed-master:/data
+
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs:3.57
+    ports:
+      - "8888:8888"
+      - "18888:18888"
+    command: "filer -master=seaweedfs-master:9333 -filerdir=/data"
+    depends_on:
+      - seaweedfs-master
+    volumes:
+      - seaweed-filer:/data
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:3.57
+    ports:
+      - "8080:8080"
+      - "18080:18080"
+    command: "volume -mserver=seaweedfs-master:9333 -dir=/data -max=100"
+    depends_on:
+      - seaweedfs-master
+    volumes:
+      - seaweed-volume:/data
+
+volumes:
+  seaweed-master:
+  seaweed-filer: 
+  seaweed-volume:

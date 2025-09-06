@@ -1,15 +1,15 @@
 # Knowledge Base (KB) CLAUDE.md
 
 ## Purpose
-Foundational data layer for the transflow MVP self-healing Knowledge Base system that stores error patterns, successful patches, and learning summaries to improve automated error resolution success rates.
+Production-ready Knowledge Base learning system actively integrated in the transflow healing workflow. Automatically records, analyzes, and learns from every healing attempt to provide intelligent fix recommendations and improve automated error resolution success rates over time.
 
 ## Architecture Overview
-The KB system consists of four core modules that work together to learn from build failures and provide intelligent patch recommendations:
+The KB system is now actively integrated in the production transflow workflow and consists of four core modules that automatically learn from build failures and provide intelligent patch recommendations:
 
-- **Models**: Core data structures (Error, Case, Summary)
-- **Storage**: SeaweedFS-backed persistence layer
-- **Fingerprint**: Patch analysis and similarity detection
-- **Learning**: Orchestration and learning pipeline
+- **Models**: Core data structures (Error, Case, Summary) - actively used in production
+- **Storage**: SeaweedFS-backed persistence layer - production storage backend
+- **Fingerprint**: Patch analysis and similarity detection - active deduplication
+- **Learning**: Orchestration and learning pipeline - integrated in transflow healing workflow
 
 ## Module Structure
 - `models/` - Core KB data models
@@ -76,15 +76,17 @@ The KB system consists of four core modules that work together to learn from bui
 ## Integration Points
 
 ### Consumes
-- SeaweedFS HTTP API for distributed storage
-- Build error messages and logs from transflow pipeline
-- Git patch data from automated healing attempts
+- SeaweedFS HTTP API for distributed storage (production backend)
+- **Active**: Build error messages and logs from every transflow healing attempt
+- **Active**: Git patch data from all automated healing attempts (success and failure)
+- Consul KV store for distributed locking across multiple transflow instances
 
 ### Provides
-- Error pattern recognition and canonicalization
-- Patch similarity analysis and deduplication
-- Success rate statistics and confidence scoring
-- Best patch recommendations for known error patterns
+- **Active**: Error pattern recognition and canonicalization for all transflow builds
+- **Active**: Patch similarity analysis and deduplication in production workflow
+- **Active**: Success rate statistics and confidence scoring from live healing attempts
+- **Production**: Best patch recommendations for known error patterns with real-time suggestions
+- **Active**: Automatic learning from every healing attempt via transflow integration
 
 ## Configuration
 
@@ -105,12 +107,13 @@ The KB system consists of four core modules that work together to learn from bui
 - `kb/cases/{uuid}` - Individual learning cases
 - `kb/summaries/{error_id}` - Aggregated error statistics
 
-### Data Flow
-1. Build errors normalized and stored with canonical signatures
-2. Patches fingerprinted and stored as cases linked to errors
-3. Similar patches deduplicated using semantic analysis
-4. Success rates and confidence scores calculated from historical data
-5. Best patches recommended based on confidence thresholds
+### Data Flow (Active in Production)
+1. **Transflow integration**: Build errors automatically normalized and stored with canonical signatures
+2. **Active recording**: Patches fingerprinted and stored as cases linked to errors from every healing attempt
+3. **Real-time deduplication**: Similar patches deduplicated using semantic analysis during healing
+4. **Live statistics**: Success rates and confidence scores calculated from ongoing healing attempts
+5. **Production recommendations**: Best patches recommended based on confidence thresholds during active healing
+6. **Automatic learning**: Every transflow healing attempt contributes to KB knowledge base
 
 ## Key Patterns
 

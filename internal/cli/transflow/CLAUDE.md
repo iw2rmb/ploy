@@ -1,7 +1,7 @@
 # Transflow CLI Module CLAUDE.md
 
 ## Purpose
-Complete CLI integration for orchestrating multi-step code transformation workflows with comprehensive self-healing capabilities using three distinct branch types (human-step, llm-exec, orw-gen), production Nomad job orchestration, and GitLab merge request integration.
+Complete CLI integration for orchestrating multi-step code transformation workflows with comprehensive self-healing capabilities using three distinct branch types (human-step, llm-exec, orw-gen), production Nomad job orchestration, GitLab merge request integration, and active Knowledge Base learning from healing attempts.
 
 ## Narrative Summary
 The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines with production-ready self-healing capabilities. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with three distinct healing branch types executed via production Nomad job orchestration.
@@ -10,7 +10,7 @@ Core workflow: clone repository → create branch → apply transformations → 
 
 **NEW: Model Context Protocol (MCP) Integration** - Extends LLM-exec healing branches with Model Context Protocol tool support, enabling enhanced context gathering during code transformation workflows. The system supports file system tools (mcp://fs), search tools (mcp://rg), and HTTP/HTTPS URL context sources. MCP configuration is declaratively specified in transflow YAML files and automatically converted to environment variables for containerized job execution. Context prefetching system pre-loads file patterns and web resources to improve LLM context quality during healing operations.
 
-**NEW: KB Persistence Layer with Deduplication** - Implements advanced cross-run learning system with intelligent deduplication capabilities that persists error signatures, healing attempts, successful patches, and statistical summaries. The KB system enables intelligent fix recommendations based on historical success rates and provides distributed coordination via Consul locking. Features comprehensive deduplication with fuzzy error signature matching using Hamming distance similarity, multi-factor patch similarity detection (lexical, structural, semantic), automated storage compaction with intelligent case merging, and performance monitoring achieving 50%+ storage reduction with 25%+ faster queries.
+**ACTIVE: KB Learning Pipeline** - Production-ready Knowledge Base learning system now actively integrated in the main transflow workflow. Every healing attempt (success or failure) is automatically recorded, analyzed, and added to the KB for future recommendations. The system provides intelligent fix suggestions based on historical success patterns, fuzzy error signature matching, and confidence scoring. Features comprehensive deduplication with Hamming distance similarity, multi-factor patch similarity detection, automated storage compaction, and distributed coordination via Consul locking.
 
 ## Key Files
 - `run.go:1-250` - CLI command entry point and flag parsing
@@ -24,7 +24,8 @@ Core workflow: clone repository → create branch → apply transformations → 
 - `config.go:1-149` - Configuration loading, validation, and timeout parsing with MCP integration
 - `config.go:20-25` - Extended TransflowStep with MCP fields (MCPTools, Context, Budgets)
 - `config.go:91-103` - Integrated MCP configuration validation in transflow step validation
-- `integrations.go:87-200` - Factory pattern for production vs test implementations
+- `integrations.go:87-245` - Factory pattern for production vs test implementations with KB integration
+- `integrations.go:215-237` - CreateConfiguredRunner() creates KBTransflowRunner with active KB learning
 - `types.go:1-72` - Complete job submission type system with interface definitions
 - `fanout_orchestrator.go:17-27` - ProductionBranchRunner interface for asset rendering and dependency access with GetTargetRepo() method
 - `types.go:60-72` - JobSubmissionHelper and FanoutOrchestrator interfaces
@@ -72,8 +73,12 @@ Core workflow: clone repository → create branch → apply transformations → 
 - `kb_locks.go:29-50` - ConsulKBLockManager implementation
 - `kb_summary.go:1-350` - Summary computation and fix promotion logic
 - `kb_summary.go:12-30` - SummaryConfig with scoring weights and thresholds
-- `kb_integration.go:1-200` - Main KB integration orchestrator
+- `kb_integration.go:1-451` - Complete KB integration orchestrator with active learning
 - `kb_integration.go:12-36` - KBConfig and EnhancedSelfHealConfig structures
+- `kb_integration.go:55-85` - KBIntegration with SeaweedFS and Consul backends
+- `kb_integration.go:87-122` - LoadKBContext() for real-time KB suggestions during healing
+- `kb_integration.go:124-169` - WriteHealingCase() for automatic learning from all healing attempts
+- `kb_integration.go:310-451` - KBTransflowRunner with integrated KB learning workflow
 
 ## Integration Points
 ### Consumes
@@ -97,7 +102,8 @@ Core workflow: clone repository → create branch → apply transformations → 
 - Test Mode: Complete mock infrastructure for CI/CD and local testing with comprehensive branch type coverage
 - Job Orchestration: Production Nomad job submission with HCL template rendering and artifact processing
 - Artifact Processing: JSON parsing of plan.json, next.json, and diff.patch from completed jobs
-- KB Learning System: Cross-run persistence with advanced deduplication capabilities and intelligent fix recommendations
+- **Active KB Learning**: Automatic recording and learning from every healing attempt in production workflow
+- **KB-Enhanced Healing**: Real-time suggestions from historical successful fixes with confidence scoring
 - KB API: Storage/retrieval of error signatures, patches, and statistical summaries
 - KB Deduplication API: Fuzzy error signature matching, intelligent case merging, automated compaction
 - KB Performance Monitoring: Real-time metrics with 50%+ storage reduction and 25%+ query optimization
@@ -191,7 +197,9 @@ CLI flags:
 - Comprehensive test coverage with mock implementations supporting all interface methods and error scenarios (see job_submission_test.go:450-1400)
 - Self-healing workflow with production LangGraph integration and complete parallel branch execution via first-success-wins fanout orchestration
 - Configuration validation with timeout parsing and comprehensive error reporting
+- **Active KB learning integration** via KBTransflowRunner with automatic healing case recording
 - KB persistence with content-addressed storage and distributed locking (see kb_storage.go, kb_locks.go)
+- Production KB integration with SeaweedFS and Consul backends (see integrations.go:192-213)
 - Advanced deduplication with fuzzy matching algorithms and Hamming distance similarity (see kb_signatures.go:100-300)
 - Multi-factor patch similarity detection using lexical, structural, and semantic analysis (see kb_signatures.go:400-600)
 - Automated storage compaction with intelligent case merging and retention policies (see kb_compaction.go:200-350)

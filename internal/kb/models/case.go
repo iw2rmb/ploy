@@ -28,10 +28,10 @@ func NewCase(errorID string, patch []byte, success bool) *Case {
 		Success: success,
 		Created: time.Now(),
 	}
-	
+
 	c.PatchHash = c.GeneratePatchHash()
 	c.Confidence = 0.5 // Default confidence
-	
+
 	return c
 }
 
@@ -40,7 +40,7 @@ func (c *Case) GeneratePatchHash() string {
 	if len(c.Patch) == 0 {
 		return "empty-patch-hash"
 	}
-	
+
 	hash := sha256.Sum256(c.Patch)
 	return fmt.Sprintf("patch-%x", hash[:8])
 }
@@ -51,7 +51,7 @@ func (c *Case) UpdateConfidence(historicalCases []Case) {
 		c.Confidence = 0.5 // Default for new patterns
 		return
 	}
-	
+
 	// Calculate success rate from historical cases
 	successCount := 0
 	for _, hc := range historicalCases {
@@ -59,7 +59,7 @@ func (c *Case) UpdateConfidence(historicalCases []Case) {
 			successCount++
 		}
 	}
-	
+
 	c.Confidence = float64(successCount) / float64(len(historicalCases))
 }
 

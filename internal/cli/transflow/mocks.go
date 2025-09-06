@@ -145,3 +145,48 @@ func (m *MockGitProvider) ValidateConfiguration() error {
 	m.ValidationCalled = true
 	return m.ValidationError
 }
+
+// MockKBIntegration implements KBIntegrator for testing
+type MockKBIntegration struct {
+	LoadKBContextCalled       bool
+	WriteHealingCaseCalled    bool
+	ShouldUseKBSuggestionsVal bool
+	LoadKBContextError        error
+	WriteHealingCaseError     error
+	LoadKBContextResult       *KBContext
+	ConvertKBFixesResult      []BranchSpec
+}
+
+// Ensure MockKBIntegration implements KBIntegrator
+var _ KBIntegrator = (*MockKBIntegration)(nil)
+
+func NewMockKBIntegration() *MockKBIntegration {
+	return &MockKBIntegration{
+		ShouldUseKBSuggestionsVal: false,
+		LoadKBContextResult: &KBContext{
+			HasData: false,
+		},
+		ConvertKBFixesResult: []BranchSpec{},
+	}
+}
+
+func (m *MockKBIntegration) LoadKBContext(ctx context.Context, lang string, stdout, stderr []byte) (*KBContext, error) {
+	m.LoadKBContextCalled = true
+	if m.LoadKBContextError != nil {
+		return nil, m.LoadKBContextError
+	}
+	return m.LoadKBContextResult, nil
+}
+
+func (m *MockKBIntegration) WriteHealingCase(ctx context.Context, kbCtx *KBContext, attempt *HealingAttempt, outcome *HealingOutcome, stdout, stderr string) error {
+	m.WriteHealingCaseCalled = true
+	return m.WriteHealingCaseError
+}
+
+func (m *MockKBIntegration) ShouldUseKBSuggestions(kbCtx *KBContext) bool {
+	return m.ShouldUseKBSuggestionsVal
+}
+
+func (m *MockKBIntegration) ConvertKBFixesToBranchSpecs(fixes []PromotedFix) []BranchSpec {
+	return m.ConvertKBFixesResult
+}

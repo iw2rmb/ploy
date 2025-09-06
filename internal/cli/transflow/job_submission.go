@@ -23,7 +23,7 @@ type ProductionJobSubmitter interface {
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface
 type jobSubmissionHelper struct {
-	submitter interface{}            // MockJobSubmitter in tests, real submitter in production
+	submitter interface{}            // JobSubmitter interface for production job submission
 	runner    ProductionJobSubmitter // For accessing asset rendering methods in production
 }
 
@@ -31,7 +31,7 @@ type jobSubmissionHelper struct {
 func NewJobSubmissionHelper(submitter interface{}) JobSubmissionHelper {
 	return &jobSubmissionHelper{
 		submitter: submitter,
-		runner:    nil, // Will be nil for mock tests
+		runner:    nil, // Will be nil when runner is not needed
 	}
 }
 

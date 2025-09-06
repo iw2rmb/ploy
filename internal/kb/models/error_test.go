@@ -9,11 +9,11 @@ import (
 
 func TestError_GenerateSignature(t *testing.T) {
 	tests := []struct {
-		name          string
-		message       string
-		location      string
-		buildLogs     []string
-		expectedSig   string
+		name           string
+		message        string
+		location       string
+		buildLogs      []string
+		expectedSig    string
 		expectedUnique bool
 	}{
 		{
@@ -30,7 +30,7 @@ func TestError_GenerateSignature(t *testing.T) {
 		{
 			name:     "duplicate errors should have same signature",
 			message:  "cannot find symbol: class List",
-			location: "Service.java:42", 
+			location: "Service.java:42",
 			buildLogs: []string{
 				"[ERROR] Service.java:[42,10] cannot find symbol",
 				"[ERROR]   symbol:   class List",
@@ -55,7 +55,7 @@ func TestError_GenerateSignature(t *testing.T) {
 			// This should fail - Error model doesn't exist yet
 			err := NewError(tt.message, tt.location, tt.buildLogs)
 			assert.NotNil(t, err)
-			
+
 			signature := err.GenerateSignature()
 			assert.NotEmpty(t, signature)
 			assert.Equal(t, tt.expectedSig, signature)
@@ -108,7 +108,7 @@ func TestError_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// This should fail - Error.Validate() doesn't exist yet
 			err := tt.error.Validate()
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -127,13 +127,13 @@ func TestError_Normalization(t *testing.T) {
 			BuildLogs: []string{
 				"[INFO] Compiling project",
 				"[ERROR] /path/to/Main.java:[15,24] cannot find symbol",
-				"[ERROR]   symbol:   class Optional", 
+				"[ERROR]   symbol:   class Optional",
 				"[INFO] BUILD FAILED",
 			},
 		}
 
 		normalized := err.NormalizeBuildLogs()
-		
+
 		// Should keep only error logs and normalize paths
 		assert.Len(t, normalized, 2)
 		assert.Contains(t, normalized[0], "Main.java:[15,24]")
@@ -147,7 +147,7 @@ func TestError_Normalization(t *testing.T) {
 		}
 
 		normalized := err.NormalizeMessage()
-		
+
 		// Should remove type parameters and normalize
 		assert.Equal(t, "cannot find symbol: class Optional", normalized)
 	})

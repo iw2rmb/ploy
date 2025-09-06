@@ -121,7 +121,7 @@ func TestCase_SetPatchHash(t *testing.T) {
 	t.Run("auto-generate patch hash on creation", func(t *testing.T) {
 		// This should fail - NewCase doesn't exist yet
 		patch := []byte("diff --git a/Main.java b/Main.java\n+import java.util.Optional;")
-		
+
 		c := NewCase("error-123", patch, true)
 		assert.NotNil(t, c)
 		assert.NotEmpty(t, c.ID)
@@ -134,10 +134,10 @@ func TestCase_SetPatchHash(t *testing.T) {
 
 	t.Run("patch hash should be deterministic", func(t *testing.T) {
 		patch := []byte("same patch content")
-		
+
 		c1 := NewCase("error-123", patch, true)
 		c2 := NewCase("error-456", patch, false) // Different error, same patch
-		
+
 		assert.Equal(t, c1.PatchHash, c2.PatchHash, "Same patch should have same hash")
 	})
 }
@@ -159,7 +159,7 @@ func TestCase_UpdateConfidence(t *testing.T) {
 		}
 
 		c.UpdateConfidence(historicalCases)
-		
+
 		// Should calculate confidence based on historical success rate
 		// 3 successes out of 4 = 0.75 confidence
 		assert.Equal(t, 0.75, c.Confidence)
@@ -172,7 +172,7 @@ func TestCase_UpdateConfidence(t *testing.T) {
 		}
 
 		c.UpdateConfidence([]Case{})
-		
+
 		// Should use default confidence for new error patterns
 		assert.Equal(t, 0.5, c.Confidence)
 	})

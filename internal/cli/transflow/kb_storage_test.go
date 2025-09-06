@@ -186,7 +186,7 @@ func TestSeaweedFSKBStorage_WriteCase(t *testing.T) {
 	caseRecord := createTestCaseRecord()
 
 	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/errors/java/abc123def456/cases/test-run-123.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("storage.PutOption")).Return(nil)
+	mockStorage.On("Put", ctx, "kb/healing/errors/java/abc123def456/cases/test-run-123.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
 
 	err := kbStorage.WriteCase(ctx, "java", "abc123def456", "test-run-123", caseRecord)
 
@@ -259,7 +259,7 @@ func TestSeaweedFSKBStorage_WriteSummary(t *testing.T) {
 	summary := createTestSummaryRecord()
 
 	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/errors/java/abc123def456/summary.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("storage.PutOption")).Return(nil)
+	mockStorage.On("Put", ctx, "kb/healing/errors/java/abc123def456/summary.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
 
 	err := kbStorage.WriteSummary(ctx, "java", "abc123def456", summary)
 
@@ -318,7 +318,7 @@ func TestSeaweedFSKBStorage_StorePatch(t *testing.T) {
 	fingerprint := "abcd1234567890ef"
 
 	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/patches/abcd1234567890ef.patch", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("storage.PutOption")).Return(nil)
+	mockStorage.On("Put", ctx, "kb/healing/patches/abcd1234567890ef.patch", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
 
 	err := kbStorage.StorePatch(ctx, fingerprint, patchContent)
 
@@ -363,7 +363,7 @@ func TestSeaweedFSKBStorage_WriteSnapshot(t *testing.T) {
 	}
 
 	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/snapshot.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("storage.PutOption")).Return(nil)
+	mockStorage.On("Put", ctx, "kb/healing/snapshot.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
 
 	err := kbStorage.WriteSnapshot(ctx, snapshot)
 

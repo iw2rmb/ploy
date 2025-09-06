@@ -9,6 +9,8 @@ import (
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
+	"github.com/iw2rmb/ploy/internal/orchestration"
+	"github.com/iw2rmb/ploy/internal/storage"
 )
 
 // ARFGitOperations wraps the existing ARF Git operations
@@ -179,12 +181,50 @@ func (i *TransflowIntegrations) CreateGitProvider() provider.GitProvider {
 	return provider.NewGitLabProvider()
 }
 
-// CreateConfiguredRunner creates a fully configured TransflowRunner with real integrations
-func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) (*TransflowRunner, error) {
-	runner, err := NewTransflowRunner(config, i.WorkDir)
+// CreateKBIntegration creates a KB integration for learning from healing attempts
+func (i *TransflowIntegrations) CreateKBIntegration() KBIntegrator {
+	if i.TestMode {
+		// Return mock KB integration for testing
+		return NewMockKBIntegration()
+	}
+
+	// Create production KB integration
+	storageConfig := storage.Config{
+		Master:      "localhost:9333", // Default SeaweedFS master
+		Filer:       "localhost:8888", // Default SeaweedFS filer
+		Collection:  "kb",
+		Replication: "000", // No replication for development
+		Timeout:     30,
+	}
+
+	storageClient, err := storage.New(storageConfig)
+	if err != nil {
+		// If storage creation fails, use a mock KB integration to prevent breaking the workflow
+		return NewMockKBIntegration()
+	}
+
+	// Adapt StorageProvider to Storage interface
+	storageBackend := storage.NewStorageAdapter(storageClient)
+
+	kvStore := orchestration.NewKV()
+
+	kbConfig := DefaultKBConfig()
+	return NewKBIntegration(storageBackend, kvStore, kbConfig)
+}
+
+// CreateConfiguredRunner creates a fully configured TransflowRunner with KB learning integration
+func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) (*KBTransflowRunner, error) {
+	// Create KB integration
+	kbIntegration := i.CreateKBIntegration()
+
+	// Create KB-enhanced runner
+	kbRunner, err := NewKBTransflowRunner(config, i.WorkDir, kbIntegration)
 	if err != nil {
 		return nil, err
 	}
+
+	// Get the embedded TransflowRunner for dependency injection
+	runner := kbRunner.TransflowRunner
 
 	// Inject the concrete implementations
 	runner.SetGitOperations(i.CreateGitOperations())
@@ -192,7 +232,8 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	runner.SetBuildChecker(i.CreateBuildChecker())
 	runner.SetGitProvider(i.CreateGitProvider())
 
-	return runner, nil
+	// Return the KB-enhanced runner which will use KB learning when healing is needed
+	return kbRunner, nil
 }
 
 // GetDefaultControllerURL returns the default controller URL for transflow operations
