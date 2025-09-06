@@ -23,8 +23,10 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - **LangGraph planner/reducer job integration:** Complete with HCL templates, job submission, and orchestrator wiring
 - **Self-healing workflow coordination:** Full TransflowRunner integration with production deployment validation
 
+✅ **Recently Completed:**
+- **Model registry in `ployman` CLI:** Complete CRUD operations with schema validation, storage integration
+
 ❌ **Not Implemented:**
-- Model registry in `ployman` CLI
 - KB (knowledge base) read/write for learning
 
 ### In-Scope (Must Work)
@@ -36,7 +38,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
  - LLM plan and exec
   - `llm-exec` (Stream 2/Phase 1): run model with prompts + prefetched context (repo paths, HTTPS URLs), apply generated patch, commit; execute as Nomad jobs via internal/orchestration.
   - `llm-plan` (Stream 2/Phase 2): produce a list of `llm-exec` steps (sequential only in MVP) from repo state + last error.
-  - Model registry: minimal CRUD in `ployman` CLI with schema validation; stored under `llms` namespace.
+  - ✅ Model registry: Complete CRUD in `ployman` CLI with schema validation; stored under `llms` namespace.
   - MCP tools: declare per-step (MCP spec), env-only config; prefetch context per execution (no cache/persist).
 
 - Build check (sandbox mode, no deploy)
@@ -86,8 +88,8 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
   - `llm-exec`: container/job that receives model+prompts+context; produces unified diff or patch; apply and commit (used in parallel healing options).
   - MCP injection via env; context prefetcher for repo files and HTTPS URLs.
 
-- Model registry
-  - `ployman models {list|get|add|update|delete}` with basic schema validation; stored alongside existing recipe metadata.
+- ✅ Model registry
+  - `ployman models {list|get|add|update|delete}` with comprehensive schema validation; stored under `llms` namespace in SeaweedFS.
 
  - MR integration (GitLab)
   - Push branch using token env; call GitLab REST to create/update MR (project inferred from `target_repo` URL, source branch, target=`base_ref`), adding default labels `ploy`,`tfl` when supported.

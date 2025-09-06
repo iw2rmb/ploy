@@ -11,7 +11,7 @@ Streams are designed to be largely independent, minimizing interference and enab
   - Phase 2 ⚠️ (In Progress): LangGraph planner/reducer as jobs for build‑error healing with parallel options (human, LLM‑exec, ORW‑generated)
 
 - Stream 2: LLM Execution + Planning
-  - Phase 1 ⚠️ (Partial): LLM‑Exec (sequential) as Nomad jobs, MCP context, model registry under `llms` (used by Stream 1 Phase 2 branches)
+  - Phase 1 ⚠️ (Partial): LLM‑Exec (sequential) as Nomad jobs, MCP context, ✅ model registry under `llms` (used by Stream 1 Phase 2 branches)
   - Phase 2: LLM‑Plan (LangGraph) to emit exec steps; optional beyond MVP since planner/reducer exist in Stream 1
 
 - Stream 3: Merge Request to GitLab
