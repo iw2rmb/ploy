@@ -169,13 +169,23 @@ func (r *RecipeRegistry) RegisterCustomRecipe(ctx context.Context, recipe *model
 
 // GetRecipe retrieves a recipe by ID
 func (r *RecipeRegistry) GetRecipe(ctx context.Context, id string) (*UnifiedRecipeMetadata, error) {
-	// Construct registry path
+	// Try the ID as-is first
 	key := fmt.Sprintf("registry/%s.yaml", id)
-
-	// Get from storage
+	
 	dataReader, err := r.storage.GetObject(r.bucket, key)
 	if err != nil {
-		return nil, fmt.Errorf("recipe not found: %s", id)
+		// If not found and ID looks like a full recipe class name, try generating the recipe ID
+		if strings.Contains(id, ".") {
+			generatedID := generateRecipeID(id)
+			if generatedID != id {
+				key = fmt.Sprintf("registry/%s.yaml", generatedID)
+				dataReader, err = r.storage.GetObject(r.bucket, key)
+			}
+		}
+		
+		if err != nil {
+			return nil, fmt.Errorf("recipe not found: %s", id)
+		}
 	}
 	defer dataReader.Close()
 
