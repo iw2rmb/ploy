@@ -84,14 +84,14 @@ job "ploy-api" {
         NOMAD_ADDR = "http://nomad.service.consul:4646"
         VAULT_ADDR = "http://vault.service.consul:8200"
 
-        # SeaweedFS configuration
-        SEAWEEDFS_MASTER = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
-        SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
+        # SeaweedFS configuration (master via localhost, filer via consul DNS)
+        SEAWEEDFS_MASTER = "http://localhost:9333"
+        SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:8888"
 
         # ARF (Automated Remediation Framework) configuration
         ARF_STORAGE_BACKEND = "seaweedfs"
-        ARF_SEAWEEDFS_MASTER_URL = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
-        ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
+        ARF_SEAWEEDFS_MASTER_URL = "http://localhost:9333"
+        ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:8888"
         ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"
         ARF_FREEBSD_USER = "root"
         ARF_FREEBSD_PORT = "22"
