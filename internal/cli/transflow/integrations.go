@@ -238,7 +238,20 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 
 // GetDefaultControllerURL returns the default controller URL for transflow operations
 func GetDefaultControllerURL() string {
-	// This would typically come from environment or config
-	// For now, return a placeholder that matches the ARF system defaults
-	return "http://localhost:8080" // This should be configurable
+	// First check if PLOY_CONTROLLER is explicitly set
+	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
+		return url
+	}
+
+	// Check if PLOY_APPS_DOMAIN is set for SSL endpoint
+	if domain := os.Getenv("PLOY_APPS_DOMAIN"); domain != "" {
+		// Check for environment-specific subdomain
+		if env := os.Getenv("PLOY_ENVIRONMENT"); env == "dev" {
+			return fmt.Sprintf("https://api.dev.%s/v1", domain)
+		}
+		return fmt.Sprintf("https://api.%s/v1", domain)
+	}
+
+	// Default fallback for development
+	return "https://api.dev.ployman.app/v1"
 }

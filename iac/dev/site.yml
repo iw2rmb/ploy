@@ -21,7 +21,7 @@
 - import_playbook: playbooks/main.yml
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
-- import_playbook: playbooks/arf-openrewrite-recipes.yml
+- import_playbook: playbooks/arf-openrewrite-recipes-registry.yml
 - import_playbook: playbooks/traefik.yml
 - import_playbook: playbooks/docker-registry.yml
 - import_playbook: playbooks/openrewrite-jvm.yml
