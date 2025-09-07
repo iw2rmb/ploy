@@ -1892,11 +1892,11 @@
             provider: seaweedfs
             # New centralized config Service expects an endpoint; keep master/filer for
             # backward compatibility and legacy helpers during transition.
-            endpoint: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
+            endpoint: "{{ storage_config.seaweedfs.master }}"
             
             # SeaweedFS Configuration
-            master: "{{ storage_config.seaweedfs.master | default('localhost:9333') }}"
-            filer: "{{ storage_config.seaweedfs.filer | default('localhost:8888') }}"
+            master: "{{ storage_config.seaweedfs.master }}"
+            filer: "{{ storage_config.seaweedfs.filer }}"
             collection: "{{ storage_config.seaweedfs.collection | default('artifacts') }}"
             replication: "{{ seaweedfs_single_node.replication | default(storage_config.seaweedfs.replication | default('001')) }}"
             timeout: {{ storage_config.seaweedfs.timeout | default(30) }}

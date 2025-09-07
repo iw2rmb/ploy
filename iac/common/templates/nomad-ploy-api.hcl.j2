@@ -54,7 +54,7 @@ job "ploy-api" {
 
       # Binary distribution via artifact download from SeaweedFS
       artifact {
-        source = "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
+        source = "http://{{ 'seaweedfs-filer.service.consul:8888' if seaweedfs.use_consul_discovery else 'localhost:8888' }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
         destination = "local/api"
         mode = "file"
       }
@@ -89,6 +89,7 @@ job "ploy-api" {
         SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
 
         # ARF (Automated Remediation Framework) configuration
+        ARF_STORAGE_BACKEND = "seaweedfs"
         ARF_SEAWEEDFS_MASTER_URL = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
         ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
         ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"

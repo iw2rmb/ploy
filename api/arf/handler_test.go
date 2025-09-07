@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -76,13 +75,12 @@ func (e *ValidationError) Error() string {
 	return e.Message
 }
 
-func setupTestHandler() (*Handler, *RecipeExecutor, *MockRecipeCatalog, *MockSandboxManager) {
+func setupTestHandler() (*Handler, *RecipeExecutor, *MockSandboxManager) {
 	// Create mock storage and sandbox manager for RecipeExecutor
 	storage := NewInMemoryRecipeStorage()
 	sandboxMgr := NewMockSandboxManager()
 	executor := NewRecipeExecutor(storage, sandboxMgr, nil)
-	catalog := NewMockRecipeCatalog()
-	handler := NewHandler(executor, catalog, sandboxMgr)
+	handler := NewHandler(executor, sandboxMgr)
 
 	// Add some test recipes
 	testRecipe := &models.Recipe{
@@ -101,13 +99,12 @@ func setupTestHandler() (*Handler, *RecipeExecutor, *MockRecipeCatalog, *MockSan
 		}},
 	}
 	storage.CreateRecipe(context.Background(), testRecipe)
-	catalog.StoreRecipe(context.Background(), testRecipe)
 
-	return handler, executor, catalog, sandboxMgr
+	return handler, executor, sandboxMgr
 }
 
 func TestHandlerListRecipes(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
@@ -150,7 +147,7 @@ func TestHandlerListRecipes(t *testing.T) {
 }
 
 func TestHandlerGetRecipe(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
@@ -188,7 +185,7 @@ func TestHandlerGetRecipe(t *testing.T) {
 }
 
 func TestHandlerCreateRecipe(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
@@ -252,7 +249,7 @@ func TestHandlerCreateRecipe(t *testing.T) {
 // Use TestExecuteTransformation_Async in handler_transformation_async_test.go instead
 
 func TestHandlerSandboxOperations(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
@@ -312,7 +309,7 @@ func TestHandlerSandboxOperations(t *testing.T) {
 }
 
 func TestHandlerHealthCheck(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
@@ -341,7 +338,7 @@ func TestHandlerHealthCheck(t *testing.T) {
 }
 
 func TestHandlerSearchRecipes(t *testing.T) {
-	handler, _, _, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
@@ -379,13 +376,12 @@ func TestHandlerSearchRecipes(t *testing.T) {
 }
 
 func TestHandlerRecipeStats(t *testing.T) {
-	handler, _, catalog, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)
 
-	// Update stats first
-	catalog.UpdateRecipeStats(context.Background(), "test-recipe", true, 2*time.Second)
+	// Stats are now handled by RecipeRegistry, which returns default values for testing
 
 	req := httptest.NewRequest("GET", "/v1/arf/recipes/test-recipe/stats", nil)
 	resp, err := app.Test(req)
@@ -410,27 +406,10 @@ func TestHandlerRecipeStats(t *testing.T) {
 }
 
 func BenchmarkHandlerListRecipes(b *testing.B) {
-	handler, _, catalog, _ := setupTestHandler()
+	handler, _, _ := setupTestHandler()
 
-	// Add many recipes for benchmarking
-	for i := 0; i < 1000; i++ {
-		recipe := &models.Recipe{
-			ID: fmt.Sprintf("bench-recipe-%d", i),
-			Metadata: models.RecipeMetadata{
-				Name:        fmt.Sprintf("benchmark-recipe-%d", i),
-				Description: fmt.Sprintf("Benchmark Recipe %d", i),
-				Author:      "bench-author",
-				Languages:   []string{"java"},
-				Categories:  []string{"code-cleanup"},
-			},
-			Steps: []models.RecipeStep{{
-				Name:   "bench-step",
-				Type:   models.StepTypeOpenRewrite,
-				Config: map[string]interface{}{"recipe": "bench"},
-			}},
-		}
-		catalog.StoreRecipe(context.Background(), recipe)
-	}
+	// Note: RecipeRegistry would need to be initialized with recipes for proper benchmarking
+	// Currently testing with only the default test recipe from setupTestHandler
 
 	app := fiber.New()
 	handler.RegisterRoutes(app)

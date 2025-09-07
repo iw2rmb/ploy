@@ -241,7 +241,7 @@ func CreateOpenRewriteEngine(config *Phase3Config) interface{} {
 }
 
 // CreateHandlerWithPhase3 creates a handler with all Phase 3 components initialized
-func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) (*Handler, error) {
+func CreateHandlerWithPhase3(executor *RecipeExecutor, sandboxMgr SandboxManager) (*Handler, error) {
 	// Load configuration
 	config := LoadPhase3ConfigFromEnv()
 
@@ -254,7 +254,6 @@ func CreateHandlerWithPhase3(executor *RecipeExecutor, catalog RecipeCatalog, sa
 	// Create handler with Phase 3 components
 	return NewHandlerWithPhase3(
 		executor,
-		catalog,
 		sandboxMgr,
 		components.LLMGenerator,
 		components.LearningSystem,

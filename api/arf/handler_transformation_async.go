@@ -47,10 +47,10 @@ func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
 		})
 	}
 
-	// Optional: Validate recipe_id against catalog (suggestions on 400)
-	if h.catalog != nil && req.Type == "openrewrite" {
+	// Optional: Validate recipe_id against RecipeRegistry (suggestions on 400)
+	if h.recipeRegistry != nil && req.Type == "openrewrite" {
 		startSearch := time.Now()
-		if _, err := h.catalog.GetRecipe(c.Context(), req.RecipeID); err != nil {
+		if _, err := h.recipeRegistry.GetRecipeAsModelsRecipe(c.Context(), req.RecipeID); err != nil {
 			// Record catalog miss
 			if h.metrics != nil {
 				h.metrics.RecordMiss()
@@ -87,14 +87,14 @@ func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
 			}
 
 			// Search by full value
-			if list, e := h.catalog.SearchRecipes(c.Context(), req.RecipeID); e == nil {
+			if list, e := h.recipeRegistry.SearchRecipes(c.Context(), req.RecipeID); e == nil {
 				collect(list)
 			}
 			// Search by last segment (after last dot)
 			if dot := strings.LastIndex(req.RecipeID, "."); dot != -1 {
 				seg := req.RecipeID[dot+1:]
 				if seg != "" {
-					if list, e := h.catalog.SearchRecipes(c.Context(), seg); e == nil {
+					if list, e := h.recipeRegistry.SearchRecipes(c.Context(), seg); e == nil {
 						collect(list)
 					}
 				}

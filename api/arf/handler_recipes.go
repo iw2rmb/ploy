@@ -25,9 +25,9 @@ func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilt
 		return h.recipeStorage.ListRecipes(ctx, storageFilter)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.ListRecipes(ctx, filters)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.ListRecipes(ctx, filters)
 	}
 
 	return nil, fmt.Errorf("no storage backend available")
@@ -38,9 +38,9 @@ func (h *Handler) getRecipeWithStorage(ctx context.Context, recipeID string) (*m
 		return h.recipeStorage.GetRecipe(ctx, recipeID)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.GetRecipe(ctx, recipeID)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.GetRecipeAsModelsRecipe(ctx, recipeID)
 	}
 
 	return nil, fmt.Errorf("no storage backend available")
@@ -58,9 +58,9 @@ func (h *Handler) createRecipeWithStorage(ctx context.Context, recipe *models.Re
 		return h.recipeStorage.CreateRecipe(ctx, recipe)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.StoreRecipe(ctx, recipe)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.StoreRecipe(ctx, recipe)
 	}
 
 	return fmt.Errorf("no storage backend available")
@@ -78,9 +78,9 @@ func (h *Handler) updateRecipeWithStorage(ctx context.Context, recipeID string, 
 		return h.recipeStorage.UpdateRecipe(ctx, recipeID, recipe)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.UpdateRecipe(ctx, recipe)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.UpdateRecipe(ctx, recipe)
 	}
 
 	return fmt.Errorf("no storage backend available")
@@ -91,9 +91,9 @@ func (h *Handler) deleteRecipeWithStorage(ctx context.Context, recipeID string) 
 		return h.recipeStorage.DeleteRecipe(ctx, recipeID)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.DeleteRecipe(ctx, recipeID)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.DeleteRecipe(ctx, recipeID)
 	}
 
 	return fmt.Errorf("no storage backend available")
@@ -114,18 +114,18 @@ func (h *Handler) searchRecipesWithStorage(ctx context.Context, query string) ([
 		return recipes, nil
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.SearchRecipes(ctx, query)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.SearchRecipes(ctx, query)
 	}
 
 	return nil, fmt.Errorf("no storage backend available")
 }
 
 func (h *Handler) getRecipeStatsWithStorage(ctx context.Context, recipeID string) (interface{}, error) {
-	// Try catalog first if available (it has stats functionality)
-	if h.catalog != nil {
-		return h.catalog.GetRecipeStats(ctx, recipeID)
+	// Use RecipeRegistry for stats functionality
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.GetRecipeStats(ctx, recipeID)
 	}
 
 	// If no catalog available, return mock stats

@@ -15,6 +15,28 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// RecipeFilters defines search criteria for recipes
+type RecipeFilters struct {
+	Language      string   `json:"language,omitempty"`
+	Category      string   `json:"category,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	Author        string   `json:"author,omitempty"`
+	MinConfidence float64  `json:"min_confidence,omitempty"`
+	MaxConfidence float64  `json:"max_confidence,omitempty"`
+}
+
+// RecipeStats tracks usage and performance metrics for recipes
+type RecipeStats struct {
+	RecipeID         string        `json:"recipe_id"`
+	TotalExecutions  int64         `json:"total_executions"`
+	SuccessfulRuns   int64         `json:"successful_runs"`
+	FailedRuns       int64         `json:"failed_runs"`
+	SuccessRate      float64       `json:"success_rate"`
+	AvgExecutionTime time.Duration `json:"avg_execution_time"`
+	LastExecuted     time.Time     `json:"last_executed"`
+	FirstExecuted    time.Time     `json:"first_executed"`
+}
+
 // UnifiedRecipeMetadata represents the unified format for all recipes
 type UnifiedRecipeMetadata struct {
 	Metadata RecipeInfo          `json:"metadata" yaml:"metadata"`
@@ -445,4 +467,248 @@ func generateHash(input string) string {
 	// Simple hash generation for demo
 	// In production, use crypto/sha256
 	return fmt.Sprintf("sha256:%x", input)
+}
+
+// ============================================================================
+// RecipeCatalog Interface Adapter Methods
+// These methods allow RecipeRegistry to implement the RecipeCatalog interface
+// ============================================================================
+
+// StoreRecipe stores a models.Recipe in the registry (RecipeCatalog interface)
+func (r *RecipeRegistry) StoreRecipe(ctx context.Context, recipe *models.Recipe) error {
+	if recipe == nil {
+		return fmt.Errorf("recipe cannot be nil")
+	}
+
+	// Convert models.Recipe to UnifiedRecipeMetadata
+	metadata := &UnifiedRecipeMetadata{
+		Metadata: RecipeInfo{
+			ID:         recipe.ID,
+			Name:       recipe.Metadata.Name,
+			Version:    recipe.Metadata.Version,
+			Type:       "custom",
+			Source:     "user",
+			Author:     recipe.Metadata.Author,
+			Tags:       recipe.Metadata.Tags,
+			Categories: recipe.Metadata.Categories,
+		},
+		Steps: recipe.Steps,
+		Cache: &CacheInfo{
+			StoredAt:  time.Now(),
+			SizeBytes: int64(len(recipe.Hash)),
+			Hash:      recipe.Hash,
+		},
+	}
+
+	return r.storeRecipe(ctx, metadata)
+}
+
+// GetRecipeAsModelsRecipe retrieves a recipe by ID (RecipeCatalog interface)
+func (r *RecipeRegistry) GetRecipeAsModelsRecipe(ctx context.Context, recipeID string) (*models.Recipe, error) {
+	unified, err := r.GetRecipe(ctx, recipeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert UnifiedRecipeMetadata to models.Recipe
+	recipe := &models.Recipe{
+		Metadata: models.RecipeMetadata{
+			Name:        unified.Metadata.Name,
+			Version:     unified.Metadata.Version,
+			Description: "Converted from RecipeRegistry",
+			Author:      unified.Metadata.Author,
+			Tags:        unified.Metadata.Tags,
+			Categories:  unified.Metadata.Categories,
+		},
+		Steps:     unified.Steps,
+		ID:        unified.Metadata.ID,
+		CreatedAt: unified.Cache.StoredAt,
+		UpdatedAt: unified.Cache.StoredAt,
+	}
+
+	if unified.Cache != nil {
+		recipe.Hash = unified.Cache.Hash
+	}
+
+	return recipe, nil
+}
+
+// ListRecipes lists recipes with filters (RecipeCatalog interface)
+func (r *RecipeRegistry) ListRecipes(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error) {
+	// Get all recipes from registry
+	allUnified, err := r.ListAllRecipes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var recipes []*models.Recipe
+	for _, unified := range allUnified {
+		// Apply filters
+		if !matchesFilters(unified, filters) {
+			continue
+		}
+
+		// Convert to models.Recipe
+		recipe := &models.Recipe{
+			Metadata: models.RecipeMetadata{
+				Name:        unified.Metadata.Name,
+				Version:     unified.Metadata.Version,
+				Description: "Converted from RecipeRegistry",
+				Author:      unified.Metadata.Author,
+				Tags:        unified.Metadata.Tags,
+				Categories:  unified.Metadata.Categories,
+			},
+			Steps:     unified.Steps,
+			ID:        unified.Metadata.ID,
+			CreatedAt: unified.Cache.StoredAt,
+			UpdatedAt: unified.Cache.StoredAt,
+		}
+
+		if unified.Cache != nil {
+			recipe.Hash = unified.Cache.Hash
+		}
+
+		recipes = append(recipes, recipe)
+	}
+
+	return recipes, nil
+}
+
+// UpdateRecipe updates an existing recipe (RecipeCatalog interface)
+func (r *RecipeRegistry) UpdateRecipe(ctx context.Context, recipe *models.Recipe) error {
+	// For now, treat update as store (replace)
+	return r.StoreRecipe(ctx, recipe)
+}
+
+// DeleteRecipe deletes a recipe by ID (RecipeCatalog interface)
+func (r *RecipeRegistry) DeleteRecipe(ctx context.Context, recipeID string) error {
+	// Check if storage provider supports Delete method
+	if storageDeleter, ok := r.storage.(interface {
+		Delete(ctx context.Context, key string) error
+	}); ok {
+		// Delete from registry
+		key := fmt.Sprintf("registry/%s.yaml", recipeID)
+		err := storageDeleter.Delete(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to delete recipe from registry: %w", err)
+		}
+
+		// Also delete custom implementation if it exists
+		customKey := fmt.Sprintf("custom/%s/recipe.yaml", recipeID)
+		_ = storageDeleter.Delete(ctx, customKey) // Ignore error if doesn't exist
+	} else {
+		// Fallback: StorageProvider doesn't have Delete method
+		return fmt.Errorf("delete operation not supported by storage provider")
+	}
+
+	return nil
+}
+
+// SearchRecipes searches recipes by query (RecipeCatalog interface)
+func (r *RecipeRegistry) SearchRecipes(ctx context.Context, query string) ([]*models.Recipe, error) {
+	// Get all recipes and filter by query
+	allUnified, err := r.ListAllRecipes(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var recipes []*models.Recipe
+	query = strings.ToLower(query)
+
+	for _, unified := range allUnified {
+		// Search in name, tags, and categories
+		matches := strings.Contains(strings.ToLower(unified.Metadata.Name), query) ||
+			containsInSlice(unified.Metadata.Tags, query) ||
+			containsInSlice(unified.Metadata.Categories, query)
+
+		if matches {
+			recipe := &models.Recipe{
+				Metadata: models.RecipeMetadata{
+					Name:        unified.Metadata.Name,
+					Version:     unified.Metadata.Version,
+					Description: "Converted from RecipeRegistry",
+					Author:      unified.Metadata.Author,
+					Tags:        unified.Metadata.Tags,
+					Categories:  unified.Metadata.Categories,
+				},
+				Steps:     unified.Steps,
+				ID:        unified.Metadata.ID,
+				CreatedAt: unified.Cache.StoredAt,
+				UpdatedAt: unified.Cache.StoredAt,
+			}
+
+			if unified.Cache != nil {
+				recipe.Hash = unified.Cache.Hash
+			}
+
+			recipes = append(recipes, recipe)
+		}
+	}
+
+	return recipes, nil
+}
+
+// GetRecipeStats returns stats for a recipe (RecipeCatalog interface)
+func (r *RecipeRegistry) GetRecipeStats(ctx context.Context, recipeID string) (*RecipeStats, error) {
+	// For now, return default stats
+	// In the future, this could be implemented with proper tracking
+	return &RecipeStats{
+		RecipeID:         recipeID,
+		TotalExecutions:  0,
+		SuccessfulRuns:   0,
+		FailedRuns:       0,
+		SuccessRate:      0.0,
+		AvgExecutionTime: 0,
+		LastExecuted:     time.Time{},
+		FirstExecuted:    time.Time{},
+	}, nil
+}
+
+// UpdateRecipeStats updates stats for a recipe (RecipeCatalog interface)
+func (r *RecipeRegistry) UpdateRecipeStats(ctx context.Context, recipeID string, success bool, executionTime time.Duration) error {
+	// For now, this is a no-op
+	// In the future, implement proper stats tracking
+	return nil
+}
+
+// Helper functions for filtering and searching
+
+func matchesFilters(unified *UnifiedRecipeMetadata, filters RecipeFilters) bool {
+	if filters.Language != "" && !strings.Contains(strings.ToLower(unified.Metadata.Type), strings.ToLower(filters.Language)) {
+		return false
+	}
+
+	if filters.Category != "" && !containsInSlice(unified.Metadata.Categories, filters.Category) {
+		return false
+	}
+
+	if len(filters.Tags) > 0 {
+		hasAllTags := true
+		for _, tag := range filters.Tags {
+			if !containsInSlice(unified.Metadata.Tags, tag) {
+				hasAllTags = false
+				break
+			}
+		}
+		if !hasAllTags {
+			return false
+		}
+	}
+
+	if filters.Author != "" && !strings.EqualFold(unified.Metadata.Author, filters.Author) {
+		return false
+	}
+
+	// Confidence filtering not applicable for unified metadata
+	return true
+}
+
+func containsInSlice(slice []string, target string) bool {
+	target = strings.ToLower(target)
+	for _, item := range slice {
+		if strings.Contains(strings.ToLower(item), target) {
+			return true
+		}
+	}
+	return false
 }
