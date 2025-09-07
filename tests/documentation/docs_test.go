@@ -91,7 +91,7 @@ func TestDocumentationExamples(t *testing.T) {
 				assert.Contains(t, validMethods, example.Method, "HTTP method should be valid")
 
 				// Validate API path structure
-				assert.True(t, strings.HasPrefix(example.Path, "/v1/"), 
+				assert.True(t, strings.HasPrefix(example.Path, "/v1/"),
 					"API paths should follow /v1/ pattern")
 
 				// Validate JSON syntax for request bodies
@@ -127,14 +127,14 @@ func TestDocumentationExamples(t *testing.T) {
 				// Validate subcommands exist for ploy
 				if parts[0] == "ploy" {
 					validSubcommands := []string{"transflow", "apps", "env", "domains", "debug", "version"}
-					assert.Contains(t, validSubcommands, parts[1], 
+					assert.Contains(t, validSubcommands, parts[1],
 						"Ploy subcommand should be valid")
 				}
 
 				// Validate subcommands exist for ployman
 				if parts[0] == "ployman" {
 					validSubcommands := []string{"models", "api", "version"}
-					assert.Contains(t, validSubcommands, parts[1], 
+					assert.Contains(t, validSubcommands, parts[1],
 						"Ployman subcommand should be valid")
 				}
 			})
@@ -145,12 +145,12 @@ func TestDocumentationExamples(t *testing.T) {
 // TestDocumentationCompleteness validates that all required documentation exists
 func TestDocumentationCompleteness(t *testing.T) {
 	requiredDocs := map[string]string{
-		"docs/transflow/README.md":     "Transflow user guide",
-		"docs/kb/README.md":           "KB learning system documentation", 
-		"docs/api/transflow.md":       "Transflow API documentation",
-		"docs/examples/":              "Example configurations directory",
-		"docs/FEATURES.md":            "Features documentation",
-		"CHANGELOG.md":                "Changelog",
+		"docs/transflow/README.md": "Transflow user guide",
+		"docs/kb/README.md":        "KB learning system documentation",
+		"docs/api/transflow.md":    "Transflow API documentation",
+		"docs/examples/":           "Example configurations directory",
+		"docs/FEATURES.md":         "Features documentation",
+		"CHANGELOG.md":             "Changelog",
 	}
 
 	for docPath, description := range requiredDocs {
@@ -209,7 +209,7 @@ func TestConfigurationValidation(t *testing.T) {
 				},
 			},
 			{
-				name: "MissingID", 
+				name: "MissingID",
 				config: &transflow.Config{
 					Version:    "v1alpha1",
 					TargetRepo: "https://github.com/example/repo.git",
@@ -248,7 +248,7 @@ func TestExampleConfigurationIntegrity(t *testing.T) {
 
 		t.Run(entry.Name(), func(t *testing.T) {
 			filePath := filepath.Join(exampleDir, entry.Name())
-			
+
 			yamlData, err := os.ReadFile(filePath)
 			require.NoError(t, err, "Should be able to read example file")
 
@@ -267,7 +267,7 @@ func TestExampleConfigurationIntegrity(t *testing.T) {
 				assert.NotEmpty(t, step.Type, "Step %d should have type", i)
 				assert.NotEmpty(t, step.ID, "Step %d should have ID", i)
 				assert.NotEmpty(t, step.Engine, "Step %d should have engine", i)
-				
+
 				if step.Engine == "openrewrite" {
 					assert.NotEmpty(t, step.Recipes, "OpenRewrite step %d should have recipes", i)
 				}
@@ -282,7 +282,7 @@ func TestDocumentationLinks(t *testing.T) {
 	t.Run("ReferencedFiles", func(t *testing.T) {
 		referencedFiles := []string{
 			"docs/examples/java-migration.yaml",
-			"docs/examples/self-healing.yaml", 
+			"docs/examples/self-healing.yaml",
 			"docs/examples/multi-step.yaml",
 			"docs/examples/kb-enabled.yaml",
 		}

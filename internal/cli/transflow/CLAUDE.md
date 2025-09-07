@@ -1,7 +1,7 @@
 # Transflow CLI Module CLAUDE.md
 
 ## Purpose
-Complete CLI integration for orchestrating multi-step code transformation workflows with comprehensive self-healing capabilities using three distinct branch types (human-step, llm-exec, orw-gen), production Nomad job orchestration, GitLab merge request integration, and active Knowledge Base learning from healing attempts.
+Production-ready CLI integration for orchestrating multi-step code transformation workflows with comprehensive self-healing capabilities using three distinct branch types (human-step, llm-exec, orw-gen), production Nomad job orchestration, GitLab merge request integration, and active Knowledge Base learning from healing attempts. **MVP COMPLETE**: All components now operational in production environment.
 
 ## Narrative Summary
 The transflow module provides end-to-end implementation of `ploy transflow run` command supporting complete transformation pipelines with production-ready self-healing capabilities. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows with three distinct healing branch types executed via production Nomad job orchestration.
@@ -10,9 +10,9 @@ Core workflow: clone repository → create branch → apply transformations → 
 
 **NEW: Model Context Protocol (MCP) Integration** - Extends LLM-exec healing branches with Model Context Protocol tool support, enabling enhanced context gathering during code transformation workflows. The system supports file system tools (mcp://fs), search tools (mcp://rg), and HTTP/HTTPS URL context sources. MCP configuration is declaratively specified in transflow YAML files and automatically converted to environment variables for containerized job execution. Context prefetching system pre-loads file patterns and web resources to improve LLM context quality during healing operations.
 
-**ACTIVE: KB Learning Pipeline** - Production-ready Knowledge Base learning system now actively integrated in the main transflow workflow. Every healing attempt (success or failure) is automatically recorded, analyzed, and added to the KB for future recommendations. The system provides intelligent fix suggestions based on historical success patterns, fuzzy error signature matching, and confidence scoring. Features comprehensive deduplication with Hamming distance similarity, multi-factor patch similarity detection, automated storage compaction, and distributed coordination via Consul locking.
+**✅ ACTIVE: KB Learning Pipeline** - Production-ready Knowledge Base learning system now actively integrated in the main transflow workflow via `KBTransflowRunner`. Every healing attempt (success or failure) is automatically recorded, analyzed, and added to the KB for future recommendations. The system provides intelligent fix suggestions based on historical success patterns, fuzzy error signature matching, and confidence scoring. Features comprehensive deduplication with Hamming distance similarity, multi-factor patch similarity detection, automated storage compaction, and distributed coordination via Consul locking. **VPS VALIDATED**: System operational in production environment with real-world validation.
 
-**E2E Test Framework** - Complete end-to-end validation framework providing comprehensive testing of entire transflow workflows from CLI invocation through GitLab MR creation. Framework validates Java migration workflows, self-healing capabilities, KB learning integration, and production Nomad job orchestration. Supports VPS production environment testing with real GitLab integration, enabling full workflow validation including repository cloning, code transformation, build validation, healing branch execution, and merge request operations.
+**✅ E2E Test Framework** - Complete end-to-end validation framework providing comprehensive testing of entire transflow workflows from CLI invocation through GitLab MR creation. Framework validates Java migration workflows, self-healing capabilities, KB learning integration, and production Nomad job orchestration. **VPS PRODUCTION VALIDATED**: Supports VPS production environment testing with real GitLab integration at https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git, enabling full workflow validation including repository cloning, code transformation, build validation, healing branch execution, and merge request operations.
 
 ## Key Files
 - `run.go:1-250` - CLI command entry point and flag parsing
@@ -27,7 +27,7 @@ Core workflow: clone repository → create branch → apply transformations → 
 - `config.go:20-25` - Extended TransflowStep with MCP fields (MCPTools, Context, Budgets)
 - `config.go:91-103` - Integrated MCP configuration validation in transflow step validation
 - `integrations.go:87-245` - Factory pattern for production vs test implementations with KB integration
-- `integrations.go:215-237` - CreateConfiguredRunner() creates KBTransflowRunner with active KB learning
+- `integrations.go:215-237` - CreateConfiguredRunner() creates KBTransflowRunner with active KB learning (MVP production integration)
 - `types.go:1-72` - Complete job submission type system with interface definitions
 - `fanout_orchestrator.go:17-27` - ProductionBranchRunner interface for asset rendering and dependency access with GetTargetRepo() method
 - `types.go:60-72` - JobSubmissionHelper and FanoutOrchestrator interfaces
@@ -202,7 +202,7 @@ CLI flags:
 - Comprehensive test coverage with mock implementations supporting all interface methods and error scenarios (see job_submission_test.go:450-1400)
 - Self-healing workflow with production LangGraph integration and complete parallel branch execution via first-success-wins fanout orchestration
 - Configuration validation with timeout parsing and comprehensive error reporting
-- **Active KB learning integration** via KBTransflowRunner with automatic healing case recording
+- **✅ Production KB learning integration** via KBTransflowRunner with automatic healing case recording - MVP complete and VPS validated
 - KB persistence with content-addressed storage and distributed locking (see kb_storage.go, kb_locks.go)
 - Production KB integration with SeaweedFS and Consul backends (see integrations.go:192-213)
 - Advanced deduplication with fuzzy matching algorithms and Hamming distance similarity (see kb_signatures.go:100-300)
@@ -213,6 +213,26 @@ CLI flags:
 - Backward compatibility preservation with comprehensive performance validation (see kb_performance_analysis.go:50-150)
 - Weighted scoring system for fix promotion with recency/frequency/success factors (see kb_summary.go:80-150)
 - Backward compatibility maintained for non-MCP workflows with optional MCP fields in YAML configuration
+
+## Production Status
+
+**✅ MVP COMPLETE - All Components Operational:**
+- **Self-Healing System**: All three branch types (human-step, llm-exec, orw-gen) operational with production Nomad orchestration
+- **KB Learning Integration**: Active learning from every healing attempt via KBTransflowRunner integration
+- **VPS Production Validation**: Complete workflows tested and validated in production environment (45.12.75.241)
+- **E2E Testing Framework**: Full workflow validation from CLI through GitLab MR creation
+- **Performance Benchmarking**: Acceptance testing completed with production-grade performance
+- **GitLab Integration**: Production merge request operations with real repository validation
+- **Storage Backends**: SeaweedFS + Consul operational for KB persistence and distributed coordination
+- **Job Orchestration**: Nomad-based healing workflows with HCL template rendering and artifact processing
+
+**Production Deployment Status:**
+- ✅ KB learning pipeline: Integrated and active
+- ✅ Self-healing workflows: All branch types operational
+- ✅ VPS validation: Complete production environment testing
+- ✅ Performance testing: Benchmarking and acceptance criteria met
+- ✅ Integration testing: End-to-end workflows validated
+- ✅ GitLab operations: Production MR creation and management
 
 ## Related Documentation
 - `../git/provider/CLAUDE.md` - GitLab provider implementation

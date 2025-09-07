@@ -13,15 +13,15 @@ import (
 
 // AcceptanceReport represents the complete MVP acceptance test results
 type AcceptanceReport struct {
-	GeneratedAt    time.Time            `json:"generated_at"`
-	Environment    string               `json:"environment"`
-	MVPVersion     string               `json:"mvp_version"`
-	TestSummary    TestSummary          `json:"test_summary"`
-	MVPCriteria    []MVPCriterion       `json:"mvp_criteria"`
-	Performance    PerformanceResults   `json:"performance"`
-	Stability      StabilityResults     `json:"stability"`
-	Production     ProductionResults    `json:"production"`
-	Recommendations []string            `json:"recommendations"`
+	GeneratedAt     time.Time          `json:"generated_at"`
+	Environment     string             `json:"environment"`
+	MVPVersion      string             `json:"mvp_version"`
+	TestSummary     TestSummary        `json:"test_summary"`
+	MVPCriteria     []MVPCriterion     `json:"mvp_criteria"`
+	Performance     PerformanceResults `json:"performance"`
+	Stability       StabilityResults   `json:"stability"`
+	Production      ProductionResults  `json:"production"`
+	Recommendations []string           `json:"recommendations"`
 }
 
 // TestSummary provides overall test execution statistics
@@ -44,26 +44,26 @@ type MVPCriterion struct {
 
 // PerformanceResults captures performance validation results
 type PerformanceResults struct {
-	JavaMigrationTime    string  `json:"java_migration_time"`
-	MemoryUsage          string  `json:"memory_usage"`
-	CPUUtilization       string  `json:"cpu_utilization"`
-	ConcurrentWorkflows  int     `json:"concurrent_workflows"`
-	KBLearningLatency    string  `json:"kb_learning_latency"`
-	BuildValidationTime  string  `json:"build_validation_time"`
-	MRCreationTime       string  `json:"mr_creation_time"`
-	OverallScore         string  `json:"overall_score"`
+	JavaMigrationTime   string `json:"java_migration_time"`
+	MemoryUsage         string `json:"memory_usage"`
+	CPUUtilization      string `json:"cpu_utilization"`
+	ConcurrentWorkflows int    `json:"concurrent_workflows"`
+	KBLearningLatency   string `json:"kb_learning_latency"`
+	BuildValidationTime string `json:"build_validation_time"`
+	MRCreationTime      string `json:"mr_creation_time"`
+	OverallScore        string `json:"overall_score"`
 }
 
 // StabilityResults captures long-term stability test results
 type StabilityResults struct {
-	TestDuration      string  `json:"test_duration"`
-	SuccessRate       float64 `json:"success_rate"`
-	TotalWorkflows    int     `json:"total_workflows"`
-	SuccessfulRuns    int     `json:"successful_runs"`
-	FailedRuns        int     `json:"failed_runs"`
-	AverageRunTime    string  `json:"average_run_time"`
-	MemoryStability   string  `json:"memory_stability"`
-	ResourceLeaks     bool    `json:"resource_leaks"`
+	TestDuration    string  `json:"test_duration"`
+	SuccessRate     float64 `json:"success_rate"`
+	TotalWorkflows  int     `json:"total_workflows"`
+	SuccessfulRuns  int     `json:"successful_runs"`
+	FailedRuns      int     `json:"failed_runs"`
+	AverageRunTime  string  `json:"average_run_time"`
+	MemoryStability string  `json:"memory_stability"`
+	ResourceLeaks   bool    `json:"resource_leaks"`
 }
 
 // ProductionResults captures production readiness assessment
@@ -484,7 +484,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to read JSON file: %v", err)
 		}
-		
+
 		if err := json.Unmarshal(data, &report); err != nil {
 			log.Fatalf("Failed to parse JSON file: %v", err)
 		}
@@ -525,7 +525,7 @@ func generateMockReport() *AcceptanceReport {
 		GeneratedAt: time.Now(),
 		Environment: "Production VPS (45.12.75.241)",
 		MVPVersion:  "1.0.0-MVP",
-		
+
 		TestSummary: TestSummary{
 			TotalTests:    25,
 			PassedTests:   23,
@@ -534,7 +534,7 @@ func generateMockReport() *AcceptanceReport {
 			SuccessRate:   92.0,
 			TotalDuration: "2h 45m",
 		},
-		
+
 		MVPCriteria: []MVPCriterion{
 			{
 				Name:        "OpenRewrite Integration with ARF",
@@ -597,18 +597,18 @@ func generateMockReport() *AcceptanceReport {
 				Details:     "Complete CRUD operations with schema validation",
 			},
 		},
-		
+
 		Performance: PerformanceResults{
-			JavaMigrationTime:    "< 8 minutes",
-			MemoryUsage:          "< 1GB peak",
-			CPUUtilization:       "< 150% average",
-			ConcurrentWorkflows:  5,
-			KBLearningLatency:    "< 200ms",
-			BuildValidationTime:  "< 5 minutes",
-			MRCreationTime:       "< 30 seconds",
-			OverallScore:         "95% (Excellent)",
+			JavaMigrationTime:   "< 8 minutes",
+			MemoryUsage:         "< 1GB peak",
+			CPUUtilization:      "< 150% average",
+			ConcurrentWorkflows: 5,
+			KBLearningLatency:   "< 200ms",
+			BuildValidationTime: "< 5 minutes",
+			MRCreationTime:      "< 30 seconds",
+			OverallScore:        "95% (Excellent)",
 		},
-		
+
 		Stability: StabilityResults{
 			TestDuration:    "30 minutes (reduced for testing)",
 			SuccessRate:     95.0,
@@ -619,7 +619,7 @@ func generateMockReport() *AcceptanceReport {
 			MemoryStability: "Stable",
 			ResourceLeaks:   false,
 		},
-		
+
 		Production: ProductionResults{
 			VPSDeployment:      "✅ Successful",
 			ServiceIntegration: "✅ Functional",
@@ -630,7 +630,7 @@ func generateMockReport() *AcceptanceReport {
 			Scalability:        "✅ Tested",
 			ReadinessScore:     "95% (Production Ready)",
 		},
-		
+
 		Recommendations: []string{
 			"Continue monitoring in production environment for extended periods",
 			"Implement CI/CD integration for automated regression testing",

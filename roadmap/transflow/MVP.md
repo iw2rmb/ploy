@@ -25,9 +25,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 
 ✅ **Recently Completed:**
 - **Model registry in `ployman` CLI:** Complete CRUD operations with schema validation, storage integration
-
-❌ **Not Implemented:**
-- KB (knowledge base) read/write for learning
+- **KB (Knowledge Base) learning system:** Complete implementation with SeaweedFS storage, Consul locking, case aggregation, deduplication, and active learning integration in transflow healing workflows
 
 ### In-Scope (Must Work)
 
