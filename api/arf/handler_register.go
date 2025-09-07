@@ -96,12 +96,6 @@ func (h *Handler) RegisterRecipeFromRunner(c *fiber.Ctx) error {
 
 // ListRecipes lists all recipes from the registry
 func (h *Handler) ListRecipes(c *fiber.Ctx) error {
-	if h.recipeRegistry == nil {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-			"error": "Recipe registry not available",
-		})
-	}
-
 	ctx := context.Background()
 
 	// Get query parameters for filtering
@@ -109,6 +103,13 @@ func (h *Handler) ListRecipes(c *fiber.Ctx) error {
 
 	var recipes []*UnifiedRecipeMetadata
 	var err error
+
+	// Use RecipeRegistry only
+	if h.recipeRegistry == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": "RecipeRegistry not available - check SeaweedFS connectivity",
+		})
+	}
 
 	if recipeType != "" {
 		recipes, err = h.recipeRegistry.QueryByType(ctx, recipeType)

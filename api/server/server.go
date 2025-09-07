@@ -1359,10 +1359,15 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 
 	// Create storage provider for OpenRewrite dispatcher
 	var storageProvider internalStorage.StorageProvider
+
+	// SeaweedFS Master and Filer have different ports
+	seaweedfsMaster := utils.Getenv("SEAWEEDFS_MASTER", "http://seaweedfs-filer.service.consul:9333")
+	seaweedfsFiler := utils.Getenv("SEAWEEDFS_FILER", seaweedfsURL)
+
 	seaweedConfig := internalStorage.SeaweedFSConfig{
-		Master:      seaweedfsURL,
-		Filer:       seaweedfsURL,
-		Collection:  "artifacts",
+		Master:      seaweedfsMaster,
+		Filer:       seaweedfsFiler,
+		Collection:  "ploy-recipes", // Use recipes collection for RecipeRegistry
 		Replication: "000",
 		Timeout:     30,
 	}
@@ -1376,8 +1381,8 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 	}
 
 	if storageProvider != nil {
-		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs=%s, api=%s",
-			nomadAddr, registryURL, seaweedfsURL, apiURL)
+		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs_master=%s, seaweedfs_filer=%s, api=%s",
+			nomadAddr, registryURL, seaweedfsMaster, seaweedfsFiler, apiURL)
 
 		// Create ARF service with unified storage interface
 		// Storage already has "artifacts" bucket configured via collection in storage config
@@ -1415,7 +1420,7 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 		}
 	} else {
 		log.Printf("WARNING: No storage provider available - OpenRewrite dispatcher will not be initialized")
-		log.Printf("Check SeaweedFS connectivity at: %s", seaweedfsURL)
+		log.Printf("Check SeaweedFS connectivity at: master=%s, filer=%s", seaweedfsMaster, seaweedfsFiler)
 	}
 
 	// Initialize recipe executor with optional dispatcher
@@ -1427,10 +1432,16 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 		log.Printf("OpenRewrite recipes that are not in storage will fail")
 	}
 
-	// Create ARF handler based on available backends
+	// Create ARF handler - RecipeRegistry only (no fallback)
 	var handler *arf.Handler
+	
+	// Require SeaweedFS storage for RecipeRegistry
+	if storageProvider == nil {
+		return nil, fmt.Errorf("SeaweedFS storage is required for RecipeRegistry - check SeaweedFS connectivity")
+	}
+	
 	if recipeStorage != nil && (recipeIndex != nil || arfConfig.Storage.Backend == "memory") {
-		// Use storage-aware handler
+		// Use storage-aware handler with RecipeRegistry
 		handler = arf.NewHandlerWithStorage(
 			engine,
 			recipeStorage,
@@ -1439,17 +1450,9 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 			sandboxMgr,
 			storageProvider, // Pass the storage provider for recipe registry
 		)
-		log.Printf("ARF handler initialized with storage backend: %s", arfConfig.Storage.Backend)
+		log.Printf("ARF handler initialized with RecipeRegistry backend: %s", arfConfig.Storage.Backend)
 	} else {
-		// Fallback to catalog-based handler
-		keyPrefix := utils.Getenv("ARF_CONSUL_PREFIX", "arf")
-		catalog, err := arf.NewConsulRecipeCatalog(cfg.ConsulAddr, keyPrefix)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create recipe catalog: %w", err)
-		}
-
-		handler = arf.NewHandler(engine, catalog, sandboxMgr)
-		log.Printf("ARF handler initialized with catalog fallback")
+		return nil, fmt.Errorf("recipe storage and index are required for ARF handler")
 	}
 
 	// Initialize Consul store for async transformations (required)
