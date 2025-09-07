@@ -4,7 +4,7 @@
   become: true
   
   vars:
-    ploy_api_url: "http://localhost:31082"  # Use dynamic port for local dev
+    ploy_api_url: "https://api.dev.ployman.app"  # Use proper API domain
     recipe_register_endpoint: "{{ ploy_api_url }}/v1/arf/recipes/register"
     
     openrewrite_recipes:
@@ -74,21 +74,14 @@
 
   tasks:
     - name: Wait for Ploy API to be ready
-      wait_for:
-        port: 31082
-        host: localhost
-        delay: 10
-        timeout: 120
-      
-    - name: Check Ploy API health
       uri:
         url: "{{ ploy_api_url }}/health"
         method: GET
         status_code: [200, 404]  # 404 is OK if /health doesn't exist
-      register: api_health
+      register: api_health_check
       retries: 10
-      delay: 3
-      until: api_health.status in [200, 404]
+      delay: 5
+      until: api_health_check.status in [200, 404]
 
     - name: Register OpenRewrite recipes in RecipeRegistry
       uri:

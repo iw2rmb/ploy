@@ -40,29 +40,12 @@ func (h *Handler) RegisterRecipeFromRunner(c *fiber.Ctx) error {
 
 	ctx := context.Background()
 
-	// Initialize recipe registry if not already done
+	// Ensure recipe registry is available
 	if h.recipeRegistry == nil {
-		// Get storage provider from handler's storage
-		if h.recipeStorage == nil {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-				"error": "Recipe storage not available",
-			})
-		}
-
-		// Create storage provider adapter (we'll need to get the actual storage provider)
-		// For now, we'll log the registration request
-		log.Printf("[Recipe Registration] Received registration request: recipe=%s, coords=%s, jar=%s",
-			req.RecipeClass, req.MavenCoords, req.JarPath)
-
-		// TODO: Initialize recipe registry with actual storage provider
-		// h.recipeRegistry = NewRecipeRegistry(storageProvider)
-
-		// For now, return success to not block the runner
-		return c.JSON(fiber.Map{
-			"status":       "acknowledged",
-			"message":      "Recipe registration request received",
-			"recipe_class": req.RecipeClass,
-			"maven_coords": req.MavenCoords,
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error":   "Recipe registry not available",
+			"details": "RecipeRegistry requires SeaweedFS storage - check storage connectivity",
+			"status":  "failed",
 		})
 	}
 

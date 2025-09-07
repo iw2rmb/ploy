@@ -65,7 +65,7 @@ iac/
 │   │   └── hosts.yml              # Target hosts configuration  
 │   ├── playbooks/                  # Environment-specific playbooks (11 files)
 │   │   ├── api.yml                # API deployment
-│   │   ├── arf-openrewrite-recipes.yml # ARF OpenRewrite recipes setup
+│   │   ├── arf-openrewrite-recipes-registry.yml # ARF RecipeRegistry setup
 │   │   ├── docker-registry.yml    # Docker registry deployment
 │   │   ├── freebsd.yml            # FreeBSD VM deployment
 │   │   ├── hashicorp.yml          # HashiCorp stack deployment

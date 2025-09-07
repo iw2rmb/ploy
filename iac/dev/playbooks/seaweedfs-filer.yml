@@ -1,0 +1,162 @@
+---
+# SeaweedFS Filer Deployment via Nomad
+#
+# This playbook deploys the SeaweedFS Filer as a Nomad service:
+# - Ensures master and volume servers are running via systemd
+# - Deploys filer as Nomad job for better integration and management
+# - Configures Consul service discovery for seaweedfs-filer.service.consul
+# - Validates filer deployment and health checks
+#
+- name: Deploy SeaweedFS Filer via Nomad
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  
+  tasks:
+    - name: Ensure SeaweedFS master and volume servers are running
+      block:
+        - name: Wait for SeaweedFS master to be healthy
+          wait_for:
+            port: "{{ seaweedfs.master_port }}"
+            delay: 2
+            timeout: 60
+          
+        - name: Wait for SeaweedFS volume server to be healthy
+          wait_for:
+            port: "{{ seaweedfs.volume_port }}"
+            delay: 2
+            timeout: 60
+          
+        - name: Verify master cluster status
+          uri:
+            url: "http://localhost:{{ seaweedfs.master_port }}/cluster/status"
+            method: GET
+          register: cluster_status
+          failed_when: cluster_status.status != 200
+
+        - name: Display SeaweedFS cluster readiness
+          debug:
+            msg: "✅ SeaweedFS master and volume servers are ready for filer deployment"
+
+    - name: Ensure Nomad is ready for filer deployment
+      block:
+        - name: Verify Nomad cluster is ready
+          uri:
+            url: "http://localhost:4646/v1/status/leader"
+            method: GET
+            status_code: 200
+          retries: 5
+          delay: 10
+
+        - name: Display Nomad readiness status
+          debug:
+            msg: "✅ Nomad cluster is ready for filer deployment"
+
+    - name: Deploy SeaweedFS filer via Nomad
+      block:
+        - name: Create Nomad job for SeaweedFS filer
+          template:
+            src: ../../common/templates/nomad-seaweedfs-filer.hcl.j2
+            dest: /opt/hashicorp/nomad/jobs/seaweedfs-filer.hcl
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+        - name: Validate job syntax
+          shell: nomad job validate /opt/hashicorp/nomad/jobs/seaweedfs-filer.hcl
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          become_user: ploy
+
+        - name: Copy job manager script (if not exists)
+          copy:
+            src: ../../common/scripts/nomad-job-manager.sh
+            dest: /opt/hashicorp/bin/nomad-job-manager.sh
+            mode: '0755'
+            owner: root
+            group: root
+            force: false
+
+        - name: Stop existing filer job if running
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh stop --job seaweedfs-filer
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: stop_result
+          failed_when: false
+
+        - name: Wait between stop and deploy operations
+          pause:
+            seconds: 5
+
+        - name: Deploy SeaweedFS filer job
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job seaweedfs-filer --file /opt/hashicorp/nomad/jobs/seaweedfs-filer.hcl
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: filer_deploy
+
+        - name: Wait for filer allocation to be running
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job seaweedfs-filer --timeout 120
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: wait_result
+          failed_when: wait_result.rc != 0
+
+        - name: Get allocation status for verification
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh status --job seaweedfs-filer
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: filer_allocs
+          failed_when: false
+
+        - name: Display filer deployment status
+          debug:
+            msg: "SeaweedFS filer deployed successfully via Nomad"
+
+    - name: Validate SeaweedFS filer service
+      block:
+        - name: Wait for filer to be available via Consul DNS
+          wait_for:
+            host: "seaweedfs-filer.service.consul"
+            port: "{{ seaweedfs.filer_port }}"
+            delay: 10
+            timeout: 60
+          register: consul_dns_check
+          ignore_errors: true
+
+        - name: Test filer HTTP endpoint directly
+          uri:
+            url: "http://localhost:{{ seaweedfs.filer_port }}/"
+            method: GET
+            status_code: 200
+          register: filer_http_check
+          retries: 5
+          delay: 10
+
+        - name: Verify filer is registered in Consul
+          uri:
+            url: "http://localhost:8500/v1/catalog/service/seaweedfs-filer"
+            method: GET
+            status_code: 200
+          register: consul_service_check
+
+        - name: Display final validation results
+          debug:
+            msg: |
+              ✅ SeaweedFS Filer Deployment Complete:
+              - Nomad job status: {{ 'running' if wait_result.rc == 0 else 'failed' }}
+              - HTTP endpoint: {{ 'healthy' if filer_http_check.status == 200 else 'failed' }}
+              - Consul registration: {{ 'registered' if consul_service_check.status == 200 else 'failed' }}
+              - Consul DNS: {{ 'accessible' if consul_dns_check is success else 'not accessible (expected during bootstrap)' }}
+              - Access via: seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}
+
+      rescue:
+        - name: Display troubleshooting information
+          debug:
+            msg: |
+              ⚠️  Filer deployment completed but validation failed.
+              Check the following:
+              1. Nomad job status: nomad job status seaweedfs-filer
+              2. Service logs: nomad alloc logs <alloc-id>
+              3. Consul services: consul catalog services
+              4. Port accessibility: curl http://localhost:{{ seaweedfs.filer_port }}/

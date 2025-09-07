@@ -1434,26 +1434,23 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 
 	// Create ARF handler - RecipeRegistry only (no fallback)
 	var handler *arf.Handler
-	
+
 	// Require SeaweedFS storage for RecipeRegistry
 	if storageProvider == nil {
 		return nil, fmt.Errorf("SeaweedFS storage is required for RecipeRegistry - check SeaweedFS connectivity")
 	}
-	
-	if recipeStorage != nil && (recipeIndex != nil || arfConfig.Storage.Backend == "memory") {
-		// Use storage-aware handler with RecipeRegistry
-		handler = arf.NewHandlerWithStorage(
-			engine,
-			recipeStorage,
-			recipeIndex,
-			recipeValidator,
-			sandboxMgr,
-			storageProvider, // Pass the storage provider for recipe registry
-		)
-		log.Printf("ARF handler initialized with RecipeRegistry backend: %s", arfConfig.Storage.Backend)
-	} else {
-		return nil, fmt.Errorf("recipe storage and index are required for ARF handler")
-	}
+
+	// Always create handler with RecipeRegistry when storage provider is available
+	// Use storage-aware handler with RecipeRegistry
+	handler = arf.NewHandlerWithStorage(
+		engine,
+		recipeStorage, // This may be in-memory fallback, but RecipeRegistry will use storageProvider
+		recipeIndex,   // This may be nil, but RecipeRegistry handles this
+		recipeValidator,
+		sandboxMgr,
+		storageProvider, // Pass the working SeaweedFS storage provider for RecipeRegistry
+	)
+	log.Printf("ARF handler initialized with RecipeRegistry backend (storageProvider: %T)", storageProvider)
 
 	// Initialize Consul store for async transformations (required)
 	consulConfig := consulapi.DefaultConfig()
