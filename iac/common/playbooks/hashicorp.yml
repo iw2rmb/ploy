@@ -418,6 +418,29 @@
               debug:
                 msg: "Traefik installed successfully: {{ traefik_install_version.stdout_lines[0] if traefik_install_version.stdout_lines else 'Version info not available' }}"
 
+        - name: Install hcl2json for HCL to JSON conversion
+          block:
+            - name: Check if hcl2json is already installed
+              stat:
+                path: /usr/local/bin/hcl2json
+              register: hcl2json_binary
+
+            - name: Download hcl2json
+              get_url:
+                url: "https://github.com/tmccombs/hcl2json/releases/latest/download/hcl2json_linux_amd64"
+                dest: /usr/local/bin/hcl2json
+                mode: '0755'
+              when: not hcl2json_binary.stat.exists
+
+            - name: Verify hcl2json installation
+              command: /usr/local/bin/hcl2json --version
+              register: hcl2json_version
+              changed_when: false
+
+            - name: Display hcl2json version
+              debug:
+                msg: "hcl2json installed successfully: {{ hcl2json_version.stdout }}"
+
         - name: Copy Traefik Nomad job template to VPS
           copy:
             src: "{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
