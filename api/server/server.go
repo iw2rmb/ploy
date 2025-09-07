@@ -34,7 +34,10 @@ import (
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/api/selfupdate"
 	"github.com/iw2rmb/ploy/api/templates"
+	"github.com/iw2rmb/ploy/api/transflow"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
+	"github.com/iw2rmb/ploy/internal/git/provider"
+	"github.com/iw2rmb/ploy/internal/orchestration"
 
 	// "github.com/iw2rmb/ploy/api/openrewrite"
 	"github.com/iw2rmb/ploy/api/version"
@@ -69,6 +72,7 @@ type ServiceDependencies struct {
 	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
 	ARFHandler              *arf.Handler
+	TransflowHandler        *transflow.Handler
 	AnalysisHandler         *analysis.Handler
 	LLMHandler              *llms.Handler
 	CoordinationManager     *coordination.CoordinationManager
@@ -468,6 +472,12 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		log.Printf("Warning: Failed to initialize LLM handler: %v", err)
 	}
 
+	// Initialize Transflow Handler
+	transflowHandler, err := initializeTransflowHandler(cfg, cfgService)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Transflow handler: %v", err)
+	}
+
 	// Initialize Metrics
 	metricsInstance := metrics.NewMetrics()
 
@@ -494,6 +504,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
 		ARFHandler:              arfHandler,
+		TransflowHandler:        transflowHandler,
 		AnalysisHandler:         analysisHandler,
 		LLMHandler:              llmHandler,
 		CoordinationManager:     coordinationManager,
@@ -831,6 +842,12 @@ func (s *Server) setupRoutes() {
 	if s.dependencies.ARFHandler != nil {
 		s.dependencies.ARFHandler.RegisterRoutes(s.app)
 		log.Printf("ARF routes registered successfully")
+	}
+
+	// Transflow endpoints
+	if s.dependencies.TransflowHandler != nil {
+		s.dependencies.TransflowHandler.RegisterRoutes(s.app)
+		log.Printf("Transflow routes registered successfully")
 	}
 
 	// Internal ARF recipes handlers are now the default; legacy overlay removed
@@ -1855,6 +1872,36 @@ func initializeLLMHandler(cfgService *cfgsvc.Service) (*llms.Handler, error) {
 	// Create LLM handler
 	handler := llms.NewHandler(storage)
 	log.Printf("LLM model registry handler initialized successfully")
+	return handler, nil
+}
+
+// initializeTransflowHandler initializes the Transflow handler
+func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*transflow.Handler, error) {
+	log.Printf("Initializing Transflow handler")
+
+	// Create GitLab provider
+	gitProvider := provider.NewGitLabProvider()
+
+
+	// Resolve unified storage from config service
+	var storage internalStorage.Storage
+	if cfgService != nil {
+		var err error
+		storage, err = resolveStorageFromConfigService(cfgService)
+		if err != nil {
+			log.Printf("Warning: Failed to resolve storage for Transflow handler: %v", err)
+		}
+	}
+
+	// Create status store (Consul KV)
+	var statusStore orchestration.KV
+	if cfg.ConsulAddr != "" {
+		statusStore = orchestration.NewKV()
+	}
+
+	// Create transflow handler
+	handler := transflow.NewHandler(gitProvider, storage, statusStore)
+	log.Printf("Transflow handler initialized successfully")
 	return handler, nil
 }
 
