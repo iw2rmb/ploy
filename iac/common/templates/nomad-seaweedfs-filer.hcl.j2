@@ -1,0 +1,160 @@
+# SeaweedFS Filer - Nomad Service Job
+# 
+# This job deploys the SeaweedFS Filer with:
+# - Service discovery via Consul DNS (seaweedfs-filer.service.consul)
+# - Integration with systemd-managed master and volume servers
+# - Health checks and automatic recovery
+# - Binary distribution via SeaweedFS artifact download
+
+job "seaweedfs-filer" {
+  datacenters = ["dc1"]
+  type = "service"
+  priority = 75
+
+  # Single instance for development, can be scaled in production
+  group "filer" {
+    count = 1
+
+    # Rolling update configuration
+    update {
+      max_parallel = 1
+      min_healthy_time = "10s"
+      healthy_deadline = "5m"
+      progress_deadline = "10m"
+      auto_revert = true
+    }
+
+    # Network configuration - use static port for SeaweedFS filer
+    network {
+      port "filer" {
+        static = {{ seaweedfs.filer_port }}
+      }
+    }
+
+    # Restart policy for stability
+    restart {
+      attempts = 5
+      interval = "10m"
+      delay = "30s"
+      mode = "fail"
+    }
+
+    task "filer" {
+      driver = "raw_exec"
+
+      # Download SeaweedFS binary
+      artifact {
+        source = "https://github.com/seaweedfs/seaweedfs/releases/download/{{ seaweedfs.version }}/linux_amd64.tar.gz"
+        destination = "local/"
+        mode = "any"
+      }
+
+      # Environment variables for filer configuration
+      env {
+        SEAWEEDFS_MASTER = "localhost:{{ seaweedfs.master_port }}"
+        SEAWEEDFS_DATA_CENTER = "dc1"
+        SEAWEEDFS_RACK = "rack1"
+        SEAWEEDFS_FILER_PORT = "{{ seaweedfs.filer_port }}"
+      }
+
+      # Configuration for raw_exec driver
+      config {
+        command = "/bin/bash"
+        args = ["local/start-filer.sh"]
+      }
+
+      # Resource allocation
+      resources {
+        cpu = 300    # MHz - lighter than API
+        memory = 256 # MB - filer is lightweight
+      }
+
+      # Create startup script
+      template {
+        data = <<EOF
+#!/bin/bash
+set -e
+
+# Ensure master is accessible before starting filer
+echo "[FILER] Waiting for SeaweedFS master at localhost:{{ seaweedfs.master_port }}..."
+timeout 60 bash -c 'until nc -z localhost {{ seaweedfs.master_port }}; do sleep 2; done'
+echo "[FILER] ✓ Master is accessible"
+
+# Create filer data directory in the local allocation space
+mkdir -p local/filer-data
+
+# Extract and prepare SeaweedFS binary
+echo "[FILER] Checking for SeaweedFS binary..."
+echo "[FILER] Current directory: $(pwd)"
+echo "[FILER] Files available: $(ls -la local/)"
+
+if [ ! -f local/weed ]; then
+  echo "[FILER] Extracting SeaweedFS binary..."
+  tar -xzf local/linux_amd64.tar.gz -C local/
+  chmod +x local/weed
+  echo "[FILER] ✓ Binary extracted and made executable"
+else
+  echo "[FILER] ✓ SeaweedFS binary already exists"
+fi
+
+# Start SeaweedFS filer
+echo "[FILER] Starting SeaweedFS filer on port {{ seaweedfs.filer_port }}..."
+exec local/weed filer \
+  -port={{ seaweedfs.filer_port }} \
+  -ip.bind=0.0.0.0 \
+  -master=localhost:{{ seaweedfs.master_port }} \
+  -dataCenter=dc1 \
+  -defaultReplicaPlacement=000 \
+  -dirListLimit=1000 \
+  -defaultStoreDir=local/filer-data
+EOF
+        destination = "local/start-filer.sh"
+        perms = "755"
+      }
+
+      # Health checks and service discovery
+      service {
+        name = "seaweedfs-filer"
+        port = "filer"
+        tags = [
+          "seaweedfs",
+          "filer", 
+          "storage"
+        ]
+
+        # HTTP health check
+        check {
+          type = "http"
+          path = "/"
+          interval = "10s"
+          timeout = "5s"
+          port = "filer"
+        }
+
+        # TCP health check as backup
+        check {
+          name = "filer-tcp"
+          type = "tcp"
+          interval = "15s"
+          timeout = "5s"
+          port = "filer"
+        }
+        
+        # Configure Consul to automatically deregister failed services
+        meta {
+          deregister_critical_service_after = "30s"
+        }
+      }
+
+      # Graceful shutdown
+      kill_timeout = "30s"
+      kill_signal = "SIGTERM"
+
+      # Logging configuration
+      logs {
+        max_files = 5
+        max_file_size = 10
+      }
+    }
+  }
+}

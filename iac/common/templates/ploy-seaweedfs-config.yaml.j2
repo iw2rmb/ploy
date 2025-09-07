@@ -2,10 +2,10 @@
 # Simplified configuration with SeaweedFS as the only storage backend
 
 # SeaweedFS master server address
-master: "localhost:{{ seaweedfs.master_port }}"
+master: "{{ 'seaweedfs-master.service.consul:9333' if seaweedfs.use_consul_discovery else 'localhost:9333' }}"
 
 # SeaweedFS filer server address  
-filer: "localhost:{{ seaweedfs.filer_port }}"
+filer: "{{ 'seaweedfs-filer.service.consul:8888' if seaweedfs.use_consul_discovery else 'localhost:8888' }}"
 
 # Collection name for storing artifacts
 collection: "{{ seaweedfs.collections.artifacts.name }}"

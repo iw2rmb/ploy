@@ -134,7 +134,7 @@ func convertStringMap(stringMap map[string]string) map[string]interface{} {
 
 // DefaultRecipeEvolution implements the RecipeEvolution interface
 type DefaultRecipeEvolution struct {
-	catalog    RecipeCatalog
+	registry   *RecipeRegistry
 	validator  RecipeValidator
 	versioning RecipeVersioning
 	config     RecipeEvolutionConfig
@@ -150,7 +150,7 @@ type RecipeEvolutionConfig struct {
 }
 
 // NewRecipeEvolution creates a new recipe evolution system
-func NewRecipeEvolution(catalog RecipeCatalog, validator RecipeValidator, versioning RecipeVersioning) RecipeEvolution {
+func NewRecipeEvolution(registry *RecipeRegistry, validator RecipeValidator, versioning RecipeVersioning) RecipeEvolution {
 	config := RecipeEvolutionConfig{
 		MaxEvolutionDepth:     5,
 		MinConfidenceRequired: 0.7,
@@ -160,7 +160,7 @@ func NewRecipeEvolution(catalog RecipeCatalog, validator RecipeValidator, versio
 	}
 
 	return &DefaultRecipeEvolution{
-		catalog:    catalog,
+		registry:   registry,
 		validator:  validator,
 		versioning: versioning,
 		config:     config,
@@ -727,7 +727,7 @@ func (re *DefaultRecipeEvolution) RollbackRecipe(ctx context.Context, recipeID s
 	}
 
 	// Store the current version as a rollback point
-	currentRecipe, err := re.catalog.GetRecipe(ctx, recipeID)
+	currentRecipe, err := re.registry.GetRecipeAsModelsRecipe(ctx, recipeID)
 	if err != nil {
 		return fmt.Errorf("failed to get current recipe: %w", err)
 	}
@@ -747,8 +747,8 @@ func (re *DefaultRecipeEvolution) RollbackRecipe(ctx context.Context, recipeID s
 		return fmt.Errorf("failed to store rollback version: %w", err)
 	}
 
-	// Update the catalog with the rolled-back recipe
-	return re.catalog.UpdateRecipe(ctx, recipeVersion.Recipe)
+	// Update the registry with the rolled-back recipe
+	return re.registry.UpdateRecipe(ctx, recipeVersion.Recipe)
 }
 
 // ErrorPattern represents a stored error pattern in the database

@@ -92,13 +92,7 @@
         group: root
         mode: '0644'
 
-    - name: Create SeaweedFS filer service
-      template:
-        src: ../../common/templates/seaweedfs-filer.service.j2
-        dest: /etc/systemd/system/seaweedfs-filer.service
-        owner: root
-        group: root
-        mode: '0644'
+    # SeaweedFS filer will be deployed via Nomad (see seaweedfs-filer.yml playbook)
 
     # SeaweedFS will run with command-line arguments, no config files needed
 
@@ -142,25 +136,7 @@
         delay: 2
         timeout: 30
 
-    - name: Check SeaweedFS filer service status
-      command: systemctl is-active seaweedfs-filer
-      register: seaweedfs_filer_status
-      ignore_errors: true
-      changed_when: false
-
-    - name: Start and enable SeaweedFS filer (if not running)
-      systemd:
-        name: seaweedfs-filer
-        state: started
-        enabled: true
-        daemon_reload: true
-      when: seaweedfs_filer_status.stdout != "active"
-
-    - name: Wait for filer to be ready
-      wait_for:
-        port: "{{ seaweedfs.filer_port }}"
-        delay: 2
-        timeout: 30
+    # SeaweedFS filer service is managed by Nomad - see seaweedfs-filer.yml playbook
 
     - name: Create artifact collections
       uri:
@@ -273,25 +249,7 @@
             group: root
             mode: '0644'
 
-        - name: Create Consul service definition for SeaweedFS filer
-          copy:
-            content: |
-              {
-                "service": {
-                  "name": "seaweedfs-filer",
-                  "port": {{ seaweedfs.filer_port }},
-                  "tags": ["seaweedfs", "filer", "storage"],
-                  "check": {
-                    "http": "http://localhost:{{ seaweedfs.filer_port }}/",
-                    "interval": "10s",
-                    "timeout": "5s"
-                  }
-                }
-              }
-            dest: /etc/consul.d/seaweedfs-filer.json
-            owner: root
-            group: root
-            mode: '0644'
+        # SeaweedFS filer service registration handled by Nomad
 
         - name: Reload Consul to register SeaweedFS services
           systemd:
@@ -311,7 +269,7 @@
           loop:
             - seaweedfs-master
             - seaweedfs-volume
-            - seaweedfs-filer
+            # seaweedfs-filer will be registered by Nomad
 
         - name: Display SeaweedFS Consul registration status
           debug:

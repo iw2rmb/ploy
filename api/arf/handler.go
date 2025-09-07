@@ -25,7 +25,6 @@ type Handler struct {
 	recipeIndex      RecipeIndexStore
 	recipeValidator  RecipeValidatorInterface
 	recipeRegistry   *RecipeRegistry // Unified recipe registry
-	catalog          RecipeCatalog
 	sandboxMgr       SandboxManager
 	llmGenerator     LLMRecipeGenerator
 	learningSystem   LearningSystem
@@ -44,11 +43,10 @@ type Handler struct {
 }
 
 // NewHandler creates a new ARF HTTP handler
-func NewHandler(executor *RecipeExecutor, catalog RecipeCatalog, sandboxMgr SandboxManager) *Handler {
+func NewHandler(executor *RecipeExecutor, sandboxMgr SandboxManager) *Handler {
 	return &Handler{
 		recipeExecutor: executor,
 		recipeRegistry: nil, // Will be initialized when needed
-		catalog:        catalog,
 		sandboxMgr:     sandboxMgr,
 		// Initialize Phase 4 components
 		securityEngine: NewSecurityEngine(),
@@ -164,7 +162,6 @@ func NewHandlerWithStorage(
 		recipeIndex:     recipeIndex,
 		recipeValidator: recipeValidator,
 		recipeRegistry:  recipeRegistry,
-		catalog:         nil, // Will use storage directly
 		sandboxMgr:      sandboxMgr,
 		// Initialize Phase 4 components
 		securityEngine: NewSecurityEngine(),
@@ -175,7 +172,6 @@ func NewHandlerWithStorage(
 // NewHandlerWithPhase3 creates a new ARF HTTP handler with Phase 3 components
 func NewHandlerWithPhase3(
 	executor *RecipeExecutor,
-	catalog RecipeCatalog,
 	sandboxMgr SandboxManager,
 	llmGen LLMRecipeGenerator,
 	learning LearningSystem,
@@ -185,7 +181,7 @@ func NewHandlerWithPhase3(
 ) *Handler {
 	return &Handler{
 		recipeExecutor:   executor,
-		catalog:          catalog,
+		recipeRegistry:   nil, // Will be initialized when needed
 		sandboxMgr:       sandboxMgr,
 		llmGenerator:     llmGen,
 		learningSystem:   learning,
