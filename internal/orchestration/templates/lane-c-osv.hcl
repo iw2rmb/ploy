@@ -37,11 +37,7 @@ job "{{APP_NAME}}-lane-c" {
       port "jmx" { to = 9999 }
     }
 
-    volume "jvm-data" {
-      type      = "host"
-      source    = "jvm-data"
-      read_only = false
-    }
+    # host volume removed for dev simplicity
 
     {{#if CONNECT_ENABLED}}
     service {
@@ -78,7 +74,7 @@ job "{{APP_NAME}}-lane-c" {
         cpu = "host"
       }
 
-      volume_mount { volume = "jvm-data"; destination = "/app/data" }
+      # volume mount removed
 
       env {
         JAVA_OPTS = "{{JVM_OPTS}}"
@@ -100,16 +96,7 @@ job "{{APP_NAME}}-lane-c" {
       service {
         name = "{{APP_NAME}}-lane-c-osv"
         port = "http"
-        tags = [
-          "lane-c","osv","jvm",
-          "version-{{VERSION}}",
-          "java-{{JAVA_VERSION}}",
-          "traefik.enable=true",
-          "traefik.http.routers.{{APP_NAME}}-c.rule=Host(`{{APP_NAME}}-c.{{DOMAIN_SUFFIX}}`)",
-          "traefik.http.routers.{{APP_NAME}}-c.tls.certresolver=letsencrypt",
-          "traefik.http.services.{{APP_NAME}}-c.loadbalancer.healthcheck.path=/actuator/health",
-          "traefik.http.services.{{APP_NAME}}-c.loadbalancer.healthcheck.interval=10s"
-        ]
+        tags = ["lane-c","osv","jvm","version-{{VERSION}}"]
         # Single health check to avoid duplicate default names
         check {
           type     = "http"
