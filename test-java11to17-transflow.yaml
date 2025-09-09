@@ -55,9 +55,8 @@ merge:
   recheck_gates_post_merge: true
 
 steps:
-  - type: recipe
+  - type: orw-apply
     id: java11to17-migration
-    engine: openrewrite
     recipes:
       - org.openrewrite.java.migrate.UpgradeToJava17
 
@@ -79,6 +78,4 @@ steps:
       max_cost: 0
       timeout: 30m
 
-  - type: human-step
-    id: manual-review
-    reason: "Review migration changes if build healing fails"
+  # human-step is intentionally omitted; it will be injected by llm-plan if needed
