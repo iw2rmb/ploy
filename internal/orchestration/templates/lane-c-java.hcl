@@ -20,7 +20,6 @@ job "{{APP_NAME}}-lane-c" {
     reschedule { delay = "30s"; delay_function = "exponential"; max_delay = "2h"; unlimited = true }
 
     network {
-      mode = "bridge"
       port "http" { to = {{HTTP_PORT}} }
       port "metrics" { to = 9090 }
       port "jmx" { to = 9999 }
@@ -97,4 +96,3 @@ job "{{APP_NAME}}-lane-c" {
     migrate { max_parallel = 1; health_check = "checks"; min_healthy_time = "30s"; healthy_deadline = "3m" }
   }
 }
-
