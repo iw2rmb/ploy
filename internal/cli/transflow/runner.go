@@ -402,30 +402,85 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		Message: fmt.Sprintf("Created workflow branch: %s", branchName),
 	})
 
-	// Step 3: Execute recipe steps
-	for _, step := range r.config.Steps {
-		if step.Type == "recipe" {
-			stepStart := time.Now()
-			if err := r.recipeExecutor.ExecuteRecipes(ctx, repoPath, step.Recipes); err != nil {
-				result.StepResults = append(result.StepResults, StepResult{
-					StepID:   step.ID,
-					Success:  false,
-					Message:  fmt.Sprintf("Recipe execution failed: %v", err),
-					Duration: time.Since(stepStart),
-				})
-				result.ErrorMessage = fmt.Sprintf("failed to execute recipes: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("failed to execute recipes: %w", err)
-			}
+    // Step 3: Execute transformation steps
+    for _, step := range r.config.Steps {
+        switch step.Type {
+        case "orw-apply":
+            stepStart := time.Now()
+            // Render ORW apply HCL assets
+            renderedPath, err := r.RenderORWApplyAssets(step.ID)
+            if err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to render ORW assets: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("failed to render orw-apply assets: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
+            }
 
-			result.StepResults = append(result.StepResults, StepResult{
-				StepID:   step.ID,
-				Success:  true,
-				Message:  fmt.Sprintf("Applied recipe: %s", strings.Join(step.Recipes, ", ")),
-				Duration: time.Since(stepStart),
-			})
-		}
-	}
+            // Pre-substitute recipe class into template
+            hclBytes, err := os.ReadFile(renderedPath)
+            if err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to read HCL: %v", err)})
+                return nil, fmt.Errorf("failed to read HCL: %w", err)
+            }
+            rclass := ""
+            if len(step.Recipes) > 0 {
+                rclass = step.Recipes[0]
+            }
+            prePath := strings.ReplaceAll(renderedPath, ".rendered.hcl", ".pre.hcl")
+            preContent := strings.ReplaceAll(string(hclBytes), "${RECIPE_CLASS}", rclass)
+            if err := os.WriteFile(prePath, []byte(preContent), 0644); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
+                return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
+            }
+
+            // Prepare env and substitute final template
+            baseDir := filepath.Dir(renderedPath)
+            _ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
+            os.Setenv("TRANSFLOW_CONTEXT_DIR", baseDir)
+            os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+            runID := fmt.Sprintf("orw-apply-%s-%d", step.ID, time.Now().Unix())
+            submittedPath, err := substituteORWTemplate(prePath, runID)
+            if err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
+                return nil, fmt.Errorf("failed to substitute ORW HCL: %w", err)
+            }
+
+            // Submit job and wait terminal
+            if err := orchestration.SubmitAndWaitTerminal(submittedPath, 30*time.Minute); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("orw-apply job failed: %w", err)
+            }
+
+            // Locate diff.patch and apply
+            diffPath := filepath.Join(baseDir, "out", "diff.patch")
+            if _, err := os.Stat(diffPath); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("No diff.patch produced: %v", err)})
+                result.ErrorMessage = "no diff produced by orw-apply"
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("no diff produced by orw-apply: %w", err)
+            }
+
+            if err := r.ApplyDiffAndBuild(ctx, repoPath, diffPath); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("apply/build failed: %w", err)
+            }
+
+            result.StepResults = append(result.StepResults, StepResult{
+                StepID:   step.ID,
+                Success:  true,
+                Message:  "Applied ORW diff and passed build gate",
+                Duration: time.Since(stepStart),
+            })
+
+        case "recipe":
+            // Deprecated: recipe step is no longer supported in main workflow
+            return nil, fmt.Errorf("recipe step is no longer supported; use orw-apply")
+        }
+    }
 
 	// Step 4: Commit changes
 	// Guard: ensure recipes produced actual changes before committing
