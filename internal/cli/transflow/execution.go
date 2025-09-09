@@ -168,8 +168,8 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 				}
 				os.Setenv("TRANSFLOW_CONTEXT_DIR", contextDir)
 				os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
-				runID2 := fmt.Sprintf("%s-orw-apply-%d", runner.config.ID, time.Now().Unix())
-				submittedPath, serr := substituteHCLTemplate(prePath, runID2)
+    runID2 := fmt.Sprintf("%s-orw-apply-%d", runner.config.ID, time.Now().Unix())
+    submittedPath, serr := substituteORWTemplate(prePath, runID2)
 				if serr != nil {
 					fmt.Printf("failed to write submitted HCL: %v\n", serr)
 				} else {
@@ -234,7 +234,7 @@ func executeApplyFirst(runner *TransflowRunner) error {
 }
 
 // substituteHCLTemplate performs HCL template substitution (needs to be implemented based on original logic)
-func substituteHCLTemplate(prePath, runID string) (string, error) {
+func substituteORWTemplate(prePath, runID string) (string, error) {
 	// This is a stub - the original logic would need to be extracted from the full implementation
 	submittedPath := strings.ReplaceAll(prePath, ".pre.hcl", ".submitted.hcl")
 
@@ -265,9 +265,9 @@ func substituteHCLTemplate(prePath, runID string) (string, error) {
 		"${ORW_IMAGE}", orwImage,
 	).Replace(string(content))
 
-	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
-		return "", err
-	}
+    if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
+        return "", err
+    }
 
-	return submittedPath, nil
+    return submittedPath, nil
 }
