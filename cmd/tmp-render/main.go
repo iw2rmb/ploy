@@ -21,6 +21,7 @@ func main() {
         VaultEnabled:      false,
         ConnectEnabled:    false,
         ConsulConfigEnabled: false,
+        Language:          "java",
     }
     f, err := orch.RenderTemplate("C", rd)
     if err != nil {
@@ -30,4 +31,3 @@ func main() {
     b, _ := os.ReadFile(f)
     fmt.Println(string(b))
 }
-
