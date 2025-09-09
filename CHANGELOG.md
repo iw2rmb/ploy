@@ -58,6 +58,7 @@
 - Optimized storage operations for better performance characteristics
 - Fixed ARF config storage initialization to match updated NewRecipeRegistry signature (no error return)
 - IAC docs: consolidated `iac/README.md` (clean, non-duplicative) and removed redundant `iac/CLAUDE.md`
+- Transflow orw-apply HCL: mount prepared `input.tar` into the container (`/workspace/input.tar`) alongside context/out mounts to ensure source files are available. Fixes orw-apply failing with "No build file found" when the archive wasn’t accessible in-container.
 
 ### Technical Details
 - **Coverage**: 60% minimum, 90% for critical healing components
