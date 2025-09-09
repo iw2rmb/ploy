@@ -276,12 +276,43 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	}()
 
 	select {
-	case <-doneCh:
-		if runErr != nil {
-			h.recordError(executionID, runErr)
-			return
-		}
-		// continue to success handling below
+    case <-doneCh:
+        if runErr != nil {
+            // Best-effort: persist any artifacts (e.g., error logs) and enrich error message
+            if h.storage != nil {
+                if _, err := h.persistArtifacts(executionID, tempDir); err != nil {
+                    log.Printf("[Transflow] Warning: artifact persistence on failure failed: %v", err)
+                }
+            }
+            // Try to include first error.log contents from orw-apply in the error message for clarity
+            orwDir := filepath.Join(tempDir, "orw-apply")
+            var errDetail string
+            _ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
+                if err != nil || info == nil || info.IsDir() {
+                    return nil
+                }
+                if filepath.Base(path) == "error.log" {
+                    if b, e := os.ReadFile(path); e == nil {
+                        s := strings.TrimSpace(string(b))
+                        if len(s) > 0 {
+                            // Limit to a reasonable snippet
+                            if len(s) > 1024 {
+                                s = s[:1024]
+                            }
+                            errDetail = s
+                        }
+                    }
+                    return io.EOF // stop after first match
+                }
+                return nil
+            })
+            if errDetail != "" {
+                runErr = fmt.Errorf("%v; details: %s", runErr, errDetail)
+            }
+            h.recordError(executionID, runErr)
+            return
+        }
+        // continue to success handling below
 	case <-ctx.Done():
 		// Timeout/cancellation — record a terminal error
 		h.recordError(executionID, fmt.Errorf("transflow execution exceeded max duration (%s)", execTimeout))
@@ -385,8 +416,16 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			if err := h.storage.Put(ctx, key, io.NopCloser(bytes.NewReader(buf))); err == nil {
 				artifacts["diff_patch"] = key
 			}
-			// Stop after first match
-			return io.EOF
+			return nil
+		}
+		if filepath.Base(path) == "error.log" {
+			key := fmt.Sprintf("artifacts/transflow/%s/error.log", executionID)
+			f, _ := os.Open(path)
+			defer f.Close()
+			if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("text/plain")); err == nil {
+				artifacts["error_log"] = key
+			}
+			return nil
 		}
 		return nil
 	})
