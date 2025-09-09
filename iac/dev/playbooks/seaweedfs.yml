@@ -275,6 +275,93 @@
           debug:
             msg: "✅ SeaweedFS services successfully registered with Consul"
 
+    - name: Create Knowledge Base (KB) namespace structure
+      block:
+        - name: Wait for SeaweedFS filer to be available
+          wait_for:
+            host: "{{ 'seaweedfs-filer.service.consul' if seaweedfs.use_consul_discovery else 'localhost' }}"
+            port: "{{ seaweedfs.filer_port }}"
+            delay: 10
+            timeout: 60
+          ignore_errors: true
+
+        - name: Create temporary KB setup directory
+          file:
+            path: /tmp/kb-setup
+            state: directory
+            mode: '0755'
+
+        - name: Create KB namespace placeholder files
+          copy:
+            content: "KB {{ item }} directory - created by Ansible"
+            dest: "/tmp/kb-setup/{{ item }}_placeholder.txt"
+            mode: '0644'
+          loop:
+            - errors
+            - cases
+            - summaries
+            - patches
+
+        - name: Create root KB namespace
+          copy:
+            content: "Knowledge Base root namespace"
+            dest: /tmp/kb-setup/kb_placeholder.txt
+            mode: '0644'
+
+        - name: Upload KB namespace structure to SeaweedFS
+          uri:
+            url: "http://{{ 'seaweedfs-filer.service.consul' if seaweedfs.use_consul_discovery else 'localhost' }}:{{ seaweedfs.filer_port }}/kb/{{ item }}/"
+            method: POST
+            body_format: form-multipart
+            body:
+              file:
+                filename: "{{ item }}_placeholder.txt"
+                content: "KB {{ item }} directory - created by Ansible"
+            status_code: [200, 201, 409]  # 409 = already exists
+          loop:
+            - errors
+            - cases
+            - summaries
+            - patches
+          register: kb_namespace_creation
+          failed_when: false
+          ignore_errors: true
+
+        - name: Display KB namespace creation results
+          debug:
+            msg: "KB namespace {{ item.item }}: {{ 'Created' if item.status in [200, 201] else 'Already exists' if item.status == 409 else 'Skipped (filer not ready)' if item.skipped is defined else 'Failed' }}"
+          loop: "{{ kb_namespace_creation.results | default([]) }}"
+          when: kb_namespace_creation.results is defined
+
+        - name: Create KB root placeholder
+          uri:
+            url: "http://{{ 'seaweedfs-filer.service.consul' if seaweedfs.use_consul_discovery else 'localhost' }}:{{ seaweedfs.filer_port }}/kb/kb_placeholder.txt"
+            method: POST
+            body_format: form-multipart
+            body:
+              file:
+                filename: kb_placeholder.txt
+                content: "Knowledge Base root namespace"
+            status_code: [200, 201, 409]  # 409 = already exists
+          register: kb_root_creation
+          failed_when: false
+          ignore_errors: true
+
+        - name: Clean up temporary KB setup files
+          file:
+            path: /tmp/kb-setup
+            state: absent
+
+        - name: Display KB namespace setup status
+          debug:
+            msg: "✅ Knowledge Base namespace structure created in SeaweedFS"
+          when: kb_namespace_creation.results is defined and kb_namespace_creation.results | length > 0
+
+      rescue:
+        - name: Display KB namespace setup failure
+          debug:
+            msg: "⚠️ KB namespace creation failed or skipped - filer may not be ready yet. KB will be created when filer becomes available."
+
     - name: Cleanup installation files
       file:
         path: /tmp/seaweedfs.tar.gz

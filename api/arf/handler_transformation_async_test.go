@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mockSeaweedFS lives in mock_seaweedfs_test.go for reuse across tests
+
 // MockRecipeExecutor for testing
 type MockRecipeExecutor struct {
 	shouldFail bool
@@ -276,10 +278,11 @@ func TestExecuteTransformation_Async(t *testing.T) {
 }
 
 func TestExecuteTransformation_ValidationSuggestions(t *testing.T) {
-	// Setup mock catalog with a couple of recipes
-	cat := NewMockRecipeCatalog()
+	// Setup RecipeRegistry with a couple of recipes
 	ctx := context.Background()
-	_ = cat.StoreRecipe(ctx, &models.Recipe{
+	sea := newMockSeaweed()
+	reg := NewRecipeRegistry(sea)
+	_ = reg.StoreRecipe(ctx, &models.Recipe{
 		ID: "org.openrewrite.java.RemoveUnusedImports",
 		Metadata: models.RecipeMetadata{
 			Name:        "RemoveUnusedImports",
@@ -288,7 +291,7 @@ func TestExecuteTransformation_ValidationSuggestions(t *testing.T) {
 			Languages:   []string{"java"},
 		},
 	})
-	_ = cat.StoreRecipe(ctx, &models.Recipe{
+	_ = reg.StoreRecipe(ctx, &models.Recipe{
 		ID: "org.openrewrite.java.migrate.UpgradeToJava17",
 		Metadata: models.RecipeMetadata{
 			Name:        "UpgradeToJava17",
@@ -302,8 +305,8 @@ func TestExecuteTransformation_ValidationSuggestions(t *testing.T) {
 	mockStore := &MockConsulHealingStore{MockConsulStore: MockConsulStore{data: make(map[string]*TransformationStatus)}}
 
 	handler := &Handler{
-		consulStore: mockStore,
-		catalog:     cat,
+		consulStore:    mockStore,
+		recipeRegistry: reg,
 	}
 
 	app := fiber.New()
@@ -614,13 +617,14 @@ func TestGetTransformationStatusEnhanced(t *testing.T) {
 
 // Test that catalog hits and misses are tracked
 func TestHandler_TracksCatalogMetrics(t *testing.T) {
-	// Create handler with mock catalog and metrics
-	mockCatalog := NewMockRecipeCatalog()
+	// Create handler with registry and metrics
+	sea := newMockSeaweed()
+	reg := NewRecipeRegistry(sea)
 	mockMetrics := &MockCatalogMetrics{}
 	mockStore := NewMockConsulStore()
 
 	handler := &Handler{
-		catalog:        mockCatalog,
+		recipeRegistry: reg,
 		consulStore:    mockStore,
 		recipeExecutor: &RecipeExecutor{}, // Use actual RecipeExecutor type
 		metrics:        mockMetrics,
@@ -629,9 +633,9 @@ func TestHandler_TracksCatalogMetrics(t *testing.T) {
 	app := fiber.New()
 	app.Post("/v1/arf/transforms", handler.ExecuteTransformationAsync)
 
-	// Add a known recipe to catalog
+	// Add a known recipe to registry
 	ctx := context.Background()
-	_ = mockCatalog.StoreRecipe(ctx, &models.Recipe{
+	_ = reg.StoreRecipe(ctx, &models.Recipe{
 		ID: "org.openrewrite.java.RemoveUnusedImports",
 		Metadata: models.RecipeMetadata{
 			Name: "Remove Unused Imports",

@@ -28,8 +28,7 @@ internal/
 │   │   └── handler.go       # Analysis command handlers
 │   ├── apps/                # Application management commands
 │   │   └── handler.go       # App command handlers
-│   ├── arf/                 # ARF CLI commands ✅ Aug 2025
-│   │   ├── benchmark.go     # Benchmark testing commands
+│   ├── arf/                 # ARF CLI commands ✅ Sep 2025 - Refactored
 │   │   ├── composition.go   # Recipe composition utilities
 │   │   ├── config.go        # ARF configuration management
 │   │   ├── config_handler.go # Configuration command handlers
@@ -40,14 +39,24 @@ internal/
 │   │   ├── health.go        # Health check commands
 │   │   ├── help.go          # Help and documentation commands
 │   │   ├── import_export.go # Recipe import/export functionality
+│   │   ├── models.go        # Data models for ARF operations
 │   │   ├── pagination.go    # Result pagination utilities
-│   │   ├── recipes.go       # Recipe management commands
-│   │   ├── recipes_test.go  # Recipe tests
-│   │   ├── sandbox.go       # Sandbox management commands
+│   │   ├── recipe_catalog.go    # Recipe catalog operations
+│   │   ├── recipe_crud.go       # Recipe CRUD operations (upload, update, delete, download)
+│   │   ├── recipe_display.go    # Recipe display and formatting utilities
+│   │   ├── recipe_flags.go      # Recipe command flag parsing utilities
+│   │   ├── recipe_handlers.go   # Recipe command routing and usage printing
+│   │   ├── recipe_search.go     # Recipe search, list, show, and stats operations
+│   │   ├── recipe_types.go      # Recipe type definitions (RecipeFilter, CommandFlags, etc.)
+│   │   ├── recipe_unified.go    # Unified recipe registry handling
+│   │   ├── recipe_validation.go # Recipe validation logic
+│   │   ├── recipes.go.backup    # Original monolithic recipe file (pre-refactoring backup)
+│   │   ├── recipes_catalog_parse_test.go # Recipe catalog parsing tests
+│   │   ├── recipes_suggestions_test.go  # Recipe suggestion tests
+│   │   ├── recipes_test.go      # Main recipe functionality tests
 │   │   ├── templates.go     # Template management commands
 │   │   ├── transform.go     # Transformation commands
-│   │   ├── utils.go         # ARF utility functions
-│   │   └── workflow.go      # Workflow management commands
+│   │   └── utils.go         # ARF utility functions
 │   ├── bluegreen/           # Blue-green deployment commands
 │   │   └── bluegreen.go     # Blue-green deployment logic
 │   ├── certs/               # Certificate management

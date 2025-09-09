@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,9 +54,8 @@ func (m *MockEngine) ListAvailableRecipes() ([]*models.Recipe, error) {
 func (m *MockEngine) GetRecipeMetadata(recipeID string) (*models.RecipeMetadata, error) {
 	recipe, exists := m.recipes[recipeID]
 	if !exists {
-		return nil, &RecipeNotFoundError{RecipeID: recipeID}
+		return nil, fmt.Errorf("recipe not found")
 	}
-
 	return &recipe.Metadata, nil
 }
 
@@ -75,14 +75,18 @@ func (e *ValidationError) Error() string {
 	return e.Message
 }
 
-func setupTestHandler() (*Handler, *RecipeExecutor, *MockSandboxManager) {
-	// Create mock storage and sandbox manager for RecipeExecutor
-	storage := NewInMemoryRecipeStorage()
-	sandboxMgr := NewMockSandboxManager()
-	executor := NewRecipeExecutor(storage, sandboxMgr, nil)
-	handler := NewHandler(executor, sandboxMgr)
+// mockSeaweedFS shared in mock_seaweedfs_test.go
 
-	// Add some test recipes
+func setupTestHandler() (*Handler, *RecipeExecutor, *MockSandboxManager) {
+	// Create SeaweedFS-like mock and registry-backed storage adapter
+	sea := newMockSeaweed()
+	registry := NewRecipeRegistry(sea)
+	storageAdapter := NewRegistryStorageAdapter(registry)
+	sandboxMgr := NewMockSandboxManager()
+	executor := NewRecipeExecutor(storageAdapter, sandboxMgr, nil)
+	handler := NewHandlerWithStorage(executor, storageAdapter, nil, nil, sandboxMgr, sea)
+
+	// Add some test recipes to registry
 	testRecipe := &models.Recipe{
 		ID: "test-recipe",
 		Metadata: models.RecipeMetadata{
@@ -98,7 +102,7 @@ func setupTestHandler() (*Handler, *RecipeExecutor, *MockSandboxManager) {
 			Config: map[string]interface{}{"recipe": "org.openrewrite.java.cleanup.TestRecipe"},
 		}},
 	}
-	storage.CreateRecipe(context.Background(), testRecipe)
+	_ = registry.StoreRecipe(context.Background(), testRecipe)
 
 	return handler, executor, sandboxMgr
 }

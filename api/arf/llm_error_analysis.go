@@ -3,8 +3,6 @@ package arf
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,121 +10,13 @@ import (
 
 // EnhancedLLMAnalyzer provides sophisticated LLM-based error analysis for healing workflows
 type EnhancedLLMAnalyzer struct {
-	llmGenerator    LLMRecipeGenerator
-	llmDispatcher   *LLMDispatcher
-	cache           map[string]*LLMAnalysisResult // Simple cache for similar errors
-	cacheMutex      sync.RWMutex
-	cacheExpiry     time.Duration
-	costTracker     *LLMCostTracker         // Track costs and optimize usage
-	metricsExporter *HealingMetricsExporter // Prometheus metrics
-}
-
-// EnhancedErrorPattern represents a pattern for error detection in LLM analysis
-type EnhancedErrorPattern struct {
-	Pattern    *regexp.Regexp
-	Type       string
-	Confidence float64
-	Language   string
-	Extractor  func([]string) string // Extract relevant info from error
-}
-
-// ExtractErrorContext is a standalone function that extracts context from error messages
-func ExtractErrorContext(errors []string, language string) ErrorContext {
-	context := ErrorContext{
-		ErrorMessage: strings.Join(errors, "\n"),
-		ErrorType:    "compilation",
-		ErrorDetails: make(map[string]string),
-		Timestamp:    time.Now(),
-	}
-
-	// Detect error type
-	errorText := strings.ToLower(strings.Join(errors, " "))
-	if strings.Contains(errorText, "test") && (strings.Contains(errorText, "fail") || strings.Contains(errorText, "assertion")) {
-		context.ErrorType = "test"
-	} else if strings.Contains(errorText, "import") || strings.Contains(errorText, "module") {
-		context.ErrorType = "import"
-	} else if strings.Contains(errorText, "dependency") || strings.Contains(errorText, "version") {
-		context.ErrorType = "dependency"
-	}
-
-	// Extract source file and line number
-	for _, err := range errors {
-		lines := strings.Split(err, "\n")
-		for _, line := range lines {
-			trimmed := strings.TrimSpace(line)
-
-			// Look for file:line:column pattern
-			if strings.Contains(trimmed, ".go:") || strings.Contains(trimmed, ".java:") ||
-				strings.Contains(trimmed, ".py:") || strings.Contains(trimmed, ".js:") ||
-				strings.HasPrefix(trimmed, "./") || strings.HasPrefix(trimmed, "/") {
-
-				// Handle Go-specific pattern "main.go:5:2: error"
-				if strings.Contains(trimmed, ".go:") {
-					// Find the .go: pattern
-					goIndex := strings.Index(trimmed, ".go:")
-					if goIndex != -1 {
-						// Find start of filename (could be just "main.go" or "./main.go")
-						start := 0
-						for i := goIndex - 1; i >= 0; i-- {
-							if trimmed[i] == ' ' || trimmed[i] == '\t' {
-								start = i + 1
-								break
-							}
-						}
-						filePath := trimmed[start : goIndex+3] // Include ".go"
-						context.SourceFile = filePath
-
-						// Extract line number
-						remainder := trimmed[goIndex+4:] // After ".go:"
-						parts := strings.Split(remainder, ":")
-						if len(parts) > 0 {
-							lineNum := strings.TrimSpace(parts[0])
-							if _, err := strconv.Atoi(lineNum); err == nil {
-								context.ErrorDetails["line_number"] = lineNum
-							}
-						}
-						break
-					}
-				} else {
-					// Generic file:line pattern
-					parts := strings.Split(trimmed, ":")
-					if len(parts) >= 2 {
-						context.SourceFile = parts[0]
-						// Try to parse line number
-						lineNum := strings.TrimSpace(parts[1])
-						if _, err := strconv.Atoi(lineNum); err == nil {
-							context.ErrorDetails["line_number"] = lineNum
-						}
-						break
-					}
-				}
-			}
-		}
-		if context.SourceFile != "" {
-			break
-		}
-	}
-
-	// Extract stack trace for runtime errors
-	var stackTrace []string
-	for _, err := range errors {
-		if strings.Contains(err, "\tat ") || strings.Contains(err, "goroutine") {
-			lines := strings.Split(err, "\n")
-			for _, line := range lines {
-				if strings.Contains(line, "\tat ") || strings.Contains(line, ".go:") || strings.Contains(line, ".java:") {
-					stackTrace = append(stackTrace, strings.TrimSpace(line))
-				}
-			}
-		}
-	}
-	if len(stackTrace) > 0 {
-		context.StackTrace = stackTrace
-		if context.ErrorType == "compilation" {
-			context.ErrorType = "runtime"
-		}
-	}
-
-	return context
+	llmGenerator       LLMRecipeGenerator
+	llmDispatcher      *LLMDispatcher
+	patternAnalyzer    *PatternAnalyzer
+	analysisCache      *AnalysisCache
+	healingSuggestions *HealingSuggestionService
+	costTracker        *LLMCostTracker         // Track costs and optimize usage
+	metricsExporter    *HealingMetricsExporter // Prometheus metrics
 }
 
 // NewEnhancedLLMAnalyzer creates a new enhanced LLM analyzer
@@ -143,11 +33,12 @@ func NewEnhancedLLMAnalyzer(generator LLMRecipeGenerator, dispatcher *LLMDispatc
 	}
 
 	return &EnhancedLLMAnalyzer{
-		llmGenerator:  generator,
-		llmDispatcher: dispatcher,
-		cache:         make(map[string]*LLMAnalysisResult),
-		cacheExpiry:   30 * time.Minute,
-		costTracker:   NewLLMCostTracker(budgetConfig),
+		llmGenerator:       generator,
+		llmDispatcher:      dispatcher,
+		patternAnalyzer:    NewPatternAnalyzer(),
+		analysisCache:      NewAnalysisCache(30 * time.Minute),
+		healingSuggestions: NewHealingSuggestionService(),
+		costTracker:        NewLLMCostTracker(budgetConfig),
 	}
 }
 
@@ -159,8 +50,8 @@ func (a *EnhancedLLMAnalyzer) SetMetricsExporter(exporter *HealingMetricsExporte
 // AnalyzeErrors performs comprehensive LLM-based error analysis
 func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string, language string) (*LLMAnalysisResult, error) {
 	// Check cache first
-	cacheKey := a.generateCacheKey(errors)
-	if cached := a.getFromCache(cacheKey); cached != nil {
+	cacheKey := a.analysisCache.GenerateCacheKey(errors)
+	if cached := a.analysisCache.GetFromCache(cacheKey); cached != nil {
 		// Record cache hit in cost tracker
 		if a.costTracker != nil {
 			a.costTracker.RecordUsage(ctx, LLMUsageRecord{
@@ -169,14 +60,14 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 				OutputTokens: 0,
 				TotalCost:    0,
 				CacheHit:     true,
-				TransformID:  ctx.Value("transformID").(string),
+				TransformID:  a.getTransformID(ctx),
 			})
 		}
 		return cached, nil
 	}
 
-	// Extract error context
-	errorContext := a.extractErrorContext(errors)
+	// Extract error context using standalone function
+	errorContext := ExtractErrorContext(errors, language)
 
 	// Check if we have LLM cost tracking cache
 	prompt := a.generateHealingPrompt(errorContext, language)
@@ -187,13 +78,10 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 		if cachedEntry, found := a.costTracker.GetCachedResponse(prompt, modelToUse); found {
 			// Parse cached response
 			result := a.parseCachedResponse(cachedEntry.Response, errorContext)
-			a.storeInCache(cacheKey, result)
+			a.analysisCache.StoreInCache(cacheKey, result)
 
 			// Get transformation ID safely
-			transformID := ""
-			if ctx.Value("transformID") != nil {
-				transformID = ctx.Value("transformID").(string)
-			}
+			transformID := a.getTransformID(ctx)
 
 			// Log cache hit
 			GetHealingLogger().WithFields(LogFields{
@@ -241,8 +129,8 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 				"estimated_tokens": estimatedTokens,
 				"reason":           reason,
 			}).Warn("LLM budget exceeded, using fallback pattern-based analysis")
-			result := a.analyzeErrorsWithPattern(errors, language)
-			a.storeInCache(cacheKey, result)
+			result := a.patternAnalyzer.AnalyzeErrors(errors, language)
+			a.analysisCache.StoreInCache(cacheKey, result)
 			return result, nil
 		}
 
@@ -265,10 +153,7 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 		}
 
 		// Log LLM analysis start
-		transformID := ""
-		if ctx.Value("transformID") != nil {
-			transformID = ctx.Value("transformID").(string)
-		}
+		transformID := a.getTransformID(ctx)
 		GetHealingLogger().WithFields(LogFields{
 			"transformation_id": transformID,
 			"model":             modelToUse,
@@ -281,7 +166,7 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 
 		if err == nil && recipe != nil {
 			result := a.parseGeneratedRecipe(recipe, errorContext)
-			a.storeInCache(cacheKey, result)
+			a.analysisCache.StoreInCache(cacheKey, result)
 
 			// Track LLM usage and costs
 			if a.costTracker != nil {
@@ -343,15 +228,17 @@ func (a *EnhancedLLMAnalyzer) AnalyzeErrors(ctx context.Context, errors []string
 	}
 
 	// Fallback to pattern-based analysis
-	result := a.analyzeErrorsWithPattern(errors, language)
-	a.storeInCache(cacheKey, result)
+	result := a.patternAnalyzer.AnalyzeErrors(errors, language)
+	a.analysisCache.StoreInCache(cacheKey, result)
 	return result, nil
 }
 
-// extractErrorContext extracts structured context from error messages
-func (a *EnhancedLLMAnalyzer) extractErrorContext(errors []string) ErrorContext {
-	// Use standalone function for consistency
-	return ExtractErrorContext(errors, "")
+// getTransformID safely extracts transform ID from context
+func (a *EnhancedLLMAnalyzer) getTransformID(ctx context.Context) string {
+	if ctx.Value("transformID") != nil {
+		return ctx.Value("transformID").(string)
+	}
+	return ""
 }
 
 // generateHealingPrompt creates an intelligent prompt for LLM analysis
@@ -400,102 +287,6 @@ Please provide:
 	prompt += "\nFormat your response as JSON with fields: suggested_fix, alternative_fixes, risk_assessment, confidence_score (0-1)"
 
 	return prompt
-}
-
-// analyzeErrorsWithPattern performs pattern-based error analysis as fallback
-func (a *EnhancedLLMAnalyzer) analyzeErrorsWithPattern(errors []string, language string) *LLMAnalysisResult {
-	errorText := strings.ToLower(strings.Join(errors, " "))
-
-	result := &LLMAnalysisResult{
-		ErrorType:        "unknown",
-		Confidence:       0.5,
-		AlternativeFixes: []string{},
-		RiskAssessment:   "medium",
-	}
-
-	// Java patterns
-	if language == "java" {
-		if strings.Contains(errorText, "cannot find symbol") {
-			result.ErrorType = "compilation"
-			result.Confidence = 0.8
-			result.SuggestedFix = "Add missing import statement or define the missing class/method"
-			result.AlternativeFixes = []string{
-				"Check if the required dependency is in your pom.xml or build.gradle",
-				"Verify the class name spelling and package structure",
-			}
-			result.RiskAssessment = "low"
-		} else if strings.Contains(errorText, "package") && strings.Contains(errorText, "does not exist") {
-			result.ErrorType = "import"
-			result.Confidence = 0.85
-			result.SuggestedFix = "Add the missing package dependency to your build file"
-			result.AlternativeFixes = []string{
-				"Create the missing package structure",
-				"Update import statements to use correct package names",
-			}
-			result.RiskAssessment = "low"
-		}
-	}
-
-	// Python patterns
-	if language == "python" {
-		if strings.Contains(errorText, "modulenotfounderror") || strings.Contains(errorText, "no module named") {
-			result.ErrorType = "import"
-			result.Confidence = 0.9
-			result.SuggestedFix = "Install the missing module using pip install"
-			result.AlternativeFixes = []string{
-				"Add the module to requirements.txt",
-				"Check if the module name is spelled correctly",
-			}
-			result.RiskAssessment = "low"
-		} else if strings.Contains(errorText, "syntaxerror") {
-			result.ErrorType = "syntax"
-			result.Confidence = 0.75
-			result.SuggestedFix = "Fix the syntax error at the indicated line"
-			result.AlternativeFixes = []string{
-				"Check for missing colons, parentheses, or indentation",
-			}
-			result.RiskAssessment = "low"
-		}
-	}
-
-	// Go patterns
-	if language == "go" {
-		if strings.Contains(errorText, "undefined") {
-			result.ErrorType = "compilation"
-			result.Confidence = 0.8
-			result.SuggestedFix = "Import the required package or define the missing identifier"
-			result.AlternativeFixes = []string{
-				"Run 'go get' to fetch missing dependencies",
-				"Check if the identifier is exported (capitalized)",
-			}
-			result.RiskAssessment = "low"
-		} else if strings.Contains(errorText, "cannot use") && strings.Contains(errorText, "as type") {
-			result.ErrorType = "type_mismatch"
-			result.Confidence = 0.85
-			result.SuggestedFix = "Fix type mismatch by converting or changing the variable type"
-			result.AlternativeFixes = []string{
-				"Use type assertion or type conversion",
-				"Update function signature to match expected types",
-			}
-			result.RiskAssessment = "medium"
-		}
-	}
-
-	// Test failure patterns (language agnostic)
-	if strings.Contains(errorText, "test") &&
-		(strings.Contains(errorText, "fail") || strings.Contains(errorText, "assertion")) {
-		result.ErrorType = "test"
-		result.Confidence = 0.7
-		result.SuggestedFix = "Review the test logic and expected values"
-		result.AlternativeFixes = []string{
-			"Update test expectations if business logic changed",
-			"Fix the implementation to match test expectations",
-			"Check for race conditions or timing issues",
-		}
-		result.RiskAssessment = "medium"
-	}
-
-	return result
 }
 
 // parseCachedResponse converts cached LLM response to LLMAnalysisResult
@@ -554,49 +345,6 @@ func (a *EnhancedLLMAnalyzer) parseGeneratedRecipe(recipe *GeneratedRecipe, erro
 	return result
 }
 
-// convertToOpenRewriteRecipe converts analysis to OpenRewrite recipe
-func (a *EnhancedLLMAnalyzer) convertToOpenRewriteRecipe(analysis *LLMAnalysisResult, language string) (string, map[string]interface{}) {
-	metadata := make(map[string]interface{})
-
-	// Map common fixes to OpenRewrite recipes
-	suggestedFix := strings.ToLower(analysis.SuggestedFix)
-
-	switch language {
-	case "java":
-		if strings.Contains(suggestedFix, "add import") {
-			// Extract import statement
-			importPattern := regexp.MustCompile(`import\s+([\w\.]+);?`)
-			if matches := importPattern.FindStringSubmatch(analysis.SuggestedFix); len(matches) > 1 {
-				metadata["type"] = matches[1]
-				metadata["onlyIfUsed"] = true
-				return "org.openrewrite.java.AddImport", metadata
-			}
-		} else if strings.Contains(suggestedFix, "remove unused") {
-			return "org.openrewrite.java.RemoveUnusedImports", metadata
-		} else if analysis.ErrorType == "compilation" {
-			return "org.openrewrite.java.cleanup.UnnecessaryThrows", metadata
-		}
-
-	case "python":
-		if strings.Contains(suggestedFix, "remove unused import") {
-			// Extract module name
-			modulePattern := regexp.MustCompile(`import\s+(\w+)`)
-			if matches := modulePattern.FindStringSubmatch(analysis.SuggestedFix); len(matches) > 1 {
-				metadata["module"] = matches[1]
-			}
-			return "org.openrewrite.python.cleanup.RemoveUnusedImports", metadata
-		}
-
-	case "go":
-		if strings.Contains(suggestedFix, "gofmt") || strings.Contains(suggestedFix, "format") {
-			return "org.openrewrite.go.format", metadata
-		}
-	}
-
-	// Default generic recipe
-	return "org.openrewrite.text.Find", metadata
-}
-
 // BatchAnalyzeErrors analyzes multiple error sets in batch
 func (a *EnhancedLLMAnalyzer) BatchAnalyzeErrors(ctx context.Context, errorSets [][]string, language string) []*LLMAnalysisResult {
 	results := make([]*LLMAnalysisResult, len(errorSets))
@@ -610,7 +358,7 @@ func (a *EnhancedLLMAnalyzer) BatchAnalyzeErrors(ctx context.Context, errorSets 
 			result, err := a.AnalyzeErrors(ctx, errs, language)
 			if err != nil {
 				// Fallback to pattern analysis
-				result = a.analyzeErrorsWithPattern(errs, language)
+				result = a.patternAnalyzer.AnalyzeErrors(errs, language)
 			}
 			results[index] = result
 		}(i, errors)
@@ -618,35 +366,6 @@ func (a *EnhancedLLMAnalyzer) BatchAnalyzeErrors(ctx context.Context, errorSets 
 
 	wg.Wait()
 	return results
-}
-
-// Cache management functions
-func (a *EnhancedLLMAnalyzer) generateCacheKey(errors []string) string {
-	// Simple hash of error messages
-	return fmt.Sprintf("%v", errors)
-}
-
-func (a *EnhancedLLMAnalyzer) getFromCache(key string) *LLMAnalysisResult {
-	a.cacheMutex.RLock()
-	defer a.cacheMutex.RUnlock()
-	return a.cache[key]
-}
-
-func (a *EnhancedLLMAnalyzer) storeInCache(key string, result *LLMAnalysisResult) {
-	a.cacheMutex.Lock()
-	defer a.cacheMutex.Unlock()
-	a.cache[key] = result
-
-	// Simple cache cleanup - in production, use proper TTL
-	if len(a.cache) > 100 {
-		// Clear oldest entries
-		for k := range a.cache {
-			delete(a.cache, k)
-			if len(a.cache) <= 50 {
-				break
-			}
-		}
-	}
 }
 
 // AnalyzeAndSuggestHealing is the main entry point for healing workflow integration
@@ -657,69 +376,8 @@ func (a *EnhancedLLMAnalyzer) AnalyzeAndSuggestHealing(ctx context.Context, erro
 		return nil, fmt.Errorf("failed to analyze errors: %w", err)
 	}
 
-	// Convert to OpenRewrite recipe
-	recipeName, recipeMetadata := a.convertToOpenRewriteRecipe(analysis, language)
-
-	// Create healing suggestion
-	suggestion := &HealingSuggestion{
-		Analysis:        analysis,
-		RecipeName:      recipeName,
-		RecipeMetadata:  recipeMetadata,
-		SandboxID:       sandboxID,
-		Language:        language,
-		Confidence:      analysis.Confidence,
-		EstimatedImpact: a.estimateImpact(analysis),
-		Prerequisites:   a.determinePrerequisites(analysis, language),
-	}
-
-	return suggestion, nil
-}
-
-// HealingSuggestion represents a complete healing suggestion with recipe
-type HealingSuggestion struct {
-	Analysis        *LLMAnalysisResult     `json:"analysis"`
-	RecipeName      string                 `json:"recipe_name"`
-	RecipeMetadata  map[string]interface{} `json:"recipe_metadata"`
-	SandboxID       string                 `json:"sandbox_id"`
-	Language        string                 `json:"language"`
-	Confidence      float64                `json:"confidence"`
-	EstimatedImpact string                 `json:"estimated_impact"`
-	Prerequisites   []string               `json:"prerequisites"`
-}
-
-// estimateImpact estimates the impact of applying the healing suggestion
-func (a *EnhancedLLMAnalyzer) estimateImpact(analysis *LLMAnalysisResult) string {
-	if analysis.RiskAssessment == "high" {
-		return "major"
-	} else if analysis.RiskAssessment == "medium" {
-		return "moderate"
-	}
-	return "minor"
-}
-
-// determinePrerequisites determines what needs to be in place before applying the fix
-func (a *EnhancedLLMAnalyzer) determinePrerequisites(analysis *LLMAnalysisResult, language string) []string {
-	prereqs := []string{}
-
-	if analysis.ErrorType == "import" || analysis.ErrorType == "dependency" {
-		switch language {
-		case "java":
-			prereqs = append(prereqs, "Maven or Gradle build file updated")
-		case "python":
-			prereqs = append(prereqs, "requirements.txt or setup.py updated")
-		case "go":
-			prereqs = append(prereqs, "go.mod updated")
-		case "javascript", "typescript":
-			prereqs = append(prereqs, "package.json updated")
-		}
-	}
-
-	if analysis.ErrorType == "test" {
-		prereqs = append(prereqs, "Test data validated")
-		prereqs = append(prereqs, "Business requirements confirmed")
-	}
-
-	return prereqs
+	// Use healing suggestion service to create suggestion
+	return a.healingSuggestions.CreateHealingSuggestion(ctx, analysis, language, sandboxID)
 }
 
 // GetCostMetrics returns the current LLM usage metrics

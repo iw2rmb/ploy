@@ -83,5 +83,5 @@ The validation module provides specialized validators for different types of pla
 ## Related Documentation
 - `../../api/llms/CLAUDE.md` - API handlers using validation services
 - `../arf/models/` - Model structures being validated
-- `../../cmd/ployman/CLAUDE.md` - CLI operations with validation
+- `../../cmd/ployman/README.md` - CLI operations with validation
 - `../storage/CLAUDE.md` - Storage operations requiring valid models

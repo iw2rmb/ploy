@@ -61,6 +61,16 @@ client {
     path      = "/opt/ploy/logs"
     read_only = false
   }
+
+  # Host volumes for Transflow planner/LLM/ORW jobs (optional if using docker bind mounts)
+  host_volume "transflow-context" {
+    path      = "/opt/ploy/transflow/context"
+    read_only = false
+  }
+  host_volume "transflow-out" {
+    path      = "/opt/ploy/transflow/out"
+    read_only = false
+  }
 }
 
 consul {

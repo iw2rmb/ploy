@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -204,6 +205,11 @@ func TestModelsCmd_List(t *testing.T) {
 		Provider:     "openai",
 		Capabilities: []string{"code", "analysis"},
 		MaxTokens:    8000,
+	}
+	{
+		var buf bytes.Buffer
+		_ = json.NewEncoder(&buf).Encode(testModel)
+		_, _ = http.Post(server.URL+"/v1/llms/models", "application/json", &buf)
 	}
 
 	// We can't easily capture stdout in tests, but we can test that the command doesn't panic

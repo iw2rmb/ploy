@@ -27,7 +27,6 @@ type Handler struct {
 	recipeRegistry   *RecipeRegistry // Unified recipe registry
 	sandboxMgr       SandboxManager
 	llmGenerator     LLMRecipeGenerator
-	learningSystem   LearningSystem
 	hybridPipeline   HybridPipeline
 	multiLangEngine  MultiLanguageEngine
 	strategySelector StrategySelector
@@ -174,7 +173,6 @@ func NewHandlerWithPhase3(
 	executor *RecipeExecutor,
 	sandboxMgr SandboxManager,
 	llmGen LLMRecipeGenerator,
-	learning LearningSystem,
 	hybrid HybridPipeline,
 	multiLang MultiLanguageEngine,
 	strategy StrategySelector,
@@ -184,7 +182,6 @@ func NewHandlerWithPhase3(
 		recipeRegistry:   nil, // Will be initialized when needed
 		sandboxMgr:       sandboxMgr,
 		llmGenerator:     llmGen,
-		learningSystem:   learning,
 		hybridPipeline:   hybrid,
 		multiLangEngine:  multiLang,
 		strategySelector: strategy,
@@ -246,10 +243,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// arf.Post("/transform/hybrid", h.ExecuteHybridTransformation)
 	// arf.Post("/strategy/select", h.SelectTransformationStrategy)
 	// arf.Post("/complexity/analyze", h.AnalyzeComplexity)
-
-	// TODO: Phase 3 Learning System - methods not yet implemented
-	// arf.Post("/learning/outcome", h.RecordTransformationOutcome)
-	// arf.Get("/learning/patterns", h.ExtractLearningPatterns)
 
 	// Phase 3: A/B Testing removed - functionality deprecated
 

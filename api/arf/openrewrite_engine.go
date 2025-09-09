@@ -301,11 +301,11 @@ func (e *OpenRewriteEngine) parseMavenOutput(output string) []string {
 	lines := strings.Split(output, "\n")
 
 	for _, line := range lines {
-		// Look for file change indicators
+		// Look for file change indicators commonly emitted by OpenRewrite Maven plugin
 		if strings.Contains(line, "Changes have been made to") ||
 			strings.Contains(line, "Modified") ||
-			strings.Contains(line, ".java") && strings.Contains(line, "fixed") {
-			// Extract filename
+			strings.Contains(line, "fixed") {
+			// Extract filenames from the line
 			parts := strings.Fields(line)
 			for _, part := range parts {
 				if strings.HasSuffix(part, ".java") || strings.HasSuffix(part, ".xml") {

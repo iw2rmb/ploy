@@ -56,6 +56,8 @@
 - Enhanced API documentation with transflow and KB endpoints
 - Improved error handling across all service integrations
 - Optimized storage operations for better performance characteristics
+- Fixed ARF config storage initialization to match updated NewRecipeRegistry signature (no error return)
+- IAC docs: consolidated `iac/README.md` (clean, non-duplicative) and removed redundant `iac/CLAUDE.md`
 
 ### Technical Details
 - **Coverage**: 60% minimum, 90% for critical healing components
@@ -4434,3 +4436,33 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
   - Stream 1 MVP: OpenRewrite + self‑healing build (phase‑1)
   - Stream 2: LLM‑Plan + LLM‑Exec (phase‑1)
   - Stream 3: GitLab MR creation (phase‑1)
+### Changed - ARF Recipe System
+
+- Removed legacy RecipeCatalog code paths and mocks; the system uses RecipeRegistry exclusively (no fallback). Unit tests and documentation updated accordingly.
+## [2025-09-09] - OpenRewrite Setup: Prefer /workspace/context
+
+### Fixed
+- Setup script now prefers mounted context directory early (`/workspace/context`) and never falls back to `.` when present.
+- Establishes deterministic build root selection under the chosen `ARTIFACT_DIR` by scanning for `pom.xml`, `build.gradle`, or `build.gradle.kts` and tarring only that directory.
+- Added environment overrides for testability and robustness:
+  - `CONTEXT_DIR` (defaults to `/workspace/context`)
+  - `WORKSPACE_DIR` (defaults to `/workspace`)
+  - `SKIP_EXEC_OPENREWRITE=1` to skip runner exec in unit tests
+
+### Testing
+- Unit test `tests/unit/openrewrite_setup_workspace_test.go` verifies early context selection and correct tar layout (project root contains `pom.xml`).
+
+## [2025-09-09] - Transflow ORW Diff + CI Images
+
+### Added
+- `services/openrewrite-jvm/generate-diff.sh`: Generates unified diff between original and transformed trees; always creates `diff.patch`.
+- `scripts/build-langgraph-runner.sh`: Build/push helper for `services/langgraph-runner` image.
+- CI: `.github/workflows/langgraph-runner-image.yml` builds/pushes LangGraph runner on changes.
+
+### Changed
+- `services/openrewrite-jvm/runner.sh`: Produces `/workspace/out/diff.patch` after transformation via the new helper, enabling `orw-gen` branch artifact checks.
+- `services/openrewrite-jvm/Dockerfile`: Includes `generate-diff.sh` in image.
+- Makefile: Added `langgraph-runner-image` and `langgraph-runner-push` targets; `openrewrite-jvm-*` targets already available.
+
+### Testing
+- Unit test `tests/unit/generate_diff_test.go` ensures `generate-diff.sh` creates a patch file even when there are no changes.

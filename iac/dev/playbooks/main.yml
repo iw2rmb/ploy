@@ -1271,20 +1271,24 @@
             src: /tmp/kraft.tar.gz
             dest: /usr/local/bin
             remote_src: true
+          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
 
         - name: Make KraftKit executable
           file:
             path: /usr/local/bin/kraft
             mode: '0755'
+          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
 
         - name: Verify KraftKit installation
           command: /usr/local/bin/kraft version
           register: kraft_version
           changed_when: false
+          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
 
-        - name: Display KraftKit version
+        - name: Display KraftKit status
           debug:
-            msg: "KraftKit installed successfully: {{ kraft_version.stdout_lines[0] if kraft_version.stdout_lines else 'Version info not available' }}"
+            msg: "KraftKit is available on the host (installed or up-to-date)."
+          when: kraft_version is defined or kraft_binary.stat.exists
 
         - name: Check if Capstan is already installed
           stat:

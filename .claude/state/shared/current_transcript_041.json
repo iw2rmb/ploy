@@ -288,7 +288,7 @@
       {
         "tool_use_id": "toolu_01NaEy4WVzQ8vPmyQVBkPz8m",
         "type": "tool_result",
-        "content": "./cmd/ployman/CLAUDE.md\n./tests/e2e/CLAUDE.md\n./internal/kb/CLAUDE.md\n./internal/arf/models/CLAUDE.md\n./internal/cli/transflow/CLAUDE.md\n./internal/cli/common/CLAUDE.md\n./internal/storage/CLAUDE.md\n./internal/testing/CLAUDE.md\n./internal/orchestration/CLAUDE.md\n./internal/git/provider/CLAUDE.md",
+        "content": "./cmd/ployman/README.md\n./tests/e2e/CLAUDE.md\n./internal/kb/CLAUDE.md\n./internal/arf/models/CLAUDE.md\n./internal/cli/transflow/CLAUDE.md\n./internal/cli/common/CLAUDE.md\n./internal/storage/CLAUDE.md\n./internal/testing/CLAUDE.md\n./internal/orchestration/CLAUDE.md\n./internal/git/provider/CLAUDE.md",
         "is_error": false
       }
     ]

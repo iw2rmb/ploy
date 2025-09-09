@@ -2,7 +2,6 @@ package arf
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"time"
@@ -19,8 +18,6 @@ type Phase3Config struct {
 	LLMTemperature float64 `yaml:"llm_temperature"`
 	LLMBaseURL     string  `yaml:"llm_base_url"` // For Ollama and custom endpoints
 
-	// Learning System Configuration
-	LearningDBURL     string        `yaml:"learning_db_url"`
 	PatternMinSamples int           `yaml:"pattern_min_samples"`
 	PatternTimeWindow time.Duration `yaml:"pattern_time_window"`
 
@@ -73,9 +70,6 @@ func LoadPhase3ConfigFromEnv() *Phase3Config {
 	if model := os.Getenv("ARF_LLM_MODEL"); model != "" {
 		config.LLMModel = model
 	}
-	if dbURL := os.Getenv("ARF_LEARNING_DB_URL"); dbURL != "" {
-		config.LearningDBURL = dbURL
-	}
 	if treeSitter := os.Getenv("ARF_TREE_SITTER_PATH"); treeSitter != "" {
 		config.TreeSitterPath = treeSitter
 	}
@@ -113,15 +107,6 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 		return nil, fmt.Errorf("unsupported LLM provider: %s (only external models supported)", config.LLMProvider)
 	}
 
-	// Initialize Learning System
-	if config.LearningDBURL != "" {
-		components.LearningSystem, err = initializeLearningSystem(config.LearningDBURL)
-		if err != nil {
-			// Log error but continue with nil learning system
-			fmt.Printf("Warning: Failed to initialize learning system: %v\n", err)
-		}
-	}
-
 	// Initialize Multi-Language Engine
 	multiLang, err := NewTreeSitterMultiLanguageEngine()
 	if err != nil {
@@ -148,38 +133,9 @@ func InitializePhase3Components(config *Phase3Config) (*Phase3Components, error)
 // Phase3Components contains all initialized Phase 3 components
 type Phase3Components struct {
 	LLMGenerator     LLMRecipeGenerator
-	LearningSystem   LearningSystem
 	HybridPipeline   HybridPipeline
 	MultiLangEngine  MultiLanguageEngine
 	StrategySelector StrategySelector
-}
-
-// initializeLearningSystem creates and initializes the learning system with database
-func initializeLearningSystem(dbURL string) (LearningSystem, error) {
-	db, err := sql.Open("pgx", dbURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to learning database: %w", err)
-	}
-
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping learning database: %w", err)
-	}
-
-	// Create PostgreSQL learning system
-	return NewPostgreSQLLearningSystem()
-}
-
-// getDBFromLearningSystem extracts the database connection from learning system
-func getDBFromLearningSystem(ls LearningSystem) *sql.DB {
-	// Type assertion to get DB from PostgreSQL learning system
-	if pgls, ok := ls.(*PostgreSQLLearningSystem); ok {
-		return pgls.db
-	}
-	return nil
 }
 
 // Note: Mock LLM generator removed - only external models are supported
@@ -256,7 +212,6 @@ func CreateHandlerWithPhase3(executor *RecipeExecutor, sandboxMgr SandboxManager
 		executor,
 		sandboxMgr,
 		components.LLMGenerator,
-		components.LearningSystem,
 		components.HybridPipeline,
 		components.MultiLangEngine,
 		components.StrategySelector,

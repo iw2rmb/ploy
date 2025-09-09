@@ -84,7 +84,7 @@ The LLMs API module provides HTTP endpoints for managing LLM models in the regis
 - Context-based request handling
 
 ## Related Documentation
-- `../../cmd/ployman/CLAUDE.md` - CLI client for these endpoints
+- `../../cmd/ployman/README.md` - CLI client for these endpoints
 - `../../internal/storage/CLAUDE.md` - Storage layer implementation
 - `../../internal/arf/models/` - Core model data structures
 - `../../internal/validation/` - Model validation logic

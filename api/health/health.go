@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/iw2rmb/ploy/api/consul_envstore"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
+	orch "github.com/iw2rmb/ploy/internal/orchestration"
 	istorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
@@ -289,6 +291,11 @@ func (h *HealthChecker) checkNomad() DependencyHealth {
 
 	config := nomad.DefaultConfig()
 	config.Address = h.nomadAddr
+	// Install retry transport to handle 429/5xx gracefully
+	config.HttpClient = &http.Client{
+		Transport: orch.NewDefaultRetryTransport(nil),
+		Timeout:   60 * time.Second,
+	}
 	client, err := nomad.NewClient(config)
 	if err != nil {
 		dep.Status = "unhealthy"
@@ -514,7 +521,7 @@ func (h *HealthChecker) LivenessHandler(c *fiber.Ctx) error {
 // MetricsHandler exposes health check metrics for monitoring
 func (h *HealthChecker) MetricsHandler(c *fiber.Ctx) error {
 	// Calculate average response times
-	for depName, _ := range h.metricsCollector.DependencyFailures {
+	for depName := range h.metricsCollector.DependencyFailures {
 		// This would normally track actual response times
 		// For now, we'll just report what we have
 		if _, exists := h.metricsCollector.AverageResponseTime[depName]; !exists {
