@@ -162,6 +162,10 @@ job "ploy-api" {
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"
+
+        # GitLab integration (populated from local env via Ansible)
+        GITLAB_TOKEN = "{{ lookup('env', 'GITLAB_TOKEN') }}"
+        GITLAB_URL   = "{{ lookup('env', 'GITLAB_URL') }}"
       }
 
       # Make binary executable and start
