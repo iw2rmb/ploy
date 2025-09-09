@@ -169,7 +169,23 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 
 // executeTransflow runs the transflow workflow asynchronously
 func (h *Handler) executeTransflow(executionID string, config *transflow.TransflowConfig, testMode bool) {
-	ctx := context.Background()
+    // Top-level guard: always convert panics to a terminal failure status
+    defer func() {
+        if r := recover(); r != nil {
+            h.recordError(executionID, fmt.Errorf("transflow execution panic: %v", r))
+        }
+    }()
+
+    // Top-level execution timeout to ensure terminal status is written
+    execTimeout := 45 * time.Minute
+    if v := os.Getenv("PLOY_TRANSFLOW_EXEC_TIMEOUT"); v != "" {
+        if d, err := time.ParseDuration(v); err == nil && d > 0 {
+            execTimeout = d
+        }
+    }
+    parentCtx := context.Background()
+    ctx, cancel := context.WithTimeout(parentCtx, execTimeout)
+    defer cancel()
 
 	// Update status to running
 	status := TransflowStatus{
@@ -242,12 +258,29 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 
-	// Execute the workflow
-	result, err := runner.Run(ctx)
-	if err != nil {
-		h.recordError(executionID, err)
-		return
-	}
+    // Execute the workflow with timeout awareness; ensure terminal status on any error
+    var (
+        result *transflow.TransflowResult
+        runErr error
+        doneCh = make(chan struct{})
+    )
+    go func() {
+        defer close(doneCh)
+        result, runErr = runner.Run(ctx)
+    }()
+
+    select {
+    case <-doneCh:
+        if runErr != nil {
+            h.recordError(executionID, runErr)
+            return
+        }
+        // continue to success handling below
+    case <-ctx.Done():
+        // Timeout/cancellation — record a terminal error
+        h.recordError(executionID, fmt.Errorf("transflow execution exceeded max duration (%s)", execTimeout))
+        return
+    }
 
 	// Store successful result
 	endTime := time.Now()
