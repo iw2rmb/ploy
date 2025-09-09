@@ -11,7 +11,9 @@ job "${RUN_ID}" {
         force_pull = true
         volumes = [
           "${CONTEXT_HOST_DIR}:/workspace/context:ro",
-          "${OUT_HOST_DIR}:/workspace/out"
+          "${OUT_HOST_DIR}:/workspace/out",
+          # Mount the prepared repository archive so the runner can extract sources
+          "${INPUT_TAR_HOST_PATH}:/workspace/input.tar:ro"
         ]
       }
 
