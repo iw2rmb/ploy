@@ -238,7 +238,7 @@ func (i *TransflowIntegrations) CreateKBIntegration() KBIntegrator {
 }
 
 // CreateConfiguredRunner creates a fully configured TransflowRunner with KB learning integration
-func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) (*KBTransflowRunner, error) {
+func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) (*TransflowRunner, error) {
 	// Create KB integration
 	kbIntegration := i.CreateKBIntegration()
 
@@ -262,8 +262,8 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	// signals that healing should be attempted when builds fail.
 	runner.SetJobSubmitter(struct{}{})
 
-	// Return the KB-enhanced runner which will use KB learning when healing is needed
-	return kbRunner, nil
+    // Return the embedded TransflowRunner; KB integration remains wired inside kbRunner
+    return runner, nil
 }
 
 // GetDefaultControllerURL returns the default controller URL for transflow operations
