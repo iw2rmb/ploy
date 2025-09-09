@@ -145,11 +145,15 @@ func debugTemplateForLane(lane string) string {
 
 // loadTemplateContent tries Consul KV first, then standard platform file locations
 func loadTemplateContent(templatePath string) ([]byte, error) {
-	if consulClient, err := NewConsulTemplateClient(); err == nil {
-		if content, err := consulClient.GetTemplate(templatePath); err == nil {
-			return content, nil
-		}
-	}
+    // Prefer embedded templates when available
+    if b := getEmbeddedTemplate(templatePath); b != nil {
+        return b, nil
+    }
+    if consulClient, err := NewConsulTemplateClient(); err == nil {
+        if content, err := consulClient.GetTemplate(templatePath); err == nil {
+            return content, nil
+        }
+    }
 	possiblePaths := []string{
 		templatePath,
 	}
