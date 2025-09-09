@@ -11,7 +11,6 @@ job "${RUN_ID}" {
         force_pull = true
         volumes = [
           "${CONTEXT_HOST_DIR}:/workspace/context:ro",
-          "${INPUT_TAR_HOST_PATH}:/workspace/input.tar:ro",
           "${OUT_HOST_DIR}:/workspace/out"
         ]
       }
@@ -40,4 +39,3 @@ job "${RUN_ID}" {
     }
   }
 }
-
