@@ -1,16 +1,17 @@
 package transflow
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
+    "context"
+    "fmt"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/cli/common"
-	"github.com/iw2rmb/ploy/internal/git/provider"
+    "github.com/iw2rmb/ploy/internal/cli/common"
+    "github.com/iw2rmb/ploy/internal/git/provider"
+    "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // GitOperationsInterface defines the Git operations needed by the runner
@@ -388,19 +389,22 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		Message: fmt.Sprintf("Cloned %s at %s", r.config.TargetRepo, r.config.BaseRef),
 	})
 
-	// Step 2: Create and checkout workflow branch
-	branchName := GenerateBranchName(r.config.ID)
-	result.BranchName = branchName
-	if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
+    // Step 2: Create and checkout workflow branch
+    branchName := GenerateBranchName(r.config.ID)
+    result.BranchName = branchName
+    if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
 		result.ErrorMessage = fmt.Sprintf("failed to create branch: %v", err)
 		result.Duration = time.Since(startTime)
 		return nil, fmt.Errorf("failed to create branch: %w", err)
 	}
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:  "create-branch",
-		Success: true,
-		Message: fmt.Sprintf("Created workflow branch: %s", branchName),
-	})
+    result.StepResults = append(result.StepResults, StepResult{
+        StepID:  "create-branch",
+        Success: true,
+        Message: fmt.Sprintf("Created workflow branch: %s", branchName),
+    })
+
+    // Capture initial HEAD to detect later if steps produced a commit
+    initialHead, _ := getHeadHash(repoPath)
 
     // Step 3: Execute transformation steps
     for _, step := range r.config.Steps {
@@ -416,7 +420,14 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
                 return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
             }
 
-            // Pre-substitute recipe class into template
+            // Prepare input tar from repository
+            inputTar := filepath.Join(filepath.Dir(renderedPath), "input.tar")
+            if err := createTarFromDir(repoPath, inputTar); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to create input tar: %v", err)})
+                return nil, fmt.Errorf("failed to create input tar: %w", err)
+            }
+
+            // Pre-substitute recipe class and input tar host path into template
             hclBytes, err := os.ReadFile(renderedPath)
             if err != nil {
                 result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to read HCL: %v", err)})
@@ -426,8 +437,29 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             if len(step.Recipes) > 0 {
                 rclass = step.Recipes[0]
             }
+            // Determine coords and discovery flag
+            discover := "true"
+            rgroup, rartifact, rversion := "", "", ""
+            if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
+                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "2.11.0"
+                discover = "false"
+            } else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
+                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-spring", "5.7.0"
+                discover = "false"
+            } else if strings.HasPrefix(rclass, "org.openrewrite.java") {
+                rgroup, rartifact, rversion = "org.openrewrite", "rewrite-java", "8.21.0"
+                discover = "false"
+            }
+            // Create run ID for this submission and then substitute it
+            runID := fmt.Sprintf("orw-apply-%s-%d", step.ID, time.Now().Unix())
             prePath := strings.ReplaceAll(renderedPath, ".rendered.hcl", ".pre.hcl")
             preContent := strings.ReplaceAll(string(hclBytes), "${RECIPE_CLASS}", rclass)
+            preContent = strings.ReplaceAll(preContent, "${INPUT_TAR_HOST_PATH}", inputTar)
+            preContent = strings.ReplaceAll(preContent, "${RUN_ID}", runID)
+            preContent = strings.ReplaceAll(preContent, "${DISCOVER_RECIPE}", discover)
+            preContent = strings.ReplaceAll(preContent, "${RECIPE_GROUP}", rgroup)
+            preContent = strings.ReplaceAll(preContent, "${RECIPE_ARTIFACT}", rartifact)
+            preContent = strings.ReplaceAll(preContent, "${RECIPE_VERSION}", rversion)
             if err := os.WriteFile(prePath, []byte(preContent), 0644); err != nil {
                 result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
                 return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
@@ -438,7 +470,6 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             _ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
             os.Setenv("TRANSFLOW_CONTEXT_DIR", baseDir)
             os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
-            runID := fmt.Sprintf("orw-apply-%s-%d", step.ID, time.Now().Unix())
             submittedPath, err := substituteORWTemplate(prePath, runID)
             if err != nil {
                 result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
@@ -482,41 +513,46 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
         }
     }
 
-	// Step 4: Commit changes
-	// Guard: ensure recipes produced actual changes before committing
-	{
-		changed, err := hasRepoChanges(repoPath)
-		if err != nil {
-			result.ErrorMessage = fmt.Sprintf("failed to check repository changes: %v", err)
-			result.Duration = time.Since(startTime)
-			return nil, fmt.Errorf("failed to check repository changes: %w", err)
-		}
-		if !changed {
-			result.StepResults = append(result.StepResults, StepResult{
-				StepID:   "validate-change",
-				Success:  false,
-				Message:  "No changes detected after recipe execution; aborting to avoid empty MR",
-				Duration: 0,
-			})
-			result.ErrorMessage = "no changes produced by transformation"
-			result.Duration = time.Since(startTime)
-			return nil, fmt.Errorf("no changes produced by transformation")
-		}
-	}
+    // Step 4: Commit changes (only if not already committed by an apply step)
+    headBefore := initialHead
+    // Re-check working tree status
+    changed, _ := hasRepoChanges(repoPath)
+    commitMessage := fmt.Sprintf("Applied recipe transformations for workflow %s", r.config.ID)
+    if !changed {
+        // No staged/working changes; check if HEAD moved (apply step may have committed already)
+        headAfter, _ := getHeadHash(repoPath)
+        if headAfter != "" && headBefore != "" && headAfter != headBefore {
+            // Consider commit step successful without creating a new commit
+            result.StepResults = append(result.StepResults, StepResult{
+                StepID:  "commit",
+                Success: true,
+                Message: "Changes already committed by apply step",
+            })
+            goto build_step
+        }
+        // No changes and HEAD same => fail to avoid empty MR
+        result.StepResults = append(result.StepResults, StepResult{
+            StepID:  "commit",
+            Success: false,
+            Message: "No changes to commit",
+        })
+        result.ErrorMessage = "no changes produced by transformation"
+        result.Duration = time.Since(startTime)
+        return nil, fmt.Errorf("no changes produced by transformation")
+    }
+    if err := r.gitOps.CommitChanges(ctx, repoPath, commitMessage); err != nil {
+        result.ErrorMessage = fmt.Sprintf("failed to commit changes: %v", err)
+        result.Duration = time.Since(startTime)
+        return nil, fmt.Errorf("failed to commit changes: %w", err)
+    }
+    result.StepResults = append(result.StepResults, StepResult{
+        StepID:  "commit",
+        Success: true,
+        Message: "Committed changes",
+    })
 
-	commitMessage := fmt.Sprintf("Applied recipe transformations for workflow %s", r.config.ID)
-	if err := r.gitOps.CommitChanges(ctx, repoPath, commitMessage); err != nil {
-		result.ErrorMessage = fmt.Sprintf("failed to commit changes: %v", err)
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("failed to commit changes: %w", err)
-	}
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:  "commit",
-		Success: true,
-		Message: "Committed changes",
-	})
-
-	// Step 5: Run build check
+build_step:
+    // Step 5: Run build check
 	buildStart := time.Now()
 	appName := GenerateAppName(r.config.ID)
 	timeout, err := r.config.ParseBuildTimeout()
@@ -786,4 +822,27 @@ func hasRepoChanges(repoPath string) (bool, error) {
 		return false, fmt.Errorf("git status failed: %v: %s", err, string(out))
 	}
 	return strings.TrimSpace(string(out)) != "", nil
+}
+
+// getHeadHash returns the current HEAD commit hash
+func getHeadHash(repoPath string) (string, error) {
+    cmd := exec.Command("git", "rev-parse", "HEAD")
+    cmd.Dir = repoPath
+    out, err := cmd.CombinedOutput()
+    if err != nil {
+        return "", fmt.Errorf("git rev-parse failed: %v: %s", err, string(out))
+    }
+    return strings.TrimSpace(string(out)), nil
+}
+
+// createTarFromDir creates a tar archive of a directory using system tar
+func createTarFromDir(srcDir, dstTar string) error {
+    // Remove existing tar if any
+    _ = os.Remove(dstTar)
+    cmd := exec.Command("tar", "-cf", dstTar, ".")
+    cmd.Dir = srcDir
+    if out, err := cmd.CombinedOutput(); err != nil {
+        return fmt.Errorf("tar failed: %v: %s", err, string(out))
+    }
+    return nil
 }
