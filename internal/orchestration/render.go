@@ -341,8 +341,7 @@ func (r *RenderData) SetDefaults() {
 			r.MemoryLimit = 512
 		}
 	}
-	r.ConnectEnabled = true
-	r.VaultEnabled = true
+    // Respect caller intent for Connect/Vault; do not force-enable here
 	r.VolumeEnabled = true
 	r.ConsulConfigEnabled = true
 	r.DebugEnabled = false
