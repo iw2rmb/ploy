@@ -150,6 +150,61 @@
               - Consul DNS: {{ 'accessible' if consul_dns_check is success else 'not accessible (expected during bootstrap)' }}
               - Access via: seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}
 
+        - name: Create Knowledge Base (KB) namespace structure
+          block:
+            - name: Create KB namespace placeholder files locally
+              copy:
+                content: "KB {{ item }} directory - created by Ansible"
+                dest: "/tmp/kb_{{ item }}_placeholder.txt"
+                mode: '0644'
+              loop:
+                - errors
+                - cases
+                - summaries
+                - patches
+
+            - name: Upload KB namespace structure to SeaweedFS filer
+              uri:
+                url: "http://localhost:{{ seaweedfs.filer_port }}/kb/{{ item }}/"
+                method: POST
+                body_format: form-multipart
+                body:
+                  file:
+                    filename: "{{ item }}_placeholder.txt"
+                    content: "KB {{ item }} directory - created by Ansible"
+                status_code: [200, 201, 409]  # 409 = already exists
+              loop:
+                - errors
+                - cases
+                - summaries
+                - patches
+              register: kb_namespace_creation
+              failed_when: false
+
+            - name: Display KB namespace creation results
+              debug:
+                msg: "KB namespace {{ item.item }}: {{ 'Created' if item.status in [200, 201] else 'Already exists' if item.status == 409 else 'Failed' }}"
+              loop: "{{ kb_namespace_creation.results }}"
+
+            - name: Clean up temporary KB files
+              file:
+                path: "/tmp/kb_{{ item }}_placeholder.txt"
+                state: absent
+              loop:
+                - errors
+                - cases
+                - summaries
+                - patches
+
+            - name: Display KB namespace setup status
+              debug:
+                msg: "✅ Knowledge Base namespace structure created in SeaweedFS"
+
+          rescue:
+            - name: Display KB namespace creation warning
+              debug:
+                msg: "⚠️ KB namespace creation failed - this is optional and can be created later"
+
       rescue:
         - name: Display troubleshooting information
           debug:

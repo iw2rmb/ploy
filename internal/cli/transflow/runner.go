@@ -317,7 +317,11 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 		Environment: "dev",
 		Timeout:     timeout,
 	}
+	// Ensure build tar is created from the repository root
+	cwd, _ := os.Getwd()
+	_ = os.Chdir(repoPath)
 	res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
+	_ = os.Chdir(cwd)
 	if err != nil {
 		return fmt.Errorf("build gate failed: %w", err)
 	}
@@ -453,7 +457,11 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		ControllerURL: "", // Will be set by the actual implementation
 	}
 
+	// Ensure build tar is created from the repository root
+	cwd2, _ := os.Getwd()
+	_ = os.Chdir(repoPath)
 	buildResult, err := r.buildChecker.CheckBuild(ctx, buildConfig)
+	_ = os.Chdir(cwd2)
 	if err != nil || (buildResult != nil && !buildResult.Success) {
 		message := "Build check failed"
 		if buildResult != nil && buildResult.Message != "" {

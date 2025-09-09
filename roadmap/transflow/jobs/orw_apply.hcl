@@ -7,31 +7,32 @@ job "transflow-orw-apply" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/your-org/openrewrite-runner:jvm-6.17.0" # pin digest
-        command = "/usr/local/bin/openrewrite"
-        args = [
-          "--engine", "openrewrite",
-          "--recipe-class", "${RECIPE_CLASS}",
-          "--coords", "${RECIPE_COORDS}",
-          "--timeout", "${RECIPE_TIMEOUT}"
+        image = "${ORW_APPLY_IMAGE}" # pin digest
+        force_pull = true
+        volumes = [
+          "${CONTEXT_HOST_DIR}:/workspace/context:ro",
+          "${OUT_HOST_DIR}:/workspace/out"
         ]
       }
 
       env = {
-        OUTPUT_DIR  = "/workspace/out"
+        OUTPUT_DIR      = "/workspace/out"
+        RECIPE          = "${RECIPE_CLASS}"
+        DISCOVER_RECIPE = "true"
       }
 
-      resources { cpu = 500, memory = 1024 }
-
-      volume_mount { volume = "context" destination = "/workspace/context" read_only = true }
-      volume_mount { volume = "out"     destination = "/workspace/out"     read_only = false }
+      resources {
+        cpu    = 500
+        memory = 1024
+      }
 
       kill_timeout = "5m"
-      timeout      = "30m"
     }
 
-    volume "context" { type = "host" source = "transflow-context" }
-    volume "out"     { type = "host" source = "transflow-out" }
+    # using docker bind mounts via config.volumes
+    restart {
+      attempts = 0
+      mode     = "fail"
+    }
   }
 }
-

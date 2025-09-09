@@ -97,6 +97,10 @@ upload_to_cache() {
     fi
 }
 
+# Prepare output directory for artifacts
+OUTPUT_DIR="${OUTPUT_DIR:-/workspace/out}"
+mkdir -p "${OUTPUT_DIR}"
+
 # Step 1: Extract input tar
 echo "[OpenRewrite] Extracting input archive..."
 echo "[OpenRewrite] Current directory: $(pwd)"
@@ -127,6 +131,12 @@ ls -la
 echo "[OpenRewrite] Directory tree (max depth 2):"
 find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
+
+# Snapshot original tree for diff generation later
+ORIG_SNAPSHOT="/workspace/original"
+rm -rf "$ORIG_SNAPSHOT"
+mkdir -p "$ORIG_SNAPSHOT"
+cp -a . "$ORIG_SNAPSHOT/"
 
 # Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
@@ -456,7 +466,17 @@ else
     echo "[OpenRewrite] No OUTPUT_KEY/OUTPUT_URL provided, skipping upload"
 fi
 
-# Step 7: Generate transformation report
+# Step 7: Generate diff.patch artifact for transflow (always create file)
+echo "[OpenRewrite] Generating unified diff patch..."
+if /usr/local/bin/generate-diff.sh "$ORIG_SNAPSHOT" "/workspace/project" "${OUTPUT_DIR}/diff.patch"; then
+  echo "[OpenRewrite] diff.patch generated at ${OUTPUT_DIR}/diff.patch"
+else
+  echo "[OpenRewrite] WARNING: diff generation script returned non-zero status; continuing"
+  # Ensure file exists
+  touch "${OUTPUT_DIR}/diff.patch" || true
+fi
+
+# Step 8: Generate transformation report
 cat > /workspace/transformation-report.json << EOF
 {
   "recipe": "${RECIPE_CLASS}",

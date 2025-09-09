@@ -36,6 +36,10 @@ COPY runner.sh /usr/local/bin/openrewrite
 COPY setup-workspace.sh /usr/local/bin/setup-workspace
 RUN chmod 755 /usr/local/bin/openrewrite /usr/local/bin/setup-workspace
 
+# Diff generation helper
+COPY generate-diff.sh /usr/local/bin/generate-diff.sh
+RUN chmod 755 /usr/local/bin/generate-diff.sh
+
 # Set up Maven settings for better performance
 RUN mkdir -p /root/.m2 && \
     echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \

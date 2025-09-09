@@ -11,8 +11,16 @@ api/
 ├── main.go                   # API server entry point
 ├── server/                   # HTTP server architecture
 │   ├── server.go             # Main server with endpoint definitions (setupRoutes)
-│   ├── handlers.go           # Primary request handlers  
-│   └── platform_handlers.go  # Platform service handlers
+│   ├── routes.go             # Route definitions and setup
+│   ├── handlers.go           # Primary request handlers
+│   ├── handlers_bluegreen.go # Blue-green deployment handlers
+│   ├── handlers_certificate.go # Certificate management handlers
+│   ├── handlers_health.go    # Health check handlers
+│   ├── platform_handlers.go  # Platform service handlers
+│   ├── recipes_handlers.go   # Recipe-specific request handlers
+│   ├── initializers.go       # Server initialization and setup
+│   ├── config.go             # Server configuration management
+│   └── storage_resolver.go   # Storage backend resolution
 ├── config/                   # Configuration management
 │   └── config.go             # Configuration loading and validation
 ├── health/                   # Health checking infrastructure
@@ -58,6 +66,7 @@ api/
 ├── consul_envstore/          # Consul KV environment storage
 │   └── store.go              # Consul-based environment storage
 ├── coordination/             # Distributed coordination
+│   ├── leader.go             # Distributed leader election logic
 │   └── ttl_cleanup.go        # TTL-based resource cleanup
 ├── selfupdate/               # Self-updating capability
 │   ├── executor.go           # Update execution logic
@@ -84,18 +93,72 @@ api/
 │   ├── types.go              # Analysis type definitions
 │   ├── arf_integration.go    # ARF integration
 │   ├── nomad_analyzer.go     # Nomad-based distributed analysis
+│   ├── nomad_dispatcher.go   # Distributed analysis job dispatch
 │   └── analyzers/            # Language-specific analyzers
 │       ├── java/             # Java analysis tools (ErrorProne)
 │       └── python/           # Python analysis tools (Pylint)
-└── arf/                      # Automated Remediation Framework
-    ├── handler_*.go          # ARF endpoint handlers
-    ├── catalog.go            # Recipe catalog management
-    ├── sandbox.go            # Sandbox management for transformations
+├── platform/                 # Platform service integration
+│   ├── handler.go            # Platform API endpoints
+│   └── handler_test.go       # Platform handler tests
+├── transflow/                # Transflow API endpoints
+│   └── handler.go            # Transflow transformation handlers
+├── llms/                     # Large Language Model integration
+│   ├── handler.go            # LLM API endpoints
+│   └── handler_test.go       # LLM handler tests
+└── arf/                      # Automated Remediation Framework ✅ Sep 2025 - Enhanced
+    ├── handler.go            # Main ARF endpoint handlers
+    ├── handler_debug.go      # Debug and analysis endpoints
+    ├── handler_recipes.go    # Recipe management endpoints
+    ├── handler_sandbox.go    # Sandbox management endpoints
+    ├── handler_security.go   # Security analysis endpoints
+    ├── handler_transformation_async.go # Async transformation handlers
     ├── openrewrite_engine.go # OpenRewrite integration
+    ├── openrewrite_dispatcher.go # OpenRewrite job dispatch
     ├── hybrid_pipeline.go    # Hybrid transformation pipeline
+    ├── learning_system.go    # Machine learning integration
+    ├── healing_coordinator.go # Self-healing orchestration
+    ├── healing_workflow.go   # Healing workflow management
+    ├── healing_metrics.go    # Healing system metrics
+    ├── healing_alerts.go     # Healing alert management
+    ├── healing_logger.go     # Healing event logging
+    ├── llm_dispatcher.go     # LLM integration dispatch
+    ├── llm_error_analysis.go # LLM-powered error analysis
+    ├── llm_cost_tracker.go   # LLM usage cost tracking
+    ├── multi_language_core.go # Multi-language transformation core
+    ├── multi_language_java.go # Java-specific transformations
+    ├── multi_language_python.go # Python-specific transformations
+    ├── multi_language_go.go  # Go-specific transformations
+    ├── multi_language_rust.go # Rust-specific transformations
+    ├── multi_language_wasm.go # WebAssembly transformations
+    ├── multi_language_javascript.go # JavaScript transformations
+    ├── pattern_matcher.go    # Code pattern matching engine
+    ├── recipe_registry.go    # Recipe catalog management
+    ├── recipe_executor.go    # Recipe execution engine
+    ├── recipe_evolution.go   # Recipe versioning and evolution
+    ├── sandbox.go            # Sandbox management for transformations
+    ├── sandbox_validation.go # Sandbox security validation
+    ├── security_engine.go    # Security analysis engine
+    ├── storage_service.go    # ARF storage service layer
+    ├── unified_service.go    # Unified ARF service interface
+    ├── transformation_workflow.go # Transformation orchestration
+    ├── strategy_selector.go  # Transformation strategy selection
+    ├── complexity_analyzer.go # Code complexity analysis
+    ├── sbom_analyzer.go      # Software Bill of Materials analysis
+    ├── nvd_database.go       # National Vulnerability Database integration
+    ├── deployment_sandbox.go # Deployment environment sandboxing
+    ├── config.go             # ARF configuration management
+    ├── common_types.go       # Shared type definitions
+    ├── shared_types.go       # Additional shared types
+    ├── recipe_types.go       # Recipe-specific type definitions
+    ├── transformation_types.go # Transformation type definitions
+    ├── llm_types.go          # LLM integration types
+    ├── debug_types.go        # Debug system types
+    ├── security_engine_types.go # Security engine types
+    ├── consul_store.go       # Consul-based storage backend
+    ├── registry_storage_adapter.go # Storage adapter for recipe registry
+    ├── db/                   # Database schemas and migrations
     ├── examples/             # ARF recipe examples
     ├── models/               # ARF data models and validation
-    ├── storage/              # ARF storage backends
     ├── validation/           # Recipe validation
     └── sql/                  # Database integration for learning system
 ```

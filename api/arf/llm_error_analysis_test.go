@@ -111,10 +111,9 @@ import "log"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewEnhancedLLMAnalyzer(nil, nil)
-
-			// For this test, we'll mock the internal LLM call
-			result := analyzer.analyzeErrorsWithPattern(tt.errors, tt.language)
+			// For this test, we'll use pattern analysis directly
+			patternAnalyzer := NewPatternAnalyzer()
+			result := patternAnalyzer.AnalyzeErrors(tt.errors, tt.language)
 
 			if tt.expectError {
 				assert.Nil(t, result)
@@ -174,8 +173,7 @@ func TestExtractErrorContext(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewEnhancedLLMAnalyzer(nil, nil)
-			context := analyzer.extractErrorContext(tt.errors)
+			context := ExtractErrorContext(tt.errors, "")
 
 			assert.Equal(t, tt.expectedContext.ErrorType, context.ErrorType)
 			assert.Equal(t, tt.expectedContext.ErrorMessage, context.ErrorMessage)
@@ -296,8 +294,8 @@ func TestConvertToOpenRewriteRecipe(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewEnhancedLLMAnalyzer(nil, nil)
-			recipe, metadata := analyzer.convertToOpenRewriteRecipe(tt.analysis, tt.language)
+			recipeConverter := NewRecipeConverter()
+			recipe, metadata := recipeConverter.ConvertToOpenRewriteRecipe(tt.analysis, tt.language)
 
 			assert.Equal(t, tt.expectedRecipe, recipe)
 			if tt.expectedMetadata != nil {

@@ -1,3 +1,6 @@
+//go:build vps
+// +build vps
+
 package vps
 
 import (

@@ -210,6 +210,14 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
+	// Provide host directories for bind mounts during substitution
+	// Use the directory of the HCL as context, and an 'out' subdir for outputs
+	baseDir := filepath.Dir(hclPath)
+	// Ensure out directory exists for bind mount target
+	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
+	os.Setenv("TRANSFLOW_CONTEXT_DIR", baseDir)
+	os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+
 	// Step 2: Generate unique run ID for this branch
 	runID := fmt.Sprintf("llm-exec-%s-%d", branch.ID, time.Now().Unix())
 
@@ -375,18 +383,33 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		}
 	}
 
-	// Perform recipe-specific substitution
-	rendered := strings.NewReplacer(
+	// Perform recipe-specific substitution first, then apply environment/template substitution
+	prePath := strings.ReplaceAll(hclPath, ".rendered.hcl", ".pre.hcl")
+	preContent := strings.NewReplacer(
 		"${RECIPE_CLASS}", rclass,
 		"${RECIPE_COORDS}", rcoords,
 		"${RECIPE_TIMEOUT}", rtimeout,
 	).Replace(string(hclBytes))
-
-	// Write substituted HCL to a new file
-	renderedHCLPath := strings.ReplaceAll(hclPath, ".rendered.hcl", ".rendered.submitted.hcl")
-	if err := os.WriteFile(renderedHCLPath, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(prePath, []byte(preContent), 0644); err != nil {
 		result.Status = "failed"
-		result.Notes = fmt.Sprintf("failed to write substituted ORW HCL: %v", err)
+		result.Notes = fmt.Sprintf("failed to write pre-substituted ORW HCL: %v", err)
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
+	}
+
+	// Provide host directories for bind mounts
+	baseDir := filepath.Dir(hclPath)
+	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
+	os.Setenv("TRANSFLOW_CONTEXT_DIR", baseDir)
+	os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+
+	// Step 2b: Substitute environment variables in HCL template
+	runID := fmt.Sprintf("orw-apply-%s-%d", branch.ID, time.Now().Unix())
+	renderedHCLPath, err := substituteHCLTemplate(prePath, runID)
+	if err != nil {
+		result.Status = "failed"
+		result.Notes = fmt.Sprintf("failed to substitute ORW HCL template: %v", err)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result

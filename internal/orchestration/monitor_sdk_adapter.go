@@ -4,17 +4,13 @@ import (
 	"fmt"
 
 	nomadapi "github.com/hashicorp/nomad/api"
-	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 type sdkNomadAdapter struct{ client *nomadapi.Client }
 
 func newSDKNomadAdapter() *sdkNomadAdapter {
-	cfg := nomadapi.DefaultConfig()
-	if addr := utils.Getenv("NOMAD_ADDR", ""); addr != "" {
-		cfg.Address = addr
-	}
-	c, _ := nomadapi.NewClient(cfg)
+	// Reuse orchestration client helper to ensure RetryTransport is installed
+	c, _ := newNomadClient()
 	return &sdkNomadAdapter{client: c}
 }
 

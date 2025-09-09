@@ -1,3 +1,6 @@
+//go:build arf_legacy
+// +build arf_legacy
+
 package arf
 
 import (

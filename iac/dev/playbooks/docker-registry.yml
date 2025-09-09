@@ -53,14 +53,13 @@
 
     - name: Deploy Docker Registry via Nomad
       block:
-        - name: Copy Docker Registry Nomad job file
+        - name: Copy Docker Registry Nomad job file from controller
           copy:
-            src: "{{ ansible_env.HOME }}/ploy/platform/nomad/docker-registry.hcl"
+            src: "{{ playbook_dir }}/../../platform/nomad/docker-registry.hcl"
             dest: /home/ploy/ploy/platform/nomad/docker-registry.hcl
             owner: ploy
             group: ploy
             mode: '0644'
-          become_user: ploy
         
         - name: Validate Docker Registry job syntax
           command: nomad job validate platform/nomad/docker-registry.hcl

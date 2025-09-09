@@ -201,6 +201,55 @@
               - Manifest: Available in registry
               - Ready for use by ARF transformations
 
+    - name: Prune old image tags in registry (keep latest + 2 previous)
+      block:
+        - name: Create prune script
+          copy:
+            dest: "/usr/local/bin/registry-prune.sh"
+            mode: '0755'
+            content: |
+              {% raw %}
+              #!/usr/bin/env bash
+              set -euo pipefail
+              REGISTRY="${1}"
+              IMAGE="${2}"
+              KEEP=3
+              echo "Pruning tags for ${IMAGE} at ${REGISTRY} (keeping ${KEEP})"
+              tags=$(curl -fsSL https://${REGISTRY}/v2/${IMAGE}/tags/list | jq -r '.tags[]' | sort -V || true)
+              # Always keep 'latest'
+              keep_tags=(latest)
+              mapfile -t other_tags < <(echo "${tags}" | grep -v '^latest$' || true)
+              if [ ${#other_tags[@]} -gt 0 ]; then
+                # take last (highest) two by version-sort if available
+                cnt=${#other_tags[@]}
+                if [ $cnt -ge 2 ]; then
+                  keep_tags+=("${other_tags[$((cnt-2))]}" "${other_tags[$((cnt-1))]}")
+                else
+                  keep_tags+=("${other_tags[0]}")
+                fi
+              fi
+              echo "Keeping: ${keep_tags[*]}"
+              for tag in ${tags}; do
+                skip=false
+                for k in "${keep_tags[@]}"; do
+                  if [ "$tag" = "$k" ]; then skip=true; break; fi
+                done
+                if [ "$skip" = true ]; then continue; fi
+                # Fetch manifest digest for tag
+                digest=$(curl -fsSI -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \\
+                         https://${REGISTRY}/v2/${IMAGE}/manifests/${tag} | awk -F': ' '/Docker-Content-Digest/{print $2}' | tr -d '\\r')
+                if [ -n "$digest" ]; then
+                  echo "Deleting ${IMAGE}:${tag} (digest ${digest})"
+                  curl -fsS -X DELETE https://${REGISTRY}/v2/${IMAGE}/manifests/${digest} || true
+                fi
+              done
+              echo "Prune complete"
+              {% endraw %}
+        - name: Run prune script for OpenRewrite image
+          shell: "/usr/local/bin/registry-prune.sh {{ registry_endpoint }} {{ openrewrite_image_name }}"
+          args:
+            executable: /bin/bash
+
     - name: Clean up build directory
       file:
         path: "{{ build_directory }}"

@@ -931,9 +931,6 @@ func testNomadOperations(t *testing.T, nomadAddr string) {
 		t.Fatalf("failed to create Nomad client: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	// Test basic Nomad connectivity
 	_, err = client.Status().Leader()
 	if err != nil {
@@ -960,9 +957,6 @@ func testConsulOperations(t *testing.T, consulAddr string) {
 	if err != nil {
 		t.Fatalf("failed to create Consul client: %v", err)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	// Test key for this integration test
 	testKey := fmt.Sprintf("transflow/integration-test/%d", time.Now().Unix())
@@ -1103,7 +1097,9 @@ func validateNomadUsage(t *testing.T, result *TransflowResult, serviceConfig *Se
 	} else {
 		transflowJobs := 0
 		for _, job := range jobs {
-			if job.Name != nil && strings.Contains(*job.Name, "transflow") {
+			// JobListStub.Name can be a string in some Nomad client versions
+			name := job.Name
+			if strings.Contains(name, "transflow") {
 				transflowJobs++
 			}
 		}

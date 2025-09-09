@@ -7,15 +7,18 @@ job "transflow-planner" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/your-org/langchain-runner:py-0.1.0" # pin exact digest in prod
-        command = "python"
-        args    = ["-m", "runner", "--mode", "planner"]
+        image = "${PLANNER_IMAGE}"
+        force_pull = true
+        volumes = [
+          "${CONTEXT_HOST_DIR}:/workspace/context:ro",
+          "${OUT_HOST_DIR}:/workspace/out"
+        ]
       }
 
       env = {
-        MODEL       = "${MODEL}"           # e.g., gpt-4o-mini@2024-08-06
-        TOOLS       = "${TOOLS_JSON}"      # JSON string allowlisting tools
-        LIMITS      = "${LIMITS_JSON}"     # JSON limits (steps/tool_calls/timeout)
+        MODEL       = "${MODEL}"
+        TOOLS       = "${TOOLS_JSON}"
+        LIMITS      = "${LIMITS_JSON}"
         CONTEXT_DIR = "/workspace/context"
         KB_DIR      = "/workspace/kb"
         OUTPUT_DIR  = "/workspace/out"
@@ -27,36 +30,12 @@ job "transflow-planner" {
         memory = 1024
       }
 
-      volume_mount {
-        volume      = "context"
-        destination = "/workspace/context"
-        read_only   = true
-      }
-
-      volume_mount {
-        volume      = "kb"
-        destination = "/workspace/kb"
-        read_only   = true
-      }
-
-      volume_mount {
-        volume      = "out"
-        destination = "/workspace/out"
-        read_only   = false
-      }
-
-      template {
-        destination = "/workspace/out/.keep"
-        data        = ""
-      }
+      # Using docker bind mounts via config.volumes
 
       kill_timeout = "5m"
-      timeout      = "30m"
     }
 
-    volume "context" { type = "host" source = "transflow-context" }
-    volume "kb"      { type = "host" source = "transflow-kb" }
-    volume "out"     { type = "host" source = "transflow-out" }
+    # no external volumes; using docker bind mounts via config.volumes
 
     restart {
       attempts = 0

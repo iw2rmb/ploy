@@ -1,0 +1,84 @@
+version: v1alpha1
+id: java11to17-test
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
+target_branch: main
+base_ref: main
+lane: C
+build_timeout: 10m
+
+self_heal:
+  max_retries: 2
+
+budgets:
+  run_max_tokens: 0
+  run_max_cost: 0  
+  run_timeout: 0s
+
+artifacts:
+  type: mr
+  target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
+  storage:
+    diffs: seaweedfs
+    process_state: consul_kv
+
+mr:
+  forge: gitlab
+  repo_url_env: GITLAB_URL
+  token_env: GITLAB_TOKEN
+  labels: ["ploy", "tfl", "java11to17"]
+
+branch_naming:
+  workflow_branch: "workflow/${id}/${timestamp}"
+  exec_branch: "exec/${id}/${seq}"
+
+job_defaults:
+  retries: 3
+  timeout: 30m
+
+network:
+  default_policy: deny
+  allow_llm: true
+  allow_mcp_endpoints: true
+
+gates:
+  enabled: [static_analysis, vuln_scan, compile]
+  disabled: [deploy, tests]
+
+error_policy:
+  on_failure:
+    max_retries: 2
+    fallback: human-step
+
+merge:
+  strategy: merge
+  auto_format: true
+  recheck_gates_post_merge: true
+
+steps:
+  - type: recipe
+    id: java11to17-migration
+    engine: openrewrite
+    recipes:
+      - org.openrewrite.java.migrate.Java11toJava17
+
+  - type: llm-plan
+    id: plan-build-fixes
+    parallel: true
+    max_parallel_execs: 3
+    mcp_tools:
+      - name: file-system
+        endpoint: mcp://fs
+      - name: search
+        endpoint: mcp://rg
+    context:
+      - "src/**/*.java"
+      - "pom.xml"
+      - "**/*.xml"
+    budgets:
+      max_tokens: 0
+      max_cost: 0
+      timeout: 30m
+
+  - type: human-step
+    id: manual-review
+    reason: "Review migration changes if build healing fails"

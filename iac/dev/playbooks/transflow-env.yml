@@ -1,0 +1,57 @@
+---
+# Transflow environment defaults for VPS
+
+- name: Configure Transflow environment defaults
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  vars:
+    transflow_registry: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
+    planner_image: "{{ transflow_registry }}/langgraph-runner:py-0.1.0"
+    reducer_image: "{{ transflow_registry }}/langgraph-runner:py-0.1.0"
+    llm_exec_image: "{{ transflow_registry }}/langgraph-runner:py-0.1.0"
+    orw_apply_image: "{{ transflow_registry }}/openrewrite-jvm:latest"
+
+  tasks:
+    - name: Add Transflow registry and image environment variables for ploy user (.bashrc)
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Transflow container registry and image defaults
+          export TRANSFLOW_REGISTRY="{{ transflow_registry }}"
+          export TRANSFLOW_PLANNER_IMAGE="{{ planner_image }}"
+          export TRANSFLOW_REDUCER_IMAGE="{{ reducer_image }}"
+          export TRANSFLOW_LLM_EXEC_IMAGE="{{ llm_exec_image }}"
+          export TRANSFLOW_ORW_APPLY_IMAGE="{{ orw_apply_image }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Transflow Images"
+
+    - name: Add Transflow registry and image environment variables for ploy user (.profile)
+      blockinfile:
+        path: /home/ploy/.profile
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Transflow container registry and image defaults
+          export TRANSFLOW_REGISTRY="{{ transflow_registry }}"
+          export TRANSFLOW_PLANNER_IMAGE="{{ planner_image }}"
+          export TRANSFLOW_REDUCER_IMAGE="{{ reducer_image }}"
+          export TRANSFLOW_LLM_EXEC_IMAGE="{{ llm_exec_image }}"
+          export TRANSFLOW_ORW_APPLY_IMAGE="{{ orw_apply_image }}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Transflow Images"
+
+    - name: Print Transflow environment configuration summary
+      debug:
+        msg: |
+          Transflow environment configured:
+            TRANSFLOW_REGISTRY={{ transflow_registry }}
+            TRANSFLOW_PLANNER_IMAGE={{ planner_image }}
+            TRANSFLOW_REDUCER_IMAGE={{ reducer_image }}
+            TRANSFLOW_LLM_EXEC_IMAGE={{ llm_exec_image }}
+            TRANSFLOW_ORW_APPLY_IMAGE={{ orw_apply_image }}

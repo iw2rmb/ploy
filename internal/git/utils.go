@@ -217,9 +217,7 @@ func (g *GitUtils) tryExtractFromPomXML() string {
 		if matches := findStringSubmatch(pattern, content); len(matches) > 1 {
 			url := strings.TrimSpace(matches[1])
 			// Clean up SCM URLs
-			if strings.HasPrefix(url, "scm:git:") {
-				url = strings.TrimPrefix(url, "scm:git:")
-			}
+			url = strings.TrimPrefix(url, "scm:git:")
 			return g.normalizeURL(url)
 		}
 	}
@@ -267,9 +265,7 @@ func (g *GitUtils) normalizeURL(url string) string {
 	}
 
 	// Remove .git suffix
-	if strings.HasSuffix(url, ".git") {
-		url = url[:len(url)-4]
-	}
+	url = strings.TrimSuffix(url, ".git")
 
 	// Ensure https:// prefix
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
@@ -422,9 +418,7 @@ func (g *GitUtils) GetBranches() ([]string, error) {
 		branch := strings.TrimSpace(line)
 		if branch != "" && !strings.Contains(branch, "->") {
 			// Remove "origin/" prefix
-			if strings.HasPrefix(branch, "origin/") {
-				branch = strings.TrimPrefix(branch, "origin/")
-			}
+			branch = strings.TrimPrefix(branch, "origin/")
 			branches = append(branches, branch)
 		}
 	}

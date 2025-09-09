@@ -74,19 +74,59 @@ func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPCo
 	// Get MCP environment variables
 	mcpEnvConfig := getMCPEnvironmentConfig(mcpConfig)
 
+	// Escape values for safe inclusion inside quoted HCL strings
+	hclEscape := func(s string) string {
+		s = strings.ReplaceAll(s, "\\", "\\\\")
+		s = strings.ReplaceAll(s, "\"", "\\\"")
+		return s
+	}
+
+	// Compute optional host directories for bind mounts
+	// Derive from typical workspace layout when present in env
+	contextHostDir := os.Getenv("TRANSFLOW_CONTEXT_DIR")
+	outHostDir := os.Getenv("TRANSFLOW_OUT_DIR")
+
+	// Defaults for images (can be overridden via environment)
+	defaultRegistry := os.Getenv("TRANSFLOW_REGISTRY")
+	if defaultRegistry == "" {
+		defaultRegistry = "registry.dev.ployman.app"
+	}
+	plannerImage := os.Getenv("TRANSFLOW_PLANNER_IMAGE")
+	if plannerImage == "" {
+		plannerImage = defaultRegistry + "/langgraph-runner:py-0.1.0"
+	}
+	reducerImage := os.Getenv("TRANSFLOW_REDUCER_IMAGE")
+	if reducerImage == "" {
+		reducerImage = plannerImage
+	}
+	llmExecImage := os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE")
+	if llmExecImage == "" {
+		llmExecImage = plannerImage
+	}
+	orwApplyImage := os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE")
+	if orwApplyImage == "" {
+		orwApplyImage = defaultRegistry + "/openrewrite-jvm:latest"
+	}
+
 	// Perform substitution
 	replacer := strings.NewReplacer(
-		"${MODEL}", model,
-		"${TOOLS_JSON}", toolsJSON,
-		"${LIMITS_JSON}", limitsJSON,
+		"${MODEL}", hclEscape(model),
+		"${TOOLS_JSON}", hclEscape(toolsJSON),
+		"${LIMITS_JSON}", hclEscape(limitsJSON),
 		"${RUN_ID}", runID,
-		"${MCP_TOOLS_JSON}", mcpEnvConfig.MCPToolsJSON,
-		"${MCP_CONTEXT_JSON}", mcpEnvConfig.MCPContextJSON,
-		"${MCP_ENDPOINTS_JSON}", mcpEnvConfig.MCPEndpointsJSON,
-		"${MCP_BUDGETS_JSON}", mcpEnvConfig.MCPBudgetsJSON,
-		"${MCP_PROMPTS_JSON}", mcpEnvConfig.MCPPromptsJSON,
-		"${MCP_TIMEOUT}", mcpEnvConfig.MCPTimeout,
-		"${MCP_SECURITY_MODE}", mcpEnvConfig.MCPSecurityMode,
+		"${CONTEXT_HOST_DIR}", hclEscape(contextHostDir),
+		"${OUT_HOST_DIR}", hclEscape(outHostDir),
+		"${PLANNER_IMAGE}", hclEscape(plannerImage),
+		"${REDUCER_IMAGE}", hclEscape(reducerImage),
+		"${LLM_EXEC_IMAGE}", hclEscape(llmExecImage),
+		"${ORW_APPLY_IMAGE}", hclEscape(orwApplyImage),
+		"${MCP_TOOLS_JSON}", hclEscape(mcpEnvConfig.MCPToolsJSON),
+		"${MCP_CONTEXT_JSON}", hclEscape(mcpEnvConfig.MCPContextJSON),
+		"${MCP_ENDPOINTS_JSON}", hclEscape(mcpEnvConfig.MCPEndpointsJSON),
+		"${MCP_BUDGETS_JSON}", hclEscape(mcpEnvConfig.MCPBudgetsJSON),
+		"${MCP_PROMPTS_JSON}", hclEscape(mcpEnvConfig.MCPPromptsJSON),
+		"${MCP_TIMEOUT}", hclEscape(mcpEnvConfig.MCPTimeout),
+		"${MCP_SECURITY_MODE}", hclEscape(mcpEnvConfig.MCPSecurityMode),
 	)
 	rendered := replacer.Replace(string(hclBytes))
 
@@ -193,6 +233,12 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		runID := fmt.Sprintf("%s-planner-%d", config.ID, time.Now().Unix())
 
 		// Step 3: Substitute environment variables in HCL template
+		// Provide host directories for bind mounts
+		contextDir := filepath.Dir(assets.InputsPath)
+		outDir := filepath.Join(workspace, "planner", "out")
+		// Inform substitution via env to avoid signature churn
+		os.Setenv("TRANSFLOW_CONTEXT_DIR", contextDir)
+		os.Setenv("TRANSFLOW_OUT_DIR", outDir)
 		renderedHCLPath, err := substituteHCLTemplate(assets.HCLPath, runID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
@@ -266,6 +312,11 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		runID := fmt.Sprintf("%s-reducer-%d", planID, time.Now().Unix())
 
 		// Step 3: Substitute environment variables in HCL template
+		// Provide host directories for bind mounts
+		contextDir := filepath.Dir(assets.HistoryPath)
+		outDir := filepath.Join(workspace, "reducer", "out")
+		os.Setenv("TRANSFLOW_CONTEXT_DIR", contextDir)
+		os.Setenv("TRANSFLOW_OUT_DIR", outDir)
 		renderedHCLPath, err := substituteHCLTemplate(assets.HCLPath, runID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)

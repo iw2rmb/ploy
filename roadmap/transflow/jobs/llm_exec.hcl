@@ -7,9 +7,12 @@ job "transflow-llm-exec" {
       driver = "docker"
 
       config {
-        image   = "ghcr.io/your-org/langchain-runner:py-0.1.0" # pin exact digest in prod
-        command = "python"
-        args    = ["-m", "runner", "--mode", "exec"]
+        image = "${LLM_EXEC_IMAGE}"
+        # Use the image's default entrypoint to generate a diff patch.
+        volumes = [
+          "${CONTEXT_HOST_DIR}:/workspace/context:ro",
+          "${OUT_HOST_DIR}:/workspace/out",
+        ]
       }
 
       env = {
@@ -51,25 +54,11 @@ job "transflow-llm-exec" {
         }
       }
 
-      volume_mount {
-        volume      = "context"
-        destination = "/workspace/context"
-        read_only   = true
-      }
-
-      volume_mount {
-        volume      = "out"
-        destination = "/workspace/out"
-        read_only   = false
-      }
-
       # The runner should write /workspace/out/diff.patch on success
       kill_timeout = "5m"
-      timeout      = "30m"
     }
 
-    volume "context" { type = "host" source = "transflow-context" }
-    volume "out"     { type = "host" source = "transflow-out" }
+    # Using docker bind mounts via config.volumes
 
     restart {
       attempts = 0
@@ -77,4 +66,3 @@ job "transflow-llm-exec" {
     }
   }
 }
-

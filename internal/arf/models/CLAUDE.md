@@ -94,4 +94,4 @@ The models package defines the fundamental data structures used throughout the P
 - `../../validation/CLAUDE.md` - Extended validation logic using these models
 - `../../storage/CLAUDE.md` - Persistence layer for model storage
 - `../../../api/llms/CLAUDE.md` - API endpoints consuming these models
-- `../../../cmd/ployman/CLAUDE.md` - CLI operations with these models
+- `../../../cmd/ployman/README.md` - CLI operations with these models
