@@ -189,8 +189,32 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Write config to temp file
-	configPath := filepath.Join(tempDir, "transflow.yaml")
+    // Prepare workspace structure and write templates for transflow runner
+    jobsDir := filepath.Join(tempDir, "roadmap", "transflow", "jobs")
+    if err := os.MkdirAll(jobsDir, 0755); err != nil {
+        h.recordError(executionID, fmt.Errorf("failed to create jobs dir: %w", err))
+        return
+    }
+    // Write embedded HCL templates
+    if err := os.WriteFile(filepath.Join(jobsDir, "planner.hcl"), plannerHCL, 0644); err != nil {
+        h.recordError(executionID, fmt.Errorf("failed to write planner.hcl: %w", err))
+        return
+    }
+    if err := os.WriteFile(filepath.Join(jobsDir, "llm_exec.hcl"), llmExecHCL, 0644); err != nil {
+        h.recordError(executionID, fmt.Errorf("failed to write llm_exec.hcl: %w", err))
+        return
+    }
+    if err := os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), orwApplyHCL, 0644); err != nil {
+        h.recordError(executionID, fmt.Errorf("failed to write orw_apply.hcl: %w", err))
+        return
+    }
+    if err := os.WriteFile(filepath.Join(jobsDir, "reducer.hcl"), reducerHCL, 0644); err != nil {
+        h.recordError(executionID, fmt.Errorf("failed to write reducer.hcl: %w", err))
+        return
+    }
+
+    // Write config to temp file
+    configPath := filepath.Join(tempDir, "transflow.yaml")
 	configBytes, _ := yaml.Marshal(config)
 	if err := os.WriteFile(configPath, configBytes, 0644); err != nil {
 		h.recordError(executionID, fmt.Errorf("failed to write config file: %w", err))

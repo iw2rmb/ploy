@@ -223,12 +223,12 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
 		return nil, err
 	}
 
-	// Copy HCL template
-	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
-	}
+    // Read planner template from workspace (provided by server)
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
+    }
 
 	hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
 	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
@@ -244,11 +244,11 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
-	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "llm_exec.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err)
-	}
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "llm_exec.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil {
+        return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err)
+    }
 	renderedPath := filepath.Join(dir, "llm_exec.rendered.hcl")
 	// Defer env substitution to caller (same as planner/reducer), we just copy template here
 	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
@@ -263,34 +263,10 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
     if err := os.MkdirAll(dir, 0755); err != nil {
         return "", err
     }
-    // Locate template relative to CWD or executable directory
     hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
     hclBytes, err := os.ReadFile(hclTemplate)
     if err != nil {
-        // Fallback: search upwards from executable directory
-        if exe, e2 := os.Executable(); e2 == nil {
-            base := filepath.Dir(exe)
-            for i := 0; i < 5; i++ { // search up to 5 levels
-                tryPath := filepath.Join(base, hclTemplate)
-                if b, e3 := os.ReadFile(tryPath); e3 == nil {
-                    hclBytes = b
-                    err = nil
-                    break
-                }
-                base = filepath.Dir(base)
-            }
-        }
-        // Fallback: common server workspace root
-        if err != nil {
-            tryPath := filepath.Join("/home/ploy/ploy", hclTemplate)
-            if b, e4 := os.ReadFile(tryPath); e4 == nil {
-                hclBytes = b
-                err = nil
-            }
-        }
-        if err != nil {
-            return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
-        }
+        return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
     }
 	renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
 	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
@@ -377,12 +353,11 @@ func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
 		return nil, err
 	}
 
-	// Copy HCL template
-	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "reducer.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err)
-	}
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "reducer.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err)
+    }
 
 	hclPath := filepath.Join(r.workspaceDir, "reducer", "reducer.hcl")
 	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
