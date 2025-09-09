@@ -29,22 +29,27 @@ func (d *OpenRewriteDispatcher) createNomadJob(req *OpenRewriteRecipeRequest, jo
 					"image":      fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL),
 					"force_pull": true, // Force pull to get latest image with setup script
 				},
-				Env: map[string]string{
-					"JOB_ID":            req.JobID,            // Nomad job ID for storage paths
-					"TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
-					"RECIPE":            req.RecipeClass,
-					// Prefer dynamic discovery; leave RECIPE_* empty
-					"RECIPE_GROUP":     "",
-					"RECIPE_ARTIFACT":  "",
-					"RECIPE_VERSION":   "",
-					"SEAWEEDFS_URL":    "http://45.12.75.241:8888",
-					"PLOY_API_URL":     d.apiURL,
-					"MAVEN_CACHE_PATH": "maven-repository",
-					"DISCOVER_RECIPE":  "true",                                                                    // Let runner handle pack resolution
-					"ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID),  // Full artifact URL
-					"OUTPUT_KEY":       fmt.Sprintf("jobs/%s/output.tar", req.JobID),                              // Key retained for backward compatibility
-					"OUTPUT_URL":       fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID), // Prefer full upload URL in runner
-				},
+            Env: func() map[string]string {
+                env := map[string]string{
+                    "JOB_ID":            req.JobID,            // Nomad job ID for storage paths
+                    "TRANSFORMATION_ID": req.TransformationID, // UUID from ARF handler
+                    "RECIPE":            req.RecipeClass,
+                    "SEAWEEDFS_URL":    "http://45.12.75.241:8888",
+                    "PLOY_API_URL":     d.apiURL,
+                    "MAVEN_CACHE_PATH": "maven-repository",
+                    "DISCOVER_RECIPE":  "true",                                                                   // Let runner handle pack resolution (overridden when coords provided)
+                    "ARTIFACT_URL":     fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID), // Full artifact URL
+                    "OUTPUT_KEY":       fmt.Sprintf("jobs/%s/output.tar", req.JobID),                             // Key retained for backward compatibility
+                    "OUTPUT_URL":       fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID),
+                }
+                if req.RecipeGroup != "" && req.RecipeArtifact != "" && req.RecipeVersion != "" {
+                    env["RECIPE_GROUP"] = req.RecipeGroup
+                    env["RECIPE_ARTIFACT"] = req.RecipeArtifact
+                    env["RECIPE_VERSION"] = req.RecipeVersion
+                    env["DISCOVER_RECIPE"] = "false"
+                }
+                return env
+            }(),
 				Resources: &api.Resources{
 					CPU:      intPtr(500),
 					MemoryMB: intPtr(2048),
