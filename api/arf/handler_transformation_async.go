@@ -51,13 +51,13 @@ func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
 	if h.recipeRegistry != nil && req.Type == "openrewrite" {
 		startSearch := time.Now()
 		if _, err := h.recipeRegistry.GetRecipeAsModelsRecipe(c.Context(), req.RecipeID); err != nil {
-			// Record catalog miss
+			// Record registry miss
 			if h.metrics != nil {
 				h.metrics.RecordMiss()
 				h.metrics.RecordValidationFailure()
 			}
 
-			// Build suggestions using catalog search (by full ID and last segment)
+			// Build suggestions using registry search (by full ID and last segment)
 			suggestions := []string{}
 			collect := func(items []*models.Recipe) {
 				for _, r := range items {
@@ -107,12 +107,12 @@ func (h *Handler) ExecuteTransformationAsync(c *fiber.Ctx) error {
 
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error":       "invalid recipe_id",
-				"message":     "Recipe not found in catalog",
+				"message":     "Recipe not found in registry",
 				"recipe_id":   req.RecipeID,
 				"suggestions": suggestions,
 			})
 		} else {
-			// Record catalog hit
+			// Record registry hit
 			if h.metrics != nil {
 				h.metrics.RecordHit()
 				h.metrics.RecordSearch(time.Since(startSearch))

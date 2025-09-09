@@ -460,10 +460,11 @@ func (r *RenderData) SetDefaults() {
 		}
 	}
 
-	// Enable enterprise features by default for production readiness
-	// These provide service mesh, secrets, persistence, and configuration
-	r.ConnectEnabled = true
-	r.VaultEnabled = true
+	// Default to disabled for dev/test clusters to avoid Nomad validation
+	// issues when Connect/Vault are not configured. Can be enabled
+	// explicitly by callers when the environment supports them.
+	r.ConnectEnabled = false
+	r.VaultEnabled = false
 	r.VolumeEnabled = true
 	r.ConsulConfigEnabled = true
 

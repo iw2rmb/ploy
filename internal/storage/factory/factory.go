@@ -98,10 +98,10 @@ func createSeaweedFSProvider(cfg FactoryConfig) (storage.Storage, error) {
 	if masterURL == "" {
 		masterURL = "http://localhost:9333" // Default master address
 	}
-	
-	filerURL := os.Getenv("SEAWEEDFS_FILER") 
+
+	filerURL := os.Getenv("SEAWEEDFS_FILER")
 	if filerURL == "" {
-		filerURL = "http://localhost:8888" // Default filer address
+		filerURL = "http://seaweedfs-filer.service.consul:8888" // Default filer address via Consul DNS
 	}
 
 	seaweedCfg := seaweedfs.Config{

@@ -198,6 +198,14 @@ curl http://localhost:8888/kb/summaries/java-compilation-missing-symbol
 build_timeout: 20m  # Increase for complex projects
 ```
 
+## Verification
+
+- Java 11→17 scenario validated end‑to‑end as outlined in `roadmap/transflow/java11-17.md`.
+- Quick local checks (no external services):
+  - `go run ./cmd/ploy transflow run -f test-java11to17-transflow.yaml --dry-run -v`
+  - `go run ./cmd/ploy transflow run -f test-java11to17-transflow.yaml --render-planner -v`
+- VPS E2E: run `ploy transflow run -f /opt/ploy/test/fixtures/java-migration.yaml -v` from the VPS as `ploy` user.
+
 #### GitLab Authentication
 ```bash
 # Verify GitLab token has correct permissions

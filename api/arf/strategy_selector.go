@@ -84,7 +84,6 @@ type EscalationRecommendation struct {
 // DefaultStrategySelector implements strategy selection logic
 type DefaultStrategySelector struct {
 	complexityAnalyzer ComplexityAnalyzer
-	learningSystem     LearningSystem
 	strategyWeights    map[StrategyType]float64
 }
 

@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+	"bytes"
+	"log"
+
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
@@ -82,6 +85,7 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	if config.Timeout > 0 {
 		client.Timeout = config.Timeout
 	}
+	log.Printf("[SharedPush] POST %s app=%s lane=%s env=%s", url, config.App, config.Lane, config.Environment)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("deployment request failed: %w", err)
@@ -89,6 +93,13 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	defer resp.Body.Close()
 
 	// Parse response
+	if resp.StatusCode != http.StatusOK {
+		// Read and log response body for diagnostics, then restore body for downstream readers
+		if b, rerr := io.ReadAll(resp.Body); rerr == nil {
+			log.Printf("[SharedPush] Non-200 response status=%d body=%s", resp.StatusCode, string(b))
+			resp.Body = io.NopCloser(bytes.NewReader(b))
+		}
+	}
 	result, err := parseDeployResponse(resp, config)
 	if err != nil {
 		return nil, err

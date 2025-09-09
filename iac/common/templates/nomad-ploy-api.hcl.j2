@@ -83,6 +83,12 @@ job "ploy-api" {
         CONSUL_ADDR = "http://consul.service.consul:8500"
         NOMAD_ADDR = "http://nomad.service.consul:4646"
         VAULT_ADDR = "http://vault.service.consul:8200"
+        # Nomad SDK resilience (used by API when talking to Nomad directly)
+        NOMAD_HTTP_MAX_RETRIES = "{{ ploy.nomad_http_max_retries | default('5') }}"
+        NOMAD_HTTP_BASE_DELAY = "{{ ploy.nomad_http_base_delay | default('500ms') }}"
+        NOMAD_HTTP_MAX_DELAY = "{{ ploy.nomad_http_max_delay | default('30s') }}"
+        NOMAD_SUBMIT_MAX_CONCURRENCY = "{{ ploy.nomad_submit_max_concurrency | default('4') }}"
+        NOMAD_BLOCKING_WAIT = "{{ ploy.nomad_blocking_wait | default('30s') }}"
 
         # SeaweedFS configuration (master via localhost, filer via consul DNS)
         SEAWEEDFS_MASTER = "http://localhost:9333"

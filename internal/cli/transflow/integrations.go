@@ -3,8 +3,10 @@ package transflow
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
@@ -48,8 +50,23 @@ func (e *ARFRecipeExecutor) ExecuteRecipes(ctx context.Context, workspacePath st
 		return fmt.Errorf("failed to get current executable path: %w", err)
 	}
 
+	// Resolve origin URL from the cloned repository to satisfy ARF CLI input requirements
+	// (ARF transform requires either --repo or --archive)
+	originURL := ""
+	{
+		cmd := exec.CommandContext(ctx, "git", "config", "--get", "remote.origin.url")
+		cmd.Dir = workspacePath
+		if out, err := cmd.Output(); err == nil {
+			originURL = strings.TrimSpace(string(out))
+		}
+	}
+
 	for _, recipeID := range recipeIDs {
-		args := []string{"arf", "recipes", "transform", "--recipe", recipeID}
+		// Use robust ARF transform path; prefer repository input inferred from local clone
+		args := []string{"arf", "transform", "--recipe", recipeID}
+		if originURL != "" {
+			args = append(args, "--repo", originURL)
+		}
 		if e.controllerURL != "" {
 			args = append(args, "--controller", e.controllerURL)
 		}
@@ -84,13 +101,21 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	config.ControllerURL = b.controllerURL
 	config.IsPlatform = false // transflow uses ploy mode, not ployman mode
 
+	log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s", b.controllerURL, config.App, config.Lane, config.Environment)
+
 	// Use SharedPush to perform the build check
 	// SharedPush already supports build-only mode when used with specific endpoints
 	result, err := common.SharedPush(config)
 	if err != nil {
-		return nil, fmt.Errorf("build check failed: %w", err)
+		// Emit additional context for debugging 500s
+		return nil, fmt.Errorf("build check failed (controller=%s app=%s lane=%s env=%s): %w", b.controllerURL, config.App, config.Lane, config.Environment, err)
 	}
 
+	if result != nil && !result.Success {
+		log.Printf("[Transflow Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
+		return result, fmt.Errorf("build check unsuccessful (controller=%s app=%s lane=%s env=%s): %s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
+	}
+	log.Printf("[Transflow Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
 }
 
@@ -231,6 +256,11 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	runner.SetRecipeExecutor(i.CreateRecipeExecutor())
 	runner.SetBuildChecker(i.CreateBuildChecker())
 	runner.SetGitProvider(i.CreateGitProvider())
+
+	// Ensure self-healing path is enabled by providing a non-nil submitter marker.
+	// The production submission path uses the runner directly; this marker only
+	// signals that healing should be attempted when builds fail.
+	runner.SetJobSubmitter(struct{}{})
 
 	// Return the KB-enhanced runner which will use KB learning when healing is needed
 	return kbRunner, nil

@@ -11,9 +11,12 @@ import (
 	"text/template"
 	"time"
 
+	"net/http"
+
 	"github.com/google/uuid"
 	consulapi "github.com/hashicorp/consul/api"
 	nomadapi "github.com/hashicorp/nomad/api"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -48,11 +51,12 @@ type LLMDispatcher struct {
 
 // NewLLMDispatcher creates a new dispatcher
 func NewLLMDispatcher(nomadAddr, consulAddr string, storageClient *storage.StorageClient) (*LLMDispatcher, error) {
-	// Create Nomad client
+	// Create Nomad client with retry transport for resilience
 	nomadConfig := nomadapi.DefaultConfig()
 	if nomadAddr != "" {
 		nomadConfig.Address = nomadAddr
 	}
+	nomadConfig.HttpClient = &http.Client{Transport: orchestration.NewDefaultRetryTransport(nil), Timeout: 60 * time.Second}
 	nomadClient, err := nomadapi.NewClient(nomadConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Nomad client: %w", err)
@@ -460,16 +464,19 @@ func (d *LLMDispatcher) submitToNomad(job *LLMJob, params map[string]interface{}
 		return fmt.Errorf("failed to generate job HCL: %w", err)
 	}
 
-	// Parse HCL to Job struct
-	nomadJob, err := d.nomadClient.Jobs().ParseHCL(buf.String(), true)
+	// Submit job via orchestration facade (ensures wrapper is used on VPS)
+	tmpFile, err := os.CreateTemp("", "llm-job-*.hcl")
 	if err != nil {
-		return fmt.Errorf("failed to parse job HCL: %w", err)
+		return fmt.Errorf("failed to create temp file for job: %w", err)
 	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.Write(buf.Bytes()); err != nil {
+		return fmt.Errorf("failed to write job HCL: %w", err)
+	}
+	tmpFile.Close()
 
-	// Submit job
-	_, _, err = d.nomadClient.Jobs().Register(nomadJob, nil)
-	if err != nil {
-		return fmt.Errorf("failed to register job with Nomad: %w", err)
+	if err := orchestration.Submit(tmpFile.Name()); err != nil {
+		return fmt.Errorf("failed to submit job via orchestration: %w", err)
 	}
 
 	return nil

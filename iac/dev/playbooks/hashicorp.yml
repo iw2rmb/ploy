@@ -31,6 +31,18 @@
         - /etc/consul.d
         - /etc/vault.d
 
+    - name: Create Transflow host volume directories for Nomad
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+      loop:
+        - /opt/ploy/transflow
+        - /opt/ploy/transflow/context
+        - /opt/ploy/transflow/out
+
     - name: Download and install Nomad
       block:
         - name: Check if Nomad is already installed
@@ -574,6 +586,22 @@
         create: true
         owner: ploy
         group: ploy
+
+    - name: Add Nomad SDK resilience env defaults for ploy user (dev)
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Nomad SDK backoff and blocking defaults (dev)
+          export NOMAD_HTTP_MAX_RETRIES="${NOMAD_HTTP_MAX_RETRIES:-5}"
+          export NOMAD_HTTP_BASE_DELAY="${NOMAD_HTTP_BASE_DELAY:-500ms}"
+          export NOMAD_HTTP_MAX_DELAY="${NOMAD_HTTP_MAX_DELAY:-30s}"
+          export NOMAD_SUBMIT_MAX_CONCURRENCY="${NOMAD_SUBMIT_MAX_CONCURRENCY:-4}"
+          export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience (dev)"
 
     - name: Deploy Traefik system job to Nomad
       block:

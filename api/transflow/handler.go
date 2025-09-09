@@ -1,12 +1,15 @@
 package transflow
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -51,6 +54,8 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	tf.Get("/status/:id", h.GetTransflowStatus)
 	tf.Get("/list", h.ListTransflows)
 	tf.Delete("/:id", h.CancelTransflow)
+	tf.Get("/artifacts/:id", h.GetArtifacts)
+	tf.Get("/artifacts/:id/:name", h.DownloadArtifact)
 }
 
 // TransflowRunRequest represents the request body for running a transflow
@@ -192,10 +197,17 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 
-	// Create transflow integrations
-	controllerURL := fmt.Sprintf("http://localhost:%s", os.Getenv("PORT"))
-	if controllerURL == "http://localhost:" {
-		controllerURL = "http://localhost:8080" // Default port
+	// Create transflow integrations (prefer explicit controller URL if provided)
+	controllerURL := os.Getenv("PLOY_CONTROLLER")
+	if controllerURL == "" {
+		controllerURL = fmt.Sprintf("http://localhost:%s", os.Getenv("PORT"))
+		if controllerURL == "http://localhost:" {
+			controllerURL = "http://localhost:8080"
+		}
+	}
+	// Ensure controllerURL includes /v1 base for client helpers
+	if !strings.HasSuffix(controllerURL, "/v1") {
+		controllerURL = strings.TrimRight(controllerURL, "/") + "/v1"
 	}
 	integrations := transflow.NewTransflowIntegrationsWithTestMode(controllerURL, tempDir, testMode)
 
@@ -215,6 +227,16 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 
 	// Store successful result
 	endTime := time.Now()
+
+	// Persist known artifacts (best-effort)
+	artifacts := map[string]string{}
+	if h.storage != nil {
+		if persisted, err := h.persistArtifacts(executionID, tempDir); err == nil {
+			artifacts = persisted
+		} else {
+			log.Printf("[Transflow] Warning: artifact persistence failed: %v", err)
+		}
+	}
 	status = TransflowStatus{
 		ID:        executionID,
 		Status:    "completed",
@@ -229,6 +251,7 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			"mr_url":        result.MRURL,
 			"healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
 			"duration":      result.Duration.String(),
+			"artifacts":     artifacts,
 		},
 	}
 	if err := h.storeStatus(status); err != nil {
@@ -248,6 +271,60 @@ func (h *Handler) recordError(executionID string, err error) {
 	if storeErr := h.storeStatus(status); storeErr != nil {
 		log.Printf("Failed to store error status: %v", storeErr)
 	}
+}
+
+// persistArtifacts scans the temp workspace for known Transflow artifacts and uploads them to storage.
+// Returns a map of artifact logical names to storage keys.
+func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]string, error) {
+	artifacts := map[string]string{}
+	if h.storage == nil {
+		return artifacts, nil
+	}
+	ctx := context.Background()
+	// Planner plan.json
+	planPath := filepath.Join(tempDir, "planner", "out", "plan.json")
+	if fi, err := os.Stat(planPath); err == nil && !fi.IsDir() {
+		key := fmt.Sprintf("artifacts/transflow/%s/plan.json", executionID)
+		f, _ := os.Open(planPath)
+		defer f.Close()
+		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
+			artifacts["plan_json"] = key
+		}
+	}
+	// Reducer next.json
+	nextPath := filepath.Join(tempDir, "reducer", "out", "next.json")
+	if fi, err := os.Stat(nextPath); err == nil && !fi.IsDir() {
+		key := fmt.Sprintf("artifacts/transflow/%s/next.json", executionID)
+		f, _ := os.Open(nextPath)
+		defer f.Close()
+		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
+			artifacts["next_json"] = key
+		}
+	}
+	// ORW diff.patch (search first match)
+	// orw-apply/<option>/out/diff.patch
+	orwDir := filepath.Join(tempDir, "orw-apply")
+	_ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		if filepath.Base(path) == "diff.patch" {
+			key := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
+			f, _ := os.Open(path)
+			defer f.Close()
+			// Read once for content-type neutrality
+			var buf []byte
+			buf, _ = io.ReadAll(f)
+			_ = f.Close()
+			if err := h.storage.Put(ctx, key, io.NopCloser(bytes.NewReader(buf))); err == nil {
+				artifacts["diff_patch"] = key
+			}
+			// Stop after first match
+			return io.EOF
+		}
+		return nil
+	})
+	return artifacts, nil
 }
 
 // GetTransflowStatus handles GET /v1/transflow/status/:id
@@ -397,4 +474,67 @@ func (h *Handler) getStatus(executionID string) (*TransflowStatus, error) {
 	}
 
 	return &status, nil
+}
+
+// GetArtifacts returns the artifact keys for a given execution
+func (h *Handler) GetArtifacts(c *fiber.Ctx) error {
+	id := c.Params("id")
+	st, err := h.getStatus(id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "not_found", "message": "execution not found"}})
+	}
+	var arts map[string]any
+	if st.Result != nil {
+		if a, ok := st.Result["artifacts"].(map[string]any); ok {
+			arts = a
+		}
+	}
+	if arts == nil {
+		arts = map[string]any{}
+	}
+	return c.JSON(fiber.Map{"artifacts": arts})
+}
+
+// DownloadArtifact streams the requested artifact (plan_json|next_json|diff_patch)
+func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
+	if h.storage == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": fiber.Map{"code": "storage_disabled", "message": "artifact storage not configured"}})
+	}
+	id := c.Params("id")
+	name := c.Params("name")
+	st, err := h.getStatus(id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "not_found", "message": "execution not found"}})
+	}
+	var arts map[string]any
+	if st.Result != nil {
+		if a, ok := st.Result["artifacts"].(map[string]any); ok {
+			arts = a
+		}
+	}
+	if arts == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "no_artifacts", "message": "no artifacts recorded"}})
+	}
+	keyAny, ok := arts[name]
+	if !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
+	}
+	key, _ := keyAny.(string)
+	if key == "" {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
+	}
+	reader, err := h.storage.Get(c.Context(), key)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fiber.Map{"code": "storage_error", "message": err.Error()}})
+	}
+	defer reader.Close()
+	// Stream
+	c.Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", name))
+	if strings.HasSuffix(key, ".json") {
+		c.Type("json")
+	} else if strings.HasSuffix(key, ".patch") || name == "diff_patch" {
+		c.Type("text/plain")
+	}
+	_, _ = io.Copy(c, reader)
+	return nil
 }

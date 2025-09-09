@@ -7,9 +7,11 @@ job "transflow-reducer" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/your-org/langchain-runner:py-0.1.0" # pin exact digest in prod
-        command = "python"
-        args    = ["-m", "runner", "--mode", "reducer", "--input", "/workspace/context/history.json"]
+        image = "${REDUCER_IMAGE}"
+        volumes = [
+          "${CONTEXT_HOST_DIR}:/workspace/context:ro",
+          "${OUT_HOST_DIR}:/workspace/out"
+        ]
       }
 
       env = {
@@ -25,29 +27,12 @@ job "transflow-reducer" {
         memory = 512
       }
 
-      volume_mount {
-        volume      = "context"
-        destination = "/workspace/context"
-        read_only   = true
-      }
-
-      volume_mount {
-        volume      = "out"
-        destination = "/workspace/out"
-        read_only   = false
-      }
-
-      template {
-        destination = "/workspace/out/.keep"
-        data        = ""
-      }
+      # Using docker bind mounts via config.volumes
 
       kill_timeout = "5m"
-      timeout      = "15m"
     }
 
-    volume "context" { type = "host" source = "transflow-history" }
-    volume "out"     { type = "host" source = "transflow-out" }
+    # no external volumes; using docker bind mounts via config.volumes
 
     restart {
       attempts = 0

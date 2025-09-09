@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	amodels "github.com/iw2rmb/ploy/internal/arf/models"
 )
 
 // TransformRequest represents a robust transformation request with self-healing
@@ -38,11 +36,6 @@ type TransformRequest struct {
 	OutputFormat string // archive, diff, mr
 	OutputPath   string
 	ReportLevel  string // minimal, standard, detailed
-
-	// Legacy fields for compatibility
-	Language string
-	AppName  string
-	Lane     string
 }
 
 // Transform command - Robust transformation with self-healing
@@ -180,23 +173,6 @@ func parseTransformArgs(args []string) *TransformRequest {
 				req.ReportLevel = args[i+1]
 				i++
 			}
-
-		// Legacy compatibility
-		case "--language":
-			if i+1 < len(args) {
-				req.Language = args[i+1]
-				i++
-			}
-		case "--app-name":
-			if i+1 < len(args) {
-				req.AppName = args[i+1]
-				i++
-			}
-		case "--lane":
-			if i+1 < len(args) {
-				req.Lane = args[i+1]
-				i++
-			}
 		}
 	}
 
@@ -234,8 +210,6 @@ func printTransformUsage() {
 	fmt.Println()
 	fmt.Println("Additional Options:")
 	fmt.Println("  --branch <name>        Git branch (default: main)")
-	fmt.Println("  --app-name <name>      Application name for deployment testing")
-	fmt.Println("  --lane <lane>          Deployment lane (auto-detected if not specified)")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  # Apply Java 17 migration recipe")
@@ -248,191 +222,6 @@ func printTransformUsage() {
 	fmt.Println("  # LLM-driven transformation with custom prompt")
 	fmt.Println("  ploy arf transform --repo https://github.com/example/app \\")
 	fmt.Println("    --prompt \"Migrate from JUnit 4 to JUnit 5\" --output archive")
-}
-
-// Legacy function - replaced by executeRobustTransformation
-// Kept for backward compatibility with existing API endpoints
-func executeTransformation(recipeID, repository, branch, language string) error {
-	fmt.Printf("Executing transformation...\n")
-	fmt.Printf("Recipe: %s\n", recipeID)
-	fmt.Printf("Repository: %s\n", repository)
-	fmt.Printf("Branch: %s\n", branch)
-
-	if language != "" {
-		fmt.Printf("Language: %s\n", language)
-	}
-	fmt.Println()
-
-	// Check if this is an OpenRewrite recipe
-	if isOpenRewriteRecipe(recipeID) {
-		// If catalog mode is enabled, preflight for suggestions to give fast feedback
-		if os.Getenv("PLOY_RECIPES_CATALOG") == "true" {
-			if sugg, err := getCatalogSuggestions(recipeID); err == nil {
-				// If the exact ID is not among suggestions and there are candidates, show them
-				exact := false
-				for _, s := range sugg {
-					if s == recipeID {
-						exact = true
-						break
-					}
-				}
-				if !exact && len(sugg) > 0 {
-					PrintError(NewCLIError("Unknown recipe_id", 1))
-					fmt.Println("Did you mean:")
-					for _, s := range sugg {
-						fmt.Printf("  - %s\n", s)
-					}
-					return fmt.Errorf("invalid recipe_id: %s", recipeID)
-				}
-			}
-		}
-		// Use OpenRewrite-specific endpoint for better integration
-		request := map[string]interface{}{
-			"project_url":     repository,
-			"recipes":         []string{recipeID},
-			"branch":          branch,
-			"package_manager": detectPackageManager(language),
-			"base_jdk":        detectJDKVersion(language),
-		}
-
-		data, err := json.Marshal(request)
-		if err != nil {
-			return fmt.Errorf("failed to serialize request: %w", err)
-		}
-
-		// Use standard transform endpoint (which handles OpenRewrite internally)
-		url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
-		response, err := makeAPIRequest("POST", url, data)
-		if err != nil {
-			return fmt.Errorf("OpenRewrite transformation failed: %w", err)
-		}
-
-		// Parse OpenRewrite-specific response
-		var result map[string]interface{}
-		if err := json.Unmarshal(response, &result); err != nil {
-			return fmt.Errorf("failed to parse response: %w", err)
-		}
-
-		// Display OpenRewrite job information
-		fmt.Printf("✅ OpenRewrite transformation submitted!\n")
-		if jobID, ok := result["job_id"].(string); ok {
-			fmt.Printf("Job ID: %s\n", jobID)
-			fmt.Printf("Status: %s\n", result["status"])
-			fmt.Printf("Image: %s\n", result["image"])
-			fmt.Printf("\nUse 'ploy arf status %s' to check progress\n", jobID)
-		}
-		return nil
-	}
-
-	// Standard ARF transformation for non-OpenRewrite recipes
-	request := map[string]interface{}{
-		"recipe_id": recipeID,
-		"codebase": map[string]interface{}{
-			"repository": repository,
-			"branch":     branch,
-			"language":   language,
-		},
-	}
-
-	data, err := json.Marshal(request)
-	if err != nil {
-		return fmt.Errorf("failed to serialize request: %w", err)
-	}
-
-	// Execute standard transformation
-	url := fmt.Sprintf("%s/arf/transform", arfControllerURL)
-	response, err := makeAPIRequest("POST", url, data)
-	if err != nil {
-		return fmt.Errorf("transformation failed: %w", err)
-	}
-
-	var result amodels.TransformationResult
-	if err := json.Unmarshal(response, &result); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	// Display results
-	fmt.Printf("Transformation completed!\n\n")
-	fmt.Printf("Status: ")
-	if result.Success {
-		fmt.Printf("✅ Success\n")
-	} else {
-		fmt.Printf("❌ Failed\n")
-	}
-
-	fmt.Printf("Changes Applied: %d\n", result.ChangesApplied)
-	fmt.Printf("Files Modified: %d\n", len(result.FilesModified))
-	fmt.Printf("Execution Time: %s\n", result.ExecutionTime.String())
-	fmt.Printf("Validation Score: %.2f\n", result.ValidationScore)
-
-	if len(result.FilesModified) > 0 {
-		fmt.Println("\nModified Files:")
-		for _, file := range result.FilesModified {
-			fmt.Printf("  • %s\n", file)
-		}
-	}
-
-	if len(result.Errors) > 0 {
-		fmt.Println("\nErrors:")
-		for _, err := range result.Errors {
-			fmt.Printf("  ❌ %s\n", err.Message)
-			if err.File != "" {
-				fmt.Printf("     File: %s:%d:%d\n", err.File, err.Line, err.Column)
-			}
-		}
-	}
-
-	if len(result.Warnings) > 0 {
-		fmt.Println("\nWarnings:")
-		for _, warn := range result.Warnings {
-			fmt.Printf("  ⚠️  %s\n", warn.Message)
-		}
-	}
-
-	return nil
-}
-
-// isOpenRewriteRecipe checks if a recipe ID is an OpenRewrite recipe
-func isOpenRewriteRecipe(recipeID string) bool {
-	// OpenRewrite recipes typically have these patterns
-	openRewritePatterns := []string{
-		"openrewrite-",                       // Our custom prefix
-		"org.openrewrite.",                   // Full class names
-		"java11to17", "java8to11", "jakarta", // Known shortcuts
-		"spring-boot-3", "spring-security-6",
-		"junit5", "mockito", "assertj",
-		"slf4j", "log4j2",
-	}
-
-	recipeLower := strings.ToLower(recipeID)
-	for _, pattern := range openRewritePatterns {
-		if strings.Contains(recipeLower, pattern) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// detectPackageManager detects the package manager based on language
-func detectPackageManager(language string) string {
-	switch strings.ToLower(language) {
-	case "java", "kotlin", "scala":
-		// Default to Maven for Java projects
-		// Could be enhanced to detect gradle vs maven from repo
-		return "maven"
-	case "groovy":
-		return "gradle"
-	default:
-		return "maven"
-	}
-}
-
-// detectJDKVersion detects appropriate JDK version based on language
-func detectJDKVersion(language string) string {
-	// Default to Java 17 for modern projects
-	// Could be enhanced to detect from repository configuration
-	return "17"
 }
 
 // executeRobustTransformation executes a transformation with self-healing capabilities
@@ -494,14 +283,6 @@ func executeRobustTransformation(req *TransformRequest) error {
 			"path":         req.OutputPath,
 			"report_level": req.ReportLevel,
 		},
-	}
-
-	// Add legacy fields if provided
-	if req.AppName != "" {
-		apiRequest["app_name"] = req.AppName
-	}
-	if req.Lane != "" {
-		apiRequest["lane"] = req.Lane
 	}
 
 	// Serialize request
