@@ -67,12 +67,16 @@ type TransflowRunRequest struct {
 
 // TransflowStatus represents the status of a transflow execution
 type TransflowStatus struct {
-	ID        string                 `json:"id"`
-	Status    string                 `json:"status"`
-	StartTime time.Time              `json:"start_time"`
-	EndTime   *time.Time             `json:"end_time,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	Result    map[string]interface{} `json:"result,omitempty"`
+    ID        string                 `json:"id"`
+    Status    string                 `json:"status"`
+    StartTime time.Time              `json:"start_time"`
+    EndTime   *time.Time             `json:"end_time,omitempty"`
+    Error     string                 `json:"error,omitempty"`
+    Result    map[string]interface{} `json:"result,omitempty"`
+    // Enriched runtime fields
+    Phase     string                 `json:"phase,omitempty"`
+    Overdue   bool                   `json:"overdue,omitempty"`
+    Duration  string                 `json:"duration,omitempty"`
 }
 
 // RunTransflow handles POST /v1/transflow/run
@@ -146,11 +150,12 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 	executionID := fmt.Sprintf("tf-%s", uuid.New().String()[:8])
 
 	// Store initial status
-	status := TransflowStatus{
-		ID:        executionID,
-		Status:    "initializing",
-		StartTime: time.Now(),
-	}
+    status := TransflowStatus{
+        ID:        executionID,
+        Status:    "initializing",
+        StartTime: time.Now(),
+        Phase:     "init",
+    }
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store initial status: %v", err)
 	}
@@ -188,11 +193,12 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
     defer cancel()
 
 	// Update status to running
-	status := TransflowStatus{
-		ID:        executionID,
-		Status:    "running",
-		StartTime: time.Now(),
-	}
+    status := TransflowStatus{
+        ID:        executionID,
+        Status:    "running",
+        StartTime: time.Now(),
+        Phase:     "running",
+    }
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to update status: %v", err)
 	}
@@ -294,12 +300,12 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			log.Printf("[Transflow] Warning: artifact persistence failed: %v", err)
 		}
 	}
-	status = TransflowStatus{
-		ID:        executionID,
-		Status:    "completed",
-		StartTime: status.StartTime,
-		EndTime:   &endTime,
-		Result: map[string]interface{}{
+    status = TransflowStatus{
+        ID:        executionID,
+        Status:    "completed",
+        StartTime: status.StartTime,
+        EndTime:   &endTime,
+        Result: map[string]interface{}{
 			"success":       result.Success,
 			"workflow_id":   result.WorkflowID,
 			"branch_name":   result.BranchName,
@@ -309,11 +315,42 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			"healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
 			"duration":      result.Duration.String(),
 			"artifacts":     artifacts,
-		},
-	}
-	if err := h.storeStatus(status); err != nil {
-		log.Printf("Failed to store final status: %v", err)
-	}
+        },
+    }
+    if err := h.storeStatus(status); err != nil {
+        log.Printf("Failed to store final status: %v", err)
+    }
+}
+
+// GetTransflowStatus handles GET /v1/transflow/status/:id and enriches running statuses with duration/overdue
+func (h *Handler) GetTransflowStatus(c *fiber.Ctx) error {
+    id := c.Params("id")
+    if id == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "missing id"})
+    }
+    // Fetch from KV
+    raw, err := h.statusStore.Get(c.Context(), h.statusKey(id))
+    if err != nil || len(raw) == 0 {
+        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "not found"})
+    }
+    var st TransflowStatus
+    if err := json.Unmarshal(raw, &st); err != nil {
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "corrupt status"})
+    }
+    // Enrich running statuses inline
+    if st.Status == "running" {
+        now := time.Now()
+        elapsed := now.Sub(st.StartTime)
+        st.Duration = elapsed.String()
+        overdueThresh := 30 * time.Minute
+        if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
+            if d, e := time.ParseDuration(v); e == nil && d > 0 {
+                overdueThresh = d
+            }
+        }
+        st.Overdue = elapsed > overdueThresh
+    }
+    return c.JSON(st)
 }
 
 // recordError records an error status for the execution
