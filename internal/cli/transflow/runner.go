@@ -224,7 +224,7 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
 	}
 
     // Read planner template from workspace (provided by server)
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "planner.hcl")
+    hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "planner.hcl")
     hclBytes, err := os.ReadFile(hclTemplate)
     if err != nil {
         return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
@@ -244,7 +244,7 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "llm_exec.hcl")
+    hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "llm_exec.hcl")
     hclBytes, err := os.ReadFile(hclTemplate)
     if err != nil {
         return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err)
@@ -263,7 +263,7 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
     if err := os.MkdirAll(dir, 0755); err != nil {
         return "", err
     }
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
+    hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "orw_apply.hcl")
     hclBytes, err := os.ReadFile(hclTemplate)
     if err != nil {
         return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
@@ -353,7 +353,7 @@ func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
 		return nil, err
 	}
 
-    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "reducer.hcl")
+    hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "reducer.hcl")
     hclBytes, err := os.ReadFile(hclTemplate)
     if err != nil {
         return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err)
