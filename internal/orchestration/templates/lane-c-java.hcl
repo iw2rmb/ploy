@@ -25,15 +25,6 @@ job "{{APP_NAME}}-lane-c" {
       port "jmx" { to = 9999 }
     }
 
-    {{#if CONNECT_ENABLED}}
-    service {
-      name = "{{APP_NAME}}-connect"
-      port = "http"
-      connect { sidecar_service {} }
-      meta { version = "{{VERSION}}"; lane = "C"; runtime = "osv-jvm" }
-    }
-    {{/if}}
-
     task "osv-jvm" {
       driver = "qemu"
 
@@ -73,19 +64,7 @@ job "{{APP_NAME}}-lane-c" {
         {{CUSTOM_ENV_VARS}}
       }
 
-      service {
-        name = "{{APP_NAME}}-lane-c-osv"
-        port = "http"
-        tags = ["lane-c","osv","jvm","version-{{VERSION}}"]
-        check { type = "http"; path = "/actuator/health"; interval = "15s"; timeout = "5s" }
-        {{#if CONNECT_ENABLED}}
-        connect { sidecar_service {} }
-        {{/if}}
-        meta { version = "{{VERSION}}"; lane = "C"; runtime = "osv-jvm"; java_version = "{{JAVA_VERSION}}"; main_class = "{{MAIN_CLASS}}"; build_time = "{{BUILD_TIME}}" }
-      }
-
-      service { name = "{{APP_NAME}}-jmx"; port = "jmx"; check { type = "tcp"; interval = "30s"; timeout = "5s" } }
-      service { name = "{{APP_NAME}}-osv-metrics"; port = "metrics"; check { type = "http"; path = "/actuator/prometheus"; interval = "30s"; timeout = "5s" } }
+      # No Consul service registration in dev-minimal template
 
       resources { cpu = {{CPU_LIMIT}}; memory = {{MEMORY_LIMIT}} }
       logs { max_files = 5; max_file_size = 20 }
