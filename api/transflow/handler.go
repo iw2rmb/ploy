@@ -323,35 +323,7 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 }
 
 // GetTransflowStatus handles GET /v1/transflow/status/:id and enriches running statuses with duration/overdue
-func (h *Handler) GetTransflowStatus(c *fiber.Ctx) error {
-    id := c.Params("id")
-    if id == "" {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "missing id"})
-    }
-    // Fetch from KV
-    raw, err := h.statusStore.Get(c.Context(), h.statusKey(id))
-    if err != nil || len(raw) == 0 {
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "not found"})
-    }
-    var st TransflowStatus
-    if err := json.Unmarshal(raw, &st); err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "corrupt status"})
-    }
-    // Enrich running statuses inline
-    if st.Status == "running" {
-        now := time.Now()
-        elapsed := now.Sub(st.StartTime)
-        st.Duration = elapsed.String()
-        overdueThresh := 30 * time.Minute
-        if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
-            if d, e := time.ParseDuration(v); e == nil && d > 0 {
-                overdueThresh = d
-            }
-        }
-        st.Overdue = elapsed > overdueThresh
-    }
-    return c.JSON(st)
-}
+// (See bottom of file for the handler that returns status and includes runtime enrichment.)
 
 // recordError records an error status for the execution
 func (h *Handler) recordError(executionID string, err error) {
@@ -442,6 +414,19 @@ func (h *Handler) GetTransflowStatus(c *fiber.Ctx) error {
 				"message": fmt.Sprintf("Transflow execution %s not found", executionID),
 			},
 		})
+	}
+
+	// Enrich running statuses: add duration and overdue fields without changing stored state
+	if status.Status == "running" {
+		elapsed := time.Since(status.StartTime)
+		status.Duration = elapsed.String()
+		overdueThresh := 30 * time.Minute
+		if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
+			if d, e := time.ParseDuration(v); e == nil && d > 0 {
+				overdueThresh = d
+			}
+		}
+		status.Overdue = elapsed > overdueThresh
 	}
 
 	return c.JSON(status)
