@@ -31,7 +31,6 @@ job "{{APP_NAME}}-lane-c" {
     }
 
     network {
-      mode = "bridge"
       port "http" { to = {{HTTP_PORT}} }
       port "metrics" { to = 9090 }
       port "jmx" { to = 9999 }
