@@ -378,15 +378,15 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Use enhanced templates with comprehensive configuration
-    jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
-        App:         appName,
-        ImagePath:   imagePath,
-        DockerImage: dockerImage,
-        EnvVars:     appEnvVars,
-        Version:     sha,
-        MainClass:   mainClass,
-        IsDebug:     debug,
-        Language:    "java",
+	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
+		App:         appName,
+		ImagePath:   imagePath,
+		DockerImage: dockerImage,
+		EnvVars:     appEnvVars,
+		Version:     sha,
+		MainClass:   mainClass,
+		IsDebug:     debug,
+		Language:    "java",
 
 		// Feature flags (dev-friendly defaults)
 		VaultEnabled:        false, // Vault not enabled on dev cluster
@@ -407,7 +407,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		JavaVersion: "17", // Default Java version
 
 		// Domain configuration
-        DomainSuffix: "ployd.app",
+		DomainSuffix: "ployd.app",
 
 		// Build metadata
 		BuildTime: time.Now().Format(time.RFC3339),
