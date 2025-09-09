@@ -67,16 +67,16 @@ type TransflowRunRequest struct {
 
 // TransflowStatus represents the status of a transflow execution
 type TransflowStatus struct {
-    ID        string                 `json:"id"`
-    Status    string                 `json:"status"`
-    StartTime time.Time              `json:"start_time"`
-    EndTime   *time.Time             `json:"end_time,omitempty"`
-    Error     string                 `json:"error,omitempty"`
-    Result    map[string]interface{} `json:"result,omitempty"`
-    // Enriched runtime fields
-    Phase     string                 `json:"phase,omitempty"`
-    Overdue   bool                   `json:"overdue,omitempty"`
-    Duration  string                 `json:"duration,omitempty"`
+	ID        string                 `json:"id"`
+	Status    string                 `json:"status"`
+	StartTime time.Time              `json:"start_time"`
+	EndTime   *time.Time             `json:"end_time,omitempty"`
+	Error     string                 `json:"error,omitempty"`
+	Result    map[string]interface{} `json:"result,omitempty"`
+	// Enriched runtime fields
+	Phase    string `json:"phase,omitempty"`
+	Overdue  bool   `json:"overdue,omitempty"`
+	Duration string `json:"duration,omitempty"`
 }
 
 // RunTransflow handles POST /v1/transflow/run
@@ -150,12 +150,12 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 	executionID := fmt.Sprintf("tf-%s", uuid.New().String()[:8])
 
 	// Store initial status
-    status := TransflowStatus{
-        ID:        executionID,
-        Status:    "initializing",
-        StartTime: time.Now(),
-        Phase:     "init",
-    }
+	status := TransflowStatus{
+		ID:        executionID,
+		Status:    "initializing",
+		StartTime: time.Now(),
+		Phase:     "init",
+	}
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store initial status: %v", err)
 	}
@@ -174,31 +174,31 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 
 // executeTransflow runs the transflow workflow asynchronously
 func (h *Handler) executeTransflow(executionID string, config *transflow.TransflowConfig, testMode bool) {
-    // Top-level guard: always convert panics to a terminal failure status
-    defer func() {
-        if r := recover(); r != nil {
-            h.recordError(executionID, fmt.Errorf("transflow execution panic: %v", r))
-        }
-    }()
+	// Top-level guard: always convert panics to a terminal failure status
+	defer func() {
+		if r := recover(); r != nil {
+			h.recordError(executionID, fmt.Errorf("transflow execution panic: %v", r))
+		}
+	}()
 
-    // Top-level execution timeout to ensure terminal status is written
-    execTimeout := 45 * time.Minute
-    if v := os.Getenv("PLOY_TRANSFLOW_EXEC_TIMEOUT"); v != "" {
-        if d, err := time.ParseDuration(v); err == nil && d > 0 {
-            execTimeout = d
-        }
-    }
-    parentCtx := context.Background()
-    ctx, cancel := context.WithTimeout(parentCtx, execTimeout)
-    defer cancel()
+	// Top-level execution timeout to ensure terminal status is written
+	execTimeout := 45 * time.Minute
+	if v := os.Getenv("PLOY_TRANSFLOW_EXEC_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			execTimeout = d
+		}
+	}
+	parentCtx := context.Background()
+	ctx, cancel := context.WithTimeout(parentCtx, execTimeout)
+	defer cancel()
 
 	// Update status to running
-    status := TransflowStatus{
-        ID:        executionID,
-        Status:    "running",
-        StartTime: time.Now(),
-        Phase:     "running",
-    }
+	status := TransflowStatus{
+		ID:        executionID,
+		Status:    "running",
+		StartTime: time.Now(),
+		Phase:     "running",
+	}
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to update status: %v", err)
 	}
@@ -211,32 +211,32 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	}
 	defer os.RemoveAll(tempDir)
 
-    // Prepare workspace structure and write templates for transflow runner
-    jobsDir := filepath.Join(tempDir, "roadmap", "transflow", "jobs")
-    if err := os.MkdirAll(jobsDir, 0755); err != nil {
-        h.recordError(executionID, fmt.Errorf("failed to create jobs dir: %w", err))
-        return
-    }
-    // Write embedded HCL templates
-    if err := os.WriteFile(filepath.Join(jobsDir, "planner.hcl"), plannerHCL, 0644); err != nil {
-        h.recordError(executionID, fmt.Errorf("failed to write planner.hcl: %w", err))
-        return
-    }
-    if err := os.WriteFile(filepath.Join(jobsDir, "llm_exec.hcl"), llmExecHCL, 0644); err != nil {
-        h.recordError(executionID, fmt.Errorf("failed to write llm_exec.hcl: %w", err))
-        return
-    }
-    if err := os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), orwApplyHCL, 0644); err != nil {
-        h.recordError(executionID, fmt.Errorf("failed to write orw_apply.hcl: %w", err))
-        return
-    }
-    if err := os.WriteFile(filepath.Join(jobsDir, "reducer.hcl"), reducerHCL, 0644); err != nil {
-        h.recordError(executionID, fmt.Errorf("failed to write reducer.hcl: %w", err))
-        return
-    }
+	// Prepare workspace structure and write templates for transflow runner
+	jobsDir := filepath.Join(tempDir, "roadmap", "transflow", "jobs")
+	if err := os.MkdirAll(jobsDir, 0755); err != nil {
+		h.recordError(executionID, fmt.Errorf("failed to create jobs dir: %w", err))
+		return
+	}
+	// Write embedded HCL templates
+	if err := os.WriteFile(filepath.Join(jobsDir, "planner.hcl"), plannerHCL, 0644); err != nil {
+		h.recordError(executionID, fmt.Errorf("failed to write planner.hcl: %w", err))
+		return
+	}
+	if err := os.WriteFile(filepath.Join(jobsDir, "llm_exec.hcl"), llmExecHCL, 0644); err != nil {
+		h.recordError(executionID, fmt.Errorf("failed to write llm_exec.hcl: %w", err))
+		return
+	}
+	if err := os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), orwApplyHCL, 0644); err != nil {
+		h.recordError(executionID, fmt.Errorf("failed to write orw_apply.hcl: %w", err))
+		return
+	}
+	if err := os.WriteFile(filepath.Join(jobsDir, "reducer.hcl"), reducerHCL, 0644); err != nil {
+		h.recordError(executionID, fmt.Errorf("failed to write reducer.hcl: %w", err))
+		return
+	}
 
-    // Write config to temp file
-    configPath := filepath.Join(tempDir, "transflow.yaml")
+	// Write config to temp file
+	configPath := filepath.Join(tempDir, "transflow.yaml")
 	configBytes, _ := yaml.Marshal(config)
 	if err := os.WriteFile(configPath, configBytes, 0644); err != nil {
 		h.recordError(executionID, fmt.Errorf("failed to write config file: %w", err))
@@ -264,29 +264,29 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 
-    // Execute the workflow with timeout awareness; ensure terminal status on any error
-    var (
-        result *transflow.TransflowResult
-        runErr error
-        doneCh = make(chan struct{})
-    )
-    go func() {
-        defer close(doneCh)
-        result, runErr = runner.Run(ctx)
-    }()
+	// Execute the workflow with timeout awareness; ensure terminal status on any error
+	var (
+		result *transflow.TransflowResult
+		runErr error
+		doneCh = make(chan struct{})
+	)
+	go func() {
+		defer close(doneCh)
+		result, runErr = runner.Run(ctx)
+	}()
 
-    select {
-    case <-doneCh:
-        if runErr != nil {
-            h.recordError(executionID, runErr)
-            return
-        }
-        // continue to success handling below
-    case <-ctx.Done():
-        // Timeout/cancellation — record a terminal error
-        h.recordError(executionID, fmt.Errorf("transflow execution exceeded max duration (%s)", execTimeout))
-        return
-    }
+	select {
+	case <-doneCh:
+		if runErr != nil {
+			h.recordError(executionID, runErr)
+			return
+		}
+		// continue to success handling below
+	case <-ctx.Done():
+		// Timeout/cancellation — record a terminal error
+		h.recordError(executionID, fmt.Errorf("transflow execution exceeded max duration (%s)", execTimeout))
+		return
+	}
 
 	// Store successful result
 	endTime := time.Now()
@@ -300,12 +300,12 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			log.Printf("[Transflow] Warning: artifact persistence failed: %v", err)
 		}
 	}
-    status = TransflowStatus{
-        ID:        executionID,
-        Status:    "completed",
-        StartTime: status.StartTime,
-        EndTime:   &endTime,
-        Result: map[string]interface{}{
+	status = TransflowStatus{
+		ID:        executionID,
+		Status:    "completed",
+		StartTime: status.StartTime,
+		EndTime:   &endTime,
+		Result: map[string]interface{}{
 			"success":       result.Success,
 			"workflow_id":   result.WorkflowID,
 			"branch_name":   result.BranchName,
@@ -315,11 +315,11 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			"healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
 			"duration":      result.Duration.String(),
 			"artifacts":     artifacts,
-        },
-    }
-    if err := h.storeStatus(status); err != nil {
-        log.Printf("Failed to store final status: %v", err)
-    }
+		},
+	}
+	if err := h.storeStatus(status); err != nil {
+		log.Printf("Failed to store final status: %v", err)
+	}
 }
 
 // GetTransflowStatus handles GET /v1/transflow/status/:id and enriches running statuses with duration/overdue

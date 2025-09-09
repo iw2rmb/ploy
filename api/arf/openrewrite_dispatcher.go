@@ -199,26 +199,26 @@ func (d *OpenRewriteDispatcher) ExecuteOpenRewriteRecipe(ctx context.Context, re
 	log.Printf("[OpenRewrite Dispatcher]   Storage bucket: artifacts")
 
 	// Build HCL spec equivalent to createNomadJob and submit via orchestration facade
-    // Build environment for batch job
-    env := map[string]string{
-        "JOB_ID":            req.JobID,
-        "TRANSFORMATION_ID": req.TransformationID,
-        "RECIPE":            req.RecipeClass,
-        "SEAWEEDFS_URL":     d.seaweedfsURL,
-        "PLOY_API_URL":      d.apiURL,
-        "MAVEN_CACHE_PATH":  "maven-repository",
-        "DISCOVER_RECIPE":   "true",
-        "ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID),
-        "OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),
-        "OUTPUT_URL":        fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID),
-    }
-    // If explicit Maven coordinates are provided, pass them and disable discovery
-    if req.RecipeGroup != "" && req.RecipeArtifact != "" && req.RecipeVersion != "" {
-        env["RECIPE_GROUP"] = req.RecipeGroup
-        env["RECIPE_ARTIFACT"] = req.RecipeArtifact
-        env["RECIPE_VERSION"] = req.RecipeVersion
-        env["DISCOVER_RECIPE"] = "false"
-    }
+	// Build environment for batch job
+	env := map[string]string{
+		"JOB_ID":            req.JobID,
+		"TRANSFORMATION_ID": req.TransformationID,
+		"RECIPE":            req.RecipeClass,
+		"SEAWEEDFS_URL":     d.seaweedfsURL,
+		"PLOY_API_URL":      d.apiURL,
+		"MAVEN_CACHE_PATH":  "maven-repository",
+		"DISCOVER_RECIPE":   "true",
+		"ARTIFACT_URL":      fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID),
+		"OUTPUT_KEY":        fmt.Sprintf("jobs/%s/output.tar", req.JobID),
+		"OUTPUT_URL":        fmt.Sprintf("%s/artifacts/jobs/%s/output.tar", d.seaweedfsURL, req.JobID),
+	}
+	// If explicit Maven coordinates are provided, pass them and disable discovery
+	if req.RecipeGroup != "" && req.RecipeArtifact != "" && req.RecipeVersion != "" {
+		env["RECIPE_GROUP"] = req.RecipeGroup
+		env["RECIPE_ARTIFACT"] = req.RecipeArtifact
+		env["RECIPE_VERSION"] = req.RecipeVersion
+		env["DISCOVER_RECIPE"] = "false"
+	}
 	artifactURL := fmt.Sprintf("%s/artifacts/jobs/%s/input.tar", d.seaweedfsURL, req.JobID)
 	hcl := orchestration.RenderBatchDockerJobHCL(nomadJobName, "openrewrite", "openrewrite", fmt.Sprintf("%s/openrewrite-jvm:latest", d.registryURL), env, artifactURL)
 
