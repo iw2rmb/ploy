@@ -259,15 +259,39 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
 
 // RenderORWApplyAssets writes a rendered orw_apply.hcl for the given option ID.
 func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) {
-	dir := filepath.Join(r.workspaceDir, "orw-apply", optionID)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err
-	}
-	hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
-	}
+    dir := filepath.Join(r.workspaceDir, "orw-apply", optionID)
+    if err := os.MkdirAll(dir, 0755); err != nil {
+        return "", err
+    }
+    // Locate template relative to CWD or executable directory
+    hclTemplate := filepath.Join("roadmap", "transflow", "jobs", "orw_apply.hcl")
+    hclBytes, err := os.ReadFile(hclTemplate)
+    if err != nil {
+        // Fallback: search upwards from executable directory
+        if exe, e2 := os.Executable(); e2 == nil {
+            base := filepath.Dir(exe)
+            for i := 0; i < 5; i++ { // search up to 5 levels
+                tryPath := filepath.Join(base, hclTemplate)
+                if b, e3 := os.ReadFile(tryPath); e3 == nil {
+                    hclBytes = b
+                    err = nil
+                    break
+                }
+                base = filepath.Dir(base)
+            }
+        }
+        // Fallback: common server workspace root
+        if err != nil {
+            tryPath := filepath.Join("/home/ploy/ploy", hclTemplate)
+            if b, e4 := os.ReadFile(tryPath); e4 == nil {
+                hclBytes = b
+                err = nil
+            }
+        }
+        if err != nil {
+            return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
+        }
+    }
 	renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
 	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
 		return "", err
