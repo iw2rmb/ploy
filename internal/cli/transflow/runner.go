@@ -14,6 +14,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/orchestration"
 )
 
+// submitAndWaitTerminal is a package-level indirection to allow test stubbing.
+// By default it points to orchestration.SubmitAndWaitTerminal.
+var submitAndWaitTerminal = orchestration.SubmitAndWaitTerminal
+
 // GitOperationsInterface defines the Git operations needed by the runner
 type GitOperationsInterface interface {
 	CloneRepository(ctx context.Context, repoURL, branch, targetPath string) error
@@ -478,12 +482,12 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 
 			// Submit job and wait terminal
-			if err := orchestration.SubmitAndWaitTerminal(submittedPath, 30*time.Minute); err != nil {
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-				result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("orw-apply job failed: %w", err)
-			}
+            if err := submitAndWaitTerminal(submittedPath, 30*time.Minute); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("orw-apply job failed: %w", err)
+            }
 
 			// Locate diff.patch and apply
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
