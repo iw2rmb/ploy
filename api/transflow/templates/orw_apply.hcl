@@ -13,7 +13,8 @@ job "${RUN_ID}" {
           "${CONTEXT_HOST_DIR}:/workspace/context:ro",
           "${OUT_HOST_DIR}:/workspace/out",
           # Mount the prepared repository archive so the runner can extract sources
-          "${INPUT_TAR_HOST_PATH}:/workspace/input.tar:ro"
+          # Allow container setup to (re)create the tar if needed
+          "${INPUT_TAR_HOST_PATH}:/workspace/input.tar"
         ]
       }
 
