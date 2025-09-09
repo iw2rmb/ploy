@@ -173,8 +173,17 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 }
 
 func applyTemplateSubstitutions(template string, data RenderData) string {
-	s := template
-	s = processConditionalBlocks(s, data)
+    s := template
+    s = processConditionalBlocks(s, data)
+    // Safety: strip mesh/secrets blocks if disabled and conditionals didn't remove them
+    if !data.ConnectEnabled {
+        s = strings.ReplaceAll(s, "connect { sidecar_service {} }", "")
+        // Best-effort removal of standalone connect service blocks
+        s = regexp.MustCompile(`(?s)service\s*\{\s*name\s*=\s*\".*-connect\".*?\}`).ReplaceAllString(s, "")
+    }
+    if !data.VaultEnabled {
+        s = regexp.MustCompile(`(?s)vault\s*\{.*?\}`).ReplaceAllString(s, "")
+    }
 	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
 	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
 	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
