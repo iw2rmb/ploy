@@ -59,7 +59,7 @@ steps:
     id: java11to17-migration
     engine: openrewrite
     recipes:
-      - org.openrewrite.java.migrate.Java11toJava17
+      - org.openrewrite.java.migrate.UpgradeToJava17
 
   - type: llm-plan
     id: plan-build-fixes

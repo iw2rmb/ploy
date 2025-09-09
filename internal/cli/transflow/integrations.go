@@ -262,8 +262,8 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	// signals that healing should be attempted when builds fail.
 	runner.SetJobSubmitter(struct{}{})
 
-    // Return the embedded TransflowRunner; KB integration remains wired inside kbRunner
-    return runner, nil
+	// Return the embedded TransflowRunner; KB integration remains wired inside kbRunner
+	return runner, nil
 }
 
 // GetDefaultControllerURL returns the default controller URL for transflow operations

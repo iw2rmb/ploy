@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -427,6 +428,27 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	}
 
 	// Step 4: Commit changes
+	// Guard: ensure recipes produced actual changes before committing
+	{
+		changed, err := hasRepoChanges(repoPath)
+		if err != nil {
+			result.ErrorMessage = fmt.Sprintf("failed to check repository changes: %v", err)
+			result.Duration = time.Since(startTime)
+			return nil, fmt.Errorf("failed to check repository changes: %w", err)
+		}
+		if !changed {
+			result.StepResults = append(result.StepResults, StepResult{
+				StepID:   "validate-change",
+				Success:  false,
+				Message:  "No changes detected after recipe execution; aborting to avoid empty MR",
+				Duration: 0,
+			})
+			result.ErrorMessage = "no changes produced by transformation"
+			result.Duration = time.Since(startTime)
+			return nil, fmt.Errorf("no changes produced by transformation")
+		}
+	}
+
 	commitMessage := fmt.Sprintf("Applied recipe transformations for workflow %s", r.config.ID)
 	if err := r.gitOps.CommitChanges(ctx, repoPath, commitMessage); err != nil {
 		result.ErrorMessage = fmt.Sprintf("failed to commit changes: %v", err)
@@ -698,4 +720,15 @@ func (r *TransflowRunner) CleanupWorkspace() error {
 		return os.RemoveAll(r.workspaceDir)
 	}
 	return nil
+}
+
+// hasRepoChanges returns true if the working tree has any changes
+func hasRepoChanges(repoPath string) (bool, error) {
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = repoPath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("git status failed: %v: %s", err, string(out))
+	}
+	return strings.TrimSpace(string(out)) != "", nil
 }

@@ -406,7 +406,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 
 	// Step 2b: Substitute environment variables in HCL template
 	runID := fmt.Sprintf("orw-apply-%s-%d", branch.ID, time.Now().Unix())
-    renderedHCLPath, err := substituteORWTemplate(prePath, runID)
+	renderedHCLPath, err := substituteORWTemplate(prePath, runID)
 	if err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("failed to substitute ORW HCL template: %v", err)

@@ -145,15 +145,15 @@ func debugTemplateForLane(lane string) string {
 
 // loadTemplateContent tries Consul KV first, then standard platform file locations
 func loadTemplateContent(templatePath string) ([]byte, error) {
-    // Prefer embedded templates when available
-    if b := getEmbeddedTemplate(templatePath); b != nil {
-        return b, nil
-    }
-    if consulClient, err := NewConsulTemplateClient(); err == nil {
-        if content, err := consulClient.GetTemplate(templatePath); err == nil {
-            return content, nil
-        }
-    }
+	// Prefer embedded templates when available
+	if b := getEmbeddedTemplate(templatePath); b != nil {
+		return b, nil
+	}
+	if consulClient, err := NewConsulTemplateClient(); err == nil {
+		if content, err := consulClient.GetTemplate(templatePath); err == nil {
+			return content, nil
+		}
+	}
 	possiblePaths := []string{
 		templatePath,
 	}
@@ -173,17 +173,17 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 }
 
 func applyTemplateSubstitutions(template string, data RenderData) string {
-    s := template
-    s = processConditionalBlocks(s, data)
-    // Safety: strip mesh/secrets blocks if disabled and conditionals didn't remove them
-    if !data.ConnectEnabled {
-        s = strings.ReplaceAll(s, "connect { sidecar_service {} }", "")
-        // Best-effort removal of standalone connect service blocks
-        s = regexp.MustCompile(`(?s)service\s*\{\s*name\s*=\s*\".*-connect\".*?\}`).ReplaceAllString(s, "")
-    }
-    if !data.VaultEnabled {
-        s = regexp.MustCompile(`(?s)vault\s*\{.*?\}`).ReplaceAllString(s, "")
-    }
+	s := template
+	s = processConditionalBlocks(s, data)
+	// Safety: strip mesh/secrets blocks if disabled and conditionals didn't remove them
+	if !data.ConnectEnabled {
+		s = strings.ReplaceAll(s, "connect { sidecar_service {} }", "")
+		// Best-effort removal of standalone connect service blocks
+		s = regexp.MustCompile(`(?s)service\s*\{\s*name\s*=\s*\".*-connect\".*?\}`).ReplaceAllString(s, "")
+	}
+	if !data.VaultEnabled {
+		s = regexp.MustCompile(`(?s)vault\s*\{.*?\}`).ReplaceAllString(s, "")
+	}
 	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
 	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
 	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
@@ -350,7 +350,7 @@ func (r *RenderData) SetDefaults() {
 			r.MemoryLimit = 512
 		}
 	}
-    // Respect caller intent for Connect/Vault; do not force-enable here
+	// Respect caller intent for Connect/Vault; do not force-enable here
 	r.VolumeEnabled = true
 	r.ConsulConfigEnabled = true
 	r.DebugEnabled = false
