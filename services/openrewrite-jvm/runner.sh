@@ -4,6 +4,40 @@
 
 set -ex  # Enable verbose output for debugging
 
+# Helper: write an error message to an artifact that the controller can collect
+write_error() {
+  local msg="$*"
+  local dir="${OUTPUT_DIR:-/workspace/out}"
+  mkdir -p "$dir" 2>/dev/null || true
+  echo "$msg" > "$dir/error.log" 2>/dev/null || true
+}
+
+# Define recipe metadata registration early so calls are safe
+register_recipe_metadata() {
+    local recipe_class=$1
+    local group=$2
+    local artifact=$3
+    local version=$4
+    local jar_path=$5
+
+    if [ -n "${PLOY_API_URL}" ]; then
+        echo "[Recipe] Registering recipe metadata with Ploy API..."
+        cat > /tmp/recipe-registration.json << EOJSON
+{
+  "recipe_class": "${recipe_class}",
+  "maven_coords": "${group}:${artifact}:${version}",
+  "jar_path": "${jar_path}",
+  "source": "openrewrite-jvm",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOJSON
+        curl -sS -X POST "${PLOY_API_URL}/v1/arf/recipes/register" \
+             -H "Content-Type: application/json" \
+             -d @/tmp/recipe-registration.json \
+             -o /dev/null || true
+    fi
+}
+
 # Arguments from Nomad job
 INPUT_TAR="${1:-/workspace/input.tar}"
 OUTPUT_TAR="${2:-/workspace/output.tar}"
@@ -31,18 +65,21 @@ if command -v java >/dev/null 2>&1; then
   java -version || true
 else
   echo "[OpenRewrite] ERROR: 'java' not found in PATH" >&2
-fi
+  write_error "java not found in PATH"
+  fi
 if command -v javac >/dev/null 2>&1; then
   javac -version || true
 else
   echo "[OpenRewrite] ERROR: 'javac' (Java compiler) not found. A JDK is required, not a JRE." >&2
   echo "[OpenRewrite] Please ensure JAVA_HOME points to a JDK and PATH includes \"$JAVA_HOME/bin\"." >&2
+  write_error "javac not found; JDK required"
   exit 1
 fi
 if command -v mvn >/dev/null 2>&1; then
   mvn -version || true
 else
   echo "[OpenRewrite] ERROR: 'mvn' (Maven) not found in PATH" >&2
+  write_error "mvn (Maven) not found in PATH"
   exit 1
 fi
 
@@ -121,6 +158,7 @@ tar -xf "${INPUT_TAR}" || {
     echo "[Error] Failed to extract input tar"
     echo "[Error] Tar exit code: $?"
     ls -la /workspace/
+    write_error "Failed to extract input.tar"
     exit 1
 }
 
@@ -150,12 +188,13 @@ elif [ -f "build.gradle.kts" ]; then
     echo "[OpenRewrite] Found build.gradle.kts"
     head -20 build.gradle.kts
 else
-    echo "[OpenRewrite] ERROR: No build file found (pom.xml, build.gradle, or build.gradle.kts)"
-    echo "[OpenRewrite] OpenRewrite requires a valid build configuration to run transformations"
-    echo "[OpenRewrite] Please ensure your project has one of the following:"
-    echo "[OpenRewrite]   - pom.xml for Maven projects"
-    echo "[OpenRewrite]   - build.gradle or build.gradle.kts for Gradle projects"
-    exit 1
+  echo "[OpenRewrite] ERROR: No build file found (pom.xml, build.gradle, or build.gradle.kts)"
+  echo "[OpenRewrite] OpenRewrite requires a valid build configuration to run transformations"
+  echo "[OpenRewrite] Please ensure your project has one of the following:"
+  echo "[OpenRewrite]   - pom.xml for Maven projects"
+  echo "[OpenRewrite]   - build.gradle or build.gradle.kts for Gradle projects"
+  write_error "No build file found in project (pom.xml/build.gradle/build.gradle.kts)"
+  exit 1
 fi
 
 # Step 3: Handle caching based on discovery mode
@@ -184,7 +223,7 @@ else
         
         # Register recipe metadata even for cached recipes (idempotent operation)
         JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
-        register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
+        register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}" || true
     else
         echo "[OpenRewrite] Recipe not in cache, downloading from Maven Central..."
         
@@ -219,7 +258,7 @@ else
         
         # Register the main recipe metadata with Ploy API
         JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
-        register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}"
+        register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}" || true
     fi
 fi
 
@@ -247,6 +286,7 @@ if [ -f "pom.xml" ]; then
                 echo "[Error] Exit code: $?"
                 echo "[Error] Last 100 lines of output:"
                 tail -100 /tmp/transform.log
+                write_error "OpenRewrite transformation failed"
                 exit 1
             }
         
@@ -360,10 +400,12 @@ EOF
     # Run OpenRewrite
     gradle rewriteRun --no-daemon || {
         echo "[Error] OpenRewrite transformation failed"
+        write_error "OpenRewrite transformation failed (Gradle)"
         exit 1
     }
 else
     echo "[Error] No supported build file found (pom.xml or build.gradle)"
+    write_error "No supported build file found (pom.xml/gradle)"
     exit 1
 fi
 
@@ -417,6 +459,7 @@ echo "[OpenRewrite] Creating tar archive (excluding Maven cache and build artifa
 tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build . || {
     echo "[Error] Failed to create output tar"
     echo "[Error] Exit code: $?"
+    write_error "Failed to create output.tar"
     exit 1
 }
 
