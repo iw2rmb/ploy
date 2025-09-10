@@ -80,6 +80,59 @@ job "{{APP_NAME}}-lane-c" {
       }
 
       # No Consul service registration in dev-minimal template
+      {{#if CONSUL_CONFIG_ENABLED}}
+      service {
+        name = "{{APP_NAME}}-lane-c"
+        port = "http"
+        tags = [
+          "lane-c",
+          "app={{APP_NAME}}",
+          "version={{VERSION}}",
+          "runtime=jvm"
+        ]
+        check {
+          type     = "http"
+          path     = "/health"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+
+      # Optional metrics service (HTTP)
+      service {
+        name = "{{APP_NAME}}-lane-c-metrics"
+        port = "metrics"
+        tags = [
+          "lane-c",
+          "app={{APP_NAME}}",
+          "metrics",
+          "runtime=jvm"
+        ]
+        check {
+          type     = "http"
+          path     = "/metrics"
+          interval = "15s"
+          timeout  = "2s"
+        }
+      }
+
+      # Optional JMX service (TCP) for JVM tooling
+      service {
+        name = "{{APP_NAME}}-lane-c-jmx"
+        port = "jmx"
+        tags = [
+          "lane-c",
+          "app={{APP_NAME}}",
+          "jmx",
+          "runtime=jvm"
+        ]
+        check {
+          type     = "tcp"
+          interval = "20s"
+          timeout  = "2s"
+        }
+      }
+      {{/if}}
 
       resources { cpu = {{CPU_LIMIT}}; memory = {{MEMORY_LIMIT}} }
       logs { max_files = 5; max_file_size = 20 }
