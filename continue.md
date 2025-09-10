@@ -3,6 +3,7 @@
 ## Key Takeaways (Updated)
 
 - CLI is REST-only. All orchestration (Nomad jobs, HCL templates) runs on the API (VPS). No local Nomad usage.
+- Remote execution permitted: SSH access to the target VPS is available for running Ansible, Nomad helpers, and validation commands directly from this agent.
 - API embeds all Transflow HCL templates and writes them to a per-run temp workspace:
   - `api/transflow/templates/{planner.hcl,llm_exec.hcl,orw_apply.hcl,reducer.hcl}`
   - Runner reads templates relative to its `workspaceDir`.
@@ -151,8 +152,10 @@ DEV LOGGING NOTE (keep logs tidy):
 
 ## Action Plan (Next Session)
 
-1) Rebuild/push image (if not completed):
-   - Playbook: `iac/dev/playbooks/openrewrite-jvm.yml`
+1) Rebuild/push image on VPS (do not build locally):
+   - Use Ansible against the target host. Example:
+     - `ansible-playbook -i '"${TARGET_HOST}",' -u ploy --become iac/dev/playbooks/openrewrite-jvm.yml -e ploy_domain=dev.ployman.app`
+   - This builds and pushes `registry.dev.ployman.app/openrewrite-jvm:latest` on the VPS. Avoid local Docker builds.
    - Confirms latest runner diagnostics are in use (logs `INPUT_URL` and download HTTP result).
 
 2) Run a new transflow and capture evidence:
