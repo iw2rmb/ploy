@@ -546,6 +546,19 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
 				return nil, fmt.Errorf("failed to substitute ORW HCL: %w", err)
 			}
+
+			// Debug: log env block from submitted HCL for verification (INPUT_URL, SEAWEEDFS_URL, etc.)
+			if b, e := os.ReadFile(submittedPath); e == nil {
+				s := string(b)
+				start := strings.Index(s, "env = {")
+				if start >= 0 {
+					end := strings.Index(s[start:], "}")
+					if end > 0 {
+						block := s[start : start+end+1]
+						log.Printf("[Transflow] orw-apply env block (preview):\n%s", block)
+					}
+				}
+			}
 			// Predefine diffPath for fallback checks
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			// Preflight validate HCL, then submit job and wait terminal
