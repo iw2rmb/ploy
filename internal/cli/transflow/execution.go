@@ -259,8 +259,14 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	}
 
 	// Controller and execution ID for in-job event push
-	controllerURL := os.Getenv("PLOY_CONTROLLER")
-	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+    controllerURL := os.Getenv("PLOY_CONTROLLER")
+    execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+    seaweedURL := os.Getenv("PLOY_SEAWEEDFS_URL")
+    if seaweedURL == "" {
+        seaweedURL = "http://seaweedfs-filer.service.consul:8888"
+    }
+    outputKey := "artifacts/transflow/" + execID + "/output.tar"
+    diffKey := "artifacts/transflow/" + execID + "/diff.patch"
 
     dc := os.Getenv("NOMAD_DC")
     if dc == "" { dc = "dc1" }
@@ -272,6 +278,9 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
         "${ORW_IMAGE}", orwImage,
         "${CONTROLLER_URL}", controllerURL,
         "${EXECUTION_ID}", execID,
+        "${SEAWEEDFS_URL}", seaweedURL,
+        "${OUTPUT_KEY}", outputKey,
+        "${DIFF_KEY}", diffKey,
         "${NOMAD_DC}", dc,
     ).Replace(string(content))
 
