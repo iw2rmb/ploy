@@ -1,5 +1,5 @@
 job "transflow-reducer" {
-  datacenters = ["dc1"]
+  datacenters = ["${NOMAD_DC}"]
   type        = "batch"
 
   group "reducer" {

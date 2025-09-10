@@ -1,5 +1,5 @@
 job "transflow-planner" {
-  datacenters = ["dc1"]
+  datacenters = ["${NOMAD_DC}"]
   type        = "batch"
 
   group "planner" {
