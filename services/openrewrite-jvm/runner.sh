@@ -512,6 +512,8 @@ if [ -n "${OUTPUT_KEY}" ] || [ -n "${OUTPUT_URL}" ]; then
     fi
     
     echo "[OpenRewrite] Uploading with verbose output..."
+    # Avoid set -e causing premature exit on curl failure; capture status explicitly
+    set +e
     UPLOAD_RESPONSE=$(curl -X PUT "${UPLOAD_URL}" \
            --data-binary "@${OUTPUT_TAR}" \
            -H "Content-Type: application/octet-stream" \
@@ -520,6 +522,7 @@ if [ -n "${OUTPUT_KEY}" ] || [ -n "${OUTPUT_URL}" ]; then
            -w "HTTP_CODE:%{http_code} SIZE_UPLOAD:%{size_upload} TIME_TOTAL:%{time_total}" \
            2>&1)
     UPLOAD_EXIT_CODE=$?
+    set -e
     
     echo "[OpenRewrite] Upload response: ${UPLOAD_RESPONSE}"
     echo "[OpenRewrite] Upload exit code: ${UPLOAD_EXIT_CODE}"
