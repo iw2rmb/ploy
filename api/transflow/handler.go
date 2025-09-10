@@ -1,27 +1,27 @@
 package transflow
 
 import (
-    "bufio"
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "log"
-    "net/http"
-    "os"
-    "path/filepath"
-    "os/exec"
-    "strings"
-    "time"
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 
-    "github.com/gofiber/fiber/v2"
-    "github.com/google/uuid"
-    "github.com/iw2rmb/ploy/internal/cli/transflow"
-    "github.com/iw2rmb/ploy/internal/git/provider"
-    "github.com/iw2rmb/ploy/internal/orchestration"
-    internalStorage "github.com/iw2rmb/ploy/internal/storage"
-    "gopkg.in/yaml.v3"
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/iw2rmb/ploy/internal/cli/transflow"
+	"github.com/iw2rmb/ploy/internal/git/provider"
+	"github.com/iw2rmb/ploy/internal/orchestration"
+	internalStorage "github.com/iw2rmb/ploy/internal/storage"
+	"gopkg.in/yaml.v3"
 )
 
 // Handler provides HTTP endpoints for Transflow operations
@@ -50,7 +50,7 @@ func NewHandler(
 
 // RegisterRoutes registers Transflow routes with the Fiber app
 func (h *Handler) RegisterRoutes(app *fiber.App) {
-    tf := app.Group("/v1/transflow")
+	tf := app.Group("/v1/transflow")
 
 	// Transflow execution
 	tf.Post("/run", h.RunTransflow)
@@ -61,10 +61,10 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	tf.Get("/artifacts/:id/:name", h.DownloadArtifact)
 	// Real-time events push endpoint
 	tf.Post("/event", h.ReportEvent)
-    // Logs streaming (SSE stub)
-    tf.Get("/logs/:id", h.StreamLogs)
-    // Debug: Nomad recent job diagnostics (dev only)
-    tf.Get("/debug/nomad", h.DebugNomad)
+	// Logs streaming (SSE stub)
+	tf.Get("/logs/:id", h.StreamLogs)
+	// Debug: Nomad recent job diagnostics (dev only)
+	tf.Get("/debug/nomad", h.DebugNomad)
 }
 
 // TransflowRunRequest represents the request body for running a transflow
@@ -298,10 +298,10 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	// Expose controller and execution ID to job templates for in-job event pushes
 	_ = os.Setenv("PLOY_CONTROLLER", controllerURL)
 	_ = os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", executionID)
-    // Expose SeaweedFS URL default for task-side uploads
-    if os.Getenv("PLOY_SEAWEEDFS_URL") == "" {
-        _ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
-    }
+	// Expose SeaweedFS URL default for task-side uploads
+	if os.Getenv("PLOY_SEAWEEDFS_URL") == "" {
+		_ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
+	}
 
 	// Execute the workflow with timeout awareness; ensure terminal status on any error
 	var (
@@ -437,7 +437,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			artifacts["next_json"] = key
 		}
 	}
-    // ORW diff.patch (search first match)
+	// ORW diff.patch (search first match)
 	// orw-apply/<option>/out/diff.patch
 	orwDir := filepath.Join(tempDir, "orw-apply")
 	_ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
@@ -445,36 +445,40 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			return nil
 		}
 		if filepath.Base(path) == "diff.patch" {
-            key := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
-            // If already present (task-side upload), record and skip
-            if ok, _ := h.storage.Exists(ctx, key); ok {
-                artifacts["diff_patch"] = key
-            } else {
-                f, _ := os.Open(path)
-                defer f.Close()
-                // Read once for content-type neutrality
-                var buf []byte
-                buf, _ = io.ReadAll(f)
-                _ = f.Close()
-                if err := h.storage.Put(ctx, key, io.NopCloser(bytes.NewReader(buf))); err == nil {
-                    artifacts["diff_patch"] = key
-                }
-            }
-            return nil
-        }
-        if filepath.Base(path) == "error.log" {
-            key := fmt.Sprintf("artifacts/transflow/%s/error.log", executionID)
-            if ok, _ := h.storage.Exists(ctx, key); ok {
-                artifacts["error_log"] = key
-            } else {
-                f, _ := os.Open(path)
-                defer f.Close()
-                if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("text/plain")); err == nil {
-                    artifacts["error_log"] = key
-                }
-            }
-            return nil
-        }
+			// Prefer task-side upload key if present; support both legacy and new prefixes
+			keyPrimary := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
+			keyAlt := fmt.Sprintf("transflow/%s/diff.patch", executionID)
+			// If already present (task-side upload), record and skip
+			if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
+				artifacts["diff_patch"] = keyPrimary
+			} else if ok2, _ := h.storage.Exists(ctx, keyAlt); ok2 {
+				artifacts["diff_patch"] = keyAlt
+			} else {
+				f, _ := os.Open(path)
+				defer f.Close()
+				// Read once for content-type neutrality
+				var buf []byte
+				buf, _ = io.ReadAll(f)
+				_ = f.Close()
+				if err := h.storage.Put(ctx, keyPrimary, io.NopCloser(bytes.NewReader(buf))); err == nil {
+					artifacts["diff_patch"] = keyPrimary
+				}
+			}
+			return nil
+		}
+		if filepath.Base(path) == "error.log" {
+			key := fmt.Sprintf("artifacts/transflow/%s/error.log", executionID)
+			if ok, _ := h.storage.Exists(ctx, key); ok {
+				artifacts["error_log"] = key
+			} else {
+				f, _ := os.Open(path)
+				defer f.Close()
+				if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("text/plain")); err == nil {
+					artifacts["error_log"] = key
+				}
+			}
+			return nil
+		}
 		return nil
 	})
 	return artifacts, nil
@@ -779,11 +783,11 @@ func (h *Handler) StreamLogs(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "missing_id", "message": "Execution ID is required"}})
 	}
-    // Set SSE headers
-    c.Set("Content-Type", "text/event-stream")
-    c.Set("Cache-Control", "no-cache")
-    c.Set("Connection", "keep-alive")
-    c.Set("X-Accel-Buffering", "no")
+	// Set SSE headers
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
 
 	follow := strings.ToLower(c.Query("follow", "true")) != "false"
 	interval := 2 * time.Second
@@ -856,9 +860,9 @@ func (h *Handler) StreamLogs(c *fiber.Ctx) error {
 		}
 
 		// Follow mode: poll for new steps and status
-    ticker := time.NewTicker(interval)
-    defer ticker.Stop()
-    var lastLogPreview string
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		var lastLogPreview string
 		for {
 			if time.Since(start) > maxDur {
 				_ = writeEvent("end", `{"status":"timeout"}`)
@@ -881,17 +885,19 @@ func (h *Handler) StreamLogs(c *fiber.Ctx) error {
 					}
 				}
 
-                // Optional: stream last job log preview if available and changed
-                if st.LastJob != nil && st.LastJob.AllocID != "" {
-                    task := taskForJob(st.LastJob.JobName)
-                    if preview := tailAllocLogs(st.LastJob.AllocID, task, 50); preview != "" && preview != lastLogPreview {
-                        payload := map[string]any{"task": task, "preview": preview}
-                        if b, e := json.Marshal(payload); e == nil {
-                            if !writeEvent("log", string(b)) { return }
-                            lastLogPreview = preview
-                        }
-                    }
-                }
+				// Optional: stream last job log preview if available and changed
+				if st.LastJob != nil && st.LastJob.AllocID != "" {
+					task := taskForJob(st.LastJob.JobName)
+					if preview := tailAllocLogs(st.LastJob.AllocID, task, 50); preview != "" && preview != lastLogPreview {
+						payload := map[string]any{"task": task, "preview": preview}
+						if b, e := json.Marshal(payload); e == nil {
+							if !writeEvent("log", string(b)) {
+								return
+							}
+							lastLogPreview = preview
+						}
+					}
+				}
 				// Stream new steps
 				if len(st.Steps) > lastCount {
 					for i := lastCount; i < len(st.Steps); i++ {
@@ -920,142 +926,154 @@ func (h *Handler) StreamLogs(c *fiber.Ctx) error {
 // tailAllocLogs fetches a short preview of allocation logs using the VPS job manager wrapper.
 // Returns empty string on any error.
 func tailAllocLogs(allocID, task string, lines int) string {
-    mgr := os.Getenv("NOMAD_JOB_MANAGER")
-    if mgr == "" {
-        mgr = "/opt/hashicorp/bin/nomad-job-manager.sh"
-    }
-    if _, err := os.Stat(mgr); err != nil {
-        return ""
-    }
-    if task == "" {
-        task = "api"
-    }
-    if lines <= 0 {
-        lines = 50
-    }
-    cmd := exec.Command(mgr, "logs", "--alloc-id", allocID, "--task", task, "--both", "--lines", fmt.Sprintf("%d", lines))
-    out, err := cmd.CombinedOutput()
-    if err != nil {
-        return ""
-    }
-    s := string(out)
-    if len(s) > 4000 {
-        s = s[len(s)-4000:]
-    }
-    return s
+	mgr := os.Getenv("NOMAD_JOB_MANAGER")
+	if mgr == "" {
+		mgr = "/opt/hashicorp/bin/nomad-job-manager.sh"
+	}
+	if _, err := os.Stat(mgr); err != nil {
+		return ""
+	}
+	if task == "" {
+		task = "api"
+	}
+	if lines <= 0 {
+		lines = 50
+	}
+	cmd := exec.Command(mgr, "logs", "--alloc-id", allocID, "--task", task, "--both", "--lines", fmt.Sprintf("%d", lines))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	s := string(out)
+	if len(s) > 4000 {
+		s = s[len(s)-4000:]
+	}
+	return s
 }
 
 // DebugNomad returns recent Nomad job diagnostics (allocs and evaluation summary) for troubleshooting
 func (h *Handler) DebugNomad(c *fiber.Ctx) error {
-    if os.Getenv("PLOY_DEBUG") != "1" {
-        return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": fiber.Map{"code": "forbidden", "message": "debug endpoint disabled"}})
-    }
-    // Use the job manager wrapper to list recent jobs known to transflow (prefix heuristics)
-    // Fallback: scan logs for runID is non-trivial here; instead, list recent jobs by prefix
-    type JobInfo struct {
-        Name         string                 `json:"name"`
-        AllocCount   int                    `json:"alloc_count"`
-        AllocStates  map[string]int         `json:"alloc_states"`
-        LastEval     map[string]interface{} `json:"last_eval,omitempty"`
-        Error        string                 `json:"error,omitempty"`
-    }
-    jobs := []JobInfo{}
+	if os.Getenv("PLOY_DEBUG") != "1" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": fiber.Map{"code": "forbidden", "message": "debug endpoint disabled"}})
+	}
+	// Use the job manager wrapper to list recent jobs known to transflow (prefix heuristics)
+	// Fallback: scan logs for runID is non-trivial here; instead, list recent jobs by prefix
+	type JobInfo struct {
+		Name        string                 `json:"name"`
+		AllocCount  int                    `json:"alloc_count"`
+		AllocStates map[string]int         `json:"alloc_states"`
+		LastEval    map[string]interface{} `json:"last_eval,omitempty"`
+		Error       string                 `json:"error,omitempty"`
+	}
+	jobs := []JobInfo{}
 
-    // Helper to run job-manager wrapper and parse JSON
-    run := func(args ...string) ([]byte, error) {
-        mgr := os.Getenv("NOMAD_JOB_MANAGER")
-        if mgr == "" { mgr = "/opt/hashicorp/bin/nomad-job-manager.sh" }
-        if _, err := os.Stat(mgr); err != nil { return nil, fmt.Errorf("job manager not available") }
-        cmd := exec.Command(mgr, args...)
-        out, err := cmd.CombinedOutput()
-        if err != nil { return nil, fmt.Errorf("%v: %s", err, string(out)) }
-        return out, nil
-    }
+	// Helper to run job-manager wrapper and parse JSON
+	run := func(args ...string) ([]byte, error) {
+		mgr := os.Getenv("NOMAD_JOB_MANAGER")
+		if mgr == "" {
+			mgr = "/opt/hashicorp/bin/nomad-job-manager.sh"
+		}
+		if _, err := os.Stat(mgr); err != nil {
+			return nil, fmt.Errorf("job manager not available")
+		}
+		cmd := exec.Command(mgr, args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("%v: %s", err, string(out))
+		}
+		return out, nil
+	}
 
-    // Heuristic: scan last 50 jobs via job-manager 'jobs --format json' then filter
-    out, err := run("jobs", "--format", "json")
-    if err != nil {
-        return c.Status(500).JSON(fiber.Map{"error": fiber.Map{"code": "internal_error", "message": "jobs listing failed", "details": err.Error()}})
-    }
-    var jmJobs []map[string]interface{}
-    _ = json.Unmarshal(out, &jmJobs)
-    candidates := []string{}
-    cutoff := time.Now().Add(-24 * time.Hour)
-    for _, j := range jmJobs {
-        name, _ := j["Name"].(string)
-        submitTimeAny := j["SubmitTime"]
-        var recent bool = true
-        switch t := submitTimeAny.(type) {
-        case float64:
-            // milliseconds
-            ts := time.UnixMilli(int64(t))
-            recent = ts.After(cutoff)
-        }
-        if recent && (strings.HasPrefix(name, "orw-apply-") || strings.Contains(strings.ToLower(name), "transflow") || strings.HasPrefix(name, "transflow-llm-exec") || strings.HasPrefix(name, "transflow-planner") || strings.HasPrefix(name, "transflow-reducer")) {
-            candidates = append(candidates, name)
-        }
-    }
-    // Limit candidates
-    if len(candidates) > 30 {
-        candidates = candidates[len(candidates)-30:]
-    }
+	// Heuristic: scan last 50 jobs via job-manager 'jobs --format json' then filter
+	out, err := run("jobs", "--format", "json")
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fiber.Map{"code": "internal_error", "message": "jobs listing failed", "details": err.Error()}})
+	}
+	var jmJobs []map[string]interface{}
+	_ = json.Unmarshal(out, &jmJobs)
+	candidates := []string{}
+	cutoff := time.Now().Add(-24 * time.Hour)
+	for _, j := range jmJobs {
+		name, _ := j["Name"].(string)
+		submitTimeAny := j["SubmitTime"]
+		var recent bool = true
+		switch t := submitTimeAny.(type) {
+		case float64:
+			// milliseconds
+			ts := time.UnixMilli(int64(t))
+			recent = ts.After(cutoff)
+		}
+		if recent && (strings.HasPrefix(name, "orw-apply-") || strings.Contains(strings.ToLower(name), "transflow") || strings.HasPrefix(name, "transflow-llm-exec") || strings.HasPrefix(name, "transflow-planner") || strings.HasPrefix(name, "transflow-reducer")) {
+			candidates = append(candidates, name)
+		}
+	}
+	// Limit candidates
+	if len(candidates) > 30 {
+		candidates = candidates[len(candidates)-30:]
+	}
 
-    for _, jobName := range candidates {
-        ji := JobInfo{Name: jobName, AllocStates: map[string]int{}}
-        // Get allocs for job
-        aout, aerr := run("allocs", "--job", jobName, "--format", "json")
-        if aerr == nil {
-            var allocs []map[string]interface{}
-            _ = json.Unmarshal(aout, &allocs)
-            ji.AllocCount = len(allocs)
-            for _, a := range allocs {
-                st, _ := a["ClientStatus"].(string)
-                ji.AllocStates[st] = ji.AllocStates[st] + 1
-            }
-        } else {
-            ji.Error = aerr.Error()
-        }
-        // Evaluations via Nomad HTTP API
-        // Best effort: http://127.0.0.1:4646/v1/job/<job>/evaluations
-        func() {
-            client := &http.Client{Timeout: 5 * time.Second}
-            req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:4646/v1/job/%s/evaluations", jobName), nil)
-            resp, err := client.Do(req)
-            if err != nil { return }
-            defer resp.Body.Close()
-            var evals []map[string]interface{}
-            if err := json.NewDecoder(resp.Body).Decode(&evals); err != nil { return }
-            if len(evals) == 0 { return }
-            last := evals[len(evals)-1]
-            ji.LastEval = map[string]interface{}{
-                "Status": last["Status"],
-                "TriggeredBy": last["TriggeredBy"],
-                "Class": last["Class"],
-                "NodesEvaluated": last["NodesEvaluated"],
-                "NodesFiltered": last["NodesFiltered"],
-                "FailedTGAllocs": last["FailedTGAllocs"],
-            }
-        }()
+	for _, jobName := range candidates {
+		ji := JobInfo{Name: jobName, AllocStates: map[string]int{}}
+		// Get allocs for job
+		aout, aerr := run("allocs", "--job", jobName, "--format", "json")
+		if aerr == nil {
+			var allocs []map[string]interface{}
+			_ = json.Unmarshal(aout, &allocs)
+			ji.AllocCount = len(allocs)
+			for _, a := range allocs {
+				st, _ := a["ClientStatus"].(string)
+				ji.AllocStates[st] = ji.AllocStates[st] + 1
+			}
+		} else {
+			ji.Error = aerr.Error()
+		}
+		// Evaluations via Nomad HTTP API
+		// Best effort: http://127.0.0.1:4646/v1/job/<job>/evaluations
+		func() {
+			client := &http.Client{Timeout: 5 * time.Second}
+			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:4646/v1/job/%s/evaluations", jobName), nil)
+			resp, err := client.Do(req)
+			if err != nil {
+				return
+			}
+			defer resp.Body.Close()
+			var evals []map[string]interface{}
+			if err := json.NewDecoder(resp.Body).Decode(&evals); err != nil {
+				return
+			}
+			if len(evals) == 0 {
+				return
+			}
+			last := evals[len(evals)-1]
+			ji.LastEval = map[string]interface{}{
+				"Status":         last["Status"],
+				"TriggeredBy":    last["TriggeredBy"],
+				"Class":          last["Class"],
+				"NodesEvaluated": last["NodesEvaluated"],
+				"NodesFiltered":  last["NodesFiltered"],
+				"FailedTGAllocs": last["FailedTGAllocs"],
+			}
+		}()
 
-        jobs = append(jobs, ji)
-    }
+		jobs = append(jobs, ji)
+	}
 
-    return c.JSON(fiber.Map{"recent_jobs": jobs, "count": len(jobs)})
+	return c.JSON(fiber.Map{"recent_jobs": jobs, "count": len(jobs)})
 }
 
 // taskForJob maps a job name to its task name for log tailing
 func taskForJob(jobName string) string {
-    n := strings.ToLower(jobName)
-    switch {
-    case strings.Contains(n, "orw-apply"):
-        return "openrewrite-apply"
-    case strings.Contains(n, "planner"):
-        return "planner"
-    case strings.Contains(n, "reducer"):
-        return "reducer"
-    case strings.Contains(n, "llm-exec") || strings.Contains(n, "llm_exec"):
-        return "llm-exec"
-    default:
-        return "api"
-    }
+	n := strings.ToLower(jobName)
+	switch {
+	case strings.Contains(n, "orw-apply"):
+		return "openrewrite-apply"
+	case strings.Contains(n, "planner"):
+		return "planner"
+	case strings.Contains(n, "reducer"):
+		return "reducer"
+	case strings.Contains(n, "llm-exec") || strings.Contains(n, "llm_exec"):
+		return "llm-exec"
+	default:
+		return "api"
+	}
 }

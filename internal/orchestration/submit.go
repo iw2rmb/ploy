@@ -95,21 +95,31 @@ func submitWithJobManager(hclPath string) (string, error) {
 // Wait for terminal state using job manager outputs
 func waitTerminalWithJobManager(jobName string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	allocAppearGuard := envDur("NOMAD_ALLOC_APPEARANCE_TIMEOUT", 90*time.Second)
+	sawAnyAllocs := false
 	for time.Now().Before(deadline) {
-		// Get allocations as JSON
+		// Get allocations as JSON (parse stdout only; wrapper emits logs)
 		cmd := exec.Command(jobManagerPath(), "allocs", "--job", jobName, "--format", "json")
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Stderr = &out
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
-			// Brief backoff and retry
 			time.Sleep(2 * time.Second)
 			continue
 		}
+		raw := stdout.Bytes()
+		// The wrapper may prepend log lines; find JSON start
+		if idx := bytes.IndexByte(raw, '['); idx >= 0 {
+			raw = raw[idx:]
+		}
 		var allocs []AllocationStatusLite
-		if err := json.Unmarshal(out.Bytes(), &allocs); err == nil {
+		if err := json.Unmarshal(raw, &allocs); err == nil {
 			// Terminal if any alloc failed or any alloc completed
 			sawRunningOrPending := false
+			if len(allocs) > 0 {
+				sawAnyAllocs = true
+			}
 			for _, a := range allocs {
 				// Prefer explicit terminated event exit codes when available
 				for _, ts := range a.TaskStates {
@@ -138,6 +148,10 @@ func waitTerminalWithJobManager(jobName string, timeout time.Duration) error {
 			if !sawRunningOrPending && len(allocs) > 0 {
 				// Not clearly terminal; wait
 			}
+		}
+		// Fast-fail guard: no allocations appeared within guard window
+		if !sawAnyAllocs && time.Since(deadline.Add(-timeout)) > allocAppearGuard {
+			return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", jobName, allocAppearGuard)
 		}
 		time.Sleep(2 * time.Second)
 	}
@@ -260,22 +274,22 @@ func WaitHealthy(jobName string, timeout time.Duration) error {
 // SubmitAndWaitTerminal registers a batch job and waits until its allocations reach a terminal state
 // (complete or failed), or the timeout elapses. This is intended for short-lived planner/reducer jobs.
 func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
-    start := time.Now()
-    allocAppearGuard := envDur("NOMAD_ALLOC_APPEARANCE_TIMEOUT", 90*time.Second)
-    if useJobManager() {
-        name, err := submitWithJobManager(jobPath)
-        if err != nil {
-            return err
-        }
-        // Wait with guard: if no allocations appear within guard, fail fast
-        if err := waitTerminalWithJobManager(name, timeout); err != nil {
-            return err
-        }
-        // Note: waitTerminalWithJobManager handles alloc checks internally; guard is less applicable here
-        _ = start
-        _ = allocAppearGuard
-        return nil
-    }
+	start := time.Now()
+	allocAppearGuard := envDur("NOMAD_ALLOC_APPEARANCE_TIMEOUT", 90*time.Second)
+	if useJobManager() {
+		name, err := submitWithJobManager(jobPath)
+		if err != nil {
+			return err
+		}
+		// Wait with guard: if no allocations appear within guard, fail fast
+		if err := waitTerminalWithJobManager(name, timeout); err != nil {
+			return err
+		}
+		// Note: waitTerminalWithJobManager handles alloc checks internally; guard is less applicable here
+		_ = start
+		_ = allocAppearGuard
+		return nil
+	}
 	acquireSubmit()
 	defer releaseSubmit()
 	hcl, err := os.ReadFile(jobPath)
@@ -305,42 +319,42 @@ func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastIndex uint64
 	waitTime := envDur("NOMAD_BLOCKING_WAIT", 30*time.Second)
-    sawAnyAllocs := false
-    for time.Now().Before(deadline) {
-        // Use blocking query to reduce control-plane load
-        q := &nomadapi.QueryOptions{WaitIndex: lastIndex, WaitTime: waitTime, AllowStale: true}
-        allocs, meta, err := client.Jobs().Allocations(name, false, q)
-        if err != nil {
-            // Non-fatal: backoff briefly and retry
-            time.Sleep(2 * time.Second)
-            continue
-        }
-        if meta != nil && meta.LastIndex > 0 {
-            lastIndex = meta.LastIndex
-        }
-        // Evaluate terminal states
-        sawRunning := false
-        for _, a := range allocs {
-            sawAnyAllocs = true
-            cs := a.ClientStatus
-            if cs == "complete" {
-                return nil
-            }
-            if cs == "failed" {
-                return fmt.Errorf("job %s allocation failed (%s)", name, a.ID)
-            }
-            if cs == "running" || cs == "pending" || cs == "starting" {
-                sawRunning = true
-            }
-        }
-        if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
-            return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
-        }
-        if !sawRunning && len(allocs) > 0 {
-            // Allocations exist but none running and none complete/failed; give them time
-        }
-        // Do not sleep here; blocking query already waited. Loop continues.
-    }
+	sawAnyAllocs := false
+	for time.Now().Before(deadline) {
+		// Use blocking query to reduce control-plane load
+		q := &nomadapi.QueryOptions{WaitIndex: lastIndex, WaitTime: waitTime, AllowStale: true}
+		allocs, meta, err := client.Jobs().Allocations(name, false, q)
+		if err != nil {
+			// Non-fatal: backoff briefly and retry
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if meta != nil && meta.LastIndex > 0 {
+			lastIndex = meta.LastIndex
+		}
+		// Evaluate terminal states
+		sawRunning := false
+		for _, a := range allocs {
+			sawAnyAllocs = true
+			cs := a.ClientStatus
+			if cs == "complete" {
+				return nil
+			}
+			if cs == "failed" {
+				return fmt.Errorf("job %s allocation failed (%s)", name, a.ID)
+			}
+			if cs == "running" || cs == "pending" || cs == "starting" {
+				sawRunning = true
+			}
+		}
+		if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
+			return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
+		}
+		if !sawRunning && len(allocs) > 0 {
+			// Allocations exist but none running and none complete/failed; give them time
+		}
+		// Do not sleep here; blocking query already waited. Loop continues.
+	}
 	return fmt.Errorf("timeout waiting for job %s to complete", name)
 }
 
