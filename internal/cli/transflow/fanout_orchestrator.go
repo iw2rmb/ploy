@@ -260,9 +260,16 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		}(runID)
 	}
 
-	// Step 5: Submit job to Nomad and wait for completion
-	timeout := 30 * time.Minute
-	if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
+    // Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
+    if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
+        result.Status = "failed"
+        result.Notes = fmt.Sprintf("LLM exec HCL validation failed: %v", err)
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(result.StartedAt)
+        return result
+    }
+    timeout := 30 * time.Minute
+    if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec job failed: %v", err)
 		result.FinishedAt = time.Now()
@@ -449,9 +456,16 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		}(runID)
 	}
 
-	// Step 4: Submit job to Nomad and wait for completion
-	timeout := 30 * time.Minute
-	if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
+    // Step 4: Preflight validate HCL, then submit job to Nomad and wait for completion
+    if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
+        result.Status = "failed"
+        result.Notes = fmt.Sprintf("ORW apply HCL validation failed: %v", err)
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(result.StartedAt)
+        return result
+    }
+    timeout := 30 * time.Minute
+    if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
 		result.FinishedAt = time.Now()
