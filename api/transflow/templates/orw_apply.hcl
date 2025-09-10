@@ -17,6 +17,7 @@ job "${RUN_ID}" {
 
       env = {
         OUTPUT_DIR       = "/workspace/out"
+        INPUT_URL        = "${INPUT_URL}"
         RECIPE           = "${RECIPE_CLASS}"
         DISCOVER_RECIPE  = "${DISCOVER_RECIPE}"
         RECIPE_GROUP     = "${RECIPE_GROUP}"

@@ -519,12 +519,32 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 
 			// Prepare env and substitute final template
-			baseDir := filepath.Dir(renderedPath)
-			_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-			// Mount the cloned repository as the context so the container can build its own input.tar
-			// Keep outputs under the step workspace for artifact collection
-			os.Setenv("TRANSFLOW_CONTEXT_DIR", repoPath)
-			os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+            baseDir := filepath.Dir(renderedPath)
+            _ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
+            // Keep outputs under the step workspace for artifact collection
+            os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+
+            // Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
+            execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+            seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
+            if seaweed == "" { seaweed = "http://seaweedfs-filer.service.consul:8888" }
+            inputTar := filepath.Join(baseDir, "input.tar")
+            if err := createTarFromDir(repoPath, inputTar); err == nil {
+                // Upload best-effort to artifacts/transflow/<id>/input.tar
+                key := fmt.Sprintf("transflow/%s/input.tar", execID)
+                url := strings.TrimRight(seaweed, "/") + "/artifacts/" + key
+                // simple PUT
+                _ = func() error {
+                    cmd := exec.Command("curl", "-sS", "-X", "PUT", url, "--data-binary", "@"+inputTar, "-H", "Content-Type: application/octet-stream")
+                    if out, err := cmd.CombinedOutput(); err != nil {
+                        log.Printf("[Transflow] input.tar upload failed: %v: %s", err, string(out))
+                        return err
+                    }
+                    return nil
+                }()
+            } else {
+                log.Printf("[Transflow] Failed to create input tar: %v", err)
+            }
 			submittedPath, err := substituteORWTemplate(prePath, runID)
 			if err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})

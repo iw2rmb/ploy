@@ -169,6 +169,22 @@ mkdir -p "${OUTPUT_DIR}"
 echo "[OpenRewrite] Extracting input archive..."
 echo "[OpenRewrite] Current directory: $(pwd)"
 echo "[OpenRewrite] Input tar location: ${INPUT_TAR}"
+
+# If INPUT_URL is provided and the tar is missing, try to download it (best-effort)
+if [ ! -s "${INPUT_TAR}" ] && [ -n "${INPUT_URL:-}" ]; then
+  echo "[OpenRewrite] INPUT_TAR not found; attempting download from INPUT_URL"
+  set +e
+  curl -f -sSL --connect-timeout 30 --max-time 300 -o "${INPUT_TAR}" "${INPUT_URL}"
+  CURL_RC=$?
+  set -e
+  if [ $CURL_RC -ne 0 ]; then
+    echo "[OpenRewrite] WARNING: failed to download INPUT_TAR from ${INPUT_URL} (curl rc=$CURL_RC)"
+  else
+    echo "[OpenRewrite] Downloaded INPUT_TAR from ${INPUT_URL}"
+    ls -lh "${INPUT_TAR}" || true
+  fi
+fi
+
 ls -la "${INPUT_TAR}" || echo "[Error] Input tar not found at ${INPUT_TAR}"
 
 # Clean workspace to avoid mixing files from previous runs
