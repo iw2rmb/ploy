@@ -24,9 +24,17 @@ job "${RUN_ID}" {
         RECIPE_VERSION   = "${RECIPE_VERSION}"
         CONTROLLER_URL   = "${CONTROLLER_URL}"
         TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
-        SEAWEEDFS_URL    = "${SEAWEEDFS_URL}"
         OUTPUT_KEY       = "${OUTPUT_KEY}"
         DIFF_KEY         = "${DIFF_KEY}"
+      }
+
+      # Resolve SeaweedFS Filer address dynamically via Consul and inject as ENV
+      template {
+        destination = "local/seaweed.env"
+        env         = true
+        data        = <<EOH
+SEAWEEDFS_URL=http://{{ with service "seaweedfs-filer" }}{{ (index . 0).Address }}:{{ (index . 0).Port }}{{ end }}
+EOH
       }
 
       resources {
