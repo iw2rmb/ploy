@@ -58,7 +58,7 @@ steps:
   - type: orw-apply
     id: java11to17-migration
     recipes:
-      - org.openrewrite.java.migrate.UpgradeToJava17
+      - org.openrewrite.java.migrate.Java11toJava17
 
   - type: llm-plan
     id: plan-build-fixes
