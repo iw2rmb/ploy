@@ -532,11 +532,18 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 			// Predefine diffPath for fallback checks
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
-			// Submit job and wait terminal
-			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
-			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
-			r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
-			if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
+            // Preflight validate HCL, then submit job and wait terminal
+            r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
+            log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
+            if err := orchestration.ValidateJob(submittedPath); err != nil {
+                r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("HCL validation failed: %v", err))
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW HCL validation failed: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("orw-apply HCL validation failed: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("orw-apply HCL validation failed: %w", err)
+            }
+            r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
+            if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
 				// Fallback: if wait timed out but diff.patch exists, continue
 				if strings.Contains(err.Error(), "timeout waiting for job") {
 					if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
