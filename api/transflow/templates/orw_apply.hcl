@@ -9,6 +9,8 @@ job "${RUN_ID}" {
       config {
         image = "${ORW_IMAGE}" # pin digest
         force_pull = true
+        # Use host networking so container inherits host's DNS (Consul) and can resolve service.consul
+        network_mode = "host"
       }
 
       env = {
