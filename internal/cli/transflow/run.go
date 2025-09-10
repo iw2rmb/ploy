@@ -54,6 +54,8 @@ func runTransflow(args []string, controllerURL string) error {
 	verbose := fs.Bool("v", false, "verbose output")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace (for debugging)")
 
+	// Optional: auto-attach watch after starting remote run
+	watch := fs.Bool("watch", false, "after starting remote run, attach a live watch")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("flag parsing failed: %w", err)
 	}
@@ -63,7 +65,7 @@ func runTransflow(args []string, controllerURL string) error {
 		if *file == "" {
 			return fmt.Errorf("missing -f <transflow.yaml>")
 		}
-		return executeRemoteTransflow(controllerURL, *file, *testMode, *verbose)
+		return executeRemoteTransflow(controllerURL, *file, *testMode, *verbose, *watch)
 	}
 
 	if *file == "" {

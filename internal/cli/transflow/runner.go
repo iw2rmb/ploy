@@ -519,28 +519,30 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 
 			// Prepare env and substitute final template
-            baseDir := filepath.Dir(renderedPath)
-            _ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
+			baseDir := filepath.Dir(renderedPath)
+			_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
             // Keep outputs under the step workspace for artifact collection
             os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
 
-            // Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
-            execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-            seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
-            if seaweed == "" { seaweed = "http://seaweedfs-filer.service.consul:8888" }
-            // Upload best-effort to artifacts/transflow/<id>/input.tar
-            {
-                key := fmt.Sprintf("transflow/%s/input.tar", execID)
-                url := strings.TrimRight(seaweed, "/") + "/artifacts/" + key
-                _ = func() error {
-                    cmd := exec.Command("curl", "-sS", "-X", "PUT", url, "--data-binary", "@"+inputTar, "-H", "Content-Type: application/octet-stream")
-                    if out, err := cmd.CombinedOutput(); err != nil {
-                        log.Printf("[Transflow] input.tar upload failed: %v: %s", err, string(out))
-                        return err
-                    }
-                    return nil
-                }()
-            }
+			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
+			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
+			if seaweed == "" {
+				seaweed = "http://seaweedfs-filer.service.consul:8888"
+			}
+			// Upload best-effort to artifacts/transflow/<id>/input.tar
+			{
+				key := fmt.Sprintf("transflow/%s/input.tar", execID)
+				url := strings.TrimRight(seaweed, "/") + "/artifacts/" + key
+				_ = func() error {
+					cmd := exec.Command("curl", "-sS", "-X", "PUT", url, "--data-binary", "@"+inputTar, "-H", "Content-Type: application/octet-stream")
+					if out, err := cmd.CombinedOutput(); err != nil {
+						log.Printf("[Transflow] input.tar upload failed: %v: %s", err, string(out))
+						return err
+					}
+					return nil
+				}()
+			}
 			submittedPath, err := substituteORWTemplate(prePath, runID)
 			if err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
@@ -583,18 +585,18 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("orw-apply HCL validation failed: %w", err)
 			}
 			r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
-            if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
-                // Best-effort: if diff.patch exists, proceed even if job failed (uploads/network can fail)
-                if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
-                    log.Printf("[Transflow] orw-apply wait failed (%v), but diff present (size=%d). Proceeding.", err, fi.Size())
-                } else {
-                    r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
-                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-                    result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-                    result.Duration = time.Since(startTime)
-                    return nil, fmt.Errorf("orw-apply job failed: %w", err)
-                }
-            }
+			if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
+				// Best-effort: if diff.patch exists, proceed even if job failed (uploads/network can fail)
+				if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
+					log.Printf("[Transflow] orw-apply wait failed (%v), but diff present (size=%d). Proceeding.", err, fi.Size())
+				} else {
+					r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+					result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+					result.Duration = time.Since(startTime)
+					return nil, fmt.Errorf("orw-apply job failed: %w", err)
+				}
+			}
 			// Successful wait implies job completed; emit explicit completion event
 			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
 

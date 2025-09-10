@@ -65,10 +65,9 @@ EOJSON
     fi
 }
 
-# Arguments from Nomad job
+# Arguments from Nomad job (SeaweedFS-only IO: no OUTPUT_TAR)
 INPUT_TAR="${1:-/workspace/input.tar}"
-OUTPUT_TAR="${2:-/workspace/output.tar}"
-RECIPE_CLASS="${3:-${RECIPE}}"
+RECIPE_CLASS="${2:-${RECIPE}}"
 
 # Environment variables (set by Nomad job)
 SEAWEEDFS_URL="${SEAWEEDFS_URL:-http://seaweedfs-filer.service.consul:8888}"
@@ -82,7 +81,8 @@ echo "[OpenRewrite]   JOB_ID: ${JOB_ID}"
 echo "[OpenRewrite]   TRANSFORMATION_ID: ${TRANSFORMATION_ID}"
 echo "[OpenRewrite]   RECIPE: ${RECIPE_CLASS}"
 echo "[OpenRewrite]   SEAWEEDFS_URL: ${SEAWEEDFS_URL}"
-echo "[OpenRewrite]   OUTPUT_KEY: ${OUTPUT_KEY}"
+echo "[OpenRewrite]   INPUT_URL: ${INPUT_URL}"
+echo "[OpenRewrite]   OUTPUT_KEY: (unused)"
 echo "[OpenRewrite]   Discovery mode: ${DISCOVER_RECIPE}"
 echo "[OpenRewrite] SeaweedFS: ${SEAWEEDFS_URL}"
 
@@ -172,13 +172,14 @@ echo "[OpenRewrite] Input tar location: ${INPUT_TAR}"
 
 # If INPUT_URL is provided and the tar is missing, try to download it (best-effort)
 if [ ! -s "${INPUT_TAR}" ] && [ -n "${INPUT_URL:-}" ]; then
-  echo "[OpenRewrite] INPUT_TAR not found; attempting download from INPUT_URL"
+  echo "[OpenRewrite] INPUT_TAR not found; attempting download from INPUT_URL=${INPUT_URL}"
   set +e
-  curl -f -sSL --connect-timeout 30 --max-time 300 -o "${INPUT_TAR}" "${INPUT_URL}"
+  RESP=$(curl -sSL --connect-timeout 30 --max-time 300 -w "HTTP_CODE:%{http_code}" -o "${INPUT_TAR}" "${INPUT_URL}")
   CURL_RC=$?
   set -e
-  if [ $CURL_RC -ne 0 ]; then
-    echo "[OpenRewrite] WARNING: failed to download INPUT_TAR from ${INPUT_URL} (curl rc=$CURL_RC)"
+  echo "[OpenRewrite] INPUT_URL download result: rc=${CURL_RC} ${RESP}"
+  if [ $CURL_RC -ne 0 ] || ! echo "$RESP" | grep -q "HTTP_CODE:200"; then
+    echo "[OpenRewrite] WARNING: failed to download INPUT_TAR from ${INPUT_URL}"
   else
     echo "[OpenRewrite] Downloaded INPUT_TAR from ${INPUT_URL}"
     ls -lh "${INPUT_TAR}" || true
@@ -479,83 +480,7 @@ ls -la . | head -10
 echo "[OpenRewrite] Contents of /workspace:"
 ls -la /workspace | head -10
 
-# Always create tar from the project directory where source files are located
-# This ensures we capture all transformed source files, not just moved pom.xml
-echo "[OpenRewrite] Ensuring we're in project directory for tar creation..."
-if [ "$(pwd)" != "/workspace/project" ]; then
-    echo "[OpenRewrite] Current directory is $(pwd), changing to /workspace/project"
-    cd /workspace/project
-fi
-
-# Verify we have source files in the current directory
-if [ -f "./pom.xml" ]; then
-    echo "[OpenRewrite] Found pom.xml in current directory: $(pwd)"
-else
-    echo "[OpenRewrite] WARNING: No pom.xml found in project directory $(pwd)"
-fi
-
-echo "[OpenRewrite] Final location for tar creation: $(pwd)"
-echo "[OpenRewrite] Creating tar archive (excluding Maven cache and build artifacts)..."
-
-# Create tar with all transformed content, excluding only build artifacts
-# Never exclude the project directory as it contains the actual source files
-tar -cf "${OUTPUT_TAR}" --exclude=.m2 --exclude=target --exclude=.gradle --exclude=build . || {
-    echo "[Error] Failed to create output tar"
-    echo "[Error] Exit code: $?"
-    write_error "Failed to create output.tar"
-    exit 1
-}
-
-echo "[OpenRewrite] Output tar created successfully"
-ls -la "${OUTPUT_TAR}"
-
-# Step 6: Upload output to SeaweedFS (if OUTPUT_KEY or OUTPUT_URL is provided)
-if [ -n "${OUTPUT_KEY}" ] || [ -n "${OUTPUT_URL}" ]; then
-    echo "[OpenRewrite] Uploading output to SeaweedFS..."
-    echo "[OpenRewrite] Job ID: ${JOB_ID}"
-    # Prefer full OUTPUT_URL if provided; otherwise construct from SEAWEEDFS_URL + artifacts + OUTPUT_KEY
-    if [ -n "${OUTPUT_URL}" ]; then
-        UPLOAD_URL="${OUTPUT_URL}"
-    else
-        UPLOAD_URL="${SEAWEEDFS_URL}/artifacts/${OUTPUT_KEY}"
-    fi
-    echo "[OpenRewrite] Upload URL: ${UPLOAD_URL}"
-    
-    echo "[OpenRewrite] Attempting to upload $(ls -lh ${OUTPUT_TAR} | awk '{print $5}') file to SeaweedFS..."
-    echo "[OpenRewrite] Testing network connectivity to SeaweedFS..."
-    if ! curl -f -s --connect-timeout 10 "${SEAWEEDFS_URL}/status" >/dev/null; then
-        echo "[OpenRewrite] WARNING: Cannot reach SeaweedFS at ${SEAWEEDFS_URL}"
-    fi
-    
-    echo "[OpenRewrite] Uploading with verbose output..."
-    # Avoid set -e causing premature exit on curl failure; capture status explicitly
-    set +e
-    UPLOAD_RESPONSE=$(curl -X PUT "${UPLOAD_URL}" \
-           --data-binary "@${OUTPUT_TAR}" \
-           -H "Content-Type: application/octet-stream" \
-           --connect-timeout 30 \
-           --max-time 300 \
-           -w "HTTP_CODE:%{http_code} SIZE_UPLOAD:%{size_upload} TIME_TOTAL:%{time_total}" \
-           2>&1)
-    UPLOAD_EXIT_CODE=$?
-    set -e
-    
-    echo "[OpenRewrite] Upload response: ${UPLOAD_RESPONSE}"
-    echo "[OpenRewrite] Upload exit code: ${UPLOAD_EXIT_CODE}"
-    
-    if [ $UPLOAD_EXIT_CODE -eq 0 ] && echo "$UPLOAD_RESPONSE" | grep -q "HTTP_CODE:2[0-9][0-9]"; then
-        echo "[OpenRewrite] Output uploaded successfully to ${UPLOAD_URL}"
-    else
-        echo "[OpenRewrite] ERROR: Failed to upload output to SeaweedFS"
-        echo "[OpenRewrite] Exit code: ${UPLOAD_EXIT_CODE}"
-        echo "[OpenRewrite] Response: ${UPLOAD_RESPONSE}"
-        # Continue anyway - transformation was successful
-    fi
-else
-    echo "[OpenRewrite] No OUTPUT_KEY/OUTPUT_URL provided, skipping upload"
-fi
-
-# Step 7: Generate diff.patch artifact for transflow (always create file)
+# Step 5: Generate diff.patch artifact for transflow (always create file)
 echo "[OpenRewrite] Generating unified diff patch..."
 if /usr/local/bin/generate-diff.sh "$ORIG_SNAPSHOT" "/workspace/project" "${OUTPUT_DIR}/diff.patch"; then
   echo "[OpenRewrite] diff.patch generated at ${OUTPUT_DIR}/diff.patch"
@@ -577,7 +502,6 @@ cat > /workspace/transformation-report.json << EOF
 EOF
 
 echo "[OpenRewrite] Transformation completed successfully"
-echo "[OpenRewrite] Output: ${OUTPUT_TAR}"
 echo "[OpenRewrite] Cache status: $([ "$CACHE_HIT" = true ] && echo "HIT" || echo "MISS")"
 
 # Optional upload of diff.patch to SeaweedFS if DIFF_URL or DIFF_KEY provided (best-effort)

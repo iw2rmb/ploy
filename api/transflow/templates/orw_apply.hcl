@@ -16,7 +16,6 @@ job "${RUN_ID}" {
 
       env = {
         OUTPUT_DIR       = "/workspace/out"
-        INPUT_URL        = "${INPUT_URL}"
         RECIPE           = "${RECIPE_CLASS}"
         DISCOVER_RECIPE  = "${DISCOVER_RECIPE}"
         RECIPE_GROUP     = "${RECIPE_GROUP}"
@@ -24,7 +23,6 @@ job "${RUN_ID}" {
         RECIPE_VERSION   = "${RECIPE_VERSION}"
         CONTROLLER_URL   = "${CONTROLLER_URL}"
         TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
-        OUTPUT_KEY       = "${OUTPUT_KEY}"
         DIFF_KEY         = "${DIFF_KEY}"
       }
 
@@ -34,6 +32,7 @@ job "${RUN_ID}" {
         env         = true
         data        = <<EOH
 SEAWEEDFS_URL=http://{{ with service "seaweedfs-filer" }}{{ (index . 0).Address }}:{{ (index . 0).Port }}{{ end }}
+INPUT_URL=http://{{ with service "seaweedfs-filer" }}{{ (index . 0).Address }}:{{ (index . 0).Port }}{{ end }}/artifacts/${INPUT_KEY}
 EOH
       }
 
