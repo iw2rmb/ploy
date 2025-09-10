@@ -532,29 +532,21 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 			// Predefine diffPath for fallback checks
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
-            // Preflight validate HCL, then submit job and wait terminal
-            r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
-            log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
-            if err := orchestration.ValidateJob(submittedPath); err != nil {
-                r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("HCL validation failed: %v", err))
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW HCL validation failed: %v", err)})
-                result.ErrorMessage = fmt.Sprintf("orw-apply HCL validation failed: %v", err)
-                result.Duration = time.Since(startTime)
-                return nil, fmt.Errorf("orw-apply HCL validation failed: %w", err)
-            }
-            r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
+			// Preflight validate HCL, then submit job and wait terminal
+			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
+			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
+			if err := orchestration.ValidateJob(submittedPath); err != nil {
+				r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("HCL validation failed: %v", err))
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW HCL validation failed: %v", err)})
+				result.ErrorMessage = fmt.Sprintf("orw-apply HCL validation failed: %v", err)
+				result.Duration = time.Since(startTime)
+				return nil, fmt.Errorf("orw-apply HCL validation failed: %w", err)
+			}
+			r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
             if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
-                // Fallback: if wait timed out but diff.patch exists, continue
-                if strings.Contains(err.Error(), "timeout waiting for job") {
-                    if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
-                        log.Printf("[Transflow] Wait timeout, but diff present (size=%d). Proceeding.", fi.Size())
-                    } else {
-                        r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
-                        result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-                        result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-                        result.Duration = time.Since(startTime)
-                        return nil, fmt.Errorf("orw-apply job failed: %w", err)
-                    }
+                // Best-effort: if diff.patch exists, proceed even if job failed (uploads/network can fail)
+                if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
+                    log.Printf("[Transflow] orw-apply wait failed (%v), but diff present (size=%d). Proceeding.", err, fi.Size())
                 } else {
                     r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
                     result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
@@ -563,8 +555,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
                     return nil, fmt.Errorf("orw-apply job failed: %w", err)
                 }
             }
-            // Successful wait implies job completed; emit explicit completion event
-            r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
+			// Successful wait implies job completed; emit explicit completion event
+			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
 
 			// Locate diff.patch and apply
 			if _, err := os.Stat(diffPath); err != nil {
@@ -575,35 +567,35 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("no diff produced by orw-apply: %w", err)
 			}
 
-            if fi, err := os.Stat(diffPath); err == nil {
-                log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
-                r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
-            } else {
-                log.Printf("[Transflow] Diff ready but stat failed: %v", err)
-            }
+			if fi, err := os.Stat(diffPath); err == nil {
+				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
+				r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
+			} else {
+				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
+			}
 
 			// Apply + build with a phase timeout
 			applyTimeout := 10 * time.Minute
 			applyCtx, cancelApply := context.WithTimeout(ctx, applyTimeout)
 			defer cancelApply()
 			log.Printf("[Transflow] Applying diff and running build gate (timeout=%s): repo=%s diff=%s", applyTimeout, repoPath, diffPath)
-            r.emit(ctx, "apply", "diff-apply-started", "info", "Applying diff to repository")
-            r.emit(ctx, "build", "build-gate-start", "info", "Running build gate")
-            if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
-                r.emit(ctx, "build", "build-gate-failed", "error", fmt.Sprintf("apply/build failed: %v", err))
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
-                result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
-                result.Duration = time.Since(startTime)
-                return nil, fmt.Errorf("apply/build failed: %w", err)
-            }
+			r.emit(ctx, "apply", "diff-apply-started", "info", "Applying diff to repository")
+			r.emit(ctx, "build", "build-gate-start", "info", "Running build gate")
+			if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
+				r.emit(ctx, "build", "build-gate-failed", "error", fmt.Sprintf("apply/build failed: %v", err))
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
+				result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
+				result.Duration = time.Since(startTime)
+				return nil, fmt.Errorf("apply/build failed: %w", err)
+			}
 
-            r.emit(ctx, "apply", "diff-applied", "info", "Diff applied and build gate passed")
-            result.StepResults = append(result.StepResults, StepResult{
-                StepID:   step.ID,
-                Success:  true,
-                Message:  "Applied ORW diff and passed build gate",
-                Duration: time.Since(stepStart),
-            })
+			r.emit(ctx, "apply", "diff-applied", "info", "Diff applied and build gate passed")
+			result.StepResults = append(result.StepResults, StepResult{
+				StepID:   step.ID,
+				Success:  true,
+				Message:  "Applied ORW diff and passed build gate",
+				Duration: time.Since(stepStart),
+			})
 
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow
@@ -722,16 +714,16 @@ build_step:
 		}
 	}
 
-    if buildResult != nil {
-        result.BuildVersion = buildResult.Version
-    }
-    r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", result.BuildVersion))
-    result.StepResults = append(result.StepResults, StepResult{
-        StepID:   "build",
-        Success:  true,
-        Message:  "Build completed successfully",
-        Duration: time.Since(buildStart),
-    })
+	if buildResult != nil {
+		result.BuildVersion = buildResult.Version
+	}
+	r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", result.BuildVersion))
+	result.StepResults = append(result.StepResults, StepResult{
+		StepID:   "build",
+		Success:  true,
+		Message:  "Build completed successfully",
+		Duration: time.Since(buildStart),
+	})
 
 	// Step 6: Push branch
 	// Push branch with a phase timeout
