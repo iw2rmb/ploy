@@ -544,25 +544,27 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             }
             r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
             if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
-				// Fallback: if wait timed out but diff.patch exists, continue
-				if strings.Contains(err.Error(), "timeout waiting for job") {
-					if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
-						log.Printf("[Transflow] Wait timeout, but diff present (size=%d). Proceeding.", fi.Size())
-					} else {
-						r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
-						result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-						result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-						result.Duration = time.Since(startTime)
-						return nil, fmt.Errorf("orw-apply job failed: %w", err)
-					}
-				} else {
-					r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
-					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-					result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-					result.Duration = time.Since(startTime)
-					return nil, fmt.Errorf("orw-apply job failed: %w", err)
-				}
-			}
+                // Fallback: if wait timed out but diff.patch exists, continue
+                if strings.Contains(err.Error(), "timeout waiting for job") {
+                    if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
+                        log.Printf("[Transflow] Wait timeout, but diff present (size=%d). Proceeding.", fi.Size())
+                    } else {
+                        r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
+                        result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+                        result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+                        result.Duration = time.Since(startTime)
+                        return nil, fmt.Errorf("orw-apply job failed: %w", err)
+                    }
+                } else {
+                    r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
+                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+                    result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+                    result.Duration = time.Since(startTime)
+                    return nil, fmt.Errorf("orw-apply job failed: %w", err)
+                }
+            }
+            // Successful wait implies job completed; emit explicit completion event
+            r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
 
 			// Locate diff.patch and apply
 			if _, err := os.Stat(diffPath); err != nil {
