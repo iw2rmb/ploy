@@ -529,7 +529,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
             if seaweed == "" { seaweed = "http://seaweedfs-filer.service.consul:8888" }
             inputTar := filepath.Join(baseDir, "input.tar")
-            if err := createTarFromDir(repoPath, inputTar); err == nil {
+            if e := createTarFromDir(repoPath, inputTar); e == nil {
                 // Upload best-effort to artifacts/transflow/<id>/input.tar
                 key := fmt.Sprintf("transflow/%s/input.tar", execID)
                 url := strings.TrimRight(seaweed, "/") + "/artifacts/" + key
@@ -543,7 +543,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
                     return nil
                 }()
             } else {
-                log.Printf("[Transflow] Failed to create input tar: %v", err)
+                log.Printf("[Transflow] Failed to create input tar: %v", e)
             }
 			submittedPath, err := substituteORWTemplate(prePath, runID)
 			if err != nil {
