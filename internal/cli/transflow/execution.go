@@ -266,8 +266,12 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	if seaweedURL == "" {
 		seaweedURL = "http://seaweedfs-filer.service.consul:8888"
 	}
-	// Keys under artifacts/ namespace used by uploader/runner
-	diffKey := "transflow/" + execID + "/diff.patch"
+    // Keys under artifacts/ namespace used by uploader/runner
+    // Allow override via TRANSFLOW_DIFF_KEY for branch-scoped step uploads
+    diffKey := os.Getenv("TRANSFLOW_DIFF_KEY")
+    if diffKey == "" {
+        diffKey = "transflow/" + execID + "/diff.patch"
+    }
 	inputKey := "transflow/" + execID + "/input.tar"
 	inputURL := seaweedURL + "/artifacts/" + inputKey
 	log.Printf("[Transflow] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
