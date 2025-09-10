@@ -350,15 +350,15 @@ func (r *RenderData) SetDefaults() {
 			r.MemoryLimit = 512
 		}
 	}
-    // Default feature flags based on whether this is a platform service
-    isPlat := isPlatformService(*r)
-    // Consul services enabled by default for platform services, disabled for regular apps
-    r.ConsulConfigEnabled = isPlat
-    // Volumes default off for regular apps; may be enabled for platform services
-    r.VolumeEnabled = isPlat
-    // Vault and Connect default off unless explicitly enabled by caller
-    // r.VaultEnabled and r.ConnectEnabled remain false unless set by caller
-    r.DebugEnabled = false
+	// Default feature flags based on whether this is a platform service
+	isPlat := isPlatformService(*r)
+	// Consul services enabled by default for platform services, disabled for regular apps
+	r.ConsulConfigEnabled = isPlat
+	// Volumes default off for regular apps; may be enabled for platform services
+	r.VolumeEnabled = isPlat
+	// Vault and Connect default off unless explicitly enabled by caller
+	// r.VaultEnabled and r.ConnectEnabled remain false unless set by caller
+	r.DebugEnabled = false
 }
 
 func processConditionalBlocks(template string, data RenderData) string {
