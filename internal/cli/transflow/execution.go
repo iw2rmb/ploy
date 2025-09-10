@@ -262,14 +262,18 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	controllerURL := os.Getenv("PLOY_CONTROLLER")
 	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 
-	rendered := strings.NewReplacer(
-		"${RUN_ID}", runID,
-		"${CONTEXT_HOST_DIR}", contextDir,
-		"${OUT_HOST_DIR}", outDir,
-		"${ORW_IMAGE}", orwImage,
-		"${CONTROLLER_URL}", controllerURL,
-		"${EXECUTION_ID}", execID,
-	).Replace(string(content))
+    dc := os.Getenv("NOMAD_DC")
+    if dc == "" { dc = "dc1" }
+
+    rendered := strings.NewReplacer(
+        "${RUN_ID}", runID,
+        "${CONTEXT_HOST_DIR}", contextDir,
+        "${OUT_HOST_DIR}", outDir,
+        "${ORW_IMAGE}", orwImage,
+        "${CONTROLLER_URL}", controllerURL,
+        "${EXECUTION_ID}", execID,
+        "${NOMAD_DC}", dc,
+    ).Replace(string(content))
 
 	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
 		return "", err

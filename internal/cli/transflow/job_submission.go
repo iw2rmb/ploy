@@ -112,8 +112,11 @@ func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPCo
 	controllerURL := os.Getenv("PLOY_CONTROLLER")
 	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 
-	replacer := strings.NewReplacer(
-		"${MODEL}", hclEscape(model),
+    dc := os.Getenv("NOMAD_DC")
+    if dc == "" { dc = "dc1" }
+
+    replacer := strings.NewReplacer(
+        "${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
 		"${LIMITS_JSON}", hclEscape(limitsJSON),
 		"${RUN_ID}", runID,
@@ -129,10 +132,11 @@ func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPCo
 		"${MCP_BUDGETS_JSON}", hclEscape(mcpEnvConfig.MCPBudgetsJSON),
 		"${MCP_PROMPTS_JSON}", hclEscape(mcpEnvConfig.MCPPromptsJSON),
 		"${MCP_TIMEOUT}", hclEscape(mcpEnvConfig.MCPTimeout),
-		"${MCP_SECURITY_MODE}", hclEscape(mcpEnvConfig.MCPSecurityMode),
-		"${CONTROLLER_URL}", hclEscape(controllerURL),
-		"${EXECUTION_ID}", hclEscape(execID),
-	)
+        "${MCP_SECURITY_MODE}", hclEscape(mcpEnvConfig.MCPSecurityMode),
+        "${CONTROLLER_URL}", hclEscape(controllerURL),
+        "${EXECUTION_ID}", hclEscape(execID),
+        "${NOMAD_DC}", hclEscape(dc),
+    )
 	rendered := replacer.Replace(string(hclBytes))
 
 	// Write substituted HCL to a new file

@@ -1,5 +1,5 @@
 job "transflow-llm-exec" {
-  datacenters = ["dc1"]
+  datacenters = ["${NOMAD_DC}"]
   type        = "batch"
 
   group "llm-exec" {
