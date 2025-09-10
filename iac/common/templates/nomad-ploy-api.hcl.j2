@@ -95,7 +95,8 @@ job "ploy-api" {
         SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:8888"
 
         # Prefer direct filer IP for transflow tasks to avoid DNS issues inside job containers
-        PLOY_SEAWEEDFS_URL = "http://localhost:8888"
+        # Use the host's primary IPv4 for Filer port 8888
+        PLOY_SEAWEEDFS_URL = "http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8888"
 
         # ARF (Automated Remediation Framework) configuration
         ARF_STORAGE_BACKEND = "seaweedfs"
