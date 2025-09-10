@@ -528,12 +528,10 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
             seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
             if seaweed == "" { seaweed = "http://seaweedfs-filer.service.consul:8888" }
-            inputTar := filepath.Join(baseDir, "input.tar")
-            if e := createTarFromDir(repoPath, inputTar); e == nil {
-                // Upload best-effort to artifacts/transflow/<id>/input.tar
+            // Upload best-effort to artifacts/transflow/<id>/input.tar
+            {
                 key := fmt.Sprintf("transflow/%s/input.tar", execID)
                 url := strings.TrimRight(seaweed, "/") + "/artifacts/" + key
-                // simple PUT
                 _ = func() error {
                     cmd := exec.Command("curl", "-sS", "-X", "PUT", url, "--data-binary", "@"+inputTar, "-H", "Content-Type: application/octet-stream")
                     if out, err := cmd.CombinedOutput(); err != nil {
@@ -542,8 +540,6 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
                     }
                     return nil
                 }()
-            } else {
-                log.Printf("[Transflow] Failed to create input tar: %v", e)
             }
 			submittedPath, err := substituteORWTemplate(prePath, runID)
 			if err != nil {
