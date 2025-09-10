@@ -10,7 +10,6 @@ job "${RUN_ID}" {
         image = "${ORW_IMAGE}" # pin digest
         force_pull = true
         volumes = [
-          "${CONTEXT_HOST_DIR}:/workspace/context:ro",
           "${OUT_HOST_DIR}:/workspace/out"
         ]
       }
