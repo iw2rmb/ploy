@@ -115,3 +115,62 @@ DEV LOGGING NOTE (keep logs tidy):
   - `/opt/hashicorp/bin/nomad-job-manager.sh stop --job ploy-api && sleep 2 && /opt/hashicorp/bin/nomad-job-manager.sh run --job ploy-api`
   - Or prune specific allocations for transient jobs (planner/reducer/orw-apply) after you’ve captured artifacts. Keep only the latest run’s logs for clarity.
   - Additionally, consider rotating `/var/lib/nomad/alloc` logs or truncating via the job manager’s wrappers if the files get large.
+
+## Latest Findings (2025‑09‑10)
+
+- Fast-fail achieved: Controller now detects terminal apply failures in seconds (wrapper JSON parsing fixed, 90s alloc guard for wrapper path). No more long stalls.
+- SeaweedFS integration:
+  - Filer verified healthy on VPS (HTTP 8888). Host PUT/GET works (201/200).
+  - Job-side SEAWEEDFS_URL injected via Consul service template, removing container DNS dependency.
+  - Controller previously computed `INPUT_URL` using host IP to avoid DNS; we switched to derive `INPUT_URL` inside the job via the same Consul template for consistency.
+- Host bind removed: orw-apply HCL no longer mounts host repo/context. Jobs must consume `INPUT_URL` → `/workspace/input.tar`.
+- HCL persistence: Submitted HCL is saved at `/tmp/transflow-submitted/<exec_id>/<step>/orw_apply.submitted.hcl` for post‑mortem inspection. Verified env includes `INPUT_URL`.
+- Image diagnostics added: openrewrite-jvm now logs `INPUT_URL` and prints download HTTP status (`HTTP_CODE:`) for the input tar path.
+- Current symptom: Despite `INPUT_URL` in persisted HCL, runs still fail at ~4s with setup complaining “No files found to tar”. This implies the runner either didn’t download (`404/connection`), or we’re hitting an early error before extraction.
+
+## Action Plan (Next Session)
+
+1) Rebuild/push image (if not completed):
+   - Playbook: `iac/dev/playbooks/openrewrite-jvm.yml`
+   - Confirms latest runner diagnostics are in use (logs `INPUT_URL` and download HTTP result).
+
+2) Run a new transflow and capture evidence:
+   - Inspect persisted HCL at `/tmp/transflow-submitted/<exec_id>/<step>/orw_apply.submitted.hcl` → confirm `INPUT_URL` and keys.
+   - Tail orw-apply task logs for lines:
+     - `[OpenRewrite]   INPUT_URL: ...`
+     - `INPUT_URL download result: rc=..., HTTP_CODE:...`
+   - If HTTP_CODE=404 → upload missing; if 200 → extraction should proceed.
+
+3) If upload missing (404):
+   - Add/verify controller upload of `input.tar` (curl PUT) logs HTTP code and retries 2–3x with backoff.
+   - Confirm a 201 from Filer after upload in controller logs: “input.tar upload … HTTP_CODE:201”.
+   - Ensure `PLOY_SEAWEEDFS_URL` for controller is reachable (currently set to host IP:8888 via Ansible), or switch controller’s compute to use Consul with a runtime resolve.
+
+4) If download OK (HTTP 200) but still failing early:
+   - Check extraction error section in task logs (we now log tar errors and list `/workspace`): `Failed to extract input tar`.
+   - Validate tar integrity and path (`/workspace/input.tar` exists and non-empty).
+
+5) Success path validation:
+   - Expect: diff.patch generated → controller records artifact (either task upload or persisted copy) → apply+build runs → MR flow continues.
+
+## Debug Commands (Quick Reference)
+
+- Persisted HCL (on VPS):
+  - `ls -dt /tmp/transflow-submitted/* | head -n1`
+  - `awk '/env = {/{flag=1; print; next} /}/{if(flag){print; exit}} flag' /tmp/transflow-submitted/<exec_id>/*/orw_apply.submitted.hcl`
+
+- Task logs (orw-apply):
+  - `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job <orw-job> --format json | jq -r '.[-1].ID'`
+  - `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <alloc> --task openrewrite-apply --both --lines 200`
+
+- Filer checks:
+  - `curl -sI http://<filer-ip>:8888/status`
+  - `curl -sI http://<filer-ip>:8888/artifacts/transflow/<exec_id>/input.tar`
+
+## Acceptance Criteria (closeout)
+
+- Submitted HCL (persisted) shows both `SEAWEEDFS_URL` and `INPUT_URL` injected via Consul template.
+- Task logs show `INPUT_URL` download with HTTP_CODE:200 and successful extraction.
+- No reliance on host bind mounts for context; all inputs supplied via `INPUT_URL`.
+- Controller persists artifacts (`diff_patch`, `plan_json`, `next_json`) and errors when present.
+- End-to-end: apply → build gate → MR creation or healing branch execution proceeds without stalls.

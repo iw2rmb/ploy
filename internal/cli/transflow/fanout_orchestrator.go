@@ -465,19 +465,19 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 	timeout := 30 * time.Minute
-    if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
-        // Best-effort: continue if diff exists even on failure
-        diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
-        if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
-            // proceed
-        } else {
-            result.Status = "failed"
-            result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
-            result.FinishedAt = time.Now()
-            result.Duration = time.Since(result.StartedAt)
-            return result
-        }
-    }
+	if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
+		// Best-effort: continue if diff exists even on failure
+		diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
+		if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
+			// proceed
+		} else {
+			result.Status = "failed"
+			result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
+			result.FinishedAt = time.Now()
+			result.Duration = time.Since(result.StartedAt)
+			return result
+		}
+	}
 
 	// Step 5: Check for generated diff.patch artifact
 	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
