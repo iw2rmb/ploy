@@ -437,8 +437,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			artifacts["next_json"] = key
 		}
 	}
-	// ORW diff.patch (search first match)
-	// orw-apply/<option>/out/diff.patch
+	// ORW diff.patch
+	// Prefer task-side upload key when present; also support legacy presence on local FS (pre-mount design)
 	orwDir := filepath.Join(tempDir, "orw-apply")
 	_ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil || info.IsDir() {
@@ -481,6 +481,16 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 		}
 		return nil
 	})
+	// If no local diff found or persisted above, check storage proactively for known keys (SeaweedFS-only IO path)
+	if _, ok := artifacts["diff_patch"]; !ok {
+		keyPrimary := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
+		keyAlt := fmt.Sprintf("transflow/%s/diff.patch", executionID)
+		if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
+			artifacts["diff_patch"] = keyPrimary
+		} else if ok2, _ := h.storage.Exists(ctx, keyAlt); ok2 {
+			artifacts["diff_patch"] = keyAlt
+		}
+	}
 	return artifacts, nil
 }
 
