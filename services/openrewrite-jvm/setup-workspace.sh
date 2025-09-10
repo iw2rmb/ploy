@@ -99,11 +99,11 @@ if [ -d "$BUILD_DIR" ]; then
   cp -r "$BUILD_DIR"/* "${WORKSPACE_DIR}/project/" 2>/dev/null || true
 fi
 
-# Create input.tar for OpenRewrite runner
-echo "[SETUP] Creating input.tar for OpenRewrite runner..."
+echo "[SETUP] Preparing input for OpenRewrite runner..."
 cd "${WORKSPACE_DIR}/project"
 FILE_COUNT=$(find . -type f | wc -l)
 if [ "$FILE_COUNT" -gt 0 ]; then
+  echo "[SETUP] Creating input.tar from local project files..."
   tar -cf "${WORKSPACE_DIR}/input.tar" . 2>/dev/null || {
     echo "[SETUP] Failed to create input.tar"
     exit 1
@@ -111,8 +111,12 @@ if [ "$FILE_COUNT" -gt 0 ]; then
   echo "[SETUP] Created input.tar successfully"
   ls -la "${WORKSPACE_DIR}/input.tar"
 else
-  echo "[SETUP] ERROR: No files found to tar in /workspace/project"
-  exit 1
+  if [ -n "${INPUT_URL:-}" ]; then
+    echo "[SETUP] No local files found; INPUT_URL is provided. Skipping local tar creation and deferring download to runner."
+  else
+    echo "[SETUP] ERROR: No files found to tar in /workspace/project and no INPUT_URL provided"
+    exit 1
+  fi
 fi
 
 # Verify workspace contents
