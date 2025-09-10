@@ -259,15 +259,17 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	}
 
 	// Controller and execution ID for in-job event push
-	controllerURL := os.Getenv("PLOY_CONTROLLER")
-	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-	seaweedURL := os.Getenv("PLOY_SEAWEEDFS_URL")
-	if seaweedURL == "" {
-		seaweedURL = "http://seaweedfs-filer.service.consul:8888"
-	}
-	// Keys under artifacts/ namespace will be composed by the uploader
-	outputKey := "transflow/" + execID + "/output.tar"
-	diffKey := "transflow/" + execID + "/diff.patch"
+    controllerURL := os.Getenv("PLOY_CONTROLLER")
+    execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+    seaweedURL := os.Getenv("PLOY_SEAWEEDFS_URL")
+    if seaweedURL == "" {
+        seaweedURL = "http://seaweedfs-filer.service.consul:8888"
+    }
+    // Keys under artifacts/ namespace will be composed by the uploader
+    outputKey := "transflow/" + execID + "/output.tar"
+    diffKey := "transflow/" + execID + "/diff.patch"
+    inputKey := "transflow/" + execID + "/input.tar"
+    inputURL := seaweedURL + "/artifacts/" + inputKey
 
 	dc := os.Getenv("NOMAD_DC")
 	if dc == "" {
@@ -282,10 +284,12 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 		"${CONTROLLER_URL}", controllerURL,
 		"${EXECUTION_ID}", execID,
 		"${SEAWEEDFS_URL}", seaweedURL,
-		"${OUTPUT_KEY}", outputKey,
-		"${DIFF_KEY}", diffKey,
-		"${NOMAD_DC}", dc,
-	).Replace(string(content))
+        "${OUTPUT_KEY}", outputKey,
+        "${DIFF_KEY}", diffKey,
+        "${INPUT_KEY}", inputKey,
+        "${INPUT_URL}", inputURL,
+        "${NOMAD_DC}", dc,
+    ).Replace(string(content))
 
 	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
 		return "", err
