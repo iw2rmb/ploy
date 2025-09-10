@@ -500,8 +500,18 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("no diff produced by orw-apply: %w", err)
 			}
 
-			log.Printf("[Transflow] Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath)
-			if err := r.ApplyDiffAndBuild(ctx, repoPath, diffPath); err != nil {
+			if fi, err := os.Stat(diffPath); err == nil {
+				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
+			} else {
+				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
+			}
+
+			// Apply + build with a phase timeout
+			applyTimeout := 10 * time.Minute
+			applyCtx, cancelApply := context.WithTimeout(ctx, applyTimeout)
+			defer cancelApply()
+			log.Printf("[Transflow] Applying diff and running build gate (timeout=%s): repo=%s diff=%s", applyTimeout, repoPath, diffPath)
+			if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
 				result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
 				result.Duration = time.Since(startTime)
@@ -639,8 +649,12 @@ build_step:
 	})
 
 	// Step 6: Push branch
-	log.Printf("[Transflow] Pushing branch: repo=%s branch=%s", r.config.TargetRepo, branchName)
-	if err := r.gitOps.PushBranch(ctx, repoPath, r.config.TargetRepo, branchName); err != nil {
+	// Push branch with a phase timeout
+	pushTimeout := 3 * time.Minute
+	pushCtx, cancelPush := context.WithTimeout(ctx, pushTimeout)
+	defer cancelPush()
+	log.Printf("[Transflow] Pushing branch (timeout=%s): repo=%s branch=%s", pushTimeout, r.config.TargetRepo, branchName)
+	if err := r.gitOps.PushBranch(pushCtx, repoPath, r.config.TargetRepo, branchName); err != nil {
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "push",
 			Success: false,
@@ -677,8 +691,12 @@ build_step:
 				Labels:       []string{"ploy", "tfl"},
 			}
 
-			log.Printf("[Transflow] Creating/updating MR: source=%s target=%s", mrConfig.SourceBranch, mrConfig.TargetBranch)
-			mrResult, err := r.gitProvider.CreateOrUpdateMR(ctx, mrConfig)
+			// Create MR with a phase timeout
+			mrTimeout := 3 * time.Minute
+			mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
+			defer cancelMR()
+			log.Printf("[Transflow] Creating/updating MR (timeout=%s): source=%s target=%s", mrTimeout, mrConfig.SourceBranch, mrConfig.TargetBranch)
+			mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
 			if err != nil {
 				// MR creation is optional - log but don't fail the workflow
 				result.StepResults = append(result.StepResults, StepResult{
