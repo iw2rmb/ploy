@@ -6,16 +6,37 @@
 - API embeds all Transflow HCL templates and writes them to a per-run temp workspace:
   - `api/transflow/templates/{planner.hcl,llm_exec.hcl,orw_apply.hcl,reducer.hcl}`
   - Runner reads templates relative to its `workspaceDir`.
-- orw-apply container setup stabilized:
-  - Mount cloned repo as context; container creates `/workspace/input.tar` internally.
-  - Fixed undefined `register_recipe_metadata` (defined early + guarded) to prevent exit 127.
-  - Runner writes `/workspace/out/error.log` on failures; controller persists and includes snippet in status.
+- orw-apply I/O stabilized (SeaweedFS-only, Consul DNS):
+  - Container always downloads `input.tar` from SeaweedFS via `INPUT_URL` (Consul DNS: `seaweedfs-filer.service.consul`).
+  - Container uploads `diff.patch` to SeaweedFS via `DIFF_KEY`.
+  - Runner writes `/workspace/out/error.log` on failures; controller persists and includes a snippet in status.
 - Status reliability improved:
   - Added top-level execution timeout (default 45m, `PLOY_TRANSFLOW_EXEC_TIMEOUT`) and panic guard.
   - `/v1/transflow/status/:id` enriched with `duration` and `overdue` (default overdue if >30m, configurable via `PLOY_TRANSFLOW_OVERDUE`).
 - We cancelled stale executions as needed; older failures remain for history.
 
-Bottom line: orw-apply reliably produces `diff.patch`; remaining visibility gaps after orw-apply are addressed in the plan below.
+Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build gate fetch artifacts directly from SeaweedFS.
+
+### Java 17 Migration (OpenRewrite)
+
+- Working combo (validated manually and in pipeline):
+  - Plugin: `org.openrewrite.maven:rewrite-maven-plugin:6.19.0`
+  - Pack: `org.openrewrite.recipe:rewrite-migrate-java:2.26.0`
+  - Recipe: `org.openrewrite.java.migrate.UpgradeToJava17`
+- These are pinned in the orw-apply image and defaults.
+
+## Diffs Strategy (Space‑Efficient Chain)
+
+- Each successful step gets a `step_id` like `s-<random>` and persists immutable artifacts:
+  - `artifacts/transflow/<exec_id>/branches/<branch_id>/steps/<step_id>/diff.patch`
+  - `artifacts/transflow/<exec_id>/branches/<branch_id>/steps/<step_id>/meta.json` (contains `prev_step_id`, `branch_id`, `diff_key`, `ts`)
+  - `artifacts/transflow/<exec_id>/branches/<branch_id>/HEAD.json` → `{ "step_id": "..." }`
+  - orw-apply uploads `diff.patch` directly under the branch/step path via `DIFF_KEY`; controller reuses the same `step_id` and no longer re-uploads the diff (only writes `meta.json` and updates `HEAD.json`).
+- Original baseline `input.tar` remains immutable at `artifacts/transflow/<exec_id>/input.tar`.
+- Build gate (chain mode):
+  - Always fetches artifacts from SeaweedFS; reconstructs branch state by walking HEAD→root via meta.json and applying all diffs in order, then runs compile gate.
+  - For sequential scope, runner applies current step’s diff and records chain metadata (ready for multi‑step flows like llm‑exec).
+- `next_json` includes optional `step_id` to carry forward chain context.
 
 ## Current Signals / Observations (latest)
 
