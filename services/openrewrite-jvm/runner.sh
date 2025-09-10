@@ -337,6 +337,8 @@ if [ -f "pom.xml" ]; then
             write_error "OpenRewrite transformation failed"
             exit 1
         fi
+        # Persist transform.log for diagnostics
+        cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
         
         echo "[OpenRewrite] Transformation completed successfully"
 else
@@ -530,6 +532,20 @@ if [ -n "${DIFF_URL}" ] || { [ -n "${SEAWEEDFS_URL}" ] && [ -n "${DIFF_KEY}" ]; 
          2>&1) || true
   echo "[OpenRewrite] diff.patch upload response: ${UPLOAD_RESPONSE}"
   set -e
+  # Also upload transform.log alongside diff for debugging
+  if [ -s "${OUTPUT_DIR}/transform.log" ]; then
+    LOG_URL="${TARGET_URL%/diff.patch}/transform.log"
+    echo "[OpenRewrite] Uploading transform.log to $LOG_URL"
+    set +e
+    curl -X PUT "$LOG_URL" \
+         --data-binary "@${OUTPUT_DIR}/transform.log" \
+         -H "Content-Type: text/plain" \
+         --connect-timeout 30 \
+         --max-time 300 \
+         -w "HTTP_CODE:%{http_code} SIZE_UPLOAD:%{size_upload} TIME_TOTAL:%{time_total}" \
+         -s 2>&1 | sed -n '1,2p'
+    set -e
+  fi
 fi
 
 # Function to register recipe metadata with Ploy API
