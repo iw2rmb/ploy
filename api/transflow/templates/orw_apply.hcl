@@ -9,9 +9,6 @@ job "${RUN_ID}" {
       config {
         image = "${ORW_IMAGE}" # pin digest
         force_pull = true
-        volumes = [
-          "${OUT_HOST_DIR}:/workspace/out"
-        ]
       }
 
       env = {

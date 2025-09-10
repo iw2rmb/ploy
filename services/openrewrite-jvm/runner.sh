@@ -320,7 +320,7 @@ if [ -f "pom.xml" ]; then
         echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
         echo "[OpenRewrite] Recipe coordinates: ${RECIPE_COORDS}"
         
-    mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
+    mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
@@ -342,7 +342,7 @@ else
         
         # First, try to discover available recipes
         echo "[OpenRewrite] Step 1: Discovering available recipes..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:discover 2>&1 | tee /tmp/discover.log || {
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:discover 2>&1 | tee /tmp/discover.log || {
             echo "[Error] Recipe discovery failed"
             echo "[Error] Discovery output:"
             cat /tmp/discover.log
@@ -350,7 +350,7 @@ else
         
         # Now run the transformation
         echo "[OpenRewrite] Step 2: Running transformation..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \
@@ -371,7 +371,7 @@ else
                         echo "[Resolver] Trying pack: ${COORDS}"
                         mvn -B dependency:get -DgroupId=org.openrewrite.recipe -DartifactId="${ART}" -Dversion="${RESOLVE_VERSION}" -Dtransitive=true || true
                         echo "[Resolver] Re-running transformation with coordinates: ${COORDS}"
-                        if mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.17.0:run \
+                        if mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:run \
                             -Drewrite.recipe="${RECIPE_CLASS}" \
                             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
                             -Drewrite.recipeArtifactCoordinates="${COORDS}" \

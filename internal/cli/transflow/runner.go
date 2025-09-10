@@ -493,10 +493,10 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Determine coords and discovery flag
 			discover := "true"
 			rgroup, rartifact, rversion := "", "", ""
-			if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
-				rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "2.11.0"
-				discover = "false"
-			} else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
+            if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
+                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "2.26.0"
+                discover = "false"
+            } else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
 				rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-spring", "5.7.0"
 				discover = "false"
 			} else if strings.HasPrefix(rclass, "org.openrewrite.java") {
@@ -521,8 +521,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Prepare env and substitute final template
 			baseDir := filepath.Dir(renderedPath)
 			_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-            // Keep outputs under the step workspace for artifact collection
-            os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+			// Keep outputs under the step workspace for artifact collection
+			os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
 			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
@@ -612,6 +612,15 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if fi, err := os.Stat(diffPath); err == nil {
 				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
 				r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
+				if fi.Size() == 0 {
+					// Treat empty diff as no-op: skip apply/build and continue pipeline
+					msg := "No changes produced by orw-apply; skipping apply/build"
+					log.Printf("[Transflow] %s", msg)
+					r.emit(ctx, "apply", "diff-empty", "info", msg)
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: true, Message: msg, Duration: time.Since(stepStart)})
+					// Continue with next steps
+					continue
+				}
 			} else {
 				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
 			}
