@@ -763,10 +763,11 @@ func (h *Handler) StreamLogs(c *fiber.Ctx) error {
 	if id == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "missing_id", "message": "Execution ID is required"}})
 	}
-	// Set SSE headers
-	c.Set("Content-Type", "text/event-stream")
-	c.Set("Cache-Control", "no-cache")
-	c.Set("Connection", "keep-alive")
+    // Set SSE headers
+    c.Set("Content-Type", "text/event-stream")
+    c.Set("Cache-Control", "no-cache")
+    c.Set("Connection", "keep-alive")
+    c.Set("X-Accel-Buffering", "no")
 
 	follow := strings.ToLower(c.Query("follow", "true")) != "false"
 	interval := 2 * time.Second
