@@ -48,13 +48,16 @@ job "{{APP_NAME}}-lane-c" {
       {{/if}}
     }
     
-    # Persistent volume for Node.js application data
+    {{#if VOLUME_ENABLED}}
+    # Persistent volume for Node.js application data (platform services only)
     volume "node-data" {
       type      = "host"
       source    = "node-data"
       read_only = false
     }
+    {{/if}}
     
+    {{#if CONNECT_ENABLED}}
     # Consul service mesh integration
     service {
       name = "{{APP_NAME}}-connect"
@@ -85,15 +88,18 @@ job "{{APP_NAME}}-lane-c" {
         runtime = "osv-node"
       }
     }
+    {{/if}}
     
     task "osv-node" {
       driver = "qemu"
       
+      {{#if VAULT_ENABLED}}
       # Vault integration for Node.js applications
       vault {
         policies = ["{{APP_NAME}}-policy"]
         change_mode = "restart"
       }
+      {{/if}}
       
       config {
         image_path = "{{IMAGE_PATH}}"
@@ -110,11 +116,13 @@ job "{{APP_NAME}}-lane-c" {
         cpu = "host"
       }
       
+      {{#if VOLUME_ENABLED}}
       # Volume mounting for Node.js data
       volume_mount {
         volume      = "node-data"
         destination = "/app/data"
       }
+      {{/if}}
       
       # Comprehensive environment variables for Node.js
       env {
@@ -202,6 +210,7 @@ EOF
         perms       = "0600"
       }
       
+      {{#if CONSUL_CONFIG_ENABLED}}
       # Enhanced service registration
       service {
         name = "{{APP_NAME}}-lane-c-osv"
@@ -270,6 +279,7 @@ EOF
           timeout  = "5s"
         }
       }
+      {{/if}}
       
       # Node.js-optimized resources
       resources { 
@@ -296,6 +306,7 @@ EOF
       kill_signal = "SIGTERM"
     }
     
+    {{#if CONNECT_ENABLED}}
     # Consul Connect sidecar for service mesh
     task "connect-proxy" {
       driver = "docker"
@@ -324,6 +335,7 @@ EOF
         max_file_size = 25
       }
     }
+    {{/if}}
     
     # Node.js-optimized migration
     migrate {
