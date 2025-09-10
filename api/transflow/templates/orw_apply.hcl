@@ -23,13 +23,13 @@ job "${RUN_ID}" {
         DIFF_KEY         = "${DIFF_KEY}"
       }
 
-      # Resolve SeaweedFS Filer address dynamically via Consul and inject as ENV
+      # Inject SeaweedFS Filer via Consul DNS (avoid host IPs)
       template {
         destination = "local/seaweed.env"
         env         = true
         data        = <<EOH
-SEAWEEDFS_URL=http://{{ with service "seaweedfs-filer" }}{{ (index . 0).Address }}:{{ (index . 0).Port }}{{ end }}
-INPUT_URL=http://{{ with service "seaweedfs-filer" }}{{ (index . 0).Address }}:{{ (index . 0).Port }}{{ end }}/artifacts/${INPUT_KEY}
+SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
+INPUT_URL=http://seaweedfs-filer.service.consul:8888/artifacts/${INPUT_KEY}
 EOH
       }
 
