@@ -1,5 +1,5 @@
 job "${RUN_ID}" {
-  datacenters = ["dc1"]
+  datacenters = ["${NOMAD_DC}"]
   type        = "batch"
 
   group "orw" {
