@@ -561,23 +561,28 @@ echo "[OpenRewrite] Transformation completed successfully"
 echo "[OpenRewrite] Output: ${OUTPUT_TAR}"
 echo "[OpenRewrite] Cache status: $([ "$CACHE_HIT" = true ] && echo "HIT" || echo "MISS")"
 
-# Optional upload of diff.patch to SeaweedFS if DIFF_URL or DIFF_KEY provided
+# Optional upload of diff.patch to SeaweedFS if DIFF_URL or DIFF_KEY provided (best-effort)
 if [ -n "${DIFF_URL}" ] || { [ -n "${SEAWEEDFS_URL}" ] && [ -n "${DIFF_KEY}" ]; }; then
   TARGET_URL="${DIFF_URL}"
   if [ -z "$TARGET_URL" ]; then
-    TARGET_URL="${SEAWEEDFS_URL%/}/artifacts/${DIFF_KEY}"
+    # Compose URL; avoid double /artifacts/
+    KEY_PATH="${DIFF_KEY}"
+    case "$KEY_PATH" in
+      artifacts/*) TARGET_URL="${SEAWEEDFS_URL%/}/${KEY_PATH}" ;;
+      *)           TARGET_URL="${SEAWEEDFS_URL%/}/artifacts/${KEY_PATH}" ;;
+    esac
   fi
   echo "[OpenRewrite] Uploading diff.patch to $TARGET_URL"
+  set +e
   UPLOAD_RESPONSE=$(curl -X PUT "$TARGET_URL" \
          --data-binary "@${OUTPUT_DIR}/diff.patch" \
          -H "Content-Type: text/plain" \
          --connect-timeout 30 \
          --max-time 300 \
          -w "HTTP_CODE:%{http_code} SIZE_UPLOAD:%{size_upload} TIME_TOTAL:%{time_total}" \
-         2>&1)
-  UPLOAD_EXIT_CODE=$?
+         2>&1) || true
   echo "[OpenRewrite] diff.patch upload response: ${UPLOAD_RESPONSE}"
-  echo "[OpenRewrite] diff.patch upload exit code: ${UPLOAD_EXIT_CODE}"
+  set -e
 fi
 
 # Function to register recipe metadata with Ploy API
