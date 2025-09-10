@@ -547,6 +547,17 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("failed to substitute ORW HCL: %w", err)
 			}
 
+			// Persist a copy of the submitted HCL for post-mortem inspection
+			if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+				persistDir := filepath.Join("/tmp/transflow-submitted", execID, step.ID)
+				_ = os.MkdirAll(persistDir, 0755)
+				dest := filepath.Join(persistDir, "orw_apply.submitted.hcl")
+				if b, e := os.ReadFile(submittedPath); e == nil {
+					_ = os.WriteFile(dest, b, 0644)
+					log.Printf("[Transflow] Saved submitted HCL to %s", dest)
+				}
+			}
+
 			// Debug: log env block from submitted HCL for verification (INPUT_URL, SEAWEEDFS_URL, etc.)
 			if b, e := os.ReadFile(submittedPath); e == nil {
 				s := string(b)
