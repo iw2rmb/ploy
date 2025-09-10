@@ -24,6 +24,9 @@ job "${RUN_ID}" {
         RECIPE_VERSION   = "${RECIPE_VERSION}"
         CONTROLLER_URL   = "${CONTROLLER_URL}"
         TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
+        SEAWEEDFS_URL    = "${SEAWEEDFS_URL}"
+        OUTPUT_KEY       = "${OUTPUT_KEY}"
+        DIFF_KEY         = "${DIFF_KEY}"
       }
 
       resources {

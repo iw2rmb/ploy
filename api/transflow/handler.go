@@ -298,6 +298,10 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	// Expose controller and execution ID to job templates for in-job event pushes
 	_ = os.Setenv("PLOY_CONTROLLER", controllerURL)
 	_ = os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", executionID)
+    // Expose SeaweedFS URL default for task-side uploads
+    if os.Getenv("PLOY_SEAWEEDFS_URL") == "" {
+        _ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
+    }
 
 	// Execute the workflow with timeout awareness; ensure terminal status on any error
 	var (
@@ -433,7 +437,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			artifacts["next_json"] = key
 		}
 	}
-	// ORW diff.patch (search first match)
+    // ORW diff.patch (search first match)
 	// orw-apply/<option>/out/diff.patch
 	orwDir := filepath.Join(tempDir, "orw-apply")
 	_ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
@@ -441,27 +445,36 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			return nil
 		}
 		if filepath.Base(path) == "diff.patch" {
-			key := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
-			f, _ := os.Open(path)
-			defer f.Close()
-			// Read once for content-type neutrality
-			var buf []byte
-			buf, _ = io.ReadAll(f)
-			_ = f.Close()
-			if err := h.storage.Put(ctx, key, io.NopCloser(bytes.NewReader(buf))); err == nil {
-				artifacts["diff_patch"] = key
-			}
-			return nil
-		}
-		if filepath.Base(path) == "error.log" {
-			key := fmt.Sprintf("artifacts/transflow/%s/error.log", executionID)
-			f, _ := os.Open(path)
-			defer f.Close()
-			if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("text/plain")); err == nil {
-				artifacts["error_log"] = key
-			}
-			return nil
-		}
+            key := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
+            // If already present (task-side upload), record and skip
+            if ok, _ := h.storage.Exists(ctx, key); ok {
+                artifacts["diff_patch"] = key
+            } else {
+                f, _ := os.Open(path)
+                defer f.Close()
+                // Read once for content-type neutrality
+                var buf []byte
+                buf, _ = io.ReadAll(f)
+                _ = f.Close()
+                if err := h.storage.Put(ctx, key, io.NopCloser(bytes.NewReader(buf))); err == nil {
+                    artifacts["diff_patch"] = key
+                }
+            }
+            return nil
+        }
+        if filepath.Base(path) == "error.log" {
+            key := fmt.Sprintf("artifacts/transflow/%s/error.log", executionID)
+            if ok, _ := h.storage.Exists(ctx, key); ok {
+                artifacts["error_log"] = key
+            } else {
+                f, _ := os.Open(path)
+                defer f.Close()
+                if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("text/plain")); err == nil {
+                    artifacts["error_log"] = key
+                }
+            }
+            return nil
+        }
 		return nil
 	})
 	return artifacts, nil
