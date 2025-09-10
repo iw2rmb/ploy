@@ -3,6 +3,7 @@ package transflow
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -482,12 +483,13 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 
 			// Submit job and wait terminal
-            if err := submitAndWaitTerminal(submittedPath, 30*time.Minute); err != nil {
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-                result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-                result.Duration = time.Since(startTime)
-                return nil, fmt.Errorf("orw-apply job failed: %w", err)
-            }
+			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
+			if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+				result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+				result.Duration = time.Since(startTime)
+				return nil, fmt.Errorf("orw-apply job failed: %w", err)
+			}
 
 			// Locate diff.patch and apply
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
@@ -498,6 +500,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("no diff produced by orw-apply: %w", err)
 			}
 
+			log.Printf("[Transflow] Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath)
 			if err := r.ApplyDiffAndBuild(ctx, repoPath, diffPath); err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
 				result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
@@ -636,6 +639,7 @@ build_step:
 	})
 
 	// Step 6: Push branch
+	log.Printf("[Transflow] Pushing branch: repo=%s branch=%s", r.config.TargetRepo, branchName)
 	if err := r.gitOps.PushBranch(ctx, repoPath, r.config.TargetRepo, branchName); err != nil {
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "push",
@@ -673,6 +677,7 @@ build_step:
 				Labels:       []string{"ploy", "tfl"},
 			}
 
+			log.Printf("[Transflow] Creating/updating MR: source=%s target=%s", mrConfig.SourceBranch, mrConfig.TargetBranch)
 			mrResult, err := r.gitProvider.CreateOrUpdateMR(ctx, mrConfig)
 			if err != nil {
 				// MR creation is optional - log but don't fail the workflow
