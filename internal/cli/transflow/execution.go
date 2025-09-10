@@ -270,6 +270,7 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
     diffKey := "transflow/" + execID + "/diff.patch"
     inputKey := "transflow/" + execID + "/input.tar"
     inputURL := seaweedURL + "/artifacts/" + inputKey
+    log.Printf("[Transflow] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
 
 	dc := os.Getenv("NOMAD_DC")
 	if dc == "" {
