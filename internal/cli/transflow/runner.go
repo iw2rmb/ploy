@@ -481,18 +481,30 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
 				return nil, fmt.Errorf("failed to substitute ORW HCL: %w", err)
 			}
-
+			// Predefine diffPath for fallback checks
+			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			// Submit job and wait terminal
 			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
 			if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-				result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("orw-apply job failed: %w", err)
+				// Fallback: if wait timed out but diff.patch exists, continue
+				if strings.Contains(err.Error(), "timeout waiting for job") {
+					if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
+						log.Printf("[Transflow] Wait timeout, but diff present (size=%d). Proceeding.", fi.Size())
+					} else {
+						result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+						result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+						result.Duration = time.Since(startTime)
+						return nil, fmt.Errorf("orw-apply job failed: %w", err)
+					}
+				} else {
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
+					result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
+					result.Duration = time.Since(startTime)
+					return nil, fmt.Errorf("orw-apply job failed: %w", err)
+				}
 			}
 
 			// Locate diff.patch and apply
-			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			if _, err := os.Stat(diffPath); err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("No diff.patch produced: %v", err)})
 				result.ErrorMessage = "no diff produced by orw-apply"
