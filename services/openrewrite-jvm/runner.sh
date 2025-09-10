@@ -2,7 +2,8 @@
 # OpenRewrite Runner with SeaweedFS Maven Repository Caching
 # This script manages recipe downloads and caching to avoid repeated Maven Central hits
 
-set -ex  # Enable verbose output for debugging
+set -euo pipefail
+set -x  # Enable verbose output for debugging
 
 # --- Event push helpers (best-effort) ---
 post_event() {
@@ -325,14 +326,17 @@ if [ -f "pom.xml" ]; then
             -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \
-            -X 2>&1 | tee /tmp/transform.log || {
-                echo "[Error] OpenRewrite transformation failed"
-                echo "[Error] Exit code: $?"
-                echo "[Error] Last 100 lines of output:"
-                tail -100 /tmp/transform.log
-                write_error "OpenRewrite transformation failed"
-                exit 1
-            }
+            -X 2>&1 | tee /tmp/transform.log
+        # If mvn failed in the pipeline above, detect and exit (pipefail set covers this, but also double-check)
+        status=${PIPESTATUS[0]}
+        if [ "$status" -ne 0 ]; then
+            echo "[Error] OpenRewrite transformation failed"
+            echo "[Error] Exit code: $?"
+            echo "[Error] Last 100 lines of output:"
+            tail -100 /tmp/transform.log
+            write_error "OpenRewrite transformation failed"
+            exit 1
+        fi
         
         echo "[OpenRewrite] Transformation completed successfully"
 else
