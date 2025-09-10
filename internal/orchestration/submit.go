@@ -68,6 +68,12 @@ func extractJobName(hclPath string) (string, error) {
 type AllocationStatusLite struct {
 	ID           string `json:"ID"`
 	ClientStatus string `json:"ClientStatus"`
+	TaskStates   map[string]struct {
+		Events []struct {
+			Type    string            `json:"Type"`
+			Details map[string]string `json:"Details"`
+		} `json:"Events"`
+	} `json:"TaskStates"`
 }
 
 // Submit HCL using the job manager wrapper
@@ -105,6 +111,21 @@ func waitTerminalWithJobManager(jobName string, timeout time.Duration) error {
 			// Terminal if any alloc failed or any alloc completed
 			sawRunningOrPending := false
 			for _, a := range allocs {
+				// Prefer explicit terminated event exit codes when available
+				for _, ts := range a.TaskStates {
+					// Scan events from latest to earliest
+					for i := len(ts.Events) - 1; i >= 0; i-- {
+						ev := ts.Events[i]
+						if strings.EqualFold(ev.Type, "Terminated") {
+							if code, ok := ev.Details["exit_code"]; ok {
+								if code == "0" {
+									return nil
+								}
+								return fmt.Errorf("job %s allocation failed (exit %s)", jobName, code)
+							}
+						}
+					}
+				}
 				switch strings.ToLower(a.ClientStatus) {
 				case "failed":
 					return fmt.Errorf("job %s allocation failed (%s)", jobName, a.ID)
