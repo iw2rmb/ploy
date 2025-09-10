@@ -139,6 +139,7 @@ type TransflowRunner struct {
 	buildChecker   BuildCheckerInterface
 	jobSubmitter   interface{}          // For healing workflows
 	gitProvider    provider.GitProvider // For MR creation
+	eventReporter  EventReporter        // Optional real-time event reporter
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -176,6 +177,50 @@ func (r *TransflowRunner) SetJobSubmitter(submitter interface{}) {
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
 func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
 	r.gitProvider = provider
+}
+
+// SetEventReporter sets the reporter used for real-time observability
+func (r *TransflowRunner) SetEventReporter(reporter EventReporter) {
+	r.eventReporter = reporter
+}
+
+func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
+	if r.eventReporter == nil {
+		return
+	}
+	_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
+}
+
+// GetEventReporter exposes the reporter for orchestrators
+func (r *TransflowRunner) GetEventReporter() EventReporter {
+	return r.eventReporter
+}
+
+// reportLastJobAsync looks up allocation ID and reports job metadata once available
+func (r *TransflowRunner) reportLastJobAsync(ctx context.Context, jobName, phase, step string) {
+	if r.eventReporter == nil || jobName == "" {
+		return
+	}
+	go func() {
+		// brief delay to allow registration
+		select {
+		case <-time.After(1 * time.Second):
+		case <-ctx.Done():
+			return
+		}
+		deadline := time.Now().Add(1 * time.Minute)
+		for time.Now().Before(deadline) {
+			if id := findFirstAllocID(jobName); id != "" {
+				_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: "info", Message: "job submitted", JobName: jobName, AllocID: id, Time: time.Now()})
+				return
+			}
+			select {
+			case <-time.After(1 * time.Second):
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 // GetGitProvider returns the Git provider for human-step branch operations
@@ -381,8 +426,10 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	}
 
 	// Step 1: Clone repository
+	r.emit(ctx, "clone", "clone", "info", "Cloning repository")
 	repoPath := filepath.Join(r.workspaceDir, "repo")
 	if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+		r.emit(ctx, "clone", "clone", "error", fmt.Sprintf("clone failed: %v", err))
 		result.ErrorMessage = fmt.Sprintf("failed to clone repository: %v", err)
 		result.Duration = time.Since(startTime)
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
@@ -394,9 +441,11 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	})
 
 	// Step 2: Create and checkout workflow branch
+	r.emit(ctx, "branch", "create-branch", "info", "Creating workflow branch")
 	branchName := GenerateBranchName(r.config.ID)
 	result.BranchName = branchName
 	if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
+		r.emit(ctx, "branch", "create-branch", "error", fmt.Sprintf("branch failed: %v", err))
 		result.ErrorMessage = fmt.Sprintf("failed to create branch: %v", err)
 		result.Duration = time.Since(startTime)
 		return nil, fmt.Errorf("failed to create branch: %w", err)
@@ -484,19 +533,23 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Predefine diffPath for fallback checks
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			// Submit job and wait terminal
+			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
 			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
+			r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
 			if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
 				// Fallback: if wait timed out but diff.patch exists, continue
 				if strings.Contains(err.Error(), "timeout waiting for job") {
 					if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
 						log.Printf("[Transflow] Wait timeout, but diff present (size=%d). Proceeding.", fi.Size())
 					} else {
+						r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
 						result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
 						result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
 						result.Duration = time.Since(startTime)
 						return nil, fmt.Errorf("orw-apply job failed: %w", err)
 					}
 				} else {
+					r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
 					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
 					result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
 					result.Duration = time.Since(startTime)
@@ -506,6 +559,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 
 			// Locate diff.patch and apply
 			if _, err := os.Stat(diffPath); err != nil {
+				r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("no diff produced: %v", err))
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("No diff.patch produced: %v", err)})
 				result.ErrorMessage = "no diff produced by orw-apply"
 				result.Duration = time.Since(startTime)
@@ -523,7 +577,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			applyCtx, cancelApply := context.WithTimeout(ctx, applyTimeout)
 			defer cancelApply()
 			log.Printf("[Transflow] Applying diff and running build gate (timeout=%s): repo=%s diff=%s", applyTimeout, repoPath, diffPath)
+			r.emit(ctx, "build", "build", "info", "Running build gate")
 			if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
+				r.emit(ctx, "build", "build", "error", fmt.Sprintf("apply/build failed: %v", err))
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
 				result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
 				result.Duration = time.Since(startTime)
@@ -561,6 +617,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			goto build_step
 		}
 		// No changes and HEAD same => fail to avoid empty MR
+		r.emit(ctx, "commit", "commit", "error", "no changes to commit")
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "commit",
 			Success: false,
@@ -571,6 +628,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		return nil, fmt.Errorf("no changes produced by transformation")
 	}
 	if err := r.gitOps.CommitChanges(ctx, repoPath, commitMessage); err != nil {
+		r.emit(ctx, "commit", "commit", "error", fmt.Sprintf("commit failed: %v", err))
 		result.ErrorMessage = fmt.Sprintf("failed to commit changes: %v", err)
 		result.Duration = time.Since(startTime)
 		return nil, fmt.Errorf("failed to commit changes: %w", err)
@@ -637,6 +695,7 @@ build_step:
 				})
 				// Continue with normal workflow (push, etc.)
 			} else {
+				r.emit(ctx, "healing", "healing", "error", "build check failed and healing failed")
 				// Healing also failed
 				result.ErrorMessage = "build check failed and healing failed"
 				result.Duration = time.Since(startTime)
@@ -644,6 +703,7 @@ build_step:
 			}
 		} else {
 			// No healing enabled, fail immediately
+			r.emit(ctx, "build", "build", "error", message)
 			result.ErrorMessage = "build check failed"
 			result.Duration = time.Since(startTime)
 			return nil, fmt.Errorf("build check failed: %s", message)
@@ -666,7 +726,9 @@ build_step:
 	pushCtx, cancelPush := context.WithTimeout(ctx, pushTimeout)
 	defer cancelPush()
 	log.Printf("[Transflow] Pushing branch (timeout=%s): repo=%s branch=%s", pushTimeout, r.config.TargetRepo, branchName)
+	r.emit(ctx, "push", "push", "info", "Pushing branch")
 	if err := r.gitOps.PushBranch(pushCtx, repoPath, r.config.TargetRepo, branchName); err != nil {
+		r.emit(ctx, "push", "push", "error", fmt.Sprintf("push failed: %v", err))
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "push",
 			Success: false,
@@ -685,7 +747,9 @@ build_step:
 	// Step 7: Create or update GitLab merge request (if GitProvider is configured)
 	if r.gitProvider != nil {
 		mrStart := time.Now()
+		r.emit(ctx, "mr", "mr", "info", "Creating merge request")
 		if err := r.gitProvider.ValidateConfiguration(); err != nil {
+			r.emit(ctx, "mr", "mr", "warn", "MR creation skipped - configuration invalid")
 			// MR creation is optional - log but don't fail the workflow
 			result.StepResults = append(result.StepResults, StepResult{
 				StepID:   "mr",

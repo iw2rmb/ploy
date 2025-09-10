@@ -77,6 +77,8 @@ func (m *MockProductionBranchRunner) GetTargetRepo() string {
 	return m.TargetRepo
 }
 
+func (m *MockProductionBranchRunner) GetEventReporter() EventReporter { return nil }
+
 func (m *MockJobSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error) {
 	m.SubmitCalled = true
 	m.SubmittedJobs = append(m.SubmittedJobs, spec)

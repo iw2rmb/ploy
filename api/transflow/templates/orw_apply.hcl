@@ -22,6 +22,8 @@ job "${RUN_ID}" {
         RECIPE_GROUP     = "${RECIPE_GROUP}"
         RECIPE_ARTIFACT  = "${RECIPE_ARTIFACT}"
         RECIPE_VERSION   = "${RECIPE_VERSION}"
+        CONTROLLER_URL   = "${CONTROLLER_URL}"
+        TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
       }
 
       resources {

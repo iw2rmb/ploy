@@ -23,6 +23,8 @@ job "transflow-planner" {
         KB_DIR      = "/workspace/kb"
         OUTPUT_DIR  = "/workspace/out"
         RUN_ID      = "${RUN_ID}"
+        CONTROLLER_URL   = "${CONTROLLER_URL}"
+        TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
       }
 
       resources {
@@ -43,4 +45,3 @@ job "transflow-planner" {
     }
   }
 }
-

@@ -6,7 +6,7 @@ This document describes the REST API endpoints for Ploy's Transflow automated co
 
 All API endpoints are available under:
 ```
-https://api.ployd.app/v1/
+https://api.dev.ployman.app/v1/
 ```
 
 For local development:
@@ -24,12 +24,12 @@ curl -H "Authorization: Bearer your-api-token" \
 
 ## Transflow Workflows
 
-### Create Transflow Workflow
+### Start Transflow
 
 Create and execute a new transflow workflow.
 
 ```http
-POST /v1/transflows
+POST /v1/transflow/run
 ```
 
 **Request Body:**
@@ -95,7 +95,7 @@ POST /v1/transflows
 Get the current status and progress of a transflow workflow.
 
 ```http
-GET /v1/transflows/{id}
+GET /v1/transflow/status/{id}
 ```
 
 **Response:**
@@ -134,10 +134,10 @@ GET /v1/transflows/{id}
 
 ### List Transflows
 
-Get a list of transflow workflows with filtering and pagination.
+Get a list of transflow workflows.
 
 ```http
-GET /v1/transflows?status=completed&limit=20&offset=0&sort=created_at
+GET /v1/transflow/list
 ```
 
 **Query Parameters:**
@@ -181,7 +181,7 @@ GET /v1/transflows?status=completed&limit=20&offset=0&sort=created_at
 Cancel a running transflow workflow.
 
 ```http
-POST /v1/transflows/{id}/cancel
+DELETE /v1/transflow/{id}
 ```
 
 **Response:**
@@ -193,32 +193,16 @@ POST /v1/transflows/{id}/cancel
 }
 ```
 
-### Get Transflow Logs
+### Artifacts
 
-Stream or retrieve logs from a transflow workflow.
+Retrieve workflow artifacts via the controller (keys are exposed in status `result.artifacts`).
 
 ```http
-GET /v1/transflows/{id}/logs?follow=true&lines=100
+GET /v1/transflow/artifacts/{id}
+GET /v1/transflow/artifacts/{id}/{name}
 ```
 
-**Query Parameters:**
-- `follow` (bool): Stream logs in real-time (default: false)
-- `lines` (int): Number of recent lines to retrieve (default: all)
-- `level` (string): Filter by log level (`debug`, `info`, `warn`, `error`)
-
-**Response (Stream):**
-```
-2025-01-09T10:30:00Z [INFO] Starting transflow workflow: java-11-to-17-migration
-2025-01-09T10:30:05Z [INFO] Cloning repository: https://gitlab.com/org/project.git
-2025-01-09T10:30:15Z [INFO] Executing OpenRewrite recipe: Java11toJava17
-2025-01-09T10:35:00Z [INFO] Recipe execution completed: 127 changes applied
-2025-01-09T10:35:05Z [INFO] Starting build validation
-2025-01-09T10:35:45Z [ERROR] Build failed: compilation error in UserService.java:42
-2025-01-09T10:35:50Z [INFO] Self-healing enabled, analyzing error
-2025-01-09T10:36:10Z [INFO] Generated healing strategy: llm-exec
-2025-01-09T10:37:15Z [INFO] Healing successful, build passed
-2025-01-09T10:37:30Z [INFO] Workflow completed successfully
-```
+Known names: `plan_json`, `next_json`, `diff_patch`, `error_log`.
 
 ## Knowledge Base API
 
@@ -622,3 +606,69 @@ Configure webhooks to receive real-time notifications about transflow events.
   }
 }
 ```
+
+## Real-Time Events (Push)
+
+Jobs and the server-side runner can push fine-grained execution events to update live status.
+
+- POST `/v1/transflow/event`
+
+Request body:
+
+```json
+{
+  "execution_id": "tf-abc123",
+  "phase": "apply",
+  "step": "orw-apply",
+  "level": "info",
+  "message": "Submitted orw-apply job",
+  "ts": "2025-09-09T18:23:00Z",
+  "job_name": "orw-apply-tf-abc123",
+  "alloc_id": "c1f..."
+}
+```
+
+Effect:
+
+- Updates `/v1/transflow/status/{id}` with latest `phase`.
+- Appends to `steps[]` with timestamped records.
+- Populates `last_job` metadata when `job_name` is provided.
+
+Notes:
+
+- If `ts` is omitted, the server timestamps the event.
+- This complements artifacts persisted under `artifacts/transflow/{id}/...`.
+
+## Live Logs (SSE)
+
+Stream live status and step events via Server-Sent Events.
+
+- GET `/v1/transflow/logs/{id}?follow=true|false`
+
+Headers:
+
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+
+Events:
+
+- `init` — connection established
+- `meta` — status heartbeat: `{"status","phase","duration","overdue"}`
+- `step` — new step entry: `{"step","phase","level","message","time"}`
+- `log` — optional last-job log preview (if available). Payload:
+  `{ "task": "openrewrite-apply|planner|reducer|llm-exec|api", "preview": "...last lines..." }`
+- `ping` — keepalive/empty heartbeat
+- `end` — terminal state or timeout, payload includes last `meta`
+
+Examples:
+
+```sh
+curl -sN "https://api.dev.ployman.app/v1/transflow/logs/tf-abc123?follow=true"
+```
+
+Notes:
+
+- `follow=false` streams a snapshot of current steps then ends with `end`.
+- Interval and timeout are tunable via env: `PLOY_TRANSFLOW_SSE_INTERVAL` (default `2s`), `PLOY_TRANSFLOW_SSE_TIMEOUT` (default `30m`).
+- When available, the server includes a `log` event containing a short log preview from the job’s last allocation.

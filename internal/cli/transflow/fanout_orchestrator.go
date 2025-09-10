@@ -24,6 +24,7 @@ type ProductionBranchRunner interface {
 	GetBuildChecker() BuildCheckerInterface
 	GetWorkspaceDir() string
 	GetTargetRepo() string
+	GetEventReporter() EventReporter
 }
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
@@ -242,7 +243,24 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
-	// Step 4: Submit job to Nomad and wait for completion
+	// Step 4: Report job metadata asynchronously (job name == runID)
+	if rep := o.runner.GetEventReporter(); rep != nil {
+		go func(job string) {
+			// small delay to allow registration
+			select {
+			case <-time.After(1 * time.Second):
+			case <-ctx.Done():
+				return
+			}
+			if id := findFirstAllocID(job); id != "" {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
+			} else {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: "job submitted", JobName: job, Time: time.Now()})
+			}
+		}(runID)
+	}
+
+	// Step 5: Submit job to Nomad and wait for completion
 	timeout := 30 * time.Minute
 	if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
@@ -252,7 +270,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
-	// Step 5: Check for generated diff.patch artifact
+	// Step 6: Check for generated diff.patch artifact
 	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 	if _, err := os.Stat(diffPath); err != nil {
 		result.Status = "failed"
@@ -415,7 +433,23 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 
-	// Step 3: Submit job to Nomad and wait for completion
+	// Step 3: Report job metadata asynchronously (job name == runID)
+	if rep := o.runner.GetEventReporter(); rep != nil {
+		go func(job string) {
+			select {
+			case <-time.After(1 * time.Second):
+			case <-ctx.Done():
+				return
+			}
+			if id := findFirstAllocID(job); id != "" {
+				_ = rep.Report(ctx, Event{Phase: "apply", Step: "orw-apply", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
+			} else {
+				_ = rep.Report(ctx, Event{Phase: "apply", Step: "orw-apply", Level: "info", Message: "job submitted", JobName: job, Time: time.Now()})
+			}
+		}(runID)
+	}
+
+	// Step 4: Submit job to Nomad and wait for completion
 	timeout := 30 * time.Minute
 	if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
@@ -425,7 +459,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 
-	// Step 4: Check for generated diff.patch artifact
+	// Step 5: Check for generated diff.patch artifact
 	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 	if _, err := os.Stat(diffPath); err != nil {
 		result.Status = "failed"

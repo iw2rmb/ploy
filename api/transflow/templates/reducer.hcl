@@ -20,6 +20,8 @@ job "transflow-reducer" {
         LIMITS      = "${LIMITS_JSON}"
         OUTPUT_DIR  = "/workspace/out"
         RUN_ID      = "${RUN_ID}"
+        CONTROLLER_URL   = "${CONTROLLER_URL}"
+        TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
       }
 
       resources {
@@ -40,4 +42,3 @@ job "transflow-reducer" {
     }
   }
 }
-

@@ -258,11 +258,17 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 		orwImage = reg + "/openrewrite-jvm:latest"
 	}
 
+	// Controller and execution ID for in-job event push
+	controllerURL := os.Getenv("PLOY_CONTROLLER")
+	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+
 	rendered := strings.NewReplacer(
 		"${RUN_ID}", runID,
 		"${CONTEXT_HOST_DIR}", contextDir,
 		"${OUT_HOST_DIR}", outDir,
 		"${ORW_IMAGE}", orwImage,
+		"${CONTROLLER_URL}", controllerURL,
+		"${EXECUTION_ID}", execID,
 	).Replace(string(content))
 
 	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {

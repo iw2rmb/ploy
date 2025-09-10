@@ -2,6 +2,11 @@
 
 ## [Unreleased] - Transflow MVP Release
 
+### Added - Real-Time Observability
+- New `POST /v1/transflow/event` endpoint for pushing phase/step updates
+- `/v1/transflow/status/:id` now includes `steps[]` and `last_job` metadata
+- Error messages enriched with first 1KB from `error.log` when available
+
 ### Added - Transflow Complete Implementation
 
 **Core Transflow System**
@@ -59,6 +64,8 @@
 - Fixed ARF config storage initialization to match updated NewRecipeRegistry signature (no error return)
 - IAC docs: consolidated `iac/README.md` (clean, non-duplicative) and removed redundant `iac/CLAUDE.md`
 - Transflow orw-apply HCL: mount prepared `input.tar` into the container (`/workspace/input.tar`) alongside context/out mounts to ensure source files are available. Fixes orw-apply failing with "No build file found" when the archive wasn’t accessible in-container.
+- Transflow API docs: aligned endpoints with implementation (singular `/v1/transflow/*`, artifacts endpoints). Removed non-implemented logs streaming section.
+- OpenRewrite runner image: added error.log emission on failures (missing build file, missing tools, tar issues, transformation failure) to improve server-side status messages and artifact capture.
 
 ### Technical Details
 - **Coverage**: 60% minimum, 90% for critical healing components

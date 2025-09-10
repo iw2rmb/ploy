@@ -109,6 +109,9 @@ func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPCo
 	}
 
 	// Perform substitution
+	controllerURL := os.Getenv("PLOY_CONTROLLER")
+	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+
 	replacer := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
@@ -127,6 +130,8 @@ func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPCo
 		"${MCP_PROMPTS_JSON}", hclEscape(mcpEnvConfig.MCPPromptsJSON),
 		"${MCP_TIMEOUT}", hclEscape(mcpEnvConfig.MCPTimeout),
 		"${MCP_SECURITY_MODE}", hclEscape(mcpEnvConfig.MCPSecurityMode),
+		"${CONTROLLER_URL}", hclEscape(controllerURL),
+		"${EXECUTION_ID}", hclEscape(execID),
 	)
 	rendered := replacer.Replace(string(hclBytes))
 
@@ -244,18 +249,45 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
 
-		// Step 4: Submit job to Nomad and wait for completion
+		// Step 4: Push start event and report job metadata
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			// Start event
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+			// Report alloc id asynchronously
+			go func(job string) {
+				select {
+				case <-time.After(1 * time.Second):
+				case <-ctx.Done():
+					return
+				}
+				if id := findFirstAllocID(job); id != "" {
+					_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
+				}
+			}(runID)
+		}
+
+		// Step 5: Submit job to Nomad and wait for completion
 		timeout := 15 * time.Minute
 		if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
+			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-		// Step 5: Read and parse job output artifact
+		// Step 6: Read and parse job output artifact
 		// The planner job should write plan.json to the output directory
 		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
 		var planResult PlanResult
 		if err := readJobArtifact(artifactPath, &planResult); err != nil {
 			return nil, fmt.Errorf("failed to read planner output: %w", err)
+		}
+
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
 		return &planResult, nil
@@ -322,18 +354,43 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
 
-		// Step 4: Submit job to Nomad and wait for completion
+		// Step 4: Push start event and report job metadata
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+			go func(job string) {
+				select {
+				case <-time.After(1 * time.Second):
+				case <-ctx.Done():
+					return
+				}
+				if id := findFirstAllocID(job); id != "" {
+					_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
+				}
+			}(runID)
+		}
+
+		// Step 5: Submit job to Nomad and wait for completion
 		timeout := 10 * time.Minute
 		if err := orchestration.SubmitAndWaitTerminal(renderedHCLPath, timeout); err != nil {
+			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
 			return nil, fmt.Errorf("reducer job failed: %w", err)
 		}
 
-		// Step 5: Read and parse job output artifact
+		// Step 6: Read and parse job output artifact
 		// The reducer job should write next.json to the output directory
 		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
 		var nextAction NextAction
 		if err := readJobArtifact(artifactPath, &nextAction); err != nil {
 			return nil, fmt.Errorf("failed to read reducer output: %w", err)
+		}
+
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
 		return &nextAction, nil

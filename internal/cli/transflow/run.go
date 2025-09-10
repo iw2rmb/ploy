@@ -1,17 +1,22 @@
 package transflow
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
 // TransflowCmd provides the CLI entrypoint to run transflows
 func TransflowCmd(args []string, controllerURL string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: ploy transflow run -f <transflow.yaml>")
+		fmt.Println("Usage: ploy transflow run -f <transflow.yaml> | ploy transflow watch -id <execution_id>")
 		return
 	}
 
@@ -21,8 +26,13 @@ func TransflowCmd(args []string, controllerURL string) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+	case "watch":
+		if err := watchTransflow(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	default:
-		fmt.Println("Usage: ploy transflow run -f <transflow.yaml>")
+		fmt.Println("Usage: ploy transflow run -f <transflow.yaml> | ploy transflow watch -id <execution_id>")
 	}
 }
 
@@ -168,4 +178,175 @@ func runTransflow(args []string, controllerURL string) error {
 	}
 
 	return nil
+}
+
+// watchTransflow polls the controller for status updates and streams step events
+func watchTransflow(args []string, controllerURL string) error {
+	fs := flag.NewFlagSet("transflow watch", flag.ContinueOnError)
+	id := fs.String("id", "", "execution id to watch")
+	interval := fs.Duration("interval", 2*time.Second, "poll interval")
+	noSSE := fs.Bool("no-sse", false, "disable SSE and use polling")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("flag parsing failed: %w", err)
+	}
+	if *id == "" {
+		return fmt.Errorf("missing -id <execution_id>")
+	}
+	base := controllerURL
+	if base == "" {
+		base = GetDefaultControllerURL()
+	}
+	base = strings.TrimRight(base, "/")
+	// The runner/controller use /v1/transflow/* endpoints; ensure /v1 prefix exists
+	if !strings.HasSuffix(base, "/v1") {
+		base = base + "/v1"
+	}
+	statusURL := base + "/transflow/status/" + *id
+	artsURL := base + "/transflow/artifacts/" + *id
+
+	if !*noSSE {
+		if err := watchTransflowSSE(base, *id); err == nil {
+			return nil
+		}
+		fmt.Println("SSE unavailable; falling back to polling...")
+	}
+
+	seen := 0
+	lastStatus := ""
+	client := &http.Client{Timeout: 10 * time.Second}
+	fmt.Printf("Watching transflow %s (poll %s)\n", *id, interval.String())
+	for {
+		req, _ := http.NewRequest(http.MethodGet, statusURL, nil)
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("status error: %v\n", err)
+			time.Sleep(*interval)
+			continue
+		}
+		var st struct {
+			ID       string `json:"id"`
+			Status   string `json:"status"`
+			Phase    string `json:"phase"`
+			Duration string `json:"duration"`
+			Overdue  bool   `json:"overdue"`
+			Steps    []struct {
+				Step    string    `json:"step"`
+				Phase   string    `json:"phase"`
+				Level   string    `json:"level"`
+				Message string    `json:"message"`
+				Time    time.Time `json:"time"`
+			} `json:"steps"`
+			Result map[string]interface{} `json:"result"`
+			Error  string                 `json:"error"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&st)
+		_ = resp.Body.Close()
+
+		if st.Status != lastStatus || st.Phase != "" {
+			fmt.Printf("[%s] phase=%s status=%s duration=%s overdue=%v\n", time.Now().Format(time.RFC3339), st.Phase, st.Status, st.Duration, st.Overdue)
+			lastStatus = st.Status
+		}
+
+		if len(st.Steps) > seen {
+			for _, ev := range st.Steps[seen:] {
+				ts := ev.Time.Format(time.RFC3339)
+				if ev.Level == "" {
+					ev.Level = "info"
+				}
+				if ev.Step == "" {
+					ev.Step = "?"
+				}
+				fmt.Printf("%s [%s] %s: %s\n", ts, ev.Level, ev.Step, ev.Message)
+			}
+			seen = len(st.Steps)
+		}
+
+		if st.Status == "completed" || st.Status == "failed" || st.Status == "cancelled" {
+			// Print error log if available
+			if st.Error != "" {
+				fmt.Printf("Error: %s\n", st.Error)
+			}
+			// Try to fetch error_log artifact
+			req2, _ := http.NewRequest(http.MethodGet, artsURL, nil)
+			resp2, err2 := client.Do(req2)
+			if err2 == nil && resp2.StatusCode == 200 {
+				var arts struct {
+					Artifacts map[string]string `json:"artifacts"`
+				}
+				_ = json.NewDecoder(resp2.Body).Decode(&arts)
+				_ = resp2.Body.Close()
+				if key := arts.Artifacts["error_log"]; key != "" {
+					// Server provides a download endpoint alias using logical name
+					dl := base + "/transflow/artifacts/" + *id + "/error_log"
+					if r3, e3 := client.Get(dl); e3 == nil && r3.StatusCode == 200 {
+						defer r3.Body.Close()
+						fmt.Println("--- error.log ---")
+						io.Copy(os.Stdout, r3.Body)
+						fmt.Println("\n--- end error.log ---")
+					}
+				}
+			}
+			break
+		}
+		time.Sleep(*interval)
+	}
+	return nil
+}
+
+func watchTransflowSSE(base, id string) error {
+	url := base + "/transflow/logs/" + id + "?follow=true"
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	client := &http.Client{Timeout: 0}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "text/event-stream" {
+		return fmt.Errorf("unexpected SSE response: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	curEvent := ""
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "event:") {
+			curEvent = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			switch curEvent {
+			case "init":
+				fmt.Printf("[SSE] %s\n", data)
+			case "meta":
+				fmt.Printf("[meta] %s\n", data)
+			case "step":
+				// Try to decode minimally to format nicer; fallback to raw
+				var ev struct{ Level, Step, Message string }
+				if _ = json.Unmarshal([]byte(data), &ev); ev.Step != "" {
+					lvl := ev.Level
+					if lvl == "" {
+						lvl = "info"
+					}
+					fmt.Printf("[%s] %s: %s\n", lvl, ev.Step, ev.Message)
+				} else {
+					fmt.Printf("%s\n", data)
+				}
+			case "log":
+				fmt.Printf("[log]\n%s\n", data)
+			case "ping":
+				// ignore
+			case "end":
+				fmt.Printf("[end] %s\n", data)
+				return nil
+			default:
+				fmt.Printf("[%s] %s\n", curEvent, data)
+			}
+		}
+		if line == "" {
+			curEvent = ""
+		}
+	}
+	return scanner.Err()
 }

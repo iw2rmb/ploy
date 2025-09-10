@@ -899,6 +899,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ YAML configuration parsing and validation
 - ✅ Complete CLI integration (`ploy transflow run`) with full end-to-end workflow
 - ✅ Test mode infrastructure with mock implementations for CI/testing
+ - ✅ Real-time observability: status `steps[]`, `last_job`, and event push API
 
 **Self-Healing System**
 - ✅ LangGraph planner/reducer jobs for build-error healing
