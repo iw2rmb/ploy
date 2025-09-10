@@ -2,6 +2,10 @@
 
 ## [Unreleased] - Transflow MVP Release
 
+### CLI
+- `ploy transflow run` now prints the execution ID and a watch hint (e.g., `ploy transflow watch -id <id>`) immediately after starting a remote run. This aids quick tracking without digging into status endpoints.
+- New `--watch` flag for `ploy transflow run` attaches a live watch immediately after starting a remote run. Falls back to polling when SSE is unavailable.
+
 ### Added - Real-Time Observability
 - New `POST /v1/transflow/event` endpoint for pushing phase/step updates
 - `/v1/transflow/status/:id` now includes `steps[]` and `last_job` metadata
