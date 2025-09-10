@@ -21,17 +21,12 @@ job "${RUN_ID}" {
         CONTROLLER_URL   = "${CONTROLLER_URL}"
         TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
         DIFF_KEY         = "${DIFF_KEY}"
+        SEAWEEDFS_URL    = "${SEAWEEDFS_URL}"
+        INPUT_URL        = "${INPUT_URL}"
       }
 
-      # Inject SeaweedFS Filer via Consul DNS (avoid host IPs)
-      template {
-        destination = "local/seaweed.env"
-        env         = true
-        data        = <<EOH
-SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
-INPUT_URL=http://seaweedfs-filer.service.consul:8888/artifacts/${INPUT_KEY}
-EOH
-      }
+      # SEAWEEDFS_URL and INPUT_URL are computed server-side (controller) and injected above.
+      # This avoids resolving to host IPs via consul-template and ensures Consul DNS names are used.
 
       resources {
         cpu    = 500
