@@ -572,11 +572,39 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
 			}
 
+			// Guard: ensure repository contains a supported build file before creating input tar
+			{
+				p1 := filepath.Join(repoPath, "pom.xml")
+				p2 := filepath.Join(repoPath, "build.gradle")
+				p3 := filepath.Join(repoPath, "build.gradle.kts")
+				if _, e1 := os.Stat(p1); e1 != nil {
+					if _, e2 := os.Stat(p2); e2 != nil {
+						if _, e3 := os.Stat(p3); e3 != nil {
+							r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
+							result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: "No build file found in repository"})
+							result.ErrorMessage = "no build file found in repository"
+							result.Duration = time.Since(startTime)
+							return nil, fmt.Errorf("no build file found in repository")
+						}
+					}
+				}
+			}
+
 			// Prepare input tar from repository
 			inputTar := filepath.Join(filepath.Dir(renderedPath), "input.tar")
 			if err := createTarFromDir(repoPath, inputTar); err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to create input tar: %v", err)})
 				return nil, fmt.Errorf("failed to create input tar: %w", err)
+			}
+			// Log a brief preview of tar contents for diagnostics
+			{
+				// Best-effort: list a few entries
+				cmd := exec.Command("tar", "-tf", inputTar)
+				out, _ := cmd.CombinedOutput()
+				lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+				max := 20
+				if len(lines) < max { max = len(lines) }
+				log.Printf("[Transflow] input.tar preview (%d entries):\n%s", max, strings.Join(lines[:max], "\n"))
 			}
 
 			// Pre-substitute recipe class and input tar host path into template
