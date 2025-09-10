@@ -2,8 +2,13 @@ package transflow
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -236,6 +241,100 @@ func (r *TransflowRunner) GetBuildChecker() BuildCheckerInterface {
 // GetWorkspaceDir returns the workspace directory for human-step branch operations
 func (r *TransflowRunner) GetWorkspaceDir() string {
 	return r.workspaceDir
+}
+
+// downloadToFile fetches the url content and writes to dest path
+func downloadToFile(url, dest string) error {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("http %d", resp.StatusCode)
+	}
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+// randomStepID returns s-<12 hex chars>
+func randomStepID() string {
+	var buf [6]byte
+	_, _ = crand.Read(buf[:])
+	return "s-" + hex.EncodeToString(buf[:])
+}
+
+// putFile uploads a local file to SeaweedFS artifacts namespace using PUT
+func putFile(seaweedBase, key, srcPath, contentType string) error {
+	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
+	f, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	req, err := http.NewRequest(http.MethodPut, url, f)
+	if err != nil {
+		return err
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("put %s: http %d: %s", key, resp.StatusCode, string(b))
+	}
+	return nil
+}
+
+// putJSON uploads JSON bytes to SeaweedFS
+func putJSON(seaweedBase, key string, body []byte) error {
+	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
+	req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(string(body)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("put %s: http %d: %s", key, resp.StatusCode, string(b))
+	}
+	return nil
+}
+
+// getJSON fetches a JSON document from SeaweedFS
+func getJSON(seaweedBase, key string) ([]byte, int, error) {
+	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return b, resp.StatusCode, nil
 }
 
 // GetTargetRepo returns the target repository URL for human-step branch operations
@@ -493,10 +592,10 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Determine coords and discovery flag
 			discover := "true"
 			rgroup, rartifact, rversion := "", "", ""
-            if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
-                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "2.26.0"
-                discover = "false"
-            } else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
+			if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
+				rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "2.26.0"
+				discover = "false"
+			} else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
 				rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-spring", "5.7.0"
 				discover = "false"
 			} else if strings.HasPrefix(rclass, "org.openrewrite.java") {
@@ -524,8 +623,14 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Keep outputs under the step workspace for artifact collection
 			os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
 
+            // Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
+            execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+            branchID := step.ID
+            curStepID := randomStepID()
+            os.Setenv("TRANSFLOW_DIFF_KEY", fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID))
+
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
-			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 			seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
 			if seaweed == "" {
 				seaweed = "http://seaweedfs-filer.service.consul:8888"
@@ -572,8 +677,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 					}
 				}
 			}
-			// Predefine diffPath for fallback checks
+			// Prepare diff path for later fetch and processing
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
+			_ = os.MkdirAll(filepath.Dir(diffPath), 0755)
 			// Preflight validate HCL, then submit job and wait terminal
 			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
 			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
@@ -599,14 +705,72 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 			// Successful wait implies job completed; emit explicit completion event
 			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
-
-			// Locate diff.patch and apply
-			if _, err := os.Stat(diffPath); err != nil {
+			// Fetch diff from SeaweedFS now
+			seaweed = os.Getenv("PLOY_SEAWEEDFS_URL")
+			if seaweed == "" {
+				seaweed = "http://seaweedfs-filer.service.consul:8888"
+			}
+			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			var fetchErr error
+			if execID != "" {
+				branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
+				url := strings.TrimRight(seaweed, "/") + "/artifacts/" + branchDiffKey
+				fetchErr = downloadToFile(url, diffPath)
+			} else {
+				fetchErr = fmt.Errorf("missing execution id for diff fetch")
+			}
+			if fetchErr != nil {
 				r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("no diff produced: %v", err))
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("No diff.patch produced: %v", err)})
 				result.ErrorMessage = "no diff produced by orw-apply"
 				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("no diff produced by orw-apply: %w", err)
+				return nil, fmt.Errorf("no diff produced by orw-apply: %w", fetchErr)
+			}
+
+			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
+			{
+				branchID := step.ID
+				// Read HEAD
+				headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
+				if b, code, _ := getJSON(seaweed, headKey); code == 200 {
+					var head map[string]string
+					_ = json.Unmarshal(b, &head)
+					cur := head["step_id"]
+					// Collect step_ids from head back to root
+					chain := []string{}
+					for cur != "" {
+						chain = append(chain, cur)
+						metaKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, cur)
+						if mb, mc, _ := getJSON(seaweed, metaKey); mc == 200 {
+							var meta struct {
+								Prev string `json:"prev_step_id"`
+							}
+							_ = json.Unmarshal(mb, &meta)
+							cur = meta.Prev
+						} else {
+							cur = ""
+						}
+					}
+					// Reverse to root→head
+					for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
+						chain[i], chain[j] = chain[j], chain[i]
+					}
+					// Apply each recorded diff in order
+					for _, sid := range chain {
+						url := strings.TrimRight(seaweed, "/") + "/artifacts/" + fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, sid)
+						tmp := filepath.Join(baseDir, "out", "chain-"+sid+".patch")
+						_ = downloadToFile(url, tmp)
+						// Validate and apply
+						allow := []string{"src/**", "pom.xml"}
+						if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" {
+							allow = strings.Split(v, ",")
+						}
+						if err := ValidateDiffPaths(tmp, allow); err == nil {
+							_ = ValidateUnifiedDiff(ctx, repoPath, tmp)
+							_ = ApplyUnifiedDiff(ctx, repoPath, tmp)
+						}
+					}
+				}
 			}
 
 			if fi, err := os.Stat(diffPath); err == nil {
@@ -647,6 +811,33 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				Message:  "Applied ORW diff and passed build gate",
 				Duration: time.Since(stepStart),
 			})
+
+            // Record chain metadata for this branch (option_id = step.ID)
+            {
+                branchID := step.ID
+                // Read previous HEAD
+                headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
+                prevID := ""
+                if b, code, _ := getJSON(seaweed, headKey); code == 200 {
+                    var head map[string]string
+                    _ = json.Unmarshal(b, &head)
+                    prevID = head["step_id"]
+                }
+                // Diff already uploaded by task under DIFF_KEY; reference it directly
+                branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
+                // Write meta.json
+                meta := map[string]any{
+                    "step_id":      curStepID,
+                    "prev_step_id": prevID,
+                    "branch_id":    branchID,
+                    "diff_key":     branchDiffKey,
+                    "ts":           time.Now().UTC().Format(time.RFC3339),
+                }
+                if mb, e := json.Marshal(meta); e == nil {
+                    _ = putJSON(seaweed, fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, curStepID), mb)
+                    _ = putJSON(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", curStepID)))
+                }
+            }
 
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow
