@@ -23,6 +23,8 @@ job "transflow-llm-exec" {
         CONTEXT_DIR = "/workspace/context"
         OUTPUT_DIR  = "/workspace/out"
         RUN_ID      = "${RUN_ID}"
+        CONTROLLER_URL   = "${CONTROLLER_URL}"
+        TRANSFLOW_EXECUTION_ID = "${EXECUTION_ID}"
         
         # MCP integration configuration
         MCP_TOOLS_JSON      = "${MCP_TOOLS_JSON}"
@@ -66,4 +68,3 @@ job "transflow-llm-exec" {
     }
   }
 }
-

@@ -4,6 +4,33 @@
 
 set -ex  # Enable verbose output for debugging
 
+# --- Event push helpers (best-effort) ---
+post_event() {
+  local level="$1"; shift
+  local phase="$1"; shift
+  local step="$1"; shift
+  local msg="$1"
+  if [ -n "${CONTROLLER_URL}" ] && [ -n "${TRANSFLOW_EXECUTION_ID}" ]; then
+    # Avoid failing the run due to telemetry issues
+    curl -sS -X POST "${CONTROLLER_URL}/transflow/event" \
+      -H "Content-Type: application/json" \
+      -d "{\"execution_id\":\"${TRANSFLOW_EXECUTION_ID}\",\"phase\":\"${phase}\",\"step\":\"${step}\",\"level\":\"${level}\",\"message\":\"${msg}\"}" \
+      -o /dev/null || true
+  fi
+}
+
+on_exit() {
+  code=$?
+  if [ "$code" -eq 0 ]; then
+    post_event "info" "apply" "orw-apply" "Completed orw-apply"
+  else
+    post_event "error" "apply" "orw-apply" "Failed orw-apply"
+  fi
+}
+
+trap on_exit EXIT
+post_event "info" "apply" "orw-apply" "Started orw-apply"
+
 # Helper: write an error message to an artifact that the controller can collect
 write_error() {
   local msg="$*"

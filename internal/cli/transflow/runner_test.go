@@ -3,6 +3,7 @@ package transflow
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -247,45 +248,45 @@ func TestTransflowRunner_Run(t *testing.T) {
 // RED: When orw-apply fails inside the container with a clear error (e.g., "No build file found"),
 // the runner must surface a terminal error so the API status becomes failed instead of staying running.
 func TestTransflowRunner_ORWApplyNoBuildFileError(t *testing.T) {
-    // Save and restore submitter
-    orig := submitAndWaitTerminal
-    defer func() { submitAndWaitTerminal = orig }()
+	// Save and restore submitter
+	orig := submitAndWaitTerminal
+	defer func() { submitAndWaitTerminal = orig }()
 
-    // Stub submission to simulate container failure with meaningful message
-    submitAndWaitTerminal = func(hclPath string, timeout time.Duration) error {
-        return fmt.Errorf("No build file found (pom.xml, build.gradle) in project root")
-    }
+	// Stub submission to simulate container failure with meaningful message
+	submitAndWaitTerminal = func(hclPath string, timeout time.Duration) error {
+		return fmt.Errorf("No build file found (pom.xml, build.gradle) in project root")
+	}
 
-    // Create temp workspace and minimal template
-    workspaceDir := t.TempDir()
-    jobsDir := filepath.Join(workspaceDir, "roadmap", "transflow", "jobs")
-    _ = os.MkdirAll(jobsDir, 0755)
-    // Minimal HCL content is enough for rendering/substitution path
-    hcl := []byte("job \"orw-apply-test\" { group \"orw\" { task \"openrewrite-apply\" { driver=\"docker\" config { volumes=[\"${CONTEXT_HOST_DIR}:/workspace/context:ro\",\"${OUT_HOST_DIR}:/workspace/out\"] } } } }")
-    _ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), hcl, 0644)
+	// Create temp workspace and minimal template
+	workspaceDir := t.TempDir()
+	jobsDir := filepath.Join(workspaceDir, "roadmap", "transflow", "jobs")
+	_ = os.MkdirAll(jobsDir, 0755)
+	// Minimal HCL content is enough for rendering/substitution path
+	hcl := []byte("job \"orw-apply-test\" { group \"orw\" { task \"openrewrite-apply\" { driver=\"docker\" config { volumes=[\"${CONTEXT_HOST_DIR}:/workspace/context:ro\",\"${OUT_HOST_DIR}:/workspace/out\"] } } } }")
+	_ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), hcl, 0644)
 
-    // Config with a single orw-apply step
-    config := &TransflowConfig{
-        ID:         "java11to17-test",
-        TargetRepo: "https://example.com/org/repo.git",
-        BaseRef:    "main",
-        Steps: []TransflowStep{{Type: "orw-apply", ID: "java11to17-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}}},
-    }
+	// Config with a single orw-apply step
+	config := &TransflowConfig{
+		ID:         "java11to17-test",
+		TargetRepo: "https://example.com/org/repo.git",
+		BaseRef:    "main",
+		Steps:      []TransflowStep{{Type: "orw-apply", ID: "java11to17-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}}},
+	}
 
-    runner, err := NewTransflowRunner(config, workspaceDir)
-    assert.NoError(t, err)
+	runner, err := NewTransflowRunner(config, workspaceDir)
+	assert.NoError(t, err)
 
-    // Mocks: clone creates repo directory so tar succeeds
-    mockGit := NewMockGitOperations()
-    mockBuild := NewMockBuildChecker() // not reached
-    runner.SetGitOperations(mockGit)
-    runner.SetBuildChecker(mockBuild)
+	// Mocks: clone creates repo directory so tar succeeds
+	mockGit := NewMockGitOperations()
+	mockBuild := NewMockBuildChecker() // not reached
+	runner.SetGitOperations(mockGit)
+	runner.SetBuildChecker(mockBuild)
 
-    // Run
-    _, runErr := runner.Run(context.Background())
-    assert.Error(t, runErr)
-    assert.Contains(t, runErr.Error(), "orw-apply job failed")
-    assert.Contains(t, runErr.Error(), "No build file found")
+	// Run
+	_, runErr := runner.Run(context.Background())
+	assert.Error(t, runErr)
+	assert.Contains(t, runErr.Error(), "orw-apply job failed")
+	assert.Contains(t, runErr.Error(), "No build file found")
 }
 
 func TestTransflowResult_Summary(t *testing.T) {

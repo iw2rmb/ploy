@@ -1,16 +1,18 @@
 package transflow
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+    "bufio"
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "io"
+    "log"
+    "os"
+    "path/filepath"
+    "os/exec"
+    "strings"
+    "time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -56,6 +58,10 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	tf.Delete("/:id", h.CancelTransflow)
 	tf.Get("/artifacts/:id", h.GetArtifacts)
 	tf.Get("/artifacts/:id/:name", h.DownloadArtifact)
+	// Real-time events push endpoint
+	tf.Post("/event", h.ReportEvent)
+	// Logs streaming (SSE stub)
+	tf.Get("/logs/:id", h.StreamLogs)
 }
 
 // TransflowRunRequest represents the request body for running a transflow
@@ -74,9 +80,27 @@ type TransflowStatus struct {
 	Error     string                 `json:"error,omitempty"`
 	Result    map[string]interface{} `json:"result,omitempty"`
 	// Enriched runtime fields
-	Phase    string `json:"phase,omitempty"`
-	Overdue  bool   `json:"overdue,omitempty"`
-	Duration string `json:"duration,omitempty"`
+	Phase    string                `json:"phase,omitempty"`
+	Overdue  bool                  `json:"overdue,omitempty"`
+	Duration string                `json:"duration,omitempty"`
+	Steps    []TransflowStepStatus `json:"steps,omitempty"`
+	LastJob  *TransflowLastJob     `json:"last_job,omitempty"`
+}
+
+// TransflowStepStatus represents a single step update with timestamp
+type TransflowStepStatus struct {
+	Step    string    `json:"step,omitempty"`
+	Phase   string    `json:"phase,omitempty"`
+	Level   string    `json:"level,omitempty"`
+	Message string    `json:"message,omitempty"`
+	Time    time.Time `json:"time"`
+}
+
+// TransflowLastJob captures metadata about the most recent submitted Nomad job
+type TransflowLastJob struct {
+	JobName     string    `json:"job_name,omitempty"`
+	AllocID     string    `json:"alloc_id,omitempty"`
+	SubmittedAt time.Time `json:"submitted_at"`
 }
 
 // RunTransflow handles POST /v1/transflow/run
@@ -264,6 +288,14 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 
+	// Wire event reporter for real-time observability
+	reporter := transflow.NewControllerEventReporter(controllerURL, executionID)
+	runner.SetEventReporter(reporter)
+
+	// Expose controller and execution ID to job templates for in-job event pushes
+	_ = os.Setenv("PLOY_CONTROLLER", controllerURL)
+	_ = os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", executionID)
+
 	// Execute the workflow with timeout awareness; ensure terminal status on any error
 	var (
 		result *transflow.TransflowResult
@@ -276,43 +308,43 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	}()
 
 	select {
-    case <-doneCh:
-        if runErr != nil {
-            // Best-effort: persist any artifacts (e.g., error logs) and enrich error message
-            if h.storage != nil {
-                if _, err := h.persistArtifacts(executionID, tempDir); err != nil {
-                    log.Printf("[Transflow] Warning: artifact persistence on failure failed: %v", err)
-                }
-            }
-            // Try to include first error.log contents from orw-apply in the error message for clarity
-            orwDir := filepath.Join(tempDir, "orw-apply")
-            var errDetail string
-            _ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
-                if err != nil || info == nil || info.IsDir() {
-                    return nil
-                }
-                if filepath.Base(path) == "error.log" {
-                    if b, e := os.ReadFile(path); e == nil {
-                        s := strings.TrimSpace(string(b))
-                        if len(s) > 0 {
-                            // Limit to a reasonable snippet
-                            if len(s) > 1024 {
-                                s = s[:1024]
-                            }
-                            errDetail = s
-                        }
-                    }
-                    return io.EOF // stop after first match
-                }
-                return nil
-            })
-            if errDetail != "" {
-                runErr = fmt.Errorf("%v; details: %s", runErr, errDetail)
-            }
-            h.recordError(executionID, runErr)
-            return
-        }
-        // continue to success handling below
+	case <-doneCh:
+		if runErr != nil {
+			// Best-effort: persist any artifacts (e.g., error logs) and enrich error message
+			if h.storage != nil {
+				if _, err := h.persistArtifacts(executionID, tempDir); err != nil {
+					log.Printf("[Transflow] Warning: artifact persistence on failure failed: %v", err)
+				}
+			}
+			// Try to include first error.log contents from orw-apply in the error message for clarity
+			orwDir := filepath.Join(tempDir, "orw-apply")
+			var errDetail string
+			_ = filepath.Walk(orwDir, func(path string, info os.FileInfo, err error) error {
+				if err != nil || info == nil || info.IsDir() {
+					return nil
+				}
+				if filepath.Base(path) == "error.log" {
+					if b, e := os.ReadFile(path); e == nil {
+						s := strings.TrimSpace(string(b))
+						if len(s) > 0 {
+							// Limit to a reasonable snippet
+							if len(s) > 1024 {
+								s = s[:1024]
+							}
+							errDetail = s
+						}
+					}
+					return io.EOF // stop after first match
+				}
+				return nil
+			})
+			if errDetail != "" {
+				runErr = fmt.Errorf("%v; details: %s", runErr, errDetail)
+			}
+			h.recordError(executionID, runErr)
+			return
+		}
+		// continue to success handling below
 	case <-ctx.Done():
 		// Timeout/cancellation — record a terminal error
 		h.recordError(executionID, fmt.Errorf("transflow execution exceeded max duration (%s)", execTimeout))
@@ -594,6 +626,73 @@ func (h *Handler) getStatus(executionID string) (*TransflowStatus, error) {
 	return &status, nil
 }
 
+// TransflowEvent represents a real-time event emitted by runner/jobs
+type TransflowEvent struct {
+	ExecutionID string    `json:"execution_id"`
+	Phase       string    `json:"phase,omitempty"`
+	Step        string    `json:"step,omitempty"`
+	Level       string    `json:"level,omitempty"`
+	Message     string    `json:"message,omitempty"`
+	Time        time.Time `json:"ts,omitempty"`
+	JobName     string    `json:"job_name,omitempty"`
+	AllocID     string    `json:"alloc_id,omitempty"`
+}
+
+// ReportEvent handles POST /v1/transflow/event to update live status metadata
+func (h *Handler) ReportEvent(c *fiber.Ctx) error {
+	if h.statusStore == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": fiber.Map{"code": "storage_disabled", "message": "status store not configured"},
+		})
+	}
+	var ev TransflowEvent
+	if err := c.BodyParser(&ev); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fiber.Map{"code": "invalid_event", "message": "failed to parse event", "details": err.Error()},
+		})
+	}
+	if ev.ExecutionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fiber.Map{"code": "missing_execution_id", "message": "execution_id is required"},
+		})
+	}
+	// Load or initialize status
+	st, err := h.getStatus(ev.ExecutionID)
+	if err != nil || st == nil || st.ID == "" {
+		now := time.Now()
+		st = &TransflowStatus{ID: ev.ExecutionID, Status: "running", StartTime: now}
+	}
+	// Event timestamp
+	ts := ev.Time
+	if ts.IsZero() {
+		ts = time.Now()
+	}
+	// Update phase
+	if ev.Phase != "" {
+		st.Phase = ev.Phase
+	}
+	// Append step record
+	if ev.Step != "" || ev.Message != "" || ev.Phase != "" {
+		st.Steps = append(st.Steps, TransflowStepStatus{
+			Step:    ev.Step,
+			Phase:   ev.Phase,
+			Level:   ev.Level,
+			Message: ev.Message,
+			Time:    ts,
+		})
+	}
+	// Last job metadata if provided
+	if ev.JobName != "" {
+		st.LastJob = &TransflowLastJob{JobName: ev.JobName, AllocID: ev.AllocID, SubmittedAt: ts}
+	}
+	if err := h.storeStatus(*st); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fiber.Map{"code": "storage_error", "message": "failed to persist status", "details": err.Error()},
+		})
+	}
+	return c.JSON(fiber.Map{"ok": true})
+}
+
 // GetArtifacts returns the artifact keys for a given execution
 func (h *Handler) GetArtifacts(c *fiber.Ctx) error {
 	id := c.Params("id")
@@ -655,4 +754,193 @@ func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
 	}
 	_, _ = io.Copy(c, reader)
 	return nil
+}
+
+// StreamLogs provides a basic Server-Sent Events (SSE) stub for live transflow logs.
+// For now, it emits a single init event and returns; future work will stream steps and job tails.
+func (h *Handler) StreamLogs(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "missing_id", "message": "Execution ID is required"}})
+	}
+	// Set SSE headers
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+
+	follow := strings.ToLower(c.Query("follow", "true")) != "false"
+	interval := 2 * time.Second
+	if v := os.Getenv("PLOY_TRANSFLOW_SSE_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			interval = d
+		}
+	}
+	// Optional time cap
+	maxDur := 30 * time.Minute
+	if v := os.Getenv("PLOY_TRANSFLOW_SSE_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			maxDur = d
+		}
+	}
+
+	start := time.Now()
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		// helper to write event
+		writeEvent := func(event string, data string) bool {
+			if _, err := w.WriteString("event: " + event + "\n"); err != nil {
+				return false
+			}
+			if _, err := w.WriteString("data: " + data + "\n\n"); err != nil {
+				return false
+			}
+			if err := w.Flush(); err != nil {
+				return false
+			}
+			return true
+		}
+
+		// Send init
+		initPayload := fmt.Sprintf(`{"id":"%s","message":"SSE connected"}`, id)
+		if !writeEvent("init", initPayload) {
+			return
+		}
+
+		// Always send current snapshot of steps
+		lastCount := 0
+		st, err := h.getStatus(id)
+		if err == nil && st != nil {
+			if len(st.Steps) > 0 {
+				for i := 0; i < len(st.Steps); i++ {
+					b, _ := json.Marshal(st.Steps[i])
+					if !writeEvent("step", string(b)) {
+						return
+					} else if !follow {
+						// No status available but follow=false: end immediately
+						_ = writeEvent("end", `{"status":"unknown"}`)
+						return
+					}
+				}
+				lastCount = len(st.Steps)
+			}
+			// If not following, end now
+			if !follow {
+				fin := map[string]any{"status": st.Status, "phase": st.Phase, "duration": st.Duration}
+				b, _ := json.Marshal(fin)
+				_ = writeEvent("end", string(b))
+				return
+			}
+			// If already terminal, end
+			if st.Status == "completed" || st.Status == "failed" || st.Status == "cancelled" {
+				fin := map[string]any{"status": st.Status, "phase": st.Phase, "duration": st.Duration}
+				b, _ := json.Marshal(fin)
+				_ = writeEvent("end", string(b))
+				return
+			}
+		}
+
+		// Follow mode: poll for new steps and status
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+    var lastLogPreview string
+		for {
+			if time.Since(start) > maxDur {
+				_ = writeEvent("end", `{"status":"timeout"}`)
+				return
+			}
+			select {
+			case <-ticker.C:
+				st, err := h.getStatus(id)
+				if err != nil || st == nil {
+					if !writeEvent("ping", `{"ok":false}`) {
+						return
+					}
+					continue
+				}
+				// Phase/status updates as event
+				meta := map[string]any{"status": st.Status, "phase": st.Phase, "duration": st.Duration, "overdue": st.Overdue}
+				if b, e := json.Marshal(meta); e == nil {
+					if !writeEvent("meta", string(b)) {
+						return
+					}
+				}
+
+                // Optional: stream last job log preview if available and changed
+                if st.LastJob != nil && st.LastJob.AllocID != "" {
+                    task := taskForJob(st.LastJob.JobName)
+                    if preview := tailAllocLogs(st.LastJob.AllocID, task, 50); preview != "" && preview != lastLogPreview {
+                        payload := map[string]any{"task": task, "preview": preview}
+                        if b, e := json.Marshal(payload); e == nil {
+                            if !writeEvent("log", string(b)) { return }
+                            lastLogPreview = preview
+                        }
+                    }
+                }
+				// Stream new steps
+				if len(st.Steps) > lastCount {
+					for i := lastCount; i < len(st.Steps); i++ {
+						b, _ := json.Marshal(st.Steps[i])
+						if !writeEvent("step", string(b)) {
+							return
+						}
+					}
+					lastCount = len(st.Steps)
+				}
+				// Terminal?
+				if st.Status == "completed" || st.Status == "failed" || st.Status == "cancelled" {
+					b, _ := json.Marshal(meta)
+					_ = writeEvent("end", string(b))
+					return
+				}
+			default:
+				// Best-effort CPU yield
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+	})
+	return nil
+}
+
+// tailAllocLogs fetches a short preview of allocation logs using the VPS job manager wrapper.
+// Returns empty string on any error.
+func tailAllocLogs(allocID, task string, lines int) string {
+    mgr := os.Getenv("NOMAD_JOB_MANAGER")
+    if mgr == "" {
+        mgr = "/opt/hashicorp/bin/nomad-job-manager.sh"
+    }
+    if _, err := os.Stat(mgr); err != nil {
+        return ""
+    }
+    if task == "" {
+        task = "api"
+    }
+    if lines <= 0 {
+        lines = 50
+    }
+    cmd := exec.Command(mgr, "logs", "--alloc-id", allocID, "--task", task, "--both", "--lines", fmt.Sprintf("%d", lines))
+    out, err := cmd.CombinedOutput()
+    if err != nil {
+        return ""
+    }
+    s := string(out)
+    if len(s) > 4000 {
+        s = s[len(s)-4000:]
+    }
+    return s
+}
+
+// taskForJob maps a job name to its task name for log tailing
+func taskForJob(jobName string) string {
+    n := strings.ToLower(jobName)
+    switch {
+    case strings.Contains(n, "orw-apply"):
+        return "openrewrite-apply"
+    case strings.Contains(n, "planner"):
+        return "planner"
+    case strings.Contains(n, "reducer"):
+        return "reducer"
+    case strings.Contains(n, "llm-exec") || strings.Contains(n, "llm_exec"):
+        return "llm-exec"
+    default:
+        return "api"
+    }
 }
