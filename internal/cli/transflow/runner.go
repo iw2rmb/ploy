@@ -573,32 +573,35 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("no diff produced by orw-apply: %w", err)
 			}
 
-			if fi, err := os.Stat(diffPath); err == nil {
-				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
-			} else {
-				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
-			}
+            if fi, err := os.Stat(diffPath); err == nil {
+                log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
+                r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
+            } else {
+                log.Printf("[Transflow] Diff ready but stat failed: %v", err)
+            }
 
 			// Apply + build with a phase timeout
 			applyTimeout := 10 * time.Minute
 			applyCtx, cancelApply := context.WithTimeout(ctx, applyTimeout)
 			defer cancelApply()
 			log.Printf("[Transflow] Applying diff and running build gate (timeout=%s): repo=%s diff=%s", applyTimeout, repoPath, diffPath)
-			r.emit(ctx, "build", "build", "info", "Running build gate")
-			if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
-				r.emit(ctx, "build", "build", "error", fmt.Sprintf("apply/build failed: %v", err))
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
-				result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("apply/build failed: %w", err)
-			}
+            r.emit(ctx, "apply", "diff-apply-started", "info", "Applying diff to repository")
+            r.emit(ctx, "build", "build-gate-start", "info", "Running build gate")
+            if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
+                r.emit(ctx, "build", "build-gate-failed", "error", fmt.Sprintf("apply/build failed: %v", err))
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("apply/build failed: %w", err)
+            }
 
-			result.StepResults = append(result.StepResults, StepResult{
-				StepID:   step.ID,
-				Success:  true,
-				Message:  "Applied ORW diff and passed build gate",
-				Duration: time.Since(stepStart),
-			})
+            r.emit(ctx, "apply", "diff-applied", "info", "Diff applied and build gate passed")
+            result.StepResults = append(result.StepResults, StepResult{
+                StepID:   step.ID,
+                Success:  true,
+                Message:  "Applied ORW diff and passed build gate",
+                Duration: time.Since(stepStart),
+            })
 
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow
@@ -717,15 +720,16 @@ build_step:
 		}
 	}
 
-	if buildResult != nil {
-		result.BuildVersion = buildResult.Version
-	}
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:   "build",
-		Success:  true,
-		Message:  "Build completed successfully",
-		Duration: time.Since(buildStart),
-	})
+    if buildResult != nil {
+        result.BuildVersion = buildResult.Version
+    }
+    r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", result.BuildVersion))
+    result.StepResults = append(result.StepResults, StepResult{
+        StepID:   "build",
+        Success:  true,
+        Message:  "Build completed successfully",
+        Duration: time.Since(buildStart),
+    })
 
 	// Step 6: Push branch
 	// Push branch with a phase timeout
