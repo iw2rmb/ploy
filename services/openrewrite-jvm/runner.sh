@@ -210,18 +210,16 @@ echo "[OpenRewrite] Directory tree (max depth 2):"
 find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
 
-# Establish a Git baseline only if repo is not already a git repo
-BASELINE_NEEDED=0
-if [ ! -d .git ]; then
-  git init -q || true
-  git config user.email "orw-runner@local" || true
-  git config user.name "OpenRewrite Runner" || true
-  BASELINE_NEEDED=1
+# Establish a clean Git baseline regardless of tar contents (ignore tar-provided .git)
+if [ -d .git ]; then
+  mv .git .git.tarbak || true
 fi
-if [ "$BASELINE_NEEDED" = "1" ]; then
-  git add -A >/dev/null 2>&1 || true
-  git commit -qm baseline || true
-fi
+git init -q || true
+git config user.email "orw-runner@local" || true
+git config user.name "OpenRewrite Runner" || true
+git add -A >/dev/null 2>&1 || true
+git commit -qm baseline || true
+git config --global --add safe.directory /workspace/project || true
 
 # Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
@@ -362,10 +360,9 @@ set +e
 git diff -U3 --no-color HEAD -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"
 DIFF_RC=$?
 set -e
-# git diff returns 1 when differences are present; 0 when none
+# git diff returns 1 when differences are present; 0 when none; non-zero unexpected -> leave file as is
 if [ "$DIFF_RC" -eq 0 ]; then
-  # Ensure file exists even if empty
-  touch "${OUTPUT_DIR}/diff.patch" || true
+  : > "${OUTPUT_DIR}/diff.patch"
 fi
 
 # Log diff size and preview
