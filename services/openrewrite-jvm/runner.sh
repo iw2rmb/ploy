@@ -82,7 +82,6 @@ echo "[OpenRewrite]   TRANSFORMATION_ID: ${TRANSFORMATION_ID:-}"
 echo "[OpenRewrite]   RECIPE: ${RECIPE_CLASS}"
 echo "[OpenRewrite]   SEAWEEDFS_URL: ${SEAWEEDFS_URL}"
 echo "[OpenRewrite]   INPUT_URL: ${INPUT_URL:-}"
-echo "[OpenRewrite]   OUTPUT_KEY: (unused)"
 echo "[OpenRewrite] SeaweedFS: ${SEAWEEDFS_URL}"
 
 # Sanity check Java toolchain
