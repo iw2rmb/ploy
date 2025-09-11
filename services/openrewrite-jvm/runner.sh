@@ -215,16 +215,7 @@ if [ -d .git ]; then
   git config --global --add safe.directory "$(pwd)" 2>/dev/null || true
 fi
 
-# Create a baseline snapshot before transformation for diff fallback
-BASE_SNAPSHOT="/workspace/original"
-rm -rf "$BASE_SNAPSHOT"
-mkdir -p "$BASE_SNAPSHOT"
-echo "[OpenRewrite] Creating baseline snapshot at $BASE_SNAPSHOT (hardlinks if supported)"
-if cp -al /workspace/project/. "$BASE_SNAPSHOT" 2>/dev/null; then
-  :
-else
-  rsync -a --delete --exclude '.m2' --exclude 'target' --exclude 'build' /workspace/project/ "$BASE_SNAPSHOT" >/dev/null 2>&1 || cp -a /workspace/project/. "$BASE_SNAPSHOT"/
-fi
+# No baseline snapshot: we require a .git repository and rely solely on git diff
 
 # Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
@@ -337,27 +328,29 @@ echo "[OpenRewrite] Contents of current directory:"
 echo "[OpenRewrite] Contents of /workspace:"
 { ls -la /workspace | head -10; } || true
 
-echo "[OpenRewrite] Generating unified diff patch..."
+echo "[OpenRewrite] Generating unified diff patch (git only)..."
 rm -f "${OUTPUT_DIR}/diff.patch" || true
-# Prefer git diff if repo present; else fallback to diff -ruN with baseline
-if [ -d .git ]; then
-  ( cd /workspace/project && \
-    set +e; \
-    git diff -U3 --no-color -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"; \
-    GIT_RC=$?; set -e; \
-    if [ $GIT_RC -ne 0 ] && [ $GIT_RC -ne 1 ]; then \
-      echo "[OpenRewrite] git diff failed (rc=$GIT_RC); falling back to baseline diff"; \
-      cd /workspace; \
-      diff -ruN --exclude='.m2' --exclude='target' --exclude='build' original project > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
-      sed -i -E 's|^--- original/|--- |; s|^\\+\\+\\+ project/|+++ |' "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
-    fi \
-  )
-else
-  ( cd /workspace; \
-    diff -ruN --exclude='.m2' --exclude='target' --exclude='build' original project > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
-    sed -i -E 's|^--- original/|--- |; s|^\\+\\+\\+ project/|+++ |' "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
-  )
+
+# Enforce presence of a Git repository; no fallback to filesystem diff
+if [ ! -d .git ]; then
+  echo "[OpenRewrite] ERROR: .git directory not found in /workspace/project; git repository is required" >&2
+  write_error ".git not found; repository required for diff generation"
+  exit 1
 fi
+
+# Generate repo-relative unified diff using git
+( cd /workspace/project && \
+  # Ensure Git considers this directory safe
+  git config --global --add safe.directory "$(pwd)" 2>/dev/null || true; \
+  set +e; \
+  git diff -U3 --no-color -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"; \
+  GIT_RC=$?; set -e; \
+  if [ $GIT_RC -ne 0 ] && [ $GIT_RC -ne 1 ]; then \
+    echo "[OpenRewrite] ERROR: git diff failed (rc=$GIT_RC)" >&2; \
+    write_error "git diff failed (rc=$GIT_RC)"; \
+    exit 1; \
+  fi \
+)
 
 # Log diff size and preview
 if [ -f "${OUTPUT_DIR}/diff.patch" ]; then

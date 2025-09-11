@@ -61,6 +61,7 @@
 - Connection pooling and caching for optimal performance
 
 ### Changed
+- OpenRewrite runner: removed `/workspace/original` baseline snapshot and `diff -ruN` fallback. The runner now requires a valid Git repository in the extracted input and generates patches exclusively via `git diff` from `/workspace/project`. This simplifies behavior and matches production inputs (always tarred from Git).
 - Updated roadmap documentation to reflect MVP completion status
 - Enhanced API documentation with transflow and KB endpoints
 - Improved error handling across all service integrations

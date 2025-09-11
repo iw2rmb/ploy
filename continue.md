@@ -46,6 +46,18 @@ Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build
 - One recent run failed during orw-apply with exit code 6 due to SeaweedFS upload DNS failure (`Could not resolve host: seaweedfs-filer.service.consul`). With `set -e` this aborted the task.
 - Another symptom was the controller waiting at phase=apply because it looked for `diff.patch` in its own temp workspace (bind/mount assumption) instead of pulling from alloc/task-side storage.
 - SSE previously lacked granular events; added emits now show `diff-found`, `diff-apply-started`, `build-gate-start`, and final `build-gate-succeeded/failed`.
+- Resolved: empty diff.patch from orw-apply. Runner aligned to Maven‑only with explicit recipe coords; patch generation now uses repo‑relative unified diffs (git diff in `/workspace/project`) and assumes a valid Git repository is present in the extracted input. Manual transflow produces a non‑empty diff.
+
+### Runner + Input Prep Updates (2025‑09‑11)
+
+- Input tar preparation:
+  - Server‑side Git clone now uses `--single-branch --depth 1` to snapshot the requested branch efficiently before tar creation.
+  - Tars remain full working trees for deterministic, SCM‑independent job inputs.
+- orw‑apply runner (services/openrewrite-jvm):
+  - Maven‑only; discovery and Gradle support removed. Requires explicit `RECIPE_GROUP/ARTIFACT/VERSION` and `MAVEN_PLUGIN_VERSION`.
+  - Executes OpenRewrite, then generates repo‑relative patches via `git diff -U3 --no-color -- .` in `/workspace/project` (excludes `target/`, `.m2/`, `build/`). No filesystem-baseline fallback; `.git` is required in the input tar.
+  - Logs diff size and a head preview; uploads `diff.patch` and `transform.log` to SeaweedFS.
+  - Manual one‑off validation and transflow now yield a non‑empty `diff.patch` for the Java11→17 repo.
 
 ## Operational How-To (Quick Reference)
 
