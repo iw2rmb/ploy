@@ -210,6 +210,22 @@ echo "[OpenRewrite] Directory tree (max depth 2):"
 find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
 
+# Ensure git can operate if a repo is present
+if [ -d .git ]; then
+  git config --global --add safe.directory "$(pwd)" 2>/dev/null || true
+fi
+
+# Create a baseline snapshot before transformation for diff fallback
+BASE_SNAPSHOT="/workspace/original"
+rm -rf "$BASE_SNAPSHOT"
+mkdir -p "$BASE_SNAPSHOT"
+echo "[OpenRewrite] Creating baseline snapshot at $BASE_SNAPSHOT (hardlinks if supported)"
+if cp -al /workspace/project/. "$BASE_SNAPSHOT" 2>/dev/null; then
+  :
+else
+  rsync -a --delete --exclude '.m2' --exclude 'target' --exclude 'build' /workspace/project/ "$BASE_SNAPSHOT" >/dev/null 2>&1 || cp -a /workspace/project/. "$BASE_SNAPSHOT"/
+fi
+
 # Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
 if [ -f "pom.xml" ]; then
@@ -321,19 +337,26 @@ echo "[OpenRewrite] Contents of current directory:"
 echo "[OpenRewrite] Contents of /workspace:"
 { ls -la /workspace | head -10; } || true
 
-# Step 5: Generate diff.patch artifact for transflow using git diff (preferred)
 echo "[OpenRewrite] Generating unified diff patch..."
 rm -f "${OUTPUT_DIR}/diff.patch" || true
-# Use git diff against HEAD to capture working tree changes (no color, unified),
-# excluding build artifacts
-set +e
-git diff -U3 --no-color HEAD -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"
-DIFF_RC=$?
-set -e
-# git diff returns 1 when differences are present; 0 when none
-if [ "$DIFF_RC" -eq 0 ]; then
-  # Ensure file exists even if empty
-  touch "${OUTPUT_DIR}/diff.patch" || true
+# Prefer git diff if repo present; else fallback to diff -ruN with baseline
+if [ -d .git ]; then
+  ( cd /workspace/project && \
+    set +e; \
+    git diff -U3 --no-color -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"; \
+    GIT_RC=$?; set -e; \
+    if [ $GIT_RC -ne 0 ] && [ $GIT_RC -ne 1 ]; then \
+      echo "[OpenRewrite] git diff failed (rc=$GIT_RC); falling back to baseline diff"; \
+      cd /workspace; \
+      diff -ruN --exclude='.m2' --exclude='target' --exclude='build' original project > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
+      sed -i -E 's|^--- original/|--- |; s|^\\+\\+\\+ project/|+++ |' "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
+    fi \
+  )
+else
+  ( cd /workspace; \
+    diff -ruN --exclude='.m2' --exclude='target' --exclude='build' original project > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
+    sed -i -E 's|^--- original/|--- |; s|^\\+\\+\\+ project/|+++ |' "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true; \
+  )
 fi
 
 # Log diff size and preview
