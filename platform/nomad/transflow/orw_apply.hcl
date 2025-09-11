@@ -6,7 +6,7 @@ job "transflow-orw-apply-${RUN_ID}" {
     task "openrewrite" {
       driver = "docker"
       config {
-        image = "${TRANSFLOW_ORW_APPLY_IMAGE}"
+        image = "${ORW_IMAGE}"
       }
       env = {
         RECIPE_CLASS        = "${RECIPE_CLASS}"
