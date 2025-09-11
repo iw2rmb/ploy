@@ -34,15 +34,8 @@ rsync -a --delete \
   --exclude '.git' \
   "$AFTER_DIR"/ "$TMP_AFTER"/ 2>/dev/null || true
 
-# Generate unified diff; if no changes, create empty file
-if command -v git >/dev/null 2>&1; then
-  # Use git-style diff to ensure consistent headers when available
-  (
-    cd "$TMP_BEFORE" && git init -q && git add -A && git commit -qm init && cp -a "$TMP_AFTER"/. . && git add -A && git diff -U3 HEAD -- . || true
-  ) > "$OUT_PATCH" 2>/dev/null || true
-else
-  diff -ruN "$TMP_BEFORE" "$TMP_AFTER" > "$OUT_PATCH" 2>/dev/null || true
-fi
+## Generate unified diff reliably using diff(1)
+diff -ruN "$TMP_BEFORE" "$TMP_AFTER" > "$OUT_PATCH" 2>/dev/null || true
 
 # Ensure file exists even if empty
 touch "$OUT_PATCH"
