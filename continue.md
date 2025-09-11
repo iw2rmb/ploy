@@ -5,7 +5,7 @@
 - CLI is REST-only. All orchestration (Nomad jobs, HCL templates) runs on the API (VPS). No local Nomad usage.
 - Remote execution permitted: SSH access to the target VPS is available for running Ansible, Nomad helpers, and validation commands directly from this agent.
 - API embeds all Transflow HCL templates and writes them to a per-run temp workspace:
-  - `api/transflow/templates/{planner.hcl,llm_exec.hcl,orw_apply.hcl,reducer.hcl}`
+  - `platform/nomad/transflow/{planner.hcl,llm_exec.hcl,reducer.hcl,orw_apply.hcl}` (embedded at build time)
   - Runner reads templates relative to its `workspaceDir`.
 - orw-apply I/O stabilized (SeaweedFS-only, Consul DNS):
   - Container always downloads `input.tar` from SeaweedFS via `INPUT_URL` (Consul DNS: `seaweedfs-filer.service.consul`).

@@ -527,7 +527,7 @@ go test -v ./tests/e2e -run TestVPSE2E_ConcurrentWorkflows -timeout 30m
 - Enhanced error handling to prevent information disclosure
 
 #### Service Documentation Updates
-- Updated `internal/cli/transflow/CLAUDE.md` with E2E test framework integration
+- Updated `internal/cli/transflow/README.md` with E2E test framework integration
 - Updated `internal/validation/CLAUDE.md` with E2E validation infrastructure
 - Created `internal/testing/CLAUDE.md` documenting Makefile build system integration
 - Created `tests/e2e/CLAUDE.md` documenting complete workflow testing from CLI to GitLab MR

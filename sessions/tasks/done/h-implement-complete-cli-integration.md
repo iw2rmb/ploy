@@ -78,7 +78,7 @@ Build checking leverages the existing `SharedPush` function from `/internal/cli/
 When builds fail and self-healing is enabled, the system initiates a sophisticated three-phase healing process: planner job submission, parallel fanout execution, and reducer job evaluation. The planner job analyzes the build error and generates a `plan.json` with multiple healing options (human-step, llm-exec, orw-generated). The fanout orchestrator in `/internal/cli/transflow/fanout_orchestrator.go` executes healing branches in parallel with first-success-wins semantics and configurable parallelism limits. The reducer job evaluates all results and determines next actions (typically "stop" if a branch succeeded).
 
 **Job Submission Infrastructure:**
-The healing workflow uses Nomad job templates from `/roadmap/transflow/jobs/` including `planner.hcl`, `reducer.hcl`, `llm_exec.hcl`, and `orw_apply.hcl`. Job submission occurs through `/internal/orchestration/submit.go` using `SubmitAndWaitTerminal()` for batch jobs that must reach terminal states. Environment variable substitution handles model configuration (`TRANSFLOW_MODEL`), MCP tools (`TRANSFLOW_TOOLS`), execution limits (`TRANSFLOW_LIMITS`), and run identification. The system supports both local file output and SeaweedFS/HTTP artifact retrieval patterns.
+The healing workflow uses Nomad job templates from `platform/nomad/transflow/` including `planner.hcl`, `reducer.hcl`, `llm_exec.hcl`, and `orw_apply.hcl`. Job submission occurs through `/internal/orchestration/submit.go` using `SubmitAndWaitTerminal()` for batch jobs that must reach terminal states. Environment variable substitution handles model configuration (`TRANSFLOW_MODEL`), MCP tools (`TRANSFLOW_TOOLS`), execution limits (`TRANSFLOW_LIMITS`), and run identification. The system supports both local file output and SeaweedFS/HTTP artifact retrieval patterns.
 
 **GitLab Merge Request Integration:**
 The recently implemented GitLab integration in `/internal/git/provider/gitlab.go` handles MR creation and updates through GitLab's REST API v4. The system extracts project namespace/name from HTTPS repository URLs, searches for existing MRs with the same source branch for idempotency, and creates descriptive MR content including applied transformations, healing summaries (if applicable), and standardized labels ("ploy", "tfl"). Authentication uses `GITLAB_TOKEN` environment variable with optional `GITLAB_URL` for custom instances.
@@ -227,10 +227,10 @@ PUT /api/v4/projects/{project}/merge_requests/{id}
 - Orchestration: `/internal/orchestration/submit.go` - Nomad job submission
 
 **Job templates:**
-- `/roadmap/transflow/jobs/planner.hcl` - Planner job template
-- `/roadmap/transflow/jobs/reducer.hcl` - Reducer job template  
-- `/roadmap/transflow/jobs/llm_exec.hcl` - LLM execution job template
-- `/roadmap/transflow/jobs/orw_apply.hcl` - OpenRewrite application job template
+- `platform/nomad/transflow/planner.hcl` - Planner job template
+- `platform/nomad/transflow/reducer.hcl` - Reducer job template  
+- `platform/nomad/transflow/llm_exec.hcl` - LLM execution job template
+- `platform/nomad/transflow/orw_apply.hcl` - OpenRewrite application job template
 
 **Test files requiring completion:**
 - `/internal/cli/transflow/runner_test.go` - Core workflow tests
