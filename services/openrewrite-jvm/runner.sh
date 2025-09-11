@@ -462,8 +462,11 @@ echo "[OpenRewrite] Contents of /workspace:"
 
 # Step 5: Generate diff.patch artifact for transflow (always create file)
 echo "[OpenRewrite] Generating unified diff patch..."
+rm -f "${OUTPUT_DIR}/diff.patch" || true
 if /usr/local/bin/generate-diff.sh "$ORIG_SNAPSHOT" "/workspace/project" "${OUTPUT_DIR}/diff.patch"; then
   echo "[OpenRewrite] diff.patch generated at ${OUTPUT_DIR}/diff.patch"
+  echo "[OpenRewrite] diff size: $(wc -c < \"${OUTPUT_DIR}/diff.patch\") bytes"
+  echo "[OpenRewrite] diff head preview:"; head -n 20 "${OUTPUT_DIR}/diff.patch" || true
 else
   echo "[OpenRewrite] WARNING: diff generation script returned non-zero status; continuing"
   # Ensure file exists
