@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,6 +13,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// seqBuildChecker returns success on the first call and error on subsequent calls.
+// Used to let the orw-apply apply+build pass, then trigger healing on the later build gate.
+type seqBuildChecker struct{ calls int }
+
+func (s *seqBuildChecker) CheckBuild(ctx context.Context, cfg common.DeployConfig) (*common.DeployResult, error) {
+	s.calls++
+	if s.calls == 1 {
+		return &common.DeployResult{Success: true, Version: "mock-v1"}, nil
+	}
+	return nil, fmt.Errorf("compilation failed: undefined symbol")
+}
 
 // Mock job submission interfaces for testing - move these to top of file
 // to be available to all parts of the package
@@ -357,6 +370,48 @@ func TestRunHealingFanout(t *testing.T) {
 // Test runner integration
 func TestTransflowRunnerWithHealing(t *testing.T) {
 	t.Run("healing triggered on build failure", func(t *testing.T) {
+		// Stub out Nomad-dependent functions to keep this a unit test
+		oldValidate := validateJob
+		oldSubmit := submitAndWaitTerminal
+		oldDL := downloadToFileFn
+		oldGet := getJSONFn
+		oldPut := putJSONFn
+		oldVDP := validateDiffPathsFn
+		oldVUD := validateUnifiedDiffFn
+		oldAD := applyUnifiedDiffFn
+		oldHasChanges := hasRepoChangesFn
+		validateJob = func(string) error { return nil }
+		// Force wait error to trigger local diff fallback logic (we will create the diff ourselves)
+		submitAndWaitTerminal = func(string, time.Duration) error { return fmt.Errorf("simulated wait error") }
+		// Stub remote artifact calls: write minimal content to dest, and no-op JSON interactions
+		downloadToFileFn = func(_ string, dest string) error {
+			// Ensure a small valid unified diff is present
+			_ = os.MkdirAll(filepath.Dir(dest), 0755)
+			diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
+			return os.WriteFile(dest, []byte(diff), 0644)
+		}
+		getJSONFn = func(string, string) ([]byte, int, error) { return nil, 404, nil }
+		putJSONFn = func(string, string, []byte) error { return nil }
+		// Skip path validation and patch application in unit test
+		validateDiffPathsFn = func(string, []string) error { return nil }
+		validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+		applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+		hasRepoChangesFn = func(string) (bool, error) { return true, nil }
+
+		defer func() {
+			validateJob = oldValidate
+			submitAndWaitTerminal = oldSubmit
+			downloadToFileFn = oldDL
+			getJSONFn = oldGet
+			putJSONFn = oldPut
+			validateDiffPathsFn = oldVDP
+			validateUnifiedDiffFn = oldVUD
+			applyUnifiedDiffFn = oldAD
+			hasRepoChangesFn = oldHasChanges
+		}()
+		// Execution id used in branch metadata paths
+		os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "test-exec")
+		defer os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
 		// Setup
 		config := &TransflowConfig{
 			ID:         "healing-test",
@@ -367,17 +422,23 @@ func TestTransflowRunnerWithHealing(t *testing.T) {
 				Enabled:    true,
 			},
 			Steps: []TransflowStep{
-				{Type: "recipe", ID: "java-migration", Engine: "openrewrite", Recipes: []string{"Java11to17"}},
+				{
+					Type:               "orw-apply",
+					ID:                 "java-migration",
+					Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+					RecipeGroup:        "org.openrewrite.recipe",
+					RecipeArtifact:     "rewrite-migrate-java",
+					RecipeVersion:      "3.17.0",
+					MavenPluginVersion: "6.18.0",
+				},
 			},
 		}
 
 		// Mocks
 		mockGit := &MockGitOperations{}
 		mockRecipe := &MockRecipeExecutor{}
-		mockBuild := &MockBuildChecker{
-			// First build fails, triggering healing
-			BuildError: fmt.Errorf("compilation failed: undefined symbol"),
-		}
+		var check seqBuildChecker
+		mockBuild := &check
 		mockJobSubmitter := &MockJobSubmitter{
 			JobResults: map[string]JobResult{
 				"planner": {JobID: "plan-123", Status: "completed", Output: `{"plan_id": "p1", "options": [{"id": "llm1", "type": "llm-exec"}]}`},
@@ -395,6 +456,13 @@ func TestTransflowRunnerWithHealing(t *testing.T) {
 
 		// This integration doesn't exist yet - will need to add healing to runner
 		runner.SetJobSubmitter(mockJobSubmitter)
+
+		// Ensure a minimal build file exists to pass ORW guard
+		_ = os.MkdirAll("/tmp/workspace/repo", 0755)
+		_ = os.WriteFile("/tmp/workspace/repo/pom.xml", []byte("<project></project>"), 0644)
+		// Pre-create a local diff to allow fallback when submit wait is stubbed to error
+		_ = os.MkdirAll("/tmp/workspace/orw-apply/java-migration/out", 0755)
+		_ = os.WriteFile("/tmp/workspace/orw-apply/java-migration/out/diff.patch", []byte("--- a/pom.xml\n+++ b/pom.xml\n"), 0644)
 
 		// Execute
 		ctx := context.Background()
