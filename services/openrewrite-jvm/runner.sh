@@ -210,17 +210,6 @@ echo "[OpenRewrite] Directory tree (max depth 2):"
 find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
 
-# Establish a clean Git baseline regardless of tar contents (ignore tar-provided .git)
-if [ -d .git ]; then
-  mv .git .git.tarbak || true
-fi
-git init -q || true
-git config user.email "orw-runner@local" || true
-git config user.name "OpenRewrite Runner" || true
-git add -A >/dev/null 2>&1 || true
-git commit -qm baseline || true
-git config --global --add safe.directory /workspace/project || true
-
 # Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
 if [ -f "pom.xml" ]; then
@@ -289,17 +278,6 @@ fi
 JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
 register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}" || true
 
-# Create a lightweight baseline snapshot (no Git), before transformation
-BASE_SNAPSHOT="/workspace/original"
-rm -rf "$BASE_SNAPSHOT"
-mkdir -p "$BASE_SNAPSHOT"
-echo "[OpenRewrite] Creating baseline snapshot at $BASE_SNAPSHOT (hardlinks if supported)"
-if cp -al /workspace/project/. "$BASE_SNAPSHOT" 2>/dev/null; then
-  :
-else
-  rsync -a --delete --exclude '.m2' --exclude 'target' --exclude 'build' /workspace/project/ "$BASE_SNAPSHOT" >/dev/null 2>&1 || cp -a /workspace/project/. "$BASE_SNAPSHOT"/
-fi
-
 # Step 4: Run OpenRewrite transformation
 echo "[OpenRewrite] Running transformation with recipe: ${RECIPE_CLASS}"
 
@@ -362,22 +340,19 @@ echo "[OpenRewrite] Contents of current directory:"
 echo "[OpenRewrite] Contents of /workspace:"
 { ls -la /workspace | head -10; } || true
 
-# Step 5: Generate diff.patch artifact for transflow using diff -ruN (no Git)
+# Step 5: Generate diff.patch artifact for transflow using git diff (preferred)
 echo "[OpenRewrite] Generating unified diff patch..."
 rm -f "${OUTPUT_DIR}/diff.patch" || true
-cd /workspace
+# Use git diff against HEAD to capture working tree changes (no color, unified),
+# excluding build artifacts
 set +e
-diff -ruN \
-  --exclude='.m2' \
-  --exclude='target' \
-  --exclude='build' \
-  original project > "${OUTPUT_DIR}/diff.patch" 2>/dev/null
+git diff -U3 --no-color HEAD -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"
 DIFF_RC=$?
 set -e
-
-# Normalize patch paths to be repo-relative (strip original/ and project/ prefixes)
-if [ -f "${OUTPUT_DIR}/diff.patch" ]; then
-  sed -i -E 's|^--- original/|--- |; s|^\+\+\+ project/|+++ |' "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true
+# git diff returns 1 when differences are present; 0 when none
+if [ "$DIFF_RC" -eq 0 ]; then
+  # Ensure file exists even if empty
+  touch "${OUTPUT_DIR}/diff.patch" || true
 fi
 
 # Log diff size and preview
