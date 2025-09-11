@@ -313,7 +313,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 			Enabled:    true,
 		},
 		Steps: []TransflowStep{
-			{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.test.Recipe"}},
+			{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 		},
 	}
 
@@ -395,7 +395,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 			Enabled:    true,
 		},
 		Steps: []TransflowStep{
-			{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.test.Recipe"}},
+			{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 		},
 	}
 

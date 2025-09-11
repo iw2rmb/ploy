@@ -44,7 +44,7 @@ steps:
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:   "recipe",
+						Type:   "orw-apply",
 						ID:     "openrewrite-updates",
 						Engine: "openrewrite",
 						Recipes: []string{
@@ -79,7 +79,7 @@ steps:
 				BuildTimeout: "",
 				Steps: []TransflowStep{
 					{
-						Type:   "recipe",
+						Type:   "orw-apply",
 						ID:     "simple-recipe",
 						Engine: "openrewrite",
 						Recipes: []string{
@@ -200,7 +200,7 @@ func TestConfigValidation(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
+						Type:    "orw-apply",
 						ID:      "test-recipe",
 						Engine:  "openrewrite",
 						Recipes: []string{"com.acme.Recipe"},
@@ -216,7 +216,7 @@ func TestConfigValidation(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 				},
 			},
 			expectError: true,
@@ -229,7 +229,7 @@ func TestConfigValidation(t *testing.T) {
 				TargetRepo: "",
 				BaseRef:    "refs/heads/main",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 				},
 			},
 			expectError: true,
@@ -242,7 +242,7 @@ func TestConfigValidation(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 				},
 			},
 			expectError: true,

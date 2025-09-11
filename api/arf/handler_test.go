@@ -119,6 +119,7 @@ func TestHandlerListRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -143,6 +144,7 @@ func TestHandlerListRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -162,6 +164,7 @@ func TestHandlerGetRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -181,6 +184,7 @@ func TestHandlerGetRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected status 404, got %d", resp.StatusCode)
@@ -219,6 +223,7 @@ func TestHandlerCreateRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("Expected status 201, got %d", resp.StatusCode)
@@ -242,6 +247,7 @@ func TestHandlerCreateRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", resp.StatusCode)
@@ -264,6 +270,7 @@ func TestHandlerSandboxOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -294,6 +301,7 @@ func TestHandlerSandboxOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("Expected status 201, got %d", resp.StatusCode)
@@ -323,6 +331,7 @@ func TestHandlerHealthCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -353,6 +362,7 @@ func TestHandlerSearchRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -372,6 +382,7 @@ func TestHandlerSearchRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", resp.StatusCode)
@@ -392,6 +403,7 @@ func TestHandlerRecipeStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)

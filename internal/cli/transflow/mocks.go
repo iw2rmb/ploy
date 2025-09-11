@@ -46,6 +46,8 @@ func (m *MockGitOperations) CloneRepository(ctx context.Context, repoURL, branch
 	// Create a harmless placeholder file so subsequent steps (branch/apply) run.
 	placeholder := targetPath + "/README.md"
 	_ = os.WriteFile(placeholder, []byte("# mock repo\n"), 0644)
+	// Provide a minimal build file to pass ORW build-file guard
+	_ = os.WriteFile(targetPath+"/pom.xml", []byte("<project></project>"), 0644)
 
 	return m.CloneError
 }
