@@ -4,19 +4,19 @@ import "time"
 
 // TransformationStatus represents the current status of a transformation with healing support
 type TransformationStatus struct {
-	TransformationID     string                     `json:"transformation_id"`
-	WorkflowStage        string                     `json:"workflow_stage"` // openrewrite, build, deploy, test, heal
-	Status               string                     `json:"status"`         // pending, in_progress, completed, failed
-	StartTime            time.Time                  `json:"start_time"`
-	EndTime              time.Time                  `json:"end_time,omitempty"`
-	Children             []HealingAttempt           `json:"children"`
-	ActiveHealingCount   int                        `json:"active_healing_count"`
-	TotalHealingAttempts int                        `json:"total_healing_attempts"`
-	CoordinatorMetrics   *HealingCoordinatorMetrics `json:"coordinator_metrics,omitempty"`
-	Progress             *TransformationProgress    `json:"progress,omitempty"`
-	Error                string                     `json:"error,omitempty"`
-	SandboxInfo          *TransformationSandboxInfo `json:"sandbox_info,omitempty"`
-	HealingSummary       *HealingSummary            `json:"healing_summary,omitempty"`
+	TransformationID     string           `json:"transformation_id"`
+	WorkflowStage        string           `json:"workflow_stage"` // openrewrite, build, deploy, test, heal
+	Status               string           `json:"status"`         // pending, in_progress, completed, failed
+	StartTime            time.Time        `json:"start_time"`
+	EndTime              time.Time        `json:"end_time,omitempty"`
+	Children             []HealingAttempt `json:"children"`
+	ActiveHealingCount   int              `json:"active_healing_count"`
+	TotalHealingAttempts int              `json:"total_healing_attempts"`
+	// CoordinatorMetrics removed with healing coordinator
+	Progress       *TransformationProgress    `json:"progress,omitempty"`
+	Error          string                     `json:"error,omitempty"`
+	SandboxInfo    *TransformationSandboxInfo `json:"sandbox_info,omitempty"`
+	HealingSummary *HealingSummary            `json:"healing_summary,omitempty"`
 
 	// Transformation result fields (previously in TransformationResult)
 	RecipeID        string   `json:"recipe_id,omitempty"`
@@ -63,12 +63,7 @@ type LLMAnalysisResult struct {
 // HealingTree represents the complete healing attempt hierarchy
 type HealingTree struct {
 	RootTransformID string           `json:"root_transform_id"`
-	Attempts        []HealingAttempt `json:"attempts"`        // Array of attempts
-	ActiveAttempts  []string         `json:"active_attempts"` // Currently running
-	TotalAttempts   int              `json:"total_attempts"`
-	SuccessfulHeals int              `json:"successful_heals"`
-	FailedHeals     int              `json:"failed_heals"`
-	MaxDepth        int              `json:"max_depth"`
+	Attempts        []HealingAttempt `json:"attempts"`
 }
 
 // DeploymentMetrics contains deployment-related metrics

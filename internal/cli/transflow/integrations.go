@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
@@ -105,13 +106,19 @@ func NewTransflowIntegrationsWithTestMode(controllerURL, workDir string, testMod
 	}
 }
 
+// ARFGitOperations wraps the ARF Git operations to satisfy the interface
+type ARFGitOperations struct{ *arf.GitOperations }
+
+func NewARFGitOperations(workDir string) *ARFGitOperations {
+	return &ARFGitOperations{GitOperations: arf.NewGitOperations(workDir)}
+}
+
 // CreateGitOperations creates a Git operations implementation
 func (i *TransflowIntegrations) CreateGitOperations() GitOperationsInterface {
 	if i.TestMode {
 		return NewMockGitOperations() // Use mock implementation for testing
 	}
-	// Use mock or a direct implementation; ARF Git wrappers removed
-	return NewMockGitOperations()
+	return NewARFGitOperations(i.WorkDir)
 }
 
 // CreateRecipeExecutor creates a recipe executor implementation

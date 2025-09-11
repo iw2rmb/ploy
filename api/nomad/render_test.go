@@ -255,19 +255,13 @@ func TestRenderTemplateFilenames(t *testing.T) {
 				Language: tt.language,
 			}
 
-			// Call RenderTemplate to get template path (we expect it to fail on template loading)
-			// but we can check the template path by examining the error message
-			_, err := RenderTemplate(tt.lane, data)
-
-			if err == nil {
-				t.Error("Expected error due to missing template file")
-				return
+			// Call RenderTemplate to generate an output file using embedded templates
+			out, err := RenderTemplate(tt.lane, data)
+			if err != nil {
+				t.Fatalf("RenderTemplate failed: %v", err)
 			}
-
-			// Extract template path from error message
-			errorMsg := err.Error()
-			if !strings.Contains(errorMsg, tt.expectedTemplate) {
-				t.Errorf("Expected template %s in error message: %s", tt.expectedTemplate, errorMsg)
+			if out == "" || !strings.HasSuffix(out, ".hcl") {
+				t.Errorf("expected output file path ending with .hcl, got %q", out)
 			}
 		})
 	}
