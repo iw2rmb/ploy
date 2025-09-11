@@ -40,10 +40,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: GetDefaultSelfHealConfig(),
@@ -63,10 +66,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: GetDefaultSelfHealConfig(),
@@ -86,10 +92,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe-storage",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: &SelfHealConfig{
@@ -113,10 +122,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe-nomad",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: &SelfHealConfig{
@@ -140,10 +152,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe-consul",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: &SelfHealConfig{
@@ -167,10 +182,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe-gitlab",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: &SelfHealConfig{
@@ -194,10 +212,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BuildTimeout: "15m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe-all-services",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.format.AutoFormat"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 				SelfHeal: &SelfHealConfig{
@@ -504,7 +525,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 			}
 
 			// Check that all expected steps completed
-			expectedSteps := []string{"clone", "create-branch", "test-recipe", "commit", "build", "push", "mr"}
+			expectedSteps := []string{"clone", "create-branch", "java-migration", "commit", "build", "push", "mr"}
 			if len(result.StepResults) < len(expectedSteps) {
 				t.Errorf("expected at least %d steps but got %d", len(expectedSteps), len(result.StepResults))
 			}
@@ -545,10 +566,12 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 				BaseRef:      "main",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.test.Recipe"},
+						Type:           "orw-apply",
+						ID:             "java-migration",
+						Recipes:        []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:    "org.openrewrite.recipe",
+						RecipeArtifact: "rewrite-migrate-java",
+						RecipeVersion:  "3.17.0",
 					},
 				},
 			},
@@ -573,10 +596,12 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 				BuildTimeout: "invalid-timeout",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test",
-						Engine:  "openrewrite",
-						Recipes: []string{"org.test.Recipe"},
+						Type:           "orw-apply",
+						ID:             "java-migration",
+						Recipes:        []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:    "org.openrewrite.recipe",
+						RecipeArtifact: "rewrite-migrate-java",
+						RecipeVersion:  "3.17.0",
 					},
 				},
 			},
