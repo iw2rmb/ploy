@@ -44,7 +44,7 @@ The reducer evaluation happens through `SubmitReducerJob()` (lines 66-102) follo
 Both job submission helper and fanout orchestrator use identical type assertion patterns to detect test submitters versus production submitters. The test interface requires `SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)` and provides complete mock implementations for testing. Production mode explicitly returns "production job submission not implemented yet" errors, indicating this exact integration point.
 
 **Nomad Job Template Architecture:**
-The system includes comprehensive HCL job templates in `/roadmap/transflow/jobs/` for each healing job type. The planner template (`planner.hcl`) configures a batch job running the langchain-runner container in planner mode, with environment variable placeholders for `${MODEL}`, `${TOOLS_JSON}`, `${LIMITS_JSON}`, and `${RUN_ID}`. Volume mounts provide access to context, knowledge base, and output directories. The reducer template (`reducer.hcl`) follows similar patterns but with reducer-specific configuration and input history.json processing. The LLM execution template (`llm_exec.hcl`) supports direct LLM-driven code generation and patching workflows.
+The system includes comprehensive HCL job templates in `platform/nomad/transflow/` for each healing job type. The planner template (`planner.hcl`) configures a batch job running the langchain-runner container in planner mode, with environment variable placeholders for `${MODEL}`, `${TOOLS_JSON}`, `${LIMITS_JSON}`, and `${RUN_ID}`. Volume mounts provide access to context, knowledge base, and output directories. The reducer template (`reducer.hcl`) follows similar patterns but with reducer-specific configuration and input history.json processing. The LLM execution template (`llm_exec.hcl`) supports direct LLM-driven code generation and patching workflows.
 
 **Asset Rendering Infrastructure:**
 The `TransflowRunner` includes sophisticated asset rendering methods that prepare job inputs and HCL templates for submission. `RenderPlannerAssets()` generates planner inputs JSON and performs environment variable substitution in the HCL template. Similar methods exist for LLM execution and OpenRewrite application jobs. These rendered assets are designed to be consumed by production job submission but currently only serve testing and validation purposes.
@@ -160,9 +160,9 @@ type NextAction struct {
 - `/internal/cli/transflow/integrations.go` - Dependency injection and factory methods
 
 **Job templates (already implemented):**
-- `/roadmap/transflow/jobs/planner.hcl` - Planner job specification with variable placeholders
-- `/roadmap/transflow/jobs/reducer.hcl` - Reducer job specification with input processing
-- `/roadmap/transflow/jobs/llm_exec.hcl` - LLM execution job for code generation
+- `platform/nomad/transflow/planner.hcl` - Planner job specification with variable placeholders
+- `platform/nomad/transflow/reducer.hcl` - Reducer job specification with input processing
+- `platform/nomad/transflow/llm_exec.hcl` - LLM execution job for code generation
 
 **Test files requiring updates:**
 - `/internal/cli/transflow/job_submission_test.go` - Extend tests for production implementations

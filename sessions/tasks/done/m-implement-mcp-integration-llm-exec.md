@@ -31,7 +31,7 @@ The LLM-exec functionality operates as part of the broader transflow healing inf
 
 #### Current LLM-exec Architecture
 
-The existing LLM-exec implementation is defined in `/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl` as a Nomad batch job template. The job runs a containerized LangGraph runner (`ghcr.io/your-org/langchain-runner:py-0.1.0`) with specific environment variables and volume mounts for context and output. The current environment configuration includes:
+The existing LLM-exec implementation is defined in `platform/nomad/transflow/llm_exec.hcl` as a Nomad batch job template. The job runs a containerized LangGraph runner (`ghcr.io/your-org/langchain-runner:py-0.1.0`) with specific environment variables and volume mounts for context and output. The current environment configuration includes:
 
 - `MODEL`: Resolved via LLM registry (e.g., `gpt-4o-mini@2024-08-06`)
 - `TOOLS_JSON`: JSON allowlist config for tools (`file`, `search`, `build`, optional `openrewrite`)
@@ -123,7 +123,7 @@ The existing test infrastructure in `/Users/vk/@iw2rmb/ploy/internal/cli/transfl
 
 #### Core Components to Modify
 
-**HCL Job Template** (`/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl`):
+**HCL Job Template** (`platform/nomad/transflow/llm_exec.hcl`):
 - Extend `env` block with MCP-related environment variables
 - Add network configuration for MCP endpoint access
 - Consider additional volume mounts for MCP tool configurations
@@ -198,9 +198,9 @@ type MCPConfig struct {
 
 - **Primary Implementation**: `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration.go`
 - **Configuration Extensions**: `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/config.go`
-- **Job Template Updates**: `/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/llm_exec.hcl`
+- **Job Template Updates**: `platform/nomad/transflow/llm_exec.hcl`
 - **Testing**: `/Users/vk/@iw2rmb/ploy/internal/cli/transflow/mcp_integration_test.go`
-- **Documentation**: `/Users/vk/@iw2rmb/ploy/roadmap/transflow/jobs/mcp_tools.md`
+- **Documentation**: `platform/nomad/transflow/MCP_INTEGRATION.md`
 
 ## Implementation Approach
 
@@ -241,7 +241,7 @@ The implementation extends the transflow healing infrastructure with MCP capabil
 ### 2025-09-06
 
 #### Completed
-- Updated service documentation (internal/cli/transflow/CLAUDE.md)
+- Updated service documentation (internal/cli/transflow/README.md)
 - Finalized task documentation with clean work log consolidation
 - Verified build compilation and code formatting
 - Task completion verified with all success criteria met
@@ -258,8 +258,8 @@ The MCP integration for LLM-exec has been successfully completed with a comprehe
 - `internal/cli/transflow/config.go` - Extended configuration with MCP field support
 - `internal/cli/transflow/job_submission.go` - MCP-aware HCL template substitution
 - `internal/cli/transflow/fanout_orchestrator.go` - MCP configuration parsing integration
-- `roadmap/transflow/jobs/llm_exec.hcl` - Enhanced Nomad job template
-- `roadmap/transflow/jobs/MCP_INTEGRATION.md` - User documentation and examples
+- `platform/nomad/transflow/llm_exec.hcl` - Enhanced Nomad job template
+- `platform/nomad/transflow/MCP_INTEGRATION.md` - User documentation and examples
 
 ### Performance Characteristics
 - **Validation**: 36ns per operation with zero allocations

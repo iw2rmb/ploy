@@ -12,8 +12,8 @@ This doc specifies the contract for running LangGraph as short‑lived Nomad job
   - `/workspace/out`: writable artifacts dir (planner: `plan.json`; reducer: `next.json`).
 - Env (shared):
   - `MODEL` — model identifier `name@version` (resolved via llms registry).
-  - `TOOLS` — JSON string allowlist for MCP tools (e.g., file/search/build/openrewrite) and their scoped config. Validate against `schemas/tools.schema.json`.
-  - `LIMITS` — JSON with limits: `{ "max_steps": N, "max_tool_calls": N, "timeout": "30m" }`. Validate against `schemas/limits.schema.json`.
+  - `TOOLS` — JSON string allowlist for MCP tools (e.g., file/search/build/openrewrite) and their scoped config. Validate against `platform/nomad/transflow/schemas/tools.schema.json`.
+  - `LIMITS` — JSON with limits: `{ "max_steps": N, "max_tool_calls": N, "timeout": "30m" }`. Validate against `platform/nomad/transflow/schemas/limits.schema.json`.
   - `CONTEXT_DIR` — `/workspace/context` (mounted by orchestrator).
   - `KB_DIR` — `/workspace/kb` if present; empty otherwise.
   - `OUTPUT_DIR` — `/workspace/out` (job writes artifacts here).
@@ -79,8 +79,8 @@ Example:
 - Reducer: `out/next.json`, `out/manifest.json`; optional traces under `out/logs/`.
 
 Schemas:
-- Plan schema: see `schemas/plan.schema.json` (plan_id + options[] of type human|llm-exec|orw-gen).
-- Next schema: see `schemas/next.schema.json` (action stop|new_plan; optional embedded plan).
+- Plan schema: see `platform/nomad/transflow/schemas/plan.schema.json` (plan_id + options[] of type human|llm-exec|orw-gen).
+- Next schema: see `platform/nomad/transflow/schemas/next.schema.json` (action stop|new_plan; optional embedded plan).
 
 ### Error Handling
 

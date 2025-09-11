@@ -92,7 +92,7 @@ The missing piece was proper integration into the transflow workflow:
 - `internal/cli/transflow/integrations.go` - Production KB integration factory (line 216)
 - `internal/cli/transflow/kb_integration.go` - KB integration implementation
 - `internal/kb/learning/` - Complete KB learning pipeline implementation
-- `internal/cli/transflow/CLAUDE.md` - Updated service documentation
+- `internal/cli/transflow/README.md` - Updated service documentation
 - `internal/kb/CLAUDE.md` - Updated KB service documentation
 
 ## Production Status

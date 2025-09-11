@@ -399,16 +399,20 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 
 // recordError records an error status for the execution
 func (h *Handler) recordError(executionID string, err error) {
-	endTime := time.Now()
-	status := TransflowStatus{
-		ID:      executionID,
-		Status:  "failed",
-		EndTime: &endTime,
-		Error:   err.Error(),
-	}
-	if storeErr := h.storeStatus(status); storeErr != nil {
-		log.Printf("Failed to store error status: %v", storeErr)
-	}
+    endTime := time.Now()
+    // Preserve existing status (steps, phase, start time) if available
+    var status *TransflowStatus
+    if st, getErr := h.getStatus(executionID); getErr == nil && st != nil {
+        status = st
+    } else {
+        status = &TransflowStatus{ID: executionID, StartTime: endTime}
+    }
+    status.Status = "failed"
+    status.EndTime = &endTime
+    status.Error = err.Error()
+    if storeErr := h.storeStatus(*status); storeErr != nil {
+        log.Printf("Failed to store error status: %v", storeErr)
+    }
 }
 
 // persistArtifacts scans the temp workspace for known Transflow artifacts and uploads them to storage.

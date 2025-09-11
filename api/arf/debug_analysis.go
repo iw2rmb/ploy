@@ -33,8 +33,8 @@ func analyzeTransformation(status *TransformationStatus) *TransformationAnalysis
 		successRate = 1.0
 	}
 
-    // Calculate max depth
-    maxDepth := calculateMaxDepth(status.Children, 0)
+	// Calculate max depth
+	maxDepth := calculateMaxDepth(status.Children, 0)
 
 	// Find most common error
 	mostCommonError := ""
@@ -114,18 +114,18 @@ func analyzeTransformation(status *TransformationStatus) *TransformationAnalysis
 
 // calculateMaxDepth determines the maximum depth of the healing attempts tree
 func calculateMaxDepth(attempts []HealingAttempt, currentDepth int) int {
-    if len(attempts) == 0 {
-        return currentDepth - 1
-    }
+	if len(attempts) == 0 {
+		return currentDepth - 1
+	}
 
-    maxDepth := currentDepth
-    for _, attempt := range attempts {
-        childDepth := calculateMaxDepth(attempt.Children, currentDepth+1)
-        if childDepth > maxDepth {
-            maxDepth = childDepth
-        }
-    }
-    return maxDepth
+	maxDepth := currentDepth
+	for _, attempt := range attempts {
+		childDepth := calculateMaxDepth(attempt.Children, currentDepth+1)
+		if childDepth > maxDepth {
+			maxDepth = childDepth
+		}
+	}
+	return maxDepth
 }
 
 // countAttempts recursively counts all healing attempts in the tree
