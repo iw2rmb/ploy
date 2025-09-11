@@ -366,16 +366,31 @@ echo "[OpenRewrite] Contents of current directory:"
 echo "[OpenRewrite] Contents of /workspace:"
 { ls -la /workspace | head -10; } || true
 
-# Step 5: Generate diff.patch artifact for transflow (always create file)
+# Step 5: Generate diff.patch artifact for transflow using git diff (preferred)
 echo "[OpenRewrite] Generating unified diff patch..."
 rm -f "${OUTPUT_DIR}/diff.patch" || true
-if /usr/local/bin/generate-diff.sh "$ORIG_SNAPSHOT" "/workspace/project" "${OUTPUT_DIR}/diff.patch"; then
-  echo "[OpenRewrite] diff.patch generated at ${OUTPUT_DIR}/diff.patch"
+if [ -d .git ]; then
+  # Use git diff against HEAD to capture working tree changes (no color, unified)
+  set +e
+  git diff -U3 --no-color > "${OUTPUT_DIR}/diff.patch"
+  DIFF_RC=$?
+  set -e
+  # git diff returns 1 when differences are present; treat 0 or 1 as success
+  if [ "$DIFF_RC" -ne 0 ] && [ "$DIFF_RC" -ne 1 ]; then
+    echo "[OpenRewrite] WARNING: git diff returned rc=$DIFF_RC; falling back to diff -ruN"
+    diff -ruN "/workspace/original" "/workspace/project" > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true
+  fi
+else
+  echo "[OpenRewrite] .git not found; using diff -ruN fallback"
+  diff -ruN "/workspace/original" "/workspace/project" > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true
+fi
+
+# Log diff size and preview
+if [ -f "${OUTPUT_DIR}/diff.patch" ]; then
   echo "[OpenRewrite] diff size: $(wc -c < \"${OUTPUT_DIR}/diff.patch\") bytes"
   echo "[OpenRewrite] diff head preview:"; head -n 20 "${OUTPUT_DIR}/diff.patch" || true
 else
-  echo "[OpenRewrite] WARNING: diff generation script returned non-zero status; continuing"
-  # Ensure file exists
+  echo "[OpenRewrite] WARNING: diff.patch was not created"
   touch "${OUTPUT_DIR}/diff.patch" || true
 fi
 
