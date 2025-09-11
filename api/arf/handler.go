@@ -1,13 +1,10 @@
 package arf
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // CatalogMetrics interface for tracking catalog metrics
@@ -35,8 +32,6 @@ type Handler struct {
 	sbomAnalyzer   *SyftSBOMAnalyzer
 	// Consul store for transformation status
 	consulStore ConsulStoreInterface
-	// Healing coordination for parallel attempts
-	healingCoordinator *HealingCoordinator
 	// Metrics for catalog operations
 	metrics CatalogMetrics
 }
@@ -53,91 +48,10 @@ func NewHandler(executor *RecipeExecutor, sandboxMgr SandboxManager) *Handler {
 	}
 }
 
-// SetConsulStore sets the Consul store and initializes the healing coordinator
-func (h *Handler) SetConsulStore(store ConsulStoreInterface) {
-	h.consulStore = store
+// SetConsulStore sets the Consul store
+func (h *Handler) SetConsulStore(store ConsulStoreInterface) { h.consulStore = store }
 
-	// Initialize healing coordinator with default config when Consul is available
-	config := DefaultHealingConfig()
-	h.healingCoordinator = NewHealingCoordinator(config)
-
-	// Start the coordinator
-	if err := h.healingCoordinator.Start(context.Background()); err != nil {
-		fmt.Printf("Warning: Failed to start healing coordinator: %v\n", err)
-	}
-}
-
-// RegisterPrometheusMetrics registers the healing metrics with the Prometheus registry
-func (h *Handler) RegisterPrometheusMetrics(registry interface{}) error {
-	if h.healingCoordinator == nil {
-		return fmt.Errorf("healing coordinator not initialized")
-	}
-
-	exporter := h.healingCoordinator.GetMetricsExporter()
-	if exporter == nil {
-		return fmt.Errorf("metrics exporter not available")
-	}
-
-	// Check if registry is a Prometheus registry
-	if promRegistry, ok := registry.(*prometheus.Registry); ok {
-		return exporter.Register(promRegistry)
-	}
-
-	return fmt.Errorf("invalid registry type")
-}
-
-// GetHealingCoordinatorMetrics returns metrics from the healing coordinator
-func (h *Handler) GetHealingCoordinatorMetrics() *HealingCoordinatorMetrics {
-	if h.healingCoordinator != nil {
-		metrics := h.healingCoordinator.GetMetrics()
-		return &metrics
-	}
-	return nil
-}
-
-// GetHealingMetrics provides an HTTP endpoint for healing coordinator metrics
-func (h *Handler) GetHealingMetrics(c *fiber.Ctx) error {
-	if h.healingCoordinator == nil {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-			"error":   "Healing coordinator not initialized",
-			"message": "Healing coordinator requires Consul store to be configured",
-		})
-	}
-
-	if !h.healingCoordinator.IsRunning() {
-		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-			"error":   "Healing coordinator not running",
-			"message": "Healing coordinator is not currently active",
-		})
-	}
-
-	metrics := h.healingCoordinator.GetMetrics()
-
-	// Get active alerts
-	activeAlerts := h.healingCoordinator.GetActiveAlerts()
-	alertHistory := h.healingCoordinator.GetAlertHistory()
-
-	// Create enhanced response with additional context
-	response := fiber.Map{
-		"coordinator_metrics": metrics,
-		"status": fiber.Map{
-			"running":      h.healingCoordinator.IsRunning(),
-			"active_tasks": h.healingCoordinator.GetActiveTaskCount(),
-		},
-		"configuration": fiber.Map{
-			"max_parallel_attempts": 3, // Default from config
-			"max_healing_depth":     5,
-			"max_total_attempts":    20,
-		},
-		"alerts": fiber.Map{
-			"active":        activeAlerts,
-			"active_count":  len(activeAlerts),
-			"history_count": len(alertHistory),
-		},
-	}
-
-	return c.JSON(response)
-}
+// RegisterPrometheusMetrics removed
 
 // NewHandlerWithStorage creates a new ARF HTTP handler with storage backend
 func NewHandlerWithStorage(
@@ -250,6 +164,5 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/sbom/report", h.GetSBOMReport)
 	arf.Get("/sbom/:id", h.GetSBOMReport) // Support route param
 
-	// Healing coordinator monitoring
-	arf.Get("/healing/metrics", h.GetHealingMetrics)
+	// Healing coordinator monitoring removed
 }

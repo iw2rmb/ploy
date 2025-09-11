@@ -2,6 +2,9 @@
 
 ## [Unreleased] - Transflow MVP Release
 
+### Changed
+- API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
+
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).
 - Remove `ploy arf transform` CLI command; use `ploy transflow run` instead.

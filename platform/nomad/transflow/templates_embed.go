@@ -21,4 +21,3 @@ func GetPlannerTemplate() []byte  { return plannerHCL }
 func GetLLMExecTemplate() []byte  { return llmExecHCL }
 func GetORWApplyTemplate() []byte { return orwApplyHCL }
 func GetReducerTemplate() []byte  { return reducerHCL }
-

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
+	platformnomad "github.com/iw2rmb/ploy/platform/nomad"
 )
 
 type RenderData struct {
@@ -72,19 +73,8 @@ func NewConsulTemplateClient() (*ConsulTemplateClient, error) {
 
 // GetTemplate retrieves a template from Consul KV with platform file fallback
 func (c *ConsulTemplateClient) GetTemplate(templatePath string) ([]byte, error) {
-	// Try Consul KV first
-	keyPath := fmt.Sprintf("ploy/templates/%s", filepath.Base(templatePath))
-	pair, _, err := c.client.KV().Get(keyPath, nil)
-	if err == nil && pair != nil && len(pair.Value) > 0 {
-		return pair.Value, nil
-	}
-
-	// Fall back to platform templates
-	content, err := os.ReadFile(templatePath)
-	if err != nil {
-		return nil, fmt.Errorf("template not found in Consul KV or platform files: %s", templatePath)
-	}
-	return content, nil
+	// Deprecated in API path: templates are now embedded and Consul is not used for reads here.
+	return nil, fmt.Errorf("template reads are embed-only in API: %s", templatePath)
 }
 
 // PutTemplate stores a template in Consul KV
@@ -159,42 +149,10 @@ func debugTemplateForLane(lane string) string {
 
 // loadTemplateContent loads template content using hybrid approach: Consul KV first, then platform file fallback
 func loadTemplateContent(templatePath string) ([]byte, error) {
-	// Try to create Consul client (fail gracefully if not available)
-	consulClient, err := NewConsulTemplateClient()
-	if err == nil {
-		// Consul is available, try to get template from KV store
-		content, err := consulClient.GetTemplate(templatePath)
-		if err == nil {
-			return content, nil
-		}
-		// Log the Consul error but continue to platform file fallback
-		// Note: In production, this could be logged via structured logging
+	if b := platformnomad.GetEmbeddedTemplate(templatePath); b != nil {
+		return b, nil
 	}
-
-	// Try multiple possible locations for platform templates
-	possiblePaths := []string{
-		templatePath, // Relative path (development)
-	}
-
-	// Add path from environment variable if set
-	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
-		possiblePaths = append(possiblePaths, filepath.Join(templateDir, templatePath))
-	}
-
-	// Add fallback paths
-	possiblePaths = append(possiblePaths,
-		filepath.Join("/home/ploy/ploy", templatePath), // Absolute path on VPS
-		filepath.Join("/opt/ploy", templatePath),       // Alternative deployment location
-	)
-
-	for _, path := range possiblePaths {
-		content, err := os.ReadFile(path)
-		if err == nil {
-			return content, nil
-		}
-	}
-
-	return nil, fmt.Errorf("template not found in any platform locations: %s", templatePath)
+	return nil, fmt.Errorf("template not embedded: %s", templatePath)
 }
 
 func RenderTemplate(lane string, data RenderData) (string, error) {

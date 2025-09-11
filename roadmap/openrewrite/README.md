@@ -171,7 +171,7 @@ graph TD
 - [x] Container size < 1GB ✅ 2025-08-26
 
 ### Production Metrics
-- [x] Service handles 10+ concurrent transformations ✅ (Via ARF healing coordinator)
+- [x] Service handles 10+ concurrent transformations ✅
 - [x] 99.9% job completion rate ✅ (Via ARF circuit breaker and retry logic)
 - [ ] Zero-to-one scaling in < 30 seconds
 - [ ] Auto-shutdown saves 80% resource cost

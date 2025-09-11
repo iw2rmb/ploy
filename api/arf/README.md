@@ -19,9 +19,9 @@ ARF provides automated code transformations with OpenRewrite, optional LLM‑ass
 - Security: `POST /v1/arf/security/scan`, `POST /v1/arf/security/remediation`, `GET /v1/arf/security/{report|report/:id|compliance}`.
 - SBOM: `POST /v1/arf/sbom/{generate|analyze}`, `GET /v1/arf/sbom/{report|compliance|:id}`.
 - Sandboxes: `GET/POST /v1/arf/sandboxes`, `DELETE /v1/arf/sandboxes/:id`.
-- Healing metrics: `GET /v1/arf/healing/metrics`.
+ 
 
-Removed/unsupported: legacy benchmark endpoints; direct Nomad/Consul CLI instructions in this README.
+Removed/unsupported: legacy benchmark endpoints; ARF healing coordinator and healing metrics; direct Nomad/Consul CLI instructions in this README. Healing is unified under Transflow.
 
 ## Transform Workflows
 

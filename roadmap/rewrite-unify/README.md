@@ -45,7 +45,7 @@ Code changes:
   - `api/arf/transformation_workflow.go` (not referenced; safe to delete or archive under roadmap if you prefer).
 
 Notes:
-- Keep ARF internals used by Transflow (OpenRewrite engine/dispatcher, healing coordinator types, recipe registry, SBOM/security, sandbox interfaces).
+- Keep ARF internals used by Transflow (OpenRewrite engine/dispatcher, recipe registry, SBOM/security, sandbox interfaces). Healing coordinator has been removed.
 
 ### Phase 2: CLI and Help Surface
 
@@ -119,7 +119,7 @@ rg -n '/v1/transflows\b'  # fix pluralization in docs
 
 Keep (Transflow dependencies):
 - `api/arf/openrewrite_engine.go`, `api/arf/openrewrite_dispatcher.go`, `api/arf/engine.go`, `api/arf/factory.go`.
-- Consul status/healing types: `api/arf/consul_types.go` and healing coordinator components.
+- Consul status types: `api/arf/consul_types.go` (healing coordinator components removed).
 - Recipe registry and SBOM/security endpoints.
 
 Remove (legacy ARF transform surface):

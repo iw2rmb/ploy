@@ -92,7 +92,7 @@ func (c *ConsulHealingStore) UpdateWorkflowStage(ctx context.Context, id string,
 }
 
 // AddHealingAttempt adds a healing attempt to the transformation hierarchy
-func (c *ConsulHealingStore) AddHealingAttempt(ctx context.Context, rootID, attemptPath string, attempt *HealingAttempt) error {
+/*func (c *ConsulHealingStore) AddHealingAttempt(ctx context.Context, rootID, attemptPath string, attempt *HealingAttempt) error {
 	// Get current status
 	status, err := c.GetTransformationStatus(ctx, rootID)
 	if err != nil {
@@ -133,10 +133,10 @@ func (c *ConsulHealingStore) AddHealingAttempt(ctx context.Context, rootID, atte
 
 	// Store back
 	return c.StoreTransformationStatus(ctx, rootID, status)
-}
+}*/
 
 // addAttemptToTree recursively adds an attempt to the correct position in the tree
-func (c *ConsulHealingStore) addAttemptToTree(children *[]HealingAttempt, path string, attempt *HealingAttempt) error {
+/*func (c *ConsulHealingStore) addAttemptToTree(children *[]HealingAttempt, path string, attempt *HealingAttempt) error {
 	// Parse path (e.g., "1.2.3")
 	parts := strings.Split(path, ".")
 
@@ -161,10 +161,10 @@ func (c *ConsulHealingStore) addAttemptToTree(children *[]HealingAttempt, path s
 	}
 
 	return fmt.Errorf("parent path %s not found", parentPath)
-}
+}*/
 
 // UpdateHealingAttempt updates an existing healing attempt
-func (c *ConsulHealingStore) UpdateHealingAttempt(ctx context.Context, rootID, attemptPath string, attempt *HealingAttempt) error {
+/*func (c *ConsulHealingStore) UpdateHealingAttempt(ctx context.Context, rootID, attemptPath string, attempt *HealingAttempt) error {
 	// Get current status
 	status, err := c.GetTransformationStatus(ctx, rootID)
 	if err != nil {
@@ -190,10 +190,10 @@ func (c *ConsulHealingStore) UpdateHealingAttempt(ctx context.Context, rootID, a
 
 	// Store back
 	return c.StoreTransformationStatus(ctx, rootID, status)
-}
+}*/
 
 // updateAttemptInTree recursively updates an attempt in the tree
-func (c *ConsulHealingStore) updateAttemptInTree(children *[]HealingAttempt, path string, attempt *HealingAttempt) error {
+/*func (c *ConsulHealingStore) updateAttemptInTree(children *[]HealingAttempt, path string, attempt *HealingAttempt) error {
 	for i := range *children {
 		if (*children)[i].AttemptPath == path {
 			// Found - update
@@ -206,10 +206,10 @@ func (c *ConsulHealingStore) updateAttemptInTree(children *[]HealingAttempt, pat
 		}
 	}
 	return fmt.Errorf("attempt path %s not found", path)
-}
+}*/
 
 // GetHealingTree retrieves the complete healing tree for a transformation
-func (c *ConsulHealingStore) GetHealingTree(ctx context.Context, rootID string) (*HealingTree, error) {
+/*func (c *ConsulHealingStore) GetHealingTree(ctx context.Context, rootID string) (*HealingTree, error) {
 	status, err := c.GetTransformationStatus(ctx, rootID)
 	if err != nil {
 		return nil, err
@@ -232,48 +232,14 @@ func (c *ConsulHealingStore) GetHealingTree(ctx context.Context, rootID string) 
 	c.calculateTreeMetrics(tree, status.Children, 1)
 
 	return tree, nil
-}
+}*/
 
-// calculateTreeMetrics recursively calculates tree metrics
-func (c *ConsulHealingStore) calculateTreeMetrics(tree *HealingTree, attempts []HealingAttempt, depth int) {
-	if depth > tree.MaxDepth {
-		tree.MaxDepth = depth
-	}
-
-	for _, attempt := range attempts {
-		tree.TotalAttempts++
-
-		if attempt.Status == "in_progress" || attempt.Status == "pending" {
-			tree.ActiveAttempts = append(tree.ActiveAttempts, attempt.AttemptPath)
-		}
-
-		if attempt.Status == "completed" {
-			if attempt.Result == "success" {
-				tree.SuccessfulHeals++
-			} else if attempt.Result == "failed" {
-				tree.FailedHeals++
-			}
-		}
-
-		// Recurse into children
-		if len(attempt.Children) > 0 {
-			c.calculateTreeMetrics(tree, attempt.Children, depth+1)
-		}
-	}
-}
+// calculateTreeMetrics removed
 
 // GetActiveHealingAttempts returns paths of all active healing attempts
-func (c *ConsulHealingStore) GetActiveHealingAttempts(ctx context.Context, rootID string) ([]string, error) {
-	tree, err := c.GetHealingTree(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	if tree == nil {
-		return []string{}, nil
-	}
-
-	return tree.ActiveAttempts, nil
-}
+/*func (c *ConsulHealingStore) GetActiveHealingAttempts(ctx context.Context, rootID string) ([]string, error) {
+    return []string{}, nil
+}*/
 
 // CleanupCompletedTransformations removes transformations older than maxAge
 func (c *ConsulHealingStore) CleanupCompletedTransformations(ctx context.Context, maxAge time.Duration) error {
@@ -353,7 +319,7 @@ func (c *ConsulHealingStore) SetTransformationTTL(ctx context.Context, id string
 }
 
 // countSuccessfulHeals recursively counts successful heals in the tree
-func (c *ConsulHealingStore) countSuccessfulHeals(status *TransformationStatus) {
+/*func (c *ConsulHealingStore) countSuccessfulHeals(status *TransformationStatus) {
 	count := 0
 	c.countHealsRecursive(status.Children, &count)
 	// Update the count in status if needed
@@ -369,10 +335,10 @@ func (c *ConsulHealingStore) countHealsRecursive(attempts []HealingAttempt, coun
 			c.countHealsRecursive(attempt.Children, count)
 		}
 	}
-}
+}*/
 
 // GenerateNextAttemptPath generates the next available attempt path for a transformation
-func (c *ConsulHealingStore) GenerateNextAttemptPath(ctx context.Context, rootID string, parentPath string) (string, error) {
+/*func (c *ConsulHealingStore) GenerateNextAttemptPath(ctx context.Context, rootID string, parentPath string) (string, error) {
 	status, err := c.GetTransformationStatus(ctx, rootID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get transformation status: %w", err)
@@ -393,4 +359,4 @@ func (c *ConsulHealingStore) GenerateNextAttemptPath(ctx context.Context, rootID
 	}
 
 	return GenerateAttemptPath(rootID, parentPath, status.Children), nil
-}
+}*/
