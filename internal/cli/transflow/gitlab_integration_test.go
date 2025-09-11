@@ -3,8 +3,10 @@ package transflow
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
@@ -32,6 +34,37 @@ func (m *MockGitLabProvider) CreateOrUpdateMR(ctx context.Context, config provid
 }
 
 func TestTransflowRunner_GitLabIntegration(t *testing.T) {
+	// Stub external integrations and provide exec ID
+	oldSubmit := submitAndWaitTerminal
+	oldDL := downloadToFileFn
+	oldHas := hasRepoChangesFn
+	oldVDP := validateDiffPathsFn
+	oldVUD := validateUnifiedDiffFn
+	oldAD := applyUnifiedDiffFn
+	baseValidate := func(string) error { return nil }
+	oldValidate := validateJob
+	validateJob = baseValidate
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	downloadToFileFn = func(_ string, dest string) error {
+		_ = os.MkdirAll(filepath.Dir(dest), 0755)
+		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
+		return os.WriteFile(dest, []byte(diff), 0644)
+	}
+	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
+	validateDiffPathsFn = func(string, []string) error { return nil }
+	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "gitlab-test")
+	defer func() {
+		submitAndWaitTerminal = oldSubmit
+		downloadToFileFn = oldDL
+		hasRepoChangesFn = oldHas
+		validateDiffPathsFn = oldVDP
+		validateUnifiedDiffFn = oldVUD
+		applyUnifiedDiffFn = oldAD
+		validateJob = oldValidate
+		os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+	}()
 	// Create a temporary workspace
 	workspaceDir := t.TempDir()
 
@@ -43,10 +76,13 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 		Lane:       "C",
 		Steps: []TransflowStep{
 			{
-				ID:      "recipe-1",
-				Type:    "recipe",
-				Engine:  "openrewrite",
-				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
+				ID:                 "java-migration",
+				Type:               "orw-apply",
+				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+				RecipeGroup:        "org.openrewrite.recipe",
+				RecipeArtifact:     "rewrite-migrate-java",
+				RecipeVersion:      "3.17.0",
+				MavenPluginVersion: "6.18.0",
 			},
 		},
 	}
@@ -155,6 +191,37 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 }
 
 func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
+	// Stubs as above to keep unit-only
+	oldSubmit := submitAndWaitTerminal
+	oldDL := downloadToFileFn
+	oldHas := hasRepoChangesFn
+	oldVDP := validateDiffPathsFn
+	oldVUD := validateUnifiedDiffFn
+	oldAD := applyUnifiedDiffFn
+	baseValidate := func(string) error { return nil }
+	oldValidate := validateJob
+	validateJob = baseValidate
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	downloadToFileFn = func(_ string, dest string) error {
+		_ = os.MkdirAll(filepath.Dir(dest), 0755)
+		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
+		return os.WriteFile(dest, []byte(diff), 0644)
+	}
+	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
+	validateDiffPathsFn = func(string, []string) error { return nil }
+	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "gitlab-test")
+	defer func() {
+		submitAndWaitTerminal = oldSubmit
+		downloadToFileFn = oldDL
+		hasRepoChangesFn = oldHas
+		validateDiffPathsFn = oldVDP
+		validateUnifiedDiffFn = oldVUD
+		applyUnifiedDiffFn = oldAD
+		validateJob = oldValidate
+		os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+	}()
 	// Test that MR creation fails gracefully when GitLab configuration is invalid
 	workspaceDir := t.TempDir()
 
@@ -165,10 +232,13 @@ func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 		Lane:       "C",
 		Steps: []TransflowStep{
 			{
-				ID:      "recipe-1",
-				Type:    "recipe",
-				Engine:  "openrewrite",
-				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
+				ID:                 "java-migration",
+				Type:               "orw-apply",
+				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+				RecipeGroup:        "org.openrewrite.recipe",
+				RecipeArtifact:     "rewrite-migrate-java",
+				RecipeVersion:      "3.17.0",
+				MavenPluginVersion: "6.18.0",
 			},
 		},
 	}
