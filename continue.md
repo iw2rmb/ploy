@@ -156,6 +156,7 @@ DEV LOGGING NOTE (keep logs tidy):
    - Use Ansible against the target host. Example:
      - `ansible-playbook -i '"${TARGET_HOST}",' -u ploy --become iac/dev/playbooks/openrewrite-jvm.yml -e ploy_domain=dev.ployman.app`
    - This builds and pushes `registry.dev.ployman.app/openrewrite-jvm:latest` on the VPS. Avoid local Docker builds.
+   - To override the orw-apply image used by the server, set a single env on the API: `TRANSFLOW_ORW_APPLY_IMAGE=registry.dev.ployman.app/openrewrite-jvm:<tag>`.
    - Confirms latest runner diagnostics are in use (logs `INPUT_URL` and download HTTP result).
 
 2) Run a new transflow and capture evidence:
