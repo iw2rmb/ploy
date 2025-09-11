@@ -132,24 +132,8 @@ func TestRecipeRegistry_ListAllRecipes(t *testing.T) {
 }
 
 func TestRecipeRegistry_ExtractRecipeFromJAR(t *testing.T) {
-	// Test extracting recipe metadata from Maven JAR
-	ctx := context.Background()
-	mockStorage := &mockStorageProvider{}
-	registry := NewRecipeRegistry(mockStorage)
-
-	// Create a mock JAR file (ZIP format) in storage
-	jarPath := "test-data/rewrite-migrate-java-2.11.0.jar"
-
-	// For now, skip this test as it requires a real JAR file
+	// Requires a real/mock JAR; skipping in unit tests
 	t.Skip("Skipping JAR extraction test - requires mock JAR implementation")
-
-	// Extract and register
-	metadata, err := registry.ExtractRecipeFromJAR(ctx, jarPath)
-	require.NoError(t, err)
-
-	assert.NotNil(t, metadata)
-	assert.Contains(t, metadata.Metadata.Tags, "java")
-	assert.Contains(t, metadata.Metadata.Categories, "java-migration")
 }
 
 func TestRecipeRegistry_QueryByType(t *testing.T) {

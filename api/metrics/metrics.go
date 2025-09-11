@@ -415,11 +415,8 @@ func (m *Metrics) StartUptimeUpdater() {
 
 	go func() {
 		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				m.UpdateUptime()
-			}
+		for range ticker.C {
+			m.UpdateUptime()
 		}
 	}()
 }

@@ -1012,7 +1012,7 @@ func (h *Handler) DebugNomad(c *fiber.Ctx) error {
 	for _, j := range jmJobs {
 		name, _ := j["Name"].(string)
 		submitTimeAny := j["SubmitTime"]
-		var recent bool = true
+		recent := true
 		switch t := submitTimeAny.(type) {
 		case float64:
 			// milliseconds

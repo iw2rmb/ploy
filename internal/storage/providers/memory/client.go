@@ -260,7 +260,7 @@ func (m *MemoryStorage) Copy(ctx context.Context, src, dst string) error {
 		}
 	}
 
-	srcMeta, _ := m.metadata[src]
+	srcMeta := m.metadata[src]
 
 	// Check memory limit for copy
 	dataSize := int64(len(srcData))
@@ -308,7 +308,7 @@ func (m *MemoryStorage) Move(ctx context.Context, src, dst string) error {
 		}
 	}
 
-	srcMeta, _ := m.metadata[src]
+	srcMeta := m.metadata[src]
 
 	// Move data (no memory change since we're just moving)
 	m.data[dst] = srcData
