@@ -34,9 +34,7 @@ COPY runner.sh /usr/local/bin/openrewrite
 COPY setup-workspace.sh /usr/local/bin/setup-workspace
 RUN chmod 755 /usr/local/bin/openrewrite /usr/local/bin/setup-workspace
 
-# Diff generation helper
-COPY generate-diff.sh /usr/local/bin/generate-diff.sh
-RUN chmod 755 /usr/local/bin/generate-diff.sh
+## Diff generation helper removed; runner uses git diff directly
 
 # Set up Maven settings for better performance
 RUN mkdir -p /root/.m2 && \
