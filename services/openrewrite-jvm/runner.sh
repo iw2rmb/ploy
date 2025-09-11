@@ -314,48 +314,27 @@ echo "[OpenRewrite] Running transformation with recipe: ${RECIPE_CLASS}"
 if [ -f "pom.xml" ]; then
     echo "[OpenRewrite] Using Maven for transformation..."
 
-    # Helper to run Maven with a specific plugin version
-    run_openrewrite_with_version() {
-      local plugin_ver="$1"
-      echo "[OpenRewrite] Running Maven with plugin version ${plugin_ver}"
-      mvn -B org.openrewrite.maven:rewrite-maven-plugin:${plugin_ver}:run \
-          -Drewrite.recipe="${RECIPE_CLASS}" \
-          -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
-          -Drewrite.activeRecipes="${RECIPE_CLASS}" \
-          -DskipTests \
-          -X 2>&1 | tee /tmp/transform.log
-      return ${PIPESTATUS[0]}
-    }
-
     if [ -n "${RECIPE_COORDS}" ]; then
         # Use explicit coordinates if provided
         echo "[OpenRewrite] Running Maven command with explicit coordinates..."
         echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
         echo "[OpenRewrite] Recipe coordinates: ${RECIPE_COORDS}"
 
-        # Try preferred plugin version, then fallback if not found in Central
-        PLUGIN_VER="6.19.0"
-        if ! run_openrewrite_with_version "$PLUGIN_VER"; then
-          if grep -q "Could not find artifact org.openrewrite.maven:rewrite-maven-plugin:jar:${PLUGIN_VER}" /tmp/transform.log; then
-            echo "[OpenRewrite] Plugin ${PLUGIN_VER} not found in Central; falling back to 6.18.0"
-            PLUGIN_VER="6.18.0"
-            if ! run_openrewrite_with_version "$PLUGIN_VER"; then
-              echo "[Error] OpenRewrite transformation failed after fallback to ${PLUGIN_VER}"
-              echo "[Error] Last 100 lines of output:"
-              tail -100 /tmp/transform.log
-              write_error "OpenRewrite failed: plugin ${PLUGIN_VER} execution error. See transform.log"
-              # Persist transform.log before exiting
-              cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
-              exit 1
-            fi
-          else
-            echo "[Error] OpenRewrite transformation failed"
-            echo "[Error] Last 100 lines of output:"
-            tail -100 /tmp/transform.log
-            write_error "OpenRewrite transformation failed (see transform.log)"
-            cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
-            exit 1
-          fi
+        # Use plugin 6.18.0 (validated available in Central on VPS)
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.18.0:run \
+            -Drewrite.recipe="${RECIPE_CLASS}" \
+            -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
+            -Drewrite.activeRecipes="${RECIPE_CLASS}" \
+            -DskipTests \
+            -X 2>&1 | tee /tmp/transform.log
+        status=${PIPESTATUS[0]}
+        if [ "$status" -ne 0 ]; then
+          echo "[Error] OpenRewrite transformation failed (plugin 6.18.0)"
+          echo "[Error] Last 100 lines of output:"
+          tail -100 /tmp/transform.log
+          write_error "OpenRewrite transformation failed (see transform.log)"
+          cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
+          exit 1
         fi
         # Persist transform.log for diagnostics on success as well
         cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
