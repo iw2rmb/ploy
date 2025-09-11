@@ -4,6 +4,10 @@
 
 FROM --platform=linux/amd64 eclipse-temurin:17-jdk-alpine
 
+# Build metadata to force fresh image digests on rebuilds
+ARG ORW_BUILD_TS="dev"
+LABEL org.ploy.orw_build_ts="${ORW_BUILD_TS}"
+
 # Install required tools
 RUN apk add --no-cache \
     bash \
