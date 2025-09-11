@@ -347,7 +347,7 @@ else
         
         # First, try to discover available recipes
         echo "[OpenRewrite] Step 1: Discovering available recipes..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:discover 2>&1 | tee /tmp/discover.log || {
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.18.0:discover 2>&1 | tee /tmp/discover.log || {
             echo "[Error] Recipe discovery failed"
             echo "[Error] Discovery output:"
             cat /tmp/discover.log
@@ -355,7 +355,7 @@ else
         
         # Now run the transformation
         echo "[OpenRewrite] Step 2: Running transformation..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:run \
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.18.0:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \
@@ -366,34 +366,6 @@ else
                 tail -100 /tmp/transform.log
                 # If recipe not found, try dynamic pack resolution
                 if grep -q "Recipe(s) not found" /tmp/transform.log; then
-                    echo "[Resolver] Recipe not found in current environment. Attempting dynamic pack resolution..."
-                    CANDIDATES=${RECIPE_PACK_CANDIDATES:-rewrite-java,rewrite-migrate-java,rewrite-spring}
-                    RESOLVE_VERSION=${RECIPE_VERSION:-2.20.0}
-                    IFS=',' read -r -a PACKS <<< "$CANDIDATES"
-                    RESOLVED=false
-                    for ART in "${PACKS[@]}"; do
-                        COORDS="org.openrewrite.recipe:${ART}:${RESOLVE_VERSION}"
-                        echo "[Resolver] Trying pack: ${COORDS}"
-                        mvn -B dependency:get -DgroupId=org.openrewrite.recipe -DartifactId="${ART}" -Dversion="${RESOLVE_VERSION}" -Dtransitive=true || true
-                        echo "[Resolver] Re-running transformation with coordinates: ${COORDS}"
-                        if mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.19.0:run \
-                            -Drewrite.recipe="${RECIPE_CLASS}" \
-                            -Drewrite.activeRecipes="${RECIPE_CLASS}" \
-                            -Drewrite.recipeArtifactCoordinates="${COORDS}" \
-                            -DskipTests \
-                            -X 2>&1 | tee /tmp/transform.log; then
-                            echo "[Resolver] Transformation succeeded with pack ${COORDS}"
-                            # Register for caching at API level
-                            register_recipe_metadata "${RECIPE_CLASS}" "org.openrewrite.recipe" "${ART}" "${RESOLVE_VERSION}" "maven-repository/org/openrewrite/recipe/${ART}/${RESOLVE_VERSION}/${ART}-${RESOLVE_VERSION}.jar"
-                            RESOLVED=true
-                            break
-                        fi
-                    done
-                    if [ "${RESOLVED}" != "true" ]; then
-                        echo "[Resolver] ERROR: Could not resolve recipe ${RECIPE_CLASS} using candidate packs: ${CANDIDATES}" >&2
-                        exit 1
-                    fi
-                else
                     exit 1
                 fi
             }
@@ -417,7 +389,7 @@ elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
             cat >> build.gradle.kts << EOF
 
 plugins {
-    id("org.openrewrite.rewrite") version "6.16.2"
+    id("org.openrewrite.rewrite") version "6.18.0"
 }
 
 rewrite {
@@ -432,7 +404,7 @@ EOF
             cat >> build.gradle << EOF
 
 plugins {
-    id 'org.openrewrite.rewrite' version '6.16.2'
+    id 'org.openrewrite.rewrite' version '6.18.0'
 }
 
 rewrite {

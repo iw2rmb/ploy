@@ -106,6 +106,8 @@
               path: "{{ build_directory }}"
               pull: true
               nocache: true
+              args:
+                ORW_BUILD_TS: "{{ ansible_date_time.iso8601 }}"
             state: present
           register: build_result
           
@@ -221,33 +223,42 @@
               REGISTRY="${1}"
               IMAGE="${2}"
               KEEP=3
+              CURL="curl -kfsS"
               echo "Pruning tags for ${IMAGE} at ${REGISTRY} (keeping ${KEEP})"
-              tags=$(curl -fsSL https://${REGISTRY}/v2/${IMAGE}/tags/list | jq -r '.tags[]' | sort -V || true)
-              # Always keep 'latest'
+              # List tags (ignore errors gracefully)
+              tags_json=$($CURL https://${REGISTRY}/v2/${IMAGE}/tags/list || true)
+              if [ -z "${tags_json}" ]; then
+                echo "No tags list returned; skipping prune"
+                exit 0
+              fi
+              # Extract tags safely
+              mapfile -t tags < <(echo "${tags_json}" | jq -r '.tags[]?')
+              if [ ${#tags[@]} -eq 0 ]; then
+                echo "No tags found; nothing to prune"
+                exit 0
+              fi
+              # Always keep 'latest' and two most recent others by version sort
               keep_tags=(latest)
-              mapfile -t other_tags < <(echo "${tags}" | grep -v '^latest$' || true)
-              if [ ${#other_tags[@]} -gt 0 ]; then
-                # take last (highest) two by version-sort if available
-                cnt=${#other_tags[@]}
-                if [ $cnt -ge 2 ]; then
-                  keep_tags+=("${other_tags[$((cnt-2))]}" "${other_tags[$((cnt-1))]}")
-                else
-                  keep_tags+=("${other_tags[0]}")
-                fi
+              mapfile -t other_sorted < <(printf "%s\n" "${tags[@]}" | grep -v '^latest$' | sort -V || true)
+              cnt=${#other_sorted[@]}
+              if [ $cnt -ge 2 ]; then
+                keep_tags+=("${other_sorted[$((cnt-2))]}" "${other_sorted[$((cnt-1))]}")
+              elif [ $cnt -eq 1 ]; then
+                keep_tags+=("${other_sorted[0]}")
               fi
               echo "Keeping: ${keep_tags[*]}"
-              for tag in ${tags}; do
-                skip=false
+              for tag in "${tags[@]}"; do
+                # Skip kept tags
                 for k in "${keep_tags[@]}"; do
-                  if [ "$tag" = "$k" ]; then skip=true; break; fi
+                  if [ "$tag" = "$k" ]; then continue 2; fi
                 done
-                if [ "$skip" = true ]; then continue; fi
                 # Fetch manifest digest for tag
-                digest=$(curl -fsSI -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \\
-                         https://${REGISTRY}/v2/${IMAGE}/manifests/${tag} | awk -F': ' '/Docker-Content-Digest/{print $2}' | tr -d '\\r')
-                if [ -n "$digest" ]; then
+                digest=$($CURL -I -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' https://${REGISTRY}/v2/${IMAGE}/manifests/${tag} | awk -F': ' '/Docker-Content-Digest/{print $2}' | tr -d '\r')
+                if [ -n "$digest" ] && [[ "$digest" == sha256:* ]]; then
                   echo "Deleting ${IMAGE}:${tag} (digest ${digest})"
-                  curl -fsS -X DELETE https://${REGISTRY}/v2/${IMAGE}/manifests/${digest} || true
+                  $CURL -X DELETE https://${REGISTRY}/v2/${IMAGE}/manifests/${digest} || true
+                else
+                  echo "Skip delete for ${IMAGE}:${tag}: missing digest"
                 fi
               done
               echo "Prune complete"
