@@ -441,7 +441,7 @@ ls -la
 echo "[OpenRewrite] All directories in workspace:"
 find . -type d | sort
 echo "[OpenRewrite] Files to archive:"
-find . -type f | head -20
+{ find . -type f | head -20; } || true
 echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
 echo "[OpenRewrite] Checking for project directory:"
 if [ -d "project" ]; then
@@ -456,9 +456,9 @@ fi
 echo "[OpenRewrite] Pre-tar debugging:"
 echo "[OpenRewrite] Current directory: $(pwd)"
 echo "[OpenRewrite] Contents of current directory:"
-ls -la . | head -10
+{ ls -la . | head -10; } || true
 echo "[OpenRewrite] Contents of /workspace:"
-ls -la /workspace | head -10
+{ ls -la /workspace | head -10; } || true
 
 # Step 5: Generate diff.patch artifact for transflow (always create file)
 echo "[OpenRewrite] Generating unified diff patch..."
