@@ -74,7 +74,6 @@ RECIPE_CLASS="${2:-${RECIPE}}"
 SEAWEEDFS_URL="${SEAWEEDFS_URL:-http://seaweedfs-filer.service.consul:8888}"
 MAVEN_CACHE_PATH="${MAVEN_CACHE_PATH:-maven-repository}"
 PLOY_API_URL="${PLOY_API_URL:-http://api.service.consul:8081}"
-DISCOVER_RECIPE="${DISCOVER_RECIPE:-false}"
 
 echo "[OpenRewrite] Starting transformation"
 echo "[OpenRewrite] Environment variables:"
@@ -84,7 +83,6 @@ echo "[OpenRewrite]   RECIPE: ${RECIPE_CLASS}"
 echo "[OpenRewrite]   SEAWEEDFS_URL: ${SEAWEEDFS_URL}"
 echo "[OpenRewrite]   INPUT_URL: ${INPUT_URL:-}"
 echo "[OpenRewrite]   OUTPUT_KEY: (unused)"
-echo "[OpenRewrite]   Discovery mode: ${DISCOVER_RECIPE}"
 echo "[OpenRewrite] SeaweedFS: ${SEAWEEDFS_URL}"
 
 # Sanity check Java toolchain
@@ -111,19 +109,17 @@ else
   exit 1
 fi
 
-# Check if we need to discover recipe coordinates
-if [ "${DISCOVER_RECIPE}" = "true" ] || [ -z "${RECIPE_GROUP}" ]; then
-    echo "[OpenRewrite] Dynamic recipe discovery enabled - OpenRewrite will find coordinates automatically"
-    # OpenRewrite will discover the recipe's Maven coordinates from its built-in catalog
-    RECIPE_COORDS=""
-else
-    # Use provided coordinates
-    RECIPE_GROUP="${RECIPE_GROUP:-org.openrewrite.recipe}"
-    RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-rewrite-migrate-java}"
-    RECIPE_VERSION="${RECIPE_VERSION:-3.17.0}"
-    RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
-    echo "[OpenRewrite] Using provided coordinates: ${RECIPE_COORDS}"
+# Require explicit coordinates from env (no discovery)
+RECIPE_GROUP="${RECIPE_GROUP:-}"
+RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-}"
+RECIPE_VERSION="${RECIPE_VERSION:-}"
+if [ -z "$RECIPE_GROUP" ] || [ -z "$RECIPE_ARTIFACT" ] || [ -z "$RECIPE_VERSION" ]; then
+  echo "[OpenRewrite] ERROR: Missing recipe coordinates (RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION)" >&2
+  write_error "Missing recipe coordinates"
+  exit 1
 fi
+RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
+echo "[OpenRewrite] Using coordinates: ${RECIPE_COORDS}"
 
 # Function to download from SeaweedFS cache
 download_from_cache() {
@@ -251,13 +247,8 @@ echo "  RECIPE_GROUP: ${RECIPE_GROUP}"
 echo "  RECIPE_ARTIFACT: ${RECIPE_ARTIFACT}"
 echo "  RECIPE_VERSION: ${RECIPE_VERSION}"
 echo "  RECIPE_COORDS: ${RECIPE_COORDS}"
-echo "  DISCOVER_RECIPE: ${DISCOVER_RECIPE}"
 
-if [ "${DISCOVER_RECIPE}" = "true" ] || [ -z "${RECIPE_COORDS}" ]; then
-    echo "[OpenRewrite] Dynamic discovery mode - OpenRewrite will handle recipe resolution"
-    # In discovery mode, OpenRewrite will download recipes as needed
-    # We'll cache them after the transformation completes
-else
+if [ -n "${RECIPE_COORDS}" ]; then
     # Try to get recipe from cache first
     echo "[OpenRewrite] Checking SeaweedFS cache for recipe artifacts..."
     
@@ -310,7 +301,7 @@ fi
 # Step 4: Run OpenRewrite transformation
 echo "[OpenRewrite] Running transformation with recipe: ${RECIPE_CLASS}"
 
-# Determine build tool
+# Determine build tool: Maven only
 if [ -f "pom.xml" ]; then
     echo "[OpenRewrite] Using Maven for transformation..."
 
@@ -344,92 +335,8 @@ if [ -f "pom.xml" ]; then
         
         echo "[OpenRewrite] Transformation completed successfully"
 else
-    # Let OpenRewrite discover recipe from its catalog
-    echo "[OpenRewrite] Running Maven command for dynamic discovery..."
-    echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
-        
-        # First, try to discover available recipes
-        echo "[OpenRewrite] Step 1: Discovering available recipes..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:${MAVEN_PLUGIN_VERSION_ENV}:discover 2>&1 | tee /tmp/discover.log || {
-            echo "[Error] Recipe discovery failed"
-            echo "[Error] Discovery output:"
-            cat /tmp/discover.log
-        }
-        
-        # Now run the transformation
-        echo "[OpenRewrite] Step 2: Running transformation..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:${MAVEN_PLUGIN_VERSION_ENV}:run \
-            -Drewrite.recipe="${RECIPE_CLASS}" \
-            -Drewrite.activeRecipes="${RECIPE_CLASS}" \
-            -DskipTests \
-            -X 2>&1 | tee /tmp/transform.log || {
-                echo "[Error] OpenRewrite transformation failed"
-                echo "[Error] Exit code: $?"
-                echo "[Error] Last 100 lines of output:"
-                tail -100 /tmp/transform.log
-                # If recipe not found, try dynamic pack resolution
-                if grep -q "Recipe(s) not found" /tmp/transform.log; then
-                    exit 1
-                fi
-            }
-
-        echo "[OpenRewrite] Transformation completed successfully"
-
-        # Check what Maven/OpenRewrite created
-        echo "[OpenRewrite] Post-transformation directory check:"
-        echo "[OpenRewrite] Current directory: $(pwd)"
-        echo "[OpenRewrite] All directories after transformation:"
-        find . -type d | sort
-    fi
-        
-elif [ -f "build.gradle" ] || [ -f "build.gradle.kts" ]; then
-    echo "[OpenRewrite] Using Gradle for transformation..."
-    
-    # Add OpenRewrite plugin to build.gradle if not present
-    if ! grep -q "id.*org.openrewrite.rewrite" build.gradle* 2>/dev/null; then
-        echo "[OpenRewrite] Adding OpenRewrite plugin to build.gradle..."
-        if [ -f "build.gradle.kts" ]; then
-            cat >> build.gradle.kts << EOF
-
-plugins {
-    id("org.openrewrite.rewrite") version "6.18.0"
-}
-
-rewrite {
-    activeRecipe("${RECIPE_CLASS}")
-}
-
-dependencies {
-    rewrite("${RECIPE_COORDS}")
-}
-EOF
-        else
-            cat >> build.gradle << EOF
-
-plugins {
-    id 'org.openrewrite.rewrite' version '6.18.0'
-}
-
-rewrite {
-    activeRecipe '${RECIPE_CLASS}'
-}
-
-dependencies {
-    rewrite '${RECIPE_COORDS}'
-}
-EOF
-        fi
-    fi
-    
-    # Run OpenRewrite
-    gradle rewriteRun --no-daemon || {
-        echo "[Error] OpenRewrite transformation failed"
-        write_error "OpenRewrite transformation failed (Gradle)"
-        exit 1
-    }
-else
-    echo "[Error] No supported build file found (pom.xml or build.gradle)"
-    write_error "No supported build file found (pom.xml/gradle)"
+    echo "[Error] No supported build file found (pom.xml)"
+    write_error "No supported build file found (pom.xml)"
     exit 1
 fi
 
