@@ -2,7 +2,7 @@
 # OpenRewrite Runner with SeaweedFS Maven Repository Caching
 # This script manages recipe downloads and caching to avoid repeated Maven Central hits
 
-set -euo pipefail
+set -eo pipefail
 set -x  # Enable verbose output for debugging
 
 # --- Event push helpers (best-effort) ---
