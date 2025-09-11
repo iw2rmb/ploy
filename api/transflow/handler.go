@@ -303,10 +303,7 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		_ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
 	}
 
-	// Allow overriding orw-apply image via server-side env (propagated to template)
-	if v := os.Getenv("PLOY_ORW_APPLY_IMAGE"); v != "" {
-		_ = os.Setenv("TRANSFLOW_ORW_APPLY_IMAGE", v)
-	}
+	// Image override: use TRANSFLOW_ORW_APPLY_IMAGE only (set in API env when needed)
 
 	// Execute the workflow with timeout awareness; ensure terminal status on any error
 	var (
