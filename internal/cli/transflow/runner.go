@@ -5,6 +5,7 @@ import (
 	crand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -542,7 +543,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			r.emit(ctx, "clone", "clone-failed", "error", msg)
 			result.ErrorMessage = msg
 			result.Duration = time.Since(startTime)
-			return nil, fmt.Errorf(msg)
+			return nil, errors.New(msg)
 		}
 	}
 

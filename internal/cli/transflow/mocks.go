@@ -42,6 +42,11 @@ func (m *MockGitOperations) CloneRepository(ctx context.Context, repoURL, branch
 		return err
 	}
 
+	// Ensure the working tree is non-empty to satisfy runner guards.
+	// Create a harmless placeholder file so subsequent steps (branch/apply) run.
+	placeholder := targetPath + "/README.md"
+	_ = os.WriteFile(placeholder, []byte("# mock repo\n"), 0644)
+
 	return m.CloneError
 }
 
