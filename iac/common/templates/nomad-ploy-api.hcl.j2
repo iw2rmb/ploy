@@ -114,6 +114,9 @@ job "ploy-api" {
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
         ARF_OPENREWRITE_JAR = "/usr/local/bin/rewrite-maven.jar"
         ARF_WORKING_DIR = "/tmp/arf"
+
+        # Transflow job image overrides (server-side) — use single env only
+        TRANSFLOW_ORW_APPLY_IMAGE = "{{ lookup('env', 'TRANSFLOW_ORW_APPLY_IMAGE') }}"
         
         # ARF Phase 3 - LLM Integration & Learning System
         ARF_LEARNING_DB_URL = "postgres://ploy:{{ arf_db_password | default('arf_dev_password') }}@localhost/arf_learning?sslmode=disable"
