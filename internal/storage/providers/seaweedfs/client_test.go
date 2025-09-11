@@ -22,10 +22,11 @@ func skipIfSeaweedFSUnavailable(t *testing.T) {
 	}
 
 	client := &http.Client{Timeout: 1 * time.Second}
-	_, err := client.Get("http://localhost:9333/cluster/status")
+	resp, err := client.Get("http://localhost:9333/cluster/status")
 	if err != nil {
 		t.Skipf("SeaweedFS not available: %v", err)
 	}
+	resp.Body.Close()
 }
 
 func TestSeaweedFSProvider_ImplementsStorageInterface(t *testing.T) {

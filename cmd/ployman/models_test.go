@@ -209,7 +209,9 @@ func TestModelsCmd_List(t *testing.T) {
 	{
 		var buf bytes.Buffer
 		_ = json.NewEncoder(&buf).Encode(testModel)
-		_, _ = http.Post(server.URL+"/v1/llms/models", "application/json", &buf)
+		if resp, err := http.Post(server.URL+"/v1/llms/models", "application/json", &buf); err == nil && resp != nil {
+			resp.Body.Close()
+		}
 	}
 
 	// We can't easily capture stdout in tests, but we can test that the command doesn't panic

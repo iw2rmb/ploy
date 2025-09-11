@@ -35,6 +35,7 @@ func TestRetryTransport_RetriesOn429ThenSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -51,6 +52,7 @@ func TestRetryTransport_RetriesOn5xxThenFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer resp.Body.Close()
 	// After 4 attempts (0..3), last response should be 503 and returned
 	if resp.StatusCode != 503 {
 		t.Fatalf("expected 503, got %d", resp.StatusCode)

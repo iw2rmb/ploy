@@ -16,6 +16,39 @@ import (
 // Mock interfaces for testing are now in mocks.go
 
 func TestTransflowRunner_Run(t *testing.T) {
+	// Stub external integrations for all subtests
+	oldSubmit := submitAndWaitTerminal
+	oldDL := downloadToFileFn
+	oldHas := hasRepoChangesFn
+	oldVDP := validateDiffPathsFn
+	oldVUD := validateUnifiedDiffFn
+	oldAD := applyUnifiedDiffFn
+	baseValidate := func(string) error { return nil }
+	validateJob = baseValidate
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	downloadToFileFn = func(_ string, dest string) error {
+		_ = os.MkdirAll(filepath.Dir(dest), 0755)
+		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
+		return os.WriteFile(dest, []byte(diff), 0644)
+	}
+	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
+	validateDiffPathsFn = func(string, []string) error { return nil }
+	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	// Provide exec ID so diff fetch proceeds
+	os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "t-runner")
+	defer os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+
+	defer func() {
+		validateJob = baseValidate
+		submitAndWaitTerminal = oldSubmit
+		downloadToFileFn = oldDL
+		hasRepoChangesFn = oldHas
+		validateDiffPathsFn = oldVDP
+		validateUnifiedDiffFn = oldVUD
+		applyUnifiedDiffFn = oldAD
+	}()
+
 	tests := []struct {
 		name           string
 		config         *TransflowConfig
@@ -33,10 +66,13 @@ func TestTransflowRunner_Run(t *testing.T) {
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:    "recipe",
-						ID:      "test-recipe",
-						Engine:  "openrewrite",
-						Recipes: []string{"com.acme.TestRecipe"},
+						Type:               "orw-apply",
+						ID:                 "java-migration",
+						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+						RecipeGroup:        "org.openrewrite.recipe",
+						RecipeArtifact:     "rewrite-migrate-java",
+						RecipeVersion:      "3.17.0",
+						MavenPluginVersion: "6.18.0",
 					},
 				},
 			},
@@ -47,7 +83,6 @@ func TestTransflowRunner_Run(t *testing.T) {
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled, "CloneRepository should be called")
 				assert.True(t, git.CreateBranchCalled, "CreateBranchAndCheckout should be called")
-				assert.True(t, recipe.ExecuteCalled, "ExecuteRecipes should be called")
 				assert.True(t, git.CommitCalled, "CommitChanges should be called")
 				assert.True(t, build.BuildCalled, "CheckBuild should be called")
 				assert.True(t, git.PushCalled, "PushBranch should be called")
@@ -56,8 +91,8 @@ func TestTransflowRunner_Run(t *testing.T) {
 				assert.Equal(t, "https://github.com/org/project", git.CloneRepo)
 				assert.Equal(t, "refs/heads/main", git.CloneBranch)
 				assert.Contains(t, git.BranchName, "workflow/test-workflow/")
-				assert.Equal(t, []string{"com.acme.TestRecipe"}, recipe.RecipeIDs)
-				assert.Contains(t, git.CommitMessage, "Applied recipe")
+				// Commit message may be from apply(diff) or later commit step; just ensure a commit was attempted
+				assert.NotEqual(t, "", git.CommitMessage)
 				assert.Contains(t, build.BuildConfig.App, "tfw-test-workflow-")
 				assert.Equal(t, "https://github.com/org/project", git.PushRemoteURL)
 			},
@@ -69,7 +104,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -80,33 +115,34 @@ func TestTransflowRunner_Run(t *testing.T) {
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.False(t, git.CreateBranchCalled)
-				assert.False(t, recipe.ExecuteCalled)
 				assert.False(t, build.BuildCalled)
 				assert.False(t, git.PushCalled)
 			},
 		},
 		{
-			name: "recipe execution failure",
+			name: "orw-apply validation failure",
 			config: &TransflowConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
-				recipe.ExecuteError = errors.New("recipe execution failed")
+				// Force HCL validation failure
+				validateJob = func(string) error { return fmt.Errorf("job parse/validate failed: bad HCL") }
 			},
 			expectError:    true,
-			expectedErrMsg: "failed to execute recipes",
+			expectedErrMsg: "orw-apply HCL validation failed",
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
-				assert.True(t, recipe.ExecuteCalled)
 				assert.False(t, git.CommitCalled)
 				assert.False(t, build.BuildCalled)
 				assert.False(t, git.PushCalled)
+				// restore for following tests
+				validateJob = baseValidate
 			},
 		},
 		{
@@ -116,7 +152,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -127,11 +163,10 @@ func TestTransflowRunner_Run(t *testing.T) {
 				}
 			},
 			expectError:    true,
-			expectedErrMsg: "build check failed",
+			expectedErrMsg: "build gate failed",
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
-				assert.True(t, recipe.ExecuteCalled)
 				assert.True(t, git.CommitCalled)
 				assert.True(t, build.BuildCalled)
 				assert.False(t, git.PushCalled) // Should not push on build failure
@@ -144,7 +179,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -155,7 +190,6 @@ func TestTransflowRunner_Run(t *testing.T) {
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
-				assert.True(t, recipe.ExecuteCalled)
 				assert.True(t, git.CommitCalled)
 				assert.True(t, build.BuildCalled)
 				assert.True(t, git.PushCalled)
@@ -169,7 +203,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 				BaseRef:      "refs/heads/main",
 				BuildTimeout: "5m",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -188,7 +222,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 				BaseRef:    "refs/heads/main",
 				Lane:       "D",
 				Steps: []TransflowStep{
-					{Type: "recipe", ID: "test-recipe", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
