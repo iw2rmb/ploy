@@ -289,6 +289,17 @@ fi
 JAR_PATH="${MAVEN_CACHE_PATH}/$(echo ${RECIPE_GROUP} | tr '.' '/')/${RECIPE_ARTIFACT}/${RECIPE_VERSION}/${RECIPE_ARTIFACT}-${RECIPE_VERSION}.jar"
 register_recipe_metadata "${RECIPE_CLASS}" "${RECIPE_GROUP}" "${RECIPE_ARTIFACT}" "${RECIPE_VERSION}" "${JAR_PATH}" || true
 
+# Create a lightweight baseline snapshot (no Git), before transformation
+BASE_SNAPSHOT="/workspace/original"
+rm -rf "$BASE_SNAPSHOT"
+mkdir -p "$BASE_SNAPSHOT"
+echo "[OpenRewrite] Creating baseline snapshot at $BASE_SNAPSHOT (hardlinks if supported)"
+if cp -al /workspace/project/. "$BASE_SNAPSHOT" 2>/dev/null; then
+  :
+else
+  rsync -a --delete --exclude '.m2' --exclude 'target' --exclude 'build' /workspace/project/ "$BASE_SNAPSHOT" >/dev/null 2>&1 || cp -a /workspace/project/. "$BASE_SNAPSHOT"/
+fi
+
 # Step 4: Run OpenRewrite transformation
 echo "[OpenRewrite] Running transformation with recipe: ${RECIPE_CLASS}"
 
@@ -351,18 +362,22 @@ echo "[OpenRewrite] Contents of current directory:"
 echo "[OpenRewrite] Contents of /workspace:"
 { ls -la /workspace | head -10; } || true
 
-# Step 5: Generate diff.patch artifact for transflow using git diff (preferred)
+# Step 5: Generate diff.patch artifact for transflow using diff -ruN (no Git)
 echo "[OpenRewrite] Generating unified diff patch..."
 rm -f "${OUTPUT_DIR}/diff.patch" || true
-# Use git diff against HEAD to capture working tree changes (no color, unified),
-# excluding build artifacts
+cd /workspace
 set +e
-git diff -U3 --no-color HEAD -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"
+diff -ruN \
+  --exclude='.m2' \
+  --exclude='target' \
+  --exclude='build' \
+  original project > "${OUTPUT_DIR}/diff.patch" 2>/dev/null
 DIFF_RC=$?
 set -e
-# git diff returns 1 when differences are present; 0 when none; non-zero unexpected -> leave file as is
-if [ "$DIFF_RC" -eq 0 ]; then
-  : > "${OUTPUT_DIR}/diff.patch"
+
+# Normalize patch paths to be repo-relative (strip original/ and project/ prefixes)
+if [ -f "${OUTPUT_DIR}/diff.patch" ]; then
+  sed -i -E 's|^--- original/|--- |; s|^\+\+\+ project/|+++ |' "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true
 fi
 
 # Log diff size and preview
