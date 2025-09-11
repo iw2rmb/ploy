@@ -50,7 +50,7 @@ RUN mkdir -p /root/.m2 && \
 
 # Pre-download the OpenRewrite Maven plugin (exact version used at runtime)
 RUN java -version && javac -version && mvn -version && \
-    mvn -q org.openrewrite.maven:rewrite-maven-plugin:6.19.0:help \
+    mvn -q org.openrewrite.maven:rewrite-maven-plugin:6.18.0:help \
     -Ddetail=true -DskipTests 2>/dev/null || true
 
 # Use setup script as entrypoint (which then calls openrewrite)
