@@ -37,7 +37,7 @@ rsync -a --delete \
 ## Generate unified diff reliably using diff(1)
 diff -ruN "$TMP_BEFORE" "$TMP_AFTER" > "$OUT_PATCH" 2>/dev/null || true
 
-# Ensure file exists even if empty
-touch "$OUT_PATCH"
+# Ensure file exists (do not truncate an existing diff)
+[ -f "$OUT_PATCH" ] || touch "$OUT_PATCH"
 
 exit 0
