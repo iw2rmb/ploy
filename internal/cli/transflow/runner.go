@@ -26,6 +26,13 @@ import (
 // By default it points to orchestration.SubmitAndWaitTerminal.
 var submitAndWaitTerminal = orchestration.SubmitAndWaitTerminal
 
+// validateJob is a package-level indirection for orchestration.ValidateJob to ease unit testing.
+var validateJob = orchestration.ValidateJob
+var validateDiffPathsFn = ValidateDiffPaths
+var validateUnifiedDiffFn = ValidateUnifiedDiff
+var applyUnifiedDiffFn = ApplyUnifiedDiff
+var hasRepoChangesFn = hasRepoChanges
+
 // GitOperationsInterface defines the Git operations needed by the runner
 type GitOperationsInterface interface {
 	CloneRepository(ctx context.Context, repoURL, branch, targetPath string) error
@@ -269,6 +276,9 @@ func downloadToFile(url, dest string) error {
 	return err
 }
 
+// test indirections
+var downloadToFileFn = downloadToFile
+
 // randomStepID returns s-<12 hex chars>
 func randomStepID() string {
 	var buf [6]byte
@@ -325,6 +335,8 @@ func putJSON(seaweedBase, key string, body []byte) error {
 	return nil
 }
 
+var putJSONFn = putJSON
+
 // getJSON fetches a JSON document from SeaweedFS
 func getJSON(seaweedBase, key string) ([]byte, int, error) {
 	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
@@ -338,6 +350,8 @@ func getJSON(seaweedBase, key string) ([]byte, int, error) {
 	b, _ := io.ReadAll(resp.Body)
 	return b, resp.StatusCode, nil
 }
+
+var getJSONFn = getJSON
 
 // GetTargetRepo returns the target repository URL for human-step branch operations
 func (r *TransflowRunner) GetTargetRepo() string {
@@ -430,13 +444,13 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 	if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" {
 		allow = strings.Split(v, ",")
 	}
-	if err := ValidateDiffPaths(diffPath, allow); err != nil {
+	if err := validateDiffPathsFn(diffPath, allow); err != nil {
 		return err
 	}
-	if err := ValidateUnifiedDiff(ctx, repoPath, diffPath); err != nil {
+	if err := validateUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
 		return err
 	}
-	if err := ApplyUnifiedDiff(ctx, repoPath, diffPath); err != nil {
+	if err := applyUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
 		return err
 	}
 	if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
@@ -732,7 +746,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Preflight validate HCL, then submit job and wait terminal
 			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
 			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
-			if err := orchestration.ValidateJob(submittedPath); err != nil {
+			if err := validateJob(submittedPath); err != nil {
 				r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("HCL validation failed: %v", err))
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW HCL validation failed: %v", err)})
 				result.ErrorMessage = fmt.Sprintf("orw-apply HCL validation failed: %v", err)
@@ -764,7 +778,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if execID != "" {
 				branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
 				url := strings.TrimRight(seaweed, "/") + "/artifacts/" + branchDiffKey
-				fetchErr = downloadToFile(url, diffPath)
+				fetchErr = downloadToFileFn(url, diffPath)
 			} else {
 				fetchErr = fmt.Errorf("missing execution id for diff fetch")
 			}
@@ -781,7 +795,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				branchID := step.ID
 				// Read HEAD
 				headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
-				if b, code, _ := getJSON(seaweed, headKey); code == 200 {
+				if b, code, _ := getJSONFn(seaweed, headKey); code == 200 {
 					var head map[string]string
 					_ = json.Unmarshal(b, &head)
 					cur := head["step_id"]
@@ -790,7 +804,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 					for cur != "" {
 						chain = append(chain, cur)
 						metaKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, cur)
-						if mb, mc, _ := getJSON(seaweed, metaKey); mc == 200 {
+						if mb, mc, _ := getJSONFn(seaweed, metaKey); mc == 200 {
 							var meta struct {
 								Prev string `json:"prev_step_id"`
 							}
@@ -808,15 +822,15 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 					for _, sid := range chain {
 						url := strings.TrimRight(seaweed, "/") + "/artifacts/" + fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, sid)
 						tmp := filepath.Join(baseDir, "out", "chain-"+sid+".patch")
-						_ = downloadToFile(url, tmp)
+						_ = downloadToFileFn(url, tmp)
 						// Validate and apply
 						allow := []string{"src/**", "pom.xml"}
 						if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" {
 							allow = strings.Split(v, ",")
 						}
-						if err := ValidateDiffPaths(tmp, allow); err == nil {
-							_ = ValidateUnifiedDiff(ctx, repoPath, tmp)
-							_ = ApplyUnifiedDiff(ctx, repoPath, tmp)
+						if err := validateDiffPathsFn(tmp, allow); err == nil {
+							_ = validateUnifiedDiffFn(ctx, repoPath, tmp)
+							_ = applyUnifiedDiffFn(ctx, repoPath, tmp)
 						}
 					}
 				}
@@ -883,8 +897,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 					"ts":           time.Now().UTC().Format(time.RFC3339),
 				}
 				if mb, e := json.Marshal(meta); e == nil {
-					_ = putJSON(seaweed, fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, curStepID), mb)
-					_ = putJSON(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", curStepID)))
+					_ = putJSONFn(seaweed, fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, curStepID), mb)
+					_ = putJSONFn(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", curStepID)))
 				}
 			}
 
@@ -897,7 +911,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	// Step 4: Commit changes (only if not already committed by an apply step)
 	headBefore := initialHead
 	// Re-check working tree status
-	changed, _ := hasRepoChanges(repoPath)
+	changed, _ := hasRepoChangesFn(repoPath)
 	commitMessage := fmt.Sprintf("Applied recipe transformations for workflow %s", r.config.ID)
 	if !changed {
 		// No staged/working changes; check if HEAD moved (apply step may have committed already)
