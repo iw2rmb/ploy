@@ -394,10 +394,10 @@ func TestStatusHelperFunctionsAdvanced(t *testing.T) {
 		iterations := 10000
 
 		for i := 0; i < iterations; i++ {
-			mapNomadStatusToARF("running")
-			mapNomadStatusToARF("pending")
-			mapNomadStatusToARF("dead")
-			mapNomadStatusToARF("unknown")
+			_ = mapNomadStatusToARF("running")
+			_ = mapNomadStatusToARF("pending")
+			_ = mapNomadStatusToARF("dead")
+			_ = mapNomadStatusToARF("unknown")
 		}
 
 		duration := time.Since(start)

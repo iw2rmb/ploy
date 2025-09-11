@@ -104,9 +104,7 @@ func (m *MockStorage) DeleteBatch(ctx context.Context, keys []string) error {
 		return m.failError
 	}
 
-	for _, key := range keys {
-		m.deleteCalls = append(m.deleteCalls, key)
-	}
+	m.deleteCalls = append(m.deleteCalls, keys...)
 	return nil
 }
 
