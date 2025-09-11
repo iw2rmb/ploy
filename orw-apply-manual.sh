@@ -25,7 +25,15 @@ RECIPE_ARTIFACT=${RECIPE_ARTIFACT:-rewrite-migrate-java}
 RECIPE_VERSION=${RECIPE_VERSION:-3.17.0}
 MAVEN_PLUGIN_VERSION=${MAVEN_PLUGIN_VERSION:-6.18.0}
 
-ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o StrictHostKeyChecking=no root@"${TARGET_HOST}" 'bash -s' <<'EOSH'
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=4 -o StrictHostKeyChecking=no \
+  root@"${TARGET_HOST}" \
+  REPO_URL="${REPO_URL}" \
+  RECIPE_CLASS="${RECIPE_CLASS}" \
+  RECIPE_GROUP="${RECIPE_GROUP}" \
+  RECIPE_ARTIFACT="${RECIPE_ARTIFACT}" \
+  RECIPE_VERSION="${RECIPE_VERSION}" \
+  MAVEN_PLUGIN_VERSION="${MAVEN_PLUGIN_VERSION}" \
+  bash -s <<'EOSH'
 set -euo pipefail
 
 SEAWEED=http://seaweedfs-filer.service.consul:8888
@@ -78,4 +86,3 @@ fi
 EOSH
 
 echo "Done. Check the VPS output above for DIFF_URL and logs."
-
