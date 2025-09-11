@@ -19,8 +19,20 @@ TMP_AFTER=$(mktemp -d 2>/dev/null || mktemp -d -t diffafter)
 trap 'rm -rf "$TMP_BEFORE" "$TMP_AFTER"' EXIT
 
 # Copy trees (best-effort) excluding build caches
-rsync -a --delete --exclude '.m2' --exclude 'target' --exclude '.gradle' --exclude 'build' "$BEFORE_DIR"/ "$TMP_BEFORE"/ 2>/dev/null || true
-rsync -a --delete --exclude '.m2' --exclude 'target' --exclude '.gradle' --exclude 'build' "$AFTER_DIR"/ "$TMP_AFTER"/ 2>/dev/null || true
+rsync -a --delete \
+  --exclude '.m2' \
+  --exclude 'target' \
+  --exclude '.gradle' \
+  --exclude 'build' \
+  --exclude '.git' \
+  "$BEFORE_DIR"/ "$TMP_BEFORE"/ 2>/dev/null || true
+rsync -a --delete \
+  --exclude '.m2' \
+  --exclude 'target' \
+  --exclude '.gradle' \
+  --exclude 'build' \
+  --exclude '.git' \
+  "$AFTER_DIR"/ "$TMP_AFTER"/ 2>/dev/null || true
 
 # Generate unified diff; if no changes, create empty file
 if command -v git >/dev/null 2>&1; then
@@ -36,4 +48,3 @@ fi
 touch "$OUT_PATCH"
 
 exit 0
-
