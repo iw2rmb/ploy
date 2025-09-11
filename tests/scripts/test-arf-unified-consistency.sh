@@ -125,90 +125,16 @@ clear_nomad_logs() {
 
 # Test 1: Verify Recipe Type Enforcement
 test_recipe_type_enforcement() {
-    log_stage "Test 1: Recipe Type Enforcement"
-    
-    # Clear logs before transformation tests
-    clear_nomad_logs
-    
-    # Test 1a: Request without type should fail
-    run_consistency_test "ARF Transform without recipe type" \
-        "test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"org.openrewrite.java.migrate.UpgradeToJava17\",\"repository_url\":\"https://github.com/winterbe/java8-tutorial.git\"}' '400'" \
+    log_stage "Test 1: Transflow Run Submission"
+    local req='{"config_data": {"version":"1","id":"consistency-$(date +%s)","target_repo":"https://github.com/winterbe/java8-tutorial.git","target_branch":"master","base_ref":"master","lane":"A","build_timeout":"2m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.UpgradeToJava17"]}],"self_heal":{"enabled":false}}}'
+    run_consistency_test "Transflow run accepted" \
+        "test_arf_endpoint 'POST' '/transflow/run' '$req' '202' '600'" \
         "success"
-    
-    # Test 1b: Request with explicit type - expect infrastructure issue (dispatcher not ready)
-    # Note: This will timeout until OpenRewrite infrastructure is fully deployed
-    # We accept 000 (timeout) or 500 (infrastructure error) as valid responses for now
-    local transform_response=$(test_arf_endpoint 'POST' '/arf/transform' '{\"recipe_id\":\"org.openrewrite.java.migrate.UpgradeToJava17\",\"type\":\"openrewrite\",\"codebase\":{\"repository\":\"https://github.com/winterbe/java8-tutorial.git\",\"branch\":\"master\"}}' '200' '600')
-    if [[ $? -ne 0 ]]; then
-        log_info "Transform with type returned non-200 (expected until infrastructure ready)"
-        # Check if it's a timeout or infrastructure error
-        local status_code=$(echo "$transform_response" | grep -oE "returned [0-9]{3}" | awk '{print $2}')
-        if [[ "$status_code" == "000" || "$status_code" == "500" ]]; then
-            log_info "EXPECTED: OpenRewrite infrastructure not ready (timeout or error)"
-        else
-            log_error "FAILED: Unexpected error code: $status_code"
-        fi
-    else
-        log_success "PASSED: ARF Transform with explicit openrewrite type"
-    fi
 }
 
 # Test 2: Full Recipe Name Verification and Transformation  
 test_full_recipe_names() {
-    log_stage "Test 2: Full Recipe Name Verification and OpenRewrite Transformation"
-    
-    # Clear logs before transformation test
-    clear_nomad_logs
-    
-    # Test 2a: Submit OpenRewrite transformation
-    log_info "Submitting OpenRewrite transformation job..."
-    local transform_response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
-        -d '{"recipe_id":"org.openrewrite.java.RemoveUnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
-        "$CONTROLLER_URL/arf/transform" || echo '{"error":"request_failed"}')
-    
-    # Check if transformation was accepted (even if it times out waiting)
-    if echo "$transform_response" | jq -e '.transformation_id' >/dev/null 2>&1; then
-        local transform_id=$(echo "$transform_response" | jq -r '.transformation_id')
-        log_success "OpenRewrite transformation submitted: $transform_id"
-        
-        # Wait briefly and check if job was created
-        sleep 5
-        local job_status=$(nomad job status 2>/dev/null | grep -c "openrewrite" || echo "0")
-        if [[ "$job_status" -gt 0 ]]; then
-            log_success "OpenRewrite Nomad job created successfully"
-            
-            # Get job details
-            local latest_job=$(nomad job status 2>/dev/null | grep openrewrite | tail -1 | awk '{print $1}')
-            if [[ -n "$latest_job" ]]; then
-                log_info "Job ID: $latest_job"
-                
-                # Wait for job to complete or fail (max 60 seconds)
-                local wait_time=0
-                while [[ $wait_time -lt 60 ]]; do
-                    local job_status=$(nomad job status "$latest_job" 2>/dev/null | grep "^Status" | awk '{print $3}')
-                    if [[ "$job_status" == "dead" || "$job_status" == "complete" ]]; then
-                        log_info "Job completed with status: $job_status"
-                        break
-                    fi
-                    sleep 5
-                    wait_time=$((wait_time + 5))
-                done
-                
-                # Check job logs for debugging
-                local alloc_id=$(nomad job status "$latest_job" 2>/dev/null | grep -A5 "^Allocations" | tail -1 | awk '{print $1}')
-                if [[ -n "$alloc_id" && "$alloc_id" != "ID" ]]; then
-                    log_info "Checking allocation logs for debugging..."
-                    nomad alloc logs "$alloc_id" 2>&1 | grep -E "DEBUG|ERROR" | head -10 || true
-                fi
-            fi
-        else
-            log_error "No OpenRewrite job created in Nomad"
-        fi
-    elif echo "$transform_response" | jq -e '.error' >/dev/null 2>&1; then
-        log_error "Transformation request failed: $(echo "$transform_response" | jq -r '.error')"
-    else
-        log_info "Transformation request timed out (infrastructure may not be ready)"
-    fi
+    log_stage "Test 2: (Skipped) OpenRewrite ARF-specific checks not applicable after unification"
 }
 
 # Test 3: Timeout Consistency Verification
@@ -236,7 +162,7 @@ monitor_transformation_with_timeout() {
             return 1
         fi
         
-        local status_response=$(curl -s -m 600 "$CONTROLLER_URL/arf/transforms/$transform_id" || echo '{"status":"connection_error"}')
+        local status_response=$(curl -s -m 600 "$CONTROLLER_URL/transflow/status/$transform_id" || echo '{"status":"connection_error"}')
         local status=$(echo "$status_response" | jq -r '.status // "unknown"')
         
         if [[ "$status" != "$last_status" ]]; then
@@ -295,26 +221,8 @@ test_unified_arf_system() {
 # Helper to verify dispatcher path usage
 verify_openrewrite_dispatcher_path() {
     # Submit an OpenRewrite transformation and check logs/behavior
-    local response=$(curl -s -m 600 -X POST -H "Content-Type: application/json" \
-        -d '{"recipe_id":"org.openrewrite.java.RemoveUnusedImports","type":"openrewrite","codebase":{"repository":"https://github.com/winterbe/java8-tutorial.git","branch":"master"}}' \
-        "$CONTROLLER_URL/arf/transform")
-    
-    if echo "$response" | jq -e '.transformation_id' >/dev/null 2>&1; then
-        local transform_id=$(echo "$response" | jq -r '.transformation_id')
-        log_info "Submitted OpenRewrite transformation: $transform_id"
-        
-        # Wait a bit and check status to verify it's using unified system
-        sleep 10
-        local status_response=$(curl -s -m 600 "$CONTROLLER_URL/arf/transforms/$transform_id")
-        
-        if echo "$status_response" | jq -e '.transformation_id' >/dev/null 2>&1; then
-            log_success "OpenRewrite transformation using unified system path"
-            return 0
-        fi
-    fi
-    
-    log_error "OpenRewrite transformation failed to use unified system"
-    return 1
+    log_info "Skipping ARF dispatcher verification (ARF transform endpoints removed)"
+    return 0
 }
 
 # Test 6: Container Image Consistency 
@@ -382,7 +290,7 @@ main() {
     
     # Execute test phases
     test_recipe_type_enforcement
-    test_full_recipe_names  
+    test_full_recipe_names
     test_timeout_consistency
     test_recipe_registry  # Test what IS working after our fix
     test_unified_arf_system

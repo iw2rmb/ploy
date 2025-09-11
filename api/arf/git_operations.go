@@ -3,7 +3,9 @@ package arf
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +43,8 @@ func (g *GitOperations) CreateBranchAndCheckout(ctx context.Context, repoPath, b
 
 // PushBranch pushes the current HEAD to the given remote URL and branch (HTTPS with token recommended)
 func (g *GitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
+	// If an access token is available, embed it into the remote URL for HTTPS auth
+	remoteURL = g.authenticatedRemoteURL(remoteURL)
 	// Set remote named 'origin' to provided URL
 	rm := exec.CommandContext(ctx, "git", "remote", "remove", "origin")
 	rm.Dir = repoPath
@@ -58,9 +62,38 @@ func (g *GitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, bra
 	var stderr bytes.Buffer
 	push.Stderr = &stderr
 	if err := push.Run(); err != nil {
-		return fmt.Errorf("git push failed: %v - %s", err, stderr.String())
+		rc := 0
+		var ee *exec.ExitError
+		if errors.As(err, &ee) && ee.ProcessState != nil {
+			rc = ee.ProcessState.ExitCode()
+		}
+		return fmt.Errorf("git push failed: rc=%d: %v - %s", rc, err, stderr.String())
 	}
 	return nil
+}
+
+// authenticatedRemoteURL injects credentials into the remote URL when possible.
+// For GitLab, using username "oauth2" with the token as password works for PATs
+// and project/group access tokens. Only applies to http/https URLs.
+func (g *GitOperations) authenticatedRemoteURL(remote string) string {
+	token := os.Getenv("GITLAB_TOKEN")
+	if token == "" {
+		return remote
+	}
+	u, err := url.Parse(remote)
+	if err != nil {
+		return remote
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return remote
+	}
+	// Avoid overwriting if userinfo already present
+	if u.User != nil {
+		return remote
+	}
+	// url.UserPassword will handle necessary escaping
+	u.User = url.UserPassword("oauth2", token)
+	return u.String()
 }
 
 // checkGitAvailable verifies that git is installed and accessible
@@ -86,7 +119,7 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 	}
 
 	// Build clone command
-    args := []string{"clone", "--depth", "1", "--single-branch"}
+	args := []string{"clone", "--depth", "1", "--single-branch"}
 	if branch != "" && branch != "main" && branch != "master" {
 		args = append(args, "--branch", branch)
 	}

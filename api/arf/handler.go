@@ -220,18 +220,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Delete("/models/:name", h.RemoveModel)
 	arf.Post("/models/:name/set-default", h.SetDefaultModel)
 
-	// Transformation execution
-	arf.Post("/transforms", h.ExecuteTransformationAsync)
-	arf.Get("/transforms/:id", h.GetTransformationResult)
-	arf.Get("/transforms/:id/status", h.GetTransformationStatusAsync)
-
-	// Transformation debugging endpoints
-	arf.Get("/transforms/:id/hierarchy", h.GetTransformationHierarchy)
-	arf.Get("/transforms/:id/active", h.GetActiveHealingAttempts)
-	arf.Get("/transforms/:id/timeline", h.GetTransformationTimeline)
-	arf.Get("/transforms/:id/analysis", h.GetTransformationAnalysis)
-	arf.Get("/transforms/:id/report", h.GetTransformationReport)
-	arf.Get("/transforms/orphaned", h.GetOrphanedTransformations)
+	// Legacy ARF transform HTTP endpoints have been removed in favor of Transflow
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)

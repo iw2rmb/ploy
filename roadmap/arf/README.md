@@ -137,18 +137,11 @@ ARF leverages Ploy's existing infrastructure:
 
 ARF provides comprehensive API endpoints for transformation management and debugging:
 
-### Core Transformation Endpoints
-- `POST /v1/arf/transforms` - Execute new transformations
-- `GET /v1/arf/transforms/:id` - Get transformation results
-- `GET /v1/arf/transforms/:id/status` - Check transformation status
+### Core Transformation Endpoints (Legacy)
+// Legacy ARF transform endpoints removed; use Transflow under `/v1/transflow/*`.
 
-### Debugging & Analysis Endpoints
-- `GET /v1/arf/transforms/:id/hierarchy` - Hierarchical view of healing attempts
-- `GET /v1/arf/transforms/:id/timeline` - Chronological timeline of all events
-- `GET /v1/arf/transforms/:id/analysis` - Deep analysis with cost and performance metrics
-- `GET /v1/arf/transforms/:id/active` - Currently active healing attempts
-- `GET /v1/arf/transforms/:id/report` - **Human-readable markdown report** (NEW)
-- `GET /v1/arf/transforms/orphaned` - Find orphaned transformations
+### Debugging & Analysis Endpoints (Legacy)
+// Legacy ARF debugging endpoints removed with transform API; Transflow may expose equivalents in future.
 
 ### Transformation Reports
 

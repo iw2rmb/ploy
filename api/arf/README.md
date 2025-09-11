@@ -15,8 +15,6 @@ ARF provides automated code transformations with OpenRewrite, optional LLM‑ass
 
 - Recipes: `GET /v1/arf/recipes`, `GET /v1/arf/recipes/:id`, `GET /v1/arf/recipes/search`,
   `POST /v1/arf/recipes` (create custom), `POST /v1/arf/recipes/upload`, `POST /v1/arf/recipes/validate`, `GET /v1/arf/recipes/:id/download`.
-- Transforms (async): `POST /v1/arf/transforms`, `GET /v1/arf/transforms/:id`, `GET /v1/arf/transforms/:id/status`,
-  `GET /v1/arf/transforms/:id/{hierarchy|timeline|analysis|report}`, `GET /v1/arf/transforms/orphaned`.
 - Models: `GET/POST/PUT /v1/arf/models`, `DELETE /v1/arf/models/:name`, `POST /v1/arf/models/:name/set-default`.
 - Security: `POST /v1/arf/security/scan`, `POST /v1/arf/security/remediation`, `GET /v1/arf/security/{report|report/:id|compliance}`.
 - SBOM: `POST /v1/arf/sbom/{generate|analyze}`, `GET /v1/arf/sbom/{report|compliance|:id}`.
@@ -25,26 +23,9 @@ ARF provides automated code transformations with OpenRewrite, optional LLM‑ass
 
 Removed/unsupported: legacy benchmark endpoints; direct Nomad/Consul CLI instructions in this README.
 
-## Transform Request (async)
+## Transform Workflows
 
-Endpoint: `POST /v1/arf/transforms`
-
-Body (required fields shown):
-```json
-{
-  "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
-  "type": "openrewrite",
-  "codebase": {
-    "repository": "https://github.com/example/app",
-    "branch": "main"
-  }
-}
-```
-
-Behavior:
-- Returns `{ transformation_id, status, status_url }` immediately; poll `GET /v1/arf/transforms/:id/status`.
-- Only fully‑qualified OpenRewrite recipe IDs are accepted; packs are auto‑mapped, default pack version pinned in code.
-- Consul must be available for status storage; otherwise the request is rejected.
+Transformation execution is unified under the Transflow API and CLI. See `docs/api/transflow.md` and `docs/transflow/README.md` for details on `/v1/transflow/*` endpoints and `ploy transflow run`.
 
 ## Operational Rules
 
@@ -58,10 +39,8 @@ Behavior:
 # List recipes
 ploy arf recipes list
 
-# Run an OpenRewrite recipe (async)
-ploy arf transform \
-  --recipe org.openrewrite.java.migrate.UpgradeToJava17 \
-  --repository https://github.com/example/app
+# Execute code transformations via Transflow
+ploy transflow run -f ./transflow.yaml
 ```
 
 ## Notes & Limitations

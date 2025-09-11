@@ -5,83 +5,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
-	"strings"
 
-	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
-// ARFGitOperations wraps the existing ARF Git operations
-type ARFGitOperations struct {
-	*arf.GitOperations
-}
-
-// NewARFGitOperations creates a new ARF Git operations wrapper
-func NewARFGitOperations(workDir string) *ARFGitOperations {
-	return &ARFGitOperations{
-		GitOperations: arf.NewGitOperations(workDir),
-	}
-}
-
-// ARFRecipeExecutor implements recipe execution via the ARF system
-type ARFRecipeExecutor struct {
-	controllerURL string
-}
-
-// NewARFRecipeExecutor creates a new ARF recipe executor
-func NewARFRecipeExecutor(controllerURL string) *ARFRecipeExecutor {
-	return &ARFRecipeExecutor{
-		controllerURL: controllerURL,
-	}
-}
-
-// ExecuteRecipes executes OpenRewrite recipes using the ARF system
-func (e *ARFRecipeExecutor) ExecuteRecipes(ctx context.Context, workspacePath string, recipeIDs []string) error {
-	// For MVP, we'll invoke the ploy arf command directly
-	// This reuses the existing ARF pipeline without duplicating logic
-
-	// Get current executable path to avoid PATH dependency issues
-	execPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to get current executable path: %w", err)
-	}
-
-	// Resolve origin URL from the cloned repository to satisfy ARF CLI input requirements
-	// (ARF transform requires either --repo or --archive)
-	originURL := ""
-	{
-		cmd := exec.CommandContext(ctx, "git", "config", "--get", "remote.origin.url")
-		cmd.Dir = workspacePath
-		if out, err := cmd.Output(); err == nil {
-			originURL = strings.TrimSpace(string(out))
-		}
-	}
-
-	for _, recipeID := range recipeIDs {
-		// Use robust ARF transform path; prefer repository input inferred from local clone
-		args := []string{"arf", "transform", "--recipe", recipeID}
-		if originURL != "" {
-			args = append(args, "--repo", originURL)
-		}
-		if e.controllerURL != "" {
-			args = append(args, "--controller", e.controllerURL)
-		}
-
-		// Execute ploy arf transform command using full executable path
-		cmd := exec.CommandContext(ctx, execPath, args...)
-		cmd.Dir = workspacePath
-
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to execute recipe %s: %w", recipeID, err)
-		}
-	}
-
-	return nil
-}
+// Note: ARF-based Git/Recipe execution wrappers removed with ARF transforms HTTP removal.
 
 // SharedPushBuildChecker implements build checking using SharedPush
 type SharedPushBuildChecker struct {
@@ -179,7 +110,8 @@ func (i *TransflowIntegrations) CreateGitOperations() GitOperationsInterface {
 	if i.TestMode {
 		return NewMockGitOperations() // Use mock implementation for testing
 	}
-	return NewARFGitOperations(i.WorkDir)
+	// Use mock or a direct implementation; ARF Git wrappers removed
+	return NewMockGitOperations()
 }
 
 // CreateRecipeExecutor creates a recipe executor implementation
@@ -187,7 +119,8 @@ func (i *TransflowIntegrations) CreateRecipeExecutor() RecipeExecutorInterface {
 	if i.TestMode {
 		return NewMockRecipeExecutor() // Use mock implementation for testing
 	}
-	return NewARFRecipeExecutor(i.ControllerURL)
+	// No-op in production for now; Transflow does not rely on ARF recipe executor
+	return NewMockRecipeExecutor()
 }
 
 // CreateBuildChecker creates a build checker implementation

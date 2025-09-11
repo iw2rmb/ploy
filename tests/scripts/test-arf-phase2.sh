@@ -127,8 +127,9 @@ run_test test_endpoint "GET" "/v1/arf/patterns/recommendations?error_type=import
 
 # Transformation Execution Testing
 run_test_section "Transformation Execution"
-run_test test_endpoint "POST" "/v1/arf/transforms" "Execute transformation" '{"recipe_id":"org.openrewrite.java.RemoveUnusedImports","recipe_type":"openrewrite","codebase":{"language":"java","build_tool":"maven"}}'
-run_test test_endpoint "GET" "/v1/arf/transforms/test-transform-123" "Get transformation result" "" 404
+# Use Transflow unified API (basic smoke test)
+TRANSFLOW_REQ='{"config_data": {"version":"1","id":"phase2-smoke","target_repo":"https://github.com/example/app.git","target_branch":"main","base_ref":"main","lane":"A","build_timeout":"2m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.Java11toJava17"]}],"self_heal":{"enabled":false}}}'
+run_test test_endpoint "POST" "/v1/transflow/run" "Transflow run (smoke)" "$TRANSFLOW_REQ" 202
 
 # Sandbox Management Testing
 run_test_section "Sandbox Management"

@@ -1,10 +1,10 @@
 # OpenRewrite Transformation Test Plan
 
 ## Objective
-Verify that ARF transformations with OpenRewrite actually modify code and produce tangible results.
+Verify that Transflow workflows with OpenRewrite actually modify code and produce tangible results.
 
 ## Test Environment
-- **API Endpoint**: `https://api.dev.ployman.app/v1/arf/transforms`
+- **API Endpoint**: `https://api.dev.ployman.app/v1/transflow`
 - **Test Repository**: `/tmp/test-java-project` with deliberate code issues
 - **Target Recipes**: Standard OpenRewrite Java cleanup and modernization recipes
 
@@ -50,15 +50,22 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 - Modernize collection usage
 - Update legacy patterns
 
-## Transformation Request Format
+## Transflow Request Format (config_data)
 
 ```json
 {
-  "recipe_id": "org.openrewrite.java.RemoveUnusedImports",
-  "type": "openrewrite",
-  "codebase": {
-    "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
-    "branch": "main"
+  "config_data": {
+    "version": "1",
+    "id": "orw-test-<timestamp>",
+    "target_repo": "https://github.com/iw2rmb/ploy-orw-test-java.git",
+    "target_branch": "main",
+    "base_ref": "main",
+    "lane": "A",
+    "build_timeout": "5m",
+    "steps": [
+      {"type": "orw-apply", "id": "orw1", "engine": "openrewrite", "recipes": ["org.openrewrite.java.RemoveUnusedImports"]}
+    ],
+    "self_heal": {"enabled": false}
   }
 }
 ```
@@ -70,28 +77,20 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    - Document all issues present
    - Create checksums of files
 
-2. **Execute Transformation**
-   ```bash
-   curl -X POST https://api.dev.ployman.app/v1/arf/transforms \
+2. **Execute Transflow Run**
+  ```bash
+  curl -X POST https://api.dev.ployman.app/v1/transflow/run \
      -H "Content-Type: application/json" \
-     -d '{
-       "recipe_id": "org.openrewrite.java.RemoveUnusedImports",
-       "type": "openrewrite",
-       "codebase": {
-         "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
-         "branch": "main"
-       }
-     }'
-   ```
+     -d '{"config_data": {"version":"1","id":"orw-test-$(date +%s)","target_repo":"https://github.com/iw2rmb/ploy-orw-test-java.git","target_branch":"main","base_ref":"main","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.RemoveUnusedImports"]}],"self_heal":{"enabled":false}}}'
+  ```
 
 3. **Monitor Execution**
-   - Track transformation status via `/v1/arf/transforms/{id}/status`
+   - Track status via `/v1/transflow/status/{id}`
    - Monitor Nomad job execution
    - Check SeaweedFS for artifacts
 
 4. **Retrieve Results**
-   - Download transformed code from storage
-   - Location: `artifacts/jobs/{job-name}/output.tar` where job-name format is `openrewrite-{timestamp}`
+   - Download artifacts from storage under `artifacts/transflow/{id}/...`
 
 5. **Verify Changes**
    - Compare before/after files
@@ -206,31 +205,24 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    - `changes_applied > 0` based on OpenRewrite output parsing, not actual file persistence
 3. **Storage Bucket Configuration**: Must use `artifacts` collection consistently
 
-## API Usage Documentation
+## API Usage Documentation (Updated: Transflow)
 
-### Successful Pattern for Transformations
+### Successful Pattern for Transformations via Transflow
 
 ```bash
-# 1. Start transformation
-curl -X POST https://api.dev.ployman.app/v1/arf/transforms \
+# 1. Start transflow run
+curl -X POST https://api.dev.ployman.app/v1/transflow/run \
   -H "Content-Type: application/json" \
-  -d '{
-    "recipe_id": "org.openrewrite.java.migrate.Java8toJava11",
-    "type": "openrewrite",
-    "codebase": {
-      "repository": "https://github.com/iw2rmb/ploy-orw-test-java.git",
-      "branch": "main"
-    }
-  }'
+  -d '{"config_data": {"version":"1","id":"orw-test-$(date +%s)","target_repo":"https://github.com/iw2rmb/ploy-orw-test-java.git","target_branch":"main","base_ref":"main","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.Java8toJava11"]}],"self_heal":{"enabled":false}}}'
 
 # 2. Monitor status
-curl https://api.dev.ployman.app/v1/arf/transforms/{id}/status
+curl https://api.dev.ployman.app/v1/transflow/status/{id}
 
-# 3. Get transformation details (must be done quickly after completion)
-curl https://api.dev.ployman.app/v1/arf/transforms/{id}
+# 3. Get artifacts (e.g., diff.patch)
+curl https://api.dev.ployman.app/v1/transflow/artifacts/{id}
 
-# 4. Get human-readable report
-curl https://api.dev.ployman.app/v1/arf/transforms/{id}/report
+# 4. Logs / events
+curl https://api.dev.ployman.app/v1/transflow/logs/{id}
 ```
 
 ### Tested Recipe IDs That Work

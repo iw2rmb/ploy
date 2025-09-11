@@ -12,24 +12,33 @@ NC='\033[0m'
 
 # Configuration
 API_URL="${API_URL:-https://api.dev.ployman.app}"
-TRANSFORM_ENDPOINT="$API_URL/v1/arf/transforms"
+TRANSFLOW_ENDPOINT="$API_URL/v1/transflow/run"
 
-echo -e "${BLUE}=== Testing End-to-End Transformation Workflow ===${NC}"
+echo -e "${BLUE}=== Testing Transflow Submission Workflow ===${NC}"
 echo "API URL: $API_URL"
 echo
 
-# Test transformation with registered recipe
-echo "1. Testing transformation with registered Java 11 to 17 recipe..."
+echo "1. Testing transflow run with Java 11 to 17 recipe..."
 
 # Use Ploy's test repository created for Java 11 to 17 migration testing
 TRANSFORM_PAYLOAD='{
-  "recipe_id": "org.openrewrite.java.migrate.Java11toJava17",
-  "type": "openrewrite",
-  "codebase": {
-    "repository": "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
-    "branch": "main",
-    "language": "java",
-    "build_tool": "maven"
+  "config_data": {
+    "version": "1",
+    "id": "twf-$(date +%s)",
+    "target_repo": "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
+    "target_branch": "main",
+    "base_ref": "main",
+    "lane": "A",
+    "build_timeout": "5m",
+    "steps": [
+      {
+        "type": "orw-apply",
+        "id": "orw1",
+        "engine": "openrewrite",
+        "recipes": ["org.openrewrite.java.migrate.Java11toJava17"]
+      }
+    ],
+    "self_heal": {"enabled": false}
   }
 }'
 
@@ -38,11 +47,11 @@ echo "$TRANSFORM_PAYLOAD" | jq .
 echo
 
 # Attempt transformation
-echo "Submitting transformation request..."
+echo "Submitting transflow run request..."
 RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" \
     -H "Content-Type: application/json" \
     -d "$TRANSFORM_PAYLOAD" \
-    "$TRANSFORM_ENDPOINT")
+    "$TRANSFLOW_ENDPOINT")
 
 # Extract HTTP status and response body
 HTTP_STATUS=$(echo "$RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
@@ -52,18 +61,18 @@ echo "HTTP Status: $HTTP_STATUS"
 echo "Response: $RESPONSE_BODY"
 echo
 
-if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 202 ]; then
+if [ "$HTTP_STATUS" -eq 202 ] || [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
     echo -e "${GREEN}✓ Transformation request accepted${NC}"
     
     # Parse task ID if available
-    TASK_ID=$(echo "$RESPONSE_BODY" | jq -r '.task_id // empty')
+    TASK_ID=$(echo "$RESPONSE_BODY" | jq -r '.execution_id // empty')
     
     if [ ! -z "$TASK_ID" ]; then
         echo "Task ID: $TASK_ID"
         
         # Test task status endpoint
         echo "2. Testing transformation status tracking..."
-        STATUS_ENDPOINT="$API_URL/v1/arf/transforms/$TASK_ID/status"
+        STATUS_ENDPOINT="$API_URL/v1/transflow/status/$TASK_ID"
         
         STATUS_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" "$STATUS_ENDPOINT")
         STATUS_HTTP_CODE=$(echo "$STATUS_RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
@@ -79,13 +88,11 @@ if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" 
         fi
     fi
     
-    echo -e "${GREEN}🎉 End-to-end transformation workflow is functional!${NC}"
+    echo -e "${GREEN}🎉 Transflow submission workflow is functional!${NC}"
     echo
     echo -e "${BLUE}=== Workflow Summary ===${NC}"
-    echo "✓ Recipe registration: Working (RecipeRegistry)"
-    echo "✓ Transformation submission: Working"
-    echo "✓ OpenRewrite integration: Functional"
-    echo "✓ Async task handling: Available"
+    echo "✓ Transflow submission: Working"
+    echo "✓ Async status endpoint reachable (if provided)"
     
 else
     echo -e "${RED}✗ Transformation request failed${NC}"
