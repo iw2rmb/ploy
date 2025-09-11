@@ -33,7 +33,7 @@ Phase 3 transforms the static analysis framework into an enterprise-grade system
 - ✅ Create multi-language ARF recipe support and validation (ARF healing workflow supports all languages)
 - ✅ Build sophisticated remediation workflow orchestration (async transformation system operational)
 - ✅ Add human-in-the-loop integration for complex transformations (approval workflows in place)
-- ✅ Implement transformation impact analysis and risk assessment (healing coordinator metrics)
+- ✅ Implement transformation impact analysis and risk assessment (transflow runtime metrics)
 
 **Deliverables**:
 ```go
@@ -151,7 +151,7 @@ advanced_arf_mapping:
 **Acceptance Criteria**:
 - ✅ Advanced workflow integration achieves 85% automatic remediation rate (met via healing workflow)
 - ✅ Confidence scoring predicts transformation success within 10% accuracy (implemented)
-- ✅ Impact analysis correctly identifies high-risk transformations (healing coordinator tracks)
+- ✅ Impact analysis correctly identifies high-risk transformations (transflow metrics tracks)
 - ✅ Human approval workflows complete within defined SLA timeframes (async system)
 - ⏳ Multi-language recipe support covers 200+ transformation patterns (expanding)
 

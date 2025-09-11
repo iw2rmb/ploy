@@ -504,7 +504,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	}
 
 	// Step 1: Clone repository
-	r.emit(ctx, "clone", "clone", "info", "Cloning repository")
+	r.emit(ctx, "clone", "clone", "info", fmt.Sprintf("Cloning repository: repo=%s ref=%s", r.config.TargetRepo, r.config.BaseRef))
 	repoPath := filepath.Join(r.workspaceDir, "repo")
 	if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
 		r.emit(ctx, "clone", "clone", "error", fmt.Sprintf("clone failed: %v", err))
@@ -512,13 +512,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		result.Duration = time.Since(startTime)
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
 	}
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:  "clone",
-		Success: true,
-		Message: fmt.Sprintf("Cloned %s at %s", r.config.TargetRepo, r.config.BaseRef),
-	})
-
-	// Diagnostics: list repo root contents after clone (first 10 entries)
+	// Post-clone verification and diagnostics
 	if entries, err := os.ReadDir(repoPath); err == nil {
 		max := len(entries)
 		if max > 10 {
@@ -532,6 +526,31 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		// Emit as event for remote visibility
 		r.emit(ctx, "clone", "clone-diagnostics", "info", fmt.Sprintf("repo=%s entries=%s", repoPath, strings.Join(names, ",")))
 	}
+
+	// If repository has no working tree files (besides .git), fail early
+	{
+		entries, _ := os.ReadDir(repoPath)
+		nonMeta := 0
+		for _, e := range entries {
+			if e.Name() == ".git" {
+				continue
+			}
+			nonMeta++
+		}
+		if nonMeta == 0 {
+			msg := fmt.Sprintf("clone produced empty working tree: repo=%s ref=%s", r.config.TargetRepo, r.config.BaseRef)
+			r.emit(ctx, "clone", "clone-failed", "error", msg)
+			result.ErrorMessage = msg
+			result.Duration = time.Since(startTime)
+			return nil, fmt.Errorf(msg)
+		}
+	}
+
+	result.StepResults = append(result.StepResults, StepResult{
+		StepID:  "clone",
+		Success: true,
+		Message: fmt.Sprintf("Cloned %s at %s", r.config.TargetRepo, r.config.BaseRef),
+	})
 
 	// Step 2: Create and checkout workflow branch
 	r.emit(ctx, "branch", "create-branch", "info", "Creating workflow branch")

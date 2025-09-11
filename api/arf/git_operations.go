@@ -118,10 +118,12 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
+	// Normalize branch ref (support refs/heads/*)
+	normalized := strings.TrimPrefix(branch, "refs/heads/")
 	// Build clone command
 	args := []string{"clone", "--depth", "1", "--single-branch"}
-	if branch != "" && branch != "main" && branch != "master" {
-		args = append(args, "--branch", branch)
+	if normalized != "" && normalized != "main" && normalized != "master" {
+		args = append(args, "--branch", normalized)
 	}
 	args = append(args, repoURL, targetPath)
 
@@ -135,19 +137,49 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 	}
 
 	// If branch wasn't specified during clone, checkout the branch
-	if branch != "" && branch != "main" && branch != "master" {
-		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", branch)
+	if normalized != "" && normalized != "main" && normalized != "master" {
+		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", normalized)
 		checkoutCmd.Dir = targetPath
 		if err := checkoutCmd.Run(); err != nil {
 			// Try to fetch the branch first
-			fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin", branch)
+			fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin", normalized)
 			fetchCmd.Dir = targetPath
 			fetchCmd.Run() // Ignore fetch errors
 
 			// Try checkout again
 			if err := checkoutCmd.Run(); err != nil {
-				return fmt.Errorf("failed to checkout branch %s: %w", branch, err)
+				return fmt.Errorf("failed to checkout branch %s: %w", normalized, err)
 			}
+		}
+	}
+
+	// Ensure sparse checkout is disabled and working tree is fully populated (best-effort)
+	{
+		cfg := exec.CommandContext(ctx, "git", "config", "core.sparseCheckout", "false")
+		cfg.Dir = targetPath
+		_ = cfg.Run()
+		disable := exec.CommandContext(ctx, "git", "sparse-checkout", "disable")
+		disable.Dir = targetPath
+		_ = disable.Run()
+		reset := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+		reset.Dir = targetPath
+		_ = reset.Run()
+	}
+
+	// Post-clone sanity: ensure repository is not empty
+	if fi, err := os.Stat(filepath.Join(targetPath, ".git")); err != nil || !fi.IsDir() {
+		return fmt.Errorf("git clone produced no .git directory at %s", targetPath)
+	}
+	if entries, err := os.ReadDir(targetPath); err == nil {
+		nonMeta := 0
+		for _, e := range entries {
+			if e.Name() == ".git" {
+				continue
+			}
+			nonMeta++
+		}
+		if nonMeta == 0 {
+			return fmt.Errorf("git clone empty working tree at %s (no files besides .git)", targetPath)
 		}
 	}
 
