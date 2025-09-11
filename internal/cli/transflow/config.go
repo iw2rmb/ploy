@@ -11,17 +11,23 @@ import (
 )
 
 type TransflowStep struct {
-	Type        string     `yaml:"type"`
-	ID          string     `yaml:"id"`
-	Engine      string     `yaml:"engine"`
-	Recipes     []string   `yaml:"recipes"`
-	Model       string     `yaml:"model,omitempty"`
-	Prompts     []string   `yaml:"prompts,omitempty"`
-	MCPTools    []MCPTool  `yaml:"mcp_tools,omitempty"`
-	Context     []string   `yaml:"context,omitempty"`
-	Budgets     MCPBudgets `yaml:"budgets,omitempty"`
-	Parallel    bool       `yaml:"parallel,omitempty"`
-	MaxParallel int        `yaml:"max_parallel_execs,omitempty"`
+	Type    string   `yaml:"type"`
+	ID      string   `yaml:"id"`
+	Engine  string   `yaml:"engine"`
+	Recipes []string `yaml:"recipes"`
+	// OpenRewrite-specific optional overrides
+	RecipeGroup        string     `yaml:"recipe_group,omitempty"`
+	RecipeArtifact     string     `yaml:"recipe_artifact,omitempty"`
+	RecipeVersion      string     `yaml:"recipe_version,omitempty"`
+	MavenPluginVersion string     `yaml:"maven_plugin_version,omitempty"`
+	DiscoverRecipe     *bool      `yaml:"discover_recipe,omitempty"`
+	Model              string     `yaml:"model,omitempty"`
+	Prompts            []string   `yaml:"prompts,omitempty"`
+	MCPTools           []MCPTool  `yaml:"mcp_tools,omitempty"`
+	Context            []string   `yaml:"context,omitempty"`
+	Budgets            MCPBudgets `yaml:"budgets,omitempty"`
+	Parallel           bool       `yaml:"parallel,omitempty"`
+	MaxParallel        int        `yaml:"max_parallel_execs,omitempty"`
 }
 
 type TransflowConfig struct {

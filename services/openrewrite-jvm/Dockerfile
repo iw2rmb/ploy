@@ -52,10 +52,10 @@ RUN mkdir -p /root/.m2 && \
     echo '  <offline>false</offline>' >> /root/.m2/settings.xml && \
     echo '</settings>' >> /root/.m2/settings.xml
 
-# Pre-download the OpenRewrite Maven plugin (exact version used at runtime)
-RUN java -version && javac -version && mvn -version && \
-    mvn -q org.openrewrite.maven:rewrite-maven-plugin:6.18.0:help \
-    -Ddetail=true -DskipTests 2>/dev/null || true
+# NOTE: Do not pre-download a specific plugin version here.
+# The runner selects the Maven plugin version via MAVEN_PLUGIN_VERSION env.
+# We only verify toolchain presence.
+RUN java -version && javac -version && mvn -version || true
 
 # Use setup script as entrypoint (which then calls openrewrite)
 ENTRYPOINT ["/usr/local/bin/setup-workspace"]

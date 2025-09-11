@@ -19,10 +19,10 @@ job "${RUN_ID}" {
       env = {
         OUTPUT_DIR       = "/workspace/out"
         RECIPE           = "${RECIPE_CLASS}"
-        DISCOVER_RECIPE  = "${DISCOVER_RECIPE}"
         RECIPE_GROUP     = "${RECIPE_GROUP}"
         RECIPE_ARTIFACT  = "${RECIPE_ARTIFACT}"
         RECIPE_VERSION   = "${RECIPE_VERSION}"
+        MAVEN_PLUGIN_VERSION = "${MAVEN_PLUGIN_VERSION}"
       }
 
       resources {

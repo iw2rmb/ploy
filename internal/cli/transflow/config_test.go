@@ -415,3 +415,37 @@ func TestGenerateBranchName(t *testing.T) {
 		})
 	}
 }
+
+func TestTransflowStep_OpenRewriteOverrides(t *testing.T) {
+	yamlContent := `version: v1alpha1
+id: ow-overrides
+target_repo: https://example.com/x/y.git
+base_ref: main
+steps:
+  - type: orw-apply
+    id: java11to17
+    recipes:
+      - org.openrewrite.java.migrate.UpgradeToJava17
+    recipe_group: org.openrewrite.recipe
+    recipe_artifact: rewrite-migrate-java
+    recipe_version: 3.17.0
+    maven_plugin_version: 6.18.0
+    discover_recipe: false
+`
+	tmp := filepath.Join(t.TempDir(), "tf.yaml")
+	require.NoError(t, os.WriteFile(tmp, []byte(yamlContent), 0644))
+
+	cfg, err := LoadConfig(tmp)
+	require.NoError(t, err)
+	require.Len(t, cfg.Steps, 1)
+	s := cfg.Steps[0]
+	assert.Equal(t, "orw-apply", s.Type)
+	assert.Equal(t, "java11to17", s.ID)
+	assert.Equal(t, "org.openrewrite.recipe", s.RecipeGroup)
+	assert.Equal(t, "rewrite-migrate-java", s.RecipeArtifact)
+	assert.Equal(t, "3.17.0", s.RecipeVersion)
+	assert.Equal(t, "6.18.0", s.MavenPluginVersion)
+	if assert.NotNil(t, s.DiscoverRecipe) {
+		assert.Equal(t, false, *s.DiscoverRecipe)
+	}
+}

@@ -314,14 +314,17 @@ echo "[OpenRewrite] Running transformation with recipe: ${RECIPE_CLASS}"
 if [ -f "pom.xml" ]; then
     echo "[OpenRewrite] Using Maven for transformation..."
 
+    # Allow overriding plugin version from env; default kept for backward-compat
+    MAVEN_PLUGIN_VERSION_ENV="${MAVEN_PLUGIN_VERSION:-6.18.0}"
+
     if [ -n "${RECIPE_COORDS}" ]; then
         # Use explicit coordinates if provided
         echo "[OpenRewrite] Running Maven command with explicit coordinates..."
         echo "[OpenRewrite] Recipe class: ${RECIPE_CLASS}"
         echo "[OpenRewrite] Recipe coordinates: ${RECIPE_COORDS}"
 
-        # Use plugin 6.18.0 (validated available in Central on VPS)
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.18.0:run \
+        # Use configured plugin version
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:${MAVEN_PLUGIN_VERSION_ENV}:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.recipeArtifactCoordinates="${RECIPE_COORDS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
@@ -347,7 +350,7 @@ else
         
         # First, try to discover available recipes
         echo "[OpenRewrite] Step 1: Discovering available recipes..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.18.0:discover 2>&1 | tee /tmp/discover.log || {
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:${MAVEN_PLUGIN_VERSION_ENV}:discover 2>&1 | tee /tmp/discover.log || {
             echo "[Error] Recipe discovery failed"
             echo "[Error] Discovery output:"
             cat /tmp/discover.log
@@ -355,7 +358,7 @@ else
         
         # Now run the transformation
         echo "[OpenRewrite] Step 2: Running transformation..."
-        mvn -B org.openrewrite.maven:rewrite-maven-plugin:6.18.0:run \
+        mvn -B org.openrewrite.maven:rewrite-maven-plugin:${MAVEN_PLUGIN_VERSION_ENV}:run \
             -Drewrite.recipe="${RECIPE_CLASS}" \
             -Drewrite.activeRecipes="${RECIPE_CLASS}" \
             -DskipTests \

@@ -603,7 +603,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				out, _ := cmd.CombinedOutput()
 				lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 				max := 20
-				if len(lines) < max { max = len(lines) }
+				if len(lines) < max {
+					max = len(lines)
+				}
 				log.Printf("[Transflow] input.tar preview (%d entries):\n%s", max, strings.Join(lines[:max], "\n"))
 			}
 
@@ -617,18 +619,18 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if len(step.Recipes) > 0 {
 				rclass = step.Recipes[0]
 			}
-			// Determine coords and discovery flag
-			discover := "true"
-			rgroup, rartifact, rversion := "", "", ""
-            if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
-                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0"
-                discover = "false"
-            } else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
-                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-spring", "5.7.0"
-                discover = "false"
-            } else if strings.HasPrefix(rclass, "org.openrewrite.java") {
-				rgroup, rartifact, rversion = "org.openrewrite", "rewrite-java", "8.21.0"
-				discover = "false"
+			// Determine coordinates strictly from YAML (no discovery)
+			rgroup, rartifact, rversion := step.RecipeGroup, step.RecipeArtifact, step.RecipeVersion
+			if rgroup == "" || rartifact == "" || rversion == "" {
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: "Missing recipe coordinates (recipe_group/artifact/version)"})
+				result.ErrorMessage = "missing recipe coordinates in transflow step"
+				result.Duration = time.Since(startTime)
+				return nil, fmt.Errorf("missing recipe coordinates: please set recipe_group, recipe_artifact, recipe_version in step %s", step.ID)
+			}
+			// Optional Maven plugin version (prefer YAML, then env; runner defaults internally if unset)
+			pluginVersion := step.MavenPluginVersion
+			if pluginVersion == "" {
+				pluginVersion = os.Getenv("TRANSFLOW_MAVEN_PLUGIN_VERSION")
 			}
 			// Create run ID for this submission and then substitute it
 			runID := fmt.Sprintf("orw-apply-%s-%d", step.ID, time.Now().Unix())
@@ -636,10 +638,10 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			preContent := strings.ReplaceAll(string(hclBytes), "${RECIPE_CLASS}", rclass)
 			preContent = strings.ReplaceAll(preContent, "${INPUT_TAR_HOST_PATH}", inputTar)
 			preContent = strings.ReplaceAll(preContent, "${RUN_ID}", runID)
-			preContent = strings.ReplaceAll(preContent, "${DISCOVER_RECIPE}", discover)
 			preContent = strings.ReplaceAll(preContent, "${RECIPE_GROUP}", rgroup)
 			preContent = strings.ReplaceAll(preContent, "${RECIPE_ARTIFACT}", rartifact)
 			preContent = strings.ReplaceAll(preContent, "${RECIPE_VERSION}", rversion)
+			preContent = strings.ReplaceAll(preContent, "${MAVEN_PLUGIN_VERSION}", pluginVersion)
 			if err := os.WriteFile(prePath, []byte(preContent), 0644); err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
 				return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
@@ -651,11 +653,11 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Keep outputs under the step workspace for artifact collection
 			os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
 
-            // Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
-            execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-            branchID := step.ID
-            curStepID := randomStepID()
-            os.Setenv("TRANSFLOW_DIFF_KEY", fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID))
+			// Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
+			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			branchID := step.ID
+			curStepID := randomStepID()
+			os.Setenv("TRANSFLOW_DIFF_KEY", fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID))
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
 			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
@@ -840,32 +842,32 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				Duration: time.Since(stepStart),
 			})
 
-            // Record chain metadata for this branch (option_id = step.ID)
-            {
-                branchID := step.ID
-                // Read previous HEAD
-                headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
-                prevID := ""
-                if b, code, _ := getJSON(seaweed, headKey); code == 200 {
-                    var head map[string]string
-                    _ = json.Unmarshal(b, &head)
-                    prevID = head["step_id"]
-                }
-                // Diff already uploaded by task under DIFF_KEY; reference it directly
-                branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
-                // Write meta.json
-                meta := map[string]any{
-                    "step_id":      curStepID,
-                    "prev_step_id": prevID,
-                    "branch_id":    branchID,
-                    "diff_key":     branchDiffKey,
-                    "ts":           time.Now().UTC().Format(time.RFC3339),
-                }
-                if mb, e := json.Marshal(meta); e == nil {
-                    _ = putJSON(seaweed, fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, curStepID), mb)
-                    _ = putJSON(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", curStepID)))
-                }
-            }
+			// Record chain metadata for this branch (option_id = step.ID)
+			{
+				branchID := step.ID
+				// Read previous HEAD
+				headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
+				prevID := ""
+				if b, code, _ := getJSON(seaweed, headKey); code == 200 {
+					var head map[string]string
+					_ = json.Unmarshal(b, &head)
+					prevID = head["step_id"]
+				}
+				// Diff already uploaded by task under DIFF_KEY; reference it directly
+				branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
+				// Write meta.json
+				meta := map[string]any{
+					"step_id":      curStepID,
+					"prev_step_id": prevID,
+					"branch_id":    branchID,
+					"diff_key":     branchDiffKey,
+					"ts":           time.Now().UTC().Format(time.RFC3339),
+				}
+				if mb, e := json.Marshal(meta); e == nil {
+					_ = putJSON(seaweed, fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, curStepID), mb)
+					_ = putJSON(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", curStepID)))
+				}
+			}
 
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow

@@ -35,9 +35,9 @@ type PlanResult struct {
 
 // NextAction describes what the reducer determined should happen next
 type NextAction struct {
-    Action string `json:"action"`
-    Notes  string `json:"notes"`
-    StepID string `json:"step_id,omitempty"`
+	Action string `json:"action"`
+	Notes  string `json:"notes"`
+	StepID string `json:"step_id,omitempty"`
 }
 
 // BranchSpec describes a healing branch to execute

@@ -22,7 +22,7 @@ Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build
 
 - Working combo (validated manually and in pipeline):
   - Plugin: `org.openrewrite.maven:rewrite-maven-plugin:6.18.0`
-  - Pack: `org.openrewrite.recipe:rewrite-migrate-java:2.26.0`
+  - Pack: `org.openrewrite.recipe:rewrite-migrate-java:3.17.0`
   - Recipe: `org.openrewrite.java.migrate.UpgradeToJava17`
 - These are pinned in the orw-apply image and defaults.
 
