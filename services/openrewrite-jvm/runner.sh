@@ -333,6 +333,7 @@ if [ -f "pom.xml" ]; then
         cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
         
         echo "[OpenRewrite] Transformation completed successfully"
+    fi
 else
     echo "[Error] No supported build file found (pom.xml)"
     write_error "No supported build file found (pom.xml)"
