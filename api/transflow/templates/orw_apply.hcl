@@ -15,6 +15,8 @@ job "${RUN_ID}" {
 
       env = {
         OUTPUT_DIR       = "/workspace/out"
+        JOB_ID           = ""
+        TRANSFORMATION_ID= ""
         RECIPE           = "${RECIPE_CLASS}"
         DISCOVER_RECIPE  = "${DISCOVER_RECIPE}"
         RECIPE_GROUP     = "${RECIPE_GROUP}"
