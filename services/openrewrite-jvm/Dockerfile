@@ -1,5 +1,5 @@
 # JVM-based OpenRewrite Runner with SeaweedFS Caching
-# This image runs OpenRewrite transformations using Maven/Gradle with dynamic recipe loading
+# This image runs OpenRewrite transformations using Maven with dynamic recipe loading
 # Recipes are cached in SeaweedFS to avoid repeated downloads from Maven Central
 
 FROM --platform=linux/amd64 eclipse-temurin:17-jdk-alpine
@@ -23,13 +23,7 @@ RUN apk add --no-cache \
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="$JAVA_HOME/bin:${PATH}"
 
-# Install Gradle
-ENV GRADLE_VERSION=8.5
-RUN curl -L https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -o gradle.zip && \
-    unzip gradle.zip && \
-    mv gradle-${GRADLE_VERSION} /opt/gradle && \
-    rm gradle.zip
-ENV PATH="/opt/gradle/bin:${PATH}"
+## Gradle removed: runner is Maven-only
 
 # Create workspace directory
 WORKDIR /workspace
