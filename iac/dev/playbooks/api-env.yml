@@ -16,13 +16,41 @@
         group: ploy
         mode: '0755'
 
+    - name: Discover existing GitLab envs on VPS (do not log)
+      no_log: true
+      become_user: ploy
+      shell: |
+        set -a
+        [ -r "$HOME/api.env" ] && . "$HOME/api.env" || true
+        [ -r "$HOME/.bashrc" ] && . "$HOME/.bashrc" || true
+        [ -r "$HOME/ploy/.bashrc" ] && . "$HOME/ploy/.bashrc" || true
+        set +a
+        if [ -z "${GITLAB_URL}" ] && [ -r /etc/environment ]; then
+          eval $(grep -E '^GITLAB_URL=' /etc/environment | sed 's/^/export /') || true
+        fi
+        if [ -z "${GITLAB_TOKEN}" ] && [ -r /etc/environment ]; then
+          eval $(grep -E '^GITLAB_TOKEN=' /etc/environment | sed 's/^/export /') || true
+        fi
+        if [ -z "${GITLAB_TOKEN}" ] && [ -r "$HOME/.gitlab_token" ]; then
+          GITLAB_TOKEN=$(tr -d '\n' <"$HOME/.gitlab_token" 2>/dev/null)
+        fi
+        printf 'GITLAB_URL=%s\n' "${GITLAB_URL}"
+        printf 'GITLAB_TOKEN=%s\n' "${GITLAB_TOKEN}"
+      register: vps_env
+
+    - name: Extract fallback URL/token (do not log)
+      no_log: true
+      set_fact:
+        fallback_url: "{{ (vps_env.stdout | regex_search('^GITLAB_URL=(.*)$', '\\1', multiline=True)) | default(omit, true) }}"
+        fallback_token: "{{ (vps_env.stdout | regex_search('^GITLAB_TOKEN=(.*)$', '\\1', multiline=True)) | default(omit, true) }}"
+
     - name: Build api.env content from controller env (do not log)
       no_log: true
       set_fact:
         api_env_content: |
           # Managed by Ansible - API service environment
-          GITLAB_URL="{{ lookup('env', 'GITLAB_URL') | default('https://gitlab.com', true) }}"
-          GITLAB_TOKEN="{{ lookup('env', 'GITLAB_TOKEN') | default('', true) }}"
+          GITLAB_URL="{{ lookup('env', 'GITLAB_URL') | default(fallback_url | default('https://gitlab.com', true), true) }}"
+          GITLAB_TOKEN="{{ lookup('env', 'GITLAB_TOKEN') | default(fallback_token | default('', true), true) }}"
           PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') | default('https://api.dev.ployman.app/v1', true) }}"
 
     - name: Write /home/ploy/api.env with restricted permissions (do not log)
@@ -57,4 +85,3 @@
     - name: Report token presence
       debug:
         msg: "GITLAB_TOKEN in api.env: {{ token_check.stdout }}"
-

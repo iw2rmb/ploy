@@ -182,7 +182,7 @@ A comprehensive manifest file is created at `/workspace/context/mcp_context_mani
 The LLM-exec HCL template has been extended with MCP environment variables:
 
 ```hcl
-# roadmap/transflow/jobs/llm_exec.hcl
+# platform/nomad/transflow/llm_exec.hcl
 env = {
   # Core LLM configuration
   MODEL       = "${MODEL}"

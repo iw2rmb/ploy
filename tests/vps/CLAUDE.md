@@ -104,7 +104,7 @@ User Context:
 
 ## Related Documentation
 - `../e2e/CLAUDE.md` - E2E testing framework with VPS integration (✅ operational)
-- `../../internal/cli/transflow/CLAUDE.md` - Transflow CLI with VPS deployment support (MVP complete)
+- `../../internal/cli/transflow/README.md` - Transflow CLI with VPS deployment support (MVP complete)
 - `../../internal/kb/CLAUDE.md` - KB system with SeaweedFS backend integration (✅ production operational)
 - Root `Makefile` - VPS integration test targets and TARGET_HOST configuration
 - Production deployment documentation for service stack configuration

@@ -39,9 +39,9 @@ Without this infrastructure, the healing workflow cannot function and the MVP ca
 - @roadmap/transflow/MVP.md                           # MVP specification and requirements
 - @roadmap/transflow/orchestrator_submit_wait_terminal.md  # Job submission guidance
 - @roadmap/transflow/orchestrator_fanout_sketch.md        # Parallel execution pattern
-- @roadmap/transflow/jobs/planner.hcl                    # Planner job template
-- @roadmap/transflow/jobs/reducer.hcl                    # Reducer job template
-- @roadmap/transflow/jobs/llm_exec.hcl                   # LLM execution job template
+- platform/nomad/transflow/planner.hcl                   # Planner job template
+- platform/nomad/transflow/reducer.hcl                   # Reducer job template
+- platform/nomad/transflow/llm_exec.hcl                  # LLM execution job template
 
 <!-- Current implementation -->
 - @internal/cli/transflow/runner.go                   # Main runner that needs job integration
@@ -120,7 +120,7 @@ The `TransflowRunner` in `internal/cli/transflow/runner.go` follows dependency i
 - Comprehensive test coverage with mock implementations in `runner_test.go`
 
 **Existing Job Templates and Patterns:**
-The healing workflow architecture is defined through HCL job templates in `roadmap/transflow/jobs/`:
+The healing workflow architecture is defined through HCL job templates in `platform/nomad/transflow/`:
 
 1. **Planner Job** (`planner.hcl`):
    - LangGraph-based Docker container execution
@@ -276,7 +276,7 @@ type BranchResult struct {
 - Extend: `internal/cli/transflow/runner_test.go` - Add healing workflow test cases
 
 **Job Template Integration:**
-- Use existing: `roadmap/transflow/jobs/*.hcl` - Job templates with placeholder substitution
+- Use existing: `platform/nomad/transflow/*.hcl` - Job templates with placeholder substitution
 - Workspace structure: `${workspace}/planner/`, `${workspace}/llm-exec/${option-id}/`, etc.
 
 **Volume Mount Points:**

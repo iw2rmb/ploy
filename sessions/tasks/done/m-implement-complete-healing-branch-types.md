@@ -114,7 +114,7 @@ The healing workflow integrates with the existing Nomad job submission infrastru
 4. **Artifact Collection**: Reads job output artifacts (diff.patch files) from expected output directories
 5. **Result Processing**: Parses artifacts and determines branch success/failure
 
-The existing HCL templates in `roadmap/transflow/jobs/` define the Nomad job specifications with placeholder variables that get substituted at runtime.
+The existing HCL templates in `platform/nomad/transflow/` define the Nomad job specifications with placeholder variables that get substituted at runtime.
 
 ### Technical Reference Details
 
@@ -202,9 +202,9 @@ Environment variables for healing jobs:
   - `internal/cli/transflow/integration_test.go` - End-to-end integration tests
 
 - **Nomad Job Templates**:
-  - `roadmap/transflow/jobs/llm_exec.hcl` - LLM execution job template
-  - `roadmap/transflow/jobs/orw_apply.hcl` - OpenRewrite application job template
-  - Need to create: `roadmap/transflow/jobs/human_step.hcl` (if job-based approach is used)
+  - `platform/nomad/transflow/llm_exec.hcl` - LLM execution job template
+  - `platform/nomad/transflow/orw_apply.hcl` - OpenRewrite application job template
+  - Need to create: `platform/nomad/transflow/human_step.hcl` (if job-based approach is used)
 
 - **Documentation Updates**:
   - `roadmap/transflow/MVP.md` - Update implementation status from "Partially Implemented" to "Fully Implemented"
@@ -287,7 +287,7 @@ Environment variables for healing jobs:
   - `internal/cli/transflow/job_submission_test.go` - Comprehensive test coverage for all branch types
   - `roadmap/transflow/MVP.md` - Updated implementation status documentation
   - `CHANGELOG.md` - Added comprehensive entry documenting completed features
-  - `internal/cli/transflow/CLAUDE.md` - Enhanced service documentation
+  - `internal/cli/transflow/README.md` - Enhanced service documentation
   - `internal/cli/common/CLAUDE.md` - Created documentation for shared deployment utilities
 
 #### Fixed

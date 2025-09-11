@@ -39,7 +39,7 @@ After transformations complete, the system performs build validation using the e
 
 When builds fail, the self-healing workflow activates through the integration points in `internal/cli/transflow/runner.go:441-500`. The system captures the build error output (stdout/stderr) and initiates a three-phase healing process:
 
-**Phase 1: Planning** - A LangGraph planner job is submitted via the orchestration infrastructure. The planner analyzes the error context, repository metadata, and any existing KB knowledge to generate healing options. These options typically include: human intervention steps, LLM-generated fixes (llm-exec), and OpenRewrite recipe generation (orw-gen). The planner job runs as a containerized Nomad batch job following the contract defined in `roadmap/transflow/jobs/README.md`.
+**Phase 1: Planning** - A LangGraph planner job is submitted via the orchestration infrastructure. The planner analyzes the error context, repository metadata, and any existing KB knowledge to generate healing options. These options typically include: human intervention steps, LLM-generated fixes (llm-exec), and OpenRewrite recipe generation (orw-gen). The planner job runs as a containerized Nomad batch job using the templates defined in `platform/nomad/transflow/`.
 
 **Phase 2: Fanout Execution** - The `FanoutOrchestrator` in `internal/cli/transflow/fanout_orchestrator.go` executes the healing options in parallel with first-success-wins semantics. Each branch runs as an independent Nomad job, applying its proposed fix and validating the result through build checks. The orchestrator monitors all branches and cancels remaining jobs once the first successful fix is found.
 
@@ -88,11 +88,11 @@ The KB system leverages existing storage infrastructure in the platform:
 
 The KB system integrates with the existing job orchestration pattern:
 
-**Compactor Job:** A periodic Nomad job template (similar to those in `roadmap/transflow/jobs/`) runs compaction tasks. The compactor scans case files, recomputes summaries with updated statistics, rebuilds vector indices if enabled, and prunes stale or blacklisted data. This job template follows the same orchestration pattern as planner/reducer jobs.
+**Compactor Job:** A periodic Nomad job template (similar to those in `platform/nomad/transflow/`) runs compaction tasks. The compactor scans case files, recomputes summaries with updated statistics, rebuilds vector indices if enabled, and prunes stale or blacklisted data. This job template follows the same orchestration pattern as planner/reducer jobs.
 
 **KB Snapshot Generation:** The compactor produces `kb/healing/snapshot.json` manifests containing timestamp, language counts, statistics, and version information. These manifests enable efficient KB state tracking and validation.
 
-**Template Integration:** The existing job templates in `roadmap/transflow/jobs/` (planner.hcl, reducer.hcl) need modification to mount KB snapshot data as read-only volumes. The orchestration code in `internal/orchestration/render.go` handles template variable substitution for KB paths and configuration.
+**Template Integration:** The existing job templates in `platform/nomad/transflow/` (planner.hcl, reducer.hcl) need modification to mount KB snapshot data as read-only volumes. The orchestration code in `internal/orchestration/render.go` handles template variable substitution for KB paths and configuration.
 
 ### Technical Reference Details
 
@@ -241,7 +241,7 @@ Environment variables:
 - Signature generation: `/Users/vk/@iw2rmb/sf/internal/cli/transflow/kb_signatures.go`  
 - Lock management: `/Users/vk/@iw2rmb/sf/internal/cli/transflow/kb_locks.go`
 - Integration with runner: `/Users/vk/@iw2rmb/sf/internal/cli/transflow/runner.go` (extend existing healing workflow)
-- Compactor job template: `/Users/vk/@iw2rmb/sf/roadmap/transflow/jobs/compactor.hcl`
+- Compactor job template: `platform/nomad/transflow/compactor.hcl` (if implemented)
 - Tests: `/Users/vk/@iw2rmb/sf/internal/cli/transflow/kb_*_test.go`
 - Integration tests: `/Users/vk/@iw2rmb/sf/internal/cli/transflow/integration_test.go` (extend existing)
 

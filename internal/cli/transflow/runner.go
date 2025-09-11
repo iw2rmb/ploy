@@ -18,6 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
+	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/transflow"
 )
 
 // submitAndWaitTerminal is a package-level indirection to allow test stubbing.
@@ -372,15 +373,9 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
 		return nil, err
 	}
 
-	// Read planner template from workspace (provided by server)
-	hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "planner.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read planner.hcl template: %w", err)
-	}
-
+	// Write embedded planner template into workspace
 	hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
-	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
+	if err := os.WriteFile(hclPath, nomadtpl.GetPlannerTemplate(), 0644); err != nil {
 		return nil, err
 	}
 
@@ -393,14 +388,9 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
-	hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "llm_exec.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return "", fmt.Errorf("failed to read llm_exec.hcl template: %w", err)
-	}
 	renderedPath := filepath.Join(dir, "llm_exec.rendered.hcl")
 	// Defer env substitution to caller (same as planner/reducer), we just copy template here
-	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
+	if err := os.WriteFile(renderedPath, nomadtpl.GetLLMExecTemplate(), 0644); err != nil {
 		return "", err
 	}
 	return renderedPath, nil
@@ -412,13 +402,8 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
-	hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "orw_apply.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return "", fmt.Errorf("failed to read orw_apply.hcl template: %w", err)
-	}
 	renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
-	if err := os.WriteFile(renderedPath, hclBytes, 0644); err != nil {
+	if err := os.WriteFile(renderedPath, nomadtpl.GetORWApplyTemplate(), 0644); err != nil {
 		return "", err
 	}
 	return renderedPath, nil
@@ -502,14 +487,8 @@ func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
 		return nil, err
 	}
 
-	hclTemplate := filepath.Join(r.workspaceDir, "roadmap", "transflow", "jobs", "reducer.hcl")
-	hclBytes, err := os.ReadFile(hclTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read reducer.hcl template: %w", err)
-	}
-
 	hclPath := filepath.Join(r.workspaceDir, "reducer", "reducer.hcl")
-	if err := os.WriteFile(hclPath, hclBytes, 0644); err != nil {
+	if err := os.WriteFile(hclPath, nomadtpl.GetReducerTemplate(), 0644); err != nil {
 		return nil, err
 	}
 
@@ -538,6 +517,21 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		Success: true,
 		Message: fmt.Sprintf("Cloned %s at %s", r.config.TargetRepo, r.config.BaseRef),
 	})
+
+	// Diagnostics: list repo root contents after clone (first 10 entries)
+	if entries, err := os.ReadDir(repoPath); err == nil {
+		max := len(entries)
+		if max > 10 {
+			max = 10
+		}
+		var names []string
+		for i := 0; i < max; i++ {
+			names = append(names, entries[i].Name())
+		}
+		log.Printf("[Transflow] Repo root after clone: %s | entries: %v", repoPath, names)
+		// Emit as event for remote visibility
+		r.emit(ctx, "clone", "clone-diagnostics", "info", fmt.Sprintf("repo=%s entries=%s", repoPath, strings.Join(names, ",")))
+	}
 
 	// Step 2: Create and checkout workflow branch
 	r.emit(ctx, "branch", "create-branch", "info", "Creating workflow branch")
@@ -577,16 +571,21 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				p1 := filepath.Join(repoPath, "pom.xml")
 				p2 := filepath.Join(repoPath, "build.gradle")
 				p3 := filepath.Join(repoPath, "build.gradle.kts")
-				if _, e1 := os.Stat(p1); e1 != nil {
-					if _, e2 := os.Stat(p2); e2 != nil {
-						if _, e3 := os.Stat(p3); e3 != nil {
-							r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
-							result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: "No build file found in repository"})
-							result.ErrorMessage = "no build file found in repository"
-							result.Duration = time.Since(startTime)
-							return nil, fmt.Errorf("no build file found in repository")
-						}
-					}
+				_, e1 := os.Stat(p1)
+				_, e2 := os.Stat(p2)
+				_, e3 := os.Stat(p3)
+				hasPom := e1 == nil
+				hasGradle := e2 == nil
+				hasKts := e3 == nil
+				log.Printf("[Transflow] Build file check at %s: pom=%v gradle=%v gradle.kts=%v", repoPath, hasPom, hasGradle, hasKts)
+				// Emit guard details to the controller event stream
+				r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
+				if !hasPom && !hasGradle && !hasKts {
+					r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: "No build file found in repository"})
+					result.ErrorMessage = "no build file found in repository"
+					result.Duration = time.Since(startTime)
+					return nil, fmt.Errorf("no build file found in repository")
 				}
 			}
 
