@@ -158,24 +158,16 @@ arfService := arf.NewARFService(storageAdapter, "")  // Empty bucket since adapt
 - Test ARFService passes keys without modification
 - Test SeaweedFS handles empty bucket parameter correctly
 
-#### 5.2 Integration Tests
+#### 5.2 Integration Tests (Transflow)
 ```bash
-# Test transformation creates correct paths
-curl -X POST "https://api.dev.ployman.app/v1/arf/transforms" \
+# Test transflow run creates correct paths under artifacts/transflow/<id>/...
+curl -X POST "https://api.dev.ployman.app/v1/transflow/run" \
   -H "Content-Type: application/json" \
-  -d '{
-    "recipe_id": "org.openrewrite.java.migrate:java-8-to-11",
-    "type": "openrewrite",
-    "codebase": {
-      "repository": "https://github.com/winterbe/java8-tutorial.git",
-      "branch": "master"
-    }
-  }'
+  -d '{"config_data": {"version":"1","id":"storage-fix-$(date +%s)","target_repo":"https://github.com/winterbe/java8-tutorial.git","target_branch":"master","base_ref":"master","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.Java8toJava11"]}],"self_heal":{"enabled":false}}}'
 
-# Verify paths in SeaweedFS
-curl "http://45.12.75.241:8888/artifacts/jobs/"
-# Should see: openrewrite-{timestamp}/input.tar
-# NOT: artifacts/jobs/openrewrite-{timestamp}/input.tar
+# Verify paths in SeaweedFS (Transflow)
+curl "http://45.12.75.241:8888/artifacts/transflow/"
+ # Artifacts should be under: artifacts/transflow/<exec_id>/...
 ```
 
 #### 5.3 Validation Checklist

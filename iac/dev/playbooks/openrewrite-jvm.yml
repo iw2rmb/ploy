@@ -81,12 +81,7 @@
             mode: '0755'
             remote_src: true
 
-        - name: Copy generate-diff script from repository
-          copy:
-            src: "/home/ploy/ploy/services/openrewrite-jvm/generate-diff.sh"
-            dest: "{{ build_directory }}/generate-diff.sh"
-            mode: '0755'
-            remote_src: true
+        # generate-diff helper removed; runner now uses git diff directly
             
         - name: Display build files location
           debug:

@@ -64,12 +64,12 @@ func TestDocumentationExamples(t *testing.T) {
 		apiExamples := map[string]APIExample{
 			"create_transflow": {
 				Method: "POST",
-				Path:   "/v1/transflows",
+                Path:   "/v1/transflow",
 				Body:   `{"config": {"version": "v1alpha1", "id": "test", "target_repo": "https://github.com/example/repo.git", "steps": []}}`,
 			},
 			"get_transflow": {
 				Method: "GET",
-				Path:   "/v1/transflows/tf-abc123",
+                Path:   "/v1/transflow/status/tf-abc123",
 				Body:   "",
 			},
 			"kb_query": {

@@ -2,6 +2,10 @@
 
 ## [Unreleased] - Transflow MVP Release
 
+### Breaking Changes
+- Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).
+- Remove `ploy arf transform` CLI command; use `ploy transflow run` instead.
+
 ### CLI
 - `ploy transflow run` now prints the execution ID and a watch hint (e.g., `ploy transflow watch -id <id>`) immediately after starting a remote run. This aids quick tracking without digging into status endpoints.
 - New `--watch` flag for `ploy transflow run` attaches a live watch immediately after starting a remote run. Falls back to polling when SSE is unavailable.
@@ -4465,17 +4469,22 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
 ### Testing
 - Unit test `tests/unit/openrewrite_setup_workspace_test.go` verifies early context selection and correct tar layout (project root contains `pom.xml`).
 
+## [2025-09-11] - Remove generate-diff helper
+
+### Removed
+- `services/openrewrite-jvm/generate-diff.sh` and related references.
+- Unit test `tests/unit/generate_diff_test.go`.
+- Ansible playbook copy step for the helper in `iac/dev/playbooks/openrewrite-jvm.yml`.
+
+### Notes
+- OpenRewrite runner now generates diffs directly using `git diff`; no separate helper script is required.
+
 ## [2025-09-09] - Transflow ORW Diff + CI Images
 
 ### Added
-- `services/openrewrite-jvm/generate-diff.sh`: Generates unified diff between original and transformed trees; always creates `diff.patch`.
 - `scripts/build-langgraph-runner.sh`: Build/push helper for `services/langgraph-runner` image.
 - CI: `.github/workflows/langgraph-runner-image.yml` builds/pushes LangGraph runner on changes.
 
 ### Changed
-- `services/openrewrite-jvm/runner.sh`: Produces `/workspace/out/diff.patch` after transformation via the new helper, enabling `orw-gen` branch artifact checks.
-- `services/openrewrite-jvm/Dockerfile`: Includes `generate-diff.sh` in image.
+- `services/openrewrite-jvm/runner.sh`: Produces `/workspace/out/diff.patch` after transformation using `git diff`.
 - Makefile: Added `langgraph-runner-image` and `langgraph-runner-push` targets; `openrewrite-jvm-*` targets already available.
-
-### Testing
-- Unit test `tests/unit/generate_diff_test.go` ensures `generate-diff.sh` creates a patch file even when there are no changes.
