@@ -120,7 +120,7 @@ else
     # Use provided coordinates
     RECIPE_GROUP="${RECIPE_GROUP:-org.openrewrite.recipe}"
     RECIPE_ARTIFACT="${RECIPE_ARTIFACT:-rewrite-migrate-java}"
-    RECIPE_VERSION="${RECIPE_VERSION:-2.20.0}"
+    RECIPE_VERSION="${RECIPE_VERSION:-3.17.0}"
     RECIPE_COORDS="${RECIPE_GROUP}:${RECIPE_ARTIFACT}:${RECIPE_VERSION}"
     echo "[OpenRewrite] Using provided coordinates: ${RECIPE_COORDS}"
 fi
