@@ -210,30 +210,27 @@ echo "[OpenRewrite] Directory tree (max depth 2):"
 find . -maxdepth 2 -type d | sort
 echo "[OpenRewrite] Total files extracted: $(find . -type f | wc -l)"
 
-# Snapshot original tree for diff generation later
-ORIG_SNAPSHOT="/workspace/original"
-rm -rf "$ORIG_SNAPSHOT"
-mkdir -p "$ORIG_SNAPSHOT"
-cp -a . "$ORIG_SNAPSHOT/"
+# Establish a Git baseline (no-cost working baseline)
+if [ ! -d .git ]; then
+  git init -q || true
+  git config user.email "orw-runner@local" || true
+  git config user.name "OpenRewrite Runner" || true
+fi
+# Commit baseline state (HEAD)
+git add -A >/dev/null 2>&1 || true
+git commit -qm baseline || true
 
 # Step 2: Detect project type - build file is REQUIRED
 echo "[OpenRewrite] Checking for build files..."
 if [ -f "pom.xml" ]; then
     echo "[OpenRewrite] Found pom.xml"
     head -20 pom.xml
-elif [ -f "build.gradle" ]; then
-    echo "[OpenRewrite] Found build.gradle"
-    head -20 build.gradle
-elif [ -f "build.gradle.kts" ]; then
-    echo "[OpenRewrite] Found build.gradle.kts"
-    head -20 build.gradle.kts
 else
-  echo "[OpenRewrite] ERROR: No build file found (pom.xml, build.gradle, or build.gradle.kts)"
+  echo "[OpenRewrite] ERROR: No build file found (pom.xml)"
   echo "[OpenRewrite] OpenRewrite requires a valid build configuration to run transformations"
   echo "[OpenRewrite] Please ensure your project has one of the following:"
   echo "[OpenRewrite]   - pom.xml for Maven projects"
-  echo "[OpenRewrite]   - build.gradle or build.gradle.kts for Gradle projects"
-  write_error "No build file found in project (pom.xml/build.gradle/build.gradle.kts)"
+  write_error "No build file found in project (pom.xml)"
   exit 1
 fi
 
@@ -322,7 +319,7 @@ if [ -f "pom.xml" ]; then
             -X 2>&1 | tee /tmp/transform.log
         status=${PIPESTATUS[0]}
         if [ "$status" -ne 0 ]; then
-          echo "[Error] OpenRewrite transformation failed (plugin 6.18.0)"
+          echo "[Error] OpenRewrite transformation failed (plugin ${MAVEN_PLUGIN_VERSION_ENV})"
           echo "[Error] Last 100 lines of output:"
           tail -100 /tmp/transform.log
           write_error "OpenRewrite transformation failed (see transform.log)"
@@ -370,20 +367,16 @@ echo "[OpenRewrite] Contents of /workspace:"
 # Step 5: Generate diff.patch artifact for transflow using git diff (preferred)
 echo "[OpenRewrite] Generating unified diff patch..."
 rm -f "${OUTPUT_DIR}/diff.patch" || true
-if [ -d .git ]; then
-  # Use git diff against HEAD to capture working tree changes (no color, unified)
-  set +e
-  git diff -U3 --no-color > "${OUTPUT_DIR}/diff.patch"
-  DIFF_RC=$?
-  set -e
-  # git diff returns 1 when differences are present; treat 0 or 1 as success
-  if [ "$DIFF_RC" -ne 0 ] && [ "$DIFF_RC" -ne 1 ]; then
-    echo "[OpenRewrite] WARNING: git diff returned rc=$DIFF_RC; falling back to diff -ruN"
-    diff -ruN "/workspace/original" "/workspace/project" > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true
-  fi
-else
-  echo "[OpenRewrite] .git not found; using diff -ruN fallback"
-  diff -ruN "/workspace/original" "/workspace/project" > "${OUTPUT_DIR}/diff.patch" 2>/dev/null || true
+# Use git diff against HEAD to capture working tree changes (no color, unified),
+# excluding build artifacts
+set +e
+git diff -U3 --no-color HEAD -- . ':(exclude)target/**' ':(exclude).m2/**' ':(exclude)build/**' > "${OUTPUT_DIR}/diff.patch"
+DIFF_RC=$?
+set -e
+# git diff returns 1 when differences are present; 0 when none
+if [ "$DIFF_RC" -eq 0 ]; then
+  # Ensure file exists even if empty
+  touch "${OUTPUT_DIR}/diff.patch" || true
 fi
 
 # Log diff size and preview
