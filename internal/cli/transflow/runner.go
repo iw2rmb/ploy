@@ -620,13 +620,13 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Determine coords and discovery flag
 			discover := "true"
 			rgroup, rartifact, rversion := "", "", ""
-			if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
-				rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "2.26.0"
-				discover = "false"
-			} else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
-				rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-spring", "5.7.0"
-				discover = "false"
-			} else if strings.HasPrefix(rclass, "org.openrewrite.java") {
+            if strings.HasPrefix(rclass, "org.openrewrite.java.migrate") {
+                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0"
+                discover = "false"
+            } else if strings.HasPrefix(rclass, "org.openrewrite.java.spring") {
+                rgroup, rartifact, rversion = "org.openrewrite.recipe", "rewrite-spring", "5.7.0"
+                discover = "false"
+            } else if strings.HasPrefix(rclass, "org.openrewrite.java") {
 				rgroup, rartifact, rversion = "org.openrewrite", "rewrite-java", "8.21.0"
 				discover = "false"
 			}
