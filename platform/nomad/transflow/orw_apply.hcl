@@ -18,11 +18,7 @@ job "transflow-orw-apply-${RUN_ID}" {
         INPUT_TAR_HOST_PATH = "${INPUT_TAR_HOST_PATH}"
         RUN_ID              = "${RUN_ID}"
       }
-      artifact {
-        source      = "${TRANSFLOW_CONTEXT_URL}"
-        destination = "local/context"
-      }
+      # No Nomad artifact getter; context is provided via INPUT_URL env.
     }
   }
 }
-
