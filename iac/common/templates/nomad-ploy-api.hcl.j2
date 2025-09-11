@@ -208,8 +208,38 @@ fi
 
 echo "[SETUP] Dependency verification completed"
 
-# Make binary executable and start API
+# Make binary executable
 chmod +x local/api
+
+# Attempt to load credentials if not provided via Nomad env
+if [ -z "$GITLAB_TOKEN" ]; then
+  # Source ploy user's bashrc if available (may contain exported token)
+  if [ -r /home/ploy/.bashrc ]; then
+    set +o allexport
+    . /home/ploy/.bashrc || true
+  fi
+  # Also source repo-local bashrc if used as stash for env
+  if [ -r /home/ploy/ploy/.bashrc ]; then
+    set +o allexport
+    . /home/ploy/ploy/.bashrc || true
+  fi
+  # Source explicit per-service env file (auto-export)
+  if [ -r /home/ploy/api.env ]; then
+    set -a
+    . /home/ploy/api.env || true
+    set +a
+  fi
+fi
+
+if [ -z "$GITLAB_TOKEN" ] && [ -r /etc/environment ]; then
+  # Extract from /etc/environment if present
+  eval $(grep -E '^GITLAB_TOKEN=' /etc/environment | sed 's/^/export /') || true
+fi
+
+if [ -z "$GITLAB_TOKEN" ] && [ -r /home/ploy/.gitlab_token ]; then
+  export GITLAB_TOKEN="$(tr -d '\n' </home/ploy/.gitlab_token 2>/dev/null)"
+fi
+
 echo "[SETUP] Starting Ploy API..."
 exec local/api
 EOF

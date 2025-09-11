@@ -110,7 +110,7 @@ OpenRewrite transformations use the unified ARF transformation pipeline:
 
 ```bash
 # Execute transformation
-curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
+// Removed: Use Transflow run instead of ARF transform
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
@@ -124,7 +124,7 @@ curl -X POST "${PLOY_CONTROLLER}/arf/transform" \
   }'
 
 # Check transformation status
-curl "${PLOY_CONTROLLER}/arf/transforms/{transformation_id}"
+// Removed: Use /v1/transflow/status/{id}
 ```
 
 ### Recipe Management
@@ -356,12 +356,12 @@ Additional recipes are discovered dynamically based on project needs.
 
 ```bash
 # Create migration job
-curl -X POST https://api.dev.ployman.app/v1/arf/transforms \
+curl -X POST https://api.dev.ployman.app/v1/transflow/run \
   -H "Content-Type: application/json" \
   -d '{"recipe_id":"org.openrewrite.java.migrate.UpgradeToJava17","type":"openrewrite","codebase":{...}}'
 
 # Check job status
-curl https://api.dev.ployman.app/v1/arf/transforms/{id}
+curl https://api.dev.ployman.app/v1/transflow/status/{id}
 ```
 
 This migration system provides automated, scalable Java migration capabilities through reliable batch job execution with intelligent recipe discovery and optional LLM enhancement.

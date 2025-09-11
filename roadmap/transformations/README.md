@@ -2,7 +2,9 @@
 
 ## Overview
 
-The ARF transformation system provides comprehensive status tracking for code transformations with support for nested healing workflows. When a transformation encounters issues during build/test phases, the system automatically spawns healing attempts that can recursively create additional healing transformations as new issues are discovered.
+Legacy note: The ARF `/v1/arf/transforms/*` HTTP endpoints referenced in this document have been removed. Transflow is now the unified API for transformation workflows under `/v1/transflow/*`. The concepts below (status, healing, nested attempts) live on via Transflow.
+
+The ARF transformation system provided comprehensive status tracking for code transformations with support for nested healing workflows. When a transformation encountered issues during build/test phases, the system automatically spawned healing attempts that could recursively create additional healing transformations as new issues were discovered. This behavior is now modeled in Transflow’s status and artifacts.
 
 ## Transform Route Enhancement Plan
 

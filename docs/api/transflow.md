@@ -1,6 +1,6 @@
 # Transflow API Reference
 
-This document describes the REST API endpoints for Ploy's Transflow automated code transformation system.
+This document describes the REST API endpoints for Ploy's Transflow automated code transformation system. Note: ARF transform endpoints `/v1/arf/transforms/*` were removed; Transflow is the single surface.
 
 ## Base URL
 
@@ -19,7 +19,7 @@ http://localhost:8080/v1/
 All API requests require authentication via the `Authorization` header:
 ```bash
 curl -H "Authorization: Bearer your-api-token" \
-  https://api.ployd.app/v1/transflows
+  https://api.ployd.app/v1/transflow
 ```
 
 ## Transflow Workflows
@@ -83,9 +83,9 @@ POST /v1/transflow/run
     "steps_total": 1
   },
   "urls": {
-    "status": "/v1/transflows/tf-abc123def456",
-    "logs": "/v1/transflows/tf-abc123def456/logs",
-    "cancel": "/v1/transflows/tf-abc123def456/cancel"
+    "status": "/v1/transflow/status/tf-abc123def456",
+    "logs": "/v1/transflow/logs/tf-abc123def456",
+    "cancel": "/v1/transflow/tf-abc123def456"
   }
 }
 ```
@@ -399,7 +399,7 @@ GET /v1/llms/models/{model_id}
 Get default transflow configuration template.
 
 ```http
-GET /v1/transflows/config/template?type=java-migration
+// Removed: config template endpoint (not implemented)
 ```
 
 **Response:**
@@ -433,7 +433,7 @@ llm_model: gpt-4o-mini@2024-08-06
 Validate a transflow configuration without executing it.
 
 ```http
-POST /v1/transflows/config/validate
+// Removed: config validate endpoint (not implemented)
 ```
 
 **Request Body:**

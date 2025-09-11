@@ -1005,7 +1005,11 @@ build_step:
 	log.Printf("[Transflow] Pushing branch (timeout=%s): repo=%s branch=%s", pushTimeout, r.config.TargetRepo, branchName)
 	r.emit(ctx, "push", "push", "info", "Pushing branch")
 	if err := r.gitOps.PushBranch(pushCtx, repoPath, r.config.TargetRepo, branchName); err != nil {
-		r.emit(ctx, "push", "push", "error", fmt.Sprintf("push failed: %v", err))
+		msg := fmt.Sprintf("push failed: %v", err)
+		if strings.Contains(msg, "rc=128") || strings.Contains(msg, "exit status 128") {
+			r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
+		}
+		r.emit(ctx, "push", "push", "error", msg)
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "push",
 			Success: false,

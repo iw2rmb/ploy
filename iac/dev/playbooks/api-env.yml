@@ -1,0 +1,60 @@
+---
+# Configure per-service environment file for Ploy API
+# Safely writes /home/ploy/api.env and ensures it is sourced by ~/.bashrc
+
+- name: Configure API environment file for Transflow
+  hosts: linux_hosts
+  become: true
+  vars:
+    api_env_path: "/home/ploy/api.env"
+  tasks:
+    - name: Ensure ploy home exists
+      file:
+        path: "/home/ploy"
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Build api.env content from controller env (do not log)
+      no_log: true
+      set_fact:
+        api_env_content: |
+          # Managed by Ansible - API service environment
+          GITLAB_URL="{{ lookup('env', 'GITLAB_URL') | default('https://gitlab.com', true) }}"
+          GITLAB_TOKEN="{{ lookup('env', 'GITLAB_TOKEN') | default('', true) }}"
+          PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') | default('https://api.dev.ployman.app/v1', true) }}"
+
+    - name: Write /home/ploy/api.env with restricted permissions (do not log)
+      no_log: true
+      copy:
+        content: "{{ api_env_content }}\n"
+        dest: "{{ api_env_path }}"
+        owner: ploy
+        group: ploy
+        mode: '0600'
+
+    - name: Ensure ~/.bashrc sources api.env if present (idempotent)
+      lineinfile:
+        path: "/home/ploy/.bashrc"
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        create: true
+        line: "[ -r \"$HOME/api.env\" ] && set -a && . \"$HOME/api.env\" && set +a"
+        insertafter: EOF
+
+    - name: Verify token presence without printing value (best-effort)
+      become_user: ploy
+      shell: |
+        set -a
+        [ -r "$HOME/api.env" ] && . "$HOME/api.env"
+        set +a
+        if [ -n "$GITLAB_TOKEN" ]; then echo PRESENT; else echo MISSING; fi
+      register: token_check
+      changed_when: false
+
+    - name: Report token presence
+      debug:
+        msg: "GITLAB_TOKEN in api.env: {{ token_check.stdout }}"
+

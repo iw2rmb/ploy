@@ -19,7 +19,7 @@
 ## Phase 1: Async OpenRewrite Transformation Testing
 
 ### Step 1: Execute ARF Transformation with OpenRewrite (Async)
-1. **Transform Request**: Use `/v1/arf/transforms` endpoint with OpenRewrite recipe
+1. **Transform Request**: Use Transflow `/v1/transflow/run` endpoint with configuration
    - **Response Time**: <1 second (returns status URL immediately)
    - **Background Processing**: Transformation runs asynchronously
    - **Consul Storage**: Status persisted to Consul KV immediately
@@ -43,14 +43,14 @@
    {
      "transformation_id": "uuid-1234-5678",
      "status": "initiated",
-     "status_url": "/v1/arf/transforms/uuid-1234-5678/status",
+     "status_url": "/v1/transflow/status/tf-abc123",
      "message": "Transformation started, use status_url to monitor progress"
    }
    ```
 
 ### Step 2: Monitor Transformation Execution
 1. **Immediate Status URL**: Use the `status_url` from initial response
-2. **Status Monitoring**: Poll `/v1/arf/transforms/{transformation_id}/status` endpoint
+2. **Status Monitoring**: Poll `/v1/transflow/status/{id}` endpoint
    - **Polling Interval**: 30 seconds
    - **Maximum Wait Time**: 30 minutes total (allows for recipe download + transformation)
    - **Status Check Timeout**: 10 seconds per poll
@@ -201,9 +201,8 @@ The OpenRewrite transformations run in a custom Docker container with two-stage 
 Based on Phase 1 implementation, OpenRewrite uses async ARF system:
 
 ### Unified ARF System for OpenRewrite (Async)
-- `POST /v1/arf/transforms` — initiate async transformation, returns status URL immediately
-- `GET /v1/arf/transforms/:id/status` — get transformation status from Consul KV
-- `GET /v1/arf/transforms/:id` — (deprecated) legacy endpoint for compatibility
+- Transflow: `POST /v1/transflow/run` — initiate async transformation, returns status URL immediately
+- Transflow: `GET /v1/transflow/status/:id` — get execution status
 
 **Note**: OpenRewrite recipes are managed exclusively through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
@@ -228,7 +227,7 @@ Based on Phase 1 implementation, OpenRewrite uses async ARF system:
 ### Step 1: Execute Async Transformation via Unified ARF
 ```bash
 # Initiate async transformation (returns immediately)
-RESPONSE=$(curl -X POST "${PLOY_CONTROLLER%/v1}/v1/arf/transforms" \
+RESPONSE=$(curl -X POST "${PLOY_CONTROLLER%/v1}/v1/transflow/run" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
@@ -253,7 +252,7 @@ echo "Monitor at: $STATUS_URL"
 # Poll status endpoint (data from Consul KV)
 timeout 3600 bash -c '
   while true; do
-    STATUS_RESPONSE=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/arf/transforms/'$TRANSFORM_ID'/status")
+    STATUS_RESPONSE=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/transflow/status/'$TRANSFORM_ID'")
     STATUS=$(echo "$STATUS_RESPONSE" | jq -r ".status")
     STAGE=$(echo "$STATUS_RESPONSE" | jq -r ".workflow_stage")
     echo "$(date): Stage: $STAGE, Status: $STATUS"
@@ -320,8 +319,7 @@ ploy/arf/transforms/{id}/sandbox    # Sandbox deployment info
 ```
 
 ## Breaking Changes:
-- `/v1/arf/transforms` now returns status URL, not full result
-- Clients must poll `/v1/arf/transforms/{id}/status` for results
+- Transflow returns status URL and execution ID; clients poll `/v1/transflow/status/{id}` for results
 - No backward compatibility with synchronous pattern
 
 This async approach with Consul persistence provides production-ready OpenRewrite transformation capabilities with support for complex healing workflows.

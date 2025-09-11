@@ -88,76 +88,22 @@ ploy env delete myapp DEBUG
 - Persistent storage across api restarts
 - Full CRUD operations with user-friendly output
 
-### `ploy arf` (implemented - Enhanced with Self-Healing)
+### `ploy arf`
 ```
 ploy arf recipes list [--language <java|python|rust>] [--category <cleanup|modernize|security>] [--min-confidence <0.0-1.0>]
 ploy arf recipes get <recipe-id>
 ploy arf recipes search <query>
 ploy arf recipes stats <recipe-id>
-ploy arf transform [--recipe <recipe-id>] [--prompt <llm-prompt>] [--repository <url>] [--archive <path>] 
-                   [--branch <branch>] [--plan-model <model>] [--exec-model <model>]
-                   [--max-iterations <n>] [--parallel-tries <n>] [--timeout <duration>]
-                   [--output <archive|diff|mr>] [--output-path <path>] [--report <minimal|standard|detailed>]
 ploy arf health
 ploy arf cache stats
 ploy arf cache clear
 ```
-**Automated Remediation Framework**: Execute code transformations with self-healing capabilities powered by LLM.
+Automated Remediation Framework (ARF) provides recipe registry/catalog management, model registry, and related utilities. Code transformation workflows are unified under Transflow CLI.
 
-**Transform Command - Unified Transformation Engine:**
-The `transform` command now consolidates all transformation, benchmarking, and testing functionality with advanced self-healing capabilities:
-
-**Examples:**
-```bash
-# Execute recipe-based transformation
-ploy arf transform --recipe cleanup.unused-imports --repository https://github.com/user/repo
-
-# Execute LLM-guided transformation
-ploy arf transform --prompt "Migrate from JUnit 4 to JUnit 5" --repository https://github.com/user/repo
-
-# Combine recipes and LLM prompts for hybrid approach
-ploy arf transform --recipe modernize.java-8-to-11 --prompt "Also update logging to SLF4J" --repository https://github.com/user/repo
-
-# Advanced self-healing with parallel solution attempts
-ploy arf transform --recipe complex.migration --max-iterations 5 --parallel-tries 3 --plan-model codellama:13b
-
-# Output as merge request
-ploy arf transform --recipe security.fixes --output mr --output-path ./security-fixes.patch
-
-# Detailed reporting with custom timeout
-ploy arf transform --prompt "Optimize database queries" --report detailed --timeout 30m
-
-# Transform local archive
-ploy arf transform --archive ./myproject.tar.gz --recipe cleanup.all
-
-# Multi-iteration benchmarking (replaces old benchmark command)
-ploy arf transform --recipe performance.optimize --repository https://github.com/user/app --max-iterations 10
+Use Transflow for executing transformations and self-healing workflows:
 ```
-
-**Self-Healing Features:**
-- **Automatic Error Recovery**: When transformations fail, the system automatically attempts recovery
-- **LLM-Powered Planning**: Uses specified models to plan solutions when errors occur
-- **Parallel Solution Attempts**: Tries multiple fix approaches simultaneously for faster resolution
-- **Iterative Refinement**: Continues attempting fixes up to max-iterations
-- **Build & Deploy Testing**: Validates each solution with actual compilation and deployment
-
-**Output Formats:**
-- **archive**: Produces transformed code as tar.gz archive
-- **diff**: Generates unified diff showing all changes
-- **mr**: Creates merge request format with commit messages
-
-**Report Levels:**
-- **minimal**: Only critical information and final status
-- **standard**: Includes timing, key metrics, and major events
-- **detailed**: Comprehensive logs with all transformation steps
-
-**Migration from Legacy Commands:**
-- `ploy arf sandbox` → Use `transform` with deployment testing (automatic)
-- `ploy arf benchmark` → Use `transform --max-iterations N` for multi-run testing
-- `ploy arf workflow` → Use `transform` with LLM prompts for complex workflows
-
-**Features:**
-- **2,800+ OpenRewrite Recipes**: Java transformations for cleanup, modernization, security, and migration
+ploy transflow run -f <config.yaml> [--verbose]
+```
 - **LLM-Powered Transformations**: Natural language prompts for custom transformations
 - **Self-Healing Engine**: Automatic error recovery with parallel solution attempts
 - **Hybrid Approach**: Combine recipes and LLM prompts for maximum flexibility

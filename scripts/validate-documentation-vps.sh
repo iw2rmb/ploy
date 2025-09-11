@@ -226,7 +226,7 @@ test_api_documentation() {
     local endpoints=(
         "/health"
         "/v1/llms/models"
-        "/v1/transflows"
+        "/v1/transflow"
     )
     
     for endpoint in "${endpoints[@]}"; do
