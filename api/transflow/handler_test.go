@@ -183,11 +183,17 @@ func TestArtifactsEndpoints(t *testing.T) {
 	// List artifacts
 	req := httptest.NewRequest("GET", "/v1/transflow/artifacts/"+id, nil)
 	resp, _ := app.Test(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	assert.Equal(t, 200, resp.StatusCode)
 
 	// Download artifact
 	req2 := httptest.NewRequest("GET", "/v1/transflow/artifacts/"+id+"/error_log", nil)
 	resp2, _ := app.Test(req2)
+	if resp2 != nil {
+		defer resp2.Body.Close()
+	}
 	assert.Equal(t, 200, resp2.StatusCode)
 }
 
@@ -270,6 +276,9 @@ func TestReportEvent_UpdatesStatusWithStepsAndLastJob(t *testing.T) {
 	req1 := httptest.NewRequest("POST", "/v1/transflow/event", bytes.NewReader(b1))
 	req1.Header.Set("Content-Type", "application/json")
 	resp1, _ := app.Test(req1)
+	if resp1 != nil {
+		defer resp1.Body.Close()
+	}
 	assert.Equal(t, 200, resp1.StatusCode)
 
 	// Send a job metadata event
@@ -278,6 +287,9 @@ func TestReportEvent_UpdatesStatusWithStepsAndLastJob(t *testing.T) {
 	req2 := httptest.NewRequest("POST", "/v1/transflow/event", bytes.NewReader(b2))
 	req2.Header.Set("Content-Type", "application/json")
 	resp2, _ := app.Test(req2)
+	if resp2 != nil {
+		defer resp2.Body.Close()
+	}
 	assert.Equal(t, 200, resp2.StatusCode)
 
 	// Read back status
