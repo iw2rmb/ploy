@@ -313,25 +313,6 @@ cp -f /tmp/transform.log "${OUTPUT_DIR}/transform.log" 2>/dev/null || true
 
 echo "[OpenRewrite] Transformation completed successfully"
 
-# Step 5: Create output tar
-echo "[OpenRewrite] Creating output archive..."
-echo "[OpenRewrite] Current working directory: $(pwd)"
-echo "[OpenRewrite] Directory structure before tar:"
-ls -la
-echo "[OpenRewrite] All directories in workspace:"
-find . -type d | sort
-echo "[OpenRewrite] Files to archive:"
-{ find . -type f | head -20; } || true
-echo "[OpenRewrite] Total files to archive: $(find . -type f | wc -l)"
-echo "[OpenRewrite] Checking for project directory:"
-if [ -d "project" ]; then
-    echo "[OpenRewrite] WARNING: project/ directory exists!"
-    echo "[OpenRewrite] Contents of project/:"
-    ls -la project/ || echo "Empty"
-else
-    echo "[OpenRewrite] No project/ directory found (good)"
-fi
-
 # Debug: Show exactly where we are and what files exist before tar creation
 echo "[OpenRewrite] Pre-tar debugging:"
 echo "[OpenRewrite] Current directory: $(pwd)"
