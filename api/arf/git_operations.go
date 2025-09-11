@@ -86,7 +86,7 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 	}
 
 	// Build clone command
-	args := []string{"clone", "--depth", "1"}
+    args := []string{"clone", "--depth", "1", "--single-branch"}
 	if branch != "" && branch != "main" && branch != "master" {
 		args = append(args, "--branch", branch)
 	}
