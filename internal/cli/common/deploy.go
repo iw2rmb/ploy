@@ -25,7 +25,8 @@ type DeployConfig struct {
 	ControllerURL string
 	Metadata      map[string]string
 	Timeout       time.Duration
-	BuildOnly     bool // when true, API should run build gate and tear down app (no long-lived service)
+	BuildOnly     bool   // when true, API should run build gate and tear down app (no long-lived service)
+	WorkingDir    string // optional: directory to tar instead of current working directory
 }
 
 // DeployResult contains deployment outcome information
@@ -54,11 +55,15 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	}
 
 	// Create tar archive
-	ign, _ := utils.ReadGitignore(".")
+	wd := config.WorkingDir
+	if wd == "" {
+		wd = "."
+	}
+	ign, _ := utils.ReadGitignore(wd)
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close()
-		_ = utils.TarDir(".", pw, ign)
+		_ = utils.TarDir(wd, pw, ign)
 	}()
 
 	// Build deployment URL
