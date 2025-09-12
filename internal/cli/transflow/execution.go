@@ -1,14 +1,14 @@
 package transflow
 
 import (
-    "context"
-    "fmt"
-    "log"
-    "os"
-    "path/filepath"
-    "strings"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
 
-    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // executeWithPlan handles execution modes that require a plan.json
@@ -70,24 +70,24 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 			if hcl, err := runner.RenderLLMExecAssets(lid); err == nil {
 				fmt.Printf("Rendered llm_exec HCL: %s\n", hcl)
 				// Centralized substitution (no global env writes)
-                runID := LLMRunID(lid)
-                imgs := ResolveImagesFromEnv()
-                infra := ResolveInfraFromEnv()
-                vars := map[string]string{
-                    "TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
-                    "TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
-                    "TRANSFLOW_REGISTRY":          imgs.Registry,
-                    "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-                    "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-                    "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-                    "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-                    "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-                    "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-                    "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-                    "PLOY_CONTROLLER":             infra.Controller,
-                    "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-                    "NOMAD_DC":                    infra.DC,
-                }
+				runID := LLMRunID(lid)
+				imgs := ResolveImagesFromEnv()
+				infra := ResolveInfraFromEnv()
+				vars := map[string]string{
+					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
+					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
+					"TRANSFLOW_REGISTRY":          imgs.Registry,
+					"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+					"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+					"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+					"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+					"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+					"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+					"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+					"PLOY_CONTROLLER":             infra.Controller,
+					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					"NOMAD_DC":                    infra.DC,
+				}
 				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
 				if sErr != nil {
 					fmt.Printf("failed to write substituted HCL: %v\n", sErr)
@@ -121,11 +121,11 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 			oid, _ := o["id"].(string)
 			if hcl, err := runner.RenderORWApplyAssets(oid); err == nil {
 				fmt.Printf("Rendered orw_apply HCL: %s\n", hcl)
-                // Pre-substitute recipe placeholders (no global env mutation)
-                rclass := os.Getenv("TRANSFLOW_RECIPE_CLASS")
-                rcoords := os.Getenv("TRANSFLOW_RECIPE_COORDS")
-                rtimeout := os.Getenv("TRANSFLOW_RECIPE_TIMEOUT")
-                prePath, _ := preSubstituteRecipe(hcl, rclass, rcoords, rtimeout)
+				// Pre-substitute recipe placeholders (no global env mutation)
+				rclass := os.Getenv("TRANSFLOW_RECIPE_CLASS")
+				rcoords := os.Getenv("TRANSFLOW_RECIPE_COORDS")
+				rtimeout := os.Getenv("TRANSFLOW_RECIPE_TIMEOUT")
+				prePath, _ := preSubstituteRecipe(hcl, rclass, rcoords, rtimeout)
 				// Prepare context: clone repo into context subdir
 				baseDir := filepath.Dir(hcl)
 				contextDir := filepath.Join(baseDir, "context")
@@ -153,20 +153,20 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 						fmt.Printf("warning: repo clone failed: %v\n", err)
 					}
 				}
-                runID2 := ORWRunID(oid)
-                imgs := ResolveImagesFromEnv()
-                infra := ResolveInfraFromEnv()
-                vars := map[string]string{
-                    "TRANSFLOW_CONTEXT_DIR":       contextDir,
-                    "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-                    "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-                    "TRANSFLOW_REGISTRY":          imgs.Registry,
-                    "PLOY_CONTROLLER":             infra.Controller,
-                    "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-                    "PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
-                    "TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-                    "NOMAD_DC":                    infra.DC,
-                }
+				runID2 := ORWRunID(oid)
+				imgs := ResolveImagesFromEnv()
+				infra := ResolveInfraFromEnv()
+				vars := map[string]string{
+					"TRANSFLOW_CONTEXT_DIR":       contextDir,
+					"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+					"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+					"TRANSFLOW_REGISTRY":          imgs.Registry,
+					"PLOY_CONTROLLER":             infra.Controller,
+					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					"PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
+					"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+					"NOMAD_DC":                    infra.DC,
+				}
 				submittedPath, serr := substituteORWTemplateVars(prePath, runID2, vars)
 				if serr != nil {
 					fmt.Printf("failed to write submitted HCL: %v\n", serr)
@@ -195,13 +195,13 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 func executeApplyFirst(runner *TransflowRunner) error {
 	// Fetch diff content path or URL
 	var diffPath string
-    if url := os.Getenv("TRANSFLOW_DIFF_URL"); url != "" {
-        dp := filepath.Join(runner.workspaceDir, "apply", "diff.patch")
-        _ = os.MkdirAll(filepath.Dir(dp), 0755)
-        if err := downloadToFileFn(url, dp); err == nil {
-            diffPath = dp
-        }
-    }
+	if url := os.Getenv("TRANSFLOW_DIFF_URL"); url != "" {
+		dp := filepath.Join(runner.workspaceDir, "apply", "diff.patch")
+		_ = os.MkdirAll(filepath.Dir(dp), 0755)
+		if err := downloadToFileFn(url, dp); err == nil {
+			diffPath = dp
+		}
+	}
 	if diffPath == "" {
 		if p := os.Getenv("TRANSFLOW_DIFF_PATH"); p != "" {
 			diffPath = p

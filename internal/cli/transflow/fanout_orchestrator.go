@@ -160,22 +160,22 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 
 	// Check if this is a test submitter (backward compatibility)
 	if o.submitter != nil {
-        // Choose sensible default timeouts based on branch type
-        var tmo time.Duration
-        switch branch.Type {
-        case "llm-exec":
-            tmo = ResolveDefaultsFromEnv().LLMExecTimeout
-        case "orw-gen":
-            tmo = ResolveDefaultsFromEnv().ORWApplyTimeout
-        default:
-            tmo = ResolveDefaultsFromEnv().BuildApplyTimeout
-        }
-        spec := JobSpec{
-            Name:    branch.ID,
-            Type:    branch.Type,
-            Inputs:  branch.Inputs,
-            Timeout: tmo,
-        }
+		// Choose sensible default timeouts based on branch type
+		var tmo time.Duration
+		switch branch.Type {
+		case "llm-exec":
+			tmo = ResolveDefaultsFromEnv().LLMExecTimeout
+		case "orw-gen":
+			tmo = ResolveDefaultsFromEnv().ORWApplyTimeout
+		default:
+			tmo = ResolveDefaultsFromEnv().BuildApplyTimeout
+		}
+		spec := JobSpec{
+			Name:    branch.ID,
+			Type:    branch.Type,
+			Inputs:  branch.Inputs,
+			Timeout: tmo,
+		}
 		jobResult, err := o.submitter.SubmitAndWaitTerminal(ctx, spec)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(startTime)
@@ -233,25 +233,25 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	baseDir := filepath.Dir(hclPath)
 	// Ensure out directory exists for bind mount target
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-    imgs := ResolveImagesFromEnv()
-    infra := ResolveInfraFromEnv()
-    vars := map[string]string{
-        "TRANSFLOW_CONTEXT_DIR":       baseDir,
-        "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-        "TRANSFLOW_REGISTRY":          imgs.Registry,
-        "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-        "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-        "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-        "PLOY_CONTROLLER":             infra.Controller,
-        "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-        "NOMAD_DC":                    infra.DC,
-        "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-        "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-        "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-    }
+	imgs := ResolveImagesFromEnv()
+	infra := ResolveInfraFromEnv()
+	vars := map[string]string{
+		"TRANSFLOW_CONTEXT_DIR":       baseDir,
+		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"TRANSFLOW_REGISTRY":          imgs.Registry,
+		"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+		"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+		"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+		"PLOY_CONTROLLER":             infra.Controller,
+		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+		"NOMAD_DC":                    infra.DC,
+		"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+		"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+		"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+	}
 
 	// Step 2: Generate unique run ID for this branch
-    runID := LLMRunID(branch.ID)
+	runID := LLMRunID(branch.ID)
 
 	// Step 3: Extract MCP configuration from branch inputs
 	var mcpConfig *MCPConfig = nil
@@ -274,8 +274,8 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
-    // Step 4: Report job metadata asynchronously (job name == runID)
-    reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "llm-exec", "llm-exec")
+	// Step 4: Report job metadata asynchronously (job name == runID)
+	reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "llm-exec", "llm-exec")
 
 	// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 	if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
@@ -443,22 +443,22 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	// Provide host directories for bind mounts (no global env)
 	baseDir := filepath.Dir(hclPath)
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-    imgs := ResolveImagesFromEnv()
-    infra := ResolveInfraFromEnv()
-    vars := map[string]string{
-        "TRANSFLOW_CONTEXT_DIR":       baseDir,
-        "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-        "PLOY_CONTROLLER":             infra.Controller,
-        "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-        "PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
-        "TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-        "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-        "TRANSFLOW_REGISTRY":          imgs.Registry,
-        "NOMAD_DC":                    infra.DC,
-    }
+	imgs := ResolveImagesFromEnv()
+	infra := ResolveInfraFromEnv()
+	vars := map[string]string{
+		"TRANSFLOW_CONTEXT_DIR":       baseDir,
+		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"PLOY_CONTROLLER":             infra.Controller,
+		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+		"PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
+		"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+		"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+		"TRANSFLOW_REGISTRY":          imgs.Registry,
+		"NOMAD_DC":                    infra.DC,
+	}
 
 	// Step 2b: Substitute environment variables in HCL template
-    runID := ORWRunID(branch.ID)
+	runID := ORWRunID(branch.ID)
 	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
 	if err != nil {
 		result.Status = "failed"
@@ -468,8 +468,8 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 
-    // Step 3: Report job metadata asynchronously (job name == runID)
-    reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "apply", "orw-apply")
+	// Step 3: Report job metadata asynchronously (job name == runID)
+	reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "apply", "orw-apply")
 
 	// Step 4: Preflight validate HCL, then submit job to Nomad and wait for completion
 	if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
@@ -514,7 +514,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 // executeHumanStepBranch handles human intervention branches with Git-based manual intervention workflow
 func (o *fanoutOrchestrator) executeHumanStepBranch(ctx context.Context, branch BranchSpec, result BranchResult) BranchResult {
 	// Parse timeout from branch inputs
-    timeout := ResolveDefaultsFromEnv().BuildApplyTimeout // default timeout
+	timeout := ResolveDefaultsFromEnv().BuildApplyTimeout // default timeout
 	if timeoutStr, ok := branch.Inputs["timeout"].(string); ok {
 		if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
 			timeout = parsedTimeout
@@ -591,13 +591,13 @@ func (o *fanoutOrchestrator) executeHumanStepBranch(ctx context.Context, branch 
 
 		case <-ticker.C:
 			// Check if human made changes by attempting build validation
-            buildConfig := common.DeployConfig{
-                App:           branch.ID,
-                Lane:          "A", // Simple build validation
-                Environment:   "dev",
-                ControllerURL: "", // Will be set by build checker if needed
-                Timeout:       ResolveDefaultsFromEnv().BuildApplyTimeout,
-            }
+			buildConfig := common.DeployConfig{
+				App:           branch.ID,
+				Lane:          "A", // Simple build validation
+				Environment:   "dev",
+				ControllerURL: "", // Will be set by build checker if needed
+				Timeout:       ResolveDefaultsFromEnv().BuildApplyTimeout,
+			}
 
 			buildResult, err := buildChecker.CheckBuild(branchCtx, buildConfig)
 			if err != nil {

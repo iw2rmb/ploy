@@ -1,14 +1,14 @@
 package transflow
 
 import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
-    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // executeReducerMode renders and optionally submits reducer job
@@ -37,7 +37,7 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		limitsJSON = `{"max_steps":4,"max_tool_calls":8,"timeout":"15m"}`
 	}
 
-    runID := ReducerRunID(runner.config.ID)
+	runID := ReducerRunID(runner.config.ID)
 	rendered := strings.NewReplacer(
 		"${MODEL}", model,
 		"${TOOLS_JSON}", toolsJSON,
@@ -60,10 +60,10 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		return nil
 	}
 
-    timeout := ResolveDefaultsFromEnv().ReducerTimeout
-    if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-        return fmt.Errorf("reducer job failed: %w", err)
-    }
+	timeout := ResolveDefaultsFromEnv().ReducerTimeout
+	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
+		return fmt.Errorf("reducer job failed: %w", err)
+	}
 
 	// Fetch next.json via URL or local path
 	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {

@@ -1,16 +1,16 @@
 package transflow
 
 import (
-    "context"
-    crand "crypto/rand"
-    "encoding/hex"
-    "errors"
-    "fmt"
-    "log"
-    "os"
-    "path/filepath"
-    "strings"
-    "time"
+	"context"
+	crand "crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
@@ -509,19 +509,19 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
 			}
 
-            // Guard: ensure repository contains a supported build file before creating input tar
-            {
-                hasPom, hasGradle, hasKts := checkBuildFiles(repoPath)
-                log.Printf("[Transflow] Build file check at %s: pom=%v gradle=%v gradle.kts=%v", repoPath, hasPom, hasGradle, hasKts)
-                r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
-                if err := ensureBuildFile(repoPath); err != nil {
-                    r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
-                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: ErrNoBuildFile.Error()})
-                    result.ErrorMessage = ErrNoBuildFile.Error()
-                    result.Duration = time.Since(startTime)
-                    return nil, ErrNoBuildFile
-                }
-            }
+			// Guard: ensure repository contains a supported build file before creating input tar
+			{
+				hasPom, hasGradle, hasKts := checkBuildFiles(repoPath)
+				log.Printf("[Transflow] Build file check at %s: pom=%v gradle=%v gradle.kts=%v", repoPath, hasPom, hasGradle, hasKts)
+				r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
+				if err := ensureBuildFile(repoPath); err != nil {
+					r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: ErrNoBuildFile.Error()})
+					result.ErrorMessage = ErrNoBuildFile.Error()
+					result.Duration = time.Since(startTime)
+					return nil, ErrNoBuildFile
+				}
+			}
 
 			// Prepare input tar from repository
 			inputTar := filepath.Join(filepath.Dir(renderedPath), "input.tar")
@@ -529,54 +529,54 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to create input tar: %v", err)})
 				return nil, fmt.Errorf("failed to create input tar: %w", err)
 			}
-            // Log a brief preview of tar contents for diagnostics
-            logPreviewTar(inputTar, 20)
+			// Log a brief preview of tar contents for diagnostics
+			logPreviewTar(inputTar, 20)
 
-            // Pre-substitute recipe class and input tar host path into template
+			// Pre-substitute recipe class and input tar host path into template
 			rclass := ""
 			if len(step.Recipes) > 0 {
 				rclass = step.Recipes[0]
 			}
-            // Determine coordinates strictly from YAML (no discovery)
-            rgroup, rartifact, rversion := step.RecipeGroup, step.RecipeArtifact, step.RecipeVersion
-            if err := validateRecipeCoords(rgroup, rartifact, rversion, step.ID); err != nil {
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
-                result.ErrorMessage = err.Error()
-                result.Duration = time.Since(startTime)
-                return nil, err
-            }
+			// Determine coordinates strictly from YAML (no discovery)
+			rgroup, rartifact, rversion := step.RecipeGroup, step.RecipeArtifact, step.RecipeVersion
+			if err := validateRecipeCoords(rgroup, rartifact, rversion, step.ID); err != nil {
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+				result.ErrorMessage = err.Error()
+				result.Duration = time.Since(startTime)
+				return nil, err
+			}
 			// Optional Maven plugin version (prefer YAML, then env; runner defaults internally if unset)
 			pluginVersion := step.MavenPluginVersion
 			if pluginVersion == "" {
 				pluginVersion = os.Getenv("TRANSFLOW_MAVEN_PLUGIN_VERSION")
 			}
 			// Create run ID for this submission and then substitute it
-            runID := ORWRunID(step.ID)
-            prePath, err := writeORWPreHCL(renderedPath, ORWRecipeParams{Class: rclass, Group: rgroup, Artifact: rartifact, Version: rversion, PluginVersion: pluginVersion}, inputTar, runID)
-            if err != nil {
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
-                return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
-            }
+			runID := ORWRunID(step.ID)
+			prePath, err := writeORWPreHCL(renderedPath, ORWRecipeParams{Class: rclass, Group: rgroup, Artifact: rartifact, Version: rversion, PluginVersion: pluginVersion}, inputTar, runID)
+			if err != nil {
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
+				return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
+			}
 
-            // Prepare env and substitute final template
-            baseDir := filepath.Dir(renderedPath)
+			// Prepare env and substitute final template
+			baseDir := filepath.Dir(renderedPath)
 
-            // Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
-            execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-            branchID := step.ID
-            bs := NewBranchStep(execID, branchID)
-            curStepID := bs.ID
-            diffKey := bs.DiffKey
+			// Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
+			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			branchID := step.ID
+			bs := NewBranchStep(execID, branchID)
+			curStepID := bs.ID
+			diffKey := bs.DiffKey
 
-            // Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
-            execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-            seaweed := ResolveInfraFromEnv().SeaweedURL
+			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
+			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			seaweed := ResolveInfraFromEnv().SeaweedURL
 			// Upload best-effort to artifacts/transflow/<id>/input.tar using HTTP client
 			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
 				log.Printf("[Transflow] input.tar upload failed: %v", err)
 			}
-            // Substitute HCL with explicit variables to avoid global env writes
-            vars := makeORWVars(baseDir, execID, diffKey, seaweed)
+			// Substitute HCL with explicit variables to avoid global env writes
+			vars := makeORWVars(baseDir, execID, diffKey, seaweed)
 			submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
 			if err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
@@ -606,21 +606,21 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 					}
 				}
 			}
-            // Prepare diff path for later fetch and processing
-            diffPath := filepath.Join(baseDir, "out", "diff.patch")
-            _ = os.MkdirAll(filepath.Dir(diffPath), 0755)
-            r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
-            // Submit job and fetch diff via helper
-            orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-            if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID, submittedPath, diffPath, orwTimeout); err != nil {
-                r.emit(ctx, "apply", "orw-apply", "error", err.Error())
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
-                result.ErrorMessage = err.Error()
-                result.Duration = time.Since(startTime)
-                return nil, err
-            }
-            // Successful wait and fetch implies job completed
-            r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
+			// Prepare diff path for later fetch and processing
+			diffPath := filepath.Join(baseDir, "out", "diff.patch")
+			_ = os.MkdirAll(filepath.Dir(diffPath), 0755)
+			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
+			// Submit job and fetch diff via helper
+			orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+			if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID, submittedPath, diffPath, orwTimeout); err != nil {
+				r.emit(ctx, "apply", "orw-apply", "error", err.Error())
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+				result.ErrorMessage = err.Error()
+				result.Duration = time.Since(startTime)
+				return nil, err
+			}
+			// Successful wait and fetch implies job completed
+			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
 
 			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
 			_ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
@@ -641,22 +641,22 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
 			}
 
-            // Apply + build via helper with events and timeout
-            log.Printf("[Transflow] Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath)
-            sr, err := runApplyAndBuildWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffAndBuild)
-            result.StepResults = append(result.StepResults, sr)
-            if err != nil {
-                result.ErrorMessage = sr.Message
-                result.Duration = time.Since(startTime)
-                return nil, err
-            }
+			// Apply + build via helper with events and timeout
+			log.Printf("[Transflow] Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath)
+			sr, err := runApplyAndBuildWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffAndBuild)
+			result.StepResults = append(result.StepResults, sr)
+			if err != nil {
+				result.ErrorMessage = sr.Message
+				result.Duration = time.Since(startTime)
+				return nil, err
+			}
 
 			// Record chain metadata for this branch (option_id = step.ID)
-            {
-                branchID := step.ID
-                branchDiffKey := computeBranchDiffKey(execID, branchID, curStepID)
-                _ = writeBranchChainStepMeta(seaweed, execID, branchID, curStepID, branchDiffKey)
-            }
+			{
+				branchID := step.ID
+				branchDiffKey := computeBranchDiffKey(execID, branchID, curStepID)
+				_ = writeBranchChainStepMeta(seaweed, execID, branchID, curStepID, branchDiffKey)
+			}
 
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow
