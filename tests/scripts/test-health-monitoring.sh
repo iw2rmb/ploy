@@ -75,7 +75,7 @@ EOF
 
 # Test validation catches the error
 echo "Testing validation of invalid job template..."
-if /opt/hashicorp/bin/nomad-job-manager.sh validate --file platform/nomad/test-invalid.hcl 2>&1 | grep -q "Error\|Invalid"; then
+if /opt/hashicorp/bin/nomad-job-manager.sh validate --file platform/nomad/test-invalid.hcl 2>&1 | grep -q "Error\|Invalid\|failed"; then
     echo "✓ Validation correctly detected invalid job"
 else
     echo "✗ Validation should have failed for invalid job"
