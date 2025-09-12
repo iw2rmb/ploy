@@ -127,12 +127,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	// Recipe registration from OpenRewrite JVM runner
 	arf.Post("/recipes/register", h.RegisterRecipeFromRunner)
 
-	// Model registry management
-	arf.Get("/models", h.GetModels)
-	arf.Post("/models", h.AddModel)
-	arf.Put("/models", h.ImportModels)
-	arf.Delete("/models/:name", h.RemoveModel)
-	arf.Post("/models/:name/set-default", h.SetDefaultModel)
+	// Model registry moved to LLMS: /v1/llms/models/*
 
 	// Legacy ARF transform HTTP endpoints have been removed in favor of Transflow
 
