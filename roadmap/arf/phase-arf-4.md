@@ -13,7 +13,7 @@ Phase ARF-4 transforms ARF into a production-ready, security-focused transformat
 
 **✅ Complete:**
 - All REST API endpoints (`/v1/arf/security/*`, `/v1/arf/workflow/*`)
-- Test suite (`test-arf-phase4-security.sh`) with comprehensive coverage
+- Comprehensive Go test coverage (policy enforcer unit tests, integration/behavioral suites)
 - Core engine structures and interfaces
 - Handler implementations with proper routing
 

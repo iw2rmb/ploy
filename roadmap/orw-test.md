@@ -161,7 +161,9 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 ### 2025-09-04: Comprehensive Testing Completed
 
 **Test Environment**: api.dev.ployman.app
-**Test Script**: `/tests/scripts/test-openrewrite-comprehensive.sh`
+**Go Test Suites**: Prefer Go-based integration/E2E tests over shell scripts
+  - Integration: `go test ./tests/integration -tags=integration -v`
+  - E2E (Dev API): `PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags=e2e -v`
 **Results Directory**: `tests/results/openrewrite-20250904-075658/`
 
 **Summary**:
@@ -233,8 +235,7 @@ curl https://api.dev.ployman.app/v1/transflow/logs/{id}
 - `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2` - Spring Boot upgrade
 
 ### Test Automation
-- Created test script: `/tests/scripts/test-openrewrite-transformations.sh`
-- Quick test script: `/tests/scripts/test-orw-quick.sh`
+- Automated via Go tests: integration/E2E suites above and transflow unit tests under `internal/cli/transflow`
 - Test repositories created and available on GitHub
 
 ## Conclusions
