@@ -568,12 +568,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             curStepID := bs.ID
             diffKey := bs.DiffKey
 
-			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
-			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-			seaweed := os.Getenv("PLOY_SEAWEEDFS_URL")
-			if seaweed == "" {
-				seaweed = "http://seaweedfs-filer.service.consul:8888"
-			}
+            // Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
+            execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+            seaweed := ResolveInfraFromEnv().SeaweedURL
 			// Upload best-effort to artifacts/transflow/<id>/input.tar using HTTP client
 			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
 				log.Printf("[Transflow] input.tar upload failed: %v", err)
