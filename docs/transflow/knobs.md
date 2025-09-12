@@ -62,6 +62,11 @@ Notes
 - PLOY_API_URL vs PLOY_CONTROLLER: PLOY_API_URL is the base (no /v1) used by in-job HTTP calls (e.g., recipe registration); PLOY_CONTROLLER includes /v1 and is used by runner/controller for control-plane events.
 - Cleanup is automatic: transflow sets build_only so the API deregisters the lane‑c sandbox after the build gate, preventing tfw-…-lane-c leftovers.
 - For production/staging, mirror the same knobs but point images to the appropriate registry and increase resources if projects are larger.
+
+Centralized Defaults (helpers)
+- ResolveImagesFromEnv: resolves planner/reducer/llm/orw image refs and registry using Defaults fallbacks.
+- ResolveInfraFromEnv: resolves controller, DC, and SeaweedFS with Defaults; also derives API base (controller without `/v1`).
+- These helpers back all var maps (planner/reducer/LLM/ORW) across preview, fanout, and production submission flows, replacing ad‑hoc environment lookups.
 # Transflow Configuration Knobs
 
 The following environment variables control Transflow defaults. All are optional; sensible defaults are provided.
