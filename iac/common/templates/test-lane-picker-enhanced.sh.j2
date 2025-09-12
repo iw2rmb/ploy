@@ -87,13 +87,23 @@ test_lane_detection \
     "java" \
     "Jib plugin detected"
 
-# Test 2: Scala with Jib (should be Lane E)
-test_lane_detection \
-    "Scala project with Jib plugin" \
-    "/home/ploy/ploy/apps/scala-catalogsvc" \
-    "E" \
-    "scala" \
-    "Jib plugin detected"
+# Test 2: Scala with Jib (should be Lane E) — using external repo if provided
+if [[ -n "$SCALA_HELLO_REPO" ]]; then
+    TMP_SCALA="/tmp/scala-hello"
+    rm -rf "$TMP_SCALA" && git clone --depth 1 "$SCALA_HELLO_REPO" "$TMP_SCALA" >/dev/null 2>&1 || true
+    if [[ -d "$TMP_SCALA" ]]; then
+        test_lane_detection \
+            "Scala project with Jib plugin (external)" \
+            "$TMP_SCALA" \
+            "E" \
+            "scala" \
+            "Jib plugin detected"
+    else
+        log_warn "SCALA_HELLO_REPO clone failed; skipping Scala Jib test"
+    fi
+else
+    log_warn "SCALA_HELLO_REPO not set; skipping Scala Jib test"
+fi
 
 # Create test projects for additional scenarios
 TEST_DIR="/tmp/ploy-lane-tests"
