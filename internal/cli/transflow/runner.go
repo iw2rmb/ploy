@@ -701,51 +701,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("no diff produced by orw-apply: %w", fetchErr)
 			}
 
-			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
-			{
-				branchID := step.ID
-				// Read HEAD
-				headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
-				if b, code, _ := getJSONFn(seaweed, headKey); code == 200 {
-					var head map[string]string
-					_ = json.Unmarshal(b, &head)
-					cur := head["step_id"]
-					// Collect step_ids from head back to root
-					chain := []string{}
-					for cur != "" {
-						chain = append(chain, cur)
-						metaKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, cur)
-						if mb, mc, _ := getJSONFn(seaweed, metaKey); mc == 200 {
-							var meta struct {
-								Prev string `json:"prev_step_id"`
-							}
-							_ = json.Unmarshal(mb, &meta)
-							cur = meta.Prev
-						} else {
-							cur = ""
-						}
-					}
-					// Reverse to root→head
-					for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
-						chain[i], chain[j] = chain[j], chain[i]
-					}
-					// Apply each recorded diff in order
-					for _, sid := range chain {
-						url := strings.TrimRight(seaweed, "/") + "/artifacts/" + fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, sid)
-						tmp := filepath.Join(baseDir, "out", "chain-"+sid+".patch")
-						_ = downloadToFileFn(url, tmp)
-						// Validate and apply
-						allow := []string{"src/**", "pom.xml"}
-						if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" {
-							allow = strings.Split(v, ",")
-						}
-						if err := validateDiffPathsFn(tmp, allow); err == nil {
-							_ = validateUnifiedDiffFn(ctx, repoPath, tmp)
-							_ = applyUnifiedDiffFn(ctx, repoPath, tmp)
-						}
-					}
-				}
-			}
+            // Reconstruct branch state: apply all prior diffs from chain HEAD → root
+            _ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
 
 			if fi, err := os.Stat(diffPath); err == nil {
 				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
