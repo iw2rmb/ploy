@@ -51,15 +51,8 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		return s
 	}
 
-	// Defaults for images (env override) - prefer VPS registry
-	plannerImage := os.Getenv("TRANSFLOW_PLANNER_IMAGE")
-	if plannerImage == "" {
-		reg := os.Getenv("TRANSFLOW_REGISTRY")
-		if reg == "" {
-			reg = "registry.dev.ployman.app"
-		}
-		plannerImage = reg + "/langgraph-runner:py-0.1.0"
-	}
+    // Resolve planner image via centralized resolver
+    plannerImage := ResolveImagesFromEnv().Planner
 
 	rendered := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
