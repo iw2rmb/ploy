@@ -41,12 +41,12 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 			config.WorkingDir = wd
 		}
 	}
-    // Optional: emit via controller reporter if exec ID present
-    if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
-        rep := NewControllerEventReporter(b.controllerURL, execID)
-        _ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("start app=%s lane=%s env=%s wd=%s", config.App, config.Lane, config.Environment, config.WorkingDir)})
-    }
-    log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s wd=%s", b.controllerURL, config.App, config.Lane, config.Environment, config.WorkingDir)
+	// Optional: emit via controller reporter if exec ID present
+	if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+		rep := NewControllerEventReporter(b.controllerURL, execID)
+		_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("start app=%s lane=%s env=%s wd=%s", config.App, config.Lane, config.Environment, config.WorkingDir)})
+	}
+	log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s wd=%s", b.controllerURL, config.App, config.Lane, config.Environment, config.WorkingDir)
 
 	// Use SharedPush to perform the build check
 	// SharedPush already supports build-only mode when used with specific endpoints
@@ -57,18 +57,18 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 
 	if result != nil && !result.Success {
-        if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
-            rep := NewControllerEventReporter(b.controllerURL, execID)
-            _ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "error", Message: fmt.Sprintf("unsuccessful: %s", result.Message)})
-        }
-        log.Printf("[Transflow Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
+		if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+			rep := NewControllerEventReporter(b.controllerURL, execID)
+			_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "error", Message: fmt.Sprintf("unsuccessful: %s", result.Message)})
+		}
+		log.Printf("[Transflow Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
 		return result, fmt.Errorf("build check unsuccessful (controller=%s app=%s lane=%s env=%s): %s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
 	}
-    if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
-        rep := NewControllerEventReporter(b.controllerURL, execID)
-        _ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("succeeded version=%s", result.Version)})
-    }
-    log.Printf("[Transflow Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
+	if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+		rep := NewControllerEventReporter(b.controllerURL, execID)
+		_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("succeeded version=%s", result.Version)})
+	}
+	log.Printf("[Transflow Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
 }
 
