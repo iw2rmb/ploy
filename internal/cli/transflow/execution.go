@@ -71,21 +71,22 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 				fmt.Printf("Rendered llm_exec HCL: %s\n", hcl)
 				// Centralized substitution (no global env writes)
                 runID := LLMRunID(lid)
-				vars := map[string]string{
-					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
-					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
-					"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
-					"TRANSFLOW_PLANNER_IMAGE":     os.Getenv("TRANSFLOW_PLANNER_IMAGE"),
-					"TRANSFLOW_REDUCER_IMAGE":     os.Getenv("TRANSFLOW_REDUCER_IMAGE"),
-					"TRANSFLOW_LLM_EXEC_IMAGE":    os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE"),
-					"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
-					"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-					"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-					"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-					"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
-					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-					"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
-				}
+                imgs := ResolveImagesFromEnv()
+                vars := map[string]string{
+                    "TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
+                    "TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
+                    "TRANSFLOW_REGISTRY":          imgs.Registry,
+                    "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+                    "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+                    "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+                    "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+                    "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+                    "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+                    "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+                    "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+                    "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+                    "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+                }
 				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
 				if sErr != nil {
 					fmt.Printf("failed to write substituted HCL: %v\n", sErr)
@@ -152,17 +153,18 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 					}
 				}
                 runID2 := ORWRunID(oid)
-				vars := map[string]string{
-					"TRANSFLOW_CONTEXT_DIR":       contextDir,
-					"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-					"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
-					"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
-					"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
-					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-					"PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
-					"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-					"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
-				}
+                imgs := ResolveImagesFromEnv()
+                vars := map[string]string{
+                    "TRANSFLOW_CONTEXT_DIR":       contextDir,
+                    "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+                    "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+                    "TRANSFLOW_REGISTRY":          imgs.Registry,
+                    "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+                    "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+                    "PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+                    "TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+                    "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+                }
 				submittedPath, serr := substituteORWTemplateVars(prePath, runID2, vars)
 				if serr != nil {
 					fmt.Printf("failed to write submitted HCL: %v\n", serr)

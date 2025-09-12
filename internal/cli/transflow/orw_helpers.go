@@ -20,6 +20,7 @@ func ensureOutDir(baseDir string) string {
 
 // makeORWVars builds the substitution variables for ORW apply HCL templates.
 func makeORWVars(baseDir, execID, diffKey, seaweed string) map[string]string {
+    imgs := ResolveImagesFromEnv()
     vars := map[string]string{
         "TRANSFLOW_CONTEXT_DIR":       baseDir,
         "TRANSFLOW_OUT_DIR":           ensureOutDir(baseDir),
@@ -27,10 +28,9 @@ func makeORWVars(baseDir, execID, diffKey, seaweed string) map[string]string {
         "TRANSFLOW_DIFF_KEY":          diffKey,
         "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
         "PLOY_SEAWEEDFS_URL":          seaweed,
-        "TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
-        "TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+        "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+        "TRANSFLOW_REGISTRY":          imgs.Registry,
         "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
     }
     return vars
 }
-
