@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/go-acme/lego/v4 v4.25.2
 	github.com/gofiber/fiber/v2 v2.52.0

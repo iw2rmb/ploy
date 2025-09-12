@@ -2,9 +2,18 @@
 
 ## [Unreleased] - Transflow MVP Release
 
+### Added
+- New scenario and scripts: `tests/transflow/orw-apply-llm-plan-seq` for an end-to-end flow where orw-apply build gate fails, triggering llm-plan → llm-exec → reducer. Includes run.sh to submit/stream/persist and helpers to fetch artifacts and watch events.
+- Developer workflow: added `.pre-commit-config.yaml` to run `make fmt` and `golangci-lint run` on commit; documented in AGENTS.md and docs/TESTING.md.
+ - CI: added GitHub Actions job to execute pre-commit hooks across all files.
+ - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
+
 ### Changed
+- Housekeeping: removed redundant `internal/cli/arf/recipes.go.backup` and the legacy `internal/testutils/` package in favor of `internal/testing/**`.
 - API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
 - Ansible API deploy: switch to Nomad rolling updates (no stop/start). The dev playbook removes explicit stop and relies on the job's `update` stanza. Nomad job template now enables `auto_promote = true` and `health_check = "checks"` for zero‑downtime rollouts.
+- AGENTS.md: added mandatory Go analysis tooling section and pre-commit hooks guidance.
+- Transflow: diff path allowlist now uses doublestar globbing with `**` support; added unit tests covering `src/**/*.java`, `src/**`, and `pom.xml` to prevent false negatives in path validation.
 
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).

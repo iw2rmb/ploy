@@ -11,7 +11,7 @@ import (
 )
 
 // executeRemoteTransflow handles execution via remote controller API
-func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch bool) error {
+func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch bool, output string) error {
 	b, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %w", err)
@@ -24,7 +24,33 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 		return err
 	}
 
-	// Print the execution id and a watch hint for convenience
+	// Output selection
+	if output == "json" {
+		// Print a single JSON line. If --watch is set, attach watch afterwards.
+		base := strings.TrimRight(controllerURL, "/")
+		// Normalize to include /v1 if missing for clarity
+		if !strings.HasSuffix(base, "/v1") {
+			base = base + "/v1"
+		}
+		resp := map[string]any{
+			"execution_id": id,
+			"status":       "initializing",
+			"status_url":   "/v1/transflow/status/" + id,
+			"watch_hint":   "ploy transflow watch -id " + id,
+		}
+		b, _ := json.Marshal(resp)
+		fmt.Println(string(b))
+		if watch {
+			// Attach live watch after emitting JSON
+			if err := watchTransflow([]string{"-id", id}, controllerURL); err != nil {
+				// Best-effort: do not fail JSON mode if watch cannot attach
+				return nil
+			}
+		}
+		return nil
+	}
+
+	// Text output: Print the execution id and a watch hint for convenience
 	fmt.Printf("Execution ID: %s\n", id)
 	// Ensure /v1 prefix for watch compatibility
 	fmt.Printf("Watch: ploy transflow watch -id %s\n", id)

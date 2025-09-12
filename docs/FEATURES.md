@@ -934,6 +934,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ End-to-end workflow validation on VPS environment
 - ✅ Performance benchmarks and load testing
 - ✅ Mock replacement with real service calls for production fidelity
+- ✅ Secure diff path validation now supports doublestar globs (`**`) in allowlists to correctly match nested paths like `src/**/*.java` and repo-root files like `pom.xml`.
 
 **Production Readiness**
 - ✅ VPS deployment and testing validation

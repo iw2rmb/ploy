@@ -337,6 +337,15 @@ func putJSON(seaweedBase, key string, body []byte) error {
 
 var putJSONFn = putJSON
 
+// test indirection for file upload
+var putFileFn = putFile
+
+// uploadInputTar uploads input.tar to artifacts/transflow/<execID>/input.tar (best-effort)
+func uploadInputTar(seaweedBase, execID, inputTarPath string) error {
+	key := fmt.Sprintf("transflow/%s/input.tar", execID)
+	return putFileFn(seaweedBase, key, inputTarPath, "application/octet-stream")
+}
+
 // getJSON fetches a JSON document from SeaweedFS
 func getJSON(seaweedBase, key string) ([]byte, int, error) {
 	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
@@ -683,14 +692,14 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Prepare env and substitute final template
 			baseDir := filepath.Dir(renderedPath)
 			_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-			// Keep outputs under the step workspace for artifact collection
-			os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+			// Compute per-run OUT_DIR without mutating global env
+			outDir := filepath.Join(baseDir, "out")
 
 			// Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
 			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 			branchID := step.ID
 			curStepID := randomStepID()
-			os.Setenv("TRANSFLOW_DIFF_KEY", fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID))
+			diffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
 			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
@@ -698,20 +707,23 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if seaweed == "" {
 				seaweed = "http://seaweedfs-filer.service.consul:8888"
 			}
-			// Upload best-effort to artifacts/transflow/<id>/input.tar
-			{
-				key := fmt.Sprintf("transflow/%s/input.tar", execID)
-				url := strings.TrimRight(seaweed, "/") + "/artifacts/" + key
-				_ = func() error {
-					cmd := exec.Command("curl", "-sS", "-X", "PUT", url, "--data-binary", "@"+inputTar, "-H", "Content-Type: application/octet-stream")
-					if out, err := cmd.CombinedOutput(); err != nil {
-						log.Printf("[Transflow] input.tar upload failed: %v: %s", err, string(out))
-						return err
-					}
-					return nil
-				}()
+			// Upload best-effort to artifacts/transflow/<id>/input.tar using HTTP client
+			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
+				log.Printf("[Transflow] input.tar upload failed: %v", err)
 			}
-			submittedPath, err := substituteORWTemplate(prePath, runID)
+			// Substitute HCL with explicit variables to avoid global env writes
+			vars := map[string]string{
+				"TRANSFLOW_CONTEXT_DIR":       baseDir,
+				"TRANSFLOW_OUT_DIR":           outDir,
+				"PLOY_TRANSFLOW_EXECUTION_ID": execID,
+				"TRANSFLOW_DIFF_KEY":          diffKey,
+				"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+				"PLOY_SEAWEEDFS_URL":          seaweed,
+				"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+				"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+				"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+			}
+			submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
 			if err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
 				return nil, fmt.Errorf("failed to substitute ORW HCL: %w", err)
