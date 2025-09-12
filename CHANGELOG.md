@@ -14,6 +14,8 @@
 - Ansible API deploy: switch to Nomad rolling updates (no stop/start). The dev playbook removes explicit stop and relies on the job's `update` stanza. Nomad job template now enables `auto_promote = true` and `health_check = "checks"` for zero‑downtime rollouts.
 - AGENTS.md: added mandatory Go analysis tooling section and pre-commit hooks guidance.
 - Transflow: diff path allowlist now uses doublestar globbing with `**` support; added unit tests covering `src/**/*.java`, `src/**`, and `pom.xml` to prevent false negatives in path validation.
+- Transflow: hardened SeaweedFS artifact key policy — keys must start with `transflow/` and reject path traversal/backslashes; added unit tests.
+- Transflow CLI sequential helpers: switched to context-aware job submission and centralized templating (no global env writes) for `llm-exec` and `orw-apply` preview flows.
 
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).

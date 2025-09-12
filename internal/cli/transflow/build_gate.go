@@ -1,24 +1,24 @@
 package transflow
 
 import (
-    "context"
+	"context"
 
-    "github.com/iw2rmb/ploy/internal/cli/common"
+	"github.com/iw2rmb/ploy/internal/cli/common"
 )
 
 // runBuildGate prepares DeployConfig and invokes the build checker using repoPath as working dir.
 func (r *TransflowRunner) runBuildGate(ctx context.Context, repoPath string) (*common.DeployResult, error) {
-    timeout, err := r.config.ParseBuildTimeout()
-    if err != nil {
-        return nil, err
-    }
-    appName := GenerateAppName(r.config.ID)
-    buildCfg := common.DeployConfig{
-        App:         appName,
-        Lane:        r.config.Lane,
-        Environment: "dev",
-        Timeout:     timeout,
-        Metadata:    map[string]string{"working_dir": repoPath},
-    }
-    return r.buildChecker.CheckBuild(ctx, buildCfg)
+	timeout, err := r.config.ParseBuildTimeout()
+	if err != nil {
+		return nil, err
+	}
+	appName := GenerateAppName(r.config.ID)
+	buildCfg := common.DeployConfig{
+		App:         appName,
+		Lane:        r.config.Lane,
+		Environment: "dev",
+		Timeout:     timeout,
+		Metadata:    map[string]string{"working_dir": repoPath},
+	}
+	return r.buildChecker.CheckBuild(ctx, buildCfg)
 }

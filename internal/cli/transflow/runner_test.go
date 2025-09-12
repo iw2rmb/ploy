@@ -540,7 +540,7 @@ func TestTransflowRunner_GenerateMRDescription(t *testing.T) {
 		},
 	}
 
-    description := renderMRDescription(runner, result)
+	description := renderMRDescription(runner, result)
 	assert.Contains(t, description, "Transflow Workflow")
 	assert.Contains(t, description, "test-workflow")
 	assert.Contains(t, description, "Applied successfully")
