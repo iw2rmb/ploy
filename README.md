@@ -1,5 +1,7 @@
 # Ploy — Ultra-Lightweight Deployment Platform
 
+[![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml)
+
 ## Purpose
 Achieve **maximum performance** and **smallest footprint** by default using **unikernels on FreeBSD** (bhyve), while offering compatibility lanes when needed. Ploy makes the fast path the easy path.
 
