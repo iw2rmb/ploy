@@ -72,6 +72,7 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 				// Centralized substitution (no global env writes)
                 runID := LLMRunID(lid)
                 imgs := ResolveImagesFromEnv()
+                infra := ResolveInfraFromEnv()
                 vars := map[string]string{
                     "TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
                     "TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
@@ -83,9 +84,9 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
                     "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
                     "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
                     "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-                    "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+                    "PLOY_CONTROLLER":             infra.Controller,
                     "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-                    "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+                    "NOMAD_DC":                    infra.DC,
                 }
 				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
 				if sErr != nil {
@@ -154,16 +155,17 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 				}
                 runID2 := ORWRunID(oid)
                 imgs := ResolveImagesFromEnv()
+                infra := ResolveInfraFromEnv()
                 vars := map[string]string{
                     "TRANSFLOW_CONTEXT_DIR":       contextDir,
                     "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
                     "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
                     "TRANSFLOW_REGISTRY":          imgs.Registry,
-                    "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+                    "PLOY_CONTROLLER":             infra.Controller,
                     "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-                    "PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+                    "PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
                     "TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-                    "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+                    "NOMAD_DC":                    infra.DC,
                 }
 				submittedPath, serr := substituteORWTemplateVars(prePath, runID2, vars)
 				if serr != nil {
