@@ -16,8 +16,7 @@ ARF provides automated code transformations with OpenRewrite, optional LLM‑ass
 - Recipes: `GET /v1/arf/recipes`, `GET /v1/arf/recipes/:id`, `GET /v1/arf/recipes/search`,
   `POST /v1/arf/recipes` (create custom), `POST /v1/arf/recipes/upload`, `POST /v1/arf/recipes/validate`, `GET /v1/arf/recipes/:id/download`.
   
-  Note: LLM model registry endpoints have been removed from ARF. Use the LLMS registry under `/v1/llms/models/*`.
-  - Default model management: `GET /v1/llms/models/default`, `PUT /v1/llms/models/default { id }`.
+  Note: LLM model registry endpoints have been removed from ARF. Use the LLMS registry under `/v1/llms/models/*` (including default model management via `/v1/llms/models/default`).
 - Security: `POST /v1/arf/security/scan`, `POST /v1/arf/security/remediation`, `GET /v1/arf/security/{report|report/:id|compliance}`.
 - SBOM: `POST /v1/arf/sbom/{generate|analyze}`, `GET /v1/arf/sbom/{report|compliance|:id}`.
 - Sandboxes: `GET/POST /v1/arf/sandboxes`, `DELETE /v1/arf/sandboxes/:id`.
