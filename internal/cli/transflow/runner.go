@@ -1,18 +1,18 @@
 package transflow
 
 import (
-    "context"
-    crand "crypto/rand"
-    "encoding/hex"
-    "encoding/json"
-    "errors"
-    "fmt"
-    "log"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "time"
+	"context"
+	crand "crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
@@ -149,7 +149,7 @@ type TransflowRunner struct {
 	gitOps         GitOperationsInterface
 	recipeExecutor RecipeExecutorInterface
 	buildChecker   BuildCheckerInterface
-    jobSubmitter   JobSubmitter         // For healing workflows
+	jobSubmitter   JobSubmitter         // For healing workflows
 	gitProvider    provider.GitProvider // For MR creation
 	eventReporter  EventReporter        // Optional real-time event reporter
 }
@@ -183,15 +183,15 @@ func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
 func (r *TransflowRunner) SetJobSubmitter(submitter interface{}) {
-    switch s := submitter.(type) {
-    case nil:
-        r.jobSubmitter = nil
-    case JobSubmitter:
-        r.jobSubmitter = s
-    default:
-        // Any non-nil marker enables healing; production path prefers runner
-        r.jobSubmitter = NoopJobSubmitter{}
-    }
+	switch s := submitter.(type) {
+	case nil:
+		r.jobSubmitter = nil
+	case JobSubmitter:
+		r.jobSubmitter = s
+	default:
+		// Any non-nil marker enables healing; production path prefers runner
+		r.jobSubmitter = NoopJobSubmitter{}
+	}
 }
 
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
@@ -379,15 +379,15 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 	if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
 	}
-    // Build gate
-    res, err := r.runBuildGate(ctx, repoPath)
-    if err != nil {
-        return fmt.Errorf("build gate failed: %w", err)
-    }
-    if res != nil && !res.Success {
-        return fmt.Errorf("build gate failed: %s", res.Message)
-    }
-    return nil
+	// Build gate
+	res, err := r.runBuildGate(ctx, repoPath)
+	if err != nil {
+		return fmt.Errorf("build gate failed: %w", err)
+	}
+	if res != nil && !res.Success {
+		return fmt.Errorf("build gate failed: %s", res.Message)
+	}
+	return nil
 }
 
 // ReducerAssets holds file paths for rendered reducer inputs and HCL
@@ -701,8 +701,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("no diff produced by orw-apply: %w", fetchErr)
 			}
 
-            // Reconstruct branch state: apply all prior diffs from chain HEAD → root
-            _ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
+			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
+			_ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
 
 			if fi, err := os.Stat(diffPath); err == nil {
 				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
@@ -776,25 +776,25 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		}
 	}
 
-    // Step 4: Commit changes (only if not already committed by an apply step)
-    if committed, msg, err := r.runCommitStep(ctx, repoPath, initialHead); err != nil {
-        r.emit(ctx, "commit", "commit", "error", msg)
-        result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: false, Message: msg})
-        result.ErrorMessage = err.Error()
-        result.Duration = time.Since(startTime)
-        return nil, err
-    } else if committed {
-        result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
-    } else {
-        // committed=false implies already committed by apply step
-        result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
-        goto build_step
-    }
+	// Step 4: Commit changes (only if not already committed by an apply step)
+	if committed, msg, err := r.runCommitStep(ctx, repoPath, initialHead); err != nil {
+		r.emit(ctx, "commit", "commit", "error", msg)
+		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: false, Message: msg})
+		result.ErrorMessage = err.Error()
+		result.Duration = time.Since(startTime)
+		return nil, err
+	} else if committed {
+		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
+	} else {
+		// committed=false implies already committed by apply step
+		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
+		goto build_step
+	}
 
 build_step:
-    // Step 5: Run build check
-    buildStart := time.Now()
-    buildResult, err := r.runBuildGate(ctx, repoPath)
+	// Step 5: Run build check
+	buildStart := time.Now()
+	buildResult, err := r.runBuildGate(ctx, repoPath)
 	if err != nil || (buildResult != nil && !buildResult.Success) {
 		message := "Build check failed"
 		if buildResult != nil && buildResult.Message != "" {
@@ -853,14 +853,14 @@ build_step:
 		Duration: time.Since(buildStart),
 	})
 
-    // Step 6: Push branch
-    r.emit(ctx, "push", "push", "info", "Pushing branch")
-    if err := r.runPushStep(ctx, repoPath, branchName); err != nil {
-        msg := fmt.Sprintf("push failed: %v", err)
-        if strings.Contains(msg, "rc=128") || strings.Contains(msg, "exit status 128") {
-            r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
-        }
-        r.emit(ctx, "push", "push", "error", msg)
+	// Step 6: Push branch
+	r.emit(ctx, "push", "push", "info", "Pushing branch")
+	if err := r.runPushStep(ctx, repoPath, branchName); err != nil {
+		msg := fmt.Sprintf("push failed: %v", err)
+		if strings.Contains(msg, "rc=128") || strings.Contains(msg, "exit status 128") {
+			r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
+		}
+		r.emit(ctx, "push", "push", "error", msg)
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "push",
 			Success: false,
@@ -876,10 +876,10 @@ build_step:
 		Message: fmt.Sprintf("Pushed branch %s", branchName),
 	})
 
-    // Step 7: Create or update merge request (if provider is configured)
-    if r.gitProvider != nil {
-        r.createOrUpdateMR(ctx, result, branchName)
-    }
+	// Step 7: Create or update merge request (if provider is configured)
+	if r.gitProvider != nil {
+		r.createOrUpdateMR(ctx, result, branchName)
+	}
 
 	// Success!
 	result.Success = true

@@ -22,6 +22,7 @@ Controller/registration endpointst   ⌃C quit   2450012 tokens used   1% contex
 Storage endpoints
     - PLOY_SEAWEEDFS_URL: http://seaweedfs-filer.service.consul:8888
     - DIFF_KEY: transflow//branches//steps//diff.patch (auto-set per run)
+    - Artifact key policy: keys must start with `transflow/` and cannot contain `..` or backslashes. Non-conforming keys are rejected client-side.
 -
 Images
     - TRANSFLOW_ORW_APPLY_IMAGE: registry.dev.ployman.app/openrewrite-jvm:latest
