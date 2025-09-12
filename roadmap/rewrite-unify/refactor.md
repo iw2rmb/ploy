@@ -26,9 +26,10 @@ Scope
   - Fanout cancellation does not stop running jobs.
       - RunHealingFanout cancels context on first success, but production branch execution calls orchestration.SubmitAndWaitTerminal (no context), so other jobs keep running.
       - Change: add cancellation support in orchestration: on cancel, deregister the job or call the job manager to stop it; ensure the fanout orchestrator issues cancels and the orchestration layer honors them. Add tests for “winner found” ensures others are stopped.
-  - Process‑wide environment mutation for job templating.
+  - ✅ Process‑wide environment mutation for job templating.
       - Runner and helpers set env vars (os.Setenv) such as TRANSFLOW_OUT_DIR, TRANSFLOW_DIFF_KEY, etc. That leaks global state and breaks multi‑run concurrency in a single process.
       - Change: consolidate templating into a function that takes an explicit map[string]string and writes the rendered HCL without touching global env. Thread per‑job env only where needed (e.g., pass env to job submitter wrapper).
+      - Completed: added `substituteHCLTemplateWithMCPVars` and `substituteORWTemplateVars`, updated runner, planner/reducer, and fanout to pass explicit vars; removed os.Setenv usage in these paths.
   - Duplicate HCL substitution logic and inconsistent pathways.
       - substituteHCLTemplate (planner/reducer), substituteORWTemplate (ORW), ad‑hoc substitutions in execution.go/planner.go; escaping rules duplicated; env keys spread out.
       - Change: one templating utility (inputs: template bytes/path + substitutions struct; outputs: rendered path). Centralize escaping, defaulting, and env assembly (model/tools/limits/MCP/registry/DC/controller/execution id). Add tests.

@@ -49,24 +49,41 @@ func substituteHCLTemplate(hclPath string, runID string) (string, error) {
 }
 
 // substituteHCLTemplateWithMCP performs environment variable substitution with MCP support
+// substituteHCLTemplateWithMCP reads process env to assemble substitutions.
+// Prefer substituteHCLTemplateWithMCPVars to avoid global env reliance.
 func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPConfig) (string, error) {
+	return substituteHCLTemplateWithMCPVars(hclPath, runID, nil, mcpConfig)
+}
+
+// substituteHCLTemplateWithMCPVars performs HCL substitution using provided vars (no global env mutation).
+// If vars is nil, falls back to reading from environment for backward compatibility.
+func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[string]string, mcpConfig *MCPConfig) (string, error) {
 	hclBytes, err := os.ReadFile(hclPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read HCL template: %w", err)
 	}
 
-	// Get core environment variables with defaults
-	model := os.Getenv("TRANSFLOW_MODEL")
+	get := func(k string) string {
+		if vars != nil {
+			if v, ok := vars[k]; ok {
+				return v
+			}
+		}
+		return os.Getenv(k)
+	}
+
+	// Get core variables with defaults
+	model := get("TRANSFLOW_MODEL")
 	if model == "" {
 		model = "gpt-4o-mini@2024-08-06"
 	}
 
-	toolsJSON := os.Getenv("TRANSFLOW_TOOLS")
+	toolsJSON := get("TRANSFLOW_TOOLS")
 	if toolsJSON == "" {
 		toolsJSON = `{"file":{"allow":["src/**","pom.xml"]},"search":{"provider":"rg","allow":["src/**"]}}`
 	}
 
-	limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
+	limitsJSON := get("TRANSFLOW_LIMITS")
 	if limitsJSON == "" {
 		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
 	}
@@ -83,36 +100,36 @@ func substituteHCLTemplateWithMCP(hclPath string, runID string, mcpConfig *MCPCo
 
 	// Compute optional host directories for bind mounts
 	// Derive from typical workspace layout when present in env
-	contextHostDir := os.Getenv("TRANSFLOW_CONTEXT_DIR")
-	outHostDir := os.Getenv("TRANSFLOW_OUT_DIR")
+	contextHostDir := get("TRANSFLOW_CONTEXT_DIR")
+	outHostDir := get("TRANSFLOW_OUT_DIR")
 
 	// Defaults for images (can be overridden via environment)
-	defaultRegistry := os.Getenv("TRANSFLOW_REGISTRY")
+	defaultRegistry := get("TRANSFLOW_REGISTRY")
 	if defaultRegistry == "" {
 		defaultRegistry = "registry.dev.ployman.app"
 	}
-	plannerImage := os.Getenv("TRANSFLOW_PLANNER_IMAGE")
+	plannerImage := get("TRANSFLOW_PLANNER_IMAGE")
 	if plannerImage == "" {
 		plannerImage = defaultRegistry + "/langgraph-runner:py-0.1.0"
 	}
-	reducerImage := os.Getenv("TRANSFLOW_REDUCER_IMAGE")
+	reducerImage := get("TRANSFLOW_REDUCER_IMAGE")
 	if reducerImage == "" {
 		reducerImage = plannerImage
 	}
-	llmExecImage := os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE")
+	llmExecImage := get("TRANSFLOW_LLM_EXEC_IMAGE")
 	if llmExecImage == "" {
 		llmExecImage = plannerImage
 	}
-	orwApplyImage := os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE")
+	orwApplyImage := get("TRANSFLOW_ORW_APPLY_IMAGE")
 	if orwApplyImage == "" {
 		orwApplyImage = defaultRegistry + "/openrewrite-jvm:latest"
 	}
 
 	// Perform substitution
-	controllerURL := os.Getenv("PLOY_CONTROLLER")
-	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+	controllerURL := get("PLOY_CONTROLLER")
+	execID := get("PLOY_TRANSFLOW_EXECUTION_ID")
 
-	dc := os.Getenv("NOMAD_DC")
+	dc := get("NOMAD_DC")
 	if dc == "" {
 		dc = "dc1"
 	}
@@ -243,14 +260,25 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		// Step 2: Generate unique run ID for this planner job
 		runID := fmt.Sprintf("%s-planner-%d", config.ID, time.Now().Unix())
 
-		// Step 3: Substitute environment variables in HCL template
-		// Provide host directories for bind mounts
+		// Step 3: Substitute environment variables in HCL template without global env writes
 		contextDir := filepath.Dir(assets.InputsPath)
 		outDir := filepath.Join(workspace, "planner", "out")
-		// Inform substitution via env to avoid signature churn
-		os.Setenv("TRANSFLOW_CONTEXT_DIR", contextDir)
-		os.Setenv("TRANSFLOW_OUT_DIR", outDir)
-		renderedHCLPath, err := substituteHCLTemplate(assets.HCLPath, runID)
+		vars := map[string]string{
+			"TRANSFLOW_CONTEXT_DIR":       contextDir,
+			"TRANSFLOW_OUT_DIR":           outDir,
+			"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+			"TRANSFLOW_PLANNER_IMAGE":     os.Getenv("TRANSFLOW_PLANNER_IMAGE"),
+			"TRANSFLOW_REDUCER_IMAGE":     os.Getenv("TRANSFLOW_REDUCER_IMAGE"),
+			"TRANSFLOW_LLM_EXEC_IMAGE":    os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE"),
+			"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+			"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+			"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+			"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+			"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+			"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+		}
+		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
@@ -352,13 +380,25 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		// Step 2: Generate unique run ID for this reducer job
 		runID := fmt.Sprintf("%s-reducer-%d", planID, time.Now().Unix())
 
-		// Step 3: Substitute environment variables in HCL template
-		// Provide host directories for bind mounts
+		// Step 3: Substitute environment variables in HCL template without global env writes
 		contextDir := filepath.Dir(assets.HistoryPath)
 		outDir := filepath.Join(workspace, "reducer", "out")
-		os.Setenv("TRANSFLOW_CONTEXT_DIR", contextDir)
-		os.Setenv("TRANSFLOW_OUT_DIR", outDir)
-		renderedHCLPath, err := substituteHCLTemplate(assets.HCLPath, runID)
+		vars := map[string]string{
+			"TRANSFLOW_CONTEXT_DIR":       contextDir,
+			"TRANSFLOW_OUT_DIR":           outDir,
+			"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+			"TRANSFLOW_PLANNER_IMAGE":     os.Getenv("TRANSFLOW_PLANNER_IMAGE"),
+			"TRANSFLOW_REDUCER_IMAGE":     os.Getenv("TRANSFLOW_REDUCER_IMAGE"),
+			"TRANSFLOW_LLM_EXEC_IMAGE":    os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE"),
+			"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+			"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+			"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+			"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+			"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+			"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+		}
+		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
