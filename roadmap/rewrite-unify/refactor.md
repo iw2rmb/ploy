@@ -34,6 +34,7 @@ Scope
   - Duplicate HCL substitution logic and inconsistent pathways.
       - substituteHCLTemplate (planner/reducer), substituteORWTemplate (ORW), ad‑hoc substitutions in execution.go/planner.go; escaping rules duplicated; env keys spread out.
       - Change: one templating utility (inputs: template bytes/path + substitutions struct; outputs: rendered path). Centralize escaping, defaulting, and env assembly (model/tools/limits/MCP/registry/DC/controller/execution id). Add tests.
+      - Completed: centralized `substituteHCLTemplateWithMCPVars` and `substituteORWTemplateVars`; added ORW helpers (`computeBranchDiffKey`, `makeORWVars`) and ORW pre-HCL builder to remove ad-hoc env mutations. Tests added for substitution and helpers.
   - ✅ Inconsistent HTTP vs shell “curl” usage.
       - Mixed direct Go HTTP clients and exec.Command("curl", ...) for SeaweedFS uploads. Shelling out adds dependencies and error‑parsing fragility.
       - Change: replace shell curl calls with a robust Go function (existing putFile/putJSON) and reuse.
@@ -141,3 +142,6 @@ Scope
     - ✅ Avoid os.Chdir by passing WorkingDir to SharedPush
     - ✅ Logging unified via EventReporter (runner) with fallback logging; build checker emits via controller when exec ID present
   - P2: Decompose runner into smaller components; streamline CLI subcommands; centralize config defaults; tighten SeaweedFS access policy.
+    - ✅ Extracted ORW pre-HCL builder (`writeORWPreHCL`) and branch chain metadata writer (`writeBranchChainStepMeta`) with unit tests.
+    - ✅ Extracted ORW submission/fetch-diff helper (`submitORWJobAndFetchDiff`) and wired runner to use it.
+    - ✅ Extracted ORW utility helpers for diff key and substitution var assembly.
