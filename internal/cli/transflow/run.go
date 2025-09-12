@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"mime"
 )
 
 // TransflowCmd provides the CLI entrypoint to run transflows
@@ -316,9 +318,19 @@ func watchTransflowSSE(base, id string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "text/event-stream" {
-		return fmt.Errorf("unexpected SSE response: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
-	}
+    if resp.StatusCode != 200 {
+        return fmt.Errorf("unexpected SSE response: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
+    }
+    // Accept text/event-stream with optional charset
+    if ctype := resp.Header.Get("Content-Type"); ctype != "" {
+        if mt, _, err := mime.ParseMediaType(ctype); err == nil {
+            if mt != "text/event-stream" {
+                return fmt.Errorf("unexpected SSE response: %d %s", resp.StatusCode, ctype)
+            }
+        } else if !strings.HasPrefix(strings.ToLower(ctype), "text/event-stream") {
+            return fmt.Errorf("unexpected SSE response: %d %s", resp.StatusCode, ctype)
+        }
+    }
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	curEvent := ""
