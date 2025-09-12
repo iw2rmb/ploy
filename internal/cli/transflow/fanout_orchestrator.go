@@ -160,12 +160,22 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 
 	// Check if this is a test submitter (backward compatibility)
 	if o.submitter != nil {
-		spec := JobSpec{
-			Name:    branch.ID,
-			Type:    branch.Type,
-			Inputs:  branch.Inputs,
-			Timeout: 30 * time.Minute, // Default timeout for mock path
-		}
+        // Choose sensible default timeouts based on branch type
+        var tmo time.Duration
+        switch branch.Type {
+        case "llm-exec":
+            tmo = ResolveDefaultsFromEnv().LLMExecTimeout
+        case "orw-gen":
+            tmo = ResolveDefaultsFromEnv().ORWApplyTimeout
+        default:
+            tmo = ResolveDefaultsFromEnv().BuildApplyTimeout
+        }
+        spec := JobSpec{
+            Name:    branch.ID,
+            Type:    branch.Type,
+            Inputs:  branch.Inputs,
+            Timeout: tmo,
+        }
 		jobResult, err := o.submitter.SubmitAndWaitTerminal(ctx, spec)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(startTime)
@@ -527,7 +537,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 // executeHumanStepBranch handles human intervention branches with Git-based manual intervention workflow
 func (o *fanoutOrchestrator) executeHumanStepBranch(ctx context.Context, branch BranchSpec, result BranchResult) BranchResult {
 	// Parse timeout from branch inputs
-	timeout := 30 * time.Minute // default timeout
+    timeout := ResolveDefaultsFromEnv().BuildApplyTimeout // default timeout
 	if timeoutStr, ok := branch.Inputs["timeout"].(string); ok {
 		if parsedTimeout, err := time.ParseDuration(timeoutStr); err == nil {
 			timeout = parsedTimeout
@@ -604,13 +614,13 @@ func (o *fanoutOrchestrator) executeHumanStepBranch(ctx context.Context, branch 
 
 		case <-ticker.C:
 			// Check if human made changes by attempting build validation
-			buildConfig := common.DeployConfig{
-				App:           branch.ID,
-				Lane:          "A", // Simple build validation
-				Environment:   "dev",
-				ControllerURL: "", // Will be set by build checker if needed
-				Timeout:       10 * time.Minute,
-			}
+            buildConfig := common.DeployConfig{
+                App:           branch.ID,
+                Lane:          "A", // Simple build validation
+                Environment:   "dev",
+                ControllerURL: "", // Will be set by build checker if needed
+                Timeout:       ResolveDefaultsFromEnv().BuildApplyTimeout,
+            }
 
 			buildResult, err := buildChecker.CheckBuild(branchCtx, buildConfig)
 			if err != nil {

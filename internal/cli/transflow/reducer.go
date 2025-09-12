@@ -61,10 +61,10 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		return nil
 	}
 
-	timeout := 15 * time.Minute
-	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-		return fmt.Errorf("reducer job failed: %w", err)
-	}
+    timeout := ResolveDefaultsFromEnv().ReducerTimeout
+    if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
+        return fmt.Errorf("reducer job failed: %w", err)
+    }
 
 	// Fetch next.json via URL or local path
 	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
