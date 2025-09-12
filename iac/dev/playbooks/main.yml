@@ -1084,13 +1084,13 @@
               done
               echo "✅ Python LLM deps: $python_deps/5 available"
               
-              # Check LLM model registry
-              echo "Checking LLM model registry..."
-              if consul kv get ploy/arf/models >/dev/null 2>&1; then
-                  model_count=$(consul kv get -recurse ploy/arf/models | grep -c "config" || echo "0")
-                  echo "✅ LLM models registered: $model_count"
+              # Check LLM model registry via API (LLMS)
+              echo "Checking LLM model registry (LLMS)..."
+              CONTROLLER="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
+              if resp=$(curl -sS -m 5 "$CONTROLLER/llms/models" | jq -r '.count // .models | length' 2>/dev/null); then
+                  echo "✅ LLM models registered: ${resp}"
               else
-                  echo "⚠️  No LLM models registered (use: ploy arf models add)"
+                  echo "⚠️  Unable to query LLM registry at $CONTROLLER/llms/models"
               fi
               
               echo ""
@@ -1188,9 +1188,11 @@
           export ARF_LLM_CACHE_ENABLED="${ARF_LLM_CACHE_ENABLED:-true}"
           export ARF_LLM_CACHE_TTL="${ARF_LLM_CACHE_TTL:-24h}"
           
-          # LLM Model Registry Configuration
-          export ARF_MODEL_REGISTRY="consul"
-          export ARF_MODEL_REGISTRY_PATH="ploy/arf/models"
+          # LLM Model Registry Configuration (migrated to LLMS)
+          # Deprecated: ARF_MODEL_REGISTRY and ARF_MODEL_REGISTRY_PATH
+          # Use /v1/llms/models API and internal storage instead of Consul KV
+          export ARF_MODEL_REGISTRY="llms"
+          export ARF_MODEL_REGISTRY_PATH="llms/models"
           export ARF_LLM_TIMEOUT="120s"
           export ARF_LLM_MAX_RETRIES="3"
           
