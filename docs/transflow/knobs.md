@@ -67,6 +67,25 @@ Centralized Defaults (helpers)
 - ResolveImagesFromEnv: resolves planner/reducer/llm/orw image refs and registry using Defaults fallbacks.
 - ResolveInfraFromEnv: resolves controller, DC, and SeaweedFS with Defaults; also derives API base (controller without `/v1`).
 - These helpers back all var maps (planner/reducer/LLM/ORW) across preview, fanout, and production submission flows, replacing ad‑hoc environment lookups.
+
+Example var maps used for HCL substitution
+
+- Planner/Reducer/LLM (substituteHCLTemplateWithMCPVars):
+  - TRANSFLOW_CONTEXT_DIR, TRANSFLOW_OUT_DIR
+  - TRANSFLOW_REGISTRY, TRANSFLOW_PLANNER_IMAGE, TRANSFLOW_REDUCER_IMAGE, TRANSFLOW_LLM_EXEC_IMAGE
+  - TRANSFLOW_MODEL, TRANSFLOW_TOOLS, TRANSFLOW_LIMITS (optional)
+  - PLOY_CONTROLLER (from ResolveInfra), PLOY_TRANSFLOW_EXECUTION_ID, NOMAD_DC (from ResolveInfra)
+
+- ORW Apply (substituteORWTemplateVars):
+  - TRANSFLOW_CONTEXT_DIR, TRANSFLOW_OUT_DIR
+  - TRANSFLOW_ORW_APPLY_IMAGE, TRANSFLOW_REGISTRY (from ResolveImages)
+  - PLOY_CONTROLLER, PLOY_SEAWEEDFS_URL, NOMAD_DC (from ResolveInfra)
+  - TRANSFLOW_DIFF_KEY (branch-scoped step diff key)
+  - Internally derived by template helper: PLOY_API_URL (from PLOY_CONTROLLER, no `/v1`), INPUT_KEY and INPUT_URL for input.tar
+
+Notes
+- Always pass explicit var maps to substitution helpers; do not mutate process-wide environment.
+- Prefer Defaults/Resolvers for values that have sensible platform fallbacks (registry/images/seaweed/DC/controller).
 # Transflow Configuration Knobs
 
 The following environment variables control Transflow defaults. All are optional; sensible defaults are provided.
