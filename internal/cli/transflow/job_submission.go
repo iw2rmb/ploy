@@ -302,8 +302,8 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
 			return nil, fmt.Errorf("planner HCL validation failed: %w", err)
 		}
-		timeout := 15 * time.Minute
-		if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
+        timeout := ResolveDefaultsFromEnv().PlannerTimeout
+        if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
 			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
 				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
@@ -420,8 +420,8 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
 			return nil, fmt.Errorf("reducer HCL validation failed: %w", err)
 		}
-		timeout := 10 * time.Minute
-		if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
+        timeout := ResolveDefaultsFromEnv().ReducerTimeout
+        if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
 			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
 				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
