@@ -29,24 +29,36 @@ type ProductionBranchRunner interface {
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
 type fanoutOrchestrator struct {
-	submitter interface{}            // MockJobSubmitter in tests, real submitter in production
-	runner    ProductionBranchRunner // For accessing asset rendering methods in production
+    submitter JobSubmitter           // Mock in tests, real in production (Noop enables healing)
+    runner    ProductionBranchRunner // For accessing asset rendering methods in production
 }
 
 // NewFanoutOrchestrator creates a new fanout orchestrator
 func NewFanoutOrchestrator(submitter interface{}) FanoutOrchestrator {
-	return &fanoutOrchestrator{
-		submitter: submitter,
-		runner:    nil, // Will be nil for mock tests
-	}
+    var js JobSubmitter
+    switch s := submitter.(type) {
+    case nil:
+        js = nil
+    case JobSubmitter:
+        js = s
+    default:
+        js = NoopJobSubmitter{}
+    }
+    return &fanoutOrchestrator{submitter: js, runner: nil}
 }
 
 // NewFanoutOrchestratorWithRunner creates a new fanout orchestrator with runner access for production
 func NewFanoutOrchestratorWithRunner(submitter interface{}, runner ProductionBranchRunner) FanoutOrchestrator {
-	return &fanoutOrchestrator{
-		submitter: submitter,
-		runner:    runner,
-	}
+    var js JobSubmitter
+    switch s := submitter.(type) {
+    case nil:
+        js = nil
+    case JobSubmitter:
+        js = s
+    default:
+        js = NoopJobSubmitter{}
+    }
+    return &fanoutOrchestrator{submitter: js, runner: runner}
 }
 
 // RunHealingFanout executes parallel healing branches with first-success-wins semantics
@@ -147,31 +159,26 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 	}
 
 	// Check if this is a test submitter (backward compatibility)
-	if testSubmitter, ok := o.submitter.(interface {
-		SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)
-	}); ok {
-		spec := JobSpec{
-			Name:    branch.ID,
-			Type:    branch.Type,
-			Inputs:  branch.Inputs,
-			Timeout: 30 * time.Minute, // Default timeout
-		}
-
-		jobResult, err := testSubmitter.SubmitAndWaitTerminal(ctx, spec)
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(startTime)
-
-		if err != nil {
-			result.Status = "failed"
-			result.Notes = fmt.Sprintf("job execution failed: %v", err)
-		} else {
-			result.JobID = jobResult.JobID
-			result.Status = jobResult.Status
-			result.Notes = jobResult.Output
-		}
-
-		return result
-	}
+    if o.submitter != nil {
+        spec := JobSpec{
+            Name:    branch.ID,
+            Type:    branch.Type,
+            Inputs:  branch.Inputs,
+            Timeout: 30 * time.Minute, // Default timeout for mock path
+        }
+        jobResult, err := o.submitter.SubmitAndWaitTerminal(ctx, spec)
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(startTime)
+        if err != nil {
+            result.Status = "failed"
+            result.Notes = fmt.Sprintf("job execution failed: %v", err)
+        } else {
+            result.JobID = jobResult.JobID
+            result.Status = jobResult.Status
+            result.Notes = jobResult.Output
+        }
+        return result
+    }
 
 	// Production implementation using real Nomad job submission
 	if o.runner != nil {
