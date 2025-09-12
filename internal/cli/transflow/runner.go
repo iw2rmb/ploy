@@ -659,28 +659,15 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
 			}
 
-			// Apply + build with a phase timeout
-			applyTimeout := ResolveDefaultsFromEnv().BuildApplyTimeout
-			applyCtx, cancelApply := context.WithTimeout(ctx, applyTimeout)
-			defer cancelApply()
-			log.Printf("[Transflow] Applying diff and running build gate (timeout=%s): repo=%s diff=%s", applyTimeout, repoPath, diffPath)
-			r.emit(ctx, "apply", "diff-apply-started", "info", "Applying diff to repository")
-			r.emit(ctx, "build", "build-gate-start", "info", "Running build gate")
-			if err := r.ApplyDiffAndBuild(applyCtx, repoPath, diffPath); err != nil {
-				r.emit(ctx, "build", "build-gate-failed", "error", fmt.Sprintf("apply/build failed: %v", err))
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Apply/build failed: %v", err)})
-				result.ErrorMessage = fmt.Sprintf("apply/build failed: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("apply/build failed: %w", err)
-			}
-
-			r.emit(ctx, "apply", "diff-applied", "info", "Diff applied and build gate passed")
-			result.StepResults = append(result.StepResults, StepResult{
-				StepID:   step.ID,
-				Success:  true,
-				Message:  "Applied ORW diff and passed build gate",
-				Duration: time.Since(stepStart),
-			})
+            // Apply + build via helper with events and timeout
+            log.Printf("[Transflow] Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath)
+            sr, err := runApplyAndBuildWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffAndBuild)
+            result.StepResults = append(result.StepResults, sr)
+            if err != nil {
+                result.ErrorMessage = sr.Message
+                result.Duration = time.Since(startTime)
+                return nil, err
+            }
 
 			// Record chain metadata for this branch (option_id = step.ID)
             {
