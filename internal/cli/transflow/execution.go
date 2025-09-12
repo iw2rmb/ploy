@@ -1,17 +1,15 @@
 package transflow
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+    "context"
+    "fmt"
+    "log"
+    "os"
+    "path/filepath"
+    "strings"
+    "time"
 
-	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // executeWithPlan handles execution modes that require a plan.json
@@ -122,24 +120,11 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 			oid, _ := o["id"].(string)
 			if hcl, err := runner.RenderORWApplyAssets(oid); err == nil {
 				fmt.Printf("Rendered orw_apply HCL: %s\n", hcl)
-				// Pre-substitute recipe placeholders
-				hb, _ := os.ReadFile(hcl)
-				rclass := os.Getenv("TRANSFLOW_RECIPE_CLASS")
-				if rclass == "" {
-					rclass = "org.openrewrite.java.migrate.Java11toJava17"
-				}
-				rcoords := os.Getenv("TRANSFLOW_RECIPE_COORDS")
-				rtimeout := os.Getenv("TRANSFLOW_RECIPE_TIMEOUT")
-				if rtimeout == "" {
-					rtimeout = "10m"
-				}
-				pre := strings.NewReplacer(
-					"${RECIPE_CLASS}", rclass,
-					"${RECIPE_COORDS}", rcoords,
-					"${RECIPE_TIMEOUT}", rtimeout,
-				).Replace(string(hb))
-				prePath := strings.ReplaceAll(hcl, ".rendered.hcl", ".pre.hcl")
-				_ = os.WriteFile(prePath, []byte(pre), 0644)
+                // Pre-substitute recipe placeholders (no global env mutation)
+                rclass := os.Getenv("TRANSFLOW_RECIPE_CLASS")
+                rcoords := os.Getenv("TRANSFLOW_RECIPE_COORDS")
+                rtimeout := os.Getenv("TRANSFLOW_RECIPE_TIMEOUT")
+                prePath, _ := preSubstituteRecipe(hcl, rclass, rcoords, rtimeout)
 				// Prepare context: clone repo into context subdir
 				baseDir := filepath.Dir(hcl)
 				contextDir := filepath.Join(baseDir, "context")
@@ -207,17 +192,13 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 func executeApplyFirst(runner *TransflowRunner) error {
 	// Fetch diff content path or URL
 	var diffPath string
-	if url := os.Getenv("TRANSFLOW_DIFF_URL"); url != "" {
-		if resp, err := http.Get(url); err == nil && resp.StatusCode == 200 {
-			b, _ := io.ReadAll(resp.Body)
-			_ = resp.Body.Close()
-			// Write to temp file in workspace
-			dp := filepath.Join(runner.workspaceDir, "apply", "diff.patch")
-			_ = os.MkdirAll(filepath.Dir(dp), 0755)
-			_ = os.WriteFile(dp, b, 0644)
-			diffPath = dp
-		}
-	}
+    if url := os.Getenv("TRANSFLOW_DIFF_URL"); url != "" {
+        dp := filepath.Join(runner.workspaceDir, "apply", "diff.patch")
+        _ = os.MkdirAll(filepath.Dir(dp), 0755)
+        if err := downloadToFileFn(url, dp); err == nil {
+            diffPath = dp
+        }
+    }
 	if diffPath == "" {
 		if p := os.Getenv("TRANSFLOW_DIFF_PATH"); p != "" {
 			diffPath = p
