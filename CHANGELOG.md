@@ -16,6 +16,7 @@
 - Transflow: diff path allowlist now uses doublestar globbing with `**` support; added unit tests covering `src/**/*.java`, `src/**`, and `pom.xml` to prevent false negatives in path validation.
 - Transflow: hardened SeaweedFS artifact key policy — keys must start with `transflow/` and reject path traversal/backslashes; added unit tests.
 - Transflow CLI sequential helpers: switched to context-aware job submission and centralized templating (no global env writes) for `llm-exec` and `orw-apply` preview flows.
+- Pre-commit: switched golangci-lint hook to official v2 pre-commit integration (rev v2.4.0) to match `.golangci.yml` (`version: 2`) and fix CI/pre-commit mismatch.
 
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).

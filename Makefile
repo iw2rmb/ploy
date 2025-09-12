@@ -430,6 +430,18 @@ api-deploy: ## Deploy api to VPS
 lint: ## Run linting checks
 	@echo "$(BLUE)Running linting checks...$(NC)"
 	@which golangci-lint > /dev/null || (echo "$(RED)golangci-lint not found. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest$(NC)" && exit 1)
+	@ver=$$(golangci-lint version 2>/dev/null | awk '{print $$4}'); \
+	ver=$${ver#v}; \
+	major=$${ver%%.*}; \
+	if [ -z "$$major" ]; then \
+		echo "$(YELLOW)⚠️  Unable to detect golangci-lint version; continuing$(NC)"; \
+	else \
+		if [ "$$major" -lt 2 ]; then \
+			echo "$(RED)golangci-lint v2 required for this repo. Detected v$$ver.$(NC)"; \
+			echo "$(YELLOW)Install/update with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest$(NC)"; \
+			exit 1; \
+		fi; \
+	fi
 	golangci-lint run
 
 .PHONY: fmt

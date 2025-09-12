@@ -8,17 +8,20 @@ repos:
         pass_filenames: false
         files: \.go$
 
+  # Use official golangci-lint pre-commit hook pinned to v2
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.4.0
+    hooks:
       - id: golangci-lint
-        name: golangci-lint
-        entry: golangci-lint run
-        language: system
-        pass_filenames: false
-        files: \.go$
+        args: ["--timeout=5m"]
+        additional_dependencies: []
 
-      # Optional: block commits with race conditions in quick runs
-      # - id: go-test-race
-      #   name: go test -race (quick)
-      #   entry: go test -race -short ./...
-      #   language: system
-      #   pass_filenames: false
-      #   files: \.go$
+  # Optional: block commits with race conditions in quick runs
+  # - repo: local
+  #   hooks:
+  #   - id: go-test-race
+  #     name: go test -race (quick)
+  #     entry: go test -race -short ./...
+  #     language: system
+  #     pass_filenames: false
+  #     files: \\.(go)$
