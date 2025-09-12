@@ -34,6 +34,8 @@ job "ploy-api" {
       progress_deadline = "15m"   # Increased from 10m to allow more time
       auto_revert = true
       canary = 1
+      auto_promote = true         # Enable automatic promotion of canaries for unattended rollouts
+      health_check = "checks"     # Gate on service/Consul health checks
     }
 
     # Network configuration (moved from task level to group level)

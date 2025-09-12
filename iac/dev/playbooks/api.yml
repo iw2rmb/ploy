@@ -421,16 +421,7 @@
             msg: "Service cleanup completed: {{ cleanup_result.stdout_lines[-1] if cleanup_result.stdout_lines else 'No output' }}"
           when: cleanup_result.stdout_lines is defined
 
-        - name: Stop existing API job if running
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh stop --job ploy-api
-          environment:
-            NOMAD_ADDR: "http://localhost:4646"
-          register: stop_result
-          failed_when: false
-
-        - name: Wait between stop and deploy operations
-          pause:
-            seconds: 5
+        # NOTE: Do not stop the existing job. Rely on Nomad update stanza for zero-downtime rollout.
 
         - name: Deploy API job using HTTP API
           shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job ploy-api --file /opt/hashicorp/nomad/jobs/ploy-api.hcl
