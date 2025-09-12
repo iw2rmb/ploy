@@ -588,17 +588,14 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
 			}
 
-			// Prepare env and substitute final template
-			baseDir := filepath.Dir(renderedPath)
-			_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-			// Compute per-run OUT_DIR without mutating global env
-			outDir := filepath.Join(baseDir, "out")
+            // Prepare env and substitute final template
+            baseDir := filepath.Dir(renderedPath)
 
-			// Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
-			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-			branchID := step.ID
-			curStepID := randomStepID()
-			diffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
+            // Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
+            execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+            branchID := step.ID
+            curStepID := randomStepID()
+            diffKey := computeBranchDiffKey(execID, branchID, curStepID)
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
 			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
@@ -610,18 +607,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
 				log.Printf("[Transflow] input.tar upload failed: %v", err)
 			}
-			// Substitute HCL with explicit variables to avoid global env writes
-			vars := map[string]string{
-				"TRANSFLOW_CONTEXT_DIR":       baseDir,
-				"TRANSFLOW_OUT_DIR":           outDir,
-				"PLOY_TRANSFLOW_EXECUTION_ID": execID,
-				"TRANSFLOW_DIFF_KEY":          diffKey,
-				"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
-				"PLOY_SEAWEEDFS_URL":          seaweed,
-				"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
-				"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
-				"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
-			}
+            // Substitute HCL with explicit variables to avoid global env writes
+            vars := makeORWVars(baseDir, execID, diffKey, seaweed)
 			submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
 			if err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
