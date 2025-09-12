@@ -1,20 +1,18 @@
 package transflow
 
 import (
-	"context"
-	crand "crypto/rand"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
+    "context"
+    crand "crypto/rand"
+    "encoding/hex"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "log"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
@@ -262,32 +260,7 @@ func (r *TransflowRunner) GetWorkspaceDir() string {
 	return r.workspaceDir
 }
 
-// downloadToFile fetches the url content and writes to dest path
-func downloadToFile(url, dest string) error {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("http %d", resp.StatusCode)
-	}
-	f, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
-	return err
-}
-
-// test indirections
-var downloadToFileFn = downloadToFile
+// test indirections moved to job_io.go
 
 // randomStepID returns s-<12 hex chars>
 func randomStepID() string {
@@ -296,59 +269,7 @@ func randomStepID() string {
 	return "s-" + hex.EncodeToString(buf[:])
 }
 
-// putFile uploads a local file to SeaweedFS artifacts namespace using PUT
-func putFile(seaweedBase, key, srcPath, contentType string) error {
-	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
-	f, err := os.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	req, err := http.NewRequest(http.MethodPut, url, f)
-	if err != nil {
-		return err
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("put %s: http %d: %s", key, resp.StatusCode, string(b))
-	}
-	return nil
-}
-
-// putJSON uploads JSON bytes to SeaweedFS
-func putJSON(seaweedBase, key string, body []byte) error {
-	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
-	req, err := http.NewRequest(http.MethodPut, url, strings.NewReader(string(body)))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("put %s: http %d: %s", key, resp.StatusCode, string(b))
-	}
-	return nil
-}
-
-var putJSONFn = putJSON
-
-// test indirection for file upload
-var putFileFn = putFile
+// IO helpers moved to job_io.go; keep indirection vars there
 
 // uploadInputTar uploads input.tar to artifacts/transflow/<execID>/input.tar (best-effort)
 func uploadInputTar(seaweedBase, execID, inputTarPath string) error {
@@ -356,21 +277,7 @@ func uploadInputTar(seaweedBase, execID, inputTarPath string) error {
 	return putFileFn(seaweedBase, key, inputTarPath, "application/octet-stream")
 }
 
-// getJSON fetches a JSON document from SeaweedFS
-func getJSON(seaweedBase, key string) ([]byte, int, error) {
-	url := strings.TrimRight(seaweedBase, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
-	req, _ := http.NewRequest(http.MethodGet, url, nil)
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
-	return b, resp.StatusCode, nil
-}
-
-var getJSONFn = getJSON
+// JSON helpers moved to job_io.go; keep indirection vars there
 
 // GetTargetRepo returns the target repository URL for human-step branch operations
 func (r *TransflowRunner) GetTargetRepo() string {
@@ -1079,58 +986,10 @@ build_step:
 		Message: fmt.Sprintf("Pushed branch %s", branchName),
 	})
 
-	// Step 7: Create or update GitLab merge request (if GitProvider is configured)
-	if r.gitProvider != nil {
-		mrStart := time.Now()
-		r.emit(ctx, "mr", "mr", "info", "Creating merge request")
-		if err := r.gitProvider.ValidateConfiguration(); err != nil {
-			r.emit(ctx, "mr", "mr", "warn", "MR creation skipped - configuration invalid")
-			// MR creation is optional - log but don't fail the workflow
-			result.StepResults = append(result.StepResults, StepResult{
-				StepID:   "mr",
-				Success:  false,
-				Message:  fmt.Sprintf("MR creation skipped - configuration invalid: %v", err),
-				Duration: time.Since(mrStart),
-			})
-		} else {
-			mrConfig := provider.MRConfig{
-				RepoURL:      r.config.TargetRepo,
-				SourceBranch: branchName,
-				TargetBranch: r.config.BaseRef,
-				Title:        fmt.Sprintf("Transflow: %s", r.config.ID),
-				Description:  r.generateMRDescription(result),
-				Labels:       []string{"ploy", "tfl"},
-			}
-
-			// Create MR with a phase timeout
-			mrTimeout := 3 * time.Minute
-			mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
-			defer cancelMR()
-			log.Printf("[Transflow] Creating/updating MR (timeout=%s): source=%s target=%s", mrTimeout, mrConfig.SourceBranch, mrConfig.TargetBranch)
-			mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
-			if err != nil {
-				// MR creation is optional - log but don't fail the workflow
-				result.StepResults = append(result.StepResults, StepResult{
-					StepID:   "mr",
-					Success:  false,
-					Message:  fmt.Sprintf("MR creation failed: %v", err),
-					Duration: time.Since(mrStart),
-				})
-			} else {
-				action := "created"
-				if !mrResult.Created {
-					action = "updated"
-				}
-				result.StepResults = append(result.StepResults, StepResult{
-					StepID:   "mr",
-					Success:  true,
-					Message:  fmt.Sprintf("MR %s: %s", action, mrResult.MRURL),
-					Duration: time.Since(mrStart),
-				})
-				result.MRURL = mrResult.MRURL
-			}
-		}
-	}
+    // Step 7: Create or update merge request (if provider is configured)
+    if r.gitProvider != nil {
+        r.createOrUpdateMR(ctx, result, branchName)
+    }
 
 	// Success!
 	result.Success = true
@@ -1253,35 +1112,4 @@ func (r *TransflowRunner) CleanupWorkspace() error {
 }
 
 // hasRepoChanges returns true if the working tree has any changes
-func hasRepoChanges(repoPath string) (bool, error) {
-	cmd := exec.Command("git", "status", "--porcelain")
-	cmd.Dir = repoPath
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("git status failed: %v: %s", err, string(out))
-	}
-	return strings.TrimSpace(string(out)) != "", nil
-}
-
-// getHeadHash returns the current HEAD commit hash
-func getHeadHash(repoPath string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = repoPath
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git rev-parse failed: %v: %s", err, string(out))
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-// createTarFromDir creates a tar archive of a directory using system tar
-func createTarFromDir(srcDir, dstTar string) error {
-	// Remove existing tar if any
-	_ = os.Remove(dstTar)
-	cmd := exec.Command("tar", "-cf", dstTar, ".")
-	cmd.Dir = srcDir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("tar failed: %v: %s", err, string(out))
-	}
-	return nil
-}
+// repo ops moved to repo_ops.go
