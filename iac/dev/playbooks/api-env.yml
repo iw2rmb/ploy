@@ -52,6 +52,12 @@
           GITLAB_URL="{{ lookup('env', 'GITLAB_URL') | default(fallback_url | default('https://gitlab.com', true), true) }}"
           GITLAB_TOKEN="{{ lookup('env', 'GITLAB_TOKEN') | default(fallback_token | default('', true), true) }}"
           PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') | default('https://api.dev.ployman.app/v1', true) }}"
+          # Nomad/Transflow runtime defaults
+          NOMAD_DC="{{ lookup('env', 'NOMAD_DC') | default('dc1', true) }}"
+          PLOY_SEAWEEDFS_URL="{{ lookup('env', 'PLOY_SEAWEEDFS_URL') | default('http://seaweedfs-filer.service.consul:8888', true) }}"
+          # OpenRewrite apply runner image (must exist in internal registry)
+          # Preferred: set TRANSFLOW_ORW_APPLY_IMAGE; runner substitutes ${ORW_IMAGE}
+          TRANSFLOW_ORW_APPLY_IMAGE="{{ lookup('env', 'TRANSFLOW_ORW_APPLY_IMAGE') | default('registry.dev.ployman.app/openrewrite-jvm:latest', true) }}"
 
     - name: Write /home/ploy/api.env with restricted permissions (do not log)
       no_log: true
