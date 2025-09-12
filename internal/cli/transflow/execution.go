@@ -72,32 +72,32 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 			lid, _ := o["id"].(string)
 			if hcl, err := runner.RenderLLMExecAssets(lid); err == nil {
 				fmt.Printf("Rendered llm_exec HCL: %s\n", hcl)
-				// Substitute envs
-				hb, _ := os.ReadFile(hcl)
-				model := os.Getenv("TRANSFLOW_MODEL")
-				if model == "" {
-					model = "gpt-4o-mini@2024-08-06"
-				}
-				tools := os.Getenv("TRANSFLOW_TOOLS")
-				if tools == "" {
-					tools = `{"file":{"allow":["src/**","pom.xml"]}}`
-				}
-				limits := os.Getenv("TRANSFLOW_LIMITS")
-				if limits == "" {
-					limits = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
-				}
+				// Centralized substitution (no global env writes)
 				runID := fmt.Sprintf("%s-%d", runner.config.ID, time.Now().Unix())
-				rendered := strings.NewReplacer(
-					"${MODEL}", model,
-					"${TOOLS_JSON}", tools,
-					"${LIMITS_JSON}", limits,
-					"${RUN_ID}", runID,
-				).Replace(string(hb))
-				renderedPath := strings.ReplaceAll(hcl, ".rendered.hcl", ".rendered.submitted.hcl")
-				_ = os.WriteFile(renderedPath, []byte(rendered), 0644)
+				vars := map[string]string{
+					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
+					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
+					"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+					"TRANSFLOW_PLANNER_IMAGE":     os.Getenv("TRANSFLOW_PLANNER_IMAGE"),
+					"TRANSFLOW_REDUCER_IMAGE":     os.Getenv("TRANSFLOW_REDUCER_IMAGE"),
+					"TRANSFLOW_LLM_EXEC_IMAGE":    os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE"),
+					"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+					"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+					"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+					"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+					"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+				}
+				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
+				if sErr != nil {
+					fmt.Printf("failed to write substituted HCL: %v\n", sErr)
+					return nil
+				}
 				fmt.Printf("Rendered llm_exec HCL (substituted): %s\n", renderedPath)
 				if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
-					if err := orchestration.SubmitAndWaitTerminal(renderedPath, 30*time.Minute); err != nil {
+					timeout := ResolveDefaultsFromEnv().LLMExecTimeout
+					if err := orchestration.SubmitAndWaitTerminalCtx(context.Background(), renderedPath, timeout); err != nil {
 						fmt.Printf("llm-exec job failed: %v\n", err)
 					} else {
 						// Show where diff.patch would be
@@ -167,16 +167,26 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 						fmt.Printf("warning: repo clone failed: %v\n", err)
 					}
 				}
-				os.Setenv("TRANSFLOW_CONTEXT_DIR", contextDir)
-				os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
 				runID2 := fmt.Sprintf("%s-orw-apply-%d", runner.config.ID, time.Now().Unix())
-				submittedPath, serr := substituteORWTemplate(prePath, runID2)
+				vars := map[string]string{
+					"TRANSFLOW_CONTEXT_DIR":       contextDir,
+					"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+					"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+					"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+					"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					"PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+					"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+					"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+				}
+				submittedPath, serr := substituteORWTemplateVars(prePath, runID2, vars)
 				if serr != nil {
 					fmt.Printf("failed to write submitted HCL: %v\n", serr)
 				} else {
 					fmt.Printf("Rendered orw_apply HCL (substituted): %s\n", submittedPath)
 					if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
-						if err := orchestration.SubmitAndWaitTerminal(submittedPath, 30*time.Minute); err != nil {
+						timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+						if err := orchestration.SubmitAndWaitTerminalCtx(context.Background(), submittedPath, timeout); err != nil {
 							fmt.Printf("orw-apply job failed: %v\n", err)
 						} else {
 							diffPath := filepath.Join(filepath.Dir(submittedPath), "out", "diff.patch")

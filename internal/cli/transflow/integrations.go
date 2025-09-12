@@ -218,8 +218,8 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	runner.SetBuildChecker(i.CreateBuildChecker())
 	runner.SetGitProvider(i.CreateGitProvider())
 
-    // Enable self-healing by providing a no-op submitter; production path prefers runner.
-    runner.SetJobSubmitter(NoopJobSubmitter{})
+	// Enable self-healing by providing a no-op submitter; production path prefers runner.
+	runner.SetJobSubmitter(NoopJobSubmitter{})
 
 	// Return the embedded TransflowRunner; KB integration remains wired inside kbRunner
 	return runner, nil

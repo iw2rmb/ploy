@@ -1,8 +1,8 @@
 package transflow
 
 import (
-    "bytes"
-    "text/template"
+	"bytes"
+	"text/template"
 )
 
 // Template for MR description
@@ -38,54 +38,53 @@ const mrDescriptionTmpl = `## Transflow Workflow: {{.WorkflowID}}
 `
 
 type mrStep struct {
-    StepID  string
-    Message string
+	StepID  string
+	Message string
 }
 
 type mrHealing struct {
-    Enabled  bool
-    PlanID   string
-    WinnerID string
-    Attempts int
+	Enabled  bool
+	PlanID   string
+	WinnerID string
+	Attempts int
 }
 
 type mrData struct {
-    WorkflowID  string
-    BranchName  string
-    BuildVersion string
-    Duration    string
-    Steps       []mrStep
-    Healing     mrHealing
+	WorkflowID   string
+	BranchName   string
+	BuildVersion string
+	Duration     string
+	Steps        []mrStep
+	Healing      mrHealing
 }
 
 func renderMRDescription(r *TransflowRunner, result *TransflowResult) string {
-    var steps []mrStep
-    for _, s := range result.StepResults {
-        if s.StepID == "mr" || !s.Success {
-            continue
-        }
-        steps = append(steps, mrStep{StepID: s.StepID, Message: s.Message})
-    }
-    hd := mrHealing{}
-    if result.HealingSummary != nil && result.HealingSummary.Enabled {
-        hd.Enabled = true
-        hd.PlanID = result.HealingSummary.PlanID
-        hd.Attempts = result.HealingSummary.AttemptsCount
-        if result.HealingSummary.Winner != nil {
-            hd.WinnerID = result.HealingSummary.Winner.ID
-        }
-    }
-    data := mrData{
-        WorkflowID:  r.config.ID,
-        BranchName:  result.BranchName,
-        BuildVersion: result.BuildVersion,
-        Duration:    result.Duration.String(),
-        Steps:       steps,
-        Healing:     hd,
-    }
-    tmpl := template.Must(template.New("mr").Parse(mrDescriptionTmpl))
-    var buf bytes.Buffer
-    _ = tmpl.Execute(&buf, data)
-    return buf.String()
+	var steps []mrStep
+	for _, s := range result.StepResults {
+		if s.StepID == "mr" || !s.Success {
+			continue
+		}
+		steps = append(steps, mrStep{StepID: s.StepID, Message: s.Message})
+	}
+	hd := mrHealing{}
+	if result.HealingSummary != nil && result.HealingSummary.Enabled {
+		hd.Enabled = true
+		hd.PlanID = result.HealingSummary.PlanID
+		hd.Attempts = result.HealingSummary.AttemptsCount
+		if result.HealingSummary.Winner != nil {
+			hd.WinnerID = result.HealingSummary.Winner.ID
+		}
+	}
+	data := mrData{
+		WorkflowID:   r.config.ID,
+		BranchName:   result.BranchName,
+		BuildVersion: result.BuildVersion,
+		Duration:     result.Duration.String(),
+		Steps:        steps,
+		Healing:      hd,
+	}
+	tmpl := template.Must(template.New("mr").Parse(mrDescriptionTmpl))
+	var buf bytes.Buffer
+	_ = tmpl.Execute(&buf, data)
+	return buf.String()
 }
-
