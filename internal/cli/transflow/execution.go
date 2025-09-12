@@ -275,10 +275,8 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 	// Controller and execution ID for in-job event push
 	controllerURL := vars["PLOY_CONTROLLER"]
 	execID := vars["PLOY_TRANSFLOW_EXECUTION_ID"]
-	seaweedURL := vars["PLOY_SEAWEEDFS_URL"]
-	if seaweedURL == "" {
-		seaweedURL = "http://seaweedfs-filer.service.consul:8888"
-	}
+    seaweedURL := vars["PLOY_SEAWEEDFS_URL"]
+    if seaweedURL == "" { seaweedURL = d.SeaweedURL }
 	// Keys under artifacts/ namespace used by uploader/runner
 	// Allow override via TRANSFLOW_DIFF_KEY for branch-scoped step uploads
 	diffKey := vars["TRANSFLOW_DIFF_KEY"]
