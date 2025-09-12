@@ -29,6 +29,9 @@ var validateUnifiedDiffFn = ValidateUnifiedDiff
 var applyUnifiedDiffFn = ApplyUnifiedDiff
 var hasRepoChangesFn = hasRepoChanges
 
+// ErrNoBuildFile indicates missing supported build files in repository.
+var ErrNoBuildFile = errors.New("no build file found in repository")
+
 // GitOperationsInterface defines the Git operations needed by the runner
 type GitOperationsInterface interface {
 	CloneRepository(ctx context.Context, repoURL, branch, targetPath string) error
@@ -506,28 +509,19 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
 			}
 
-			// Guard: ensure repository contains a supported build file before creating input tar
-			{
-				p1 := filepath.Join(repoPath, "pom.xml")
-				p2 := filepath.Join(repoPath, "build.gradle")
-				p3 := filepath.Join(repoPath, "build.gradle.kts")
-				_, e1 := os.Stat(p1)
-				_, e2 := os.Stat(p2)
-				_, e3 := os.Stat(p3)
-				hasPom := e1 == nil
-				hasGradle := e2 == nil
-				hasKts := e3 == nil
-				log.Printf("[Transflow] Build file check at %s: pom=%v gradle=%v gradle.kts=%v", repoPath, hasPom, hasGradle, hasKts)
-				// Emit guard details to the controller event stream
-				r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
-				if !hasPom && !hasGradle && !hasKts {
-					r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
-					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: "No build file found in repository"})
-					result.ErrorMessage = "no build file found in repository"
-					result.Duration = time.Since(startTime)
-					return nil, fmt.Errorf("no build file found in repository")
-				}
-			}
+            // Guard: ensure repository contains a supported build file before creating input tar
+            {
+                hasPom, hasGradle, hasKts := checkBuildFiles(repoPath)
+                log.Printf("[Transflow] Build file check at %s: pom=%v gradle=%v gradle.kts=%v", repoPath, hasPom, hasGradle, hasKts)
+                r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
+                if err := ensureBuildFile(repoPath); err != nil {
+                    r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
+                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: ErrNoBuildFile.Error()})
+                    result.ErrorMessage = ErrNoBuildFile.Error()
+                    result.Duration = time.Since(startTime)
+                    return nil, ErrNoBuildFile
+                }
+            }
 
 			// Prepare input tar from repository
 			inputTar := filepath.Join(filepath.Dir(renderedPath), "input.tar")
