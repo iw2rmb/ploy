@@ -773,10 +773,14 @@ func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
 	}
-	key, _ := keyAny.(string)
-	if key == "" {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
-	}
+    key, _ := keyAny.(string)
+    if key == "" {
+        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
+    }
+    // Validate artifact path safety and prefix
+    if !validTransflowArtifactKey(id, key) {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "invalid_artifact_key", "message": "artifact key failed validation"}})
+    }
 	reader, err := h.storage.Get(c.Context(), key)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fiber.Map{"code": "storage_error", "message": err.Error()}})
@@ -791,6 +795,16 @@ func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
 	}
 	_, _ = io.Copy(c, reader)
 	return nil
+}
+
+// validTransflowArtifactKey enforces prefix and path safety for artifact keys.
+func validTransflowArtifactKey(id, key string) bool {
+    if id == "" || key == "" { return false }
+    prefix := fmt.Sprintf("artifacts/transflow/%s/", id)
+    if !strings.HasPrefix(key, prefix) { return false }
+    if strings.Contains(key, "..") { return false }
+    if strings.Contains(key, "\\") { return false }
+    return true
 }
 
 // StreamLogs provides a basic Server-Sent Events (SSE) stub for live transflow logs.

@@ -197,6 +197,34 @@ func TestArtifactsEndpoints(t *testing.T) {
 	assert.Equal(t, 200, resp2.StatusCode)
 }
 
+func TestDownloadArtifact_InvalidKeyRejected(t *testing.T) {
+    kv := newMockKV()
+    st := newMockStorage()
+    h := &Handler{statusStore: kv, storage: st}
+    id := "tf-evil"
+    // Status points to a malicious key outside allowed prefix
+    status := TransflowStatus{
+        ID:     id,
+        Status: "completed",
+        Result: map[string]any{
+            "artifacts": map[string]any{
+                "error_log": "../../etc/passwd",
+            },
+        },
+    }
+    _ = h.storeStatus(status)
+
+    app := fiber.New()
+    h.RegisterRoutes(app)
+
+    req := httptest.NewRequest("GET", "/v1/transflow/artifacts/"+id+"/error_log", nil)
+    resp, _ := app.Test(req)
+    if resp != nil { defer resp.Body.Close() }
+    if resp.StatusCode != 400 {
+        t.Fatalf("expected 400 for invalid key, got %d", resp.StatusCode)
+    }
+}
+
 func TestSSELogsStub(t *testing.T) {
 	kv := newMockKV()
 	// Seed minimal status to ensure immediate snapshot
