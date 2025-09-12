@@ -379,32 +379,15 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 	if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
 	}
-	// Build gate
-	timeout, err := r.config.ParseBuildTimeout()
-	if err != nil {
-		return err
-	}
-	appName := GenerateAppName(r.config.ID)
-	buildCfg := common.DeployConfig{
-		App:         appName,
-		Lane:        r.config.Lane,
-		Environment: "dev",
-		Timeout:     timeout,
-	}
-	// Ensure build tar is created from the repository root without changing process cwd
-	// SharedPush honors WorkingDir in config when set via build checker integration
-	// Inject working dir via context: decorate DeployConfig with a metadata hint consumed by SharedPush
-	// For minimal change, use WorkingDir when supported by build checker implementation.
-	buildCfg.Metadata = map[string]string{"working_dir": repoPath}
-	// If build checker supports WorkingDir in DeployConfig, it will honor it; otherwise default behavior applies.
-	res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
-	if err != nil {
-		return fmt.Errorf("build gate failed: %w", err)
-	}
-	if res != nil && !res.Success {
-		return fmt.Errorf("build gate failed: %s", res.Message)
-	}
-	return nil
+    // Build gate
+    res, err := r.runBuildGate(ctx, repoPath)
+    if err != nil {
+        return fmt.Errorf("build gate failed: %w", err)
+    }
+    if res != nil && !res.Success {
+        return fmt.Errorf("build gate failed: %s", res.Message)
+    }
+    return nil
 }
 
 // ReducerAssets holds file paths for rendered reducer inputs and HCL
@@ -877,29 +860,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	})
 
 build_step:
-	// Step 5: Run build check
-	buildStart := time.Now()
-	appName := GenerateAppName(r.config.ID)
-	timeout, err := r.config.ParseBuildTimeout()
-	if err != nil {
-		result.ErrorMessage = fmt.Sprintf("invalid build timeout: %v", err)
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("invalid build timeout: %w", err)
-	}
-
-	buildConfig := common.DeployConfig{
-		App:           appName,
-		Lane:          r.config.Lane,
-		Environment:   "dev",
-		Timeout:       timeout,
-		ControllerURL: "", // Will be set by the actual implementation
-	}
-
-	// Ensure build tar is created from the repository root
-	cwd2, _ := os.Getwd()
-	_ = os.Chdir(repoPath)
-	buildResult, err := r.buildChecker.CheckBuild(ctx, buildConfig)
-	_ = os.Chdir(cwd2)
+    // Step 5: Run build check
+    buildStart := time.Now()
+    buildResult, err := r.runBuildGate(ctx, repoPath)
 	if err != nil || (buildResult != nil && !buildResult.Success) {
 		message := "Build check failed"
 		if buildResult != nil && buildResult.Message != "" {
