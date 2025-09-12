@@ -53,6 +53,7 @@ func runTransflow(args []string, controllerURL string) error {
 	applyFirst := fs.Bool("apply-first", false, "after fetching diff (TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
 	verbose := fs.Bool("v", false, "verbose output")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace (for debugging)")
+	outputFmt := fs.String("output", "text", "output format: text|json (json prints execution_id and exits in remote mode)")
 
 	// Optional: auto-attach watch after starting remote run
 	watch := fs.Bool("watch", false, "after starting remote run, attach a live watch")
@@ -60,12 +61,17 @@ func runTransflow(args []string, controllerURL string) error {
 		return fmt.Errorf("flag parsing failed: %w", err)
 	}
 
+	// Validate output format
+	if *outputFmt != "text" && *outputFmt != "json" {
+		return fmt.Errorf("invalid --output value: %s (expected text|json)", *outputFmt)
+	}
+
 	// Remote mode (default when a controller URL is provided): thin client calling Controller API to execute on VPS
 	if controllerURL != "" && !*dryRun && !*renderPlanner && !*submitPlanner && !*submitReducer {
 		if *file == "" {
 			return fmt.Errorf("missing -f <transflow.yaml>")
 		}
-		return executeRemoteTransflow(controllerURL, *file, *testMode, *verbose, *watch)
+		return executeRemoteTransflow(controllerURL, *file, *testMode, *verbose, *watch, *outputFmt)
 	}
 
 	if *file == "" {
@@ -83,7 +89,13 @@ func runTransflow(args []string, controllerURL string) error {
 	}
 
 	if *dryRun {
-		fmt.Println("Configuration is valid")
+		if *outputFmt == "json" {
+			// Print a minimal JSON ack for tooling
+			// Shape: {"ok":true,"mode":"dry-run","id":"<config id>"}
+			fmt.Printf("{\"ok\":true,\"mode\":\"dry-run\",\"id\":\"%s\"}\n", config.ID)
+		} else {
+			fmt.Println("Configuration is valid")
+		}
 		return nil
 	}
 

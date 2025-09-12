@@ -50,7 +50,7 @@ assertions.RequireErrorContains(t, err, "expected message")
 
 This package replaces:
 - `internal/testutil/`
-- `internal/testutils/`
+Note: The legacy `internal/testutils/` package has been removed. Use `internal/testing/**` (assertions, builders, helpers, integration, mocks) instead for all new and existing tests.
 
 All duplicate test utilities have been consolidated here with improved APIs and better organization.
 

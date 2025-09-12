@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
+
+	doublestar "github.com/bmatcuk/doublestar/v4"
 )
 
 // ValidateUnifiedDiff runs a dry-run git apply --check on the diff file in the repo path
@@ -54,10 +55,10 @@ func ValidateDiffPaths(diffPath string, allowedGlobs []string) error {
 			if len(p) > 2 && (p[:2] == "a/" || p[:2] == "b/") {
 				p = p[2:]
 			}
-			// Match against allowed globs
+			// Match against allowed globs using doublestar (** support)
 			ok := false
 			for _, pat := range allowedGlobs {
-				if m, _ := filepath.Match(pat, p); m {
+				if m, _ := doublestar.PathMatch(pat, p); m {
 					ok = true
 					break
 				}

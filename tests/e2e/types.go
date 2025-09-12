@@ -25,6 +25,11 @@ type WorkflowStep struct {
 	ID      string
 	Engine  string
 	Recipes []string
+	// OpenRewrite explicit coordinates (for orw-apply)
+	RecipeGroup        string
+	RecipeArtifact     string
+	RecipeVersion      string
+	MavenPluginVersion string
 }
 
 type SelfHealConfig struct {
@@ -47,6 +52,9 @@ type WorkflowResult struct {
 	Success             bool
 	Output              string
 	Error               string
+	ExecutionID         string
+	ConfigPath          string
+	ConfigYAML          string
 	WorkflowBranch      string
 	BuildVersion        string
 	MRUrl               string
@@ -72,8 +80,8 @@ func (w *TransflowWorkflow) ToYAML() (string, error) {
 	yaml := fmt.Sprintf(`version: v1alpha1
 id: %s
 target_repo: %s
-target_branch: refs/heads/%s
-base_ref: refs/heads/%s
+target_branch: %s
+base_ref: %s
 lane: C
 build_timeout: 10m
 
@@ -81,15 +89,38 @@ steps:
 `, w.ID, w.Repository, w.TargetBranch, w.TargetBranch)
 
 	for _, step := range w.Steps {
-		yaml += fmt.Sprintf(`  - type: %s
+		if step.Type == "orw-apply" {
+			yaml += fmt.Sprintf(`  - type: orw-apply
+    id: %s
+    recipes:
+`, step.ID)
+			for _, recipe := range step.Recipes {
+				yaml += fmt.Sprintf(`      - %s
+`, recipe)
+			}
+			if step.RecipeGroup != "" {
+				yaml += fmt.Sprintf("    recipe_group: %s\n", step.RecipeGroup)
+			}
+			if step.RecipeArtifact != "" {
+				yaml += fmt.Sprintf("    recipe_artifact: %s\n", step.RecipeArtifact)
+			}
+			if step.RecipeVersion != "" {
+				yaml += fmt.Sprintf("    recipe_version: %s\n", step.RecipeVersion)
+			}
+			if step.MavenPluginVersion != "" {
+				yaml += fmt.Sprintf("    maven_plugin_version: %s\n", step.MavenPluginVersion)
+			}
+		} else {
+			// Legacy recipe step (engine-based) retained for backwards compatibility
+			yaml += fmt.Sprintf(`  - type: %s
     id: %s
     engine: %s
     recipes:
 `, step.Type, step.ID, step.Engine)
-
-		for _, recipe := range step.Recipes {
-			yaml += fmt.Sprintf(`      - %s
+			for _, recipe := range step.Recipes {
+				yaml += fmt.Sprintf(`      - %s
 `, recipe)
+			}
 		}
 	}
 
@@ -107,6 +138,19 @@ self_heal:
 }
 
 func (r *WorkflowResult) parseFromOutput(output string) {
+	// Parse execution_id from controller output variants
+	// 1) JSON-like: execution_id: "<id>"
+	execJSON := regexp.MustCompile(`(?i)execution_id\s*[:=]\s*\"([a-zA-Z0-9\-]+)\"`)
+	if m := execJSON.FindStringSubmatch(output); len(m) > 1 {
+		r.ExecutionID = m[1]
+	}
+	// 2) Human line: Execution ID: <id>
+	if r.ExecutionID == "" {
+		execLine := regexp.MustCompile(`(?i)execution\s+id\s*[:=]\s*([a-zA-Z0-9\-]+)`)
+		if m := execLine.FindStringSubmatch(output); len(m) > 1 {
+			r.ExecutionID = m[1]
+		}
+	}
 	// Parse workflow branch
 	branchRegex := regexp.MustCompile(`(?i)branch:\s+([^\s]+)`)
 	if matches := branchRegex.FindStringSubmatch(output); len(matches) > 1 {

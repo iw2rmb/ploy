@@ -23,10 +23,54 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
   - `gofmt -s -w .` (simplifies and formats code)
   - `staticcheck ./...` (runs static analysis across the module)
 
+## Go Analysis Tooling (MANDATORY)
+
+- Source of truth: `.golangci.yml` in repo. Use `make` targets below.
+- Local quick pass (run before PRs):
+  - `make fmt` — `go fmt` + `goimports` organization
+  - `make vet` — `go vet ./...` core analyzers
+  - `make lint` — `golangci-lint run` using `.golangci.yml`
+  - `staticcheck ./...` — supplementary static analysis (config: `staticcheck.conf`)
+- Security and vulnerabilities:
+  - `make sec` — `gosec ./...` security rules
+  - `govulncheck ./...` — known vulnerabilities in code and deps
+- Reliability and tests:
+  - `go test -race ./...` — data race detector
+  - Coverage gate: `make test-coverage-threshold` (60% min; 90% for critical)
+- Modules hygiene:
+  - `go mod tidy -v && go mod verify`
+- Notes:
+  - `golangci-lint` aggregates high-signal linters (errcheck, ineffassign, revive, gocritic, bodyclose, gosec, unparam, cyclo/cognit, etc.). No need to run them individually.
+  - Prefer `gofumpt -l -w .` locally if you want stricter formatting; `gofmt` remains the baseline.
+- Install helpers (developers):
+  - `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
+  - `go install golang.org/x/tools/cmd/goimports@latest`
+  - `go install honnef.co/go/tools/cmd/staticcheck@latest`
+  - `go install github.com/securego/gosec/v2/cmd/gosec@latest`
+  - `go install golang.org/x/vuln/cmd/govulncheck@latest`
+
+### Pre-commit Hooks
+
+- Install once: `pipx install pre-commit` or `pip install pre-commit`
+- Enable in this repo: `pre-commit install`
+- Config: `.pre-commit-config.yaml` runs `make fmt` and `golangci-lint run` on commit.
+- Run manually on all files: `pre-commit run --all-files`
+- CI: GitHub Actions runs pre-commit hooks on all files (`.github/workflows/ci.yml` job: Pre-commit Hooks).
+- Required status check: Configure branch protection to require "CI / Pre-commit Hooks".
+  - If Probot Settings is installed, `.github/settings.yml` enforces this for `main` and `develop`.
+  - Otherwise, set it manually in GitHub → Settings → Branches → Branch protection rules.
+
 ## VPS Testing
 
 **Setup**: `ssh root@$TARGET_HOST` → `su - ploy`  
 **Nomad**: ONLY use `/opt/hashicorp/bin/nomad-job-manager.sh` (never direct `nomad` commands)
+
+**E2E via Dev API (Allowed from Workstation)**
+- You may run E2E tests locally when they call the VPS Dev API endpoint (e.g., set `PLOY_CONTROLLER=https://api.dev.ployman.app/v1`).
+- These tests exercise VPS services remotely and are considered VPS-side execution (REFACTOR phase), even if invoked from the workstation.
+- Do not spin up or depend on local Nomad/Consul/Gateway for these tests.
+- Example:
+  - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestTransflowE2E_JavaMigrationComplete -timeout 20m`
 
 ## Commands
 
@@ -45,7 +89,8 @@ Notes:
 - Use for runtime inspection and logs only (e.g., `ssh root@$TARGET_HOST`, then `su - ploy`).
 - Do not run `ployman` deploys directly on the VPS.
 
-**NEVER**: Integration tests locally, direct Nomad commands
+**NEVER**: Integration tests against local infrastructure, direct Nomad commands
+  - Exception: Running E2E tests from your workstation that target the VPS Dev API is allowed (see above).
 
 ## Nomad Integration (RECOMMENDED)
 

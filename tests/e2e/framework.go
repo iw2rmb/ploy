@@ -56,6 +56,10 @@ func (env *TestEnvironment) setupLocalServices(t *testing.T) {
 			"SEAWEEDFS_FILER":  "http://localhost:8888",
 		},
 	}
+	// Propagate controller URL if set in outer environment
+	if v := os.Getenv("PLOY_CONTROLLER"); v != "" {
+		env.TransflowCLI.env["PLOY_CONTROLLER"] = v
+	}
 }
 
 func (env *TestEnvironment) setupVPSServices(t *testing.T) {
@@ -91,14 +95,16 @@ func (env *TestEnvironment) ExecuteWorkflow(ctx context.Context, workflow *Trans
 	defer os.Remove(tempFile)
 
 	start := time.Now()
-	output, err := env.TransflowCLI.Run(ctx, "transflow", "run", "-f", tempFile)
+	output, err := env.TransflowCLI.Run(ctx, "transflow", "run", "-f", tempFile, "--output", "json")
 	duration := time.Since(start)
 
 	result := WorkflowResult{
-		ID:       workflow.ID,
-		Duration: duration,
-		Success:  err == nil,
-		Output:   output,
+		ID:         workflow.ID,
+		Duration:   duration,
+		Success:    err == nil,
+		Output:     output,
+		ConfigPath: tempFile,
+		ConfigYAML: yamlContent,
 	}
 
 	if err != nil {
