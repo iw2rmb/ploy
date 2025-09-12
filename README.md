@@ -349,3 +349,14 @@ Recommended usage:
 Notes:
 - Unit tests stub Nomad and SeaweedFS interactions; integration/E2E tests run on VPS lanes only per AGENTS.md.
 - Recipe coordinates and test repo for ORW are aligned with `orw-apply-manual.sh`.
+
+## Continuous Integration (GitHub Actions)
+
+- The repository uses GitHub Actions for CI:
+  - Validate lanes: runs `go run ./tools/lane-pick --path apps`.
+  - Transflow tests: runs `go test` for `internal/cli/transflow` and `staticcheck`.
+  - Format check: enforces `gofmt -s` and `goimports` cleanliness.
+  - Build: compiles API and CLI binaries and uploads artifacts.
+  - Supply chain: generates SBOM (Syft), scans (Grype), and signs (Cosign).
+
+All jobs trigger on push and pull requests.
