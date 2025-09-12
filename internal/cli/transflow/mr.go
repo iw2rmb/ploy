@@ -32,29 +32,16 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
 		Labels:       []string{"ploy", "tfl"},
 	}
 
-	mrTimeout := 2 * time.Minute
-	mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
-	defer cancelMR()
-	r.emit(ctx, "mr", "mr", "info", fmt.Sprintf("creating MR: source=%s target=%s", mrConfig.SourceBranch, mrConfig.TargetBranch))
-	mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
-	if err != nil {
-		result.StepResults = append(result.StepResults, StepResult{
-			StepID:  "mr",
-			Success: true,
-			Message: fmt.Sprintf("MR creation failed: %v", err),
-		})
-		return
-	}
-	if mrResult != nil && mrResult.MRURL != "" {
-		action := "created"
-		if !mrResult.Created {
-			action = "updated"
-		}
-		result.StepResults = append(result.StepResults, StepResult{
-			StepID:  "mr",
-			Success: true,
-			Message: fmt.Sprintf("MR %s: %s", action, mrResult.MRURL),
-		})
-		result.MRURL = mrResult.MRURL
-	}
+    mrTimeout := 2 * time.Minute
+    mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
+    defer cancelMR()
+    mrEmitStart(r, ctx, mrConfig.SourceBranch, mrConfig.TargetBranch)
+    mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
+    if err != nil {
+        mrAppendFailure(result, err)
+        return
+    }
+    if mrResult != nil && mrResult.MRURL != "" {
+        mrAppendSuccess(result, mrResult.MRURL, mrResult.Created)
+    }
 }
