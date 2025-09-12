@@ -1,8 +1,9 @@
 package transflow
 
 import (
-	"context"
-	"time"
+    "context"
+    "fmt"
+    "time"
 )
 
 // Job submission types for transflow healing workflow
@@ -62,11 +63,24 @@ type BranchResult struct {
 
 // JobSubmissionHelper provides methods for submitting transflow jobs
 type JobSubmissionHelper interface {
-	SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error)
-	SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error)
+    SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error)
+    SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error)
 }
 
 // FanoutOrchestrator manages parallel execution of healing branches
 type FanoutOrchestrator interface {
-	RunHealingFanout(ctx context.Context, runCtx interface{}, branches []BranchSpec, maxParallel int) (BranchResult, []BranchResult, error)
+    RunHealingFanout(ctx context.Context, runCtx interface{}, branches []BranchSpec, maxParallel int) (BranchResult, []BranchResult, error)
+}
+
+// JobSubmitter abstracts job submission for tests and production
+type JobSubmitter interface {
+    SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)
+}
+
+// NoopJobSubmitter is a minimal submitter that returns an error when used.
+// It serves only as a marker to enable healing while production paths use the runner.
+type NoopJobSubmitter struct{}
+
+func (NoopJobSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error) {
+    return JobResult{}, fmt.Errorf("NoopJobSubmitter cannot submit jobs")
 }
