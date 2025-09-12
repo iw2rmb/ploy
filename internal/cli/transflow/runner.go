@@ -625,55 +625,20 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 					}
 				}
 			}
-			// Prepare diff path for later fetch and processing
-			diffPath := filepath.Join(baseDir, "out", "diff.patch")
-			_ = os.MkdirAll(filepath.Dir(diffPath), 0755)
-			// Preflight validate HCL, then submit job and wait terminal
-			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
-			log.Printf("[Transflow] Submitting orw-apply job runID=%s; hcl=%s", runID, submittedPath)
-			if err := validateJob(submittedPath); err != nil {
-				r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("HCL validation failed: %v", err))
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW HCL validation failed: %v", err)})
-				result.ErrorMessage = fmt.Sprintf("orw-apply HCL validation failed: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("orw-apply HCL validation failed: %w", err)
-			}
-			r.reportLastJobAsync(ctx, runID, "apply", "orw-apply")
-			if err := submitAndWaitTerminal(submittedPath, 15*time.Minute); err != nil {
-				// Best-effort: if diff.patch exists, proceed even if job failed (uploads/network can fail)
-				if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
-					log.Printf("[Transflow] orw-apply wait failed (%v), but diff present (size=%d). Proceeding.", err, fi.Size())
-				} else {
-					r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("orw-apply failed: %v", err))
-					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("ORW apply failed: %v", err)})
-					result.ErrorMessage = fmt.Sprintf("orw-apply job failed: %v", err)
-					result.Duration = time.Since(startTime)
-					return nil, fmt.Errorf("orw-apply job failed: %w", err)
-				}
-			}
-			// Successful wait implies job completed; emit explicit completion event
-			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
-			// Fetch diff from SeaweedFS now
-			seaweed = os.Getenv("PLOY_SEAWEEDFS_URL")
-			if seaweed == "" {
-				seaweed = "http://seaweedfs-filer.service.consul:8888"
-			}
-			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-			var fetchErr error
-			if execID != "" {
-				branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
-				url := strings.TrimRight(seaweed, "/") + "/artifacts/" + branchDiffKey
-				fetchErr = downloadToFileFn(url, diffPath)
-			} else {
-				fetchErr = fmt.Errorf("missing execution id for diff fetch")
-			}
-			if fetchErr != nil {
-				r.emit(ctx, "apply", "orw-apply", "error", fmt.Sprintf("no diff produced: %v", err))
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("No diff.patch produced: %v", err)})
-				result.ErrorMessage = "no diff produced by orw-apply"
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("no diff produced by orw-apply: %w", fetchErr)
-			}
+            // Prepare diff path for later fetch and processing
+            diffPath := filepath.Join(baseDir, "out", "diff.patch")
+            _ = os.MkdirAll(filepath.Dir(diffPath), 0755)
+            r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
+            // Submit job and fetch diff via helper
+            if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, submittedPath, diffPath, 15*time.Minute); err != nil {
+                r.emit(ctx, "apply", "orw-apply", "error", err.Error())
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+                result.ErrorMessage = err.Error()
+                result.Duration = time.Since(startTime)
+                return nil, err
+            }
+            // Successful wait and fetch implies job completed
+            r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
 
 			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
 			_ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
