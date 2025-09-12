@@ -87,10 +87,10 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		return nil
 	}
 
-	timeout := 30 * time.Minute
-	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-		return fmt.Errorf("planner job failed: %w", err)
-	}
+    timeout := ResolveDefaultsFromEnv().PlannerTimeout
+    if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
+        return fmt.Errorf("planner job failed: %w", err)
+    }
 
 	// Attempt to read plan.json from URL or locally (also support SeaweedFS filer via bucket/key)
 	if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
