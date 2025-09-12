@@ -216,8 +216,20 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	baseDir := filepath.Dir(hclPath)
 	// Ensure out directory exists for bind mount target
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-	os.Setenv("TRANSFLOW_CONTEXT_DIR", baseDir)
-	os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+	vars := map[string]string{
+		"TRANSFLOW_CONTEXT_DIR":       baseDir,
+		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+		"TRANSFLOW_PLANNER_IMAGE":     os.Getenv("TRANSFLOW_PLANNER_IMAGE"),
+		"TRANSFLOW_REDUCER_IMAGE":     os.Getenv("TRANSFLOW_REDUCER_IMAGE"),
+		"TRANSFLOW_LLM_EXEC_IMAGE":    os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE"),
+		"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+		"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+		"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+		"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+		"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+	}
 
 	// Step 2: Generate unique run ID for this branch
 	runID := fmt.Sprintf("llm-exec-%s-%d", branch.ID, time.Now().Unix())
@@ -234,7 +246,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	}
 
 	// Step 4: Substitute environment variables in HCL template with MCP support
-	renderedHCLPath, err := substituteHCLTemplateWithMCP(hclPath, runID, mcpConfig)
+	renderedHCLPath, err := substituteHCLTemplateWithMCPVars(hclPath, runID, vars, mcpConfig)
 	if err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("failed to substitute HCL template: %v", err)
@@ -423,15 +435,24 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 
-	// Provide host directories for bind mounts
+	// Provide host directories for bind mounts (no global env)
 	baseDir := filepath.Dir(hclPath)
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-	os.Setenv("TRANSFLOW_CONTEXT_DIR", baseDir)
-	os.Setenv("TRANSFLOW_OUT_DIR", filepath.Join(baseDir, "out"))
+	vars := map[string]string{
+		"TRANSFLOW_CONTEXT_DIR":       baseDir,
+		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+		"PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+		"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+		"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+		"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+		"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+	}
 
 	// Step 2b: Substitute environment variables in HCL template
 	runID := fmt.Sprintf("orw-apply-%s-%d", branch.ID, time.Now().Unix())
-	renderedHCLPath, err := substituteORWTemplate(prePath, runID)
+	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
 	if err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("failed to substitute ORW HCL template: %v", err)

@@ -228,31 +228,21 @@ func SubmitAndWaitHealthy(jobPath string, expectedCount int, timeout time.Durati
 
 // ValidateJob parses HCL to validate syntax; returns error if invalid.
 func ValidateJob(jobPath string) error {
-	if useJobManager() {
-		// For wrapper path, rely on nomad CLI to validate HCL by converting (-output)
-		cmd := exec.Command("nomad", "job", "run", "-output", jobPath)
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("job parse/validate failed via nomad CLI: %w", err)
-		}
-		return nil
-	}
-	// Validation does not register jobs, but still talks to API
-	acquireSubmit()
-	defer releaseSubmit()
-	hcl, err := os.ReadFile(jobPath)
-	if err != nil {
-		return err
-	}
-	client, err := newNomadClient()
-	if err != nil {
-		return err
-	}
-	if _, err := client.Jobs().ParseHCL(string(hcl), true); err != nil {
-		return fmt.Errorf("job parse/validate failed: %w", err)
-	}
-	return nil
+    // Always use SDK HCL parse to avoid raw CLI usage in wrapper mode.
+    acquireSubmit()
+    defer releaseSubmit()
+    hcl, err := os.ReadFile(jobPath)
+    if err != nil {
+        return err
+    }
+    client, err := newNomadClient()
+    if err != nil {
+        return err
+    }
+    if _, err := client.Jobs().ParseHCL(string(hcl), true); err != nil {
+        return fmt.Errorf("job parse/validate failed: %w", err)
+    }
+    return nil
 }
 
 // PlanJob is not implemented in SDK mode; returns a placeholder message.
