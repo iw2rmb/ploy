@@ -4,6 +4,7 @@
 
 ### Changed
 - API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
+- Ansible API deploy: switch to Nomad rolling updates (no stop/start). The dev playbook removes explicit stop and relies on the job's `update` stanza. Nomad job template now enables `auto_promote = true` and `health_check = "checks"` for zero‑downtime rollouts.
 
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).
