@@ -58,12 +58,9 @@ Notes:
 
 ### Phase 3: Tests and Scripts
 
-- Update/remove all direct ARF transform references in scripts:
-  - `tests/scripts/test-arf-phase2.sh` (remove POST/GET to `/v1/arf/transforms*`).
-  - `tests/scripts/test-transformation-workflow.sh`.
-  - `tests/scripts/test-arf-unified-consistency.sh` (has references to `/arf/transform`).
-  - `tests/scripts/test-openrewrite-comprehensive.sh`.
-  - `tests/scripts/test-storage-fix-verification.sh`.
+- Remove legacy shell scripts that call ARF transform endpoints and migrate coverage into Go tests:
+  - Replaced by Go integration/E2E suites: `tests/integration/transflow`, `tests/e2e/transflow_workflows_test.go`, `tests/acceptance/mvp_acceptance_test.go`.
+  - Unit-level coverage in `internal/cli/transflow/**/*_test.go`, `internal/build/**/*_test.go`, and policy tests.
 - Update unit tests that encode the Consul key prefix `ploy/arf/transforms` if we rename it (see Phase 5).
 
 Recommended repo-sweep to catch stragglers:
