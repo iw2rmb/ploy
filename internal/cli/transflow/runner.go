@@ -1,18 +1,17 @@
 package transflow
 
 import (
-	"context"
-	crand "crypto/rand"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
+    "context"
+    crand "crypto/rand"
+    "encoding/hex"
+    "errors"
+    "fmt"
+    "log"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "time"
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
@@ -550,12 +549,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				log.Printf("[Transflow] input.tar preview (%d entries):\n%s", max, strings.Join(lines[:max], "\n"))
 			}
 
-			// Pre-substitute recipe class and input tar host path into template
-			hclBytes, err := os.ReadFile(renderedPath)
-			if err != nil {
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to read HCL: %v", err)})
-				return nil, fmt.Errorf("failed to read HCL: %w", err)
-			}
+            // Pre-substitute recipe class and input tar host path into template
 			rclass := ""
 			if len(step.Recipes) > 0 {
 				rclass = step.Recipes[0]
@@ -575,18 +569,11 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 			// Create run ID for this submission and then substitute it
 			runID := fmt.Sprintf("orw-apply-%s-%d", step.ID, time.Now().Unix())
-			prePath := strings.ReplaceAll(renderedPath, ".rendered.hcl", ".pre.hcl")
-			preContent := strings.ReplaceAll(string(hclBytes), "${RECIPE_CLASS}", rclass)
-			preContent = strings.ReplaceAll(preContent, "${INPUT_TAR_HOST_PATH}", inputTar)
-			preContent = strings.ReplaceAll(preContent, "${RUN_ID}", runID)
-			preContent = strings.ReplaceAll(preContent, "${RECIPE_GROUP}", rgroup)
-			preContent = strings.ReplaceAll(preContent, "${RECIPE_ARTIFACT}", rartifact)
-			preContent = strings.ReplaceAll(preContent, "${RECIPE_VERSION}", rversion)
-			preContent = strings.ReplaceAll(preContent, "${MAVEN_PLUGIN_VERSION}", pluginVersion)
-			if err := os.WriteFile(prePath, []byte(preContent), 0644); err != nil {
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
-				return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
-			}
+            prePath, err := writeORWPreHCL(renderedPath, ORWRecipeParams{Class: rclass, Group: rgroup, Artifact: rartifact, Version: rversion, PluginVersion: pluginVersion}, inputTar, runID)
+            if err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
+                return nil, fmt.Errorf("failed to write pre-substituted HCL: %w", err)
+            }
 
             // Prepare env and substitute final template
             baseDir := filepath.Dir(renderedPath)
@@ -731,31 +718,11 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			})
 
 			// Record chain metadata for this branch (option_id = step.ID)
-			{
-				branchID := step.ID
-				// Read previous HEAD
-				headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
-				prevID := ""
-				if b, code, _ := getJSON(seaweed, headKey); code == 200 {
-					var head map[string]string
-					_ = json.Unmarshal(b, &head)
-					prevID = head["step_id"]
-				}
-				// Diff already uploaded by task under DIFF_KEY; reference it directly
-				branchDiffKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, curStepID)
-				// Write meta.json
-				meta := map[string]any{
-					"step_id":      curStepID,
-					"prev_step_id": prevID,
-					"branch_id":    branchID,
-					"diff_key":     branchDiffKey,
-					"ts":           time.Now().UTC().Format(time.RFC3339),
-				}
-				if mb, e := json.Marshal(meta); e == nil {
-					_ = putJSONFn(seaweed, fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, curStepID), mb)
-					_ = putJSONFn(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", curStepID)))
-				}
-			}
+            {
+                branchID := step.ID
+                branchDiffKey := computeBranchDiffKey(execID, branchID, curStepID)
+                _ = writeBranchChainStepMeta(seaweed, execID, branchID, curStepID, branchDiffKey)
+            }
 
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow
