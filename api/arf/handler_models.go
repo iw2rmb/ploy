@@ -8,6 +8,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/hashicorp/consul/api"
+	llmmodel "github.com/iw2rmb/ploy/internal/arf/models"
+	istorage "github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/storage/factory"
 )
 
 // ModelConfig represents a single LLM model configuration
@@ -440,7 +443,8 @@ func (h *Handler) ImportModels(c *fiber.Ctx) error {
 func GetDefaultModel(ctx context.Context) (*ModelConfig, error) {
 	client, err := getConsulClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Consul: %w", err)
+		// Fallback to LLMS registry storage when Consul is unavailable
+		return getDefaultModelFromLLMS(ctx)
 	}
 
 	kv := client.KV()
@@ -450,7 +454,8 @@ func GetDefaultModel(ctx context.Context) (*ModelConfig, error) {
 	}
 
 	if pair == nil || pair.Value == nil {
-		return nil, fmt.Errorf("no models configured")
+		// Fallback to LLMS registry if ARF registry empty
+		return getDefaultModelFromLLMS(ctx)
 	}
 
 	registry := ModelRegistry{Models: []ModelConfig{}}
@@ -470,14 +475,15 @@ func GetDefaultModel(ctx context.Context) (*ModelConfig, error) {
 		return &registry.Models[0], nil
 	}
 
-	return nil, fmt.Errorf("no models available")
+	// Fallback to LLMS registry
+	return getDefaultModelFromLLMS(ctx)
 }
 
 // GetModelByName retrieves a specific model configuration
 func GetModelByName(ctx context.Context, name string) (*ModelConfig, error) {
 	client, err := getConsulClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Consul: %w", err)
+		return getModelByNameFromLLMS(ctx, name)
 	}
 
 	kv := client.KV()
@@ -487,7 +493,7 @@ func GetModelByName(ctx context.Context, name string) (*ModelConfig, error) {
 	}
 
 	if pair == nil || pair.Value == nil {
-		return nil, fmt.Errorf("no models configured")
+		return getModelByNameFromLLMS(ctx, name)
 	}
 
 	registry := ModelRegistry{Models: []ModelConfig{}}
@@ -500,8 +506,8 @@ func GetModelByName(ctx context.Context, name string) (*ModelConfig, error) {
 			return &model, nil
 		}
 	}
-
-	return nil, fmt.Errorf("model '%s' not found", name)
+	// Fallback search in LLMS registry
+	return getModelByNameFromLLMS(ctx, name)
 }
 
 // RegisterModelRoutes registers all model management routes
@@ -513,4 +519,101 @@ func RegisterModelRoutes(app *fiber.App, handler *Handler) {
 	models.Put("/", handler.ImportModels)
 	models.Delete("/:name", handler.RemoveModel)
 	models.Post("/:name/set-default", handler.SetDefaultModel)
+}
+
+// fetchLLMSModels loads all LLMS models from the storage-backed registry.
+func fetchLLMSModels(ctx context.Context) ([]llmmodel.LLMModel, error) {
+	// Use factory defaults (SeaweedFS) driven by env; matches other API components
+	stor, err := factory.New(factory.FactoryConfig{
+		Provider:   "seaweedfs",
+		Monitoring: factory.MonitoringConfig{Enabled: false},
+		Cache:      factory.CacheConfig{Enabled: false},
+		Retry:      factory.RetryConfig{Enabled: true, MaxAttempts: 3},
+	})
+	if err != nil {
+		return nil, err
+	}
+	// List models under keyspace llms/models/
+	objects, err := stor.List(ctx, istorage.ListOptions{Prefix: "llms/models/"})
+	if err != nil {
+		return nil, err
+	}
+	models := make([]llmmodel.LLMModel, 0, len(objects))
+	for _, obj := range objects {
+		r, err := stor.Get(ctx, obj.Key)
+		if err != nil {
+			continue
+		}
+		var m llmmodel.LLMModel
+		if json.NewDecoder(r).Decode(&m) == nil {
+			models = append(models, m)
+		}
+		r.Close()
+	}
+	return models, nil
+}
+
+// mapLLMToARF converts LLMS model to ARF ModelConfig best-effort.
+func mapLLMToARF(m llmmodel.LLMModel) *ModelConfig {
+	endpoint := ""
+	apiKey := ""
+	temp := 0.1
+	if m.Config != nil {
+		if v, ok := m.Config["endpoint"]; ok {
+			endpoint = v
+		}
+		if v, ok := m.Config["api_key"]; ok {
+			apiKey = v
+		}
+		if v, ok := m.Config["temperature"]; ok {
+			if f, err := fmt.Sscanf(v, "%f", &temp); err == nil && f == 1 {
+				// parsed into temp
+			}
+		}
+	}
+	return &ModelConfig{
+		Name:        m.Name,
+		Provider:    m.Provider,
+		Endpoint:    endpoint,
+		APIKey:      apiKey,
+		Model:       m.ID,
+		Default:     false,
+		MaxTokens:   m.MaxTokens,
+		Temperature: temp,
+		CreatedAt:   time.Time(m.Created).UTC().Format(time.RFC3339),
+		UpdatedAt:   time.Time(m.Updated).UTC().Format(time.RFC3339),
+	}
+}
+
+func getDefaultModelFromLLMS(ctx context.Context) (*ModelConfig, error) {
+	models, err := fetchLLMSModels(ctx)
+	if err != nil || len(models) == 0 {
+		if err == nil {
+			err = fmt.Errorf("no models available")
+		}
+		return nil, err
+	}
+	// Heuristic: prefer models that include 'code' capability, else first
+	for _, m := range models {
+		if m.HasCapability("code") {
+			return mapLLMToARF(m), nil
+		}
+	}
+	return mapLLMToARF(models[0]), nil
+}
+
+func getModelByNameFromLLMS(ctx context.Context, name string) (*ModelConfig, error) {
+	models, err := fetchLLMSModels(ctx)
+	if err != nil || len(models) == 0 {
+		if err == nil {
+			err = fmt.Errorf("no models available")
+		}
+		return nil, err
+	}
+	for _, m := range models {
+		if m.Name == name || m.ID == name {
+			return mapLLMToARF(m), nil
+		}
+	}
+	return nil, fmt.Errorf("model '%s' not found", name)
 }
