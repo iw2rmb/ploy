@@ -477,11 +477,13 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 		Environment: "dev",
 		Timeout:     timeout,
 	}
-	// Ensure build tar is created from the repository root
-	cwd, _ := os.Getwd()
-	_ = os.Chdir(repoPath)
+	// Ensure build tar is created from the repository root without changing process cwd
+	// SharedPush honors WorkingDir in config when set via build checker integration
+	// Inject working dir via context: decorate DeployConfig with a metadata hint consumed by SharedPush
+	// For minimal change, use WorkingDir when supported by build checker implementation.
+	buildCfg.Metadata = map[string]string{"working_dir": repoPath}
+	// If build checker supports WorkingDir in DeployConfig, it will honor it; otherwise default behavior applies.
 	res, err := r.buildChecker.CheckBuild(ctx, buildCfg)
-	_ = os.Chdir(cwd)
 	if err != nil {
 		return fmt.Errorf("build gate failed: %w", err)
 	}

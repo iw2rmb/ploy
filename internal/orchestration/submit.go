@@ -2,6 +2,7 @@ package orchestration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -228,21 +229,21 @@ func SubmitAndWaitHealthy(jobPath string, expectedCount int, timeout time.Durati
 
 // ValidateJob parses HCL to validate syntax; returns error if invalid.
 func ValidateJob(jobPath string) error {
-    // Always use SDK HCL parse to avoid raw CLI usage in wrapper mode.
-    acquireSubmit()
-    defer releaseSubmit()
-    hcl, err := os.ReadFile(jobPath)
-    if err != nil {
-        return err
-    }
-    client, err := newNomadClient()
-    if err != nil {
-        return err
-    }
-    if _, err := client.Jobs().ParseHCL(string(hcl), true); err != nil {
-        return fmt.Errorf("job parse/validate failed: %w", err)
-    }
-    return nil
+	// Always use SDK HCL parse to avoid raw CLI usage in wrapper mode.
+	acquireSubmit()
+	defer releaseSubmit()
+	hcl, err := os.ReadFile(jobPath)
+	if err != nil {
+		return err
+	}
+	client, err := newNomadClient()
+	if err != nil {
+		return err
+	}
+	if _, err := client.Jobs().ParseHCL(string(hcl), true); err != nil {
+		return fmt.Errorf("job parse/validate failed: %w", err)
+	}
+	return nil
 }
 
 // PlanJob is not implemented in SDK mode; returns a placeholder message.
@@ -264,6 +265,12 @@ func WaitHealthy(jobName string, timeout time.Duration) error {
 // SubmitAndWaitTerminal registers a batch job and waits until its allocations reach a terminal state
 // (complete or failed), or the timeout elapses. This is intended for short-lived planner/reducer jobs.
 func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
+	return SubmitAndWaitTerminalCtx(context.Background(), jobPath, timeout)
+}
+
+// SubmitAndWaitTerminalCtx is like SubmitAndWaitTerminal but honors context cancellation.
+// On ctx cancel, it best-effort deregisters/stops the job.
+func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.Duration) error {
 	start := time.Now()
 	allocAppearGuard := envDur("NOMAD_ALLOC_APPEARANCE_TIMEOUT", 90*time.Second)
 	if useJobManager() {
@@ -271,14 +278,21 @@ func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
 		if err != nil {
 			return err
 		}
-		// Wait with guard: if no allocations appear within guard, fail fast
-		if err := waitTerminalWithJobManager(name, timeout); err != nil {
+		// Wait with guard and cancellation support
+		done := make(chan error, 1)
+		go func() { done <- waitTerminalWithJobManager(name, timeout) }()
+		select {
+		case err := <-done:
 			return err
+		case <-ctx.Done():
+			// Best-effort stop via wrapper
+			_ = stopWithJobManager(name)
+			return ctx.Err()
 		}
 		// Note: waitTerminalWithJobManager handles alloc checks internally; guard is less applicable here
 		_ = start
 		_ = allocAppearGuard
-		return nil
+		// unreachable
 	}
 	acquireSubmit()
 	defer releaseSubmit()
@@ -311,6 +325,13 @@ func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
 	waitTime := envDur("NOMAD_BLOCKING_WAIT", 30*time.Second)
 	sawAnyAllocs := false
 	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			// Best-effort deregister
+			_, _, _ = client.Jobs().Deregister(name, true, nil)
+			return ctx.Err()
+		default:
+		}
 		// Use blocking query to reduce control-plane load
 		q := &nomadapi.QueryOptions{WaitIndex: lastIndex, WaitTime: waitTime, AllowStale: true}
 		allocs, meta, err := client.Jobs().Allocations(name, false, q)
@@ -346,6 +367,27 @@ func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
 		// Do not sleep here; blocking query already waited. Loop continues.
 	}
 	return fmt.Errorf("timeout waiting for job %s to complete", name)
+}
+
+// stopWithJobManager attempts to stop/deregister a job via the wrapper
+func stopWithJobManager(jobName string) error {
+	// Try 'stop' first
+	cmd := exec.Command(jobManagerPath(), "stop", "--job", jobName)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+	// Fallback to 'deregister'
+	cmd = exec.Command(jobManagerPath(), "deregister", "--job", jobName)
+	out.Reset()
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("wrapper stop/deregister failed: %v: %s", err, out.String())
+	}
+	return nil
 }
 
 func newNomadClient() (*nomadapi.Client, error) {

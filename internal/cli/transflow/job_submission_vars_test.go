@@ -31,9 +31,9 @@ func TestSubstituteHCLTemplateWithMCPVars_UsesProvidedVars(t *testing.T) {
 	if want := "MODEL=\"gpt-x\""; !contains(s, want) {
 		t.Fatalf("missing %s in %s", want, s)
 	}
-    if want := "CONTROLLER=\"https://api.dev.ployman.app/v1\""; !contains(s, want) {
-        t.Fatalf("missing %s", want)
-    }
+	if want := "CONTROLLER=\"https://api.dev.ployman.app/v1\""; !contains(s, want) {
+		t.Fatalf("missing %s", want)
+	}
 	if want := "EXEC=\"e-22\""; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}

@@ -35,7 +35,13 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	// Transflow build gate must be ephemeral; ask API to tear down sandboxed app after gate
 	config.BuildOnly = true
 
-	log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s", b.controllerURL, config.App, config.Lane, config.Environment)
+	// Propagate working directory hint from metadata if present
+	if config.Metadata != nil {
+		if wd, ok := config.Metadata["working_dir"]; ok && wd != "" {
+			config.WorkingDir = wd
+		}
+	}
+	log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s wd=%s", b.controllerURL, config.App, config.Lane, config.Environment, config.WorkingDir)
 
 	// Use SharedPush to perform the build check
 	// SharedPush already supports build-only mode when used with specific endpoints

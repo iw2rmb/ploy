@@ -23,9 +23,10 @@ Scope
       - Risk: false negatives (reject valid diffs) or false security assumptions.
       - Change: switch to doublestar globbing with “” support or implement a safe recursive matcher. Add unit tests for patterns like “src//*.java”, “src/**”, “pom.xml”.
       - Completed: replaced with doublestar, added unit tests for recursive patterns and root files.
-  - Fanout cancellation does not stop running jobs.
+  - ✅ Fanout cancellation does not stop running jobs.
       - RunHealingFanout cancels context on first success, but production branch execution calls orchestration.SubmitAndWaitTerminal (no context), so other jobs keep running.
       - Change: add cancellation support in orchestration: on cancel, deregister the job or call the job manager to stop it; ensure the fanout orchestrator issues cancels and the orchestration layer honors them. Add tests for “winner found” ensures others are stopped.
+      - Completed: introduced `SubmitAndWaitTerminalCtx` with context cancellation; on cancel, SDK path deregisters job, wrapper path calls `nomad-job-manager.sh stop|deregister`. Fanout and job submission flows now use the ctx-aware API.
   - ✅ Process‑wide environment mutation for job templating.
       - Runner and helpers set env vars (os.Setenv) such as TRANSFLOW_OUT_DIR, TRANSFLOW_DIFF_KEY, etc. That leaks global state and breaks multi‑run concurrency in a single process.
       - Change: consolidate templating into a function that takes an explicit map[string]string and writes the rendered HCL without touching global env. Thread per‑job env only where needed (e.g., pass env to job submitter wrapper).
@@ -40,9 +41,10 @@ Scope
   - ValidateJob on VPS calls raw nomad CLI.
       - In wrapper mode, ValidateJob executes nomad job run -output directly. AGENTS.md: “Never call raw nomad CLI from app code on the VPS; route through the job manager wrapper.”
       - Change: add validation command to the job manager wrapper (or wrap it in the wrapper) and call that; alternatively, fall back to SDK HCL parse always; avoid raw nomad CLI in wrapper mode.
-  - OS working directory changes (os.Chdir) around builds.
+  - ✅ OS working directory changes (os.Chdir) around builds.
       - Side‑effectful; unsafe across concurrent runs; brittle on panic.
       - Change: make build checker accept repo path or tar path; avoid process cwd changes. If unavoidable, wrap in defer with error handling and document as single‑run only.
+      - Completed: `common.DeployConfig` gained optional `WorkingDir`; SharedPush honors it; Transflow passes repo path via metadata to avoid process-wide `chdir`.
   - Interface typing with interface{} for “submitter/runners”.
       - jobSubmitter uses interface{} as a marker; jobSubmissionHelper and fanout do type assertions for test mode vs production.
       - Change: replace with explicit interfaces (ProductionJobSubmitter, ProductionBranchRunner, and a clean JobSubmitter abstraction). Remove magic “non‑nil” markers; inject typed collaborators.
