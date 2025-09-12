@@ -28,7 +28,7 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
         SourceBranch: branchName,
         TargetBranch: r.config.TargetBranch,
         Title:        fmt.Sprintf("Transflow: %s", r.config.ID),
-        Description:  r.generateMRDescription(result),
+        Description:  renderMRDescription(r, result),
         Labels:       []string{"ploy", "tfl"},
     }
 
