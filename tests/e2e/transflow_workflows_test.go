@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -150,6 +151,13 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 	// One-liner MR log on success
 	t.Logf("MR Created: %s", mr)
 
+	// Cleanup: if GITLAB_TOKEN is provided, delete source branch for the created MR (no merge)
+	if token := os.Getenv("GITLAB_TOKEN"); token != "" && mr != "" {
+		if err := deleteMRSourceBranch(ctx, token, mr); err != nil {
+			t.Logf("cleanup warning: failed to delete MR source branch: %v", err)
+		}
+	}
+
 	// Tiny guard: print artifacts map from status if present, else fall back to artifacts endpoint
 	if artsVal, ok := st.Result["artifacts"]; ok {
 		if artsMap, ok2 := artsVal.(map[string]interface{}); ok2 {
@@ -169,6 +177,59 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 			}
 		}
 	}
+}
+
+// deleteMRSourceBranch deletes the source branch of the MR at mrURL using GitLab API.
+// It does not merge; it only removes the branch to keep the repo clean for E2E.
+func deleteMRSourceBranch(ctx context.Context, token, mrURL string) error {
+    // Parse project path and IID from MR URL of form:
+    // https://gitlab.com/<namespace>/<project>/-/merge_requests/<iid>
+    const hostPrefix = "https://gitlab.com/"
+    if !strings.HasPrefix(mrURL, hostPrefix) {
+        return fmt.Errorf("unexpected MR URL: %s", mrURL)
+    }
+    path := strings.TrimPrefix(mrURL, hostPrefix)
+    parts := strings.Split(path, "/-/merge_requests/")
+    if len(parts) != 2 {
+        return fmt.Errorf("failed to parse MR URL: %s", mrURL)
+    }
+    projectPath := parts[0]
+    iid := parts[1]
+    projEsc := url.PathEscape(projectPath)
+
+    apiBase := "https://gitlab.com/api/v4"
+    httpc := &http.Client{Timeout: 20 * time.Second}
+
+    // 1) GET MR details to find source_branch
+    mrAPI := fmt.Sprintf("%s/projects/%s/merge_requests/%s", apiBase, projEsc, iid)
+    req, _ := http.NewRequestWithContext(ctx, http.MethodGet, mrAPI, nil)
+    req.Header.Set("PRIVATE-TOKEN", token)
+    resp, err := httpc.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    if resp.StatusCode != 200 {
+        return fmt.Errorf("get mr http %d", resp.StatusCode)
+    }
+    var mr struct{ SourceBranch string `json:"source_branch"` }
+    if json.NewDecoder(resp.Body).Decode(&mr) != nil || mr.SourceBranch == "" {
+        return fmt.Errorf("failed to read MR source_branch")
+    }
+
+    // 2) DELETE branch
+    delURL := fmt.Sprintf("%s/projects/%s/repository/branches/%s", apiBase, projEsc, url.PathEscape(mr.SourceBranch))
+    req2, _ := http.NewRequestWithContext(ctx, http.MethodDelete, delURL, nil)
+    req2.Header.Set("PRIVATE-TOKEN", token)
+    resp2, err := httpc.Do(req2)
+    if err != nil {
+        return err
+    }
+    defer resp2.Body.Close()
+    if resp2.StatusCode != 204 {
+        return fmt.Errorf("delete branch http %d", resp2.StatusCode)
+    }
+    return nil
 }
 
 func TestTransflowE2E_SelfHealingScenario(t *testing.T) {
