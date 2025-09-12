@@ -76,7 +76,7 @@ run_test "Vault" "curl -f -s http://localhost:8200/v1/sys/health"
 echo "🚀 Testing controller deployment..."
 
 run_test "Controller job exists in Nomad" "curl -f -s http://localhost:4646/v1/job/ploy-api"
-run_test "Controller allocations running" "nomad job status ploy-api | grep -q running"
+run_test "Controller allocations running" "/opt/hashicorp/bin/nomad-job-manager.sh allocs --job ploy-api | jq -e '. | length > 0'"
 
 # Test 569: Unified deployment system components
 echo "📦 Testing unified deployment system..."
@@ -88,7 +88,7 @@ run_test "Deployment method configured" "test -f /opt/ploy/deployment-method"
 # Test 570: High availability deployment
 echo "🏃 Testing high availability..."
 
-ALLOC_COUNT=$(nomad job status ploy-api | grep -c "running" || echo "0")
+ALLOC_COUNT=$(/opt/hashicorp/bin/nomad-job-manager.sh allocs --job ploy-api | jq -r 'length' 2>/dev/null || echo "0")
 if [ "$ALLOC_COUNT" -ge 2 ]; then
     echo -e "HA deployment: ${GREEN}PASS${NC} ($ALLOC_COUNT replicas)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
