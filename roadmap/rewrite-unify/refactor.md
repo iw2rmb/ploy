@@ -145,3 +145,7 @@ Scope
     - ✅ Extracted ORW pre-HCL builder (`writeORWPreHCL`) and branch chain metadata writer (`writeBranchChainStepMeta`) with unit tests.
     - ✅ Extracted ORW submission/fetch-diff helper (`submitORWJobAndFetchDiff`) and wired runner to use it.
     - ✅ Extracted ORW utility helpers for diff key and substitution var assembly.
+    - ✅ Extracted build-file guard helpers (`checkBuildFiles`, `ensureBuildFile`) and replaced inline guard logic in runner.
+    - ✅ Extracted input.tar preview helper (`logPreviewTar`/`previewTarEntries`) to replace inline tar listing.
+    - ✅ Centralized run ID generation (`PlannerRunID`, `ReducerRunID`, `LLMRunID`, `ORWRunID`) and replaced ad-hoc formatting.
+    - ✅ Added `NewBranchStep(execID, branchID)` to generate step IDs and DIFF keys consistently.

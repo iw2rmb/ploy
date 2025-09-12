@@ -564,8 +564,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             // Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
             execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
             branchID := step.ID
-            curStepID := randomStepID()
-            diffKey := computeBranchDiffKey(execID, branchID, curStepID)
+            bs := NewBranchStep(execID, branchID)
+            curStepID := bs.ID
+            diffKey := bs.DiffKey
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
 			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
