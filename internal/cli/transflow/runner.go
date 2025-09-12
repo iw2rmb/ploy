@@ -151,7 +151,7 @@ type TransflowRunner struct {
 	gitOps         GitOperationsInterface
 	recipeExecutor RecipeExecutorInterface
 	buildChecker   BuildCheckerInterface
-	jobSubmitter   interface{}          // For healing workflows
+    jobSubmitter   JobSubmitter         // For healing workflows
 	gitProvider    provider.GitProvider // For MR creation
 	eventReporter  EventReporter        // Optional real-time event reporter
 }
@@ -185,7 +185,15 @@ func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
 func (r *TransflowRunner) SetJobSubmitter(submitter interface{}) {
-	r.jobSubmitter = submitter
+    switch s := submitter.(type) {
+    case nil:
+        r.jobSubmitter = nil
+    case JobSubmitter:
+        r.jobSubmitter = s
+    default:
+        // Any non-nil marker enables healing; production path prefers runner
+        r.jobSubmitter = NoopJobSubmitter{}
+    }
 }
 
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)

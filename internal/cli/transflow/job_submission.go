@@ -23,24 +23,36 @@ type ProductionJobSubmitter interface {
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface
 type jobSubmissionHelper struct {
-	submitter interface{}            // JobSubmitter interface for production job submission
-	runner    ProductionJobSubmitter // For accessing asset rendering methods in production
+    submitter JobSubmitter           // Concrete job submitter (mock in tests, real in prod)
+    runner    ProductionJobSubmitter // For accessing asset rendering methods in production
 }
 
 // NewJobSubmissionHelper creates a new job submission helper
 func NewJobSubmissionHelper(submitter interface{}) JobSubmissionHelper {
-	return &jobSubmissionHelper{
-		submitter: submitter,
-		runner:    nil, // Will be nil when runner is not needed
-	}
+    var js JobSubmitter
+    switch s := submitter.(type) {
+    case nil:
+        js = nil
+    case JobSubmitter:
+        js = s
+    default:
+        js = NoopJobSubmitter{}
+    }
+    return &jobSubmissionHelper{submitter: js}
 }
 
 // NewJobSubmissionHelperWithRunner creates a new job submission helper with runner access for production
 func NewJobSubmissionHelperWithRunner(submitter interface{}, runner ProductionJobSubmitter) JobSubmissionHelper {
-	return &jobSubmissionHelper{
-		submitter: submitter,
-		runner:    runner,
-	}
+    var js JobSubmitter
+    switch s := submitter.(type) {
+    case nil:
+        js = nil
+    case JobSubmitter:
+        js = s
+    default:
+        js = NoopJobSubmitter{}
+    }
+    return &jobSubmissionHelper{submitter: js, runner: runner}
 }
 
 // substituteHCLTemplate performs environment variable substitution in HCL templates
@@ -213,41 +225,10 @@ func readJobArtifact(artifactPath string, target interface{}) error {
 
 // SubmitPlannerJob submits a planner job after a build failure
 func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error) {
-	// Check if this is a test submitter (backward compatibility)
-	if testSubmitter, ok := h.submitter.(interface {
-		SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)
-	}); ok {
-		spec := JobSpec{
-			Name:    "planner",
-			Type:    "planner",
-			HCLPath: "", // Would be set from rendered assets
-			EnvVars: map[string]string{
-				"BUILD_ERROR": buildError,
-				"TARGET_REPO": config.TargetRepo,
-				"BASE_REF":    config.BaseRef,
-			},
-			Timeout: 15 * time.Minute,
-			Inputs: map[string]interface{}{
-				"workspace": workspace,
-			},
-		}
+    // Prefer production runner path when available
 
-		result, err := testSubmitter.SubmitAndWaitTerminal(ctx, spec)
-		if err != nil {
-			return nil, fmt.Errorf("planner job failed: %w", err)
-		}
-
-		// Parse the planner output
-		var planResult PlanResult
-		if err := json.Unmarshal([]byte(result.Output), &planResult); err != nil {
-			return nil, fmt.Errorf("failed to parse planner output: %w", err)
-		}
-
-		return &planResult, nil
-	}
-
-	// Production implementation using real Nomad job submission
-	if h.runner != nil {
+    // Production implementation using real Nomad job submission
+    if h.runner != nil {
 		// Step 1: Render planner assets
 		assets, err := h.runner.RenderPlannerAssets()
 		if err != nil {
@@ -327,44 +308,64 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		return &planResult, nil
 	}
 
-	// No runner provided and not a test submitter
-	return nil, fmt.Errorf("no production runner or test submitter available for job submission")
+    // Fallback to test submitter path if runner is not provided
+    if h.submitter != nil {
+        spec := JobSpec{
+            Name:    "planner",
+            Type:    "planner",
+            HCLPath: "", // Not used by mock submitter
+            EnvVars: map[string]string{
+                "BUILD_ERROR": buildError,
+                "TARGET_REPO": config.TargetRepo,
+                "BASE_REF":    config.BaseRef,
+            },
+            Timeout: ResolveDefaultsFromEnv().PlannerTimeout,
+            Inputs: map[string]interface{}{
+                "workspace": workspace,
+            },
+        }
+        result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
+        if err != nil {
+            return nil, fmt.Errorf("planner job failed: %w", err)
+        }
+        var planResult PlanResult
+        if err := json.Unmarshal([]byte(result.Output), &planResult); err != nil {
+            return nil, fmt.Errorf("failed to parse planner output: %w", err)
+        }
+        return &planResult, nil
+    }
+    // No runner or submitter provided
+    return nil, fmt.Errorf("no production runner or submitter available for job submission")
 }
 
 // SubmitReducerJob submits a reducer job to determine the next action
 func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error) {
-	// Check if this is a test submitter (backward compatibility)
-	if testSubmitter, ok := h.submitter.(interface {
-		SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error)
-	}); ok {
-		spec := JobSpec{
-			Name:    "reducer",
-			Type:    "reducer",
-			HCLPath: "", // Would be set from rendered assets
-			EnvVars: map[string]string{
-				"PLAN_ID": planID,
-			},
-			Timeout: 10 * time.Minute,
-			Inputs: map[string]interface{}{
-				"workspace": workspace,
-				"results":   results,
-				"winner":    winner,
-			},
-		}
-
-		result, err := testSubmitter.SubmitAndWaitTerminal(ctx, spec)
-		if err != nil {
-			return nil, fmt.Errorf("reducer job failed: %w", err)
-		}
-
-		// Parse the reducer output
-		var nextAction NextAction
-		if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
-			return nil, fmt.Errorf("failed to parse reducer output: %w", err)
-		}
-
-		return &nextAction, nil
-	}
+    // Test submitter path via JobSubmitter
+    if h.submitter != nil {
+        spec := JobSpec{
+            Name:    "reducer",
+            Type:    "reducer",
+            HCLPath: "",
+            EnvVars: map[string]string{
+                "PLAN_ID": planID,
+            },
+            Timeout: ResolveDefaultsFromEnv().ReducerTimeout,
+            Inputs: map[string]interface{}{
+                "workspace": workspace,
+                "results":   results,
+                "winner":    winner,
+            },
+        }
+        result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
+        if err != nil {
+            return nil, fmt.Errorf("reducer job failed: %w", err)
+        }
+        var nextAction NextAction
+        if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
+            return nil, fmt.Errorf("failed to parse reducer output: %w", err)
+        }
+        return &nextAction, nil
+    }
 
 	// Production implementation using real Nomad job submission
 	if h.runner != nil {
@@ -445,6 +446,32 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		return &nextAction, nil
 	}
 
-	// No runner provided and not a test submitter
-	return nil, fmt.Errorf("no production runner or test submitter available for job submission")
+    // Fallback to test submitter path if runner is not provided
+    if h.submitter != nil {
+        spec := JobSpec{
+            Name:    "reducer",
+            Type:    "reducer",
+            HCLPath: "", // not used by mock submitter
+            EnvVars: map[string]string{
+                "PLAN_ID": planID,
+            },
+            Timeout: ResolveDefaultsFromEnv().ReducerTimeout,
+            Inputs: map[string]interface{}{
+                "workspace": workspace,
+                "results":   results,
+                "winner":    winner,
+            },
+        }
+        result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
+        if err != nil {
+            return nil, fmt.Errorf("reducer job failed: %w", err)
+        }
+        var nextAction NextAction
+        if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
+            return nil, fmt.Errorf("failed to parse reducer output: %w", err)
+        }
+        return &nextAction, nil
+    }
+    // No runner or submitter provided
+    return nil, fmt.Errorf("no production runner or submitter available for job submission")
 }
