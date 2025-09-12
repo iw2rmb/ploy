@@ -311,6 +311,25 @@ test-benchmark: ## Run benchmark tests
 	@mkdir -p $(TEST_RESULTS_DIR)
 	go test -bench=. -benchmem ./...
 
+# -----------------------------------------------------------------------------
+# Transflow package focused tasks
+# -----------------------------------------------------------------------------
+.PHONY: fmt-transflow
+fmt-transflow: ## Format transflow package (goimports + gofmt)
+	@echo "$(BLUE)Formatting transflow package...$(NC)"
+	goimports -w internal/cli/transflow && gofmt -s -w internal/cli/transflow
+
+.PHONY: staticcheck-transflow
+staticcheck-transflow: ## Run staticcheck on transflow package
+	@echo "$(BLUE)Running staticcheck for transflow...$(NC)"
+	staticcheck ./internal/cli/transflow/...
+
+.PHONY: test-transflow
+test-transflow: ## Run transflow unit tests + staticcheck
+	@echo "$(BLUE)Running transflow unit tests...$(NC)"
+	go test -vet=off -race -short -count=1 -v ./internal/cli/transflow
+	@$(MAKE) staticcheck-transflow
+
 .PHONY: generate-mocks
 generate-mocks: ## Generate test mocks
 	@echo "$(BLUE)Generating test mocks...$(NC)"

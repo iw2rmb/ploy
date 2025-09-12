@@ -4492,3 +4492,4 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
 - `services/openrewrite-jvm/runner.sh`: Produces `/workspace/out/diff.patch` after transformation using `git diff`.
 - Makefile: Added `langgraph-runner-image` and `langgraph-runner-push` targets; `openrewrite-jvm-*` targets already available.
 - transflow: fix unit tests by ensuring non-empty clone, add testing indirections for Nomad/SeaweedFS/diff ops, stabilize healing unit test; add opt-in Docker smoke test for ORW container (requires local Docker and SeaweedFS).
+- tooling: add Makefile targets fmt-transflow, staticcheck-transflow, and test-transflow for focused transflow development.
