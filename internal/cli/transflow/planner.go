@@ -38,7 +38,7 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
 	}
 
-    runID := PlannerRunID(runner.config.ID)
+	runID := PlannerRunID(runner.config.ID)
 
 	// Compute host bind mount directories for planner
 	contextDir := filepath.Dir(assets.InputsPath)
@@ -51,8 +51,8 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		return s
 	}
 
-    // Resolve planner image via centralized resolver
-    plannerImage := ResolveImagesFromEnv().Planner
+	// Resolve planner image via centralized resolver
+	plannerImage := ResolveImagesFromEnv().Planner
 
 	rendered := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
@@ -80,10 +80,10 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		return nil
 	}
 
-    timeout := ResolveDefaultsFromEnv().PlannerTimeout
-    if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-        return fmt.Errorf("planner job failed: %w", err)
-    }
+	timeout := ResolveDefaultsFromEnv().PlannerTimeout
+	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
+		return fmt.Errorf("planner job failed: %w", err)
+	}
 
 	// Attempt to read plan.json from URL or locally (also support SeaweedFS filer via bucket/key)
 	if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {

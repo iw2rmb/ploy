@@ -115,3 +115,5 @@ require (
 	google.golang.org/grpc v1.73.0 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 )
+
+require github.com/open-policy-agent/opa v1.8.0 // indirect

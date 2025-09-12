@@ -32,16 +32,16 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
 		Labels:       []string{"ploy", "tfl"},
 	}
 
-    mrTimeout := 2 * time.Minute
-    mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
-    defer cancelMR()
-    mrEmitStart(r, ctx, mrConfig.SourceBranch, mrConfig.TargetBranch)
-    mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
-    if err != nil {
-        mrAppendFailure(result, err)
-        return
-    }
-    if mrResult != nil && mrResult.MRURL != "" {
-        mrAppendSuccess(result, mrResult.MRURL, mrResult.Created)
-    }
+	mrTimeout := 2 * time.Minute
+	mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
+	defer cancelMR()
+	mrEmitStart(r, ctx, mrConfig.SourceBranch, mrConfig.TargetBranch)
+	mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
+	if err != nil {
+		mrAppendFailure(result, err)
+		return
+	}
+	if mrResult != nil && mrResult.MRURL != "" {
+		mrAppendSuccess(result, mrResult.MRURL, mrResult.Created)
+	}
 }
