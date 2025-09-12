@@ -776,45 +776,20 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		}
 	}
 
-	// Step 4: Commit changes (only if not already committed by an apply step)
-	headBefore := initialHead
-	// Re-check working tree status
-	changed, _ := hasRepoChangesFn(repoPath)
-	commitMessage := fmt.Sprintf("Applied recipe transformations for workflow %s", r.config.ID)
-	if !changed {
-		// No staged/working changes; check if HEAD moved (apply step may have committed already)
-		headAfter, _ := getHeadHash(repoPath)
-		if headAfter != "" && headBefore != "" && headAfter != headBefore {
-			// Consider commit step successful without creating a new commit
-			result.StepResults = append(result.StepResults, StepResult{
-				StepID:  "commit",
-				Success: true,
-				Message: "Changes already committed by apply step",
-			})
-			goto build_step
-		}
-		// No changes and HEAD same => fail to avoid empty MR
-		r.emit(ctx, "commit", "commit", "error", "no changes to commit")
-		result.StepResults = append(result.StepResults, StepResult{
-			StepID:  "commit",
-			Success: false,
-			Message: "No changes to commit",
-		})
-		result.ErrorMessage = "no changes produced by transformation"
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("no changes produced by transformation")
-	}
-	if err := r.gitOps.CommitChanges(ctx, repoPath, commitMessage); err != nil {
-		r.emit(ctx, "commit", "commit", "error", fmt.Sprintf("commit failed: %v", err))
-		result.ErrorMessage = fmt.Sprintf("failed to commit changes: %v", err)
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("failed to commit changes: %w", err)
-	}
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:  "commit",
-		Success: true,
-		Message: "Committed changes",
-	})
+    // Step 4: Commit changes (only if not already committed by an apply step)
+    if committed, msg, err := r.runCommitStep(ctx, repoPath, initialHead); err != nil {
+        r.emit(ctx, "commit", "commit", "error", msg)
+        result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: false, Message: msg})
+        result.ErrorMessage = err.Error()
+        result.Duration = time.Since(startTime)
+        return nil, err
+    } else if committed {
+        result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
+    } else {
+        // committed=false implies already committed by apply step
+        result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
+        goto build_step
+    }
 
 build_step:
     // Step 5: Run build check
@@ -878,19 +853,14 @@ build_step:
 		Duration: time.Since(buildStart),
 	})
 
-	// Step 6: Push branch
-	// Push branch with a phase timeout
-	pushTimeout := 3 * time.Minute
-	pushCtx, cancelPush := context.WithTimeout(ctx, pushTimeout)
-	defer cancelPush()
-	log.Printf("[Transflow] Pushing branch (timeout=%s): repo=%s branch=%s", pushTimeout, r.config.TargetRepo, branchName)
-	r.emit(ctx, "push", "push", "info", "Pushing branch")
-	if err := r.gitOps.PushBranch(pushCtx, repoPath, r.config.TargetRepo, branchName); err != nil {
-		msg := fmt.Sprintf("push failed: %v", err)
-		if strings.Contains(msg, "rc=128") || strings.Contains(msg, "exit status 128") {
-			r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
-		}
-		r.emit(ctx, "push", "push", "error", msg)
+    // Step 6: Push branch
+    r.emit(ctx, "push", "push", "info", "Pushing branch")
+    if err := r.runPushStep(ctx, repoPath, branchName); err != nil {
+        msg := fmt.Sprintf("push failed: %v", err)
+        if strings.Contains(msg, "rc=128") || strings.Contains(msg, "exit status 128") {
+            r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
+        }
+        r.emit(ctx, "push", "push", "error", msg)
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:  "push",
 			Success: false,
