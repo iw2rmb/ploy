@@ -38,7 +38,11 @@ git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$WORKDIR/app"
 
 pushd "$WORKDIR/app" >/dev/null
 info "Deploying app with ploy push: app=$APP_NAME env=$ENV_NAME"
-if ! ploy push -a "$APP_NAME" -env "$ENV_NAME"; then
+PLOY_CMD=${PLOY_CMD:-}
+if [[ -z "$PLOY_CMD" ]]; then
+  if command -v ploy >/dev/null 2>&1; then PLOY_CMD=ploy; elif [[ -x ./bin/ploy ]]; then PLOY_CMD=./bin/ploy; else PLOY_CMD=ploy; fi
+fi
+if ! "$PLOY_CMD" push -a "$APP_NAME" -env "$ENV_NAME"; then
   err "ploy push failed"
   exit 1
 fi
@@ -86,4 +90,3 @@ else
 fi
 
 ok "E2E complete for $APP_NAME from $REPO_URL"
-
