@@ -149,3 +149,5 @@ Scope
     - ✅ Extracted input.tar preview helper (`logPreviewTar`/`previewTarEntries`) to replace inline tar listing.
     - ✅ Centralized run ID generation (`PlannerRunID`, `ReducerRunID`, `LLMRunID`, `ORWRunID`) and replaced ad-hoc formatting.
     - ✅ Added `NewBranchStep(execID, branchID)` to generate step IDs and DIFF keys consistently.
+    - ✅ Centralized MR creation event emissions (`mrEmitStart`, `mrAppendFailure`, `mrAppendSuccess`) and updated MR flow.
+    - ✅ Centralized image resolution (`ResolveImages*`) and applied to planner path; to propagate to other paths progressively.
