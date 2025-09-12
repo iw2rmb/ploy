@@ -537,14 +537,14 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if len(step.Recipes) > 0 {
 				rclass = step.Recipes[0]
 			}
-			// Determine coordinates strictly from YAML (no discovery)
-			rgroup, rartifact, rversion := step.RecipeGroup, step.RecipeArtifact, step.RecipeVersion
-			if rgroup == "" || rartifact == "" || rversion == "" {
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: "Missing recipe coordinates (recipe_group/artifact/version)"})
-				result.ErrorMessage = "missing recipe coordinates in transflow step"
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("missing recipe coordinates: please set recipe_group, recipe_artifact, recipe_version in step %s", step.ID)
-			}
+            // Determine coordinates strictly from YAML (no discovery)
+            rgroup, rartifact, rversion := step.RecipeGroup, step.RecipeArtifact, step.RecipeVersion
+            if err := validateRecipeCoords(rgroup, rartifact, rversion, step.ID); err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+                result.ErrorMessage = err.Error()
+                result.Duration = time.Since(startTime)
+                return nil, err
+            }
 			// Optional Maven plugin version (prefer YAML, then env; runner defaults internally if unset)
 			pluginVersion := step.MavenPluginVersion
 			if pluginVersion == "" {
