@@ -260,8 +260,8 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	}
 
 	// Controller and execution ID for in-job event push
-	controllerURL := os.Getenv("PLOY_CONTROLLER")
-	execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+    controllerURL := os.Getenv("PLOY_CONTROLLER")
+    execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 	seaweedURL := os.Getenv("PLOY_SEAWEEDFS_URL")
 	if seaweedURL == "" {
 		seaweedURL = "http://seaweedfs-filer.service.consul:8888"
@@ -281,19 +281,26 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 		dc = "dc1"
 	}
 
-	rendered := strings.NewReplacer(
-		"${RUN_ID}", runID,
-		"${CONTEXT_HOST_DIR}", contextDir,
-		"${OUT_HOST_DIR}", outDir,
-		"${ORW_IMAGE}", orwImage,
-		"${CONTROLLER_URL}", controllerURL,
-		"${EXECUTION_ID}", execID,
-		"${SEAWEEDFS_URL}", seaweedURL,
-		"${DIFF_KEY}", diffKey,
-		"${INPUT_KEY}", inputKey,
-		"${INPUT_URL}", inputURL,
-		"${NOMAD_DC}", dc,
-	).Replace(string(content))
+    // Compute API base (without /v1) for PLOY_API_URL used by runner metadata registration
+    apiBase := controllerURL
+    if strings.HasSuffix(apiBase, "/v1") {
+        apiBase = strings.TrimSuffix(apiBase, "/v1")
+    }
+
+    rendered := strings.NewReplacer(
+        "${RUN_ID}", runID,
+        "${CONTEXT_HOST_DIR}", contextDir,
+        "${OUT_HOST_DIR}", outDir,
+        "${ORW_IMAGE}", orwImage,
+        "${CONTROLLER_URL}", controllerURL,
+        "${PLOY_API_URL}", apiBase,
+        "${EXECUTION_ID}", execID,
+        "${SEAWEEDFS_URL}", seaweedURL,
+        "${DIFF_KEY}", diffKey,
+        "${INPUT_KEY}", inputKey,
+        "${INPUT_URL}", inputURL,
+        "${NOMAD_DC}", dc,
+    ).Replace(string(content))
 
 	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
 		return "", err

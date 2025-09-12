@@ -22,6 +22,7 @@ job "${RUN_ID}" {
         RECIPE_VERSION        = "${RECIPE_VERSION}"
         MAVEN_PLUGIN_VERSION  = "${MAVEN_PLUGIN_VERSION}"
         CONTROLLER_URL        = "${CONTROLLER_URL}"
+        PLOY_API_URL          = "${PLOY_API_URL}"
         TRANSFLOW_EXECUTION_ID= "${EXECUTION_ID}"
         DIFF_KEY              = "${DIFF_KEY}"
         SEAWEEDFS_URL         = "${SEAWEEDFS_URL}"
@@ -30,7 +31,7 @@ job "${RUN_ID}" {
 
       resources {
         cpu    = 300
-        memory = 512
+        memory = 1024
       }
 
       kill_timeout = "5m"
