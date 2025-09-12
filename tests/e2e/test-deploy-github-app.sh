@@ -56,14 +56,10 @@ if ! "$PLOY_CMD" push -a "$APP_NAME"; then
 fi
 ok "ploy push triggered"
 
-# Determine expected URL
-if [[ "$ENV_NAME" == "dev" ]]; then
-  URL="https://${APP_NAME}.dev.ployd.app"
-else
-  URL="https://${APP_NAME}.ployd.app"
-fi
+# Determine expected URL (default to production-style domain unless overridden)
+URL=${URL_OVERRIDE:-"https://${APP_NAME}.ployd.app"}
 
-HEALTH_PATH=${HEALTH_PATH:-/health}
+HEALTH_PATH=${HEALTH_PATH:-/healthz}
 TIMEOUT=${TIMEOUT:-180}
 SLEEP=${SLEEP:-5}
 ELAPSED=0
