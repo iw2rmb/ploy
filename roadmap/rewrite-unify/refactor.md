@@ -39,9 +39,9 @@ Scope
       - Mixed direct Go HTTP clients and exec.Command("curl", ...) for SeaweedFS uploads. Shelling out adds dependencies and error‑parsing fragility.
       - Change: replace shell curl calls with a robust Go function (existing putFile/putJSON) and reuse.
       - Completed: runner now uploads input.tar via HTTP client (`putFile`), removed `exec.Command("curl")` path and added unit tests for upload key computation.
-  - ValidateJob on VPS calls raw nomad CLI.
+  - ✅ ValidateJob on VPS calls raw nomad CLI.
       - In wrapper mode, ValidateJob executes nomad job run -output directly. AGENTS.md: “Never call raw nomad CLI from app code on the VPS; route through the job manager wrapper.”
-      - Change: add validation command to the job manager wrapper (or wrap it in the wrapper) and call that; alternatively, fall back to SDK HCL parse always; avoid raw nomad CLI in wrapper mode.
+      - Completed: added `validate` command in the wrapper and updated orchestration to prefer wrapper validation with fallback to SDK ParseHCL.
   - ✅ OS working directory changes (os.Chdir) around builds.
       - Side‑effectful; unsafe across concurrent runs; brittle on panic.
       - Change: make build checker accept repo path or tar path; avoid process cwd changes. If unavoidable, wrap in defer with error handling and document as single‑run only.
@@ -74,7 +74,8 @@ Scope
 
   Security/Policy Observations
 
-  - Nomad wrapper compliance: orchestration generally honors /opt/hashicorp/bin/nomad-job-manager.sh. Fix the raw nomad CLI call in ValidateJob.
+      - Nomad wrapper compliance: orchestration generally honors /opt/hashicorp/bin/nomad-job-manager.sh. Fix the raw nomad CLI call in ValidateJob.
+      - Example apps: move local test apps (e.g., scala-catalogsvc) to GitHub-hosted hello apps; parameterize tests to clone external repos when needed.
   - SeaweedFS access:
       - Safety: restrict URL base to expected filer host(s) or require controller to broker downloads/uploads. Avoid direct external URLs for diff unless whitelisted.
       - Consider auth if filer is non‑public.
