@@ -249,7 +249,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	}
 
 	// Step 2: Generate unique run ID for this branch
-	runID := fmt.Sprintf("llm-exec-%s-%d", branch.ID, time.Now().Unix())
+    runID := LLMRunID(branch.ID)
 
 	// Step 3: Extract MCP configuration from branch inputs
 	var mcpConfig *MCPConfig = nil
@@ -468,7 +468,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 
 	// Step 2b: Substitute environment variables in HCL template
-	runID := fmt.Sprintf("orw-apply-%s-%d", branch.ID, time.Now().Unix())
+    runID := ORWRunID(branch.ID)
 	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
 	if err != nil {
 		result.Status = "failed"
