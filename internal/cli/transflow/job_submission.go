@@ -264,8 +264,8 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		}
 
 		// Step 4: Push start event and report job metadata
-		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
 		}
@@ -276,8 +276,8 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		}
 		timeout := ResolveDefaultsFromEnv().PlannerTimeout
 		if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
-			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+            if controller := ResolveInfraFromEnv().Controller; controller != "" {
+                rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
 			}
 			return nil, fmt.Errorf("planner job failed: %w", err)
@@ -291,8 +291,8 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 			return nil, fmt.Errorf("failed to read planner output: %w", err)
 		}
 
-		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
@@ -395,8 +395,8 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		}
 
 		// Step 4: Push start event and report job metadata
-		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
 		}
