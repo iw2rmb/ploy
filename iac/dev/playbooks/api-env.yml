@@ -8,6 +8,11 @@
   vars:
     api_env_path: "/home/ploy/api.env"
   tasks:
+    - name: Capture controller-side GitLab envs (workstation)
+      no_log: true
+      set_fact:
+        controller_gitlab_url: "{{ lookup('env', 'GITLAB_URL') | default('', true) }}"
+        controller_gitlab_token: "{{ lookup('env', 'GITLAB_TOKEN') | default('', true) }}"
     - name: Ensure ploy home exists
       file:
         path: "/home/ploy"
@@ -49,8 +54,10 @@
       set_fact:
         api_env_content: |
           # Managed by Ansible - API service environment
-          GITLAB_URL="{{ lookup('env', 'GITLAB_URL') | default(fallback_url | default('https://gitlab.com', true), true) }}"
-          GITLAB_TOKEN="{{ lookup('env', 'GITLAB_TOKEN') | default(fallback_token | default('', true), true) }}"
+          # Prefer controller (workstation) env; fallback to discovered VPS env; finally default URL
+          GITLAB_URL="{{ (controller_gitlab_url | length > 0) | ternary(controller_gitlab_url, (fallback_url | default('https://gitlab.com', true))) }}"
+          # Always favor controller token if provided to ensure write access for pushes/MRs
+          GITLAB_TOKEN="{{ (controller_gitlab_token | length > 0) | ternary(controller_gitlab_token, (fallback_token | default('', true))) }}"
           PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') | default('https://api.dev.ployman.app/v1', true) }}"
           # Nomad/Transflow runtime defaults
           NOMAD_DC="{{ lookup('env', 'NOMAD_DC') | default('dc1', true) }}"
@@ -58,6 +65,19 @@
           # OpenRewrite apply runner image (must exist in internal registry)
           # Preferred: set TRANSFLOW_ORW_APPLY_IMAGE; runner substitutes ${ORW_IMAGE}
           TRANSFLOW_ORW_APPLY_IMAGE="{{ lookup('env', 'TRANSFLOW_ORW_APPLY_IMAGE') | default('registry.dev.ployman.app/openrewrite-jvm:latest', true) }}"
+          # LangGraph runner images for planner/reducer/llm-exec
+          TRANSFLOW_PLANNER_IMAGE="{{ lookup('env', 'TRANSFLOW_PLANNER_IMAGE') | default(lookup('env','TRANSFLOW_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          TRANSFLOW_REDUCER_IMAGE="{{ lookup('env', 'TRANSFLOW_REDUCER_IMAGE') | default(lookup('env','TRANSFLOW_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          TRANSFLOW_LLM_EXEC_IMAGE="{{ lookup('env', 'TRANSFLOW_LLM_EXEC_IMAGE') | default(lookup('env','TRANSFLOW_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          # Optional defaults
+          TRANSFLOW_REGISTRY="{{ lookup('env', 'TRANSFLOW_REGISTRY') | default('registry.dev.ployman.app', true) }}"
+          GIT_AUTHOR_NAME="{{ lookup('env', 'GIT_AUTHOR_NAME') | default('Ploy Bot', true) }}"
+          GIT_AUTHOR_EMAIL="{{ lookup('env', 'GIT_AUTHOR_EMAIL') | default('ploy-bot@local', true) }}"
+
+    - name: Fail fast if controller token was expected but missing
+      when: controller_gitlab_token | length == 0
+      debug:
+        msg: "Controller-side GITLAB_TOKEN is empty; playbook will preserve any VPS fallback or leave token blank. To populate from workstation, export GITLAB_TOKEN before running."
 
     - name: Write /home/ploy/api.env with restricted permissions (do not log)
       no_log: true
