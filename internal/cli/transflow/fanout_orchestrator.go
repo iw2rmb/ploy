@@ -272,22 +272,8 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
-	// Step 4: Report job metadata asynchronously (job name == runID)
-	if rep := o.runner.GetEventReporter(); rep != nil {
-		go func(job string) {
-			// small delay to allow registration
-			select {
-			case <-time.After(1 * time.Second):
-			case <-ctx.Done():
-				return
-			}
-			if id := findFirstAllocID(job); id != "" {
-				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
-			} else {
-				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: "job submitted", JobName: job, Time: time.Now()})
-			}
-		}(runID)
-	}
+    // Step 4: Report job metadata asynchronously (job name == runID)
+    reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "llm-exec", "llm-exec")
 
 	// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 	if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
@@ -478,21 +464,8 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 
-	// Step 3: Report job metadata asynchronously (job name == runID)
-	if rep := o.runner.GetEventReporter(); rep != nil {
-		go func(job string) {
-			select {
-			case <-time.After(1 * time.Second):
-			case <-ctx.Done():
-				return
-			}
-			if id := findFirstAllocID(job); id != "" {
-				_ = rep.Report(ctx, Event{Phase: "apply", Step: "orw-apply", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
-			} else {
-				_ = rep.Report(ctx, Event{Phase: "apply", Step: "orw-apply", Level: "info", Message: "job submitted", JobName: job, Time: time.Now()})
-			}
-		}(runID)
-	}
+    // Step 3: Report job metadata asynchronously (job name == runID)
+    reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "apply", "orw-apply")
 
 	// Step 4: Preflight validate HCL, then submit job to Nomad and wait for completion
 	if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
