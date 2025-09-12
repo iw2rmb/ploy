@@ -8,7 +8,6 @@ import (
     "fmt"
     "log"
     "os"
-    "os/exec"
     "path/filepath"
     "strings"
     "time"
@@ -536,18 +535,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to create input tar: %v", err)})
 				return nil, fmt.Errorf("failed to create input tar: %w", err)
 			}
-			// Log a brief preview of tar contents for diagnostics
-			{
-				// Best-effort: list a few entries
-				cmd := exec.Command("tar", "-tf", inputTar)
-				out, _ := cmd.CombinedOutput()
-				lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-				max := 20
-				if len(lines) < max {
-					max = len(lines)
-				}
-				log.Printf("[Transflow] input.tar preview (%d entries):\n%s", max, strings.Join(lines[:max], "\n"))
-			}
+            // Log a brief preview of tar contents for diagnostics
+            logPreviewTar(inputTar, 20)
 
             // Pre-substitute recipe class and input tar host path into template
 			rclass := ""
