@@ -10,6 +10,8 @@ ok(){ echo -e "${GREEN}$*${NC}"; }
 warn(){ echo -e "${YELLOW}$*${NC}"; }
 err(){ echo -e "${RED}$*${NC}"; }
 
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 REPO_URL=${HELLO_APP_REPO:-}
 APP_NAME=${APP_NAME:-}
 BRANCH=${BRANCH:-main}
@@ -40,7 +42,13 @@ pushd "$WORKDIR/app" >/dev/null
 info "Deploying app with ploy push: app=$APP_NAME env=$ENV_NAME"
 PLOY_CMD=${PLOY_CMD:-}
 if [[ -z "$PLOY_CMD" ]]; then
-  if command -v ploy >/dev/null 2>&1; then PLOY_CMD=ploy; elif [[ -x ./bin/ploy ]]; then PLOY_CMD=./bin/ploy; else PLOY_CMD=ploy; fi
+  if command -v ploy >/dev/null 2>&1; then
+    PLOY_CMD=ploy
+  elif [[ -x "$REPO_ROOT/bin/ploy" ]]; then
+    PLOY_CMD="$REPO_ROOT/bin/ploy"
+  else
+    PLOY_CMD=ploy
+  fi
 fi
 if ! "$PLOY_CMD" push -a "$APP_NAME" -env "$ENV_NAME"; then
   err "ploy push failed"
