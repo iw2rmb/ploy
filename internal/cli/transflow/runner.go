@@ -199,10 +199,12 @@ func (r *TransflowRunner) SetEventReporter(reporter EventReporter) {
 }
 
 func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
-	if r.eventReporter == nil {
-		return
-	}
-	_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
+    if r.eventReporter != nil {
+        _ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
+        return
+    }
+    // Fallback to local log output when no reporter is configured
+    log.Printf("[Transflow][%s/%s][%s] %s", phase, step, level, message)
 }
 
 // GetEventReporter exposes the reporter for orchestrators

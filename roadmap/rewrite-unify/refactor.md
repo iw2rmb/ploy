@@ -134,6 +134,10 @@ Scope
   - P0: Fix diff globbing; centralize templating; remove global env writes; stop using raw nomad CLI; stop shelling out to curl.
     - ✅ Fix diff globbing (doublestar) + tests
     - ✅ Stop shelling out to curl (use HTTP client) + tests
-    - 🚧 Centralize templating/remove global env writes (started: ORW path now accepts explicit vars)
+    - ✅ Centralize templating/remove global env writes (vars-based helpers for all paths)
+    - ✅ ValidateJob no longer uses raw nomad CLI; uses SDK parse
   - P1: Add fanout cancellation with job deregistration; avoid os.Chdir; unify logging through event reporter.
+    - ✅ Fanout cancellation with ctx-aware job stop/deregister
+    - ✅ Avoid os.Chdir by passing WorkingDir to SharedPush
+    - ✅ Logging unified via EventReporter (runner) with fallback logging; build checker emits via controller when exec ID present
   - P2: Decompose runner into smaller components; streamline CLI subcommands; centralize config defaults; tighten SeaweedFS access policy.
