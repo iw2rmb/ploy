@@ -25,6 +25,7 @@ type DeployConfig struct {
 	ControllerURL string
 	Metadata      map[string]string
 	Timeout       time.Duration
+	BuildOnly     bool // when true, API should run build gate and tear down app (no long-lived service)
 }
 
 // DeployResult contains deployment outcome information
@@ -145,6 +146,11 @@ func buildDeployURL(config DeployConfig) string {
 
 	if config.Environment != "" {
 		url += "&env=" + config.Environment
+	}
+
+	// Signal build-only mode so API can clean up sandboxed app after gate
+	if config.BuildOnly {
+		url += "&build_only=true"
 	}
 
 	return url

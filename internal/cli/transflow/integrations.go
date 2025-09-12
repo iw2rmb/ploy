@@ -32,6 +32,8 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	// Set the controller URL in the config
 	config.ControllerURL = b.controllerURL
 	config.IsPlatform = false // transflow uses ploy mode, not ployman mode
+	// Transflow build gate must be ephemeral; ask API to tear down sandboxed app after gate
+	config.BuildOnly = true
 
 	log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s", b.controllerURL, config.App, config.Lane, config.Environment)
 

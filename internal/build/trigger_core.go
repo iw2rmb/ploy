@@ -420,7 +420,8 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		return utils.ErrJSON(c, 500, err)
 	}
 
-	_ = orchestration.WaitHealthy(appName+"-lane-"+strings.ToLower(lane), 90*time.Second)
+	jobName := appName + "-lane-" + strings.ToLower(lane)
+	_ = orchestration.WaitHealthy(jobName, 90*time.Second)
 
 	// Prefer unified storage interface if available, fallback to legacy StorageClient
 	if deps.Storage != nil {
@@ -553,6 +554,15 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			"criticalCount":      scanResult.CriticalCount,
 			"highCount":          scanResult.HighCount,
 			"severityThreshold":  scanner.GetSeverityThreshold(),
+		}
+	}
+
+	// In build-only mode, immediately destroy the sandboxed app to avoid leftovers
+	if c.Query("build_only", "false") == "true" {
+		log.Printf("[Build] build_only=true: tearing down sandboxed app job=%s", jobName)
+		// Best-effort purge of Nomad job to free resources
+		if err := orchestration.DeregisterJob(jobName, true); err != nil {
+			log.Printf("[Build] Warning: failed to deregister job %s: %v", jobName, err)
 		}
 	}
 
