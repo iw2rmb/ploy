@@ -73,7 +73,7 @@ func TestExecuteRemoteTransflowPrintsExecutionID(t *testing.T) {
 	}()
 
 	// Execute
-	err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, true, false)
+	err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, true, false, "text")
 
 	// Restore stdout
 	_ = w.Close()
@@ -117,7 +117,46 @@ func TestExecuteRemoteTransflowWatch(t *testing.T) {
 		t.Fatalf("write cfg: %v", err)
 	}
 
-	if err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, false, true); err != nil {
+	if err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, false, true, "text"); err != nil {
 		t.Fatalf("watch mode failed: %v", err)
+	}
+}
+
+// TestExecuteRemoteTransflowJSONOutputsExecutionID ensures --output=json prints a single JSON with execution_id
+func TestExecuteRemoteTransflowJSONOutputsExecutionID(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/transflow/run", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		io.WriteString(w, `{"execution_id":"tf-json1"}`)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "tf.yaml")
+	if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
+		t.Fatalf("write cfg: %v", err)
+	}
+
+	// Capture stdout
+	var buf bytes.Buffer
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	done := make(chan struct{})
+	go func() { _, _ = io.Copy(&buf, r); close(done) }()
+
+	err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, true, false, "json")
+
+	_ = w.Close()
+	os.Stdout = old
+	<-done
+
+	if err != nil {
+		t.Fatalf("executeRemoteTransflow json error: %v", err)
+	}
+	out := strings.TrimSpace(buf.String())
+	if !strings.Contains(out, `"execution_id":"tf-json1"`) {
+		t.Fatalf("expected json with execution_id, got: %s", out)
 	}
 }

@@ -236,7 +236,23 @@ func executeApplyFirst(runner *TransflowRunner) error {
 
 // substituteHCLTemplate performs HCL template substitution (needs to be implemented based on original logic)
 func substituteORWTemplate(prePath, runID string) (string, error) {
-	// This is a stub - the original logic would need to be extracted from the full implementation
+	// Backward-compatible wrapper that reads from process env
+	vars := map[string]string{
+		"TRANSFLOW_CONTEXT_DIR":       os.Getenv("TRANSFLOW_CONTEXT_DIR"),
+		"TRANSFLOW_OUT_DIR":           os.Getenv("TRANSFLOW_OUT_DIR"),
+		"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
+		"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
+		"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+		"PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+		"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+		"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+	}
+	return substituteORWTemplateVars(prePath, runID, vars)
+}
+
+// substituteORWTemplateVars performs HCL substitution using provided variables (no global env mutation)
+func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (string, error) {
 	submittedPath := strings.ReplaceAll(prePath, ".pre.hcl", ".submitted.hcl")
 
 	// Read the template
@@ -245,14 +261,14 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 		return "", err
 	}
 
-	// Basic substitution - this should be enhanced based on the actual template needs
-	contextDir := os.Getenv("TRANSFLOW_CONTEXT_DIR")
-	outDir := os.Getenv("TRANSFLOW_OUT_DIR")
+	// Resolve variables and defaults
+	contextDir := vars["TRANSFLOW_CONTEXT_DIR"]
+	outDir := vars["TRANSFLOW_OUT_DIR"]
 
-	// Default image from env or registry
-	orwImage := os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE")
+	// Default image from vars or registry
+	orwImage := vars["TRANSFLOW_ORW_APPLY_IMAGE"]
 	if orwImage == "" {
-		reg := os.Getenv("TRANSFLOW_REGISTRY")
+		reg := vars["TRANSFLOW_REGISTRY"]
 		if reg == "" {
 			reg = "registry.dev.ployman.app"
 		}
@@ -260,15 +276,15 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	}
 
 	// Controller and execution ID for in-job event push
-    controllerURL := os.Getenv("PLOY_CONTROLLER")
-    execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
-	seaweedURL := os.Getenv("PLOY_SEAWEEDFS_URL")
+	controllerURL := vars["PLOY_CONTROLLER"]
+	execID := vars["PLOY_TRANSFLOW_EXECUTION_ID"]
+	seaweedURL := vars["PLOY_SEAWEEDFS_URL"]
 	if seaweedURL == "" {
 		seaweedURL = "http://seaweedfs-filer.service.consul:8888"
 	}
 	// Keys under artifacts/ namespace used by uploader/runner
 	// Allow override via TRANSFLOW_DIFF_KEY for branch-scoped step uploads
-	diffKey := os.Getenv("TRANSFLOW_DIFF_KEY")
+	diffKey := vars["TRANSFLOW_DIFF_KEY"]
 	if diffKey == "" {
 		diffKey = "transflow/" + execID + "/diff.patch"
 	}
@@ -276,35 +292,31 @@ func substituteORWTemplate(prePath, runID string) (string, error) {
 	inputURL := seaweedURL + "/artifacts/" + inputKey
 	log.Printf("[Transflow] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
 
-	dc := os.Getenv("NOMAD_DC")
+	dc := vars["NOMAD_DC"]
 	if dc == "" {
 		dc = "dc1"
 	}
 
-    // Compute API base (without /v1) for PLOY_API_URL used by runner metadata registration
-    apiBase := controllerURL
-    if strings.HasSuffix(apiBase, "/v1") {
-        apiBase = strings.TrimSuffix(apiBase, "/v1")
-    }
+	// Compute API base (without /v1) for PLOY_API_URL used by runner metadata registration
+	apiBase := strings.TrimSuffix(controllerURL, "/v1")
 
-    rendered := strings.NewReplacer(
-        "${RUN_ID}", runID,
-        "${CONTEXT_HOST_DIR}", contextDir,
-        "${OUT_HOST_DIR}", outDir,
-        "${ORW_IMAGE}", orwImage,
-        "${CONTROLLER_URL}", controllerURL,
-        "${PLOY_API_URL}", apiBase,
-        "${EXECUTION_ID}", execID,
-        "${SEAWEEDFS_URL}", seaweedURL,
-        "${DIFF_KEY}", diffKey,
-        "${INPUT_KEY}", inputKey,
-        "${INPUT_URL}", inputURL,
-        "${NOMAD_DC}", dc,
-    ).Replace(string(content))
+	rendered := strings.NewReplacer(
+		"${RUN_ID}", runID,
+		"${CONTEXT_HOST_DIR}", contextDir,
+		"${OUT_HOST_DIR}", outDir,
+		"${ORW_IMAGE}", orwImage,
+		"${CONTROLLER_URL}", controllerURL,
+		"${PLOY_API_URL}", apiBase,
+		"${EXECUTION_ID}", execID,
+		"${SEAWEEDFS_URL}", seaweedURL,
+		"${DIFF_KEY}", diffKey,
+		"${INPUT_KEY}", inputKey,
+		"${INPUT_URL}", inputURL,
+		"${NOMAD_DC}", dc,
+	).Replace(string(content))
 
 	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
 		return "", err
 	}
-
 	return submittedPath, nil
 }

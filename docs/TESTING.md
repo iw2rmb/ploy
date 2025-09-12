@@ -553,6 +553,20 @@ Pre-commit configuration (`.pre-commit-config.yaml`):
 repos:
   - repo: local
     hooks:
+      - id: go-fmt
+        name: go fmt (make fmt)
+        entry: make fmt
+        language: system
+        pass_filenames: false
+        files: \.go$
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run
+        language: system
+        pass_filenames: false
+        files: \.go$
+
       - id: go-test
         name: go test
         entry: make test-unit
