@@ -235,40 +235,40 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 			return nil, fmt.Errorf("failed to render planner assets: %w", err)
 		}
 
-    // Step 2: Generate unique run ID for this planner job
-    runID := PlannerRunID(config.ID)
+		// Step 2: Generate unique run ID for this planner job
+		runID := PlannerRunID(config.ID)
 
 		// Step 3: Substitute environment variables in HCL template without global env writes
 		contextDir := filepath.Dir(assets.InputsPath)
 		outDir := filepath.Join(workspace, "planner", "out")
-        imgs := ResolveImagesFromEnv()
-        infra := ResolveInfraFromEnv()
-        vars := map[string]string{
-            "TRANSFLOW_CONTEXT_DIR":       contextDir,
-            "TRANSFLOW_OUT_DIR":           outDir,
-            "TRANSFLOW_REGISTRY":          imgs.Registry,
-            "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-            "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-            "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-            "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-            "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-            "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-            "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-            "PLOY_CONTROLLER":             infra.Controller,
-            "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-            "NOMAD_DC":                    infra.DC,
-        }
+		imgs := ResolveImagesFromEnv()
+		infra := ResolveInfraFromEnv()
+		vars := map[string]string{
+			"TRANSFLOW_CONTEXT_DIR":       contextDir,
+			"TRANSFLOW_OUT_DIR":           outDir,
+			"TRANSFLOW_REGISTRY":          imgs.Registry,
+			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+			"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+			"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+			"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+			"PLOY_CONTROLLER":             infra.Controller,
+			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+			"NOMAD_DC":                    infra.DC,
+		}
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
 
 		// Step 4: Push start event and report job metadata
-        if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
-            reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
-        }
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+			reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
+		}
 
 		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 		if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
@@ -366,40 +366,40 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("failed to render reducer assets: %w", err)
 		}
 
-    // Step 2: Generate unique run ID for this reducer job
-    runID := ReducerRunID(planID)
+		// Step 2: Generate unique run ID for this reducer job
+		runID := ReducerRunID(planID)
 
 		// Step 3: Substitute environment variables in HCL template without global env writes
 		contextDir := filepath.Dir(assets.HistoryPath)
 		outDir := filepath.Join(workspace, "reducer", "out")
-        imgs := ResolveImagesFromEnv()
-        infra := ResolveInfraFromEnv()
-        vars := map[string]string{
-            "TRANSFLOW_CONTEXT_DIR":       contextDir,
-            "TRANSFLOW_OUT_DIR":           outDir,
-            "TRANSFLOW_REGISTRY":          imgs.Registry,
-            "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-            "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-            "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-            "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-            "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-            "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-            "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-            "PLOY_CONTROLLER":             infra.Controller,
-            "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-            "NOMAD_DC":                    infra.DC,
-        }
+		imgs := ResolveImagesFromEnv()
+		infra := ResolveInfraFromEnv()
+		vars := map[string]string{
+			"TRANSFLOW_CONTEXT_DIR":       contextDir,
+			"TRANSFLOW_OUT_DIR":           outDir,
+			"TRANSFLOW_REGISTRY":          imgs.Registry,
+			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+			"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+			"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+			"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+			"PLOY_CONTROLLER":             infra.Controller,
+			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+			"NOMAD_DC":                    infra.DC,
+		}
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
 
 		// Step 4: Push start event and report job metadata
-        if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
-            reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
-        }
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+			reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
+		}
 
 		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 		if err := orchestration.ValidateJob(renderedHCLPath); err != nil {

@@ -336,7 +336,7 @@
   - Fixed storage config endpoint in `/etc/ploy/storage/config.yaml`
 
 ### Added
-- Comprehensive OpenRewrite transformation test suite (`tests/scripts/test-openrewrite-comprehensive.sh`)
+- Consolidated OpenRewrite transformation testing into Go integration/E2E suites; removed legacy shell scripts
 - Test analysis report documenting transformation success patterns
 - Three test repositories for diverse testing scenarios (ploy-orw-test-java, ploy-orw-test-legacy, ploy-orw-test-spring)
 
