@@ -262,22 +262,11 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		}
 
 		// Step 4: Push start event and report job metadata
-		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
-			// Start event
-			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
-			// Report alloc id asynchronously
-			go func(job string) {
-				select {
-				case <-time.After(1 * time.Second):
-				case <-ctx.Done():
-					return
-				}
-				if id := findFirstAllocID(job); id != "" {
-					_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
-				}
-			}(runID)
-		}
+        if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+            reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
+        }
 
 		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 		if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
@@ -402,20 +391,11 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		}
 
 		// Step 4: Push start event and report job metadata
-		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
-			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
-			go func(job string) {
-				select {
-				case <-time.After(1 * time.Second):
-				case <-ctx.Done():
-					return
-				}
-				if id := findFirstAllocID(job); id != "" {
-					_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job submitted", JobName: job, AllocID: id, Time: time.Now()})
-				}
-			}(runID)
-		}
+        if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+            reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
+        }
 
 		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 		if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
