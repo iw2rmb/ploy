@@ -104,25 +104,22 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 	outHostDir := get("TRANSFLOW_OUT_DIR")
 
 	// Defaults for images (can be overridden via environment)
-	defaultRegistry := get("TRANSFLOW_REGISTRY")
-	if defaultRegistry == "" {
-		defaultRegistry = "registry.dev.ployman.app"
-	}
+	d := ResolveDefaults(get)
 	plannerImage := get("TRANSFLOW_PLANNER_IMAGE")
 	if plannerImage == "" {
-		plannerImage = defaultRegistry + "/langgraph-runner:py-0.1.0"
+		plannerImage = d.PlannerImage
 	}
 	reducerImage := get("TRANSFLOW_REDUCER_IMAGE")
 	if reducerImage == "" {
-		reducerImage = plannerImage
+		reducerImage = d.ReducerImage
 	}
 	llmExecImage := get("TRANSFLOW_LLM_EXEC_IMAGE")
 	if llmExecImage == "" {
-		llmExecImage = plannerImage
+		llmExecImage = d.LLMExecImage
 	}
 	orwApplyImage := get("TRANSFLOW_ORW_APPLY_IMAGE")
 	if orwApplyImage == "" {
-		orwApplyImage = defaultRegistry + "/openrewrite-jvm:latest"
+		orwApplyImage = d.ORWApplyImage
 	}
 
 	// Perform substitution
@@ -131,7 +128,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 
 	dc := get("NOMAD_DC")
 	if dc == "" {
-		dc = "dc1"
+		dc = d.DC
 	}
 
 	replacer := strings.NewReplacer(
