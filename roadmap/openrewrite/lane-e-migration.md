@@ -640,7 +640,7 @@ However, this should not be needed with proper testing.
 
 1. Remove old Nomad job:
 ```bash
-nomad job stop openrewrite-service
+/opt/hashicorp/bin/nomad-job-manager.sh stop --job openrewrite-service
 ```
 
 2. Clean up Docker images:
