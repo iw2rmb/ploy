@@ -21,6 +21,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
+	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/transflow"
 	"gopkg.in/yaml.v3"
 )
 
@@ -245,19 +246,19 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 	// Write embedded HCL templates
-	if err := os.WriteFile(filepath.Join(jobsDir, "planner.hcl"), plannerHCL, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(jobsDir, "planner.hcl"), nomadtpl.GetPlannerTemplate(), 0644); err != nil {
 		h.recordError(executionID, fmt.Errorf("failed to write planner.hcl: %w", err))
 		return
 	}
-	if err := os.WriteFile(filepath.Join(jobsDir, "llm_exec.hcl"), llmExecHCL, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(jobsDir, "llm_exec.hcl"), nomadtpl.GetLLMExecTemplate(), 0644); err != nil {
 		h.recordError(executionID, fmt.Errorf("failed to write llm_exec.hcl: %w", err))
 		return
 	}
-	if err := os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), orwApplyHCL, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), nomadtpl.GetORWApplyTemplate(), 0644); err != nil {
 		h.recordError(executionID, fmt.Errorf("failed to write orw_apply.hcl: %w", err))
 		return
 	}
-	if err := os.WriteFile(filepath.Join(jobsDir, "reducer.hcl"), reducerHCL, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(jobsDir, "reducer.hcl"), nomadtpl.GetReducerTemplate(), 0644); err != nil {
 		h.recordError(executionID, fmt.Errorf("failed to write reducer.hcl: %w", err))
 		return
 	}
