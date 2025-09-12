@@ -29,8 +29,8 @@ job "${RUN_ID}" {
       }
 
       resources {
-        cpu    = 500
-        memory = 1024
+        cpu    = 300
+        memory = 512
       }
 
       kill_timeout = "5m"
