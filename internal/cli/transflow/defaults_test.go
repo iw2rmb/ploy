@@ -6,7 +6,7 @@ import (
 )
 
 func TestResolveDefaults_UsesBuiltinsWhenEnvMissing(t *testing.T) {
-    d := ResolveDefaults(func(string) string { return "" })
+	d := ResolveDefaults(func(string) string { return "" })
 	if d.Registry != "registry.dev.ployman.app" {
 		t.Fatalf("registry default: %s", d.Registry)
 	}
@@ -16,15 +16,15 @@ func TestResolveDefaults_UsesBuiltinsWhenEnvMissing(t *testing.T) {
 	if d.DC != "dc1" {
 		t.Fatalf("dc default: %s", d.DC)
 	}
-    if len(d.Allowlist) == 0 || d.Allowlist[0] != "src/**" {
-        t.Fatalf("allowlist default: %v", d.Allowlist)
-    }
-    if d.SeaweedURL == "" {
-        t.Fatalf("seaweed default missing")
-    }
-    if d.PlannerTimeout <= 0 || d.ReducerTimeout <= 0 || d.LLMExecTimeout <= 0 || d.ORWApplyTimeout <= 0 {
-        t.Fatalf("timeouts not set: %+v", d)
-    }
+	if len(d.Allowlist) == 0 || d.Allowlist[0] != "src/**" {
+		t.Fatalf("allowlist default: %v", d.Allowlist)
+	}
+	if d.SeaweedURL == "" {
+		t.Fatalf("seaweed default missing")
+	}
+	if d.PlannerTimeout <= 0 || d.ReducerTimeout <= 0 || d.LLMExecTimeout <= 0 || d.ORWApplyTimeout <= 0 || d.BuildApplyTimeout <= 0 {
+		t.Fatalf("timeouts not set: %+v", d)
+	}
 }
 
 func TestResolveDefaults_RespectsEnvOverrides(t *testing.T) {

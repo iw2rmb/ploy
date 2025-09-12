@@ -61,3 +61,31 @@ Notes
 - PLOY_API_URL vs PLOY_CONTROLLER: PLOY_API_URL is the base (no /v1) used by in-job HTTP calls (e.g., recipe registration); PLOY_CONTROLLER includes /v1 and is used by runner/controller for control-plane events.
 - Cleanup is automatic: transflow sets build_only so the API deregisters the lane‑c sandbox after the build gate, preventing tfw-…-lane-c leftovers.
 - For production/staging, mirror the same knobs but point images to the appropriate registry and increase resources if projects are larger.
+# Transflow Configuration Knobs
+
+The following environment variables control Transflow defaults. All are optional; sensible defaults are provided.
+
+Registry and Images
+- TRANSFLOW_REGISTRY: Default registry (default: registry.dev.ployman.app)
+- TRANSFLOW_PLANNER_IMAGE: Planner job image (default: <REGISTRY>/langgraph-runner:py-0.1.0)
+- TRANSFLOW_REDUCER_IMAGE: Reducer job image (default: same as planner)
+- TRANSFLOW_LLM_EXEC_IMAGE: LLM exec job image (default: same as planner)
+- TRANSFLOW_ORW_APPLY_IMAGE: OpenRewrite apply image (default: <REGISTRY>/openrewrite-jvm:latest)
+
+Infrastructure
+- NOMAD_DC: Nomad datacenter (default: dc1)
+- PLOY_SEAWEEDFS_URL: SeaweedFS filer URL (default: http://seaweedfs-filer.service.consul:8888)
+
+Security and Paths
+- TRANSFLOW_ALLOWLIST: CSV allowlist globs for diff validation (default: "src/**,pom.xml")
+
+Timeouts
+- TRANSFLOW_PLANNER_TIMEOUT: Planner job timeout (default: 15m)
+- TRANSFLOW_REDUCER_TIMEOUT: Reducer job timeout (default: 10m)
+- TRANSFLOW_LLM_EXEC_TIMEOUT: LLM exec job timeout (default: 30m)
+- TRANSFLOW_ORW_APPLY_TIMEOUT: ORW apply job timeout (default: 30m)
+- TRANSFLOW_BUILD_APPLY_TIMEOUT: Apply-diff + build-gate phase timeout (default: 10m)
+
+Notes
+- CLI may still respect explicit configuration options in YAML; env vars only provide defaults.
+- The controller event reporter is used when PLOY_TRANSFLOW_EXECUTION_ID is set.
