@@ -50,7 +50,10 @@ if [[ -z "$PLOY_CMD" ]]; then
     PLOY_CMD=ploy
   fi
 fi
-if ! "$PLOY_CMD" push -a "$APP_NAME"; then
+EXTRA_FLAGS=()
+[[ -n "${LANE:-}" ]] && EXTRA_FLAGS+=("-lane" "$LANE")
+[[ -n "${MAIN:-}" ]] && EXTRA_FLAGS+=("-main" "$MAIN")
+if ! "$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]}"; then
   err "ploy push failed"
   exit 1
 fi
