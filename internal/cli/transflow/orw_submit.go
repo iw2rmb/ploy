@@ -14,15 +14,14 @@ func submitORWJobAndFetchDiff(
     validate func(string) error,
     submit func(string, time.Duration) error,
     reportLastJob func(context.Context, string, string, string),
-    seaweed, execID, branchID, stepID, hclPath, diffPath string,
+    seaweed, execID, branchID, stepID, jobName, hclPath, diffPath string,
     timeout time.Duration,
 ) error {
-    runID := fmt.Sprintf("orw-apply-%s", stepID)
     if err := validate(hclPath); err != nil {
         return fmt.Errorf("ORW HCL validation failed: %w", err)
     }
-    if reportLastJob != nil {
-        reportLastJob(ctx, runID, "apply", "orw-apply")
+    if reportLastJob != nil && jobName != "" {
+        reportLastJob(ctx, jobName, "apply", "orw-apply")
     }
     if err := submit(hclPath, timeout); err != nil {
         return fmt.Errorf("orw-apply job failed: %w", err)
@@ -38,4 +37,3 @@ func submitORWJobAndFetchDiff(
     }
     return nil
 }
-

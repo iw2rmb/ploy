@@ -235,8 +235,8 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 			return nil, fmt.Errorf("failed to render planner assets: %w", err)
 		}
 
-		// Step 2: Generate unique run ID for this planner job
-		runID := fmt.Sprintf("%s-planner-%d", config.ID, time.Now().Unix())
+    // Step 2: Generate unique run ID for this planner job
+    runID := PlannerRunID(config.ID)
 
 		// Step 3: Substitute environment variables in HCL template without global env writes
 		contextDir := filepath.Dir(assets.InputsPath)
@@ -375,8 +375,8 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("failed to render reducer assets: %w", err)
 		}
 
-		// Step 2: Generate unique run ID for this reducer job
-		runID := fmt.Sprintf("%s-reducer-%d", planID, time.Now().Unix())
+    // Step 2: Generate unique run ID for this reducer job
+    runID := ReducerRunID(planID)
 
 		// Step 3: Substitute environment variables in HCL template without global env writes
 		contextDir := filepath.Dir(assets.HistoryPath)
