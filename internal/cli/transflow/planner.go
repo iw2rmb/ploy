@@ -38,7 +38,7 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
 	}
 
-	runID := fmt.Sprintf("%s-planner-%d", runner.config.ID, time.Now().Unix())
+    runID := PlannerRunID(runner.config.ID)
 
 	// Compute host bind mount directories for planner
 	contextDir := filepath.Dir(assets.InputsPath)

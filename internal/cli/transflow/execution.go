@@ -7,7 +7,6 @@ import (
     "os"
     "path/filepath"
     "strings"
-    "time"
 
     orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
@@ -71,7 +70,7 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 			if hcl, err := runner.RenderLLMExecAssets(lid); err == nil {
 				fmt.Printf("Rendered llm_exec HCL: %s\n", hcl)
 				// Centralized substitution (no global env writes)
-				runID := fmt.Sprintf("%s-%d", runner.config.ID, time.Now().Unix())
+                runID := LLMRunID(lid)
 				vars := map[string]string{
 					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
 					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
@@ -152,7 +151,7 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 						fmt.Printf("warning: repo clone failed: %v\n", err)
 					}
 				}
-				runID2 := fmt.Sprintf("%s-orw-apply-%d", runner.config.ID, time.Now().Unix())
+                runID2 := ORWRunID(oid)
 				vars := map[string]string{
 					"TRANSFLOW_CONTEXT_DIR":       contextDir,
 					"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),

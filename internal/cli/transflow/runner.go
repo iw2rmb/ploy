@@ -551,7 +551,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				pluginVersion = os.Getenv("TRANSFLOW_MAVEN_PLUGIN_VERSION")
 			}
 			// Create run ID for this submission and then substitute it
-			runID := fmt.Sprintf("orw-apply-%s-%d", step.ID, time.Now().Unix())
+            runID := ORWRunID(step.ID)
             prePath, err := writeORWPreHCL(renderedPath, ORWRecipeParams{Class: rclass, Group: rgroup, Artifact: rartifact, Version: rversion, PluginVersion: pluginVersion}, inputTar, runID)
             if err != nil {
                 result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to write pre-HCL: %v", err)})
@@ -614,7 +614,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
             // Submit job and fetch diff via helper
             orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-            if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, submittedPath, diffPath, orwTimeout); err != nil {
+            if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID, submittedPath, diffPath, orwTimeout); err != nil {
                 r.emit(ctx, "apply", "orw-apply", "error", err.Error())
                 result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
                 result.ErrorMessage = err.Error()
