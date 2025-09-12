@@ -41,3 +41,6 @@ func createTarFromDir(srcDir, dstTar string) error {
     return nil
 }
 
+// test indirection for getHeadHash
+var getHeadHashFn = getHeadHash
+
