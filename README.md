@@ -332,3 +332,20 @@ Recommended usage:
 - Consul service checks -> /live (fast, keeps routing responsive).
 - Readiness checks during deployment -> /ready (deep verification).
 - External status dashboards/alerts -> /health.
+## Transflow Development Workflow
+
+- Format and simplify the transflow package:
+  - `make fmt-transflow`
+
+- Run focused transflow tests and static analysis:
+  - `make test-transflow`
+
+- Optional: ORW container smoke test (requires Docker and SeaweedFS):
+  - `export TRANSFLOW_DOCKER_SMOKE=1`
+  - `export PLOY_SEAWEEDFS_URL=http://localhost:8888`
+  - `export ORW_IMAGE=registry.dev.ployman.app/openrewrite-jvm:latest`
+  - `go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/cli/transflow -v`
+
+Notes:
+- Unit tests stub Nomad and SeaweedFS interactions; integration/E2E tests run on VPS lanes only per AGENTS.md.
+- Recipe coordinates and test repo for ORW are aligned with `orw-apply-manual.sh`.

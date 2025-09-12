@@ -5,6 +5,22 @@ validate:
   image: golang:1.22
   script: [ "go run ./tools/lane-pick --path apps" ]
 
+test-transflow:
+  stage: validate
+  image: golang:1.22
+  variables:
+    GO111MODULE: "on"
+  before_script:
+    - go version
+    - go env
+    - go install honnef.co/go/tools/cmd/staticcheck@latest
+    - export PATH="$(go env GOPATH)/bin:$PATH"
+  script:
+    - echo "Running transflow unit tests..."
+    - go test -vet=off -race -short -count=1 -v ./internal/cli/transflow
+    - echo "Running staticcheck for transflow..."
+    - staticcheck ./internal/cli/transflow/...
+
 build:
   stage: build
   image: golang:1.22
