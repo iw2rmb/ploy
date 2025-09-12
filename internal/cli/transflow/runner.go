@@ -960,42 +960,7 @@ build_step:
 	return result, nil
 }
 
-// generateMRDescription creates a descriptive merge request body based on workflow results
-func (r *TransflowRunner) generateMRDescription(result *TransflowResult) string {
-	var description strings.Builder
-
-	description.WriteString(fmt.Sprintf("## Transflow Workflow: %s\n\n", r.config.ID))
-
-	// Add basic workflow information
-	description.WriteString(fmt.Sprintf("**Branch:** %s\n", result.BranchName))
-	if result.BuildVersion != "" {
-		description.WriteString(fmt.Sprintf("**Build Version:** %s\n", result.BuildVersion))
-	}
-	description.WriteString(fmt.Sprintf("**Duration:** %s\n\n", result.Duration.String()))
-
-	// Add applied transformations
-	description.WriteString("## Applied Transformations\n\n")
-	for _, step := range result.StepResults {
-		if step.StepID != "mr" && step.Success {
-			description.WriteString(fmt.Sprintf("- ✅ **%s**: %s\n", strings.Title(step.StepID), step.Message))
-		}
-	}
-
-	// Add healing information if present
-	if result.HealingSummary != nil && result.HealingSummary.Winner != nil {
-		description.WriteString("\n## Self-Healing Applied\n\n")
-		description.WriteString(fmt.Sprintf("- **Plan ID:** %s\n", result.HealingSummary.PlanID))
-		description.WriteString(fmt.Sprintf("- **Winning Strategy:** %s\n", result.HealingSummary.Winner.ID))
-		description.WriteString(fmt.Sprintf("- **Attempts:** %d\n", result.HealingSummary.AttemptsCount))
-	}
-
-	// Add footer with automation info
-	description.WriteString("\n---\n")
-	description.WriteString("🤖 *This merge request was automatically created by Ploy Transflow*\n")
-	description.WriteString("📝 *Labels: ploy, tfl*")
-
-	return description.String()
-}
+// MR description rendering moved to mr_template.go
 
 // attemptHealing orchestrates the healing workflow: planner → fanout → reducer
 func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*TransflowHealingSummary, error) {
