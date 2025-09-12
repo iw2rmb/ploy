@@ -124,32 +124,32 @@ func TestExecuteRemoteTransflowWatch(t *testing.T) {
 
 // TestExecuteRemoteTransflowWatchAcceptsCharset verifies SSE watch accepts Content-Type with charset
 func TestExecuteRemoteTransflowWatchAcceptsCharset(t *testing.T) {
-    mux := http.NewServeMux()
-    mux.HandleFunc("/v1/transflow/run", func(w http.ResponseWriter, r *http.Request) {
-        w.WriteHeader(http.StatusAccepted)
-        io.WriteString(w, `{"execution_id":"tf-watch2"}`)
-    })
-    // SSE endpoint returns with charset on content type
-    mux.HandleFunc("/v1/transflow/logs/tf-watch2", func(w http.ResponseWriter, r *http.Request) {
-        w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
-        w.WriteHeader(http.StatusOK)
-        io.WriteString(w, "event: init\n")
-        io.WriteString(w, "data: {\"id\":\"tf-watch2\",\"message\":\"SSE connected\"}\n\n")
-        io.WriteString(w, "event: end\n")
-        io.WriteString(w, "data: {\"status\":\"completed\"}\n\n")
-    })
-    srv := httptest.NewServer(mux)
-    defer srv.Close()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/transflow/run", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		io.WriteString(w, `{"execution_id":"tf-watch2"}`)
+	})
+	// SSE endpoint returns with charset on content type
+	mux.HandleFunc("/v1/transflow/logs/tf-watch2", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, "event: init\n")
+		io.WriteString(w, "data: {\"id\":\"tf-watch2\",\"message\":\"SSE connected\"}\n\n")
+		io.WriteString(w, "event: end\n")
+		io.WriteString(w, "data: {\"status\":\"completed\"}\n\n")
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
 
-    dir := t.TempDir()
-    cfgPath := filepath.Join(dir, "tf.yaml")
-    if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
-        t.Fatalf("write cfg: %v", err)
-    }
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "tf.yaml")
+	if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
+		t.Fatalf("write cfg: %v", err)
+	}
 
-    if err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, false, true, "text"); err != nil {
-        t.Fatalf("watch mode failed with charset content-type: %v", err)
-    }
+	if err := executeRemoteTransflow(srv.URL+"/v1", cfgPath, false, false, true, "text"); err != nil {
+		t.Fatalf("watch mode failed with charset content-type: %v", err)
+	}
 }
 
 // TestExecuteRemoteTransflowJSONOutputsExecutionID ensures --output=json prints a single JSON with execution_id

@@ -199,12 +199,12 @@ func (r *TransflowRunner) SetEventReporter(reporter EventReporter) {
 }
 
 func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
-    if r.eventReporter != nil {
-        _ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
-        return
-    }
-    // Fallback to local log output when no reporter is configured
-    log.Printf("[Transflow][%s/%s][%s] %s", phase, step, level, message)
+	if r.eventReporter != nil {
+		_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
+		return
+	}
+	// Fallback to local log output when no reporter is configured
+	log.Printf("[Transflow][%s/%s][%s] %s", phase, step, level, message)
 }
 
 // GetEventReporter exposes the reporter for orchestrators
@@ -451,10 +451,7 @@ func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, erro
 // ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
 func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
 	// Validate paths first (allowlist)
-	allow := []string{"src/**", "pom.xml"}
-	if v := os.Getenv("TRANSFLOW_ALLOWLIST"); v != "" {
-		allow = strings.Split(v, ",")
-	}
+	allow := ResolveDefaultsFromEnv().Allowlist
 	if err := validateDiffPathsFn(diffPath, allow); err != nil {
 		return err
 	}

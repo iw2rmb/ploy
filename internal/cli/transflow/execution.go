@@ -266,13 +266,10 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 	outDir := vars["TRANSFLOW_OUT_DIR"]
 
 	// Default image from vars or registry
+	d := ResolveDefaults(func(k string) string { return vars[k] })
 	orwImage := vars["TRANSFLOW_ORW_APPLY_IMAGE"]
 	if orwImage == "" {
-		reg := vars["TRANSFLOW_REGISTRY"]
-		if reg == "" {
-			reg = "registry.dev.ployman.app"
-		}
-		orwImage = reg + "/openrewrite-jvm:latest"
+		orwImage = d.ORWApplyImage
 	}
 
 	// Controller and execution ID for in-job event push
@@ -294,7 +291,7 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 
 	dc := vars["NOMAD_DC"]
 	if dc == "" {
-		dc = "dc1"
+		dc = d.DC
 	}
 
 	// Compute API base (without /v1) for PLOY_API_URL used by runner metadata registration
