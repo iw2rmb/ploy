@@ -234,6 +234,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	// Ensure out directory exists for bind mount target
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
     imgs := ResolveImagesFromEnv()
+    infra := ResolveInfraFromEnv()
     vars := map[string]string{
         "TRANSFLOW_CONTEXT_DIR":       baseDir,
         "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
@@ -241,9 +242,9 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
         "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
         "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
         "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-        "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+        "PLOY_CONTROLLER":             infra.Controller,
         "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-        "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+        "NOMAD_DC":                    infra.DC,
         "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
         "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
         "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
@@ -443,16 +444,17 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	baseDir := filepath.Dir(hclPath)
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
     imgs := ResolveImagesFromEnv()
+    infra := ResolveInfraFromEnv()
     vars := map[string]string{
         "TRANSFLOW_CONTEXT_DIR":       baseDir,
         "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-        "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+        "PLOY_CONTROLLER":             infra.Controller,
         "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-        "PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+        "PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
         "TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
         "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
         "TRANSFLOW_REGISTRY":          imgs.Registry,
-        "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+        "NOMAD_DC":                    infra.DC,
     }
 
 	// Step 2b: Substitute environment variables in HCL template
