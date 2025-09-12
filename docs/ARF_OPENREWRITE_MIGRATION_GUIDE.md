@@ -240,8 +240,8 @@ ploy arf benchmark logs <benchmark-id>
 # Controller health
 curl https://api.dev.ployman.app/v1/version
 
-# Nomad job status (via wrapper)
-nomad job status | grep openrewrite
+# Nomad jobs (via wrapper)
+/opt/hashicorp/bin/nomad-job-manager.sh jobs | grep openrewrite
 ```
 
 ## Batch Job Architecture Details
@@ -298,11 +298,11 @@ The system automatically resolves recipe coordinates:
 ### Debug Commands
 
 ```bash
-# Check running batch jobs
-nomad job status | grep openrewrite
+# Check running batch jobs (via wrapper)
+/opt/hashicorp/bin/nomad-job-manager.sh jobs | grep openrewrite
 
-# View job allocation details
-nomad job status openrewrite-<job-id>
+# View job allocation details (via wrapper)
+/opt/hashicorp/bin/nomad-job-manager.sh allocs --job openrewrite-<job-id>
 
 # Check dispatcher logs (in API logs)
 curl https://api.dev.ployman.app/v1/logs | grep OpenRewriteDispatcher

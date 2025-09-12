@@ -124,7 +124,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    - Confirm recipe artifacts are accessible
 
 2. **Check Nomad Job Execution**
-   - Get JobID: `nomad job status | grep openrewrite | tail -1`
+   - Get JobID: `/opt/hashicorp/bin/nomad-job-manager.sh jobs | grep openrewrite | tail -1`
    - Get allocation: `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job {job-name}`
    - Check logs: `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id {alloc-id} --task openrewrite`
 

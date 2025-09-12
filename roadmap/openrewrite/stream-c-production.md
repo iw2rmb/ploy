@@ -841,7 +841,7 @@ func (b *BatchProcessor) ProcessBatch(ctx context.Context, jobs []BatchJob) ([]B
 ## Deployment
 1. Build container: `docker build -t ploy/openrewrite-service:latest .`
 2. Push to registry: `docker push ploy/openrewrite-service:latest`
-3. Deploy to Nomad: `nomad job run openrewrite-service.hcl`
+3. Deploy to Nomad: `/opt/hashicorp/bin/nomad-job-manager.sh run --file openrewrite-service.hcl --job openrewrite-service`
 
 ## Monitoring
 - Grafana dashboard: https://grafana.example.com/d/openrewrite
@@ -862,12 +862,12 @@ func (b *BatchProcessor) ProcessBatch(ctx context.Context, jobs []BatchJob) ([]B
 ## Emergency Procedures
 ### Manual scaling
 ```bash
-nomad job scale openrewrite-service openrewrite 5
+/opt/hashicorp/bin/nomad-job-manager.sh scale --job openrewrite-service --group openrewrite --count 5
 ```
 
 ### Force shutdown all instances
 ```bash
-nomad job stop openrewrite-service
+/opt/hashicorp/bin/nomad-job-manager.sh stop --job openrewrite-service
 ```
 ```
 
