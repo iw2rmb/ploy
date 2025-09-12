@@ -95,3 +95,16 @@ Timeouts
 Notes
 - CLI may still respect explicit configuration options in YAML; env vars only provide defaults.
 - The controller event reporter is used when PLOY_TRANSFLOW_EXECUTION_ID is set.
+
+How to add new HCL template variables
+
+- Prefer central resolvers instead of reading environment variables directly:
+  - Use `ResolveImagesFromEnv()` to get image refs and registry.
+  - Use `ResolveInfraFromEnv()` to get controller (and API base), SeaweedFS URL, and DC.
+- Build var maps explicitly (do not mutate process env) and pass them to:
+  - `substituteHCLTemplateWithMCPVars` for planner/reducer/llm-exec.
+  - `substituteORWTemplateVars` for ORW apply jobs.
+- If a new template needs an additional var:
+  1) Add the key in the relevant resolver if it derives from defaults (images/infra).
+  2) Thread the value through the var map where the template is substituted (preview/fanout/runner).
+  3) Add a small unit test for the substitution to avoid regressions.
