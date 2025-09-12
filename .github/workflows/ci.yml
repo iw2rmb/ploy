@@ -19,7 +19,8 @@ jobs:
       - name: Go env
         run: go env
       - name: Validate lane selection
-        run: go run ./tools/lane-pick --path apps
+        working-directory: tools/lane-pick
+        run: go run . --path ../../apps
 
   transflow-tests:
     name: Transflow Unit + Staticcheck
@@ -124,4 +125,3 @@ jobs:
           path: |
             repo.sbom.json
             repo.sbom.json.sig
-
