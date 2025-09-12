@@ -460,7 +460,7 @@ validate_job() {
         echo "Error: --file parameter is required" >&2
         show_help
         exit 1
-    }
+    fi
 
     log "Validating job file: $JOB_FILE"
     if ! [ -f "$JOB_FILE" ]; then
