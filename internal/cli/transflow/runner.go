@@ -619,7 +619,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
             _ = os.MkdirAll(filepath.Dir(diffPath), 0755)
             r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
             // Submit job and fetch diff via helper
-            if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, submittedPath, diffPath, 15*time.Minute); err != nil {
+            orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+            if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, submittedPath, diffPath, orwTimeout); err != nil {
                 r.emit(ctx, "apply", "orw-apply", "error", err.Error())
                 result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
                 result.ErrorMessage = err.Error()
