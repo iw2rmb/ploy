@@ -43,6 +43,12 @@ func getConsulClient() (*api.Client, error) {
 
 // GetModels handles GET /v1/arf/models
 func (h *Handler) GetModels(c *fiber.Ctx) error {
+	// Deprecated: ARF model registry moved to /v1/llms/models
+	return c.Status(fiber.StatusGone).JSON(fiber.Map{
+		"error":    "ARF model registry is deprecated",
+		"message":  "Use /v1/llms/models for model operations",
+		"redirect": "/v1/llms/models",
+	})
 	client, err := getConsulClient()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -75,6 +81,12 @@ func (h *Handler) GetModels(c *fiber.Ctx) error {
 
 // AddModel handles POST /v1/arf/models
 func (h *Handler) AddModel(c *fiber.Ctx) error {
+	// Deprecated: ARF model registry moved to /v1/llms/models
+	return c.Status(fiber.StatusGone).JSON(fiber.Map{
+		"error":    "ARF model registry is deprecated",
+		"message":  "Use /v1/llms/models for model creation",
+		"redirect": "/v1/llms/models",
+	})
 	var newModel ModelConfig
 	if err := c.BodyParser(&newModel); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -179,6 +191,12 @@ save:
 
 // RemoveModel handles DELETE /v1/arf/models/:name
 func (h *Handler) RemoveModel(c *fiber.Ctx) error {
+	// Deprecated: ARF model registry moved to /v1/llms/models
+	return c.Status(fiber.StatusGone).JSON(fiber.Map{
+		"error":    "ARF model registry is deprecated",
+		"message":  "Use /v1/llms/models for model deletion",
+		"redirect": "/v1/llms/models",
+	})
 	modelName := c.Params("name")
 	if modelName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -263,6 +281,12 @@ func (h *Handler) RemoveModel(c *fiber.Ctx) error {
 
 // SetDefaultModel handles POST /v1/arf/models/:name/set-default
 func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {
+	// Deprecated: ARF model registry moved to /v1/llms/models
+	return c.Status(fiber.StatusGone).JSON(fiber.Map{
+		"error":    "ARF model registry is deprecated",
+		"message":  "Use /v1/llms/models/{id} to update models",
+		"redirect": "/v1/llms/models",
+	})
 	modelName := c.Params("name")
 	if modelName == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -346,6 +370,12 @@ func (h *Handler) SetDefaultModel(c *fiber.Ctx) error {
 
 // ImportModels handles PUT /v1/arf/models
 func (h *Handler) ImportModels(c *fiber.Ctx) error {
+	// Deprecated: ARF model registry moved to /v1/llms/models
+	return c.Status(fiber.StatusGone).JSON(fiber.Map{
+		"error":    "ARF model registry is deprecated",
+		"message":  "Use /v1/llms/models for model import",
+		"redirect": "/v1/llms/models",
+	})
 	var registry ModelRegistry
 	if err := c.BodyParser(&registry); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
