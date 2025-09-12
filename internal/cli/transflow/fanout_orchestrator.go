@@ -233,20 +233,21 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	baseDir := filepath.Dir(hclPath)
 	// Ensure out directory exists for bind mount target
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       baseDir,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
-		"TRANSFLOW_PLANNER_IMAGE":     os.Getenv("TRANSFLOW_PLANNER_IMAGE"),
-		"TRANSFLOW_REDUCER_IMAGE":     os.Getenv("TRANSFLOW_REDUCER_IMAGE"),
-		"TRANSFLOW_LLM_EXEC_IMAGE":    os.Getenv("TRANSFLOW_LLM_EXEC_IMAGE"),
-		"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
-		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-		"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
-		"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-		"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-		"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-	}
+    imgs := ResolveImagesFromEnv()
+    vars := map[string]string{
+        "TRANSFLOW_CONTEXT_DIR":       baseDir,
+        "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+        "TRANSFLOW_REGISTRY":          imgs.Registry,
+        "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+        "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+        "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+        "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+        "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+        "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+        "TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
+        "TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
+        "TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
+    }
 
 	// Step 2: Generate unique run ID for this branch
     runID := LLMRunID(branch.ID)
@@ -441,17 +442,18 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	// Provide host directories for bind mounts (no global env)
 	baseDir := filepath.Dir(hclPath)
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       baseDir,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
-		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-		"PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
-		"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-		"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
-		"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
-		"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
-	}
+    imgs := ResolveImagesFromEnv()
+    vars := map[string]string{
+        "TRANSFLOW_CONTEXT_DIR":       baseDir,
+        "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+        "PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
+        "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+        "PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
+        "TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
+        "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+        "TRANSFLOW_REGISTRY":          imgs.Registry,
+        "NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+    }
 
 	// Step 2b: Substitute environment variables in HCL template
     runID := ORWRunID(branch.ID)
