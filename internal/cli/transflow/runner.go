@@ -866,7 +866,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 
 			// Apply + build with a phase timeout
-			applyTimeout := 10 * time.Minute
+			applyTimeout := ResolveDefaultsFromEnv().BuildApplyTimeout
 			applyCtx, cancelApply := context.WithTimeout(ctx, applyTimeout)
 			defer cancelApply()
 			log.Printf("[Transflow] Applying diff and running build gate (timeout=%s): repo=%s diff=%s", applyTimeout, repoPath, diffPath)
