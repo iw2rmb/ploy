@@ -26,7 +26,7 @@ Core validation workflow: VPS service health → distributed service topology �
 - Complete service health checking for Consul, Nomad, SeaweedFS-master, SeaweedFS-filer
 - Distributed service topology validation with leader election and cluster coordination
 - KB storage namespace setup and operational validation
-- Transflow CLI availability and command execution validation
+- Mods CLI availability and command execution validation
 - Performance baseline testing with response time measurement
 - Production user context validation (ploy user with proper permissions)
 
@@ -97,14 +97,14 @@ User Context:
 - ✅ Consul cluster: Leader election and member coordination operational
 - ✅ Nomad orchestration: Job submission and execution platform ready
 - ✅ SeaweedFS storage: Master/filer topology with HTTP API operational  
-- ✅ Transflow CLI: Production installation with KB integration ready
+- ✅ Mods CLI: Production installation with KB integration ready
 - ✅ Network connectivity: Service endpoint validation and response time testing passed
 - ✅ Performance baselines: KB storage <2s response time validated
 - ✅ Security model: Ploy user permissions and service access validated
 
 ## Related Documentation
 - `../e2e/CLAUDE.md` - E2E testing framework with VPS integration (✅ operational)
-- `../../internal/cli/transflow/README.md` - Transflow CLI with VPS deployment support (MVP complete)
+- `../../internal/mods/README.md` - Mods CLI with VPS deployment support (MVP complete)
 - `../../internal/kb/CLAUDE.md` - KB system with SeaweedFS backend integration (✅ production operational)
 - Root `Makefile` - VPS integration test targets and TARGET_HOST configuration
 - Production deployment documentation for service stack configuration

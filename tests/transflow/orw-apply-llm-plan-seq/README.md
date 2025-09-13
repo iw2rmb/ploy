@@ -82,7 +82,7 @@ Quick start (scripts) — operator flow
 Go E2E tests — CI/VPS flow
 
 - Primary method for automated validation. Tests live under tests/e2e with build tag `e2e`.
-- New healing test: TestTransflowE2E_HealingFlow_ORWFail_LLMSucceeds
+- New healing test: TestModsE2E_HealingFlow_ORWFail_LLMSucceeds
   - Skips unless PLOY_CONTROLLER and E2E_HEALING_REPO are set.
   - Branch selection: E2E_HEALING_BRANCH (default e2e/fail-missing-symbol).
   - Expects build-gate failure (deterministic branch) then planner → llm-exec → reducer, and asserts plan_json/next_json artifacts on the controller.
