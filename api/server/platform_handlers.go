@@ -1,8 +1,16 @@
 package server
 
 import (
+	"bytes"
+	"context"
+	"fmt"
+	"os/exec"
+	"strings"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/api/platform"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // handlePlatformDeploy handles platform service deployment
@@ -77,18 +85,65 @@ func (s *Server) handlePlatformRemove(c *fiber.Ctx) error {
 // handlePlatformLogs handles platform service log retrieval
 func (s *Server) handlePlatformLogs(c *fiber.Ctx) error {
 	serviceName := c.Params("service")
-	lines := c.QueryInt("lines", 100)
+	lines := c.QueryInt("lines", 200)
 	follow := c.QueryBool("follow", false)
 
-	// TODO: Implement platform log streaming
-	// This should connect to Nomad API to stream logs
+	// Derive Nomad job name for platform services
+	jobName := serviceName
+	if !strings.HasPrefix(jobName, "ploy-") {
+		jobName = "ploy-" + jobName
+	}
 
-	return c.JSON(fiber.Map{
-		"service": serviceName,
-		"lines":   lines,
-		"follow":  follow,
-		"logs": []string{
-			"Platform service log streaming not yet implemented",
-		},
-	})
+	monitor := orchestration.NewHealthMonitor()
+	allocs, err := monitor.GetJobAllocations(jobName)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error":   "Failed to retrieve allocations",
+			"details": err.Error(),
+		})
+	}
+	runningID := ""
+	for _, a := range allocs {
+		if a.ClientStatus == "running" {
+			runningID = a.ID
+			break
+		}
+	}
+	if runningID == "" {
+		return c.JSON(fiber.Map{
+			"service":         serviceName,
+			"job_name":        jobName,
+			"logs":            "No running allocations found",
+			"lines_requested": lines,
+		})
+	}
+
+	// Prefer the VPS job manager wrapper when available for consistent log retrieval
+	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+	defer cancel()
+	// Build command arguments safely
+	args := []string{"logs", "--alloc-id", runningID}
+	if lines > 0 {
+		args = append(args, "--lines", fmt.Sprintf("%d", lines))
+	}
+	if follow {
+		args = append(args, "--follow")
+	}
+	cmd := exec.CommandContext(ctx, wrapper, args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Run(); err != nil {
+		// Fallback: return basic info rather than failing hard
+		return c.Status(500).JSON(fiber.Map{
+			"error":    "Failed to fetch logs via job manager",
+			"details":  err.Error(),
+			"output":   out.String(),
+			"service":  serviceName,
+			"job_name": jobName,
+		})
+	}
+	c.Set("Content-Type", "text/plain; charset=utf-8")
+	return c.Send(out.Bytes())
 }

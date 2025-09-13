@@ -830,13 +830,13 @@ build_step:
 			Duration: time.Since(buildStart),
 		})
 
-		// Check if self-healing is enabled
-		if r.config.SelfHeal != nil && r.config.SelfHeal.Enabled && r.jobSubmitter != nil {
+		// Check if self-healing is enabled (allow local remediation even without job submitter)
+		if r.config.SelfHeal != nil && r.config.SelfHeal.Enabled {
 			// Attempt healing workflow
 			healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
 			result.HealingSummary = healingSummary
 
-			if healingErr == nil && healingSummary.Winner != nil {
+			if healingErr == nil && (healingSummary.Winner != nil || healingSummary.FinalSuccess) {
 				// Healing succeeded! Continue with the healed version
 				result.StepResults = append(result.StepResults, StepResult{
 					StepID:   "healing",
