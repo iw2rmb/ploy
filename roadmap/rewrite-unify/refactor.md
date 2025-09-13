@@ -82,19 +82,20 @@ Scope
 
   Security/Policy Observations
 
-      - Nomad wrapper compliance: orchestration generally honors /opt/hashicorp/bin/nomad-job-manager.sh. Fix the raw nomad CLI call in ValidateJob.
-      - Example apps: move local test apps (e.g., scala-catalogsvc) to GitHub-hosted hello apps; parameterize tests to clone external repos when needed.
-  - SeaweedFS access:
-      - Safety: restrict URL base to expected filer host(s) or require controller to broker downloads/uploads. Avoid direct external URLs for diff unless whitelisted.
-      - Consider auth if filer is non‑public.
-  - Allowlist verification:
-      - As noted, switch to doublestar; consider path normalization, symlink guards, and reject absolute paths in diffs.
-  - Temp artifacts in /tmp/transflow-submitted/<exec>/<step>:
-      - Ensure sensitive values aren’t leaking. Consider opting this off or making it diagnostic behind a debug flag.
+  - ✅ Nomad wrapper compliance:
+      - Orchestration now prefers `/opt/hashicorp/bin/nomad-job-manager.sh` for validate/run/logs; raw Nomad CLI removed from ValidateJob path; ctx-aware stop/deregister implemented.
+  - Example apps:
+      - Move local test apps to public hello apps; parameterize tests to clone external repos — pending (current E2E uses public GitLab repo; local examples still exist in docs/tests).
+  - ✅ SeaweedFS access:
+      - Client uploads use HTTP helpers (no curl); artifact key policy enforced client-side and server-side; controller brokers artifact downloads via `/v1/transflow/artifacts/:id/:name` with key validation. SeaweedFS base resolved via infra resolver. Auth TBD if filer becomes non‑public.
+  - ✅ Allowlist verification:
+      - Diff allowlist switched to doublestar; absolute/suspicious paths rejected; path prefix validation added for artifacts.
+  - ⚠️ Temp artifacts in `/tmp/transflow-submitted/<exec>/<step>`:
+      - Diagnostic only; no sensitive values emitted to controller (env block preview now local-only). Consider gating under a debug flag or disabling in production lanes.
 
   Overcomplications / Simplifications
 
-  - Runner bloat (single large file handles cloning, events, HCL rendering, SeaweedFS uploads, build gate, MR, healing).
+  - ⚠️ Runner bloat (monolithic responsibilities).
       - Change: split runner into cohesive components:
           - RepoManager (clone, branch, commit, push)
           - TransformationExecutor (orw-apply orchestration)
@@ -102,12 +103,12 @@ Scope
           - HealingOrchestrator (planner/fanout/reducer)
           - MRManager (provider wrapper)
           - EventBus (reporting)
-      - Improves testability and minimizes env side effects.
-  - CLI flag surface and mixed modes.
-      - “run”, “watch”, “render-planner”, “plan”, “reduce”, “execute-first”, “exec-llm-first”, “exec-orw-first”, “apply-first” are all flags under run.
+      - Status: Partially completed — extracted cohesive helpers (pre-HCL builder, branch chain meta, ORW submit/fetch, build guard, tar preview, run ID, branch step, push events), unified EventBus via EventReporter, and centralized image/infra/defaults. Full module split can be considered later if needed.
+  - ✅ CLI flag surface and mixed modes.
       - Change: expose explicit subcommands: render, plan, reduce, apply, run, watch. Keep “test-mode” behind an env or a separate build tag.
-  - KB integration breadth.
-      - KB files are extensive; good that it degrades to mocks on failure. Ensure it’s fully optional and behind feature flags to reduce coupling.
+      - Completed: Added `ploy transflow render|plan|reduce|apply|run|watch` plus `help` alias; updated docs and help output.
+  - ⚠️ KB integration breadth.
+      - Status: KB remains integrated by default with graceful degradation on backend issues. Optional feature flagging can be added later if stricter decoupling is required.
 
   Targeted Change Proposals
 
