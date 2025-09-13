@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // Implementation of job submission helpers for the transflow healing workflow.
@@ -19,6 +17,7 @@ import (
 type ProductionJobSubmitter interface {
 	RenderPlannerAssets() (*PlannerAssets, error)
 	RenderReducerAssets() (*ReducerAssets, error)
+	GetHCLSubmitter() HCLSubmitter
 }
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface
@@ -253,18 +252,18 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 			reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
 		}
 
-        // Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
-        if err := h.runner.hcl.Validate(renderedHCLPath); err != nil {
-            return nil, fmt.Errorf("planner HCL validation failed: %w", err)
-        }
-        timeout := ResolveDefaultsFromEnv().PlannerTimeout
-        if err := h.runner.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
-                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
-            }
-            return nil, fmt.Errorf("planner job failed: %w", err)
-        }
+		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
+		if err := h.runner.GetHCLSubmitter().Validate(renderedHCLPath); err != nil {
+			return nil, fmt.Errorf("planner HCL validation failed: %w", err)
+		}
+		timeout := ResolveDefaultsFromEnv().PlannerTimeout
+		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
+			return nil, fmt.Errorf("planner job failed: %w", err)
+		}
 
 		// Step 6: Read and validate job output artifact (plan.json)
 		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
@@ -389,18 +388,18 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
 		}
 
-        // Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
-        if err := h.runner.hcl.Validate(renderedHCLPath); err != nil {
-            return nil, fmt.Errorf("reducer HCL validation failed: %w", err)
-        }
-        timeout := ResolveDefaultsFromEnv().ReducerTimeout
-        if err := h.runner.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
-            if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-                rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
-                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
-            }
-            return nil, fmt.Errorf("reducer job failed: %w", err)
-        }
+		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
+		if err := h.runner.GetHCLSubmitter().Validate(renderedHCLPath); err != nil {
+			return nil, fmt.Errorf("reducer HCL validation failed: %w", err)
+		}
+		timeout := ResolveDefaultsFromEnv().ReducerTimeout
+		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
+			return nil, fmt.Errorf("reducer job failed: %w", err)
+		}
 
 		// Step 6: Read and validate job output artifact (next.json)
 		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
