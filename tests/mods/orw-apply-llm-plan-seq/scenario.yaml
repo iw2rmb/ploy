@@ -7,7 +7,9 @@ lane: C
 build_timeout: 12m
 
 self_heal:
-  max_retries: 3
+  enabled: true
+  kb_learning: true
+  max_retries: 2
 
 budgets:
   run_max_tokens: 0
@@ -84,4 +86,3 @@ steps:
       max_tokens: 0
       max_cost: 0
       timeout: 30m
-
