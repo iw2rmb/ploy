@@ -6,9 +6,9 @@ Collapse the dual surface into a single API: remove ARF transform endpoints enti
 
 - Current:
   - ARF transforms: `/v1/arf/transforms/*` (async single-recipe + debug/reporting)
-  - Transflow: `/v1/transflow/*` (orchestrated workflows, artifacts, logs, events)
+  - Transflow: `/v1/mods/*` (orchestrated workflows, artifacts, logs, events)
 - Target:
-  - Only `/v1/transflow/*` for all transformation operations
+  - Only `/v1/mods/*` for all transformation operations
   - Hard removal of `/v1/arf/transforms*` and related code (no deprecation)
 
 Backwards compatibility is NOT required. Remove legacy surfaces and references in one change set, and update docs/tests accordingly.
@@ -18,7 +18,7 @@ Backwards compatibility is NOT required. Remove legacy surfaces and references i
 - Mixed singular/plural and legacy paths in code/docs/tests:
   - Legacy singular: `/v1/arf/transform` appears in CLI/docs/comments; no server route exists.
   - ARF plural: `/v1/arf/transforms/*` still registered and used across tests/scripts.
-  - Transflow docs mix `/v1/transflow/*` and `/v1/transflows/*`; only singular is implemented.
+  - Transflow docs mix `/v1/mods/*` and `/v1/modss/*`; only singular is implemented.
 - CLI “ploy arf transform” still posts to `/arf/transform` and will break when ARF transforms are removed. No compatibility mode: remove this command and its docs.
 - Test scripts and unit tests reference ARF transforms; expand sweep beyond the few listed earlier.
 - Consul KV prefix uses `ploy/arf/transforms` in tests; decide and update naming to `ploy/transflow/*` or keep legacy prefix intentionally. No runtime data migration is required.
@@ -52,21 +52,21 @@ Notes:
 - Remove the “ploy arf transform” command and help/examples:
   - Delete `internal/cli/arf/transform.go` and strip references from `cmd/ploy/README.md` and any ARF help files.
 - Ensure Transflow is the sole CLI for workflows:
-  - Continue to promote `ploy transflow run` and the Transflow config path.
+  - Continue to promote `ploy mod run` and the Transflow config path.
 - Remove unused integration shims:
-  - In `internal/cli/transflow/integrations.go`, remove `ARFRecipeExecutor` (wrapper that shells out to `ploy arf transform`), and any calls to it. The current Transflow runner does not depend on it; ensure no dead references remain.
+  - In `internal/mods/integrations.go`, remove `ARFRecipeExecutor` (wrapper that shells out to `ploy arf transform`), and any calls to it. The current Transflow runner does not depend on it; ensure no dead references remain.
 
 ### Phase 3: Tests and Scripts
 
 - Remove legacy shell scripts that call ARF transform endpoints and migrate coverage into Go tests:
   - Replaced by Go integration/E2E suites: `tests/integration/transflow`, `tests/e2e/transflow_workflows_test.go`, `tests/acceptance/mvp_acceptance_test.go`.
-  - Unit-level coverage in `internal/cli/transflow/**/*_test.go`, `internal/build/**/*_test.go`, and policy tests.
+  - Unit-level coverage in `internal/mods/**/*_test.go`, `internal/build/**/*_test.go`, and policy tests.
 - Update unit tests that encode the Consul key prefix `ploy/arf/transforms` if we rename it (see Phase 5).
 
 Recommended repo-sweep to catch stragglers:
 ```
 rg -n '/v1/arf/transforms|/v1/arf/transform\b' 
-rg -n '/v1/transflows\b'  # fix pluralization in docs
+rg -n '/v1/modss\b'  # fix pluralization in docs
 ```
 
 ### Phase 4: Documentation Sweep (single Transflow surface)
@@ -80,14 +80,14 @@ rg -n '/v1/transflows\b'  # fix pluralization in docs
 - Normalize Transflow docs and remove unimplemented endpoints:
   - `docs/api/transflow.md`
     - Ensure only implemented endpoints are documented:
-      - `POST   /v1/transflow/run`
-      - `GET    /v1/transflow/status/:id`
-      - `GET    /v1/transflow/list`
-      - `DELETE /v1/transflow/:id`
-      - `GET    /v1/transflow/artifacts/:id[/:name]`
-      - `POST   /v1/transflow/event`
-      - `GET    /v1/transflow/logs/:id`
-    - Remove plural “/v1/transflows/*” variants and any “config/template|config/validate” sections if not implemented.
+      - `POST   /v1/mods/run`
+      - `GET    /v1/mods/status/:id`
+      - `GET    /v1/mods/list`
+      - `DELETE /v1/mods/:id`
+      - `GET    /v1/mods/artifacts/:id[/:name]`
+      - `POST   /v1/mods/event`
+      - `GET    /v1/mods/logs/:id`
+    - Remove plural “/v1/modss/*” variants and any “config/template|config/validate” sections if not implemented.
 - Update `CHANGELOG.md` and `docs/FEATURES.md` per protocol to record the breaking change (removal) and the unified API surface.
 
 ### Phase 5: Consul KV Prefix (optional but recommended)
@@ -99,7 +99,7 @@ rg -n '/v1/transflows\b'  # fix pluralization in docs
 ### Phase 6: Nomad Templates and Runners
 
 - No changes required for runner templates that emit `TRANSFORMATION_ID` or use transformation‑centric naming inside jobs; these are internal to jobs and orthogonal to HTTP removal.
-- Verify that Transflow jobs and services (e.g., `services/openrewrite-jvm/runner.sh`) keep reporting to `/v1/transflow/event` and persist artifacts under Transflow paths.
+- Verify that Transflow jobs and services (e.g., `services/openrewrite-jvm/runner.sh`) keep reporting to `/v1/mods/event` and persist artifacts under Transflow paths.
 
 ### Phase 7: Build, Format, Static Analysis, and Validation
 
@@ -127,7 +127,7 @@ Remove (legacy ARF transform surface):
 
 ## Success Criteria
 
-1. Only `/v1/transflow/*` endpoints exist (singular path), documented and tested.
+1. Only `/v1/mods/*` endpoints exist (singular path), documented and tested.
 2. No references to `/v1/arf/transforms` or `/v1/arf/transform` remain in code, tests, or product docs.
 3. All unit tests pass and staticcheck is clean after removals; coverage thresholds maintained.
 4. E2E transflow workflows function as before (artifacts, events, logs, status).
@@ -146,7 +146,7 @@ Remove (legacy ARF transform surface):
   - remove `api/arf/transformation_workflow.go`
 - CLI:
   - remove `internal/cli/arf/transform.go`, update `cmd/ploy/README.md` and ARF help files
-  - clean `internal/cli/transflow/integrations.go` (remove `ARFRecipeExecutor`)
+  - clean `internal/mods/integrations.go` (remove `ARFRecipeExecutor`)
 - Tests/Scripts:
   - `tests/scripts/test-arf-phase2.sh`, `tests/scripts/test-transformation-workflow.sh`, `tests/scripts/test-arf-unified-consistency.sh`,
     `tests/scripts/test-openrewrite-comprehensive.sh`, `tests/scripts/test-storage-fix-verification.sh`

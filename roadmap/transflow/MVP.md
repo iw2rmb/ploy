@@ -11,7 +11,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - Git operations (clone, branch, commit, push)
 - Diff validation and application utilities
 - GitLab MR integration with environment variable configuration
-- Complete CLI integration (`ploy transflow run`) with full end-to-end workflow
+- Complete CLI integration (`ploy mod run`) with full end-to-end workflow
 - Test mode infrastructure with mock implementations for CI/testing
 - **LangGraph healing branch types:** complete implementation of all three healing strategies
   - **human-step:** Git-based manual intervention with MR creation, commit polling, and build validation
@@ -79,7 +79,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 ### New Work (Minimal)
 
 - New `transflow` orchestrator
-  - CLI entry: `ploy transflow run -f transflow.yaml`.
+  - CLI entry: `ploy mod run -f transflow.yaml`.
   - Step engine: call existing ARF recipe execution; implement LLM plan/exec runners; manage workflow branch lifecycle; run Build check before MR.
 
 - LLM runners
@@ -126,7 +126,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 
 ### Next Steps
 
-1) Add `ploy transflow run` CLI + YAML parser. 2) Wire recipe step to ARF. 3) Implement LangGraph planner/reducer jobs and orchestrator fan‑out logic. 4) Implement LLM‑exec runner with MCP/env/context prefetch (for branch options). 5) Implement git push + GitLab MR creation. 6) Minimal logs and summary output.
+1) Add `ploy mod run` CLI + YAML parser. 2) Wire recipe step to ARF. 3) Implement LangGraph planner/reducer jobs and orchestrator fan‑out logic. 4) Implement LLM‑exec runner with MCP/env/context prefetch (for branch options). 5) Implement git push + GitLab MR creation. 6) Minimal logs and summary output.
 ### Test Case: JDK 11 → 17 Migration
 
 - Minimal transform request (single OpenRewrite recipe step):
@@ -172,16 +172,16 @@ Content-Type: application/json
 
 ```bash
 # Run a complete transflow workflow
-ploy transflow run -f transflow.yaml
+ploy mod run -f transflow.yaml
 
 # Run with verbose output
-ploy transflow run -f transflow.yaml --verbose
+ploy mod run -f transflow.yaml --verbose
 
 # Dry run to validate configuration
-ploy transflow run -f transflow.yaml --dry-run
+ploy mod run -f transflow.yaml --dry-run
 
 # Use test mode for development/CI
-ploy transflow run -f transflow.yaml --test-mode
+ploy mod run -f transflow.yaml --test-mode
 ```
 
 ### Configuration Examples
@@ -219,7 +219,7 @@ export GITLAB_URL=https://gitlab.com
 export GITLAB_TOKEN=your-gitlab-token
 
 # Run workflow with MR creation
-ploy transflow run -f transflow.yaml
+ploy mod run -f transflow.yaml
 ```
 
 **Multiple Recipe Steps:**
@@ -256,29 +256,29 @@ self_heal:
 **Specialized Execution Modes:**
 ```bash
 # Execute only planner step (for debugging healing workflows)
-ploy transflow run -f transflow.yaml --render-planner
+ploy mod run -f transflow.yaml --render-planner
 
 # Execute only LLM step with custom model
 TRANSFLOW_MODEL=gpt-4o-mini@2024-08-06 \
-ploy transflow run -f transflow.yaml --exec-llm-first
+ploy mod run -f transflow.yaml --exec-llm-first
 
 # Execute OpenRewrite application step
-ploy transflow run -f transflow.yaml --exec-orw-first
+ploy mod run -f transflow.yaml --exec-orw-first
 
 # Apply first successful transformation and stop
-ploy transflow run -f transflow.yaml --apply-first
+ploy mod run -f transflow.yaml --apply-first
 ```
 
 **Testing and Development:**
 ```bash
 # Test mode - uses mock implementations for all external services
-ploy transflow run -f transflow.yaml --test-mode
+ploy mod run -f transflow.yaml --test-mode
 
 # Plan mode - shows execution plan without running
-ploy transflow run -f transflow.yaml --plan
+ploy mod run -f transflow.yaml --plan
 
 # Reduce mode - processes healing results
-ploy transflow run -f transflow.yaml --reduce
+ploy mod run -f transflow.yaml --reduce
 ```
 
 ### Expected Workflow Output
