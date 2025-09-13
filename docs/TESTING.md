@@ -217,7 +217,6 @@ The local environment includes:
 - **Consul** (8500): Service discovery and configuration
 - **Nomad** (4646): Container orchestration
 - **SeaweedFS** (9333/8888): Distributed storage
-- **PostgreSQL** (5432): Database
 - **Redis** (6379): Caching
 - **Traefik** (80/8080): Load balancing
 
@@ -232,12 +231,6 @@ export NOMAD_ADDR=http://localhost:4646
 export SEAWEEDFS_MASTER=http://localhost:9333
 export SEAWEEDFS_FILER=http://localhost:8888
 
-# Database
-export POSTGRES_HOST=localhost
-export POSTGRES_PORT=5432
-export POSTGRES_USER=ploy
-export POSTGRES_PASSWORD=ploy-test
-export POSTGRES_DATABASE=ploy_test
 
 # Testing flags
 export PLOY_TEST_MODE=true
@@ -454,8 +447,6 @@ export PLOY_TEST_TIMEOUT=60s
 # Enable debug logging in tests
 export PLOY_TEST_DEBUG=true
 
-# Use alternative test database
-export PLOY_TEST_DB_NAME=ploy_test_ci
 ```
 
 ### Parallel Testing
@@ -510,17 +501,6 @@ jobs:
 
   integration-tests:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: ploy-test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v4

@@ -105,7 +105,7 @@ func extractRewriteYAMLs(r io.ReaderAt, size int64) ([][]byte, error) {
 			continue
 		}
 		b, _ := io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if len(b) > 0 {
 			out = append(out, b)
 		}

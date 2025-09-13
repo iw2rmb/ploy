@@ -105,7 +105,7 @@ func (cp *CloudflareProvider) CreateRecord(ctx context.Context, record Record) e
 	if err != nil {
 		return fmt.Errorf("failed to create record: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -153,7 +153,7 @@ func (cp *CloudflareProvider) UpdateRecord(ctx context.Context, record Record) e
 	if err != nil {
 		return fmt.Errorf("failed to update record: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -178,7 +178,7 @@ func (cp *CloudflareProvider) DeleteRecord(ctx context.Context, hostname string,
 	if err != nil {
 		return fmt.Errorf("failed to delete record: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 		body, _ := io.ReadAll(resp.Body)
@@ -197,7 +197,7 @@ func (cp *CloudflareProvider) GetRecord(ctx context.Context, hostname string, re
 	if err != nil {
 		return nil, fmt.Errorf("failed to get record: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -246,7 +246,7 @@ func (cp *CloudflareProvider) ListRecords(ctx context.Context, domain string) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to list records: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -314,7 +314,7 @@ func (cp *CloudflareProvider) ValidateConfiguration() error {
 	if err != nil {
 		return fmt.Errorf("failed to validate credentials: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -333,7 +333,7 @@ func (cp *CloudflareProvider) getRecordID(ctx context.Context, hostname string, 
 	if err != nil {
 		return "", fmt.Errorf("failed to get record ID: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

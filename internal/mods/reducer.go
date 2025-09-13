@@ -12,7 +12,7 @@ import (
 )
 
 // executeReducerMode renders and optionally submits reducer job
-func executeReducerMode(runner *TransflowRunner, preserve bool) error {
+func executeReducerMode(runner *ModRunner, preserve bool) error {
 	ctx := context.Background()
 	assets, err := runner.RenderReducerAssets()
 	if err != nil {
@@ -28,8 +28,8 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 	llm := ResolveLLMDefaultsFromEnv()
 	model := llm.Model
 	toolsJSON := llm.ToolsJSON
-	// For reducer, slightly tighter default limits; override only if TRANSFLOW_LIMITS provided
-	limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
+	// For reducer, slightly tighter default limits; override only if MODS_LIMITS provided
+	limitsJSON := os.Getenv("MODS_LIMITS")
 	if limitsJSON == "" {
 		limitsJSON = `{"max_steps":4,"max_tool_calls":8,"timeout":"15m"}`
 	}
@@ -52,8 +52,8 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		runner.emit(ctx, "reducer", "preserve", "info", fmt.Sprintf("Workspace preserved at: %s", runner.workspaceDir))
 	}
 
-	if os.Getenv("TRANSFLOW_SUBMIT") != "1" {
-		runner.emit(ctx, "reducer", "submit", "info", "Skipping reducer submission (unset TRANSFLOW_SUBMIT)")
+	if os.Getenv("MODS_SUBMIT") != "1" {
+		runner.emit(ctx, "reducer", "submit", "info", "Skipping reducer submission (unset MODS_SUBMIT)")
 		return nil
 	}
 
@@ -64,11 +64,11 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 	}
 
 	// Fetch next.json via URL or local path
-	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
+	if url := os.Getenv("MODS_NEXT_URL"); url != "" {
 		client := &http.Client{Timeout: 15 * time.Second}
 		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == 200 {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			b, _ := io.ReadAll(resp.Body)
 			printNextSummary(b)
 		} else if err != nil {
@@ -76,14 +76,14 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		}
 	}
 
-	np := os.Getenv("TRANSFLOW_NEXT_PATH")
+	np := os.Getenv("MODS_NEXT_PATH")
 	if np == "" {
 		np = filepath.Join(filepath.Dir(renderedPath), "out", "next.json")
 	}
 	if b, err := os.ReadFile(np); err == nil {
 		printNextSummary(b)
 	} else {
-		fmt.Println("Reducer job completed. Could not read next.json; set TRANSFLOW_NEXT_PATH or TRANSFLOW_NEXT_URL.")
+		fmt.Println("Reducer job completed. Could not read next.json; set MODS_NEXT_PATH or MODS_NEXT_URL.")
 	}
 
 	return nil

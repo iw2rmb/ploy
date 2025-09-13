@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/storage/factory"
 )
 
-func TestTransflowEndToEndIntegration(t *testing.T) {
+func TestModsEndToEndIntegration(t *testing.T) {
 	// Skip integration tests in short mode
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
@@ -24,13 +24,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		config      *TransflowConfig
+		config      *ModConfig
 		testMode    bool
 		expectError bool
 	}{
 		{
 			name: "successful_workflow_with_mocks",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-integration-success",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -38,7 +38,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -56,7 +56,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 		},
 		{
 			name: "workflow_with_build_failure",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-integration-fail",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -64,7 +64,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -82,7 +82,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 		},
 		{
 			name: "workflow_with_seaweedfs",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-seaweedfs",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -90,7 +90,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -112,7 +112,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 		},
 		{
 			name: "workflow_with_nomad_jobs",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-nomad-real",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -120,7 +120,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -142,7 +142,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 		},
 		{
 			name: "workflow_with_consul_kv",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-consul-real",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -150,7 +150,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -172,7 +172,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 		},
 		{
 			name: "workflow_with_gitlab_api",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-gitlab-real",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -180,7 +180,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -202,7 +202,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 		},
 		{
 			name: "workflow_with_all_real_services",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-all-services-real",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
@@ -210,7 +210,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				BaseRef:      "main",
 				Lane:         "C",
 				BuildTimeout: "15m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -235,11 +235,11 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temporary workspace
-			workspaceDir, err := os.MkdirTemp("", "transflow-integration-test-*")
+			workspaceDir, err := os.MkdirTemp("", "mods-integration-test-*")
 			if err != nil {
 				t.Fatalf("failed to create temp directory: %v", err)
 			}
-			defer os.RemoveAll(workspaceDir)
+			defer func() { _ = os.RemoveAll(workspaceDir) }()
 
 			// Handle real service test cases
 			switch tt.name {
@@ -248,7 +248,7 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				serviceConfig := RequireServices(t, "seaweedfs")
 
 				// Create integrations WITHOUT test mode for services
-				integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+				integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
 
 				// Test SeaweedFS storage operations before running workflow
 				t.Run("validate_seaweedfs_operations", func(t *testing.T) {
@@ -287,13 +287,13 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				serviceConfig := RequireServices(t, "nomad")
 
 				// Set environment for real Nomad job submission
-				os.Setenv("TRANSFLOW_SUBMIT", "1")
-				os.Setenv("NOMAD_ADDR", serviceConfig.NomadAddr)
-				defer os.Unsetenv("TRANSFLOW_SUBMIT")
-				defer os.Unsetenv("NOMAD_ADDR")
+				_ = os.Setenv("MODS_SUBMIT", "1")
+				_ = os.Setenv("NOMAD_ADDR", serviceConfig.NomadAddr)
+				defer func() { _ = os.Unsetenv("MODS_SUBMIT") }()
+				defer func() { _ = os.Unsetenv("NOMAD_ADDR") }()
 
 				// Create integrations WITHOUT test mode
-				integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+				integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
 
 				// Test Nomad operations before running workflow
 				t.Run("validate_nomad_operations", func(t *testing.T) {
@@ -327,10 +327,10 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				serviceConfig := RequireServices(t, "consul")
 
 				// Set environment for real Consul
-				os.Setenv("CONSUL_HTTP_ADDR", serviceConfig.ConsulAddr)
-				defer os.Unsetenv("CONSUL_HTTP_ADDR")
+				_ = os.Setenv("CONSUL_HTTP_ADDR", serviceConfig.ConsulAddr)
+				defer func() { _ = os.Unsetenv("CONSUL_HTTP_ADDR") }()
 
-				integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+				integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
 
 				// Test Consul operations
 				t.Run("validate_consul_operations", func(t *testing.T) {
@@ -364,12 +364,12 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				serviceConfig := RequireServices(t, "gitlab")
 
 				// Set environment for real GitLab
-				os.Setenv("GITLAB_URL", serviceConfig.GitLabURL)
-				os.Setenv("GITLAB_TOKEN", serviceConfig.GitLabToken)
-				defer os.Unsetenv("GITLAB_URL")
-				defer os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Setenv("GITLAB_URL", serviceConfig.GitLabURL)
+				_ = os.Setenv("GITLAB_TOKEN", serviceConfig.GitLabToken)
+				defer func() { _ = os.Unsetenv("GITLAB_URL") }()
+				defer func() { _ = os.Unsetenv("GITLAB_TOKEN") }()
 
-				integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+				integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
 
 				// Test GitLab operations
 				t.Run("validate_gitlab_operations", func(t *testing.T) {
@@ -403,20 +403,20 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 				serviceConfig := RequireServices(t, "consul", "nomad", "seaweedfs", "gitlab")
 
 				// Set all environment variables for real services
-				os.Setenv("TRANSFLOW_SUBMIT", "1")
-				os.Setenv("NOMAD_ADDR", serviceConfig.NomadAddr)
-				os.Setenv("CONSUL_HTTP_ADDR", serviceConfig.ConsulAddr)
-				os.Setenv("GITLAB_URL", serviceConfig.GitLabURL)
-				os.Setenv("GITLAB_TOKEN", serviceConfig.GitLabToken)
+				_ = os.Setenv("MODS_SUBMIT", "1")
+				_ = os.Setenv("NOMAD_ADDR", serviceConfig.NomadAddr)
+				_ = os.Setenv("CONSUL_HTTP_ADDR", serviceConfig.ConsulAddr)
+				_ = os.Setenv("GITLAB_URL", serviceConfig.GitLabURL)
+				_ = os.Setenv("GITLAB_TOKEN", serviceConfig.GitLabToken)
 				defer func() {
-					os.Unsetenv("TRANSFLOW_SUBMIT")
-					os.Unsetenv("NOMAD_ADDR")
-					os.Unsetenv("CONSUL_HTTP_ADDR")
-					os.Unsetenv("GITLAB_URL")
-					os.Unsetenv("GITLAB_TOKEN")
+					_ = os.Unsetenv("MODS_SUBMIT")
+					_ = os.Unsetenv("NOMAD_ADDR")
+					_ = os.Unsetenv("CONSUL_HTTP_ADDR")
+					_ = os.Unsetenv("GITLAB_URL")
+					_ = os.Unsetenv("GITLAB_TOKEN")
 				}()
 
-				integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+				integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
 
 				// Test all service operations
 				t.Run("validate_all_service_operations", func(t *testing.T) {
@@ -450,12 +450,12 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 			}
 
 			// Create integrations with test mode
-			integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, tt.testMode)
+			integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, tt.testMode)
 
 			// For build failure test, override with failing mock
 			if tt.name == "workflow_with_build_failure" {
 				integrations.TestMode = true
-				failingIntegrations := &TransflowIntegrations{
+				failingIntegrations := &ModIntegrations{
 					ControllerURL: integrations.ControllerURL,
 					WorkDir:       integrations.WorkDir,
 					TestMode:      true,
@@ -490,8 +490,8 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 			}
 
 			// Set environment for GitLab integration testing
-			os.Setenv("GITLAB_TOKEN", "test-token-for-integration")
-			defer os.Unsetenv("GITLAB_TOKEN")
+			_ = os.Setenv("GITLAB_TOKEN", "test-token-for-integration")
+			defer func() { _ = os.Unsetenv("GITLAB_TOKEN") }()
 
 			// Execute workflow
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -550,21 +550,21 @@ func TestTransflowEndToEndIntegration(t *testing.T) {
 	}
 }
 
-func TestTransflowConfigurationValidation(t *testing.T) {
+func TestModConfigurationValidation(t *testing.T) {
 	tests := []struct {
 		name        string
-		config      *TransflowConfig
+		config      *ModConfig
 		expectError bool
 	}{
 		{
 			name: "valid_minimal_config",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-valid",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				BaseRef:      "main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:           "orw-apply",
 						ID:             "java-migration",
@@ -579,7 +579,7 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 		},
 		{
 			name: "missing_required_fields",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version: "v1alpha1",
 				// Missing ID, TargetRepo, etc.
 			},
@@ -587,14 +587,14 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 		},
 		{
 			name: "invalid_build_timeout",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-timeout",
 				TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",
 				BaseRef:      "main",
 				BuildTimeout: "invalid-timeout",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:           "orw-apply",
 						ID:             "java-migration",
@@ -626,15 +626,15 @@ func TestTransflowConfigurationValidation(t *testing.T) {
 	}
 }
 
-func TestTransflowIntegrationsFactory(t *testing.T) {
-	workspaceDir, err := os.MkdirTemp("", "transflow-factory-test-*")
+func TestModsIntegrationsFactory(t *testing.T) {
+	workspaceDir, err := os.MkdirTemp("", "mods-factory-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(workspaceDir)
+	defer func() { _ = os.RemoveAll(workspaceDir) }()
 
 	t.Run("production_mode_integrations", func(t *testing.T) {
-		integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+		integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
 
 		if integrations.TestMode {
 			t.Error("expected TestMode to be false")
@@ -663,7 +663,7 @@ func TestTransflowIntegrationsFactory(t *testing.T) {
 	})
 
 	t.Run("test_mode_integrations", func(t *testing.T) {
-		integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)
+		integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)
 
 		if !integrations.TestMode {
 			t.Error("expected TestMode to be true")
@@ -725,7 +725,7 @@ func testSeaweedFSOperations(t *testing.T, filerURL string) {
 	defer cancel()
 
 	// Test key for this integration test
-	testKey := fmt.Sprintf("transflow/integration-test/%d", time.Now().Unix())
+	testKey := fmt.Sprintf("mods/integration-test/%d", time.Now().Unix())
 	testData := []byte("SeaweedFS integration test data")
 
 	// Test Put operation
@@ -747,7 +747,7 @@ func testSeaweedFSOperations(t *testing.T, filerURL string) {
 	if err != nil {
 		t.Fatalf("Failed to read retrieved data: %v", err)
 	}
-	retrievedData.Close()
+	_ = retrievedData.Close()
 
 	if n != len(testData) || string(retrievedBytes[:n]) != string(testData) {
 		t.Fatalf("Retrieved data doesn't match stored data. Expected: %s, Got: %s",
@@ -757,7 +757,7 @@ func testSeaweedFSOperations(t *testing.T, filerURL string) {
 
 	// Test List operation
 	objects, err := storageClient.List(ctx, storage.ListOptions{
-		Prefix: "transflow/integration-test/",
+		Prefix: "mods/integration-test/",
 	})
 	if err != nil {
 		t.Fatalf("Failed to list objects from SeaweedFS: %v", err)
@@ -792,7 +792,7 @@ func testSeaweedFSOperations(t *testing.T, filerURL string) {
 }
 
 // validateServiceUsage checks that the workflow actually used services
-func validateServiceUsage(t *testing.T, result *TransflowResult, serviceConfig *ServicesConfig) {
+func validateServiceUsage(t *testing.T, result *ModResult, serviceConfig *ServicesConfig) {
 	t.Helper()
 
 	// Validate that the workflow produced expected artifacts that would only exist with services
@@ -805,7 +805,7 @@ func validateServiceUsage(t *testing.T, result *TransflowResult, serviceConfig *
 		t.Error("Expected step results but got none")
 	}
 
-	// Validate that SeaweedFS was actually used by checking for transflow artifacts
+	// Validate that SeaweedFS was actually used by checking for Mods artifacts
 	storageClient, err := factory.New(factory.FactoryConfig{
 		Provider: "seaweedfs",
 		Endpoint: serviceConfig.SeaweedFSFiler,
@@ -821,14 +821,14 @@ func validateServiceUsage(t *testing.T, result *TransflowResult, serviceConfig *
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Check for transflow-related artifacts in SeaweedFS
+	// Check for Mods-related artifacts in SeaweedFS
 	objects, err := storageClient.List(ctx, storage.ListOptions{
-		Prefix: "transflow/",
+		Prefix: "mods/",
 	})
 	if err != nil {
-		t.Logf("Warning: Could not list transflow objects from SeaweedFS: %v", err)
+		t.Logf("Warning: Could not list Mods objects from SeaweedFS: %v", err)
 	} else if len(objects) > 0 {
-		t.Logf("Found %d transflow-related artifacts in SeaweedFS storage", len(objects))
+		t.Logf("Found %d Mods-related artifacts in SeaweedFS storage", len(objects))
 	}
 
 	// Additional validations
@@ -939,7 +939,7 @@ func isServiceHealthyHTTP(ctx context.Context, url string) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
@@ -984,7 +984,7 @@ func testConsulOperations(t *testing.T, consulAddr string) {
 	}
 
 	// Test key for this integration test
-	testKey := fmt.Sprintf("transflow/integration-test/%d", time.Now().Unix())
+	testKey := fmt.Sprintf("mods/integration-test/%d", time.Now().Unix())
 	testValue := []byte("Consul integration test data")
 
 	kv := client.KV()
@@ -1014,7 +1014,7 @@ func testConsulOperations(t *testing.T, consulAddr string) {
 	t.Logf("Successfully retrieved and validated data from Consul")
 
 	// Test List operation
-	pairs, _, err := kv.List("transflow/integration-test/", &consulapi.QueryOptions{})
+	pairs, _, err := kv.List("mods/integration-test/", &consulapi.QueryOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list keys from Consul: %v", err)
 	}
@@ -1070,7 +1070,7 @@ func testGitLabOperations(t *testing.T, gitlabURL, token string) {
 	if err != nil {
 		t.Fatalf("Failed to connect to GitLab API: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GitLab API returned status %d", resp.StatusCode)
@@ -1089,7 +1089,7 @@ func testGitLabOperations(t *testing.T, gitlabURL, token string) {
 	if err != nil {
 		t.Fatalf("Failed to fetch GitLab projects: %v", err)
 	}
-	defer projectResp.Body.Close()
+	defer func() { _ = projectResp.Body.Close() }()
 
 	if projectResp.StatusCode != http.StatusOK {
 		t.Fatalf("GitLab projects API returned status %d", projectResp.StatusCode)
@@ -1099,7 +1099,7 @@ func testGitLabOperations(t *testing.T, gitlabURL, token string) {
 }
 
 // validateNomadUsage checks that the workflow actually used Nomad
-func validateNomadUsage(t *testing.T, result *TransflowResult, serviceConfig *ServicesConfig) {
+func validateNomadUsage(t *testing.T, result *ModResult, serviceConfig *ServicesConfig) {
 	t.Helper()
 
 	// Validate that the workflow produced expected results
@@ -1115,21 +1115,21 @@ func validateNomadUsage(t *testing.T, result *TransflowResult, serviceConfig *Se
 		t.Fatalf("Failed to create Nomad client for validation: %v", err)
 	}
 
-	// List recent jobs to see if transflow jobs were submitted
+	// List recent jobs to see if Mods jobs were submitted
 	jobs, _, err := client.Jobs().List(&nomadapi.QueryOptions{})
 	if err != nil {
 		t.Logf("Warning: Could not list Nomad jobs for validation: %v", err)
 	} else {
-		transflowJobs := 0
+		modsJobs := 0
 		for _, job := range jobs {
 			// JobListStub.Name can be a string in some Nomad client versions
 			name := job.Name
-			if strings.Contains(name, "transflow") {
-				transflowJobs++
+			if strings.Contains(name, "mods") {
+				modsJobs++
 			}
 		}
-		if transflowJobs > 0 {
-			t.Logf("Found %d transflow-related jobs in Nomad", transflowJobs)
+		if modsJobs > 0 {
+			t.Logf("Found %d Mods-related jobs in Nomad", modsJobs)
 		}
 	}
 
@@ -1146,7 +1146,7 @@ func validateNomadUsage(t *testing.T, result *TransflowResult, serviceConfig *Se
 }
 
 // validateConsulUsage checks that the workflow actually used Consul
-func validateConsulUsage(t *testing.T, result *TransflowResult, serviceConfig *ServicesConfig) {
+func validateConsulUsage(t *testing.T, result *ModResult, serviceConfig *ServicesConfig) {
 	t.Helper()
 
 	// Validate that the workflow produced expected results
@@ -1162,13 +1162,13 @@ func validateConsulUsage(t *testing.T, result *TransflowResult, serviceConfig *S
 		t.Fatalf("Failed to create Consul client for validation: %v", err)
 	}
 
-	// Check for transflow-related keys in Consul
+	// Check for Mods-related keys in Consul
 	kv := client.KV()
-	pairs, _, err := kv.List("transflow/", &consulapi.QueryOptions{})
+	pairs, _, err := kv.List("mods/", &consulapi.QueryOptions{})
 	if err != nil {
-		t.Logf("Warning: Could not list transflow keys from Consul: %v", err)
+		t.Logf("Warning: Could not list Mods keys from Consul: %v", err)
 	} else if len(pairs) > 0 {
-		t.Logf("Found %d transflow-related keys in Consul KV", len(pairs))
+		t.Logf("Found %d Mods-related keys in Consul KV", len(pairs))
 	}
 
 	// Validate workflow completed successfully
@@ -1184,7 +1184,7 @@ func validateConsulUsage(t *testing.T, result *TransflowResult, serviceConfig *S
 }
 
 // validateGitLabUsage checks that the workflow actually used GitLab API
-func validateGitLabUsage(t *testing.T, result *TransflowResult, serviceConfig *ServicesConfig) {
+func validateGitLabUsage(t *testing.T, result *ModResult, serviceConfig *ServicesConfig) {
 	t.Helper()
 
 	// Validate that the workflow produced expected results
@@ -1208,7 +1208,7 @@ func validateGitLabUsage(t *testing.T, result *TransflowResult, serviceConfig *S
 }
 
 // validateAllServicesUsage checks that the workflow used all real services
-func validateAllServicesUsage(t *testing.T, result *TransflowResult, serviceConfig *ServicesConfig) {
+func validateAllServicesUsage(t *testing.T, result *ModResult, serviceConfig *ServicesConfig) {
 	t.Helper()
 
 	// Run individual service validations

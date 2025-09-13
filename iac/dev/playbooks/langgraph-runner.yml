@@ -1,14 +1,13 @@
----
-# LangGraph Runner Image Provisioning for Transflow
+# LangGraph Runner Image Provisioning for Mods
 # Pulls or builds the LangGraph runner image and pushes it to the local Docker Registry.
 
-- name: Provision LangGraph Runner image for Transflow
+- name: Provision LangGraph Runner image for Mods
   hosts: linux_hosts
   become: true
   vars_files:
     - ../vars/main.yml
   vars:
-    transflow_registry: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
+    mods_registry: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
     langgraph_image_name: "langgraph-runner"
     langgraph_image_tag: "py-0.1.0"
 
@@ -45,7 +44,7 @@
     - name: Pull LangGraph runner image from local registry (if available)
       shell: |
         set -euo pipefail
-        docker pull {{ transflow_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} >/dev/null 2>&1 && echo "Pulled from local registry" || echo "Not present in local registry"
+        docker pull {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} >/dev/null 2>&1 && echo "Pulled from local registry" || echo "Not present in local registry"
       args:
         executable: /bin/bash
       register: pull_local
@@ -54,7 +53,7 @@
     - name: Build LangGraph runner image locally if not pulled
       shell: |
         set -euo pipefail
-        docker build -t {{ transflow_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} /home/ploy/ploy/services/langgraph-runner
+        docker build -t {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} /home/ploy/ploy/services/langgraph-runner
       args:
         executable: /bin/bash
       when: pull_local is failed or (pull_local.stdout is defined and 'Not present' in pull_local.stdout)
@@ -62,20 +61,20 @@
     - name: Rebuild LangGraph runner image with no cache (ensure latest stub)
       shell: |
         set -euo pipefail
-        docker build --no-cache -t {{ transflow_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} /home/ploy/ploy/services/langgraph-runner
+        docker build --no-cache -t {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} /home/ploy/ploy/services/langgraph-runner
       args:
         executable: /bin/bash
 
     - name: Push LangGraph runner image to local registry
       shell: |
         set -euo pipefail
-        docker push {{ transflow_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }}
+        docker push {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }}
       args:
         executable: /bin/bash
 
     - name: Display LangGraph image info
       debug:
-        msg: "LangGraph runner available at {{ transflow_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }}"
+        msg: "LangGraph runner available at {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }}"
 
     - name: Ensure prune script exists
       copy:
@@ -121,7 +120,7 @@
           {% endraw %}
 
     - name: Prune old LangGraph runner tags in registry (keep latest + 2 previous)
-      shell: "/usr/local/bin/registry-prune.sh {{ transflow_registry }} {{ langgraph_image_name }}"
+      shell: "/usr/local/bin/registry-prune.sh {{ mods_registry }} {{ langgraph_image_name }}"
       args:
         executable: /bin/bash
       ignore_errors: true

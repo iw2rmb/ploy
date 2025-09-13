@@ -173,7 +173,7 @@ func TestDestroyAppWithUnifiedStorage(t *testing.T) {
 	// Execute request (this will fail in RED phase)
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response
 	assert.Equal(t, 200, resp.StatusCode)
@@ -243,7 +243,7 @@ func TestBackwardCompatibility(t *testing.T) {
 	// Execute request
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should still work even with nil storage
 	assert.Equal(t, 200, resp.StatusCode)
@@ -280,7 +280,7 @@ func TestDestroyAppDualStorageSupport(t *testing.T) {
 	// Execute request (will fail in RED phase as function doesn't exist)
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response
 	assert.Equal(t, 200, resp.StatusCode)

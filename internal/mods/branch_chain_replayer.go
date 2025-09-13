@@ -25,7 +25,7 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, execID, b
 		return fmt.Errorf("replayer not fully configured")
 	}
 	// Read HEAD and collect chain from head back to root
-	headKey := fmt.Sprintf("transflow/%s/branches/%s/HEAD.json", execID, branchID)
+	headKey := fmt.Sprintf("mods/%s/branches/%s/HEAD.json", execID, branchID)
 	if b, code, _ := r.GetJSON(storageBase, headKey); code == 200 {
 		var head map[string]string
 		_ = json.Unmarshal(b, &head)
@@ -33,7 +33,7 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, execID, b
 		chain := []string{}
 		for cur != "" {
 			chain = append(chain, cur)
-			metaKey := fmt.Sprintf("transflow/%s/branches/%s/steps/%s/meta.json", execID, branchID, cur)
+			metaKey := fmt.Sprintf("mods/%s/branches/%s/steps/%s/meta.json", execID, branchID, cur)
 			if mb, mc, _ := r.GetJSON(storageBase, metaKey); mc == 200 {
 				var meta struct {
 					Prev string `json:"prev_step_id"`
@@ -50,7 +50,7 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, execID, b
 		}
 		allow := r.Allowlist
 		for _, sid := range chain {
-			url := strings.TrimRight(storageBase, "/") + "/artifacts/" + fmt.Sprintf("transflow/%s/branches/%s/steps/%s/diff.patch", execID, branchID, sid)
+			url := strings.TrimRight(storageBase, "/") + "/artifacts/" + fmt.Sprintf("mods/%s/branches/%s/steps/%s/diff.patch", execID, branchID, sid)
 			tmp := filepath.Join(outDir, "chain-"+sid+".patch")
 			_ = r.DownloadToFile(url, tmp)
 			if err := r.ValidateDiffPaths(tmp, allow); err == nil {

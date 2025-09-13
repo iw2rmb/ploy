@@ -71,10 +71,8 @@ func TestFanoutOrchestrator_RunHealingFanout(t *testing.T) {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
 			} else {
-				// For non-error cases, we just expect some kind of failure due to missing implementation
-				// The goal is to get coverage, not full functionality testing
-				// In most cases this will error due to context timeout or missing job submitter
-				// Both are acceptable for coverage testing
+				// In current test wiring, an error is expected due to context timing/job submitter.
+				assert.Error(t, err)
 			}
 		})
 	}
@@ -85,8 +83,8 @@ func TestFanoutOrchestratorBasics(t *testing.T) {
 	submitter := NoopJobSubmitter{}
 	orchestrator := NewFanoutOrchestrator(submitter)
 
-	// Test interface conformance
-	var _ FanoutOrchestrator = orchestrator
+	// Test interface conformance (compile-time check)
+	var _ FanoutOrchestrator = (*fanoutOrchestrator)(nil)
 
 	// Test empty execution with immediate cancellation
 	ctx, cancel := context.WithCancel(context.Background())

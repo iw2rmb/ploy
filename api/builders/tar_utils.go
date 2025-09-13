@@ -29,7 +29,7 @@ func extractTar(tarPath, destDir string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var tr *tar.Reader
 
@@ -39,7 +39,7 @@ func extractTar(tarPath, destDir string) error {
 		if err != nil {
 			return err
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		tr = tar.NewReader(gz)
 	} else {
 		tr = tar.NewReader(file)
@@ -72,10 +72,12 @@ func extractTar(tarPath, destDir string) error {
 			}
 
 			if _, err := io.Copy(file, tr); err != nil {
-				file.Close()
+				_ = file.Close()
 				return err
 			}
-			file.Close()
+			if err := file.Close(); err != nil {
+				return err
+			}
 		}
 	}
 

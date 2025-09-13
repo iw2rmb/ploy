@@ -37,7 +37,7 @@ func TestCreateTarFromDir_GoArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	tr := tar.NewReader(f)
 	found := map[string]bool{}
 	for {

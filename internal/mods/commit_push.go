@@ -8,7 +8,7 @@ import (
 
 // runCommitStep performs commit logic considering whether changes exist and whether HEAD moved already.
 // Returns committed=true when a commit was created or already exists; message provides a human summary.
-func (r *TransflowRunner) runCommitStep(ctx context.Context, repoPath, initialHead string) (bool, string, error) {
+func (r *ModRunner) runCommitStep(ctx context.Context, repoPath, initialHead string) (bool, string, error) {
 	changed, _ := hasRepoChangesFn(repoPath)
 	if !changed {
 		headAfter, _ := getHeadHashFn(repoPath)
@@ -24,7 +24,7 @@ func (r *TransflowRunner) runCommitStep(ctx context.Context, repoPath, initialHe
 }
 
 // runPushStep pushes the branch with a timeout.
-func (r *TransflowRunner) runPushStep(ctx context.Context, repoPath, branchName string) error {
+func (r *ModRunner) runPushStep(ctx context.Context, repoPath, branchName string) error {
 	pushTimeout := 3 * time.Minute
 	pushCtx, cancel := context.WithTimeout(ctx, pushTimeout)
 	defer cancel()

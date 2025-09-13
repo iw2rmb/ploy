@@ -4,7 +4,7 @@ import "time"
 
 // TransformationStatus represents the current status of a transformation with healing support
 type TransformationStatus struct {
-	TransformationID     string           `json:"transformation_id"`
+	ModID                string           `json:"mod_id"`
 	WorkflowStage        string           `json:"workflow_stage"` // openrewrite, build, deploy, test, heal
 	Status               string           `json:"status"`         // pending, in_progress, completed, failed
 	StartTime            time.Time        `json:"start_time"`
@@ -35,7 +35,7 @@ type TransformationProgress struct {
 
 // HealingAttempt represents a single healing attempt in the transformation workflow
 type HealingAttempt struct {
-	TransformationID    string                  `json:"transformation_id"`
+	ModID               string                  `json:"mod_id"`
 	AttemptPath         string                  `json:"attempt_path"`   // "1.1.2" for nested attempts
 	TriggerReason       string                  `json:"trigger_reason"` // build_failure, test_failure, etc.
 	TargetErrors        []string                `json:"target_errors"`  // Specific errors this attempt targets
@@ -83,13 +83,13 @@ type TransformationSandboxInfo struct {
 
 // SandboxDeployment represents a single sandbox deployment
 type SandboxDeployment struct {
-	TransformationID string    `json:"transformation_id"`
-	SandboxID        string    `json:"sandbox_id"`
-	DeploymentURL    string    `json:"deployment_url"`
-	BuildStatus      string    `json:"build_status"`
-	TestStatus       string    `json:"test_status"`
-	CreatedAt        time.Time `json:"created_at"`
-	LastUpdated      time.Time `json:"last_updated"`
+	ModID         string    `json:"mod_id"`
+	SandboxID     string    `json:"sandbox_id"`
+	DeploymentURL string    `json:"deployment_url"`
+	BuildStatus   string    `json:"build_status"`
+	TestStatus    string    `json:"test_status"`
+	CreatedAt     time.Time `json:"created_at"`
+	LastUpdated   time.Time `json:"last_updated"`
 }
 
 // HealingSummary provides aggregated metrics for healing attempts

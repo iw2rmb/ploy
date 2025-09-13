@@ -1,14 +1,14 @@
 # VPS Integration Testing CLAUDE.md
 
 ## Purpose
-VPS production environment integration testing infrastructure providing comprehensive validation of transflow workflows, KB learning systems, and distributed service coordination in real production environment (45.12.75.241). **MVP COMPLETE**: All production services validated and operational.
+VPS production environment integration testing infrastructure providing comprehensive validation of mods workflows, KB learning systems, and distributed service coordination in real production environment (45.12.75.241). **MVP COMPLETE**: All production services validated and operational.
 
 ## Narrative Summary
-The VPS integration testing module provides production environment validation for the complete transflow system including distributed job orchestration, KB learning integration, and real-world service interactions. Framework validates service topology (Consul, Nomad, SeaweedFS), performance baselines, KB storage operations, and complete transflow workflow execution in production environment.
+The VPS integration testing module provides production environment validation for the complete mods system including distributed job orchestration, KB learning integration, and real-world service interactions. Framework validates service topology (Consul, Nomad, SeaweedFS), performance baselines, KB storage operations, and complete mods workflow execution in production environment.
 
-**✅ Production Environment Validation** - Complete testing infrastructure for validating transflow workflows in production VPS environment with real service interactions, distributed coordination, and performance benchmarking. System provides service health checks, topology validation, performance baselines, and comprehensive workflow testing with actual GitLab operations.
+**✅ Production Environment Validation** - Complete testing infrastructure for validating mods workflows in production VPS environment with real service interactions, distributed coordination, and performance benchmarking. System provides service health checks, topology validation, performance baselines, and comprehensive workflow testing with actual GitLab operations.
 
-Core validation workflow: VPS service health → distributed service topology → KB storage performance → transflow CLI availability → production workflow execution → GitLab integration → comprehensive result validation. Framework ensures production readiness with real-world service interactions and distributed system coordination.
+Core validation workflow: VPS service health → distributed service topology → KB storage performance → mods CLI availability → production workflow execution → GitLab integration → comprehensive result validation. Framework ensures production readiness with real-world service interactions and distributed system coordination.
 
 ## Key Files
 - `vps_client.go:1-150` - VPS client implementation with SSH operations and service health checking
@@ -38,7 +38,7 @@ Core validation workflow: VPS service health → distributed service topology �
 - **✅ Consul Cluster**: Distributed coordination service with member validation and health checking
 - **✅ Nomad Orchestration**: Job execution platform with leader election and cluster status validation
 - **✅ SeaweedFS Storage**: Distributed storage backend with master/filer topology and performance validation
-- **✅ Ploy CLI**: Production transflow CLI installation with command availability validation
+- **✅ Ploy CLI**: Production mods CLI installation with command availability validation
 - **✅ System Services**: Service management and health monitoring with systemctl integration
 
 ### Provides (✅ MVP Complete)
@@ -86,7 +86,7 @@ User Context:
 **✅ MVP COMPLETE - All VPS Integration Components Operational:**
 - **Service Stack**: Complete Consul + Nomad + SeaweedFS deployment validated and operational
 - **VPS Environment**: Production server (45.12.75.241) with full service topology deployment
-- **CLI Integration**: Ploy transflow commands available and functional in production environment
+- **CLI Integration**: Ploy mods commands available and functional in production environment
 - **KB Storage**: SeaweedFS backend operational with namespace setup and performance validation
 - **Service Health**: All critical services (consul, nomad, seaweedfs-master, seaweedfs-filer) healthy
 - **Performance Validation**: Response time baselines established and acceptance criteria met

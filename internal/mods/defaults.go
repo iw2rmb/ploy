@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Defaults holds resolved transflow defaults from environment and built-ins
+// Defaults holds resolved Mods defaults from environment and built-ins
 type Defaults struct {
 	Registry          string
 	PlannerImage      string
@@ -37,23 +37,23 @@ func ResolveDefaults(get func(string) string) Defaults {
 		d, _ := time.ParseDuration(def)
 		return d
 	}
-	reg := get("TRANSFLOW_REGISTRY")
+	reg := get("MODS_REGISTRY")
 	if reg == "" {
 		reg = "registry.dev.ployman.app"
 	}
-	planner := get("TRANSFLOW_PLANNER_IMAGE")
+	planner := get("MODS_PLANNER_IMAGE")
 	if planner == "" {
 		planner = reg + "/langgraph-runner:py-0.1.0"
 	}
-	reducer := get("TRANSFLOW_REDUCER_IMAGE")
+	reducer := get("MODS_REDUCER_IMAGE")
 	if reducer == "" {
 		reducer = planner
 	}
-	llm := get("TRANSFLOW_LLM_EXEC_IMAGE")
+	llm := get("MODS_LLM_EXEC_IMAGE")
 	if llm == "" {
 		llm = planner
 	}
-	orw := get("TRANSFLOW_ORW_APPLY_IMAGE")
+	orw := get("MODS_ORW_APPLY_IMAGE")
 	if orw == "" {
 		orw = reg + "/openrewrite-jvm:latest"
 	}
@@ -61,7 +61,7 @@ func ResolveDefaults(get func(string) string) Defaults {
 	if dc == "" {
 		dc = "dc1"
 	}
-	allowCSV := get("TRANSFLOW_ALLOWLIST")
+	allowCSV := get("MODS_ALLOWLIST")
 	var allow []string
 	if allowCSV != "" {
 		for _, part := range strings.Split(allowCSV, ",") {
@@ -78,7 +78,7 @@ func ResolveDefaults(get func(string) string) Defaults {
 		seaweed = "http://seaweedfs-filer.service.consul:8888"
 	}
 	allowPartial := func() bool {
-		v := strings.ToLower(strings.TrimSpace(get("TRANSFLOW_ALLOW_PARTIAL_ORW")))
+		v := strings.ToLower(strings.TrimSpace(get("MODS_ALLOW_PARTIAL_ORW")))
 		return v == "1" || v == "true" || v == "yes"
 	}()
 	return Defaults{
@@ -90,11 +90,11 @@ func ResolveDefaults(get func(string) string) Defaults {
 		DC:                dc,
 		Allowlist:         allow,
 		SeaweedURL:        seaweed,
-		PlannerTimeout:    parseDur("TRANSFLOW_PLANNER_TIMEOUT", "15m"),
-		ReducerTimeout:    parseDur("TRANSFLOW_REDUCER_TIMEOUT", "10m"),
-		LLMExecTimeout:    parseDur("TRANSFLOW_LLM_EXEC_TIMEOUT", "30m"),
-		ORWApplyTimeout:   parseDur("TRANSFLOW_ORW_APPLY_TIMEOUT", "30m"),
-		BuildApplyTimeout: parseDur("TRANSFLOW_BUILD_APPLY_TIMEOUT", "10m"),
+		PlannerTimeout:    parseDur("MODS_PLANNER_TIMEOUT", "15m"),
+		ReducerTimeout:    parseDur("MODS_REDUCER_TIMEOUT", "10m"),
+		LLMExecTimeout:    parseDur("MODS_LLM_EXEC_TIMEOUT", "30m"),
+		ORWApplyTimeout:   parseDur("MODS_ORW_APPLY_TIMEOUT", "30m"),
+		BuildApplyTimeout: parseDur("MODS_BUILD_APPLY_TIMEOUT", "10m"),
 		AllowPartialORW:   allowPartial,
 	}
 }

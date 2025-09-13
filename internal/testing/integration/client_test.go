@@ -16,15 +16,15 @@ func TestAPITestingFramework(t *testing.T) {
 		case "/health":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"healthy","version":"1.0.0"}`))
+			_, _ = w.Write([]byte(`{"status":"healthy","version":"1.0.0"}`))
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"internal server error"}`))
+			_, _ = w.Write([]byte(`{"error":"internal server error"}`))
 		case "/echo":
 			if r.Method == "POST" {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(`{"received":true}`))
+				_, _ = w.Write([]byte(`{"received":true}`))
 			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -87,7 +87,7 @@ func TestRequestBuilder(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		// Simple JSON response for testing
-		w.Write([]byte(`{"method":"` + r.Method + `","received":true}`))
+		_, _ = w.Write([]byte(`{"method":"` + r.Method + `","received":true}`))
 	}))
 	defer server.Close()
 

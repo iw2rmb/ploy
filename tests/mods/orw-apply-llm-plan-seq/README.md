@@ -4,7 +4,7 @@ Overview
 
 - Goal: Reproduce a run where OpenRewrite (orw-apply) produces a diff but the build gate fails; the system then triggers the healing flow using llm-plan → llm-exec → reducer. The winning branch produces a patch that passes the build gate, and a Merge Request is created.
 - This mirrors the validated Java 11→17 pipeline while forcing a compile failure post-ORW apply, so the planner has work to do.
-- Uses SeaweedFS for artifacts and the controller’s /v1/mods/event stream for live status.
+- Uses SeaweedFS for artifacts and the controller’s /v1/mods/{id}/events endpoint for live status.
 
 Pre‑requisites
 
@@ -111,10 +111,10 @@ What success looks like
   - artifacts.diff_patch present (from winning llm-exec branch)
   - Steps include build-gate-failed before healing and a final build-gate-succeeded (or diff-applied + MR)
 
-LLM runner event expectations (/v1/mods/event)
+LLM runner event expectations (/v1/mods/{id}/events)
 
 - Planner and reducer jobs should post events like the orw-apply task does. Reference services/langgraph-runner/entrypoint.sh for examples:
-  - POST ${PLOY_CONTROLLER}/transflow/event with JSON body:
+  - POST ${PLOY_CONTROLLER}/mods/${EXECUTION_ID}/events with JSON body:
     {"execution_id":"…","phase":"planner","step":"planner","level":"info","message":"job started","job_name":"…"}
   - On exit, post either level=info message=job completed or level=error message=job failed.
 - orw-apply events are already emitted by services/openrewrite-jvm/runner.sh. Use the same endpoint and schema.
@@ -122,16 +122,16 @@ LLM runner event expectations (/v1/mods/event)
 Tips and knobs
 
 - See docs/mods/knobs.md for resource and image knobs, and continue.md for the latest behavior around SeaweedFS artifacts and event stream.
-- Images must point to internal registry on VPS (TRANSFLOW_*_IMAGE). Do not use public registries in VPS flows.
+- Images must point to internal registry on VPS (MODS_*_IMAGE). Do not use public registries in VPS flows.
 - For Go E2E, ensure env is set appropriately; tests will Skip with clear messages if not configured.
 - To inspect VPS runtime (optional), ssh root@$TARGET_HOST; su - ploy; then use /opt/hashicorp/bin/nomad-job-manager.sh helpers to inspect recent allocs. Do not deploy from VPS.
 
 Manual verification commands
 
 - After run.sh prints EXEC_ID, in another terminal:
-  - curl -s "$PLOY_CONTROLLER/transflow/status/$EXEC_ID" | jq .
-  - curl -s "$PLOY_CONTROLLER/transflow/artifacts/$EXEC_ID" | jq .
-  - curl -sN "$PLOY_CONTROLLER/transflow/logs/$EXEC_ID?follow=1"
+  - curl -s "$PLOY_CONTROLLER/mods/$EXEC_ID/status" | jq .
+  - curl -s "$PLOY_CONTROLLER/mods/$EXEC_ID/artifacts" | jq .
+  - curl -sN "$PLOY_CONTROLLER/mods/$EXEC_ID/logs?follow=1"
 
 Cleanup
 
@@ -142,5 +142,5 @@ Cleanup
 Troubleshooting
 
 - No artifacts: ensure SeaweedFS is reachable from jobs and controller (PLOY_SEAWEEDFS_URL). See continue.md for details.
-- No SSE events: verify runners post to /v1/mods/event and that PLOY_CONTROLLER is set in job HCL substitution (see internal/mods/job_submission.go substituteHCLTemplate).
-- Planner/reducer template images: check TRANSFLOW_PLANNER_IMAGE, TRANSFLOW_REDUCER_IMAGE, and TRANSFLOW_LLM_EXEC_IMAGE env in API service; they must reference the internal registry.
+- No SSE events: verify runners post to /v1/mods/{id}/events and that PLOY_CONTROLLER is set in job HCL substitution (see internal/mods/job_submission.go substituteHCLTemplate).
+- Planner/reducer template images: check MODS_PLANNER_IMAGE, MODS_REDUCER_IMAGE, and MODS_LLM_EXEC_IMAGE env in API service; they must reference the internal registry.

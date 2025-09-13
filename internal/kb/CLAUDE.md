@@ -1,15 +1,15 @@
 # Knowledge Base (KB) CLAUDE.md
 
 ## Purpose
-Production-ready Knowledge Base learning system actively integrated in the transflow healing workflow via `KBTransflowRunner`. **MVP COMPLETE**: Automatically records, analyzes, and learns from every healing attempt to provide intelligent fix recommendations and improve automated error resolution success rates over time. **VPS VALIDATED**: System operational in production environment with real-world performance validation.
+Production-ready Knowledge Base learning system actively integrated in the mods healing workflow via `KBModRunner`. **MVP COMPLETE**: Automatically records, analyzes, and learns from every healing attempt to provide intelligent fix recommendations and improve automated error resolution success rates over time. **VPS VALIDATED**: System operational in production environment with real-world performance validation.
 
 ## Architecture Overview
-The KB system is now actively integrated in the production transflow workflow via `KBTransflowRunner` and consists of four core modules that automatically learn from build failures and provide intelligent patch recommendations:
+The KB system is now actively integrated in the production mods workflow via `KBModRunner` and consists of four core modules that automatically learn from build failures and provide intelligent patch recommendations:
 
 - **Models**: Core data structures (Error, Case, Summary) - ✅ actively used in production
 - **Storage**: SeaweedFS-backed persistence layer - ✅ production storage backend operational
 - **Fingerprint**: Patch analysis and similarity detection - ✅ active deduplication with VPS validation
-- **Learning**: Orchestration and learning pipeline - ✅ integrated in transflow healing workflow (MVP complete)
+- **Learning**: Orchestration and learning pipeline - ✅ integrated in mods healing workflow (MVP complete)
 
 ## Module Structure
 - `models/` - Core KB data models
@@ -77,16 +77,16 @@ The KB system is now actively integrated in the production transflow workflow vi
 
 ### Consumes
 - SeaweedFS HTTP API for distributed storage (✅ production backend operational)
-- **✅ Production Active**: Build error messages and logs from every transflow healing attempt via KBTransflowRunner
+- **✅ Production Active**: Build error messages and logs from every mods healing attempt via KBModRunner
 - **✅ Production Active**: Git patch data from all automated healing attempts (success and failure) with VPS validation
-- Consul KV store for distributed locking across multiple transflow instances (✅ production operational)
+- Consul KV store for distributed locking across multiple mods instances (✅ production operational)
 
 ### Provides
-- **✅ Production Active**: Error pattern recognition and canonicalization for all transflow builds
+- **✅ Production Active**: Error pattern recognition and canonicalization for all mods builds
 - **✅ Production Active**: Patch similarity analysis and deduplication in production workflow with VPS validation
 - **✅ Production Active**: Success rate statistics and confidence scoring from live healing attempts
 - **✅ Production Active**: Best patch recommendations for known error patterns with real-time suggestions
-- **✅ MVP Complete**: Automatic learning from every healing attempt via KBTransflowRunner integration
+- **✅ MVP Complete**: Automatic learning from every healing attempt via KBModRunner integration
 
 ## Configuration
 

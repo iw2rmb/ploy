@@ -352,17 +352,17 @@ func TestSummaryComputer_ComputeAndUpdateSummary(t *testing.T) {
 	cases := createTestCases()
 
 	// Mock lock acquisition
-	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*transflow.LockConfig"), mock.AnythingOfType("func() error")).
+	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*mods.LockConfig"), mock.AnythingOfType("func() error")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			// Execute the function under lock
 			fn := args.Get(3).(func() error)
-			fn()
+			_ = fn()
 		})
 
 	// Mock storage operations
 	mockStorage.On("ReadCases", ctx, lang, signature).Return(cases, nil)
-	mockStorage.On("WriteSummary", ctx, lang, signature, mock.AnythingOfType("*transflow.SummaryRecord")).Return(nil)
+	mockStorage.On("WriteSummary", ctx, lang, signature, mock.AnythingOfType("*mods.SummaryRecord")).Return(nil)
 
 	err := computer.ComputeAndUpdateSummary(ctx, lang, signature)
 
@@ -444,15 +444,15 @@ func TestSummaryComputer_UpdateSummaryAfterCase(t *testing.T) {
 	cases := []*CaseRecord{createTestCases()[0]} // Just one case
 
 	// Mock successful lock and summary update
-	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*transflow.LockConfig"), mock.AnythingOfType("func() error")).
+	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*mods.LockConfig"), mock.AnythingOfType("func() error")).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			fn := args.Get(3).(func() error)
-			fn()
+			_ = fn()
 		})
 
 	mockStorage.On("ReadCases", ctx, lang, signature).Return(cases, nil)
-	mockStorage.On("WriteSummary", ctx, lang, signature, mock.AnythingOfType("*transflow.SummaryRecord")).Return(nil)
+	mockStorage.On("WriteSummary", ctx, lang, signature, mock.AnythingOfType("*mods.SummaryRecord")).Return(nil)
 
 	err := computer.UpdateSummaryAfterCase(ctx, lang, signature)
 
@@ -472,7 +472,7 @@ func TestSummaryComputer_UpdateSummaryAfterCase_LockFailure(t *testing.T) {
 	lockKey := BuildSignatureLockKey(lang, signature)
 
 	// Mock lock acquisition failure (should not fail the operation)
-	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*transflow.LockConfig"), mock.AnythingOfType("func() error")).
+	mockLockMgr.On("TryWithLockRetry", ctx, lockKey, mock.AnythingOfType("*mods.LockConfig"), mock.AnythingOfType("func() error")).
 		Return(assert.AnError)
 
 	// Should succeed even if lock fails (non-blocking)

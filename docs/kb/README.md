@@ -1,10 +1,10 @@
 # Knowledge Base Learning System
 
-The Knowledge Base (KB) learning system is Ploy's intelligent error pattern recognition and solution caching system. It automatically learns from transflow healing attempts to improve future success rates and reduce manual intervention.
+The Knowledge Base (KB) learning system is Ploy's intelligent error pattern recognition and solution caching system. It automatically learns from mod healing attempts to improve future success rates and reduce manual intervention.
 
 ## Overview
 
-The KB system captures and analyzes every self-healing attempt during transflow workflows, building a comprehensive database of error patterns and their successful solutions. This enables the system to become more effective over time, automatically applying proven fixes for similar issues.
+The KB system captures and analyzes every self-healing attempt during mods workflows, building a comprehensive knowledge store of error patterns and their successful solutions. This enables the system to become more effective over time, automatically applying proven fixes for similar issues (no SQL database is required).
 
 ## Key Components
 
@@ -55,7 +55,7 @@ Distributed operations use Consul KV for coordination:
 ## Learning Workflow
 
 ### 1. Error Capture
-When a build fails during transflow execution:
+When a build fails during a mod run:
 ```go
 errorSig := kb.CanonicalizeBuildError(buildError)
 case := &kb.Case{
@@ -114,7 +114,7 @@ export KB_SUMMARY_UPDATE_INTERVAL=1h
 ```
 
 ### Mods Integration
-Enable KB learning in transflow configuration:
+Enable KB learning in mod configuration:
 ```yaml
 self_heal:
   enabled: true
@@ -272,8 +272,8 @@ echo $KB_ENABLED $KB_STORAGE_URL
 # Verify storage connectivity
 curl http://localhost:8888/
 
-# Check transflow configuration
-grep -r "kb_learning" transflow-config.yaml
+# Check mod configuration
+grep -r "kb_learning" mod-config.yaml
 ```
 
 #### Low Success Rates

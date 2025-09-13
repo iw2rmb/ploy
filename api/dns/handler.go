@@ -140,7 +140,9 @@ func (h *Handler) SetupWildcard(c *fiber.Ctx) error {
 
 	// Store configuration in Consul
 	if h.consulClient != nil {
-		h.storeDNSConfig()
+		if err := h.storeDNSConfig(); err != nil {
+			log.Printf("warning: failed to store DNS config: %v", err)
+		}
 	}
 
 	return c.JSON(fiber.Map{
@@ -331,14 +333,15 @@ func LoadDNSConfig() (*DNSConfig, error) {
 		}
 
 		// Load provider-specific configuration
-		if provider == "cloudflare" {
+		switch provider {
+		case "cloudflare":
 			config.Cloudflare = &CloudflareConfig{
 				APIToken: os.Getenv("CLOUDFLARE_API_TOKEN"),
 				ZoneID:   os.Getenv("CLOUDFLARE_ZONE_ID"),
 				Email:    os.Getenv("CLOUDFLARE_EMAIL"),
 				APIKey:   os.Getenv("CLOUDFLARE_API_KEY"),
 			}
-		} else if provider == "namecheap" {
+		case "namecheap":
 			// Use appropriate API key based on sandbox setting
 			sandbox := os.Getenv("NAMECHEAP_SANDBOX") == "true"
 			apiKey := os.Getenv("NAMECHEAP_API_KEY")

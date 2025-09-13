@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/api/arf"
 )
 
-// SelfHealConfig represents the self-healing configuration in transflow.yaml
+// SelfHealConfig represents the self-healing configuration in mods.yaml
 type SelfHealConfig struct {
 	MaxRetries int    `yaml:"max_retries"`
 	Cooldown   string `yaml:"cooldown"`
@@ -51,9 +51,9 @@ func GetDefaultSelfHealConfig() *SelfHealConfig {
 	}
 }
 
-// TransflowHealingAttempt represents a single healing attempt in the transflow context
-// This is simpler than the complex ARF HealingAttempt and focused on transflow needs
-type TransflowHealingAttempt struct {
+// ModHealingAttempt represents a single healing attempt in the Mods context
+// This is simpler than the complex ARF HealingAttempt and focused on Mods needs
+type ModHealingAttempt struct {
 	AttemptNumber    int              `json:"attempt_number"`
 	ErrorContext     arf.ErrorContext `json:"error_context"`
 	SuggestedRecipes []string         `json:"suggested_recipes"`
@@ -64,9 +64,9 @@ type TransflowHealingAttempt struct {
 	Timestamp        time.Time        `json:"timestamp"`
 }
 
-// NewTransflowHealingAttempt creates a new healing attempt
-func NewTransflowHealingAttempt(attemptNumber int, errorContext arf.ErrorContext, suggestedRecipes []string) *TransflowHealingAttempt {
-	return &TransflowHealingAttempt{
+// NewModHealingAttempt creates a new healing attempt
+func NewModHealingAttempt(attemptNumber int, errorContext arf.ErrorContext, suggestedRecipes []string) *ModHealingAttempt {
+	return &ModHealingAttempt{
 		AttemptNumber:    attemptNumber,
 		ErrorContext:     errorContext,
 		SuggestedRecipes: suggestedRecipes,
@@ -77,7 +77,7 @@ func NewTransflowHealingAttempt(attemptNumber int, errorContext arf.ErrorContext
 }
 
 // MarkSuccess marks the healing attempt as successful
-func (a *TransflowHealingAttempt) MarkSuccess(appliedRecipes []string, duration time.Duration) {
+func (a *ModHealingAttempt) MarkSuccess(appliedRecipes []string, duration time.Duration) {
 	a.Success = true
 	a.AppliedRecipes = appliedRecipes
 	a.Duration = duration
@@ -85,22 +85,22 @@ func (a *TransflowHealingAttempt) MarkSuccess(appliedRecipes []string, duration 
 }
 
 // MarkFailure marks the healing attempt as failed
-func (a *TransflowHealingAttempt) MarkFailure(appliedRecipes []string, errorMsg string, duration time.Duration) {
+func (a *ModHealingAttempt) MarkFailure(appliedRecipes []string, errorMsg string, duration time.Duration) {
 	a.Success = false
 	a.AppliedRecipes = appliedRecipes
 	a.ErrorMessage = errorMsg
 	a.Duration = duration
 }
 
-// TransflowHealingSummary tracks the overall healing process for a transflow run
-type TransflowHealingSummary struct {
-	Enabled       bool                       `json:"enabled"`
-	AttemptsCount int                        `json:"attempts_count"`
-	MaxRetries    int                        `json:"max_retries"`
-	Attempts      []*TransflowHealingAttempt `json:"attempts"`
-	FinalSuccess  bool                       `json:"final_success"`
-	TotalHealed   int                        `json:"total_healed"`
-	TotalDuration time.Duration              `json:"total_duration"`
+// ModHealingSummary tracks the overall healing process for a Mod run
+type ModHealingSummary struct {
+	Enabled       bool                 `json:"enabled"`
+	AttemptsCount int                  `json:"attempts_count"`
+	MaxRetries    int                  `json:"max_retries"`
+	Attempts      []*ModHealingAttempt `json:"attempts"`
+	FinalSuccess  bool                 `json:"final_success"`
+	TotalHealed   int                  `json:"total_healed"`
+	TotalDuration time.Duration        `json:"total_duration"`
 
 	// Job-based healing workflow fields
 	PlanID     string         `json:"plan_id,omitempty"`
@@ -108,20 +108,20 @@ type TransflowHealingSummary struct {
 	AllResults []BranchResult `json:"all_results,omitempty"`
 }
 
-// NewTransflowHealingSummary creates a new healing summary
-func NewTransflowHealingSummary(enabled bool, maxRetries int) *TransflowHealingSummary {
-	return &TransflowHealingSummary{
+// NewModHealingSummary creates a new healing summary
+func NewModHealingSummary(enabled bool, maxRetries int) *ModHealingSummary {
+	return &ModHealingSummary{
 		Enabled:       enabled,
 		AttemptsCount: 0,
 		MaxRetries:    maxRetries,
-		Attempts:      []*TransflowHealingAttempt{},
+		Attempts:      []*ModHealingAttempt{},
 		FinalSuccess:  false,
 		TotalHealed:   0,
 	}
 }
 
 // AddAttempt adds a healing attempt to the summary
-func (s *TransflowHealingSummary) AddAttempt(attempt *TransflowHealingAttempt) {
+func (s *ModHealingSummary) AddAttempt(attempt *ModHealingAttempt) {
 	s.Attempts = append(s.Attempts, attempt)
 	s.AttemptsCount++
 	s.TotalDuration += attempt.Duration
@@ -132,12 +132,12 @@ func (s *TransflowHealingSummary) AddAttempt(attempt *TransflowHealingAttempt) {
 }
 
 // SetFinalResult sets the final success status
-func (s *TransflowHealingSummary) SetFinalResult(success bool) {
+func (s *ModHealingSummary) SetFinalResult(success bool) {
 	s.FinalSuccess = success
 }
 
 // HasReachedMaxRetries checks if max retries have been reached
-func (s *TransflowHealingSummary) HasReachedMaxRetries() bool {
+func (s *ModHealingSummary) HasReachedMaxRetries() bool {
 	return s.AttemptsCount >= s.MaxRetries
 }
 
@@ -150,19 +150,19 @@ type BuildFailureAnalysis struct {
 	SourceFiles      []string `json:"source_files,omitempty"`
 }
 
-// TransflowErrorAnalyzer analyzes build failures and suggests healing recipes
-type TransflowErrorAnalyzer struct {
+// ModErrorAnalyzer analyzes build failures and suggests healing recipes
+type ModErrorAnalyzer struct {
 	// In the future, this might wrap the ARF analyzer
 	// For now, we'll use simple pattern matching
 }
 
-// NewTransflowErrorAnalyzer creates a new error analyzer for transflow
-func NewTransflowErrorAnalyzer() *TransflowErrorAnalyzer {
-	return &TransflowErrorAnalyzer{}
+// NewModErrorAnalyzer creates a new error analyzer for Mods
+func NewModErrorAnalyzer() *ModErrorAnalyzer {
+	return &ModErrorAnalyzer{}
 }
 
 // AnalyzeBuildFailure analyzes build failure and suggests healing recipes
-func (a *TransflowErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors []string, language string) (*BuildFailureAnalysis, error) {
+func (a *ModErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors []string, language string) (*BuildFailureAnalysis, error) {
 	// For MVP, use simple error pattern matching to suggest common recipes
 	// In the future, integrate with the full ARF LLM analyzer
 
@@ -183,11 +183,12 @@ func (a *TransflowErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors
 
 	case "compilation":
 		// Suggest common compilation fixes
-		if language == "java" {
+		switch language {
+		case "java":
 			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes,
 				"org.openrewrite.java.cleanup.SimplifyBooleanExpression",
 				"org.openrewrite.java.cleanup.UnnecessaryParentheses")
-		} else if language == "go" {
+		case "go":
 			analysis.SuggestedRecipes = append(analysis.SuggestedRecipes,
 				"org.openrewrite.go.format.AutoFormat",
 				"org.openrewrite.go.cleanup.UnnecessaryParentheses")

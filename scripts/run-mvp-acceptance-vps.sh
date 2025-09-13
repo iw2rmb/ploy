@@ -3,7 +3,7 @@ set -e
 
 # MVP Acceptance Testing Script for VPS Environment
 # This script runs comprehensive MVP acceptance tests on the production VPS
-# to validate complete Transflow MVP implementation and production readiness
+# to validate complete Mods MVP implementation and production readiness
 
 TARGET_HOST=${TARGET_HOST:-45.12.75.241}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -86,7 +86,7 @@ validate_prerequisites() {
 
 # Deploy latest implementation to VPS
 deploy_latest_to_vps() {
-    log_info "Deploying latest transflow implementation to VPS..."
+    log_info "Deploying latest Mods implementation to VPS..."
     
     # Build latest binaries locally
     log_info "Building latest binaries locally..."
@@ -144,7 +144,7 @@ run_core_mvp_tests() {
         export GITLAB_TOKEN=\"'$GITLAB_TOKEN'\"
         export PLOY_TEST_VPS=true
         export PLOY_ACCEPTANCE_MODE=true
-        export TRANSFLOW_LOG_LEVEL=info
+        export MODS_LOG_LEVEL=info
         
         echo \"📋 Running core MVP acceptance test suite...\"
         
@@ -267,7 +267,7 @@ generate_acceptance_report() {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Transflow MVP Acceptance Report</title>
+    <title>Mods MVP Acceptance Report</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; }
         .header { background: #2196F3; color: white; padding: 20px; }
@@ -279,7 +279,7 @@ generate_acceptance_report() {
 </head>
 <body>
     <div class=\"header\">
-        <h1>Transflow MVP Acceptance Report</h1>
+        <h1>Mods MVP Acceptance Report</h1>
         <p>Generated: $(date)</p>
         <p>Environment: Production VPS ($TARGET_HOST)</p>
     </div>
@@ -300,7 +300,7 @@ generate_acceptance_report() {
             <li class=\"success\">✓ Git Operations (clone, branch, commit, push)</li>
             <li class=\"success\">✓ GitLab MR Integration</li>
             <li class=\"success\">✓ YAML Configuration Parsing</li>
-            <li class=\"success\">✓ CLI Integration (ploy transflow run)</li>
+            <li class=\"success\">✓ CLI Integration (ploy mod run)</li>
             <li class=\"warning\">⚠ Self-Healing System (partial validation)</li>
             <li class=\"warning\">⚠ Knowledge Base Learning (partial validation)</li>
             <li class=\"warning\">⚠ Model Registry CRUD (partial validation)</li>
@@ -380,7 +380,7 @@ restore_original_binaries() {
 
 # Main execution function
 main() {
-    echo "🎯 MVP ACCEPTANCE TESTING FOR TRANSFLOW"
+    echo "🎯 MVP ACCEPTANCE TESTING FOR MODS"
     echo "=========================================="
     echo
     
@@ -414,7 +414,7 @@ main() {
     
     if [ $TESTS_FAILED -eq 0 ]; then
         log_success "🎉 ALL MVP ACCEPTANCE TESTS PASSED!"
-        echo "🚀 Transflow MVP is ready for production deployment"
+        echo "🚀 Mods MVP is ready for production deployment"
         echo "📄 Detailed report: $(ls mvp-acceptance-report-*.html | tail -1)"
         echo "⏰ Completed at: $(date)"
         exit 0

@@ -15,19 +15,19 @@ type Images struct {
 // Uses the Defaults resolver to centralize registry and per-image fallbacks.
 func ResolveImages(get func(string) string) Images {
 	d := ResolveDefaults(get)
-	planner := get("TRANSFLOW_PLANNER_IMAGE")
+	planner := get("MODS_PLANNER_IMAGE")
 	if planner == "" {
 		planner = d.PlannerImage
 	}
-	reducer := get("TRANSFLOW_REDUCER_IMAGE")
+	reducer := get("MODS_REDUCER_IMAGE")
 	if reducer == "" {
 		reducer = d.ReducerImage
 	}
-	llm := get("TRANSFLOW_LLM_EXEC_IMAGE")
+	llm := get("MODS_LLM_EXEC_IMAGE")
 	if llm == "" {
 		llm = d.LLMExecImage
 	}
-	orw := get("TRANSFLOW_ORW_APPLY_IMAGE")
+	orw := get("MODS_ORW_APPLY_IMAGE")
 	if orw == "" {
 		orw = d.ORWApplyImage
 	}

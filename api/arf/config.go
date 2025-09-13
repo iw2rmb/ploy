@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/iw2rmb/ploy/api/arf/models"
 	"github.com/iw2rmb/ploy/api/arf/validation"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 	internalstorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -62,6 +64,7 @@ type Config struct {
 	Index      IndexConfig      `yaml:"index" json:"index"`
 	Validation ValidationConfig `yaml:"validation" json:"validation"`
 	Security   SecurityConfig   `yaml:"security" json:"security"`
+	NVD        NVDConfig        `yaml:"nvd" json:"nvd"`
 }
 
 // StorageConfig configures recipe storage backend
@@ -116,6 +119,14 @@ type SecurityConfig struct {
 	AuditLogPath     string `yaml:"audit_log_path" json:"audit_log_path"`
 }
 
+// NVDConfig configures the NVD CVE database integration
+type NVDConfig struct {
+	Enabled bool          `yaml:"enabled" json:"enabled"`
+	APIKey  string        `yaml:"api_key" json:"api_key"`
+	BaseURL string        `yaml:"base_url" json:"base_url"`
+	Timeout time.Duration `yaml:"timeout" json:"timeout"`
+}
+
 // DefaultConfig returns the default ARF configuration
 func DefaultConfig() *Config {
 	return &Config{
@@ -165,6 +176,12 @@ func DefaultConfig() *Config {
 			EnableAuditLog:   true,
 			AuditLogPath:     "/var/log/ploy/arf-audit.log",
 		},
+		NVD: NVDConfig{
+			Enabled: true,
+			APIKey:  "",
+			BaseURL: "https://services.nvd.nist.gov/rest/json/cves/2.0",
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
@@ -211,7 +228,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Index.Backend == "consul" && c.Index.ConsulAddr == "" {
-		return fmt.Errorf("Consul address is required")
+		return fmt.Errorf("consul address is required")
 	}
 
 	// Validate validation config
@@ -231,7 +248,7 @@ func (c *Config) Validate() error {
 }
 
 // InitializeStorage creates and configures the storage backend from config
-func (c *Config) InitializeStorage() (RecipeStorage, error) {
+func (c *Config) InitializeStorage() (recipes.RecipeStorage, error) {
 	switch c.Storage.Backend {
 	case "seaweedfs":
 		// Create SeaweedFS client
@@ -250,7 +267,7 @@ func (c *Config) InitializeStorage() (RecipeStorage, error) {
 
 		// Create RecipeRegistry with SeaweedFS storage provider and expose it
 		// via a RecipeStorage-compatible adapter (SeaweedFS only; no memory fallback)
-		registry := NewRecipeRegistry(client)
+		registry := recipes.NewRecipeRegistry(client)
 		return NewRegistryStorageAdapter(registry), nil
 
 	default:
@@ -259,7 +276,7 @@ func (c *Config) InitializeStorage() (RecipeStorage, error) {
 }
 
 // InitializeIndex creates and configures the index backend from config
-func (c *Config) InitializeIndex() (RecipeIndexStore, error) {
+func (c *Config) InitializeIndex() (recipes.RecipeIndexStore, error) {
 	switch c.Index.Backend {
 	case "consul":
 		// TODO: Implement NewConsulRecipeIndex
@@ -274,7 +291,7 @@ func (c *Config) InitializeIndex() (RecipeIndexStore, error) {
 }
 
 // InitializeValidator creates and configures the validator from config
-func (c *Config) InitializeValidator() RecipeValidatorInterface {
+func (c *Config) InitializeValidator() recipes.RecipeValidatorInterface {
 	if !c.Validation.Enabled {
 		return nil
 	}
@@ -315,6 +332,22 @@ func LoadConfigFromEnv() *Config {
 		}
 		if keyPrefix := os.Getenv("ARF_CONSUL_PREFIX"); keyPrefix != "" {
 			config.Index.KeyPrefix = keyPrefix
+		}
+
+		// NVD configuration
+		if enabled := os.Getenv("NVD_ENABLED"); enabled != "" {
+			config.NVD.Enabled = enabled == "1" || enabled == "true" || enabled == "TRUE" || enabled == "yes"
+		}
+		if apiKey := os.Getenv("NVD_API_KEY"); apiKey != "" {
+			config.NVD.APIKey = apiKey
+		}
+		if baseURL := os.Getenv("NVD_BASE_URL"); baseURL != "" {
+			config.NVD.BaseURL = baseURL
+		}
+		if to := os.Getenv("NVD_TIMEOUT_MS"); to != "" {
+			if ms, err := strconv.Atoi(to); err == nil && ms > 0 {
+				config.NVD.Timeout = time.Duration(ms) * time.Millisecond
+			}
 		}
 
 		return config

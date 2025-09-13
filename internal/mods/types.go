@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Job submission types for transflow healing workflow
+// Job submission types for Mods healing workflow
 
 // JobSpec describes a job to be submitted to the orchestrator
 type JobSpec struct {
@@ -61,9 +61,9 @@ type BranchResult struct {
 
 // Interface definitions
 
-// JobSubmissionHelper provides methods for submitting transflow jobs
+// JobSubmissionHelper provides methods for submitting Mods jobs
 type JobSubmissionHelper interface {
-	SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error)
+	SubmitPlannerJob(ctx context.Context, config *ModConfig, buildError string, workspace string) (*PlanResult, error)
 	SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error)
 }
 

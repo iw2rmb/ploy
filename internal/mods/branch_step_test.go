@@ -7,7 +7,7 @@ func TestNewBranchStep_GeneratesIDAndKey(t *testing.T) {
 	if bs.ID == "" || bs.DiffKey == "" {
 		t.Fatalf("expected id and key: %+v", bs)
 	}
-	if !strContains(bs.DiffKey, "transflow/e-1/branches/b-1/steps/") {
+	if !strContains(bs.DiffKey, "mods/e-1/branches/b-1/steps/") {
 		t.Fatalf("unexpected diff key: %s", bs.DiffKey)
 	}
 	if !strContains(bs.DiffKey, "/"+bs.ID+"/") && !strContains(bs.DiffKey, "/"+bs.ID) {

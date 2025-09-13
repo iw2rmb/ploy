@@ -277,7 +277,7 @@ type WorkflowStateMachine struct {
 }
 
 type ApprovalRequest struct {
-    TransformationID  string                 `json:"transformation_id"`
+    ModID  string                 `json:"mod_id"`
     Repository        RepositoryInfo         `json:"repository"`
     Changes          []FileChange           `json:"changes"`
     RiskAssessment   RiskAssessment         `json:"risk_assessment"`
@@ -982,7 +982,7 @@ response:
 ```yaml
 # API: POST /v1/arf/approvals/request
 request:
-  transformation_id: "trans-xyz789"
+  mod_id: "trans-xyz789"
   risk_assessment:
     level: "high"
     factors: ["security_impact", "business_critical"]

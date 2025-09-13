@@ -52,7 +52,7 @@ func fetchLLMSModels(ctx context.Context) ([]llmmodel.LLMModel, error) {
 		if json.NewDecoder(r).Decode(&m) == nil {
 			models = append(models, m)
 		}
-		r.Close()
+		_ = r.Close()
 	}
 	return models, nil
 }

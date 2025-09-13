@@ -9,7 +9,7 @@ func TestWriteBranchChainStepMeta_WritesMetaAndHead(t *testing.T) {
 	// Mock getJSON to return existing HEAD with prev step
 	prevGet := getJSONFn
 	getJSONFn = func(seaweedBase, key string) ([]byte, int, error) {
-		if key == "transflow/e-1/branches/b-1/HEAD.json" {
+		if key == "mods/e-1/branches/b-1/HEAD.json" {
 			return []byte(`{"step_id":"s-prev"}`), 200, nil
 		}
 		return nil, 404, nil
@@ -31,7 +31,7 @@ func TestWriteBranchChainStepMeta_WritesMetaAndHead(t *testing.T) {
 	}
 	defer func() { putJSONFn = prevPut }()
 
-	if err := writeBranchChainStepMeta("http://filer:8888", "e-1", "b-1", "s-2", "transflow/e-1/branches/b-1/steps/s-2/diff.patch"); err != nil {
+	if err := writeBranchChainStepMeta("http://filer:8888", "e-1", "b-1", "s-2", "mods/e-1/branches/b-1/steps/s-2/diff.patch"); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	// Expect two writes: meta.json and HEAD.json
@@ -39,7 +39,7 @@ func TestWriteBranchChainStepMeta_WritesMetaAndHead(t *testing.T) {
 		t.Fatalf("expected 2 writes, got %d", len(calls))
 	}
 	// First is meta.json
-	if calls[0].key != "transflow/e-1/branches/b-1/steps/s-2/meta.json" {
+	if calls[0].key != "mods/e-1/branches/b-1/steps/s-2/meta.json" {
 		t.Fatalf("meta key mismatch: %s", calls[0].key)
 	}
 	if calls[0].body["step_id"] != "s-2" {
@@ -48,11 +48,11 @@ func TestWriteBranchChainStepMeta_WritesMetaAndHead(t *testing.T) {
 	if calls[0].body["prev_step_id"] != "s-prev" {
 		t.Fatal("meta prev_step_id mismatch")
 	}
-	if calls[0].body["diff_key"] != "transflow/e-1/branches/b-1/steps/s-2/diff.patch" {
+	if calls[0].body["diff_key"] != "mods/e-1/branches/b-1/steps/s-2/diff.patch" {
 		t.Fatal("meta diff_key mismatch")
 	}
 	// Second is HEAD
-	if calls[1].key != "transflow/e-1/branches/b-1/HEAD.json" {
+	if calls[1].key != "mods/e-1/branches/b-1/HEAD.json" {
 		t.Fatalf("head key mismatch: %s", calls[1].key)
 	}
 	// HEAD has only step_id field as string JSON
@@ -76,7 +76,7 @@ func TestWriteBranchChainStepMeta_NoPrevHead(t *testing.T) {
 	}
 	defer func() { putJSONFn = prevPut }()
 
-	if err := writeBranchChainStepMeta("http://filer:8888", "e-2", "b-2", "s-1", "transflow/e-2/branches/b-2/steps/s-1/diff.patch"); err != nil {
+	if err := writeBranchChainStepMeta("http://filer:8888", "e-2", "b-2", "s-1", "mods/e-2/branches/b-2/steps/s-1/diff.patch"); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if count != 2 {

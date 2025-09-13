@@ -432,7 +432,7 @@ func TestSeaweedFSClient_GetObject(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, reader)
-				defer reader.Close()
+				defer func() { _ = reader.Close() }()
 
 				content, err := io.ReadAll(reader)
 				assert.NoError(t, err)
@@ -1026,14 +1026,14 @@ func TestSeaweedFSClient_Retry(t *testing.T) {
 
 	// This test verifies that the client can handle transient failures
 	// In a real implementation, retry logic would be in a wrapper
-	reader, err := client.GetObject("bucket", "key")
+	_, err := client.GetObject("bucket", "key")
 
 	// First attempt should fail
 	assert.Error(t, err)
 	attempts++
 
 	// Second attempt should succeed
-	reader, err = client.GetObject("bucket", "key")
+	reader, err := client.GetObject("bucket", "key")
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
 	attempts++
@@ -1159,6 +1159,6 @@ func BenchmarkSeaweedFSClient_GetObject(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		reader.Close()
+		_ = reader.Close()
 	}
 }

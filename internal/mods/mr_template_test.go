@@ -6,8 +6,8 @@ import (
 )
 
 func TestRenderMRDescription_IncludesHealingAndSteps(t *testing.T) {
-	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-1"}}
-	res := &TransflowResult{
+	r := &ModRunner{config: &ModConfig{ID: "wf-1"}}
+	res := &ModResult{
 		BranchName:   "workflow/wf-1/123",
 		BuildVersion: "v123",
 		Duration:     0,
@@ -16,7 +16,7 @@ func TestRenderMRDescription_IncludesHealingAndSteps(t *testing.T) {
 			{StepID: "build", Success: true, Message: "Build passed"},
 			{StepID: "mr", Success: true, Message: "MR created"}, // should be filtered out
 		},
-		HealingSummary: &TransflowHealingSummary{
+		HealingSummary: &ModHealingSummary{
 			Enabled:       true,
 			PlanID:        "plan-abc",
 			AttemptsCount: 2,
@@ -24,7 +24,7 @@ func TestRenderMRDescription_IncludesHealingAndSteps(t *testing.T) {
 		},
 	}
 	s := renderMRDescription(r, res)
-	mustContain(t, s, "Transflow Workflow")
+	mustContain(t, s, "Mods Workflow")
 	mustContain(t, s, "wf-1")
 	mustContain(t, s, "workflow/wf-1/123")
 	mustContain(t, s, "v123")
@@ -54,16 +54,16 @@ func mustContain(t *testing.T, s, sub string) {
 }
 
 func TestRenderMRDescription_NoSteps(t *testing.T) {
-	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-x"}}
-	res := &TransflowResult{BranchName: "workflow/wf-x/1", StepResults: nil}
+	r := &ModRunner{config: &ModConfig{ID: "wf-x"}}
+	res := &ModResult{BranchName: "workflow/wf-x/1", StepResults: nil}
 	s := renderMRDescription(r, res)
-	mustContain(t, s, "Transflow Workflow")
+	mustContain(t, s, "Mods Workflow")
 	mustContain(t, s, "(no transformation steps recorded)")
 }
 
 func TestRenderMRDescription_FiltersFailedAndMR(t *testing.T) {
-	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-y"}}
-	res := &TransflowResult{
+	r := &ModRunner{config: &ModConfig{ID: "wf-y"}}
+	res := &ModResult{
 		BranchName: "workflow/wf-y/1",
 		StepResults: []StepResult{
 			{StepID: "apply", Success: true, Message: "Applied"},
@@ -80,8 +80,8 @@ func TestRenderMRDescription_FiltersFailedAndMR(t *testing.T) {
 }
 
 func TestRenderMRDescription_HealingDisabled(t *testing.T) {
-	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-z"}}
-	res := &TransflowResult{BranchName: "workflow/wf-z/1", HealingSummary: &TransflowHealingSummary{Enabled: false}}
+	r := &ModRunner{config: &ModConfig{ID: "wf-z"}}
+	res := &ModResult{BranchName: "workflow/wf-z/1", HealingSummary: &ModHealingSummary{Enabled: false}}
 	s := renderMRDescription(r, res)
 	// No Self-Healing section
 	if strings.Contains(s, "Self-Healing Applied") {

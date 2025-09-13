@@ -30,13 +30,13 @@ func TestResolveDefaults_UsesBuiltinsWhenEnvMissing(t *testing.T) {
 func TestResolveDefaults_RespectsEnvOverrides(t *testing.T) {
 	get := func(k string) string {
 		switch k {
-		case "TRANSFLOW_REGISTRY":
+		case "MODS_REGISTRY":
 			return "reg.local"
-		case "TRANSFLOW_PLANNER_IMAGE":
+		case "MODS_PLANNER_IMAGE":
 			return "custom/planner:1"
 		case "NOMAD_DC":
 			return "dc9"
-		case "TRANSFLOW_ALLOWLIST":
+		case "MODS_ALLOWLIST":
 			return "a/**,b.txt"
 		default:
 			return ""
@@ -58,8 +58,8 @@ func TestResolveDefaults_RespectsEnvOverrides(t *testing.T) {
 }
 
 func TestResolveDefaultsFromEnv_Smoke(t *testing.T) {
-	os.Setenv("TRANSFLOW_REGISTRY", "r.example")
-	defer os.Unsetenv("TRANSFLOW_REGISTRY")
+	_ = os.Setenv("MODS_REGISTRY", "r.example")
+	defer func() { _ = os.Unsetenv("MODS_REGISTRY") }()
 	d := ResolveDefaultsFromEnv()
 	if d.Registry != "r.example" {
 		t.Fatalf("env registry: %s", d.Registry)

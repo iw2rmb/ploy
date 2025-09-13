@@ -7,19 +7,20 @@ import (
 
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/arf/models"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 	"github.com/sirupsen/logrus"
 )
 
 // ARFIntegration handles integration with the Automated Remediation Framework
 type ARFIntegration struct {
 	arfHandler     *arf.Handler
-	recipeExecutor *arf.RecipeExecutor
+	recipeExecutor *recipes.RecipeExecutor
 	sandboxManager arf.SandboxManager
 	logger         *logrus.Logger
 }
 
 // NewARFIntegration creates a new ARF integration
-func NewARFIntegration(arfHandler *arf.Handler, executor *arf.RecipeExecutor, sandboxMgr arf.SandboxManager, logger *logrus.Logger) *ARFIntegration {
+func NewARFIntegration(arfHandler *arf.Handler, executor *recipes.RecipeExecutor, sandboxMgr arf.SandboxManager, logger *logrus.Logger) *ARFIntegration {
 	return &ARFIntegration{
 		arfHandler:     arfHandler,
 		recipeExecutor: executor,
@@ -165,7 +166,11 @@ func (a *ARFIntegration) processRecipeGroup(ctx context.Context, repo Repository
 	if err != nil {
 		return fmt.Errorf("failed to create sandbox: %w", err)
 	}
-	defer a.sandboxManager.DestroySandbox(ctx, sandbox.ID)
+	defer func() {
+		if derr := a.sandboxManager.DestroySandbox(ctx, sandbox.ID); derr != nil {
+			a.logger.WithError(derr).Warn("failed to destroy sandbox")
+		}
+	}()
 
 	// Execute recipe in sandbox
 	// Note: This is a simplified integration - actual implementation would

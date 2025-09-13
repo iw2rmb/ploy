@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/mods/tools.schema.json",
+  "title": "TOOLS Allowlist",
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "allow": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "search": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string" },
+        "allow": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "build": {
+      "type": "object",
+      "properties": {
+        "endpoint_env": { "type": "string" },
+        "app": { "type": "string" },
+        "env": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "openrewrite": {
+      "type": "object",
+      "properties": {
+        "allow_groups": { "type": "array", "items": { "type": "string" } },
+        "timeout": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -15,7 +15,7 @@ func TestLoadConfig(t *testing.T) {
 	tests := []struct {
 		name        string
 		yamlContent string
-		expected    *TransflowConfig
+		expected    *ModConfig
 		expectError bool
 	}{
 		{
@@ -34,7 +34,7 @@ steps:
     recipes:
       - com.acme.FixNulls
       - com.acme.UpdateApi`,
-			expected: &TransflowConfig{
+			expected: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-workflow",
 				TargetRepo:   "https://github.com/org/project",
@@ -42,7 +42,7 @@ steps:
 				BaseRef:      "refs/heads/main",
 				Lane:         "C",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:     "openrewrite-updates",
@@ -69,7 +69,7 @@ steps:
     engine: openrewrite
     recipes:
       - com.acme.SimpleRecipe`,
-			expected: &TransflowConfig{
+			expected: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "minimal-workflow",
 				TargetRepo:   "https://github.com/org/simple-project",
@@ -77,7 +77,7 @@ steps:
 				BaseRef:      "refs/heads/main",
 				Lane:         "",
 				BuildTimeout: "",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:     "simple-recipe",
@@ -164,7 +164,7 @@ steps:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temporary file with test content
-			tmpFile := filepath.Join(t.TempDir(), "transflow.yaml")
+			tmpFile := filepath.Join(t.TempDir(), "mods.yaml")
 			err := os.WriteFile(tmpFile, []byte(tt.yamlContent), 0644)
 			require.NoError(t, err)
 
@@ -186,19 +186,19 @@ steps:
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
 		name        string
-		config      *TransflowConfig
+		config      *ModConfig
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "valid config",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				Version:      "v1alpha1",
 				ID:           "test-workflow",
 				TargetRepo:   "https://github.com/org/project",
 				BaseRef:      "refs/heads/main",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:    "orw-apply",
 						ID:      "test-recipe",
@@ -211,11 +211,11 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "empty id",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 				},
 			},
@@ -224,11 +224,11 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "empty target_repo",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "",
 				BaseRef:    "refs/heads/main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 				},
 			},
@@ -237,11 +237,11 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "empty base_ref",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 				},
 			},
@@ -250,11 +250,11 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "no steps",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
-				Steps:      []TransflowStep{},
+				Steps:      []ModStep{},
 			},
 			expectError: true,
 			errorMsg:    "at least one step is required",
@@ -324,7 +324,7 @@ func TestParseBuildTimeout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &TransflowConfig{
+			config := &ModConfig{
 				BuildTimeout: tt.timeout,
 			}
 
@@ -416,7 +416,7 @@ func TestGenerateBranchName(t *testing.T) {
 	}
 }
 
-func TestTransflowStep_OpenRewriteOverrides(t *testing.T) {
+func TestModStep_OpenRewriteOverrides(t *testing.T) {
 	yamlContent := `version: v1alpha1
 id: ow-overrides
 target_repo: https://example.com/x/y.git

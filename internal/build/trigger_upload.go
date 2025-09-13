@@ -25,7 +25,7 @@ func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, file
 
 		// Attempt upload with verification
 		_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), storageKey, f, contentType)
-		f.Close()
+		_ = f.Close()
 
 		if uploadErr == nil {
 			// Upload successful, now verify integrity
@@ -107,7 +107,7 @@ func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.
 		}
 
 		uploadErr := storageInterface.Put(ctx, storageKey, f, putOpts...)
-		f.Close()
+		_ = f.Close()
 
 		if uploadErr == nil {
 			// Upload successful - unified storage interface doesn't need separate verification

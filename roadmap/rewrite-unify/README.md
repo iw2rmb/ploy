@@ -1,12 +1,12 @@
-# Migration Plan: Remove ARF `transforms` HTTP, Unify on `transflow`
+# Migration Plan: Remove ARF `transforms` HTTP, Unify on `mods`
 
 ## Overview
 
-Collapse the dual surface into a single API: remove ARF transform endpoints entirely and use only Transflow for all transformation workflows.
+Collapse the dual surface into a single API: remove ARF transform endpoints entirely and use only Mods for all transformation workflows.
 
 - Current:
   - ARF transforms: `/v1/arf/transforms/*` (async single-recipe + debug/reporting)
-  - Transflow: `/v1/mods/*` (orchestrated workflows, artifacts, logs, events)
+- Mods: `/v1/mods/*` (orchestrated workflows, artifacts, logs, events)
 - Target:
   - Only `/v1/mods/*` for all transformation operations
   - Hard removal of `/v1/arf/transforms*` and related code (no deprecation)
@@ -18,11 +18,11 @@ Backwards compatibility is NOT required. Remove legacy surfaces and references i
 - Mixed singular/plural and legacy paths in code/docs/tests:
   - Legacy singular: `/v1/arf/transform` appears in CLI/docs/comments; no server route exists.
   - ARF plural: `/v1/arf/transforms/*` still registered and used across tests/scripts.
-  - Transflow docs mix `/v1/mods/*` and `/v1/modss/*`; only singular is implemented.
+- Mods docs mix `/v1/mods/*` and `/v1/modss/*`; only singular is implemented.
 - CLI “ploy arf transform” still posts to `/arf/transform` and will break when ARF transforms are removed. No compatibility mode: remove this command and its docs.
 - Test scripts and unit tests reference ARF transforms; expand sweep beyond the few listed earlier.
-- Consul KV prefix uses `ploy/arf/transforms` in tests; decide and update naming to `ploy/transflow/*` or keep legacy prefix intentionally. No runtime data migration is required.
-- ARF debug/report endpoints (hierarchy/timeline/analysis/report/orphaned) will disappear; explicitly remove and update docs. Optional rehome under transflow can be considered later as a new feature.
+- Consul KV prefix uses `ploy/arf/transforms` in tests; decide and update naming to `ploy/mods/*` or keep legacy prefix intentionally. No runtime data migration is required.
+- ARF debug/report endpoints (hierarchy/timeline/analysis/report/orphaned) will disappear; explicitly remove and update docs. Optional rehome under mods can be considered later as a new feature.
 - Orphan file: `api/arf/transformation_workflow.go` appears unused; safe to remove.
 
 ## Detailed Migration Plan (hard removal)
@@ -45,14 +45,14 @@ Code changes:
   - `api/arf/transformation_workflow.go` (not referenced; safe to delete or archive under roadmap if you prefer).
 
 Notes:
-- Keep ARF internals used by Transflow (OpenRewrite engine/dispatcher, recipe registry, SBOM/security, sandbox interfaces). Healing coordinator has been removed.
+- Keep ARF internals used by Mods (OpenRewrite engine/dispatcher, recipe registry, SBOM/security, sandbox interfaces). Healing coordinator has been removed.
 
 ### Phase 2: CLI and Help Surface
 
 - Remove the “ploy arf transform” command and help/examples:
   - Delete `internal/cli/arf/transform.go` and strip references from `cmd/ploy/README.md` and any ARF help files.
-- Ensure Transflow is the sole CLI for workflows:
-  - Continue to promote `ploy mod run` and the Transflow config path.
+- Ensure Mods is the sole CLI for workflows:
+  - Continue to promote `ploy mod run` and the Mods config path.
 - Remove unused integration shims:
   - In `internal/mods/integrations.go`, remove `ARFRecipeExecutor` (wrapper that shells out to `ploy arf transform`), and any calls to it. The current Transflow runner does not depend on it; ensure no dead references remain.
 
@@ -80,13 +80,13 @@ rg -n '/v1/modss\b'  # fix pluralization in docs
 - Normalize Transflow docs and remove unimplemented endpoints:
   - `docs/api/transflow.md`
     - Ensure only implemented endpoints are documented:
-      - `POST   /v1/mods/run`
-      - `GET    /v1/mods/status/:id`
-      - `GET    /v1/mods/list`
+      - `POST   /v1/mods`
+      - `GET    /v1/mods/:id/status`
+      - `GET    /v1/mods`
       - `DELETE /v1/mods/:id`
-      - `GET    /v1/mods/artifacts/:id[/:name]`
-      - `POST   /v1/mods/event`
-      - `GET    /v1/mods/logs/:id`
+      - `GET    /v1/mods/:id/artifacts[/:name]`
+      - `POST   /v1/mods/:id/events`
+      - `GET    /v1/mods/:id/logs`
     - Remove plural “/v1/modss/*” variants and any “config/template|config/validate” sections if not implemented.
 - Update `CHANGELOG.md` and `docs/FEATURES.md` per protocol to record the breaking change (removal) and the unified API surface.
 
@@ -98,8 +98,8 @@ rg -n '/v1/modss\b'  # fix pluralization in docs
 
 ### Phase 6: Nomad Templates and Runners
 
-- No changes required for runner templates that emit `TRANSFORMATION_ID` or use transformation‑centric naming inside jobs; these are internal to jobs and orthogonal to HTTP removal.
-- Verify that Transflow jobs and services (e.g., `services/openrewrite-jvm/runner.sh`) keep reporting to `/v1/mods/event` and persist artifacts under Transflow paths.
+- No changes required for runner templates that emit `MOD_ID` or use transformation‑centric naming inside jobs; these are internal to jobs and orthogonal to HTTP removal.
+- Verify that Mod jobs and services (e.g., `services/openrewrite-jvm/runner.sh`) keep reporting to `/v1/mods/{id}/events` and persist artifacts under Mods paths.
 
 ### Phase 7: Build, Format, Static Analysis, and Validation
 
@@ -115,7 +115,7 @@ rg -n '/v1/modss\b'  # fix pluralization in docs
 ## Keep vs Remove
 
 Keep (Transflow dependencies):
-- `api/arf/openrewrite_engine.go`, `api/arf/openrewrite_dispatcher.go`, `api/arf/engine.go`, `api/arf/factory.go`.
+- `api/arf/openrewrite_engine.go` (dev/local only), `api/arf/engine.go`, `api/arf/factory.go`. The dispatcher was removed; Mods orw-apply owns execution.
 - Consul status types: `api/arf/consul_types.go` (healing coordinator components removed).
 - Recipe registry and SBOM/security endpoints.
 

@@ -72,13 +72,13 @@ func (m *ConsulKBLockManager) AcquireLock(ctx context.Context, key string, ttl t
 	acquired, _, err := m.client.KV().Acquire(kvPair, nil)
 	if err != nil {
 		// Clean up session if lock acquisition failed
-		m.client.Session().Destroy(sessionID, nil)
+		_, _ = m.client.Session().Destroy(sessionID, nil)
 		return nil, fmt.Errorf("failed to acquire lock: %w", err)
 	}
 
 	if !acquired {
 		// Clean up session if lock was not acquired
-		m.client.Session().Destroy(sessionID, nil)
+		_, _ = m.client.Session().Destroy(sessionID, nil)
 		return nil, fmt.Errorf("lock already held by another session")
 	}
 
@@ -129,7 +129,7 @@ func (m *ConsulKBLockManager) TryWithLock(ctx context.Context, key string, ttl t
 	if err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
-	defer m.ReleaseLock(ctx, lock)
+	defer func() { _ = m.ReleaseLock(ctx, lock) }()
 
 	return fn()
 }
@@ -187,8 +187,8 @@ func (m *ConsulKBLockManager) TryWithLockRetry(ctx context.Context, key string, 
 		err = fn()
 		releaseErr := m.ReleaseLock(ctx, lock)
 		if releaseErr != nil {
-			// Log warning but don't fail the operation
-			// The lock will expire anyway due to TTL
+			// Best-effort: ignore release error; lock TTL will expire
+			_ = releaseErr
 		}
 
 		if err == nil {

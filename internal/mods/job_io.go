@@ -21,7 +21,7 @@ func downloadToFile(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("http %d", resp.StatusCode)
 	}
@@ -32,7 +32,7 @@ func downloadToFile(url, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = io.Copy(f, resp.Body)
 	return err
 }
@@ -42,7 +42,7 @@ var downloadToFileFn = downloadToFile
 
 // validateArtifactKey ensures keys are safe and within the allowed namespace.
 // Allowed form:
-//   - must start with "transflow/"
+//   - must start with "mods/"
 //   - must not contain ".." path segments
 //   - must not contain backslashes
 //   - must not be empty
@@ -63,8 +63,8 @@ func validateArtifactKey(key string) error {
 			return fmt.Errorf("invalid artifact key: path traversal")
 		}
 	}
-	if !strings.HasPrefix(key, "transflow/") {
-		return fmt.Errorf("invalid artifact key: must start with 'transflow/'")
+	if !strings.HasPrefix(key, "mods/") {
+		return fmt.Errorf("invalid artifact key: must start with 'mods/'")
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func putFile(seaweedBase, key, srcPath, contentType string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	req, err := http.NewRequest(http.MethodPut, url, f)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func putFile(seaweedBase, key, srcPath, contentType string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("put %s: http %d: %s", key, resp.StatusCode, string(b))
@@ -116,7 +116,7 @@ func putJSON(seaweedBase, key string, body []byte) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("put %s: http %d: %s", key, resp.StatusCode, string(b))
@@ -139,7 +139,7 @@ func getJSON(seaweedBase, key string) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
 	return b, resp.StatusCode, nil
 }

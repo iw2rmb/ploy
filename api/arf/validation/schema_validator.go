@@ -227,7 +227,7 @@ func (v *SchemaValidator) validateSteps(steps []models.RecipeStep) error {
 		}
 
 		// Validate step configuration
-		if step.Config == nil || len(step.Config) == 0 {
+		if len(step.Config) == 0 {
 			return fmt.Errorf("step %d (%s) missing configuration", i+1, step.Name)
 		}
 
@@ -320,7 +320,7 @@ func isValidName(name string) bool {
 	}
 
 	for _, r := range name {
-		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-') {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
 			return false
 		}
 	}
@@ -359,8 +359,7 @@ func isValidTag(tag string) bool {
 	}
 
 	for _, r := range tag {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') || r == '-' || r == '_' || r == ' ') {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '-' && r != '_' && r != ' ' {
 			return false
 		}
 	}

@@ -6,7 +6,7 @@ import (
 )
 
 // mrEmitStart emits a standardized MR creation start message.
-func mrEmitStart(r *TransflowRunner, ctx context.Context, sourceBranch, targetBranch string) {
+func mrEmitStart(r *ModRunner, ctx context.Context, sourceBranch, targetBranch string) {
 	if r == nil {
 		return
 	}
@@ -14,7 +14,7 @@ func mrEmitStart(r *TransflowRunner, ctx context.Context, sourceBranch, targetBr
 }
 
 // mrAppendFailure appends a non-fatal MR failure step result to the workflow result.
-func mrAppendFailure(result *TransflowResult, err error) {
+func mrAppendFailure(result *ModResult, err error) {
 	if result == nil || err == nil {
 		return
 	}
@@ -22,7 +22,7 @@ func mrAppendFailure(result *TransflowResult, err error) {
 }
 
 // mrAppendSuccess appends a success step result and sets the MR URL on the workflow result.
-func mrAppendSuccess(result *TransflowResult, url string, created bool) {
+func mrAppendSuccess(result *ModResult, url string, created bool) {
 	if result == nil || url == "" {
 		return
 	}

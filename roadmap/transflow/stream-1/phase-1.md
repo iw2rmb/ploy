@@ -8,8 +8,8 @@ Reuse First
 - Git: `api/arf/git_operations.go` (clone/diff/commit) — extend with push and branch helpers.
 
 Scope
-- CLI entry: `ploy mod run -f transflow.yaml`.
-- YAML: `roadmap/transflow/transflow.yaml` with global `lane` and `build_timeout` (default 10m), steps: `recipe`, `build`.
+- CLI entry: `ploy mod run -f mod.yaml`.
+- YAML: `roadmap/transflow/mod.yaml` with global `lane` and `build_timeout` (default 10m), steps: `recipe`, `build`.
 - Branching: create `workflow/<id>/<timestamp>`; commit after each step.
 - Build-only check: generate app name `tfw-<id>-<timestamp>`; POST tar to `/v1/apps/:app/builds?env=dev[&lane=...]` and honor `build_timeout` (client-side).
 

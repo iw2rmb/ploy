@@ -334,9 +334,7 @@ func (h *HealthChecker) checkVault() DependencyHealth {
 
 	// Allow insecure TLS for development/testing
 	if utils.Getenv("VAULT_SKIP_VERIFY", "false") == "true" {
-		config.ConfigureTLS(&vault.TLSConfig{
-			Insecure: true,
-		})
+		_ = config.ConfigureTLS(&vault.TLSConfig{Insecure: true})
 	}
 
 	client, err := vault.NewClient(config)
@@ -602,10 +600,11 @@ func (h *HealthChecker) DeploymentStatusHandler(c *fiber.Ctx) error {
 	deployment := h.GetDeploymentStatus()
 
 	statusCode := 200
-	if deployment.Status == "unhealthy" {
+	switch deployment.Status {
+	case "unhealthy":
 		statusCode = 503
-	} else if deployment.Status == "degraded" {
-		statusCode = 200 // Still healthy, but with warnings
+	case "degraded":
+		statusCode = 200 // healthy with warnings
 	}
 
 	return c.Status(statusCode).JSON(deployment)

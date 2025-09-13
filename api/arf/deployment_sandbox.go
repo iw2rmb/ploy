@@ -168,7 +168,7 @@ func (d *DeploymentSandboxManager) DestroySandbox(ctx context.Context, sandboxID
 	if err != nil {
 		return fmt.Errorf("delete request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body := make([]byte, 1024)

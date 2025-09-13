@@ -488,7 +488,7 @@ func TestStatus(t *testing.T) {
 
 			if tt.expectedError != "" {
 				var responseBody map[string]interface{}
-				json.NewDecoder(resp.Body).Decode(&responseBody)
+				_ = json.NewDecoder(resp.Body).Decode(&responseBody)
 
 				if errorMsg, exists := responseBody["error"]; exists {
 					assert.Contains(t, errorMsg.(string), tt.expectedError)

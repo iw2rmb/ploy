@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildJail tests the BuildJail function
@@ -207,7 +209,8 @@ func TestBuildJailCommandArguments(t *testing.T) {
 			}
 
 			// Run the test with mock
-			BuildJailWithMock(tt.app, tt.srcDir, tt.sha, tt.outDir, nil, mockCommand)
+			_, err := BuildJailWithMock(tt.app, tt.srcDir, tt.sha, tt.outDir, nil, mockCommand)
+			require.NoError(t, err)
 
 			// Verify script name
 			if capturedScript != tt.expectedScript {
@@ -246,7 +249,8 @@ func TestBuildJailEnvironmentPropagation(t *testing.T) {
 	}
 
 	// Run BuildJail with environment variables
-	BuildJailWithMock("app", "/src", "sha", "/out", envVars, mockCommand)
+	_, err := BuildJailWithMock("app", "/src", "sha", "/out", envVars, mockCommand)
+	require.NoError(t, err)
 
 	// Convert captured environment to map for easier checking
 	envMap := make(map[string]string)

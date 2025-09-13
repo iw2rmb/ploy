@@ -15,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/cli/domains"
 	"github.com/iw2rmb/ploy/internal/cli/env"
+	"github.com/iw2rmb/ploy/internal/cli/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
 	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
@@ -48,6 +49,8 @@ func main() {
 			debug.RollbackCmd(os.Args[2:], controllerURL)
 		case "arf":
 			arf.ARFCmd(os.Args[2:], controllerURL)
+		case "sbom":
+			sbom.SBOMCmd(os.Args[2:], controllerURL)
 		case "bluegreen":
 			bluegreen.BlueGreenCmd(os.Args[2:], controllerURL)
 		case "version":
@@ -58,7 +61,7 @@ func main() {
 		return
 	}
 	p := tea.NewProgram(ui.Model{})
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}

@@ -4,9 +4,9 @@ import "testing"
 
 func TestValidateArtifactKey_Valid(t *testing.T) {
 	cases := []string{
-		"transflow/exec-123/input.tar",
-		"transflow/abc/branches/x/steps/y/diff.patch",
-		"/transflow/leading/slash/is/ok",
+		"mods/exec-123/input.tar",
+		"mods/abc/branches/x/steps/y/diff.patch",
+		"/mods/leading/slash/is/ok",
 	}
 	for _, c := range cases {
 		if err := validateArtifactKey(c); err != nil {
@@ -19,9 +19,9 @@ func TestValidateArtifactKey_Invalid(t *testing.T) {
 	cases := []string{
 		"",
 		"../escape",
-		"transflow/../escape",
+		"mods/../escape",
 		"otherns/key",
-		"transflow\\backslash",
+		"mods\\backslash",
 	}
 	for _, c := range cases {
 		if err := validateArtifactKey(c); err == nil {

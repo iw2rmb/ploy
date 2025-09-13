@@ -141,14 +141,14 @@ func TestNewFactory_MiddlewareApplication(t *testing.T) {
 		reader1, err := store.Get(ctx, "cache-key")
 		require.NoError(t, err)
 		data1, _ := io.ReadAll(reader1)
-		reader1.Close()
+		_ = reader1.Close()
 		assert.Equal(t, testData, string(data1))
 
 		// Second read should hit the cache (faster)
 		reader2, err := store.Get(ctx, "cache-key")
 		require.NoError(t, err)
 		data2, _ := io.ReadAll(reader2)
-		reader2.Close()
+		_ = reader2.Close()
 		assert.Equal(t, testData, string(data2))
 	})
 
@@ -257,7 +257,7 @@ func TestNewFactory_IntegrationWithStorageInterface(t *testing.T) {
 		reader, err := store.Get(ctx, "test-key")
 		assert.NoError(t, err)
 		data, _ := io.ReadAll(reader)
-		reader.Close()
+		_ = reader.Close()
 		assert.Equal(t, "test-value", string(data))
 
 		// Exists
@@ -348,7 +348,7 @@ func TestNewFactory_IntegrationWithStorageInterface(t *testing.T) {
 		reader, err := store.Get(ctx, "dest-key")
 		assert.NoError(t, err)
 		data, _ := io.ReadAll(reader)
-		reader.Close()
+		_ = reader.Close()
 		assert.Equal(t, "copy-me", string(data))
 
 		// Move
@@ -433,7 +433,7 @@ func BenchmarkNewFactory_Operations(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			reader, _ := store.Get(ctx, "bench-get-key")
 			if reader != nil {
-				reader.Close()
+				_ = reader.Close()
 			}
 		}
 	})

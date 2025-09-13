@@ -7,7 +7,7 @@ import (
 )
 
 func TestRunCommitStep_NoChangesHeadMoved(t *testing.T) {
-	r, _ := NewTransflowRunner(&TransflowConfig{ID: "w"}, t.TempDir())
+	r, _ := NewModRunner(&ModConfig{ID: "w"}, t.TempDir())
 	// Override getHeadHashFn and hasRepoChangesFn
 	oldGet := getHeadHashFn
 	oldHas := hasRepoChangesFn
@@ -22,7 +22,7 @@ func TestRunCommitStep_NoChangesHeadMoved(t *testing.T) {
 }
 
 func TestRunCommitStep_NoChangesHeadSame(t *testing.T) {
-	r, _ := NewTransflowRunner(&TransflowConfig{ID: "w"}, t.TempDir())
+	r, _ := NewModRunner(&ModConfig{ID: "w"}, t.TempDir())
 	oldGet := getHeadHashFn
 	oldHas := hasRepoChangesFn
 	getHeadHashFn = func(string) (string, error) { return "same", nil }
@@ -42,8 +42,8 @@ func (e *errGitOps) CommitChanges(ctx context.Context, repoPath, message string)
 }
 
 func TestRunCommitStep_DoCommitError(t *testing.T) {
-	cfg := &TransflowConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []TransflowStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
-	r, _ := NewTransflowRunner(cfg, t.TempDir())
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+	r, _ := NewModRunner(cfg, t.TempDir())
 	r.SetGitOperations(&errGitOps{})
 	oldHas := hasRepoChangesFn
 	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
@@ -61,8 +61,8 @@ func (e *errPushGitOps) PushBranch(ctx context.Context, repoPath, remoteURL, bra
 }
 
 func TestRunPushStep_Error(t *testing.T) {
-	cfg := &TransflowConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []TransflowStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
-	r, _ := NewTransflowRunner(cfg, t.TempDir())
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+	r, _ := NewModRunner(cfg, t.TempDir())
 	r.SetGitOperations(&errPushGitOps{})
 	if err := r.runPushStep(context.Background(), "/repo", "branch"); err == nil {
 		t.Fatalf("expected push error")
@@ -70,8 +70,8 @@ func TestRunPushStep_Error(t *testing.T) {
 }
 
 func TestRunPushWithEvents_Error(t *testing.T) {
-	cfg := &TransflowConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []TransflowStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
-	r, _ := NewTransflowRunner(cfg, t.TempDir())
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+	r, _ := NewModRunner(cfg, t.TempDir())
 	r.SetGitOperations(&errPushGitOps{})
 	sr, err := runPushWithEvents(r, context.Background(), "/repo", "branch")
 	if err == nil || sr.Success {

@@ -1,7 +1,7 @@
 # Ployman CLI Module
 
 ## Purpose
-Comprehensive CLI tool for Ploy platform management with specialized LLM model registry operations for transflow healing workflows.
+Comprehensive CLI tool for Ploy platform management with specialized LLM model registry operations for mods healing workflows.
 
 ## Architecture Overview
 Ployman provides a unified command-line interface to the Ploy platform, with dedicated model management functionality for the LLM registry system. The CLI communicates with the API server for all operations and supports multiple output formats (table, JSON, YAML) with comprehensive error handling.

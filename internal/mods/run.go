@@ -27,32 +27,32 @@ func ModCmd(args []string, controllerURL string) {
 		printModHelp()
 		return
 	case "run":
-		if err := runTransflow(args[1:], controllerURL); err != nil {
+		if err := runMod(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case "watch":
-		if err := watchTransflow(args[1:], controllerURL); err != nil {
+		if err := watchMod(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case "render":
-		if err := transflowRenderCmd(args[1:], controllerURL); err != nil {
+		if err := modsRenderCmd(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case "plan":
-		if err := transflowPlanCmd(args[1:], controllerURL); err != nil {
+		if err := modsPlanCmd(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case "reduce":
-		if err := transflowReduceCmd(args[1:], controllerURL); err != nil {
+		if err := modsReduceCmd(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case "apply":
-		if err := transflowApplyCmd(args[1:], controllerURL); err != nil {
+		if err := modsApplyCmd(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -73,24 +73,27 @@ func printModHelp() {
 	fmt.Println("  help     - Show this help message")
 }
 
-// runTransflow handles the actual transflow execution
-func runTransflow(args []string, controllerURL string) error {
+// runMod handles the actual Mod execution
+func runMod(args []string, controllerURL string) error {
 	// Parse command line flags
-	fs := flag.NewFlagSet("transflow run", flag.ContinueOnError)
-	file := fs.String("f", "", "transflow YAML file")
+	fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
+	file := fs.String("f", "", "mods YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	dryRun := fs.Bool("dry-run", false, "validate configuration without executing")
 	testMode := fs.Bool("test-mode", false, "use mock implementations for testing (no real builds/pushes)")
 	renderPlanner := fs.Bool("render-planner", false, "render planner inputs and HCL (no submission)")
-	submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set TRANSFLOW_SUBMIT=1 to submit.")
-	submitReducer := fs.Bool("reduce", false, "render and (optionally) submit reducer job; prints next actions. Set TRANSFLOW_SUBMIT=1 to submit.")
+	submitPlanner := fs.Bool("plan", false, "render and (optionally) submit planner job; prints paths. Set MODS_SUBMIT=1 to submit.")
+	submitReducer := fs.Bool("reduce", false, "render and (optionally) submit reducer job; prints next actions. Set MODS_SUBMIT=1 to submit.")
 	execFirst := fs.Bool("execute-first", false, "after reading plan.json, print which first option would be executed (sequential stub)")
 	execLLM := fs.Bool("exec-llm-first", false, "render and optionally submit llm-exec job for the first plan option of type llm-exec")
 	execORW := fs.Bool("exec-orw-first", false, "render and optionally submit orw-apply job for the first plan option of type orw-gen (requires recipe envs)")
-	applyFirst := fs.Bool("apply-first", false, "after fetching diff (TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
+	applyFirst := fs.Bool("apply-first", false, "after fetching diff (MODS_DIFF_URL/MODS_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
 	verbose := fs.Bool("v", false, "verbose output")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace (for debugging)")
 	outputFmt := fs.String("output", "text", "output format: text|json (json prints execution_id and exits in remote mode)")
+	// SBOM flags to override config
+	sbomEnabled := fs.String("sbom", "", "override SBOM enabled (true|false)")
+	sbomFail := fs.String("sbom-fail-on-error", "", "override SBOM fail_on_error (true|false)")
 
 	// Optional: auto-attach watch after starting remote run
 	watch := fs.Bool("watch", false, "after starting remote run, attach a live watch")
@@ -106,13 +109,13 @@ func runTransflow(args []string, controllerURL string) error {
 	// Remote mode (default when a controller URL is provided): thin client calling Controller API to execute on VPS
 	if controllerURL != "" && !*dryRun && !*renderPlanner && !*submitPlanner && !*submitReducer {
 		if *file == "" {
-			return fmt.Errorf("missing -f <transflow.yaml>")
+			return fmt.Errorf("missing -f <mods.yaml>")
 		}
-		return executeRemoteTransflow(controllerURL, *file, *testMode, *verbose, *watch, *outputFmt)
+		return executeRemoteMod(controllerURL, *file, *testMode, *verbose, *watch, *outputFmt)
 	}
 
 	if *file == "" {
-		return fmt.Errorf("missing -f <transflow.yaml>")
+		return fmt.Errorf("missing -f <mods.yaml>")
 	}
 
 	// Load and validate configuration
@@ -122,7 +125,7 @@ func runTransflow(args []string, controllerURL string) error {
 	}
 
 	if *verbose {
-		fmt.Printf("Loaded transflow config: %s\n", config.ID)
+		fmt.Printf("Loaded mods config: %s\n", config.ID)
 	}
 
 	if *dryRun {
@@ -136,6 +139,34 @@ func runTransflow(args []string, controllerURL string) error {
 		return nil
 	}
 
+	// Apply SBOM flag overrides if provided
+	if *sbomEnabled != "" {
+		if strings.EqualFold(*sbomEnabled, "true") || *sbomEnabled == "1" {
+			if config.SBOM == nil {
+				config.SBOM = &SBOMConfig{}
+			}
+			config.SBOM.Enabled = true
+		} else if strings.EqualFold(*sbomEnabled, "false") || *sbomEnabled == "0" {
+			if config.SBOM == nil {
+				config.SBOM = &SBOMConfig{}
+			}
+			config.SBOM.Enabled = false
+		}
+	}
+	if *sbomFail != "" {
+		if strings.EqualFold(*sbomFail, "true") || *sbomFail == "1" {
+			if config.SBOM == nil {
+				config.SBOM = &SBOMConfig{}
+			}
+			config.SBOM.FailOnError = true
+		} else if strings.EqualFold(*sbomFail, "false") || *sbomFail == "0" {
+			if config.SBOM == nil {
+				config.SBOM = &SBOMConfig{}
+			}
+			config.SBOM.FailOnError = false
+		}
+	}
+
 	// Create working directory
 	var workspaceDir string
 	if *workDir != "" {
@@ -144,12 +175,12 @@ func runTransflow(args []string, controllerURL string) error {
 			return fmt.Errorf("failed to create work directory %s: %w", workspaceDir, err)
 		}
 	} else {
-		workspaceDir, err = os.MkdirTemp("", "transflow-*")
+		workspaceDir, err = os.MkdirTemp("", "mods-*")
 		if err != nil {
 			return fmt.Errorf("failed to create temp directory: %w", err)
 		}
 		if !*preserve {
-			defer os.RemoveAll(workspaceDir)
+			defer func() { _ = os.RemoveAll(workspaceDir) }()
 		}
 	}
 
@@ -158,7 +189,7 @@ func runTransflow(args []string, controllerURL string) error {
 	}
 
 	// Create integrations and runner
-	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, workspaceDir, *testMode)
+	integrations := NewModIntegrationsWithTestMode(controllerURL, workspaceDir, *testMode)
 	runner, err := integrations.CreateConfiguredRunner(config)
 	if err != nil {
 		return fmt.Errorf("failed to create runner: %w", err)
@@ -184,7 +215,7 @@ func runTransflow(args []string, controllerURL string) error {
 			// Try to get plan bytes from various sources
 			var planBytes []byte
 			// This is a simplified version - the original has complex plan.json retrieval logic
-			planPath := os.Getenv("TRANSFLOW_PLAN_PATH")
+			planPath := os.Getenv("MODS_PLAN_PATH")
 			if planPath == "" {
 				planPath = findPlanJSON(runner.workspaceDir)
 			}
@@ -202,7 +233,7 @@ func runTransflow(args []string, controllerURL string) error {
 		return executeReducerMode(runner, *preserve)
 	}
 
-	// Execute the transflow
+	// Execute the Mods run
 	ctx := context.Background()
 	startTime := time.Now()
 
@@ -231,10 +262,10 @@ func runTransflow(args []string, controllerURL string) error {
 	return nil
 }
 
-// transflowRenderCmd: planner render (no submission)
-func transflowRenderCmd(args []string, controllerURL string) error {
+// modsRenderCmd: planner render (no submission)
+func modsRenderCmd(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("mod render", flag.ContinueOnError)
-	file := fs.String("f", "", "transflow YAML file")
+	file := fs.String("f", "", "mods YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
 	verbose := fs.Bool("v", false, "verbose output")
@@ -242,7 +273,7 @@ func transflowRenderCmd(args []string, controllerURL string) error {
 		return err
 	}
 	if *file == "" {
-		return fmt.Errorf("missing -f <transflow.yaml>")
+		return fmt.Errorf("missing -f <mods.yaml>")
 	}
 	cfg, err := LoadConfig(*file)
 	if err != nil {
@@ -250,14 +281,14 @@ func transflowRenderCmd(args []string, controllerURL string) error {
 	}
 	wd := *workDir
 	if wd == "" {
-		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+		if wd, err = os.MkdirTemp("", "mods-*"); err != nil {
 			return err
 		}
 	}
 	if !*preserve {
-		defer os.RemoveAll(wd)
+		defer func() { _ = os.RemoveAll(wd) }()
 	}
-	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, true)
+	integrations := NewModIntegrationsWithTestMode(controllerURL, wd, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		return err
@@ -266,10 +297,10 @@ func transflowRenderCmd(args []string, controllerURL string) error {
 	return executePlannerMode(runner, *preserve, *verbose)
 }
 
-// transflowPlanCmd: render planner and optionally submit when --submit provided
-func transflowPlanCmd(args []string, controllerURL string) error {
+// modsPlanCmd: render planner and optionally submit when --submit provided
+func modsPlanCmd(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("mod plan", flag.ContinueOnError)
-	file := fs.String("f", "", "transflow YAML file")
+	file := fs.String("f", "", "mods YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
 	submit := fs.Bool("submit", false, "submit planner job after rendering")
@@ -278,7 +309,7 @@ func transflowPlanCmd(args []string, controllerURL string) error {
 		return err
 	}
 	if *file == "" {
-		return fmt.Errorf("missing -f <transflow.yaml>")
+		return fmt.Errorf("missing -f <mods.yaml>")
 	}
 	cfg, err := LoadConfig(*file)
 	if err != nil {
@@ -286,30 +317,30 @@ func transflowPlanCmd(args []string, controllerURL string) error {
 	}
 	wd := *workDir
 	if wd == "" {
-		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+		if wd, err = os.MkdirTemp("", "mods-*"); err != nil {
 			return err
 		}
 	}
 	if !*preserve {
-		defer os.RemoveAll(wd)
+		defer func() { _ = os.RemoveAll(wd) }()
 	}
-	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
+	integrations := NewModIntegrationsWithTestMode(controllerURL, wd, false)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		return err
 	}
 	if *submit {
-		os.Setenv("TRANSFLOW_SUBMIT", "1")
+		_ = os.Setenv("MODS_SUBMIT", "1")
 	} else {
-		os.Unsetenv("TRANSFLOW_SUBMIT")
+		_ = os.Unsetenv("MODS_SUBMIT")
 	}
 	return executePlannerMode(runner, *preserve, *verbose)
 }
 
-// transflowReduceCmd: render reducer and optionally submit when --submit
-func transflowReduceCmd(args []string, controllerURL string) error {
+// modsReduceCmd: render reducer and optionally submit when --submit
+func modsReduceCmd(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("mod reduce", flag.ContinueOnError)
-	file := fs.String("f", "", "transflow YAML file")
+	file := fs.String("f", "", "mods YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
 	submit := fs.Bool("submit", false, "submit reducer job after rendering")
@@ -318,7 +349,7 @@ func transflowReduceCmd(args []string, controllerURL string) error {
 		return err
 	}
 	if *file == "" {
-		return fmt.Errorf("missing -f <transflow.yaml>")
+		return fmt.Errorf("missing -f <mods.yaml>")
 	}
 	cfg, err := LoadConfig(*file)
 	if err != nil {
@@ -326,31 +357,31 @@ func transflowReduceCmd(args []string, controllerURL string) error {
 	}
 	wd := *workDir
 	if wd == "" {
-		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+		if wd, err = os.MkdirTemp("", "mods-*"); err != nil {
 			return err
 		}
 	}
 	if !*preserve {
-		defer os.RemoveAll(wd)
+		defer func() { _ = os.RemoveAll(wd) }()
 	}
-	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
+	integrations := NewModIntegrationsWithTestMode(controllerURL, wd, false)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		return err
 	}
 	if *submit {
-		os.Setenv("TRANSFLOW_SUBMIT", "1")
+		_ = os.Setenv("MODS_SUBMIT", "1")
 	} else {
-		os.Unsetenv("TRANSFLOW_SUBMIT")
+		_ = os.Unsetenv("MODS_SUBMIT")
 	}
 	_ = verbose
 	return executeReducerMode(runner, *preserve)
 }
 
-// transflowApplyCmd: apply a diff to repo and run build gate
-func transflowApplyCmd(args []string, controllerURL string) error {
+// modsApplyCmd: apply a diff to repo and run build gate
+func modsApplyCmd(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("mod apply", flag.ContinueOnError)
-	file := fs.String("f", "", "transflow YAML file")
+	file := fs.String("f", "", "mods YAML file")
 	diffPath := fs.String("diff-path", "", "local unified diff file path")
 	diffURL := fs.String("diff-url", "", "URL to download unified diff")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
@@ -359,7 +390,7 @@ func transflowApplyCmd(args []string, controllerURL string) error {
 		return err
 	}
 	if *file == "" {
-		return fmt.Errorf("missing -f <transflow.yaml>")
+		return fmt.Errorf("missing -f <mods.yaml>")
 	}
 	if *diffPath == "" && *diffURL == "" {
 		return fmt.Errorf("provide --diff-path or --diff-url")
@@ -370,34 +401,34 @@ func transflowApplyCmd(args []string, controllerURL string) error {
 	}
 	wd := *workDir
 	if wd == "" {
-		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+		if wd, err = os.MkdirTemp("", "mods-*"); err != nil {
 			return err
 		}
 	}
 	if !*preserve {
-		defer os.RemoveAll(wd)
+		defer func() { _ = os.RemoveAll(wd) }()
 	}
-	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
+	integrations := NewModIntegrationsWithTestMode(controllerURL, wd, false)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		return err
 	}
 	// Wire env for executeApplyFirst (compat)
 	if *diffURL != "" {
-		os.Setenv("TRANSFLOW_DIFF_URL", *diffURL)
+		_ = os.Setenv("MODS_DIFF_URL", *diffURL)
 	} else {
-		os.Unsetenv("TRANSFLOW_DIFF_URL")
+		_ = os.Unsetenv("MODS_DIFF_URL")
 	}
 	if *diffPath != "" {
-		os.Setenv("TRANSFLOW_DIFF_PATH", *diffPath)
+		_ = os.Setenv("MODS_DIFF_PATH", *diffPath)
 	} else {
-		os.Unsetenv("TRANSFLOW_DIFF_PATH")
+		_ = os.Unsetenv("MODS_DIFF_PATH")
 	}
 	return executeApplyFirst(runner)
 }
 
-// watchTransflow polls the controller for status updates and streams step events
-func watchTransflow(args []string, controllerURL string) error {
+// watchMods polls the controller for status updates and streams step events
+func watchMod(args []string, controllerURL string) error {
 	fs := flag.NewFlagSet("mod watch", flag.ContinueOnError)
 	id := fs.String("id", "", "execution id to watch")
 	interval := fs.Duration("interval", 2*time.Second, "poll interval")
@@ -421,7 +452,7 @@ func watchTransflow(args []string, controllerURL string) error {
 	artsURL := base + "/mods/" + *id + "/artifacts"
 
 	if !*noSSE {
-		if err := watchTransflowSSE(base, *id); err == nil {
+		if err := watchModSSE(base, *id); err == nil {
 			return nil
 		}
 		fmt.Println("SSE unavailable; falling back to polling...")
@@ -430,7 +461,7 @@ func watchTransflow(args []string, controllerURL string) error {
 	seen := 0
 	lastStatus := ""
 	client := &http.Client{Timeout: 10 * time.Second}
-	fmt.Printf("Watching transflow %s (poll %s)\n", *id, interval.String())
+	fmt.Printf("Watching mod %s (poll %s)\n", *id, interval.String())
 	for {
 		req, _ := http.NewRequest(http.MethodGet, statusURL, nil)
 		resp, err := client.Do(req)
@@ -495,9 +526,9 @@ func watchTransflow(args []string, controllerURL string) error {
 					// Server provides a download endpoint alias using logical name
 					dl := base + "/mods/" + *id + "/artifacts/error_log"
 					if r3, e3 := client.Get(dl); e3 == nil && r3.StatusCode == 200 {
-						defer r3.Body.Close()
+						defer func() { _ = r3.Body.Close() }()
 						fmt.Println("--- error.log ---")
-						io.Copy(os.Stdout, r3.Body)
+						_, _ = io.Copy(os.Stdout, r3.Body)
 						fmt.Println("\n--- end error.log ---")
 					}
 				}
@@ -509,7 +540,7 @@ func watchTransflow(args []string, controllerURL string) error {
 	return nil
 }
 
-func watchTransflowSSE(base, id string) error {
+func watchModSSE(base, id string) error {
 	url := fmt.Sprintf("%s/mods/%s/logs?follow=true", base, id)
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 	client := &http.Client{Timeout: 0}
@@ -517,7 +548,7 @@ func watchTransflowSSE(base, id string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("unexpected SSE response: %d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}

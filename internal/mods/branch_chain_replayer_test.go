@@ -12,10 +12,10 @@ import (
 func TestBranchChainReplayer_ReplaysInOrder(t *testing.T) {
 	// Build fake storage map for HEAD and meta chain: s1 -> s2 -> s3 (HEAD)
 	storage := map[string][]byte{
-		"transflow/exec-1/branches/branch-A/HEAD.json":          []byte(`{"step_id":"s3"}`),
-		"transflow/exec-1/branches/branch-A/steps/s3/meta.json": []byte(`{"prev_step_id":"s2"}`),
-		"transflow/exec-1/branches/branch-A/steps/s2/meta.json": []byte(`{"prev_step_id":"s1"}`),
-		"transflow/exec-1/branches/branch-A/steps/s1/meta.json": []byte(`{"prev_step_id":""}`),
+		"mods/exec-1/branches/branch-A/HEAD.json":          []byte(`{"step_id":"s3"}`),
+		"mods/exec-1/branches/branch-A/steps/s3/meta.json": []byte(`{"prev_step_id":"s2"}`),
+		"mods/exec-1/branches/branch-A/steps/s2/meta.json": []byte(`{"prev_step_id":"s1"}`),
+		"mods/exec-1/branches/branch-A/steps/s1/meta.json": []byte(`{"prev_step_id":""}`),
 	}
 	var appliedOrder []string
 
@@ -60,9 +60,9 @@ func TestBranchChainReplayer_ReplaysInOrder(t *testing.T) {
 
 func TestBranchChainReplayer_SkipsOnInvalidDiffPath(t *testing.T) {
 	storage := map[string][]byte{
-		"transflow/exec-2/branches/B/HEAD.json":          []byte(`{"step_id":"s2"}`),
-		"transflow/exec-2/branches/B/steps/s2/meta.json": []byte(`{"prev_step_id":"s1"}`),
-		"transflow/exec-2/branches/B/steps/s1/meta.json": []byte(`{"prev_step_id":""}`),
+		"mods/exec-2/branches/B/HEAD.json":          []byte(`{"step_id":"s2"}`),
+		"mods/exec-2/branches/B/steps/s2/meta.json": []byte(`{"prev_step_id":"s1"}`),
+		"mods/exec-2/branches/B/steps/s1/meta.json": []byte(`{"prev_step_id":""}`),
 	}
 	var validated []string
 

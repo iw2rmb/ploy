@@ -15,5 +15,4 @@ if [[ -z "$API_BASE" ]]; then
   exit 1
 fi
 
-curl -sN "$API_BASE/transflow/logs/$EXEC_ID?follow=1"
-
+curl -sN "$API_BASE/mods/$EXEC_ID/logs?follow=1"

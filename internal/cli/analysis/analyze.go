@@ -13,6 +13,8 @@ import (
 	"time"
 
 	amodels "github.com/iw2rmb/ploy/internal/analysis/models"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // AnalyzeCmd handles the analyze command
@@ -190,7 +192,7 @@ func analyzeRepository(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to start analysis: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -222,7 +224,7 @@ func getAnalysisStatus(analysisID, controllerURL string) {
 		fmt.Printf("Error: Failed to get analysis status: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		fmt.Printf("Analysis %s not found\n", analysisID)
@@ -258,7 +260,7 @@ func getAnalysisResults(analysisID, controllerURL string) {
 		fmt.Printf("Error: Failed to get analysis results: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		fmt.Printf("Analysis %s not found\n", analysisID)
@@ -311,7 +313,7 @@ func listAnalyses(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to list analyses: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
@@ -335,15 +337,15 @@ func listAnalyses(args []string, controllerURL string) {
 
 	// Display results in table
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tTIMESTAMP\tSCORE\tISSUES\tSTATUS")
-	fmt.Fprintln(w, strings.Repeat("-", 60))
+	_, _ = fmt.Fprintln(w, "ID\tTIMESTAMP\tSCORE\tISSUES\tSTATUS")
+	_, _ = fmt.Fprintln(w, strings.Repeat("-", 60))
 
 	for _, result := range response.Results {
 		status := "Success"
 		if !result.Success {
 			status = "Failed"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%.1f\t%d\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%.1f\t%d\t%s\n",
 			result.ID,
 			result.Timestamp.Format("2006-01-02 15:04"),
 			result.OverallScore,
@@ -351,7 +353,7 @@ func listAnalyses(args []string, controllerURL string) {
 			status,
 		)
 	}
-	w.Flush()
+	_ = w.Flush()
 
 	fmt.Printf("\nTotal: %d analyses\n", response.Count)
 }
@@ -392,7 +394,7 @@ func showConfig(controllerURL string) {
 		fmt.Printf("Error: Failed to get configuration: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
@@ -428,7 +430,7 @@ func validateConfig(configFile, controllerURL string) {
 		fmt.Printf("Error: Failed to validate configuration: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result struct {
 		Valid bool   `json:"valid"`
@@ -470,7 +472,7 @@ func updateConfig(configFile, controllerURL string) {
 		fmt.Printf("Error: Failed to update configuration: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
@@ -542,7 +544,7 @@ func listSupportedLanguages(controllerURL string) {
 		fmt.Printf("Error: Failed to get supported languages: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error: Failed with status %d\n", resp.StatusCode)
@@ -625,7 +627,8 @@ func displayResultTable(result *amodels.AnalysisResult) {
 	if len(result.LanguageResults) > 0 {
 		fmt.Printf("\n=== LANGUAGE ANALYSIS ===\n")
 		for lang, langResult := range result.LanguageResults {
-			fmt.Printf("\n%s (%s):\n", strings.Title(lang), langResult.Analyzer)
+			title := cases.Title(language.Und).String(lang)
+			fmt.Printf("\n%s (%s):\n", title, langResult.Analyzer)
 			fmt.Printf("  Issues: %d\n", len(langResult.Issues))
 			if langResult.Success {
 				fmt.Printf("  Status: Success\n")
@@ -644,8 +647,8 @@ func displayResultTable(result *amodels.AnalysisResult) {
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "SEVERITY\tCATEGORY\tFILE\tLINE\tMESSAGE")
-		fmt.Fprintln(w, strings.Repeat("-", 80))
+		_, _ = fmt.Fprintln(w, "SEVERITY\tCATEGORY\tFILE\tLINE\tMESSAGE")
+		_, _ = fmt.Fprintln(w, strings.Repeat("-", 80))
 
 		for i := 0; i < displayCount; i++ {
 			issue := result.Issues[i]
@@ -657,7 +660,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 			if len(message) > 40 {
 				message = message[:37] + "..."
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
 				issue.Severity,
 				issue.Category,
 				file,
@@ -665,7 +668,7 @@ func displayResultTable(result *amodels.AnalysisResult) {
 				message,
 			)
 		}
-		w.Flush()
+		_ = w.Flush()
 
 		if len(result.Issues) > displayCount {
 			fmt.Printf("\n... and %d more issues\n", len(result.Issues)-displayCount)

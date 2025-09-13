@@ -94,7 +94,7 @@ func TestSharedPush(t *testing.T) {
 				// Send success response
 				w.Header().Set("X-Deployment-ID", "test-deployment-123")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"status": "success"}`))
+				_, _ = w.Write([]byte(`{"status": "success"}`))
 			}))
 			defer server.Close()
 

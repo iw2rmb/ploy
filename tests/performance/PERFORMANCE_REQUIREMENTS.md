@@ -14,7 +14,7 @@ This document defines the performance requirements and acceptance criteria for t
 ### Test Execution
 ```bash
 # Local performance benchmarks
-go test -tags=performance -bench=BenchmarkTransflow ./tests/performance/
+go test -tags=performance -bench=BenchmarkMods ./tests/performance/
 go test -tags=performance -bench=BenchmarkKB ./tests/performance/
 go test -tags=performance -bench=BenchmarkService ./tests/performance/
 

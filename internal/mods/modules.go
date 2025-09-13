@@ -75,9 +75,9 @@ func (f *ModulesFactory) ForBuildGate(c BuildCheckerInterface) BuildGate {
 }
 
 // TransformationExecutorAdapter adapts runner helpers to TransformationExecutor.
-type TransformationExecutorAdapter struct{ r *TransflowRunner }
+type TransformationExecutorAdapter struct{ r *ModRunner }
 
-func NewTransformationExecutorAdapter(r *TransflowRunner) *TransformationExecutorAdapter {
+func NewTransformationExecutorAdapter(r *ModRunner) *TransformationExecutorAdapter {
 	return &TransformationExecutorAdapter{r: r}
 }
 

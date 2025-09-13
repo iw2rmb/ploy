@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	mods "github.com/iw2rmb/ploy/internal/mods"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -31,9 +32,9 @@ type LoadTestScenario struct {
 type LoadTestEnvironment struct {
 	TempDir       string
 	StorageClient *storage.StorageClient
-	Integrations  *transflow.TransflowIntegrations
-	KBStorage     transflow.KBStorage
-	Config        *transflow.TransflowConfig
+	Integrations  *mods.ModIntegrations
+	KBStorage     mods.KBStorage
+	Config        *mods.ModConfig
 }
 
 // setupLoadTestEnvironment creates a load test environment
@@ -52,12 +53,12 @@ func setupLoadTestEnvironment(t *testing.T) *LoadTestEnvironment {
 	}
 
 	// Create basic config
-	config := &transflow.TransflowConfig{
+	config := &mods.ModConfig{
 		ID:           "load-test-workflow",
 		TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		BaseRef:      "refs/heads/main",
 		BuildTimeout: "5m", // Shorter timeout for load testing
-		Steps: []transflow.TransflowStep{
+		Steps: []mods.ModStep{
 			{
 				Type:    "recipe",
 				ID:      "java-migration-load",
@@ -65,21 +66,18 @@ func setupLoadTestEnvironment(t *testing.T) *LoadTestEnvironment {
 				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
 			},
 		},
-		SelfHeal: transflow.SelfHealConfig{
+		SelfHeal: mods.SelfHealConfig{
 			Enabled:    true,
 			MaxRetries: 1, // Reduced retries for load testing
 		},
 	}
 
 	// Create integrations in test mode
-	integrations, err := transflow.NewTransflowIntegrations(config, true)
-	if err != nil {
-		t.Fatalf("Failed to create integrations: %v", err)
-	}
+	integrations := mods.NewModIntegrationsWithTestMode("", tempDir, true)
 
 	// Create KB storage
-	lockManager := &transflow.MockKBLockManager{}
-	kbStorage := transflow.NewSeaweedFSKBStorage(storageClient, lockManager)
+	lockManager := &mods.MockKBLockManager{}
+	kbStorage := mods.NewSeaweedFSKBStorage(storageClient, lockManager)
 
 	return &LoadTestEnvironment{
 		TempDir:       tempDir,
@@ -188,14 +186,14 @@ func (env *LoadTestEnvironment) RunLoadTest(scenario LoadTestScenario) *LoadTest
 				config.ID = fmt.Sprintf("load-test-%d", wfID)
 
 				// Create runner
-				runner, err := transflow.NewTransflowRunner(&config, env.TempDir)
+				runner, err := mods.NewModRunner(&config, env.TempDir)
 				if err != nil {
 					atomic.AddInt64(&result.FailedWorkflows, 1)
 					atomic.AddInt64(&result.ErrorCounts["runner_create_error"], 1)
 					return
 				}
 
-				runner.SetBuildChecker(env.Integrations.CheckBuild)
+				runner.SetBuildChecker(env.Integrations.CreateBuildChecker())
 
 				// Execute workflow
 				workflowCtx, workflowCancel := context.WithTimeout(context.Background(), 3*time.Minute)
@@ -432,14 +430,14 @@ func TestConcurrentWorkflowExecution(t *testing.T) {
 					config.ID = fmt.Sprintf("concurrent-test-%d-%d", concurrency, workerID)
 
 					// Create runner
-					runner, err := transflow.NewTransflowRunner(&config, env.TempDir)
+					runner, err := mods.NewModRunner(&config, env.TempDir)
 					if err != nil {
 						atomic.AddInt64(&failedWorkflows, 1)
 						t.Logf("Worker %d: Failed to create runner: %v", workerID, err)
 						return
 					}
 
-					runner.SetBuildChecker(env.Integrations.CheckBuild)
+					runner.SetBuildChecker(env.Integrations.CreateBuildChecker())
 
 					// Execute workflow
 					result, err := runner.Run(ctx)
@@ -536,13 +534,13 @@ func TestMemoryLeakDetection(t *testing.T) {
 				config := *env.Config
 				config.ID = fmt.Sprintf("memory-leak-test-%d", workflowID)
 
-				runner, err := transflow.NewTransflowRunner(&config, env.TempDir)
+				runner, err := mods.NewModRunner(&config, env.TempDir)
 				if err != nil {
 					t.Logf("Memory test workflow %d: Failed to create runner: %v", workflowID, err)
 					return
 				}
 
-				runner.SetBuildChecker(env.Integrations.CheckBuild)
+				runner.SetBuildChecker(env.Integrations.CreateBuildChecker())
 
 				wfCtx, wfCancel := context.WithTimeout(context.Background(), 1*time.Minute)
 				result, err := runner.Run(wfCtx)

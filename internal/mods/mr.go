@@ -10,7 +10,7 @@ import (
 
 // createOrUpdateMR attempts to create or update an MR if a git provider is configured.
 // It emits reporter events and updates result.MRURL on success. Errors are logged into result steps but do not fail the workflow.
-func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *TransflowResult, branchName string) {
+func (r *ModRunner) createOrUpdateMR(ctx context.Context, result *ModResult, branchName string) {
 	if r.gitProvider == nil && r.mrManager == nil {
 		return
 	}
@@ -20,7 +20,7 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
 			RepoURL:      r.config.TargetRepo,
 			SourceBranch: branchName,
 			TargetBranch: r.config.TargetBranch,
-            Title:        fmt.Sprintf("Mods: %s", r.config.ID),
+			Title:        fmt.Sprintf("Mods: %s", r.config.ID),
 			Description:  renderMRDescription(r, result),
 			Labels:       []string{"ploy", "tfl"},
 		}
@@ -52,7 +52,7 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
 		RepoURL:      r.config.TargetRepo,
 		SourceBranch: branchName,
 		TargetBranch: r.config.TargetBranch,
-    Title:        fmt.Sprintf("Mods: %s", r.config.ID),
+		Title:        fmt.Sprintf("Mods: %s", r.config.ID),
 		Description:  renderMRDescription(r, result),
 		Labels:       []string{"ploy", "tfl"},
 	}

@@ -14,13 +14,13 @@ func TestSubstituteHCLTemplateWithMCPVars_UsesProvidedVars(t *testing.T) {
 		t.Fatalf("write hcl: %v", err)
 	}
 	vars := map[string]string{
-		"TRANSFLOW_MODEL":             "gpt-x",
-		"PLOY_CONTROLLER":             "https://api.dev.ployman.app/v1",
-		"PLOY_TRANSFLOW_EXECUTION_ID": "e-22",
-		"TRANSFLOW_CONTEXT_DIR":       tmp,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(tmp, "out"),
-		"TRANSFLOW_PLANNER_IMAGE":     "registry.dev.ployman.app/langgraph-runner:py-0.1.0",
-		"NOMAD_DC":                    "dc77",
+		"MODS_MODEL":             "gpt-x",
+		"PLOY_CONTROLLER":        "https://api.dev.ployman.app/v1",
+		"PLOY_MODS_EXECUTION_ID": "e-22",
+		"MODS_CONTEXT_DIR":       tmp,
+		"MODS_OUT_DIR":           filepath.Join(tmp, "out"),
+		"MODS_PLANNER_IMAGE":     "registry.dev.ployman.app/langgraph-runner:py-0.1.0",
+		"NOMAD_DC":               "dc77",
 	}
 	out, err := substituteHCLTemplateWithMCPVars(hcl, "run-1", vars, nil)
 	if err != nil {
@@ -37,13 +37,13 @@ func TestSubstituteHCLTemplateWithMCPVars_UsesProvidedVars(t *testing.T) {
 	if want := "EXEC=\"e-22\""; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "CTX=" + vars["TRANSFLOW_CONTEXT_DIR"]; !contains(s, want) {
+	if want := "CTX=" + vars["MODS_CONTEXT_DIR"]; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "OUT=" + vars["TRANSFLOW_OUT_DIR"]; !contains(s, want) {
+	if want := "OUT=" + vars["MODS_OUT_DIR"]; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "IMG=" + vars["TRANSFLOW_PLANNER_IMAGE"]; !contains(s, want) {
+	if want := "IMG=" + vars["MODS_PLANNER_IMAGE"]; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
 	if want := "DC=dc77"; !contains(s, want) {

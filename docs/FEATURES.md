@@ -767,8 +767,8 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Hybrid Transformation Pipeline**: Intelligent combination of OpenRewrite and LLM approaches
 - ✅ **Multi-Language AST Support**: Tree-sitter integration for universal language parsing (Java, JavaScript, TypeScript, Python, Go, Rust)
 - ✅ **A/B Testing Framework**: Statistical validation of recipe improvements with confidence intervals
-- ✅ **Continuous Learning System**: Pattern extraction from historical transformations with PostgreSQL storage
-- ✅ **Error Pattern Learning Database**: PostgreSQL vector similarity for pattern matching and solution caching
+- ⏸️ Continuous Learning System: planned (disabled; no SQL database in use)
+- ⏸️ Error Pattern Learning Database: planned (disabled; no SQL database in use)
 - ✅ **Confidence Scoring**: Multi-layered validation with recipe effectiveness tracking
 - ✅ **Pattern Matching Algorithms**: Vector embeddings for cross-repository learning and generalization
 - ✅ **Monitoring Infrastructure**: Comprehensive metrics, alerting, and distributed tracing for ARF operations
@@ -787,7 +787,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **API Endpoints**: Complete `/v1/arf/security/*` and `/v1/arf/workflow/*` endpoints
 - ✅ **Test Coverage**: Comprehensive Go test suites for ARF security workflows (policy enforcer unit tests, integration and behavioral tests)
 - ⚠️ **Mock OpenRewrite Engine**: Simulated transformations (real OpenRewrite execution required)
-- ⚠️ **Mock Security Components**: CVE database, vulnerability scanning (see Phase 7)
+- ✅ **Optional NVD Vulnerability Gate (Mods)**: When enabled, Mods queries NVD using SBOM dependencies and can fail the run on configurable severity.
 
 ### ⚠️ **Implementation Gap Analysis: Toward First Real Java Migration**
 **What's Complete:**
@@ -799,7 +799,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 
 **What's Required for Real Java Migration Test:**
 - ⚠️ **Real OpenRewrite Execution**: Replace MockOpenRewriteEngine with actual Maven/Gradle OpenRewrite plugin execution
-- ⚠️ **Production Infrastructure**: VPS setup with Ollama and PostgreSQL via Ansible playbooks
+- ⚠️ Production Infrastructure: VPS setup with Ollama; PostgreSQL-related steps are disabled for now
 - ⚠️ **CLI Integration**: `ploy arf benchmark` commands for end-to-end testing workflow
 - ⚠️ **Actual Recipe Execution**: Real AST transformations instead of simulated file changes
 

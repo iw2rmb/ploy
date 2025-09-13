@@ -26,7 +26,7 @@ func skipIfSeaweedFSUnavailable(t *testing.T) {
 	if err != nil {
 		t.Skipf("SeaweedFS not available: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 func TestSeaweedFSProvider_ImplementsStorageInterface(t *testing.T) {
@@ -62,7 +62,7 @@ func TestSeaweedFSProvider_Get(t *testing.T) {
 	reader, err := provider.Get(ctx, "test-key")
 	// This will fail until implemented
 	if err == nil {
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 		content, err := io.ReadAll(reader)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, content)

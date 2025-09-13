@@ -161,13 +161,13 @@ func importFromTarGz(archiveFile string, flags CommandFlags) (ImportResult, erro
 	if err != nil {
 		return result, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
 		return result, err
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }()
 
 	tarReader := tar.NewReader(gzipReader)
 
@@ -202,7 +202,7 @@ func importFromZip(archiveFile string, flags CommandFlags) (ImportResult, error)
 	if err != nil {
 		return result, err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Process zip files
 	for _, file := range reader.File {
@@ -218,7 +218,7 @@ func importFromZip(archiveFile string, flags CommandFlags) (ImportResult, error)
 				result.Errors = append(result.Errors, fmt.Sprintf("Failed to process %s: %v", file.Name, err))
 				result.FailedRecipes++
 			}
-			rc.Close()
+			_ = rc.Close()
 		}
 	}
 
@@ -234,7 +234,7 @@ func importFromTar(archiveFile string, flags CommandFlags) (ImportResult, error)
 	if err != nil {
 		return result, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	tarReader := tar.NewReader(file)
 
@@ -343,13 +343,13 @@ func exportToTarGz(recipes []*models.Recipe, outputFile string, filter RecipeFil
 	if err != nil {
 		return result, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	gzipWriter := gzip.NewWriter(file)
-	defer gzipWriter.Close()
+	defer func() { _ = gzipWriter.Close() }()
 
 	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
+	defer func() { _ = tarWriter.Close() }()
 
 	// Add metadata file
 	if err := addMetadataToTar(tarWriter, recipes, filter); err != nil {
@@ -382,10 +382,10 @@ func exportToZip(recipes []*models.Recipe, outputFile string, filter RecipeFilte
 	if err != nil {
 		return result, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	zipWriter := zip.NewWriter(file)
-	defer zipWriter.Close()
+	defer func() { _ = zipWriter.Close() }()
 
 	// Add metadata file
 	if err := addMetadataToZip(zipWriter, recipes, filter); err != nil {
@@ -418,10 +418,10 @@ func exportToTar(recipes []*models.Recipe, outputFile string, filter RecipeFilte
 	if err != nil {
 		return result, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	tarWriter := tar.NewWriter(file)
-	defer tarWriter.Close()
+	defer func() { _ = tarWriter.Close() }()
 
 	// Add metadata file
 	if err := addMetadataToTar(tarWriter, recipes, filter); err != nil {

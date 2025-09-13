@@ -27,7 +27,7 @@ func EnvCmd(args []string, controllerURL string) {
 			fmt.Println("env list error:", err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != 200 {
 			fmt.Printf("Failed to list environment variables: HTTP %d\n", resp.StatusCode)
@@ -67,7 +67,7 @@ func EnvCmd(args []string, controllerURL string) {
 			fmt.Println("env set error:", err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == 200 {
 			fmt.Printf("Environment variable %s set for app %s\n", key, app)
 		} else {
@@ -86,7 +86,7 @@ func EnvCmd(args []string, controllerURL string) {
 			fmt.Println("env get error:", err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		var result struct {
 			App string            `json:"app"`
@@ -116,7 +116,7 @@ func EnvCmd(args []string, controllerURL string) {
 			fmt.Println("env delete error:", err)
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == 200 {
 			fmt.Printf("Environment variable %s deleted from app %s\n", key, app)
 		} else {

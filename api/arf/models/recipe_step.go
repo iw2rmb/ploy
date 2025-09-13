@@ -65,7 +65,7 @@ type Duration struct {
 
 // MarshalYAML converts Duration to a string for YAML
 func (d Duration) MarshalYAML() (interface{}, error) {
-	return d.Duration.String(), nil
+	return d.String(), nil
 }
 
 // UnmarshalYAML parses a duration string from YAML
@@ -86,7 +86,7 @@ func (d *Duration) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // MarshalJSON converts Duration to a string for JSON
 func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Duration.String())
+	return json.Marshal(d.String())
 }
 
 // UnmarshalJSON parses a duration string from JSON

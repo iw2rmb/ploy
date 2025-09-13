@@ -24,13 +24,13 @@ func TestMVPAcceptance_CompleteJavaTransformation(t *testing.T) {
 	// Test Case: Complete Java 11→17 Migration as specified in MVP.md
 	scenario := &Scenario{
 		Name:        "Complete Java 11 to 17 Migration",
-		Description: "Validate complete transflow workflow as specified in MVP requirements",
+		Description: "Validate complete Mods workflow as specified in MVP requirements",
 
 		// Use official MVP test repository
 		Repository: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 
 		// Exact workflow from MVP specification
-		TransflowConfig: `
+		ModsConfig: `
 version: v1alpha1
 id: java11to17
 target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
@@ -116,7 +116,7 @@ func TestMVPAcceptance_SelfHealingWorkflow(t *testing.T) {
 		// Repository designed to trigger compilation failures for testing
 		Repository: "https://gitlab.com/iw2rmb/ploy-test-healing-scenario.git",
 
-		TransflowConfig: `
+		ModsConfig: `
 version: v1alpha1
 id: self-healing-test
 target_repo: https://gitlab.com/iw2rmb/ploy-test-healing-scenario.git
@@ -346,7 +346,7 @@ func TestMVPAcceptance_GitLabIntegration(t *testing.T) {
 
 		Repository: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 
-		TransflowConfig: `
+		ModsConfig: `
 version: v1alpha1
 id: gitlab-integration-test
 target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
@@ -408,10 +408,10 @@ func TestMVPAcceptance_ProductionScale(t *testing.T) {
 		for i := 0; i < concurrentCount; i++ {
 			scenarios[i] = &Scenario{
 				Name:        fmt.Sprintf("Concurrent Workflow %d", i+1),
-				Description: fmt.Sprintf("Concurrent transflow execution test %d", i+1),
+				Description: fmt.Sprintf("Concurrent mods execution test %d", i+1),
 				Repository:  "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 
-				TransflowConfig: fmt.Sprintf(`
+				ModsConfig: fmt.Sprintf(`
 version: v1alpha1
 id: concurrent-test-%d
 target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
@@ -494,7 +494,7 @@ func TestMVPStability(t *testing.T) {
 			Description: "Long-term stability validation",
 			Repository:  "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 
-			TransflowConfig: `
+			ModsConfig: `
 version: v1alpha1
 id: stability-test
 target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
@@ -545,7 +545,7 @@ func createKBLearningScenario(errorType string, attempt int) *Scenario {
 		Description: fmt.Sprintf("Knowledge base learning validation for %s", errorType),
 		Repository:  "https://gitlab.com/iw2rmb/ploy-test-kb-learning.git",
 
-		TransflowConfig: fmt.Sprintf(`
+		ModsConfig: fmt.Sprintf(`
 version: v1alpha1
 id: kb-learning-%s-%d
 target_repo: https://gitlab.com/iw2rmb/ploy-test-kb-learning.git

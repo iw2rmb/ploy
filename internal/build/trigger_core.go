@@ -24,6 +24,28 @@ import (
 	"github.com/iw2rmb/ploy/internal/validation"
 )
 
+// sbomFeatureEnabled returns whether SBOM generation is enabled for this request.
+// Controlled by env PLOY_SBOM_ENABLED (default true). Query param sbom=false disables per-request.
+func sbomFeatureEnabled(c *fiber.Ctx) bool {
+	// Per-request override
+	if v := strings.ToLower(c.Query("sbom", "")); v == "false" || v == "0" || v == "off" {
+		return false
+	}
+	// Global toggle
+	env := strings.ToLower(os.Getenv("PLOY_SBOM_ENABLED"))
+	if env == "false" || env == "0" || env == "off" {
+		return false
+	}
+	return true
+}
+
+// sbomFailOnError returns whether SBOM generation errors should fail the build.
+// Controlled by env PLOY_SBOM_FAIL_ON_ERROR (default false).
+func sbomFailOnError() bool {
+	v := strings.ToLower(os.Getenv("PLOY_SBOM_FAIL_ON_ERROR"))
+	return v == "true" || v == "1" || v == "on"
+}
+
 // BuildDependencies holds the dependencies needed for build operations
 type BuildDependencies struct {
 	StorageClient *storage.StorageClient
@@ -55,18 +77,20 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s body_bytes=%d", appName, sha, lane, c.Query("env", "dev"), len(c.Body()))
 
 	tmpDir, _ := os.MkdirTemp("", "ploy-build-")
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	tarPath := filepath.Join(tmpDir, "src.tar")
 	f, _ := os.Create(tarPath)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(c.Body()); err != nil {
 		log.Printf("[Build] Failed to write request body: %v", err)
 		return c.Status(400).SendString("Failed to read request body: " + err.Error())
 	}
 
 	srcDir := filepath.Join(tmpDir, "src")
-	os.MkdirAll(srcDir, 0755)
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "mkdir src"})
+	}
 	if err := utils.Untar(tarPath, srcDir); err != nil {
 		log.Printf("[Build] Untar failed: %v", err)
 		return utils.ErrJSON(c, 500, fmt.Errorf("untar failed: %w", err))
@@ -195,33 +219,44 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		imagePath = persistentImagePath
 	}
 
-	// Generate comprehensive SBOM for the built artifact
-	if imagePath != "" {
-		// Generate SBOM for file-based artifacts (Lanes A, B, C, D, F)
-		if !utils.FileExists(imagePath + ".sbom.json") {
-			if err := supply.GenerateSBOM(imagePath, lane, appName, sha); err != nil {
-				// Log error but don't fail the build - SBOM generation is best effort
-				fmt.Printf("Warning: SBOM generation failed for %s: %v\n", imagePath, err)
+	// Generate comprehensive SBOMs (optional)
+	if sbomFeatureEnabled(c) {
+		if imagePath != "" {
+			// Generate SBOM for file-based artifacts (Lanes A, B, C, D, F)
+			if !utils.FileExists(imagePath + ".sbom.json") {
+				if err := supply.GenerateSBOM(imagePath, lane, appName, sha); err != nil {
+					msg := fmt.Sprintf("SBOM generation failed for %s: %v", imagePath, err)
+					if sbomFailOnError() {
+						return utils.ErrJSON(c, 500, fmt.Errorf("%s", msg))
+					}
+					fmt.Printf("Warning: %s\n", msg)
+				}
+			}
+		} else if dockerImage != "" {
+			// Generate SBOM for container images (Lane E)
+			if err := supply.GenerateSBOM(dockerImage, lane, appName, sha); err != nil {
+				msg := fmt.Sprintf("SBOM generation failed for container %s: %v", dockerImage, err)
+				if sbomFailOnError() {
+					return utils.ErrJSON(c, 500, fmt.Errorf("%s", msg))
+				}
+				fmt.Printf("Warning: %s\n", msg)
 			}
 		}
-	} else if dockerImage != "" {
-		// Generate SBOM for container images (Lane E)
-		if err := supply.GenerateSBOM(dockerImage, lane, appName, sha); err != nil {
-			// Log error but don't fail the build - SBOM generation is best effort
-			fmt.Printf("Warning: SBOM generation failed for container %s: %v\n", dockerImage, err)
-		}
-	}
 
-	// Also generate source code SBOM for dependency analysis
-	if !utils.FileExists(filepath.Join(srcDir, ".sbom.json")) {
-		generator := supply.NewSBOMGenerator()
-		options := supply.DefaultSBOMOptions()
-		options.Lane = lane
-		options.AppName = appName
-		options.SHA = sha
-		if err := generator.GenerateForSourceCode(srcDir, options); err != nil {
-			// Log error but don't fail the build
-			fmt.Printf("Warning: Source code SBOM generation failed: %v\n", err)
+		// Also generate source code SBOM for dependency analysis
+		if !utils.FileExists(filepath.Join(srcDir, ".sbom.json")) {
+			generator := supply.NewSBOMGenerator()
+			options := supply.DefaultSBOMOptions()
+			options.Lane = lane
+			options.AppName = appName
+			options.SHA = sha
+			if err := generator.GenerateForSourceCode(srcDir, options); err != nil {
+				msg := fmt.Sprintf("Source code SBOM generation failed: %v", err)
+				if sbomFailOnError() {
+					return utils.ErrJSON(c, 500, fmt.Errorf("%s", msg))
+				}
+				fmt.Printf("Warning: %s\n", msg)
+			}
 		}
 	}
 
@@ -241,7 +276,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 	}
 
-	sbom := utils.FileExists(imagePath+".sbom.json") || utils.FileExists(filepath.Join(srcDir, "SBOM.json"))
+	sbom := utils.FileExists(imagePath+".sbom.json") || utils.FileExists(filepath.Join(srcDir, "SBOM.json")) || utils.FileExists(filepath.Join(srcDir, ".sbom.json"))
 
 	var signed bool
 	if imagePath != "" {

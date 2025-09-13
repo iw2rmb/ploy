@@ -105,7 +105,7 @@ func (v *IntegrityVerifier) verifyFile(localPath, storageKey string, info *Integ
 	if err != nil {
 		return fmt.Errorf("failed to open local file: %w", err)
 	}
-	defer localFile.Close()
+	defer func() { _ = localFile.Close() }()
 
 	localStat, err := localFile.Stat()
 	if err != nil {
@@ -130,7 +130,7 @@ func (v *IntegrityVerifier) verifyFile(localPath, storageKey string, info *Integ
 	if err != nil {
 		return fmt.Errorf("failed to download uploaded file: %w", err)
 	}
-	defer uploadedReader.Close()
+	defer func() { _ = uploadedReader.Close() }()
 
 	// Count bytes and calculate checksum of uploaded file
 	uploadedChecksum, uploadedSize, err := v.calculateChecksumAndSize(uploadedReader)
@@ -181,7 +181,7 @@ func (v *IntegrityVerifier) validateSBOMContent(sbomPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open SBOM file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Parse as JSON to validate basic structure
 	var sbomData map[string]interface{}

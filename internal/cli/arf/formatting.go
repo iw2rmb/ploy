@@ -137,15 +137,15 @@ func formatRecipesTable(recipes []*models.Recipe, verbose bool) error {
 
 	if verbose {
 		// Verbose table format
-		fmt.Fprintln(w, "ID\tNAME\tVERSION\tAUTHOR\tLANGUAGES\tCATEGORIES\tTAGS\tSTEPS\tCREATED\tUPDATED")
-		fmt.Fprintln(w, "--\t----\t-------\t------\t---------\t----------\t----\t-----\t-------\t-------")
+		_, _ = fmt.Fprintln(w, "ID\tNAME\tVERSION\tAUTHOR\tLANGUAGES\tCATEGORIES\tTAGS\tSTEPS\tCREATED\tUPDATED")
+		_, _ = fmt.Fprintln(w, "--\t----\t-------\t------\t---------\t----------\t----\t-----\t-------\t-------")
 
 		for _, recipe := range recipes {
 			languages := formatStringSlice(recipe.Metadata.Languages, 15)
 			categories := formatStringSlice(recipe.Metadata.Categories, 15)
 			tags := formatStringSlice(recipe.Metadata.Tags, 10)
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
 				TruncateString(recipe.ID, 20),
 				TruncateString(recipe.Metadata.Name, 25),
 				TruncateString(recipe.Metadata.Version, 10),
@@ -160,14 +160,14 @@ func formatRecipesTable(recipes []*models.Recipe, verbose bool) error {
 		}
 	} else {
 		// Compact table format
-		fmt.Fprintln(w, "ID\tNAME\tVERSION\tLANGUAGES\tCATEGORIES\tAUTHOR\tSTEPS")
-		fmt.Fprintln(w, "--\t----\t-------\t---------\t----------\t------\t-----")
+		_, _ = fmt.Fprintln(w, "ID\tNAME\tVERSION\tLANGUAGES\tCATEGORIES\tAUTHOR\tSTEPS")
+		_, _ = fmt.Fprintln(w, "--\t----\t-------\t---------\t----------\t------\t-----")
 
 		for _, recipe := range recipes {
 			languages := formatStringSlice(recipe.Metadata.Languages, 20)
 			categories := formatStringSlice(recipe.Metadata.Categories, 20)
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%d\n",
 				TruncateString(recipe.ID, 25),
 				TruncateString(recipe.Metadata.Name, 30),
 				TruncateString(recipe.Metadata.Version, 10),
@@ -179,7 +179,7 @@ func formatRecipesTable(recipes []*models.Recipe, verbose bool) error {
 		}
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	fmt.Printf("\nTotal: %d recipes\n", len(recipes))
 	return nil
 }

@@ -128,21 +128,21 @@ func (m *FreeBSDJailManager) CreateSandbox(ctx context.Context, config SandboxCo
 
 	// Copy base template to jail root
 	if err := m.copyTemplate(sandbox.RootPath); err != nil {
-		os.RemoveAll(sandbox.RootPath)
+		_ = os.RemoveAll(sandbox.RootPath)
 		return nil, fmt.Errorf("failed to copy jail template: %w", err)
 	}
 
 	// Create workspace directory
 	workspaceDir := filepath.Join(sandbox.RootPath, "workspace")
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
-		os.RemoveAll(sandbox.RootPath)
+		_ = os.RemoveAll(sandbox.RootPath)
 		return nil, fmt.Errorf("failed to create workspace: %w", err)
 	}
 
 	// Clone repository into workspace
 	if config.Repository != "" {
 		if err := m.cloneRepository(ctx, config.Repository, config.Branch, workspaceDir); err != nil {
-			os.RemoveAll(sandbox.RootPath)
+			_ = os.RemoveAll(sandbox.RootPath)
 			return nil, fmt.Errorf("failed to clone repository: %w", err)
 		}
 	}
@@ -150,14 +150,14 @@ func (m *FreeBSDJailManager) CreateSandbox(ctx context.Context, config SandboxCo
 	// Create jail configuration
 	jailConf := m.generateJailConfig(sandbox, config)
 	if err := m.writeJailConfig(jailName, jailConf); err != nil {
-		os.RemoveAll(sandbox.RootPath)
+		_ = os.RemoveAll(sandbox.RootPath)
 		return nil, fmt.Errorf("failed to write jail config: %w", err)
 	}
 
 	// Start the jail
 	if err := m.startJail(ctx, jailName); err != nil {
-		os.RemoveAll(sandbox.RootPath)
-		m.removeJailConfig(jailName)
+		_ = os.RemoveAll(sandbox.RootPath)
+		_ = m.removeJailConfig(jailName)
 		return nil, fmt.Errorf("failed to start jail: %w", err)
 	}
 

@@ -7,7 +7,7 @@ import (
 )
 
 // runBuildGate prepares DeployConfig and invokes the build checker using repoPath as working dir.
-func (r *TransflowRunner) runBuildGate(ctx context.Context, repoPath string) (*common.DeployResult, error) {
+func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.DeployResult, error) {
 	timeout, err := r.config.ParseBuildTimeout()
 	if err != nil {
 		return nil, err

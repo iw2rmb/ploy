@@ -13,7 +13,7 @@ func TestDetermineSigningMethod(t *testing.T) {
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "signing-test-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	tests := []struct {
 		name           string
@@ -31,8 +31,8 @@ func TestDetermineSigningMethod(t *testing.T) {
 				certPath := imgPath + ".cert"
 
 				// Create dummy files
-				os.WriteFile(imgPath, []byte("dummy image"), 0644)
-				os.WriteFile(certPath, []byte("dummy certificate"), 0644)
+				_ = os.WriteFile(imgPath, []byte("dummy image"), 0644)
+				_ = os.WriteFile(certPath, []byte("dummy certificate"), 0644)
 
 				return imgPath
 			},
@@ -46,8 +46,8 @@ func TestDetermineSigningMethod(t *testing.T) {
 				sigPath := imgPath + ".sig"
 
 				// Create dummy files
-				os.WriteFile(imgPath, []byte("dummy image"), 0644)
-				os.WriteFile(sigPath, []byte("development signature"), 0644)
+				_ = os.WriteFile(imgPath, []byte("dummy image"), 0644)
+				_ = os.WriteFile(sigPath, []byte("development signature"), 0644)
 
 				return imgPath
 			},
@@ -61,8 +61,8 @@ func TestDetermineSigningMethod(t *testing.T) {
 				sigPath := imgPath + ".sig"
 
 				// Create dummy files
-				os.WriteFile(imgPath, []byte("dummy image"), 0644)
-				os.WriteFile(sigPath, []byte("regular signature content"), 0644)
+				_ = os.WriteFile(imgPath, []byte("dummy image"), 0644)
+				_ = os.WriteFile(sigPath, []byte("regular signature content"), 0644)
 
 				return imgPath
 			},

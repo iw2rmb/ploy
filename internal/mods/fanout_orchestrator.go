@@ -242,18 +242,18 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	infra := ResolveInfraFromEnv()
 	llm := ResolveLLMDefaultsFromEnv()
 	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       baseDir,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"TRANSFLOW_REGISTRY":          imgs.Registry,
-		"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-		"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-		"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-		"PLOY_CONTROLLER":             infra.Controller,
-		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-		"NOMAD_DC":                    infra.DC,
-		"TRANSFLOW_MODEL":             llm.Model,
-		"TRANSFLOW_TOOLS":             llm.ToolsJSON,
-		"TRANSFLOW_LIMITS":            llm.LimitsJSON,
+		"MODS_CONTEXT_DIR":       baseDir,
+		"MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"MODS_REGISTRY":          imgs.Registry,
+		"MODS_PLANNER_IMAGE":     imgs.Planner,
+		"MODS_REDUCER_IMAGE":     imgs.Reducer,
+		"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+		"PLOY_CONTROLLER":        infra.Controller,
+		"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+		"NOMAD_DC":               infra.DC,
+		"MODS_MODEL":             llm.Model,
+		"MODS_TOOLS":             llm.ToolsJSON,
+		"MODS_LIMITS":            llm.LimitsJSON,
 	}
 
 	// Step 2: Generate unique run ID for this branch
@@ -452,15 +452,15 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	imgs := ResolveImagesFromEnv()
 	infra := ResolveInfraFromEnv()
 	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       baseDir,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"PLOY_CONTROLLER":             infra.Controller,
-		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-		"PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
-		"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-		"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-		"TRANSFLOW_REGISTRY":          imgs.Registry,
-		"NOMAD_DC":                    infra.DC,
+		"MODS_CONTEXT_DIR":       baseDir,
+		"MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"PLOY_CONTROLLER":        infra.Controller,
+		"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+		"PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
+		"MODS_DIFF_KEY":          os.Getenv("MODS_DIFF_KEY"),
+		"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
+		"MODS_REGISTRY":          imgs.Registry,
+		"NOMAD_DC":               infra.DC,
 	}
 
 	// Step 2b: Substitute environment variables in HCL template

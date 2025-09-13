@@ -65,7 +65,7 @@ func handleARFModelsList() error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch models: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -84,7 +84,7 @@ func handleARFModelsList() error {
 
 	// Display models in table format
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tPROVIDER\tMODEL\tENDPOINT\tDEFAULT")
+	_, _ = fmt.Fprintln(w, "NAME\tPROVIDER\tMODEL\tENDPOINT\tDEFAULT")
 	for _, model := range registry.Models {
 		defaultStr := ""
 		if model.Default {
@@ -94,10 +94,10 @@ func handleARFModelsList() error {
 		if len(endpoint) > 40 {
 			endpoint = endpoint[:37] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			model.Name, model.Provider, model.Model, endpoint, defaultStr)
 	}
-	w.Flush()
+	_ = w.Flush()
 
 	return nil
 }
@@ -138,12 +138,12 @@ func handleARFModelsAdd(args []string) error {
 			config.Default = true
 		case "--max-tokens":
 			if i+1 < len(args) {
-				fmt.Sscanf(args[i+1], "%d", &config.MaxTokens)
+				_, _ = fmt.Sscanf(args[i+1], "%d", &config.MaxTokens)
 				i++
 			}
 		case "--temperature":
 			if i+1 < len(args) {
-				fmt.Sscanf(args[i+1], "%f", &config.Temperature)
+				_, _ = fmt.Sscanf(args[i+1], "%f", &config.Temperature)
 				i++
 			}
 		case "--file", "-f":
@@ -202,7 +202,7 @@ func handleARFModelsAdd(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to add model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -234,7 +234,7 @@ func handleARFModelsRemove(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
@@ -260,7 +260,7 @@ func handleARFModelsSetDefault(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to set default model: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -319,7 +319,7 @@ func handleARFModelsImport(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to import models: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -355,7 +355,7 @@ func handleARFModelsExport(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch models: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

@@ -1,14 +1,14 @@
 # ARF (Automated Remediation Framework)
 
-ARF provides automated code transformations with OpenRewrite, optional LLM‑assisted healing, and supporting registries. This document reflects the current, shipped API and behavior.
+ARF provides recipe catalog/registry, Security, and minimal sandbox helpers. Transformation execution, planning, and healing are unified under Mods + LangGraph. SBOM is a separate package.
 
 ## What’s Implemented
 
-- OpenRewrite execution via Nomad with SeaweedFS artifacts storage (see `openrewrite_dispatcher.go`).
+- OpenRewrite execution is handled by Mods orw-apply. ARF does not dispatch transformations.
 - Asynchronous transforms with Consul‑backed status tracking.
 - Recipe registry/catalog: list, get, search, upload, validate, download.
 - Model registry for LLMs (stored in Consul).
-- Security and SBOM endpoints (Phase 4 slice).
+- Security endpoints (Phase 4 slice). SBOM endpoints live under `/v1/sbom/*`.
 - Sandbox management endpoints (minimal).
 
 ## API Surface (v1)
@@ -18,15 +18,17 @@ ARF provides automated code transformations with OpenRewrite, optional LLM‑ass
   
   Note: LLM model registry endpoints have been removed from ARF. Use the LLMS registry under `/v1/llms/models/*` (including default model management via `/v1/llms/models/default`).
 - Security: `POST /v1/arf/security/scan`, `POST /v1/arf/security/remediation`, `GET /v1/arf/security/{report|report/:id|compliance}`.
-- SBOM: `POST /v1/arf/sbom/{generate|analyze}`, `GET /v1/arf/sbom/{report|compliance|:id}`.
+- SBOM moved to separate package:
+  - `POST /v1/sbom/generate`, `POST /v1/sbom/analyze`
+  - `GET /v1/sbom/{report|:id|compliance}`
 - Sandboxes: `GET/POST /v1/arf/sandboxes`, `DELETE /v1/arf/sandboxes/:id`.
  
 
-Removed/unsupported: legacy benchmark endpoints; ARF healing coordinator and healing metrics; direct Nomad/Consul CLI instructions in this README. Healing is unified under Mods.
+Removed/unsupported: hybrid pipeline and strategy selection, LLM dispatcher, local OpenRewrite engine, legacy benchmark endpoints, ARF healing coordinator and learning/metrics. Healing and planning are unified under Mods + LangGraph.
 
 ## Transform Workflows
 
-Transformation execution is unified under the Mods API and CLI. See `docs/api/mods.md` and `docs/mods/README.md` for details on `/v1/mods/*` endpoints and `ploy mod run`.
+Transformation execution is unified under the Mods API and CLI. See `docs/api/mods.md` for `/v1/mods/*` endpoints and use `ploy mod run`.
 
 ## Operational Rules
 
@@ -41,7 +43,7 @@ Transformation execution is unified under the Mods API and CLI. See `docs/api/mo
 ploy arf recipes list
 
 # Execute code transformations via Mods
-ploy transflow run -f ./transflow.yaml
+ploy mod run -f ./mods.yaml
 ```
 
 ## Notes & Limitations

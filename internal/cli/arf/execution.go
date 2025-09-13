@@ -175,7 +175,7 @@ func executeViaBenchmarkSystem(request ExecutionRequest, flags CommandFlags) err
 		return NewCLIError("Failed to parse benchmark response", 1).WithCause(err)
 	}
 
-	PrintSuccess(fmt.Sprintf("Recipe execution started via benchmark system"))
+	PrintSuccess("Recipe execution started via benchmark system")
 	fmt.Printf("Benchmark ID: %s\n", result.BenchmarkID)
 	fmt.Printf("Execution ID: %s\n", result.ExecutionID)
 	fmt.Printf("Status: %s\n", result.Status)
@@ -450,11 +450,12 @@ func listExecutions(outputFormat string, verbose bool) error {
 		fmt.Printf("Recent Recipe Executions:\n\n")
 		for _, exec := range data.Executions {
 			status := "✅"
-			if exec.Status == "failed" {
+			switch exec.Status {
+			case "failed":
 				status = "❌"
-			} else if exec.Status == "running" {
+			case "running":
 				status = "🔄"
-			} else if exec.Status == "pending" {
+			case "pending":
 				status = "⏳"
 			}
 

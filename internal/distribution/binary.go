@@ -64,7 +64,7 @@ func (bd *BinaryDistributor) UploadBinary(binaryPath string, info BinaryInfo) er
 	if err != nil {
 		return fmt.Errorf("failed to open binary: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	_, err = bd.storage.PutObject(bd.collection, storageKey, file, "application/octet-stream")
 	if err != nil {
@@ -108,7 +108,7 @@ func (bd *BinaryDistributor) DownloadBinary(version, platform, architecture stri
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to download binary: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Create cache directory
 	cacheDir := filepath.Dir(localPath)
@@ -121,7 +121,7 @@ func (bd *BinaryDistributor) DownloadBinary(version, platform, architecture stri
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create cache file: %w", err)
 	}
-	defer outFile.Close()
+	defer func() { _ = outFile.Close() }()
 
 	if _, err := io.Copy(outFile, reader); err != nil {
 		return "", nil, fmt.Errorf("failed to write binary: %w", err)
@@ -140,7 +140,7 @@ func (bd *BinaryDistributor) DownloadBinary(version, platform, architecture stri
 
 	// Verify integrity
 	if err := bd.verifyBinaryIntegrity(localPath, info); err != nil {
-		os.Remove(localPath) // Clean up invalid binary
+		_ = os.Remove(localPath) // Clean up invalid binary
 		return "", nil, fmt.Errorf("binary integrity verification failed: %w", err)
 	}
 
@@ -203,7 +203,7 @@ func (bd *BinaryDistributor) calculateHash(filePath string) (string, int64, erro
 	if err != nil {
 		return "", 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hasher := sha256.New()
 	size, err := io.Copy(hasher, file)
@@ -279,7 +279,7 @@ func (bd *BinaryDistributor) downloadMetadata(version, platform, architecture st
 	if err != nil {
 		return nil, fmt.Errorf("failed to download metadata: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
@@ -295,7 +295,7 @@ func (bd *BinaryDistributor) downloadMetadata(version, platform, architecture st
 	metadataPath := filepath.Join(bd.cacheDir, version, platform, architecture, "metadata.json")
 	cacheDir := filepath.Dir(metadataPath)
 	if err := os.MkdirAll(cacheDir, 0755); err == nil {
-		os.WriteFile(metadataPath, data, 0644)
+		_ = os.WriteFile(metadataPath, data, 0644)
 	}
 
 	return &info, nil

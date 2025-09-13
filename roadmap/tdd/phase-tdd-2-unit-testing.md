@@ -768,13 +768,13 @@ func TestServer_HandleSetEnvVars(t *testing.T) {
             appName: "test-app",
             requestBody: map[string]string{
                 "NODE_ENV":     "production",
-                "DATABASE_URL": "postgres://localhost",
+                "DATABASE_URL": "db://localhost",
                 "DEBUG":        "true",
             },
             mockSetup: func(store *testutil.MockEnvStore) {
                 store.On("SetEnvVars", "test-app", mock.MatchedBy(func(envVars map[string]string) bool {
                     return envVars["NODE_ENV"] == "production" &&
-                           envVars["DATABASE_URL"] == "postgres://localhost" &&
+                           envVars["DATABASE_URL"] == "db://localhost" &&
                            envVars["DEBUG"] == "true"
                 })).Return(nil)
             },
@@ -1002,7 +1002,7 @@ func generateTestApps() []build.App {
             EnvVars: map[string]string{
                 "JAVA_OPTS":    "-Xmx512m",
                 "SPRING_PROFILE": "prod",
-                "DB_URL":       "jdbc:postgresql://db:5432/app",
+                "DB_URL":       "jdbc:local://db/app",
             },
         },
         {

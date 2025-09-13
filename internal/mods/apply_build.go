@@ -10,7 +10,7 @@ import (
 // applyBuild is injected for testability (usually r.ApplyDiffAndBuild).
 func runApplyAndBuildWithEvents(
 	parent context.Context,
-	r *TransflowRunner,
+	r *ModRunner,
 	repoPath, diffPath, stepID string,
 	stepStart time.Time,
 	applyBuild func(context.Context, string, string) error,

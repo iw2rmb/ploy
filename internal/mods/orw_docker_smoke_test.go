@@ -18,7 +18,7 @@ import (
 // It is opt-in and requires a local Docker daemon and a reachable SeaweedFS filer.
 // To run:
 //   - Ensure Docker is running and you have access to the specified image.
-//   - Export: TRANSFLOW_DOCKER_SMOKE=1
+//   - Export: MODS_DOCKER_SMOKE=1
 //   - Optionally override:
 //     ORW_IMAGE=registry.dev.ployman.app/openrewrite-jvm:latest
 //     REPO_URL=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
@@ -26,8 +26,8 @@ import (
 //     RECIPE_CLASS, RECIPE_GROUP, RECIPE_ARTIFACT, RECIPE_VERSION, MAVEN_PLUGIN_VERSION
 //   - Run: go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/mods -v
 func TestORWApplyDocker_Smoke(t *testing.T) {
-	if os.Getenv("TRANSFLOW_DOCKER_SMOKE") != "1" {
-		t.Skip("set TRANSFLOW_DOCKER_SMOKE=1 to enable this smoke test")
+	if os.Getenv("MODS_DOCKER_SMOKE") != "1" {
+		t.Skip("set MODS_DOCKER_SMOKE=1 to enable this smoke test")
 	}
 
 	// Check docker binary
@@ -73,7 +73,7 @@ func TestORWApplyDocker_Smoke(t *testing.T) {
 
 	// Upload input tar to SeaweedFS
 	ts := time.Now().Unix()
-	inputKey := fmt.Sprintf("transflow/docker-smoke/%d/input.tar", ts)
+	inputKey := fmt.Sprintf("mods/docker-smoke/%d/input.tar", ts)
 	inputURL := fmt.Sprintf("%s/artifacts/%s", trimRight(seaweed, "/"), inputKey)
 	f, err := os.Open(inputTar)
 	if err != nil {
@@ -92,7 +92,7 @@ func TestORWApplyDocker_Smoke(t *testing.T) {
 	}
 
 	// Run container
-	diffKey := fmt.Sprintf("transflow/docker-smoke/%d/diff.patch", ts)
+	diffKey := fmt.Sprintf("mods/docker-smoke/%d/diff.patch", ts)
 	cmd := exec.Command("docker", "run", "--rm", "--network", "host",
 		"-e", "INPUT_URL="+inputURL,
 		"-e", "RECIPE="+recipeClass,

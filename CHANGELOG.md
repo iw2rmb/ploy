@@ -20,6 +20,11 @@
 - Transflow: hardened SeaweedFS artifact key policy — keys must start with `transflow/` and reject path traversal/backslashes; added unit tests.
 - Transflow CLI sequential helpers: switched to context-aware job submission and centralized templating (no global env writes) for `llm-exec` and `orw-apply` preview flows. Also standardized run IDs using constants.
 - Pre-commit: switched golangci-lint hook to official v2 pre-commit integration (rev v2.4.0) to match `.golangci.yml` (`version: 2`) and fix CI/pre-commit mismatch.
+- Security/ARF: moved NVD integration from `api/arf/nvd_*.go` to new package `api/nvd` (package name `nvd`); updated internal references accordingly.
+  - New env vars: `NVD_ENABLED`, `NVD_API_KEY`, `NVD_BASE_URL`, `NVD_TIMEOUT_MS` to control NVD integration.
+  - Mods: Added optional NVD-based vulnerability gate after SBOM generation with YAML config (`security.enabled`, `security.min_severity`, `security.fail_on_findings`) and env toggles (`PLOY_MODS_VULN_*`).
+ - ARF: removed legacy complexity analyzer module (`api/arf/complexity_*.go`) and doc references; Mods + LangGraph strategy selection is canonical. No runtime paths referenced these functions.
+ - ARF: removed SQL learning layer assets (no SQL in use) — deleted `api/arf/sql/**`, generated `api/arf/db/**`, and `configs/arf-learning-config.yaml`. Docs adjusted to not claim PostgreSQL-backed learning.
 
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).
@@ -95,6 +100,17 @@
 - Transflow API docs: aligned endpoints with implementation (singular `/v1/transflow/*`, artifacts endpoints). Removed non-implemented logs streaming section.
 - OpenRewrite runner image: added error.log emission on failures (missing build file, missing tools, tar issues, transformation failure) to improve server-side status messages and artifact capture.
 
+### Removed
+- ARF redundant execution/planning components in favor of Mods/LangGraph:
+  - Deleted `api/arf/llm_dispatcher.go`, `api/arf/hybrid_pipeline.go`, `api/arf/strategy_selector.go`, `api/arf/openrewrite_engine.go`, and `api/arf/factory.go`.
+  - Removed ARF healing/learning scaffolding: `api/arf/consul_store.go` and `api/arf/sql/schema/001_learning_system.sql` (and tests).
+- ARF now focuses on recipe catalog/registry, SBOM/Security, and minimal sandbox utilities. All transformation execution flows live under `/v1/mods/*`.
+
+### Moved
+- SBOM endpoints moved out of ARF into a dedicated package and route namespace:
+  - New `api/sbom` package with routes under `/v1/sbom/*` (generate, analyze, compliance, report).
+  - ARF no longer exposes `/v1/arf/sbom/*` routes; docs updated accordingly.
+
 ### Technical Details
 - **Coverage**: 60% minimum, 90% for critical healing components
 - **Performance**: Java migration workflows complete in <8 minutes
@@ -116,7 +132,7 @@
   - **llm-exec branch**: HCL template rendering with environment variable substitution, production Nomad job submission, and diff.patch artifact processing.
   - **orw-gen branch**: Recipe configuration extraction from branch inputs, template variable substitution (RECIPE_CLASS, RECIPE_COORDS, RECIPE_TIMEOUT), and OpenRewrite job execution.
 - **Production Job Submission Integration**: Real Nomad job orchestration via orchestration.SubmitAndWaitTerminal() with HCL template processing.
-  - Environment variable substitution for TRANSFLOW_MODEL, TRANSFLOW_TOOLS, TRANSFLOW_LIMITS, and RUN_ID in job templates.
+  - Environment variable substitution for MODS_MODEL, MODS_TOOLS, MODS_LIMITS, and RUN_ID in job templates.
   - Artifact collection and JSON parsing for planner/reducer job outputs (plan.json, next.json, diff.patch).
   - Timeout handling and proper error propagation from job execution to branch results.
 - **Fanout Orchestration System**: First-success-wins parallel execution with context cancellation and resource cleanup.
@@ -281,12 +297,12 @@
 - Helpers: validate_artifacts.py to check artifacts against schemas; example runner and compactor pseudocode.
 - Orchestration: `SubmitAndWaitTerminal` helper for batch jobs (planner/reducer) to wait for terminal state.
 - CLI: `ploy transflow run --render-planner` renders planner inputs and HCL (dry-run) into the workspace to prepare for planner submission.
-- CLI: `ploy transflow run --plan` renders planner assets, substitutes env placeholders (MODEL, TOOLS, LIMITS, RUN_ID), and optionally submits the planner job when `TRANSFLOW_SUBMIT=1`.
-- CLI: after planner submission, attempts to read `plan.json` (from `TRANSFLOW_PLAN_PATH` or workspace out dir), performs minimal validation, and prints option IDs/types.
-- CLI: supports `TRANSFLOW_PLAN_URL` to fetch plan.json via HTTP; supports `TRANSFLOW_NEXT_URL`/`TRANSFLOW_NEXT_PATH` to print reducer next actions. Adds `--execute-first` stub to indicate the first plan option that would run (sequential).
-- CLI: `--reduce` renders and optionally submits reducer job; prints next actions. Added SeaweedFS filer fetch for plan.json via `TRANSFLOW_FILER`/`TRANSFLOW_BUCKET`/`TRANSFLOW_PLAN_KEY`.
+- CLI: `ploy transflow run --plan` renders planner assets, substitutes env placeholders (MODEL, TOOLS, LIMITS, RUN_ID), and optionally submits the planner job when `MODS_SUBMIT=1`.
+- CLI: after planner submission, attempts to read `plan.json` (from `MODS_PLAN_PATH` or workspace out dir), performs minimal validation, and prints option IDs/types.
+- CLI: supports `MODS_PLAN_URL` to fetch plan.json via HTTP; supports `MODS_NEXT_URL`/`MODS_NEXT_PATH` to print reducer next actions. Adds `--execute-first` stub to indicate the first plan option that would run (sequential).
+- CLI: `--reduce` renders and optionally submits reducer job; prints next actions. Added SeaweedFS filer fetch for plan.json via `MODS_FILER`/`MODS_BUCKET`/`MODS_PLAN_KEY`.
 - CLI: plan/next JSON validated against schemas (santhosh-tekuri/jsonschema). Sequential stub renders `llm_exec.hcl` template for the first option.
-- CLI: guarded stubs `--exec-llm-first` and `--exec-orw-first` render branch HCL, substitute envs, and optionally submit branch jobs (controlled by `TRANSFLOW_SUBMIT`).
+- CLI: guarded stubs `--exec-llm-first` and `--exec-orw-first` render branch HCL, substitute envs, and optionally submit branch jobs (controlled by `MODS_SUBMIT`).
 
 ### Changed
 - internal/cli/common/deploy.go: DeployConfig now includes Timeout; SharedPush honors per-call timeout.
@@ -747,7 +763,7 @@
 - **BREAKING: Transform Endpoint**: `/v1/arf/transforms` now returns immediately with status link
   - Old behavior: Synchronous execution returning complete `TransformationResult` (could timeout)
   - New behavior: Asynchronous execution returning status link within <1 second
-  - Response format changed to include `transformation_id`, `status`, `status_url`, and `message`
+  - Response format changed to include `mod_id`, `status`, `status_url`, and `message`
   - Clients must now poll `/v1/arf/transforms/{id}/status` for transformation results
 
 ### Added
@@ -848,7 +864,7 @@
 ### Removed
 - **Obsolete OpenRewrite Service**: Removed unnecessary `platform-openrewrite` Nomad service
   - Stopped and removed persistent service that was consuming resources unnecessarily
-  - ARF already uses ephemeral batch jobs via `openrewrite_dispatcher.go`
+  - ARF used ephemeral batch jobs via `openrewrite_dispatcher.go` (now removed; Mods orw-apply handles execution)
   
 ### Changed
 - **Configuration Simplification**: Removed ARF_OPENREWRITE_MODE environment variable
@@ -2479,14 +2495,14 @@
 
 ### Added
 - **✅ LLM API Integration**: OpenAI client with recipe generation, validation, and optimization capabilities
-- **✅ Multi-Language Transformation Engine**: Universal AST parsing using tree-sitter for Java, JavaScript, TypeScript, Python, Go, Rust
+- Multi-language Tree‑Sitter engine removed; focus consolidated on Mods and ARF recipes.
 - **✅ Hybrid Transformation Pipeline**: Combined OpenRewrite + LLM strategies with intelligent selection (Sequential, Parallel, Tree-sitter, LLM-enhanced)
 - **✅ Continuous Learning System**: PostgreSQL-based pattern storage with transformation outcome analysis and strategy weight optimization
 - **✅ Advanced Analytics Framework**: A/B testing with statistical analysis, complexity analysis, strategy selection with risk assessment
 - **✅ Enhanced Database Layer**: PostgreSQL integration with pgx driver and comprehensive schema design
 - **✅ 10 New REST API Endpoints**: Complete HTTP integration for all Phase 3 functionality (/arf/recipes/generate, /arf/hybrid/transform, etc.)
 - **✅ Comprehensive Testing Suite**: 80+ test scenarios covering all Phase 3 components (tests 621-700) with integration and unit test scripts
-- **✅ Infrastructure Enhancements**: Updated Ansible playbooks with PostgreSQL, tree-sitter, LLM APIs, and Nomad deployment templates
+- Infrastructure: tree‑sitter installation steps removed from playbooks and templates
 - **✅ Statistical Analysis**: Confidence intervals, p-values, and power analysis for experiment results
 
 ### Fixed
@@ -4510,3 +4526,5 @@ Python projects requiring C-extensions now reliably route to Lane C for full POS
 - transflow: fix unit tests by ensuring non-empty clone, add testing indirections for Nomad/SeaweedFS/diff ops, stabilize healing unit test; add opt-in Docker smoke test for ORW container (requires local Docker and SeaweedFS).
 - tooling: add Makefile targets fmt-transflow, staticcheck-transflow, and test-transflow for focused transflow development.
 - ci: migrate pipelines to GitHub Actions (validate, transflow tests, format, build, supply) and remove legacy GitLab CI file.
+### Refactor
+- Moved `api/arf/recipe_*.go` to new package `api/recipes` and renamed package to `recipes`. Updated all references in code and tests, including server initializers and analysis integration. Added shims for types used by recipes to avoid circular imports.

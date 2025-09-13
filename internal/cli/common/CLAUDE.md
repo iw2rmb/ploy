@@ -1,10 +1,10 @@
 # CLI Common Module CLAUDE.md
 
 ## Purpose
-Provides shared deployment configuration and build validation utilities used across CLI commands, particularly for transflow workflows and general application deployment.
+Provides shared deployment configuration and build validation utilities used across CLI commands, particularly for mods workflows and general application deployment.
 
 ## Narrative Summary
-The common module implements DeployConfig and SharedPush functionality that enables consistent deployment behavior across ploy and ployman CLI tools. It handles tar archive creation, HTTP-based deployment requests, and response parsing with support for multiple environments and deployment lanes. The module is extensively used by transflow's build validation step during the healing workflow.
+The common module implements DeployConfig and SharedPush functionality that enables consistent deployment behavior across ploy and ployman CLI tools. It handles tar archive creation, HTTP-based deployment requests, and response parsing with support for multiple environments and deployment lanes. The module is extensively used by the mod build validation step during the healing workflow.
 
 ## Key Files
 - `deploy.go:13-25` - DeployConfig structure with comprehensive deployment parameters
@@ -31,7 +31,7 @@ The common module implements DeployConfig and SharedPush functionality that enab
 - HTTP client: Deployment request submission with proper headers and timeout handling
 
 ### Provides
-- Build validation for transflow healing workflows (via CheckBuild interface)
+- Build validation for mods healing workflows (via CheckBuild interface)
 - Deployment functionality for ploy/ployman CLI tools
 - Environment-aware domain resolution (dev.ployd.app, ployd.app, etc.)
 - Platform differentiation between ploy and ployman services

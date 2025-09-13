@@ -4,7 +4,7 @@ Goal
 
 - Rename the feature set currently named "Transflow" to "Mods" across code, tests, docs, and platform assets.
 - Align HTTP endpoints to RESTful conventions (resource-oriented paths), e.g. `transflow/status/:id` → `mods/:id/status`.
-- Change CLI subcommands from `ploy mod ...` to `ploy mod ...`.
+- Change CLI subcommands from `ploy transflow ...` to `ploy mod ...`.
 
 Scope (What changes)
 
@@ -47,7 +47,7 @@ Detailed Work Breakdown
 
 2. CLI rename
 - Add `ploy mod` command group (`run`, `watch`, `status`, etc.).
-- Remove `ploy mod` group entirely.
+- Remove `ploy transflow` group entirely.
 - Update CLI help/README and examples.
 
 3. Mechanical rename in codebase
@@ -111,7 +111,7 @@ Risk & Mitigations
 
 Work Items (Trackable)
 
-- [ ] Implement `/v1/mods` routes + handlers and remove `/v1/mods/*`
+- [ ] Implement `/v1/mods` routes + handlers and remove `/v1/transflow/*`
 - [ ] Add POST `/v1/mods/:id/events` and wire reporter
 - [ ] CLI: add `mod` group; remove `transflow` group
 - [ ] Mechanical rename (internal packages, symbols, files)

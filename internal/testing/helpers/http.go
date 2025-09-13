@@ -16,7 +16,7 @@ func ReadJSONResponse(t testing.TB, resp *http.Response, target interface{}) {
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	err = json.Unmarshal(body, target)
 	require.NoError(t, err)
@@ -28,7 +28,7 @@ func ReadStringResponse(t testing.TB, resp *http.Response) string {
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return string(body)
 }

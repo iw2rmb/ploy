@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/api/arf/models"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 )
 
 // Mock implementations for testing
@@ -77,13 +78,13 @@ func (e *ValidationError) Error() string {
 
 // mockSeaweedFS shared in mock_seaweedfs_test.go
 
-func setupTestHandler() (*Handler, *RecipeExecutor, *MockSandboxManager) {
+func setupTestHandler() (*Handler, *recipes.RecipeExecutor, *MockSandboxManager) {
 	// Create SeaweedFS-like mock and registry-backed storage adapter
 	sea := newMockSeaweed()
-	registry := NewRecipeRegistry(sea)
+	registry := recipes.NewRecipeRegistry(sea)
 	storageAdapter := NewRegistryStorageAdapter(registry)
 	sandboxMgr := NewMockSandboxManager()
-	executor := NewRecipeExecutor(storageAdapter, sandboxMgr, nil)
+	executor := recipes.NewRecipeExecutor(storageAdapter, sandboxMgr)
 	handler := NewHandlerWithStorage(executor, storageAdapter, nil, nil, sandboxMgr, sea)
 
 	// Add some test recipes to registry
@@ -119,14 +120,14 @@ func TestHandlerListRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
 		}
 
 		var response map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&response)
+		_ = json.NewDecoder(resp.Body).Decode(&response)
 
 		recipes, exists := response["recipes"].([]interface{})
 		if !exists {
@@ -144,7 +145,7 @@ func TestHandlerListRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
@@ -164,14 +165,14 @@ func TestHandlerGetRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
 		}
 
 		var recipe models.Recipe
-		json.NewDecoder(resp.Body).Decode(&recipe)
+		_ = json.NewDecoder(resp.Body).Decode(&recipe)
 
 		if recipe.ID != "test-recipe" {
 			t.Errorf("Expected recipe ID 'test-recipe', got %s", recipe.ID)
@@ -184,7 +185,7 @@ func TestHandlerGetRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected status 404, got %d", resp.StatusCode)
@@ -223,7 +224,7 @@ func TestHandlerCreateRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("Expected status 201, got %d", resp.StatusCode)
@@ -247,7 +248,7 @@ func TestHandlerCreateRecipe(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", resp.StatusCode)
@@ -270,14 +271,14 @@ func TestHandlerSandboxOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
 		}
 
 		var response map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&response)
+		_ = json.NewDecoder(resp.Body).Decode(&response)
 
 		if _, exists := response["sandboxes"]; !exists {
 			t.Error("Response should contain sandboxes array")
@@ -301,14 +302,14 @@ func TestHandlerSandboxOperations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusCreated {
 			t.Errorf("Expected status 201, got %d", resp.StatusCode)
 		}
 
 		var sandbox Sandbox
-		json.NewDecoder(resp.Body).Decode(&sandbox)
+		_ = json.NewDecoder(resp.Body).Decode(&sandbox)
 
 		if sandbox.ID == "" {
 			t.Error("Sandbox should have an ID")
@@ -331,14 +332,14 @@ func TestHandlerHealthCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
 	}
 
 	var health map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&health)
+	_ = json.NewDecoder(resp.Body).Decode(&health)
 
 	status, exists := health["status"].(string)
 	if !exists || status != "healthy" {
@@ -362,14 +363,14 @@ func TestHandlerSearchRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Expected status 200, got %d", resp.StatusCode)
 		}
 
 		var response map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&response)
+		_ = json.NewDecoder(resp.Body).Decode(&response)
 
 		if query, exists := response["query"].(string); !exists || query != "test" {
 			t.Errorf("Expected query 'test', got %v", response["query"])
@@ -382,7 +383,7 @@ func TestHandlerSearchRecipes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("Expected status 400, got %d", resp.StatusCode)
@@ -403,14 +404,14 @@ func TestHandlerRecipeStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
 	}
 
-	var stats RecipeStats
-	json.NewDecoder(resp.Body).Decode(&stats)
+	var stats recipes.RecipeStats
+	_ = json.NewDecoder(resp.Body).Decode(&stats)
 
 	if stats.RecipeID != "test-recipe" {
 		t.Errorf("Expected recipe ID 'test-recipe', got %s", stats.RecipeID)
@@ -433,7 +434,10 @@ func BenchmarkHandlerListRecipes(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		req := httptest.NewRequest("GET", "/v1/arf/recipes", nil)
-		app.Test(req)
+		resp, err := app.Test(req)
+		if err == nil && resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
 	}
 }
 

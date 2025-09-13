@@ -12,7 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
-// KB storage interface and data structures for transflow MVP knowledge base persistence
+// KB storage interface and data structures for Mods MVP knowledge base persistence
 
 // CaseContext contains the context information for a healing case
 type CaseContext struct {
@@ -102,7 +102,7 @@ type SnapshotManifest struct {
 	Version    string         `json:"version"`
 }
 
-// KBStorage provides persistent storage interface for transflow knowledge base
+// KBStorage provides persistent storage interface for Mods knowledge base
 type KBStorage interface {
 	// Case operations
 	WriteCase(ctx context.Context, lang, signature, runID string, caseData *CaseRecord) error
@@ -176,7 +176,7 @@ func (s *SeaweedFSKBStorage) ReadCases(ctx context.Context, lang, signature stri
 		}
 
 		data, err := io.ReadAll(reader)
-		reader.Close()
+		_ = reader.Close()
 		if err != nil {
 			continue
 		}
@@ -200,7 +200,7 @@ func (s *SeaweedFSKBStorage) ReadSummary(ctx context.Context, lang, signature st
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summary: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
@@ -254,7 +254,7 @@ func (s *SeaweedFSKBStorage) GetPatch(ctx context.Context, fingerprint string) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to get patch: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
@@ -290,7 +290,7 @@ func (s *SeaweedFSKBStorage) ReadSnapshot(ctx context.Context) (*SnapshotManifes
 	if err != nil {
 		return nil, fmt.Errorf("failed to get snapshot: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {

@@ -32,7 +32,7 @@ func TestUploadInputTar_InvokesPutFileWithExpectedKey(t *testing.T) {
 	if gotBase != "http://filer:8888" {
 		t.Fatalf("base mismatch: %s", gotBase)
 	}
-	if gotKey != "transflow/exec-123/input.tar" {
+	if gotKey != "mods/exec-123/input.tar" {
 		t.Fatalf("key mismatch: %s", gotKey)
 	}
 	if gotPath != tarPath {
@@ -51,14 +51,14 @@ func TestSubstituteORWTemplateVars_ReplacesValuesWithoutEnv(t *testing.T) {
 		t.Fatalf("write pre: %v", err)
 	}
 	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       tmp,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(tmp, "out"),
-		"PLOY_CONTROLLER":             "https://api.dev.ployman.app/v1",
-		"PLOY_TRANSFLOW_EXECUTION_ID": "e-1",
-		"PLOY_SEAWEEDFS_URL":          "http://filer:8888",
-		"TRANSFLOW_DIFF_KEY":          "transflow/e-1/branches/b-1/steps/s-1/diff.patch",
-		"TRANSFLOW_ORW_APPLY_IMAGE":   "registry.dev.ployman.app/openrewrite-jvm:latest",
-		"NOMAD_DC":                    "dc9",
+		"MODS_CONTEXT_DIR":       tmp,
+		"MODS_OUT_DIR":           filepath.Join(tmp, "out"),
+		"PLOY_CONTROLLER":        "https://api.dev.ployman.app/v1",
+		"PLOY_MODS_EXECUTION_ID": "e-1",
+		"PLOY_SEAWEEDFS_URL":     "http://filer:8888",
+		"MODS_DIFF_KEY":          "mods/e-1/branches/b-1/steps/s-1/diff.patch",
+		"MODS_ORW_APPLY_IMAGE":   "registry.dev.ployman.app/openrewrite-jvm:latest",
+		"NOMAD_DC":               "dc9",
 	}
 	out, err := substituteORWTemplateVars(pre, "run-1", vars)
 	if err != nil {
@@ -70,19 +70,19 @@ func TestSubstituteORWTemplateVars_ReplacesValuesWithoutEnv(t *testing.T) {
 	if want := "EXEC=e-1"; !contains(s, want) {
 		t.Fatalf("missing %s in %s", want, s)
 	}
-	if want := "DIFF=transflow/e-1/branches/b-1/steps/s-1/diff.patch"; !contains(s, want) {
+	if want := "DIFF=mods/e-1/branches/b-1/steps/s-1/diff.patch"; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "OUT=" + vars["TRANSFLOW_OUT_DIR"]; !contains(s, want) {
+	if want := "OUT=" + vars["MODS_OUT_DIR"]; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
 	if want := "API=https://api.dev.ployman.app"; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "INPUT=http://filer:8888/artifacts/transflow/e-1/input.tar"; !contains(s, want) {
+	if want := "INPUT=http://filer:8888/artifacts/mods/e-1/input.tar"; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "IMG=" + vars["TRANSFLOW_ORW_APPLY_IMAGE"]; !contains(s, want) {
+	if want := "IMG=" + vars["MODS_ORW_APPLY_IMAGE"]; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
 	if want := "DC=dc9"; !contains(s, want) {

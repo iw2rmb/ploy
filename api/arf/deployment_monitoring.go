@@ -81,7 +81,7 @@ func (d *DeploymentSandboxManager) TestSandbox(ctx context.Context, sandbox *San
 	if err != nil {
 		return fmt.Errorf("health check request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("health check failed with status: %d", resp.StatusCode)
@@ -108,7 +108,7 @@ func (d *DeploymentSandboxManager) GetSandboxLogs(ctx context.Context, sandboxID
 	if err != nil {
 		return "", fmt.Errorf("logs request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("logs request failed with status: %d", resp.StatusCode)
@@ -140,7 +140,7 @@ func (d *DeploymentSandboxManager) GetSandboxMetrics(ctx context.Context, sandbo
 	if err != nil {
 		return nil, fmt.Errorf("metrics request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("metrics request failed with status: %d", resp.StatusCode)
@@ -185,7 +185,7 @@ func (d *DeploymentSandboxManager) ExecuteCommand(ctx context.Context, sandboxID
 	if err != nil {
 		return "", fmt.Errorf("failed to execute command: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	output, err := io.ReadAll(resp.Body)
 	if err != nil {

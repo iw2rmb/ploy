@@ -3,7 +3,6 @@ package builders
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,11 +21,11 @@ func buildOSvWithCapstan(jibTar, mainClass, app, sha, outputPath, javaVersion st
 	}
 
 	// Create a temporary working directory
-	workDir, err := ioutil.TempDir("", "osv-build-*")
+	workDir, err := os.MkdirTemp("", "osv-build-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(workDir)
+	defer func() { _ = os.RemoveAll(workDir) }()
 
 	// Extract the Jib tar to staging directory
 	stagingDir := filepath.Join(workDir, "staging")
@@ -86,7 +85,7 @@ created: "%s"
 `, app, app, javaPackage, time.Now().Format(time.RFC3339))
 
 	packageYamlPath := filepath.Join(metaDir, "package.yaml")
-	if err := ioutil.WriteFile(packageYamlPath, []byte(packageYaml), 0644); err != nil {
+	if err := os.WriteFile(packageYamlPath, []byte(packageYaml), 0644); err != nil {
 		return fmt.Errorf("failed to write package.yaml: %w", err)
 	}
 
@@ -107,7 +106,7 @@ config_set_default: default
 `, mainClass)
 
 	runYamlPath := filepath.Join(metaDir, "run.yaml")
-	if err := ioutil.WriteFile(runYamlPath, []byte(runYaml), 0644); err != nil {
+	if err := os.WriteFile(runYamlPath, []byte(runYaml), 0644); err != nil {
 		return fmt.Errorf("failed to write run.yaml: %w", err)
 	}
 

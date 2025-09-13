@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -17,19 +18,14 @@ type CatalogMetrics interface {
 
 // Handler provides HTTP endpoints for ARF operations
 type Handler struct {
-	recipeExecutor   *RecipeExecutor
-	recipeStorage    RecipeStorage
-	recipeIndex      RecipeIndexStore
-	recipeValidator  RecipeValidatorInterface
-	recipeRegistry   *RecipeRegistry // Unified recipe registry
-	sandboxMgr       SandboxManager
-	llmGenerator     LLMRecipeGenerator
-	hybridPipeline   HybridPipeline
-	multiLangEngine  MultiLanguageEngine
-	strategySelector StrategySelector
+	recipeExecutor  *recipes.RecipeExecutor
+	recipeStorage   recipes.RecipeStorage
+	recipeIndex     recipes.RecipeIndexStore
+	recipeValidator recipes.RecipeValidatorInterface
+	recipeRegistry  *recipes.RecipeRegistry // Unified recipe registry
+	sandboxMgr      SandboxManager
 	// Phase 4 components
 	securityEngine *SecurityEngine
-	sbomAnalyzer   *SyftSBOMAnalyzer
 	// Consul store for transformation status
 	consulStore ConsulStoreInterface
 	// Metrics for catalog operations
@@ -37,14 +33,20 @@ type Handler struct {
 }
 
 // NewHandler creates a new ARF HTTP handler
-func NewHandler(executor *RecipeExecutor, sandboxMgr SandboxManager) *Handler {
+func NewHandler(executor *recipes.RecipeExecutor, sandboxMgr SandboxManager) *Handler {
 	return &Handler{
 		recipeExecutor: executor,
 		recipeRegistry: nil, // Will be initialized when needed
 		sandboxMgr:     sandboxMgr,
 		// Initialize Phase 4 components
 		securityEngine: NewSecurityEngine(),
-		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
+	}
+}
+
+// SetCVEDatabase wires a CVE database into the security engine
+func (h *Handler) SetCVEDatabase(db CVEDatabase) {
+	if h != nil && h.securityEngine != nil {
+		h.securityEngine.SetCVEDatabase(db)
 	}
 }
 
@@ -55,18 +57,18 @@ func (h *Handler) SetConsulStore(store ConsulStoreInterface) { h.consulStore = s
 
 // NewHandlerWithStorage creates a new ARF HTTP handler with storage backend
 func NewHandlerWithStorage(
-	executor *RecipeExecutor,
-	recipeStorage RecipeStorage,
-	recipeIndex RecipeIndexStore,
-	recipeValidator RecipeValidatorInterface,
+	executor *recipes.RecipeExecutor,
+	recipeStorage recipes.RecipeStorage,
+	recipeIndex recipes.RecipeIndexStore,
+	recipeValidator recipes.RecipeValidatorInterface,
 	sandboxMgr SandboxManager,
 	storageProvider internalStorage.StorageProvider, // Storage provider for recipe registry
 ) *Handler {
 	// Initialize recipe registry if we have storage provider
-	var recipeRegistry *RecipeRegistry
+	var recipeRegistry *recipes.RecipeRegistry
 	if storageProvider != nil {
 		// Create recipe registry with the storage provider
-		recipeRegistry = NewRecipeRegistry(storageProvider)
+		recipeRegistry = recipes.NewRecipeRegistry(storageProvider)
 	}
 
 	return &Handler{
@@ -78,30 +80,6 @@ func NewHandlerWithStorage(
 		sandboxMgr:      sandboxMgr,
 		// Initialize Phase 4 components
 		securityEngine: NewSecurityEngine(),
-		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
-	}
-}
-
-// NewHandlerWithPhase3 creates a new ARF HTTP handler with Phase 3 components
-func NewHandlerWithPhase3(
-	executor *RecipeExecutor,
-	sandboxMgr SandboxManager,
-	llmGen LLMRecipeGenerator,
-	hybrid HybridPipeline,
-	multiLang MultiLanguageEngine,
-	strategy StrategySelector,
-) *Handler {
-	return &Handler{
-		recipeExecutor:   executor,
-		recipeRegistry:   nil, // Will be initialized when needed
-		sandboxMgr:       sandboxMgr,
-		llmGenerator:     llmGen,
-		hybridPipeline:   hybrid,
-		multiLangEngine:  multiLang,
-		strategySelector: strategy,
-		// Initialize Phase 4 components
-		securityEngine: NewSecurityEngine(),
-		sbomAnalyzer:   NewSyftSBOMAnalyzer(),
 	}
 }
 
@@ -109,15 +87,19 @@ func NewHandlerWithPhase3(
 func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf := app.Group("/v1/arf")
 
+	// Health
+	arf.Get("/health", h.Health)
+
 	// Recipe management
+	// Place specific routes before parameterized ones to avoid shadowing
 	arf.Get("/recipes", h.ListRecipes)
-	arf.Get("/recipes/:id", h.GetRecipe)
-	arf.Post("/recipes", h.CreateRecipe)
-	arf.Put("/recipes/:id", h.UpdateRecipe)
-	arf.Delete("/recipes/:id", h.DeleteRecipe)
 	arf.Get("/recipes/search", h.SearchRecipes)
 	arf.Post("/recipes/upload", h.UploadRecipe)
 	arf.Post("/recipes/validate", h.ValidateRecipe)
+	arf.Post("/recipes", h.CreateRecipe)
+	arf.Get("/recipes/:id", h.GetRecipe)
+	arf.Put("/recipes/:id", h.UpdateRecipe)
+	arf.Delete("/recipes/:id", h.DeleteRecipe)
 	arf.Get("/recipes/:id/download", h.DownloadRecipe)
 
 	// Recipe metadata and stats
@@ -129,7 +111,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 
 	// Model registry moved to LLMS: /v1/llms/models/*
 
-    // Legacy ARF transform HTTP endpoints have been removed in favor of Mods
+	// Legacy ARF transform HTTP endpoints have been removed in favor of Mods
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)
@@ -151,13 +133,6 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	arf.Get("/security/report", h.GetSecurityReport)
 	arf.Get("/security/report/:id", h.GetSecurityReport) // Support route param
 	arf.Get("/security/compliance", h.GetComplianceStatus)
-
-	// Phase 4: SBOM
-	arf.Post("/sbom/generate", h.GenerateSBOM)
-	arf.Post("/sbom/analyze", h.AnalyzeSBOM)
-	arf.Get("/sbom/compliance", h.GetSBOMCompliance)
-	arf.Get("/sbom/report", h.GetSBOMReport)
-	arf.Get("/sbom/:id", h.GetSBOMReport) // Support route param
 
 	// Healing coordinator monitoring removed
 }

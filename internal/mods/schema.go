@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/transflow"
+	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/mods"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
 

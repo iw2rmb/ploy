@@ -8,7 +8,7 @@ import (
 )
 
 func TestRunApplyAndBuildWithEvents_Success(t *testing.T) {
-	r := &TransflowRunner{config: &TransflowConfig{ID: "wf"}}
+	r := &ModRunner{config: &ModConfig{ID: "wf"}}
 	stepStart := time.Now().Add(-500 * time.Millisecond)
 	sr, err := runApplyAndBuildWithEvents(context.Background(), r, "/repo", "/diff.patch", "apply", stepStart,
 		func(ctx context.Context, repo, diff string) error { return nil })
@@ -27,7 +27,7 @@ func TestRunApplyAndBuildWithEvents_Success(t *testing.T) {
 }
 
 func TestRunApplyAndBuildWithEvents_Failure(t *testing.T) {
-	r := &TransflowRunner{config: &TransflowConfig{ID: "wf"}}
+	r := &ModRunner{config: &ModConfig{ID: "wf"}}
 	want := errors.New("boom")
 	sr, err := runApplyAndBuildWithEvents(context.Background(), r, "/repo", "/diff.patch", "apply", time.Now(),
 		func(ctx context.Context, repo, diff string) error { return want })

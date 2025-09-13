@@ -31,7 +31,7 @@ func setupLocalRepos(t *testing.T, root string) (origin, bare string) {
 	run(t, origin, "git", "config", "user.email", "test@example.com")
 	run(t, origin, "git", "config", "user.name", "Test User")
 	// Write file and commit
-	os.WriteFile(filepath.Join(origin, "README.md"), []byte("hello\n"), 0644)
+	_ = os.WriteFile(filepath.Join(origin, "README.md"), []byte("hello\n"), 0644)
 	run(t, origin, "git", "add", ".")
 	run(t, origin, "git", "commit", "-m", "chore: initial")
 	// Create bare clone

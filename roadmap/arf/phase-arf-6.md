@@ -186,7 +186,7 @@ type ResolutionRecord struct {
 - Stack Overflow API integration
 - GitHub search integration
 - Maven Central/npm/PyPI API clients
-- PostgreSQL knowledge base schema
+- Knowledge base schema (SQL) — deferred (no SQL database in use)
 - Pattern matching algorithms
 
 ### Phase 6C: Advanced Resolution (Month 3)

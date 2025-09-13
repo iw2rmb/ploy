@@ -23,7 +23,7 @@ fi
 
 mkdir -p "$ROOT_DIR/logs"
 
-echo "Submitting transflow run…"
+echo "Submitting mods run…"
 CONFIG_ESCAPED=$(jq -Rs . < "$SCENARIO_YAML")
 BODY=$(cat <<EOF
 {
@@ -34,7 +34,7 @@ EOF
 )
 
 RESP=$(curl -sS -w "\nHTTP_CODE:%{http_code}" -H "Content-Type: application/json" \
-  -X POST "$API_BASE/transflow/run" -d "$BODY")
+  -X POST "$API_BASE/mods" -d "$BODY")
 
 HTTP_CODE=$(echo "$RESP" | awk -FHTTP_CODE: 'END{print $2}')
 JSON=$(echo "$RESP" | sed '/HTTP_CODE:/d')
@@ -44,7 +44,7 @@ if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]
   exit 1
 fi
 
-EXEC_ID=$(echo "$JSON" | jq -r '.execution_id')
+EXEC_ID=$(echo "$JSON" | jq -r '.execution_id // .id')
 if [[ -z "$EXEC_ID" || "$EXEC_ID" == "null" ]]; then
   echo "No execution_id in response:" >&2
   echo "$JSON" | jq . >&2 || echo "$JSON" >&2
@@ -59,7 +59,7 @@ echo "EXEC_ID: $EXEC_ID"
 echo "Streaming events to $LOG_DIR/events.sse …"
 (
   set +e
-  curl -sN "$API_BASE/transflow/logs/$EXEC_ID?follow=1" \
+  curl -sN "$API_BASE/mods/$EXEC_ID/logs?follow=1" \
     | tee "$LOG_DIR/events.sse"
 ) &
 SSE_PID=$!
@@ -71,7 +71,7 @@ MR_URL=""
 START_TS=$(date +%s)
 TIMEOUT_SEC=${TIMEOUT_SEC:-3600}
 while :; do
-  ST_JSON=$(curl -sS "$API_BASE/transflow/status/$EXEC_ID" || true)
+  ST_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/status" || true)
   if [[ -n "$ST_JSON" ]]; then
     echo "$ST_JSON" > "$LOG_DIR/status_last.json"
     TERM_STATUS=$(echo "$ST_JSON" | jq -r '.status // empty')
@@ -108,4 +108,3 @@ if [[ "$TERM_STATUS" != "completed" ]]; then
 fi
 
 exit 0
-

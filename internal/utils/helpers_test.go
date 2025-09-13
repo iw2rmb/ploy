@@ -95,18 +95,18 @@ func TestGetenv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up environment variable before test
 			originalValue := os.Getenv(tt.envKey)
-			os.Unsetenv(tt.envKey)
+			_ = os.Unsetenv(tt.envKey)
 			defer func() {
 				if originalValue != "" {
-					os.Setenv(tt.envKey, originalValue)
+					_ = os.Setenv(tt.envKey, originalValue)
 				} else {
-					os.Unsetenv(tt.envKey)
+					_ = os.Unsetenv(tt.envKey)
 				}
 			}()
 
 			// Set environment variable if needed
 			if tt.setEnv {
-				os.Setenv(tt.envKey, tt.envValue)
+				_ = os.Setenv(tt.envKey, tt.envValue)
 			}
 
 			// Execute test
@@ -190,18 +190,18 @@ func TestParseIntEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up environment variable before test
 			originalValue := os.Getenv(tt.envKey)
-			os.Unsetenv(tt.envKey)
+			_ = os.Unsetenv(tt.envKey)
 			defer func() {
 				if originalValue != "" {
-					os.Setenv(tt.envKey, originalValue)
+					_ = os.Setenv(tt.envKey, originalValue)
 				} else {
-					os.Unsetenv(tt.envKey)
+					_ = os.Unsetenv(tt.envKey)
 				}
 			}()
 
 			// Set environment variable if needed
 			if tt.setEnv {
-				os.Setenv(tt.envKey, tt.envValue)
+				_ = os.Setenv(tt.envKey, tt.envValue)
 			}
 
 			// Execute test
@@ -338,7 +338,7 @@ func TestErrJSON(t *testing.T) {
 			// Execute request
 			resp, err := app.Test(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Verify status code
 			assert.Equal(t, tt.expectedCode, resp.StatusCode)
@@ -369,7 +369,7 @@ func TestIsHealthy(t *testing.T) {
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusOK)
-					w.Write([]byte("OK"))
+					_, _ = w.Write([]byte("OK"))
 				}))
 			},
 			expectedResult: true,
@@ -379,7 +379,7 @@ func TestIsHealthy(t *testing.T) {
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("Internal Server Error"))
+					_, _ = w.Write([]byte("Internal Server Error"))
 				}))
 			},
 			expectedResult: false,
@@ -389,7 +389,7 @@ func TestIsHealthy(t *testing.T) {
 			setupServer: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte("Not Found"))
+					_, _ = w.Write([]byte("Not Found"))
 				}))
 			},
 			expectedResult: false,
@@ -529,18 +529,18 @@ func createTestTar(t *testing.T, baseDir string, files map[string]string, useGzi
 	if err != nil {
 		return "", err
 	}
-	defer tarFile.Close()
+	defer func() { _ = tarFile.Close() }()
 
 	var writer io.Writer = tarFile
 
 	if useGzip {
 		gzipWriter := gzip.NewWriter(tarFile)
 		writer = gzipWriter
-		defer gzipWriter.Close()
+		defer func() { _ = gzipWriter.Close() }()
 	}
 
 	tarWriter := tar.NewWriter(writer)
-	defer tarWriter.Close()
+	defer func() { _ = tarWriter.Close() }()
 
 	for filename, content := range files {
 		// Create directory entries if needed
@@ -649,8 +649,8 @@ func TestRunLanePick(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkGetenv(b *testing.B) {
-	os.Setenv("BENCHMARK_VAR", "benchmark_value")
-	defer os.Unsetenv("BENCHMARK_VAR")
+	_ = os.Setenv("BENCHMARK_VAR", "benchmark_value")
+	defer func() { _ = os.Unsetenv("BENCHMARK_VAR") }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -659,8 +659,8 @@ func BenchmarkGetenv(b *testing.B) {
 }
 
 func BenchmarkParseIntEnv(b *testing.B) {
-	os.Setenv("BENCHMARK_INT", "42")
-	defer os.Unsetenv("BENCHMARK_INT")
+	_ = os.Setenv("BENCHMARK_INT", "42")
+	defer func() { _ = os.Unsetenv("BENCHMARK_INT") }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -670,10 +670,10 @@ func BenchmarkParseIntEnv(b *testing.B) {
 
 func BenchmarkFileExists(b *testing.B) {
 	tmpDir, _ := os.MkdirTemp("", "benchmark_*")
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	testFile := filepath.Join(tmpDir, "benchmark_file.txt")
-	os.WriteFile(testFile, []byte("benchmark content"), 0644)
+	_ = os.WriteFile(testFile, []byte("benchmark content"), 0644)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

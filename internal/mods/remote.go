@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// executeRemoteTransflow handles execution via remote controller API
-func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch bool, output string) error {
+// executeRemoteMod handles execution via remote controller API
+func executeRemoteMod(controllerURL, file string, testMode, verbose, watch bool, output string) error {
 	b, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read config: %w", err)
@@ -27,22 +27,17 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 	// Output selection
 	if output == "json" {
 		// Print a single JSON line. If --watch is set, attach watch afterwards.
-		base := strings.TrimRight(controllerURL, "/")
-		// Normalize to include /v1 if missing for clarity
-		if !strings.HasSuffix(base, "/v1") {
-			base = base + "/v1"
-		}
 		resp := map[string]any{
 			"execution_id": id,
 			"status":       "initializing",
-			"status_url":   "/v1/mods/status/" + id,
+			"status_url":   "/v1/mods/" + id + "/status",
 			"watch_hint":   "ploy mod watch -id " + id,
 		}
 		b, _ := json.Marshal(resp)
 		fmt.Println(string(b))
 		if watch {
 			// Attach live watch after emitting JSON
-			if err := watchTransflow([]string{"-id", id}, controllerURL); err != nil {
+			if err := watchMod([]string{"-id", id}, controllerURL); err != nil {
 				// Best-effort: do not fail JSON mode if watch cannot attach
 				return nil
 			}
@@ -58,14 +53,14 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 	// Optional: attach a live watch
 	if watch {
 		// Use the same base controller URL
-		if err := watchTransflow([]string{"-id", id}, controllerURL); err == nil {
+		if err := watchMod([]string{"-id", id}, controllerURL); err == nil {
 			return nil
 		}
 		// Fall back to polling flow below if watch fails to attach
 	}
 
 	// Poll status
-	statusURL := strings.TrimRight(controllerURL, "/") + "/mods/status/" + id
+	statusURL := strings.TrimRight(controllerURL, "/") + "/mods/" + id + "/status"
 	start := time.Now()
 	for {
 		time.Sleep(2 * time.Second)
@@ -74,7 +69,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 			continue
 		}
 		if sresp.StatusCode != 200 {
-			sresp.Body.Close()
+			_ = sresp.Body.Close()
 			continue
 		}
 
@@ -85,7 +80,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 			Result map[string]any `json:"result"`
 		}
 		_ = json.NewDecoder(sresp.Body).Decode(&st)
-		sresp.Body.Close()
+		_ = sresp.Body.Close()
 
 		if verbose {
 			fmt.Printf("Status: %s (elapsed %s)\n", st.Status, time.Since(start).Round(time.Second))
@@ -98,7 +93,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 					fmt.Printf("  %s: %v\n", k, v)
 				}
 				// Printable download URLs via controller proxy
-				base := strings.TrimRight(controllerURL, "/") + "/mods/artifacts/" + st.ID + "/"
+				base := strings.TrimRight(controllerURL, "/") + "/mods/" + st.ID + "/artifacts/"
 				fmt.Println("Download URLs:")
 				// Known names
 				known := []string{"plan_json", "next_json", "diff_patch"}
@@ -113,9 +108,9 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 
 		if st.Status == "failed" {
 			if st.Error != "" {
-				return fmt.Errorf("transflow failed: %s", st.Error)
+				return fmt.Errorf("mod failed: %s", st.Error)
 			}
-			return fmt.Errorf("transflow failed")
+			return fmt.Errorf("mod failed")
 		}
 	}
 }
@@ -132,7 +127,7 @@ func remoteStart(controllerURL string, configBytes []byte, testMode bool, client
 	if err != nil {
 		return "", fmt.Errorf("controller request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
 		rb, _ := io.ReadAll(resp.Body)

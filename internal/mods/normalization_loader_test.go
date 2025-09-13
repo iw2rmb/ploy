@@ -9,7 +9,7 @@ import (
 // fakeJobHelper returns a plan with a human alias and a stop next action.
 type fakeJobHelper struct{}
 
-func (f *fakeJobHelper) SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error) {
+func (f *fakeJobHelper) SubmitPlannerJob(ctx context.Context, config *ModConfig, buildError string, workspace string) (*PlanResult, error) {
 	return &PlanResult{PlanID: "p-1", Options: []map[string]any{{"id": "opt1", "type": "human"}}}, nil
 }
 func (f *fakeJobHelper) SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error) {
@@ -30,8 +30,8 @@ func (c *captureHealer) RunFanout(ctx context.Context, runCtx any, branches []Br
 }
 
 func TestPlannerHumanAliasIsNormalizedBeforeFanout(t *testing.T) {
-	cfg := &TransflowConfig{ID: "w1", TargetRepo: "https://x/y.git", BaseRef: "main", Steps: []TransflowStep{{Type: "recipe", ID: "s"}}, SelfHeal: GetDefaultSelfHealConfig()}
-	r, err := NewTransflowRunner(cfg, t.TempDir())
+	cfg := &ModConfig{ID: "w1", TargetRepo: "https://x/y.git", BaseRef: "main", Steps: []ModStep{{Type: "recipe", ID: "s"}}, SelfHeal: GetDefaultSelfHealConfig()}
+	r, err := NewModRunner(cfg, t.TempDir())
 	if err != nil {
 		t.Fatalf("runner: %v", err)
 	}

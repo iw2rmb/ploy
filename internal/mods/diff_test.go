@@ -14,7 +14,7 @@ func writeMinimalDiff(t *testing.T, dir string, paths []string) string {
 	if err != nil {
 		t.Fatalf("failed to create diff file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	for _, p := range paths {
 		// write only headers; ValidateDiffPaths only parses +++ lines
 		_, _ = f.WriteString("--- a/" + p + "\n")

@@ -133,11 +133,11 @@ func (a *NomadPylintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 
 	// Create gzip writer
 	gzWriter := gzip.NewWriter(&buf)
-	defer gzWriter.Close()
+	defer func() { _ = gzWriter.Close() }()
 
 	// Create tar writer
 	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
+	defer func() { _ = tarWriter.Close() }()
 
 	// Filter Python files
 	pythonFiles := make([]string, 0)
@@ -309,10 +309,14 @@ func (a *NomadESLintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 	var buf bytes.Buffer
 
 	gzWriter := gzip.NewWriter(&buf)
-	defer gzWriter.Close()
+	defer func() {
+		_ = gzWriter.Close()
+	}()
 
 	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
+	defer func() {
+		_ = tarWriter.Close()
+	}()
 
 	// Filter JavaScript/TypeScript files
 	jsFiles := make([]string, 0)
@@ -353,8 +357,12 @@ func (a *NomadESLintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, 
 		}
 	}
 
-	tarWriter.Close()
-	gzWriter.Close()
+	if err := tarWriter.Close(); err != nil {
+		return nil, err
+	}
+	if err := gzWriter.Close(); err != nil {
+		return nil, err
+	}
 
 	return buf.Bytes(), nil
 }
@@ -485,10 +493,14 @@ func (a *NomadGolangCIAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte
 	var buf bytes.Buffer
 
 	gzWriter := gzip.NewWriter(&buf)
-	defer gzWriter.Close()
+	defer func() {
+		_ = gzWriter.Close()
+	}()
 
 	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
+	defer func() {
+		_ = tarWriter.Close()
+	}()
 
 	// Include Go files and module files
 	goFiles := make([]string, 0)
@@ -529,8 +541,12 @@ func (a *NomadGolangCIAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte
 		}
 	}
 
-	tarWriter.Close()
-	gzWriter.Close()
+	if err := tarWriter.Close(); err != nil {
+		return nil, err
+	}
+	if err := gzWriter.Close(); err != nil {
+		return nil, err
+	}
 
 	return buf.Bytes(), nil
 }

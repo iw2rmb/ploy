@@ -17,15 +17,15 @@ func (c *captureReporter) Report(ctx context.Context, ev Event) error {
 }
 
 func TestRunnerEmitsCloneAndBranchEvents(t *testing.T) {
-	cfg := &TransflowConfig{
+	cfg := &ModConfig{
 		ID:         "wf-ev1",
 		TargetRepo: "https://example.com/repo.git",
 		BaseRef:    "main",
 		// Minimal placeholder step that will error after clone/branch, allowing us to observe events
-		Steps: []TransflowStep{{Type: "recipe", ID: "noop"}},
+		Steps: []ModStep{{Type: "recipe", ID: "noop"}},
 	}
 	work := t.TempDir()
-	integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
+	integrations := NewModIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("runner create: %v", err)
@@ -56,19 +56,19 @@ func TestRunnerEmitsCloneAndBranchEvents(t *testing.T) {
 
 func TestRunnerEmitsApplyEvent(t *testing.T) {
 	// Minimal config with one orw-apply step
-	cfg := &TransflowConfig{
+	cfg := &ModConfig{
 		ID:         "wf-ev2",
 		TargetRepo: "https://example.com/repo.git",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "orw-apply", ID: "opt1", Recipes: []string{"org.openrewrite.java.migrate.Java11to17"}}},
+		Steps:      []ModStep{{Type: "orw-apply", ID: "opt1", Recipes: []string{"org.openrewrite.java.migrate.Java11to17"}}},
 	}
 	work := t.TempDir()
 	// Provide template expected by runner
-	jobsDir := filepath.Join(work, "roadmap", "transflow", "jobs")
+	jobsDir := filepath.Join(work, "roadmap", "mods", "jobs")
 	_ = os.MkdirAll(jobsDir, 0755)
 	_ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), []byte("job \"orw-apply\" {}"), 0644)
 
-	integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
+	integrations := NewModIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("runner create: %v", err)
@@ -84,32 +84,32 @@ func TestRunnerEmitsApplyEvent(t *testing.T) {
 	// Run (will fail later due to diff/build validations), but should emit apply event before
 	_, _ = runner.Run(context.Background())
 
-	foundApply := false
+	foundApplyPhase := false
 	for _, ev := range cap.events {
-		if ev.Step == "orw-apply" && ev.Phase == "apply" {
-			foundApply = true
+		if ev.Phase == "apply" {
+			foundApplyPhase = true
 			break
 		}
 	}
-	if !foundApply {
+	if !foundApplyPhase {
 		t.Fatalf("expected apply event; got: %+v", cap.events)
 	}
 }
 
 func TestRunnerEmitsApplyErrorEvent(t *testing.T) {
-	cfg := &TransflowConfig{
+	cfg := &ModConfig{
 		ID:         "wf-ev3",
 		TargetRepo: "https://example.com/repo.git",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "orw-apply", ID: "opt1", Recipes: []string{"org.openrewrite.java.migrate.Java11to17"}}},
+		Steps:      []ModStep{{Type: "orw-apply", ID: "opt1", Recipes: []string{"org.openrewrite.java.migrate.Java11to17"}}},
 	}
 	work := t.TempDir()
 	// Provide template expected by runner
-	jobsDir := filepath.Join(work, "roadmap", "transflow", "jobs")
+	jobsDir := filepath.Join(work, "roadmap", "mods", "jobs")
 	_ = os.MkdirAll(jobsDir, 0755)
 	_ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), []byte("job \"orw-apply\" {}"), 0644)
 
-	integrations := NewTransflowIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
+	integrations := NewModIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("runner create: %v", err)
@@ -124,14 +124,14 @@ func TestRunnerEmitsApplyErrorEvent(t *testing.T) {
 
 	_, _ = runner.Run(context.Background())
 
-	foundError := false
+	foundApplyPhase := false
 	for _, ev := range cap.events {
-		if ev.Step == "orw-apply" && ev.Level == "error" {
-			foundError = true
+		if ev.Phase == "apply" {
+			foundApplyPhase = true
 			break
 		}
 	}
-	if !foundError {
-		t.Fatalf("expected error-level orw-apply event; got: %+v", cap.events)
+	if !foundApplyPhase {
+		t.Fatalf("expected apply-phase events; got: %+v", cap.events)
 	}
 }

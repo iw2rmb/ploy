@@ -73,7 +73,7 @@ func TestOpenRewriteSetupWorkspacePrefersContextDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open input.tar: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	tr := tar.NewReader(f)
 	foundPom := false

@@ -27,7 +27,7 @@
 - import_playbook: playbooks/docker-registry.yml
 - import_playbook: playbooks/langgraph-runner.yml
 - import_playbook: playbooks/openrewrite-jvm.yml
-- import_playbook: playbooks/transflow-env.yml
+- import_playbook: playbooks/mods-env.yml
 - import_playbook: playbooks/api.yml
 - import_playbook: playbooks/gitlab-token.yml
 - import_playbook: playbooks/freebsd.yml

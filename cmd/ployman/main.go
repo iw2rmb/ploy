@@ -13,7 +13,7 @@ var controllerURL = utils.ResolveControllerURLFromEnv()
 
 func main() {
 	// Set platform mode environment variable
-	os.Setenv("PLOY_PLATFORM_MODE", "true")
+	_ = os.Setenv("PLOY_PLATFORM_MODE", "true")
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {

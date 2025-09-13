@@ -618,10 +618,10 @@ func (r *ResourceManager) monitorMemory() {
 - [ ] Add progress reporting
 - [ ] Enable batch transformations
 
-### C4.1: ARF Client Implementation
+### C4.1: [Historical] ARF Client Implementation (superseded by Mods)
 
 ```go
-// api/arf/openrewrite_client.go
+// [Historical] api/arf/openrewrite_client.go
 package arf
 
 import (
@@ -687,7 +687,7 @@ func (c *OpenRewriteClient) submitJob(ctx context.Context, req TransformRequest)
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var submitResp SubmitResponse
     if err := json.NewDecoder(resp.Body).Decode(&submitResp); err != nil {

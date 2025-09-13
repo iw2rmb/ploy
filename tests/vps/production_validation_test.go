@@ -85,19 +85,19 @@ job "perf-test" {
 	})
 }
 
-func TestVPSTransflowEndToEnd(t *testing.T) {
+func TestVPSModsEndToEnd(t *testing.T) {
 	if os.Getenv("TARGET_HOST") == "" {
 		t.Skip("TARGET_HOST not set")
 	}
 
 	vpsClient := NewVPSClient(os.Getenv("TARGET_HOST"))
 
-	t.Run("TransflowWorkflowValidation", func(t *testing.T) {
-		// Test transflow CLI is available and shows correct help
-        configCmd := `su - ploy -c "/opt/ploy/bin/ploy mod --help"`
+	t.Run("ModsWorkflowValidation", func(t *testing.T) {
+		// Test mods CLI is available and shows correct help
+		configCmd := `su - ploy -c "/opt/ploy/bin/ploy mod --help"`
 		output, err := vpsClient.RunCommand(configCmd)
-        assert.NoError(t, err, "Mods CLI should be accessible")
-		assert.Contains(t, output, "transflow.yaml", "Mods should show usage")
+		assert.NoError(t, err, "Mods CLI should be accessible")
+		assert.Contains(t, output, "mods.yaml", "Mods should show usage")
 
 		// Test configuration file exists
 		fileCmd := `su - ploy -c "test -f /opt/ploy/test/fixtures/java-migration.yaml && echo 'config exists'"`
@@ -142,7 +142,7 @@ func TestVPSSecurityAndAccess(t *testing.T) {
 		assert.NoError(t, err, "Should be able to list /opt/ploy directory as ploy user")
 		assert.Contains(t, output, "bin", "/opt/ploy should contain bin directory")
 
-		// Verify transflow binary is executable by ploy user
+		// Verify ploy binary is executable by ploy user
 		output, err = vpsClient.RunCommand("su - ploy -c 'test -x /opt/ploy/bin/ploy && echo \"executable\"'")
 		assert.NoError(t, err, "Should be able to test ploy binary executability")
 		assert.Contains(t, output, "executable", "ploy binary should be executable")

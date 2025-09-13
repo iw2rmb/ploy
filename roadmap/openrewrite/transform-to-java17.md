@@ -41,16 +41,16 @@
 5. **Expected Response** (immediate):
    ```json
    {
-     "transformation_id": "uuid-1234-5678",
+     "mod_id": "uuid-1234-5678",
      "status": "initiated",
-     "status_url": "/v1/mods/status/tf-abc123",
+    "status_url": "/v1/mods/tf-abc123/status",
      "message": "Transformation started, use status_url to monitor progress"
    }
    ```
 
 ### Step 2: Monitor Transformation Execution
 1. **Immediate Status URL**: Use the `status_url` from initial response
-2. **Status Monitoring**: Poll `/v1/mods/status/{id}` endpoint
+2. **Status Monitoring**: Poll `/v1/mods/{id}/status` endpoint
    - **Polling Interval**: 30 seconds
    - **Maximum Wait Time**: 30 minutes total (allows for recipe download + transformation)
    - **Status Check Timeout**: 10 seconds per poll
@@ -62,7 +62,7 @@
 5. **Enhanced Status Response**:
    ```json
    {
-     "transformation_id": "uuid-1234-5678",
+     "mod_id": "uuid-1234-5678",
      "workflow_stage": "openrewrite",
      "status": "in_progress",
      "start_time": "2025-01-15T10:00:00Z",
@@ -202,7 +202,7 @@ Based on Phase 1 implementation, OpenRewrite uses async ARF system:
 
 ### Unified ARF System for OpenRewrite (Async)
 - Transflow: `POST /v1/mods/run` — initiate async transformation, returns status URL immediately
-- Transflow: `GET /v1/mods/status/:id` — get execution status
+- Mods: `GET /v1/mods/:id/status` — get execution status
 
 **Note**: OpenRewrite recipes are managed exclusively through the unified `/v1/arf/recipes/*` endpoints with `type: "openrewrite"`.
 
@@ -240,8 +240,8 @@ RESPONSE=$(curl -X POST "${PLOY_CONTROLLER%/v1}/v1/mods/run" \
     }
   }')
 
-# Extract transformation_id and status_url from immediate response
-TRANSFORM_ID=$(echo "$RESPONSE" | jq -r '.transformation_id')
+# Extract mod_id and status_url from immediate response
+TRANSFORM_ID=$(echo "$RESPONSE" | jq -r '.mod_id')
 STATUS_URL=$(echo "$RESPONSE" | jq -r '.status_url')
 echo "Transformation initiated: $TRANSFORM_ID"
 echo "Monitor at: $STATUS_URL"
@@ -252,7 +252,7 @@ echo "Monitor at: $STATUS_URL"
 # Poll status endpoint (data from Consul KV)
 timeout 3600 bash -c '
   while true; do
-    STATUS_RESPONSE=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/mods/status/'$TRANSFORM_ID'")
+    STATUS_RESPONSE=$(curl -s "${PLOY_CONTROLLER%/v1}/v1/mods/'$TRANSFORM_ID'/status")
     STATUS=$(echo "$STATUS_RESPONSE" | jq -r ".status")
     STAGE=$(echo "$STATUS_RESPONSE" | jq -r ".workflow_stage")
     echo "$(date): Stage: $STAGE, Status: $STATUS"
@@ -319,7 +319,7 @@ ploy/arf/transforms/{id}/sandbox    # Sandbox deployment info
 ```
 
 ## Breaking Changes:
-- Transflow returns status URL and execution ID; clients poll `/v1/mods/status/{id}` for results
+- Mods returns status URL and execution ID; clients poll `/v1/mods/{id}/status` for results
 - No backward compatibility with synchronous pattern
 
 This async approach with Consul persistence provides production-ready OpenRewrite transformation capabilities with support for complex healing workflows.

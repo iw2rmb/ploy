@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-// Implementation of job submission helpers for the transflow healing workflow.
+// Implementation of job submission helpers for the mods healing workflow.
 // This provides the GREEN phase implementation for the failing tests.
 
 // ProductionJobSubmitter defines the interface for production job submission
@@ -66,17 +67,17 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 	}
 
 	// Get core variables with defaults
-	model := get("TRANSFLOW_MODEL")
+	model := get("MODS_MODEL")
 	if model == "" {
 		model = "gpt-4o-mini@2024-08-06"
 	}
 
-	toolsJSON := get("TRANSFLOW_TOOLS")
+	toolsJSON := get("MODS_TOOLS")
 	if toolsJSON == "" {
 		toolsJSON = `{"file":{"allow":["src/**","pom.xml"]},"search":{"provider":"rg","allow":["src/**"]}}`
 	}
 
-	limitsJSON := get("TRANSFLOW_LIMITS")
+	limitsJSON := get("MODS_LIMITS")
 	if limitsJSON == "" {
 		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
 	}
@@ -93,31 +94,31 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 
 	// Compute optional host directories for bind mounts
 	// Derive from typical workspace layout when present in env
-	contextHostDir := get("TRANSFLOW_CONTEXT_DIR")
-	outHostDir := get("TRANSFLOW_OUT_DIR")
+	contextHostDir := get("MODS_CONTEXT_DIR")
+	outHostDir := get("MODS_OUT_DIR")
 
 	// Defaults for images (can be overridden via environment)
 	d := ResolveDefaults(get)
-	plannerImage := get("TRANSFLOW_PLANNER_IMAGE")
+	plannerImage := get("MODS_PLANNER_IMAGE")
 	if plannerImage == "" {
 		plannerImage = d.PlannerImage
 	}
-	reducerImage := get("TRANSFLOW_REDUCER_IMAGE")
+	reducerImage := get("MODS_REDUCER_IMAGE")
 	if reducerImage == "" {
 		reducerImage = d.ReducerImage
 	}
-	llmExecImage := get("TRANSFLOW_LLM_EXEC_IMAGE")
+	llmExecImage := get("MODS_LLM_EXEC_IMAGE")
 	if llmExecImage == "" {
 		llmExecImage = d.LLMExecImage
 	}
-	orwApplyImage := get("TRANSFLOW_ORW_APPLY_IMAGE")
+	orwApplyImage := get("MODS_ORW_APPLY_IMAGE")
 	if orwApplyImage == "" {
 		orwApplyImage = d.ORWApplyImage
 	}
 
 	// Perform substitution
 	controllerURL := get("PLOY_CONTROLLER")
-	execID := get("PLOY_TRANSFLOW_EXECUTION_ID")
+	execID := get("PLOY_MODS_EXECUTION_ID")
 
 	dc := get("NOMAD_DC")
 	if dc == "" {
@@ -145,6 +146,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${CONTROLLER_URL}", hclEscape(controllerURL),
 		"${EXECUTION_ID}", hclEscape(execID),
 		"${NOMAD_DC}", hclEscape(dc),
+		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
 	)
 	rendered := replacer.Replace(string(hclBytes))
 
@@ -205,7 +207,7 @@ func readJobArtifact(artifactPath string, target interface{}) error {
 }
 
 // SubmitPlannerJob submits a planner job after a build failure
-func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error) {
+func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModConfig, buildError string, workspace string) (*PlanResult, error) {
 	// Prefer production runner path when available
 
 	// Production implementation using real Nomad job submission
@@ -226,19 +228,23 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		infra := ResolveInfraFromEnv()
 		llm := ResolveLLMDefaultsFromEnv()
 		vars := map[string]string{
-			"TRANSFLOW_CONTEXT_DIR":       contextDir,
-			"TRANSFLOW_OUT_DIR":           outDir,
-			"TRANSFLOW_REGISTRY":          imgs.Registry,
-			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-			"TRANSFLOW_MODEL":             llm.Model,
-			"TRANSFLOW_TOOLS":             llm.ToolsJSON,
-			"TRANSFLOW_LIMITS":            llm.LimitsJSON,
-			"PLOY_CONTROLLER":             infra.Controller,
-			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-			"NOMAD_DC":                    infra.DC,
+			"MODS_CONTEXT_DIR":       contextDir,
+			"MODS_OUT_DIR":           outDir,
+			"MODS_REGISTRY":          imgs.Registry,
+			"MODS_PLANNER_IMAGE":     imgs.Planner,
+			"MODS_REDUCER_IMAGE":     imgs.Reducer,
+			"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+			"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
+			"MODS_MODEL":             llm.Model,
+			"MODS_TOOLS":             llm.ToolsJSON,
+			"MODS_LIMITS":            llm.LimitsJSON,
+			"PLOY_CONTROLLER":        infra.Controller,
+			"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+			"NOMAD_DC":               infra.DC,
+		}
+		// Inject SBOM_LATEST_URL for job reuse of last SBOM
+		if infra.Controller != "" && config != nil && config.TargetRepo != "" {
+			vars["SBOM_LATEST_URL"] = fmt.Sprintf("%s/sbom/latest?repo=%s", strings.TrimRight(infra.Controller, "/"), url.QueryEscape(config.TargetRepo))
 		}
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
@@ -247,7 +253,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 
 		// Step 4: Push start event and report job metadata
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
 		}
@@ -259,7 +265,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		timeout := ResolveDefaultsFromEnv().PlannerTimeout
 		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 			if controller := ResolveInfraFromEnv().Controller; controller != "" {
-				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
 				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
 			}
 			return nil, fmt.Errorf("planner job failed: %w", err)
@@ -278,7 +284,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		}
 
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
@@ -362,20 +368,21 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		infra := ResolveInfraFromEnv()
 		llm := ResolveLLMDefaultsFromEnv()
 		vars := map[string]string{
-			"TRANSFLOW_CONTEXT_DIR":       contextDir,
-			"TRANSFLOW_OUT_DIR":           outDir,
-			"TRANSFLOW_REGISTRY":          imgs.Registry,
-			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-			"TRANSFLOW_MODEL":             llm.Model,
-			"TRANSFLOW_TOOLS":             llm.ToolsJSON,
-			"TRANSFLOW_LIMITS":            llm.LimitsJSON,
-			"PLOY_CONTROLLER":             infra.Controller,
-			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-			"NOMAD_DC":                    infra.DC,
+			"MODS_CONTEXT_DIR":       contextDir,
+			"MODS_OUT_DIR":           outDir,
+			"MODS_REGISTRY":          imgs.Registry,
+			"MODS_PLANNER_IMAGE":     imgs.Planner,
+			"MODS_REDUCER_IMAGE":     imgs.Reducer,
+			"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+			"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
+			"MODS_MODEL":             llm.Model,
+			"MODS_TOOLS":             llm.ToolsJSON,
+			"MODS_LIMITS":            llm.LimitsJSON,
+			"PLOY_CONTROLLER":        infra.Controller,
+			"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+			"NOMAD_DC":               infra.DC,
 		}
+		// vars already carries PLOY_CONTROLLER; nothing else to do here.
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
@@ -383,7 +390,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 
 		// Step 4: Push start event and report job metadata
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
 		}
@@ -395,7 +402,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		timeout := ResolveDefaultsFromEnv().ReducerTimeout
 		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
 				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
 			}
 			return nil, fmt.Errorf("reducer job failed: %w", err)
@@ -414,7 +421,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		}
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 

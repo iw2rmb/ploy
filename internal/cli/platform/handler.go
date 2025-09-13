@@ -15,7 +15,7 @@ func PushCmd(args []string, controllerURL string) {
 	lane := fs.String("lane", "E", "lane override (default: E for containers)")
 	sha := fs.String("sha", "", "git sha to annotate")
 	env := fs.String("env", "dev", "target environment (dev, staging, prod)")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	// Platform services require explicit service name
 	if *service == "" {

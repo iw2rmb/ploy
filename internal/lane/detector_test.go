@@ -60,7 +60,7 @@ func main() {}`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -136,7 +136,7 @@ crate-type = ["cdylib"]`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -198,7 +198,7 @@ func TestDetect_NodeProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -280,7 +280,7 @@ ext_modules = [Extension('module', ['module.c'])]`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -351,7 +351,7 @@ func TestDetect_JavaProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -408,7 +408,7 @@ addSbtPlugin("de.gccc.sbt" % "sbt-jib" % "1.0.0")`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -441,7 +441,7 @@ func TestDetect_DotNetProject(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -511,7 +511,7 @@ int add(int a, int b) { return a + b; }`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -554,7 +554,7 @@ func TestDetect_DirectWASMFiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -604,7 +604,7 @@ with open('/proc/meminfo') as f:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -683,7 +683,7 @@ func TestDetect_PriorityHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := createTestDir(t, tt.files)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			result := Detect(tmpDir)
 			assert.Equal(t, tt.expected.Lane, result.Lane)
@@ -698,7 +698,7 @@ func TestDetect_UnknownProject(t *testing.T) {
 		"README.md": "# Test Project",
 		"data.txt":  "some data",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	result := Detect(tmpDir)
 	assert.Equal(t, "A", result.Lane)
@@ -709,7 +709,7 @@ func TestDetect_UnknownProject(t *testing.T) {
 func TestDetect_EmptyDirectory(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "test-detect-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	result := Detect(tmpDir)
 	assert.Equal(t, "A", result.Lane)
@@ -730,7 +730,7 @@ func BenchmarkDetect_SimpleProject(b *testing.B) {
 		"go.mod":  "module test",
 		"main.go": "package main\nfunc main() {}",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -754,7 +754,7 @@ func BenchmarkDetect_ComplexProject(b *testing.B) {
 	}
 
 	tmpDir := createTestDir(b, files)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -768,7 +768,7 @@ func BenchmarkDetect_WASMDetection(b *testing.B) {
 		"src/lib.rs": "use wasm_bindgen::prelude::*;",
 		"build.sh":   "wasm-pack build",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

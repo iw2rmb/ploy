@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/iw2rmb/ploy/internal/mods"
+	"github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -21,8 +23,8 @@ type KBIntegrationSuite struct {
 	suite.Suite
 	consulClient  *consulapi.Client
 	storageClient *storage.StorageClient
-	kbStorage     *transflow.SeaweedFSKBStorage
-	lockManager   *transflow.ConsulKBLockManager
+	kbStorage     *mods.SeaweedFSKBStorage
+	lockManager   *mods.ConsulKBLockManager
 }
 
 func (s *KBIntegrationSuite) SetupSuite() {
@@ -43,8 +45,9 @@ func (s *KBIntegrationSuite) SetupSuite() {
 	require.NoError(s.T(), err)
 
 	// KB storage with real services
-	s.lockManager = transflow.NewConsulKBLockManager(s.consulClient)
-	s.kbStorage = transflow.NewSeaweedFSKBStorage(s.storageClient, s.lockManager)
+	kv := orchestration.NewKV()
+	s.lockManager = mods.NewConsulKBLockManager(kv)
+	s.kbStorage = mods.NewSeaweedFSKBStorage(s.storageClient, s.lockManager)
 }
 
 func (s *KBIntegrationSuite) skipIfNoServices() {
@@ -73,29 +76,29 @@ func (s *KBIntegrationSuite) TestKBLearningIntegration() {
 	runID := "test-run-123"
 
 	// Create test healing case
-	caseRecord := &transflow.HealingCaseRecord{
+	caseRecord := &mods.CaseRecord{
 		RunID:     runID,
-		Timestamp: time.Now().Format(time.RFC3339),
+		Timestamp: time.Now(),
 		Language:  "java",
 		Signature: errorSig,
-		Context: transflow.HealingContext{
+		Context: &mods.CaseContext{
 			Language:        "java",
 			Lane:            "C",
 			RepoURL:         "https://github.com/test/repo.git",
 			CompilerVersion: "javac 11.0.1",
 		},
-		Attempt: transflow.HealingAttemptRecord{
+		Attempt: &mods.HealingAttempt{
 			Type:   "orw_recipe",
 			Recipe: "org.openrewrite.java.migrate.Java11toJava17",
 		},
-		Outcome: transflow.HealingOutcomeRecord{
+		Outcome: &mods.HealingOutcome{
 			Success:      true,
 			BuildStatus:  "passed",
 			ErrorChanged: false,
-			DurationMs:   5000,
-			CompletedAt:  time.Now().Format(time.RFC3339),
+			Duration:     5000,
+			CompletedAt:  time.Now(),
 		},
-		BuildLogs: transflow.HealingBuildLogs{
+		BuildLogs: &mods.SanitizedLogs{
 			Stdout: "Build successful",
 		},
 	}
@@ -135,17 +138,17 @@ func (s *KBIntegrationSuite) TestKBLockingMechanism() {
 	lockKey := "test-lock-integration"
 
 	// Test distributed locking
-	acquired, err := s.lockManager.AcquireLock(ctx, lockKey, time.Minute)
+	lock, err := s.lockManager.AcquireLock(ctx, lockKey, time.Minute)
 	if err != nil {
 		t.Logf("Lock acquisition failed: %v (expected initially)", err)
 		assert.Error(t, err, "Locking should fail initially due to incomplete setup")
-	} else {
-		assert.True(t, acquired, "Lock should be acquired")
-
-		// Release lock
-		err = s.lockManager.ReleaseLock(ctx, lockKey)
-		assert.NoError(t, err, "Lock release should succeed")
+		return
 	}
+	assert.NotNil(t, lock, "Lock should be returned when acquired")
+
+	// Release lock
+	err = s.lockManager.ReleaseLock(ctx, lock)
+	assert.NoError(t, err, "Lock release should succeed")
 }
 
 func TestKBIntegrationSuite(t *testing.T) {

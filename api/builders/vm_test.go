@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildVM tests the BuildVM function
@@ -216,7 +218,8 @@ func TestBuildVMCommandArguments(t *testing.T) {
 			}
 
 			// Run with mock
-			BuildVMWithMock(tt.app, tt.sha, tt.outDir, nil, mockCommand)
+			_, err := BuildVMWithMock(tt.app, tt.sha, tt.outDir, nil, mockCommand)
+			require.NoError(t, err)
 
 			// Verify script
 			if capturedScript != tt.expectedScript {
@@ -257,7 +260,8 @@ func TestBuildVMEnvironmentVariables(t *testing.T) {
 	}
 
 	// Run with environment variables
-	BuildVMWithMock("app", "sha", "/out", envVars, mockCommand)
+	_, err := BuildVMWithMock("app", "sha", "/out", envVars, mockCommand)
+	require.NoError(t, err)
 
 	// Convert to map for checking
 	envMap := make(map[string]string)

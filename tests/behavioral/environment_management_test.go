@@ -21,14 +21,17 @@ var _ = Describe("Environment Variable Management", func() {
 				Execute()
 
 			// Allow for various responses during development
-			if resp.StatusCode == 200 {
+			switch resp.StatusCode {
+			case 200:
 				var envResp map[string]interface{}
 				resp.JSON(&envResp)
 				if env, ok := envResp["env"]; ok {
 					Expect(env).To(BeEmpty(), "Environment should start empty")
 				}
-			} else if resp.StatusCode == 404 {
+			case 404:
 				By("App doesn't exist yet, which is expected")
+			default:
+				// no-op for other statuses during dev
 			}
 
 			By("Setting multiple environment variables")

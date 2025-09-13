@@ -5,15 +5,16 @@ import (
 	"fmt"
 
 	"github.com/iw2rmb/ploy/api/arf/models"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 )
 
 // RegistryStorageAdapter adapts RecipeRegistry to the RecipeStorage interface
 // to enforce SeaweedFS-backed storage only (no in-memory fallback).
 type RegistryStorageAdapter struct {
-	reg *RecipeRegistry
+	reg *recipes.RecipeRegistry
 }
 
-func NewRegistryStorageAdapter(reg *RecipeRegistry) *RegistryStorageAdapter {
+func NewRegistryStorageAdapter(reg *recipes.RecipeRegistry) *RegistryStorageAdapter {
 	return &RegistryStorageAdapter{reg: reg}
 }
 
@@ -28,7 +29,7 @@ func (a *RegistryStorageAdapter) GetRecipe(ctx context.Context, id string) (*mod
 
 func (a *RegistryStorageAdapter) GetRecipeByNameAndVersion(ctx context.Context, name, version string) (*models.Recipe, error) {
 	// Registry stores canonical IDs; emulate by scanning list and matching name+version
-	list, err := a.reg.ListRecipes(ctx, RecipeFilters{})
+	list, err := a.reg.ListRecipes(ctx, recipes.RecipeFilters{})
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +51,9 @@ func (a *RegistryStorageAdapter) DeleteRecipe(ctx context.Context, id string) er
 }
 
 // Query
-func (a *RegistryStorageAdapter) ListRecipes(ctx context.Context, filter RecipeFilter) ([]*models.Recipe, error) {
+func (a *RegistryStorageAdapter) ListRecipes(ctx context.Context, filter recipes.RecipeFilter) ([]*models.Recipe, error) {
 	// Map RecipeFilter to RecipeFilters
-	filters := RecipeFilters{
+	filters := recipes.RecipeFilters{
 		Language: filter.Language,
 		Author:   filter.Author,
 		Tags:     filter.Tags,
@@ -60,20 +61,20 @@ func (a *RegistryStorageAdapter) ListRecipes(ctx context.Context, filter RecipeF
 	return a.reg.ListRecipes(ctx, filters)
 }
 
-func (a *RegistryStorageAdapter) SearchRecipes(ctx context.Context, query string) ([]*RecipeSearchResult, error) {
-	recipes, err := a.reg.SearchRecipes(ctx, query)
+func (a *RegistryStorageAdapter) SearchRecipes(ctx context.Context, query string) ([]*recipes.RecipeSearchResult, error) {
+	list, err := a.reg.SearchRecipes(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*RecipeSearchResult, 0, len(recipes))
-	for _, r := range recipes {
-		out = append(out, &RecipeSearchResult{Recipe: r, Score: 1.0})
+	out := make([]*recipes.RecipeSearchResult, 0, len(list))
+	for _, r := range list {
+		out = append(out, &recipes.RecipeSearchResult{Recipe: r, Score: 1.0})
 	}
 	return out, nil
 }
 
 func (a *RegistryStorageAdapter) GetRecipeVersions(ctx context.Context, name string) ([]*models.Recipe, error) {
-	list, err := a.reg.ListRecipes(ctx, RecipeFilters{})
+	list, err := a.reg.ListRecipes(ctx, recipes.RecipeFilters{})
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (a *RegistryStorageAdapter) ImportRecipes(ctx context.Context, recipes []*m
 	return nil
 }
 
-func (a *RegistryStorageAdapter) ExportRecipes(ctx context.Context, filter RecipeFilter) ([]*models.Recipe, error) {
+func (a *RegistryStorageAdapter) ExportRecipes(ctx context.Context, filter recipes.RecipeFilter) ([]*models.Recipe, error) {
 	return a.ListRecipes(ctx, filter)
 }
 
@@ -136,6 +137,6 @@ func (a *RegistryStorageAdapter) VerifyRecipeHash(ctx context.Context, id string
 
 // Index (no external index; operations are no-ops)
 func (a *RegistryStorageAdapter) RebuildIndex(ctx context.Context) error { return nil }
-func (a *RegistryStorageAdapter) UpdateIndex(ctx context.Context, recipe *models.Recipe, action IndexAction) error {
+func (a *RegistryStorageAdapter) UpdateIndex(ctx context.Context, recipe *models.Recipe, action recipes.IndexAction) error {
 	return nil
 }

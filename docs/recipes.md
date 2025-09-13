@@ -270,16 +270,16 @@ Request body:
 Response includes transformation ID and status URL for monitoring:
 ```json
 {
-  "transformation_id": "abc-123-def",
+  "mod_id": "abc-123-def",
   "status": "initiated",
-  "status_url": "/v1/mods/status/tf-abc123",
+  "status_url": "/v1/mods/tf-abc123/status",
   "message": "Transformation started, use status_url to monitor progress"
 }
 ```
 
 #### Check Transformation Status
 ```http
-GET /v1/mods/status/:id
+GET /v1/mods/:id/status
 ```
 
 Returns current status, progress, and any healing attempts.
@@ -325,7 +325,7 @@ ploy arf recipes compose \
 
 The API validates `recipe_id` when a catalog is available:
 
-1. On transflow run, the plan can include OpenRewrite recipes which are checked against the catalog
+1. On mod run, the plan can include OpenRewrite recipes which are checked against the catalog
 2. If not found, returns 400 with suggestions based on fuzzy matching
 3. The CLI surfaces these suggestions to help users correct typos
 

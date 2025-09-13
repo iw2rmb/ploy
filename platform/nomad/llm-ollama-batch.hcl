@@ -71,8 +71,27 @@ cd /workspace
 tar -xzf input.tar.gz
 rm input.tar.gz
 
+# Optionally download additional context (if provided)
+if [ -n "${CONTEXT_URL}" ]; then
+  echo "Downloading context from: ${CONTEXT_URL}"
+  mkdir -p /workspace/context || true
+  if wget -q -O /workspace/context.tar.gz "${CONTEXT_URL}"; then
+    tar -C /workspace -xzf /workspace/context.tar.gz 2>/dev/null || tar -C /workspace/context -xzf /workspace/context.tar.gz 2>/dev/null || true
+    rm -f /workspace/context.tar.gz || true
+  fi
+fi
+
 # Decode the base64 encoded prompt
 DECODED_PROMPT=$(echo "${PROMPT}" | base64 -d)
+
+# Optionally enrich with SBOM summary if present
+if [ -s "/workspace/context/prompt_sbom.txt" ]; then
+  HINT=$(head -c 4000 "/workspace/context/prompt_sbom.txt")
+  DECODED_PROMPT="${DECODED_PROMPT}
+
+[Context — SBOM Summary]
+${HINT}"
+fi
 
 # Find code files based on language
 case "${LANGUAGE}" in

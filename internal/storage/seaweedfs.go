@@ -112,7 +112,9 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 	if size, err := body.Seek(0, 2); err == nil { // Seek to end to get size
 		fileSize = size
 	}
-	body.Seek(0, 0) // Reset to start for actual upload
+	if _, err := body.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to reset body: %w", err)
+	} // Reset to start for actual upload
 	fmt.Printf("[SeaweedFS PutObject] File size: %d bytes\n", fileSize)
 
 	// Create multipart form data
@@ -133,7 +135,9 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 	}
 	fmt.Printf("[SeaweedFS PutObject] Copied %d bytes to multipart form\n", bytesWritten)
 
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+	}
 	fmt.Printf("[SeaweedFS PutObject] Multipart form size: %d bytes\n", buf.Len())
 
 	// Make the request
@@ -151,7 +155,7 @@ func (c *SeaweedFSClient) PutObject(bucket, key string, body io.ReadSeeker, cont
 		fmt.Printf("[SeaweedFS PutObject] ERROR: HTTP request failed: %v\n", err)
 		return nil, fmt.Errorf("failed to upload: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	fmt.Printf("[SeaweedFS PutObject] HTTP Response Status: %s (%d)\n", resp.Status, resp.StatusCode)
 
@@ -194,7 +198,7 @@ func (c *SeaweedFSClient) GetObject(bucket, key string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("failed to get object: %s", resp.Status)
 	}
 	return resp.Body, nil
@@ -212,7 +216,7 @@ func (c *SeaweedFSClient) ListObjects(bucket, prefix string) ([]ObjectInfo, erro
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Directory doesn't exist yet, return empty list
@@ -318,7 +322,7 @@ func (c *SeaweedFSClient) VerifyUpload(key string) error {
 		fmt.Printf("[SeaweedFS VerifyUpload] ERROR: HEAD request failed: %v\n", err)
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	fmt.Printf("[SeaweedFS VerifyUpload] HEAD response status: %s (%d)\n", resp.Status, resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
@@ -369,7 +373,7 @@ func (c *SeaweedFSClient) assignVolume() (*VolumeAssignment, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to assign volume: %s", resp.Status)
@@ -399,7 +403,7 @@ func (c *SeaweedFSClient) uploadToVolume(assignment *VolumeAssignment, body io.R
 		return "", 0, err
 	}
 
-	writer.Close()
+	_ = writer.Close()
 
 	// Upload to volume server
 	uploadURL := fmt.Sprintf("http://%s/%s", assignment.URL, assignment.FileID)
@@ -413,7 +417,7 @@ func (c *SeaweedFSClient) uploadToVolume(assignment *VolumeAssignment, body io.R
 	if err != nil {
 		return "", 0, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		return "", 0, fmt.Errorf("upload failed: %s", resp.Status)
@@ -436,7 +440,7 @@ func (c *SeaweedFSClient) createDirectory(bucket, dir string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
@@ -462,7 +466,7 @@ func (c *SeaweedFSClient) createDirectoryFullPath(fullPath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
@@ -488,13 +492,21 @@ func (c *SeaweedFSClient) registerInFiler(bucket, key, fileID, contentType strin
 	writer := multipart.NewWriter(&buf)
 
 	// Add metadata fields
-	writer.WriteField("fid", fileID)
-	writer.WriteField("size", fmt.Sprintf("%d", size))
+	if err := writer.WriteField("fid", fileID); err != nil {
+		return err
+	}
+	if err := writer.WriteField("size", fmt.Sprintf("%d", size)); err != nil {
+		return err
+	}
 	if contentType != "" {
-		writer.WriteField("mime", contentType)
+		if err := writer.WriteField("mime", contentType); err != nil {
+			return err
+		}
 	}
 
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return err
+	}
 
 	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
@@ -506,7 +518,7 @@ func (c *SeaweedFSClient) registerInFiler(bucket, key, fileID, contentType strin
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to register in filer: %s", resp.Status)
@@ -520,7 +532,7 @@ func (c *SeaweedFSClient) uploadFile(keyPrefix, filePath, contentType string) er
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	key := keyPrefix + filepath.Base(filePath)
 

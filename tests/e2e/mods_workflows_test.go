@@ -84,7 +84,7 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 	// Fallback: if execution_id not parsed from CLI output, start run via controller directly
 	if result.ExecutionID == "" {
 		t.Logf("execution_id not found in CLI output; starting run via controller fallback")
-        runURL := strings.TrimRight(controller, "/") + "/mods"
+		runURL := strings.TrimRight(controller, "/") + "/mods"
 		payload := fmt.Sprintf("{\"config\": %q, \"test_mode\": false}", result.ConfigYAML)
 		req0, _ := http.NewRequestWithContext(ctx, http.MethodPost, runURL, strings.NewReader(payload))
 		req0.Header.Set("Content-Type", "application/json")
@@ -108,7 +108,7 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 	}
 
 	// Query controller for final status to assert MR and build metadata
-    statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ExecutionID)
+	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ExecutionID)
 	httpc := &http.Client{Timeout: 30 * time.Second}
 	// Poll until terminal
 	var st struct {
@@ -164,7 +164,7 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 			t.Logf("Artifacts (from status): %v", artsMap)
 		}
 	} else {
-        artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ExecutionID)
+		artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ExecutionID)
 		req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, artsURL, nil)
 		resp2, err := httpc.Do(req2)
 		if err == nil && resp2.StatusCode == 200 {
@@ -208,7 +208,7 @@ func deleteMRSourceBranch(ctx context.Context, token, mrURL string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("get mr http %d", resp.StatusCode)
 	}
@@ -421,7 +421,7 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 
 	result, err := env.ExecuteWorkflow(ctx, workflow)
 	if err != nil {
-		t.Logf("transflow run error: %v", err)
+		t.Logf("mods run error: %v", err)
 	}
 
 	if result.ExecutionID == "" {
@@ -429,8 +429,8 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 	}
 
 	// Query controller for steps and artifacts to verify healing path
-	statusURL := fmt.Sprintf("%s/transflow/status/%s", strings.TrimRight(controller, "/"), result.ExecutionID)
-	artsURL := fmt.Sprintf("%s/transflow/artifacts/%s", strings.TrimRight(controller, "/"), result.ExecutionID)
+	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ExecutionID)
+	artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ExecutionID)
 
 	httpc := &http.Client{Timeout: 30 * time.Second}
 	// Status
@@ -439,7 +439,7 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("status fetch failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		t.Fatalf("status HTTP %d", resp.StatusCode)
 	}

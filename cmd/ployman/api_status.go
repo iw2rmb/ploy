@@ -57,7 +57,7 @@ func runApiStatus(args []string) {
 				if checkVersionMatch(controllerURL, deploymentState.ExpectedCommit) {
 					fmt.Printf("✅ Deployment completed successfully\n")
 					fmt.Printf("Branch '%s' deployed to %s\n", deploymentState.TargetBranch, deploymentState.TargetHost)
-					clearDeploymentState() // Clean up successful deployment state
+					_ = clearDeploymentState() // Clean up successful deployment state
 				} else {
 					fmt.Printf("⚠️  Deployment may have failed - version mismatch\n")
 					fmt.Printf("Expected commit: %s\n", deploymentState.ExpectedCommit)
@@ -86,7 +86,7 @@ func runApiStatus(args []string) {
 		fmt.Println("  3. SSH to VPS and check Nomad: ssh root@$TARGET_HOST")
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
 		body, err := io.ReadAll(resp.Body)
@@ -118,7 +118,7 @@ func runApiStatus(args []string) {
 	if err == nil {
 		resp, err = client.Do(req)
 		if err == nil {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode == http.StatusOK {
 				fmt.Println("Health check: ✅ Healthy")
 			} else {
@@ -144,7 +144,7 @@ func checkVersionMatch(controllerURL, expectedCommit string) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return false
@@ -192,7 +192,7 @@ func checkDeploymentStatus(controllerURL string) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
 		fmt.Println("API is responding normally")

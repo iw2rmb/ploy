@@ -201,13 +201,13 @@ func TestSelfHealConfig_Validation(t *testing.T) {
 	}
 }
 
-func TestTransflowHealingAttempt_Creation(t *testing.T) {
+func TestModsHealingAttempt_Creation(t *testing.T) {
 	tests := []struct {
 		name             string
 		attemptNumber    int
 		errorContext     arf.ErrorContext
 		suggestedRecipes []string
-		expected         *TransflowHealingAttempt
+		expected         *ModHealingAttempt
 	}{
 		{
 			name:          "simple healing attempt",
@@ -218,7 +218,7 @@ func TestTransflowHealingAttempt_Creation(t *testing.T) {
 				SourceFile:   "Main.java",
 			},
 			suggestedRecipes: []string{"com.acme.FixCompilation"},
-			expected: &TransflowHealingAttempt{
+			expected: &ModHealingAttempt{
 				AttemptNumber: 1,
 				ErrorContext: arf.ErrorContext{
 					ErrorMessage: "compilation failed",
@@ -235,7 +235,7 @@ func TestTransflowHealingAttempt_Creation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attempt := NewTransflowHealingAttempt(tt.attemptNumber, tt.errorContext, tt.suggestedRecipes)
+			attempt := NewModHealingAttempt(tt.attemptNumber, tt.errorContext, tt.suggestedRecipes)
 
 			assert.Equal(t, tt.expected.AttemptNumber, attempt.AttemptNumber)
 			assert.Equal(t, tt.expected.ErrorContext.ErrorMessage, attempt.ErrorContext.ErrorMessage)
@@ -246,8 +246,8 @@ func TestTransflowHealingAttempt_Creation(t *testing.T) {
 	}
 }
 
-func TestTransflowHealingSummary_Tracking(t *testing.T) {
-	summary := NewTransflowHealingSummary(true, 2)
+func TestModsHealingSummary_Tracking(t *testing.T) {
+	summary := NewModHealingSummary(true, 2)
 
 	// Test initial state
 	assert.True(t, summary.Enabled)
@@ -258,7 +258,7 @@ func TestTransflowHealingSummary_Tracking(t *testing.T) {
 	assert.Empty(t, summary.Attempts)
 
 	// Add healing attempts
-	attempt1 := &TransflowHealingAttempt{
+	attempt1 := &ModHealingAttempt{
 		AttemptNumber:    1,
 		SuggestedRecipes: []string{"com.acme.FixImports"},
 		AppliedRecipes:   []string{"com.acme.FixImports"},
@@ -266,7 +266,7 @@ func TestTransflowHealingSummary_Tracking(t *testing.T) {
 		ErrorMessage:     "still failing",
 	}
 
-	attempt2 := &TransflowHealingAttempt{
+	attempt2 := &ModHealingAttempt{
 		AttemptNumber:    2,
 		SuggestedRecipes: []string{"com.acme.FixSyntax"},
 		AppliedRecipes:   []string{"com.acme.FixSyntax"},
@@ -293,7 +293,7 @@ func TestErrorAnalysisIntegration(t *testing.T) {
 		"main.go:20:5: syntax error: unexpected ;",
 	}
 
-	analyzer := NewTransflowErrorAnalyzer()
+	analyzer := NewModErrorAnalyzer()
 	suggestions, err := analyzer.AnalyzeBuildFailure(context.Background(), buildErrors, "go")
 
 	require.NoError(t, err)
@@ -304,7 +304,7 @@ func TestErrorAnalysisIntegration(t *testing.T) {
 
 func TestSelfHealingRunnerFlow(t *testing.T) {
 	// Test the complete self-healing flow (will fail until implemented)
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "test-healing",
 		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		BaseRef:    "refs/heads/main",
@@ -312,7 +312,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 			MaxRetries: 2,
 			Enabled:    true,
 		},
-		Steps: []TransflowStep{
+		Steps: []ModStep{
 			{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 		},
 	}
@@ -350,7 +350,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 		},
 	}
 
-	runner, err := NewTransflowRunner(config, "/tmp/test")
+	runner, err := NewModRunner(config, "/tmp/test")
 	require.NoError(t, err)
 
 	runner.SetGitOperations(mockGit)
@@ -386,7 +386,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 
 func TestSelfHealingBoundedRetries(t *testing.T) {
 	// Test that healing respects max_retries limit
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "test-bounded",
 		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		BaseRef:    "refs/heads/main",
@@ -394,7 +394,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 			MaxRetries: 1, // Only one retry allowed
 			Enabled:    true,
 		},
-		Steps: []TransflowStep{
+		Steps: []ModStep{
 			{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
 		},
 	}
@@ -407,7 +407,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 		SubmitError: errors.New("healing job failed"),
 	}
 
-	runner, err := NewTransflowRunner(config, "/tmp/test")
+	runner, err := NewModRunner(config, "/tmp/test")
 	require.NoError(t, err)
 
 	runner.SetGitOperations(&MockGitOperations{})
@@ -429,13 +429,13 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 
 // Helper functions for testing
 
-func parseTestConfigYAML(yamlContent string) (*TransflowConfig, error) {
+func parseTestConfigYAML(yamlContent string) (*ModConfig, error) {
 	// Create temporary file with test content
 	tmpFile, err := os.CreateTemp("", "transflow-test-*.yaml")
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if err := os.WriteFile(tmpFile.Name(), []byte(yamlContent), 0644); err != nil {
 		return nil, err

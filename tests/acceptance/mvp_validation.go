@@ -18,7 +18,7 @@ type Scenario struct {
 	Name            string
 	Description     string
 	Repository      string
-	TransflowConfig string
+	ModsConfig      string
 	ExpectedResults ExpectedResults
 	ValidationSteps []ValidationStep
 }
@@ -92,14 +92,14 @@ type Result struct {
 	TransformationApplied  bool
 	ModelRegistryAvailable bool
 
-    // Mods-specific results
-    TransflowResult *mods.TransflowResult
-	WorkflowID      string
-	CommitSHA       string
-	BranchName      string
-    StepResults     []mods.StepResult
-    HealingSummary  *mods.TransflowHealingSummary
-	MRURL           string
+	// Mods-specific results
+	ModsResult     *mods.ModResult
+	WorkflowID     string
+	CommitSHA      string
+	BranchName     string
+	StepResults    []mods.StepResult
+	HealingSummary *mods.ModHealingSummary
+	MRURL          string
 }
 
 // HealingOption represents a healing strategy option
@@ -120,7 +120,7 @@ type LearningMetrics struct {
 
 // MVPEnvironment provides the complete testing environment for MVP acceptance tests
 type MVPEnvironment struct {
-    TransflowRunner     *mods.TransflowRunner
+	ModsRunner          *mods.ModRunner
 	BuildClient         *BuildClient
 	GitLabClient        *GitLabClient
 	KBClient            *KBClient
@@ -197,128 +197,128 @@ func (env *MVPEnvironment) Cleanup() {
 
 // ExecuteScenario executes a complete MVP acceptance test scenario
 func (env *MVPEnvironment) ExecuteScenario(ctx context.Context, scenario *Scenario) (*Result, error) {
-	// Write transflow configuration to temporary file
-	configFile, err := os.CreateTemp("", "transflow-*.yaml")
+	// Write mods configuration to temporary file
+	configFile, err := os.CreateTemp("", "mods-*.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp config file: %w", err)
 	}
-	defer os.Remove(configFile.Name())
-	defer configFile.Close()
+	defer func() { _ = os.Remove(configFile.Name()) }()
+	defer func() { _ = configFile.Close() }()
 
-	if _, err := configFile.WriteString(scenario.TransflowConfig); err != nil {
+	if _, err := configFile.WriteString(scenario.ModsConfig); err != nil {
 		return nil, fmt.Errorf("failed to write config file: %w", err)
 	}
-	configFile.Close()
+	_ = configFile.Close()
 
-	// Parse transflow configuration
-    config, err := mods.LoadConfig(configFile.Name())
+	// Parse mods configuration
+	config, err := mods.LoadConfig(configFile.Name())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse transflow config: %w", err)
+		return nil, fmt.Errorf("failed to parse mods config: %w", err)
 	}
 
-	// Create transflow runner
-    runner, err := mods.NewTransflowRunner(config, env.WorkspaceDir)
+	// Create mods runner
+	runner, err := mods.NewModRunner(config, env.WorkspaceDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transflow runner: %w", err)
+		return nil, fmt.Errorf("failed to create mods runner: %w", err)
 	}
 
 	// Set up dependencies (use test mode for now)
 	if env.IsTestMode {
-		// Set up mock dependencies for testing
-		// Note: This may require creating mock implementations
+		// Placeholder hook for test-mode dependency wiring
+		_ = env.IsTestMode
 	}
 
-	// Execute transflow
+	// Execute mods
 	start := time.Now()
-	transflowResult, err := runner.Run(ctx)
+	modsResult, err := runner.Run(ctx)
 	duration := time.Since(start)
 
 	// Create acceptance test result
 	result := &Result{
-		ScenarioName:    scenario.Name,
-		Duration:        duration,
-		Success:         err == nil,
-		TransflowResult: transflowResult,
+		ScenarioName: scenario.Name,
+		Duration:     duration,
+		Success:      err == nil,
+		ModsResult:   modsResult,
 	}
 
 	if err != nil {
 		result.Error = err.Error()
 	}
 
-	// Extract results from TransflowResult if available
-	if transflowResult != nil {
-		result.WorkflowID = transflowResult.WorkflowID
-		result.BranchName = transflowResult.BranchName
-		result.CommitSHA = transflowResult.CommitSHA
-		result.BuildVersion = transflowResult.BuildVersion
-		result.StepResults = transflowResult.StepResults
-		result.HealingSummary = transflowResult.HealingSummary
-		result.MRURL = transflowResult.MRURL
-		result.Success = transflowResult.Success
+	// Extract results from ModsResult if available
+	if modsResult != nil {
+		result.WorkflowID = modsResult.WorkflowID
+		result.BranchName = modsResult.BranchName
+		result.CommitSHA = modsResult.CommitSHA
+		result.BuildVersion = modsResult.BuildVersion
+		result.StepResults = modsResult.StepResults
+		result.HealingSummary = modsResult.HealingSummary
+		result.MRURL = modsResult.MRURL
+		result.Success = modsResult.Success
 	}
 
-	// Map transflow results to acceptance test fields
-	env.mapTransflowResults(result, transflowResult)
+	// Map mods results to acceptance test fields
+	env.mapModsResults(result, modsResult)
 
 	return result, nil
 }
 
-// mapTransflowResults maps TransflowResult fields to acceptance test Result fields
-func (env *MVPEnvironment) mapTransflowResults(result *Result, transflowResult *mods.TransflowResult) {
-	if transflowResult == nil {
+// mapModsResults maps ModsResult fields to acceptance test Result fields
+func (env *MVPEnvironment) mapModsResults(result *Result, modsResult *mods.ModResult) {
+	if modsResult == nil {
 		return
 	}
 
 	// Map basic execution results
-	result.Success = transflowResult.Success
-	result.WorkflowID = transflowResult.WorkflowID
-	result.BranchName = transflowResult.BranchName
-	result.CommitSHA = transflowResult.CommitSHA
-	result.BuildVersion = transflowResult.BuildVersion
-	result.MRURL = transflowResult.MRURL
+	result.Success = modsResult.Success
+	result.WorkflowID = modsResult.WorkflowID
+	result.BranchName = modsResult.BranchName
+	result.CommitSHA = modsResult.CommitSHA
+	result.BuildVersion = modsResult.BuildVersion
+	result.MRURL = modsResult.MRURL
 
 	// Map step results
-	result.RecipeExecuted = len(transflowResult.StepResults) > 0
-	result.TransformationApplied = result.RecipeExecuted && transflowResult.Success
+	result.RecipeExecuted = len(modsResult.StepResults) > 0
+	result.TransformationApplied = result.RecipeExecuted && modsResult.Success
 
 	// Map build results
 	result.BuildValidated = result.BuildVersion != ""
-	result.FinalBuildSuccess = transflowResult.Success
+	result.FinalBuildSuccess = modsResult.Success
 
 	// Map Git operations (inferred from successful execution)
-	result.RepoCloned = transflowResult.WorkflowID != ""
-	result.WorkflowBranchCreated = transflowResult.BranchName != ""
-	result.ChangesCommitted = transflowResult.CommitSHA != ""
+	result.RepoCloned = modsResult.WorkflowID != ""
+	result.WorkflowBranchCreated = modsResult.BranchName != ""
+	result.ChangesCommitted = modsResult.CommitSHA != ""
 	result.BranchPushed = result.ChangesCommitted
 
 	// Map MR results
-	result.MRURL = transflowResult.MRURL
+	result.MRURL = modsResult.MRURL
 	result.MRCreated = result.MRURL != ""
 	if result.MRURL != "" {
-        result.MRTitle = "Mods automated changes"
-        result.MRDescription = "Automated code transformation via Mods"
+		result.MRTitle = "Mods automated changes"
+		result.MRDescription = "Automated code transformation via Mods"
 		result.MRLabels = []string{"ploy", "tfl"}
 	}
 
 	// Map healing results
-	if transflowResult.HealingSummary != nil {
-		result.HealingAttempted = transflowResult.HealingSummary.AttemptsCount > 0
-		result.KBLearningRecorded = transflowResult.HealingSummary.Enabled
+	if modsResult.HealingSummary != nil {
+		result.HealingAttempted = modsResult.HealingSummary.AttemptsCount > 0
+		result.KBLearningRecorded = modsResult.HealingSummary.Enabled
 	}
 
 	// Set default successful values
-	result.ArtifactsGenerated = transflowResult.Success
+	result.ArtifactsGenerated = modsResult.Success
 	result.ModelRegistryAvailable = true // Assume available in test environment
-	result.WorkflowBranch = transflowResult.BranchName
+	result.WorkflowBranch = modsResult.BranchName
 }
 
-// createConfigFile creates a temporary transflow configuration file
+// createConfigFile creates a temporary mods configuration file
 func (env *MVPEnvironment) createConfigFile(config string) (string, error) {
-	tmpFile, err := os.CreateTemp("", "transflow-acceptance-*.yaml")
+	tmpFile, err := os.CreateTemp("", "mods-acceptance-*.yaml")
 	if err != nil {
 		return "", err
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	_, err = tmpFile.WriteString(config)
 	if err != nil {
@@ -328,22 +328,22 @@ func (env *MVPEnvironment) createConfigFile(config string) (string, error) {
 	return tmpFile.Name(), nil
 }
 
-// runTransflowCLI executes the transflow CLI command
-func (env *MVPEnvironment) runTransflowCLI(configFile string) (string, error) {
+// runModCLI executes the mods CLI command
+func (env *MVPEnvironment) runModCLI(configFile string) (string, error) {
 	if env.IsTestMode {
 		// In test mode, return mock output
-		return env.generateMockTransflowOutput(), nil
+		return env.generateMockModsOutput(), nil
 	}
 
 	// In production mode, execute actual CLI
-	cmd := exec.Command("ploy", "transflow", "run", "-f", configFile, "--verbose")
+	cmd := exec.Command("ploy", "mod", "run", "-f", configFile, "--verbose")
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
 
-// generateMockTransflowOutput creates realistic mock output for testing
-func (env *MVPEnvironment) generateMockTransflowOutput() string {
-	return `[INFO] Starting transflow workflow: test-workflow
+// generateMockModsOutput creates realistic mock output for testing
+func (env *MVPEnvironment) generateMockModsOutput() string {
+	return `[INFO] Starting mods workflow: test-workflow
 [INFO] Cloning repository: https://gitlab.com/example/repo.git
 [INFO] Creating workflow branch: workflow/test-workflow/abc123
 [INFO] Executing OpenRewrite recipe: Java11toJava17

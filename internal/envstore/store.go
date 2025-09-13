@@ -16,7 +16,7 @@ type EnvStore struct {
 type AppEnvVars map[string]string
 
 func New(basePath string) *EnvStore {
-	os.MkdirAll(basePath, 0755)
+	_ = os.MkdirAll(basePath, 0755)
 	return &EnvStore{basePath: basePath}
 }
 
