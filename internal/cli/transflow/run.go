@@ -18,23 +18,19 @@ import (
 // TransflowCmd provides the CLI entrypoint to run transflows
 func TransflowCmd(args []string, controllerURL string) {
     if len(args) == 0 {
-        fmt.Println("Usage: ploy transflow <subcommand> [options]")
-        fmt.Println("Subcommands:")
-        fmt.Println("  run      - Execute full workflow remotely (default mode)")
-        fmt.Println("  watch    - Attach to a running execution by ID")
-        fmt.Println("  render   - Render planner inputs and HCL locally (no submission)")
-        fmt.Println("  plan     - Render planner and optionally submit (use --submit)")
-        fmt.Println("  reduce   - Render reducer and optionally submit (use --submit)")
-        fmt.Println("  apply    - Apply a diff locally and run build gate (use --diff-path/--diff-url)")
+        printTransflowHelp()
         return
     }
 
     switch args[0] {
+    case "help":
+        printTransflowHelp()
+        return
     case "run":
-		if err := runTransflow(args[1:], controllerURL); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
+        if err := runTransflow(args[1:], controllerURL); err != nil {
+            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+            os.Exit(1)
+        }
     case "watch":
         if err := watchTransflow(args[1:], controllerURL); err != nil {
             fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -61,8 +57,20 @@ func TransflowCmd(args []string, controllerURL string) {
             os.Exit(1)
         }
     default:
-        fmt.Println("Usage: ploy transflow <run|watch|render|plan|reduce|apply> ...")
+        printTransflowHelp()
     }
+}
+
+func printTransflowHelp() {
+    fmt.Println("Usage: ploy transflow <subcommand> [options]")
+    fmt.Println("Subcommands:")
+    fmt.Println("  run      - Execute full workflow remotely (default mode)")
+    fmt.Println("  watch    - Attach to a running execution by ID")
+    fmt.Println("  render   - Render planner inputs and HCL locally (no submission)")
+    fmt.Println("  plan     - Render planner and optionally submit (use --submit)")
+    fmt.Println("  reduce   - Render reducer and optionally submit (use --submit)")
+    fmt.Println("  apply    - Apply a diff locally and run build gate (use --diff-path/--diff-url)")
+    fmt.Println("  help     - Show this help message")
 }
 
 // runTransflow handles the actual transflow execution
