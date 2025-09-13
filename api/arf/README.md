@@ -26,7 +26,7 @@ Removed/unsupported: legacy benchmark endpoints; ARF healing coordinator and hea
 
 ## Transform Workflows
 
-Transformation execution is unified under the Transflow API and CLI. See `docs/api/transflow.md` and `docs/transflow/README.md` for details on `/v1/transflow/*` endpoints and `ploy transflow run`.
+Transformation execution is unified under the Transflow API and CLI. See `docs/api/transflow.md` and `docs/mods/README.md` for details on `/v1/transflow/*` endpoints and `ploy transflow run`.
 
 ## Operational Rules
 

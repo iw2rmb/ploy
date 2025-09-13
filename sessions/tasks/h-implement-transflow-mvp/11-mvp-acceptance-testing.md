@@ -542,7 +542,7 @@ echo "Report available: ./mvp-acceptance-report.html"
 
 ## Context Files
 - @roadmap/transflow/MVP.md - Complete MVP requirements specification
-- @docs/transflow/README.md - User-facing documentation to validate
+- @docs/mods/README.md - User-facing documentation to validate
 - @tests/fixtures/applications/ - Test repositories for validation scenarios
 - @CLAUDE.md - TDD framework and acceptance criteria
 
