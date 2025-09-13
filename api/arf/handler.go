@@ -129,7 +129,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 
 	// Model registry moved to LLMS: /v1/llms/models/*
 
-	// Legacy ARF transform HTTP endpoints have been removed in favor of Transflow
+    // Legacy ARF transform HTTP endpoints have been removed in favor of Mods
 
 	// Sandbox management
 	arf.Get("/sandboxes", h.ListSandboxes)

@@ -107,7 +107,7 @@ func (s *Server) setupRoutes() {
 		log.Printf("ARF routes registered successfully")
 	}
 
-	// Transflow endpoints
+    // Mods endpoints
 	if s.dependencies.TransflowHandler != nil {
 		s.dependencies.TransflowHandler.RegisterRoutes(s.app)
 		log.Printf("Transflow routes registered successfully")

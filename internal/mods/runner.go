@@ -245,7 +245,7 @@ func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message 
 		return
 	}
 	// Fallback to local log output when no reporter is configured
-	log.Printf("[Transflow][%s/%s][%s] %s", phase, step, level, message)
+    log.Printf("[Mods][%s/%s][%s] %s", phase, step, level, message)
 }
 
 // GetEventReporter exposes the reporter for orchestrators

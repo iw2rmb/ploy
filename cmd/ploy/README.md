@@ -98,9 +98,9 @@ ploy arf health
 ploy arf cache stats
 ploy arf cache clear
 ```
-Automated Remediation Framework (ARF) provides recipe registry/catalog management, model registry, and related utilities. Code transformation workflows are unified under Transflow CLI.
+Automated Remediation Framework (ARF) provides recipe registry/catalog management, model registry, and related utilities. Code transformation workflows are unified under Mods CLI.
 
-Use Transflow for executing transformations and self-healing workflows:
+Use Mods for executing transformations and self-healing workflows:
 ```
 ploy transflow run -f <config.yaml> [--verbose]
 ```

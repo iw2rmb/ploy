@@ -100,8 +100,8 @@ api/
 ├── platform/                 # Platform service integration
 │   ├── handler.go            # Platform API endpoints
 │   └── handler_test.go       # Platform handler tests
-├── transflow/                # Transflow API endpoints
-│   └── handler.go            # Transflow transformation handlers
+├── transflow/                # Mods API endpoints (handled here; path name preserved)
+│   └── handler.go            # Mods transformation handlers
 ├── llms/                     # Large Language Model integration
 │   ├── handler.go            # LLM API endpoints
 │   └── handler_test.go       # LLM handler tests

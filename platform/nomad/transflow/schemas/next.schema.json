@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/transflow/next.schema.json",
-  "title": "Transflow Reducer Next Actions",
+  "title": "Mods Reducer Next Actions",
   "type": "object",
   "required": ["action"],
   "properties": {
