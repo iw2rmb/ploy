@@ -148,11 +148,13 @@ type TransflowRunner struct {
     config         *TransflowConfig
     workspaceDir   string
     gitOps         GitOperationsInterface
+    repoManager    RepoManager
     recipeExecutor RecipeExecutorInterface
     buildChecker   BuildCheckerInterface
     buildGate      BuildGate
     jobSubmitter   JobSubmitter         // For healing workflows
     gitProvider    provider.GitProvider // For MR creation
+    mrManager      MRManager
     eventReporter  EventReporter        // Optional real-time event reporter
 }
 
@@ -170,7 +172,8 @@ func NewTransflowRunner(config *TransflowConfig, workspaceDir string) (*Transflo
 
 // SetGitOperations sets the Git operations implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetGitOperations(gitOps GitOperationsInterface) {
-	r.gitOps = gitOps
+    r.gitOps = gitOps
+    if gitOps != nil { r.repoManager = NewRepoManagerAdapter(gitOps) } else { r.repoManager = nil }
 }
 
 // SetRecipeExecutor sets the recipe executor implementation (for dependency injection/testing)
@@ -199,7 +202,8 @@ func (r *TransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
 
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
 func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
-	r.gitProvider = provider
+    r.gitProvider = provider
+    if provider != nil { r.mrManager = NewMRManagerAdapter(provider) } else { r.mrManager = nil }
 }
 
 // SetEventReporter sets the reporter used for real-time observability
@@ -355,15 +359,23 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
 
 // PrepareRepo clones the target repository and creates a workflow branch; returns the repo path and branch name.
 func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, error) {
-	repoPath := filepath.Join(r.workspaceDir, "repo-apply")
-	if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
-		return "", "", fmt.Errorf("clone failed: %w", err)
-	}
-	branchName := GenerateBranchName(r.config.ID)
-	if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
-		return "", "", fmt.Errorf("branch failed: %w", err)
-	}
-	return repoPath, branchName, nil
+    repoPath := filepath.Join(r.workspaceDir, "repo-apply")
+    if r.repoManager != nil {
+        if err := r.repoManager.Clone(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+            return "", "", fmt.Errorf("clone failed: %w", err)
+        }
+    } else if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+        return "", "", fmt.Errorf("clone failed: %w", err)
+    }
+    branchName := GenerateBranchName(r.config.ID)
+    if r.repoManager != nil {
+        if err := r.repoManager.CreateBranch(ctx, repoPath, branchName); err != nil {
+            return "", "", fmt.Errorf("branch failed: %w", err)
+        }
+    } else if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
+        return "", "", fmt.Errorf("branch failed: %w", err)
+    }
+    return repoPath, branchName, nil
 }
 
 // ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
@@ -379,9 +391,13 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 	if err := applyUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
 		return err
 	}
-	if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
-		return fmt.Errorf("commit failed: %w", err)
-	}
+    if r.repoManager != nil {
+        if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+            return fmt.Errorf("commit failed: %w", err)
+        }
+    } else if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+        return fmt.Errorf("commit failed: %w", err)
+    }
 	// Build gate
 	res, err := r.runBuildGate(ctx, repoPath)
 	if err != nil {
