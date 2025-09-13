@@ -272,14 +272,14 @@ Response includes transformation ID and status URL for monitoring:
 {
   "transformation_id": "abc-123-def",
   "status": "initiated",
-  "status_url": "/v1/transflow/status/tf-abc123",
+  "status_url": "/v1/mods/status/tf-abc123",
   "message": "Transformation started, use status_url to monitor progress"
 }
 ```
 
 #### Check Transformation Status
 ```http
-GET /v1/transflow/status/:id
+GET /v1/mods/status/:id
 ```
 
 Returns current status, progress, and any healing attempts.
@@ -356,7 +356,7 @@ ploy arf transform --recipe <recipe-id> --auto-heal --iterations 3
 For long-running transformations, monitor progress:
 ```bash
 # Start transformation
-EXEC_ID=$(ploy transflow run -f config.yaml | jq -r '.execution_id')
+EXEC_ID=$(ploy mod run -f config.yaml | jq -r '.execution_id')
 
 # Check status
 ploy arf transforms status $TRANSFORM_ID --watch

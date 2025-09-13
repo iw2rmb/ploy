@@ -161,7 +161,7 @@ arfService := arf.NewARFService(storageAdapter, "")  // Empty bucket since adapt
 #### 5.2 Integration Tests (Transflow)
 ```bash
 # Test transflow run creates correct paths under artifacts/transflow/<id>/...
-curl -X POST "https://api.dev.ployman.app/v1/transflow/run" \
+curl -X POST "https://api.dev.ployman.app/v1/mods/run" \
   -H "Content-Type: application/json" \
   -d '{"config_data": {"version":"1","id":"storage-fix-$(date +%s)","target_repo":"https://github.com/winterbe/java8-tutorial.git","target_branch":"master","base_ref":"master","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.Java8toJava11"]}],"self_heal":{"enabled":false}}}'
 

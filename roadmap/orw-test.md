@@ -4,7 +4,7 @@
 Verify that Transflow workflows with OpenRewrite actually modify code and produce tangible results.
 
 ## Test Environment
-- **API Endpoint**: `https://api.dev.ployman.app/v1/transflow`
+- **API Endpoint**: `https://api.dev.ployman.app/v1/mods`
 - **Test Repository**: `/tmp/test-java-project` with deliberate code issues
 - **Target Recipes**: Standard OpenRewrite Java cleanup and modernization recipes
 
@@ -79,13 +79,13 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 2. **Execute Transflow Run**
   ```bash
-  curl -X POST https://api.dev.ployman.app/v1/transflow/run \
+  curl -X POST https://api.dev.ployman.app/v1/mods/run \
      -H "Content-Type: application/json" \
      -d '{"config_data": {"version":"1","id":"orw-test-$(date +%s)","target_repo":"https://github.com/iw2rmb/ploy-orw-test-java.git","target_branch":"main","base_ref":"main","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.RemoveUnusedImports"]}],"self_heal":{"enabled":false}}}'
   ```
 
 3. **Monitor Execution**
-   - Track status via `/v1/transflow/status/{id}`
+   - Track status via `/v1/mods/status/{id}`
    - Monitor Nomad job execution
    - Check SeaweedFS for artifacts
 
@@ -213,18 +213,18 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 
 ```bash
 # 1. Start transflow run
-curl -X POST https://api.dev.ployman.app/v1/transflow/run \
+curl -X POST https://api.dev.ployman.app/v1/mods/run \
   -H "Content-Type: application/json" \
   -d '{"config_data": {"version":"1","id":"orw-test-$(date +%s)","target_repo":"https://github.com/iw2rmb/ploy-orw-test-java.git","target_branch":"main","base_ref":"main","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.Java8toJava11"]}],"self_heal":{"enabled":false}}}'
 
 # 2. Monitor status
-curl https://api.dev.ployman.app/v1/transflow/status/{id}
+curl https://api.dev.ployman.app/v1/mods/status/{id}
 
 # 3. Get artifacts (e.g., diff.patch)
-curl https://api.dev.ployman.app/v1/transflow/artifacts/{id}
+curl https://api.dev.ployman.app/v1/mods/artifacts/{id}
 
 # 4. Logs / events
-curl https://api.dev.ployman.app/v1/transflow/logs/{id}
+curl https://api.dev.ployman.app/v1/mods/logs/{id}
 ```
 
 ### Tested Recipe IDs That Work
@@ -235,7 +235,7 @@ curl https://api.dev.ployman.app/v1/transflow/logs/{id}
 - `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2` - Spring Boot upgrade
 
 ### Test Automation
-- Automated via Go tests: integration/E2E suites above and transflow unit tests under `internal/cli/transflow`
+- Automated via Go tests: integration/E2E suites above and transflow unit tests under `internal/mods`
 - Test repositories created and available on GitHub
 
 ## Conclusions

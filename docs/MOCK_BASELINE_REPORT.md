@@ -8,7 +8,7 @@
 ### Overall Statistics
 - **Total Go files:** 1,200+ files across codebase
 - **Test files:** 171 test files  
-- **Mock files:** 1 dedicated mock file (`internal/cli/transflow/mocks.go`)
+- **Mock files:** 1 dedicated mock file (`internal/mods/mocks.go`)
 - **Production files with mock references:** 24 files
 - **interface{} usage in production:** 223 instances
 - **testify/mock imports:** 19 total imports

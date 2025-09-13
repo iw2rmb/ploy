@@ -14,7 +14,7 @@ Follow instructions:
 
 Scope
 
-  - Reviewed internal/cli/transflow (runner, fanout, job submission, MCP, KB), internal/orchestration, CLI entrypoints, and related scripts/templates.
+  - Reviewed internal/mods (runner, fanout, job submission, MCP, KB), internal/orchestration, CLI entrypoints, and related scripts/templates.
   - Focus: correctness, reliability, security, maintainability, and alignment with AGENTS.md (Nomad wrapper/VPS).
 
   High‑Impact Weak Spots
@@ -87,7 +87,7 @@ Scope
   - Example apps:
       - Move local test apps to public hello apps; parameterize tests to clone external repos — pending (current E2E uses public GitLab repo; local examples still exist in docs/tests).
   - ✅ SeaweedFS access:
-      - Client uploads use HTTP helpers (no curl); artifact key policy enforced client-side and server-side; controller brokers artifact downloads via `/v1/transflow/artifacts/:id/:name` with key validation. SeaweedFS base resolved via infra resolver. Auth TBD if filer becomes non‑public.
+      - Client uploads use HTTP helpers (no curl); artifact key policy enforced client-side and server-side; controller brokers artifact downloads via `/v1/mods/artifacts/:id/:name` with key validation. SeaweedFS base resolved via infra resolver. Auth TBD if filer becomes non‑public.
   - ✅ Allowlist verification:
       - Diff allowlist switched to doublestar; absolute/suspicious paths rejected; path prefix validation added for artifacts.
   - ⚠️ Temp artifacts in `/tmp/transflow-submitted/<exec>/<step>`:
@@ -106,7 +106,7 @@ Scope
       - Status: Partially completed — extracted cohesive helpers (pre-HCL builder, branch chain meta, ORW submit/fetch, build guard, tar preview, run ID, branch step, push events), unified EventBus via EventReporter, and centralized image/infra/defaults. Full module split can be considered later if needed.
   - ✅ CLI flag surface and mixed modes.
       - Change: expose explicit subcommands: render, plan, reduce, apply, run, watch. Keep “test-mode” behind an env or a separate build tag.
-      - Completed: Added `ploy transflow render|plan|reduce|apply|run|watch` plus `help` alias; updated docs and help output.
+      - Completed: Added `ploy mod render|plan|reduce|apply|run|watch` plus `help` alias; updated docs and help output.
   - ⚠️ KB integration breadth.
       - Status: KB remains integrated by default with graceful degradation on backend issues. Optional feature flagging can be added later if stricter decoupling is required.
 

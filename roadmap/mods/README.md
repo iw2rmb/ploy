@@ -4,7 +4,7 @@ Goal
 
 - Rename the feature set currently named "Transflow" to "Mods" across code, tests, docs, and platform assets.
 - Align HTTP endpoints to RESTful conventions (resource-oriented paths), e.g. `transflow/status/:id` → `mods/:id/status`.
-- Change CLI subcommands from `ploy transflow ...` to `ploy mod ...`.
+- Change CLI subcommands from `ploy mod ...` to `ploy mod ...`.
 
 Scope (What changes)
 
@@ -47,12 +47,12 @@ Detailed Work Breakdown
 
 2. CLI rename
 - Add `ploy mod` command group (`run`, `watch`, `status`, etc.).
-- Remove `ploy transflow` group entirely.
+- Remove `ploy mod` group entirely.
 - Update CLI help/README and examples.
 
 3. Mechanical rename in codebase
 - Packages/paths:
-  - `internal/cli/transflow` → `internal/mods`
+  - `internal/mods` → `internal/mods`
   - `api/transflow` → `api/mods`
   - `docs/transflow` → `docs/mods`
   - `platform/nomad/transflow/*` → `platform/nomad/mods/*`
@@ -75,20 +75,20 @@ Detailed Work Breakdown
 
 Endpoint Mapping (reference)
 
-- POST `/v1/transflow/run` ⇒ POST `/v1/mods`
-- GET `/v1/transflow/status/{id}` ⇒ GET `/v1/mods/{id}/status`
-- GET `/v1/transflow/list` ⇒ GET `/v1/mods`
-- DELETE `/v1/transflow/{id}` ⇒ DELETE `/v1/mods/{id}`
-- GET `/v1/transflow/artifacts/{id}` ⇒ GET `/v1/mods/{id}/artifacts`
-- GET `/v1/transflow/artifacts/{id}/{name}` ⇒ GET `/v1/mods/{id}/artifacts/{name}`
-- POST `/v1/transflow/event` ⇒ POST `/v1/mods/{id}/events`
-- GET `/v1/transflow/logs/{id}` ⇒ GET `/v1/mods/{id}/logs{?follow=true|false}`
+- POST `/v1/mods/run` ⇒ POST `/v1/mods`
+- GET `/v1/mods/status/{id}` ⇒ GET `/v1/mods/{id}/status`
+- GET `/v1/mods/list` ⇒ GET `/v1/mods`
+- DELETE `/v1/mods/{id}` ⇒ DELETE `/v1/mods/{id}`
+- GET `/v1/mods/artifacts/{id}` ⇒ GET `/v1/mods/{id}/artifacts`
+- GET `/v1/mods/artifacts/{id}/{name}` ⇒ GET `/v1/mods/{id}/artifacts/{name}`
+- POST `/v1/mods/event` ⇒ POST `/v1/mods/{id}/events`
+- GET `/v1/mods/logs/{id}` ⇒ GET `/v1/mods/{id}/logs{?follow=true|false}`
 
 CLI Mapping
 
-- `ploy transflow run` → `ploy mod run`
-- `ploy transflow watch` → `ploy mod watch`
-- `ploy transflow status` → `ploy mod status`
+- `ploy mod run` → `ploy mod run`
+- `ploy mod watch` → `ploy mod watch`
+- `ploy mod status` → `ploy mod status`
 
 Rollout Strategy (single cutover)
 
@@ -111,7 +111,7 @@ Risk & Mitigations
 
 Work Items (Trackable)
 
-- [ ] Implement `/v1/mods` routes + handlers and remove `/v1/transflow/*`
+- [ ] Implement `/v1/mods` routes + handlers and remove `/v1/mods/*`
 - [ ] Add POST `/v1/mods/:id/events` and wire reporter
 - [ ] CLI: add `mod` group; remove `transflow` group
 - [ ] Mechanical rename (internal packages, symbols, files)

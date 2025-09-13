@@ -45,7 +45,7 @@ Where To Set
     - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, TRANSFLOW_IMAGEs, TRANSFLOW_REGISTRY, GIT_AUTHOR).
 - Job template (orw-apply): platform/nomad/transflow/orw_apply.hcl
     - Resources, env block (ORW_IMAGE, PLOY_API_URL, SEAWEEDFS_URL, INPUT_URL, DIFF_KEY, controller/exec IDs).
-- Controller substitution: internal/cli/transflow/execution.go
+- Controller substitution: internal/mods/execution.go
     - Computes ${ORW_IMAGE}, ${INPUT_URL}, ${PLOY_API_URL}, ${DIFF_KEY}, etc.
 
 Recommended Defaults (dev)
@@ -94,9 +94,9 @@ LLM Defaults Reference
 - Limits default: `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
 
 Override examples (per run):
-- `TRANSFLOW_MODEL=gpt-4o-mini ./bin/ploy transflow plan --preserve`
-- `TRANSFLOW_TOOLS='{"file":{"allow":["src/**","pom.xml","build.gradle"]}}' ./bin/ploy transflow plan`
-- `TRANSFLOW_LIMITS='{"max_steps":4,"max_tool_calls":6,"timeout":"10m"}' ./bin/ploy transflow reduce`
+- `TRANSFLOW_MODEL=gpt-4o-mini ./bin/ploy mod plan --preserve`
+- `TRANSFLOW_TOOLS='{"file":{"allow":["src/**","pom.xml","build.gradle"]}}' ./bin/ploy mod plan`
+- `TRANSFLOW_LIMITS='{"max_steps":4,"max_tool_calls":6,"timeout":"10m"}' ./bin/ploy mod reduce`
 # Transflow Configuration Knobs
 
 The following environment variables control Transflow defaults. All are optional; sensible defaults are provided.

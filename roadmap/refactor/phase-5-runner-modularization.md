@@ -27,7 +27,7 @@ Scope
     - report(ctx, Event)
 
 Design Notes
-- Keep interfaces in `internal/cli/transflow` (or a small `internal/transflow/core` subpackage) to avoid wide-reaching imports.
+- Keep interfaces in `internal/mods` (or a small `internal/transflow/core` subpackage) to avoid wide-reaching imports.
 - Concrete implementations:
   - Production implementations reuse existing helpers (Git, ORW submission, SharedPush, fanout orchestrator, Git provider wrapper, controller reporter).
   - Test implementations: mocks/fakes for fast unit tests.
@@ -80,7 +80,7 @@ Acceptance Criteria
 - Clear interfaces defined and used by runner (no direct helper calls from orchestration layer)
 - Unit tests cover repo operations, apply+build, fanout, MR path via mocks
 - No regression: E2E JavaMigrationComplete passes on Dev VPS
-- Docs updated (internal/cli/transflow/README.md) to reflect architecture
+- Docs updated (internal/mods/README.md) to reflect architecture
 
 Risks/Mitigations
 - Risk: silent behavior change during wiring → Mitigate with incremental PRs and E2E after each slice.

@@ -181,7 +181,7 @@ GET /v1/mods
 Cancel a running transflow workflow.
 
 ```http
-DELETE /v1/transflow/{id}
+DELETE /v1/mods/{id}
 ```
 
 **Response:**
@@ -198,8 +198,8 @@ DELETE /v1/transflow/{id}
 Retrieve workflow artifacts via the controller (keys are exposed in status `result.artifacts`).
 
 ```http
-GET /v1/transflow/artifacts/{id}
-GET /v1/transflow/artifacts/{id}/{name}
+GET /v1/mods/artifacts/{id}
+GET /v1/mods/artifacts/{id}/{name}
 ```
 
 Known names: `plan_json`, `next_json`, `diff_patch`, `error_log`.
@@ -611,7 +611,7 @@ Configure webhooks to receive real-time notifications about transflow events.
 
 Jobs and the server-side runner can push fine-grained execution events to update live status.
 
-- POST `/v1/transflow/event`
+- POST `/v1/mods/event`
 
 Request body:
 
@@ -630,7 +630,7 @@ Request body:
 
 Effect:
 
-- Updates `/v1/transflow/status/{id}` with latest `phase`.
+- Updates `/v1/mods/status/{id}` with latest `phase`.
 - Appends to `steps[]` with timestamped records.
 - Populates `last_job` metadata when `job_name` is provided.
 
@@ -643,7 +643,7 @@ Notes:
 
 Stream live status and step events via Server-Sent Events.
 
-- GET `/v1/transflow/logs/{id}?follow=true|false`
+- GET `/v1/mods/logs/{id}?follow=true|false`
 
 Headers:
 
@@ -664,7 +664,7 @@ Events:
 Examples:
 
 ```sh
-curl -sN "https://api.dev.ployman.app/v1/transflow/logs/tf-abc123?follow=true"
+curl -sN "https://api.dev.ployman.app/v1/mods/logs/tf-abc123?follow=true"
 ```
 
 Notes:

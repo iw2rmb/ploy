@@ -897,7 +897,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ Git operations (clone, branch, commit, push) with proper error handling
 - ✅ GitLab MR integration with environment variable configuration
 - ✅ YAML configuration parsing and validation
-- ✅ Complete CLI integration (`ploy transflow run`) with full end-to-end workflow
+- ✅ Complete CLI integration (`ploy mod run`) with full end-to-end workflow
 - ✅ Test mode infrastructure with mock implementations for CI/testing
  - ✅ Real-time observability: status `steps[]`, `last_job`, and event push API
 
@@ -911,7 +911,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
   - Canonical step types enforced via StepType constants with alias normalization (planner-emitted `human` maps to `human-step`). Event streams report normalized step names.
 - ✅ Production job submission via `orchestration.SubmitAndWaitTerminal()`
 - ✅ Comprehensive error handling and timeout management
-- ✅ Full integration with transflow runner
+- ✅ Full integration with mods runner
 
 **Knowledge Base Learning System**
 - ✅ Error signature canonicalization and deduplication
