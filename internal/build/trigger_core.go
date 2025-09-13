@@ -74,35 +74,63 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	sha := c.Query("sha", "dev")
 	mainClass := c.Query("main", "com.ploy.ordersvc.Main")
 	lane := c.Query("lane", "")
-	// Diagnostic: request overview
-	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s body_bytes=%d", appName, sha, lane, c.Query("env", "dev"), len(c.Body()))
+    // Diagnostic: request overview
+    log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
 
 	tmpDir, _ := os.MkdirTemp("", "ploy-build-")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	tarPath := filepath.Join(tmpDir, "src.tar")
-	f, _ := os.Create(tarPath)
-	defer func() { _ = f.Close() }()
-	// Log incoming content length (if provided)
-	log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
-	// Prefer streaming read to avoid buffering limits and reduce proxy timeouts
-	var written int64
-	if reader := c.Context().RequestBodyStream(); reader != nil {
-		n, err := io.Copy(f, reader)
-		written = n
-		if err != nil {
-			log.Printf("[Build] Failed to stream request body: %v", err)
-			return c.Status(400).SendString("Failed to read request body: " + err.Error())
-		}
-	} else {
-		n, err := f.Write(c.Body())
-		written = int64(n)
-		if err != nil {
-			log.Printf("[Build] Failed to write request body: %v", err)
-			return c.Status(400).SendString("Failed to read request body: " + err.Error())
-		}
-	}
-	log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
+    tarPath := filepath.Join(tmpDir, "src.tar")
+    f, _ := os.Create(tarPath)
+    defer func() { _ = f.Close() }()
+    ct := strings.ToLower(c.Get("Content-Type"))
+    // Multipart support (field names: file|tar|archive; falls back to first)
+    if strings.HasPrefix(ct, "multipart/form-data") {
+        var fh *multipart.FileHeader
+        for _, key := range []string{"file", "tar", "archive"} {
+            if h, err := c.FormFile(key); err == nil && h != nil {
+                fh = h; break
+            }
+        }
+        if fh == nil {
+            if form, err := c.MultipartForm(); err == nil && form != nil {
+                for _, files := range form.File {
+                    if len(files) > 0 { fh = files[0]; break }
+                }
+            }
+        }
+        if fh == nil {
+            log.Printf("[Build] Multipart request did not include a file part")
+            return c.Status(400).JSON(fiber.Map{"error": "missing file part in multipart"})
+        }
+        src, err := fh.Open()
+        if err != nil { return utils.ErrJSON(c, 400, fmt.Errorf("open multipart: %w", err)) }
+        defer src.Close()
+        n, err := io.Copy(f, src)
+        if err != nil { return utils.ErrJSON(c, 400, fmt.Errorf("copy multipart: %w", err)) }
+        log.Printf("[Build] Received multipart tar %q (%d bytes)", fh.Filename, n)
+    } else {
+        // Log incoming content length (if provided)
+        log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
+        // Prefer streaming read to avoid buffering limits and reduce proxy timeouts
+        var written int64
+        if reader := c.Context().RequestBodyStream(); reader != nil {
+            n, err := io.Copy(f, reader)
+            written = n
+            if err != nil {
+                log.Printf("[Build] Failed to stream request body: %v", err)
+                return c.Status(400).SendString("Failed to read request body: " + err.Error())
+            }
+        } else {
+            n, err := f.Write(c.Body())
+            written = int64(n)
+            if err != nil {
+                log.Printf("[Build] Failed to write request body: %v", err)
+                return c.Status(400).SendString("Failed to read request body: " + err.Error())
+            }
+        }
+        log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
+    }
 
 	srcDir := filepath.Join(tmpDir, "src")
 	if err := os.MkdirAll(srcDir, 0755); err != nil {

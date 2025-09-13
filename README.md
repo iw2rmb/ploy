@@ -133,6 +133,10 @@ This architecture makes the api "just another Ploy application" managed by the s
   - Use detected language from lane picker (no default Java for non-JVM apps).
   - Lane E Nomad template simplified for Dev: reduced log retention (10x10MB) and removed service-level checks to avoid duplicates; rely on container healthcheck.
 - Current blocker: intermittent `unexpected EOF` on `ploy push` POST requests to Dev API. Next step is API task log inspection on VPS to confirm if the request handler exits early; mitigations added (retry + early failure detection).
+  - Update: POST path and body handling are confirmed OK via `/v1/_diag/echo` (200 with and without body). Small POSTs to legacy `/v1/builds/:app` and `/v1/apps/:app/builds` return 500 (`untar failed`) as expected, confirming handler reach.
+  - Root cause now appears to be reverse‑proxy timeouts on long‑running build POSTs (connection closed without response). Two fixes:
+    - Infra: increase forward/read/idle timeouts in ingress (Traefik) for build routes.
+    - App: add async build mode returning 202 + execution ID, with separate status/watch endpoints. CLI can adopt `--watch` to poll.
 
 ## Security: NVD CVE Database Configuration
 
