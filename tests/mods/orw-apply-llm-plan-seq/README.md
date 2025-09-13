@@ -131,6 +131,22 @@ Run Log & Key Takeaways
     - Intermittent `orw-apply` allocation failures require resilience/telemetry improvements (capture transform.log/error.log; transient retry/backoff).
     - Next: re-run once caches warm and verify that on `e2e/success` the build-gate triggers a deterministic compile fail → healing → success → MR.
 
+- Cycle 3 (Fix POM + compile gate before deploy):
+  - Fixes:
+    - Corrected POM structure on fail branches — moved `<profiles>` inside `<project>` to avoid Maven parse errors.
+    - Added a pre-deploy compile gate in Mods (server-side) using ARF BuildOperations. This runs `mvn clean compile -B -DskipTests -Dploy.build.gate=1` locally in the repo before pushing an app, enabling deterministic failures and healing.
+  - Result:
+    - Build gate now fails deterministically on `e2e/fail-missing-symbol` with `maven build failed: exit status 1` during the first apply+build step.
+    - Healing did not trigger yet because `self_heal` wasn’t enabled in scenario.yaml.
+
+- Cycle 4 (Enable self_heal and attempt healing):
+  - Change: Enabled `self_heal: { enabled: true, kb_learning: true, max_retries: 2 }` in scenario.yaml.
+  - Result:
+    - Sequence: orw-apply → compile gate fails → planner job started → healing failed quickly (no plan/artifacts returned).
+  - Takeaways:
+    - Healing orchestration reached planner submission. Failure likely due to planner image/config (no `plan_json/next_json` artifacts). Requires follow-up on planner/reducer image availability and permissions in Dev (MODS_PLANNER_IMAGE/MODS_LLM_EXEC_IMAGE/MODS_REDUCER_IMAGE).
+    - Deterministic failure path and compile gate are functioning; next milestone is making planner/llm-exec produce a patch to flip the failure and complete with an MR.
+
 Notes
 - Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
