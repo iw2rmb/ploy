@@ -24,18 +24,14 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		return fmt.Errorf("failed to read reducer HCL: %w", err)
 	}
 
-	model := os.Getenv("TRANSFLOW_MODEL")
-	if model == "" {
-		model = "gpt-4o-mini@2024-08-06"
-	}
-	toolsJSON := os.Getenv("TRANSFLOW_TOOLS")
-	if toolsJSON == "" {
-		toolsJSON = `{"file":{"allow":["src/**","pom.xml"]}}`
-	}
-	limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
-	if limitsJSON == "" {
-		limitsJSON = `{"max_steps":4,"max_tool_calls":8,"timeout":"15m"}`
-	}
+    llm := ResolveLLMDefaultsFromEnv()
+    model := llm.Model
+    toolsJSON := llm.ToolsJSON
+    // For reducer, slightly tighter default limits; override only if TRANSFLOW_LIMITS provided
+    limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
+    if limitsJSON == "" {
+        limitsJSON = `{"max_steps":4,"max_tool_calls":8,"timeout":"15m"}`
+    }
 
 	runID := ReducerRunID(runner.config.ID)
 	rendered := strings.NewReplacer(

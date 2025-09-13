@@ -73,21 +73,22 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 				runID := LLMRunID(lid)
 				imgs := ResolveImagesFromEnv()
 				infra := ResolveInfraFromEnv()
-				vars := map[string]string{
-					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
-					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
-					"TRANSFLOW_REGISTRY":          imgs.Registry,
-					"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-					"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-					"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-					"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-					"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-					"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-					"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-					"PLOY_CONTROLLER":             infra.Controller,
-					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-					"NOMAD_DC":                    infra.DC,
-				}
+                llm := ResolveLLMDefaultsFromEnv()
+                vars := map[string]string{
+                    "TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
+                    "TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
+                    "TRANSFLOW_REGISTRY":          imgs.Registry,
+                    "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+                    "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+                    "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+                    "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+                    "TRANSFLOW_MODEL":             llm.Model,
+                    "TRANSFLOW_TOOLS":             llm.ToolsJSON,
+                    "TRANSFLOW_LIMITS":            llm.LimitsJSON,
+                    "PLOY_CONTROLLER":             infra.Controller,
+                    "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+                    "NOMAD_DC":                    infra.DC,
+                }
 				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
 				if sErr != nil {
 					fmt.Printf("failed to write substituted HCL: %v\n", sErr)
