@@ -60,47 +60,8 @@ job "{{APP_NAME}}-lane-e" {
     }
     {{/if}}
     
-    # Consul service mesh integration
-    {{#if CONNECT_ENABLED}}
-    service {
-      name = "{{APP_NAME}}-connect"
-      port = "http"
-      
-      connect {
-        sidecar_service {
-          proxy {
-            local_service_port = {{HTTP_PORT}}
-            
-            upstreams {
-              destination_name = "database"
-              local_bind_port  = 5432
-            }
-            upstreams {
-              destination_name = "redis"
-              local_bind_port  = 6379
-            }
-            upstreams {
-              destination_name = "elasticsearch"
-              local_bind_port  = 9200
-            }
-            {{#if VAULT_ENABLED}}
-            upstreams {
-              destination_name = "vault"
-              local_bind_port  = 8200
-            }
-            {{/if}}
-          }
-        }
-      }
-      
-      meta {
-        version = "{{VERSION}}"
-        lane    = "E"
-        runtime = "kontain"
-        isolation = "vm-level"
-      }
-    }
-    {{/if}}
+    # Consul service mesh integration (disabled in dev template)
+    # Intentionally omitted to simplify Lane E for user apps on dev/test clusters.
     
     task "oci-kontain" {
       driver = "docker"

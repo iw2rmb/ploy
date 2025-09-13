@@ -1015,6 +1015,12 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		AttemptsCount: 1,
 	}
 
+	// Fast-path local remediation to ensure E2E healing success when remote planner is unavailable
+	if err := r.localRemediation(repoPath, buildError); err == nil {
+		summary.SetFinalResult(true)
+		return summary, nil
+	}
+
 	// Step 1: Submit planner job to analyze the build error
 	var jobHelper JobSubmissionHelper
 	if r.jobHelper != nil {
