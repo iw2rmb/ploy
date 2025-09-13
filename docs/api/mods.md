@@ -18,18 +18,18 @@ http://localhost:8080/v1/
 
 All API requests require authentication via the `Authorization` header:
 ```bash
-curl -H "Authorization: Bearer your-api-token" \
-  https://api.ployd.app/v1/transflow
+curl -H "Authorization: Bearer your-api-token" \\
+  https://api.ployd.app/v1/mods
 ```
 
-## Transflow Workflows
+## Mods Workflows
 
-### Start Transflow
+### Start Mod
 
-Create and execute a new transflow workflow.
+Create and execute a new mod workflow.
 
 ```http
-POST /v1/transflow/run
+POST /v1/mods
 ```
 
 **Request Body:**
@@ -83,19 +83,19 @@ POST /v1/transflow/run
     "steps_total": 1
   },
   "urls": {
-    "status": "/v1/transflow/status/tf-abc123def456",
-    "logs": "/v1/transflow/logs/tf-abc123def456",
-    "cancel": "/v1/transflow/tf-abc123def456"
+    "status": "/v1/mods/tf-abc123def456/status",
+    "logs": "/v1/mods/tf-abc123def456/logs",
+    "cancel": "/v1/mods/tf-abc123def456"
   }
 }
 ```
 
-### Get Transflow Status
+### Get Mod Status
 
-Get the current status and progress of a transflow workflow.
+Get the current status and progress of a mod workflow.
 
 ```http
-GET /v1/transflow/status/{id}
+GET /v1/mods/{id}/status
 ```
 
 **Response:**
@@ -132,12 +132,12 @@ GET /v1/transflow/status/{id}
 }
 ```
 
-### List Transflows
+### List Mods
 
-Get a list of transflow workflows.
+Get a list of mod workflows.
 
 ```http
-GET /v1/transflow/list
+GET /v1/mods
 ```
 
 **Query Parameters:**
