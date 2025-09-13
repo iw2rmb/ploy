@@ -66,6 +66,7 @@ Notes
 Centralized Defaults (helpers)
 - ResolveImagesFromEnv: resolves planner/reducer/llm/orw image refs and registry using Defaults fallbacks.
 - ResolveInfraFromEnv: resolves controller, DC, and SeaweedFS with Defaults; also derives API base (controller without `/v1`).
+- ResolveLLMDefaultsFromEnv: resolves `TRANSFLOW_MODEL`, `TRANSFLOW_TOOLS`, and `TRANSFLOW_LIMITS` with sensible built-in defaults.
 - These helpers back all var maps (planner/reducer/LLM/ORW) across preview, fanout, and production submission flows, replacing ad‑hoc environment lookups.
 
 Example var maps used for HCL substitution
@@ -73,7 +74,7 @@ Example var maps used for HCL substitution
 - Planner/Reducer/LLM (substituteHCLTemplateWithMCPVars):
   - TRANSFLOW_CONTEXT_DIR, TRANSFLOW_OUT_DIR
   - TRANSFLOW_REGISTRY, TRANSFLOW_PLANNER_IMAGE, TRANSFLOW_REDUCER_IMAGE, TRANSFLOW_LLM_EXEC_IMAGE
-  - TRANSFLOW_MODEL, TRANSFLOW_TOOLS, TRANSFLOW_LIMITS (optional)
+  - TRANSFLOW_MODEL, TRANSFLOW_TOOLS, TRANSFLOW_LIMITS (resolved via ResolveLLMDefaultsFromEnv; env overrides honored)
   - PLOY_CONTROLLER (from ResolveInfra), PLOY_TRANSFLOW_EXECUTION_ID, NOMAD_DC (from ResolveInfra)
 
 - ORW Apply (substituteORWTemplateVars):

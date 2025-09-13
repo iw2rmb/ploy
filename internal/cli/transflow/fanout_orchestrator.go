@@ -121,13 +121,18 @@ func (o *fanoutOrchestrator) RunHealingFanout(ctx context.Context, runCtx interf
 
 // executeBranch executes a single branch and returns the result
 func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpec) BranchResult {
-	startTime := time.Now()
+    startTime := time.Now()
 
-	result := BranchResult{
-		ID:        branch.ID,
-		Status:    "failed", // Default to failed
-		StartedAt: startTime,
-	}
+    result := BranchResult{
+        ID:        branch.ID,
+        Status:    "failed", // Default to failed
+        StartedAt: startTime,
+    }
+
+    // Emit branch start event if reporter available
+    if o.runner != nil && o.runner.GetEventReporter() != nil {
+        _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: "info", Message: "branch started: " + branch.ID, Time: time.Now()})
+    }
 
 	// Check if context is already cancelled
 	select {
@@ -162,15 +167,22 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(startTime)
 		if err != nil {
-			result.Status = "failed"
-			result.Notes = fmt.Sprintf("job execution failed: %v", err)
-		} else {
-			result.JobID = jobResult.JobID
-			result.Status = jobResult.Status
-			result.Notes = jobResult.Output
-		}
-		return result
-	}
+            result.Status = "failed"
+            result.Notes = fmt.Sprintf("job execution failed: %v", err)
+        } else {
+            result.JobID = jobResult.JobID
+            result.Status = jobResult.Status
+            result.Notes = jobResult.Output
+        }
+        if o.runner != nil && o.runner.GetEventReporter() != nil {
+            lvl := "info"
+            if result.Status != "completed" {
+                lvl = "error"
+            }
+            _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: lvl, Message: fmt.Sprintf("branch %s finished: %s", branch.ID, result.Status), Time: time.Now()})
+        }
+        return result
+    }
 
 	// Production implementation using real Nomad job submission
 	if o.runner != nil {
@@ -480,6 +492,9 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
             result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
             result.FinishedAt = time.Now()
             result.Duration = time.Since(result.StartedAt)
+            if o.runner != nil && o.runner.GetEventReporter() != nil {
+                _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: "error", Message: fmt.Sprintf("branch %s failed: %s", branch.ID, result.Notes), Time: time.Now()})
+            }
             return result
         }
     }
@@ -491,8 +506,11 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		result.Notes = fmt.Sprintf("ORW apply job completed but no diff.patch found: %v", err)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
+    if o.runner != nil && o.runner.GetEventReporter() != nil {
+        _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: "info", Message: fmt.Sprintf("branch %s completed", branch.ID), Time: time.Now()})
+    }
+    return result
+}
 
 	result.Status = "completed"
 	result.Notes = fmt.Sprintf("ORW apply job completed successfully, diff.patch at: %s", diffPath)
