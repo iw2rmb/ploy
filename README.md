@@ -187,6 +187,21 @@ The CLI automatically discovers the API endpoint using a shared resolver:
 
 Tip: Override with `PLOY_CONTROLLER` to target specific environments or tunnels.
 
+### Transflow CLI
+
+Subcommands for code transformation workflows and self-healing:
+
+```
+ploy transflow run -f transflow.yaml [--watch] [--output json|text]
+ploy transflow watch -id <execution_id>
+ploy transflow render -f transflow.yaml [--work-dir DIR] [--preserve-workspace] [-v]
+ploy transflow plan -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
+ploy transflow reduce -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
+ploy transflow apply -f transflow.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]
+```
+
+Use `ploy transflow` with no subcommand to print help.
+
 ## Development Environment SSL Setup
 
 Ploy supports **automatic wildcard certificate provisioning** for development environments using Let's Encrypt.
