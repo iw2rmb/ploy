@@ -257,7 +257,7 @@ func initializeLLMHandler(cfgService *cfgsvc.Service) (*llms.Handler, error) {
 }
 
 func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*transflow.Handler, error) {
-	log.Printf("Initializing Transflow handler")
+    log.Printf("Initializing Mods handler")
 
 	// Create GitLab provider
 	gitProvider := provider.NewGitLabProvider()
@@ -268,7 +268,7 @@ func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servic
 		var err error
 		storage, err = resolveStorageFromConfigService(cfgService)
 		if err != nil {
-			log.Printf("Warning: Failed to resolve storage for Transflow handler: %v", err)
+                log.Printf("Warning: Failed to resolve storage for Mods handler: %v", err)
 		}
 	}
 
@@ -280,7 +280,7 @@ func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servic
 
 	// Create transflow handler
 	handler := transflow.NewHandler(gitProvider, storage, statusStore)
-	log.Printf("Transflow handler initialized successfully")
+    log.Printf("Mods handler initialized successfully")
 	return handler, nil
 }
 

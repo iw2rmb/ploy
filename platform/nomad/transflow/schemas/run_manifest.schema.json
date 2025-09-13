@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.com/transflow/run_manifest.schema.json",
-  "title": "Transflow Run Manifest",
+  "title": "Mods Run Manifest",
   "type": "object",
   "required": ["id", "repo", "lane", "timestamps", "build_gate"],
   "properties": {

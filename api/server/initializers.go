@@ -131,7 +131,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		log.Printf("Warning: Failed to initialize LLM handler: %v", err)
 	}
 
-	// Initialize Transflow Handler
+    // Initialize Mods Handler
 	transflowHandler, err := initializeTransflowHandler(cfg, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize Transflow handler: %v", err)

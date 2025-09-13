@@ -1,7 +1,7 @@
 # OpenRewrite Transformation Test Plan
 
 ## Objective
-Verify that Transflow workflows with OpenRewrite actually modify code and produce tangible results.
+Verify that Mods workflows with OpenRewrite actually modify code and produce tangible results.
 
 ## Test Environment
 - **API Endpoint**: `https://api.dev.ployman.app/v1/mods`
@@ -50,7 +50,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 - Modernize collection usage
 - Update legacy patterns
 
-## Transflow Request Format (config_data)
+## Mods Request Format (config_data)
 
 ```json
 {
@@ -77,7 +77,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    - Document all issues present
    - Create checksums of files
 
-2. **Execute Transflow Run**
+2. **Execute Mods Run**
   ```bash
   curl -X POST https://api.dev.ployman.app/v1/mods/run \
      -H "Content-Type: application/json" \
@@ -207,9 +207,9 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
    - `changes_applied > 0` based on OpenRewrite output parsing, not actual file persistence
 3. **Storage Bucket Configuration**: Must use `artifacts` collection consistently
 
-## API Usage Documentation (Updated: Transflow)
+## API Usage Documentation (Updated: Mods)
 
-### Successful Pattern for Transformations via Transflow
+### Successful Pattern for Transformations via Mods
 
 ```bash
 # 1. Start transflow run
