@@ -15,19 +15,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/cli/domains"
 	"github.com/iw2rmb/ploy/internal/cli/env"
-    transflow "github.com/iw2rmb/ploy/internal/cli/transflow"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
 	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
+	mods "github.com/iw2rmb/ploy/internal/mods"
 )
 
 var controllerURL = utils.ResolveControllerURLFromEnv()
 
 func main() {
 	if len(os.Args) > 1 {
-    switch os.Args[1] {
-    case "mod":
-        transflow.ModCmd(os.Args[2:], controllerURL)
+		switch os.Args[1] {
+		case "mod":
+			mods.ModCmd(os.Args[2:], controllerURL)
 		case "analyze":
 			analysis.AnalyzeCmd(os.Args[2:], controllerURL)
 		case "apps":

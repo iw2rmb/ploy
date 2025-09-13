@@ -17,8 +17,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/iw2rmb/ploy/internal/cli/transflow"
 	"github.com/iw2rmb/ploy/internal/git/provider"
+	mods "github.com/iw2rmb/ploy/internal/mods"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/transflow"
@@ -51,19 +51,19 @@ func NewHandler(
 
 // RegisterRoutes registers Transflow routes with the Fiber app
 func (h *Handler) RegisterRoutes(app *fiber.App) {
-    tf := app.Group("/v1/mods")
+	tf := app.Group("/v1/mods")
 
 	// Transflow execution
-    tf.Post("", h.RunTransflow)
-    tf.Get("/:id/status", h.GetTransflowStatus)
-    tf.Get("", h.ListTransflows)
-    tf.Delete("/:id", h.CancelTransflow)
-    tf.Get("/:id/artifacts", h.GetArtifacts)
-    tf.Get("/:id/artifacts/:name", h.DownloadArtifact)
-    // Real-time events push endpoint
-    tf.Post("/:id/events", h.ReportEvent)
-    // Logs streaming (SSE stub)
-    tf.Get("/:id/logs", h.StreamLogs)
+	tf.Post("", h.RunTransflow)
+	tf.Get("/:id/status", h.GetTransflowStatus)
+	tf.Get("", h.ListTransflows)
+	tf.Delete("/:id", h.CancelTransflow)
+	tf.Get("/:id/artifacts", h.GetArtifacts)
+	tf.Get("/:id/artifacts/:name", h.DownloadArtifact)
+	// Real-time events push endpoint
+	tf.Post("/:id/events", h.ReportEvent)
+	// Logs streaming (SSE stub)
+	tf.Get("/:id/logs", h.StreamLogs)
 	// Debug: Nomad recent job diagnostics (dev only)
 	tf.Get("/debug/nomad", h.DebugNomad)
 }
@@ -121,7 +121,7 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 	}
 
 	// Parse configuration
-	var config *transflow.TransflowConfig
+	var config *mods.TransflowConfig
 	if req.Config != "" {
 		// Parse YAML string
 		if err := yaml.Unmarshal([]byte(req.Config), &config); err != nil {
@@ -196,12 +196,12 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 		"execution_id": executionID,
 		"status":       "initializing",
 		"message":      "Transflow execution started",
-        "status_url":   fmt.Sprintf("/v1/mods/%s/status", executionID),
+		"status_url":   fmt.Sprintf("/v1/mods/%s/status", executionID),
 	})
 }
 
 // executeTransflow runs the transflow workflow asynchronously
-func (h *Handler) executeTransflow(executionID string, config *transflow.TransflowConfig, testMode bool) {
+func (h *Handler) executeTransflow(executionID string, config *mods.TransflowConfig, testMode bool) {
 	// Top-level guard: always convert panics to a terminal failure status
 	defer func() {
 		if r := recover(); r != nil {
@@ -283,7 +283,7 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	if !strings.HasSuffix(controllerURL, "/v1") {
 		controllerURL = strings.TrimRight(controllerURL, "/") + "/v1"
 	}
-	integrations := transflow.NewTransflowIntegrationsWithTestMode(controllerURL, tempDir, testMode)
+	integrations := mods.NewTransflowIntegrationsWithTestMode(controllerURL, tempDir, testMode)
 
 	// Create configured runner
 	runner, err := integrations.CreateConfiguredRunner(config)
@@ -293,7 +293,7 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 	}
 
 	// Wire event reporter for real-time observability
-	reporter := transflow.NewControllerEventReporter(controllerURL, executionID)
+	reporter := mods.NewControllerEventReporter(controllerURL, executionID)
 	runner.SetEventReporter(reporter)
 
 	// Expose controller and execution ID to job templates for in-job event pushes
@@ -308,7 +308,7 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 
 	// Execute the workflow with timeout awareness; ensure terminal status on any error
 	var (
-		result *transflow.TransflowResult
+		result *mods.TransflowResult
 		runErr error
 		doneCh = make(chan struct{})
 	)
@@ -440,7 +440,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	// Planner plan.json
 	planPath := filepath.Join(tempDir, "planner", "out", "plan.json")
 	if fi, err := os.Stat(planPath); err == nil && !fi.IsDir() {
-    key := fmt.Sprintf("artifacts/mods/%s/plan.json", executionID)
+		key := fmt.Sprintf("artifacts/mods/%s/plan.json", executionID)
 		f, _ := os.Open(planPath)
 		defer f.Close()
 		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -450,7 +450,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	// Reducer next.json
 	nextPath := filepath.Join(tempDir, "reducer", "out", "next.json")
 	if fi, err := os.Stat(nextPath); err == nil && !fi.IsDir() {
-    key := fmt.Sprintf("artifacts/mods/%s/next.json", executionID)
+		key := fmt.Sprintf("artifacts/mods/%s/next.json", executionID)
 		f, _ := os.Open(nextPath)
 		defer f.Close()
 		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -466,8 +466,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 		}
 		if filepath.Base(path) == "diff.patch" {
 			// Prefer task-side upload key if present; support both legacy and new prefixes
-                keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
-                keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
+			keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
+			keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
 			// If already present (task-side upload), record and skip
 			if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
 				artifacts["diff_patch"] = keyPrimary
@@ -487,7 +487,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			return nil
 		}
 		if filepath.Base(path) == "error.log" {
-            key := fmt.Sprintf("artifacts/mods/%s/error.log", executionID)
+			key := fmt.Sprintf("artifacts/mods/%s/error.log", executionID)
 			if ok, _ := h.storage.Exists(ctx, key); ok {
 				artifacts["error_log"] = key
 			} else {
@@ -503,8 +503,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	})
 	// If no local diff found or persisted above, check storage proactively for known keys (SeaweedFS-only IO path)
 	if _, ok := artifacts["diff_patch"]; !ok {
-        keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
-        keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
+		keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
+		keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
 		if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
 			artifacts["diff_patch"] = keyPrimary
 		} else if ok2, _ := h.storage.Exists(ctx, keyAlt); ok2 {
@@ -652,7 +652,7 @@ func (h *Handler) storeStatus(status TransflowStatus) error {
 		return nil // Silently skip if no store configured
 	}
 
-    key := fmt.Sprintf("mods/status/%s", status.ID)
+	key := fmt.Sprintf("mods/status/%s", status.ID)
 	data, err := json.Marshal(status)
 	if err != nil {
 		return err
@@ -667,7 +667,7 @@ func (h *Handler) getStatus(executionID string) (*TransflowStatus, error) {
 		return nil, fmt.Errorf("status store not configured")
 	}
 
-    key := fmt.Sprintf("mods/status/%s", executionID)
+	key := fmt.Sprintf("mods/status/%s", executionID)
 	data, err := h.statusStore.Get(key)
 	if err != nil {
 		return nil, err
@@ -706,15 +706,15 @@ func (h *Handler) ReportEvent(c *fiber.Ctx) error {
 			"error": fiber.Map{"code": "invalid_event", "message": "failed to parse event", "details": err.Error()},
 		})
 	}
-    if ev.ExecutionID == "" {
-        // Allow path param to carry execution id when payload omits it
-        ev.ExecutionID = c.Params("id")
-    }
-    if ev.ExecutionID == "" {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-            "error": fiber.Map{"code": "missing_execution_id", "message": "execution_id is required"},
-        })
-    }
+	if ev.ExecutionID == "" {
+		// Allow path param to carry execution id when payload omits it
+		ev.ExecutionID = c.Params("id")
+	}
+	if ev.ExecutionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fiber.Map{"code": "missing_execution_id", "message": "execution_id is required"},
+		})
+	}
 	// Load or initialize status
 	st, err := h.getStatus(ev.ExecutionID)
 	if err != nil || st == nil || st.ID == "" {
