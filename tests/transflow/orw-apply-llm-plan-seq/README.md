@@ -4,7 +4,7 @@ Overview
 
 - Goal: Reproduce a run where OpenRewrite (orw-apply) produces a diff but the build gate fails; the system then triggers the healing flow using llm-plan → llm-exec → reducer. The winning branch produces a patch that passes the build gate, and a Merge Request is created.
 - This mirrors the validated Java 11→17 pipeline while forcing a compile failure post-ORW apply, so the planner has work to do.
-- Uses SeaweedFS for artifacts and the controller’s /v1/transflow/event stream for live status.
+- Uses SeaweedFS for artifacts and the controller’s /v1/mods/event stream for live status.
 
 Pre‑requisites
 
@@ -41,15 +41,15 @@ Expected event timeline (observability)
 
 Artifacts persisted by controller
 
-- plan_json → artifacts/transflow/<exec_id>/plan.json
-- next_json → artifacts/transflow/<exec_id>/next.json
-- diff_patch → artifacts/transflow/<exec_id>/diff.patch (or branch-scoped under branches/<id>/steps/<sid>/diff.patch)
+- plan_json → artifacts/mods/<exec_id>/plan.json
+- next_json → artifacts/mods/<exec_id>/next.json
+- diff_patch → artifacts/mods/<exec_id>/diff.patch (or branch-scoped under branches/<id>/steps/<sid>/diff.patch)
 - error_log (if produced by orw-apply)
 
 Files here
 
-- scenario.yaml — Transflow config with orw-apply then llm healing context (planner configured implicitly on failure)
-- run.sh — Runs scenario end-to-end, streams /v1/transflow/logs SSE, polls status, downloads artifacts
+- scenario.yaml — Mods config with orw-apply then llm healing context (planner configured implicitly on failure)
+- run.sh — Runs scenario end-to-end, streams /v1/mods/logs SSE, polls status, downloads artifacts
 - watch-events.sh — Attach to the live SSE stream for a given EXEC_ID (optional standalone)
 - fetch-artifacts.sh — Download plan_json, next_json, diff_patch for a finished EXEC_ID
 - check-steps.sh — Validates presence of key steps (diff-found, build-gate-failed, planner/llm-exec/reducer lifecycle)
@@ -111,7 +111,7 @@ What success looks like
   - artifacts.diff_patch present (from winning llm-exec branch)
   - Steps include build-gate-failed before healing and a final build-gate-succeeded (or diff-applied + MR)
 
-LLM runner event expectations (/v1/transflow/event)
+LLM runner event expectations (/v1/mods/event)
 
 - Planner and reducer jobs should post events like the orw-apply task does. Reference services/langgraph-runner/entrypoint.sh for examples:
   - POST ${PLOY_CONTROLLER}/transflow/event with JSON body:
@@ -142,5 +142,5 @@ Cleanup
 Troubleshooting
 
 - No artifacts: ensure SeaweedFS is reachable from jobs and controller (PLOY_SEAWEEDFS_URL). See continue.md for details.
-- No SSE events: verify runners post to /v1/transflow/event and that PLOY_CONTROLLER is set in job HCL substitution (see internal/cli/transflow/job_submission.go substituteHCLTemplate).
+- No SSE events: verify runners post to /v1/mods/event and that PLOY_CONTROLLER is set in job HCL substitution (see internal/mods/job_submission.go substituteHCLTemplate).
 - Planner/reducer template images: check TRANSFLOW_PLANNER_IMAGE, TRANSFLOW_REDUCER_IMAGE, and TRANSFLOW_LLM_EXEC_IMAGE env in API service; they must reference the internal registry.

@@ -17,7 +17,7 @@ ploy/
 ├── go.mod                    # Go module definition
 ├── go.sum                    # Go module dependencies
 ├── docker-compose.integration.yml # Integration testing environment
-├── test-java11to17-transflow.yaml # Transflow test configuration
+├── test-java11to17-transflow.yaml # Mods test configuration
 ├── .gitignore                # Git ignore rules
 └── roadmap/                  # Detailed implementation roadmaps
     ├── README.md             # Main roadmap overview and progress
@@ -25,7 +25,7 @@ ploy/
     ├── openrewrite/          # OpenRewrite Service Implementation (see roadmap/openrewrite/README.md)
     ├── static-analysis/      # Static Analysis Integration (see roadmap/static-analysis/README.md)
     ├── tdd/                  # Test-Driven Development (see roadmap/tdd/README.md)
-    ├── transflow/            # Transflow transformation workflows (see roadmap/transflow/README.md)
+    ├── transflow/            # Mods transformation workflows (see roadmap/transflow/README.md)
     ├── transformations/      # Code transformation strategies (see roadmap/transformations/README.md)
     ├── refactor/             # Refactoring initiatives (see roadmap/refactor/README.md)
     └── storage-fix/          # Storage system improvements (see roadmap/storage-fix/README.md)
@@ -294,4 +294,4 @@ Files that influence automatic lane selection:
 7. **Testing**: See `tests/README.md` for comprehensive test execution
 8. **Documentation**: Update relevant files in `docs/` and `CHANGELOG.md`
 
-This structure enables efficient navigation through README-driven documentation in each directory, supporting the full platform capabilities including ARF, Transflow, and multi-lane deployment architecture.
+This structure enables efficient navigation through README-driven documentation in each directory, supporting the full platform capabilities including ARF, Mods, and multi-lane deployment architecture.

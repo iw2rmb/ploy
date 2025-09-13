@@ -210,10 +210,10 @@ main() {
     fi
     
     # Test 2: Submit transformation and verify paths
-    log_info "Test 2: Transflow Artifacts Path (skipping job submission by default)"
+    log_info "Test 2: Mods Artifacts Path (skipping job submission by default)"
     if [[ "${SKIP_TRANSFORM:-true}" != "true" ]]; then
         log_info "Submitting transflow run (experimental)"
-        # Transflow artifacts are stored under artifacts/transflow/<id>/...
+        # Mods artifacts are stored under artifacts/mods/<id>/...
         # Skipping verification by default; enable by setting SKIP_TRANSFORM=false.
     else
         log_info "Skipping transflow submission (SKIP_TRANSFORM=true)"

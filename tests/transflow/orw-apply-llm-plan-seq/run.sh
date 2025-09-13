@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # End-to-end runner for the orw-apply → build fail → llm-plan → llm-exec scenario
-# - Posts scenario.yaml to /v1/transflow/run
+# - Posts scenario.yaml to /v1/mods/run
 # - Streams SSE events
 # - Polls status until terminal
 # - Downloads artifacts

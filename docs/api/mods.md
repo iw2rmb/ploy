@@ -1,6 +1,6 @@
-# Transflow API Reference
+# Mods API Reference
 
-This document describes the REST API endpoints for Ploy's Transflow automated code transformation system. Note: ARF transform endpoints `/v1/arf/transforms/*` were removed; Transflow is the single surface.
+This document describes the REST API endpoints for Ploy's Mods automated code transformation system. Note: ARF transform endpoints `/v1/arf/transforms/*` were removed; Mods is the single surface.
 
 ## Base URL
 
@@ -176,7 +176,7 @@ GET /v1/mods
 }
 ```
 
-### Cancel Transflow
+### Cancel Mods
 
 Cancel a running transflow workflow.
 
@@ -394,7 +394,7 @@ GET /v1/llms/models/{model_id}
 
 ## Configuration API
 
-### Get Transflow Configuration
+### Get Mods Configuration
 
 Get default transflow configuration template.
 
@@ -637,7 +637,7 @@ Effect:
 Notes:
 
 - If `ts` is omitted, the server timestamps the event.
-- This complements artifacts persisted under `artifacts/transflow/{id}/...`.
+- This complements artifacts persisted under `artifacts/mods/{id}/...`.
 
 ## Live Logs (SSE)
 
