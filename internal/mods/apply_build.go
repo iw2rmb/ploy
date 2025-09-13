@@ -29,7 +29,7 @@ func runApplyAndBuildWithEvents(
 			Success:  false,
 			Message:  fmt.Sprintf("Apply/build failed: %v", err),
 			Duration: time.Since(stepStart),
-		}, err
+		}, nil // continue workflow to allow healing later in build_step
 	}
 
 	r.emit(parent, "apply", "diff-applied", "info", "Diff applied and build gate passed")
