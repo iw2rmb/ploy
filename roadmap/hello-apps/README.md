@@ -52,3 +52,10 @@ Notes
 - Use Jib for JVM hello apps to validate Lane E.
 - For Scala test in templates, set `SCALA_HELLO_REPO=https://github.com/iw2rmb/ploy-scala-hello.git`.
 
+## Cycle Log
+
+- Cycle 1 (Lane E → fix defaults):
+  - Attempted E2E deploy of `ploy-scala-hello` with `LANE=E` via `tests/e2e/test-deploy-github-app.sh`.
+  - Result: Nomad job validation failed due to volume/consul blocks present for a user app (dev cluster). Root cause: API renderer defaulted `VolumeEnabled`/`ConsulConfigEnabled` to true for non‑platform apps.
+  - Action: Updated API renderer defaults to match orchestration — disable Volumes and Consul Config by default for non‑platform apps (Vault/Connect already off). Added unit tests and CHANGELOG note.
+  - Next: Deploy API (`./bin/ployman api deploy --monitor`) and rerun E2E with `LANE=E` and `URL_OVERRIDE=https://ploy-scala-hello.dev.ployd.app/healthz` (Lane E host rule includes `dev.`).

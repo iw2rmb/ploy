@@ -3,6 +3,12 @@
 ## [Unreleased] - Transflow MVP Release
 
 ### Added
+- Lanes: E2E scaffolding added for A–G
+  - tests/lanes/README.md with comprehensive plan and envs
+  - tests/e2e/lanes_e2e_test.go (Go E2E; -tags e2e)
+  - tests/lanes/test-lane-deploy.sh (ploy CLI wrapper)
+  - tests/lanes/check-app-logs.sh (API/VPS log retrieval)
+  - scripts/lanes/create-lane-repos.sh (creates GitHub repos ploy-lane-<lane>-<language>)
 - Transflow: Canonical StepType constants/enums (`orw-apply`, `llm-exec`, `orw-gen`, `human-step`) with `NormalizeStepType` and `IsValid`. Swept runner/fanout/KB/CLI execution and event emissions to use canonical values; planner alias `human` now normalizes to `human-step`.
 - Transflow: Instance-scoped HCLSubmitter seam for HCL validate/submit. Runner and fanout now use `HCLSubmitter` (default delegates to orchestration). Enables deterministic tests without mutating global state.
 - Transflow tests: Added normalization tests (pre-fanout and event emission) and refactored the healing integration test to inject submitter/helper/healer seams; removed reliance on global function stubs.
@@ -12,6 +18,7 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- API Nomad templates: align default feature flags with orchestration. For non‑platform apps, disable Volumes and Consul config by default (Vault/Connect remain off). Fixes Lane E job validation for user apps and prevents invalid volume blocks on dev/test clusters.
 - Housekeeping: removed redundant `internal/cli/arf/recipes.go.backup` and the legacy `internal/testutils/` package in favor of `internal/testing/**`.
 - API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
 - Ansible API deploy: switch to Nomad rolling updates (no stop/start). The dev playbook removes explicit stop and relies on the job's `update` stanza. Nomad job template now enables `auto_promote = true` and `health_check = "checks"` for zero‑downtime rollouts.
