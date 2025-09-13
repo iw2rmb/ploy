@@ -34,7 +34,7 @@ type ControllerEventReporter struct {
 
 // NewControllerEventReporter creates a reporter targeting the given controller URL (with /v1 suffix) and execution ID
 func NewControllerEventReporter(controllerURL, executionID string) EventReporter {
-    endpoint := strings.TrimRight(controllerURL, "/") + "/mods/" + strings.TrimLeft(executionID, "/") + "/events"
+	endpoint := strings.TrimRight(controllerURL, "/") + "/mods/" + strings.TrimLeft(executionID, "/") + "/events"
 	return &ControllerEventReporter{
 		endpoint: endpoint,
 		execID:   executionID,
@@ -43,12 +43,12 @@ func NewControllerEventReporter(controllerURL, executionID string) EventReporter
 }
 
 func (r *ControllerEventReporter) Report(ctx context.Context, ev Event) error {
-    payload := map[string]interface{}{
-        "phase":        ev.Phase,
-        "step":         ev.Step,
-        "level":        ev.Level,
-        "message":      ev.Message,
-    }
+	payload := map[string]interface{}{
+		"phase":   ev.Phase,
+		"step":    ev.Step,
+		"level":   ev.Level,
+		"message": ev.Message,
+	}
 	if !ev.Time.IsZero() {
 		payload["ts"] = ev.Time
 	}

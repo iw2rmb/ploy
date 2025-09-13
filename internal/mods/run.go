@@ -17,15 +17,15 @@ import (
 
 // ModCmd provides the CLI entrypoint to run mods
 func ModCmd(args []string, controllerURL string) {
-    if len(args) == 0 {
-        printModHelp()
-        return
-    }
+	if len(args) == 0 {
+		printModHelp()
+		return
+	}
 
 	switch args[0] {
-    case "help":
-        printModHelp()
-        return
+	case "help":
+		printModHelp()
+		return
 	case "run":
 		if err := runTransflow(args[1:], controllerURL); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -56,14 +56,14 @@ func ModCmd(args []string, controllerURL string) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-    default:
-        printModHelp()
-    }
+	default:
+		printModHelp()
+	}
 }
 
 func printModHelp() {
-    fmt.Println("Usage: ploy mod <subcommand> [options]")
-    fmt.Println("Subcommands:")
+	fmt.Println("Usage: ploy mod <subcommand> [options]")
+	fmt.Println("Subcommands:")
 	fmt.Println("  run      - Execute full workflow remotely (default mode)")
 	fmt.Println("  watch    - Attach to a running execution by ID")
 	fmt.Println("  render   - Render planner inputs and HCL locally (no submission)")
@@ -206,19 +206,19 @@ func runTransflow(args []string, controllerURL string) error {
 	ctx := context.Background()
 	startTime := time.Now()
 
-    fmt.Printf("Starting mod execution: %s\n", config.ID)
+	fmt.Printf("Starting mod execution: %s\n", config.ID)
 
 	result, err := runner.Run(ctx)
 	if err != nil {
-    fmt.Printf("Mod failed after %v\n", time.Since(startTime))
+		fmt.Printf("Mod failed after %v\n", time.Since(startTime))
 		if result != nil {
 			fmt.Println(result.Summary())
 		}
-    return fmt.Errorf("mod execution failed: %w", err)
+		return fmt.Errorf("mod execution failed: %w", err)
 	}
 
 	// Print results
-    fmt.Printf("Mod completed successfully in %v\n", time.Since(startTime))
+	fmt.Printf("Mod completed successfully in %v\n", time.Since(startTime))
 	if *verbose && result != nil {
 		fmt.Println(result.Summary())
 	} else {
@@ -233,8 +233,8 @@ func runTransflow(args []string, controllerURL string) error {
 
 // transflowRenderCmd: planner render (no submission)
 func transflowRenderCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("mod render", flag.ContinueOnError)
-    file := fs.String("f", "", "transflow YAML file")
+	fs := flag.NewFlagSet("mod render", flag.ContinueOnError)
+	file := fs.String("f", "", "transflow YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
 	verbose := fs.Bool("v", false, "verbose output")
@@ -268,7 +268,7 @@ func transflowRenderCmd(args []string, controllerURL string) error {
 
 // transflowPlanCmd: render planner and optionally submit when --submit provided
 func transflowPlanCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("mod plan", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mod plan", flag.ContinueOnError)
 	file := fs.String("f", "", "transflow YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
@@ -308,7 +308,7 @@ func transflowPlanCmd(args []string, controllerURL string) error {
 
 // transflowReduceCmd: render reducer and optionally submit when --submit
 func transflowReduceCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("mod reduce", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mod reduce", flag.ContinueOnError)
 	file := fs.String("f", "", "transflow YAML file")
 	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
@@ -349,7 +349,7 @@ func transflowReduceCmd(args []string, controllerURL string) error {
 
 // transflowApplyCmd: apply a diff to repo and run build gate
 func transflowApplyCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("mod apply", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mod apply", flag.ContinueOnError)
 	file := fs.String("f", "", "transflow YAML file")
 	diffPath := fs.String("diff-path", "", "local unified diff file path")
 	diffURL := fs.String("diff-url", "", "URL to download unified diff")
@@ -398,7 +398,7 @@ func transflowApplyCmd(args []string, controllerURL string) error {
 
 // watchTransflow polls the controller for status updates and streams step events
 func watchTransflow(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("mod watch", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mod watch", flag.ContinueOnError)
 	id := fs.String("id", "", "execution id to watch")
 	interval := fs.Duration("interval", 2*time.Second, "poll interval")
 	noSSE := fs.Bool("no-sse", false, "disable SSE and use polling")
@@ -413,12 +413,12 @@ func watchTransflow(args []string, controllerURL string) error {
 		base = GetDefaultControllerURL()
 	}
 	base = strings.TrimRight(base, "/")
-    // The controller uses /v1/mods/* endpoints; ensure /v1 prefix exists
+	// The controller uses /v1/mods/* endpoints; ensure /v1 prefix exists
 	if !strings.HasSuffix(base, "/v1") {
 		base = base + "/v1"
 	}
-    statusURL := base + "/mods/" + *id + "/status"
-    artsURL := base + "/mods/" + *id + "/artifacts"
+	statusURL := base + "/mods/" + *id + "/status"
+	artsURL := base + "/mods/" + *id + "/artifacts"
 
 	if !*noSSE {
 		if err := watchTransflowSSE(base, *id); err == nil {
@@ -493,7 +493,7 @@ func watchTransflow(args []string, controllerURL string) error {
 				_ = resp2.Body.Close()
 				if key := arts.Artifacts["error_log"]; key != "" {
 					// Server provides a download endpoint alias using logical name
-            dl := base + "/mods/" + *id + "/artifacts/error_log"
+					dl := base + "/mods/" + *id + "/artifacts/error_log"
 					if r3, e3 := client.Get(dl); e3 == nil && r3.StatusCode == 200 {
 						defer r3.Body.Close()
 						fmt.Println("--- error.log ---")
@@ -510,7 +510,7 @@ func watchTransflow(args []string, controllerURL string) error {
 }
 
 func watchTransflowSSE(base, id string) error {
-    url := fmt.Sprintf("%s/mods/%s/logs?follow=true", base, id)
+	url := fmt.Sprintf("%s/mods/%s/logs?follow=true", base, id)
 	req, _ := http.NewRequest(http.MethodGet, url, nil)
 	client := &http.Client{Timeout: 0}
 	resp, err := client.Do(req)

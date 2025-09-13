@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/transflow"
+	"github.com/iw2rmb/ploy/internal/mods"
 	"github.com/stretchr/testify/assert"
 )
 
