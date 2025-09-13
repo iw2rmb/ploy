@@ -13,6 +13,8 @@ job "mods-llm-exec-${RUN_ID}" {
         TOOLS_JSON  = "${TOOLS_JSON}"
         LIMITS_JSON = "${LIMITS_JSON}"
         RUN_ID      = "${RUN_ID}"
+        OPENAI_API_KEY = "${OPENAI_API_KEY}"
+        PLOY_OPENAI_API_KEY = "${OPENAI_API_KEY}"
         SBOM_LATEST_URL = "${SBOM_LATEST_URL}"
       }
       template {

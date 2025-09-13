@@ -79,3 +79,8 @@ Notes
   - E2E retried with `TIMEOUT=180`, Lane E. CLI reports `unexpected EOF` from POST `/v1/apps/ploy-scala-hello/builds` consistently (twice, with backoff). App logs show no running allocations, as deploy aborts pre-Nomad.
   - Platform logs endpoint exists (`/v1/platform/:service/logs`) but is a stub; cannot fetch controller alloc logs via API. Next step is VPS-side alloc logs via job manager wrapper or implement the platform logs handler.
   - Hypothesis: reverse proxy (Traefik) or upstream idle timeout during streaming upload; consider increasing `forwardingTimeouts`/`readTimeout` for POSTs to `/v1/apps/*/builds`, or switching to chunked/multipart with smaller chunks.
+
+- Cycle 5 (Platform logs + streaming uploads):
+  - Implemented `/v1/platform/:service/logs` (dev helper) — for `service=api` it fetches Nomad alloc logs via the job manager wrapper with `--task api`. Verified logs return HTTP 200 with controller entries.
+  - Hardened build upload path to stream the request body to disk (`io.Copy` from request body stream) instead of `c.Body()` to reduce buffering and avoid proxy-induced EOFs.
+  - Deployed API; `ploy push` still reports `unexpected EOF` to `/v1/apps/:app/builds`. Controller logs show no explicit errors (only leader elections). Next likely step: adjust Traefik/ingress timeouts for large POSTs or switch the client to multipart/chunked uploads with retries.

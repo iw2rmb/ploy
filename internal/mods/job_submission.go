@@ -125,6 +125,12 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		dc = d.DC
 	}
 
+	// Resolve OpenAI key from env (supports PLOY_OPENAI_API_KEY fallback)
+	openaiKey := get("OPENAI_API_KEY")
+	if openaiKey == "" {
+		openaiKey = get("PLOY_OPENAI_API_KEY")
+	}
+
 	replacer := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
@@ -147,6 +153,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${EXECUTION_ID}", hclEscape(execID),
 		"${NOMAD_DC}", hclEscape(dc),
 		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
+		"${OPENAI_API_KEY}", hclEscape(openaiKey),
 	)
 	rendered := replacer.Replace(string(hclBytes))
 

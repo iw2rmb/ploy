@@ -42,6 +42,9 @@ func (s *Server) setupRoutes() {
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)
 
+	// Diagnostics (ingress/body debugging)
+	api.Post("/_diag/echo", s.handleDiagEcho)
+
 	// Platform service endpoints with platform namespace
 	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)
 

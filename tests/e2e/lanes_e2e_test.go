@@ -36,7 +36,7 @@ func TestLaneDeployments(t *testing.T) {
 	script := filepath.Join("tests", "lanes", "test-lane-deploy.sh")
 
 	laneOverride := os.Getenv("LANE_OVERRIDE")
-	forceLane := os.Getenv("FORCE_LANE") == "1"
+	forceLane := os.Getenv("FORCE_LANE") == "1" // default off: do not specify lane in tests
 
 	for _, lane := range lanes {
 		repo := os.Getenv(lane.envVar)
