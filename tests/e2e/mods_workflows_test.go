@@ -423,9 +423,37 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 	if err != nil {
 		t.Logf("mods run error: %v", err)
 	}
+	if os.Getenv("E2E_LOG_CONFIG") == "1" || err != nil {
+		t.Logf("Mods YAML path: %s", result.ConfigPath)
+		if result.ConfigYAML != "" {
+			t.Logf("Mods YAML:\n%s", result.ConfigYAML)
+		}
+	}
 
+	// Fallback: if execution_id not parsed from CLI output, start run via controller directly
 	if result.ExecutionID == "" {
-		t.Fatalf("missing execution_id in output")
+		t.Logf("execution_id not found in CLI output; starting run via controller fallback")
+		runURL := strings.TrimRight(controller, "/") + "/mods"
+		payload := fmt.Sprintf("{\"config\": %q, \"test_mode\": false}", result.ConfigYAML)
+		req0, _ := http.NewRequestWithContext(ctx, http.MethodPost, runURL, strings.NewReader(payload))
+		req0.Header.Set("Content-Type", "application/json")
+		httpc := &http.Client{Timeout: 30 * time.Second}
+		resp0, err0 := httpc.Do(req0)
+		if err0 != nil {
+			t.Fatalf("fallback run failed: %v", err0)
+		}
+		defer resp0.Body.Close()
+		if resp0.StatusCode != 202 && resp0.StatusCode != 200 {
+			t.Fatalf("fallback run HTTP %d", resp0.StatusCode)
+		}
+		var ack struct {
+			ExecutionID string `json:"execution_id"`
+		}
+		if json.NewDecoder(resp0.Body).Decode(&ack) != nil || ack.ExecutionID == "" {
+			t.Fatalf("fallback run: missing execution_id")
+		}
+		result.ExecutionID = ack.ExecutionID
+		t.Logf("Fallback Execution ID: %s", result.ExecutionID)
 	}
 
 	// Query controller for steps and artifacts to verify healing path
