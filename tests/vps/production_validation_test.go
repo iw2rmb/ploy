@@ -94,9 +94,9 @@ func TestVPSTransflowEndToEnd(t *testing.T) {
 
 	t.Run("TransflowWorkflowValidation", func(t *testing.T) {
 		// Test transflow CLI is available and shows correct help
-		configCmd := `su - ploy -c "/opt/ploy/bin/ploy transflow --help"`
+        configCmd := `su - ploy -c "/opt/ploy/bin/ploy mod --help"`
 		output, err := vpsClient.RunCommand(configCmd)
-		assert.NoError(t, err, "Transflow CLI should be accessible")
+        assert.NoError(t, err, "Mods CLI should be accessible")
 		assert.Contains(t, output, "transflow.yaml", "Transflow should show usage")
 
 		// Test configuration file exists

@@ -18,7 +18,7 @@ The E2E workflows testing module provides complete validation infrastructure for
 - `types.go:41-60` - WorkflowResult with comprehensive outcome tracking and MR integration
 - `framework.go:1-500` - E2E test execution framework with VPS environment setup
 - `transflow_workflows_test.go:1-200` - Complete Java migration workflow testing with self-healing
-- `transflow_workflows_test.go:12-50` - TestTransflowE2E_JavaMigrationComplete with production repository testing
+- `mods_workflows_test.go:12-50` - TestModsE2E_JavaMigrationComplete with production repository testing
 - `vps_e2e_test.go:1-300` - VPS-specific E2E validation with real service interactions
 
 ### Test Environment Infrastructure (✅ Production Operational)
@@ -32,7 +32,7 @@ The E2E workflows testing module provides complete validation infrastructure for
 ### Consumes (✅ Production Validated)
 - **✅ VPS Environment**: Production testing environment (45.12.75.241) for real service validation
 - **✅ GitLab API**: Real repository operations using https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
-- **✅ Transflow CLI**: Complete CLI workflow execution via ploy transflow run commands with KBTransflowRunner
+- **✅ Mods CLI**: Complete CLI workflow execution via ploy mod run commands with KB integration
 - **✅ OpenRewrite Framework**: Java migration recipe execution and code transformation (Java 11→17 validated)
 - **✅ Nomad Orchestration**: Distributed job execution and monitoring for healing workflows in production
 - **✅ Consul KV**: Distributed coordination and locking for KB operations with real distributed testing
