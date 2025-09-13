@@ -32,12 +32,12 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 		if !strings.HasSuffix(base, "/v1") {
 			base = base + "/v1"
 		}
-		resp := map[string]any{
-			"execution_id": id,
-			"status":       "initializing",
-			"status_url":   "/v1/transflow/status/" + id,
-			"watch_hint":   "ploy transflow watch -id " + id,
-		}
+        resp := map[string]any{
+            "execution_id": id,
+            "status":       "initializing",
+            "status_url":   "/v1/mods/status/" + id,
+            "watch_hint":   "ploy mod watch -id " + id,
+        }
 		b, _ := json.Marshal(resp)
 		fmt.Println(string(b))
 		if watch {
@@ -53,7 +53,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 	// Text output: Print the execution id and a watch hint for convenience
 	fmt.Printf("Execution ID: %s\n", id)
 	// Ensure /v1 prefix for watch compatibility
-	fmt.Printf("Watch: ploy transflow watch -id %s\n", id)
+    fmt.Printf("Watch: ploy mod watch -id %s\n", id)
 
 	// Optional: attach a live watch
 	if watch {
@@ -65,7 +65,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 	}
 
 	// Poll status
-	statusURL := strings.TrimRight(controllerURL, "/") + "/transflow/status/" + id
+    statusURL := strings.TrimRight(controllerURL, "/") + "/mods/status/" + id
 	start := time.Now()
 	for {
 		time.Sleep(2 * time.Second)
@@ -98,7 +98,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 					fmt.Printf("  %s: %v\n", k, v)
 				}
 				// Printable download URLs via controller proxy
-				base := strings.TrimRight(controllerURL, "/") + "/transflow/artifacts/" + st.ID + "/"
+                base := strings.TrimRight(controllerURL, "/") + "/mods/artifacts/" + st.ID + "/"
 				fmt.Println("Download URLs:")
 				// Known names
 				known := []string{"plan_json", "next_json", "diff_patch"}
@@ -122,7 +122,7 @@ func executeRemoteTransflow(controllerURL, file string, testMode, verbose, watch
 
 // remoteStart POSTs the run request to the controller and returns the execution id
 func remoteStart(controllerURL string, configBytes []byte, testMode bool, client *http.Client) (string, error) {
-	runURL := strings.TrimRight(controllerURL, "/") + "/transflow/run"
+    runURL := strings.TrimRight(controllerURL, "/") + "/mods"
 	payload := map[string]any{
 		"config":    string(configBytes),
 		"test_mode": testMode,
