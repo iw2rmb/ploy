@@ -168,6 +168,14 @@ api/
 - **Server Core**: `server/server.go` contains the main HTTP server setup and all endpoint route definitions
 - **Lane Builders**: `builders/` implements deployment targets for different performance/footprint profiles
 - **Infrastructure**: Integration with Nomad, Consul, Traefik, and SeaweedFS storage
+
+### Nomad Wrapper Policy (VPS)
+
+On VPS environments, all Nomad interactions are routed through the job manager wrapper at `/opt/hashicorp/bin/nomad-job-manager.sh`.
+
+- Submission and validation in server code prefer the wrapper and fall back to SDK/CLI only when the wrapper is not present (e.g., non-VPS/local).
+- Benefits: unified retries/backoff for 429/5xx, HCL→JSON conversion and validation, consistent logging, and service cleanup before deployments.
+- Do not call the raw `nomad` CLI directly in API code when running on the VPS; use the wrapper or the orchestration facade which auto-detects the wrapper.
 - **Security**: ACME certificates, DNS validation, supply chain security, and OPA policy enforcement
 - **Analysis & Transformation**: Static analysis and automated remediation via ARF system
 - **Management**: Self-update, cleanup, monitoring, and coordination services
