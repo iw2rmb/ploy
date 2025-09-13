@@ -361,8 +361,8 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 
-	// Store successful result
-	endTime := time.Now()
+    // Store successful result (preserve accumulated steps/phase/last_job)
+    endTime := time.Now()
 
 	// Persist known artifacts (best-effort)
 	artifacts := map[string]string{}
@@ -373,23 +373,36 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			log.Printf("[Transflow] Warning: artifact persistence failed: %v", err)
 		}
 	}
-	status = TransflowStatus{
-		ID:        executionID,
-		Status:    "completed",
-		StartTime: status.StartTime,
-		EndTime:   &endTime,
-		Result: map[string]interface{}{
-			"success":       result.Success,
-			"workflow_id":   result.WorkflowID,
-			"branch_name":   result.BranchName,
-			"commit_sha":    result.CommitSHA,
-			"build_version": result.BuildVersion,
-			"mr_url":        result.MRURL,
-			"healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
-			"duration":      result.Duration.String(),
-			"artifacts":     artifacts,
-		},
-	}
+    // Load current status to preserve steps and phase
+    prevStatus, _ := h.getStatus(executionID)
+    var prevSteps []TransflowStepStatus
+    var prevPhase string
+    var prevLastJob *TransflowLastJob
+    if prevStatus != nil {
+        prevSteps = prevStatus.Steps
+        prevPhase = prevStatus.Phase
+        prevLastJob = prevStatus.LastJob
+    }
+    status = TransflowStatus{
+        ID:        executionID,
+        Status:    "completed",
+        StartTime: status.StartTime,
+        EndTime:   &endTime,
+        Phase:     prevPhase,
+        Steps:     prevSteps,
+        LastJob:   prevLastJob,
+        Result: map[string]interface{}{
+            "success":       result.Success,
+            "workflow_id":   result.WorkflowID,
+            "branch_name":   result.BranchName,
+            "commit_sha":    result.CommitSHA,
+            "build_version": result.BuildVersion,
+            "mr_url":        result.MRURL,
+            "healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
+            "duration":      result.Duration.String(),
+            "artifacts":     artifacts,
+        },
+    }
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store final status: %v", err)
 	}
@@ -524,18 +537,23 @@ func (h *Handler) GetTransflowStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	// Enrich running statuses: add duration and overdue fields without changing stored state
-	if status.Status == "running" {
-		elapsed := time.Since(status.StartTime)
-		status.Duration = elapsed.String()
-		overdueThresh := 30 * time.Minute
-		if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
-			if d, e := time.ParseDuration(v); e == nil && d > 0 {
-				overdueThresh = d
-			}
-		}
-		status.Overdue = elapsed > overdueThresh
-	}
+    // Enrich statuses: add duration and overdue fields without changing stored state
+    if status.Status == "running" {
+        elapsed := time.Since(status.StartTime)
+        status.Duration = elapsed.String()
+        overdueThresh := 30 * time.Minute
+        if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
+            if d, e := time.ParseDuration(v); e == nil && d > 0 {
+                overdueThresh = d
+            }
+        }
+        status.Overdue = elapsed > overdueThresh
+    } else if (status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled") && status.EndTime != nil {
+        // Compute duration for terminal states if not already set
+        if status.Duration == "" {
+            status.Duration = status.EndTime.Sub(status.StartTime).String()
+        }
+    }
 
 	return c.JSON(status)
 }
