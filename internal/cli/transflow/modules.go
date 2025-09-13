@@ -5,6 +5,7 @@ import (
 
     "github.com/iw2rmb/ploy/internal/cli/common"
     "github.com/iw2rmb/ploy/internal/git/provider"
+    "fmt"
 )
 
 // Runner modularization interfaces (Phase 5)
@@ -54,3 +55,44 @@ func NewModulesFactory() *ModulesFactory { return &ModulesFactory{} }
 
 func (f *ModulesFactory) ForBuildGate(c BuildCheckerInterface) BuildGate { return NewBuildGateAdapter(c) }
 
+// RepoManagerAdapter adapts GitOperationsInterface to RepoManager.
+type RepoManagerAdapter struct{ git GitOperationsInterface }
+
+func NewRepoManagerAdapter(git GitOperationsInterface) *RepoManagerAdapter { return &RepoManagerAdapter{git: git} }
+
+func (a *RepoManagerAdapter) Clone(ctx context.Context, repoURL, ref, target string) error {
+    return a.git.CloneRepository(ctx, repoURL, ref, target)
+}
+func (a *RepoManagerAdapter) CreateBranch(ctx context.Context, repoPath, name string) error {
+    return a.git.CreateBranchAndCheckout(ctx, repoPath, name)
+}
+func (a *RepoManagerAdapter) Commit(ctx context.Context, repoPath, message string) error {
+    return a.git.CommitChanges(ctx, repoPath, message)
+}
+func (a *RepoManagerAdapter) Push(ctx context.Context, repoPath, remoteURL, branch string) error {
+    return a.git.PushBranch(ctx, repoPath, remoteURL, branch)
+}
+
+// MRManagerAdapter adapts GitProvider to MRManager.
+type MRManagerAdapter struct{ gp provider.GitProvider }
+
+func NewMRManagerAdapter(gp provider.GitProvider) *MRManagerAdapter { return &MRManagerAdapter{gp: gp} }
+
+func (m *MRManagerAdapter) CreateOrUpdate(ctx context.Context, cfg provider.MRConfig) (string, map[string]any, error) {
+    if m.gp == nil {
+        return "", nil, fmt.Errorf("git provider not configured")
+    }
+    if err := m.gp.ValidateConfiguration(); err != nil {
+        return "", nil, err
+    }
+    res, err := m.gp.CreateOrUpdateMR(ctx, cfg)
+    if err != nil {
+        return "", nil, err
+    }
+    meta := map[string]any{}
+    if res == nil {
+        return "", meta, nil
+    }
+    meta["created"] = res.Created
+    return res.MRURL, meta, nil
+}
