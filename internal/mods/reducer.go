@@ -1,0 +1,90 @@
+package mods
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+// executeReducerMode renders and optionally submits reducer job
+func executeReducerMode(runner *ModRunner, preserve bool) error {
+	ctx := context.Background()
+	assets, err := runner.RenderReducerAssets()
+	if err != nil {
+		return fmt.Errorf("failed to render reducer assets: %w", err)
+	}
+
+	// Substitute placeholders
+	hclBytes, err := os.ReadFile(assets.HCLPath)
+	if err != nil {
+		return fmt.Errorf("failed to read reducer HCL: %w", err)
+	}
+
+	llm := ResolveLLMDefaultsFromEnv()
+	model := llm.Model
+	toolsJSON := llm.ToolsJSON
+	// For reducer, slightly tighter default limits; override only if MODS_LIMITS provided
+	limitsJSON := os.Getenv("MODS_LIMITS")
+	if limitsJSON == "" {
+		limitsJSON = `{"max_steps":4,"max_tool_calls":8,"timeout":"15m"}`
+	}
+
+	runID := ReducerRunID(runner.config.ID)
+	rendered := strings.NewReplacer(
+		"${MODEL}", model,
+		"${TOOLS_JSON}", toolsJSON,
+		"${LIMITS_JSON}", limitsJSON,
+		"${RUN_ID}", runID,
+	).Replace(string(hclBytes))
+
+	renderedPath := filepath.Join(filepath.Dir(assets.HCLPath), "reducer.rendered.hcl")
+	if err := os.WriteFile(renderedPath, []byte(rendered), 0644); err != nil {
+		return fmt.Errorf("failed to write rendered HCL: %w", err)
+	}
+
+	runner.emit(ctx, "reducer", "render", "info", fmt.Sprintf("Reducer HCL rendered: %s", renderedPath))
+	if preserve {
+		runner.emit(ctx, "reducer", "preserve", "info", fmt.Sprintf("Workspace preserved at: %s", runner.workspaceDir))
+	}
+
+	if os.Getenv("MODS_SUBMIT") != "1" {
+		runner.emit(ctx, "reducer", "submit", "info", "Skipping reducer submission (unset MODS_SUBMIT)")
+		return nil
+	}
+
+	timeout := ResolveDefaultsFromEnv().ReducerTimeout
+	if err := runner.hcl.Submit(renderedPath, timeout); err != nil {
+		runner.emit(ctx, "reducer", "submit", "error", fmt.Sprintf("reducer job failed: %v", err))
+		return fmt.Errorf("reducer job failed: %w", err)
+	}
+
+	// Fetch next.json via URL or local path
+	if url := os.Getenv("MODS_NEXT_URL"); url != "" {
+		client := &http.Client{Timeout: 15 * time.Second}
+		resp, err := client.Get(url)
+		if err == nil && resp.StatusCode == 200 {
+			defer func() { _ = resp.Body.Close() }()
+			b, _ := io.ReadAll(resp.Body)
+			printNextSummary(b)
+		} else if err != nil {
+			fmt.Printf("Failed to fetch next URL: %v\n", err)
+		}
+	}
+
+	np := os.Getenv("MODS_NEXT_PATH")
+	if np == "" {
+		np = filepath.Join(filepath.Dir(renderedPath), "out", "next.json")
+	}
+	if b, err := os.ReadFile(np); err == nil {
+		printNextSummary(b)
+	} else {
+		fmt.Println("Reducer job completed. Could not read next.json; set MODS_NEXT_PATH or MODS_NEXT_URL.")
+	}
+
+	return nil
+}

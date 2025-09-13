@@ -247,12 +247,12 @@ func (b *ResponseBuilder) Build() *httptest.ResponseRecorder {
 	if b.resp.Body != nil {
 		switch v := b.resp.Body.(type) {
 		case string:
-			w.WriteString(v)
+			_, _ = w.WriteString(v)
 		case []byte:
-			w.Write(v)
+			_, _ = w.Write(v)
 		default:
 			// Assume JSON encoding for other types
-			json.NewEncoder(w).Encode(v)
+			_ = json.NewEncoder(w).Encode(v)
 		}
 	}
 

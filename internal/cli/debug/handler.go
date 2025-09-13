@@ -27,7 +27,7 @@ func DebugCmd(args []string, controllerURL string) {
 
 	fs := flag.NewFlagSet("debug shell", flag.ExitOnError)
 	lane := fs.String("lane", "", "lane override for debug build")
-	fs.Parse(args[2:])
+	_ = fs.Parse(args[2:])
 
 	app := args[1]
 	url := fmt.Sprintf("%s/apps/%s/debug", controllerURL, app)
@@ -40,8 +40,8 @@ func DebugCmd(args []string, controllerURL string) {
 		fmt.Println("debug shell error:", err)
 		return
 	}
-	defer resp.Body.Close()
-	io.Copy(os.Stdout, resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(os.Stdout, resp.Body)
 }
 
 func RollbackCmd(args []string, controllerURL string) {
@@ -58,6 +58,6 @@ func RollbackCmd(args []string, controllerURL string) {
 		fmt.Println("rollback error:", err)
 		return
 	}
-	defer resp.Body.Close()
-	io.Copy(os.Stdout, resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(os.Stdout, resp.Body)
 }

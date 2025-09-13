@@ -192,7 +192,6 @@ create_completion_marker() {
 - **Nomad UI**: http://localhost:4646  
 - **SeaweedFS Master**: http://localhost:9333
 - **Traefik Dashboard**: http://localhost:8080
-- **PostgreSQL**: localhost:5432 (ploy/ploy-test)
 - **Redis**: localhost:6379
 
 ## Next Steps

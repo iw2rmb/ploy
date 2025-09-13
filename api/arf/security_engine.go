@@ -31,8 +31,18 @@ func NewSecurityEngine() *SecurityEngine {
 	}
 }
 
+// SetCVEDatabase injects a CVE database implementation (e.g., NVD)
+func (s *SecurityEngine) SetCVEDatabase(db CVEDatabase) {
+	s.cveDatabase = db
+}
+
 // ScanForVulnerabilities performs comprehensive vulnerability scanning
 func (s *SecurityEngine) ScanForVulnerabilities(ctx context.Context, target string, scanType string) (*SecurityReport, error) {
+	// Basic validation
+	if target == "" {
+		return nil, fmt.Errorf("invalid target")
+	}
+
 	// Mock implementation for compilation
 	report := &SecurityReport{
 		Summary: SecuritySummary{

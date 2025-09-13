@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 )
 
 // LLMRecipeGenerator defines the interface for LLM-based recipe generation
@@ -23,7 +25,7 @@ type LLMRecipeGenerator interface {
 	IsAvailable(ctx context.Context) bool
 
 	// ValidateGenerated validates a generated recipe
-	ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error)
+	ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*recipes.EvolutionValidationResult, error)
 
 	// OptimizeRecipe optimizes a recipe based on feedback
 	OptimizeRecipe(ctx context.Context, recipe interface{}, feedback TransformationFeedback) (interface{}, error)
@@ -186,19 +188,19 @@ func (g *HTTPLLMGenerator) IsAvailable(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode < 500
 }
 
 // ValidateGenerated validates a generated recipe
-func (g *HTTPLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*EvolutionValidationResult, error) {
-	return &EvolutionValidationResult{
+func (g *HTTPLLMGenerator) ValidateGenerated(ctx context.Context, recipe GeneratedRecipe) (*recipes.EvolutionValidationResult, error) {
+	return &recipes.EvolutionValidationResult{
 		Valid:          true,
 		SafetyScore:    recipe.Confidence,
 		Warnings:       []string{},
 		CriticalIssues: []string{},
-		TestResults:    []EvolutionValidationTest{},
+		TestResults:    []recipes.EvolutionValidationTest{},
 	}, nil
 }
 
@@ -291,7 +293,7 @@ func (g *HTTPLLMGenerator) callLLMAPI(ctx context.Context, prompt string, maxTok
 	if err != nil {
 		return "", fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

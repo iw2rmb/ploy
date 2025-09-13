@@ -192,7 +192,7 @@ func (h *Handler) atomicBinaryReplacement(newBinaryPath, targetPath, backupPath 
 
 	// Make temporary binary executable
 	if err := os.Chmod(tempPath, 0755); err != nil {
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return fmt.Errorf("failed to make temporary binary executable: %w", err)
 	}
 
@@ -200,7 +200,7 @@ func (h *Handler) atomicBinaryReplacement(newBinaryPath, targetPath, backupPath 
 	if err := os.Rename(tempPath, targetPath); err != nil {
 		// If rename fails, try alternative strategies
 		log.Printf("Atomic rename failed: %v, trying alternative strategies", err)
-		os.Remove(tempPath)
+		_ = os.Remove(tempPath)
 		return h.fallbackBinaryReplacement(newBinaryPath, targetPath, backupPath)
 	}
 
@@ -257,7 +257,7 @@ rm -f "$0"  # Remove this script
 		log.Printf("Executing external update script: %s", scriptPath)
 
 		// Execute the script
-		exec.Command("/bin/bash", scriptPath).Start()
+		_ = exec.Command("/bin/bash", scriptPath).Start()
 
 		// Exit current process to allow script to replace binary
 		time.Sleep(2 * time.Second)
@@ -331,16 +331,16 @@ func (h *Handler) updateStatus(sessionID, status, message string, progress int) 
 		Session: sessionID,
 	}
 
-	kv.Put(kvPair, nil)
+	_, _ = kv.Put(kvPair, nil)
 }
 
 // cleanupSession cleans up the update session
 func (h *Handler) cleanupSession(sessionID string) {
 	session := h.consulClient.Session()
-	session.Destroy(sessionID, nil)
+	_, _ = session.Destroy(sessionID, nil)
 
 	kv := h.consulClient.KV()
-	kv.Delete(h.leaderPrefix+"/status", nil)
+	_, _ = kv.Delete(h.leaderPrefix+"/status", nil)
 
 	log.Printf("Cleaned up update session %s", sessionID)
 }

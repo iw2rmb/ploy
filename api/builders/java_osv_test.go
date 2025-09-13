@@ -389,6 +389,8 @@ func testBuildOSVJava(req JavaOSVRequest, mockJibOutput string, mockJibError err
 	}
 
 	// Generate expected output path
+	_ = javaVersion
+	_ = jibTar
 	out := filepath.Join(req.OutDir, fmt.Sprintf("%s-%s.qcow2", req.App, testShort(req.GitSHA)))
 	return out, nil
 }

@@ -11,7 +11,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 - Git operations (clone, branch, commit, push)
 - Diff validation and application utilities
 - GitLab MR integration with environment variable configuration
-- Complete CLI integration (`ploy transflow run`) with full end-to-end workflow
+- Complete CLI integration (`ploy mod run`) with full end-to-end workflow
 - Test mode infrastructure with mock implementations for CI/testing
 - **LangGraph healing branch types:** complete implementation of all three healing strategies
   - **human-step:** Git-based manual intervention with MR creation, commit polling, and build validation
@@ -25,9 +25,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 
 ✅ **Recently Completed:**
 - **Model registry in `ployman` CLI:** Complete CRUD operations with schema validation, storage integration
-
-❌ **Not Implemented:**
-- KB (knowledge base) read/write for learning
+- **KB (Knowledge Base) learning system:** Complete implementation with SeaweedFS storage, Consul locking, case aggregation, deduplication, and active learning integration in transflow healing workflows
 
 ### In-Scope (Must Work)
 
@@ -68,7 +66,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
     - orw-gen → openrewrite: generate ORW recipe (class/coords) via LLM; run OpenRewrite job; build-check.
 
 - Transflow runner (orchestrator)
-  - Parse `roadmap/transflow/transflow.yaml` and run steps sequentially: recipe → llm-plan → llm-exec → MR.
+  - Parse `roadmap/transflow/mod.yaml` and run steps sequentially: recipe → llm-plan → llm-exec → MR.
   - Minimal logging; write per-step logs and final summary.
 
 ### What Already Exists (Leverage)
@@ -81,7 +79,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 ### New Work (Minimal)
 
 - New `transflow` orchestrator
-  - CLI entry: `ploy transflow run -f transflow.yaml`.
+  - CLI entry: `ploy mod run -f mod.yaml`.
   - Step engine: call existing ARF recipe execution; implement LLM plan/exec runners; manage workflow branch lifecycle; run Build check before MR.
 
 - LLM runners
@@ -105,7 +103,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 
 ### Interfaces (High-Level)
 
-- Input: `roadmap/transflow/transflow.yaml` (id, repo, branch, steps; global lane/build_timeout).
+- Input: `roadmap/transflow/mod.yaml` (id, repo, branch, steps; global lane/build_timeout).
 - Output: GitLab MR link, `plan.json`/branch results, step logs, final summary JSON.
 - Env: `GITLAB_URL`, `GITLAB_TOKEN` for MR; model/MCP creds via env only.
 
@@ -128,7 +126,7 @@ Purpose: deliver a basic, working transflow that can apply OpenRewrite recipes, 
 
 ### Next Steps
 
-1) Add `ploy transflow run` CLI + YAML parser. 2) Wire recipe step to ARF. 3) Implement LangGraph planner/reducer jobs and orchestrator fan‑out logic. 4) Implement LLM‑exec runner with MCP/env/context prefetch (for branch options). 5) Implement git push + GitLab MR creation. 6) Minimal logs and summary output.
+1) Add `ploy mod run` CLI + YAML parser. 2) Wire recipe step to ARF. 3) Implement LangGraph planner/reducer jobs and orchestrator fan‑out logic. 4) Implement LLM‑exec runner with MCP/env/context prefetch (for branch options). 5) Implement git push + GitLab MR creation. 6) Minimal logs and summary output.
 ### Test Case: JDK 11 → 17 Migration
 
 - Minimal transform request (single OpenRewrite recipe step):
@@ -174,23 +172,23 @@ Content-Type: application/json
 
 ```bash
 # Run a complete transflow workflow
-ploy transflow run -f transflow.yaml
+ploy mod run -f mod.yaml
 
 # Run with verbose output
-ploy transflow run -f transflow.yaml --verbose
+ploy mod run -f mod.yaml --verbose
 
 # Dry run to validate configuration
-ploy transflow run -f transflow.yaml --dry-run
+ploy mod run -f mod.yaml --dry-run
 
 # Use test mode for development/CI
-ploy transflow run -f transflow.yaml --test-mode
+ploy mod run -f mod.yaml --test-mode
 ```
 
 ### Configuration Examples
 
 **Basic Java 11→17 Migration:**
 ```yaml
-# transflow.yaml
+# mod.yaml
 version: v1alpha1
 id: java11-to-17-migration
 target_repo: https://gitlab.com/your-org/your-java-project.git
@@ -221,7 +219,7 @@ export GITLAB_URL=https://gitlab.com
 export GITLAB_TOKEN=your-gitlab-token
 
 # Run workflow with MR creation
-ploy transflow run -f transflow.yaml
+ploy mod run -f mod.yaml
 ```
 
 **Multiple Recipe Steps:**
@@ -258,29 +256,29 @@ self_heal:
 **Specialized Execution Modes:**
 ```bash
 # Execute only planner step (for debugging healing workflows)
-ploy transflow run -f transflow.yaml --render-planner
+ploy mod run -f mod.yaml --render-planner
 
 # Execute only LLM step with custom model
-TRANSFLOW_MODEL=gpt-4o-mini@2024-08-06 \
-ploy transflow run -f transflow.yaml --exec-llm-first
+MODS_MODEL=gpt-4o-mini@2024-08-06 \
+ploy mod run -f mod.yaml --exec-llm-first
 
 # Execute OpenRewrite application step
-ploy transflow run -f transflow.yaml --exec-orw-first
+ploy mod run -f mod.yaml --exec-orw-first
 
 # Apply first successful transformation and stop
-ploy transflow run -f transflow.yaml --apply-first
+ploy mod run -f mod.yaml --apply-first
 ```
 
 **Testing and Development:**
 ```bash
 # Test mode - uses mock implementations for all external services
-ploy transflow run -f transflow.yaml --test-mode
+ploy mod run -f mod.yaml --test-mode
 
 # Plan mode - shows execution plan without running
-ploy transflow run -f transflow.yaml --plan
+ploy mod run -f mod.yaml --plan
 
 # Reduce mode - processes healing results
-ploy transflow run -f transflow.yaml --reduce
+ploy mod run -f mod.yaml --reduce
 ```
 
 ### Expected Workflow Output
@@ -334,9 +332,9 @@ When builds fail and self-healing is enabled, the system will:
 - `GITLAB_URL`: GitLab instance URL (default: https://gitlab.com)
 
 **Optional Environment Variables:**
-- `TRANSFLOW_MODEL`: LLM model for healing (default: gpt-4o-mini@2024-08-06)
-- `TRANSFLOW_TOOLS`: MCP tools configuration JSON
-- `TRANSFLOW_LIMITS`: Execution limits configuration JSON
+- `MODS_MODEL`: LLM model for healing (default: gpt-4o-mini@2024-08-06)
+- `MODS_TOOLS`: MCP tools configuration JSON
+- `MODS_LIMITS`: Execution limits configuration JSON
 - `NOMAD_ADDR`: Nomad cluster address for job submission
 
 ### Integration with Existing Systems

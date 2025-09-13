@@ -103,8 +103,8 @@ func TestBytesTrimSpace(t *testing.T) {
 		},
 		{
 			name:     "very long string",
-			input:    []byte("  " + string(make([]byte, 1000, 1000)) + "content" + string(make([]byte, 1000, 1000)) + "  "),
-			expected: string(make([]byte, 1000, 1000)) + "content" + string(make([]byte, 1000, 1000)),
+			input:    []byte("  " + string(make([]byte, 1000)) + "content" + string(make([]byte, 1000)) + "  "),
+			expected: string(make([]byte, 1000)) + "content" + string(make([]byte, 1000)),
 		},
 		{
 			name:     "unicode spaces not trimmed",
@@ -163,10 +163,10 @@ func BenchmarkBytesTrimSpace(b *testing.B) {
 	}{
 		{"small_no_trim", []byte("hello")},
 		{"small_trim", []byte("  hello  ")},
-		{"medium_no_trim", []byte(string(make([]byte, 100, 100)) + "content")},
-		{"medium_trim", []byte("  " + string(make([]byte, 100, 100)) + "content  ")},
-		{"large_no_trim", []byte(string(make([]byte, 1000, 1000)) + "content")},
-		{"large_trim", []byte("  \n\r" + string(make([]byte, 1000, 1000)) + "content\r\n  ")},
+		{"medium_no_trim", []byte(string(make([]byte, 100)) + "content")},
+		{"medium_trim", []byte("  " + string(make([]byte, 100)) + "content  ")},
+		{"large_no_trim", []byte(string(make([]byte, 1000)) + "content")},
+		{"large_trim", []byte("  \n\r" + string(make([]byte, 1000)) + "content\r\n  ")},
 		{"only_spaces", []byte("     ")},
 		{"mixed_whitespace", []byte(" \n\r \n\r ")},
 	}

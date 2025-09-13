@@ -18,7 +18,6 @@
       - tree
       - watch
       - htop
-      - postgresql@15
       - redis
       - ansible
       - docker
@@ -332,7 +331,6 @@
         - { name: "Git", command: "git --version" }
         - { name: "jq", command: "jq --version" }
         - { name: "curl", command: "curl --version" }
-        - { name: "PostgreSQL", command: "psql --version" }
         - { name: "Redis", command: "redis-cli --version" }
       changed_when: false
     

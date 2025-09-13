@@ -104,9 +104,7 @@ func (m *MockStorage) DeleteBatch(ctx context.Context, keys []string) error {
 		return m.failError
 	}
 
-	for _, key := range keys {
-		m.deleteCalls = append(m.deleteCalls, key)
-	}
+	m.deleteCalls = append(m.deleteCalls, keys...)
 	return nil
 }
 
@@ -200,7 +198,7 @@ func TestRetryMiddleware_Get_SuccessOnFirstAttempt(t *testing.T) {
 	reader, err := retryMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
 	require.NotNil(t, reader)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Verify only one call was made
 	assert.Len(t, mockStorage.getCalls, 1)
@@ -236,7 +234,7 @@ func TestRetryMiddleware_Get_RetryOnTransientError(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, reader)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Verify retry occurred (3 calls total)
 	assert.Len(t, mockStorage.getCalls, 3)
@@ -499,7 +497,7 @@ func BenchmarkRetryMiddleware_Get_NoRetry(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		reader, err := retryMiddleware.Get(ctx, fmt.Sprintf("key-%d", i))
 		if err == nil && reader != nil {
-			reader.Close()
+			_ = reader.Close()
 		}
 	}
 }
@@ -521,7 +519,7 @@ func BenchmarkRetryMiddleware_Get_WithRetry(b *testing.B) {
 		mockStorage.SetFailures(1, networkErr)
 		reader, err := retryMiddleware.Get(ctx, fmt.Sprintf("key-%d", i))
 		if err == nil && reader != nil {
-			reader.Close()
+			_ = reader.Close()
 		}
 	}
 }

@@ -3,6 +3,8 @@ package orchestration
 import (
 	"fmt"
 	"time"
+
+	nomadapi "github.com/hashicorp/nomad/api"
 )
 
 // JobStatus represents the detailed status of a Nomad job
@@ -136,8 +138,41 @@ func (h *HealthMonitor) WaitForHealthyAllocations(jobID string, minHealthy int, 
 		minHealthy = 1
 	}
 	deadline := time.Now().Add(timeout)
+	// Prefer blocking queries when using SDK adapter to reduce polling load
+	var lastIndex uint64
+	waitTime := envDur("NOMAD_BLOCKING_WAIT", 30*time.Second)
 	for time.Now().Before(deadline) {
-		allocs, err := h.GetJobAllocations(jobID)
+		var (
+			allocs []*AllocationStatus
+			err    error
+		)
+		if a, ok := h.client.(*sdkNomadAdapter); ok && a != nil && a.client != nil {
+			// Blocking query using SDK
+			q := &nomadapi.QueryOptions{WaitIndex: lastIndex, WaitTime: waitTime, AllowStale: true}
+			raw, meta, e := a.client.Jobs().Allocations(jobID, false, q)
+			if e != nil {
+				err = e
+			} else {
+				if meta != nil && meta.LastIndex > 0 {
+					lastIndex = meta.LastIndex
+				}
+				// Map SDK types to our AllocationStatus
+				out := make([]*AllocationStatus, 0, len(raw))
+				for _, al := range raw {
+					st := &AllocationStatus{ID: al.ID, ClientStatus: al.ClientStatus, DesiredStatus: al.DesiredStatus}
+					if al.DeploymentStatus != nil {
+						ds := &AllocDeploymentStatus{}
+						ds.Healthy = al.DeploymentStatus.Healthy
+						st.DeploymentStatus = ds
+					}
+					out = append(out, st)
+				}
+				allocs = out
+			}
+		} else {
+			// Fallback to adapter (may poll)
+			allocs, err = h.GetJobAllocations(jobID)
+		}
 		if err != nil {
 			time.Sleep(2 * time.Second)
 			continue
@@ -157,7 +192,7 @@ func (h *HealthMonitor) WaitForHealthyAllocations(jobID string, minHealthy int, 
 		if healthy >= minHealthy {
 			return nil
 		}
-		time.Sleep(2 * time.Second)
+		// No explicit sleep; blocking query above already waited
 	}
 	return fmt.Errorf("timeout waiting for %d healthy allocations for job %s", minHealthy, jobID)
 }

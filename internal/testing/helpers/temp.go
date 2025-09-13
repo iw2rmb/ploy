@@ -16,7 +16,7 @@ func CreateTempDir(t *testing.T, prefix string) string {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	})
 
 	return dir
@@ -30,8 +30,8 @@ func CreateTempFile(t *testing.T, dir, pattern string) *os.File {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		file.Close()
-		os.Remove(file.Name())
+		_ = file.Close()
+		_ = os.Remove(file.Name())
 	})
 
 	return file

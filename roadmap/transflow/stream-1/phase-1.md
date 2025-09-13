@@ -8,14 +8,14 @@ Reuse First
 - Git: `api/arf/git_operations.go` (clone/diff/commit) — extend with push and branch helpers.
 
 Scope
-- CLI entry: `ploy transflow run -f transflow.yaml`.
-- YAML: `roadmap/transflow/transflow.yaml` with global `lane` and `build_timeout` (default 10m), steps: `recipe`, `build`.
+- CLI entry: `ploy mod run -f mod.yaml`.
+- YAML: `roadmap/transflow/mod.yaml` with global `lane` and `build_timeout` (default 10m), steps: `recipe`, `build`.
 - Branching: create `workflow/<id>/<timestamp>`; commit after each step.
 - Build-only check: generate app name `tfw-<id>-<timestamp>`; POST tar to `/v1/apps/:app/builds?env=dev[&lane=...]` and honor `build_timeout` (client-side).
 
 Detailed Steps (small, verifiable)
-- CLI entrypoint: add `transflow` command in `cmd/ploy/main.go` → `internal/cli/transflow/run.go`.
-- YAML parsing: `internal/cli/transflow/config.go` → struct with `id`, `target_repo`, `base_ref`, `target_branch`, `lane`, `build_timeout`, `steps`.
+- CLI entrypoint: add `transflow` command in `cmd/ploy/main.go` → `internal/mods/run.go`.
+- YAML parsing: `internal/mods/config.go` → struct with `id`, `target_repo`, `base_ref`, `target_branch`, `lane`, `build_timeout`, `steps`.
 - Git operations:
   - Use `CloneRepository` to clone `target_repo@base_ref`.
   - Add `CreateBranchAndCheckout(repoPath, branch)` and `PushBranch(remote, branch)` to `api/arf/git_operations.go`.

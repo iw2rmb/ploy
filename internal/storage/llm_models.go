@@ -64,7 +64,7 @@ func (s *LLMModelStorage) GetModel(ctx context.Context, modelID string) (*models
 		}
 		return nil, fmt.Errorf("failed to get model: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	var model models.LLMModel
 	decoder := json.NewDecoder(reader)
@@ -167,10 +167,10 @@ func (s *LLMModelStorage) ListModels(ctx context.Context, filter ListModelFilter
 		var model models.LLMModel
 		decoder := json.NewDecoder(reader)
 		if err := decoder.Decode(&model); err != nil {
-			reader.Close()
+			_ = reader.Close()
 			continue // Skip invalid models
 		}
-		reader.Close()
+		_ = reader.Close()
 
 		// Apply provider filter
 		if filter.Provider != "" && model.Provider != filter.Provider {

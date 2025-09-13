@@ -39,30 +39,31 @@ check_info() {
     echo -e "${BLUE}ℹ INFO:${NC} $1"
 }
 
-# Validate Phase 1 test script exists and is executable
-validate_test_script() {
-    echo "Validating Phase 1 test script..."
+# Validate Go test coverage for OpenRewrite Phase 1
+validate_go_tests() {
+    echo "Validating Go tests for Phase 1..."
     TOTAL_CHECKS=$((TOTAL_CHECKS + 3))
-    
-    if [[ -f "$PROJECT_ROOT/tests/scripts/test-openrewrite-phase1.sh" ]]; then
-        check_passed "Phase 1 test script exists"
+
+    # Check representative Go tests exist (integration/e2e)
+    if ls "$PROJECT_ROOT/tests/integration"/*.go >/dev/null 2>&1; then
+        check_passed "Integration tests present"
     else
-        check_failed "Phase 1 test script not found"
+        check_failed "Integration tests missing under tests/integration"
         return 1
     fi
-    
-    if [[ -x "$PROJECT_ROOT/tests/scripts/test-openrewrite-phase1.sh" ]]; then
-        check_passed "Phase 1 test script is executable"
+
+    if ls "$PROJECT_ROOT/tests/e2e"/*.go >/dev/null 2>&1; then
+        check_passed "E2E tests present"
     else
-        check_failed "Phase 1 test script is not executable"
+        check_failed "E2E tests missing under tests/e2e"
         return 1
     fi
-    
-    # Check script syntax
-    if bash -n "$PROJECT_ROOT/tests/scripts/test-openrewrite-phase1.sh"; then
-        check_passed "Phase 1 test script has valid syntax"
+
+    # Check mods package has tests
+    if ls "$PROJECT_ROOT/internal/mods"/*_test.go >/dev/null 2>&1; then
+        check_passed "Mods package tests present"
     else
-        check_failed "Phase 1 test script has syntax errors"
+        check_failed "Mods package tests missing"
         return 1
     fi
 }
@@ -271,12 +272,11 @@ Components Validated:
 ✅ Workspace creation and permissions
 
 Next Steps:
-$([ $success_rate -ge 90 ] && echo "- Execute Phase 1 testing: ./tests/scripts/test-openrewrite-phase1.sh" || echo "- Resolve validation failures before executing Phase 1")
+$([ $success_rate -ge 90 ] && echo "- Run Go test suites: make test-unit && go test ./tests/integration -tags=integration && go test ./tests/e2e -tags=e2e" || echo "- Resolve validation failures before executing Phase 1 tests")
 - Monitor results for Phase 2 readiness assessment
 - Update benchmark-java11.md with Phase 1 completion status
 
 Files:
-- Phase 1 Test Script: tests/scripts/test-openrewrite-phase1.sh
 - Container Build Script: scripts/build-openrewrite-container.sh
 - OpenRewrite Dockerfile: Dockerfile.openrewrite
 - Validation Report: $(basename "$report_file")
@@ -293,7 +293,7 @@ main() {
     echo "==============================================="
     echo
     
-    validate_test_script
+    validate_go_tests
     echo
     
     validate_docker_infrastructure  
@@ -321,8 +321,10 @@ main() {
         echo "Infrastructure Status: READY"
         echo "Success Rate: $((PASSED_CHECKS * 100 / TOTAL_CHECKS))% ($PASSED_CHECKS/$TOTAL_CHECKS checks)"
         echo
-        echo "Ready to execute Phase 1 baseline testing:"
-        echo "  ./tests/scripts/test-openrewrite-phase1.sh"
+        echo "Ready to execute Phase 1 baseline testing (Go suites):"
+        echo "  make test-unit"
+        echo "  go test ./tests/integration -tags=integration"
+        echo "  go test ./tests/e2e -tags=e2e"
         echo
         return 0
     else

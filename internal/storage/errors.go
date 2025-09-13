@@ -180,7 +180,8 @@ func classifyError(err error, context ErrorContext) (ErrorType, bool, time.Durat
 // isNetworkError checks if an error is network-related
 func isNetworkError(err error) bool {
 	if netErr, ok := err.(net.Error); ok {
-		return netErr.Temporary()
+		// Consider non-timeout network errors as network-related
+		return !netErr.Timeout()
 	}
 
 	// Check for common network error messages
@@ -238,31 +239,31 @@ func parseRetryAfterHeader(headers map[string]string) time.Duration {
 func generateErrorMessage(errorType ErrorType, originalErr error, context ErrorContext) string {
 	switch errorType {
 	case ErrorTypeNetwork:
-		return fmt.Sprintf("Network connectivity issue while accessing storage (server may be unreachable)")
+		return "Network connectivity issue while accessing storage (server may be unreachable)"
 	case ErrorTypeTimeout:
-		return fmt.Sprintf("Storage operation timed out (server response too slow)")
+		return "Storage operation timed out (server response too slow)"
 	case ErrorTypeAuthentication:
-		return fmt.Sprintf("Storage authentication failed (check credentials)")
+		return "Storage authentication failed (check credentials)"
 	case ErrorTypeAuthorization:
-		return fmt.Sprintf("Storage authorization denied (insufficient permissions)")
+		return "Storage authorization denied (insufficient permissions)"
 	case ErrorTypeQuotaExceeded:
 		return fmt.Sprintf("Storage quota exceeded (file size: %d bytes)", context.FileSize)
 	case ErrorTypeStorageFull:
-		return fmt.Sprintf("Storage system is full (cannot accept new files)")
+		return "Storage system is full (cannot accept new files)"
 	case ErrorTypeCorruption:
-		return fmt.Sprintf("Data corruption detected during storage operation")
+		return "Data corruption detected during storage operation"
 	case ErrorTypeRateLimit:
-		return fmt.Sprintf("Storage rate limit exceeded (too many requests)")
+		return "Storage rate limit exceeded (too many requests)"
 	case ErrorTypeServiceUnavailable:
-		return fmt.Sprintf("Storage service temporarily unavailable")
+		return "Storage service temporarily unavailable"
 	case ErrorTypeNotFound:
 		return fmt.Sprintf("Storage object not found: %s", context.Key)
 	case ErrorTypeInvalidRequest:
-		return fmt.Sprintf("Invalid storage request (check parameters)")
+		return "Invalid storage request (check parameters)"
 	case ErrorTypeConfiguration:
-		return fmt.Sprintf("Storage configuration error (check settings)")
+		return "Storage configuration error (check settings)"
 	case ErrorTypeInternal:
-		return fmt.Sprintf("Internal storage error (server-side issue)")
+		return "Internal storage error (server-side issue)"
 	default:
 		if originalErr != nil {
 			return fmt.Sprintf("Storage operation failed: %v", originalErr)

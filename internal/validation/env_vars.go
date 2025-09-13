@@ -122,7 +122,7 @@ func ValidateEnvVarValue(value string) error {
 // ValidateEnvVars validates a map of environment variables
 func ValidateEnvVars(envVars map[string]string) error {
 	// Nil or empty map is valid
-	if envVars == nil || len(envVars) == 0 {
+	if len(envVars) == 0 {
 		return nil
 	}
 

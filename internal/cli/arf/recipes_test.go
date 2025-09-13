@@ -86,7 +86,7 @@ func TestHandleARFRecipesCommand(t *testing.T) {
 			err := handleARFRecipesCommand(tt.args)
 
 			// Restore stdout
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 
 			// Check error expectation
@@ -98,7 +98,7 @@ func TestHandleARFRecipesCommand(t *testing.T) {
 
 			// Read captured output
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 			output := buf.String()
 
 			// Verify some output was produced
@@ -144,7 +144,7 @@ func TestListRecipes(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -167,7 +167,7 @@ func TestListRecipes(t *testing.T) {
 	err := listRecipes(filter, "table", false)
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	// Check result
@@ -175,7 +175,7 @@ func TestListRecipes(t *testing.T) {
 
 	// Read captured output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify output contains expected content
@@ -210,7 +210,7 @@ func TestSearchRecipes(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -233,7 +233,7 @@ func TestSearchRecipes(t *testing.T) {
 	err := searchRecipes("java migration", flags)
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	// Check result
@@ -241,7 +241,7 @@ func TestSearchRecipes(t *testing.T) {
 
 	// Read captured output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify output contains expected content
@@ -276,7 +276,7 @@ func TestShowRecipe(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(recipe)
+		_ = json.NewEncoder(w).Encode(recipe)
 	}))
 	defer server.Close()
 
@@ -300,7 +300,7 @@ func TestShowRecipe(t *testing.T) {
 	err := showRecipe("test-recipe", flags)
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	// Check result
@@ -308,7 +308,7 @@ func TestShowRecipe(t *testing.T) {
 
 	// Read captured output
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	// Verify output contains expected content
@@ -491,7 +491,7 @@ func TestHandleRecipeList(t *testing.T) {
 						},
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(items)
+					_ = json.NewEncoder(w).Encode(items)
 				} else {
 					// Regular mode response
 					response := struct {
@@ -509,15 +509,15 @@ func TestHandleRecipeList(t *testing.T) {
 						Count: 1,
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					_ = json.NewEncoder(w).Encode(response)
 				}
 			}))
 			defer server.Close()
 
 			// Set environment and controller URL
 			if tt.envCatalog != "" {
-				os.Setenv("PLOY_RECIPES_CATALOG", tt.envCatalog)
-				defer os.Unsetenv("PLOY_RECIPES_CATALOG")
+				_ = os.Setenv("PLOY_RECIPES_CATALOG", tt.envCatalog)
+				defer func() { _ = os.Unsetenv("PLOY_RECIPES_CATALOG") }()
 			}
 
 			originalURL := arfControllerURL
@@ -535,12 +535,12 @@ func TestHandleRecipeList(t *testing.T) {
 			err := handleRecipeList(tt.args)
 
 			// Restore stdout
-			w.Close()
+			_ = w.Close()
 			os.Stdout = oldStdout
 
 			// Read output
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 
 			// Check result
 			if tt.expectError {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/transflow/inputs.schema.json",
+  "$id": "https://example.com/mods/inputs.schema.json",
   "title": "Planner Inputs",
   "type": "object",
   "required": ["language", "lane", "last_error"],
@@ -21,4 +21,3 @@
   },
   "additionalProperties": false
 }
-

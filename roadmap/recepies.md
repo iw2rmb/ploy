@@ -1,12 +1,12 @@
 # OpenRewrite Recipes UX Roadmap (Catalog + Validation)
 
-Goal: Users can discover available OpenRewrite recipes via the Ploy CLI and run transforms by passing a factual recipe name. The API validates recipe names against a server-side catalog and returns friendly suggestions when a recipe is not found.
+Goal: Users can discover available OpenRewrite recipes via the Ploy CLI and run transformations through Transflow by passing factual recipe names in the plan. The API validates recipe names against a server-side catalog and returns friendly suggestions when a recipe is not found.
 
 ## Outcomes
 
-- [x] Transforms endpoint reliably runs OpenRewrite and applies code changes.
+- [x] Transflow reliably runs OpenRewrite and applies code changes.
 - [x] Ploy CLI lists/searches available recipes from the server catalog.
-- [x] API validates recipe names in POST /v1/arf/transforms; returns 400 + suggestions if missing.
+- [x] API validates recipe names referenced in Transflow plans and returns suggestions when invalid.
 
 ## Phase 0 — Foundation (DONE)
 
@@ -45,13 +45,13 @@ Expose recipe discovery to users via Ploy CLI.
 - [x] Flags: `--pack`, `--version`, `--limit`, `--format`
 - [x] TDD: CLI unit/integration tests (mock server)
 
-## Phase 3 — API Validation in Transforms (DONE)
+## Phase 3 — API Validation in Transflow (DONE)
 
 Validate recipe names passed to transforms.
 
-- [x] On `POST /v1/arf/transforms`, validate `recipe_id` against catalog
-- [x] If missing, return 400 with top N fuzzy suggestions (no Nomad job submission)
-- [x] If found, optionally pass `RECIPE_GROUP/ARTIFACT/VERSION` to speed resolution (runner still supports discovery)
+- [x] Validate recipe IDs used in Transflow steps against the catalog
+- [x] Return top N fuzzy suggestions if invalid (no job submission)
+- [x] Optionally pass Maven coordinates to speed resolution (runner still supports discovery)
 - [x] TDD: handler tests for happy path + suggestions
 
 ## Phase 4 — UX Polish (Partial)
@@ -89,7 +89,7 @@ Validate recipe names passed to transforms.
 - [x] Runner: `OUTPUT_URL` upload (no hardcoded bucket)
 - [x] Runner: dynamic pack fallback on recipe-not-found
 - [x] Dispatcher: discovery enabled; `OUTPUT_URL` passed
-- [x] Verified: transforms produce code changes (RemoveUnusedImports on all repos)
+- [x] Verified: Transflow workflows produce code changes (RemoveUnusedImports on all repos)
 
 Verified in repo:
 - Catalog/indexer code and tests present under `api/arf/recipes_*.go` with snapshot persistence via `StorageService`.
@@ -112,5 +112,5 @@ Verified in repo:
 
 - [x] Wire internal recipes handlers into main API router; configure default packs via platform config (future enhancement)
 - [x] CLI `ploy arf recipes list/search` (consumes server catalog endpoints)
-- [x] Integrate catalog validation into `POST /v1/arf/transforms` with suggestions on 400
+- [x] Integrate catalog validation into Transflow planning/execution with suggestions on invalid recipe IDs
 - [x] Docs: add `docs/recipes.md` walkthrough; update CLI help and examples

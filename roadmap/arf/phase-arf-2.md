@@ -397,7 +397,7 @@ USING ivfflat (embedding vector_cosine_ops);
 -- Pattern effectiveness tracking
 CREATE TABLE pattern_feedback (
     pattern_id UUID REFERENCES error_patterns(id),
-    transformation_id UUID,
+    mod_id UUID,
     success BOOLEAN,
     confidence FLOAT,
     feedback_time TIMESTAMP DEFAULT NOW()

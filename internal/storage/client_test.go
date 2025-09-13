@@ -782,6 +782,6 @@ func BenchmarkStorageClient_GetObject(b *testing.B) {
 			b.Fatal(err)
 		}
 
-		reader.Close()
+		_ = reader.Close()
 	}
 }

@@ -324,6 +324,9 @@
         - { path: "/opt/ploy", owner: "ploy", group: "ploy", mode: "0755" }
         - { path: "/opt/ploy/artifacts", owner: "ploy", group: "ploy", mode: "0755" }
         - { path: "/opt/ploy/logs", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/transflow", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/transflow/context", owner: "ploy", group: "ploy", mode: "0755" }
+        - { path: "/opt/ploy/transflow/out", owner: "ploy", group: "ploy", mode: "0755" }
 
     - name: Create Nomad log file with proper permissions
       file:
@@ -369,6 +372,35 @@
         create: true
         owner: ploy
         group: ploy
+
+    - name: Add Consul and SeaweedFS environment variables for ploy user
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Consul & SeaweedFS defaults for Transflow/ARF
+          export CONSUL_HTTP_ADDR="${CONSUL_HTTP_ADDR:-127.0.0.1:8500}"
+          export SEAWEEDFS_FILER="${SEAWEEDFS_FILER:-http://localhost:8888}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Ploy Storage Vars"
+
+    - name: Add Nomad SDK resilience env defaults for ploy user
+      blockinfile:
+        path: /home/ploy/.bashrc
+        create: true
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        block: |
+          # Nomad SDK backoff and blocking defaults
+          export NOMAD_HTTP_MAX_RETRIES="${NOMAD_HTTP_MAX_RETRIES:-5}"
+          export NOMAD_HTTP_BASE_DELAY="${NOMAD_HTTP_BASE_DELAY:-500ms}"
+          export NOMAD_HTTP_MAX_DELAY="${NOMAD_HTTP_MAX_DELAY:-30s}"
+          export NOMAD_SUBMIT_MAX_CONCURRENCY="${NOMAD_SUBMIT_MAX_CONCURRENCY:-4}"
+          export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience"
 
     - name: Deploy Traefik system job to Nomad
       block:
@@ -417,6 +449,29 @@
             - name: Display Traefik version
               debug:
                 msg: "Traefik installed successfully: {{ traefik_install_version.stdout_lines[0] if traefik_install_version.stdout_lines else 'Version info not available' }}"
+
+        - name: Install hcl2json for HCL to JSON conversion
+          block:
+            - name: Check if hcl2json is already installed
+              stat:
+                path: /usr/local/bin/hcl2json
+              register: hcl2json_binary
+
+            - name: Download hcl2json
+              get_url:
+                url: "https://github.com/tmccombs/hcl2json/releases/latest/download/hcl2json_linux_amd64"
+                dest: /usr/local/bin/hcl2json
+                mode: '0755'
+              when: not hcl2json_binary.stat.exists
+
+            - name: Verify hcl2json installation
+              command: /usr/local/bin/hcl2json --version
+              register: hcl2json_version
+              changed_when: false
+
+            - name: Display hcl2json version
+              debug:
+                msg: "hcl2json installed successfully: {{ hcl2json_version.stdout }}"
 
         - name: Copy Traefik Nomad job template to VPS
           copy:

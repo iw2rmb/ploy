@@ -52,7 +52,7 @@ func TestServer_IndexesDefaultPacksOnStartup(t *testing.T) {
 	var lastErr error
 	for time.Now().Before(deadline) {
 		if rc, err := st.Get(context.Background(), "artifacts/openrewrite/catalog.json"); err == nil {
-			rc.Close()
+			_ = rc.Close()
 			return
 		} else {
 			lastErr = err

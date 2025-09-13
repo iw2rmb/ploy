@@ -41,7 +41,7 @@ func TestTriggerBuildWithUnifiedStorage(t *testing.T) {
 	// Execute request (will fail in RED phase as function doesn't exist)
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check response (expect success after implementation)
 	assert.Equal(t, 200, resp.StatusCode)
@@ -69,7 +69,7 @@ func TestTriggerPlatformBuildWithUnifiedStorage(t *testing.T) {
 	// Execute request (will fail in RED phase)
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Expect success after implementation
 	assert.Equal(t, 200, resp.StatusCode)
@@ -97,7 +97,7 @@ func TestTriggerAppBuildWithUnifiedStorage(t *testing.T) {
 	// Execute request (will fail in RED phase)
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Expect success after implementation
 	assert.Equal(t, 200, resp.StatusCode)
@@ -124,7 +124,7 @@ func TestBackwardCompatibilityBuildTriggers(t *testing.T) {
 	// Execute request
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Should handle gracefully even with nil storage
 	// (might return error but shouldn't crash)

@@ -25,7 +25,7 @@ func TestMockStorageClient_BasicOperations(t *testing.T) {
 		// Test Download
 		reader, err := client.Download(ctx, "test-key")
 		require.NoError(t, err)
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		downloaded, err := io.ReadAll(reader)
 		require.NoError(t, err)
@@ -108,7 +108,7 @@ func TestMockStorageClient_HelperMethods(t *testing.T) {
 		// Verify data is available
 		reader, err := client.Download(ctx, "preset-key")
 		require.NoError(t, err)
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		downloaded, err := io.ReadAll(reader)
 		require.NoError(t, err)

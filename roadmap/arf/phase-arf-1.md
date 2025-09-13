@@ -157,8 +157,8 @@ type Recipe struct {
 // api/arf/transformer.go
 type TransformationEngine interface {
     Transform(ctx context.Context, req TransformationRequest) (*TransformationResult, error)
-    GetTransformationStatus(transformationID string) (*TransformationStatus, error)
-    CancelTransformation(transformationID string) error
+    GetTransformationStatus(modID string) (*TransformationStatus, error)
+    CancelTransformation(modID string) error
 }
 
 type TransformationRequest struct {
@@ -202,7 +202,7 @@ type TransformationResult struct {
 ```go
 // api/arf/cost_model.go
 type CostModel interface {
-    TrackResourceUsage(ctx context.Context, transformation TransformationID) (*ResourceUsage, error)
+    TrackResourceUsage(ctx context.Context, transformation ModID) (*ResourceUsage, error)
     CalculateCost(ctx context.Context, usage ResourceUsage) (*CostBreakdown, error)
     SetBudget(ctx context.Context, budget BudgetConfig) error
     CheckBudgetLimit(ctx context.Context, projected ProjectedCost) (*BudgetStatus, error)
@@ -210,7 +210,7 @@ type CostModel interface {
 }
 
 type ResourceUsage struct {
-    TransformationID string        `json:"transformation_id"`
+    ModID string        `json:"mod_id"`
     CPUSeconds       float64       `json:"cpu_seconds"`
     MemoryGBHours    float64       `json:"memory_gb_hours"`
     StorageGB        float64       `json:"storage_gb"`
@@ -252,7 +252,7 @@ type CostBreakdown struct {
 // api/arf/disaster_recovery.go
 type DisasterRecovery interface {
     CreateSnapshot(ctx context.Context, repository Repository) (*Snapshot, error)
-    RollbackTransformation(ctx context.Context, transformationID string) error
+    RollbackTransformation(ctx context.Context, modID string) error
     CreateCheckpoint(ctx context.Context, state TransformationState) (*Checkpoint, error)
     RestoreFromCheckpoint(ctx context.Context, checkpointID string) error
     ExecuteEmergencyStop(ctx context.Context, reason string) error
@@ -308,7 +308,7 @@ arf:
 ### Nomad Job Template
 ```hcl
 # platform/nomad/templates/arf-transformation.hcl.j2
-job "arf-transform-{{ transformation_id }}" {
+job "arf-transform-{{ mod_id }}" {
   datacenters = ["{{ datacenter }}"]
   type = "batch"
   
@@ -322,7 +322,7 @@ job "arf-transform-{{ transformation_id }}" {
       driver = "jail"
       
       config {
-        path = "/zroot/jails/arf-{{ transformation_id }}"
+        path = "/zroot/jails/arf-{{ mod_id }}"
         command = "/usr/local/bin/arf-transform"
         args = [
           "--recipe", "{{ recipe_path }}",

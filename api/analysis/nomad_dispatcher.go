@@ -586,11 +586,14 @@ func (d *AnalysisDispatcher) submitToNomad(job *AnalysisJob) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	if _, err := tmp.WriteString(hcl); err != nil {
 		return err
 	}
-	tmp.Close()
+	if cerr := tmp.Close(); cerr != nil {
+		// best-effort close
+		_ = cerr
+	}
 	return orchestration.Submit(tmp.Name())
 }
 

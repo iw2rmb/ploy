@@ -1,6 +1,6 @@
 # OpenRewrite Service Migration to Lane E
 
-> **⚠️ DEPRECATED**: This roadmap document is obsolete. ARF now uses Nomad batch jobs for OpenRewrite transformations instead of persistent services. See the current implementation in `api/arf/openrewrite_dispatcher.go`.
+> **⚠️ DEPRECATED**: This roadmap document is obsolete. Execution is unified under Mods (orw-apply). The ARF dispatcher has been removed.
 
 ## Executive Summary
 
@@ -316,7 +316,9 @@ ployman push
 - `ARF_OPENREWRITE_MODE=auto` - Tries service first, falls back to embedded
 - `OPENREWRITE_SERVICE_URL=<url>` - Override service URL
 
-**api/arf/openrewrite_client.go** (new):
+> Note: The ARF OpenRewrite HTTP client was not adopted; execution is unified under Mods orw-apply.
+
+**[Historical] api/arf/openrewrite_client.go** (planned):
 ```go
 package arf
 
@@ -377,7 +379,7 @@ func (c *OpenRewriteClient) Transform(tarData []byte, recipe RecipeConfig) (*Tra
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var result TransformResult
     if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -406,7 +408,7 @@ func (c *OpenRewriteClient) CreateJob(tarData []byte, recipe RecipeConfig) (stri
     if err != nil {
         return "", err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var result JobResponse
     if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -423,7 +425,7 @@ func (c *OpenRewriteClient) GetJobStatus(jobID string) (*JobStatus, error) {
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var status JobStatus
     if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
@@ -494,7 +496,7 @@ func TestJava11to17Migration(t *testing.T) {
         bytes.NewReader(body),
     )
     require.NoError(t, err)
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var result TransformResult
     err = json.NewDecoder(resp.Body).Decode(&result)
@@ -640,7 +642,7 @@ However, this should not be needed with proper testing.
 
 1. Remove old Nomad job:
 ```bash
-nomad job stop openrewrite-service
+/opt/hashicorp/bin/nomad-job-manager.sh stop --job openrewrite-service
 ```
 
 2. Clean up Docker images:

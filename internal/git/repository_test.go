@@ -233,7 +233,7 @@ remote "origin"
 			// Create temporary directory with git config
 			tmpDir, err := os.MkdirTemp("", "git_config_test_*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			gitDir := filepath.Join(tmpDir, ".git")
 			err = os.MkdirAll(gitDir, 0755)
@@ -678,7 +678,7 @@ func TestRepository_isTextFile(t *testing.T) {
 // Benchmark tests
 func BenchmarkNewRepository(b *testing.B) {
 	tmpDir := createTestGitRepo(&testing.T{})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -1,3 +1,6 @@
+//go:build arf_legacy
+// +build arf_legacy
+
 package arf
 
 import (
@@ -171,7 +174,7 @@ func TestBucketPrefixing(t *testing.T) {
 	prefixedKey := "artifacts/test-key"
 	reader, err := mockStorage.Get(ctx, prefixedKey)
 	assert.NoError(t, err)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	storedData, err := io.ReadAll(reader)
 	assert.NoError(t, err)

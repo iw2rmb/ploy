@@ -153,7 +153,7 @@ func ConfirmAction(action string, force bool) bool {
 
 	fmt.Printf("Are you sure you want to %s? (y/N): ", action)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"

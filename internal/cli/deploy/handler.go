@@ -15,7 +15,7 @@ func PushCmd(args []string, controllerURL string) {
 	main := fs.String("main", "", "Java main class for lane C")
 	sha := fs.String("sha", "", "git sha to annotate")
 	bluegreen := fs.Bool("blue-green", false, "use blue-green deployment")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	// Check if blue-green deployment is requested
 	if *bluegreen {

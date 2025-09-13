@@ -36,5 +36,5 @@ func TestIndexer_Refresh_PersistsSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("snapshot not persisted: %v", err)
 	}
-	rc.Close()
+	_ = rc.Close()
 }

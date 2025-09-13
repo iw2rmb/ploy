@@ -1,0 +1,16 @@
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI / Pre-commit Hooks"
+  - name: develop
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI / Pre-commit Hooks"
+
+# Note: This file is applied by the GitHub App "Settings" (aka Probot Settings).
+# Install it on the repository or organization to enforce these rules automatically.
