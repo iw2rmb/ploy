@@ -887,7 +887,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 
 ⸻
 
-## 🔄 Transflow MVP ✅
+## 🔄 Mods MVP ✅
 
 ### Complete Automated Code Transformation System
 
@@ -936,7 +936,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ Performance benchmarks and load testing
 - ✅ Mock replacement with real service calls for production fidelity
 - ✅ Secure diff path validation now supports doublestar globs (`**`) in allowlists to correctly match nested paths like `src/**/*.java` and repo-root files like `pom.xml`.
- - Deterministic Transflow tests using injected seams for HCL submission and planner/reducer helpers; removed reliance on global test stubs. Added unit tests for step-type normalization and event emission.
+ - Deterministic Mods tests using injected seams for HCL submission and planner/reducer helpers; removed reliance on global test stubs. Added unit tests for step-type normalization and event emission.
 
 **Production Readiness**
 - ✅ VPS deployment and testing validation
@@ -954,7 +954,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 
 ### Migration Notes
 - No breaking changes to existing ARF or deployment functionality
-- Transflow system integrates seamlessly with existing Ploy infrastructure
+- Mods system integrates seamlessly with existing Ploy infrastructure
 - KB learning is opt-in via configuration (`kb_learning: true`)
 - All existing CLI commands and APIs remain unchanged
 

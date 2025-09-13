@@ -71,9 +71,9 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 		t.Logf("CLI Output (failure):\n%s", result.Output)
 	}
 	if os.Getenv("E2E_LOG_CONFIG") == "1" || err != nil {
-		t.Logf("Transflow YAML path: %s", result.ConfigPath)
+		t.Logf("Mods YAML path: %s", result.ConfigPath)
 		if result.ConfigYAML != "" {
-			t.Logf("Transflow YAML:\n%s", result.ConfigYAML)
+			t.Logf("Mods YAML:\n%s", result.ConfigYAML)
 		}
 	}
 	// CLI may exit non-zero in some environments; continue based on controller status

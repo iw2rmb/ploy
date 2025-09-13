@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the performance requirements and acceptance criteria for the Ploy Transflow MVP. These targets ensure production readiness for code transformation workflows with self-healing capabilities and Knowledge Base learning.
+This document defines the performance requirements and acceptance criteria for the Ploy Mods MVP. These targets ensure production readiness for code transformation workflows with self-healing capabilities and Knowledge Base learning.
 
 ## Performance Testing Framework
 
@@ -27,7 +27,7 @@ TARGET_HOST=45.12.75.241 ./tests/scripts/run-vps-performance-tests.sh
 
 ## Core Performance Targets
 
-### Transflow Workflow Performance
+### Mods Workflow Performance
 
 | Metric | Target | Measurement | Rationale |
 |--------|--------|-------------|-----------|
@@ -171,7 +171,7 @@ TARGET_HOST=45.12.75.241 ./tests/scripts/run-vps-performance-tests.sh
 
 ### Phase 1: Core Optimizations (GREEN Phase)
 
-#### Transflow Runner Optimizations
+#### Mods Runner Optimizations
 - **Connection Pooling**: Reuse HTTP connections
 - **Template Caching**: Cache HCL templates
 - **Parallel Processing**: Concurrent job operations
@@ -304,6 +304,6 @@ TARGET_HOST=45.12.75.241 go test -tags=performance -run=TestVPSValidation ./test
 
 - **Version**: 1.0
 - **Last Updated**: 2025-01-09
-- **Owner**: Transflow Performance Team
+- **Owner**: Mods Performance Team
 - **Review Cycle**: Monthly performance review
 - **Change Process**: Performance requirements change approval

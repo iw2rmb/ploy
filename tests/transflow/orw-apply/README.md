@@ -1,10 +1,10 @@
-# Continue: Transflow Java11→17 MR Pipeline (State + Detailed Plan)
+# Continue: Mods Java11→17 MR Pipeline (State + Detailed Plan)
 
 ## Key Takeaways (Updated)
 
 - CLI is REST-only. All orchestration (Nomad jobs, HCL templates) runs on the API (VPS). No local Nomad usage.
 - Remote execution permitted: SSH access to the target VPS is available for running Ansible, Nomad helpers, and validation commands directly from this agent.
-- API embeds all Transflow HCL templates and writes them to a per-run temp workspace:
+- API embeds all Mods HCL templates and writes them to a per-run temp workspace:
   - `platform/nomad/transflow/{planner.hcl,llm_exec.hcl,reducer.hcl,orw_apply.hcl}` (embedded at build time)
   - Runner reads templates relative to its `workspaceDir`.
 - orw-apply I/O stabilized (SeaweedFS-only, Consul DNS):
@@ -13,7 +13,7 @@
   - Runner writes `/workspace/out/error.log` on failures; controller persists and includes a snippet in status.
 - Status reliability improved:
   - Added top-level execution timeout (default 45m, `PLOY_TRANSFLOW_EXEC_TIMEOUT`) and panic guard.
-  - `/v1/transflow/status/:id` enriched with `duration` and `overdue` (default overdue if >30m, configurable via `PLOY_TRANSFLOW_OVERDUE`).
+  - `/v1/mods/status/:id` enriched with `duration` and `overdue` (default overdue if >30m, configurable via `PLOY_TRANSFLOW_OVERDUE`).
 - We cancelled stale executions as needed; older failures remain for history.
 
 Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build gate fetch artifacts directly from SeaweedFS.
@@ -29,11 +29,11 @@ Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build
 ## Diffs Strategy (Space‑Efficient Chain)
 
 - Each successful step gets a `step_id` like `s-<random>` and persists immutable artifacts:
-  - `artifacts/transflow/<exec_id>/branches/<branch_id>/steps/<step_id>/diff.patch`
-  - `artifacts/transflow/<exec_id>/branches/<branch_id>/steps/<step_id>/meta.json` (contains `prev_step_id`, `branch_id`, `diff_key`, `ts`)
-  - `artifacts/transflow/<exec_id>/branches/<branch_id>/HEAD.json` → `{ "step_id": "..." }`
+  - `artifacts/mods/<exec_id>/branches/<branch_id>/steps/<step_id>/diff.patch`
+  - `artifacts/mods/<exec_id>/branches/<branch_id>/steps/<step_id>/meta.json` (contains `prev_step_id`, `branch_id`, `diff_key`, `ts`)
+  - `artifacts/mods/<exec_id>/branches/<branch_id>/HEAD.json` → `{ "step_id": "..." }`
   - orw-apply uploads `diff.patch` directly under the branch/step path via `DIFF_KEY`; controller reuses the same `step_id` and no longer re-uploads the diff (only writes `meta.json` and updates `HEAD.json`).
-- Original baseline `input.tar` remains immutable at `artifacts/transflow/<exec_id>/input.tar`.
+- Original baseline `input.tar` remains immutable at `artifacts/mods/<exec_id>/input.tar`.
 - Build gate (chain mode):
   - Always fetches artifacts from SeaweedFS; reconstructs branch state by walking HEAD→root via meta.json and applying all diffs in order, then runs compile gate.
   - For sequential scope, runner applies current step’s diff and records chain metadata (ready for multi‑step flows like llm‑exec).
@@ -65,9 +65,9 @@ Deploy latest API from feature branch:
 `DEPLOY_BRANCH=feature/transflow-mvp-completion ./bin/ployman api deploy --monitor`
 
 Start and monitor a run:
-- `./bin/ploy transflow run -f test-java11to17-transflow.yaml -v`
-- `curl -sS https://api.dev.ployman.app/v1/transflow/status/<id> | jq`
-- Cancel: `curl -sS -X DELETE https://api.dev.ployman.app/v1/transflow/<id>`
+- `./bin/ploy mod run -f test-java11to17-transflow.yaml -v`
+- `curl -sS https://api.dev.ployman.app/v1/mods/status/<id> | jq`
+- Cancel: `curl -sS -X DELETE https://api.dev.ployman.app/v1/mods/<id>`
 
 Inspect VPS logs (as `ploy` user):
 - `/opt/hashicorp/bin/nomad-job-manager.sh running-alloc --job ploy-api`
@@ -95,7 +95,7 @@ Verify MR & diff (GitLab):
 - Emit granular apply/build events: `diff-found`, `diff-apply-started`, `build-gate-start`, `build-gate-failed/succeeded`.
 
 ### Near-Term (1–2 days)
-- Event push API: `POST /v1/transflow/event {execution_id, step, phase, level, message, ts}`. Jobs/runner POST start/ok/fail.
+- Event push API: `POST /v1/mods/event {execution_id, step, phase, level, message, ts}`. Jobs/runner POST start/ok/fail.
 - Controller log tailer: tail last alloc logs; update status on success/error markers; record last_log_preview.
 - Nomad event stream: subscribe to alloc events; update status on Start/Terminated.
 - Standard job status.json: each job writes `/workspace/out/status.json` (step/state/message/ts/metrics) for the controller to persist.
@@ -103,12 +103,12 @@ Verify MR & diff (GitLab):
 - SeaweedFS reachability: ensure `PLOY_SEAWEEDFS_URL` points to a resolvable/healthy filer; consider fallbacks (host IP) for environments without Consul DNS.
 
 ### Longer-Term (3–5 days)
-- Live logs endpoint (SSE): `GET /v1/transflow/logs/:id?follow=true` streams step events + job tails. CLI `ploy transflow watch` displays live progress.
+- Live logs endpoint (SSE): `GET /v1/mods/logs/:id?follow=true` streams step events + job tails. CLI `ploy mod watch` displays live progress.
 - Metrics & alerts: Prometheus metrics per phase and alerts when durations exceed baselines.
 - Conformance across job types: planner/llm-exec/reducer/human-step all emit standard events, status.json, error.log.
 
 ### Acceptance Criteria
-- `/v1/transflow/status/:id` shows current phase and last step with timestamps.
+- `/v1/mods/status/:id` shows current phase and last step with timestamps.
 - On any failure, `status.error` updates within seconds (with error snippet). Non‑zero task exits are always surfaced (apply/build/planner/reducer).
 - Artifacts include `diff_patch` (or clear no-diff failure) and `error_log` when applicable.
 - CLI watch shows live progress and immediate failures.
@@ -202,7 +202,7 @@ DEV LOGGING NOTE (keep logs tidy):
 
 - Filer checks:
   - `curl -sI http://<filer-ip>:8888/status`
-  - `curl -sI http://<filer-ip>:8888/artifacts/transflow/<exec_id>/input.tar`
+  - `curl -sI http://<filer-ip>:8888/artifacts/mods/<exec_id>/input.tar`
 
 ## Acceptance Criteria (closeout)
 

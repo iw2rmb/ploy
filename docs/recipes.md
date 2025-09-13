@@ -251,7 +251,7 @@ Rebuilds the catalog by re-indexing recipe packs.
 
 #### Execute Transformation
 ```http
-// Removed: ARF transforms endpoint. Use Transflow instead.
+// Removed: ARF transforms endpoint. Use Mods instead.
 ```
 
 Request body:

@@ -53,7 +53,7 @@ func (s *TransflowIntegrationSuite) SetupSuite() {
 	})
 	require.NoError(s.T(), err)
 
-	// Transflow config with real service endpoints
+	// Mods config with real service endpoints
 	s.config = &transflow.TransflowConfig{
 		ID:           "integration-test-workflow",
 		TargetRepo:   "https://github.com/example/test-repo.git", // Will fail - test repo

@@ -1,13 +1,13 @@
-# Mods (formerly Transflow)
+# Mods (formerly Mods)
 
 This module provides end-to-end implementation of `ploy mod run` supporting complete transformation pipelines with production-ready self-healing capabilities. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows executed via production Nomad job orchestration.
 
 See API docs under `docs/api/mods.md` and CLI implementation under `internal/mods`.
 
 \n---\n(Appended from original docs/mods/README.md)\n
-# Transflow: Automated Code Transformation Workflows
+# Mods: Automated Code Transformation Workflows
 
-Transflow is Ploy's automated code transformation system that orchestrates OpenRewrite recipes, build validation, and self-healing workflows with knowledge base learning.
+Mods is Ploy's automated code transformation system that orchestrates OpenRewrite recipes, build validation, and self-healing workflows with knowledge base learning.
 
 ## Quick Start
 
@@ -81,7 +81,7 @@ export KB_STORAGE_URL=http://localhost:8888
 export KB_TIMEOUT=10s
 ```
 
-### Transflow Configuration
+### Mods Configuration
 ```yaml
 version: v1alpha1
 id: workflow-id

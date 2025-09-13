@@ -97,13 +97,13 @@ func TestVPSTransflowEndToEnd(t *testing.T) {
         configCmd := `su - ploy -c "/opt/ploy/bin/ploy mod --help"`
 		output, err := vpsClient.RunCommand(configCmd)
         assert.NoError(t, err, "Mods CLI should be accessible")
-		assert.Contains(t, output, "transflow.yaml", "Transflow should show usage")
+		assert.Contains(t, output, "transflow.yaml", "Mods should show usage")
 
 		// Test configuration file exists
 		fileCmd := `su - ploy -c "test -f /opt/ploy/test/fixtures/java-migration.yaml && echo 'config exists'"`
 		output, err = vpsClient.RunCommand(fileCmd)
 		assert.NoError(t, err, "Should be able to check config file")
-		assert.Contains(t, output, "config exists", "Transflow config file should exist")
+		assert.Contains(t, output, "config exists", "Mods config file should exist")
 
 		// Test KB learning system availability
 		kbTestCmd := `su - ploy -c "curl -f http://localhost:8888/kb/cases/"`

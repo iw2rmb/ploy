@@ -94,7 +94,7 @@ Workflow configuration examples:
 
 ## Related Documentation
 - `../vps/` - VPS-specific test configurations and production environment validation (✅ operational)
-- `../../internal/cli/transflow/README.md` - Transflow CLI implementation with E2E integration (MVP complete)
+- `../../internal/mods/README.md` - Mods CLI implementation with E2E integration (MVP complete)
 - `../../internal/testing/CLAUDE.md` - Testing module with E2E framework integration
 - `../../internal/validation/CLAUDE.md` - Validation framework supporting E2E infrastructure
 - `../../Makefile` - Build system integration with E2E test targets and VPS execution (✅ validated)

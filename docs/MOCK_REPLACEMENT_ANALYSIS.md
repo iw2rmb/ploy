@@ -38,7 +38,7 @@ These services are used directly in production workflows and have the highest im
 
 #### 3. GitLab API Integration (HIGH)
 - **Current State**:
-  - Transflow MR creation may use mocks in integration scenarios
+  - Mods MR creation may use mocks in integration scenarios
   - Human-step healing branches require real GitLab API calls
 - **Real Implementation**: GitLab REST API via internal/git/provider
 - **Dependencies**: GITLAB_TOKEN, test project access, MR permissions

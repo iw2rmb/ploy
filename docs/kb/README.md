@@ -113,7 +113,7 @@ export KB_MAX_CASES_PER_ERROR=100
 export KB_SUMMARY_UPDATE_INTERVAL=1h
 ```
 
-### Transflow Integration
+### Mods Integration
 Enable KB learning in transflow configuration:
 ```yaml
 self_heal:

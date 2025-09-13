@@ -110,7 +110,7 @@ OpenRewrite transformations use the unified ARF transformation pipeline:
 
 ```bash
 # Execute transformation
-// Removed: Use Transflow run instead of ARF transform
+// Removed: Use Mods run instead of ARF transform
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",

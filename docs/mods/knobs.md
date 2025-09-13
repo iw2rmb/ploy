@@ -9,7 +9,7 @@ Environment examples:
 - `TRANSFLOW_LIMITS='{"max_steps":4,"max_tool_calls":6,"timeout":"10m"}' ./bin/ploy mod reduce`
 
 \n---\n(Appended from original docs/mods/knobs.md)\n
- Transflow Knobs
+ Mods Knobs
 
 - orw-apply resources
     - memory: 1024 MB (template: platform/nomad/transflow/orw_apply.hcl)
@@ -108,9 +108,9 @@ Override examples (per run):
 - `TRANSFLOW_MODEL=gpt-4o-mini ./bin/ploy mod plan --preserve`
 - `TRANSFLOW_TOOLS='{"file":{"allow":["src/**","pom.xml","build.gradle"]}}' ./bin/ploy mod plan`
 - `TRANSFLOW_LIMITS='{"max_steps":4,"max_tool_calls":6,"timeout":"10m"}' ./bin/ploy mod reduce`
-# Transflow Configuration Knobs
+# Mods Configuration Knobs
 
-The following environment variables control Transflow defaults. All are optional; sensible defaults are provided.
+The following environment variables control Mods defaults. All are optional; sensible defaults are provided.
 
 Registry and Images
 - TRANSFLOW_REGISTRY: Default registry (default: registry.dev.ployman.app)
