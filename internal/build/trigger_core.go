@@ -101,14 +101,21 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		appEnvVars = make(map[string]string)
 	}
 
+	detectedLanguage := ""
 	if lane == "" {
 		if res, err := utils.RunLanePick(srcDir); err == nil {
 			lane = res.Lane
+			detectedLanguage = res.Language
 		} else {
 			lane = "C"
 		}
+	} else {
+		// Attempt language detection even when lane is forced
+		if res, err := utils.RunLanePick(srcDir); err == nil {
+			detectedLanguage = res.Language
+		}
 	}
-	log.Printf("[Build] Lane selected: %s", strings.ToUpper(lane))
+	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
 
 	var imagePath, dockerImage string
 	switch strings.ToUpper(lane) {
@@ -413,6 +420,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Use enhanced templates with comprehensive configuration
+	// Determine domain suffix by environment
+	envName := c.Query("env", "dev")
+	domainSuffix := "ployd.app"
+	if envName == "dev" {
+		domainSuffix = "dev.ployd.app"
+	}
+
 	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
 		App:         appName,
 		ImagePath:   imagePath,
@@ -422,7 +436,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		Lane:        lane,
 		MainClass:   mainClass,
 		IsDebug:     debug,
-		Language:    "java",
+		Language:    detectedLanguage,
 
 		// Feature flags (dev-friendly defaults)
 		VaultEnabled:        false, // Vault not enabled on dev cluster
@@ -443,7 +457,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		JavaVersion: "17", // Default Java version
 
 		// Domain configuration
-		DomainSuffix: "ployd.app",
+		DomainSuffix: domainSuffix,
 
 		// Build metadata
 		BuildTime: time.Now().Format(time.RFC3339),

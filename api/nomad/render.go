@@ -438,21 +438,27 @@ func processConditionalBlocks(template string, data RenderData) string {
 	// Use regex to find all {{#if CONDITION}}...{{/if}} blocks
 	conditionalRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}`)
 
-	result := conditionalRegex.ReplaceAllStringFunc(template, func(match string) string {
-		submatch := conditionalRegex.FindStringSubmatch(match)
-		if len(submatch) < 3 {
-			return match // Keep original if can't parse
+	// Iteratively process conditionals to correctly handle nested blocks
+	prev := ""
+	result := template
+	for i := 0; i < 10; i++ { // reasonable cap to avoid infinite loops
+		if result == prev {
+			break
 		}
-
-		condition := submatch[1]
-		content := submatch[2]
-
-		// Evaluate condition using existing evaluateCondition function
-		if evaluateCondition(condition, data) {
-			return content // Include content if condition is true
-		}
-		return "" // Remove entire block if condition is false
-	})
+		prev = result
+		result = conditionalRegex.ReplaceAllStringFunc(result, func(match string) string {
+			submatch := conditionalRegex.FindStringSubmatch(match)
+			if len(submatch) < 3 {
+				return match // Keep original if can't parse
+			}
+			condition := submatch[1]
+			content := submatch[2]
+			if evaluateCondition(condition, data) {
+				return content // Include content if condition is true
+			}
+			return "" // Remove entire block if condition is false
+		})
+	}
 
 	// Strip any remaining conditional markers to avoid leaving stray tags
 	// that can break HCL parsing if earlier passes missed nested structures.
