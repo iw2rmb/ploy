@@ -145,14 +145,15 @@ func (r *TransflowResult) Summary() string {
 
 // TransflowRunner orchestrates the execution of transflow steps
 type TransflowRunner struct {
-	config         *TransflowConfig
-	workspaceDir   string
-	gitOps         GitOperationsInterface
-	recipeExecutor RecipeExecutorInterface
-	buildChecker   BuildCheckerInterface
-	jobSubmitter   JobSubmitter         // For healing workflows
-	gitProvider    provider.GitProvider // For MR creation
-	eventReporter  EventReporter        // Optional real-time event reporter
+    config         *TransflowConfig
+    workspaceDir   string
+    gitOps         GitOperationsInterface
+    recipeExecutor RecipeExecutorInterface
+    buildChecker   BuildCheckerInterface
+    buildGate      BuildGate
+    jobSubmitter   JobSubmitter         // For healing workflows
+    gitProvider    provider.GitProvider // For MR creation
+    eventReporter  EventReporter        // Optional real-time event reporter
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -179,8 +180,17 @@ func (r *TransflowRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
 
 // SetBuildChecker sets the build checker implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
-	r.buildChecker = checker
+    r.buildChecker = checker
+    // Also expose through BuildGate adapter for modularization
+    if checker != nil {
+        r.buildGate = NewBuildGateAdapter(checker)
+    } else {
+        r.buildGate = nil
+    }
 }
+
+// SetBuildGate sets the modular BuildGate; takes precedence over buildChecker when set.
+func (r *TransflowRunner) SetBuildGate(g BuildGate) { r.buildGate = g }
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
 func (r *TransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
