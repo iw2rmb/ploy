@@ -41,13 +41,28 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		}
 	}
 
-	// Create tar archive
+	// Create tar archive into a temp file so we can set Content-Length
 	ign, _ := utils.ReadGitignore(".")
-	pr, pw := io.Pipe()
-	go func() {
-		defer func() { _ = pw.Close() }()
-		_ = utils.TarDir(".", pw, ign)
-	}()
+	tmpf, err := os.CreateTemp("", "ploy-push-*.tar")
+	if err != nil {
+		return nil, fmt.Errorf("create temp: %w", err)
+	}
+	tmpPath := tmpf.Name()
+	if err := utils.TarDir(".", tmpf, ign); err != nil {
+		_ = tmpf.Close()
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("tar dir: %w", err)
+	}
+	if err := tmpf.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("close temp: %w", err)
+	}
+	rf, err := os.Open(tmpPath)
+	if err != nil {
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("open temp: %w", err)
+	}
+	stat, _ := rf.Stat()
 
 	// Build app-specific URL
 	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s",
@@ -65,13 +80,17 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		url += "&blue_green=true"
 	}
 
-	// Create HTTP request
-	req, _ := http.NewRequest("POST", url, pr)
+	// Create HTTP request with known Content-Length
+	req, _ := http.NewRequest("POST", url, rf)
 	req.Header.Set("Content-Type", "application/x-tar")
 	req.Header.Set("X-Target-Domain", "ployd.app")
+	if stat != nil {
+		req.ContentLength = stat.Size()
+	}
 
-	// Execute request
-	resp, err := http.DefaultClient.Do(req)
+	// Execute request with a generous timeout
+	client := &http.Client{Timeout: 3 * time.Minute}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("app deployment request failed: %w", err)
 	}
@@ -91,8 +110,10 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		result.Message = fmt.Sprintf("App deployment failed with status %d", resp.StatusCode)
 	}
 
-	// Output response to console
+	// Output response to console and clean up temp
 	_, _ = io.Copy(os.Stdout, resp.Body)
+	_ = rf.Close()
+	_ = os.Remove(tmpPath)
 
 	return result, nil
 }

@@ -67,3 +67,15 @@ Notes
     - Lane C deploys, but HTTPS health does not come up publicly. Logs via API show: "No running allocations found" (likely OSv path not suited for this Scala app, or not exposed publicly on Dev).
   - Script improvements: capped health wait TIMEOUT to 5 minutes by default and fixed a bash array edge case for extra flags.
   - Next: land the renderer/template fixes on the VPS (push main, then deploy) so Lane E (Jib container) validates and exposes `https://<app>.dev.ployd.app/healthz`. Until then, Lane C will not be a reliable public HTTPS path for this app.
+
+- Cycle 3 (Template simplification + validation fixes):
+  - Deployed API with nested-conditional handling, but Lane E still produced invalid HCL due to nested `{{#if}}` inside the Connect service block.
+  - Simplified `platform/nomad/lane-e-oci-kontain.hcl` for dev: removed the Consul Connect service block to avoid nested-conditional artifacts; reduced Nomad task logs retention to 10×10MB and removed the duplicate `ready` service check.
+  - Result: Lane E job validation advances; subsequent failure was an HTTP client EOF during `ploy push` to the controller.
+  - E2E script: now detects non‑JSON CLI failures (❌) and aborts quickly; applies a single global TIMEOUT budget across push+health to keep cycles under 5 minutes.
+  - Next: stabilize controller POST `/apps/:app/builds` for larger payloads (EOF); then retry Lane E. If needed, set `TIMEOUT=180` for faster cycles during iteration.
+
+- Cycle 4 (Retry with 3min cap; inspect):
+  - E2E retried with `TIMEOUT=180`, Lane E. CLI reports `unexpected EOF` from POST `/v1/apps/ploy-scala-hello/builds` consistently (twice, with backoff). App logs show no running allocations, as deploy aborts pre-Nomad.
+  - Platform logs endpoint exists (`/v1/platform/:service/logs`) but is a stub; cannot fetch controller alloc logs via API. Next step is VPS-side alloc logs via job manager wrapper or implement the platform logs handler.
+  - Hypothesis: reverse proxy (Traefik) or upstream idle timeout during streaming upload; consider increasing `forwardingTimeouts`/`readTimeout` for POSTs to `/v1/apps/*/builds`, or switching to chunked/multipart with smaller chunks.

@@ -294,17 +294,7 @@ EOF
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.sticky.cookie=true"
         ]
         
-        check { 
-          type     = "http" 
-          path     = "/healthz" 
-          interval = "10s" 
-          timeout  = "3s"
-          check_restart {
-            limit = 3
-            grace = "15s"
-            ignore_warnings = false
-          }
-        }
+        # Service-level checks disabled in dev to avoid conflicts; rely on container healthcheck above
         
         {{#if CONNECT_ENABLED}}
         connect {

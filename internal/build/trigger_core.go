@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -82,9 +83,17 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	tarPath := filepath.Join(tmpDir, "src.tar")
 	f, _ := os.Create(tarPath)
 	defer func() { _ = f.Close() }()
-	if _, err := f.Write(c.Body()); err != nil {
-		log.Printf("[Build] Failed to write request body: %v", err)
-		return c.Status(400).SendString("Failed to read request body: " + err.Error())
+	// Prefer streaming read to avoid buffering limits and reduce proxy timeouts
+	if reader := c.Context().RequestBodyStream(); reader != nil {
+		if _, err := io.Copy(f, reader); err != nil {
+			log.Printf("[Build] Failed to stream request body: %v", err)
+			return c.Status(400).SendString("Failed to read request body: " + err.Error())
+		}
+	} else {
+		if _, err := f.Write(c.Body()); err != nil {
+			log.Printf("[Build] Failed to write request body: %v", err)
+			return c.Status(400).SendString("Failed to read request body: " + err.Error())
+		}
 	}
 
 	srcDir := filepath.Join(tmpDir, "src")
