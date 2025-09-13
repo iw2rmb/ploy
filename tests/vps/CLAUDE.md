@@ -45,7 +45,7 @@ Core validation workflow: VPS service health → distributed service topology �
 - **✅ Production Validation**: Complete VPS environment readiness and service health validation
 - **✅ Service Topology Testing**: Distributed service coordination and leader election validation
 - **✅ Performance Baselines**: KB storage response time measurement and performance validation
-- **✅ CLI Availability Testing**: Transflow command execution and functionality validation
+- **✅ CLI Availability Testing**: Mods command execution and functionality validation
 - **✅ Storage Setup Validation**: KB namespace creation and SeaweedFS operational testing
 - **✅ User Context Validation**: Ploy user permissions and service access validation
 - **✅ Integration Readiness**: Complete production environment preparation and validation
@@ -63,7 +63,7 @@ VPS Service Stack (✅ Production Operational):
 - **Nomad**: Job orchestration and container management (port 4646) 
 - **SeaweedFS Master**: Storage coordination and metadata management (port 9333)
 - **SeaweedFS Filer**: File system interface and HTTP API (port 8888)
-- **Ploy CLI**: Transflow command execution with KB integration (/opt/ploy/bin/ploy)
+- **Ploy CLI**: Mods command execution with KB integration (/opt/ploy/bin/ploy)
 
 User Context:
 - Tests execute as `ploy` user with proper service permissions
