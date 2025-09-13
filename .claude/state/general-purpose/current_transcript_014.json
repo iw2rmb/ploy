@@ -194,7 +194,7 @@
     "content": [
       {
         "type": "tool_result",
-        "content": "# github.com/iw2rmb/ploy/internal/cli/transflow\ninternal/cli/transflow/fanout_orchestrator.go:379:20: undefined: provider.MRRequest\ninternal/cli/transflow/fanout_orchestrator.go:386:31: gitProvider.CreateMR undefined (type provider.GitProvider has no field or method CreateMR)\ninternal/cli/transflow/fanout_orchestrator.go:412:73: too many arguments in call to buildChecker.CheckBuild\n\thave (context.Context, string, time.Duration)\n\twant (context.Context, common.DeployConfig)",
+        "content": "# github.com/iw2rmb/ploy/internal/mods\ninternal/cli/transflow/fanout_orchestrator.go:379:20: undefined: provider.MRRequest\ninternal/cli/transflow/fanout_orchestrator.go:386:31: gitProvider.CreateMR undefined (type provider.GitProvider has no field or method CreateMR)\ninternal/cli/transflow/fanout_orchestrator.go:412:73: too many arguments in call to buildChecker.CheckBuild\n\thave (context.Context, string, time.Duration)\n\twant (context.Context, common.DeployConfig)",
         "is_error": true,
         "tool_use_id": "toolu_012vg3EN57c2FVooXbX86nDq"
       }
@@ -521,7 +521,7 @@
     "content": [
       {
         "type": "tool_result",
-        "content": "# github.com/iw2rmb/ploy/internal/cli/transflow\ninternal/cli/transflow/fanout_orchestrator.go:416:5: unknown field ApplicationID in struct literal of type common.DeployConfig\ninternal/cli/transflow/fanout_orchestrator.go:417:5: unknown field Branch in struct literal of type common.DeployConfig\ninternal/cli/transflow/fanout_orchestrator.go:418:5: unknown field Path in struct literal of type common.DeployConfig",
+        "content": "# github.com/iw2rmb/ploy/internal/mods\ninternal/cli/transflow/fanout_orchestrator.go:416:5: unknown field ApplicationID in struct literal of type common.DeployConfig\ninternal/cli/transflow/fanout_orchestrator.go:417:5: unknown field Branch in struct literal of type common.DeployConfig\ninternal/cli/transflow/fanout_orchestrator.go:418:5: unknown field Path in struct literal of type common.DeployConfig",
         "is_error": true,
         "tool_use_id": "toolu_013Zhgmqmc8aVYdwtpnzjLeF"
       }

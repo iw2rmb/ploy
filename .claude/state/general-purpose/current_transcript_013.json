@@ -214,7 +214,7 @@
     "content": [
       {
         "type": "tool_result",
-        "content": "# github.com/iw2rmb/ploy/internal/cli/transflow [github.com/iw2rmb/ploy/internal/cli/transflow.test]\ninternal/cli/transflow/job_submission_test.go:9:2: \"github.com/iw2rmb/ploy/api/arf\" imported and not used\ninternal/cli/transflow/job_submission_test.go:10:2: \"github.com/iw2rmb/ploy/internal/git/provider\" imported and not used\n\nFAIL\tgithub.com/iw2rmb/ploy/internal/cli/transflow [build failed]\nFAIL",
+        "content": "# github.com/iw2rmb/ploy/internal/mods [github.com/iw2rmb/ploy/internal/mods.test]\ninternal/cli/transflow/job_submission_test.go:9:2: \"github.com/iw2rmb/ploy/api/arf\" imported and not used\ninternal/cli/transflow/job_submission_test.go:10:2: \"github.com/iw2rmb/ploy/internal/git/provider\" imported and not used\n\nFAIL\tgithub.com/iw2rmb/ploy/internal/mods [build failed]\nFAIL",
         "is_error": true,
         "tool_use_id": "toolu_01K7qYuJtMVGQs4WGgZ4dA8E"
       }
@@ -347,7 +347,7 @@
       {
         "tool_use_id": "toolu_015aYhEDoUPmQxBrEE8keXDB",
         "type": "tool_result",
-        "content": "=== RUN   TestHumanStepBranchCurrentBehavior\n--- PASS: TestHumanStepBranchCurrentBehavior (0.00s)\nPASS\nok  \tgithub.com/iw2rmb/ploy/internal/cli/transflow\t0.757s",
+        "content": "=== RUN   TestHumanStepBranchCurrentBehavior\n--- PASS: TestHumanStepBranchCurrentBehavior (0.00s)\nPASS\nok  \tgithub.com/iw2rmb/ploy/internal/mods\t0.757s",
         "is_error": false
       }
     ]

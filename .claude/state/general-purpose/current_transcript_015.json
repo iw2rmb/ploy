@@ -28,7 +28,7 @@
     "content": [
       {
         "type": "tool_result",
-        "content": "# github.com/iw2rmb/ploy/internal/cli/transflow\ninternal/cli/transflow/fanout_orchestrator.go:366:2: declared and not used: workspaceDir",
+        "content": "# github.com/iw2rmb/ploy/internal/mods\ninternal/cli/transflow/fanout_orchestrator.go:366:2: declared and not used: workspaceDir",
         "is_error": true,
         "tool_use_id": "toolu_01EKntMDFWxSqnXQJRBjVQsa"
       }
@@ -151,7 +151,7 @@
     "content": [
       {
         "type": "tool_result",
-        "content": "=== RUN   TestHumanStepBranchCurrentBehavior\n    job_submission_test.go:390: \n        \tError Trace:\t/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission_test.go:390\n        \tError:      \t\"human-step branches require production runner (not available in test mode)\" does not contain \"not yet implemented\"\n        \tTest:       \tTestHumanStepBranchCurrentBehavior\n        \tMessages:   \tshould indicate not implemented\n--- FAIL: TestHumanStepBranchCurrentBehavior (0.00s)\nFAIL\nFAIL\tgithub.com/iw2rmb/ploy/internal/cli/transflow\t2.373s\nFAIL",
+        "content": "=== RUN   TestHumanStepBranchCurrentBehavior\n    job_submission_test.go:390: \n        \tError Trace:\t/Users/vk/@iw2rmb/ploy/internal/cli/transflow/job_submission_test.go:390\n        \tError:      \t\"human-step branches require production runner (not available in test mode)\" does not contain \"not yet implemented\"\n        \tTest:       \tTestHumanStepBranchCurrentBehavior\n        \tMessages:   \tshould indicate not implemented\n--- FAIL: TestHumanStepBranchCurrentBehavior (0.00s)\nFAIL\nFAIL\tgithub.com/iw2rmb/ploy/internal/mods\t2.373s\nFAIL",
         "is_error": true,
         "tool_use_id": "toolu_01QXHZgqzqT4WR6JrKuwyZUt"
       }
