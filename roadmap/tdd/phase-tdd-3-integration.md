@@ -198,7 +198,7 @@ func (rb *RequestBuilder) Execute() *APIResponse {
     }
     
     require.NoError(rb.client.t, err, "HTTP request failed")
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     // Read response body
     bodyBytes, err := io.ReadAll(resp.Body)

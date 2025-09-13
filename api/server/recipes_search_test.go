@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"strings"
@@ -18,7 +19,7 @@ func TestARFRecipesSearch_Query_OK(t *testing.T) {
       {"id":"org.openrewrite.java.format.AutoFormat","display_name":"Auto Format","description":"Formatting rules","tags":["format","java"]},
       {"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","description":"Cleanup rules","tags":["cleanup","java"]}
     ]`
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 
 	srv, err := NewServer(&ControllerConfig{})
 	if err != nil {

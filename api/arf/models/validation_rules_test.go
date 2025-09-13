@@ -863,7 +863,7 @@ func BenchmarkValidationRules_Validate(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rules.Validate()
+		_ = rules.Validate()
 	}
 }
 
@@ -884,7 +884,7 @@ func BenchmarkValidationRules_CheckCompatibility(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		rules.CheckCompatibility(&info)
+		_ = rules.CheckCompatibility(&info)
 	}
 }
 

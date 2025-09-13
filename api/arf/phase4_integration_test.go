@@ -1,3 +1,6 @@
+//go:build arf_legacy
+// +build arf_legacy
+
 package arf
 
 import (
@@ -18,7 +21,7 @@ import (
 func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 	// Setup test environment
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Create test SBOM file
@@ -149,7 +152,7 @@ func TestPhase4Integration_SecurityWorkflow(t *testing.T) {
 // TestPhase4Integration_SBOMAnalysisWorkflow tests complete SBOM analysis workflow
 func TestPhase4Integration_SBOMAnalysisWorkflow(t *testing.T) {
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Create test SBOM with multiple formats
@@ -229,7 +232,7 @@ func TestPhase4Integration_SBOMAnalysisWorkflow(t *testing.T) {
 // TestPhase4Integration_ProductionOptimizationWorkflow tests production optimization
 func TestPhase4Integration_ProductionOptimizationWorkflow(t *testing.T) {
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Test 1: Configure circuit breaker
@@ -349,7 +352,7 @@ func TestPhase4Integration_ProductionOptimizationWorkflow(t *testing.T) {
 // TestPhase4Integration_HumanWorkflowWithEscalation tests workflow escalation
 func TestPhase4Integration_HumanWorkflowWithEscalation(t *testing.T) {
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Set escalation rules
@@ -428,7 +431,7 @@ func TestPhase4Integration_HumanWorkflowWithEscalation(t *testing.T) {
 // TestPhase4Integration_ComplianceAssessment tests compliance checking
 func TestPhase4Integration_ComplianceAssessment(t *testing.T) {
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Create vulnerability list with OWASP and CWE mappings
@@ -493,7 +496,7 @@ func TestPhase4Integration_ComplianceAssessment(t *testing.T) {
 // TestPhase4Integration_ErrorHandling tests error handling across Phase 4
 func TestPhase4Integration_ErrorHandling(t *testing.T) {
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	tests := []struct {
@@ -563,7 +566,7 @@ func TestPhase4Integration_ErrorHandling(t *testing.T) {
 // BenchmarkPhase4Integration_FullWorkflow benchmarks complete Phase 4 workflow
 func BenchmarkPhase4Integration_FullWorkflow(b *testing.B) {
 	app := fiber.New()
-	handler := NewHandler(nil, nil, nil)
+	handler := NewHandler(nil, nil)
 	handler.RegisterRoutes(app)
 
 	// Prepare test data

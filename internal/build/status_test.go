@@ -386,7 +386,7 @@ func TestStatusHelperFunctionsRobustness(t *testing.T) {
 	t.Run("functions handle nil and empty inputs", func(t *testing.T) {
 		// Test with empty strings
 		assert.NotPanics(t, func() {
-			mapNomadStatusToARF("")
+			_ = mapNomadStatusToARF("")
 		})
 
 		assert.NotPanics(t, func() {
@@ -410,7 +410,7 @@ func TestStatusHelperFunctionsRobustness(t *testing.T) {
 		veryLongString := strings.Repeat("a", 10000)
 
 		assert.NotPanics(t, func() {
-			mapNomadStatusToARF(veryLongString)
+			_ = mapNomadStatusToARF(veryLongString)
 		})
 
 		assert.NotPanics(t, func() {
@@ -488,7 +488,7 @@ func TestStatus(t *testing.T) {
 
 			if tt.expectedError != "" {
 				var responseBody map[string]interface{}
-				json.NewDecoder(resp.Body).Decode(&responseBody)
+				_ = json.NewDecoder(resp.Body).Decode(&responseBody)
 
 				if errorMsg, exists := responseBody["error"]; exists {
 					assert.Contains(t, errorMsg.(string), tt.expectedError)

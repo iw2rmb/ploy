@@ -294,7 +294,7 @@ func (m *Manager) AutoShiftTraffic(ctx context.Context, appName string) error {
 		// Shift traffic
 		if err := m.ShiftTraffic(ctx, appName, targetWeight); err != nil {
 			log.Printf("Traffic shift failed for app %s, initiating rollback: %v", appName, err)
-			m.RollbackDeployment(ctx, appName)
+			_ = m.RollbackDeployment(ctx, appName)
 			return fmt.Errorf("traffic shift step %d failed: %w", i+1, err)
 		}
 
@@ -313,7 +313,7 @@ func (m *Manager) AutoShiftTraffic(ctx context.Context, appName string) error {
 		// Health check after each step
 		if err := m.validateDeploymentHealth(ctx, appName, Green); err != nil {
 			log.Printf("Health check failed during traffic shift for app %s, rolling back: %v", appName, err)
-			m.RollbackDeployment(ctx, appName)
+			_ = m.RollbackDeployment(ctx, appName)
 			return fmt.Errorf("health check failed at step %d: %w", i+1, err)
 		}
 	}

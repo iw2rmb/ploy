@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hashicorp/nomad/api"
 	"github.com/iw2rmb/ploy/api/builders"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
@@ -57,12 +57,12 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 
 	// Create temp directory for build
 	tmpDir, _ := os.MkdirTemp("", fmt.Sprintf("platform-%s-", serviceName))
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Save uploaded tar
 	tarPath := filepath.Join(tmpDir, "src.tar")
 	f, _ := os.Create(tarPath)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(c.Body()); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error":   "Failed to read request body",
@@ -72,7 +72,9 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 
 	// Extract source
 	srcDir := filepath.Join(tmpDir, "src")
-	os.MkdirAll(srcDir, 0755)
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "mkdir src"})
+	}
 	_ = utils.Untar(tarPath, srcDir)
 
 	// Get environment variables for the service
@@ -156,37 +158,15 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 func (h *Handler) GetPlatformStatus(c *fiber.Ctx) error {
 	serviceName := c.Params("service")
 
-	// Create Nomad client
-	nomadConfig := api.DefaultConfig()
-	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
-	nomadConfig.Address = nomadAddr
-
-	nomadClient, err := api.NewClient(nomadConfig)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to connect to Nomad",
-			"details": err.Error(),
-		})
-	}
-
-	// Get job status
+	// Query status via orchestration health monitor (SDK under the hood)
 	jobName := fmt.Sprintf("platform-%s", serviceName)
-	jobs := nomadClient.Jobs()
-	job, _, err := jobs.Info(jobName, nil)
+	monitor := orchestration.NewHealthMonitor()
+	allocs, err := monitor.GetJobAllocations(jobName)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{
 			"service": serviceName,
 			"status":  "not_found",
 			"error":   "Platform service not found",
-		})
-	}
-
-	// Get allocations
-	allocs, _, err := jobs.Allocations(jobName, false, nil)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to get allocation status",
-			"details": err.Error(),
 		})
 	}
 
@@ -206,7 +186,6 @@ func (h *Handler) GetPlatformStatus(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"service":           serviceName,
 		"status":            status,
-		"job_status":        job.Status,
 		"running_instances": runningCount,
 		"total_allocations": len(allocs),
 		"message":           fmt.Sprintf("Platform service %s status retrieved", serviceName),
@@ -231,139 +210,30 @@ func validatePlatformServiceName(name string) error {
 
 // deployToNomad deploys a platform service to Nomad
 func (h *Handler) deployToNomad(serviceName, dockerImage, environment string, envVars map[string]string) error {
-	// Create Nomad client
-	nomadConfig := api.DefaultConfig()
-	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
-	nomadConfig.Address = nomadAddr
+	// Render HCL for platform service and submit via orchestration (uses wrapper on VPS)
+	jobName := fmt.Sprintf("platform-%s", serviceName)
+	traefikHost := fmt.Sprintf("%s.%s.ployman.app", serviceName, environment)
+	hcl := orchestration.RenderServiceDockerJobHCL(jobName, serviceName, serviceName, dockerImage, envVars, traefikHost, "dev-wildcard", environment)
 
-	nomadClient, err := api.NewClient(nomadConfig)
+	tmp, err := os.CreateTemp("", "platform-*.hcl")
 	if err != nil {
-		return fmt.Errorf("failed to create Nomad client: %w", err)
+		return fmt.Errorf("create temp job file: %w", err)
 	}
-
-	// Generate platform-specific Nomad job
-	job := h.generatePlatformNomadJob(serviceName, dockerImage, environment, envVars)
-
-	// Submit job to Nomad
-	jobs := nomadClient.Jobs()
-	resp, _, err := jobs.Register(job, nil)
-	if err != nil {
-		return fmt.Errorf("failed to register Nomad job: %w", err)
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if _, err := tmp.WriteString(hcl); err != nil {
+		return fmt.Errorf("write job HCL: %w", err)
 	}
+	_ = tmp.Close()
 
-	// Wait for deployment to stabilize
-	if resp != nil && resp.EvalID != "" {
-		// Basic deployment verification - could be enhanced with proper health checks
-		evaluations := nomadClient.Evaluations()
-		eval, _, err := evaluations.Info(resp.EvalID, nil)
-		if err != nil {
-			return fmt.Errorf("failed to get evaluation info: %w", err)
-		}
-
-		if eval.Status == "failed" {
-			return fmt.Errorf("deployment evaluation failed: %s", eval.StatusDescription)
-		}
+	if err := orchestration.Submit(tmp.Name()); err != nil {
+		return fmt.Errorf("submit job via orchestration: %w", err)
 	}
-
 	return nil
 }
 
 // generatePlatformNomadJob generates a Nomad job specification for platform services
-func (h *Handler) generatePlatformNomadJob(serviceName, dockerImage, environment string, envVars map[string]string) *api.Job {
-	jobName := fmt.Sprintf("platform-%s", serviceName)
-
-	// Create job
-	job := &api.Job{
-		ID:          &jobName,
-		Name:        &jobName,
-		Type:        stringPtr("service"),
-		Priority:    intPtr(80),
-		Datacenters: []string{"dc1"},
-		TaskGroups: []*api.TaskGroup{
-			{
-				Name:  stringPtr(serviceName),
-				Count: intPtr(2), // HA deployment
-				RestartPolicy: &api.RestartPolicy{
-					Attempts: intPtr(3),
-					Interval: durationPtr("10m"),
-					Delay:    durationPtr("30s"),
-					Mode:     stringPtr("fail"),
-				},
-				ReschedulePolicy: &api.ReschedulePolicy{
-					Attempts: intPtr(3),
-					Interval: durationPtr("1h"),
-				},
-				Update: &api.UpdateStrategy{
-					MaxParallel:     intPtr(1),
-					MinHealthyTime:  durationPtr("30s"),
-					HealthyDeadline: durationPtr("5m"),
-					AutoRevert:      boolPtr(true),
-					Canary:          intPtr(1),
-				},
-				Tasks: []*api.Task{
-					{
-						Name:   serviceName,
-						Driver: "docker",
-						Config: map[string]interface{}{
-							"image": dockerImage,
-							"ports": []string{"http"},
-							"auth": []map[string]string{
-								{
-									"server_address": "registry.dev.ployman.app",
-								},
-							},
-						},
-						Env: envVars,
-						Resources: &api.Resources{
-							CPU:      intPtr(500),
-							MemoryMB: intPtr(512),
-							Networks: []*api.NetworkResource{
-								{
-									DynamicPorts: []api.Port{
-										{
-											Label: "http",
-										},
-									},
-								},
-							},
-						},
-						Services: []*api.Service{
-							{
-								Name:      fmt.Sprintf("platform-%s", serviceName),
-								PortLabel: "http",
-								Tags: []string{
-									"platform",
-									fmt.Sprintf("platform-%s", serviceName),
-									"traefik.enable=true",
-									fmt.Sprintf("traefik.http.routers.platform-%s.rule=Host(`%s.%s.ployman.app`)", serviceName, serviceName, environment),
-									fmt.Sprintf("traefik.http.routers.platform-%s.tls=true", serviceName),
-									fmt.Sprintf("traefik.http.routers.platform-%s.tls.certresolver=dev-wildcard", serviceName),
-								},
-								Checks: []api.ServiceCheck{
-									{
-										Type:     "http",
-										Path:     "/health",
-										Interval: time.Second * 15,
-										Timeout:  time.Second * 10,
-									},
-									{
-										Name:     "readiness",
-										Type:     "http",
-										Path:     "/ready",
-										Interval: time.Second * 20,
-										Timeout:  time.Second * 15,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return job
-}
+// generatePlatformNomadJob is no longer used; submission now goes through HCL + orchestration
+// Keeping helper functions below for compatibility
 
 // Helper functions for Nomad job generation
 func stringPtr(s string) *string { return &s }

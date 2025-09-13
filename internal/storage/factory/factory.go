@@ -2,6 +2,7 @@ package factory
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/storage"
@@ -92,16 +93,20 @@ func New(cfg FactoryConfig) (storage.Storage, error) {
 
 // createSeaweedFSProvider creates a SeaweedFS storage provider
 func createSeaweedFSProvider(cfg FactoryConfig) (storage.Storage, error) {
-	if cfg.Endpoint == "" {
-		return nil, fmt.Errorf("endpoint required for seaweedfs provider")
+	// Use environment variables for master and filer instead of single endpoint
+	masterURL := os.Getenv("SEAWEEDFS_MASTER")
+	if masterURL == "" {
+		masterURL = "http://localhost:9333" // Default master address
 	}
 
-	// Parse endpoint to get master and filer addresses
-	// For simplicity, assume endpoint is the master address
-	// and filer is on port 8888 of the same host
+	filerURL := os.Getenv("SEAWEEDFS_FILER")
+	if filerURL == "" {
+		filerURL = "http://seaweedfs-filer.service.consul:8888" // Default filer address via Consul DNS
+	}
+
 	seaweedCfg := seaweedfs.Config{
-		Master:      cfg.Endpoint,
-		Filer:       cfg.Endpoint, // Will be adjusted in the provider
+		Master:      masterURL,
+		Filer:       filerURL,
 		Collection:  cfg.Bucket,
 		Replication: "000", // Default replication (000 for single-node dev)
 		Timeout:     30,

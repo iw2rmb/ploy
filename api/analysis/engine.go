@@ -43,9 +43,15 @@ func NewEngineWithDispatcher(logger *logrus.Logger, dispatcher *AnalysisDispatch
 	engine.dispatcher = dispatcher
 
 	// Register Nomad-based analyzers
-	engine.RegisterAnalyzer("python", NewNomadPylintAnalyzer(dispatcher))
-	engine.RegisterAnalyzer("javascript", NewNomadESLintAnalyzer(dispatcher))
-	engine.RegisterAnalyzer("go", NewNomadGolangCIAnalyzer(dispatcher))
+	if err := engine.RegisterAnalyzer("python", NewNomadPylintAnalyzer(dispatcher)); err != nil {
+		logger.WithError(err).Warn("Failed to register python analyzer")
+	}
+	if err := engine.RegisterAnalyzer("javascript", NewNomadESLintAnalyzer(dispatcher)); err != nil {
+		logger.WithError(err).Warn("Failed to register javascript analyzer")
+	}
+	if err := engine.RegisterAnalyzer("go", NewNomadGolangCIAnalyzer(dispatcher)); err != nil {
+		logger.WithError(err).Warn("Failed to register go analyzer")
+	}
 
 	return engine
 }
@@ -384,9 +390,9 @@ func (e *Engine) detectLanguages(codebase Codebase) []string {
 // generateCacheKey generates a cache key for the analysis
 func (e *Engine) generateCacheKey(codebase Codebase, config AnalysisConfig) string {
 	h := sha256.New()
-	h.Write([]byte(codebase.Repository.ID))
-	h.Write([]byte(codebase.Repository.Commit))
-	h.Write([]byte(fmt.Sprintf("%v", config)))
+	_, _ = h.Write([]byte(codebase.Repository.ID))
+	_, _ = h.Write([]byte(codebase.Repository.Commit))
+	_, _ = fmt.Fprintf(h, "%v", config)
 	return hex.EncodeToString(h.Sum(nil))
 }
 

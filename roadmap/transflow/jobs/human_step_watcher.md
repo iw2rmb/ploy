@@ -25,9 +25,8 @@ Watches for human involvement on the workflow branch (e.g., a push, MR merge, or
 
 ### Outputs
 - stdout JSON: `{ "ok": true, "status": "success|timeout|canceled" }`
-- Optional file `out/branch.json` conforming to `jobs/schemas/branch_record.schema.json`.
+- Optional file `out/branch.json` conforming to `platform/nomad/transflow/schemas/branch_record.schema.json`.
 
 ### Security
 - Use env-injected token only; do not accept tokens in YAML.
 - Read-only operations until build trigger. Build uses controller API; no direct deploys.
-

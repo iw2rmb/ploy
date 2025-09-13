@@ -1,0 +1,54 @@
+# Hello Apps Migration Plan
+
+Goal: Move example apps from `tests/apps/` to dedicated GitHub repositories and exercise them via E2E using `ploy` CLI against the Dev API.
+
+Phases
+
+1) E2E Test (ploy → HTTPS → destroy)
+- Add a CI/VPS-friendly E2E script that:
+  - Clones a GitHub repo (HELLO_APP_REPO, BRANCH)
+  - Runs `ploy push -a <app> -env <env>`
+  - Waits for HTTPS health (default: `/<health>` on `https://<app>.<env>.ployd.app`)
+  - Destroys the app via `ploy apps destroy --name <app> --force`
+  - Verifies `/v1/apps/<app>/status` → HTTP 404
+- Implemented: `tests/e2e/test-deploy-github-app.sh`
+  - Env vars: `HELLO_APP_REPO`, `APP_NAME` (optional), `BRANCH` (default: main), `ENV_NAME` (default: dev), `PLOY_CONTROLLER` (Dev API)
+
+2) Migrate first app (Scala)
+- Source: `tests/apps/scala-catalogsvc`
+- Target GitHub repo: `https://github.com/iw2rmb/ploy-scala-hello`
+- Actions:
+  - Publish repo with Jib-enabled Scala sample (hello endpoint)
+  - Remove `tests/apps/scala-catalogsvc` from repo (done)
+  - Run E2E:
+    ```bash
+    HELLO_APP_REPO=https://github.com/iw2rmb/ploy-scala-hello.git \
+    APP_NAME=ploy-scala-hello \
+    PLOY_CONTROLLER=https://api.dev.ployman.app/v1 \
+    ./tests/e2e/test-deploy-github-app.sh
+    ```
+
+3) Update lane detection templates
+- Parameterize Scala test to use external repo if available:
+  - `iac/common/templates/test-lane-picker-enhanced.sh.j2` now uses `SCALA_HELLO_REPO` when set.
+  - `iac/common/templates/test-lane-detection.sh.j2` clones `SCALA_HELLO_REPO` if provided; otherwise skips Scala.
+
+4) Future migrations (create repos, remove local examples)
+- Node: `ploy-node-hello` (from `tests/apps/node-hello`)
+- Go: `ploy-go-hello` (from `tests/apps/go-hellosvc`)
+- Python: `ploy-python-hello` (from `tests/apps/python-apisvc`)
+- Java: `ploy-java-hello` (from `tests/apps/java-ordersvc`)
+- .NET: `ploy-dotnet-hello` (from `tests/apps/dotnet-ordersvc`)
+- Rust: `ploy-rust-hello` (from `tests/apps/rust-hellosvc`)
+- WASM samples: `ploy-wasm-*` (from `tests/apps/wasm-*`)
+
+5) CI integration (optional)
+- Add a self-hosted runner job to run `test-deploy-github-app.sh` for selected hello apps against the Dev API.
+- Gate on `HELLO_APP_REPO` secrets/inputs per job.
+
+Notes
+- Ensure hello apps expose a simple `/health` HTTP 200 endpoint.
+- Keep repos minimal with clear README and build files.
+- Use Jib for JVM hello apps to validate Lane E.
+- For Scala test in templates, set `SCALA_HELLO_REPO=https://github.com/iw2rmb/ploy-scala-hello.git`.
+

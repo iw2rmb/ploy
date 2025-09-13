@@ -126,18 +126,20 @@ func exists(p string) bool {
 
 func hasAny(root string, name string) bool {
 	found := false
-	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+	if err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && strings.HasSuffix(p, name) {
 			found = true
 		}
 		return nil
-	})
+	}); err != nil {
+		return false
+	}
 	return found
 }
 
 func grep(root, needle string) bool {
 	match := false
-	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+	if err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
 			// Get base filename for specific file checks
 			baseName := filepath.Base(p)
@@ -165,7 +167,9 @@ func grep(root, needle string) bool {
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return false
+	}
 	return match
 }
 

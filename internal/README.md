@@ -28,8 +28,7 @@ internal/
 │   │   └── handler.go       # Analysis command handlers
 │   ├── apps/                # Application management commands
 │   │   └── handler.go       # App command handlers
-│   ├── arf/                 # ARF CLI commands ✅ Aug 2025
-│   │   ├── benchmark.go     # Benchmark testing commands
+│   ├── arf/                 # ARF CLI commands ✅ Sep 2025 - Refactored
 │   │   ├── composition.go   # Recipe composition utilities
 │   │   ├── config.go        # ARF configuration management
 │   │   ├── config_handler.go # Configuration command handlers
@@ -40,14 +39,24 @@ internal/
 │   │   ├── health.go        # Health check commands
 │   │   ├── help.go          # Help and documentation commands
 │   │   ├── import_export.go # Recipe import/export functionality
+│   │   ├── models.go        # Data models for ARF operations
 │   │   ├── pagination.go    # Result pagination utilities
-│   │   ├── recipes.go       # Recipe management commands
-│   │   ├── recipes_test.go  # Recipe tests
-│   │   ├── sandbox.go       # Sandbox management commands
+│   │   ├── recipe_catalog.go    # Recipe catalog operations
+│   │   ├── recipe_crud.go       # Recipe CRUD operations (upload, update, delete, download)
+│   │   ├── recipe_display.go    # Recipe display and formatting utilities
+│   │   ├── recipe_flags.go      # Recipe command flag parsing utilities
+│   │   ├── recipe_handlers.go   # Recipe command routing and usage printing
+│   │   ├── recipe_search.go     # Recipe search, list, show, and stats operations
+│   │   ├── recipe_types.go      # Recipe type definitions (RecipeFilter, CommandFlags, etc.)
+│   │   ├── recipe_unified.go    # Unified recipe registry handling
+│   │   ├── recipe_validation.go # Recipe validation logic
+│   │   ├── recipes.go.backup    # Original monolithic recipe file (pre-refactoring backup)
+│   │   ├── recipes_catalog_parse_test.go # Recipe catalog parsing tests
+│   │   ├── recipes_suggestions_test.go  # Recipe suggestion tests
+│   │   ├── recipes_test.go      # Main recipe functionality tests
 │   │   ├── templates.go     # Template management commands
 │   │   ├── transform.go     # Transformation commands
-│   │   ├── utils.go         # ARF utility functions
-│   │   └── workflow.go      # Workflow management commands
+│   │   └── utils.go         # ARF utility functions
 │   ├── bluegreen/           # Blue-green deployment commands
 │   │   └── bluegreen.go     # Blue-green deployment logic
 │   ├── certs/               # Certificate management
@@ -97,6 +106,24 @@ internal/
 │   ├── utils_test.go        # Git utility tests
 │   ├── validator.go         # Repository validation
 │   └── validator_test.go    # Validation tests
+├── kb/                      # Knowledge Base system ✅ Sep 2025
+│   ├── fingerprint/         # Patch analysis and similarity detection
+│   │   ├── patch.go         # Semantic fingerprinting and pattern extraction
+│   │   └── patch_test.go    # Fingerprint tests
+│   ├── learning/            # Learning pipeline orchestration
+│   │   ├── learner.go       # Main learning engine and recommendations
+│   │   └── learner_test.go  # Learning pipeline tests
+│   ├── models/              # Core KB data structures
+│   │   ├── case.go          # Learning case with patch and confidence
+│   │   ├── case_test.go     # Case model tests
+│   │   ├── error.go         # Error pattern representation
+│   │   ├── error_test.go    # Error model tests
+│   │   ├── summary.go       # Aggregated learning statistics
+│   │   └── summary_test.go  # Summary model tests
+│   └── storage/             # SeaweedFS-backed persistence
+│       ├── config.go        # Storage configuration
+│       ├── kb_storage.go    # Main storage operations
+│       └── kb_storage_test.go # Storage tests
 ├── lane/                    # Lane detection system
 │   ├── detector.go          # Automatic lane detection
 │   └── detector_test.go     # Lane detection tests
@@ -181,6 +208,9 @@ CLI-specific functionality organized by command groups. Contains handlers for al
 ### git
 Git repository integration providing repository analysis, validation, and utilities for working with git repositories during deployments.
 
+### kb
+Knowledge Base system for the transflow MVP providing intelligent error pattern recognition, patch similarity analysis, and automated remediation recommendations. Stores learning data using SeaweedFS and builds confidence scores from historical success rates.
+
 ### lane
 Automatic lane detection system that analyzes project structure to determine the appropriate deployment lane (A-G) based on technology stack and configuration files.
 
@@ -189,6 +219,13 @@ System monitoring components including health checks, metrics collection, and di
 
 ### orchestration
 Orchestration layer providing abstractions for container orchestration with Nomad, including allocation management and client interfaces.
+
+### lifecycle
+Lifecycle management endpoints and helpers that perform cleanup of applications and associated resources (Nomad jobs, environment variables, domains, certificates, storage artifacts, containers, and temporary files).
+
+Nomad Wrapper Preference (VPS):
+- When stopping Nomad jobs with exact names, lifecycle uses the job manager wrapper `/opt/hashicorp/bin/nomad-job-manager.sh` to align with wrapper-first policy (retries, logging, cleanup).
+- For glob patterns (e.g., `app-*`), raw Nomad CLI may be used as a fallback due to wrapper limitations with pattern matching.
 
 ### policy
 Policy enforcement framework for security and compliance requirements.

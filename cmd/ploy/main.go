@@ -15,37 +15,20 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/cli/domains"
 	"github.com/iw2rmb/ploy/internal/cli/env"
-	"github.com/iw2rmb/ploy/internal/cli/transflow"
+	"github.com/iw2rmb/ploy/internal/cli/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
+	mods "github.com/iw2rmb/ploy/internal/mods"
 )
 
-var controllerURL = getControllerURL()
-
-func getControllerURL() string {
-	// First check if PLOY_CONTROLLER is explicitly set
-	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
-		return url
-	}
-
-	// Check if PLOY_APPS_DOMAIN is set for SSL endpoint
-	if domain := os.Getenv("PLOY_APPS_DOMAIN"); domain != "" {
-		// Check for environment-specific subdomain
-		if env := os.Getenv("PLOY_ENVIRONMENT"); env == "dev" {
-			return fmt.Sprintf("https://api.dev.%s/v1", domain)
-		}
-		return fmt.Sprintf("https://api.%s/v1", domain)
-	}
-
-	// Default to dev environment endpoint
-	return "https://api.dev.ployman.app/v1"
-}
+var controllerURL = utils.ResolveControllerURLFromEnv()
 
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "transflow":
-			transflow.TransflowCmd(os.Args[2:], controllerURL)
+		case "mod":
+			mods.ModCmd(os.Args[2:], controllerURL)
 		case "analyze":
 			analysis.AnalyzeCmd(os.Args[2:], controllerURL)
 		case "apps":
@@ -66,6 +49,8 @@ func main() {
 			debug.RollbackCmd(os.Args[2:], controllerURL)
 		case "arf":
 			arf.ARFCmd(os.Args[2:], controllerURL)
+		case "sbom":
+			sbom.SBOMCmd(os.Args[2:], controllerURL)
 		case "bluegreen":
 			bluegreen.BlueGreenCmd(os.Args[2:], controllerURL)
 		case "version":
@@ -76,7 +61,7 @@ func main() {
 		return
 	}
 	p := tea.NewProgram(ui.Model{})
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}

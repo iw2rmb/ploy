@@ -211,7 +211,7 @@ func TestBuildHandlerUsesUnifiedStorageInterface(t *testing.T) {
 
 	if resp != nil {
 		t.Logf("Response status: %d", resp.StatusCode)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 
 	// These assertions will pass once we complete the migration
@@ -247,7 +247,7 @@ func TestUnifiedStorageOperations(t *testing.T) {
 	returnedReader, err := mockStorage.Get(ctx, testKey)
 	assert.NoError(t, err)
 	assert.NotNil(t, returnedReader)
-	returnedReader.Close()
+	_ = returnedReader.Close()
 
 	exists, err := mockStorage.Exists(ctx, testKey)
 	assert.NoError(t, err)
@@ -310,7 +310,7 @@ func TestFileUploadWithUnifiedStorageInterface(t *testing.T) {
 	reader, err := mockStorage.Get(ctx, "test-key")
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
-	reader.Close()
+	_ = reader.Close()
 
 	mockStorage.AssertExpectations(t)
 }
@@ -514,7 +514,7 @@ func TestTriggerBuild(t *testing.T) {
 
 			if tt.expectedError != "" {
 				var responseBody map[string]interface{}
-				json.NewDecoder(resp.Body).Decode(&responseBody)
+				_ = json.NewDecoder(resp.Body).Decode(&responseBody)
 
 				if errorMsg, exists := responseBody["error"]; exists {
 					assert.Contains(t, errorMsg.(string), tt.expectedError)
@@ -532,7 +532,7 @@ func TestUploadFileWithRetryAndVerification(t *testing.T) {
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "upload-test-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	t.Run("upload file with retry - file not found", func(t *testing.T) {
 		mockProvider := &MockStorageClient{}
@@ -668,7 +668,7 @@ func TestCopyFile(t *testing.T) {
 	// Create temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "copy-test-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Test successful copy
 	t.Run("successful copy", func(t *testing.T) {

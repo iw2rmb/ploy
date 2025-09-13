@@ -3,7 +3,9 @@ package arf
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +43,8 @@ func (g *GitOperations) CreateBranchAndCheckout(ctx context.Context, repoPath, b
 
 // PushBranch pushes the current HEAD to the given remote URL and branch (HTTPS with token recommended)
 func (g *GitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
+	// If an access token is available, embed it into the remote URL for HTTPS auth
+	remoteURL = g.authenticatedRemoteURL(remoteURL)
 	// Set remote named 'origin' to provided URL
 	rm := exec.CommandContext(ctx, "git", "remote", "remove", "origin")
 	rm.Dir = repoPath
@@ -58,9 +62,38 @@ func (g *GitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, bra
 	var stderr bytes.Buffer
 	push.Stderr = &stderr
 	if err := push.Run(); err != nil {
-		return fmt.Errorf("git push failed: %v - %s", err, stderr.String())
+		rc := 0
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			rc = ee.ExitCode()
+		}
+		return fmt.Errorf("git push failed: rc=%d: %v - %s", rc, err, stderr.String())
 	}
 	return nil
+}
+
+// authenticatedRemoteURL injects credentials into the remote URL when possible.
+// For GitLab, using username "oauth2" with the token as password works for PATs
+// and project/group access tokens. Only applies to http/https URLs.
+func (g *GitOperations) authenticatedRemoteURL(remote string) string {
+	token := os.Getenv("GITLAB_TOKEN")
+	if token == "" {
+		return remote
+	}
+	u, err := url.Parse(remote)
+	if err != nil {
+		return remote
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return remote
+	}
+	// Avoid overwriting if userinfo already present
+	if u.User != nil {
+		return remote
+	}
+	// url.UserPassword will handle necessary escaping
+	u.User = url.UserPassword("oauth2", token)
+	return u.String()
 }
 
 // checkGitAvailable verifies that git is installed and accessible
@@ -85,10 +118,12 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
+	// Normalize branch ref (support refs/heads/*)
+	normalized := strings.TrimPrefix(branch, "refs/heads/")
 	// Build clone command
-	args := []string{"clone", "--depth", "1"}
-	if branch != "" && branch != "main" && branch != "master" {
-		args = append(args, "--branch", branch)
+	args := []string{"clone", "--depth", "1", "--single-branch"}
+	if normalized != "" && normalized != "main" && normalized != "master" {
+		args = append(args, "--branch", normalized)
 	}
 	args = append(args, repoURL, targetPath)
 
@@ -102,19 +137,49 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 	}
 
 	// If branch wasn't specified during clone, checkout the branch
-	if branch != "" && branch != "main" && branch != "master" {
-		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", branch)
+	if normalized != "" && normalized != "main" && normalized != "master" {
+		checkoutCmd := exec.CommandContext(ctx, "git", "checkout", normalized)
 		checkoutCmd.Dir = targetPath
 		if err := checkoutCmd.Run(); err != nil {
 			// Try to fetch the branch first
-			fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin", branch)
+			fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin", normalized)
 			fetchCmd.Dir = targetPath
-			fetchCmd.Run() // Ignore fetch errors
+			_ = fetchCmd.Run() // Ignore fetch errors
 
 			// Try checkout again
 			if err := checkoutCmd.Run(); err != nil {
-				return fmt.Errorf("failed to checkout branch %s: %w", branch, err)
+				return fmt.Errorf("failed to checkout branch %s: %w", normalized, err)
 			}
+		}
+	}
+
+	// Ensure sparse checkout is disabled and working tree is fully populated (best-effort)
+	{
+		cfg := exec.CommandContext(ctx, "git", "config", "core.sparseCheckout", "false")
+		cfg.Dir = targetPath
+		_ = cfg.Run()
+		disable := exec.CommandContext(ctx, "git", "sparse-checkout", "disable")
+		disable.Dir = targetPath
+		_ = disable.Run()
+		reset := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+		reset.Dir = targetPath
+		_ = reset.Run()
+	}
+
+	// Post-clone sanity: ensure repository is not empty
+	if fi, err := os.Stat(filepath.Join(targetPath, ".git")); err != nil || !fi.IsDir() {
+		return fmt.Errorf("git clone produced no .git directory at %s", targetPath)
+	}
+	if entries, err := os.ReadDir(targetPath); err == nil {
+		nonMeta := 0
+		for _, e := range entries {
+			if e.Name() == ".git" {
+				continue
+			}
+			nonMeta++
+		}
+		if nonMeta == 0 {
+			return fmt.Errorf("git clone empty working tree at %s (no files besides .git)", targetPath)
 		}
 	}
 
@@ -273,7 +338,7 @@ func (g *GitOperations) ensureGitConfig(ctx context.Context, repoPath string) er
 	emailCmd.Dir = repoPath
 	if err := emailCmd.Run(); err != nil {
 		// Set default user.email
-		setEmailCmd := exec.CommandContext(ctx, "git", "config", "user.email", "transflow@ploy.automation")
+		setEmailCmd := exec.CommandContext(ctx, "git", "config", "user.email", "mods@ploy.automation")
 		setEmailCmd.Dir = repoPath
 		if err := setEmailCmd.Run(); err != nil {
 			return fmt.Errorf("failed to set git user.email: %w", err)
@@ -405,8 +470,8 @@ func (g *GitOperations) GetLineChanges(ctx context.Context, repoPath string) (ad
 			// Format: added removed filename
 			if parts[0] != "-" { // Skip binary files
 				var a, r int
-				fmt.Sscanf(parts[0], "%d", &a)
-				fmt.Sscanf(parts[1], "%d", &r)
+				_, _ = fmt.Sscanf(parts[0], "%d", &a)
+				_, _ = fmt.Sscanf(parts[1], "%d", &r)
 				totalAdded += a
 				totalRemoved += r
 			}
@@ -427,8 +492,8 @@ func (g *GitOperations) GetLineChanges(ctx context.Context, repoPath string) (ad
 			parts := strings.Fields(line)
 			if len(parts) >= 3 && parts[0] != "-" {
 				var a, r int
-				fmt.Sscanf(parts[0], "%d", &a)
-				fmt.Sscanf(parts[1], "%d", &r)
+				_, _ = fmt.Sscanf(parts[0], "%d", &a)
+				_, _ = fmt.Sscanf(parts[1], "%d", &r)
 				totalAdded += a
 				totalRemoved += r
 			}

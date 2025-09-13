@@ -63,7 +63,7 @@ func (i *Indexer) Refresh(ctx context.Context, packs []PackSpec) ([]CatalogEntry
 			return nil, err
 		}
 		// Minimal: treat each YAML as a recipe entry with pack/version
-		for _, _ = range yamls {
+		for range yamls {
 			entries = append(entries, CatalogEntry{
 				ID:          "", // ID not parsed in minimal slice
 				DisplayName: "",
@@ -105,7 +105,7 @@ func extractRewriteYAMLs(r io.ReaderAt, size int64) ([][]byte, error) {
 			continue
 		}
 		b, _ := io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if len(b) > 0 {
 			out = append(out, b)
 		}

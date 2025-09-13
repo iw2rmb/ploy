@@ -32,6 +32,7 @@ job "{{APP_NAME}}-lane-c" {
     }
     
     network { 
+      mode = "bridge"
       port "http" { 
         to = {{HTTP_PORT}} 
       }
@@ -55,7 +56,8 @@ job "{{APP_NAME}}-lane-c" {
       read_only = false
     }
     
-    # Consul service mesh integration
+    # Consul service mesh integration (optional)
+    {{#if CONNECT_ENABLED}}
     service {
       name = "{{APP_NAME}}-connect"
       port = "http"
@@ -63,15 +65,15 @@ job "{{APP_NAME}}-lane-c" {
       connect {
         sidecar_service {
           proxy {
-            upstream {
+            upstreams {
               destination_name = "database"
               local_bind_port  = 5432
             }
-            upstream {
+            upstreams {
               destination_name = "redis"
               local_bind_port  = 6379
             }
-            upstream {
+            upstreams {
               destination_name = "vault"
               local_bind_port  = 8200
             }
@@ -85,15 +87,18 @@ job "{{APP_NAME}}-lane-c" {
         runtime = "osv-jvm"
       }
     }
+    {{/if}}
     
     task "osv-jvm" {
       driver = "qemu"
       
-      # Vault integration for JVM applications
+      # Vault integration for JVM applications (optional)
+      {{#if VAULT_ENABLED}}
       vault {
         policies = ["{{APP_NAME}}-policy"]
         change_mode = "restart"
       }
+      {{/if}}
       
       config {
         image_path = "{{IMAGE_PATH}}"
@@ -307,8 +312,8 @@ EOF
       }
       
       logs { 
-        max_files = 15
-        max_file_size = 100  # Larger logs for JVM applications
+        max_files = 5
+        max_file_size = 20  # Keep under default ephemeral disk
       }
       
       # JVM lifecycle management

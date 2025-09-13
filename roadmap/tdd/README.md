@@ -230,7 +230,7 @@ See [phase-tdd-4-behavioral.md](phase-tdd-4-behavioral.md) for detailed implemen
 #### Local Development Environment
 - Docker Desktop for macOS
 - Docker Compose stack with Consul, Nomad, SeaweedFS
-- Local PostgreSQL and Redis for testing
+- Redis for testing (SQL database disabled)
 - Mock services for external dependencies
 
 #### Continuous Integration
@@ -259,7 +259,7 @@ See [phase-tdd-4-behavioral.md](phase-tdd-4-behavioral.md) for detailed implemen
 - **Service Mesh**: Consul (dev mode)
 - **Orchestration**: Nomad (dev mode)
 - **Storage**: SeaweedFS + MinIO
-- **Databases**: PostgreSQL + Redis
+- **Databases**: Redis only (SQL database disabled)
 
 ### Development Tools
 - **Test Generation**: gotests

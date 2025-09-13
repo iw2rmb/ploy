@@ -83,7 +83,7 @@ func handleDeploy(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to start blue-green deployment: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -93,7 +93,7 @@ func handleDeploy(args []string, controllerURL string) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(body, &result)
+	_ = json.Unmarshal(body, &result)
 
 	fmt.Println("✅ Blue-green deployment started successfully")
 	if deployment, ok := result["deployment"].(map[string]interface{}); ok {
@@ -121,7 +121,7 @@ func handleStatus(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to get deployment status: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -131,7 +131,7 @@ func handleStatus(args []string, controllerURL string) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(body, &result)
+	_ = json.Unmarshal(body, &result)
 
 	if deployment, ok := result["deployment"].(map[string]interface{}); ok {
 		fmt.Printf("📊 Blue-Green Deployment Status for %s\n\n", appName)
@@ -190,7 +190,7 @@ func handleShift(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to shift traffic: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -221,7 +221,7 @@ func handleAutoShift(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to start auto shift: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -254,7 +254,7 @@ func handleComplete(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to complete deployment: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -283,7 +283,7 @@ func handleRollback(args []string, controllerURL string) {
 	// Ask for confirmation
 	fmt.Print("Are you sure you want to rollback? This will route all traffic back to the previous version. (y/N): ")
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	if response != "y" && response != "Y" {
 		fmt.Println("Rollback cancelled")
 		return
@@ -296,7 +296,7 @@ func handleRollback(args []string, controllerURL string) {
 		fmt.Printf("Error: Failed to rollback deployment: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 

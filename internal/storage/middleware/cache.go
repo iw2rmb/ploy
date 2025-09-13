@@ -91,7 +91,7 @@ func (c *CacheMiddleware) Get(ctx context.Context, key string) (io.ReadCloser, e
 
 	// Read content to cache it
 	content, err := io.ReadAll(reader)
-	reader.Close()
+	_ = reader.Close()
 	if err != nil {
 		return nil, err
 	}

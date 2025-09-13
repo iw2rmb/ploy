@@ -154,7 +154,7 @@ func (s *TTLCleanupService) testNomadConnectivity() error {
 	if err != nil {
 		return fmt.Errorf("connectivity test failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("connectivity test returned status %d", resp.StatusCode)
@@ -247,11 +247,11 @@ func (s *TTLCleanupService) getNomadJobs() ([]NomadJob, error) {
 		log.Printf("Nomad API connection failed: %v (URL: %s)", err, url)
 		return nil, fmt.Errorf("failed to query Nomad API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Nomad API returned non-200 status: %d", resp.StatusCode)
-		return nil, fmt.Errorf("Nomad API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("nomad API returned status %d", resp.StatusCode)
 	}
 
 	var jobs []NomadJob

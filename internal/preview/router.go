@@ -31,7 +31,7 @@ func Router(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(502).SendString("preview build failed")
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, _ := io.ReadAll(resp.Body)
 
 	jobName := fmt.Sprintf("%s-%s", app, sha)

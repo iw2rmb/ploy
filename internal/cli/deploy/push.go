@@ -45,7 +45,7 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	ign, _ := utils.ReadGitignore(".")
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
+		defer func() { _ = pw.Close() }()
 		_ = utils.TarDir(".", pw, ign)
 	}()
 
@@ -75,7 +75,7 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	if err != nil {
 		return nil, fmt.Errorf("app deployment request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Parse response
 	result := &DeployResult{
@@ -92,7 +92,7 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	}
 
 	// Output response to console
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 
 	return result, nil
 }

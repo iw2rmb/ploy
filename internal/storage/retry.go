@@ -285,7 +285,7 @@ func (r *retryableReadCloser) Close() error {
 func (r *retryableReadCloser) Retry() error {
 	// Close existing reader
 	if r.reader != nil {
-		r.reader.Close()
+		_ = r.reader.Close()
 	}
 
 	// Reopen the stream

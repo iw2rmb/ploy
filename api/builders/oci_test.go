@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildOCI tests the BuildOCI function
@@ -205,7 +207,8 @@ func TestBuildOCICommandArguments(t *testing.T) {
 			}
 
 			// Run with mock
-			BuildOCIWithMock(tt.app, tt.srcDir, tt.tag, nil, mockCommand)
+			_, err := BuildOCIWithMock(tt.app, tt.srcDir, tt.tag, nil, mockCommand)
+			require.NoError(t, err)
 
 			// Verify script
 			if capturedScript != tt.expectedScript {
@@ -245,7 +248,8 @@ func TestBuildOCIEnvironmentVariables(t *testing.T) {
 	}
 
 	// Run with environment variables
-	BuildOCIWithMock("app", "/src", "latest", envVars, mockCommand)
+	_, err := BuildOCIWithMock("app", "/src", "latest", envVars, mockCommand)
+	require.NoError(t, err)
 
 	// Convert to map for checking
 	envMap := make(map[string]string)

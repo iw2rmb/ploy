@@ -51,9 +51,9 @@ The ARF implementation is structured in 8 progressive phases:
 **Key Deliverables:** ✅
 - ✅ Dynamic recipe generation using OpenAI LLM APIs
 - ✅ Hybrid OpenRewrite + LLM transformation workflows
-- ✅ Success/failure pattern learning system with PostgreSQL
+- ⏸️ Success/failure pattern learning system (SQL) — deferred
 - ✅ Context-aware transformation strategy selection
-- ✅ Multi-language AST support with tree-sitter
+// Multi-language AST support via tree-sitter was removed.
 - ✅ Ollama provider integration for local LLM execution
 - ✅ Strategy selector with confidence scoring
 - ✅ CLLM service integration for enhanced error analysis
@@ -137,18 +137,11 @@ ARF leverages Ploy's existing infrastructure:
 
 ARF provides comprehensive API endpoints for transformation management and debugging:
 
-### Core Transformation Endpoints
-- `POST /v1/arf/transforms` - Execute new transformations
-- `GET /v1/arf/transforms/:id` - Get transformation results
-- `GET /v1/arf/transforms/:id/status` - Check transformation status
+### Core Transformation Endpoints (Legacy)
+// Legacy ARF transform endpoints removed; use Mods under `/v1/mods/*`.
 
-### Debugging & Analysis Endpoints
-- `GET /v1/arf/transforms/:id/hierarchy` - Hierarchical view of healing attempts
-- `GET /v1/arf/transforms/:id/timeline` - Chronological timeline of all events
-- `GET /v1/arf/transforms/:id/analysis` - Deep analysis with cost and performance metrics
-- `GET /v1/arf/transforms/:id/active` - Currently active healing attempts
-- `GET /v1/arf/transforms/:id/report` - **Human-readable markdown report** (NEW)
-- `GET /v1/arf/transforms/orphaned` - Find orphaned transformations
+### Debugging & Analysis Endpoints (Legacy)
+// Legacy ARF debugging endpoints removed with transform API; Mods may expose equivalents in future.
 
 ### Transformation Reports
 

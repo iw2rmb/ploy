@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+	"bytes"
+	"log"
+
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
@@ -22,6 +25,8 @@ type DeployConfig struct {
 	ControllerURL string
 	Metadata      map[string]string
 	Timeout       time.Duration
+	BuildOnly     bool   // when true, API should run build gate and tear down app (no long-lived service)
+	WorkingDir    string // optional: directory to tar instead of current working directory
 }
 
 // DeployResult contains deployment outcome information
@@ -50,11 +55,15 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	}
 
 	// Create tar archive
-	ign, _ := utils.ReadGitignore(".")
+	wd := config.WorkingDir
+	if wd == "" {
+		wd = "."
+	}
+	ign, _ := utils.ReadGitignore(wd)
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
-		_ = utils.TarDir(".", pw, ign)
+		defer func() { _ = pw.Close() }()
+		_ = utils.TarDir(wd, pw, ign)
 	}()
 
 	// Build deployment URL
@@ -82,20 +91,28 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	if config.Timeout > 0 {
 		client.Timeout = config.Timeout
 	}
+	log.Printf("[SharedPush] POST %s app=%s lane=%s env=%s", url, config.App, config.Lane, config.Environment)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("deployment request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Parse response
+	if resp.StatusCode != http.StatusOK {
+		// Read and log response body for diagnostics, then restore body for downstream readers
+		if b, rerr := io.ReadAll(resp.Body); rerr == nil {
+			log.Printf("[SharedPush] Non-200 response status=%d body=%s", resp.StatusCode, string(b))
+			resp.Body = io.NopCloser(bytes.NewReader(b))
+		}
+	}
 	result, err := parseDeployResponse(resp, config)
 	if err != nil {
 		return nil, err
 	}
 
 	// Output to console
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 
 	return result, nil
 }
@@ -134,6 +151,11 @@ func buildDeployURL(config DeployConfig) string {
 
 	if config.Environment != "" {
 		url += "&env=" + config.Environment
+	}
+
+	// Signal build-only mode so API can clean up sandboxed app after gate
+	if config.BuildOnly {
+		url += "&build_only=true"
 	}
 
 	return url

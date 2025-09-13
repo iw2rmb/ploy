@@ -87,7 +87,7 @@ func TestPushCmd(t *testing.T) {
 
 				w.Header().Set("X-Deployment-ID", "test-deploy-123")
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{"status": "success"}`))
+				_, _ = w.Write([]byte(`{"status": "success"}`))
 			}))
 			defer server.Close()
 

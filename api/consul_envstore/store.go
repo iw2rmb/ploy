@@ -336,7 +336,7 @@ func (s *ConsulEnvStore) HealthCheck() error {
 	kv := s.client.KV()
 	_, _, err := kv.Get("ploy/health", nil)
 	if err != nil {
-		return fmt.Errorf("Consul health check failed: %w", err)
+		return fmt.Errorf("consul health check failed: %w", err)
 	}
 	return nil
 }
