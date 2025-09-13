@@ -32,9 +32,10 @@ Notes
   - `APP_NAME` override, `BRANCH` (default `main`), `LANE` (force detection), `HEALTH_PATH` (default `/healthz`)
 
 ## Test Matrix & Success Criteria
-- Per-lane test steps:
+- Focus: validate ploy’s deploy path against the Dev API (not lane specifics).
+- Test steps:
   1) Clone repo (shallow) on a temp workdir
-  2) `ploy push -a <app>` (optionally `-lane <A-G>`)
+  2) `ploy push -a <app>` (do not specify `-lane` by default)
   3) Wait HTTPS: `https://<sha>.<app>.dev.ployd.app<HEALTH_PATH>` within 180s
   4) Destroy: `ploy apps destroy --name <app> --force`
   5) Verify 404: `GET /v1/apps/<app>/status` → 404
@@ -51,7 +52,9 @@ Notes
 ## How To Run
 - Scripted E2E per lane:
   - `LANE=A LANE_A_REPO=... PLOY_CONTROLLER=... ./tests/lanes/test-lane-deploy.sh`
-- All configured lanes via Go E2E (build tag `e2e`):
+- Stack readiness (Go E2E):
+  - `PLOY_CONTROLLER=... go test ./tests/e2e -tags e2e -v -run TestStackReadiness`
+- All configured repos via Go E2E (build tag `e2e`):
   - `PLOY_CONTROLLER=... go test ./tests/e2e -tags e2e -v -run TestLaneDeployments`
 - Tail logs (API or VPS):
   - `APP_NAME=<app> PLOY_CONTROLLER=... ./tests/lanes/check-app-logs.sh`
