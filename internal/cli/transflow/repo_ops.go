@@ -48,15 +48,6 @@ func createTarFromDir(srcDir, dstTar string) error {
     tw := tar.NewWriter(f)
     defer func() { _ = tw.Close() }()
 
-    // Add an explicit root entry like GNU tar shows ("./") for better parity with previews
-    if err := tw.WriteHeader(&tar.Header{
-        Name:     "./",
-        Mode:     0755,
-        Typeflag: tar.TypeDir,
-    }); err != nil {
-        return fmt.Errorf("tar header root: %w", err)
-    }
-
     walkFn := func(path string, d os.DirEntry, err error) error {
         if err != nil {
             return err
@@ -65,26 +56,21 @@ func createTarFromDir(srcDir, dstTar string) error {
         if err != nil {
             return err
         }
-        if rel == "." {
-            return nil // already wrote root
-        }
+        if rel == "." { return nil }
         name := "./" + filepath.ToSlash(rel)
 
         info, err := d.Info()
-        if err != nil {
-            return err
+        if err != nil { return err }
+        if info.IsDir() {
+            // Do not emit directory headers; implied by file paths
+            return nil
         }
-        hdr, err := tar.FileInfoHeader(info, "")
-        if err != nil {
-            return err
-        }
-        hdr.Name = name
-
-        if err := tw.WriteHeader(hdr); err != nil {
-            return err
-        }
-
         if info.Mode().IsRegular() {
+            hdr := &tar.Header{ Name: name, ModTime: info.ModTime() }
+            hdr.Mode = int64(info.Mode().Perm())
+            hdr.Typeflag = tar.TypeReg
+            hdr.Size = info.Size()
+            if err := tw.WriteHeader(hdr); err != nil { return err }
             rf, err := os.Open(path)
             if err != nil {
                 return err
@@ -94,12 +80,23 @@ func createTarFromDir(srcDir, dstTar string) error {
                 return err
             }
             _ = rf.Close()
+            return nil
         }
+        // Skip non-regular files
         return nil
     }
 
     if err := filepath.WalkDir(srcDir, walkFn); err != nil {
-        return fmt.Errorf("walk dir: %w", err)
+        // Fallback to system tar if Go tar hits an unexpected platform edge case
+        _ = f.Close()
+        _ = os.Remove(dstTar)
+        cmd := exec.Command("tar", "-cf", dstTar, ".")
+        cmd.Dir = srcDir
+        if out, e2 := cmd.CombinedOutput(); e2 != nil {
+            return fmt.Errorf("walk dir: %v; fallback tar failed: %v: %s", err, e2, string(out))
+        }
+        // success via fallback
+        return nil
     }
 
     // Ensure tar not empty
