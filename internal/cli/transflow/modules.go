@@ -7,6 +7,7 @@ import (
     "github.com/iw2rmb/ploy/internal/git/provider"
     "fmt"
     "path/filepath"
+    "time"
 )
 
 // Runner modularization interfaces (Phase 5)
@@ -21,7 +22,19 @@ type RepoManager interface {
 type TransformationExecutor interface {
     RenderORWAssets(optionID string) (hclPath string, err error)
     PrepareInputTar(repoPath string) (tarPath string, err error)
-    SubmitORWAndFetchDiff(ctx context.Context, renderedHCL string, outDir string) (diffPath string, err error)
+    SubmitORWAndFetchDiff(ctx context.Context, p ORWSubmitParams) (diffPath string, err error)
+}
+
+// ORWSubmitParams captures execution-time parameters needed to submit ORW job and fetch diff
+type ORWSubmitParams struct {
+    SeaweedURL       string
+    ExecID           string
+    BranchID         string
+    StepID           string
+    RunID            string
+    SubmittedHCLPath string
+    DiffPath         string
+    Timeout          time.Duration
 }
 
 type BuildGate interface {
@@ -72,13 +85,12 @@ func (a *TransformationExecutorAdapter) PrepareInputTar(repoPath string) (string
     }
     return tarPath, nil
 }
-func (a *TransformationExecutorAdapter) SubmitORWAndFetchDiff(ctx context.Context, renderedHCL string, outDir string) (string, error) {
-    // Not yet used: keep a minimal placeholder by validating job and returning expected diff path
-    // Future: thread validate/submit helpers and seaweed/exec metadata here
-    _ = ctx
-    _ = renderedHCL
-    diffPath := filepath.Join(outDir, "diff.patch")
-    return diffPath, nil
+func (a *TransformationExecutorAdapter) SubmitORWAndFetchDiff(ctx context.Context, p ORWSubmitParams) (string, error) {
+    // Use existing helper to validate, submit, wait and fetch diff
+    if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, a.r.reportLastJobAsync, p.SeaweedURL, p.ExecID, p.BranchID, p.StepID, p.RunID, p.SubmittedHCLPath, p.DiffPath, p.Timeout); err != nil {
+        return "", err
+    }
+    return p.DiffPath, nil
 }
 
 // RepoManagerAdapter adapts GitOperationsInterface to RepoManager.
