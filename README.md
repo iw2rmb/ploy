@@ -176,13 +176,16 @@ ploy push -a myapp -lane E      # Force container deployment
 
 **Note**: The separation ensures platform services and user apps never conflict, even with identical names.
 
-### Dynamic API Endpoint
-The CLI automatically discovers the api endpoint:
+### Dynamic API Endpoint (Controller URL Resolution)
+The CLI automatically discovers the API endpoint using a shared resolver:
 1. **PLOY_CONTROLLER** environment variable (highest priority)
-2. **PLOY_APPS_DOMAIN** → `https://api.{domain}/v1` (SSL with wildcard cert)
-3. Default → `http://localhost:8081/v1`
+2. For `ploy` (apps domain): **PLOY_APPS_DOMAIN** with **PLOY_ENVIRONMENT**
+   - dev → `https://api.dev.{domain}/v1`
+   - other → `https://api.{domain}/v1`
+3. For `ployman` (platform domain): **PLOY_PLATFORM_DOMAIN** → `https://api.{domain}/v1`
+4. Default → `https://api.dev.ployman.app/v1`
 
-This enables seamless operation across local development, staging, and production environments.
+Tip: Override with `PLOY_CONTROLLER` to target specific environments or tunnels.
 
 ## Development Environment SSL Setup
 
