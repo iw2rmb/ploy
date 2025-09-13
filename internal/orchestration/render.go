@@ -379,6 +379,13 @@ func processConditionalBlocks(template string, data RenderData) string {
 		}
 		return ""
 	})
+	// Strip any remaining conditional markers to avoid leaving stray tags
+	// that can break HCL parsing if earlier passes missed nested structures.
+	openTag := regexp.MustCompile(`(?m)^[\t ]*\{\{#if\s+\w+\}\}[\t ]*$`)
+	closeTag := regexp.MustCompile(`(?m)^[\t ]*\{\{/if\}\}[\t ]*$`)
+	result = openTag.ReplaceAllString(result, "")
+	result = closeTag.ReplaceAllString(result, "")
+	// Normalize excessive blank lines
 	result = regexp.MustCompile(`\n\s*\n\s*\n+`).ReplaceAllString(result, "\n\n")
 	return result
 }
