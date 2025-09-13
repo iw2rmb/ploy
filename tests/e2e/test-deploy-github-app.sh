@@ -53,6 +53,7 @@ fi
 EXTRA_FLAGS=()
 [[ -n "${LANE:-}" ]] && EXTRA_FLAGS+=("-lane" "$LANE")
 [[ -n "${MAIN:-}" ]] && EXTRA_FLAGS+=("-main" "$MAIN")
+START_TS=$(date +%s)
 PUSH_OUT=$("$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]:-}" 2>&1)
 PUSH_RC=$?
 echo "$PUSH_OUT"
@@ -85,10 +86,18 @@ fi
 HEALTH_PATH=${HEALTH_PATH:-/healthz}
 TIMEOUT=${TIMEOUT:-300}
 SLEEP=${SLEEP:-5}
+# Adjust remaining time budget after push
+NOW_TS=$(date +%s)
+SPENT=$((NOW_TS - START_TS))
+REMAIN=$((TIMEOUT - SPENT))
+if (( REMAIN <= 0 )); then
+  err "No time left after push (spent ${SPENT}s of ${TIMEOUT}s)"
+  exit 1
+fi
 ELAPSED=0
 info "Waiting for app health at ${URL}${HEALTH_PATH} (timeout ${TIMEOUT}s)"
 set +e
-while (( ELAPSED < TIMEOUT )); do
+while (( ELAPSED < REMAIN )); do
   if curl -sf "${URL}${HEALTH_PATH}" >/dev/null; then
     ok "App is responding over HTTPS: ${URL}${HEALTH_PATH}"
     READY=1; break
@@ -98,7 +107,7 @@ done
 set -e
 
 if [[ -z "${READY:-}" ]]; then
-  err "App failed to become healthy within ${TIMEOUT}s"
+  err "App failed to become healthy within ${REMAIN}s (total ${TIMEOUT}s)"
   # Fetch logs for diagnostics when available
   if command -v jq >/dev/null 2>&1; then
     APP_NAME="$APP_NAME" PLOY_CONTROLLER="$PLOY_CONTROLLER" "${REPO_ROOT}/tests/lanes/check-app-logs.sh" || true
