@@ -14,7 +14,7 @@ import (
 func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]byte, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	defer tw.Close()
+	defer func() { _ = tw.Close() }()
 
 	// Walk through the directory and add files to tar
 	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
@@ -58,7 +58,7 @@ func (d *DeploymentSandboxManager) createTarFromDirectory(sourceDir string) ([]b
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 
 			if _, err := io.Copy(tw, file); err != nil {
 				return err

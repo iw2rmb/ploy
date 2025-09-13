@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -85,10 +84,10 @@ func handleAdd(args []string, controllerURL string) {
 		fmt.Printf("Error adding domain: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Print full response for better feedback
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 	fmt.Println() // Add newline
 }
 
@@ -106,9 +105,9 @@ func handleList(args []string, controllerURL string) {
 		fmt.Printf("Error listing domains: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 	fmt.Println() // Add newline
 }
 
@@ -132,9 +131,9 @@ func handleRemove(args []string, controllerURL string) {
 		fmt.Printf("Error removing domain: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 	fmt.Println() // Add newline
 }
 
@@ -155,8 +154,8 @@ func handleCertificates(args []string, controllerURL string) {
 			fmt.Printf("Error listing certificates: %v\n", err)
 			return
 		}
-		defer resp.Body.Close()
-		io.Copy(os.Stdout, resp.Body)
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(os.Stdout, resp.Body)
 		fmt.Println() // Add newline
 
 	case "get":
@@ -171,8 +170,8 @@ func handleCertificates(args []string, controllerURL string) {
 			fmt.Printf("Error getting certificate: %v\n", err)
 			return
 		}
-		defer resp.Body.Close()
-		io.Copy(os.Stdout, resp.Body)
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(os.Stdout, resp.Body)
 		fmt.Println() // Add newline
 
 	case "provision":
@@ -187,8 +186,8 @@ func handleCertificates(args []string, controllerURL string) {
 			fmt.Printf("Error provisioning certificate: %v\n", err)
 			return
 		}
-		defer resp.Body.Close()
-		io.Copy(os.Stdout, resp.Body)
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(os.Stdout, resp.Body)
 		fmt.Println() // Add newline
 
 	case "remove":
@@ -208,8 +207,8 @@ func handleCertificates(args []string, controllerURL string) {
 			fmt.Printf("Error removing certificate: %v\n", err)
 			return
 		}
-		defer resp.Body.Close()
-		io.Copy(os.Stdout, resp.Body)
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(os.Stdout, resp.Body)
 		fmt.Println() // Add newline
 
 	case "upload":
@@ -249,14 +248,14 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 	}
 
 	// Read certificate file
-	certData, err := ioutil.ReadFile(certFile)
+	certData, err := os.ReadFile(certFile)
 	if err != nil {
 		fmt.Printf("Error reading certificate file %s: %v\n", certFile, err)
 		return
 	}
 
 	// Read private key file
-	keyData, err := ioutil.ReadFile(keyFile)
+	keyData, err := os.ReadFile(keyFile)
 	if err != nil {
 		fmt.Printf("Error reading private key file %s: %v\n", keyFile, err)
 		return
@@ -265,7 +264,7 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 	// Read CA file if provided
 	var caData []byte
 	if caFile != "" {
-		caData, err = ioutil.ReadFile(caFile)
+		caData, err = os.ReadFile(caFile)
 		if err != nil {
 			fmt.Printf("Error reading CA file %s: %v\n", caFile, err)
 			return
@@ -282,7 +281,7 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 		fmt.Printf("Error creating certificate form field: %v\n", err)
 		return
 	}
-	certPart.Write(certData)
+	_, _ = certPart.Write(certData)
 
 	// Add private key
 	keyPart, err := writer.CreateFormField("private_key")
@@ -290,7 +289,7 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 		fmt.Printf("Error creating private key form field: %v\n", err)
 		return
 	}
-	keyPart.Write(keyData)
+	_, _ = keyPart.Write(keyData)
 
 	// Add CA certificate if provided
 	if len(caData) > 0 {
@@ -299,7 +298,7 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 			fmt.Printf("Error creating CA certificate form field: %v\n", err)
 			return
 		}
-		caPart.Write(caData)
+		_, _ = caPart.Write(caData)
 	}
 
 	// Add domain
@@ -308,9 +307,9 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 		fmt.Printf("Error creating domain form field: %v\n", err)
 		return
 	}
-	domainPart.Write([]byte(domain))
+	_, _ = domainPart.Write([]byte(domain))
 
-	writer.Close()
+	_ = writer.Close()
 
 	// Make HTTP request
 	url := fmt.Sprintf("%s/v1/apps/%s/certificates/%s/upload", controllerURL, app, domain)
@@ -326,12 +325,12 @@ func handleCertificateUpload(args []string, controllerURL string, app string) {
 		fmt.Printf("Error uploading certificate: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Upload failed with status %d\n", resp.StatusCode)
 	}
 
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 	fmt.Println() // Add newline
 }

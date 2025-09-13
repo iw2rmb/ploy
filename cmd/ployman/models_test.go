@@ -45,7 +45,7 @@ func setupTestServer() *httptest.Server {
 				"count":  len(filteredModels),
 				"total":  len(mockModels),
 			}
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 
 		case "POST":
 			var model models.LLMModel
@@ -72,7 +72,7 @@ func setupTestServer() *httptest.Server {
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"id":      model.ID,
 				"message": "model created successfully",
 			})
@@ -110,7 +110,7 @@ func setupTestServer() *httptest.Server {
 					"cost_per_day": 2.25,
 				},
 			}
-			json.NewEncoder(w).Encode(stats)
+			_ = json.NewEncoder(w).Encode(stats)
 			return
 		}
 
@@ -127,7 +127,7 @@ func setupTestServer() *httptest.Server {
 				return
 			}
 
-			json.NewEncoder(w).Encode(model)
+			_ = json.NewEncoder(w).Encode(model)
 
 		case "PUT":
 			if modelID == "" {
@@ -162,7 +162,7 @@ func setupTestServer() *httptest.Server {
 			}
 
 			mockModels[modelID] = updatedModel
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"id":      modelID,
 				"message": "model updated successfully",
 			})
@@ -179,7 +179,7 @@ func setupTestServer() *httptest.Server {
 			}
 
 			delete(mockModels, modelID)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"id":      modelID,
 				"message": "model deleted successfully",
 			})
@@ -210,7 +210,7 @@ func TestModelsCmd_List(t *testing.T) {
 		var buf bytes.Buffer
 		_ = json.NewEncoder(&buf).Encode(testModel)
 		if resp, err := http.Post(server.URL+"/v1/llms/models", "application/json", &buf); err == nil && resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}
 
@@ -294,13 +294,13 @@ func TestModelsCmd_Add(t *testing.T) {
 	// Test with JSON file
 	jsonFile := "/tmp/test-model.json"
 	jsonData, _ := json.MarshalIndent(testModel, "", "  ")
-	os.WriteFile(jsonFile, jsonData, 0644)
-	defer os.Remove(jsonFile)
+	_ = os.WriteFile(jsonFile, jsonData, 0644)
+	defer func() { _ = os.Remove(jsonFile) }()
 
 	// Test with YAML-like file (we'll use JSON structure but call it yaml)
 	yamlFile := "/tmp/test-model.yaml"
-	os.WriteFile(yamlFile, jsonData, 0644) // Using JSON data for simplicity
-	defer os.Remove(yamlFile)
+	_ = os.WriteFile(yamlFile, jsonData, 0644) // Using JSON data for simplicity
+	defer func() { _ = os.Remove(yamlFile) }()
 
 	tests := []struct {
 		name string
@@ -345,8 +345,8 @@ func TestModelsCmd_Update(t *testing.T) {
 
 	jsonFile := "/tmp/test-update-model.json"
 	jsonData, _ := json.MarshalIndent(updateModel, "", "  ")
-	os.WriteFile(jsonFile, jsonData, 0644)
-	defer os.Remove(jsonFile)
+	_ = os.WriteFile(jsonFile, jsonData, 0644)
+	defer func() { _ = os.Remove(jsonFile) }()
 
 	tests := []struct {
 		name string
@@ -489,13 +489,13 @@ func TestMakeHTTPRequest(t *testing.T) {
 		switch r.URL.Path {
 		case "/success":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status": "ok"}`))
+			_, _ = w.Write([]byte(`{"status": "ok"}`))
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error": "server error"}`))
+			_, _ = w.Write([]byte(`{"error": "server error"}`))
 		case "/bad-json":
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`invalid json`))
+			_, _ = w.Write([]byte(`invalid json`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -577,12 +577,12 @@ func BenchmarkModelsCmd_List(b *testing.B) {
 func BenchmarkMakeHTTPRequest(b *testing.B) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"test": "data"}`))
+		_, _ = w.Write([]byte(`{"test": "data"}`))
 	}))
 	defer server.Close()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		makeHTTPRequest("GET", server.URL, nil)
+		_, _ = makeHTTPRequest("GET", server.URL, nil)
 	}
 }

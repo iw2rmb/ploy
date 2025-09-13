@@ -290,7 +290,7 @@ func TestMCPContextPrefetcher_PrefetchContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	config := &MCPConfig{
 		Tools: []MCPTool{
@@ -355,7 +355,7 @@ func TestMCPContextPrefetcher_CreateContextManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	config := &MCPConfig{
 		Tools: []MCPTool{
@@ -533,7 +533,7 @@ func BenchmarkMCPContextPrefetcher_PrefetchContext(b *testing.B) {
 	if err != nil {
 		b.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

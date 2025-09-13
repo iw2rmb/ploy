@@ -26,7 +26,7 @@ func detectJavaVersion(srcDir string) (string, error) {
 		return javaVersion, nil
 	}
 
-	return "", errors.New("Java version not detected")
+	return "", errors.New("java version not detected")
 }
 
 // detectJavaVersionFromGradle detects Java version from Gradle build files

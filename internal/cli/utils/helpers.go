@@ -35,11 +35,11 @@ func GitSHA() string {
 func OpenURL(u string) {
 	switch runtime.GOOS {
 	case "darwin":
-		exec.Command("open", u).Start()
+		_ = exec.Command("open", u).Start()
 	case "windows":
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start()
+		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", u).Start()
 	default:
-		exec.Command("xdg-open", u).Start()
+		_ = exec.Command("xdg-open", u).Start()
 	}
 }
 
@@ -57,7 +57,7 @@ func ReadGitignore(dir string) (Ignore, error) {
 	if err != nil {
 		return Ignore{}, nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	s := bufio.NewScanner(f)
 	var pats, neg []string
@@ -98,7 +98,7 @@ func MatchAny(rel string, globs []string) bool {
 
 func TarDir(dir string, w io.Writer, ign Ignore) error {
 	tw := tar.NewWriter(w)
-	defer tw.Close()
+	defer func() { _ = tw.Close() }()
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -132,7 +132,7 @@ func TarDir(dir string, w io.Writer, ign Ignore) error {
 			return err
 		}
 		f, _ := os.Open(path)
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		_, err = io.Copy(tw, f)
 		return err
 	})

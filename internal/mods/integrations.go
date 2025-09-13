@@ -31,8 +31,8 @@ func NewSharedPushBuildChecker(controllerURL string) *SharedPushBuildChecker {
 func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.DeployConfig) (*common.DeployResult, error) {
 	// Set the controller URL in the config
 	config.ControllerURL = b.controllerURL
-	config.IsPlatform = false // transflow uses ploy mode, not ployman mode
-	// Transflow build gate must be ephemeral; ask API to tear down sandboxed app after gate
+	config.IsPlatform = false // Mods uses ploy mode, not ployman mode
+	// Mods build gate must be ephemeral; ask API to tear down sandboxed app after gate
 	config.BuildOnly = true
 
 	// Propagate working directory hint from metadata if present
@@ -42,11 +42,11 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 		}
 	}
 	// Optional: emit via controller reporter if exec ID present
-	if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+	if execID := os.Getenv("PLOY_MODS_EXECUTION_ID"); execID != "" {
 		rep := NewControllerEventReporter(b.controllerURL, execID)
 		_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("start app=%s lane=%s env=%s wd=%s", config.App, config.Lane, config.Environment, config.WorkingDir)})
 	}
-	log.Printf("[Transflow Build] Starting build check: controller=%s app=%s lane=%s env=%s wd=%s", b.controllerURL, config.App, config.Lane, config.Environment, config.WorkingDir)
+	log.Printf("[Mods Build] Starting build check: controller=%s app=%s lane=%s env=%s wd=%s", b.controllerURL, config.App, config.Lane, config.Environment, config.WorkingDir)
 
 	// Use SharedPush to perform the build check
 	// SharedPush already supports build-only mode when used with specific endpoints
@@ -57,18 +57,18 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 
 	if result != nil && !result.Success {
-		if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+		if execID := os.Getenv("PLOY_MODS_EXECUTION_ID"); execID != "" {
 			rep := NewControllerEventReporter(b.controllerURL, execID)
 			_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "error", Message: fmt.Sprintf("unsuccessful: %s", result.Message)})
 		}
-		log.Printf("[Transflow Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
+		log.Printf("[Mods Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
 		return result, fmt.Errorf("build check unsuccessful (controller=%s app=%s lane=%s env=%s): %s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
 	}
-	if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
+	if execID := os.Getenv("PLOY_MODS_EXECUTION_ID"); execID != "" {
 		rep := NewControllerEventReporter(b.controllerURL, execID)
 		_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("succeeded version=%s", result.Version)})
 	}
-	log.Printf("[Transflow Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
+	log.Printf("[Mods Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
 }
 
@@ -102,25 +102,25 @@ func (m *TestModeBuildChecker) CheckBuild(ctx context.Context, config common.Dep
 	}, nil
 }
 
-// TransflowIntegrations provides factory methods for creating concrete implementations
-type TransflowIntegrations struct {
+// ModsIntegrations provides factory methods for creating concrete implementations
+type ModIntegrations struct {
 	ControllerURL string
 	WorkDir       string
 	TestMode      bool // Use mock implementations when true
 }
 
-// NewTransflowIntegrations creates a new integrations factory
-func NewTransflowIntegrations(controllerURL, workDir string) *TransflowIntegrations {
-	return &TransflowIntegrations{
+// NewModIntegrations creates a new integrations factory
+func NewModIntegrations(controllerURL, workDir string) *ModIntegrations {
+	return &ModIntegrations{
 		ControllerURL: controllerURL,
 		WorkDir:       workDir,
 		TestMode:      false,
 	}
 }
 
-// NewTransflowIntegrationsWithTestMode creates a new integrations factory with test mode option
-func NewTransflowIntegrationsWithTestMode(controllerURL, workDir string, testMode bool) *TransflowIntegrations {
-	return &TransflowIntegrations{
+// NewModIntegrationsWithTestMode creates a new integrations factory with test mode option
+func NewModIntegrationsWithTestMode(controllerURL, workDir string, testMode bool) *ModIntegrations {
+	return &ModIntegrations{
 		ControllerURL: controllerURL,
 		WorkDir:       workDir,
 		TestMode:      testMode,
@@ -135,7 +135,7 @@ func NewARFGitOperations(workDir string) *ARFGitOperations {
 }
 
 // CreateGitOperations creates a Git operations implementation
-func (i *TransflowIntegrations) CreateGitOperations() GitOperationsInterface {
+func (i *ModIntegrations) CreateGitOperations() GitOperationsInterface {
 	if i.TestMode {
 		return NewMockGitOperations() // Use mock implementation for testing
 	}
@@ -143,16 +143,16 @@ func (i *TransflowIntegrations) CreateGitOperations() GitOperationsInterface {
 }
 
 // CreateRecipeExecutor creates a recipe executor implementation
-func (i *TransflowIntegrations) CreateRecipeExecutor() RecipeExecutorInterface {
+func (i *ModIntegrations) CreateRecipeExecutor() RecipeExecutorInterface {
 	if i.TestMode {
 		return NewMockRecipeExecutor() // Use mock implementation for testing
 	}
-	// No-op in production for now; Transflow does not rely on ARF recipe executor
+	// No-op in production for now; Mods does not rely on ARF recipe executor
 	return NewMockRecipeExecutor()
 }
 
 // CreateBuildChecker creates a build checker implementation
-func (i *TransflowIntegrations) CreateBuildChecker() BuildCheckerInterface {
+func (i *ModIntegrations) CreateBuildChecker() BuildCheckerInterface {
 	if i.TestMode {
 		return NewMockBuildChecker() // Use mock implementation for testing
 	}
@@ -160,7 +160,7 @@ func (i *TransflowIntegrations) CreateBuildChecker() BuildCheckerInterface {
 }
 
 // CreateGitProvider creates a Git provider implementation for MR operations
-func (i *TransflowIntegrations) CreateGitProvider() provider.GitProvider {
+func (i *ModIntegrations) CreateGitProvider() provider.GitProvider {
 	if i.TestMode {
 		return NewMockGitProvider() // Use mock implementation for testing
 	}
@@ -168,7 +168,7 @@ func (i *TransflowIntegrations) CreateGitProvider() provider.GitProvider {
 }
 
 // CreateKBIntegration creates a KB integration for learning from healing attempts
-func (i *TransflowIntegrations) CreateKBIntegration() KBIntegrator {
+func (i *ModIntegrations) CreateKBIntegration() KBIntegrator {
 	if i.TestMode {
 		// Return mock KB integration for testing
 		return NewMockKBIntegration()
@@ -198,19 +198,19 @@ func (i *TransflowIntegrations) CreateKBIntegration() KBIntegrator {
 	return NewKBIntegration(storageBackend, kvStore, kbConfig)
 }
 
-// CreateConfiguredRunner creates a fully configured TransflowRunner with KB learning integration
-func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) (*TransflowRunner, error) {
+// CreateConfiguredRunner creates a fully configured ModRunner with KB learning integration
+func (i *ModIntegrations) CreateConfiguredRunner(config *ModConfig) (*ModRunner, error) {
 	// Create KB integration
 	kbIntegration := i.CreateKBIntegration()
 
 	// Create KB-enhanced runner
-	kbRunner, err := NewKBTransflowRunner(config, i.WorkDir, kbIntegration)
+	kbRunner, err := NewKBModRunner(config, i.WorkDir, kbIntegration)
 	if err != nil {
 		return nil, err
 	}
 
-	// Get the embedded TransflowRunner for dependency injection
-	runner := kbRunner.TransflowRunner
+	// Get the embedded ModRunner for dependency injection
+	runner := kbRunner.ModRunner
 
 	// Inject the concrete implementations
 	runner.SetGitOperations(i.CreateGitOperations())
@@ -226,7 +226,7 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	// Wire default production healing orchestrator (wraps existing fanout)
 	runner.SetHealingOrchestrator(NewProdHealingOrchestrator(runner.jobSubmitter, runner))
 
-	// Return the embedded TransflowRunner; KB integration remains wired inside kbRunner
+	// Return the embedded ModRunner; KB integration remains wired inside kbRunner
 	return runner, nil
 }
 

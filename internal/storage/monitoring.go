@@ -499,7 +499,7 @@ func (h *HealthChecker) checkStorageOperations(ctx context.Context, result *Heal
 					result.Status = HealthStatusDegraded
 				}
 			} else {
-				reader.Close()
+				_ = reader.Close()
 				duration := time.Since(start)
 				checkResult.Message = fmt.Sprintf("Storage operations successful (%.2fms)",
 					float64(duration.Nanoseconds())/1e6)

@@ -17,7 +17,7 @@ ploy/
 ├── go.mod                    # Go module definition
 ├── go.sum                    # Go module dependencies
 ├── docker-compose.integration.yml # Integration testing environment
-├── test-java11to17-transflow.yaml # Mods test configuration
+├── test-mod-java11to17.yaml # Mods test configuration
 ├── .gitignore                # Git ignore rules
 └── roadmap/                  # Detailed implementation roadmaps
     ├── README.md             # Main roadmap overview and progress
@@ -25,7 +25,7 @@ ploy/
     ├── openrewrite/          # OpenRewrite Service Implementation (see roadmap/openrewrite/README.md)
     ├── static-analysis/      # Static Analysis Integration (see roadmap/static-analysis/README.md)
     ├── tdd/                  # Test-Driven Development (see roadmap/tdd/README.md)
-    ├── transflow/            # Mods transformation workflows (see roadmap/transflow/README.md)
+    ├── mods/                 # Mods transformation workflows (see roadmap/mods/README.md)
     ├── transformations/      # Code transformation strategies (see roadmap/transformations/README.md)
     ├── refactor/             # Refactoring initiatives (see roadmap/refactor/README.md)
     └── storage-fix/          # Storage system improvements (see roadmap/storage-fix/README.md)

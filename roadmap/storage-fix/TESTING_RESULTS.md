@@ -36,12 +36,12 @@ All Phase 5 tests have been successfully implemented and are passing, confirming
 
 **Status: ✅ ALL PASSING**
 
-#### TestOpenRewriteDispatcher_DoubleArtifactsPath
+#### [Historical] TestOpenRewriteDispatcher_DoubleArtifactsPath
 - Documents the current issue with hardcoded `artifacts/` prefix in runner.sh
 - Shows broken URL: `http://45.12.75.241:8888/artifacts/jobs/path-test-12345/output.tar`
 - Shows correct URL: `http://45.12.75.241:8888/jobs/path-test-12345/output.tar`
 
-#### TestOpenRewriteDispatcher_VerifyFixedPaths
+#### [Historical] TestOpenRewriteDispatcher_VerifyFixedPaths
 - Confirms the fix produces correct paths
 - Fixed URL from runner.sh: `http://45.12.75.241:8888/jobs/test-fix-12345/output.tar`
 - Final path with storage bucket: `http://45.12.75.241:8888/artifacts/jobs/test-fix-12345/output.tar`

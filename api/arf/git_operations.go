@@ -64,8 +64,8 @@ func (g *GitOperations) PushBranch(ctx context.Context, repoPath, remoteURL, bra
 	if err := push.Run(); err != nil {
 		rc := 0
 		var ee *exec.ExitError
-		if errors.As(err, &ee) && ee.ProcessState != nil {
-			rc = ee.ProcessState.ExitCode()
+		if errors.As(err, &ee) {
+			rc = ee.ExitCode()
 		}
 		return fmt.Errorf("git push failed: rc=%d: %v - %s", rc, err, stderr.String())
 	}
@@ -144,7 +144,7 @@ func (g *GitOperations) CloneRepository(ctx context.Context, repoURL, branch, ta
 			// Try to fetch the branch first
 			fetchCmd := exec.CommandContext(ctx, "git", "fetch", "origin", normalized)
 			fetchCmd.Dir = targetPath
-			fetchCmd.Run() // Ignore fetch errors
+			_ = fetchCmd.Run() // Ignore fetch errors
 
 			// Try checkout again
 			if err := checkoutCmd.Run(); err != nil {
@@ -338,7 +338,7 @@ func (g *GitOperations) ensureGitConfig(ctx context.Context, repoPath string) er
 	emailCmd.Dir = repoPath
 	if err := emailCmd.Run(); err != nil {
 		// Set default user.email
-		setEmailCmd := exec.CommandContext(ctx, "git", "config", "user.email", "transflow@ploy.automation")
+		setEmailCmd := exec.CommandContext(ctx, "git", "config", "user.email", "mods@ploy.automation")
 		setEmailCmd.Dir = repoPath
 		if err := setEmailCmd.Run(); err != nil {
 			return fmt.Errorf("failed to set git user.email: %w", err)
@@ -470,8 +470,8 @@ func (g *GitOperations) GetLineChanges(ctx context.Context, repoPath string) (ad
 			// Format: added removed filename
 			if parts[0] != "-" { // Skip binary files
 				var a, r int
-				fmt.Sscanf(parts[0], "%d", &a)
-				fmt.Sscanf(parts[1], "%d", &r)
+				_, _ = fmt.Sscanf(parts[0], "%d", &a)
+				_, _ = fmt.Sscanf(parts[1], "%d", &r)
 				totalAdded += a
 				totalRemoved += r
 			}
@@ -492,8 +492,8 @@ func (g *GitOperations) GetLineChanges(ctx context.Context, repoPath string) (ad
 			parts := strings.Fields(line)
 			if len(parts) >= 3 && parts[0] != "-" {
 				var a, r int
-				fmt.Sscanf(parts[0], "%d", &a)
-				fmt.Sscanf(parts[1], "%d", &r)
+				_, _ = fmt.Sscanf(parts[0], "%d", &a)
+				_, _ = fmt.Sscanf(parts[1], "%d", &r)
 				totalAdded += a
 				totalRemoved += r
 			}

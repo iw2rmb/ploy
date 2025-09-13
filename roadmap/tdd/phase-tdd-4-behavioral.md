@@ -301,7 +301,7 @@ var _ = Describe("Environment Variable Management", func() {
             
             By("Setting multiple environment variables")
             envVars := map[string]string{
-                "DATABASE_URL": "postgres://localhost:5432/myapp",
+                "DATABASE_URL": "db://localhost/myapp",
                 "REDIS_URL":    "redis://localhost:6379",
                 "LOG_LEVEL":    "info",
                 "DEBUG":        "false",
@@ -320,7 +320,7 @@ var _ = Describe("Environment Variable Management", func() {
             resp.JSON(&envResp)
             envMap := envResp["env"].(map[string]interface{})
             
-            Expect(envMap["DATABASE_URL"]).To(Equal("postgres://localhost:5432/myapp"))
+            Expect(envMap["DATABASE_URL"]).To(Equal("db://localhost/myapp"))
             Expect(envMap["REDIS_URL"]).To(Equal("redis://localhost:6379"))
             Expect(envMap["LOG_LEVEL"]).To(Equal("info"))
             Expect(envMap["DEBUG"]).To(Equal("false"))
@@ -625,7 +625,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
             By("Step 3: Configuring environment variables")
             envVars := map[string]string{
                 "NODE_ENV":           "production",
-                "DATABASE_URL":       "postgres://prod-db:5432/app",
+                "DATABASE_URL":       "db://prod-db/app",
                 "REDIS_URL":          "redis://prod-redis:6379",
                 "LOG_LEVEL":          "info",
                 "METRICS_ENABLED":    "true",

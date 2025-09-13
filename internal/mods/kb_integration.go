@@ -52,7 +52,7 @@ type KBIntegrator interface {
 	ConvertKBFixesToBranchSpecs(fixes []PromotedFix) []BranchSpec
 }
 
-// KBIntegration provides KB functionality for the transflow healing workflow
+// KBIntegration provides KB functionality for the Mods healing workflow
 type KBIntegration struct {
 	storage KBStorage
 	lockMgr KBLockManager
@@ -162,7 +162,7 @@ func (kb *KBIntegration) WriteHealingCase(ctx context.Context, kbCtx *KBContext,
 	// Try to update summary (non-blocking)
 	go func() {
 		bgCtx := context.Background()
-		kb.summary.UpdateSummaryAfterCase(bgCtx, kbCtx.Language, kbCtx.Signature)
+		_ = kb.summary.UpdateSummaryAfterCase(bgCtx, kbCtx.Language, kbCtx.Signature)
 	}()
 
 	return nil
@@ -233,7 +233,7 @@ func NewExtendedJobSubmissionHelper(original JobSubmissionHelper, kb KBIntegrato
 }
 
 // SubmitPlannerJob submits a planner job with KB context
-func (e *ExtendedJobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *TransflowConfig, buildError string, workspace string) (*PlanResult, error) {
+func (e *ExtendedJobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModConfig, buildError string, workspace string) (*PlanResult, error) {
 	// Extract language from config or detect from build error
 	language := DetectLanguageFromBuildError(buildError)
 
@@ -307,42 +307,42 @@ func containsAny(text string, substrings ...string) bool {
 	return false
 }
 
-// KBTransflowRunner wraps the standard TransflowRunner with KB capabilities
-type KBTransflowRunner struct {
-	*TransflowRunner
+// KBModRunner wraps the standard ModRunner with KB capabilities
+type KBModRunner struct {
+	*ModRunner
 	kb KBIntegrator
 }
 
-// NewKBTransflowRunner creates a transflow runner with KB integration
-func NewKBTransflowRunner(config *TransflowConfig, workspaceDir string, kb KBIntegrator) (*KBTransflowRunner, error) {
-	runner, err := NewTransflowRunner(config, workspaceDir)
+// NewKBModRunner creates a Mod runner with KB integration
+func NewKBModRunner(config *ModConfig, workspaceDir string, kb KBIntegrator) (*KBModRunner, error) {
+	runner, err := NewModRunner(config, workspaceDir)
 	if err != nil {
 		return nil, err
 	}
 
-	return &KBTransflowRunner{
-		TransflowRunner: runner,
-		kb:              kb,
+	return &KBModRunner{
+		ModRunner: runner,
+		kb:        kb,
 	}, nil
 }
 
 // SetJobSubmitter extends the base implementation with KB-aware job submission
-func (kr *KBTransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
+func (kr *KBModRunner) SetJobSubmitter(submitter JobSubmitter) {
 	// Set the original submitter
-	kr.TransflowRunner.SetJobSubmitter(submitter)
+	kr.ModRunner.SetJobSubmitter(submitter)
 
 	// The attemptHealing method will need to be overridden or extended
 	// to use the KB-enhanced job submission helper
 }
 
 // attemptHealing overrides the base implementation to use KB-enhanced healing
-func (kr *KBTransflowRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*TransflowHealingSummary, error) {
+func (kr *KBModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
 	return kr.attemptHealingWithKB(ctx, repoPath, buildError)
 }
 
 // attemptHealingWithKB is an enhanced version of attemptHealing that uses KB
-func (kr *KBTransflowRunner) attemptHealingWithKB(ctx context.Context, repoPath string, buildError string) (*TransflowHealingSummary, error) {
-	summary := &TransflowHealingSummary{
+func (kr *KBModRunner) attemptHealingWithKB(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
+	summary := &ModHealingSummary{
 		Enabled:       true,
 		AttemptsCount: 1,
 	}
@@ -419,7 +419,7 @@ func (kr *KBTransflowRunner) attemptHealingWithKB(ctx context.Context, repoPath 
 
 		// Write the case (non-blocking)
 		go func(a *HealingAttempt, o *HealingOutcome) {
-			kr.kb.WriteHealingCase(context.Background(), kbCtx, a, o, buildError, "")
+			_ = kr.kb.WriteHealingCase(context.Background(), kbCtx, a, o, buildError, "")
 		}(attempt, outcome)
 	}
 
@@ -433,7 +433,7 @@ func (kr *KBTransflowRunner) attemptHealingWithKB(ctx context.Context, repoPath 
 }
 
 // Helper methods to convert between data structures
-func (kr *KBTransflowRunner) convertBranchResultToAttempt(result BranchResult) *HealingAttempt {
+func (kr *KBModRunner) convertBranchResultToAttempt(result BranchResult) *HealingAttempt {
 	// This would extract the actual healing attempt from the branch result
 	// For now, return a basic structure
 	return &HealingAttempt{
@@ -441,7 +441,7 @@ func (kr *KBTransflowRunner) convertBranchResultToAttempt(result BranchResult) *
 	}
 }
 
-func (kr *KBTransflowRunner) convertBranchResultToOutcome(result BranchResult) *HealingOutcome {
+func (kr *KBModRunner) convertBranchResultToOutcome(result BranchResult) *HealingOutcome {
 	return &HealingOutcome{
 		Success:     result.Status == "success",
 		BuildStatus: result.Status,

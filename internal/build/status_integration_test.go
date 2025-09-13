@@ -245,7 +245,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 
 				// Simple character validation
 				for _, char := range appName {
-					if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
+					if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 						return c.Status(400).JSON(fiber.Map{
 							"error":   "Invalid app name",
 							"details": "name contains invalid characters",

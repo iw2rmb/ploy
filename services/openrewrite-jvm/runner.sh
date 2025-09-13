@@ -11,11 +11,11 @@ post_event() {
   local phase="$1"; shift
   local step="$1"; shift
   local msg="$1"
-  if [ -n "${CONTROLLER_URL}" ] && [ -n "${TRANSFLOW_EXECUTION_ID}" ]; then
+  if [ -n "${CONTROLLER_URL}" ] && [ -n "${MODS_EXECUTION_ID}" ]; then
     # Avoid failing the run due to telemetry issues
-    curl -sS -X POST "${CONTROLLER_URL}/transflow/event" \
+    curl -sS -X POST "${CONTROLLER_URL%/}/mods/${MODS_EXECUTION_ID}/events" \
       -H "Content-Type: application/json" \
-      -d "{\"execution_id\":\"${TRANSFLOW_EXECUTION_ID}\",\"phase\":\"${phase}\",\"step\":\"${step}\",\"level\":\"${level}\",\"message\":\"${msg}\"}" \
+      -d "{\"phase\":\"${phase}\",\"step\":\"${step}\",\"level\":\"${level}\",\"message\":\"${msg}\"}" \
       -o /dev/null || true
   fi
 }
@@ -78,7 +78,7 @@ PLOY_API_URL="${PLOY_API_URL:-http://api.service.consul:8081}"
 echo "[OpenRewrite] Starting transformation"
 echo "[OpenRewrite] Environment variables:"
 echo "[OpenRewrite]   JOB_ID: ${JOB_ID:-}"
-echo "[OpenRewrite]   TRANSFORMATION_ID: ${TRANSFORMATION_ID:-}"
+echo "[OpenRewrite]   MOD_ID: ${MOD_ID:-}"
 echo "[OpenRewrite]   RECIPE: ${RECIPE_CLASS}"
 echo "[OpenRewrite]   SEAWEEDFS_URL: ${SEAWEEDFS_URL}"
 echo "[OpenRewrite]   INPUT_URL: ${INPUT_URL:-}"

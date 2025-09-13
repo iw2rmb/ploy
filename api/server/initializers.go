@@ -131,10 +131,16 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		log.Printf("Warning: Failed to initialize LLM handler: %v", err)
 	}
 
-    // Initialize Mods Handler
-	transflowHandler, err := initializeTransflowHandler(cfg, cfgService)
+	// Initialize Mods Handler
+	modsHandler, err := initializeModsHandler(cfg, cfgService)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize Transflow handler: %v", err)
+		log.Printf("Warning: Failed to initialize Mods handler: %v", err)
+	}
+
+	// Initialize SBOM Handler
+	sbomHandler, err := initializeSBOMHandler(cfgService)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize SBOM handler: %v", err)
 	}
 
 	// Initialize Metrics
@@ -163,9 +169,10 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
 		ARFHandler:              arfHandler,
-		TransflowHandler:        transflowHandler,
+		ModsHandler:             modsHandler,
 		AnalysisHandler:         analysisHandler,
 		LLMHandler:              llmHandler,
+		SBOMHandler:             sbomHandler,
 		CoordinationManager:     coordinationManager,
 		BlueGreenManager:        blueGreenManager,
 		Metrics:                 metricsInstance,

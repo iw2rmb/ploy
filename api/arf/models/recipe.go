@@ -170,6 +170,6 @@ func (r *Recipe) Clone() *Recipe {
 	// Marshal and unmarshal to create a deep copy
 	data, _ := json.Marshal(r)
 	var clone Recipe
-	json.Unmarshal(data, &clone)
+	_ = json.Unmarshal(data, &clone)
 	return &clone
 }

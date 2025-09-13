@@ -62,7 +62,7 @@ func (bp *BuildPipeline) BuildAndDistribute(version string, platforms []string, 
 		}
 
 		// Clean up local binary
-		os.Remove(binaryPath)
+		_ = os.Remove(binaryPath)
 
 		fmt.Printf("Successfully built and distributed controller v%s for %s\n", version, platform)
 	}

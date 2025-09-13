@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 // executeWithPlan handles execution modes that require a plan.json
-func executeWithPlan(runner *TransflowRunner, planBytes []byte, execFirst, execLLM, execORW, applyFirst bool) error {
+func executeWithPlan(runner *ModRunner, planBytes []byte, execFirst, execLLM, execORW, applyFirst bool) error {
 	if len(planBytes) == 0 {
 		return nil
 	}
@@ -60,7 +61,7 @@ func executeWithPlan(runner *TransflowRunner, planBytes []byte, execFirst, execL
 }
 
 // executeFirstLLMExec finds first llm-exec option and executes it
-func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) error {
+func executeFirstLLMExec(runner *ModRunner, options []map[string]any) error {
 	// Find first llm-exec
 	for _, o := range options {
 		if t, _ := o["type"].(string); t == string(StepTypeLLMExec) {
@@ -73,19 +74,22 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 				infra := ResolveInfraFromEnv()
 				llm := ResolveLLMDefaultsFromEnv()
 				vars := map[string]string{
-					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
-					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
-					"TRANSFLOW_REGISTRY":          imgs.Registry,
-					"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-					"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-					"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-					"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-					"TRANSFLOW_MODEL":             llm.Model,
-					"TRANSFLOW_TOOLS":             llm.ToolsJSON,
-					"TRANSFLOW_LIMITS":            llm.LimitsJSON,
-					"PLOY_CONTROLLER":             infra.Controller,
-					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-					"NOMAD_DC":                    infra.DC,
+					"MODS_CONTEXT_DIR":       filepath.Dir(hcl),
+					"MODS_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
+					"MODS_REGISTRY":          imgs.Registry,
+					"MODS_PLANNER_IMAGE":     imgs.Planner,
+					"MODS_REDUCER_IMAGE":     imgs.Reducer,
+					"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+					"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
+					"MODS_MODEL":             llm.Model,
+					"MODS_TOOLS":             llm.ToolsJSON,
+					"MODS_LIMITS":            llm.LimitsJSON,
+					"PLOY_CONTROLLER":        infra.Controller,
+					"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+					"NOMAD_DC":               infra.DC,
+				}
+				if infra.Controller != "" && runner.config != nil && runner.config.TargetRepo != "" {
+					vars["SBOM_LATEST_URL"] = fmt.Sprintf("%s/sbom/latest?repo=%s", strings.TrimRight(infra.Controller, "/"), url.QueryEscape(runner.config.TargetRepo))
 				}
 				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
 				if sErr != nil {
@@ -93,17 +97,17 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 					return nil
 				}
 				fmt.Printf("Rendered llm_exec HCL (substituted): %s\n", renderedPath)
-				if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+				if os.Getenv("MODS_SUBMIT") == "1" {
 					timeout := ResolveDefaultsFromEnv().LLMExecTimeout
 					if err := runner.hcl.SubmitCtx(context.Background(), renderedPath, timeout); err != nil {
 						fmt.Printf("llm-exec job failed: %v\n", err)
 					} else {
 						// Show where diff.patch would be
 						diffPath := filepath.Join(filepath.Dir(renderedPath), "out", "diff.patch")
-						fmt.Printf("llm-exec completed. diff.patch expected at: %s (or via TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH).\n", diffPath)
+						fmt.Printf("llm-exec completed. diff.patch expected at: %s (or via MODS_DIFF_URL/MODS_DIFF_PATH).\n", diffPath)
 					}
 				} else {
-					fmt.Println("Skipping llm-exec submission (unset TRANSFLOW_SUBMIT).")
+					fmt.Println("Skipping llm-exec submission (unset MODS_SUBMIT).")
 				}
 			}
 			break
@@ -113,7 +117,7 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 }
 
 // executeFirstORWGen finds first orw-gen option and executes it
-func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error {
+func executeFirstORWGen(runner *ModRunner, options []map[string]any) error {
 	// Find first orw-gen
 	for _, o := range options {
 		if t, _ := o["type"].(string); t == string(StepTypeORWGen) {
@@ -121,9 +125,9 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 			if hcl, err := runner.RenderORWApplyAssets(oid); err == nil {
 				fmt.Printf("Rendered orw_apply HCL: %s\n", hcl)
 				// Pre-substitute recipe placeholders (no global env mutation)
-				rclass := os.Getenv("TRANSFLOW_RECIPE_CLASS")
-				rcoords := os.Getenv("TRANSFLOW_RECIPE_COORDS")
-				rtimeout := os.Getenv("TRANSFLOW_RECIPE_TIMEOUT")
+				rclass := os.Getenv("MODS_RECIPE_CLASS")
+				rcoords := os.Getenv("MODS_RECIPE_COORDS")
+				rtimeout := os.Getenv("MODS_RECIPE_TIMEOUT")
 				prePath, _ := preSubstituteRecipe(hcl, rclass, rcoords, rtimeout)
 				// Prepare context: clone repo into context subdir
 				baseDir := filepath.Dir(hcl)
@@ -156,22 +160,22 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 				imgs := ResolveImagesFromEnv()
 				infra := ResolveInfraFromEnv()
 				vars := map[string]string{
-					"TRANSFLOW_CONTEXT_DIR":       contextDir,
-					"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-					"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-					"TRANSFLOW_REGISTRY":          imgs.Registry,
-					"PLOY_CONTROLLER":             infra.Controller,
-					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-					"PLOY_SEAWEEDFS_URL":          infra.SeaweedURL,
-					"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-					"NOMAD_DC":                    infra.DC,
+					"MODS_CONTEXT_DIR":       contextDir,
+					"MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
+					"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
+					"MODS_REGISTRY":          imgs.Registry,
+					"PLOY_CONTROLLER":        infra.Controller,
+					"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+					"PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
+					"MODS_DIFF_KEY":          os.Getenv("MODS_DIFF_KEY"),
+					"NOMAD_DC":               infra.DC,
 				}
 				submittedPath, serr := substituteORWTemplateVars(prePath, runID2, vars)
 				if serr != nil {
 					fmt.Printf("failed to write submitted HCL: %v\n", serr)
 				} else {
 					fmt.Printf("Rendered orw_apply HCL (substituted): %s\n", submittedPath)
-					if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+					if os.Getenv("MODS_SUBMIT") == "1" {
 						timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
 						if err := runner.hcl.SubmitCtx(context.Background(), submittedPath, timeout); err != nil {
 							fmt.Printf("orw-apply job failed: %v\n", err)
@@ -180,7 +184,7 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 							fmt.Printf("orw-apply completed. diff.patch expected at: %s\n", diffPath)
 						}
 					} else {
-						fmt.Println("Skipping orw-apply submission (unset TRANSFLOW_SUBMIT).")
+						fmt.Println("Skipping orw-apply submission (unset MODS_SUBMIT).")
 					}
 				}
 			}
@@ -191,10 +195,10 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 }
 
 // executeApplyFirst fetches diff and applies it to repo
-func executeApplyFirst(runner *TransflowRunner) error {
+func executeApplyFirst(runner *ModRunner) error {
 	// Fetch diff content path or URL
 	var diffPath string
-	if url := os.Getenv("TRANSFLOW_DIFF_URL"); url != "" {
+	if url := os.Getenv("MODS_DIFF_URL"); url != "" {
 		dp := filepath.Join(runner.workspaceDir, "apply", "diff.patch")
 		_ = os.MkdirAll(filepath.Dir(dp), 0755)
 		if err := downloadToFileFn(url, dp); err == nil {
@@ -202,12 +206,12 @@ func executeApplyFirst(runner *TransflowRunner) error {
 		}
 	}
 	if diffPath == "" {
-		if p := os.Getenv("TRANSFLOW_DIFF_PATH"); p != "" {
+		if p := os.Getenv("MODS_DIFF_PATH"); p != "" {
 			diffPath = p
 		}
 	}
 	if diffPath == "" {
-		fmt.Println("Missing TRANSFLOW_DIFF_URL or TRANSFLOW_DIFF_PATH for --apply-first")
+		fmt.Println("Missing MODS_DIFF_URL or MODS_DIFF_PATH for --apply-first")
 		return nil
 	}
 
@@ -231,15 +235,15 @@ func executeApplyFirst(runner *TransflowRunner) error {
 func substituteORWTemplate(prePath, runID string) (string, error) {
 	// Backward-compatible wrapper that reads from process env
 	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       os.Getenv("TRANSFLOW_CONTEXT_DIR"),
-		"TRANSFLOW_OUT_DIR":           os.Getenv("TRANSFLOW_OUT_DIR"),
-		"TRANSFLOW_ORW_APPLY_IMAGE":   os.Getenv("TRANSFLOW_ORW_APPLY_IMAGE"),
-		"TRANSFLOW_REGISTRY":          os.Getenv("TRANSFLOW_REGISTRY"),
-		"PLOY_CONTROLLER":             os.Getenv("PLOY_CONTROLLER"),
-		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-		"PLOY_SEAWEEDFS_URL":          os.Getenv("PLOY_SEAWEEDFS_URL"),
-		"TRANSFLOW_DIFF_KEY":          os.Getenv("TRANSFLOW_DIFF_KEY"),
-		"NOMAD_DC":                    os.Getenv("NOMAD_DC"),
+		"MODS_CONTEXT_DIR":       os.Getenv("MODS_CONTEXT_DIR"),
+		"MODS_OUT_DIR":           os.Getenv("MODS_OUT_DIR"),
+		"MODS_ORW_APPLY_IMAGE":   os.Getenv("MODS_ORW_APPLY_IMAGE"),
+		"MODS_REGISTRY":          os.Getenv("MODS_REGISTRY"),
+		"PLOY_CONTROLLER":        os.Getenv("PLOY_CONTROLLER"),
+		"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+		"PLOY_SEAWEEDFS_URL":     os.Getenv("PLOY_SEAWEEDFS_URL"),
+		"MODS_DIFF_KEY":          os.Getenv("MODS_DIFF_KEY"),
+		"NOMAD_DC":               os.Getenv("NOMAD_DC"),
 	}
 	return substituteORWTemplateVars(prePath, runID, vars)
 }
@@ -255,32 +259,32 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 	}
 
 	// Resolve variables and defaults
-	contextDir := vars["TRANSFLOW_CONTEXT_DIR"]
-	outDir := vars["TRANSFLOW_OUT_DIR"]
+	contextDir := vars["MODS_CONTEXT_DIR"]
+	outDir := vars["MODS_OUT_DIR"]
 
 	// Default image from vars or registry
 	d := ResolveDefaults(func(k string) string { return vars[k] })
-	orwImage := vars["TRANSFLOW_ORW_APPLY_IMAGE"]
+	orwImage := vars["MODS_ORW_APPLY_IMAGE"]
 	if orwImage == "" {
 		orwImage = d.ORWApplyImage
 	}
 
 	// Controller and execution ID for in-job event push
 	controllerURL := vars["PLOY_CONTROLLER"]
-	execID := vars["PLOY_TRANSFLOW_EXECUTION_ID"]
+	execID := vars["PLOY_MODS_EXECUTION_ID"]
 	seaweedURL := vars["PLOY_SEAWEEDFS_URL"]
 	if seaweedURL == "" {
 		seaweedURL = d.SeaweedURL
 	}
 	// Keys under artifacts/ namespace used by uploader/runner
-	// Allow override via TRANSFLOW_DIFF_KEY for branch-scoped step uploads
-	diffKey := vars["TRANSFLOW_DIFF_KEY"]
+	// Allow override via MODS_DIFF_KEY for branch-scoped step uploads
+	diffKey := vars["MODS_DIFF_KEY"]
 	if diffKey == "" {
-		diffKey = "transflow/" + execID + "/diff.patch"
+		diffKey = "mods/" + execID + "/diff.patch"
 	}
-	inputKey := "transflow/" + execID + "/input.tar"
+	inputKey := "mods/" + execID + "/input.tar"
 	inputURL := seaweedURL + "/artifacts/" + inputKey
-    log.Printf("[Mods] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
+	log.Printf("[Mods] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
 
 	dc := vars["NOMAD_DC"]
 	if dc == "" {

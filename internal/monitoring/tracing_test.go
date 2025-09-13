@@ -63,7 +63,7 @@ func TestNewTracingProvider(t *testing.T) {
 				}
 				// Cleanup
 				if tp != nil {
-					tp.Shutdown(context.Background())
+					_ = tp.Shutdown(context.Background())
 				}
 			}
 		})
@@ -126,8 +126,7 @@ func TestTracingProvider_TraceJob(t *testing.T) {
 			// Clear previous spans
 			exporter.Reset()
 
-			ctx := context.Background()
-			ctx, done := tp.TraceJob(ctx, tt.jobID, tt.recipe)
+			_, done := tp.TraceJob(context.Background(), tt.jobID, tt.recipe)
 
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
@@ -223,8 +222,7 @@ func TestTracingProvider_TraceTransformation(t *testing.T) {
 			// Clear previous spans
 			exporter.Reset()
 
-			ctx := context.Background()
-			ctx, done := tp.TraceTransformation(ctx, tt.buildSystem)
+			_, done := tp.TraceTransformation(context.Background(), tt.buildSystem)
 
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
@@ -299,8 +297,7 @@ func TestTracingProvider_TraceStorage(t *testing.T) {
 			// Clear previous spans
 			exporter.Reset()
 
-			ctx := context.Background()
-			ctx, done := tp.TraceStorage(ctx, tt.storage, tt.operation)
+			_, done := tp.TraceStorage(context.Background(), tt.storage, tt.operation)
 
 			// Simulate some work
 			time.Sleep(10 * time.Millisecond)
@@ -428,7 +425,7 @@ func TestTracingProvider_ConcurrentTracing(t *testing.T) {
 			jobID := fmt.Sprintf("job-%d", id)
 
 			// Start job trace
-			ctx, jobDone := tp.TraceJob(ctx, jobID, "concurrent.recipe")
+			_, jobDone := tp.TraceJob(ctx, jobID, "concurrent.recipe")
 
 			// Simulate work
 			time.Sleep(time.Duration(id) * time.Millisecond)
@@ -475,7 +472,7 @@ func TestTracingProvider_Shutdown(t *testing.T) {
 	assert.NoError(t, err)
 
 	// After shutdown, tracing should still work (no-op)
-	ctx, done = tp.TraceJob(ctx, "after-shutdown", "test.recipe")
+	_, done = tp.TraceJob(ctx, "after-shutdown", "test.recipe")
 	assert.NotPanics(t, func() {
 		done()
 	})

@@ -12,10 +12,10 @@ func TestResolveImages_UsesDefaultsWhenUnset(t *testing.T) {
 
 func TestResolveImages_PrefersEnv(t *testing.T) {
 	get := func(k string) string {
-		if k == "TRANSFLOW_PLANNER_IMAGE" {
+		if k == "MODS_PLANNER_IMAGE" {
 			return "reg/custom-planner:1"
 		}
-		if k == "TRANSFLOW_REGISTRY" {
+		if k == "MODS_REGISTRY" {
 			return "reg"
 		}
 		return ""

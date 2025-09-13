@@ -376,7 +376,7 @@ func TestValidator_ValidateForEnvironment(t *testing.T) {
 	tmpDir := createTestRepoWithFiles(t, map[string]string{
 		"README.md": "# Test Repository",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	tests := []struct {
 		name         string
@@ -444,7 +444,7 @@ func TestValidator_GetRepositorySummary(t *testing.T) {
 		"README.md": "# Test Repository",
 		"main.go":   "package main\n\nfunc main() {}",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	validator := NewValidator(DefaultValidatorConfig())
 
@@ -469,7 +469,7 @@ func TestValidator_IsRepositoryValid(t *testing.T) {
 	tmpDir := createTestRepoWithFiles(t, map[string]string{
 		"README.md": "# Test Repository",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	tests := []struct {
 		name   string
@@ -513,7 +513,7 @@ func TestValidator_GetRepositoryHealth(t *testing.T) {
 	tmpDir := createTestRepoWithFiles(t, map[string]string{
 		"README.md": "# Test Repository",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	validator := NewValidator(DefaultValidatorConfig())
 
@@ -575,7 +575,7 @@ func TestValidator_getRepositorySize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repoPath := tt.setupDir(t)
 			if tt.name != "nonexistent directory" {
-				defer os.RemoveAll(repoPath)
+				defer func() { _ = os.RemoveAll(repoPath) }()
 			}
 
 			validator := NewValidator(DefaultValidatorConfig())
@@ -599,7 +599,7 @@ func TestValidator_Integration(t *testing.T) {
 		}
 
 		tmpDir := createTestRepoWithFiles(t, files)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Test with different validation levels
 		configs := []*ValidatorConfig{
@@ -638,7 +638,7 @@ func TestValidator_Integration(t *testing.T) {
 		tmpDir := createTestRepoWithFiles(t, map[string]string{
 			"README.md": "# Production Repository",
 		})
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		validator := NewValidator(DefaultValidatorConfig())
 
@@ -665,7 +665,7 @@ func BenchmarkValidator_ValidateRepository(b *testing.B) {
 		"README.md": "# Benchmark Repository",
 		"main.go":   "package main\n\nfunc main() {}",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	validator := NewValidator(DefaultValidatorConfig())
 
@@ -686,7 +686,7 @@ func BenchmarkValidator_GetRepositoryHealth(b *testing.B) {
 	tmpDir := createTestRepoWithFiles(&testing.T{}, map[string]string{
 		"README.md": "# Benchmark Repository",
 	})
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	validator := NewValidator(DefaultValidatorConfig())
 

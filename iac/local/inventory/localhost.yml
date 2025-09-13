@@ -25,18 +25,12 @@ all:
     # Node.js configuration (for some tools)
     nodejs_version: "18"
     
-    # Test configuration
-    test_database_name: "ploy_test"
-    test_database_user: "ploy"
-    test_database_password: "ploy-test"
-    
     # Service ports (for validation)
     consul_port: 8500
     nomad_port: 4646
     seaweedfs_master_port: 9333
     seaweedfs_filer_port: 8888
     seaweedfs_volume_port: 8080
-    postgres_port: 5432
     redis_port: 6379
     traefik_http_port: 80
     traefik_https_port: 443

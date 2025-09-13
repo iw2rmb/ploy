@@ -76,7 +76,7 @@ func (env *TestEnvironment) setupMockServices(t *testing.T) {
 	env.TransflowCLI = &TransflowCLI{
 		binaryPath: "./bin/ploy",
 		env: map[string]string{
-			"TRANSFLOW_TEST_MODE": "true",
+			"MODS_TEST_MODE": "true",
 		},
 	}
 }
@@ -87,15 +87,15 @@ func (env *TestEnvironment) ExecuteWorkflow(ctx context.Context, workflow *Trans
 		return WorkflowResult{}, fmt.Errorf("failed to generate workflow YAML: %w", err)
 	}
 
-	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("transflow-%s.yaml", workflow.ID))
+	tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("mods-%s.yaml", workflow.ID))
 	err = os.WriteFile(tempFile, []byte(yamlContent), 0644)
 	if err != nil {
 		return WorkflowResult{}, fmt.Errorf("failed to write workflow file: %w", err)
 	}
-	defer os.Remove(tempFile)
+	defer func() { _ = os.Remove(tempFile) }()
 
 	start := time.Now()
-	output, err := env.TransflowCLI.Run(ctx, "transflow", "run", "-f", tempFile, "--output", "json")
+	output, err := env.TransflowCLI.Run(ctx, "mod", "run", "-f", tempFile, "--output", "json")
 	duration := time.Since(start)
 
 	result := WorkflowResult{

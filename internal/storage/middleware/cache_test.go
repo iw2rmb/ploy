@@ -44,7 +44,7 @@ func TestCacheMiddleware_Get_CacheHit(t *testing.T) {
 	// Read content to populate cache
 	content1, err := io.ReadAll(reader1)
 	require.NoError(t, err)
-	reader1.Close()
+	_ = reader1.Close()
 
 	// Reset mock call count
 	mockStorage.getCalls = []string{}
@@ -56,7 +56,7 @@ func TestCacheMiddleware_Get_CacheHit(t *testing.T) {
 
 	content2, err := io.ReadAll(reader2)
 	require.NoError(t, err)
-	reader2.Close()
+	_ = reader2.Close()
 
 	// Content should match
 	assert.Equal(t, content1, content2)
@@ -85,7 +85,7 @@ func TestCacheMiddleware_Get_CacheMiss(t *testing.T) {
 	reader, err := cacheMiddleware.Get(ctx, "uncached-key")
 	require.NoError(t, err)
 	require.NotNil(t, reader)
-	reader.Close()
+	_ = reader.Close()
 
 	// Verify underlying storage was called
 	assert.Len(t, mockStorage.getCalls, 1)
@@ -110,8 +110,8 @@ func TestCacheMiddleware_Put_InvalidatesCache(t *testing.T) {
 	// First, populate cache with a Get
 	reader, err := cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	io.ReadAll(reader)
-	reader.Close()
+	_, _ = io.ReadAll(reader)
+	_ = reader.Close()
 
 	// Reset mock call count
 	mockStorage.getCalls = []string{}
@@ -123,7 +123,7 @@ func TestCacheMiddleware_Put_InvalidatesCache(t *testing.T) {
 	// Next Get should call underlying storage (cache was invalidated)
 	reader, err = cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 
 	// Verify underlying storage was called after Put
 	assert.Len(t, mockStorage.getCalls, 1)
@@ -142,8 +142,8 @@ func TestCacheMiddleware_Delete_InvalidatesCache(t *testing.T) {
 	// First, populate cache with a Get
 	reader, err := cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	io.ReadAll(reader)
-	reader.Close()
+	_, _ = io.ReadAll(reader)
+	_ = reader.Close()
 
 	// Delete should invalidate the cache entry
 	err = cacheMiddleware.Delete(ctx, "test-key")
@@ -155,7 +155,7 @@ func TestCacheMiddleware_Delete_InvalidatesCache(t *testing.T) {
 	// Next Get should call underlying storage (cache was invalidated)
 	reader, err = cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 
 	// Verify underlying storage was called after Delete
 	assert.Len(t, mockStorage.getCalls, 1)
@@ -174,8 +174,8 @@ func TestCacheMiddleware_TTL_Expiration(t *testing.T) {
 	// First Get - populate cache
 	reader, err := cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	io.ReadAll(reader)
-	reader.Close()
+	_, _ = io.ReadAll(reader)
+	_ = reader.Close()
 
 	// Reset mock call count
 	mockStorage.getCalls = []string{}
@@ -186,7 +186,7 @@ func TestCacheMiddleware_TTL_Expiration(t *testing.T) {
 	// Get should call underlying storage (cache expired)
 	reader, err = cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 
 	// Verify underlying storage was called after TTL expiration
 	assert.Len(t, mockStorage.getCalls, 1)
@@ -205,20 +205,20 @@ func TestCacheMiddleware_MaxSize_Eviction(t *testing.T) {
 	// Add first entry
 	reader1, err := cacheMiddleware.Get(ctx, "key1")
 	require.NoError(t, err)
-	io.ReadAll(reader1)
-	reader1.Close()
+	_, _ = io.ReadAll(reader1)
+	_ = reader1.Close()
 
 	// Add second entry
 	reader2, err := cacheMiddleware.Get(ctx, "key2")
 	require.NoError(t, err)
-	io.ReadAll(reader2)
-	reader2.Close()
+	_, _ = io.ReadAll(reader2)
+	_ = reader2.Close()
 
 	// Add third entry - should evict oldest (key1)
 	reader3, err := cacheMiddleware.Get(ctx, "key3")
 	require.NoError(t, err)
-	io.ReadAll(reader3)
-	reader3.Close()
+	_, _ = io.ReadAll(reader3)
+	_ = reader3.Close()
 
 	// Reset mock call count
 	mockStorage.getCalls = []string{}
@@ -226,19 +226,19 @@ func TestCacheMiddleware_MaxSize_Eviction(t *testing.T) {
 	// Get key2 - should be in cache
 	reader, err := cacheMiddleware.Get(ctx, "key2")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 	assert.Len(t, mockStorage.getCalls, 0) // Should be served from cache
 
 	// Get key3 - should be in cache
 	reader, err = cacheMiddleware.Get(ctx, "key3")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 	assert.Len(t, mockStorage.getCalls, 0) // Should be served from cache
 
 	// Get key1 - should NOT be in cache (evicted)
 	reader, err = cacheMiddleware.Get(ctx, "key1")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 	assert.Len(t, mockStorage.getCalls, 1) // Should call underlying storage
 }
 
@@ -255,8 +255,8 @@ func TestCacheMiddleware_UpdateMetadata_InvalidatesCache(t *testing.T) {
 	// First, populate cache with a Get
 	reader, err := cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	io.ReadAll(reader)
-	reader.Close()
+	_, _ = io.ReadAll(reader)
+	_ = reader.Close()
 
 	// UpdateMetadata should invalidate the cache entry
 	metadata := map[string]string{"key": "value"}
@@ -269,7 +269,7 @@ func TestCacheMiddleware_UpdateMetadata_InvalidatesCache(t *testing.T) {
 	// Next Get should call underlying storage (cache was invalidated)
 	reader, err = cacheMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 
 	// Verify underlying storage was called after UpdateMetadata
 	assert.Len(t, mockStorage.getCalls, 1)
@@ -288,13 +288,13 @@ func TestCacheMiddleware_Move_InvalidatesCache(t *testing.T) {
 	// Populate cache for both source and potential destination
 	reader1, err := cacheMiddleware.Get(ctx, "source-key")
 	require.NoError(t, err)
-	io.ReadAll(reader1)
-	reader1.Close()
+	_, _ = io.ReadAll(reader1)
+	_ = reader1.Close()
 
 	reader2, err := cacheMiddleware.Get(ctx, "dest-key")
 	require.NoError(t, err)
-	io.ReadAll(reader2)
-	reader2.Close()
+	_, _ = io.ReadAll(reader2)
+	_ = reader2.Close()
 
 	// Move should invalidate both source and destination cache entries
 	err = cacheMiddleware.Move(ctx, "source-key", "dest-key")
@@ -306,12 +306,12 @@ func TestCacheMiddleware_Move_InvalidatesCache(t *testing.T) {
 	// Both keys should now require underlying storage calls
 	reader, err := cacheMiddleware.Get(ctx, "source-key")
 	if err == nil {
-		reader.Close()
+		_ = reader.Close()
 	}
 
 	reader, err = cacheMiddleware.Get(ctx, "dest-key")
 	require.NoError(t, err)
-	reader.Close()
+	_ = reader.Close()
 
 	// Verify underlying storage was called for both
 	assert.GreaterOrEqual(t, len(mockStorage.getCalls), 1)
@@ -335,8 +335,8 @@ func TestCacheMiddleware_ConcurrentAccess(t *testing.T) {
 		go func() {
 			reader, err := cacheMiddleware.Get(ctx, "concurrent-key")
 			if err == nil && reader != nil {
-				io.ReadAll(reader)
-				reader.Close()
+				_, _ = io.ReadAll(reader)
+				_ = reader.Close()
 			}
 			done <- true
 		}()
@@ -398,15 +398,15 @@ func TestCacheMiddleware_GetStats(t *testing.T) {
 
 	// Perform some operations
 	reader1, _ := cacheMiddleware.Get(ctx, "key1")
-	io.ReadAll(reader1)
-	reader1.Close()
+	_, _ = io.ReadAll(reader1)
+	_ = reader1.Close()
 
 	reader2, _ := cacheMiddleware.Get(ctx, "key1") // Hit
-	reader2.Close()
+	_ = reader2.Close()
 
 	reader3, _ := cacheMiddleware.Get(ctx, "key2") // Miss
-	io.ReadAll(reader3)
-	reader3.Close()
+	_, _ = io.ReadAll(reader3)
+	_ = reader3.Close()
 
 	// Check updated stats
 	stats = cacheMiddleware.GetStats()
@@ -428,12 +428,12 @@ func TestCacheMiddleware_Clear(t *testing.T) {
 
 	// Populate cache
 	reader1, _ := cacheMiddleware.Get(ctx, "key1")
-	io.ReadAll(reader1)
-	reader1.Close()
+	_, _ = io.ReadAll(reader1)
+	_ = reader1.Close()
 
 	reader2, _ := cacheMiddleware.Get(ctx, "key2")
-	io.ReadAll(reader2)
-	reader2.Close()
+	_, _ = io.ReadAll(reader2)
+	_ = reader2.Close()
 
 	// Verify cache has entries
 	stats := cacheMiddleware.GetStats()
@@ -451,7 +451,7 @@ func TestCacheMiddleware_Clear(t *testing.T) {
 
 	// Next Get should call underlying storage
 	reader, _ := cacheMiddleware.Get(ctx, "key1")
-	reader.Close()
+	_ = reader.Close()
 
 	assert.Len(t, mockStorage.getCalls, 1)
 }

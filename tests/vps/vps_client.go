@@ -76,7 +76,7 @@ func (c *VPSClient) CheckServiceEndpoint(endpoint string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return resp.StatusCode >= 200 && resp.StatusCode < 300, nil
 }

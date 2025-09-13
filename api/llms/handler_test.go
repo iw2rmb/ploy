@@ -545,7 +545,7 @@ func TestHandler_BulkOperations(t *testing.T) {
 
 		var response map[string]interface{}
 		body, _ := io.ReadAll(resp.Body)
-		json.Unmarshal(body, &response)
+		_ = json.Unmarshal(body, &response)
 
 		models := response["models"].([]interface{})
 		if len(models) < numModels {
@@ -622,7 +622,7 @@ func TestHandler_ConcurrentOperations(t *testing.T) {
 		modelJSON, _ := json.Marshal(model)
 		req := httptest.NewRequest("POST", "/v1/llms/models", bytes.NewReader(modelJSON))
 		req.Header.Set("Content-Type", "application/json")
-		app.Test(req)
+		_, _ = app.Test(req)
 
 		done := make(chan bool, numConcurrent)
 

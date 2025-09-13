@@ -5,15 +5,15 @@
 - CLI is REST-only. All orchestration (Nomad jobs, HCL templates) runs on the API (VPS). No local Nomad usage.
 - Remote execution permitted: SSH access to the target VPS is available for running Ansible, Nomad helpers, and validation commands directly from this agent.
 - API embeds all Mods HCL templates and writes them to a per-run temp workspace:
-  - `platform/nomad/transflow/{planner.hcl,llm_exec.hcl,reducer.hcl,orw_apply.hcl}` (embedded at build time)
+  - `platform/nomad/mods/{planner.hcl,llm_exec.hcl,reducer.hcl,orw_apply.hcl}` (embedded at build time)
   - Runner reads templates relative to its `workspaceDir`.
 - orw-apply I/O stabilized (SeaweedFS-only, Consul DNS):
   - Container always downloads `input.tar` from SeaweedFS via `INPUT_URL` (Consul DNS: `seaweedfs-filer.service.consul`).
   - Container uploads `diff.patch` to SeaweedFS via `DIFF_KEY`.
   - Runner writes `/workspace/out/error.log` on failures; controller persists and includes a snippet in status.
 - Status reliability improved:
-  - Added top-level execution timeout (default 45m, `PLOY_TRANSFLOW_EXEC_TIMEOUT`) and panic guard.
-  - `/v1/mods/status/:id` enriched with `duration` and `overdue` (default overdue if >30m, configurable via `PLOY_TRANSFLOW_OVERDUE`).
+  - Added top-level execution timeout (default 45m, `PLOY_MODS_EXEC_TIMEOUT`) and panic guard.
+- `/v1/mods/:id/status` enriched with `duration` and `overdue` (default overdue if >30m, configurable via `PLOY_MODS_OVERDUE`).
 - We cancelled stale executions as needed; older failures remain for history.
 
 Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build gate fetch artifacts directly from SeaweedFS.
@@ -46,7 +46,7 @@ Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build
 - One recent run failed during orw-apply with exit code 6 due to SeaweedFS upload DNS failure (`Could not resolve host: seaweedfs-filer.service.consul`). With `set -e` this aborted the task.
 - Another symptom was the controller waiting at phase=apply because it looked for `diff.patch` in its own temp workspace (bind/mount assumption) instead of pulling from alloc/task-side storage.
 - SSE previously lacked granular events; added emits now show `diff-found`, `diff-apply-started`, `build-gate-start`, and final `build-gate-succeeded/failed`.
-- Resolved: empty diff.patch from orw-apply. Runner aligned to Maven‑only with explicit recipe coords; patch generation now uses repo‑relative unified diffs (git diff in `/workspace/project`) and assumes a valid Git repository is present in the extracted input. Manual transflow produces a non‑empty diff.
+- Resolved: empty diff.patch from orw-apply. Runner aligned to Maven‑only with explicit recipe coords; patch generation now uses repo‑relative unified diffs (git diff in `/workspace/project`) and assumes a valid Git repository is present in the extracted input. Manual run produces a non‑empty diff.
 
 ### Runner + Input Prep Updates (2025‑09‑11)
 
@@ -57,15 +57,15 @@ Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build
   - Maven‑only; discovery and Gradle support removed. Requires explicit `RECIPE_GROUP/ARTIFACT/VERSION` and `MAVEN_PLUGIN_VERSION`.
   - Executes OpenRewrite, then generates repo‑relative patches via `git diff -U3 --no-color -- .` in `/workspace/project` (excludes `target/`, `.m2/`, `build/`). No filesystem-baseline fallback; `.git` is required in the input tar.
   - Logs diff size and a head preview; uploads `diff.patch` and `transform.log` to SeaweedFS.
-  - Manual one‑off validation and transflow now yield a non‑empty `diff.patch` for the Java11→17 repo.
+  - Manual one‑off validation and mods now yield a non‑empty `diff.patch` for the Java11→17 repo.
 
 ## Operational How-To (Quick Reference)
 
 Deploy latest API from feature branch:
-`DEPLOY_BRANCH=feature/transflow-mvp-completion ./bin/ployman api deploy --monitor`
+`DEPLOY_BRANCH=feature/mods-mvp-completion ./bin/ployman api deploy --monitor`
 
 Start and monitor a run:
-- `./bin/ploy mod run -f test-java11to17-transflow.yaml -v`
+- `./bin/ploy mod run -f test-mod-java11to17.yaml -v`
 - `curl -sS https://api.dev.ployman.app/v1/mods/status/<id> | jq`
 - Cancel: `curl -sS -X DELETE https://api.dev.ployman.app/v1/mods/<id>`
 
@@ -95,7 +95,7 @@ Verify MR & diff (GitLab):
 - Emit granular apply/build events: `diff-found`, `diff-apply-started`, `build-gate-start`, `build-gate-failed/succeeded`.
 
 ### Near-Term (1–2 days)
-- Event push API: `POST /v1/mods/event {execution_id, step, phase, level, message, ts}`. Jobs/runner POST start/ok/fail.
+- Event push API: `POST /v1/mods/{id}/events {execution_id, step, phase, level, message, ts}`. Jobs/runner POST start/ok/fail.
 - Controller log tailer: tail last alloc logs; update status on success/error markers; record last_log_preview.
 - Nomad event stream: subscribe to alloc events; update status on Start/Terminated.
 - Standard job status.json: each job writes `/workspace/out/status.json` (step/state/message/ts/metrics) for the controller to persist.
@@ -103,20 +103,20 @@ Verify MR & diff (GitLab):
 - SeaweedFS reachability: ensure `PLOY_SEAWEEDFS_URL` points to a resolvable/healthy filer; consider fallbacks (host IP) for environments without Consul DNS.
 
 ### Longer-Term (3–5 days)
-- Live logs endpoint (SSE): `GET /v1/mods/logs/:id?follow=true` streams step events + job tails. CLI `ploy mod watch` displays live progress.
+- Live logs endpoint (SSE): `GET /v1/mods/:id/logs?follow=true` streams step events + job tails. CLI `ploy mod watch` displays live progress.
 - Metrics & alerts: Prometheus metrics per phase and alerts when durations exceed baselines.
 - Conformance across job types: planner/llm-exec/reducer/human-step all emit standard events, status.json, error.log.
 
 ### Acceptance Criteria
-- `/v1/mods/status/:id` shows current phase and last step with timestamps.
+- `/v1/mods/:id/status` shows current phase and last step with timestamps.
 - On any failure, `status.error` updates within seconds (with error snippet). Non‑zero task exits are always surfaced (apply/build/planner/reducer).
 - Artifacts include `diff_patch` (or clear no-diff failure) and `error_log` when applicable.
 - CLI watch shows live progress and immediate failures.
 
 ## Env Knobs
 
-- `PLOY_TRANSFLOW_EXEC_TIMEOUT` (e.g., `45m`) — hard cap for a transflow execution, ensures terminal failure if exceeded.
-- `PLOY_TRANSFLOW_OVERDUE` (e.g., `30m`) — status enrichment for running executions; marks `overdue: true` if exceeded.
+- `PLOY_MODS_EXEC_TIMEOUT` (e.g., `45m`) — hard cap for a transflow execution, ensures terminal failure if exceeded.
+- `PLOY_MODS_OVERDUE` (e.g., `30m`) — status enrichment for running executions; marks `overdue: true` if exceeded.
 
 ## Known Non-Blockers
 ## Appendix: Recent Fixes
@@ -129,7 +129,7 @@ Verify MR & diff (GitLab):
 - Periodic transient TLS/SSH issues; rerun succeeds after a short interval.
 - SeaweedFS integration: pass `SEAWEEDFS_URL`, `DIFF_KEY`/`OUTPUT_KEY` to tasks; task uploads `diff.patch`/`output.tar` (best‑effort). Controller records artifacts if already present in storage.
 - SSE transparency: added `diff-found`, `diff-apply-started`, `build-gate-start`, `build-gate-failed/succeeded`, and `orw-apply job completed` event.
-- DC parameterization: all transflow Nomad jobs use `${NOMAD_DC}` (default dc1).
+- DC parameterization: all Mods Nomad jobs use `${NOMAD_DC}` (default dc1).
 - Lane C hygiene: Java/Node lane‑C templates now gate health checks, service tags, metrics/JMX behind flags. Defaults: disabled for regular apps, enabled for platform services.
 
 ## Key Takeaways (Updated)
@@ -158,7 +158,7 @@ DEV LOGGING NOTE (keep logs tidy):
   - Job-side SEAWEEDFS_URL injected via Consul service template, removing container DNS dependency.
   - Controller previously computed `INPUT_URL` using host IP to avoid DNS; we switched to derive `INPUT_URL` inside the job via the same Consul template for consistency.
 - Host bind removed: orw-apply HCL no longer mounts host repo/context. Jobs must consume `INPUT_URL` → `/workspace/input.tar`.
-- HCL persistence: Submitted HCL is saved at `/tmp/transflow-submitted/<exec_id>/<step>/orw_apply.submitted.hcl` for post‑mortem inspection. Verified env includes `INPUT_URL`.
+- HCL persistence: Submitted HCL is saved at `/tmp/mods-submitted/<exec_id>/<step>/orw_apply.submitted.hcl` for post‑mortem inspection. Verified env includes `INPUT_URL`.
 - Image diagnostics added: openrewrite-jvm now logs `INPUT_URL` and prints download HTTP status (`HTTP_CODE:`) for the input tar path.
 - Current symptom: Despite `INPUT_URL` in persisted HCL, runs still fail at ~4s with setup complaining “No files found to tar”. This implies the runner either didn’t download (`404/connection`), or we’re hitting an early error before extraction.
 
@@ -168,11 +168,11 @@ DEV LOGGING NOTE (keep logs tidy):
    - Use Ansible against the target host. Example:
      - `ansible-playbook -i '"${TARGET_HOST}",' -u ploy --become iac/dev/playbooks/openrewrite-jvm.yml -e ploy_domain=dev.ployman.app`
    - This builds and pushes `registry.dev.ployman.app/openrewrite-jvm:latest` on the VPS. Avoid local Docker builds.
-   - To override the orw-apply image used by the server, set a single env on the API: `TRANSFLOW_ORW_APPLY_IMAGE=registry.dev.ployman.app/openrewrite-jvm:<tag>`.
+   - To override the orw-apply image used by the server, set a single env on the API: `MODS_ORW_APPLY_IMAGE=registry.dev.ployman.app/openrewrite-jvm:<tag>`.
    - Confirms latest runner diagnostics are in use (logs `INPUT_URL` and download HTTP result).
 
 2) Run a new transflow and capture evidence:
-   - Inspect persisted HCL at `/tmp/transflow-submitted/<exec_id>/<step>/orw_apply.submitted.hcl` → confirm `INPUT_URL` and keys.
+   - Inspect persisted HCL at `/tmp/mods-submitted/<exec_id>/<step>/orw_apply.submitted.hcl` → confirm `INPUT_URL` and keys.
    - Tail orw-apply task logs for lines:
      - `[OpenRewrite]   INPUT_URL: ...`
      - `INPUT_URL download result: rc=..., HTTP_CODE:...`
@@ -193,8 +193,8 @@ DEV LOGGING NOTE (keep logs tidy):
 ## Debug Commands (Quick Reference)
 
 - Persisted HCL (on VPS):
-  - `ls -dt /tmp/transflow-submitted/* | head -n1`
-  - `awk '/env = {/{flag=1; print; next} /}/{if(flag){print; exit}} flag' /tmp/transflow-submitted/<exec_id>/*/orw_apply.submitted.hcl`
+  - `ls -dt /tmp/mods-submitted/* | head -n1`
+  - `awk '/env = {/{flag=1; print; next} /}/{if(flag){print; exit}} flag' /tmp/mods-submitted/<exec_id>/*/orw_apply.submitted.hcl`
 
 - Task logs (orw-apply):
   - `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job <orw-job> --format json | jq -r '.[-1].ID'`

@@ -6,7 +6,7 @@ type BranchStep struct {
 	DiffKey string
 }
 
-// NewBranchStep generates a new step ID and corresponding diff key under artifacts/transflow.
+// NewBranchStep generates a new step ID and corresponding diff key under artifacts/mods.
 func NewBranchStep(execID, branchID string) BranchStep {
 	sid := randomStepID()
 	return BranchStep{ID: sid, DiffKey: computeBranchDiffKey(execID, branchID, sid)}

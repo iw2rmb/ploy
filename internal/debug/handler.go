@@ -93,7 +93,7 @@ func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 		if err := orchestration.Submit(templatePath); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
 		}
-		os.Remove(templatePath)
+		_ = os.Remove(templatePath)
 	}
 
 	response := fiber.Map{

@@ -12,8 +12,11 @@ import (
 	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/llms"
+	modsapi "github.com/iw2rmb/ploy/api/mods"
+	nvdapi "github.com/iw2rmb/ploy/api/nvd"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
+	"github.com/iw2rmb/ploy/api/sbom"
 	"github.com/iw2rmb/ploy/api/templates"
-	"github.com/iw2rmb/ploy/api/transflow"
 
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/git/provider"
@@ -61,107 +64,43 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 	// Initialize validator
 	recipeValidator := arfConfig.InitializeValidator()
 
-	// Initialize OpenRewrite dispatcher for dynamic recipe downloading
-	var openRewriteDispatcher *arf.OpenRewriteDispatcher
-	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://nomad.service.consul:4646")
-	registryURL := utils.Getenv("PLOY_REGISTRY_URL", "registry.dev.ployman.app")
-	seaweedfsURL := utils.Getenv("SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
-	apiURL := utils.Getenv("PLOY_API_URL", "http://api.service.consul:8081")
-
-	// Create storage provider for OpenRewrite dispatcher
-	var storageProvider internalStorage.StorageProvider
-
-	// SeaweedFS Master and Filer have different ports
-	seaweedfsMaster := utils.Getenv("SEAWEEDFS_MASTER", "http://seaweedfs-filer.service.consul:9333")
-	seaweedfsFiler := utils.Getenv("SEAWEEDFS_FILER", seaweedfsURL)
-
-	seaweedConfig := internalStorage.SeaweedFSConfig{
-		Master:      seaweedfsMaster,
-		Filer:       seaweedfsFiler,
-		Collection:  "ploy-recipes", // Use recipes collection for RecipeRegistry
-		Replication: "000",
-		Timeout:     30,
-	}
-	seaweedClient, err := internalStorage.NewSeaweedFSClient(seaweedConfig)
-	if err != nil {
-		log.Printf("Warning: Failed to create SeaweedFS client for OpenRewrite dispatcher: %v", err)
-		storageProvider = nil
-	} else {
-		// Use the raw client as provider
-		storageProvider = seaweedClient
-	}
-
-	if storageProvider != nil {
-		log.Printf("Creating OpenRewrite dispatcher with: nomad=%s, registry=%s, seaweedfs_master=%s, seaweedfs_filer=%s, api=%s",
-			nomadAddr, registryURL, seaweedfsMaster, seaweedfsFiler, apiURL)
-
-		// Create ARF service with unified storage interface
-		// Storage already has "artifacts" bucket configured via collection in storage config
-		// ARFService should not add any bucket prefix - storage handles it internally
-		// Centralized config service is required for unified storage
-		if cfgService == nil {
-			return nil, fmt.Errorf("config service is required for ARF unified storage")
-		}
-		unifiedStorage, err := resolveStorageFromConfigService(cfgService)
-		if err != nil {
-			log.Printf("ERROR: Failed to create unified storage for ARF via config service: %v", err)
-			return nil, fmt.Errorf("failed to create unified storage for ARF: %w", err)
-		}
-
-		arfStorageService, err := arf.NewARFService(unifiedStorage)
-		if err != nil {
-			log.Printf("ERROR: Failed to create ARF service: %v", err)
-			return nil, fmt.Errorf("failed to create ARF service: %w", err)
-		}
-		log.Printf("ARF service created with unified storage (bucket handled by storage layer)")
-
-		openRewriteDispatcher, err = arf.NewOpenRewriteDispatcher(
-			nomadAddr,
-			registryURL,
-			seaweedfsURL,
-			apiURL,
-			arfStorageService,
-		)
-		if err != nil {
-			log.Printf("ERROR: Failed to create OpenRewrite dispatcher: %v", err)
-			log.Printf("This will prevent OpenRewrite transformations from working")
-			openRewriteDispatcher = nil
-		} else {
-			log.Printf("SUCCESS: OpenRewrite dispatcher initialized for dynamic recipe downloading")
-		}
-	} else {
-		log.Printf("WARNING: No storage provider available - OpenRewrite dispatcher will not be initialized")
-		log.Printf("Check SeaweedFS connectivity at: master=%s, filer=%s", seaweedfsMaster, seaweedfsFiler)
-	}
-
-	// Initialize recipe executor with optional dispatcher
-	engine := arf.NewRecipeExecutor(recipeStorage, sandboxMgr, openRewriteDispatcher)
-	if openRewriteDispatcher != nil {
-		log.Printf("SUCCESS: Recipe executor initialized WITH OpenRewrite dispatcher for fallback execution")
-	} else {
-		log.Printf("WARNING: Recipe executor initialized WITHOUT OpenRewrite dispatcher")
-		log.Printf("OpenRewrite recipes that are not in storage will fail")
-	}
+	// Initialize recipe executor (OpenRewrite dispatcher removed; Mods handles ORW)
+	engine := recipes.NewRecipeExecutor(recipeStorage, sandboxMgr)
 
 	// Create ARF handler - RecipeRegistry only (no fallback)
-	var handler *arf.Handler
-
-	// Require SeaweedFS storage for RecipeRegistry
-	if storageProvider == nil {
-		return nil, fmt.Errorf("SeaweedFS storage is required for RecipeRegistry - check SeaweedFS connectivity")
-	}
 
 	// Always create handler with RecipeRegistry when storage provider is available
 	// Strictly SeaweedFS-backed RecipeRegistry (no in-memory fallback)
-	handler = arf.NewHandlerWithStorage(
+	handler := arf.NewHandlerWithStorage(
 		engine,
 		recipeStorage,
 		recipeIndex,
 		recipeValidator,
 		sandboxMgr,
-		storageProvider, // Pass the working SeaweedFS storage provider for RecipeRegistry
+		nil, // No SeaweedFS provider required; registry optional
 	)
-	log.Printf("ARF handler initialized with RecipeRegistry backend (storageProvider: %T)", storageProvider)
+	log.Printf("ARF handler initialized (no RecipeRegistry storage provider)")
+
+	// Wire NVD CVE database into ARF security engine (configurable via ARF config)
+	{
+		nvdCfg := arfConfig.NVD
+		if nvdCfg.Enabled {
+			nvd := nvdapi.NewNVDDatabase()
+			if nvdCfg.APIKey != "" {
+				nvd.SetAPIKey(nvdCfg.APIKey)
+			}
+			if nvdCfg.BaseURL != "" {
+				nvd.SetBaseURL(nvdCfg.BaseURL)
+			}
+			if nvdCfg.Timeout > 0 {
+				nvd.SetHTTPTimeout(nvdCfg.Timeout)
+			}
+			handler.SetCVEDatabase(nvd)
+			log.Printf("ARF security engine configured with NVD CVE database (enabled)")
+		} else {
+			log.Printf("ARF NVD CVE database disabled by configuration")
+		}
+	}
 
 	// ARF async transforms and healing were removed; no Consul store is configured here.
 
@@ -256,8 +195,8 @@ func initializeLLMHandler(cfgService *cfgsvc.Service) (*llms.Handler, error) {
 	return handler, nil
 }
 
-func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*transflow.Handler, error) {
-    log.Printf("Initializing Mods handler")
+func initializeModsHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*modsapi.Handler, error) {
+	log.Printf("Initializing Mods handler")
 
 	// Create GitLab provider
 	gitProvider := provider.NewGitLabProvider()
@@ -268,7 +207,7 @@ func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servic
 		var err error
 		storage, err = resolveStorageFromConfigService(cfgService)
 		if err != nil {
-                log.Printf("Warning: Failed to resolve storage for Mods handler: %v", err)
+			log.Printf("Warning: Failed to resolve storage for Mods handler: %v", err)
 		}
 	}
 
@@ -278,10 +217,24 @@ func initializeTransflowHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servic
 		statusStore = orchestration.NewKV()
 	}
 
-	// Create transflow handler
-	handler := transflow.NewHandler(gitProvider, storage, statusStore)
-    log.Printf("Mods handler initialized successfully")
+	// Create Mods handler
+	handler := modsapi.NewHandler(gitProvider, storage, statusStore)
+	log.Printf("Mods handler initialized successfully")
 	return handler, nil
+}
+
+func initializeSBOMHandler(cfgService *cfgsvc.Service) (*sbom.Handler, error) {
+	log.Printf("Initializing SBOM handler")
+	var st internalStorage.Storage
+	var err error
+	if cfgService != nil {
+		st, err = resolveStorageFromConfigService(cfgService)
+		if err != nil {
+			log.Printf("Warning: SBOM storage not available: %v", err)
+		}
+	}
+	h := sbom.NewHandler(st)
+	return h, nil
 }
 
 func initializeTemplateHandler() (*templates.Handler, error) {

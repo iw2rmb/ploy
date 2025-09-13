@@ -31,15 +31,15 @@ func TestVPSEnvironmentReadiness(t *testing.T) {
 		})
 	}
 
-	// Test transflow CLI availability
+	// Test Mods CLI availability
 	output, err := vpsClient.RunCommand("su - ploy -c '/opt/ploy/bin/ploy --version'")
 	assert.NoError(t, err, "Should be able to run ploy CLI on VPS")
 	assert.Contains(t, output, "ploy version", "Ploy CLI should be installed")
 
-	// Test transflow command availability
+	// Test Mods command availability
 	output, err = vpsClient.RunCommand("su - ploy -c '/opt/ploy/bin/ploy mod --help'")
 	assert.NoError(t, err, "Mods command should be available")
-	assert.Contains(t, output, "transflow", "Mods subcommand should be available")
+	assert.Contains(t, output, "mod", "Mods subcommand should be available")
 }
 
 func TestVPSKBStorageSetup(t *testing.T) {

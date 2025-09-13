@@ -1,8 +1,7 @@
----
-# GitLab Token Setup for Transflow MR Integration
+# GitLab Token Setup for Mods MR Integration
 # This playbook configures GITLAB_TOKEN for the ploy user on VPS
 
-- name: Setup GitLab Token for Transflow MR Integration
+- name: Setup GitLab Token for Mods MR Integration
   hosts: linux_hosts
   become: true
   vars_files:
@@ -33,7 +32,7 @@
         group: ploy
         mode: '0644'
         block: |
-          # GitLab integration for Transflow MR creation
+          # GitLab integration for Mods MR creation
           export GITLAB_TOKEN="{{ lookup('env', 'GITLAB_TOKEN') }}"
           export GITLAB_URL="{{ lookup('env', 'GITLAB_URL') }}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - GitLab Token"

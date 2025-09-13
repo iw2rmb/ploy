@@ -100,30 +100,22 @@ api/
 ├── platform/                 # Platform service integration
 │   ├── handler.go            # Platform API endpoints
 │   └── handler_test.go       # Platform handler tests
-├── transflow/                # Mods API endpoints (handled here; path name preserved)
+├── mods/                     # Mods API endpoints
 │   └── handler.go            # Mods transformation handlers
 ├── llms/                     # Large Language Model integration
 │   ├── handler.go            # LLM API endpoints
 │   └── handler_test.go       # LLM handler tests
-└── arf/                      # Automated Remediation Framework ✅ Sep 2025 - Enhanced
+├── sbom/                     # SBOM API and analyzer
+│   ├── handler.go            # SBOM API endpoints (/v1/sbom/*)
+│   ├── analyzer.go           # Minimal Syft-style analyzer
+│   └── types.go              # SBOM analysis types
+└── arf/                      # Automated Remediation Framework
     ├── handler.go            # Main ARF endpoint handlers
     ├── handler_debug.go      # Debug and analysis endpoints
     ├── handler_recipes.go    # Recipe management endpoints
     ├── handler_sandbox.go    # Sandbox management endpoints
     ├── handler_security.go   # Security analysis endpoints
-    ├── handler_transformation_async.go # Async transformation handlers
-    ├── openrewrite_engine.go # OpenRewrite integration
-    ├── openrewrite_dispatcher.go # OpenRewrite job dispatch
-    ├── hybrid_pipeline.go    # Hybrid transformation pipeline
-    ├── learning_system.go    # Machine learning integration
-    ├── healing_coordinator.go # Self-healing orchestration
-    ├── healing_workflow.go   # Healing workflow management
-    ├── healing_metrics.go    # Healing system metrics
-    ├── healing_alerts.go     # Healing alert management
-    ├── healing_logger.go     # Healing event logging
-    ├── llm_dispatcher.go     # LLM integration dispatch
-    ├── llm_error_analysis.go # LLM-powered error analysis
-    ├── llm_cost_tracker.go   # LLM usage cost tracking
+    ├── handler_transformation_async.go # Async transformation handlers (catalog only)
     ├── multi_language_core.go # Multi-language transformation core
     ├── multi_language_java.go # Java-specific transformations
     ├── multi_language_python.go # Python-specific transformations
@@ -132,18 +124,16 @@ api/
     ├── multi_language_wasm.go # WebAssembly transformations
     ├── multi_language_javascript.go # JavaScript transformations
     ├── pattern_matcher.go    # Code pattern matching engine
-    ├── recipe_registry.go    # Recipe catalog management
-    ├── recipe_executor.go    # Recipe execution engine
-    ├── recipe_evolution.go   # Recipe versioning and evolution
+    # Note: recipe_* sources (registry, executor, evolution, types) moved to api/recipes
     ├── sandbox.go            # Sandbox management for transformations
     ├── sandbox_validation.go # Sandbox security validation
     ├── security_engine.go    # Security analysis engine
     ├── storage_service.go    # ARF storage service layer
     ├── unified_service.go    # Unified ARF service interface
     ├── transformation_workflow.go # Transformation orchestration
-    ├── strategy_selector.go  # Transformation strategy selection
-    ├── complexity_analyzer.go # Code complexity analysis
-    ├── sbom_analyzer.go      # Software Bill of Materials analysis
+    ├──
+    
+    
     ├── nvd_database.go       # National Vulnerability Database integration
     ├── deployment_sandbox.go # Deployment environment sandboxing
     ├── config.go             # ARF configuration management
@@ -154,13 +144,12 @@ api/
     ├── llm_types.go          # LLM integration types
     ├── debug_types.go        # Debug system types
     ├── security_engine_types.go # Security engine types
-    ├── consul_store.go       # Consul-based storage backend
+    ├──
     ├── registry_storage_adapter.go # Storage adapter for recipe registry
     ├── db/                   # Database schemas and migrations
     ├── examples/             # ARF recipe examples
     ├── models/               # ARF data models and validation
-    ├── validation/           # Recipe validation
-    └── sql/                  # Database integration for learning system
+    └── validation/           # Recipe validation
 ```
 
 ## Key Components
@@ -179,3 +168,55 @@ On VPS environments, all Nomad interactions are routed through the job manager w
 - **Security**: ACME certificates, DNS validation, supply chain security, and OPA policy enforcement
 - **Analysis & Transformation**: Static analysis and automated remediation via ARF system
 - **Management**: Self-update, cleanup, monitoring, and coordination services
+
+## SBOM Endpoints
+
+The SBOM module provides endpoints under `/v1/sbom`.
+
+### POST /v1/sbom/generate
+
+Generate a Software Bill of Materials (SBOM) using Syft for a file artifact or a container image. The API delegates to the Syft-based generator in `api/supply/sbom.go`.
+
+- Request (JSON)
+  - `artifact` (string, required): Path to a file artifact (e.g., `/path/to/app.bin`) or a container image reference (e.g., `repo/app:1.2.3`).
+  - `format` (string, optional): Output format, defaults to `spdx-json`. Accepts Syft-supported formats.
+  - `lane` (string, optional): Deployment lane identifier for metadata.
+  - `app_name` (string, optional): Application name for metadata.
+  - `sha` (string, optional): Build SHA for metadata.
+
+- Response (JSON)
+  - `status`: Always `"completed"` on success.
+  - `generated_at`: RFC3339 timestamp.
+  - `format`: Resolved output format (e.g., `spdx-json`).
+  - `location`: Absolute path to the generated SBOM file.
+
+- Behavior
+  - If `artifact` contains a colon (`:`), it is treated as a container image reference and the SBOM is written to `/tmp/<sanitized-image>.sbom.json`.
+  - Otherwise, the SBOM is generated next to the file with suffix `.sbom.json`.
+  - Backward compatibility: If `artifact` is omitted, the endpoint returns a stubbed successful envelope (legacy tests), but no real generation occurs.
+
+- Examples
+
+  File artifact
+  - Request
+    - `POST /v1/sbom/generate`
+    - Body: `{ "artifact": "/opt/builds/app.bin", "format": "spdx-json", "lane": "E", "app_name": "app", "sha": "abc123" }`
+  - Response
+    - `{ "status": "completed", "generated_at": "2025-09-13T18:30:00Z", "format": "spdx-json", "location": "/opt/builds/app.bin.sbom.json" }`
+
+  Container image
+  - Request
+    - `POST /v1/sbom/generate`
+    - Body: `{ "artifact": "registry.local/app:1.2.3", "format": "spdx-json" }`
+  - Response
+    - `{ "status": "completed", "generated_at": "2025-09-13T18:30:00Z", "format": "spdx-json", "location": "/tmp/registry.local-app-1.2.3.sbom.json" }`
+
+### POST /v1/sbom/analyze
+
+Analyze an existing SBOM and return a basic risk summary. This endpoint currently performs lightweight parsing and metric computation; vulnerability correlation is a stub in this module and is typically covered by Grype + enrichment pipelines.
+
+- Request (JSON)
+  - `sbom_path` (string, required): Path to an existing SBOM file.
+
+- Response (JSON)
+  - Includes `summary`, `vulnerabilities` (mock structure), and `generated_at` used by tests.

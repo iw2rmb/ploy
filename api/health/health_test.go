@@ -80,9 +80,9 @@ func (m *MockStorage) Health(ctx context.Context) error {
 	return args.Error(0)
 }
 
-func (m *MockStorage) Metrics() storage.StorageMetrics {
+func (m *MockStorage) Metrics() *storage.StorageMetrics {
 	args := m.Called()
-	return args.Get(0).(storage.StorageMetrics)
+	return args.Get(0).(*storage.StorageMetrics)
 }
 
 // Test that the new factory-based storage is used in health checks
@@ -114,7 +114,7 @@ func TestHealthChecker_CheckSeaweedFS_FactorySuccess(t *testing.T) {
 
 	mockStorage := new(MockStorage)
 	mockStorage.On("Health", mock.Anything).Return(nil)
-	mockStorage.On("Metrics").Return(storage.StorageMetrics{
+	mockStorage.On("Metrics").Return(&storage.StorageMetrics{
 		TotalUploads:         100,
 		SuccessfulUploads:    95,
 		FailedUploads:        5,

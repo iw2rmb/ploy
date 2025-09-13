@@ -8,7 +8,7 @@ Reuse First
 
 Scope
 - Provider abstraction: `git_provider = gitlab` (default) with envs `GITLAB_URL`, `GITLAB_TOKEN` (no secrets in YAML).
-- Infer GitLab project (namespace/name) from `target_repo` URL in transflow.yaml.
+- Infer GitLab project (namespace/name) from `target_repo` URL in mod.yaml.
 - MR target branch is always `base_ref`.
 - Create workflow branch at start; push commits; create MR (title/body from step summaries); update MR on new commits.
 

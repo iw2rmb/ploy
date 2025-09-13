@@ -43,8 +43,8 @@ func TestNew_WithEnvironment_OverridesDefaults(t *testing.T) {
 	t.Parallel()
 
 	// Ensure env is cleaned up
-	os.Setenv("PLOY_APP_NAME", "override")
-	t.Cleanup(func() { os.Unsetenv("PLOY_APP_NAME") })
+	_ = os.Setenv("PLOY_APP_NAME", "override")
+	t.Cleanup(func() { _ = os.Unsetenv("PLOY_APP_NAME") })
 
 	defaults := &cfg.Config{
 		App: cfg.AppConfig{
@@ -98,8 +98,8 @@ func TestNew_WithFile_AndEnv_MergesWithOverride(t *testing.T) {
 		t.Fatalf("failed writing test config: %v", err)
 	}
 
-	os.Setenv("PLOY_APP_NAME", "env-app")
-	t.Cleanup(func() { os.Unsetenv("PLOY_APP_NAME") })
+	_ = os.Setenv("PLOY_APP_NAME", "env-app")
+	t.Cleanup(func() { _ = os.Unsetenv("PLOY_APP_NAME") })
 
 	svc, err := cfg.New(cfg.WithFile(path), cfg.WithEnvironment("PLOY_"))
 	if err != nil {

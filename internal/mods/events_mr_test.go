@@ -6,7 +6,7 @@ import (
 )
 
 func TestMRAppendHelpers(t *testing.T) {
-	res := &TransflowResult{}
+	res := &ModResult{}
 	mrAppendFailure(res, nil) // no-op
 	if len(res.StepResults) != 0 {
 		t.Fatalf("expected no steps yet")

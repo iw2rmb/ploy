@@ -1,11 +1,10 @@
 {
   "id": "llm-1",
   "status": "success",
-  "artifact": "/mnt/transflow-out/run-20250904-120000/llm-1/diff.patch",
+  "artifact": "/mnt/mods-out/run-20250904-120000/llm-1/diff.patch",
   "notes": "Applied diff and build passed in 62s",
-  "job_name": "transflow-llm-exec-run-20250904-120000-llm-1",
+  "job_name": "mods-llm-exec-run-20250904-120000-llm-1",
   "job_id": "6f2a3f01-8c9e-4a16-bf7e-9d3a1a4a92b1",
   "started_at": "2025-09-04T12:03:10Z",
   "finished_at": "2025-09-04T12:04:12Z"
 }
-

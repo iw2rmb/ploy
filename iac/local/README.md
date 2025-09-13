@@ -6,7 +6,7 @@ This directory contains configuration and automation for setting up a local test
 
 The local testing environment provides:
 - **Fast Feedback**: Run tests locally without VPS deployment
-- **Service Stack**: Consul, Nomad, SeaweedFS, PostgreSQL, Redis
+- **Service Stack**: Consul, Nomad, SeaweedFS, Redis
 - **Test Isolation**: Clean environment for each test run
 - **Development Parity**: Close to production configuration
 
@@ -22,8 +22,8 @@ The local testing environment provides:
 │  │  :8500      │  │   :4646     │  │ :9333/8888  │     │
 │  └─────────────┘  └─────────────┘  └─────────────┘     │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
-│  │ PostgreSQL  │  │    Redis    │  │   Traefik   │     │
-│  │   :5432     │  │    :6379    │  │   :80/443   │     │
+│                 │  │    Redis    │  │   Traefik   │     │
+│                 │  │    :6379    │  │   :80/443   │     │
 │  └─────────────┘  └─────────────┘  └─────────────┘     │
 ├─────────────────────────────────────────────────────────┤
 │  Local Ploy Controller :8081                           │
@@ -98,12 +98,7 @@ make test-local
 - **Volume**: http://localhost:8080
 - **Replication**: None (single instance)
 
-### PostgreSQL (Database)
-- **Host**: localhost:5432
-- **Database**: ploy_test
-- **User**: ploy
-- **Password**: ploy-test
-- **Mode**: Testing with sample data
+
 
 ### Redis (Caching)
 - **Host**: localhost:6379
@@ -147,13 +142,6 @@ CONSUL_HTTP_ADDR=localhost:8500
 NOMAD_ADDR=http://localhost:4646
 SEAWEEDFS_MASTER=http://localhost:9333
 SEAWEEDFS_FILER=http://localhost:8888
-
-# Database connections
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-POSTGRES_USER=ploy
-POSTGRES_PASSWORD=ploy-test
-POSTGRES_DATABASE=ploy_test
 
 # Redis connection
 REDIS_ADDR=localhost:6379
@@ -283,7 +271,6 @@ If you encounter port conflicts, check which processes are using the ports:
 lsof -i :8500  # Consul
 lsof -i :4646  # Nomad
 lsof -i :9333  # SeaweedFS Master
-lsof -i :5432  # PostgreSQL
 lsof -i :6379  # Redis
 
 # Kill conflicting processes
@@ -310,7 +297,6 @@ chmod -R 755 iac/local/
 curl -f http://localhost:8500/v1/status/leader
 curl -f http://localhost:4646/v1/status/leader
 curl -f http://localhost:9333/dir/status
-pg_isready -h localhost -p 5432 -U ploy
 redis-cli -h localhost -p 6379 ping
 ```
 

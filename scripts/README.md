@@ -20,7 +20,7 @@ scripts/
 ├── build-openrewrite-container.sh  # OpenRewrite container build
 ├── setup-dev-dns.sh                # Development DNS configuration
 ├── setup-harbor-rbac.sh             # Harbor registry permissions
-├── setup-vps-transflow-testing.sh  # VPS transflow environment setup
+├── setup-vps-transflow-testing.sh  # VPS mods environment setup
 ├── validate-phase1-setup.sh        # Phase 1 environment validation
 ├── validate-arf-openrewrite-setup.sh # ARF OpenRewrite validation
 ├── validate-documentation-vps.sh   # Documentation validation on VPS

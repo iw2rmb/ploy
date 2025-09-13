@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -33,18 +34,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to open file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	key := fmt.Sprintf("%s/%s", cfg.Storage.Bucket, "api-binaries/test/api")
-	if err := store.Put(nil, key, file); err != nil {
+	if err := store.Put(context.TODO(), key, file); err != nil {
 		log.Fatalf("upload failed: %v", err)
 	}
 
-	reader, err := store.Get(nil, key)
+	reader, err := store.Get(context.TODO(), key)
 	if err != nil {
 		log.Fatalf("download failed: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 	buf := make([]byte, 16)
 	n, _ := io.ReadFull(reader, buf)
 	fmt.Printf("Uploaded and retrieved %d bytes successfully\n", n)

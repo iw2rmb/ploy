@@ -25,7 +25,7 @@ func VerifySignature(artifact, sigPath string) error {
 		return nil
 	}
 	if idre := os.Getenv("COSIGN_VERIFY_IDENTITY_REGEXP"); idre != "" {
-		os.Setenv("COSIGN_EXPERIMENTAL", "1")
+		_ = os.Setenv("COSIGN_EXPERIMENTAL", "1")
 		cmd := exec.Command("cosign", "verify-blob", "--certificate-identity-regexp", idre, "--signature", sigPath, artifact)
 		b, err := cmd.CombinedOutput()
 		if err != nil {

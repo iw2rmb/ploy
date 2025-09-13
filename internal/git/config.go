@@ -34,7 +34,7 @@ func (r *Repository) parseGitConfig() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open git config: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	inOriginSection := false

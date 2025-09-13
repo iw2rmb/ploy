@@ -476,7 +476,6 @@ echo "Available services:"
 echo "  - Consul UI: http://localhost:8500"
 echo "  - Nomad UI: http://localhost:4646"
 echo "  - SeaweedFS: http://localhost:9333"
-echo "  - PostgreSQL: localhost:5432"
 echo "  - Redis: localhost:6379"
 echo ""
 echo "Run 'make test-local' to execute tests"
@@ -822,6 +821,8 @@ jobs:
 
 ### 5. Test Data Management System
 
+Note: SQL-based test database setup is deferred; the example below is retained for reference only and is not used in the current system.
+
 #### 5.1 Test Database Setup (`internal/testutil/database.go`)
 ```go
 package testutil
@@ -841,8 +842,8 @@ func SetupTestDB(t *testing.T) *sql.DB {
     t.Helper()
     
     // Connect to postgres
-    db, err := sql.Open("postgres", 
-        "postgres://ploy:ploy-test@localhost:5432/ploy_test?sslmode=disable")
+    // Deferred: SQL-based DB connection string (example only)
+    db, err := sql.Open("sqlite3", "file:test.db?_foreign_keys=on")
     if err != nil {
         t.Fatalf("Failed to connect to test database: %v", err)
     }

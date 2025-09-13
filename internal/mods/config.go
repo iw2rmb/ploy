@@ -3,14 +3,16 @@ package mods
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"time"
+
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
-type TransflowStep struct {
+type ModStep struct {
 	Type    string   `yaml:"type"`
 	ID      string   `yaml:"id"`
 	Engine  string   `yaml:"engine"`
@@ -30,7 +32,7 @@ type TransflowStep struct {
 	MaxParallel        int        `yaml:"max_parallel_execs,omitempty"`
 }
 
-type TransflowConfig struct {
+type ModConfig struct {
 	Version      string          `yaml:"version"`
 	ID           string          `yaml:"id"`
 	TargetRepo   string          `yaml:"target_repo"`
@@ -38,16 +40,32 @@ type TransflowConfig struct {
 	BaseRef      string          `yaml:"base_ref"`
 	Lane         string          `yaml:"lane"`
 	BuildTimeout string          `yaml:"build_timeout"`
-	Steps        []TransflowStep `yaml:"steps"`
+	Steps        []ModStep       `yaml:"steps"`
 	SelfHeal     *SelfHealConfig `yaml:"self_heal"`
+	SBOM         *SBOMConfig     `yaml:"sbom,omitempty"`
+	Security     *SecurityConfig `yaml:"security,omitempty"`
 }
 
-func LoadConfig(path string) (*TransflowConfig, error) {
-	b, err := ioutil.ReadFile(path)
+// SBOMConfig controls SBOM behavior for this Mods run
+type SBOMConfig struct {
+	Enabled     bool     `yaml:"enabled"`
+	Types       []string `yaml:"types,omitempty"`         // source|artifact|container (currently only source used controller-side)
+	FailOnError bool     `yaml:"fail_on_error,omitempty"` // when true, controller-side SBOM errors fail the run
+}
+
+// SecurityConfig controls optional vulnerability scanning based on SBOM
+type SecurityConfig struct {
+	Enabled        bool   `yaml:"enabled,omitempty"`
+	MinSeverity    string `yaml:"min_severity,omitempty"`     // low|medium|high|critical
+	FailOnFindings bool   `yaml:"fail_on_findings,omitempty"` // when true, fail run if findings >= MinSeverity
+}
+
+func LoadConfig(path string) (*ModConfig, error) {
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var cfg TransflowConfig
+	var cfg ModConfig
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
@@ -60,6 +78,23 @@ func LoadConfig(path string) (*TransflowConfig, error) {
 		if cfg.SelfHeal.MaxRetries == 0 {
 			cfg.SelfHeal.MaxRetries = GetDefaultSelfHealConfig().MaxRetries
 		}
+
+		// Apply default SBOM config
+		if cfg.SBOM == nil {
+			cfg.SBOM = &SBOMConfig{Enabled: true, Types: []string{"source"}, FailOnError: false}
+		} else {
+			if len(cfg.SBOM.Types) == 0 {
+				cfg.SBOM.Types = []string{"source"}
+			}
+		}
+		// Security defaults
+		if cfg.Security == nil {
+			cfg.Security = &SecurityConfig{Enabled: false, MinSeverity: "high", FailOnFindings: true}
+		} else {
+			if cfg.Security.MinSeverity == "" {
+				cfg.Security.MinSeverity = "high"
+			}
+		}
 		// Cooldown defaults to empty string, so no need to set it
 		// For enabled field, explicit false should remain false, no default needed
 	}
@@ -71,7 +106,7 @@ func LoadConfig(path string) (*TransflowConfig, error) {
 	return &cfg, nil
 }
 
-func (c *TransflowConfig) Validate() error {
+func (c *ModConfig) Validate() error {
 	if c.ID == "" {
 		return errors.New("id is required")
 	}
@@ -116,6 +151,16 @@ func (c *TransflowConfig) Validate() error {
 		}
 	}
 
+	// Validate SBOM configuration
+	if c.SBOM != nil {
+		allowed := map[string]bool{"source": true, "artifact": true, "container": true}
+		for _, t := range c.SBOM.Types {
+			if !allowed[strings.ToLower(t)] {
+				return fmt.Errorf("invalid sbom type: %s (allowed: source, artifact, container)", t)
+			}
+		}
+	}
+
 	// Validate build timeout if provided
 	if c.BuildTimeout != "" {
 		if _, err := c.ParseBuildTimeout(); err != nil {
@@ -126,7 +171,7 @@ func (c *TransflowConfig) Validate() error {
 	return nil
 }
 
-func (c *TransflowConfig) ParseBuildTimeout() (time.Duration, error) {
+func (c *ModConfig) ParseBuildTimeout() (time.Duration, error) {
 	if c.BuildTimeout == "" {
 		return 10 * time.Minute, nil // default
 	}

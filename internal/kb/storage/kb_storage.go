@@ -148,7 +148,7 @@ func (s *KBStorage) storeJSON(ctx context.Context, key string, data interface{})
 		}
 		return fmt.Errorf("failed to store data: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("storage failed with status %d", resp.StatusCode)
@@ -173,7 +173,7 @@ func (s *KBStorage) retrieveJSON(ctx context.Context, key string, target interfa
 		}
 		return fmt.Errorf("failed to retrieve data: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == 404 {
 		return fmt.Errorf("not found")

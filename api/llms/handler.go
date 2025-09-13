@@ -92,10 +92,10 @@ func (h *Handler) ListModels(c *fiber.Ctx) error {
 		var model models.LLMModel
 		decoder := json.NewDecoder(reader)
 		if err := decoder.Decode(&model); err != nil {
-			reader.Close()
+			_ = reader.Close()
 			continue // Skip invalid models
 		}
-		reader.Close()
+		_ = reader.Close()
 
 		// Apply filters
 		if provider != "" && model.Provider != provider {
@@ -140,7 +140,7 @@ func (h *Handler) GetModel(c *fiber.Ctx) error {
 			"error": fmt.Sprintf("failed to get model: %v", err),
 		})
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	var model models.LLMModel
 	decoder := json.NewDecoder(reader)
@@ -252,12 +252,12 @@ func (h *Handler) UpdateModel(c *fiber.Ctx) error {
 	var existingModel models.LLMModel
 	decoder := json.NewDecoder(reader)
 	if err := decoder.Decode(&existingModel); err != nil {
-		reader.Close()
+		_ = reader.Close()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to parse existing model data",
 		})
 	}
-	reader.Close()
+	_ = reader.Close()
 
 	// Validate update
 	if err := h.validator.ValidateModelUpdate(&existingModel, &updatedModel); err != nil {
@@ -374,13 +374,13 @@ func (h *Handler) GetDefaultModel(c *fiber.Ctx) error {
 		if json.NewDecoder(r).Decode(&obj) == nil && obj.ID != "" {
 			modelID = obj.ID
 		}
-		r.Close()
+		_ = r.Close()
 	}
 	if modelID != "" {
 		// Attempt to fetch by id
 		key := fmt.Sprintf("llms/models/%s", modelID)
 		if r, err := h.storage.Get(ctx, key); err == nil {
-			defer r.Close()
+			defer func() { _ = r.Close() }()
 			var m models.LLMModel
 			if json.NewDecoder(r).Decode(&m) == nil {
 				return c.JSON(m)
@@ -408,11 +408,11 @@ func (h *Handler) GetDefaultModel(c *fiber.Ctx) error {
 				first = &mm
 			}
 			if m.HasCapability("code") {
-				r.Close()
+				_ = r.Close()
 				return c.JSON(m)
 			}
 		}
-		r.Close()
+		_ = r.Close()
 	}
 	if first != nil {
 		return c.JSON(first)

@@ -21,7 +21,7 @@ func runApiDeploy(args []string) {
 	// Legacy background flag (now default behavior)
 	legacyBackground := deployCmd.Bool("background", false, "[DEPRECATED] Run in background (now default)")
 
-	deployCmd.Parse(args)
+	_ = deployCmd.Parse(args)
 
 	// Validate timeout
 	if *timeoutMinutes < 1 || *timeoutMinutes > 10 {
@@ -126,7 +126,7 @@ func runAnsibleDeployment(timeoutMinutes int) {
 
 	// Update PID and save deployment state
 	deploymentState.PID = ansibleCmd.Process.Pid
-	saveDeploymentState(deploymentState)
+	_ = saveDeploymentState(deploymentState)
 
 	// Wait for completion
 	if err := ansibleCmd.Wait(); err != nil {
@@ -144,7 +144,7 @@ func runAnsibleDeployment(timeoutMinutes int) {
 	fmt.Println("Ansible deployment completed successfully!")
 
 	// Clear deployment state on successful completion
-	clearDeploymentState()
+	_ = clearDeploymentState()
 }
 
 func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
@@ -184,7 +184,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		fmt.Printf("Error creating log file: %v\n", err)
 		return
 	}
-	defer log.Close()
+	defer func() { _ = log.Close() }()
 
 	// Create context with configurable timeout
 	timeout := time.Duration(timeoutMinutes) * time.Minute
@@ -234,7 +234,9 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 
 		// Update PID and save deployment state
 		deploymentState.PID = ansibleCmd.Process.Pid
-		saveDeploymentState(deploymentState)
+		if err := saveDeploymentState(deploymentState); err != nil {
+			fmt.Printf("warning: failed to save deployment state: %v\n", err)
+		}
 
 		fmt.Printf("Deployment started in background (PID: %d)\n", ansibleCmd.Process.Pid)
 		fmt.Printf("Monitoring deployment progress (timeout: %d minutes)...\n", timeoutMinutes)
@@ -248,7 +250,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 				if n > 0 {
 					output := string(buf[:n])
 					fmt.Print(output)
-					log.WriteString(output)
+					_, _ = log.WriteString(output)
 				}
 				if err != nil {
 					break
@@ -263,7 +265,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 				if n > 0 {
 					output := string(buf[:n])
 					fmt.Print(output)
-					log.WriteString(output)
+					_, _ = log.WriteString(output)
 				}
 				if err != nil {
 					break
@@ -299,7 +301,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 
 		// Update PID and save deployment state
 		deploymentState.PID = ansibleCmd.Process.Pid
-		saveDeploymentState(deploymentState)
+		_ = saveDeploymentState(deploymentState)
 
 		fmt.Printf("Deployment started in background (PID: %d)\n", ansibleCmd.Process.Pid)
 		fmt.Printf("Timeout: %d minutes\n", timeoutMinutes)
@@ -317,12 +319,12 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		go func() {
 			if err := ansibleCmd.Wait(); err != nil {
 				if ctx.Err() == context.DeadlineExceeded {
-					log.WriteString(fmt.Sprintf("\n\nDeployment timed out after %d minutes\n", timeoutMinutes))
+					_, _ = fmt.Fprintf(log, "\n\nDeployment timed out after %d minutes\n", timeoutMinutes)
 				} else {
-					log.WriteString(fmt.Sprintf("\n\nDeployment failed: %v\n", err))
+					_, _ = fmt.Fprintf(log, "\n\nDeployment failed: %v\n", err)
 				}
 			} else {
-				log.WriteString("\n\nDeployment completed successfully!\n")
+				_, _ = log.WriteString("\n\nDeployment completed successfully!\n")
 			}
 		}()
 	}

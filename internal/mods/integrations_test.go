@@ -5,14 +5,14 @@ import (
 )
 
 func TestCreateConfiguredRunner_WiresDefaultModules(t *testing.T) {
-	cfg := &TransflowConfig{
+	cfg := &ModConfig{
 		Version:      "v1alpha1",
 		ID:           "unit-modules",
 		TargetRepo:   "https://example.com/repo.git",
 		TargetBranch: "main",
 		BaseRef:      "main",
 		Lane:         "C",
-		Steps: []TransflowStep{{
+		Steps: []ModStep{{
 			Type:    "orw-apply",
 			ID:      "s1",
 			Engine:  "openrewrite",
@@ -20,7 +20,7 @@ func TestCreateConfiguredRunner_WiresDefaultModules(t *testing.T) {
 		}},
 		SelfHeal: GetDefaultSelfHealConfig(),
 	}
-	integ := NewTransflowIntegrationsWithTestMode("http://controller/v1", t.TempDir(), false)
+	integ := NewModIntegrationsWithTestMode("http://controller/v1", t.TempDir(), false)
 	r, err := integ.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("CreateConfiguredRunner: %v", err)

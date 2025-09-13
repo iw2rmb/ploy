@@ -4,9 +4,9 @@
 Centralized testing utilities and E2E validation framework providing comprehensive testing infrastructure for the Ploy platform with VPS production environment support.
 
 ## Architecture Overview
-The testing module consolidates all test helpers, mocks, builders, and fixtures into a well-organized testing infrastructure. The module includes comprehensive E2E validation capabilities with Makefile build system integration supporting VPS production testing, complete transflow workflow validation, and GitLab integration testing.
+The testing module consolidates all test helpers, mocks, builders, and fixtures into a well-organized testing infrastructure. The module includes comprehensive E2E validation capabilities with Makefile build system integration supporting VPS production testing, complete mods workflow validation, and GitLab integration testing.
 
-**E2E Test Integration with Makefile Build System** - Production-ready end-to-end testing infrastructure integrated with Makefile build system providing comprehensive workflow validation. Supports VPS environment testing with real GitLab operations, transflow workflow validation including Java migration and self-healing, and distributed job orchestration testing with Nomad and Consul backends.
+**E2E Test Integration with Makefile Build System** - Production-ready end-to-end testing infrastructure integrated with Makefile build system providing comprehensive workflow validation. Supports VPS environment testing with real GitLab operations, mods workflow validation including Java migration and self-healing, and distributed job orchestration testing with Nomad and Consul backends.
 
 ## Module Structure
 - `mocks/` - Mock implementations for all platform interfaces
@@ -20,7 +20,7 @@ The testing module consolidates all test helpers, mocks, builders, and fixtures 
 
 ## Key Components
 ### E2E Testing Infrastructure
-- Complete transflow workflow validation from CLI to GitLab MR creation
+- Complete mods workflow validation from CLI to GitLab MR creation
 - VPS production environment testing with real service interactions
 - Java migration workflow testing with OpenRewrite recipe validation
 - Self-healing capability testing with KB learning integration

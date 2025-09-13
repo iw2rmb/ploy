@@ -138,28 +138,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # Database
-  postgres:
-    image: postgres:15.4
-    container_name: ploy-postgres
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=ploy_test
-      - POSTGRES_USER=ploy
-      - POSTGRES_PASSWORD=ploy-test
-      - POSTGRES_INITDB_ARGS=--auth-local=trust
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./config/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-    networks:
-      - ploy-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ploy -d ploy_test"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+  
 
   # Caching
   redis:
@@ -223,8 +202,6 @@ volumes:
   seaweedfs_volume_data:
     driver: local
   seaweedfs_filer_data:
-    driver: local
-  postgres_data:
     driver: local
   redis_data:
     driver: local

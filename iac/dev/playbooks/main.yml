@@ -475,89 +475,9 @@
         dest: /usr/local/bin/rewrite
         mode: '0755'
 
-    - name: Install PostgreSQL for ARF learning database
-      apt:
-        name:
-          - postgresql
-          - postgresql-contrib
-          - postgresql-client
-          - libpq-dev
-          - python3-psycopg2
-        state: present
+    # PostgreSQL tasks removed (no SQL database in use)
 
-    - name: Start and enable PostgreSQL
-      systemd:
-        name: postgresql
-        state: started
-        enabled: true
-
-    - name: Create ARF database user
-      become_user: postgres
-      postgresql_user:
-        name: ploy
-        password: "{{ arf_db_password | default('arf_dev_password') }}"
-        state: present
-
-    - name: Create ARF learning database
-      become_user: postgres
-      postgresql_db:
-        name: arf_learning
-        owner: ploy
-        state: present
-
-    - name: Grant all privileges on ARF database to ploy user
-      become_user: postgres
-      postgresql_privs:
-        db: arf_learning
-        privs: ALL
-        type: database
-        role: ploy
-        state: present
-
-    - name: Install tree-sitter CLI for multi-language AST parsing
-      block:
-        - name: Check if tree-sitter is installed
-          stat:
-            path: /usr/local/bin/tree-sitter
-          register: tree_sitter_binary
-
-        - name: Download tree-sitter CLI
-          get_url:
-            url: "https://github.com/tree-sitter/tree-sitter/releases/download/v{{ tree_sitter_version }}/tree-sitter-linux-x64.gz"
-            dest: /tmp/tree-sitter.gz
-          vars:
-            tree_sitter_version: "0.20.8"
-          when: not tree_sitter_binary.stat.exists
-
-        - name: Extract tree-sitter CLI
-          shell: |
-            gunzip /tmp/tree-sitter.gz
-            mv /tmp/tree-sitter /usr/local/bin/tree-sitter
-            chmod +x /usr/local/bin/tree-sitter
-          when: not tree_sitter_binary.stat.exists
-
-        - name: Install Node.js first for npm commands
-          shell: |
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            apt-get install -y nodejs
-          args:
-            creates: /usr/bin/node
-          
-        - name: Install tree-sitter language parsers
-          npm:
-            name: "{{ item }}"
-            global: true
-            state: latest
-          loop:
-            - tree-sitter-cli
-            - tree-sitter-java
-            - tree-sitter-javascript
-            - tree-sitter-typescript
-            - tree-sitter-python
-            - tree-sitter-go
-            - tree-sitter-rust
-            - tree-sitter-c
-            - tree-sitter-cpp
+    # Tree-sitter removed: CLI and parsers not installed
 
     - name: Install LLM API dependencies
       block:
@@ -988,10 +908,10 @@
             
             - name: "Multi-Language AST Parser"
               binary: "arf-multi-lang-parser"
-              description: "Parses code using tree-sitter for multiple languages"
+              description: "(Deprecated) Tree-sitter parsing pipeline removed"
               commands:
                 - "Detecting source language..."
-                - "Loading tree-sitter parser..."
+                - "Skipping tree-sitter parser loading (deprecated)"
                 - "Parsing AST structure..."
                 - "Extracting symbols and imports..."
               sim_time: 3
@@ -1040,14 +960,6 @@
               echo "========================================"
               echo ""
               
-              # Check database connectivity
-              echo "Checking PostgreSQL connection..."
-              if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
-                  echo "✅ PostgreSQL: Ready"
-              else
-                  echo "❌ PostgreSQL: Not available"
-              fi
-              
               # Check Redis connectivity  
               echo "Checking Redis connection..."
               if redis-cli ping > /dev/null 2>&1; then
@@ -1056,23 +968,8 @@
                   echo "❌ Redis: Not available"
               fi
               
-              # Check tree-sitter installation
-              echo "Checking tree-sitter installation..."
-              if command -v tree-sitter >/dev/null 2>&1; then
-                  echo "✅ Tree-sitter: $(tree-sitter --version)"
-              else
-                  echo "❌ Tree-sitter: Not installed"
-              fi
-              
-              # Check language parsers
-              echo "Checking language parsers..."
+              # Tree-sitter checks removed
               parser_count=0
-              for parser in tree-sitter-java tree-sitter-javascript tree-sitter-python tree-sitter-go; do
-                  if npm list -g "$parser" >/dev/null 2>&1; then
-                      parser_count=$((parser_count + 1))
-                  fi
-              done
-              echo "✅ Language parsers: $parser_count/4 installed"
               
               # Check Python dependencies
               echo "Checking Python LLM dependencies..."
@@ -1096,7 +993,7 @@
               echo ""
               echo "ARF Phase 3 validation complete."
               
-              if [ "$parser_count" -ge 3 ] && [ "$python_deps" -ge 4 ]; then
+              if [ "$python_deps" -ge 4 ]; then
                   echo "🎉 Infrastructure ready for ARF Phase 3 testing"
                   exit 0
               else
@@ -1129,14 +1026,13 @@
           export ARF_SANDBOX_BASE_DIR=/tmp/arf-sandboxes
           export ARF_CACHE_DIR=/tmp/arf-cache
           
-          # ARF Phase 3 - LLM Integration & Learning
-          export ARF_LEARNING_DB_URL="postgres://ploy:{{ arf_db_password | default('arf_dev_password') }}@localhost/arf_learning?sslmode=disable"
-          export ARF_TREE_SITTER_PATH=/usr/local/bin/tree-sitter
+          # ARF Phase 3 - LLM Integration & Learning (DB disabled)
+          # Tree-sitter removed
           export ARF_LLM_CACHE_DIR=/tmp/arf-llm-cache
           export ARF_AB_TEST_DIR=/tmp/arf-ab-tests
           
           # Tree-sitter parser paths
-          export TREE_SITTER_PARSER_DIR=/usr/local/lib/node_modules
+          # Tree-sitter removed
           
           # ARF Phase 4 - Security & Production Hardening
           export ARF_SECURITY_CONFIG_DIR=/etc/ploy/security

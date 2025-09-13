@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/open-policy-agent/opa/ast"
+	"github.com/open-policy-agent/opa/ast" //nolint:staticcheck // using v0.x ast in tests for syntax checks
 )
 
 // TestRegoPolicies_SyntaxValid ensures all .rego files under policies/ parse successfully.

@@ -8,7 +8,7 @@ import (
 )
 
 // runPushWithEvents runs push and emits start/failure events, returning a StepResult.
-func runPushWithEvents(r *TransflowRunner, ctx context.Context, repoPath, branchName string) (StepResult, error) {
+func runPushWithEvents(r *ModRunner, ctx context.Context, repoPath, branchName string) (StepResult, error) {
 	start := time.Now()
 	r.emit(ctx, "push", "push", "info", "Pushing branch")
 	if err := r.runPushStep(ctx, repoPath, branchName); err != nil {

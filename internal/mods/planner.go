@@ -12,7 +12,7 @@ import (
 )
 
 // executePlannerMode renders and optionally submits planner job
-func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
+func executePlannerMode(runner *ModRunner, preserve, verbose bool) error {
 	ctx := context.Background()
 	assets, err := runner.RenderPlannerAssets()
 	if err != nil {
@@ -66,9 +66,9 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		runner.emit(ctx, "planner", "preserve", "info", fmt.Sprintf("Workspace preserved at: %s", runner.workspaceDir))
 	}
 
-	// Optionally submit if TRANSFLOW_SUBMIT=1
-	if os.Getenv("TRANSFLOW_SUBMIT") != "1" {
-		runner.emit(ctx, "planner", "submit", "info", "Skipping submission (unset TRANSFLOW_SUBMIT)")
+	// Optionally submit if MODS_SUBMIT=1
+	if os.Getenv("MODS_SUBMIT") != "1" {
+		runner.emit(ctx, "planner", "submit", "info", "Skipping submission (unset MODS_SUBMIT)")
 		return nil
 	}
 
@@ -79,11 +79,11 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 	}
 
 	// Attempt to read plan.json from URL or locally (also support SeaweedFS filer via bucket/key)
-	if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
+	if url := os.Getenv("MODS_PLAN_URL"); url != "" {
 		client := &http.Client{Timeout: 15 * time.Second}
 		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == 200 {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			b, _ := io.ReadAll(resp.Body)
 			if err := validatePlanJSON(b); err != nil {
 				runner.emit(ctx, "planner", "validate", "error", fmt.Sprintf("plan.json schema invalid: %v", err))
@@ -100,13 +100,13 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		}
 	}
 
-	if filer := os.Getenv("TRANSFLOW_FILER"); filer != "" {
+	if filer := os.Getenv("MODS_FILER"); filer != "" {
 		client := &http.Client{Timeout: 15 * time.Second}
-		if bucket := os.Getenv("TRANSFLOW_BUCKET"); bucket != "" {
-			if key := os.Getenv("TRANSFLOW_PLAN_KEY"); key != "" {
+		if bucket := os.Getenv("MODS_BUCKET"); bucket != "" {
+			if key := os.Getenv("MODS_PLAN_KEY"); key != "" {
 				url := strings.TrimRight(filer, "/") + "/" + strings.TrimLeft(bucket, "/") + "/" + strings.TrimLeft(key, "/")
 				if resp, err := client.Get(url); err == nil && resp.StatusCode == 200 {
-					defer resp.Body.Close()
+					defer func() { _ = resp.Body.Close() }()
 					if b, err := io.ReadAll(resp.Body); err == nil {
 						if err := validatePlanJSON(b); err != nil {
 							runner.emit(ctx, "planner", "validate", "error", fmt.Sprintf("plan.json schema invalid: %v", err))
@@ -121,7 +121,7 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 	}
 
 	// Attempt to read plan.json locally if provided
-	planPath := os.Getenv("TRANSFLOW_PLAN_PATH")
+	planPath := os.Getenv("MODS_PLAN_PATH")
 	if planPath == "" {
 		// Fallback to workspace/planner/out/plan.json (works if out volume maps locally)
 		planPath = filepath.Join(filepath.Dir(renderedPath), "out", "plan.json")
@@ -173,15 +173,15 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 	}
 
 	if len(planBytes) == 0 {
-		fmt.Println("Planner job completed. Could not read plan.json locally; set TRANSFLOW_PLAN_PATH or TRANSFLOW_PLAN_URL.")
+		fmt.Println("Planner job completed. Could not read plan.json locally; set MODS_PLAN_PATH or MODS_PLAN_URL.")
 	}
 
 	// Optional reducer artifact print (if provided externally)
-	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
+	if url := os.Getenv("MODS_NEXT_URL"); url != "" {
 		client := &http.Client{Timeout: 15 * time.Second}
 		resp, err := client.Get(url)
 		if err == nil && resp.StatusCode == 200 {
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 			b, _ := io.ReadAll(resp.Body)
 			if err := validateNextJSON(b); err != nil {
 				runner.emit(ctx, "reducer", "validate", "error", fmt.Sprintf("next.json schema invalid: %v", err))
@@ -191,7 +191,7 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 			}
 		}
 	}
-	if np := os.Getenv("TRANSFLOW_NEXT_PATH"); np != "" {
+	if np := os.Getenv("MODS_NEXT_PATH"); np != "" {
 		if b, err := os.ReadFile(np); err == nil {
 			if err := validateNextJSON(b); err != nil {
 				runner.emit(ctx, "reducer", "validate", "error", fmt.Sprintf("next.json schema invalid: %v", err))

@@ -178,9 +178,9 @@ func makeRequest(method, url, payload string) {
 		fmt.Printf("Request error: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Print response
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 	fmt.Println() // Add newline for better formatting
 }

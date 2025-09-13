@@ -412,11 +412,11 @@ func (b *BuildOperations) parseMavenTestResults(output string) *TestResults {
 	summaryPattern := regexp.MustCompile(`Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)`)
 
 	if matches := summaryPattern.FindStringSubmatch(output); matches != nil {
-		fmt.Sscanf(matches[1], "%d", &results.Total)
+		_, _ = fmt.Sscanf(matches[1], "%d", &results.Total)
 		var failures, errors, skipped int
-		fmt.Sscanf(matches[2], "%d", &failures)
-		fmt.Sscanf(matches[3], "%d", &errors)
-		fmt.Sscanf(matches[4], "%d", &skipped)
+		_, _ = fmt.Sscanf(matches[2], "%d", &failures)
+		_, _ = fmt.Sscanf(matches[3], "%d", &errors)
+		_, _ = fmt.Sscanf(matches[4], "%d", &skipped)
 
 		results.Failed = failures + errors
 		results.Passed = results.Total - results.Failed - skipped
@@ -436,8 +436,8 @@ func (b *BuildOperations) parseGradleTestResults(output string) *TestResults {
 	// Parse test counts
 	testPattern := regexp.MustCompile(`(\d+) tests completed, (\d+) failed`)
 	if matches := testPattern.FindStringSubmatch(output); matches != nil {
-		fmt.Sscanf(matches[1], "%d", &results.Total)
-		fmt.Sscanf(matches[2], "%d", &results.Failed)
+		_, _ = fmt.Sscanf(matches[1], "%d", &results.Total)
+		_, _ = fmt.Sscanf(matches[2], "%d", &results.Failed)
 		results.Passed = results.Total - results.Failed
 	}
 
@@ -453,12 +453,12 @@ func (b *BuildOperations) parseJestResults(output string) *TestResults {
 
 	if matches := testPattern.FindStringSubmatch(output); matches != nil {
 		if matches[1] != "" {
-			fmt.Sscanf(matches[1], "%d", &results.Failed)
+			_, _ = fmt.Sscanf(matches[1], "%d", &results.Failed)
 		}
 		if matches[2] != "" {
-			fmt.Sscanf(matches[2], "%d", &results.Passed)
+			_, _ = fmt.Sscanf(matches[2], "%d", &results.Passed)
 		}
-		fmt.Sscanf(matches[3], "%d", &results.Total)
+		_, _ = fmt.Sscanf(matches[3], "%d", &results.Total)
 	}
 
 	return results

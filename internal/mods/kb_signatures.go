@@ -369,7 +369,7 @@ func ValidateSignature(signature string) bool {
 
 	// Check if all characters are valid hex
 	for _, char := range signature {
-		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
 			return false
 		}
 	}
