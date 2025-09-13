@@ -75,13 +75,14 @@ func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 	debugInstanceName := fmt.Sprintf("debug-%s-%d", app, time.Now().Unix())
 
 	if utils.Getenv("PLOY_SKIP_DEPLOY", "false") != "true" {
-		renderData := orchestration.RenderData{
-			App:         debugInstanceName,
-			ImagePath:   debugResult.ImagePath,
-			DockerImage: debugResult.DockerImage,
-			EnvVars:     envVars,
-			IsDebug:     true,
-		}
+        renderData := orchestration.RenderData{
+            App:         debugInstanceName,
+            ImagePath:   debugResult.ImagePath,
+            DockerImage: debugResult.DockerImage,
+            EnvVars:     envVars,
+            IsDebug:     true,
+            Lane:        lane,
+        }
         templatePath, err := orchestration.RenderTemplate(lane, renderData)
         if err != nil {
             return utils.ErrJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))

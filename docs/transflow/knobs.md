@@ -111,6 +111,9 @@ Timeouts
 - TRANSFLOW_ORW_APPLY_TIMEOUT: ORW apply job timeout (default: 30m)
 - TRANSFLOW_BUILD_APPLY_TIMEOUT: Apply-diff + build-gate phase timeout (default: 10m)
 
+Behavior
+- TRANSFLOW_ALLOW_PARTIAL_ORW: Allow continuing when ORW job reports failure but produced a non-empty diff.patch (default: false). Accepts true/false/1/0/yes/no.
+
 Notes
 - CLI may still respect explicit configuration options in YAML; env vars only provide defaults.
 - The controller event reporter is used when PLOY_TRANSFLOW_EXECUTION_ID is set.
