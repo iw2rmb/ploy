@@ -26,8 +26,9 @@ func (testJobHelper) SubmitReducerJob(context.Context, string, []BranchResult, *
 
 type okHCLSubmitter struct{}
 
-func (okHCLSubmitter) Validate(string) error              { return nil }
-func (okHCLSubmitter) Submit(string, time.Duration) error { return nil }
+func (okHCLSubmitter) Validate(string) error                                  { return nil }
+func (okHCLSubmitter) Submit(string, time.Duration) error                     { return nil }
+func (okHCLSubmitter) SubmitCtx(context.Context, string, time.Duration) error { return nil }
 
 // okHealer returns a completed winner without real job submission
 type okHealer struct{}

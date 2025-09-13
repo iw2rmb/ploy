@@ -43,6 +43,17 @@ func NewFanoutOrchestratorWithRunner(submitter JobSubmitter, runner ProductionBr
 	return &fanoutOrchestrator{submitter: submitter, runner: runner, hcl: DefaultHCLSubmitter{}}
 }
 
+// SetHCLSubmitterForFanout attempts to inject a custom HCLSubmitter into the
+// provided FanoutOrchestrator. Returns true if the underlying implementation
+// is the built-in fanout orchestrator and the submitter was set; false otherwise.
+func SetHCLSubmitterForFanout(fo FanoutOrchestrator, h HCLSubmitter) bool {
+	if f, ok := fo.(*fanoutOrchestrator); ok {
+		f.hcl = h
+		return true
+	}
+	return false
+}
+
 // RunHealingFanout executes parallel healing branches with first-success-wins semantics
 func (o *fanoutOrchestrator) RunHealingFanout(ctx context.Context, runCtx interface{}, branches []BranchSpec, maxParallel int) (BranchResult, []BranchResult, error) {
 	if len(branches) == 0 {
@@ -280,8 +291,8 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		result.Duration = time.Since(result.StartedAt)
 		return result
 	}
-    timeout := ResolveDefaultsFromEnv().LLMExecTimeout
-    if err := o.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+	timeout := ResolveDefaultsFromEnv().LLMExecTimeout
+	if err := o.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec job failed: %v", err)
 		result.FinishedAt = time.Now()
@@ -474,8 +485,8 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		result.Duration = time.Since(result.StartedAt)
 		return result
 	}
-    timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-    if err := o.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+	timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+	if err := o.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 		diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 		if ResolveDefaultsFromEnv().AllowPartialORW {
 			if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
