@@ -130,9 +130,9 @@ func TestDocumentationCompleteness(t *testing.T) {
     // Should fail initially - documentation incomplete
     
     requiredDocs := []string{
-        "docs/transflow/README.md",
-        "docs/transflow/configuration.md",
-        "docs/transflow/self-healing.md", 
+        "docs/mods/README.md",
+        "docs/mods/configuration.md",
+        "docs/mods/self-healing.md", 
         "docs/kb/README.md",
         "docs/api/transflow.md",
         "docs/examples/",
@@ -160,7 +160,7 @@ func TestDocumentationCompleteness(t *testing.T) {
 
 ### 2. GREEN: Documentation Implementation
 ```markdown
-# docs/transflow/README.md - Comprehensive Transflow Guide
+# docs/mods/README.md - Comprehensive Transflow Guide
 
 # Transflow: Automated Code Transformation Workflows
 
@@ -643,7 +643,7 @@ docs/
   - ✅ **GREEN Phase Completed**: Documentation implementation and creation  
     - Updated `docs/FEATURES.md` with complete "Transflow MVP ✅" section documenting all capabilities
     - Updated `CHANGELOG.md` with "[Unreleased] - Transflow MVP Release" comprehensive release notes
-    - Created `docs/transflow/README.md` - comprehensive user guide with quick start, features, configuration, troubleshooting
+    - Created `docs/mods/README.md` - comprehensive user guide with quick start, features, configuration, troubleshooting
     - Created `docs/kb/README.md` - complete KB learning system documentation with API reference
     - Created `docs/api/transflow.md` - comprehensive REST API reference for all transflow endpoints
     - Created example configurations: `docs/examples/{java-migration,self-healing,multi-step,kb-enabled}.yaml`
