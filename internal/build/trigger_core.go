@@ -80,29 +80,29 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	tmpDir, _ := os.MkdirTemp("", "ploy-build-")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-    tarPath := filepath.Join(tmpDir, "src.tar")
-    f, _ := os.Create(tarPath)
-    defer func() { _ = f.Close() }()
-    // Log incoming content length (if provided)
-    log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
-    // Prefer streaming read to avoid buffering limits and reduce proxy timeouts
-    var written int64
-    if reader := c.Context().RequestBodyStream(); reader != nil {
-        n, err := io.Copy(f, reader)
-        written = n
-        if err != nil {
-            log.Printf("[Build] Failed to stream request body: %v", err)
-            return c.Status(400).SendString("Failed to read request body: " + err.Error())
-        }
-    } else {
-        n, err := f.Write(c.Body())
-        written = int64(n)
-        if err != nil {
-            log.Printf("[Build] Failed to write request body: %v", err)
-            return c.Status(400).SendString("Failed to read request body: " + err.Error())
-        }
-    }
-    log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
+	tarPath := filepath.Join(tmpDir, "src.tar")
+	f, _ := os.Create(tarPath)
+	defer func() { _ = f.Close() }()
+	// Log incoming content length (if provided)
+	log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
+	// Prefer streaming read to avoid buffering limits and reduce proxy timeouts
+	var written int64
+	if reader := c.Context().RequestBodyStream(); reader != nil {
+		n, err := io.Copy(f, reader)
+		written = n
+		if err != nil {
+			log.Printf("[Build] Failed to stream request body: %v", err)
+			return c.Status(400).SendString("Failed to read request body: " + err.Error())
+		}
+	} else {
+		n, err := f.Write(c.Body())
+		written = int64(n)
+		if err != nil {
+			log.Printf("[Build] Failed to write request body: %v", err)
+			return c.Status(400).SendString("Failed to read request body: " + err.Error())
+		}
+	}
+	log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
 
 	srcDir := filepath.Join(tmpDir, "src")
 	if err := os.MkdirAll(srcDir, 0755); err != nil {
@@ -124,7 +124,8 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			lane = res.Lane
 			detectedLanguage = res.Language
 		} else {
-			lane = "C"
+			// Default to container lane for broad compatibility when detection is unavailable
+			lane = "E"
 		}
 	} else {
 		// Attempt language detection even when lane is forced
@@ -194,20 +195,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 		dockerImage = img
 	default:
-		lane = "C"
-		img, err := ibuilders.BuildOSVJava(ibuilders.JavaOSVRequest{
-			App:       appName,
-			MainClass: mainClass,
-			SrcDir:    srcDir,
-			GitSHA:    sha,
-			OutDir:    tmpDir,
-			EnvVars:   appEnvVars,
-		})
+		// Fallback to container lane if unspecified/unsupported
+		lane = "E"
+		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
+		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
-			log.Printf("[Build] Default OSv Java build error: %v", err)
+			log.Printf("[Build] Default OCI build error: %v", err)
 			return utils.ErrJSON(c, 500, err)
 		}
-		imagePath = img
+		dockerImage = img
 	}
 	log.Printf("[Build] Build artifact ready. imagePath=%s dockerImage=%s", imagePath, dockerImage)
 
