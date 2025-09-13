@@ -96,7 +96,9 @@ func (b *BuildOperations) ValidateBuild(ctx context.Context, repoPath string, bu
 // buildMaven runs Maven build
 func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error {
 	// First, try to run clean compile
-	cmd := exec.CommandContext(ctx, "mvn", "clean", "compile", "-B", "-DskipTests")
+	// Always pass a stable property to allow controlled profile activation in test repos
+	// This enables E2E scenarios to introduce compile-time failures only during the build gate
+	cmd := exec.CommandContext(ctx, "mvn", "clean", "compile", "-B", "-DskipTests", "-Dploy.build.gate=1")
 	cmd.Dir = repoPath
 
 	var stdout, stderr bytes.Buffer

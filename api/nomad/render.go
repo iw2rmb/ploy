@@ -418,13 +418,15 @@ func (r *RenderData) SetDefaults() {
 		}
 	}
 
-	// Default to disabled for dev/test clusters to avoid Nomad validation
-	// issues when Connect/Vault are not configured. Can be enabled
-	// explicitly by callers when the environment supports them.
+	// Default feature flags based on whether this is a platform service
+	// Align with internal/orchestration defaults: keep enterprise features
+	// disabled by default for regular apps on dev/test clusters to avoid
+	// validation issues; enable selectively for platform services.
+	isPlat := isPlatformService(*r)
 	r.ConnectEnabled = false
 	r.VaultEnabled = false
-	r.VolumeEnabled = true
-	r.ConsulConfigEnabled = true
+	r.VolumeEnabled = isPlat
+	r.ConsulConfigEnabled = isPlat
 
 	// Keep debug disabled by default for security
 	// Can be explicitly enabled when needed

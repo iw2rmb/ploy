@@ -187,18 +187,18 @@ func TestRenderDataSetDefaults(t *testing.T) {
 				t.Errorf("Expected MemoryLimit %d, got %d", tt.expectedMemoryLimit, data.MemoryLimit)
 			}
 
-			// Verify enterprise features are always enabled
-			if !data.VaultEnabled {
-				t.Error("Expected VaultEnabled to be true")
+			// Verify enterprise features default to disabled for non-platform apps
+			if data.VaultEnabled {
+				t.Error("Expected VaultEnabled to be false by default")
 			}
-			if !data.ConnectEnabled {
-				t.Error("Expected ConnectEnabled to be true")
+			if data.ConnectEnabled {
+				t.Error("Expected ConnectEnabled to be false by default")
 			}
-			if !data.VolumeEnabled {
-				t.Error("Expected VolumeEnabled to be true")
+			if data.VolumeEnabled {
+				t.Error("Expected VolumeEnabled to be false by default")
 			}
-			if !data.ConsulConfigEnabled {
-				t.Error("Expected ConsulConfigEnabled to be true")
+			if data.ConsulConfigEnabled {
+				t.Error("Expected ConsulConfigEnabled to be false by default")
 			}
 
 			// Verify debug is disabled by default
