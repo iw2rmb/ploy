@@ -53,8 +53,15 @@ fi
 EXTRA_FLAGS=()
 [[ -n "${LANE:-}" ]] && EXTRA_FLAGS+=("-lane" "$LANE")
 [[ -n "${MAIN:-}" ]] && EXTRA_FLAGS+=("-main" "$MAIN")
-if ! "$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]}"; then
-  err "ploy push failed"
+PUSH_OUT=$("$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]:-}" 2>&1)
+PUSH_RC=$?
+echo "$PUSH_OUT"
+if [[ $PUSH_RC -ne 0 ]]; then
+  err "ploy push failed (exit $PUSH_RC)"
+  exit 1
+fi
+if echo "$PUSH_OUT" | rg -q '"error"\s*:'; then
+  err "ploy push returned server error"
   exit 1
 fi
 ok "ploy push triggered"
