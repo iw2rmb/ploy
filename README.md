@@ -118,6 +118,22 @@ Ploy's **api is designed as a horizontally scalable, stateless application** tha
 
 This architecture makes the api "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
 
+## E2E Lanes Status (Active Cycle)
+- Lanes A–G repos created and scaffolded with minimal hello apps exposing `/healthz`.
+- E2E harness added:
+  - Go test `tests/e2e/lanes_e2e_test.go` runs per-lane deployments against Dev API.
+  - Shell driver `tests/lanes/test-lane-deploy.sh` wraps the core deploy script.
+  - Logs helper `tests/lanes/check-app-logs.sh` fetches controller/alloc logs.
+- CLI/script improvements:
+  - Enforce overall TIMEOUT across push + health wait; no overrun beyond budget.
+  - Preview URL uses Dev domain: `https://<sha>.<app>.dev.ployd.app<HEALTH_PATH>`.
+  - Detect `ploy push` failures by output content; exit early and fetch logs; retry once on transient EOF.
+- API/template fixes (Lane E):
+  - Safer nested conditional processing in HCL templating to avoid stray braces.
+  - Use detected language from lane picker (no default Java for non-JVM apps).
+  - Lane E Nomad template simplified for Dev: reduced log retention (10x10MB) and removed service-level checks to avoid duplicates; rely on container healthcheck.
+- Current blocker: intermittent `unexpected EOF` on `ploy push` POST requests to Dev API. Next step is API task log inspection on VPS to confirm if the request handler exits early; mitigations added (retry + early failure detection).
+
 ## Security: NVD CVE Database Configuration
 
 The ARF Security Engine can use the NVD CVE database via the `api/nvd` package. Configure via environment variables:
