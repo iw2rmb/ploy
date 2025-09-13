@@ -77,3 +77,21 @@ NEW: Model Context Protocol (MCP) Integration - Extends LLM-exec healing branche
 - `../../../platform/nomad/transflow/MCP_INTEGRATION.md` - MCP integration documentation and usage examples
 - `../git/provider/README.md` - GitLab provider implementation
 - `../../orchestration` - Production job submission and monitoring infrastructure
+## CLI Usage
+
+Transflow offers explicit subcommands for common workflows:
+
+- `ploy transflow run -f transflow.yaml [--watch] [--output json|text]`
+  - Remote execution via controller. Prints execution ID and optionally attaches a watch.
+- `ploy transflow watch -id <execution_id>`
+  - Attaches to a running transflow and streams status/events.
+- `ploy transflow render -f transflow.yaml [--work-dir DIR] [--preserve-workspace] [-v]`
+  - Renders planner inputs and HCL locally (no submission).
+- `ploy transflow plan -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]`
+  - Renders planner and optionally submits when `--submit` is set.
+- `ploy transflow reduce -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]`
+  - Renders reducer and optionally submits when `--submit` is set.
+- `ploy transflow apply -f transflow.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]`
+  - Applies a unified diff locally, commits, and runs the build gate.
+
+Use `ploy transflow` with no arguments or an unknown subcommand to print help.
