@@ -419,7 +419,6 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
     // Write debug copy of rendered HCL and validate before submission
     funcCopy := func(src string) {
-        defer func() { _ = os.Remove(src) }()
         _ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
         base := filepath.Base(src)
         dst := filepath.Join("/opt/ploy/debug/jobs", base)
