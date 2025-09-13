@@ -1,9 +1,11 @@
 package transflow
 
 import (
-	"log"
-	"os/exec"
-	"strings"
+    "context"
+    "log"
+    "os/exec"
+    "strings"
+    "time"
 )
 
 // previewTarEntries lists up to max entries from a tar archive.
@@ -27,10 +29,29 @@ func previewTarEntries(tarPath string, max int) ([]string, error) {
 
 // logPreviewTar logs a short preview of a tar archive's contents.
 func logPreviewTar(tarPath string, max int) {
-	entries, err := previewTarEntries(tarPath, max)
-	if err != nil {
-		log.Printf("[Transflow] input.tar preview failed: %v", err)
-		return
-	}
-	log.Printf("[Transflow] input.tar preview (%d entries):\n%s", len(entries), strings.Join(entries, "\n"))
+    entries, err := previewTarEntries(tarPath, max)
+    if err != nil {
+        log.Printf("[Transflow] input.tar preview failed: %v", err)
+        return
+    }
+    log.Printf("[Transflow] input.tar preview (%d entries):\n%s", len(entries), strings.Join(entries, "\n"))
+}
+
+// logPreviewTarWithReporter emits tar preview via EventReporter when available (fallback to log)
+func logPreviewTarWithReporter(rep EventReporter, phase, step, tarPath string, max int) {
+    entries, err := previewTarEntries(tarPath, max)
+    if err != nil {
+        if rep != nil {
+            _ = rep.Report(context.Background(), Event{Phase: phase, Step: step, Level: "warn", Message: "input.tar preview failed: " + err.Error(), Time: time.Now()})
+        } else {
+            log.Printf("[Transflow] input.tar preview failed: %v", err)
+        }
+        return
+    }
+    msg := strings.Join(entries, "\n")
+    if rep != nil {
+        _ = rep.Report(context.Background(), Event{Phase: phase, Step: step, Level: "info", Message: "input.tar preview:\n" + msg, Time: time.Now()})
+    } else {
+        log.Printf("[Transflow] input.tar preview (%d entries):\n%s", len(entries), msg)
+    }
 }

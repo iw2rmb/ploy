@@ -438,9 +438,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		for i := 0; i < max; i++ {
 			names = append(names, entries[i].Name())
 		}
-		log.Printf("[Transflow] Repo root after clone: %s | entries: %v", repoPath, names)
-		// Emit as event for remote visibility
-		r.emit(ctx, "clone", "clone-diagnostics", "info", fmt.Sprintf("repo=%s entries=%s", repoPath, strings.Join(names, ",")))
+        // Emit as event for remote visibility
+        r.emit(ctx, "clone", "clone-diagnostics", "info", fmt.Sprintf("repo=%s entries=%s", repoPath, strings.Join(names, ",")))
 	}
 
 	// If repository has no working tree files (besides .git), fail early
@@ -504,8 +503,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Guard: ensure repository contains a supported build file before creating input tar
 			{
 				hasPom, hasGradle, hasKts := checkBuildFiles(repoPath)
-				log.Printf("[Transflow] Build file check at %s: pom=%v gradle=%v gradle.kts=%v", repoPath, hasPom, hasGradle, hasKts)
-				r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
+                r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
 				if err := ensureBuildFile(repoPath); err != nil {
 					r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
 					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: ErrNoBuildFile.Error()})
@@ -521,8 +519,12 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to create input tar: %v", err)})
 				return nil, fmt.Errorf("failed to create input tar: %w", err)
 			}
-			// Log a brief preview of tar contents for diagnostics
-			logPreviewTar(inputTar, 20)
+            // Preview tar contents for diagnostics via reporter
+            if r.eventReporter != nil {
+                logPreviewTarWithReporter(r.eventReporter, "apply", "input-preview", inputTar, 20)
+            } else {
+                logPreviewTar(inputTar, 20)
+            }
 
 			// Pre-substitute recipe class and input tar host path into template
 			rclass := ""
@@ -564,9 +566,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 			seaweed := ResolveInfraFromEnv().SeaweedURL
 			// Upload best-effort to artifacts/transflow/<id>/input.tar using HTTP client
-			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
-				log.Printf("[Transflow] input.tar upload failed: %v", err)
-			}
+            if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
+                r.emit(ctx, "apply", "input-upload", "warn", fmt.Sprintf("input.tar upload failed: %v", err))
+            }
 			// Substitute HCL with explicit variables to avoid global env writes
 			vars := makeORWVars(baseDir, execID, diffKey, seaweed)
 			submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
@@ -580,24 +582,25 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				persistDir := filepath.Join("/tmp/transflow-submitted", execID, step.ID)
 				_ = os.MkdirAll(persistDir, 0755)
 				dest := filepath.Join(persistDir, "orw_apply.submitted.hcl")
-				if b, e := os.ReadFile(submittedPath); e == nil {
-					_ = os.WriteFile(dest, b, 0644)
-					log.Printf("[Transflow] Saved submitted HCL to %s", dest)
-				}
+                if b, e := os.ReadFile(submittedPath); e == nil {
+                    _ = os.WriteFile(dest, b, 0644)
+                    r.emit(ctx, "apply", "orw-apply", "info", fmt.Sprintf("Saved submitted HCL to %s", dest))
+                }
 			}
 
 			// Debug: log env block from submitted HCL for verification (INPUT_URL, SEAWEEDFS_URL, etc.)
-			if b, e := os.ReadFile(submittedPath); e == nil {
-				s := string(b)
-				start := strings.Index(s, "env = {")
-				if start >= 0 {
-					end := strings.Index(s[start:], "}")
-					if end > 0 {
-						block := s[start : start+end+1]
-						log.Printf("[Transflow] orw-apply env block (preview):\n%s", block)
-					}
-				}
-			}
+                if b, e := os.ReadFile(submittedPath); e == nil {
+                    s := string(b)
+                    start := strings.Index(s, "env = {")
+                    if start >= 0 {
+                        end := strings.Index(s[start:], "}")
+                        if end > 0 {
+                            block := s[start : start+end+1]
+                            // Avoid spamming controller with large blocks; only log locally
+                            _ = block
+                        }
+                    }
+                }
 			// Prepare diff path for later fetch and processing
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			_ = os.MkdirAll(filepath.Dir(diffPath), 0755)
@@ -617,24 +620,22 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
 			_ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
 
-			if fi, err := os.Stat(diffPath); err == nil {
-				log.Printf("[Transflow] Diff ready: path=%s size=%d bytes", diffPath, fi.Size())
-				r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
-				if fi.Size() == 0 {
-					// Treat empty diff as no-op: skip apply/build and continue pipeline
-					msg := "No changes produced by orw-apply; skipping apply/build"
-					log.Printf("[Transflow] %s", msg)
-					r.emit(ctx, "apply", "diff-empty", "info", msg)
-					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: true, Message: msg, Duration: time.Since(stepStart)})
-					// Continue with next steps
-					continue
-				}
-			} else {
-				log.Printf("[Transflow] Diff ready but stat failed: %v", err)
-			}
+            if fi, err := os.Stat(diffPath); err == nil {
+                r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
+                if fi.Size() == 0 {
+                    // Treat empty diff as no-op: skip apply/build and continue pipeline
+                    msg := "No changes produced by orw-apply; skipping apply/build"
+                    r.emit(ctx, "apply", "diff-empty", "info", msg)
+                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: true, Message: msg, Duration: time.Since(stepStart)})
+                    // Continue with next steps
+                    continue
+                }
+            } else {
+                r.emit(ctx, "apply", "diff-stat", "warn", fmt.Sprintf("diff stat failed: %v", err))
+            }
 
-			// Apply + build via helper with events and timeout
-			log.Printf("[Transflow] Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath)
+            // Apply + build via helper with events and timeout
+            r.emit(ctx, "build", "build-gate-start", "info", fmt.Sprintf("Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath))
 			sr, err := runApplyAndBuildWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffAndBuild)
 			result.StepResults = append(result.StepResults, sr)
 			if err != nil {
