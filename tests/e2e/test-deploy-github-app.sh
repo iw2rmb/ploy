@@ -59,8 +59,16 @@ if ! "$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]}"; then
 fi
 ok "ploy push triggered"
 
-# Determine expected URL (default to production-style domain unless overridden)
-URL=${URL_OVERRIDE:-"https://${APP_NAME}.ployd.app"}
+# Determine expected URL
+# Prefer preview router using commit SHA to trigger run, else allow override
+GIT_SHA=$(git rev-parse --short=12 HEAD 2>/dev/null || echo "")
+if [[ -n "$URL_OVERRIDE" ]]; then
+  URL="$URL_OVERRIDE"
+elif [[ -n "$GIT_SHA" ]]; then
+  URL="https://${GIT_SHA}.${APP_NAME}.ployd.app"
+else
+  URL="https://${APP_NAME}.ployd.app"
+fi
 
 HEALTH_PATH=${HEALTH_PATH:-/healthz}
 TIMEOUT=${TIMEOUT:-180}
