@@ -236,6 +236,9 @@ func (r *TransflowRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
 // SetJobHelper allows injecting a planner/reducer submission helper for testing.
 func (r *TransflowRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
 
+// GetHCLSubmitter exposes the HCLSubmitter for helpers that need it.
+func (r *TransflowRunner) GetHCLSubmitter() HCLSubmitter { return r.hcl }
+
 func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
 	if r.eventReporter != nil {
 		_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
