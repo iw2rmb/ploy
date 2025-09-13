@@ -1,12 +1,12 @@
 package main
 
 import (
-    "fmt"
-    "os"
+	"fmt"
+	"os"
 
-    "github.com/iw2rmb/ploy/internal/cli/platform"
-    "github.com/iw2rmb/ploy/internal/cli/utils"
-    "github.com/iw2rmb/ploy/internal/cli/version"
+	"github.com/iw2rmb/ploy/internal/cli/platform"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
+	"github.com/iw2rmb/ploy/internal/cli/version"
 )
 
 var controllerURL = utils.ResolveControllerURLFromEnv()

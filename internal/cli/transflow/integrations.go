@@ -217,9 +217,14 @@ func (i *TransflowIntegrations) CreateConfiguredRunner(config *TransflowConfig) 
 	runner.SetRecipeExecutor(i.CreateRecipeExecutor())
 	runner.SetBuildChecker(i.CreateBuildChecker())
 	runner.SetGitProvider(i.CreateGitProvider())
+	// Wire default modular adapters
+	runner.SetTransformationExecutor(NewTransformationExecutorAdapter(runner))
+	// BuildGate is already provided via SetBuildChecker; Repo/MR modules via SetGitOperations/SetGitProvider
 
 	// Enable self-healing by providing a no-op submitter; production path prefers runner.
 	runner.SetJobSubmitter(NoopJobSubmitter{})
+	// Wire default production healing orchestrator (wraps existing fanout)
+	runner.SetHealingOrchestrator(NewProdHealingOrchestrator(runner.jobSubmitter, runner))
 
 	// Return the embedded TransflowRunner; KB integration remains wired inside kbRunner
 	return runner, nil

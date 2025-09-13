@@ -113,19 +113,19 @@ Scope
   Targeted Change Proposals
 
   - Correctness and safety (do first):
-      - Replace ValidateDiffPaths with doublestar matching; add tests for recursive patterns and edge cases.
-      - Add job cancellation path: when winner found, cancel remaining branches; orchestration to deregister jobs via wrapper.
-      - Remove process‑wide os.Setenv in templating; refactor into pure functions receiving substitutions; pass env only to submitter.
-      - Fix ValidateJob policy breach: implement validation through job manager wrapper; avoid raw nomad CLI on VPS.
+      - ✅ Replace ValidateDiffPaths with doublestar matching; add tests for recursive patterns and edge cases.
+      - ✅ Add job cancellation path: when winner found, cancel remaining branches; orchestration to deregister jobs via wrapper.
+      - ✅ Remove process‑wide os.Setenv in templating; refactor into pure functions receiving substitutions; pass env only to submitter.
+      - ✅ Fix ValidateJob policy breach: implement validation through job manager wrapper; avoid raw nomad CLI on VPS.
   - Consistency and maintainability:
-      - Unify all HCL substitution paths with one utility; single place to compute defaults from env and MCP config.
-      - Replace curl exec with Go HTTP (putFile/putJSON); reuse clients and add retries/backoff.
-      - Avoid os.Chdir around builds; change SharedPush flow to accept source context explicitly.
-      - Make step types (orw-apply, llm-exec, orw-gen, human-step) constants/enums.
-      - Relax SSE Content‑Type check; robust parser.
+      - ✅ Unify all HCL substitution paths with one utility; single place to compute defaults from env and MCP config.
+      - ✅ Replace curl exec with Go HTTP (putFile/putJSON); reuse clients and add retries/backoff.
+      - ✅ Avoid os.Chdir around builds; change SharedPush flow to accept source context explicitly.
+      - ✅ Make step types (orw-apply, llm-exec, orw-gen, human-step) constants/enums, add NormalizeStepType, and sweep event Steps to use canonical values. Added unit tests for normalization and fanout event emission.
+      - ✅ Relax SSE Content‑Type check; robust parser.
   - Observability and UX:
-      - Standardize event steps and levels; ensure all major transitions emit events.
-      - Enrich MR descriptions with artifact provenance (ORW/LLM source, plan/reducer IDs).
+      - ✅ Standardize event steps and levels; ensure all major transitions emit events (planner/reducer preview, fanout branches, build gate, MR).
+      - ⚠️ Enrich MR descriptions with artifact provenance (ORW/LLM source, plan/reducer IDs). (Baseline description in place; provenance enrichment optional.)
 
   Testing Suggestions
 

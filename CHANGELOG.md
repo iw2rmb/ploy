@@ -3,6 +3,9 @@
 ## [Unreleased] - Transflow MVP Release
 
 ### Added
+- Transflow: Canonical StepType constants/enums (`orw-apply`, `llm-exec`, `orw-gen`, `human-step`) with `NormalizeStepType` and `IsValid`. Swept runner/fanout/KB/CLI execution and event emissions to use canonical values; planner alias `human` now normalizes to `human-step`.
+- Transflow: Instance-scoped HCLSubmitter seam for HCL validate/submit. Runner and fanout now use `HCLSubmitter` (default delegates to orchestration). Enables deterministic tests without mutating global state.
+- Transflow tests: Added normalization tests (pre-fanout and event emission) and refactored the healing integration test to inject submitter/helper/healer seams; removed reliance on global function stubs.
 - New scenario and scripts: `tests/transflow/orw-apply-llm-plan-seq` for an end-to-end flow where orw-apply build gate fails, triggering llm-plan → llm-exec → reducer. Includes run.sh to submit/stream/persist and helpers to fetch artifacts and watch events.
 - Developer workflow: added `.pre-commit-config.yaml` to run `make fmt` and `golangci-lint run` on commit; documented in AGENTS.md and docs/TESTING.md.
  - CI: added GitHub Actions job to execute pre-commit hooks across all files.
@@ -15,7 +18,7 @@
 - AGENTS.md: added mandatory Go analysis tooling section and pre-commit hooks guidance.
 - Transflow: diff path allowlist now uses doublestar globbing with `**` support; added unit tests covering `src/**/*.java`, `src/**`, and `pom.xml` to prevent false negatives in path validation.
 - Transflow: hardened SeaweedFS artifact key policy — keys must start with `transflow/` and reject path traversal/backslashes; added unit tests.
-- Transflow CLI sequential helpers: switched to context-aware job submission and centralized templating (no global env writes) for `llm-exec` and `orw-apply` preview flows.
+- Transflow CLI sequential helpers: switched to context-aware job submission and centralized templating (no global env writes) for `llm-exec` and `orw-apply` preview flows. Also standardized run IDs using constants.
 - Pre-commit: switched golangci-lint hook to official v2 pre-commit integration (rev v2.4.0) to match `.golangci.yml` (`version: 2`) and fix CI/pre-commit mismatch.
 
 ### Breaking Changes

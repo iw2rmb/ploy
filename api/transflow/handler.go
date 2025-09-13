@@ -361,8 +361,8 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 		return
 	}
 
-    // Store successful result (preserve accumulated steps/phase/last_job)
-    endTime := time.Now()
+	// Store successful result (preserve accumulated steps/phase/last_job)
+	endTime := time.Now()
 
 	// Persist known artifacts (best-effort)
 	artifacts := map[string]string{}
@@ -373,36 +373,36 @@ func (h *Handler) executeTransflow(executionID string, config *transflow.Transfl
 			log.Printf("[Transflow] Warning: artifact persistence failed: %v", err)
 		}
 	}
-    // Load current status to preserve steps and phase
-    prevStatus, _ := h.getStatus(executionID)
-    var prevSteps []TransflowStepStatus
-    var prevPhase string
-    var prevLastJob *TransflowLastJob
-    if prevStatus != nil {
-        prevSteps = prevStatus.Steps
-        prevPhase = prevStatus.Phase
-        prevLastJob = prevStatus.LastJob
-    }
-    status = TransflowStatus{
-        ID:        executionID,
-        Status:    "completed",
-        StartTime: status.StartTime,
-        EndTime:   &endTime,
-        Phase:     prevPhase,
-        Steps:     prevSteps,
-        LastJob:   prevLastJob,
-        Result: map[string]interface{}{
-            "success":       result.Success,
-            "workflow_id":   result.WorkflowID,
-            "branch_name":   result.BranchName,
-            "commit_sha":    result.CommitSHA,
-            "build_version": result.BuildVersion,
-            "mr_url":        result.MRURL,
-            "healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
-            "duration":      result.Duration.String(),
-            "artifacts":     artifacts,
-        },
-    }
+	// Load current status to preserve steps and phase
+	prevStatus, _ := h.getStatus(executionID)
+	var prevSteps []TransflowStepStatus
+	var prevPhase string
+	var prevLastJob *TransflowLastJob
+	if prevStatus != nil {
+		prevSteps = prevStatus.Steps
+		prevPhase = prevStatus.Phase
+		prevLastJob = prevStatus.LastJob
+	}
+	status = TransflowStatus{
+		ID:        executionID,
+		Status:    "completed",
+		StartTime: status.StartTime,
+		EndTime:   &endTime,
+		Phase:     prevPhase,
+		Steps:     prevSteps,
+		LastJob:   prevLastJob,
+		Result: map[string]interface{}{
+			"success":       result.Success,
+			"workflow_id":   result.WorkflowID,
+			"branch_name":   result.BranchName,
+			"commit_sha":    result.CommitSHA,
+			"build_version": result.BuildVersion,
+			"mr_url":        result.MRURL,
+			"healing_used":  result.HealingSummary != nil && result.HealingSummary.Enabled,
+			"duration":      result.Duration.String(),
+			"artifacts":     artifacts,
+		},
+	}
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store final status: %v", err)
 	}
@@ -537,23 +537,23 @@ func (h *Handler) GetTransflowStatus(c *fiber.Ctx) error {
 		})
 	}
 
-    // Enrich statuses: add duration and overdue fields without changing stored state
-    if status.Status == "running" {
-        elapsed := time.Since(status.StartTime)
-        status.Duration = elapsed.String()
-        overdueThresh := 30 * time.Minute
-        if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
-            if d, e := time.ParseDuration(v); e == nil && d > 0 {
-                overdueThresh = d
-            }
-        }
-        status.Overdue = elapsed > overdueThresh
-    } else if (status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled") && status.EndTime != nil {
-        // Compute duration for terminal states if not already set
-        if status.Duration == "" {
-            status.Duration = status.EndTime.Sub(status.StartTime).String()
-        }
-    }
+	// Enrich statuses: add duration and overdue fields without changing stored state
+	if status.Status == "running" {
+		elapsed := time.Since(status.StartTime)
+		status.Duration = elapsed.String()
+		overdueThresh := 30 * time.Minute
+		if v := os.Getenv("PLOY_TRANSFLOW_OVERDUE"); v != "" {
+			if d, e := time.ParseDuration(v); e == nil && d > 0 {
+				overdueThresh = d
+			}
+		}
+		status.Overdue = elapsed > overdueThresh
+	} else if (status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled") && status.EndTime != nil {
+		// Compute duration for terminal states if not already set
+		if status.Duration == "" {
+			status.Duration = status.EndTime.Sub(status.StartTime).String()
+		}
+	}
 
 	return c.JSON(status)
 }
@@ -791,14 +791,14 @@ func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
 	if !ok {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
 	}
-    key, _ := keyAny.(string)
-    if key == "" {
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
-    }
-    // Validate artifact path safety and prefix
-    if !validTransflowArtifactKey(id, key) {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "invalid_artifact_key", "message": "artifact key failed validation"}})
-    }
+	key, _ := keyAny.(string)
+	if key == "" {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": fiber.Map{"code": "artifact_not_found", "message": "artifact not present"}})
+	}
+	// Validate artifact path safety and prefix
+	if !validTransflowArtifactKey(id, key) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "invalid_artifact_key", "message": "artifact key failed validation"}})
+	}
 	reader, err := h.storage.Get(c.Context(), key)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fiber.Map{"code": "storage_error", "message": err.Error()}})
@@ -817,12 +817,20 @@ func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
 
 // validTransflowArtifactKey enforces prefix and path safety for artifact keys.
 func validTransflowArtifactKey(id, key string) bool {
-    if id == "" || key == "" { return false }
-    prefix := fmt.Sprintf("artifacts/transflow/%s/", id)
-    if !strings.HasPrefix(key, prefix) { return false }
-    if strings.Contains(key, "..") { return false }
-    if strings.Contains(key, "\\") { return false }
-    return true
+	if id == "" || key == "" {
+		return false
+	}
+	prefix := fmt.Sprintf("artifacts/transflow/%s/", id)
+	if !strings.HasPrefix(key, prefix) {
+		return false
+	}
+	if strings.Contains(key, "..") {
+		return false
+	}
+	if strings.Contains(key, "\\") {
+		return false
+	}
+	return true
 }
 
 // StreamLogs provides a basic Server-Sent Events (SSE) stub for live transflow logs.

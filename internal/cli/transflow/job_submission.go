@@ -23,18 +23,18 @@ type ProductionJobSubmitter interface {
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface
 type jobSubmissionHelper struct {
-    submitter JobSubmitter           // Concrete job submitter (mock in tests, real in prod)
-    runner    ProductionJobSubmitter // For accessing asset rendering methods in production
+	submitter JobSubmitter           // Concrete job submitter (mock in tests, real in prod)
+	runner    ProductionJobSubmitter // For accessing asset rendering methods in production
 }
 
 // NewJobSubmissionHelper creates a new job submission helper
 func NewJobSubmissionHelper(submitter JobSubmitter) JobSubmissionHelper {
-    return &jobSubmissionHelper{submitter: submitter}
+	return &jobSubmissionHelper{submitter: submitter}
 }
 
 // NewJobSubmissionHelperWithRunner creates a new job submission helper with runner access for production
 func NewJobSubmissionHelperWithRunner(submitter JobSubmitter, runner ProductionJobSubmitter) JobSubmissionHelper {
-    return &jobSubmissionHelper{submitter: submitter, runner: runner}
+	return &jobSubmissionHelper{submitter: submitter, runner: runner}
 }
 
 // substituteHCLTemplate performs environment variable substitution in HCL templates
@@ -225,30 +225,30 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		outDir := filepath.Join(workspace, "planner", "out")
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
-        llm := ResolveLLMDefaultsFromEnv()
-        vars := map[string]string{
-            "TRANSFLOW_CONTEXT_DIR":       contextDir,
-            "TRANSFLOW_OUT_DIR":           outDir,
-            "TRANSFLOW_REGISTRY":          imgs.Registry,
-            "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-            "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-            "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-            "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-            "TRANSFLOW_MODEL":             llm.Model,
-            "TRANSFLOW_TOOLS":             llm.ToolsJSON,
-            "TRANSFLOW_LIMITS":            llm.LimitsJSON,
-            "PLOY_CONTROLLER":             infra.Controller,
-            "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-            "NOMAD_DC":                    infra.DC,
-        }
+		llm := ResolveLLMDefaultsFromEnv()
+		vars := map[string]string{
+			"TRANSFLOW_CONTEXT_DIR":       contextDir,
+			"TRANSFLOW_OUT_DIR":           outDir,
+			"TRANSFLOW_REGISTRY":          imgs.Registry,
+			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+			"TRANSFLOW_MODEL":             llm.Model,
+			"TRANSFLOW_TOOLS":             llm.ToolsJSON,
+			"TRANSFLOW_LIMITS":            llm.LimitsJSON,
+			"PLOY_CONTROLLER":             infra.Controller,
+			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+			"NOMAD_DC":                    infra.DC,
+		}
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
 
 		// Step 4: Push start event and report job metadata
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
 		}
@@ -259,27 +259,27 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		}
 		timeout := ResolveDefaultsFromEnv().PlannerTimeout
 		if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
 			}
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-        // Step 6: Read and validate job output artifact (plan.json)
-        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
-        if b, err := os.ReadFile(artifactPath); err == nil {
-            if err := validatePlanJSON(b); err != nil {
-                return nil, fmt.Errorf("planner output schema invalid: %w", err)
-            }
-        }
-        var planResult PlanResult
-        if err := readJobArtifact(artifactPath, &planResult); err != nil {
-            return nil, fmt.Errorf("failed to read planner output: %w", err)
-        }
+		// Step 6: Read and validate job output artifact (plan.json)
+		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+		if b, err := os.ReadFile(artifactPath); err == nil {
+			if err := validatePlanJSON(b); err != nil {
+				return nil, fmt.Errorf("planner output schema invalid: %w", err)
+			}
+		}
+		var planResult PlanResult
+		if err := readJobArtifact(artifactPath, &planResult); err != nil {
+			return nil, fmt.Errorf("failed to read planner output: %w", err)
+		}
 
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
@@ -361,30 +361,30 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		outDir := filepath.Join(workspace, "reducer", "out")
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
-        llm := ResolveLLMDefaultsFromEnv()
-        vars := map[string]string{
-            "TRANSFLOW_CONTEXT_DIR":       contextDir,
-            "TRANSFLOW_OUT_DIR":           outDir,
-            "TRANSFLOW_REGISTRY":          imgs.Registry,
-            "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-            "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-            "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-            "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-            "TRANSFLOW_MODEL":             llm.Model,
-            "TRANSFLOW_TOOLS":             llm.ToolsJSON,
-            "TRANSFLOW_LIMITS":            llm.LimitsJSON,
-            "PLOY_CONTROLLER":             infra.Controller,
-            "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-            "NOMAD_DC":                    infra.DC,
-        }
+		llm := ResolveLLMDefaultsFromEnv()
+		vars := map[string]string{
+			"TRANSFLOW_CONTEXT_DIR":       contextDir,
+			"TRANSFLOW_OUT_DIR":           outDir,
+			"TRANSFLOW_REGISTRY":          imgs.Registry,
+			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+			"TRANSFLOW_MODEL":             llm.Model,
+			"TRANSFLOW_TOOLS":             llm.ToolsJSON,
+			"TRANSFLOW_LIMITS":            llm.LimitsJSON,
+			"PLOY_CONTROLLER":             infra.Controller,
+			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+			"NOMAD_DC":                    infra.DC,
+		}
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
 		}
 
 		// Step 4: Push start event and report job metadata
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
 		}
@@ -402,17 +402,17 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("reducer job failed: %w", err)
 		}
 
-        // Step 6: Read and validate job output artifact (next.json)
-        artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
-        if b, err := os.ReadFile(artifactPath); err == nil {
-            if err := validateNextJSON(b); err != nil {
-                return nil, fmt.Errorf("reducer output schema invalid: %w", err)
-            }
-        }
-        var nextAction NextAction
-        if err := readJobArtifact(artifactPath, &nextAction); err != nil {
-            return nil, fmt.Errorf("failed to read reducer output: %w", err)
-        }
+		// Step 6: Read and validate job output artifact (next.json)
+		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
+		if b, err := os.ReadFile(artifactPath); err == nil {
+			if err := validateNextJSON(b); err != nil {
+				return nil, fmt.Errorf("reducer output schema invalid: %w", err)
+			}
+		}
+		var nextAction NextAction
+		if err := readJobArtifact(artifactPath, &nextAction); err != nil {
+			return nil, fmt.Errorf("failed to read reducer output: %w", err)
+		}
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
 			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
