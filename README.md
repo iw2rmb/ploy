@@ -187,20 +187,20 @@ The CLI automatically discovers the API endpoint using a shared resolver:
 
 Tip: Override with `PLOY_CONTROLLER` to target specific environments or tunnels.
 
-### Transflow CLI
+### Mods CLI
 
 Subcommands for code transformation workflows and self-healing:
 
 ```
-ploy transflow run -f transflow.yaml [--watch] [--output json|text]
-ploy transflow watch -id <execution_id>
-ploy transflow render -f transflow.yaml [--work-dir DIR] [--preserve-workspace] [-v]
-ploy transflow plan -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
-ploy transflow reduce -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
-ploy transflow apply -f transflow.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]
+ploy mod run -f transflow.yaml [--watch] [--output json|text]
+ploy mod watch -id <execution_id>
+ploy mod render -f transflow.yaml [--work-dir DIR] [--preserve-workspace] [-v]
+ploy mod plan -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
+ploy mod reduce -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
+ploy mod apply -f transflow.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]
 ```
 
-Use `ploy transflow` with no subcommand to print help.
+Use `ploy mod` with no subcommand to print help.
 
 ## Development Environment SSL Setup
 
@@ -352,19 +352,20 @@ Recommended usage:
 - Consul service checks -> /live (fast, keeps routing responsive).
 - Readiness checks during deployment -> /ready (deep verification).
 - External status dashboards/alerts -> /health.
-## Transflow Development Workflow
+## Mods Development Workflow
 
-- Format and simplify the transflow package:
-  - `make fmt-transflow`
+- Format and simplify the mods package (use general fmt target):
+  - `make fmt`
 
-- Run focused transflow tests and static analysis:
-  - `make test-transflow`
+- Run focused mods tests and static analysis:
+  - `go test ./internal/mods -v`
+  - `staticcheck ./internal/mods/...`
 
 - Optional: ORW container smoke test (requires Docker and SeaweedFS):
   - `export TRANSFLOW_DOCKER_SMOKE=1`
   - `export PLOY_SEAWEEDFS_URL=http://localhost:8888`
   - `export ORW_IMAGE=registry.dev.ployman.app/openrewrite-jvm:latest`
-  - `go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/cli/transflow -v`
+  - `go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/mods -v`
 
 Notes:
 - Unit tests stub Nomad and SeaweedFS interactions; integration/E2E tests run on VPS lanes only per AGENTS.md.
@@ -374,7 +375,7 @@ Notes:
 
 - The repository uses GitHub Actions for CI:
   - Validate lanes: runs `go run ./tools/lane-pick --path apps`.
-  - Transflow tests: runs `go test` for `internal/cli/transflow` and `staticcheck`.
+- Mods tests: runs `go test` for `internal/mods` and `staticcheck`.
   - Format check: enforces `gofmt -s` and `goimports` cleanliness.
   - Build: compiles API and CLI binaries and uploads artifacts.
   - Supply chain: generates SBOM (Syft), scans (Grype), and signs (Cosign).
