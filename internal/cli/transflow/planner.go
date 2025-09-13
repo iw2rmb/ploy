@@ -81,44 +81,46 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
     }
 
 	// Attempt to read plan.json from URL or locally (also support SeaweedFS filer via bucket/key)
-	if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
-		resp, err := http.Get(url)
-		if err == nil && resp.StatusCode == 200 {
-			defer resp.Body.Close()
-			b, _ := io.ReadAll(resp.Body)
+    if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
+        client := &http.Client{Timeout: 15 * time.Second}
+        resp, err := client.Get(url)
+        if err == nil && resp.StatusCode == 200 {
+            defer resp.Body.Close()
+            b, _ := io.ReadAll(resp.Body)
             if err := validatePlanJSON(b); err != nil {
                 runner.emit(ctx, "planner", "validate", "error", fmt.Sprintf("plan.json schema invalid: %v", err))
             } else {
                 runner.emit(ctx, "planner", "validate", "info", "plan.json schema valid")
                 printPlanSummary(b)
             }
-		} else {
+        } else {
             if err != nil {
                 runner.emit(ctx, "planner", "fetch", "error", fmt.Sprintf("Failed to fetch plan URL: %v", err))
             } else {
                 runner.emit(ctx, "planner", "fetch", "error", fmt.Sprintf("Failed to fetch plan URL: %s", resp.Status))
             }
-		}
-	}
+        }
+    }
 
-	if filer := os.Getenv("TRANSFLOW_FILER"); filer != "" {
-		if bucket := os.Getenv("TRANSFLOW_BUCKET"); bucket != "" {
-			if key := os.Getenv("TRANSFLOW_PLAN_KEY"); key != "" {
-				url := strings.TrimRight(filer, "/") + "/" + strings.TrimLeft(bucket, "/") + "/" + strings.TrimLeft(key, "/")
-				if resp, err := http.Get(url); err == nil && resp.StatusCode == 200 {
-					defer resp.Body.Close()
-            if b, err := io.ReadAll(resp.Body); err == nil {
-                if err := validatePlanJSON(b); err != nil {
-                    runner.emit(ctx, "planner", "validate", "error", fmt.Sprintf("plan.json schema invalid: %v", err))
-                } else {
-                    runner.emit(ctx, "planner", "validate", "info", "plan.json schema valid")
-                    printPlanSummary(b)
+    if filer := os.Getenv("TRANSFLOW_FILER"); filer != "" {
+        client := &http.Client{Timeout: 15 * time.Second}
+        if bucket := os.Getenv("TRANSFLOW_BUCKET"); bucket != "" {
+            if key := os.Getenv("TRANSFLOW_PLAN_KEY"); key != "" {
+                url := strings.TrimRight(filer, "/") + "/" + strings.TrimLeft(bucket, "/") + "/" + strings.TrimLeft(key, "/")
+                if resp, err := client.Get(url); err == nil && resp.StatusCode == 200 {
+                    defer resp.Body.Close()
+                    if b, err := io.ReadAll(resp.Body); err == nil {
+                        if err := validatePlanJSON(b); err != nil {
+                            runner.emit(ctx, "planner", "validate", "error", fmt.Sprintf("plan.json schema invalid: %v", err))
+                        } else {
+                            runner.emit(ctx, "planner", "validate", "info", "plan.json schema valid")
+                            printPlanSummary(b)
+                        }
+                    }
                 }
             }
-				}
-			}
-		}
-	}
+        }
+    }
 
 	// Attempt to read plan.json locally if provided
 	planPath := os.Getenv("TRANSFLOW_PLAN_PATH")
@@ -178,7 +180,8 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 
 	// Optional reducer artifact print (if provided externally)
     if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
-        resp, err := http.Get(url)
+        client := &http.Client{Timeout: 15 * time.Second}
+        resp, err := client.Get(url)
         if err == nil && resp.StatusCode == 200 {
             defer resp.Body.Close()
             b, _ := io.ReadAll(resp.Body)
