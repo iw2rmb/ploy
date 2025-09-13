@@ -1,30 +1,40 @@
 package transflow
 
 import (
+    "archive/tar"
+    "compress/gzip"
     "context"
+    "io"
     "log"
-    "os/exec"
+    "os"
     "strings"
     "time"
 )
 
-// previewTarEntries lists up to max entries from a tar archive.
-// Best-effort: uses `tar -tf` and returns the first max lines.
+// previewTarEntries lists up to max entries from a tar(.gz) archive using pure Go.
 func previewTarEntries(tarPath string, max int) ([]string, error) {
-	if max <= 0 {
-		max = 1
-	}
-	cmd := exec.Command("tar", "-tf", tarPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// Return empty list with error; caller may ignore
-		return nil, err
-	}
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if max > len(lines) {
-		max = len(lines)
-	}
-	return lines[:max], nil
+    if max <= 0 { max = 1 }
+    f, err := os.Open(tarPath)
+    if err != nil { return nil, err }
+    defer f.Close()
+
+    var r io.Reader = f
+    // Allow .tar.gz preview best-effort
+    if strings.HasSuffix(strings.ToLower(tarPath), ".gz") {
+        if gz, gErr := gzip.NewReader(f); gErr == nil {
+            defer gz.Close()
+            r = gz
+        }
+    }
+    tr := tar.NewReader(r)
+    entries := make([]string, 0, max)
+    for len(entries) < max {
+        hdr, err := tr.Next()
+        if err == io.EOF { break }
+        if err != nil { return nil, err }
+        entries = append(entries, hdr.Name)
+    }
+    return entries, nil
 }
 
 // logPreviewTar logs a short preview of a tar archive's contents.
