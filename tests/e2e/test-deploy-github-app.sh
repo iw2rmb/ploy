@@ -62,6 +62,7 @@ ok "ploy push triggered"
 # Determine expected URL
 # Prefer preview router using commit SHA to trigger run, else allow override
 GIT_SHA=$(git rev-parse --short=12 HEAD 2>/dev/null || echo "")
+URL_OVERRIDE=${URL_OVERRIDE:-}
 if [[ -n "$URL_OVERRIDE" ]]; then
   URL="$URL_OVERRIDE"
 elif [[ -n "$GIT_SHA" ]]; then
