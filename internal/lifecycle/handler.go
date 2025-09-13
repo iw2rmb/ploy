@@ -131,16 +131,27 @@ func destroyNomadJobs(app string, status map[string]interface{}) error {
 		fmt.Sprintf("debug-%s-*", app),
 	}
 
-	for _, pattern := range jobPatterns {
-		cmd := exec.Command("nomad", "job", "stop", "-purge", pattern)
-		if output, err := cmd.CombinedOutput(); err != nil {
-			if !strings.Contains(string(output), "not found") {
-				log.Printf("Failed to stop Nomad job %s: %v", pattern, err)
-				return fmt.Errorf("failed to stop job %s: %v", pattern, err)
-			}
-		}
-		operations[fmt.Sprintf("nomad_%s", pattern)] = "stopped"
-	}
+    for _, pattern := range jobPatterns {
+        // Prefer wrapper for exact job names (no glob), fall back to raw CLI for patterns
+        if strings.ContainsAny(pattern, "*?") {
+            cmd := exec.Command("nomad", "job", "stop", "-purge", pattern)
+            if output, err := cmd.CombinedOutput(); err != nil {
+                if !strings.Contains(string(output), "not found") {
+                    log.Printf("Failed to stop Nomad job %s: %v", pattern, err)
+                    return fmt.Errorf("failed to stop job %s: %v", pattern, err)
+                }
+            }
+        } else {
+            cmd := exec.Command("/opt/hashicorp/bin/nomad-job-manager.sh", "stop", "--job", pattern)
+            if output, err := cmd.CombinedOutput(); err != nil {
+                if !strings.Contains(string(output), "not found") {
+                    log.Printf("Wrapper failed to stop Nomad job %s: %v (%s)", pattern, err, string(output))
+                    return fmt.Errorf("failed to stop job %s: %v", pattern, err)
+                }
+            }
+        }
+        operations[fmt.Sprintf("nomad_%s", pattern)] = "stopped"
+    }
 
 	log.Printf("Nomad jobs destroyed for app: %s", app)
 	return nil
