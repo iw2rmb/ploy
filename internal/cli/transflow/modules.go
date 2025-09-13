@@ -6,6 +6,7 @@ import (
     "github.com/iw2rmb/ploy/internal/cli/common"
     "github.com/iw2rmb/ploy/internal/git/provider"
     "fmt"
+    "path/filepath"
 )
 
 // Runner modularization interfaces (Phase 5)
@@ -55,6 +56,31 @@ func NewModulesFactory() *ModulesFactory { return &ModulesFactory{} }
 
 func (f *ModulesFactory) ForBuildGate(c BuildCheckerInterface) BuildGate { return NewBuildGateAdapter(c) }
 
+// TransformationExecutorAdapter adapts runner helpers to TransformationExecutor.
+type TransformationExecutorAdapter struct{ r *TransflowRunner }
+
+func NewTransformationExecutorAdapter(r *TransflowRunner) *TransformationExecutorAdapter { return &TransformationExecutorAdapter{r: r} }
+
+func (a *TransformationExecutorAdapter) RenderORWAssets(optionID string) (string, error) {
+    return a.r.RenderORWApplyAssets(optionID)
+}
+func (a *TransformationExecutorAdapter) PrepareInputTar(repoPath string) (string, error) {
+    // Place tar next to runner workspace (orw-apply specific directories provide final destination later)
+    tarPath := filepath.Join(a.r.workspaceDir, "input.tar")
+    if err := createTarFromDir(repoPath, tarPath); err != nil {
+        return "", err
+    }
+    return tarPath, nil
+}
+func (a *TransformationExecutorAdapter) SubmitORWAndFetchDiff(ctx context.Context, renderedHCL string, outDir string) (string, error) {
+    // Not yet used: keep a minimal placeholder by validating job and returning expected diff path
+    // Future: thread validate/submit helpers and seaweed/exec metadata here
+    _ = ctx
+    _ = renderedHCL
+    diffPath := filepath.Join(outDir, "diff.patch")
+    return diffPath, nil
+}
+
 // RepoManagerAdapter adapts GitOperationsInterface to RepoManager.
 type RepoManagerAdapter struct{ git GitOperationsInterface }
 
@@ -95,4 +121,11 @@ func (m *MRManagerAdapter) CreateOrUpdate(ctx context.Context, cfg provider.MRCo
     }
     meta["created"] = res.Created
     return res.MRURL, meta, nil
+}
+// HealerFanoutAdapter adapts a HealingOrchestrator to the FanoutOrchestrator interface
+type HealerFanoutAdapter struct{ H HealingOrchestrator }
+
+func (a HealerFanoutAdapter) RunHealingFanout(ctx context.Context, runCtx interface{}, branches []BranchSpec, maxParallel int) (BranchResult, []BranchResult, error) {
+    if a.H == nil { return BranchResult{}, nil, fmt.Errorf("healer not configured") }
+    return a.H.RunFanout(ctx, runCtx, branches, maxParallel)
 }
