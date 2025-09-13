@@ -32,7 +32,7 @@ self_heal:
 
 ```bash
 # Execute transflow
-ploy transflow run -f java-migration.yaml
+ploy mod run -f java-migration.yaml
 ```
 
 ## Features
@@ -124,13 +124,13 @@ steps:
 ### Testing and Development
 ```bash
 # Dry run to validate configuration
-ploy transflow run -f config.yaml --dry-run
+ploy mod run -f config.yaml --dry-run
 
 # Verbose output for debugging
-ploy transflow run -f config.yaml --verbose
+ploy mod run -f config.yaml --verbose
 
 # Test mode with mocked services
-ploy transflow run -f config.yaml --test-mode
+ploy mod run -f config.yaml --test-mode
 ```
 
 ## Self-Healing Workflows
@@ -202,9 +202,9 @@ build_timeout: 20m  # Increase for complex projects
 
 - Java 11→17 scenario validated end‑to‑end as outlined in `roadmap/transflow/java11-17.md`.
 - Quick local checks (no external services):
-  - `go run ./cmd/ploy transflow run -f test-java11to17-transflow.yaml --dry-run -v`
-  - `go run ./cmd/ploy transflow run -f test-java11to17-transflow.yaml --render-planner -v`
-- VPS E2E: run `ploy transflow run -f /opt/ploy/test/fixtures/java-migration.yaml -v` from the VPS as `ploy` user.
+  - `go run ./cmd/ploy mod run -f test-java11to17-transflow.yaml --dry-run -v`
+  - `go run ./cmd/ploy mod run -f test-java11to17-transflow.yaml --render-planner -v`
+- VPS E2E: run `ploy mod run -f /opt/ploy/test/fixtures/java-migration.yaml -v` from the VPS as `ploy` user.
 
 #### GitLab Authentication
 ```bash
@@ -225,16 +225,16 @@ curl http://localhost:8888/                  # SeaweedFS
 ```bash
 # Enable debug logging
 export TRANSFLOW_LOG_LEVEL=debug
-ploy transflow run -f config.yaml --verbose
+ploy mod run -f config.yaml --verbose
 ```
 
 ### Self-Healing Debug
 ```bash
 # Disable self-healing for debugging
-ploy transflow run -f config.yaml --no-self-heal
+ploy mod run -f config.yaml --no-self-heal
 
 # Test specific healing strategy
-ploy transflow run -f config.yaml --exec-llm-only
+ploy mod run -f config.yaml --exec-llm-only
 ```
 
 ## Performance Considerations

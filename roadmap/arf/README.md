@@ -138,7 +138,7 @@ ARF leverages Ploy's existing infrastructure:
 ARF provides comprehensive API endpoints for transformation management and debugging:
 
 ### Core Transformation Endpoints (Legacy)
-// Legacy ARF transform endpoints removed; use Transflow under `/v1/transflow/*`.
+// Legacy ARF transform endpoints removed; use Transflow under `/v1/mods/*`.
 
 ### Debugging & Analysis Endpoints (Legacy)
 // Legacy ARF debugging endpoints removed with transform API; Transflow may expose equivalents in future.
