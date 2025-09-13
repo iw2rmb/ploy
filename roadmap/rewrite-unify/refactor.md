@@ -31,7 +31,7 @@ Scope
       - Runner and helpers set env vars (os.Setenv) such as TRANSFLOW_OUT_DIR, TRANSFLOW_DIFF_KEY, etc. That leaks global state and breaks multi‑run concurrency in a single process.
       - Change: consolidate templating into a function that takes an explicit map[string]string and writes the rendered HCL without touching global env. Thread per‑job env only where needed (e.g., pass env to job submitter wrapper).
       - Completed: added `substituteHCLTemplateWithMCPVars` and `substituteORWTemplateVars`, updated runner, planner/reducer, and fanout to pass explicit vars; removed os.Setenv usage in these paths.
-  - Duplicate HCL substitution logic and inconsistent pathways.
+  - ✅ Duplicate HCL substitution logic and inconsistent pathways.
       - substituteHCLTemplate (planner/reducer), substituteORWTemplate (ORW), ad‑hoc substitutions in execution.go/planner.go; escaping rules duplicated; env keys spread out.
       - Change: one templating utility (inputs: template bytes/path + substitutions struct; outputs: rendered path). Centralize escaping, defaulting, and env assembly (model/tools/limits/MCP/registry/DC/controller/execution id). Add tests.
       - Completed: centralized `substituteHCLTemplateWithMCPVars` and `substituteORWTemplateVars`; added ORW helpers (`computeBranchDiffKey`, `makeORWVars`) and ORW pre-HCL builder to remove ad-hoc env mutations. Tests added for substitution and helpers.
@@ -57,22 +57,28 @@ Scope
 
   Medium‑Impact Weak Spots
 
-  - Hardcoded defaults and scattered constants.
+  - ✅ Hardcoded defaults and scattered constants.
       - Registry, images, DC, timeouts, allowlists are duplicated across files.
       - Change: centralize into a config package with env overrides. Validate early and log final resolved config.
-  - Logging fragmentation.
+      - Completed: images/infra/timeouts/allowlist centralized via Defaults + ResolveImagesFromEnv/ResolveInfraFromEnv; LLM knobs (model/tools/limits) centralized via ResolveLLMDefaultsFromEnv and applied across planner/reducer/LLM exec, fanout, and job submission.
+  - ✅ Logging fragmentation.
       - Mix of log.Printf and eventReporter. Library code emits logs; controller expects events.
       - Change: route step/status messages through a unified reporter abstraction; only thin wrapper logs where needed. Ensure levels are consistent.
-  - Tar creation via shell tar.
+      - Completed: Runner emits via EventReporter; reporter-based tar preview added; fanout emits branch start/finish; planner/reducer preview emit render/submit/fetch/validate/discover events; API /status preserves steps; SSE streams snapshot+follow.
+  - ✅ Tar creation via shell tar.
       - External dependency; error introspection limited.
       - Change: use Go’s archive/tar (or at least handle errors robustly and verify tar size > 0; add tests). Keep shell tar as fallback if performance is critical and platform is guaranteed.
-  - Error handling ambiguity around orw‑apply.
+      - Completed: Replaced with Go tar writer + unit test; added shell fallback for edge cases; tar preview uses pure-Go reader (supports .tar.gz).
+  - ✅ Error handling ambiguity around orw‑apply.
       - “Best‑effort”: if job fails but diff exists, continue. May produce inconsistent state or apply broken diffs.
       - Change: make this behavior explicit behind a config flag (e.g., ALLOW_PARTIAL_ORW=true), and record provenance in MR description. Default to fail unless explicitly allowed.
-  - Schema validation use locations.
+      - Completed: Added TRANSFLOW_ALLOW_PARTIAL_ORW; best‑effort continue only when enabled and non‑empty diff exists; otherwise fail.
+  - ✅ Schema validation use locations.
       - validatePlanJSON/validateNextJSON are used in planner mode; ensure they’re applied consistently on reducer outputs in production path as well. Fail fast on invalid schema.
-  - Timeout policy consistency.
+      - Completed: Production planner/reducer artifact reads now validate JSON schema before unmarshalling; preview emits validation events.
+  - ✅ Timeout policy consistency.
       - Per‑phase timeouts are scattered; consider central policy: default + env overrides. Add context timeouts around HTTP calls too.
+      - Completed: Per‑phase timeouts centralized via Defaults across planner/reducer/LLM/ORW/build‑apply; preview HTTP fetches now use clients with explicit timeouts.
 
   Security/Policy Observations
 

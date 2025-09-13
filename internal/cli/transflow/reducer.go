@@ -8,6 +8,7 @@ import (
     "os"
     "path/filepath"
     "strings"
+    "time"
 
     orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
@@ -65,16 +66,17 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
     }
 
 	// Fetch next.json via URL or local path
-	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
-		resp, err := http.Get(url)
-		if err == nil && resp.StatusCode == 200 {
-			defer resp.Body.Close()
-			b, _ := io.ReadAll(resp.Body)
-			printNextSummary(b)
-		} else if err != nil {
-			fmt.Printf("Failed to fetch next URL: %v\n", err)
-		}
-	}
+    if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
+        client := &http.Client{Timeout: 15 * time.Second}
+        resp, err := client.Get(url)
+        if err == nil && resp.StatusCode == 200 {
+            defer resp.Body.Close()
+            b, _ := io.ReadAll(resp.Body)
+            printNextSummary(b)
+        } else if err != nil {
+            fmt.Printf("Failed to fetch next URL: %v\n", err)
+        }
+    }
 
 	np := os.Getenv("TRANSFLOW_NEXT_PATH")
 	if np == "" {
