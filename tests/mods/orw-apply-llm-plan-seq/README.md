@@ -6,13 +6,23 @@ Overview
 - This mirrors the validated Java 11→17 pipeline while forcing a compile failure post-ORW apply, so the planner has work to do.
 - Uses SeaweedFS for artifacts and the controller’s /v1/mods/{id}/events endpoint for live status.
 
+Prepared Repo (ready-to-use)
+
+- A public GitLab repository is prepared with deterministic failure branches so you don’t need to fork or craft failures yourself:
+  - Repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven
+  - Branches intended to fail the build after orw-apply (to trigger healing):
+    - e2e/fail-missing-symbol — introduces a missing symbol compile error
+    - e2e/fail-java17-specific — introduces a Java 17–specific compile error
+  - Use one of these branches as the target to validate the full sequence:
+    orw-apply -> build (fail) -> llm-plan -> [apply fix] -> build (success) -> MR
+
 Pre‑requisites
 
 - Workstation: ploy CLI built at ./bin/ploy (make build or go build ./cmd/ploy)
 - Tools: curl, jq
 - Env: GITLAB_URL, GITLAB_TOKEN (write/api scopes), PLOY_CONTROLLER (e.g., https://api.dev.ployman.app/v1)
 - VPS: API deployed and reachable; internal images configured per docs/mods/knobs.md
-- Repo: A GitLab repo similar to https://gitlab.com/iw2rmb/ploy-orw-java11-maven you control (fork or test project)
+- Repo: EITHER your own fork OR the prepared repo above (recommended for quick validation)
 
 How we force a predictable build failure
 
@@ -57,7 +67,19 @@ Files here
 
 Quick start (scripts) — operator flow
 
-1) Prepare/fork repo with an intentional compile failure (see “How we force a predictable build failure”). Push changes to your fork’s main branch or a reproducible branch.
+1) Option A — Use prepared repo/branches (recommended):
+   - export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+   - export GITLAB_URL=https://gitlab.com
+   - (Optional) export GITLAB_TOKEN=glpat-…  # only used by cleanup scripts/tests to delete MR source branches
+   - Choose one branch to trigger healing:
+     - export E2E_HEALING_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
+     - export E2E_HEALING_BRANCH=e2e/fail-missing-symbol    # or e2e/fail-java17-specific
+   - Run via scripts (SSE stream, artifacts, step checks):
+     - ./run.sh
+     - or: ./watch-events.sh <EXEC_ID> (after run prints EXEC_ID)
+     - After completion: ./fetch-artifacts.sh <EXEC_ID> and ./check-steps.sh <EXEC_ID>
+
+   Option B — Prepare/fork your own repo with an intentional compile failure (see “How we force a predictable build failure”).
 2) Set env:
    - export GITLAB_URL=https://gitlab.com
    - export GITLAB_TOKEN=glpat-…
@@ -66,7 +88,7 @@ Quick start (scripts) — operator flow
    - id: choose a unique id (e.g., java11to17-orw-llm)
    - target_repo: set to your fork URL
    - Ensure recipe coords in the orw-apply step match docs/continue.md “Working combo”
-4) (Optional) Prepare branches in your repo once:
+4) (Optional) Prepare branches in your repo once (if using your own fork):
    - ./prepare-branches.sh https://gitlab.com/your/repo.git main
    - This creates:
      - e2e/success
@@ -78,6 +100,15 @@ Quick start (scripts) — operator flow
 5) Run (workstation):
    - ./run.sh
    - Script prints EXEC_ID, follows SSE, and waits until terminal. Artifacts are saved under ./logs/<EXEC_ID>/
+
+Quick start (Go E2E) — prepared repo/branches
+
+- Healing flow validation (uses prepared failing branch). Ensure controller is reachable:
+  - export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+  - export E2E_HEALING_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
+  - export E2E_HEALING_BRANCH=e2e/fail-missing-symbol   # or e2e/fail-java17-specific
+  - go test -count=1 ./tests/e2e -tags e2e -v -run HealingFlow_ORWFail_LLMSucceeds -timeout 20m
+  - Expected: build gate fails after orw-apply, planner/llm-exec/reducer run, build passes, MR URL logged.
 
 Go E2E tests — CI/VPS flow
 
