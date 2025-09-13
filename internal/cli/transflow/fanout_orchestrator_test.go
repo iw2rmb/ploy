@@ -9,13 +9,13 @@ import (
 )
 
 func TestNewFanoutOrchestrator(t *testing.T) {
-	submitter := "mock-submitter"
-	orchestrator := NewFanoutOrchestrator(submitter)
+    submitter := NoopJobSubmitter{}
+    orchestrator := NewFanoutOrchestrator(submitter)
 	assert.NotNil(t, orchestrator)
 }
 
 func TestNewFanoutOrchestratorWithRunner(t *testing.T) {
-	submitter := "mock-submitter"
+    submitter := NoopJobSubmitter{}
 	// Use nil runner for test - the interface is complex and we just need basic construction coverage
 	orchestrator := NewFanoutOrchestratorWithRunner(submitter, nil)
 	assert.NotNil(t, orchestrator)
@@ -57,7 +57,7 @@ func TestFanoutOrchestrator_RunHealingFanout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			submitter := "mock-submitter"
+        submitter := NoopJobSubmitter{}
 			orchestrator := NewFanoutOrchestrator(submitter)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond) // Short timeout for tests
@@ -82,7 +82,7 @@ func TestFanoutOrchestrator_RunHealingFanout(t *testing.T) {
 
 // Test construction and basic method availability
 func TestFanoutOrchestratorBasics(t *testing.T) {
-	submitter := "mock-submitter"
+    submitter := NoopJobSubmitter{}
 	orchestrator := NewFanoutOrchestrator(submitter)
 
 	// Test interface conformance
