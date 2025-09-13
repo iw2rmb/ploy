@@ -23,36 +23,18 @@ type ProductionJobSubmitter interface {
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface
 type jobSubmissionHelper struct {
-	submitter JobSubmitter           // Concrete job submitter (mock in tests, real in prod)
-	runner    ProductionJobSubmitter // For accessing asset rendering methods in production
+    submitter JobSubmitter           // Concrete job submitter (mock in tests, real in prod)
+    runner    ProductionJobSubmitter // For accessing asset rendering methods in production
 }
 
 // NewJobSubmissionHelper creates a new job submission helper
-func NewJobSubmissionHelper(submitter interface{}) JobSubmissionHelper {
-	var js JobSubmitter
-	switch s := submitter.(type) {
-	case nil:
-		js = nil
-	case JobSubmitter:
-		js = s
-	default:
-		js = NoopJobSubmitter{}
-	}
-	return &jobSubmissionHelper{submitter: js}
+func NewJobSubmissionHelper(submitter JobSubmitter) JobSubmissionHelper {
+    return &jobSubmissionHelper{submitter: submitter}
 }
 
 // NewJobSubmissionHelperWithRunner creates a new job submission helper with runner access for production
-func NewJobSubmissionHelperWithRunner(submitter interface{}, runner ProductionJobSubmitter) JobSubmissionHelper {
-	var js JobSubmitter
-	switch s := submitter.(type) {
-	case nil:
-		js = nil
-	case JobSubmitter:
-		js = s
-	default:
-		js = NoopJobSubmitter{}
-	}
-	return &jobSubmissionHelper{submitter: js, runner: runner}
+func NewJobSubmissionHelperWithRunner(submitter JobSubmitter, runner ProductionJobSubmitter) JobSubmissionHelper {
+    return &jobSubmissionHelper{submitter: submitter, runner: runner}
 }
 
 // substituteHCLTemplate performs environment variable substitution in HCL templates

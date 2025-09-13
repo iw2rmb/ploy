@@ -46,12 +46,14 @@ Scope
       - Side‑effectful; unsafe across concurrent runs; brittle on panic.
       - Change: make build checker accept repo path or tar path; avoid process cwd changes. If unavoidable, wrap in defer with error handling and document as single‑run only.
       - Completed: `common.DeployConfig` gained optional `WorkingDir`; SharedPush honors it; Transflow passes repo path via metadata to avoid process-wide `chdir`.
-  - Interface typing with interface{} for “submitter/runners”.
+  - ✅ Interface typing with interface{} for “submitter/runners”.
       - jobSubmitter uses interface{} as a marker; jobSubmissionHelper and fanout do type assertions for test mode vs production.
       - Change: replace with explicit interfaces (ProductionJobSubmitter, ProductionBranchRunner, and a clean JobSubmitter abstraction). Remove magic “non‑nil” markers; inject typed collaborators.
-  - SSE watcher strict Content‑Type check.
+      - Completed: constructors now accept typed `JobSubmitter` (`NewJobSubmissionHelper`, `NewJobSubmissionHelperWithRunner`, `NewFanoutOrchestrator`, `NewFanoutOrchestratorWithRunner`); `TransflowRunner.SetJobSubmitter` and KB wrapper accept `JobSubmitter`; tests updated to use `NoopJobSubmitter{}` or mocks.
+  - ✅ SSE watcher strict Content‑Type check.
       - Checks equality to “text/event-stream”; some servers include charset.
       - Change: use prefix match or MIME parse; handle “text/event-stream; charset=utf-8”.
+      - Completed: `watchTransflowSSE` parses media type via `mime.ParseMediaType` and falls back to prefix check; tests cover charset variant.
 
   Medium‑Impact Weak Spots
 

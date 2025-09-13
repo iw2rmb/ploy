@@ -327,12 +327,12 @@ func NewKBTransflowRunner(config *TransflowConfig, workspaceDir string, kb KBInt
 }
 
 // SetJobSubmitter extends the base implementation with KB-aware job submission
-func (kr *KBTransflowRunner) SetJobSubmitter(submitter interface{}) {
-	// Set the original submitter
-	kr.TransflowRunner.SetJobSubmitter(submitter)
+func (kr *KBTransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
+    // Set the original submitter
+    kr.TransflowRunner.SetJobSubmitter(submitter)
 
-	// The attemptHealing method will need to be overridden or extended
-	// to use the KB-enhanced job submission helper
+    // The attemptHealing method will need to be overridden or extended
+    // to use the KB-enhanced job submission helper
 }
 
 // attemptHealing overrides the base implementation to use KB-enhanced healing

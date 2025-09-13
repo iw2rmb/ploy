@@ -29,36 +29,18 @@ type ProductionBranchRunner interface {
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
 type fanoutOrchestrator struct {
-	submitter JobSubmitter           // Mock in tests, real in production (Noop enables healing)
-	runner    ProductionBranchRunner // For accessing asset rendering methods in production
+    submitter JobSubmitter           // Mock in tests, real in production (Noop enables healing)
+    runner    ProductionBranchRunner // For accessing asset rendering methods in production
 }
 
 // NewFanoutOrchestrator creates a new fanout orchestrator
-func NewFanoutOrchestrator(submitter interface{}) FanoutOrchestrator {
-	var js JobSubmitter
-	switch s := submitter.(type) {
-	case nil:
-		js = nil
-	case JobSubmitter:
-		js = s
-	default:
-		js = NoopJobSubmitter{}
-	}
-	return &fanoutOrchestrator{submitter: js, runner: nil}
+func NewFanoutOrchestrator(submitter JobSubmitter) FanoutOrchestrator {
+    return &fanoutOrchestrator{submitter: submitter, runner: nil}
 }
 
 // NewFanoutOrchestratorWithRunner creates a new fanout orchestrator with runner access for production
-func NewFanoutOrchestratorWithRunner(submitter interface{}, runner ProductionBranchRunner) FanoutOrchestrator {
-	var js JobSubmitter
-	switch s := submitter.(type) {
-	case nil:
-		js = nil
-	case JobSubmitter:
-		js = s
-	default:
-		js = NoopJobSubmitter{}
-	}
-	return &fanoutOrchestrator{submitter: js, runner: runner}
+func NewFanoutOrchestratorWithRunner(submitter JobSubmitter, runner ProductionBranchRunner) FanoutOrchestrator {
+    return &fanoutOrchestrator{submitter: submitter, runner: runner}
 }
 
 // RunHealingFanout executes parallel healing branches with first-success-wins semantics

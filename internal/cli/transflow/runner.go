@@ -183,16 +183,8 @@ func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
 }
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
-func (r *TransflowRunner) SetJobSubmitter(submitter interface{}) {
-	switch s := submitter.(type) {
-	case nil:
-		r.jobSubmitter = nil
-	case JobSubmitter:
-		r.jobSubmitter = s
-	default:
-		// Any non-nil marker enables healing; production path prefers runner
-		r.jobSubmitter = NoopJobSubmitter{}
-	}
+func (r *TransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
+    r.jobSubmitter = submitter
 }
 
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
