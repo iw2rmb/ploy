@@ -56,6 +56,10 @@ Notes
 - Tail logs (API or VPS):
   - `APP_NAME=<app> PLOY_CONTROLLER=... ./tests/lanes/check-app-logs.sh`
 
+Tip (GREEN baseline): For initial pass across all repos, force container lane:
+- `LANE_OVERRIDE=E PLOY_CONTROLLER=... go test ./tests/e2e -tags e2e -v -run TestLaneDeployments`
+  - Each repo ships a Dockerfile and /healthz endpoint; this ensures green while lane-specific scaffolding matures.
+
 ## Repo Creation
 Use the helper script (requires `GITHUB_PLOY_DEV_PAT`, `GITHUB_PLOY_DEV_USERNAME`):
 - `./scripts/lanes/create-lane-repos.sh`
@@ -75,4 +79,3 @@ The script creates the 7 repos if missing and sets descriptions.
 ## Cleanup & Idempotency
 - Scripts destroy the app post validation and tolerate 404 on status checks.
 - Avoid reusing app names across concurrent runs; env `APP_NAME` can include a suffix.
-

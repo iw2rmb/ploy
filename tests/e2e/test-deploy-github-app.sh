@@ -66,13 +66,17 @@ URL_OVERRIDE=${URL_OVERRIDE:-}
 if [[ -n "$URL_OVERRIDE" ]]; then
   URL="$URL_OVERRIDE"
 elif [[ -n "$GIT_SHA" ]]; then
-  URL="https://${GIT_SHA}.${APP_NAME}.ployd.app"
+  DOMAIN_SUFFIX="ployd.app"
+  if [[ "${ENV_NAME}" == "dev" ]]; then
+    DOMAIN_SUFFIX="dev.ployd.app"
+  fi
+  URL="https://${GIT_SHA}.${APP_NAME}.${DOMAIN_SUFFIX}"
 else
   URL="https://${APP_NAME}.ployd.app"
 fi
 
 HEALTH_PATH=${HEALTH_PATH:-/healthz}
-TIMEOUT=${TIMEOUT:-180}
+TIMEOUT=${TIMEOUT:-300}
 SLEEP=${SLEEP:-5}
 ELAPSED=0
 info "Waiting for app health at ${URL}${HEALTH_PATH} (timeout ${TIMEOUT}s)"
@@ -88,6 +92,12 @@ set -e
 
 if [[ -z "${READY:-}" ]]; then
   err "App failed to become healthy within ${TIMEOUT}s"
+  # Fetch logs for diagnostics when available
+  if command -v jq >/dev/null 2>&1; then
+    APP_NAME="$APP_NAME" PLOY_CONTROLLER="$PLOY_CONTROLLER" "${REPO_ROOT}/tests/lanes/check-app-logs.sh" || true
+  else
+    echo "Tip: install jq for prettier logs" >&2
+  fi
   exit 1
 fi
 

@@ -24,11 +24,11 @@ func main() {
 		ConsulConfigEnabled: false,
 		Language:            "java",
 	}
-    // Render Lane E (OCI/Kontain) for JVM app to inspect HCL
-    rd.ConsulConfigEnabled = true
-    rd.VolumeEnabled = false
-    rd.Language = "java"
-    f, err := orch.RenderTemplate("E", rd)
+	// Render Lane E (OCI/Kontain) for JVM app to inspect HCL
+	rd.ConsulConfigEnabled = true
+	rd.VolumeEnabled = false
+	rd.Language = "java"
+	f, err := orch.RenderTemplate("E", rd)
 	if err != nil {
 		fmt.Println("ERR:", err)
 		os.Exit(1)

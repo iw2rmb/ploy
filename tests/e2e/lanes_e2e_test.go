@@ -35,6 +35,9 @@ func TestLaneDeployments(t *testing.T) {
 
 	script := filepath.Join("tests", "lanes", "test-lane-deploy.sh")
 
+	laneOverride := os.Getenv("LANE_OVERRIDE")
+	forceLane := os.Getenv("FORCE_LANE") == "1"
+
 	for _, lane := range lanes {
 		repo := os.Getenv(lane.envVar)
 		if repo == "" {
@@ -48,10 +51,13 @@ func TestLaneDeployments(t *testing.T) {
 
 			cmd := exec.CommandContext(ctx, "bash", script)
 			cmd.Env = os.Environ()
-			cmd.Env = append(cmd.Env,
-				"LANE="+lane.letter,
-				"HELLO_APP_REPO="+repo,
-			)
+			envs := []string{"HELLO_APP_REPO=" + repo}
+			if laneOverride != "" {
+				envs = append(envs, "LANE="+laneOverride)
+			} else if forceLane {
+				envs = append(envs, "LANE="+lane.letter)
+			}
+			cmd.Env = append(cmd.Env, envs...)
 
 			out, err := cmd.CombinedOutput()
 			t.Logf("%s output:\n%s", script, string(out))

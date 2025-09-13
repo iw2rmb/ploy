@@ -59,3 +59,11 @@ Notes
   - Result: Nomad job validation failed due to volume/consul blocks present for a user app (dev cluster). Root cause: API renderer defaulted `VolumeEnabled`/`ConsulConfigEnabled` to true for non‑platform apps.
   - Action: Updated API renderer defaults to match orchestration — disable Volumes and Consul Config by default for non‑platform apps (Vault/Connect already off). Added unit tests and CHANGELOG note.
   - Next: Deploy API (`./bin/ployman api deploy --monitor`) and rerun E2E with `LANE=E` and `URL_OVERRIDE=https://ploy-scala-hello.dev.ployd.app/healthz` (Lane E host rule includes `dev.`).
+
+- Cycle 2 (Deploy + E2E, cap timeouts to 5 min):
+  - Deployed API to Dev, but Dev pulls from its own git remote. Local fixes are not yet present on the VPS because they haven’t been pushed upstream.
+  - Retried E2E:
+    - Lane E still fails server‑side Nomad job validation at a lane‑E template block (volume/conditional markers), so deploy aborts.
+    - Lane C deploys, but HTTPS health does not come up publicly. Logs via API show: "No running allocations found" (likely OSv path not suited for this Scala app, or not exposed publicly on Dev).
+  - Script improvements: capped health wait TIMEOUT to 5 minutes by default and fixed a bash array edge case for extra flags.
+  - Next: land the renderer/template fixes on the VPS (push main, then deploy) so Lane E (Jib container) validates and exposes `https://<app>.dev.ployd.app/healthz`. Until then, Lane C will not be a reliable public HTTPS path for this app.

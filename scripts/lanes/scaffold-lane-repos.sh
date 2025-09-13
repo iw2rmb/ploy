@@ -339,7 +339,7 @@ main() {
       F) scaffold_dotnet_docker "$dir" ;;
       G) scaffold_rust_docker "$dir" ;;
     esac
-    write_file "$dir/README.md" << EOF
+    write_file "$dir/README.md" << 'EOF'
 # $name
 
 Minimal hello app for Ploy E2E. Exposes /healthz on PORT (default 8080).
