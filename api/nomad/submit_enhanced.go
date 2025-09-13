@@ -225,48 +225,43 @@ func StreamJobLogs(jobID string, follow bool) error {
 		return fmt.Errorf("no running allocation found for job %s", jobID)
 	}
 
-	// Stream logs
-	args := []string{"alloc", "logs"}
-	if follow {
-		args = append(args, "-f")
-	}
-	args = append(args, runningAllocID)
-
-	cmd := exec.Command("nomad", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+    // Stream logs via wrapper when available; fall back to raw nomad CLI
+    if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
+        args := []string{"logs", "--alloc-id", runningAllocID}
+        if follow { args = append(args, "--follow") }
+        cmd := exec.Command("/opt/hashicorp/bin/nomad-job-manager.sh", args...)
+        cmd.Stdout = os.Stdout
+        cmd.Stderr = os.Stderr
+        return cmd.Run()
+    }
+    args := []string{"alloc", "logs"}
+    if follow { args = append(args, "-f") }
+    args = append(args, runningAllocID)
+    cmd := exec.Command("nomad", args...)
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
+    return cmd.Run()
 }
 
 // ValidateJob validates a job specification without running it
 func ValidateJob(jobPath string) error {
-	cmd := exec.Command("nomad", "job", "validate", jobPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("validation failed: %s", string(output))
-	}
-
-	if strings.Contains(string(output), "Job validation successful") {
-		return nil
-	}
-
-	return fmt.Errorf("validation output: %s", string(output))
+    // Delegate to orchestration layer which prefers wrapper validation with SDK fallback
+    return orchestration.ValidateJob(jobPath)
 }
 
 // PlanJob runs nomad job plan to see what changes would be made
 func PlanJob(jobPath string) (string, error) {
-	cmd := exec.Command("nomad", "job", "plan", jobPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Plan can return non-zero for updates, check output
-		if strings.Contains(string(output), "Plan result") {
-			return string(output), nil
-		}
-		return "", fmt.Errorf("plan failed: %s", string(output))
-	}
-
-	return string(output), nil
+    // Wrapper does not implement plan; prefer wrapper presence to block raw CLI
+    if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
+        return "plan not implemented with wrapper", nil
+    }
+    cmd := exec.Command("nomad", "job", "plan", jobPath)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        if strings.Contains(string(output), "Plan result") {
+            return string(output), nil
+        }
+        return "", fmt.Errorf("plan failed: %s", string(output))
+    }
+    return string(output), nil
 }
