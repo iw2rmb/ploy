@@ -20,8 +20,8 @@ func (r *TransflowRunner) runBuildGate(ctx context.Context, repoPath string) (*c
 		Timeout:     timeout,
 		Metadata:    map[string]string{"working_dir": repoPath},
 	}
-    if r.buildGate != nil {
-        return r.buildGate.Check(ctx, buildCfg)
-    }
-    return r.buildChecker.CheckBuild(ctx, buildCfg)
+	if r.buildGate != nil {
+		return r.buildGate.Check(ctx, buildCfg)
+	}
+	return r.buildChecker.CheckBuild(ctx, buildCfg)
 }

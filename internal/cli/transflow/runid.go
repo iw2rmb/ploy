@@ -14,9 +14,9 @@ func ReducerRunID(planID string) string {
 }
 
 func LLMRunID(branchID string) string {
-	return fmt.Sprintf("llm-exec-%s-%d", branchID, time.Now().Unix())
+	return fmt.Sprintf("%s-%s-%d", string(StepTypeLLMExec), branchID, time.Now().Unix())
 }
 
 func ORWRunID(stepOrBranchID string) string {
-	return fmt.Sprintf("orw-apply-%s-%d", stepOrBranchID, time.Now().Unix())
+	return fmt.Sprintf("%s-%s-%d", string(StepTypeORWApply), stepOrBranchID, time.Now().Unix())
 }

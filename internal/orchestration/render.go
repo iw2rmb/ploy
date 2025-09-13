@@ -13,11 +13,11 @@ import (
 
 // RenderData represents inputs to the job template rendering
 type RenderData struct {
-    App         string
-    ImagePath   string
-    DockerImage string
-    EnvVars     map[string]string
-    IsDebug     bool
+	App         string
+	ImagePath   string
+	DockerImage string
+	EnvVars     map[string]string
+	IsDebug     bool
 
 	// Enhanced configuration options
 	Version       string
@@ -36,10 +36,10 @@ type RenderData struct {
 	DebugEnabled        bool
 	IsPlatformService   bool
 
-    // Language-specific options
-    Language string
-    // Lane letter (A-G)
-    Lane     string
+	// Language-specific options
+	Language string
+	// Lane letter (A-G)
+	Lane string
 
 	// JVM-specific options
 	JvmOpts     string
@@ -189,11 +189,11 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
 	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
 	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
-    if data.Lane == "" {
-        // Fallback to C if not provided
-        data.Lane = "C"
-    }
-    s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Lane))
+	if data.Lane == "" {
+		// Fallback to C if not provided
+		data.Lane = "C"
+	}
+	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Lane))
 	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
@@ -223,10 +223,10 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	}
 	s = strings.ReplaceAll(s, "{{DOMAIN_SUFFIX}}", domainSuffix)
 
-    taskName := getTaskNameForLane(strings.ToUpper(data.Lane))
+	taskName := getTaskNameForLane(strings.ToUpper(data.Lane))
 	s = strings.ReplaceAll(s, "{{TASK_NAME}}", taskName)
 
-    driverConfig := getDriverConfigForLane(strings.ToUpper(data.Lane), data)
+	driverConfig := getDriverConfigForLane(strings.ToUpper(data.Lane), data)
 	s = strings.ReplaceAll(s, "{{DRIVER}}", driverConfig.Driver)
 	s = strings.ReplaceAll(s, "{{DRIVER_CONFIG}}", driverConfig.Config)
 

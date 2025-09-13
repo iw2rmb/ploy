@@ -44,7 +44,7 @@ steps:
 				BuildTimeout: "10m",
 				Steps: []TransflowStep{
 					{
-						Type:   "orw-apply",
+						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:     "openrewrite-updates",
 						Engine: "openrewrite",
 						Recipes: []string{
@@ -79,7 +79,7 @@ steps:
 				BuildTimeout: "",
 				Steps: []TransflowStep{
 					{
-						Type:   "orw-apply",
+						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:     "simple-recipe",
 						Engine: "openrewrite",
 						Recipes: []string{

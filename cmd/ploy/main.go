@@ -1,24 +1,24 @@
 package main
 
 import (
-    "fmt"
-    "os"
+	"fmt"
+	"os"
 
-    tea "github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 
-    "github.com/iw2rmb/ploy/internal/cli/analysis"
-    "github.com/iw2rmb/ploy/internal/cli/apps"
-    "github.com/iw2rmb/ploy/internal/cli/arf"
-    "github.com/iw2rmb/ploy/internal/cli/bluegreen"
-    "github.com/iw2rmb/ploy/internal/cli/certs"
-    "github.com/iw2rmb/ploy/internal/cli/debug"
-    "github.com/iw2rmb/ploy/internal/cli/deploy"
-    "github.com/iw2rmb/ploy/internal/cli/domains"
-    "github.com/iw2rmb/ploy/internal/cli/env"
-    "github.com/iw2rmb/ploy/internal/cli/transflow"
-    "github.com/iw2rmb/ploy/internal/cli/ui"
-    "github.com/iw2rmb/ploy/internal/cli/utils"
-    "github.com/iw2rmb/ploy/internal/cli/version"
+	"github.com/iw2rmb/ploy/internal/cli/analysis"
+	"github.com/iw2rmb/ploy/internal/cli/apps"
+	"github.com/iw2rmb/ploy/internal/cli/arf"
+	"github.com/iw2rmb/ploy/internal/cli/bluegreen"
+	"github.com/iw2rmb/ploy/internal/cli/certs"
+	"github.com/iw2rmb/ploy/internal/cli/debug"
+	"github.com/iw2rmb/ploy/internal/cli/deploy"
+	"github.com/iw2rmb/ploy/internal/cli/domains"
+	"github.com/iw2rmb/ploy/internal/cli/env"
+	"github.com/iw2rmb/ploy/internal/cli/transflow"
+	"github.com/iw2rmb/ploy/internal/cli/ui"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
+	"github.com/iw2rmb/ploy/internal/cli/version"
 )
 
 var controllerURL = utils.ResolveControllerURLFromEnv()

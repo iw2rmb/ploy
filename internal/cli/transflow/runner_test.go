@@ -379,7 +379,7 @@ func TestTransflowRunner_Setters(t *testing.T) {
 	runner.SetRecipeExecutor(mockRecipe)
 	runner.SetBuildChecker(mockBuild)
 	runner.SetGitProvider(mockProvider)
-    runner.SetJobSubmitter(NoopJobSubmitter{})
+	runner.SetJobSubmitter(NoopJobSubmitter{})
 
 	// Test getters
 	assert.Equal(t, mockProvider, runner.GetGitProvider())

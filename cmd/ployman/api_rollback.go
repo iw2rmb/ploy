@@ -1,14 +1,14 @@
 package main
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "time"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
 
-    "github.com/iw2rmb/ploy/internal/cli/utils"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 func runApiRollback(args []string) {
@@ -18,7 +18,7 @@ func runApiRollback(args []string) {
 	}
 
 	targetVersion := args[0]
-    controllerURL := utils.ResolveControllerURLFromEnv()
+	controllerURL := utils.ResolveControllerURLFromEnv()
 
 	// Call rollback endpoint
 	rollbackURL := fmt.Sprintf("%s/rollback", controllerURL)

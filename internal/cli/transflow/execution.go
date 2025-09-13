@@ -33,7 +33,7 @@ func executeWithPlan(runner *TransflowRunner, planBytes []byte, execFirst, execL
 
 	if execFirst {
 		fmt.Printf("Sequential stub: would execute first option %s (%s) next.\n", id, typ)
-		if typ == "llm-exec" {
+		if typ == string(StepTypeLLMExec) {
 			if path, err := runner.RenderLLMExecAssets(id); err == nil {
 				fmt.Printf("Rendered llm_exec HCL: %s\n", path)
 			}
@@ -65,7 +65,7 @@ func executeWithPlan(runner *TransflowRunner, planBytes []byte, execFirst, execL
 func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) error {
 	// Find first llm-exec
 	for _, o := range options {
-		if t, _ := o["type"].(string); t == "llm-exec" {
+		if t, _ := o["type"].(string); t == string(StepTypeLLMExec) {
 			lid, _ := o["id"].(string)
 			if hcl, err := runner.RenderLLMExecAssets(lid); err == nil {
 				fmt.Printf("Rendered llm_exec HCL: %s\n", hcl)
@@ -73,22 +73,22 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 				runID := LLMRunID(lid)
 				imgs := ResolveImagesFromEnv()
 				infra := ResolveInfraFromEnv()
-                llm := ResolveLLMDefaultsFromEnv()
-                vars := map[string]string{
-                    "TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
-                    "TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
-                    "TRANSFLOW_REGISTRY":          imgs.Registry,
-                    "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-                    "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-                    "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-                    "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-                    "TRANSFLOW_MODEL":             llm.Model,
-                    "TRANSFLOW_TOOLS":             llm.ToolsJSON,
-                    "TRANSFLOW_LIMITS":            llm.LimitsJSON,
-                    "PLOY_CONTROLLER":             infra.Controller,
-                    "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-                    "NOMAD_DC":                    infra.DC,
-                }
+				llm := ResolveLLMDefaultsFromEnv()
+				vars := map[string]string{
+					"TRANSFLOW_CONTEXT_DIR":       filepath.Dir(hcl),
+					"TRANSFLOW_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
+					"TRANSFLOW_REGISTRY":          imgs.Registry,
+					"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+					"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+					"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+					"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+					"TRANSFLOW_MODEL":             llm.Model,
+					"TRANSFLOW_TOOLS":             llm.ToolsJSON,
+					"TRANSFLOW_LIMITS":            llm.LimitsJSON,
+					"PLOY_CONTROLLER":             infra.Controller,
+					"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					"NOMAD_DC":                    infra.DC,
+				}
 				renderedPath, sErr := substituteHCLTemplateWithMCPVars(hcl, runID, vars, nil)
 				if sErr != nil {
 					fmt.Printf("failed to write substituted HCL: %v\n", sErr)
@@ -118,7 +118,7 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error {
 	// Find first orw-gen
 	for _, o := range options {
-		if t, _ := o["type"].(string); t == "orw-gen" {
+		if t, _ := o["type"].(string); t == string(StepTypeORWGen) {
 			oid, _ := o["id"].(string)
 			if hcl, err := runner.RenderORWApplyAssets(oid); err == nil {
 				fmt.Printf("Rendered orw_apply HCL: %s\n", hcl)

@@ -1,15 +1,15 @@
 package nomad
 
 import (
-    "bytes"
-    "fmt"
-    "os"
-    "os/exec"
-    "regexp"
-    "strings"
-    "time"
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"regexp"
+	"strings"
+	"time"
 
-    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // SubmitResult contains the result of a job submission
@@ -48,35 +48,39 @@ func SubmitWithMonitoring(jobPath string, timeout time.Duration) (*SubmitResult,
 
 // submitJob submits a job and parses the output
 func submitJob(jobPath string) (*SubmitResult, error) {
-    // Prefer wrapper when available, fall back to raw nomad CLI for non-VPS environments
-    if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
-        cmd := exec.Command("/opt/hashicorp/bin/nomad-job-manager.sh", "run", "--job", deriveJobName(jobPath), "--file", jobPath)
-        var out bytes.Buffer
-        cmd.Stdout = &out
-        cmd.Stderr = &out
-        if err := cmd.Run(); err != nil {
-            return &SubmitResult{Success: false, Message: out.String()}, nil
-        }
-        // Wrapper does not print nomad text; synthesize minimal success
-        return &SubmitResult{Success: true, JobID: deriveJobName(jobPath)}, nil
-    }
-    cmd := exec.Command("nomad", "job", "run", jobPath)
-    output, err := cmd.CombinedOutput()
-    if err != nil {
-        if len(output) > 0 {
-            return &SubmitResult{Success: false, Message: string(output)}, nil
-        }
-        return nil, fmt.Errorf("command failed: %w", err)
-    }
-    return parseTextOutput(string(output))
+	// Prefer wrapper when available, fall back to raw nomad CLI for non-VPS environments
+	if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
+		cmd := exec.Command("/opt/hashicorp/bin/nomad-job-manager.sh", "run", "--job", deriveJobName(jobPath), "--file", jobPath)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		if err := cmd.Run(); err != nil {
+			return &SubmitResult{Success: false, Message: out.String()}, nil
+		}
+		// Wrapper does not print nomad text; synthesize minimal success
+		return &SubmitResult{Success: true, JobID: deriveJobName(jobPath)}, nil
+	}
+	cmd := exec.Command("nomad", "job", "run", jobPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(output) > 0 {
+			return &SubmitResult{Success: false, Message: string(output)}, nil
+		}
+		return nil, fmt.Errorf("command failed: %w", err)
+	}
+	return parseTextOutput(string(output))
 }
 
 // deriveJobName extracts a job name from the HCL by using the file base without extension as a best-effort.
 func deriveJobName(path string) string {
-    base := path
-    if i := strings.LastIndex(base, "/"); i >= 0 { base = base[i+1:] }
-    if j := strings.LastIndex(base, "."); j >= 0 { base = base[:j] }
-    return base
+	base := path
+	if i := strings.LastIndex(base, "/"); i >= 0 {
+		base = base[i+1:]
+	}
+	if j := strings.LastIndex(base, "."); j >= 0 {
+		base = base[:j]
+	}
+	return base
 }
 
 // parseTextOutput parses the text output from nomad job run
@@ -225,43 +229,47 @@ func StreamJobLogs(jobID string, follow bool) error {
 		return fmt.Errorf("no running allocation found for job %s", jobID)
 	}
 
-    // Stream logs via wrapper when available; fall back to raw nomad CLI
-    if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
-        args := []string{"logs", "--alloc-id", runningAllocID}
-        if follow { args = append(args, "--follow") }
-        cmd := exec.Command("/opt/hashicorp/bin/nomad-job-manager.sh", args...)
-        cmd.Stdout = os.Stdout
-        cmd.Stderr = os.Stderr
-        return cmd.Run()
-    }
-    args := []string{"alloc", "logs"}
-    if follow { args = append(args, "-f") }
-    args = append(args, runningAllocID)
-    cmd := exec.Command("nomad", args...)
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stderr
-    return cmd.Run()
+	// Stream logs via wrapper when available; fall back to raw nomad CLI
+	if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
+		args := []string{"logs", "--alloc-id", runningAllocID}
+		if follow {
+			args = append(args, "--follow")
+		}
+		cmd := exec.Command("/opt/hashicorp/bin/nomad-job-manager.sh", args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	args := []string{"alloc", "logs"}
+	if follow {
+		args = append(args, "-f")
+	}
+	args = append(args, runningAllocID)
+	cmd := exec.Command("nomad", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // ValidateJob validates a job specification without running it
 func ValidateJob(jobPath string) error {
-    // Delegate to orchestration layer which prefers wrapper validation with SDK fallback
-    return orchestration.ValidateJob(jobPath)
+	// Delegate to orchestration layer which prefers wrapper validation with SDK fallback
+	return orchestration.ValidateJob(jobPath)
 }
 
 // PlanJob runs nomad job plan to see what changes would be made
 func PlanJob(jobPath string) (string, error) {
-    // Wrapper does not implement plan; prefer wrapper presence to block raw CLI
-    if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
-        return "plan not implemented with wrapper", nil
-    }
-    cmd := exec.Command("nomad", "job", "plan", jobPath)
-    output, err := cmd.CombinedOutput()
-    if err != nil {
-        if strings.Contains(string(output), "Plan result") {
-            return string(output), nil
-        }
-        return "", fmt.Errorf("plan failed: %s", string(output))
-    }
-    return string(output), nil
+	// Wrapper does not implement plan; prefer wrapper presence to block raw CLI
+	if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
+		return "plan not implemented with wrapper", nil
+	}
+	cmd := exec.Command("nomad", "job", "plan", jobPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(output), "Plan result") {
+			return string(output), nil
+		}
+		return "", fmt.Errorf("plan failed: %s", string(output))
+	}
+	return string(output), nil
 }

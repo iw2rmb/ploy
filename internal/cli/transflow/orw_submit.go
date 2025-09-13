@@ -21,7 +21,7 @@ func submitORWJobAndFetchDiff(
 		return fmt.Errorf("ORW HCL validation failed: %w", err)
 	}
 	if reportLastJob != nil && jobName != "" {
-		reportLastJob(ctx, jobName, "apply", "orw-apply")
+		reportLastJob(ctx, jobName, "apply", string(StepTypeORWApply))
 	}
 	if err := submit(hclPath, timeout); err != nil {
 		return fmt.Errorf("orw-apply job failed: %w", err)

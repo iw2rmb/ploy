@@ -1,15 +1,15 @@
 package main
 
 import (
-    "context"
-    "flag"
-    "fmt"
-    "os"
-    "os/exec"
-    "strings"
-    "time"
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
 
-    "github.com/iw2rmb/ploy/internal/cli/utils"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 func runApiDeploy(args []string) {
@@ -281,7 +281,7 @@ func runAnsibleDeploymentBackground(timeoutMinutes int, monitor bool) {
 		} else {
 			fmt.Println("\nDeployment completed successfully!")
 			// Check deployment status
-            checkDeploymentStatus(utils.ResolveControllerURLFromEnv())
+			checkDeploymentStatus(utils.ResolveControllerURLFromEnv())
 		}
 	} else {
 		// For background without monitoring, redirect to log file
