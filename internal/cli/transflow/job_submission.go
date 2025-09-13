@@ -265,13 +265,17 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-		// Step 6: Read and parse job output artifact
-		// The planner job should write plan.json to the output directory
-		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
-		var planResult PlanResult
-		if err := readJobArtifact(artifactPath, &planResult); err != nil {
-			return nil, fmt.Errorf("failed to read planner output: %w", err)
-		}
+        // Step 6: Read and validate job output artifact (plan.json)
+        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+        if b, err := os.ReadFile(artifactPath); err == nil {
+            if err := validatePlanJSON(b); err != nil {
+                return nil, fmt.Errorf("planner output schema invalid: %w", err)
+            }
+        }
+        var planResult PlanResult
+        if err := readJobArtifact(artifactPath, &planResult); err != nil {
+            return nil, fmt.Errorf("failed to read planner output: %w", err)
+        }
 
         if controller := ResolveInfraFromEnv().Controller; controller != "" {
             rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))
@@ -396,13 +400,17 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("reducer job failed: %w", err)
 		}
 
-		// Step 6: Read and parse job output artifact
-		// The reducer job should write next.json to the output directory
-		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
-		var nextAction NextAction
-		if err := readJobArtifact(artifactPath, &nextAction); err != nil {
-			return nil, fmt.Errorf("failed to read reducer output: %w", err)
-		}
+        // Step 6: Read and validate job output artifact (next.json)
+        artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
+        if b, err := os.ReadFile(artifactPath); err == nil {
+            if err := validateNextJSON(b); err != nil {
+                return nil, fmt.Errorf("reducer output schema invalid: %w", err)
+            }
+        }
+        var nextAction NextAction
+        if err := readJobArtifact(artifactPath, &nextAction); err != nil {
+            return nil, fmt.Errorf("failed to read reducer output: %w", err)
+        }
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
 			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"))

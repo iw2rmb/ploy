@@ -378,15 +378,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Use enhanced templates with comprehensive configuration
-	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
-		App:         appName,
-		ImagePath:   imagePath,
-		DockerImage: dockerImage,
-		EnvVars:     appEnvVars,
-		Version:     sha,
-		MainClass:   mainClass,
-		IsDebug:     debug,
-		Language:    "java",
+    jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
+        App:         appName,
+        ImagePath:   imagePath,
+        DockerImage: dockerImage,
+        EnvVars:     appEnvVars,
+        Version:     sha,
+        Lane:        lane,
+        MainClass:   mainClass,
+        IsDebug:     debug,
+        Language:    "java",
 
 		// Feature flags (dev-friendly defaults)
 		VaultEnabled:        false, // Vault not enabled on dev cluster
@@ -416,6 +417,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		return utils.ErrJSON(c, 500, err)
 	}
 
+    // Write debug copy of rendered HCL and validate before submission
+    funcCopy := func(src string) {
+        defer func() { _ = os.Remove(src) }()
+        _ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
+        base := filepath.Base(src)
+        dst := filepath.Join("/opt/ploy/debug/jobs", base)
+        _, _ = copyFile(src, dst)
+        fmt.Printf("[Build] Job HCL written to %s\n", dst)
+    }
+    funcCopy(jobFile)
     // Validate job before submission to return clearer errors from HCL conversion
     if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
         return utils.ErrJSON(c, 500, fmt.Errorf("job validation failed: %w", vErr))
