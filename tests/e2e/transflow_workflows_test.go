@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
+func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 	// Should fail initially - end-to-end integration gaps
 
 	if testing.Short() {
@@ -84,7 +84,7 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 	// Fallback: if execution_id not parsed from CLI output, start run via controller directly
 	if result.ExecutionID == "" {
 		t.Logf("execution_id not found in CLI output; starting run via controller fallback")
-		runURL := strings.TrimRight(controller, "/") + "/transflow/run"
+        runURL := strings.TrimRight(controller, "/") + "/mods"
 		payload := fmt.Sprintf("{\"config\": %q, \"test_mode\": false}", result.ConfigYAML)
 		req0, _ := http.NewRequestWithContext(ctx, http.MethodPost, runURL, strings.NewReader(payload))
 		req0.Header.Set("Content-Type", "application/json")
@@ -108,7 +108,7 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 	}
 
 	// Query controller for final status to assert MR and build metadata
-	statusURL := fmt.Sprintf("%s/transflow/status/%s", strings.TrimRight(controller, "/"), result.ExecutionID)
+    statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ExecutionID)
 	httpc := &http.Client{Timeout: 30 * time.Second}
 	// Poll until terminal
 	var st struct {
@@ -164,7 +164,7 @@ func TestTransflowE2E_JavaMigrationComplete(t *testing.T) {
 			t.Logf("Artifacts (from status): %v", artsMap)
 		}
 	} else {
-		artsURL := fmt.Sprintf("%s/transflow/artifacts/%s", strings.TrimRight(controller, "/"), result.ExecutionID)
+        artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ExecutionID)
 		req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, artsURL, nil)
 		resp2, err := httpc.Do(req2)
 		if err == nil && resp2.StatusCode == 200 {
@@ -234,7 +234,7 @@ func deleteMRSourceBranch(ctx context.Context, token, mrURL string) error {
 	return nil
 }
 
-func TestTransflowE2E_SelfHealingScenario(t *testing.T) {
+func TestModsE2E_SelfHealingScenario(t *testing.T) {
 	// Should fail initially - healing integration not complete
 
 	if testing.Short() {
@@ -297,7 +297,7 @@ func TestTransflowE2E_SelfHealingScenario(t *testing.T) {
 	}
 }
 
-func TestTransflowE2E_KBLearningProgression(t *testing.T) {
+func TestModsE2E_KBLearningProgression(t *testing.T) {
 	// Should fail initially - KB learning not integrated
 
 	if testing.Short() {
@@ -371,7 +371,7 @@ func TestTransflowE2E_KBLearningProgression(t *testing.T) {
 	}
 }
 
-func TestTransflowE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
+func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 	// E2E healing validation for a repo/branch that intentionally fails the build gate post-orw-apply
 	// Skips unless PLOY_CONTROLLER and E2E_HEALING_REPO are provided.
 
