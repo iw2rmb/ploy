@@ -225,21 +225,22 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *Tran
 		outDir := filepath.Join(workspace, "planner", "out")
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
-		vars := map[string]string{
-			"TRANSFLOW_CONTEXT_DIR":       contextDir,
-			"TRANSFLOW_OUT_DIR":           outDir,
-			"TRANSFLOW_REGISTRY":          imgs.Registry,
-			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-			"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-			"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-			"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-			"PLOY_CONTROLLER":             infra.Controller,
-			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-			"NOMAD_DC":                    infra.DC,
-		}
+        llm := ResolveLLMDefaultsFromEnv()
+        vars := map[string]string{
+            "TRANSFLOW_CONTEXT_DIR":       contextDir,
+            "TRANSFLOW_OUT_DIR":           outDir,
+            "TRANSFLOW_REGISTRY":          imgs.Registry,
+            "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+            "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+            "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+            "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+            "TRANSFLOW_MODEL":             llm.Model,
+            "TRANSFLOW_TOOLS":             llm.ToolsJSON,
+            "TRANSFLOW_LIMITS":            llm.LimitsJSON,
+            "PLOY_CONTROLLER":             infra.Controller,
+            "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+            "NOMAD_DC":                    infra.DC,
+        }
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
@@ -360,21 +361,22 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		outDir := filepath.Join(workspace, "reducer", "out")
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
-		vars := map[string]string{
-			"TRANSFLOW_CONTEXT_DIR":       contextDir,
-			"TRANSFLOW_OUT_DIR":           outDir,
-			"TRANSFLOW_REGISTRY":          imgs.Registry,
-			"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-			"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-			"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-			"TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
-			"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-			"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-			"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-			"PLOY_CONTROLLER":             infra.Controller,
-			"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-			"NOMAD_DC":                    infra.DC,
-		}
+        llm := ResolveLLMDefaultsFromEnv()
+        vars := map[string]string{
+            "TRANSFLOW_CONTEXT_DIR":       contextDir,
+            "TRANSFLOW_OUT_DIR":           outDir,
+            "TRANSFLOW_REGISTRY":          imgs.Registry,
+            "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+            "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+            "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+            "TRANSFLOW_ORW_APPLY_IMAGE":   imgs.ORWApply,
+            "TRANSFLOW_MODEL":             llm.Model,
+            "TRANSFLOW_TOOLS":             llm.ToolsJSON,
+            "TRANSFLOW_LIMITS":            llm.LimitsJSON,
+            "PLOY_CONTROLLER":             infra.Controller,
+            "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+            "NOMAD_DC":                    infra.DC,
+        }
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)

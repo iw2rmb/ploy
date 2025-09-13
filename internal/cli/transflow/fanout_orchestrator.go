@@ -217,20 +217,21 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
 	imgs := ResolveImagesFromEnv()
 	infra := ResolveInfraFromEnv()
-	vars := map[string]string{
-		"TRANSFLOW_CONTEXT_DIR":       baseDir,
-		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"TRANSFLOW_REGISTRY":          imgs.Registry,
-		"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-		"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-		"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-		"PLOY_CONTROLLER":             infra.Controller,
-		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-		"NOMAD_DC":                    infra.DC,
-		"TRANSFLOW_MODEL":             os.Getenv("TRANSFLOW_MODEL"),
-		"TRANSFLOW_TOOLS":             os.Getenv("TRANSFLOW_TOOLS"),
-		"TRANSFLOW_LIMITS":            os.Getenv("TRANSFLOW_LIMITS"),
-	}
+    llm := ResolveLLMDefaultsFromEnv()
+    vars := map[string]string{
+        "TRANSFLOW_CONTEXT_DIR":       baseDir,
+        "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+        "TRANSFLOW_REGISTRY":          imgs.Registry,
+        "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+        "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+        "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+        "PLOY_CONTROLLER":             infra.Controller,
+        "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+        "NOMAD_DC":                    infra.DC,
+        "TRANSFLOW_MODEL":             llm.Model,
+        "TRANSFLOW_TOOLS":             llm.ToolsJSON,
+        "TRANSFLOW_LIMITS":            llm.LimitsJSON,
+    }
 
 	// Step 2: Generate unique run ID for this branch
 	runID := LLMRunID(branch.ID)

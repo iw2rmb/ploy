@@ -25,18 +25,10 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 		return fmt.Errorf("failed to read planner HCL: %w", err)
 	}
 
-	model := os.Getenv("TRANSFLOW_MODEL")
-	if model == "" {
-		model = "gpt-4o-mini@2024-08-06"
-	}
-	toolsJSON := os.Getenv("TRANSFLOW_TOOLS")
-	if toolsJSON == "" {
-		toolsJSON = `{"file":{"allow":["src/**","pom.xml"]},"search":{"provider":"rg","allow":["src/**"]}}`
-	}
-	limitsJSON := os.Getenv("TRANSFLOW_LIMITS")
-	if limitsJSON == "" {
-		limitsJSON = `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
-	}
+    llm := ResolveLLMDefaultsFromEnv()
+    model := llm.Model
+    toolsJSON := llm.ToolsJSON
+    limitsJSON := llm.LimitsJSON
 
 	runID := PlannerRunID(runner.config.ID)
 
