@@ -87,6 +87,16 @@ Example var maps used for HCL substitution
 Notes
 - Always pass explicit var maps to substitution helpers; do not mutate process-wide environment.
 - Prefer Defaults/Resolvers for values that have sensible platform fallbacks (registry/images/seaweed/DC/controller).
+
+LLM Defaults Reference
+- Model default: `gpt-4o-mini@2024-08-06`
+- Tools default: `{"file":{"allow":["src/**","pom.xml"]},"search":{"provider":"rg","allow":["src/**"]}}`
+- Limits default: `{"max_steps":8,"max_tool_calls":12,"timeout":"30m"}`
+
+Override examples (per run):
+- `TRANSFLOW_MODEL=gpt-4o-mini ./bin/ploy transflow plan --preserve`
+- `TRANSFLOW_TOOLS='{"file":{"allow":["src/**","pom.xml","build.gradle"]}}' ./bin/ploy transflow plan`
+- `TRANSFLOW_LIMITS='{"max_steps":4,"max_tool_calls":6,"timeout":"10m"}' ./bin/ploy transflow reduce`
 # Transflow Configuration Knobs
 
 The following environment variables control Transflow defaults. All are optional; sensible defaults are provided.

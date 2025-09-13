@@ -1,22 +1,24 @@
 package transflow
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
+    "context"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
 
-	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // executeReducerMode renders and optionally submits reducer job
 func executeReducerMode(runner *TransflowRunner, preserve bool) error {
-	assets, err := runner.RenderReducerAssets()
-	if err != nil {
-		return fmt.Errorf("failed to render reducer assets: %w", err)
-	}
+    ctx := context.Background()
+    assets, err := runner.RenderReducerAssets()
+    if err != nil {
+        return fmt.Errorf("failed to render reducer assets: %w", err)
+    }
 
 	// Substitute placeholders
 	hclBytes, err := os.ReadFile(assets.HCLPath)
@@ -46,20 +48,21 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		return fmt.Errorf("failed to write rendered HCL: %w", err)
 	}
 
-	fmt.Printf("Reducer HCL rendered: %s\n", renderedPath)
-	if preserve {
-		fmt.Printf("Workspace preserved at: %s\n", runner.workspaceDir)
-	}
+    runner.emit(ctx, "reducer", "render", "info", fmt.Sprintf("Reducer HCL rendered: %s", renderedPath))
+    if preserve {
+        runner.emit(ctx, "reducer", "preserve", "info", fmt.Sprintf("Workspace preserved at: %s", runner.workspaceDir))
+    }
 
-	if os.Getenv("TRANSFLOW_SUBMIT") != "1" {
-		fmt.Println("Skipping reducer submission (unset TRANSFLOW_SUBMIT).")
-		return nil
-	}
+    if os.Getenv("TRANSFLOW_SUBMIT") != "1" {
+        runner.emit(ctx, "reducer", "submit", "info", "Skipping reducer submission (unset TRANSFLOW_SUBMIT)")
+        return nil
+    }
 
 	timeout := ResolveDefaultsFromEnv().ReducerTimeout
-	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-		return fmt.Errorf("reducer job failed: %w", err)
-	}
+    if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
+        runner.emit(ctx, "reducer", "submit", "error", fmt.Sprintf("reducer job failed: %v", err))
+        return fmt.Errorf("reducer job failed: %w", err)
+    }
 
 	// Fetch next.json via URL or local path
 	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {
