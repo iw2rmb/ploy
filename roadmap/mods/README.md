@@ -54,7 +54,7 @@ Detailed Work Breakdown
 - Packages/paths:
   - `internal/mods` → `internal/mods`
   - `api/transflow` → `api/mods`
-  - `docs/transflow` → `docs/mods`
+  - `docs/mods` → `docs/mods`
   - `platform/nomad/transflow/*` → `platform/nomad/mods/*`
 - Symbols/identifiers: `Transflow*` → `Mod*` (types, funcs, vars, constants). Keep type aliases for one release to reduce churn (e.g., `type TransflowRunner = ModRunner`).
 - Event step names: keep behavior, only rename phase labels/messages where they include the feature name.
@@ -62,7 +62,7 @@ Detailed Work Breakdown
 4. Storage keys and artifacts
 - Write under `artifacts/mods/{id}/...` and `mods/{id}/...` (non-artifacts).
 - Delete current Transflow artifacts under `artifacts/transflow/*` as part of the migration.
-- Update SeaweedFS policy docs (docs/transflow/knobs.md → docs/mods/knobs.md) to reflect new prefixes.
+- Update SeaweedFS policy docs (docs/mods/knobs.md → docs/mods/knobs.md) to reflect new prefixes.
 
 5. Tests and E2E
 - Update unit/integration tests to new routes and storage keys.

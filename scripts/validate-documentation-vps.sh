@@ -262,7 +262,7 @@ test_documentation_completeness() {
     log_info "Testing documentation file completeness..."
     
     local docs=(
-        "docs/transflow/README.md"
+        "docs/mods/README.md"
         "docs/kb/README.md"
         "docs/api/transflow.md"
         "docs/examples/"

@@ -11,7 +11,7 @@ Pre‑requisites
 - Workstation: ploy CLI built at ./bin/ploy (make build or go build ./cmd/ploy)
 - Tools: curl, jq
 - Env: GITLAB_URL, GITLAB_TOKEN (write/api scopes), PLOY_CONTROLLER (e.g., https://api.dev.ployman.app/v1)
-- VPS: API deployed and reachable; internal images configured per docs/transflow/knobs.md
+- VPS: API deployed and reachable; internal images configured per docs/mods/knobs.md
 - Repo: A GitLab repo similar to https://gitlab.com/iw2rmb/ploy-orw-java11-maven you control (fork or test project)
 
 How we force a predictable build failure
@@ -121,7 +121,7 @@ LLM runner event expectations (/v1/transflow/event)
 
 Tips and knobs
 
-- See docs/transflow/knobs.md for resource and image knobs, and continue.md for the latest behavior around SeaweedFS artifacts and event stream.
+- See docs/mods/knobs.md for resource and image knobs, and continue.md for the latest behavior around SeaweedFS artifacts and event stream.
 - Images must point to internal registry on VPS (TRANSFLOW_*_IMAGE). Do not use public registries in VPS flows.
 - For Go E2E, ensure env is set appropriately; tests will Skip with clear messages if not configured.
 - To inspect VPS runtime (optional), ssh root@$TARGET_HOST; su - ploy; then use /opt/hashicorp/bin/nomad-job-manager.sh helpers to inspect recent allocs. Do not deploy from VPS.

@@ -145,7 +145,7 @@ func TestDocumentationExamples(t *testing.T) {
 // TestDocumentationCompleteness validates that all required documentation exists
 func TestDocumentationCompleteness(t *testing.T) {
 	requiredDocs := map[string]string{
-		"docs/transflow/README.md": "Transflow user guide",
+		"docs/mods/README.md": "Transflow user guide",
 		"docs/kb/README.md":        "KB learning system documentation",
 		"docs/api/transflow.md":    "Transflow API documentation",
 		"docs/examples/":           "Example configurations directory",
