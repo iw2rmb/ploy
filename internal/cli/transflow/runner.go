@@ -150,12 +150,14 @@ type TransflowRunner struct {
     gitOps         GitOperationsInterface
     repoManager    RepoManager
     recipeExecutor RecipeExecutorInterface
+    transformExec  TransformationExecutor
     buildChecker   BuildCheckerInterface
     buildGate      BuildGate
     jobSubmitter   JobSubmitter         // For healing workflows
     gitProvider    provider.GitProvider // For MR creation
     mrManager      MRManager
     eventReporter  EventReporter        // Optional real-time event reporter
+    healer         HealingOrchestrator
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -178,8 +180,11 @@ func (r *TransflowRunner) SetGitOperations(gitOps GitOperationsInterface) {
 
 // SetRecipeExecutor sets the recipe executor implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
-	r.recipeExecutor = executor
+    r.recipeExecutor = executor
 }
+
+// SetTransformationExecutor sets the modular TransformationExecutor
+func (r *TransflowRunner) SetTransformationExecutor(x TransformationExecutor) { r.transformExec = x }
 
 // SetBuildChecker sets the build checker implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
@@ -208,8 +213,11 @@ func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
 
 // SetEventReporter sets the reporter used for real-time observability
 func (r *TransflowRunner) SetEventReporter(reporter EventReporter) {
-	r.eventReporter = reporter
+    r.eventReporter = reporter
 }
+
+// SetHealingOrchestrator sets the modular healing orchestrator
+func (r *TransflowRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h }
 
 func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
 	if r.eventReporter != nil {
@@ -517,14 +525,20 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		switch step.Type {
 		case "orw-apply":
 			stepStart := time.Now()
-			// Render ORW apply HCL assets
-			renderedPath, err := r.RenderORWApplyAssets(step.ID)
-			if err != nil {
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to render ORW assets: %v", err)})
-				result.ErrorMessage = fmt.Sprintf("failed to render orw-apply assets: %v", err)
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
-			}
+            // Render ORW apply HCL assets (prefer transformation executor)
+            var renderedPath string
+            var err error
+            if r.transformExec != nil {
+                renderedPath, err = r.transformExec.RenderORWAssets(step.ID)
+            } else {
+                renderedPath, err = r.RenderORWApplyAssets(step.ID)
+            }
+            if err != nil {
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to render ORW assets: %v", err)})
+                result.ErrorMessage = fmt.Sprintf("failed to render orw-apply assets: %v", err)
+                result.Duration = time.Since(startTime)
+                return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
+            }
 
 			// Guard: ensure repository contains a supported build file before creating input tar
 			{
@@ -820,7 +834,12 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 	}
 
 	// Step 3: Execute fanout orchestration
-	orchestrator := NewFanoutOrchestratorWithRunner(r.jobSubmitter, r)
+    var orchestrator FanoutOrchestrator
+    if r.healer != nil {
+        orchestrator = HealerFanoutAdapter{H: r.healer}
+    } else {
+        orchestrator = NewFanoutOrchestratorWithRunner(r.jobSubmitter, r)
+    }
 	maxParallel := 3 // Default parallelism
 	if r.config.SelfHeal.MaxRetries > 0 {
 		maxParallel = r.config.SelfHeal.MaxRetries
