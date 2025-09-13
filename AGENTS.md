@@ -70,7 +70,7 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 - These tests exercise VPS services remotely and are considered VPS-side execution (REFACTOR phase), even if invoked from the workstation.
 - Do not spin up or depend on local Nomad/Consul/Gateway for these tests.
 - Example:
-  - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestTransflowE2E_JavaMigrationComplete -timeout 20m`
+  - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestModsE2E_JavaMigrationComplete -timeout 20m`
 
 ## Commands
 
@@ -83,7 +83,7 @@ Notes:
 - Never use direct Nomad commands; if needed remotely, only via `/opt/hashicorp/bin/nomad-job-manager.sh` as invoked by platform tooling.
 - Container images (platform services and job runners) must be pushed to the VPS Docker Registry (Docker Registry v2). Do not rely on public registries in VPS workflows.
   - Examples: `openrewrite-jvm`, `langgraph-runner`, lane-specific images.
-  - Configure image refs in environment (e.g., `TRANSFLOW_ORW_APPLY_IMAGE`, `TRANSFLOW_PLANNER_IMAGE`, `TRANSFLOW_REDUCER_IMAGE`, `TRANSFLOW_LLM_EXEC_IMAGE`) to point at the internal registry.
+  - Configure image refs in environment (e.g., `MODS_ORW_APPLY_IMAGE`, `MODS_PLANNER_IMAGE`, `MODS_REDUCER_IMAGE`, `MODS_LLM_EXEC_IMAGE`) to point at the internal registry.
 
 **VPS**:
 - Use for runtime inspection and logs only (e.g., `ssh root@$TARGET_HOST`, then `su - ploy`).
@@ -133,7 +133,3 @@ For EVERY code change:
 ## Specialized Agents
 
 Use Task tool for complex domain-specific tasks. Available agents in `.claude/agents.json`.
-
-## Sessions System Behaviors
-
-@CLAUDE.sessions.md

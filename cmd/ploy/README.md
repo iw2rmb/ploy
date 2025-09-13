@@ -102,7 +102,7 @@ Automated Remediation Framework (ARF) provides recipe registry/catalog managemen
 
 Use Mods for executing transformations and self-healing workflows:
 ```
-ploy transflow run -f <config.yaml> [--verbose]
+ploy mod run -f <config.yaml> [--verbose]
 ```
 - **LLM-Powered Transformations**: Natural language prompts for custom transformations
 - **Self-Healing Engine**: Automatic error recovery with parallel solution attempts

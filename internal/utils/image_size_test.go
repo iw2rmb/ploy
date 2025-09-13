@@ -506,7 +506,7 @@ func BenchmarkParseDockerSize(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		sizeStr := testSizes[i%len(testSizes)]
-		parseDockerSize(sizeStr)
+		_, _ = parseDockerSize(sizeStr)
 	}
 }
 
@@ -531,6 +531,6 @@ func BenchmarkGetLaneSizeLimit(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		lane := lanes[i%len(lanes)]
-		GetLaneSizeLimit(lane)
+		_, _ = GetLaneSizeLimit(lane)
 	}
 }

@@ -2,6 +2,7 @@ package arf
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/api/arf/models"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 )
 
 // RecipeRegistrationRequest represents the request from OpenRewrite JVM runner
@@ -84,7 +86,7 @@ func (h *Handler) ListRecipes(c *fiber.Ctx) error {
 	// Get query parameters for filtering
 	recipeType := c.Query("type", "")
 
-	var recipes []*UnifiedRecipeMetadata
+	var recipesList []*recipes.UnifiedRecipeMetadata
 	var err error
 
 	// Use RecipeRegistry only
@@ -95,9 +97,9 @@ func (h *Handler) ListRecipes(c *fiber.Ctx) error {
 	}
 
 	if recipeType != "" {
-		recipes, err = h.recipeRegistry.QueryByType(ctx, recipeType)
+		recipesList, err = h.recipeRegistry.QueryByType(ctx, recipeType)
 	} else {
-		recipes, err = h.recipeRegistry.ListAllRecipes(ctx)
+		recipesList, err = h.recipeRegistry.ListAllRecipes(ctx)
 	}
 
 	if err != nil {
@@ -108,8 +110,8 @@ func (h *Handler) ListRecipes(c *fiber.Ctx) error {
 	}
 
 	// Transform to response format
-	response := make([]map[string]interface{}, 0, len(recipes))
-	for _, recipe := range recipes {
+	response := make([]map[string]interface{}, 0, len(recipesList))
+	for _, recipe := range recipesList {
 		item := map[string]interface{}{
 			"id":         recipe.Metadata.ID,
 			"name":       recipe.Metadata.Name,
@@ -211,6 +213,41 @@ func (h *Handler) GetRecipe(c *fiber.Ctx) error {
 
 // CreateRecipe creates a new recipe in the registry
 func (h *Handler) CreateRecipe(c *fiber.Ctx) error {
+	// Accept both full models.Recipe payloads and the simpler request struct
+	raw := c.Body()
+
+	// Try to parse as full models.Recipe first
+	var full models.Recipe
+	if err := json.Unmarshal(raw, &full); err == nil && (full.Metadata.Name != "" || len(full.Steps) > 0) {
+		// Validate
+		if h.recipeValidator != nil {
+			if err := h.recipeValidator.ValidateRecipe(c.Context(), &full); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error":   "Recipe validation failed",
+					"details": err.Error(),
+				})
+			}
+		} else if err := full.Validate(); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   "Recipe validation failed",
+				"details": err.Error(),
+			})
+		}
+
+		if err := h.createRecipeWithStorage(c.Context(), &full); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Failed to create recipe",
+				"details": err.Error(),
+			})
+		}
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+			"status":    "success",
+			"message":   "Recipe created successfully",
+			"recipe_id": full.Metadata.Name,
+		})
+	}
+
+	// Fallback to simple struct
 	var req struct {
 		Name        string              `json:"name"`
 		Description string              `json:"description"`
@@ -220,15 +257,13 @@ func (h *Handler) CreateRecipe(c *fiber.Ctx) error {
 		Categories  []string            `json:"categories"`
 		Steps       []models.RecipeStep `json:"steps"`
 	}
-
-	if err := c.BodyParser(&req); err != nil {
+	if err := json.Unmarshal(raw, &req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   "Invalid request body",
 			"details": err.Error(),
 		})
 	}
 
-	// Create custom recipe
 	recipe := &models.Recipe{
 		Metadata: models.RecipeMetadata{
 			Name:        req.Name,
@@ -241,18 +276,28 @@ func (h *Handler) CreateRecipe(c *fiber.Ctx) error {
 		Steps: req.Steps,
 	}
 
-	ctx := context.Background()
+	// Basic validation when validator is not configured
+	if h.recipeValidator != nil {
+		if err := h.recipeValidator.ValidateRecipe(c.Context(), recipe); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   "Recipe validation failed",
+				"details": err.Error(),
+			})
+		}
+	} else if err := recipe.Validate(); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Recipe validation failed",
+			"details": err.Error(),
+		})
+	}
 
-	// Initialize recipe registry if needed
 	if h.recipeRegistry == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 			"error": "Recipe registry not available",
 		})
 	}
 
-	// Register the custom recipe
-	err := h.recipeRegistry.RegisterCustomRecipe(ctx, recipe)
-	if err != nil {
+	if err := h.recipeRegistry.RegisterCustomRecipe(c.Context(), recipe); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   "Failed to create recipe",
 			"details": err.Error(),
@@ -311,7 +356,7 @@ func (h *Handler) SearchRecipes(c *fiber.Ctx) error {
 	ctx := context.Background()
 
 	// Get all recipes and filter by query
-	recipes, err := h.recipeRegistry.ListAllRecipes(ctx)
+	allRecipes, err := h.recipeRegistry.ListAllRecipes(ctx)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   "Failed to search recipes",
@@ -321,9 +366,9 @@ func (h *Handler) SearchRecipes(c *fiber.Ctx) error {
 
 	// Filter recipes by search query
 	query = strings.ToLower(query)
-	var matches []*UnifiedRecipeMetadata
+	var matches []*recipes.UnifiedRecipeMetadata
 
-	for _, recipe := range recipes {
+	for _, recipe := range allRecipes {
 		if strings.Contains(strings.ToLower(recipe.Metadata.ID), query) ||
 			strings.Contains(strings.ToLower(recipe.Metadata.Name), query) ||
 			containsInTags(recipe.Metadata.Tags, query) ||

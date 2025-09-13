@@ -2,13 +2,13 @@
 
 ## Overview
 
-The ARF (Automated Refactoring Framework) OpenRewrite migration system provides automated Java 11→17 migrations using OpenRewrite recipes via Nomad batch jobs, with optional LLM self-healing capabilities. This system implements batch job execution for reliable, scalable transformations.
+The ARF (Automated Refactoring Framework) previously described OpenRewrite migrations via Nomad batch jobs. Execution has been unified under the Mods system (orw-apply). ARF focuses on registries and auxiliary services; use Mods for transformations.
 
 ## Architecture
 
 ### Batch Job Architecture
 - **Nomad Batch Jobs**: OpenRewrite transformations run as ephemeral batch jobs
-- **ARF Dispatcher**: Manages job submission and monitoring (`api/arf/openrewrite_dispatcher.go`)
+- Execution is handled by Mods orw-apply; the ARF dispatcher has been removed.
 - **Storage Integration**: SeaweedFS for artifact storage and retrieval
 - **Dynamic Recipe Discovery**: Automatic resolution of recipe coordinates from Maven Central
 
@@ -17,8 +17,7 @@ The ARF (Automated Refactoring Framework) OpenRewrite migration system provides 
 ```
 ploy/
 ├── api/arf/
-│   ├── openrewrite_dispatcher.go      # Nomad batch job dispatcher
-│   ├── openrewrite_engine.go          # Local execution engine (testing)
+│   ├── openrewrite_engine.go          # Local execution engine (dev/testing only)
 │   └── factory.go                     # Engine factory configuration
 ├── platform/nomad/
 │   └── [job templates via dispatcher]  # Dynamic job generation
@@ -34,16 +33,9 @@ ploy/
 
 ## Implementation Details
 
-### Batch Job Dispatcher
+### Execution Path
 
-The OpenRewrite dispatcher (`api/arf/openrewrite_dispatcher.go`) manages the complete transformation lifecycle:
-
-1. **Infrastructure Validation**: Verifies Nomad and storage connectivity
-2. **Artifact Preparation**: Creates tar archives of source code
-3. **Storage Upload**: Uploads artifacts to SeaweedFS at `artifacts/openrewrite/{job-id}/`
-4. **Job Submission**: Creates and submits Nomad batch jobs
-5. **Execution Monitoring**: Tracks job progress with 4-minute timeout
-6. **Result Retrieval**: Downloads transformed code from storage
+Use Mods for execution. See `docs/api/mods.md` and run with `ploy mod run -f mods.yaml`.
 
 ### Docker Image
 
@@ -106,11 +98,11 @@ Validate your setup before running:
 
 ### Unified ARF Endpoints
 
-OpenRewrite transformations use the unified ARF transformation pipeline:
+OpenRewrite transformations should be executed via Mods:
 
 ```bash
 # Execute transformation
-// Removed: Use Mods run instead of ARF transform
+curl -X POST "$PLOY_CONTROLLER/mods" \
   -H "Content-Type: application/json" \
   -d '{
     "recipe_id": "org.openrewrite.java.migrate.UpgradeToJava17",
@@ -304,8 +296,8 @@ The system automatically resolves recipe coordinates:
 # View job allocation details (via wrapper)
 /opt/hashicorp/bin/nomad-job-manager.sh allocs --job openrewrite-<job-id>
 
-# Check dispatcher logs (in API logs)
-curl https://api.dev.ployman.app/v1/logs | grep OpenRewriteDispatcher
+# Check Mods controller logs for orw-apply
+curl https://api.dev.ployman.app/v1/logs | grep orw-apply
 
 # Verify storage accessibility
 curl -I http://seaweedfs-filer.service.consul:8888/artifacts/

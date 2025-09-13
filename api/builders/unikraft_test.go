@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // mockExecCommand is used to mock exec.Command in tests
@@ -194,7 +196,8 @@ func TestBuildUnikraftEnvironmentVariables(t *testing.T) {
 		return cmd
 	}
 
-	BuildUnikraftWithMock("app", "A", "/src", "sha", "/out", envVars, mockExecCommand)
+	_, err := BuildUnikraftWithMock("app", "A", "/src", "sha", "/out", envVars, mockExecCommand)
+	require.NoError(t, err)
 
 	// Verify all env vars were added
 	envMap := make(map[string]string)

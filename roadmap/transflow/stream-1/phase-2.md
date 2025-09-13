@@ -23,11 +23,11 @@ Deliverables
 - Planner/reducer job templates and CLI glue.
 - Self-healing policy: `max_retries`, `cooldown` (0 in MVP), stop conditions.
 - Runner emits a “healed” summary with winning branch + artifacts.
-- Extend `transflow.yaml` with optional `self_heal: {max_retries: 2}`; default to 1.
+- Extend `mod.yaml` with optional `self_heal: {max_retries: 2}`; default to 1.
  - KB integration: implement case writes and summary read; add periodic compactor job spec (separate Nomad job) as future enhancement.
 
 Implementation Steps
-- Parse `self_heal.max_retries` from transflow.yaml into runner config.
+- Parse `self_heal.max_retries` from mod.yaml into runner config.
 - On build failure, parse stdout/stderr; call `api/arf/llm_error_analysis.go` to map errors → ORW recipes.
 - Apply chosen recipe(s) using existing ARF invocation; commit; re-run build; loop up to N.
 - Unit tests: mock build failure → healing → passing path; verify retry count and summary content.
@@ -35,7 +35,7 @@ Implementation Steps
 ## Implementation Status
 
 ✅ **Completed:**
-- Self-heal config parsing in `transflow.yaml` (`self_heal.max_retries`, validation)
+- Self-heal config parsing in `mod.yaml` (`self_heal.max_retries`, validation)
 - Basic healing data structures (`TransflowHealingAttempt`, `TransflowHealingSummary`)
 - Error analysis integration (uses `arf.ExtractErrorContext`)
 - Job templates for planner, reducer, and healing options (`planner.hcl`, `reducer.hcl`, `llm_exec.hcl`, `orw_apply.hcl`)

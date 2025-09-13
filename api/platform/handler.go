@@ -57,12 +57,12 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 
 	// Create temp directory for build
 	tmpDir, _ := os.MkdirTemp("", fmt.Sprintf("platform-%s-", serviceName))
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Save uploaded tar
 	tarPath := filepath.Join(tmpDir, "src.tar")
 	f, _ := os.Create(tarPath)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Write(c.Body()); err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error":   "Failed to read request body",
@@ -72,7 +72,9 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 
 	// Extract source
 	srcDir := filepath.Join(tmpDir, "src")
-	os.MkdirAll(srcDir, 0755)
+	if err := os.MkdirAll(srcDir, 0755); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "mkdir src"})
+	}
 	_ = utils.Untar(tarPath, srcDir)
 
 	// Get environment variables for the service
@@ -217,11 +219,11 @@ func (h *Handler) deployToNomad(serviceName, dockerImage, environment string, en
 	if err != nil {
 		return fmt.Errorf("create temp job file: %w", err)
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	if _, err := tmp.WriteString(hcl); err != nil {
 		return fmt.Errorf("write job HCL: %w", err)
 	}
-	tmp.Close()
+	_ = tmp.Close()
 
 	if err := orchestration.Submit(tmp.Name()); err != nil {
 		return fmt.Errorf("submit job via orchestration: %w", err)

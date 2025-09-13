@@ -509,7 +509,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create output file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Execute template
 	if err := tmpl.Execute(file, report); err != nil {
@@ -568,7 +568,7 @@ func generateMockReport() *AcceptanceReport {
 			},
 			{
 				Name:        "CLI Integration",
-				Description: "Complete CLI integration (ploy transflow run)",
+				Description: "Complete CLI integration (ploy mod run)",
 				Status:      "passed",
 				Details:     "Full end-to-end workflow execution via CLI",
 			},

@@ -38,7 +38,7 @@ self_heal:
 ```
 
 ```bash
-# Execute transflow
+# Execute mod
 ploy mod run -f java-migration.yaml
 ```
 
@@ -207,10 +207,10 @@ build_timeout: 20m  # Increase for complex projects
 
 ## Verification
 
-- Java 11→17 scenario validated end‑to‑end as outlined in `roadmap/transflow/java11-17.md`.
+- Java 11→17 scenario validated end‑to‑end as outlined in `roadmap/mods/README.md`.
 - Quick local checks (no external services):
-  - `go run ./cmd/ploy mod run -f test-java11to17-transflow.yaml --dry-run -v`
-  - `go run ./cmd/ploy mod run -f test-java11to17-transflow.yaml --render-planner -v`
+  - `go run ./cmd/ploy mod run -f test-mod-java11to17.yaml --dry-run -v`
+  - `go run ./cmd/ploy mod run -f test-mod-java11to17.yaml --render-planner -v`
 - VPS E2E: run `ploy mod run -f /opt/ploy/test/fixtures/java-migration.yaml -v` from the VPS as `ploy` user.
 
 #### GitLab Authentication
@@ -231,7 +231,7 @@ curl http://localhost:8888/                  # SeaweedFS
 ### Debug Mode
 ```bash
 # Enable debug logging
-export TRANSFLOW_LOG_LEVEL=debug
+export MODS_LOG_LEVEL=debug
 ploy mod run -f config.yaml --verbose
 ```
 
@@ -246,7 +246,7 @@ ploy mod run -f config.yaml --exec-llm-only
 
 ## Performance Considerations
 
-- **Concurrent Workflows**: Limit to 5 simultaneous transflows per VPS
+- **Concurrent Workflows**: Limit to 5 simultaneous mods per VPS
 - **Memory Usage**: Expect 200-500MB per active workflow
 - **Build Timeouts**: Set realistic timeouts (5-15 minutes typical)
 - **KB Learning**: Asynchronous, does not block workflow execution

@@ -39,7 +39,7 @@ set -euo pipefail
 SEAWEED=http://seaweedfs-filer.service.consul:8888
 TS=$(date +%s)
 WORKDIR="/home/ploy/tmp/manual-input-$TS"
-INPUT_KEY="transflow/manual-input/$TS/input.tar"
+INPUT_KEY="mods/manual-input/$TS/input.tar"
 INPUT_TAR_URL="$SEAWEED/artifacts/$INPUT_KEY"
 
 echo "Preparing fresh baseline in $WORKDIR"
@@ -56,7 +56,7 @@ curl -sS -X PUT "$INPUT_TAR_URL" \
 echo "Verify input tar:"
 curl -sI "$INPUT_TAR_URL" | head -n1
 
-DIFF_KEY="transflow/manual-test/$TS/diff.patch"
+DIFF_KEY="mods/manual-test/$TS/diff.patch"
 IMG="registry.dev.ployman.app/openrewrite-jvm:latest"
 
 echo "Running container: $IMG"

@@ -32,7 +32,7 @@ func makeAPIRequest(method, url string, body []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -56,6 +56,6 @@ func makeAPIRequest(method, url string, body []byte) ([]byte, error) {
 func promptUser(prompt string) string {
 	fmt.Print(prompt)
 	var input string
-	fmt.Scanln(&input)
+	_, _ = fmt.Scanln(&input)
 	return input
 }

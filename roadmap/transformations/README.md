@@ -12,7 +12,7 @@ The ARF transformation system provided comprehensive status tracking for code tr
 
 **Current `/v1/arf/transforms` Behavior (Async-Only):**
 - Executes transformation asynchronously in background goroutines
-- Returns immediate response with `transformation_id` and status URL
+- Returns immediate response with `mod_id` and status URL
 - Stores status and progress in Consul KV for persistence across restarts
 - HTTP connections return within <1 second, no long-lived connections
 - Background execution handles timeouts and error recovery
@@ -32,7 +32,7 @@ The ARF transformation system provided comprehensive status tracking for code tr
 **New Response Format:**
 ```json
 {
-  "transformation_id": "uuid-1234-5678",
+  "mod_id": "uuid-1234-5678",
   "status": "initiated", 
   "status_url": "/v1/arf/transforms/uuid-1234-5678/status",
   "message": "Transformation started, use status_url to monitor progress"
@@ -82,7 +82,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
     
     // Store initial status in Consul immediately
     initialStatus := &TransformationStatus{
-        TransformationID: transformID,
+        ModID: transformID,
         Status: "initiated",
         WorkflowStage: "openrewrite", 
         StartTime: time.Now(),
@@ -94,7 +94,7 @@ func (h *Handler) ExecuteTransformation(c *fiber.Ctx) error {
     
     // Return immediately with status link
     return c.JSON(fiber.Map{
-        "transformation_id": transformID,
+        "mod_id": transformID,
         "status": "initiated",
         "status_url": fmt.Sprintf("/v1/arf/transforms/%s/status", transformID),
         "message": "Transformation started, use status_url to monitor progress",
@@ -146,13 +146,13 @@ ploy/arf/transforms/{transform_id}/sandbox/{id}    # Sandbox deployment info
 #### Status Document Format
 ```json
 {
-  "transformation_id": "uuid-root-1234",
+  "mod_id": "uuid-root-1234",
   "workflow_stage": "healing",
   "status": "in_progress",
   "start_time": "2025-01-15T10:00:00Z",
   "children": [
     {
-      "transformation_id": "uuid-heal1-5678",
+      "mod_id": "uuid-heal1-5678",
       "attempt_path": "1",
       "trigger_reason": "build_failure",
       "target_errors": ["compilation_error_line_45"],
@@ -161,7 +161,7 @@ ploy/arf/transforms/{transform_id}/sandbox/{id}    # Sandbox deployment info
       "new_issues_discovered": ["test_failure_integration"],
       "children": [
         {
-          "transformation_id": "uuid-heal1-1-9012",
+          "mod_id": "uuid-heal1-1-9012",
           "attempt_path": "1.1",
           "trigger_reason": "test_failure_after_heal", 
           "target_errors": ["test_failure_integration"],
@@ -171,7 +171,7 @@ ploy/arf/transforms/{transform_id}/sandbox/{id}    # Sandbox deployment info
       ]
     },
     {
-      "transformation_id": "uuid-heal2-3456",
+      "mod_id": "uuid-heal2-3456",
       "attempt_path": "2",
       "trigger_reason": "build_failure",
       "target_errors": ["missing_import"],
@@ -191,7 +191,7 @@ ploy/arf/transforms/{transform_id}/sandbox/{id}    # Sandbox deployment info
 ```go
 type TransformationResult struct {
     // Existing fields...
-    TransformationID string    `json:"transformation_id,omitempty"`
+    ModID string    `json:"mod_id,omitempty"`
     RecipeID         string    `json:"recipe_id"`
     Success          bool      `json:"success"`
     ChangesApplied   int       `json:"changes_applied"`
@@ -214,7 +214,7 @@ type TransformationResult struct {
 #### Nested Healing Structure
 ```go
 type HealingAttempt struct {
-    TransformationID     string                     `json:"transformation_id"`
+    ModID     string                     `json:"mod_id"`
     AttemptPath         string                     `json:"attempt_path"`        // "1.1.2" for nested attempts
     TriggerReason       string                     `json:"trigger_reason"`      // build_failure, test_failure, etc.
     TargetErrors        []string                   `json:"target_errors"`       // Specific errors this attempt targets
@@ -264,7 +264,7 @@ POST /v1/arf/transform
 }
 ```
 
-Response includes `transformation_id` for status tracking.
+Response includes `mod_id` for status tracking.
 
 #### 2. Workflow Stages
 
@@ -303,7 +303,7 @@ func (h *Handler) executeHealingWorkflow(transformID string, errors []string, pa
     
     // Create healing attempt
     attempt := &HealingAttempt{
-        TransformationID: uuid.New().String(),
+        ModID: uuid.New().String(),
         AttemptPath:     attemptPath,
         TriggerReason:   h.determineTriggerReason(errors),
         TargetErrors:    errors,
@@ -318,7 +318,7 @@ func (h *Handler) executeHealingWorkflow(transformID string, errors []string, pa
     h.consulStore.AddHealingAttempt(transformID, attemptPath, attempt)
     
     // Execute transformation with suggested fix
-    result := h.executeTransformation(attempt.TransformationID, analysis.SuggestedFix)
+    result := h.executeTransformation(attempt.ModID, analysis.SuggestedFix)
     
     // Update attempt status
     attempt.Status = "completed"
@@ -326,7 +326,7 @@ func (h *Handler) executeHealingWorkflow(transformID string, errors []string, pa
     attempt.EndTime = time.Now()
     
     // Check for new issues after healing
-    newErrors := h.validateAfterHealing(attempt.TransformationID)
+    newErrors := h.validateAfterHealing(attempt.ModID)
     if len(newErrors) > 0 {
         attempt.NewIssuesDiscovered = newErrors
         
@@ -349,7 +349,7 @@ Returns comprehensive transformation status with complete healing hierarchy:
 
 ```json
 {
-  "transformation_id": "uuid-root-1234",
+  "mod_id": "uuid-root-1234",
   "workflow_stage": "healing",
   "status": "in_progress",
   "start_time": "2025-01-15T10:00:00Z",
@@ -362,7 +362,7 @@ Returns comprehensive transformation status with complete healing hierarchy:
   },
   "children": [
     {
-      "transformation_id": "uuid-heal1-5678",
+      "mod_id": "uuid-heal1-5678",
       "attempt_path": "1",
       "status": "completed",
       "result": "partial_success",
@@ -378,7 +378,7 @@ Returns comprehensive transformation status with complete healing hierarchy:
       },
       "children": [
         {
-          "transformation_id": "uuid-heal1-1-9012",
+          "mod_id": "uuid-heal1-1-9012",
           "attempt_path": "1.1",
           "status": "in_progress",
           "trigger_reason": "test_failure_after_heal",
@@ -392,7 +392,7 @@ Returns comprehensive transformation status with complete healing hierarchy:
       ]
     },
     {
-      "transformation_id": "uuid-heal2-3456", 
+      "mod_id": "uuid-heal2-3456", 
       "attempt_path": "2",
       "status": "completed",
       "result": "success",
@@ -407,7 +407,7 @@ Returns comprehensive transformation status with complete healing hierarchy:
     "deployment_url": "https://sandbox-root-abc123.ployd.app",
     "healing_sandboxes": [
       {
-        "transformation_id": "uuid-heal1-1-9012",
+        "mod_id": "uuid-heal1-1-9012",
         "sandbox_id": "sandbox-heal1-1-def456",
         "deployment_url": "https://sandbox-heal1-1-def456.ployd.app",
         "build_status": "in_progress",

@@ -59,7 +59,7 @@ func uploadRecipe(recipePath string, flags CommandFlags) error {
 		ID      string `json:"id"`
 		Message string `json:"message"`
 	}
-	json.Unmarshal(response, &result)
+	_ = json.Unmarshal(response, &result)
 
 	fmt.Printf("Recipe '%s' uploaded successfully (ID: %s)\n", recipe.Metadata.Name, result.ID)
 	return nil
@@ -106,7 +106,7 @@ func deleteRecipe(recipeID string, flags CommandFlags) error {
 	if !flags.Force {
 		fmt.Printf("Are you sure you want to delete recipe '%s'? (y/N): ", recipeID)
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if strings.ToLower(confirm) != "y" {
 			fmt.Println("Deletion cancelled")
 			return nil

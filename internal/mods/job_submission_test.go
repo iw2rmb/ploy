@@ -17,7 +17,7 @@ import (
 // test helpers for runner healing integration
 type testJobHelper struct{}
 
-func (testJobHelper) SubmitPlannerJob(context.Context, *TransflowConfig, string, string) (*PlanResult, error) {
+func (testJobHelper) SubmitPlannerJob(context.Context, *ModConfig, string, string) (*PlanResult, error) {
 	return &PlanResult{PlanID: "p1", Options: []map[string]any{{"id": "llm1", "type": "llm-exec"}}}, nil
 }
 func (testJobHelper) SubmitReducerJob(context.Context, string, []BranchResult, *BranchResult, string) (*NextAction, error) {
@@ -29,6 +29,15 @@ type okHCLSubmitter struct{}
 func (okHCLSubmitter) Validate(string) error                                  { return nil }
 func (okHCLSubmitter) Submit(string, time.Duration) error                     { return nil }
 func (okHCLSubmitter) SubmitCtx(context.Context, string, time.Duration) error { return nil }
+
+// failingHCLSubmitter validates OK but fails on submit to avoid external Nomad dependency.
+type failingHCLSubmitter struct{}
+
+func (failingHCLSubmitter) Validate(string) error              { return nil }
+func (failingHCLSubmitter) Submit(string, time.Duration) error { return fmt.Errorf("submit failed") }
+func (failingHCLSubmitter) SubmitCtx(context.Context, string, time.Duration) error {
+	return fmt.Errorf("submit failed")
+}
 
 // okHealer returns a completed winner without real job submission
 type okHealer struct{}
@@ -162,14 +171,14 @@ func (m *MockJobSubmitter) CollectArtifacts(ctx context.Context, jobID string, o
 func TestSubmitPlannerJob(t *testing.T) {
 	tests := []struct {
 		name          string
-		config        *TransflowConfig
+		config        *ModConfig
 		buildError    string
 		expectError   bool
 		expectJobType string
 	}{
 		{
 			name: "successful planner submission",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/test/repo",
 				BaseRef:    "main",
@@ -180,7 +189,7 @@ func TestSubmitPlannerJob(t *testing.T) {
 		},
 		{
 			name: "planner submission with job failure",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "failing-workflow",
 				TargetRepo: "https://github.com/test/repo",
 				BaseRef:    "main",
@@ -398,7 +407,7 @@ func TestRunHealingFanout(t *testing.T) {
 }
 
 // Test runner integration
-func TestTransflowRunnerWithHealing(t *testing.T) {
+func TestModRunnerWithHealing(t *testing.T) {
 	t.Run("healing triggered on build failure", func(t *testing.T) {
 		// Stub out external interactions via injectable seams
 		oldDL := downloadToFileFn
@@ -432,10 +441,10 @@ func TestTransflowRunnerWithHealing(t *testing.T) {
 			hasRepoChangesFn = oldHasChanges
 		}()
 		// Execution id used in branch metadata paths
-		os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "test-exec")
-		defer os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+		_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "test-exec")
+		defer func() { _ = os.Unsetenv("PLOY_MODS_EXECUTION_ID") }()
 		// Setup
-		config := &TransflowConfig{
+		config := &ModConfig{
 			ID:         "healing-test",
 			TargetRepo: "https://github.com/test/repo",
 			BaseRef:    "main",
@@ -443,7 +452,7 @@ func TestTransflowRunnerWithHealing(t *testing.T) {
 				MaxRetries: 2,
 				Enabled:    true,
 			},
-			Steps: []TransflowStep{
+			Steps: []ModStep{
 				{
 					Type:               "orw-apply",
 					ID:                 "java-migration",
@@ -464,7 +473,7 @@ func TestTransflowRunnerWithHealing(t *testing.T) {
 		// Inject planner/reducer helper to avoid touching Nomad
 		// and HCL submitter that validates and submits successfully
 
-		runner, err := NewTransflowRunner(config, "/tmp/workspace")
+		runner, err := NewModRunner(config, "/tmp/workspace")
 		require.NoError(t, err)
 
 		runner.SetGitOperations(mockGit)
@@ -749,15 +758,17 @@ func TestLLMExecBranchValidation(t *testing.T) {
 				LLMExecAssetsPath:  "/tmp/test-llm.hcl",
 			},
 		}
+		// Prevent real Nomad interactions; force submit failure path
+		orchestrator.hcl = failingHCLSubmitter{}
 
 		// Set up test HCL template file
 		testHCL := `job "llm-exec-${RUN_ID}" {
 	group "main" {
 		task "generate" {
 			env {
-				TRANSFLOW_MODEL = "${TRANSFLOW_MODEL}"
-				TRANSFLOW_TOOLS = "${TRANSFLOW_TOOLS}"
-				TRANSFLOW_LIMITS = "${TRANSFLOW_LIMITS}"
+				MODS_MODEL = "${MODS_MODEL}"
+				MODS_TOOLS = "${MODS_TOOLS}"
+				MODS_LIMITS = "${MODS_LIMITS}"
 			}
 		}
 	}
@@ -769,7 +780,7 @@ func TestLLMExecBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
+		defer func() { _ = os.Remove(tempFile) }()
 
 		branch := BranchSpec{
 			ID:   "llm-substitution-test",
@@ -795,13 +806,14 @@ func TestLLMExecBranchValidation(t *testing.T) {
 				LLMExecAssetsPath:  "/tmp/test-nomad.hcl",
 			},
 		}
+		orchestrator.hcl = failingHCLSubmitter{}
 
 		// Create test rendered HCL file
 		testRenderedHCL := `job "llm-exec-test-123" {
 	group "main" {
 		task "generate" {
 			env {
-				TRANSFLOW_MODEL = "gpt-4o-mini@2024-08-06"
+				MODS_MODEL = "gpt-4o-mini@2024-08-06"
 			}
 		}
 	}
@@ -813,8 +825,8 @@ func TestLLMExecBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
-		defer os.Remove(renderedFile)
+		defer func() { _ = os.Remove(tempFile) }()
+		defer func() { _ = os.Remove(renderedFile) }()
 
 		branch := BranchSpec{
 			ID:   "llm-nomad-test",
@@ -840,6 +852,7 @@ func TestLLMExecBranchValidation(t *testing.T) {
 				LLMExecAssetsPath:  "/tmp/test-artifact.hcl",
 			},
 		}
+		orchestrator.hcl = failingHCLSubmitter{}
 
 		// Create test files (HCL and expected artifact path)
 		testHCL := "job \"test\" {}"
@@ -850,15 +863,15 @@ func TestLLMExecBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
-		defer os.Remove(renderedFile)
+		defer func() { _ = os.Remove(tempFile) }()
+		defer func() { _ = os.Remove(renderedFile) }()
 
 		// Create output directory but no diff.patch file (simulating job that completed but produced no artifact)
 		err = os.MkdirAll("/tmp/out", 0755)
 		if err != nil {
 			t.Fatalf("failed to create output directory: %v", err)
 		}
-		defer os.RemoveAll("/tmp/out")
+		defer func() { _ = os.RemoveAll("/tmp/out") }()
 
 		branch := BranchSpec{
 			ID:   "llm-artifact-test",
@@ -894,15 +907,15 @@ func TestLLMExecBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
-		defer os.Remove(renderedFile)
+		defer func() { _ = os.Remove(tempFile) }()
+		defer func() { _ = os.Remove(renderedFile) }()
 
 		// Create the diff.patch artifact that the job should produce
 		err = os.MkdirAll("/tmp/out", 0755)
 		if err != nil {
 			t.Fatalf("failed to create output directory: %v", err)
 		}
-		defer os.RemoveAll("/tmp/out")
+		defer func() { _ = os.RemoveAll("/tmp/out") }()
 
 		testPatch := `diff --git a/src/main.java b/src/main.java
 index 1234567..abcdefg 100644
@@ -997,7 +1010,7 @@ func TestORWGenBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
+		defer func() { _ = os.Remove(tempFile) }()
 
 		branch := BranchSpec{
 			ID:   "orw-config-test",
@@ -1053,8 +1066,8 @@ func TestORWGenBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
-		defer os.Remove(expectedRenderedFile)
+		defer func() { _ = os.Remove(tempFile) }()
+		defer func() { _ = os.Remove(expectedRenderedFile) }()
 
 		branch := BranchSpec{
 			ID:   "orw-substitution-test",
@@ -1106,7 +1119,7 @@ func TestORWGenBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
+		defer func() { _ = os.Remove(tempFile) }()
 
 		// Branch with no recipe_config
 		branch := BranchSpec{
@@ -1146,15 +1159,15 @@ func TestORWGenBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
-		defer os.Remove(renderedFile)
+		defer func() { _ = os.Remove(tempFile) }()
+		defer func() { _ = os.Remove(renderedFile) }()
 
 		// Create output directory but no diff.patch (simulating completed job with no changes)
 		err = os.MkdirAll("/tmp/out", 0755)
 		if err != nil {
 			t.Fatalf("failed to create output directory: %v", err)
 		}
-		defer os.RemoveAll("/tmp/out")
+		defer func() { _ = os.RemoveAll("/tmp/out") }()
 
 		branch := BranchSpec{
 			ID:   "orw-artifact-test",
@@ -1198,15 +1211,15 @@ func TestORWGenBranchValidation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
-		defer os.Remove(renderedFile)
+		defer func() { _ = os.Remove(tempFile) }()
+		defer func() { _ = os.Remove(renderedFile) }()
 
 		// Create the expected diff.patch artifact
 		err = os.MkdirAll("/tmp/out", 0755)
 		if err != nil {
 			t.Fatalf("failed to create output directory: %v", err)
 		}
-		defer os.RemoveAll("/tmp/out")
+		defer func() { _ = os.RemoveAll("/tmp/out") }()
 
 		orwPatch := `diff --git a/pom.xml b/pom.xml
 index abc123..def456 100644
@@ -1381,7 +1394,7 @@ func TestTimeoutAndErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer os.Remove(tempFile)
+		defer func() { _ = os.Remove(tempFile) }()
 
 		branch := BranchSpec{
 			ID:   "orw-malformed-test",

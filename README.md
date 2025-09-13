@@ -1,6 +1,8 @@
 # Ploy — Ultra-Lightweight Deployment Platform
 
 [![CI](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/ci.yml)
+[![Coverage](https://github.com/iw2rmb/ploy/actions/workflows/coverage.yml/badge.svg)](https://github.com/iw2rmb/ploy/actions/workflows/coverage.yml)
+![overall coverage](badges/overall-coverage.svg)
 
 ## Purpose
 Achieve **maximum performance** and **smallest footprint** by default using **unikernels on FreeBSD** (bhyve), while offering compatibility lanes when needed. Ploy makes the fast path the easy path.
@@ -116,6 +118,41 @@ Ploy's **api is designed as a horizontally scalable, stateless application** tha
 
 This architecture makes the api "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
 
+## Security: NVD CVE Database Configuration
+
+The ARF Security Engine can use the NVD CVE database via the `api/nvd` package. Configure via environment variables:
+
+- `NVD_ENABLED` — enable/disable NVD integration (`1`/`0`, default: `1`).
+- `NVD_API_KEY` — optional NVD API key for higher rate limits.
+- `NVD_BASE_URL` — override API endpoint (default: NVD v2 CVEs endpoint).
+- `NVD_TIMEOUT_MS` — HTTP timeout in milliseconds (default: 30000).
+
+When enabled, the server initializer wires an `nvd.NVDDatabase` into the ARF security engine.
+
+## Mods Security Gate (Optional)
+
+Mods can run an optional vulnerability gate after controller-side SBOM generation. It queries NVD for dependencies listed in `.sbom.json` and fails the run if findings at or above a configured severity are present.
+
+- YAML config (workflow):
+
+```yaml
+security:
+  enabled: true            # default: false
+  min_severity: high       # low|medium|high|critical (default: high)
+  fail_on_findings: true   # default: true
+```
+
+- Env toggles (alternative to YAML):
+  - `PLOY_MODS_VULN_ENABLED` — enable gate (true/1/on)
+  - `PLOY_MODS_VULN_MIN_SEVERITY` — low|medium|high|critical (default: high)
+  - `PLOY_MODS_VULN_FAIL_ON_FINDINGS` — default true
+
+- NVD client settings (shared): `NVD_API_KEY`, `NVD_BASE_URL`, `NVD_TIMEOUT_MS`
+
+Notes:
+- Uses keyword search per dependency name; precise purl/CPE correlation may be added later.
+- Gate runs only if SBOM exists at repo root (`.sbom.json`).
+
 ## Building and Versioning
 
 Ploy uses **automated version generation** from git metadata, eliminating manual version management.
@@ -164,6 +201,16 @@ ployman push -a openrewrite     # Deploy OpenRewrite service
 # Routes: /v1/platform/:service/*
 ```
 
+## Coverage Badges (Native)
+
+Coverage badges are updated on pushes to `main` by a native GitHub Actions workflow (no external services). Per-component coverage:
+
+- Mods: ![mods coverage](badges/mods-coverage.svg)
+- Orchestration: ![orchestration coverage](badges/orchestration-coverage.svg)
+- Storage: ![storage coverage](badges/storage-coverage.svg)
+- API (mods): ![api_mods coverage](badges/api_mods-coverage.svg)
+ - Overall: ![overall coverage](badges/overall-coverage.svg)
+
 **User Applications** (using ploy):
 ```bash
 # Deploy your application
@@ -192,12 +239,12 @@ Tip: Override with `PLOY_CONTROLLER` to target specific environments or tunnels.
 Subcommands for code transformation workflows and self-healing:
 
 ```
-ploy mod run -f transflow.yaml [--watch] [--output json|text]
+ploy mod run -f mods.yaml [--watch] [--output json|text]
 ploy mod watch -id <execution_id>
-ploy mod render -f transflow.yaml [--work-dir DIR] [--preserve-workspace] [-v]
-ploy mod plan -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
-ploy mod reduce -f transflow.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
-ploy mod apply -f transflow.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]
+ploy mod render -f mods.yaml [--work-dir DIR] [--preserve-workspace] [-v]
+ploy mod plan -f mods.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
+ploy mod reduce -f mods.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
+ploy mod apply -f mods.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]
 ```
 
 Use `ploy mod` with no subcommand to print help.
@@ -362,7 +409,7 @@ Recommended usage:
   - `staticcheck ./internal/mods/...`
 
 - Optional: ORW container smoke test (requires Docker and SeaweedFS):
-  - `export TRANSFLOW_DOCKER_SMOKE=1`
+  - `export MODS_DOCKER_SMOKE=1`
   - `export PLOY_SEAWEEDFS_URL=http://localhost:8888`
   - `export ORW_IMAGE=registry.dev.ployman.app/openrewrite-jvm:latest`
   - `go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/mods -v`

@@ -62,7 +62,7 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	ign, _ := utils.ReadGitignore(wd)
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
+		defer func() { _ = pw.Close() }()
 		_ = utils.TarDir(wd, pw, ign)
 	}()
 
@@ -96,7 +96,7 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("deployment request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Parse response
 	if resp.StatusCode != http.StatusOK {
@@ -112,7 +112,7 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	}
 
 	// Output to console
-	io.Copy(os.Stdout, resp.Body)
+	_, _ = io.Copy(os.Stdout, resp.Body)
 
 	return result, nil
 }

@@ -517,7 +517,7 @@ Each test should:
 - **Prerequisites**: Sample projects in different languages
 - **Steps**:
   1. Test Java transformation with OpenRewrite
-  2. Test Node.js transformation with tree-sitter
+  2. Test Node.js transformation
   3. Test Python transformation
   4. Test Go transformation
   5. Verify language-specific tooling works
@@ -628,20 +628,8 @@ Each test should:
   4. Check error logging and metrics
 - **Expected Results**: System continues operation with static recipes, error properly logged
 
-### 15. Multi-Language Transformation Engine Tests
-
-#### 15.1 Tree-Sitter AST Parsing
-- **Test ID**: ML-001
-- **Objective**: Verify tree-sitter can parse code for all supported languages
-- **Prerequisites**: Tree-sitter parsers installed for Java, JS, Python, Go, Rust
-- **Steps**:
-  1. For each language, create sample source files
-  2. Parse AST using multi-language engine
-  3. Verify AST structure contains expected nodes
-  4. Check symbol and import extraction
-- **Expected Results**: 95%+ parse success rate, accurate symbol/import detection
-
-#### 15.2 Cross-Language Transformation
+### 15. Cross-Language Transformation (Docs Only)
+#### 15.1 Cross-Language Transformation
 - **Test ID**: ML-002
 - **Objective**: Test transformations work across different languages
 - **Prerequisites**: Sample codebases in multiple languages
@@ -651,8 +639,8 @@ Each test should:
   3. Verify language-specific patterns are respected
 - **Expected Results**: Consistent transformation behavior across languages
 
-#### 15.3 WASM Optimization Transformations
-- **Test ID**: ML-003
+#### 15.2 WASM Optimization Transformations
+-- **Test ID**: ML-002
 - **Objective**: Verify WASM-specific optimizations work correctly
 - **Prerequisites**: WASM sample projects, wasm-opt tool
 - **Steps**:
@@ -906,11 +894,15 @@ Each test should:
 **Test Steps**:
 1. Generate enhanced SBOM with security metadata:
    ```bash
-   ./bin/ploy arf sbom generate --target /path/to/app --format spdx-json --security-analysis
+   curl -sS -X POST "$PLOY_CONTROLLER/v1/sbom/generate" \
+     -H 'Content-Type: application/json' \
+     -d '{"target":"/path/to/app","format":"spdx-json","options":{"deep_scan":true}}'
    ```
 2. Analyze SBOM for security issues:
    ```bash
-   ./bin/ploy arf sbom analyze --sbom-file app.sbom.json --deep-scan
+   curl -sS -X POST "$PLOY_CONTROLLER/v1/sbom/analyze" \
+     -H 'Content-Type: application/json' \
+     -d '{"sbom_path":"app.sbom.json"}'
    ```
 3. Test different SBOM formats:
    - SPDX JSON/XML
@@ -918,7 +910,7 @@ Each test should:
    - Syft native format
 4. Validate license compliance checking:
    ```bash
-   ./bin/ploy arf sbom compliance --sbom-file app.sbom.json --policy corporate-policy
+   curl -sS "$PLOY_CONTROLLER/v1/sbom/compliance?sbom_id=app.sbom.json&policy=corporate-policy"
    ```
 
 **Expected Results**:

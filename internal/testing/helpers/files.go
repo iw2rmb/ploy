@@ -17,7 +17,7 @@ func CreateTempDirLegacy(t testing.TB) string {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	})
 
 	return tmpDir

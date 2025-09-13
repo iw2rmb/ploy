@@ -21,7 +21,7 @@ These services are used directly in production workflows and have the highest im
   - Production healing workflows depend on real Nomad job orchestration
 - **Real Implementation**: Direct Nomad API client via `nomadapi.Client`
 - **Dependencies**: Nomad cluster, HCL template rendering, job monitoring
-- **Impact**: Core transflow healing functionality, production orchestration
+- **Impact**: Core mods healing functionality, production orchestration
 - **Estimated Effort**: 3-5 days
 - **Risk**: HIGH - Critical path for self-healing workflows
 
@@ -49,7 +49,7 @@ These services are used directly in production workflows and have the highest im
 #### 4. KB Service Integration (HIGH)
 - **Current State**:
   - KB learning pipeline may use mocks for development
-  - Critical for transflow self-healing intelligence
+  - Critical for mods self-healing intelligence
 - **Real Implementation**: SeaweedFS + Consul coordination
 - **Dependencies**: Storage backend, distributed locking, signature generation
 - **Impact**: Learning effectiveness, healing intelligence, duplicate detection
@@ -73,7 +73,7 @@ These services improve integration test quality and catch more bugs but don't di
 #### 6. Build API Client (MEDIUM)
 - **Current State**:
   - Build validation may use simplified mocks
-  - Critical for transflow build gate validation
+  - Critical for mods build gate validation
 - **Real Implementation**: Real build service calls via common.SharedPush
 - **Dependencies**: Build service availability, Docker, registry access
 - **Impact**: Build validation accuracy, deployment confidence

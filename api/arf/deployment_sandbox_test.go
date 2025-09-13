@@ -36,11 +36,11 @@ func TestDeploymentSandboxManager_CreateSandbox(t *testing.T) {
 					switch r.URL.Path {
 					case "/status/arf-benchmark-test":
 						w.WriteHeader(http.StatusOK)
-						w.Write([]byte(`{"status": "running"}`))
+						_, _ = w.Write([]byte(`{"status": "running"}`))
 					default:
 						if r.Method == "POST" && r.URL.Path == "/apps/arf-benchmark-test/builds" {
 							w.WriteHeader(http.StatusAccepted)
-							w.Write([]byte(`{"build_id": "test-build-123"}`))
+							_, _ = w.Write([]byte(`{"build_id": "test-build-123"}`))
 						} else {
 							w.WriteHeader(http.StatusNotFound)
 						}
@@ -127,7 +127,7 @@ func TestDeploymentSandboxManager_ListSandboxes(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/apps" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`[
+			_, _ = w.Write([]byte(`[
 				{
 					"name": "arf-benchmark-abc123",
 					"status": "running",
@@ -164,7 +164,7 @@ func TestDeploymentSandboxManager_CleanupExpiredSandboxes(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/apps" && r.Method == "GET" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`[
+			_, _ = w.Write([]byte(`[
 				{
 					"name": "arf-benchmark-expired1",
 					"status": "running",
@@ -194,7 +194,7 @@ func TestDeploymentSandboxManager_ExecuteCommand(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" && r.URL.Path == "/apps/test123/exec" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("command output"))
+			_, _ = w.Write([]byte("command output"))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}

@@ -15,7 +15,7 @@ import (
 
 // Mock interfaces for testing are now in mocks.go
 
-func TestTransflowRunner_Run(t *testing.T) {
+func TestModRunner_Run(t *testing.T) {
 	// Stub external integrations for all subtests
 	oldSubmit := submitAndWaitTerminal
 	oldDL := downloadToFileFn
@@ -36,8 +36,8 @@ func TestTransflowRunner_Run(t *testing.T) {
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	// Provide exec ID so diff fetch proceeds
-	os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "t-runner")
-	defer os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "t-runner")
+	defer func() { _ = os.Unsetenv("PLOY_MODS_EXECUTION_ID") }()
 
 	defer func() {
 		validateJob = baseValidate
@@ -51,7 +51,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		config         *TransflowConfig
+		config         *ModConfig
 		setupMocks     func(*MockGitOperations, *MockRecipeExecutor, *MockBuildChecker)
 		expectError    bool
 		expectedErrMsg string
@@ -59,12 +59,12 @@ func TestTransflowRunner_Run(t *testing.T) {
 	}{
 		{
 			name: "successful complete workflow",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:           "test-workflow",
 				TargetRepo:   "https://github.com/org/project",
 				BaseRef:      "refs/heads/main",
 				BuildTimeout: "10m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
@@ -99,11 +99,11 @@ func TestTransflowRunner_Run(t *testing.T) {
 		},
 		{
 			name: "git clone failure",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
@@ -121,11 +121,11 @@ func TestTransflowRunner_Run(t *testing.T) {
 		},
 		{
 			name: "orw-apply validation failure",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
@@ -147,11 +147,11 @@ func TestTransflowRunner_Run(t *testing.T) {
 		},
 		{
 			name: "build check failure",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
@@ -174,11 +174,11 @@ func TestTransflowRunner_Run(t *testing.T) {
 		},
 		{
 			name: "push failure",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
@@ -197,12 +197,12 @@ func TestTransflowRunner_Run(t *testing.T) {
 		},
 		{
 			name: "timeout configuration applied",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:           "test-workflow",
 				TargetRepo:   "https://github.com/org/project",
 				BaseRef:      "refs/heads/main",
 				BuildTimeout: "5m",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
@@ -216,12 +216,12 @@ func TestTransflowRunner_Run(t *testing.T) {
 		},
 		{
 			name: "lane override applied",
-			config: &TransflowConfig{
+			config: &ModConfig{
 				ID:         "test-workflow",
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Lane:       "D",
-				Steps: []TransflowStep{
+				Steps: []ModStep{
 					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
 				},
 			},
@@ -247,7 +247,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 			tt.setupMocks(mockGit, mockRecipe, mockBuild)
 
 			// Create runner with mocks
-			runner := &TransflowRunner{
+			runner := &ModRunner{
 				config:         tt.config,
 				workspaceDir:   workspaceDir,
 				gitOps:         mockGit,
@@ -281,7 +281,7 @@ func TestTransflowRunner_Run(t *testing.T) {
 
 // RED: When orw-apply fails inside the container with a clear error (e.g., "No build file found"),
 // the runner must surface a terminal error so the API status becomes failed instead of staying running.
-func TestTransflowRunner_ORWApplyNoBuildFileError(t *testing.T) {
+func TestModRunner_ORWApplyNoBuildFileError(t *testing.T) {
 	// Save and restore submitter
 	orig := submitAndWaitTerminal
 	defer func() { submitAndWaitTerminal = orig }()
@@ -293,21 +293,21 @@ func TestTransflowRunner_ORWApplyNoBuildFileError(t *testing.T) {
 
 	// Create temp workspace and minimal template
 	workspaceDir := t.TempDir()
-	jobsDir := filepath.Join(workspaceDir, "roadmap", "transflow", "jobs")
+	jobsDir := filepath.Join(workspaceDir, "roadmap", "mods", "jobs")
 	_ = os.MkdirAll(jobsDir, 0755)
 	// Minimal HCL content is enough for rendering/substitution path
 	hcl := []byte("job \"orw-apply-test\" { group \"orw\" { task \"openrewrite-apply\" { driver=\"docker\" config { volumes=[\"${CONTEXT_HOST_DIR}:/workspace/context:ro\",\"${OUT_HOST_DIR}:/workspace/out\"] } } } }")
 	_ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), hcl, 0644)
 
 	// Config with a single orw-apply step
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "java11to17-test",
 		TargetRepo: "https://example.com/org/repo.git",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "orw-apply", ID: "java11to17-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0"}},
+		Steps:      []ModStep{{Type: "orw-apply", ID: "java11to17-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0"}},
 	}
 
-	runner, err := NewTransflowRunner(config, workspaceDir)
+	runner, err := NewModRunner(config, workspaceDir)
 	assert.NoError(t, err)
 
 	// Mocks: clone creates repo directory so tar succeeds
@@ -328,8 +328,8 @@ func TestTransflowRunner_ORWApplyNoBuildFileError(t *testing.T) {
 	assert.Contains(t, runErr.Error(), "no build file found")
 }
 
-func TestTransflowResult_Summary(t *testing.T) {
-	result := &TransflowResult{
+func TestModResult_Summary(t *testing.T) {
+	result := &ModResult{
 		Success:      true,
 		WorkflowID:   "test-workflow",
 		BranchName:   "workflow/test-workflow/1234567890",
@@ -358,15 +358,15 @@ func TestTransflowResult_Summary(t *testing.T) {
 }
 
 // Test individual function coverage for runner methods
-func TestTransflowRunner_Setters(t *testing.T) {
-	config := &TransflowConfig{
+func TestModRunner_Setters(t *testing.T) {
+	config := &ModConfig{
 		ID:         "test",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
 	}
 
-	runner, err := NewTransflowRunner(config, t.TempDir())
+	runner, err := NewModRunner(config, t.TempDir())
 	assert.NoError(t, err)
 
 	// Test setters
@@ -388,7 +388,7 @@ func TestTransflowRunner_Setters(t *testing.T) {
 	assert.Equal(t, config.TargetRepo, runner.GetTargetRepo())
 }
 
-func TestTransflowRunner_PrepareRepo(t *testing.T) {
+func TestModRunner_PrepareRepo(t *testing.T) {
 	tests := []struct {
 		name        string
 		setupMocks  func(*MockGitOperations)
@@ -419,14 +419,14 @@ func TestTransflowRunner_PrepareRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &TransflowConfig{
+			config := &ModConfig{
 				ID:         "test",
 				TargetRepo: "https://github.com/org/repo",
 				BaseRef:    "main",
-				Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+				Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
 			}
 
-			runner, err := NewTransflowRunner(config, t.TempDir())
+			runner, err := NewModRunner(config, t.TempDir())
 			assert.NoError(t, err)
 
 			mockGit := NewMockGitOperations()
@@ -449,16 +449,16 @@ func TestTransflowRunner_PrepareRepo(t *testing.T) {
 	}
 }
 
-func TestTransflowRunner_ApplyDiffAndBuild(t *testing.T) {
+func TestModRunner_ApplyDiffAndBuild(t *testing.T) {
 	// Test basic function error paths - we don't test full functionality as it depends on external files
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "test",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
 	}
 
-	runner, err := NewTransflowRunner(config, t.TempDir())
+	runner, err := NewModRunner(config, t.TempDir())
 	assert.NoError(t, err)
 
 	mockRecipe := NewMockRecipeExecutor()
@@ -476,15 +476,15 @@ func TestTransflowRunner_ApplyDiffAndBuild(t *testing.T) {
 	assert.Error(t, err) // Should fail to read diff file
 }
 
-func TestTransflowRunner_RenderAssets(t *testing.T) {
-	config := &TransflowConfig{
+func TestModRunner_RenderAssets(t *testing.T) {
+	config := &ModConfig{
 		ID:         "test-workflow",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
 	}
 
-	runner, err := NewTransflowRunner(config, t.TempDir())
+	runner, err := NewModRunner(config, t.TempDir())
 	assert.NoError(t, err)
 
 	// These tests just verify the functions can be called - they'll error due to missing template files
@@ -519,18 +519,18 @@ func TestTransflowRunner_RenderAssets(t *testing.T) {
 	})
 }
 
-func TestTransflowRunner_GenerateMRDescription(t *testing.T) {
-	config := &TransflowConfig{
+func TestModRunner_GenerateMRDescription(t *testing.T) {
+	config := &ModConfig{
 		ID:         "test-workflow",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
 	}
 
-	runner, err := NewTransflowRunner(config, t.TempDir())
+	runner, err := NewModRunner(config, t.TempDir())
 	assert.NoError(t, err)
 
-	result := &TransflowResult{
+	result := &ModResult{
 		Success:      true,
 		WorkflowID:   "test-workflow",
 		BranchName:   "workflow/test/12345",
@@ -541,12 +541,12 @@ func TestTransflowRunner_GenerateMRDescription(t *testing.T) {
 	}
 
 	description := renderMRDescription(runner, result)
-	assert.Contains(t, description, "Transflow Workflow")
+	assert.Contains(t, description, "Workflow")
 	assert.Contains(t, description, "test-workflow")
 	assert.Contains(t, description, "Applied successfully")
 }
 
-func TestTransflowRunner_CleanupWorkspace(t *testing.T) {
+func TestModRunner_CleanupWorkspace(t *testing.T) {
 	// Create a temporary directory structure
 	tempDir := t.TempDir()
 	workspaceDir := filepath.Join(tempDir, "workspace")
@@ -558,14 +558,14 @@ func TestTransflowRunner_CleanupWorkspace(t *testing.T) {
 	err = os.WriteFile(testFile, []byte("test"), 0644)
 	assert.NoError(t, err)
 
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "test",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []TransflowStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
 	}
 
-	runner, err := NewTransflowRunner(config, workspaceDir)
+	runner, err := NewModRunner(config, workspaceDir)
 	assert.NoError(t, err)
 
 	// Verify file exists before cleanup

@@ -148,6 +148,7 @@ func waitTerminalWithJobManager(jobName string, timeout time.Duration) error {
 			}
 			if !sawRunningOrPending && len(allocs) > 0 {
 				// Not clearly terminal; wait
+				_ = allocs // no-op to satisfy staticcheck
 			}
 		}
 		// Fast-fail guard: no allocations appeared within guard window
@@ -299,10 +300,6 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 			_ = stopWithJobManager(name)
 			return ctx.Err()
 		}
-		// Note: waitTerminalWithJobManager handles alloc checks internally; guard is less applicable here
-		_ = start
-		_ = allocAppearGuard
-		// unreachable
 	}
 	acquireSubmit()
 	defer releaseSubmit()
@@ -373,6 +370,7 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 		}
 		if !sawRunning && len(allocs) > 0 {
 			// Allocations exist but none running and none complete/failed; give them time
+			_ = allocs // no-op to satisfy staticcheck
 		}
 		// Do not sleep here; blocking query already waited. Loop continues.
 	}

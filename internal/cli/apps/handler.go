@@ -20,7 +20,7 @@ func AppsCmd(args []string, controllerURL string) {
 		fs := flag.NewFlagSet("apps new", flag.ExitOnError)
 		lang := fs.String("lang", "go", "language")
 		name := fs.String("name", filepath.Base(utils.MustGetwd()), "name")
-		fs.Parse(args[1:])
+		_ = fs.Parse(args[1:])
 		if err := scaffold(*lang, *name); err != nil {
 			fmt.Println("scaffold error:", err)
 			return
@@ -32,7 +32,7 @@ func AppsCmd(args []string, controllerURL string) {
 		fs := flag.NewFlagSet("apps destroy", flag.ExitOnError)
 		name := fs.String("name", "", "app name to destroy")
 		force := fs.Bool("force", false, "skip confirmation prompt")
-		fs.Parse(args[1:])
+		_ = fs.Parse(args[1:])
 		if *name == "" {
 			fmt.Println("error: --name is required")
 			return
@@ -107,7 +107,7 @@ func DestroyApp(appName string, force bool, controllerURL string) error {
 	if err != nil {
 		return fmt.Errorf("failed to destroy app: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -134,25 +134,26 @@ func DestroyApp(appName string, force bool, controllerURL string) error {
 		fmt.Printf("📝 Message: %s\n", message)
 	}
 
-	if operations != nil && len(operations) > 0 {
+	if len(operations) > 0 {
 		fmt.Println("\n🔧 Operations performed:")
 		for op, result := range operations {
 			fmt.Printf("   • %s: %s\n", op, result)
 		}
 	}
 
-	if errors != nil && len(errors) > 0 {
+	if len(errors) > 0 {
 		fmt.Println("\n⚠️  Errors encountered:")
 		for _, err := range errors {
 			fmt.Printf("   • %s\n", err)
 		}
 	}
 
-	if status == "destroyed" {
+	switch status {
+	case "destroyed":
 		fmt.Printf("\n✅ App '%s' successfully destroyed!\n", appName)
-	} else if status == "partially_destroyed" {
+	case "partially_destroyed":
 		fmt.Printf("\n⚠️  App '%s' partially destroyed - some operations failed\n", appName)
-	} else {
+	default:
 		fmt.Printf("\n❌ App '%s' destruction incomplete\n", appName)
 	}
 

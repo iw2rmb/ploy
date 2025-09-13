@@ -33,7 +33,7 @@ func (m *MockGitLabProvider) CreateOrUpdateMR(ctx context.Context, config provid
 	}, nil
 }
 
-func TestTransflowRunner_GitLabIntegration(t *testing.T) {
+func TestModRunner_GitLabIntegration(t *testing.T) {
 	// Stub external integrations and provide exec ID
 	oldSubmit := submitAndWaitTerminal
 	oldDL := downloadToFileFn
@@ -54,7 +54,7 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 	validateDiffPathsFn = func(string, []string) error { return nil }
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
-	os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "gitlab-test")
+	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "gitlab-test")
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDL
@@ -63,18 +63,18 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 		validateUnifiedDiffFn = oldVUD
 		applyUnifiedDiffFn = oldAD
 		validateJob = oldValidate
-		os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+		_ = os.Unsetenv("PLOY_MODS_EXECUTION_ID")
 	}()
 	// Create a temporary workspace
 	workspaceDir := t.TempDir()
 
 	// Create test configuration
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "test-gitlab-integration",
 		TargetRepo: "https://gitlab.example.com/namespace/project.git",
 		BaseRef:    "refs/heads/main",
 		Lane:       "C",
-		Steps: []TransflowStep{
+		Steps: []ModStep{
 			{
 				ID:                 "java-migration",
 				Type:               "orw-apply",
@@ -88,7 +88,7 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 	}
 
 	// Create runner
-	runner, err := NewTransflowRunner(config, workspaceDir)
+	runner, err := NewModRunner(config, workspaceDir)
 	if err != nil {
 		t.Fatalf("Failed to create runner: %v", err)
 	}
@@ -123,13 +123,13 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 			if !strings.Contains(config.SourceBranch, "workflow/test-gitlab-integration") {
 				t.Errorf("Expected source branch to contain workflow ID, got %s", config.SourceBranch)
 			}
-			if config.Title != "Transflow: test-gitlab-integration" {
-				t.Errorf("Expected title %s, got %s", "Transflow: test-gitlab-integration", config.Title)
+			if config.Title != "Mods: test-gitlab-integration" {
+				t.Errorf("Expected title %s, got %s", "Mods: test-gitlab-integration", config.Title)
 			}
 			if len(config.Labels) != 2 || config.Labels[0] != "ploy" || config.Labels[1] != "tfl" {
 				t.Errorf("Expected labels [ploy, tfl], got %v", config.Labels)
 			}
-			if !strings.Contains(config.Description, "Transflow Workflow: test-gitlab-integration") {
+			if !strings.Contains(config.Description, "Mods Workflow: test-gitlab-integration") {
 				t.Errorf("Expected description to contain workflow ID, got %s", config.Description)
 			}
 
@@ -147,17 +147,17 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 	runner.SetBuildChecker(mockBuildChecker)
 	runner.SetGitProvider(mockGitLabProvider)
 
-	// Execute transflow
+	// Execute Mods
 	ctx := context.Background()
 	result, err := runner.Run(ctx)
 
 	// Verify results
 	if err != nil {
-		t.Fatalf("Transflow execution failed: %v", err)
+		t.Fatalf("Mods execution failed: %v", err)
 	}
 
 	if !result.Success {
-		t.Fatalf("Expected transflow to succeed, but got failure: %s", result.ErrorMessage)
+		t.Fatalf("Expected Mods run to succeed, but got failure: %s", result.ErrorMessage)
 	}
 
 	if result.MRURL != "https://gitlab.example.com/namespace/project/-/merge_requests/123" {
@@ -190,7 +190,7 @@ func TestTransflowRunner_GitLabIntegration(t *testing.T) {
 	}
 }
 
-func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
+func TestModRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 	// Stubs as above to keep unit-only
 	oldSubmit := submitAndWaitTerminal
 	oldDL := downloadToFileFn
@@ -211,7 +211,7 @@ func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 	validateDiffPathsFn = func(string, []string) error { return nil }
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
-	os.Setenv("PLOY_TRANSFLOW_EXECUTION_ID", "gitlab-test")
+	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "gitlab-test")
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDL
@@ -220,17 +220,17 @@ func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 		validateUnifiedDiffFn = oldVUD
 		applyUnifiedDiffFn = oldAD
 		validateJob = oldValidate
-		os.Unsetenv("PLOY_TRANSFLOW_EXECUTION_ID")
+		_ = os.Unsetenv("PLOY_MODS_EXECUTION_ID")
 	}()
 	// Test that MR creation fails gracefully when GitLab configuration is invalid
 	workspaceDir := t.TempDir()
 
-	config := &TransflowConfig{
+	config := &ModConfig{
 		ID:         "test-gitlab-config-invalid",
 		TargetRepo: "https://gitlab.example.com/namespace/project.git",
 		BaseRef:    "refs/heads/main",
 		Lane:       "C",
-		Steps: []TransflowStep{
+		Steps: []ModStep{
 			{
 				ID:                 "java-migration",
 				Type:               "orw-apply",
@@ -243,7 +243,7 @@ func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 		},
 	}
 
-	runner, err := NewTransflowRunner(config, workspaceDir)
+	runner, err := NewModRunner(config, workspaceDir)
 	if err != nil {
 		t.Fatalf("Failed to create runner: %v", err)
 	}
@@ -269,17 +269,17 @@ func TestTransflowRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 	}
 	runner.SetGitProvider(mockGitLabProvider)
 
-	// Execute transflow
+	// Execute mod
 	ctx := context.Background()
 	result, err := runner.Run(ctx)
 
-	// Verify that transflow still succeeds (MR creation is optional)
+	// Verify that mod still succeeds (MR creation is optional)
 	if err != nil {
-		t.Fatalf("Expected transflow to succeed despite MR configuration error, got: %v", err)
+		t.Fatalf("Expected mod to succeed despite MR configuration error, got: %v", err)
 	}
 
 	if !result.Success {
-		t.Fatalf("Expected transflow to succeed despite MR configuration error")
+		t.Fatalf("Expected mod to succeed despite MR configuration error")
 	}
 
 	// Verify MR step failed but didn't break the workflow

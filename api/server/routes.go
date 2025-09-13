@@ -107,10 +107,10 @@ func (s *Server) setupRoutes() {
 		log.Printf("ARF routes registered successfully")
 	}
 
-    // Mods endpoints
-	if s.dependencies.TransflowHandler != nil {
-		s.dependencies.TransflowHandler.RegisterRoutes(s.app)
-		log.Printf("Transflow routes registered successfully")
+	// Mods endpoints
+	if s.dependencies.ModsHandler != nil {
+		s.dependencies.ModsHandler.RegisterRoutes(s.app)
+		log.Printf("Mods routes registered successfully")
 	}
 
 	// Internal ARF recipes handlers are now the default; legacy overlay removed
@@ -125,6 +125,12 @@ func (s *Server) setupRoutes() {
 	if s.dependencies.LLMHandler != nil {
 		s.dependencies.LLMHandler.RegisterRoutes(s.app)
 		log.Printf("LLM model registry routes registered successfully")
+	}
+
+	// SBOM endpoints
+	if s.dependencies.SBOMHandler != nil {
+		s.dependencies.SBOMHandler.RegisterRoutes(s.app)
+		log.Printf("SBOM routes registered successfully")
 	}
 
 	// Template management endpoints

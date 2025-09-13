@@ -34,8 +34,8 @@ func TestSDKNomadAdapter_UsesRetryTransport(t *testing.T) {
 	defer srv.Close()
 
 	// Point Nomad client to our test server
-	os.Setenv("NOMAD_ADDR", srv.URL)
-	defer os.Unsetenv("NOMAD_ADDR")
+	_ = os.Setenv("NOMAD_ADDR", srv.URL)
+	defer func() { _ = os.Unsetenv("NOMAD_ADDR") }()
 
 	adapter := newSDKNomadAdapter()
 	if adapter == nil || adapter.client == nil {

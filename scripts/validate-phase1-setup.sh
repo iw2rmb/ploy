@@ -59,11 +59,11 @@ validate_go_tests() {
         return 1
     fi
 
-    # Check transflow package has tests
-    if ls "$PROJECT_ROOT/internal/cli/transflow"/*_test.go >/dev/null 2>&1; then
-        check_passed "Transflow package tests present"
+    # Check mods package has tests
+    if ls "$PROJECT_ROOT/internal/mods"/*_test.go >/dev/null 2>&1; then
+        check_passed "Mods package tests present"
     else
-        check_failed "Transflow package tests missing"
+        check_failed "Mods package tests missing"
         return 1
     fi
 }

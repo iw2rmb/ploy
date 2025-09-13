@@ -152,10 +152,10 @@ type TestMetrics struct {
 // TransformationResult contains the comprehensive results of a recipe execution
 type TransformationResult struct {
 	// Core identification
-	TransformationID string    `json:"transformation_id,omitempty"`
-	RecipeID         string    `json:"recipe_id"`
-	StartTime        time.Time `json:"start_time"`
-	EndTime          time.Time `json:"end_time"`
+	ModID     string    `json:"mod_id,omitempty"`
+	RecipeID  string    `json:"recipe_id"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
 
 	// Basic results (backward compatible)
 	Success         bool          `json:"success"`

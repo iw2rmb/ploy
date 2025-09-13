@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	mods "github.com/iw2rmb/ploy/internal/mods"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -26,12 +27,12 @@ func setupKBBenchmarkEnvironment(b *testing.B) *KBBenchmarkEnvironment {
 	}
 
 	// Create KB storage with mock lock manager for now
-	lockManager := &transflow.MockKBLockManager{}
-	kbStorage := transflow.NewSeaweedFSKBStorage(storageClient, lockManager)
+	lockManager := &mods.MockKBLockManager{}
+	kbStorage := mods.NewSeaweedFSKBStorage(storageClient, lockManager)
 
 	// Create KB integration
-	kbConfig := transflow.DefaultKBConfig()
-	kbIntegration := &transflow.KBIntegration{}
+	kbConfig := mods.DefaultKBConfig()
+	kbIntegration := &mods.KBIntegration{}
 
 	env := &KBBenchmarkEnvironment{
 		StorageClient: storageClient,
@@ -46,10 +47,10 @@ func setupKBBenchmarkEnvironment(b *testing.B) *KBBenchmarkEnvironment {
 
 type KBBenchmarkEnvironment struct {
 	StorageClient *storage.StorageClient
-	KBStorage     transflow.KBStorage
-	LockManager   transflow.KBLockManager
-	KBIntegration *transflow.KBIntegration
-	Config        *transflow.KBConfig
+	KBStorage     mods.KBStorage
+	LockManager   mods.KBLockManager
+	KBIntegration *mods.KBIntegration
+	Config        *mods.KBConfig
 }
 
 func (e *KBBenchmarkEnvironment) Cleanup() {
@@ -57,26 +58,26 @@ func (e *KBBenchmarkEnvironment) Cleanup() {
 }
 
 // generateTestHealingCase creates a realistic healing case for benchmarking
-func generateTestHealingCase(runID string, errorSig string, success bool) *transflow.CaseRecord {
-	return &transflow.CaseRecord{
+func generateTestHealingCase(runID string, errorSig string, success bool) *mods.CaseRecord {
+	return &mods.CaseRecord{
 		RunID:     runID,
 		Timestamp: time.Now(),
 		Language:  "java",
 		Signature: errorSig,
-		Context: &transflow.CaseContext{
+		Context: &mods.CaseContext{
 			Language:        "java",
 			Lane:            "C",
 			RepoURL:         "https://github.com/test/repo.git",
 			CompilerVersion: "javac 11.0.1",
 			BuildCommand:    "mvn compile",
 		},
-		Attempt: &transflow.HealingAttempt{
+		Attempt: &mods.HealingAttempt{
 			Type:             "orw_recipe",
 			Recipe:           "org.openrewrite.java.migrate.Java11toJava17",
 			PatchFingerprint: fmt.Sprintf("patch-%d", rand.Int31()),
 			PatchContent:     generateTestPatch(1024), // 1KB patch
 		},
-		Outcome: &transflow.HealingOutcome{
+		Outcome: &mods.HealingOutcome{
 			Success: success,
 			BuildStatus: func() string {
 				if success {
@@ -89,7 +90,7 @@ func generateTestHealingCase(runID string, errorSig string, success bool) *trans
 			Duration:     int64(rand.Intn(60000)), // Random duration up to 60s
 			CompletedAt:  time.Now(),
 		},
-		BuildLogs: &transflow.SanitizedLogs{
+		BuildLogs: &mods.SanitizedLogs{
 			Stdout:    "Build output...",
 			Stderr:    "Build errors...",
 			Truncated: false,
@@ -203,10 +204,10 @@ func BenchmarkKBSummaryOperations(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			errorSig := fmt.Sprintf("benchmark-summary-%d", i)
 
-			summaryRecord := &transflow.SummaryRecord{
+			summaryRecord := &mods.SummaryRecord{
 				Language:  language,
 				Signature: errorSig,
-				Promoted: []transflow.PromotedFix{
+				Promoted: []mods.PromotedFix{
 					{
 						Kind:          "orw_recipe",
 						Ref:           "org.openrewrite.java.migrate.Java11toJava17",
@@ -217,7 +218,7 @@ func BenchmarkKBSummaryOperations(b *testing.B) {
 						FirstSeenAt:   time.Now().Add(-24 * time.Hour),
 					},
 				},
-				Stats: &transflow.SummaryStats{
+				Stats: &mods.SummaryStats{
 					TotalCases:   20,
 					SuccessCount: 15,
 					FailureCount: 5,
@@ -239,11 +240,11 @@ func BenchmarkKBSummaryOperations(b *testing.B) {
 		// Pre-populate some summaries
 		for i := 0; i < 10; i++ {
 			errorSig := fmt.Sprintf("benchmark-read-summary-%d", i)
-			summaryRecord := &transflow.SummaryRecord{
+			summaryRecord := &mods.SummaryRecord{
 				Language:  language,
 				Signature: errorSig,
-				Promoted:  []transflow.PromotedFix{},
-				Stats: &transflow.SummaryStats{
+				Promoted:  []mods.PromotedFix{},
+				Stats: &mods.SummaryStats{
 					TotalCases:   10,
 					SuccessCount: 7,
 					FailureCount: 3,
@@ -345,12 +346,12 @@ func BenchmarkKBLearningWorkflow(b *testing.B) {
 		}
 
 		// Step 2: Create healing attempt
-		attempt := &transflow.HealingAttempt{
+		attempt := &mods.HealingAttempt{
 			Type:   "orw_recipe",
 			Recipe: "org.openrewrite.java.migrate.Java11toJava17",
 		}
 
-		outcome := &transflow.HealingOutcome{
+		outcome := &mods.HealingOutcome{
 			Success: i%3 == 0, // 33% success rate
 			BuildStatus: func() string {
 				if i%3 == 0 {

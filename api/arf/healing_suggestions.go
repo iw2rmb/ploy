@@ -3,17 +3,19 @@ package arf
 import (
 	"context"
 	"fmt"
+
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 )
 
 // HealingSuggestionService provides healing suggestion creation and management
 type HealingSuggestionService struct {
-	recipeConverter *RecipeConverter
+	recipeConverter *recipes.RecipeConverter
 }
 
 // NewHealingSuggestionService creates a new healing suggestion service
 func NewHealingSuggestionService() *HealingSuggestionService {
 	return &HealingSuggestionService{
-		recipeConverter: NewRecipeConverter(),
+		recipeConverter: recipes.NewRecipeConverter(),
 	}
 }
 
@@ -35,8 +37,15 @@ func (hs *HealingSuggestionService) CreateHealingSuggestion(ctx context.Context,
 		return nil, fmt.Errorf("analysis cannot be nil")
 	}
 
-	// Convert to OpenRewrite recipe
-	recipeName, recipeMetadata := hs.recipeConverter.ConvertToOpenRewriteRecipe(analysis, language)
+	// Convert to OpenRewrite recipe (adapt analysis to recipes type)
+	rcAnalysis := &recipes.LLMAnalysisResult{
+		ErrorType:        analysis.ErrorType,
+		Confidence:       analysis.Confidence,
+		SuggestedFix:     analysis.SuggestedFix,
+		AlternativeFixes: analysis.AlternativeFixes,
+		RiskAssessment:   analysis.RiskAssessment,
+	}
+	recipeName, recipeMetadata := hs.recipeConverter.ConvertToOpenRewriteRecipe(rcAnalysis, language)
 
 	// Create healing suggestion
 	suggestion := &HealingSuggestion{
@@ -55,12 +64,14 @@ func (hs *HealingSuggestionService) CreateHealingSuggestion(ctx context.Context,
 
 // estimateImpact estimates the impact of applying the healing suggestion
 func (hs *HealingSuggestionService) estimateImpact(analysis *LLMAnalysisResult) string {
-	if analysis.RiskAssessment == "high" {
+	switch analysis.RiskAssessment {
+	case "high":
 		return "major"
-	} else if analysis.RiskAssessment == "medium" {
+	case "medium":
 		return "moderate"
+	default:
+		return "minor"
 	}
-	return "minor"
 }
 
 // determinePrerequisites determines what needs to be in place before applying the fix

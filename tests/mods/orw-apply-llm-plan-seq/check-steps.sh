@@ -16,7 +16,7 @@ if [[ -z "$API_BASE" ]]; then
   exit 1
 fi
 
-ST_JSON=$(curl -sS "$API_BASE/transflow/status/$EXEC_ID")
+ST_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/status")
 
 req() {
   local field="$1"; shift
@@ -48,4 +48,3 @@ grep -Eq 'llm-exec:llm-exec:info:job completed' <<<"$ALL" || { echo "missing llm
 grep -Eq 'reducer:reducer:info:job completed' <<<"$ALL" || { echo "missing reducer completed" >&2; exit 4; }
 
 echo "All expected steps observed."
-

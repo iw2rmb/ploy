@@ -70,7 +70,7 @@ validate_documentation_on_vps() {
     ssh root@$TARGET_HOST 'su - ploy -c "
         cd /opt/ploy
         
-        echo \"📋 Testing transflow configuration examples...\"
+        echo \"📋 Testing mods configuration examples...\"
         
         # Check if examples directory exists
         if [ ! -d \"docs/examples\" ]; then
@@ -204,8 +204,8 @@ validate_documentation_on_vps() {
 }
 
 # Test individual documentation components
-test_transflow_examples() {
-    log_info "Testing Transflow configuration examples..."
+test_mods_examples() {
+    log_info "Testing Mods configuration examples..."
     
     local examples=(
         "java-migration.yaml"
@@ -226,7 +226,7 @@ test_api_documentation() {
     local endpoints=(
         "/health"
         "/v1/llms/models"
-        "/v1/transflow"
+        "/v1/mods"
     )
     
     for endpoint in "${endpoints[@]}"; do
@@ -239,7 +239,7 @@ test_cli_documentation() {
     
     run_test "Ploy Binary Exists" "ssh root@$TARGET_HOST 'su - ploy -c \"cd /opt/ploy && [ -f ./bin/ploy ]\"'"
     run_test "Ployman Binary Exists" "ssh root@$TARGET_HOST 'su - ploy -c \"cd /opt/ploy && [ -f ./bin/ployman ]\"'"
-    run_test "Transflow Help Available" "ssh root@$TARGET_HOST 'su - ploy -c \"cd /opt/ploy && ./bin/ploy transflow --help >/dev/null 2>&1\"'"
+    run_test "Mods Help Available" "ssh root@$TARGET_HOST 'su - ploy -c \"cd /opt/ploy && ./bin/ploy mod --help >/dev/null 2>&1\"'"
     run_test "Model Registry Help Available" "ssh root@$TARGET_HOST 'su - ploy -c \"cd /opt/ploy && ./bin/ployman models --help >/dev/null 2>&1\"'"
 }
 
@@ -264,7 +264,7 @@ test_documentation_completeness() {
     local docs=(
         "docs/mods/README.md"
         "docs/kb/README.md"
-        "docs/api/transflow.md"
+        "docs/api/mods.md"
         "docs/examples/"
         "docs/FEATURES.md"
         "CHANGELOG.md"
@@ -286,7 +286,7 @@ main() {
     
     # Run all validation tests
     validate_documentation_on_vps
-    test_transflow_examples
+    test_mods_examples
     test_api_documentation  
     test_cli_documentation
     test_service_connectivity

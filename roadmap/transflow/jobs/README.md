@@ -12,8 +12,8 @@ This doc specifies the contract for running LangGraph as short‑lived Nomad job
   - `/workspace/out`: writable artifacts dir (planner: `plan.json`; reducer: `next.json`).
 - Env (shared):
   - `MODEL` — model identifier `name@version` (resolved via llms registry).
-  - `TOOLS` — JSON string allowlist for MCP tools (e.g., file/search/build/openrewrite) and their scoped config. Validate against `platform/nomad/transflow/schemas/tools.schema.json`.
-  - `LIMITS` — JSON with limits: `{ "max_steps": N, "max_tool_calls": N, "timeout": "30m" }`. Validate against `platform/nomad/transflow/schemas/limits.schema.json`.
+- `TOOLS` — JSON string allowlist for MCP tools (e.g., file/search/build/openrewrite) and their scoped config. Validate against `platform/nomad/mods/schemas/tools.schema.json`.
+- `LIMITS` — JSON with limits: `{ "max_steps": N, "max_tool_calls": N, "timeout": "30m" }`. Validate against `platform/nomad/mods/schemas/limits.schema.json`.
   - `CONTEXT_DIR` — `/workspace/context` (mounted by orchestrator).
   - `KB_DIR` — `/workspace/kb` if present; empty otherwise.
   - `OUTPUT_DIR` — `/workspace/out` (job writes artifacts here).
@@ -34,7 +34,7 @@ This doc specifies the contract for running LangGraph as short‑lived Nomad job
   - `OUTPUT_DIR/plan.json`: validated plan schema:
     `{ "plan_id": "...", "options": [ {"id": "human-1", "type": "human"}, {"id": "llm-1", "type": "llm-exec", "inputs": {...}}, {"id": "orw-1", "type": "orw-gen", "inputs": {...}} ] }`.
   - `OUTPUT_DIR/manifest.json`: run manifest (prompts/version/checksums/timing).
-  - Optional upload: job may upload `plan.json` to storage and print a URL in stdout (e.g., `{ "ok": true, "plan_url": "https://filer/..../plan.json" }`). The CLI can read via `TRANSFLOW_PLAN_URL`.
+  - Optional upload: job may upload `plan.json` to storage and print a URL in stdout (e.g., `{ "ok": true, "plan_url": "https://filer/..../plan.json" }`). The CLI can read via `MODS_PLAN_URL`.
 - Exit codes
   - `0`: success with `plan.json`
   - `2`: planner could not propose options (escalate to human-step)
@@ -79,8 +79,8 @@ Example:
 - Reducer: `out/next.json`, `out/manifest.json`; optional traces under `out/logs/`.
 
 Schemas:
-- Plan schema: see `platform/nomad/transflow/schemas/plan.schema.json` (plan_id + options[] of type human|llm-exec|orw-gen).
-- Next schema: see `platform/nomad/transflow/schemas/next.schema.json` (action stop|new_plan; optional embedded plan).
+- Plan schema: see `platform/nomad/mods/schemas/plan.schema.json` (plan_id + options[] of type human|llm-exec|orw-gen).
+- Next schema: see `platform/nomad/mods/schemas/next.schema.json` (action stop|new_plan; optional embedded plan).
 
 ### Error Handling
 
@@ -90,10 +90,10 @@ Schemas:
 ## Orchestrator Glue
 
 1) Prepare host directories:
-   - Context (planner): write `inputs.json` with {language, lane, last_error{stdout,stderr}, deps…} under a per-run dir; mount as `transflow-context`.
-   - KB snapshot (optional): sync `cases/`, `summaries/` and optional vector index bundle into a dir; mount as `transflow-kb`.
-   - History (reducer): write `history.json` under a per-run dir; mount as `transflow-history`.
-   - Out: create a writable dir per run; mount as `transflow-out` to collect artifacts.
+   - Context (planner): write `inputs.json` with {language, lane, last_error{stdout,stderr}, deps…} under a per-run dir; mount as `mods-context`.
+   - KB snapshot (optional): sync `cases/`, `summaries/` and optional vector index bundle into a dir; mount as `mods-kb`.
+   - History (reducer): write `history.json` under a per-run dir; mount as `mods-history`.
+   - Out: create a writable dir per run; mount as `mods-out` to collect artifacts.
 
 2) Build env strings:
    - MODEL: resolve via llms registry (e.g., `gpt-4o-mini@2024-08-06`).
@@ -142,7 +142,7 @@ func SubmitPlanner(model, toolsJSON, limitsJSON, runID, hclPath string) error {
     if err := orchestration.SubmitAndWaitHealthy(tmp, 1, 30*60*1e9); err != nil { // 30m
         return err
     }
-    // Orchestrator can now read artifacts from the mounted `transflow-out` host dir
+    // Orchestrator can now read artifacts from the mounted `mods-out` host dir
     return nil
 }
 ```

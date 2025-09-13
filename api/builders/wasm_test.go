@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestNewWASMBuilder tests the WASMBuilder constructor
@@ -393,7 +395,7 @@ func TestBuildContextCancellation(t *testing.T) {
 
 	// Create a Rust WASM project
 	cargoPath := filepath.Join(request.SourcePath, "Cargo.toml")
-	os.WriteFile(cargoPath, []byte("[dependencies]\nwasm-bindgen = \"0.2\""), 0644)
+	require.NoError(t, os.WriteFile(cargoPath, []byte("[dependencies]\nwasm-bindgen = \"0.2\""), 0644))
 
 	// The build should fail due to cancelled context
 	_, err := builder.Build(ctx, request)
@@ -419,7 +421,7 @@ func TestBuildTimeout(t *testing.T) {
 
 	// Create a Rust WASM project
 	cargoPath := filepath.Join(request.SourcePath, "Cargo.toml")
-	os.WriteFile(cargoPath, []byte("[dependencies]\nwasm-bindgen = \"0.2\""), 0644)
+	require.NoError(t, os.WriteFile(cargoPath, []byte("[dependencies]\nwasm-bindgen = \"0.2\""), 0644))
 
 	// Sleep to ensure timeout
 	time.Sleep(2 * time.Millisecond)

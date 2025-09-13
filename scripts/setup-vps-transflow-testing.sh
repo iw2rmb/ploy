@@ -2,10 +2,10 @@
 set -e
 
 TARGET_HOST=${TARGET_HOST:-45.12.75.241}
-echo "Setting up transflow testing environment on: $TARGET_HOST"
+echo "Setting up mods testing environment on: $TARGET_HOST"
 
-# Deploy latest transflow binary
-echo "Deploying transflow binary..."
+# Deploy latest ploy binary
+echo "Deploying ploy binary..."
 scp bin/ploy-linux root@$TARGET_HOST:/opt/ploy/bin/ploy
 ssh root@$TARGET_HOST '
     chmod +x /opt/ploy/bin/ploy
@@ -26,11 +26,11 @@ ssh root@$TARGET_HOST 'su - ploy -c "
     consul kv put kb/locks/.keeper \"kb-lock-namespace\" || true
 "'
 
-# Configure transflow test environment
-echo "Setting up transflow test configuration..."
+# Configure mods test environment
+echo "Setting up mods test configuration..."
 ssh root@$TARGET_HOST 'su - ploy -c "
-    mkdir -p /opt/ploy/test/transflow
-    cat > /opt/ploy/test/transflow/test-config.yaml << \"EOF\"
+    mkdir -p /opt/ploy/test/mods
+    cat > /opt/ploy/test/mods/test-config.yaml << \"EOF\"
 version: v1alpha1
 consul_addr: localhost:8500
 nomad_addr: http://localhost:4646
@@ -60,7 +60,7 @@ echo "Setting up test fixtures..."
 ssh root@$TARGET_HOST 'su - ploy -c "
     mkdir -p /opt/ploy/test/fixtures
     
-    # Create test transflow configuration
+    # Create test mods configuration
     cat > /opt/ploy/test/fixtures/java-migration.yaml << \"EOF\"
 version: v1alpha1
 id: vps-test-java-migration

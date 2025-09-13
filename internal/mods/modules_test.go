@@ -120,7 +120,7 @@ func TestTransformationExecutorAdapter_Submit(t *testing.T) {
 	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
 	defer func() { validateJob = oldValidate; submitAndWaitTerminal = oldSubmit }()
 
-	r := &TransflowRunner{workspaceDir: t.TempDir()}
+	r := &ModRunner{workspaceDir: t.TempDir()}
 	x := NewTransformationExecutorAdapter(r)
 	diff := r.workspaceDir + "/out/diff.patch"
 	params := ORWSubmitParams{SeaweedURL: "http://filer", ExecID: "e", BranchID: "b", StepID: "s", RunID: "job-1", SubmittedHCLPath: r.workspaceDir + "/hcl.hcl", DiffPath: diff, Timeout: time.Second}

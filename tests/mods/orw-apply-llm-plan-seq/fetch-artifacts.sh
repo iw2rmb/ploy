@@ -21,14 +21,14 @@ if [[ -z "$API_BASE" ]]; then
   exit 1
 fi
 
-ARTS_JSON=$(curl -sS "$API_BASE/transflow/artifacts/$EXEC_ID" || true)
+ARTS_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/artifacts" || true)
 echo "$ARTS_JSON" > "$LOG_DIR/artifacts_index.json"
 
 download() {
   local name="$1"; shift
   local out="$LOG_DIR/$2"; shift
   echo "Fetching $name → $out"
-  curl -fsS "$API_BASE/transflow/artifacts/$EXEC_ID/$name" -o "$out" || {
+  curl -fsS "$API_BASE/mods/$EXEC_ID/artifacts/$name" -o "$out" || {
     echo "  (missing $name)"; return 0; }
 }
 
@@ -37,4 +37,3 @@ download next_json next.json
 download diff_patch diff.patch
 
 echo "Artifacts written to $LOG_DIR"
-

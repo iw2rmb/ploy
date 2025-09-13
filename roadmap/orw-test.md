@@ -85,12 +85,12 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
   ```
 
 3. **Monitor Execution**
-   - Track status via `/v1/mods/status/{id}`
+   - Track status via `/v1/mods/{id}/status`
    - Monitor Nomad job execution
    - Check SeaweedFS for artifacts
 
 4. **Retrieve Results**
-   - Download artifacts from storage under `artifacts/transflow/{id}/...`
+- Download artifacts from storage under `artifacts/mods/{id}/...`
 
 5. **Verify Changes**
    - Compare before/after files
@@ -212,19 +212,19 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 ### Successful Pattern for Transformations via Mods
 
 ```bash
-# 1. Start transflow run
+# 1. Start mods run
 curl -X POST https://api.dev.ployman.app/v1/mods/run \
   -H "Content-Type: application/json" \
   -d '{"config_data": {"version":"1","id":"orw-test-$(date +%s)","target_repo":"https://github.com/iw2rmb/ploy-orw-test-java.git","target_branch":"main","base_ref":"main","lane":"A","build_timeout":"5m","steps":[{"type":"orw-apply","id":"orw1","engine":"openrewrite","recipes":["org.openrewrite.java.migrate.Java8toJava11"]}],"self_heal":{"enabled":false}}}'
 
 # 2. Monitor status
-curl https://api.dev.ployman.app/v1/mods/status/{id}
+curl https://api.dev.ployman.app/v1/mods/{id}/status
 
 # 3. Get artifacts (e.g., diff.patch)
-curl https://api.dev.ployman.app/v1/mods/artifacts/{id}
+curl https://api.dev.ployman.app/v1/mods/{id}/artifacts
 
 # 4. Logs / events
-curl https://api.dev.ployman.app/v1/mods/logs/{id}
+curl https://api.dev.ployman.app/v1/mods/{id}/logs
 ```
 
 ### Tested Recipe IDs That Work
@@ -235,7 +235,7 @@ curl https://api.dev.ployman.app/v1/mods/logs/{id}
 - `org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_2` - Spring Boot upgrade
 
 ### Test Automation
-- Automated via Go tests: integration/E2E suites above and transflow unit tests under `internal/mods`
+- Automated via Go tests: integration/E2E suites above and mods unit tests under `internal/mods`
 - Test repositories created and available on GitHub
 
 ## Conclusions

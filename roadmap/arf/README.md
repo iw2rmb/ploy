@@ -51,9 +51,9 @@ The ARF implementation is structured in 8 progressive phases:
 **Key Deliverables:** ✅
 - ✅ Dynamic recipe generation using OpenAI LLM APIs
 - ✅ Hybrid OpenRewrite + LLM transformation workflows
-- ✅ Success/failure pattern learning system with PostgreSQL
+- ⏸️ Success/failure pattern learning system (SQL) — deferred
 - ✅ Context-aware transformation strategy selection
-- ✅ Multi-language AST support with tree-sitter
+// Multi-language AST support via tree-sitter was removed.
 - ✅ Ollama provider integration for local LLM execution
 - ✅ Strategy selector with confidence scoring
 - ✅ CLLM service integration for enhanced error analysis
@@ -138,10 +138,10 @@ ARF leverages Ploy's existing infrastructure:
 ARF provides comprehensive API endpoints for transformation management and debugging:
 
 ### Core Transformation Endpoints (Legacy)
-// Legacy ARF transform endpoints removed; use Transflow under `/v1/mods/*`.
+// Legacy ARF transform endpoints removed; use Mods under `/v1/mods/*`.
 
 ### Debugging & Analysis Endpoints (Legacy)
-// Legacy ARF debugging endpoints removed with transform API; Transflow may expose equivalents in future.
+// Legacy ARF debugging endpoints removed with transform API; Mods may expose equivalents in future.
 
 ### Transformation Reports
 

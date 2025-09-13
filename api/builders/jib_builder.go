@@ -189,7 +189,7 @@ func addJibPluginToMaven(src string) error {
 func addJibPluginToGradle(src string) error {
 	// For now, return an error as Gradle modification is more complex
 	// Will implement if needed based on testing
-	return errors.New("Gradle Jib auto-configuration not yet implemented")
+	return errors.New("gradle jib auto-configuration not yet implemented")
 }
 
 // trySpringBootBuildMaven attempts to build using direct Jib invocation for Maven
@@ -206,7 +206,7 @@ func trySpringBootBuildMaven(src string, env []string) (string, error) {
 
 	if err := compileCmd.Run(); err != nil {
 		fmt.Printf("Maven compile failed: %v\n", err)
-		return "", fmt.Errorf("Maven compile failed: %w", err)
+		return "", fmt.Errorf("maven compile failed: %w", err)
 	}
 
 	// Try direct Jib execution with explicit version and configuration
@@ -235,7 +235,7 @@ func trySpringBootBuildMaven(src string, env []string) (string, error) {
 		return tarPath, nil
 	}
 
-	return "", errors.New("Jib tar not found after direct execution")
+	return "", errors.New("jib tar not found after direct execution")
 }
 
 // tryMinimalJibBuild attempts a minimal Jib build with basic configuration
@@ -288,7 +288,7 @@ func trySpringBootBuildGradle(src string, env []string) (string, error) {
 
 	if err := compileCmd.Run(); err != nil {
 		fmt.Printf("Gradle compile failed: %v\n", err)
-		return "", fmt.Errorf("Gradle compile failed: %w", err)
+		return "", fmt.Errorf("gradle compile failed: %w", err)
 	}
 
 	// Try to add Jib plugin dynamically via init script
@@ -319,7 +319,7 @@ allprojects {
 	if err := os.WriteFile(initScript, []byte(initScriptContent), 0644); err != nil {
 		return "", fmt.Errorf("failed to create Jib init script: %w", err)
 	}
-	defer os.Remove(initScript)
+	defer func() { _ = os.Remove(initScript) }()
 
 	// Run Jib with init script
 	fmt.Println("Running: ./gradlew jibBuildTar with init script")
@@ -331,7 +331,7 @@ allprojects {
 
 	if err := jibCmd.Run(); err != nil {
 		fmt.Printf("Gradle Jib build failed: %v\n", err)
-		return "", fmt.Errorf("Gradle Jib build failed: %w", err)
+		return "", fmt.Errorf("gradle jib build failed: %w", err)
 	}
 
 	tarPath := filepath.Join(src, "build", "jib-image.tar")
@@ -340,5 +340,5 @@ allprojects {
 		return tarPath, nil
 	}
 
-	return "", errors.New("Jib tar not found after Gradle build")
+	return "", errors.New("jib tar not found after Gradle build")
 }

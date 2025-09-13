@@ -1,4 +1,4 @@
-Below is refactor scope of transflow features.
+Below is refactor scope of mods features.
 Implement this plan.
 Follow instructions:
 - For every step, pick a minimal but complete part of the plan
@@ -6,10 +6,10 @@ Follow instructions:
 - Follow AGENTS.md and TDD, update tests and docs accordingly
 - Commit and push changes
 - After pushing changes, deploy API using:
-    `DEPLOY_BRANCH=feature/transflow-mvp-completion ./bin/ployman api deploy --monitor`
+    `DEPLOY_BRANCH=feature/mods-mvp-completion ./bin/ployman api deploy --monitor`
 - After API deploy make sure this test passes succesfuly:
     `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 E2E_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git E2E_BRANCH=e2e/success go test ./tests/e2e -tags e2e -v -run JavaMigrationComplete -timeout 20m`
-- After test passes delete branch created by transflow
+- After test passes delete branch created by mods
 - After completion, mark task with checkmark.
 
 Scope
@@ -28,7 +28,7 @@ Scope
       - Change: add cancellation support in orchestration: on cancel, deregister the job or call the job manager to stop it; ensure the fanout orchestrator issues cancels and the orchestration layer honors them. Add tests for “winner found” ensures others are stopped.
       - Completed: introduced `SubmitAndWaitTerminalCtx` with context cancellation; on cancel, SDK path deregisters job, wrapper path calls `nomad-job-manager.sh stop|deregister`. Fanout and job submission flows now use the ctx-aware API.
   - ✅ Process‑wide environment mutation for job templating.
-      - Runner and helpers set env vars (os.Setenv) such as TRANSFLOW_OUT_DIR, TRANSFLOW_DIFF_KEY, etc. That leaks global state and breaks multi‑run concurrency in a single process.
+      - Runner and helpers set env vars (os.Setenv) such as MODS_OUT_DIR, MODS_DIFF_KEY, etc. That leaks global state and breaks multi‑run concurrency in a single process.
       - Change: consolidate templating into a function that takes an explicit map[string]string and writes the rendered HCL without touching global env. Thread per‑job env only where needed (e.g., pass env to job submitter wrapper).
       - Completed: added `substituteHCLTemplateWithMCPVars` and `substituteORWTemplateVars`, updated runner, planner/reducer, and fanout to pass explicit vars; removed os.Setenv usage in these paths.
   - ✅ Duplicate HCL substitution logic and inconsistent pathways.
@@ -45,15 +45,15 @@ Scope
   - ✅ OS working directory changes (os.Chdir) around builds.
       - Side‑effectful; unsafe across concurrent runs; brittle on panic.
       - Change: make build checker accept repo path or tar path; avoid process cwd changes. If unavoidable, wrap in defer with error handling and document as single‑run only.
-      - Completed: `common.DeployConfig` gained optional `WorkingDir`; SharedPush honors it; Transflow passes repo path via metadata to avoid process-wide `chdir`.
+      - Completed: `common.DeployConfig` gained optional `WorkingDir`; SharedPush honors it; Mods passes repo path via metadata to avoid process-wide `chdir`.
   - ✅ Interface typing with interface{} for “submitter/runners”.
       - jobSubmitter uses interface{} as a marker; jobSubmissionHelper and fanout do type assertions for test mode vs production.
       - Change: replace with explicit interfaces (ProductionJobSubmitter, ProductionBranchRunner, and a clean JobSubmitter abstraction). Remove magic “non‑nil” markers; inject typed collaborators.
-      - Completed: constructors now accept typed `JobSubmitter` (`NewJobSubmissionHelper`, `NewJobSubmissionHelperWithRunner`, `NewFanoutOrchestrator`, `NewFanoutOrchestratorWithRunner`); `TransflowRunner.SetJobSubmitter` and KB wrapper accept `JobSubmitter`; tests updated to use `NoopJobSubmitter{}` or mocks.
+      - Completed: constructors now accept typed `JobSubmitter` (`NewJobSubmissionHelper`, `NewJobSubmissionHelperWithRunner`, `NewFanoutOrchestrator`, `NewFanoutOrchestratorWithRunner`); `ModRunner.SetJobSubmitter` and KB wrapper accept `JobSubmitter`; tests updated to use `NoopJobSubmitter{}` or mocks.
   - ✅ SSE watcher strict Content‑Type check.
       - Checks equality to “text/event-stream”; some servers include charset.
       - Change: use prefix match or MIME parse; handle “text/event-stream; charset=utf-8”.
-      - Completed: `watchTransflowSSE` parses media type via `mime.ParseMediaType` and falls back to prefix check; tests cover charset variant.
+      - Completed: `watchModSSE` parses media type via `mime.ParseMediaType` and falls back to prefix check; tests cover charset variant.
 
   Medium‑Impact Weak Spots
 
@@ -72,7 +72,7 @@ Scope
   - ✅ Error handling ambiguity around orw‑apply.
       - “Best‑effort”: if job fails but diff exists, continue. May produce inconsistent state or apply broken diffs.
       - Change: make this behavior explicit behind a config flag (e.g., ALLOW_PARTIAL_ORW=true), and record provenance in MR description. Default to fail unless explicitly allowed.
-      - Completed: Added TRANSFLOW_ALLOW_PARTIAL_ORW; best‑effort continue only when enabled and non‑empty diff exists; otherwise fail.
+      - Completed: Added MODS_ALLOW_PARTIAL_ORW; best‑effort continue only when enabled and non‑empty diff exists; otherwise fail.
   - ✅ Schema validation use locations.
       - validatePlanJSON/validateNextJSON are used in planner mode; ensure they’re applied consistently on reducer outputs in production path as well. Fail fast on invalid schema.
       - Completed: Production planner/reducer artifact reads now validate JSON schema before unmarshalling; preview emits validation events.
@@ -87,7 +87,7 @@ Scope
   - Example apps:
       - Move local test apps to public hello apps; parameterize tests to clone external repos — pending (current E2E uses public GitLab repo; local examples still exist in docs/tests).
   - ✅ SeaweedFS access:
-      - Client uploads use HTTP helpers (no curl); artifact key policy enforced client-side and server-side; controller brokers artifact downloads via `/v1/mods/artifacts/:id/:name` with key validation. SeaweedFS base resolved via infra resolver. Auth TBD if filer becomes non‑public.
+      - Client uploads use HTTP helpers (no curl); artifact key policy enforced client-side and server-side; controller brokers artifact downloads via `/v1/mods/:id/artifacts/:name` with key validation. SeaweedFS base resolved via infra resolver. Auth TBD if filer becomes non‑public.
   - ✅ Allowlist verification:
       - Diff allowlist switched to doublestar; absolute/suspicious paths rejected; path prefix validation added for artifacts.
   - ⚠️ Temp artifacts in `/tmp/transflow-submitted/<exec>/<step>`:

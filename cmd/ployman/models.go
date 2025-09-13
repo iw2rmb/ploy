@@ -288,7 +288,7 @@ func handleModelsAdd(args []string) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(response, &result)
+	_ = json.Unmarshal(response, &result)
 
 	fmt.Printf("Model '%s' created successfully\n", model.ID)
 }
@@ -356,7 +356,7 @@ func handleModelsUpdate(modelID string, args []string) {
 	}
 
 	var result map[string]interface{}
-	json.Unmarshal(response, &result)
+	_ = json.Unmarshal(response, &result)
 
 	fmt.Printf("Model '%s' updated successfully\n", modelID)
 }
@@ -375,7 +375,7 @@ func handleModelsDelete(modelID string, args []string) {
 	if !force {
 		fmt.Printf("Are you sure you want to delete model '%s'? (y/N): ", modelID)
 		var confirm string
-		fmt.Scanln(&confirm)
+		_, _ = fmt.Scanln(&confirm)
 		if strings.ToLower(confirm) != "y" {
 			fmt.Println("Deletion cancelled")
 			return
@@ -467,7 +467,7 @@ func makeHTTPRequest(method, url string, body io.Reader) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {

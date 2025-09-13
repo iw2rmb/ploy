@@ -26,9 +26,9 @@ func WithEnvVar(t *testing.T, key, value string) {
 
 	t.Cleanup(func() {
 		if existed {
-			os.Setenv(key, oldValue)
+			_ = os.Setenv(key, oldValue)
 		} else {
-			os.Unsetenv(key)
+			_ = os.Unsetenv(key)
 		}
 	})
 }

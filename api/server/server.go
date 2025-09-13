@@ -23,9 +23,10 @@ import (
 	"github.com/iw2rmb/ploy/api/health"
 	"github.com/iw2rmb/ploy/api/llms"
 	"github.com/iw2rmb/ploy/api/metrics"
+	modsapi "github.com/iw2rmb/ploy/api/mods"
 	"github.com/iw2rmb/ploy/api/routing"
+	"github.com/iw2rmb/ploy/api/sbom"
 	"github.com/iw2rmb/ploy/api/selfupdate"
-	"github.com/iw2rmb/ploy/api/transflow"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 
 	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
@@ -52,9 +53,10 @@ type ServiceDependencies struct {
 	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
 	ARFHandler              *arf.Handler
-	TransflowHandler        *transflow.Handler
+	ModsHandler             *modsapi.Handler
 	AnalysisHandler         *analysis.Handler
 	LLMHandler              *llms.Handler
+	SBOMHandler             *sbom.Handler
 	CoordinationManager     *coordination.CoordinationManager
 	BlueGreenManager        *bluegreen.Manager
 	Metrics                 *metrics.Metrics

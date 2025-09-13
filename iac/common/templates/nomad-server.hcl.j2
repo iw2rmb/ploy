@@ -62,13 +62,13 @@ client {
     read_only = false
   }
 
-  # Host volumes for Transflow planner/LLM/ORW jobs (optional if using docker bind mounts)
-  host_volume "transflow-context" {
-    path      = "/opt/ploy/transflow/context"
+  # Host volumes for Mods planner/LLM/ORW jobs (optional if using docker bind mounts)
+  host_volume "mods-context" {
+    path      = "/opt/ploy/mods/context"
     read_only = false
   }
-  host_volume "transflow-out" {
-    path      = "/opt/ploy/transflow/out"
+  host_volume "mods-out" {
+    path      = "/opt/ploy/mods/out"
     read_only = false
   }
 }

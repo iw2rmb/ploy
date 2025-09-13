@@ -8,7 +8,7 @@ import (
 )
 
 // submitORWJobAndFetchDiff validates HCL, reports job, submits the job and fetches diff.patch from SeaweedFS.
-// The diff is fetched from artifacts/transflow/<execID>/branches/<branchID>/steps/<stepID>/diff.patch into diffPath.
+// The diff is fetched from artifacts/mods/<execID>/branches/<branchID>/steps/<stepID>/diff.patch into diffPath.
 func submitORWJobAndFetchDiff(
 	ctx context.Context,
 	validate func(string) error,

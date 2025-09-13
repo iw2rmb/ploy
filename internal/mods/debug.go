@@ -20,13 +20,13 @@ func previewTarEntries(tarPath string, max int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var r io.Reader = f
 	// Allow .tar.gz preview best-effort
 	if strings.HasSuffix(strings.ToLower(tarPath), ".gz") {
 		if gz, gErr := gzip.NewReader(f); gErr == nil {
-			defer gz.Close()
+			defer func() { _ = gz.Close() }()
 			r = gz
 		}
 	}
@@ -49,10 +49,10 @@ func previewTarEntries(tarPath string, max int) ([]string, error) {
 func logPreviewTar(tarPath string, max int) {
 	entries, err := previewTarEntries(tarPath, max)
 	if err != nil {
-		log.Printf("[Transflow] input.tar preview failed: %v", err)
+		log.Printf("[Mods] input.tar preview failed: %v", err)
 		return
 	}
-	log.Printf("[Transflow] input.tar preview (%d entries):\n%s", len(entries), strings.Join(entries, "\n"))
+	log.Printf("[Mods] input.tar preview (%d entries):\n%s", len(entries), strings.Join(entries, "\n"))
 }
 
 // logPreviewTarWithReporter emits tar preview via EventReporter when available (fallback to log)
@@ -62,7 +62,7 @@ func logPreviewTarWithReporter(rep EventReporter, phase, step, tarPath string, m
 		if rep != nil {
 			_ = rep.Report(context.Background(), Event{Phase: phase, Step: step, Level: "warn", Message: "input.tar preview failed: " + err.Error(), Time: time.Now()})
 		} else {
-			log.Printf("[Transflow] input.tar preview failed: %v", err)
+			log.Printf("[Mods] input.tar preview failed: %v", err)
 		}
 		return
 	}
@@ -70,6 +70,6 @@ func logPreviewTarWithReporter(rep EventReporter, phase, step, tarPath string, m
 	if rep != nil {
 		_ = rep.Report(context.Background(), Event{Phase: phase, Step: step, Level: "info", Message: "input.tar preview:\n" + msg, Time: time.Now()})
 	} else {
-		log.Printf("[Transflow] input.tar preview (%d entries):\n%s", len(entries), msg)
+		log.Printf("[Mods] input.tar preview (%d entries):\n%s", len(entries), msg)
 	}
 }

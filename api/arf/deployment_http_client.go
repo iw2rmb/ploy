@@ -50,7 +50,7 @@ func (d *DeploymentSandboxManager) deployRepository(ctx context.Context, appName
 	if err != nil {
 		return fmt.Errorf("deploy request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		body, _ := io.ReadAll(resp.Body)
@@ -75,7 +75,7 @@ func (d *DeploymentSandboxManager) getAppStatus(ctx context.Context, statusURL s
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("status request failed with code: %d", resp.StatusCode)
@@ -108,10 +108,10 @@ func (d *DeploymentSandboxManager) getAppURL(ctx context.Context, appName string
 		if resp, err := d.httpClient.Do(req); err == nil && resp.StatusCode == http.StatusOK {
 			var domains []string
 			if json.NewDecoder(resp.Body).Decode(&domains) == nil && len(domains) > 0 {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return fmt.Sprintf("https://%s", domains[0]), nil
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	}
 
@@ -200,7 +200,7 @@ func (d *DeploymentSandboxManager) deployTarArchive(ctx context.Context, appName
 	if d.logger != nil {
 		d.logger("DEBUG", "deployment", "HTTP request completed", fmt.Sprintf("Status: %d %s", resp.StatusCode, resp.Status))
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, readErr := io.ReadAll(resp.Body)

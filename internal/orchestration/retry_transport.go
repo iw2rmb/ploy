@@ -84,8 +84,8 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
 			if attempt < t.MaxRetries {
 				// Drain and close body before retrying
-				io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
+				_, _ = io.Copy(io.Discard, resp.Body)
+				_ = resp.Body.Close()
 				t.sleepBackoff(attempt, retryAfter)
 				continue
 			}

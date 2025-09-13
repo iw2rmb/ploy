@@ -4,18 +4,25 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	arfapi "github.com/iw2rmb/ploy/api/arf"
+	nvdapi "github.com/iw2rmb/ploy/api/nvd"
+	sbomanalysis "github.com/iw2rmb/ploy/api/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
-	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/transflow"
+	supply "github.com/iw2rmb/ploy/internal/supply"
+	"github.com/iw2rmb/ploy/internal/utils"
+	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/mods"
 )
 
 // submitAndWaitTerminal is a package-level indirection to allow test stubbing.
@@ -58,8 +65,8 @@ type StepResult struct {
 	Duration time.Duration
 }
 
-// TransflowResult represents the overall result of a transflow execution
-type TransflowResult struct {
+// ModResult represents the overall result of a Mod execution
+type ModResult struct {
 	Success        bool
 	WorkflowID     string
 	BranchName     string
@@ -68,12 +75,12 @@ type TransflowResult struct {
 	StepResults    []StepResult
 	ErrorMessage   string
 	Duration       time.Duration
-	HealingSummary *TransflowHealingSummary
+	HealingSummary *ModHealingSummary
 	MRURL          string // GitLab merge request URL if created
 }
 
-// Summary returns a human-readable summary of the transflow execution
-func (r *TransflowResult) Summary() string {
+// Summary returns a human-readable summary of the Mods execution
+func (r *ModResult) Summary() string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Workflow: %s\n", r.WorkflowID))
@@ -143,9 +150,9 @@ func (r *TransflowResult) Summary() string {
 	return sb.String()
 }
 
-// TransflowRunner orchestrates the execution of transflow steps
-type TransflowRunner struct {
-	config         *TransflowConfig
+// ModRunner orchestrates the execution of Mod steps
+type ModRunner struct {
+	config         *ModConfig
 	workspaceDir   string
 	gitOps         GitOperationsInterface
 	repoManager    RepoManager
@@ -162,13 +169,13 @@ type TransflowRunner struct {
 	jobHelper      JobSubmissionHelper
 }
 
-// NewTransflowRunner creates a new transflow runner with the given configuration
-func NewTransflowRunner(config *TransflowConfig, workspaceDir string) (*TransflowRunner, error) {
+// NewModRunner creates a new Mod runner with the given configuration
+func NewModRunner(config *ModConfig, workspaceDir string) (*ModRunner, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	return &TransflowRunner{
+	return &ModRunner{
 		config:       config,
 		workspaceDir: workspaceDir,
 		hcl:          DefaultHCLSubmitter{},
@@ -176,7 +183,7 @@ func NewTransflowRunner(config *TransflowConfig, workspaceDir string) (*Transflo
 }
 
 // SetGitOperations sets the Git operations implementation (for dependency injection/testing)
-func (r *TransflowRunner) SetGitOperations(gitOps GitOperationsInterface) {
+func (r *ModRunner) SetGitOperations(gitOps GitOperationsInterface) {
 	r.gitOps = gitOps
 	if gitOps != nil {
 		r.repoManager = NewRepoManagerAdapter(gitOps)
@@ -186,15 +193,15 @@ func (r *TransflowRunner) SetGitOperations(gitOps GitOperationsInterface) {
 }
 
 // SetRecipeExecutor sets the recipe executor implementation (for dependency injection/testing)
-func (r *TransflowRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
+func (r *ModRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
 	r.recipeExecutor = executor
 }
 
 // SetTransformationExecutor sets the modular TransformationExecutor
-func (r *TransflowRunner) SetTransformationExecutor(x TransformationExecutor) { r.transformExec = x }
+func (r *ModRunner) SetTransformationExecutor(x TransformationExecutor) { r.transformExec = x }
 
 // SetBuildChecker sets the build checker implementation (for dependency injection/testing)
-func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
+func (r *ModRunner) SetBuildChecker(checker BuildCheckerInterface) {
 	r.buildChecker = checker
 	// Also expose through BuildGate adapter for modularization
 	if checker != nil {
@@ -205,15 +212,15 @@ func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
 }
 
 // SetBuildGate sets the modular BuildGate; takes precedence over buildChecker when set.
-func (r *TransflowRunner) SetBuildGate(g BuildGate) { r.buildGate = g }
+func (r *ModRunner) SetBuildGate(g BuildGate) { r.buildGate = g }
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
-func (r *TransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
+func (r *ModRunner) SetJobSubmitter(submitter JobSubmitter) {
 	r.jobSubmitter = submitter
 }
 
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
-func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
+func (r *ModRunner) SetGitProvider(provider provider.GitProvider) {
 	r.gitProvider = provider
 	if provider != nil {
 		r.mrManager = NewMRManagerAdapter(provider)
@@ -223,38 +230,38 @@ func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
 }
 
 // SetEventReporter sets the reporter used for real-time observability
-func (r *TransflowRunner) SetEventReporter(reporter EventReporter) {
+func (r *ModRunner) SetEventReporter(reporter EventReporter) {
 	r.eventReporter = reporter
 }
 
 // SetHealingOrchestrator sets the modular healing orchestrator
-func (r *TransflowRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h }
+func (r *ModRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h }
 
 // SetHCLSubmitter sets the indirection used for HCL validate/submit flows.
-func (r *TransflowRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
+func (r *ModRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
 
 // SetJobHelper allows injecting a planner/reducer submission helper for testing.
-func (r *TransflowRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
+func (r *ModRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
 
 // GetHCLSubmitter exposes the HCLSubmitter for helpers that need it.
-func (r *TransflowRunner) GetHCLSubmitter() HCLSubmitter { return r.hcl }
+func (r *ModRunner) GetHCLSubmitter() HCLSubmitter { return r.hcl }
 
-func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
+func (r *ModRunner) emit(ctx context.Context, phase, step, level, message string) {
 	if r.eventReporter != nil {
 		_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
 		return
 	}
 	// Fallback to local log output when no reporter is configured
-    log.Printf("[Mods][%s/%s][%s] %s", phase, step, level, message)
+	log.Printf("[Mods][%s/%s][%s] %s", phase, step, level, message)
 }
 
 // GetEventReporter exposes the reporter for orchestrators
-func (r *TransflowRunner) GetEventReporter() EventReporter {
+func (r *ModRunner) GetEventReporter() EventReporter {
 	return r.eventReporter
 }
 
 // reportLastJobAsync looks up allocation ID and reports job metadata once available
-func (r *TransflowRunner) reportLastJobAsync(ctx context.Context, jobName, phase, step string) {
+func (r *ModRunner) reportLastJobAsync(ctx context.Context, jobName, phase, step string) {
 	if r.eventReporter == nil || jobName == "" {
 		return
 	}
@@ -281,17 +288,17 @@ func (r *TransflowRunner) reportLastJobAsync(ctx context.Context, jobName, phase
 }
 
 // GetGitProvider returns the Git provider for human-step branch operations
-func (r *TransflowRunner) GetGitProvider() provider.GitProvider {
+func (r *ModRunner) GetGitProvider() provider.GitProvider {
 	return r.gitProvider
 }
 
 // GetBuildChecker returns the build checker for human-step branch operations
-func (r *TransflowRunner) GetBuildChecker() BuildCheckerInterface {
+func (r *ModRunner) GetBuildChecker() BuildCheckerInterface {
 	return r.buildChecker
 }
 
 // GetWorkspaceDir returns the workspace directory for human-step branch operations
-func (r *TransflowRunner) GetWorkspaceDir() string {
+func (r *ModRunner) GetWorkspaceDir() string {
 	return r.workspaceDir
 }
 
@@ -306,16 +313,16 @@ func randomStepID() string {
 
 // IO helpers moved to job_io.go; keep indirection vars there
 
-// uploadInputTar uploads input.tar to artifacts/transflow/<execID>/input.tar (best-effort)
+// uploadInputTar uploads input.tar to artifacts/mods/<execID>/input.tar (best-effort)
 func uploadInputTar(seaweedBase, execID, inputTarPath string) error {
-	key := fmt.Sprintf("transflow/%s/input.tar", execID)
+	key := fmt.Sprintf("mods/%s/input.tar", execID)
 	return putFileFn(seaweedBase, key, inputTarPath, "application/octet-stream")
 }
 
 // JSON helpers moved to job_io.go; keep indirection vars there
 
 // GetTargetRepo returns the target repository URL for human-step branch operations
-func (r *TransflowRunner) GetTargetRepo() string {
+func (r *ModRunner) GetTargetRepo() string {
 	return r.config.TargetRepo
 }
 
@@ -327,7 +334,7 @@ type PlannerAssets struct {
 
 // RenderPlannerAssets writes minimal inputs.json and a rendered planner.hcl (with placeholders) into the workspace.
 // This is a dry-run helper to prepare artifacts for planner submission later.
-func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
+func (r *ModRunner) RenderPlannerAssets() (*PlannerAssets, error) {
 	inputsDir := filepath.Join(r.workspaceDir, "planner", "context")
 	outDir := filepath.Join(r.workspaceDir, "planner", "out")
 	if err := os.MkdirAll(inputsDir, 0755); err != nil {
@@ -359,7 +366,7 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
 }
 
 // RenderLLMExecAssets writes a rendered llm_exec.hcl for the given option ID.
-func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
+func (r *ModRunner) RenderLLMExecAssets(optionID string) (string, error) {
 	dir := filepath.Join(r.workspaceDir, string(StepTypeLLMExec), optionID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
@@ -373,7 +380,7 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
 }
 
 // RenderORWApplyAssets writes a rendered orw_apply.hcl for the given option ID.
-func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) {
+func (r *ModRunner) RenderORWApplyAssets(optionID string) (string, error) {
 	dir := filepath.Join(r.workspaceDir, string(StepTypeORWApply), optionID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
@@ -386,7 +393,7 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
 }
 
 // PrepareRepo clones the target repository and creates a workflow branch; returns the repo path and branch name.
-func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, error) {
+func (r *ModRunner) PrepareRepo(ctx context.Context) (string, string, error) {
 	repoPath := filepath.Join(r.workspaceDir, "repo-apply")
 	if r.repoManager != nil {
 		if err := r.repoManager.Clone(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
@@ -407,7 +414,7 @@ func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, erro
 }
 
 // ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
-func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
+func (r *ModRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
 	// Validate paths first (allowlist)
 	allow := ResolveDefaultsFromEnv().Allowlist
 	if err := validateDiffPathsFn(diffPath, allow); err != nil {
@@ -420,10 +427,10 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 		return err
 	}
 	if r.repoManager != nil {
-		if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+		if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): mods branch patch"); err != nil {
 			return fmt.Errorf("commit failed: %w", err)
 		}
-	} else if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+	} else if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): mods branch patch"); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
 	}
 	// Build gate
@@ -444,7 +451,7 @@ type ReducerAssets struct {
 }
 
 // RenderReducerAssets writes a minimal history.json and a rendered reducer.hcl (with placeholders) into the workspace.
-func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
+func (r *ModRunner) RenderReducerAssets() (*ReducerAssets, error) {
 	ctxDir := filepath.Join(r.workspaceDir, "reducer", "context")
 	if err := os.MkdirAll(ctxDir, 0755); err != nil {
 		return nil, err
@@ -465,10 +472,10 @@ func (r *TransflowRunner) RenderReducerAssets() (*ReducerAssets, error) {
 	return &ReducerAssets{HistoryPath: historyPath, HCLPath: hclPath}, nil
 }
 
-// Run executes the complete transflow workflow
-func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
+// Run executes the complete Mods workflow
+func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	startTime := time.Now()
-	result := &TransflowResult{
+	result := &ModResult{
 		WorkflowID:  r.config.ID,
 		StepResults: []StepResult{},
 	}
@@ -520,6 +527,43 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		Success: true,
 		Message: fmt.Sprintf("Cloned %s at %s", r.config.TargetRepo, r.config.BaseRef),
 	})
+
+	// Optional controller-side source SBOM generation (baseline)
+	if r.sbomEnabled() {
+		gen := supply.NewSBOMGenerator()
+		opts := supply.DefaultSBOMOptions()
+		opts.Lane = r.config.Lane
+		opts.AppName = r.config.ID
+		// Use branch name or base ref to label; SHA unknown here
+		opts.SHA = r.config.BaseRef
+		if err := gen.GenerateForSourceCode(repoPath, opts); err != nil {
+			msg := fmt.Sprintf("source SBOM generation failed: %v", err)
+			if r.sbomFailOnError() {
+				r.emit(ctx, "sbom", "source", "error", msg)
+				result.ErrorMessage = msg
+				result.Duration = time.Since(startTime)
+				return nil, errors.New(msg)
+			}
+			// Non-fatal: log and continue
+			r.emit(ctx, "sbom", "source", "warn", msg)
+		} else {
+			// Emit success event
+			if utils.FileExists(filepath.Join(repoPath, ".sbom.json")) {
+				r.emit(ctx, "sbom", "source", "info", "Generated source SBOM (.sbom.json)")
+			} else {
+				r.emit(ctx, "sbom", "source", "info", "Generated source SBOM")
+			}
+		}
+	}
+
+	// Optional vulnerability scan (NVD) based on SBOM
+	if r.vulnEnabled() {
+		if err := r.runVulnerabilityGate(ctx, repoPath); err != nil {
+			result.ErrorMessage = err.Error()
+			result.Duration = time.Since(startTime)
+			return nil, err
+		}
+	}
 
 	// Step 2: Create and checkout workflow branch
 	r.emit(ctx, "branch", "create-branch", "info", "Creating workflow branch")
@@ -602,7 +646,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			// Optional Maven plugin version (prefer YAML, then env; runner defaults internally if unset)
 			pluginVersion := step.MavenPluginVersion
 			if pluginVersion == "" {
-				pluginVersion = os.Getenv("TRANSFLOW_MAVEN_PLUGIN_VERSION")
+				pluginVersion = os.Getenv("MODS_MAVEN_PLUGIN_VERSION")
 			}
 			// Create run ID for this submission and then substitute it
 			runID := ORWRunID(step.ID)
@@ -616,16 +660,16 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			baseDir := filepath.Dir(renderedPath)
 
 			// Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
-			execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
 			branchID := step.ID
 			bs := NewBranchStep(execID, branchID)
 			curStepID := bs.ID
 			diffKey := bs.DiffKey
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
-			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
+			execID = os.Getenv("PLOY_MODS_EXECUTION_ID")
 			seaweed := ResolveInfraFromEnv().SeaweedURL
-			// Upload best-effort to artifacts/transflow/<id>/input.tar using HTTP client
+			// Upload best-effort to artifacts/mods/<id>/input.tar using HTTP client
 			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
 				r.emit(ctx, "apply", "input-upload", "warn", fmt.Sprintf("input.tar upload failed: %v", err))
 			}
@@ -638,8 +682,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			}
 
 			// Persist a copy of the submitted HCL for post-mortem inspection
-			if execID := os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"); execID != "" {
-				persistDir := filepath.Join("/tmp/transflow-submitted", execID, step.ID)
+			if execID := os.Getenv("PLOY_MODS_EXECUTION_ID"); execID != "" {
+				persistDir := filepath.Join("/tmp/mods-submitted", execID, step.ID)
 				_ = os.MkdirAll(persistDir, 0755)
 				dest := filepath.Join(persistDir, "orw_apply.submitted.hcl")
 				if b, e := os.ReadFile(submittedPath); e == nil {
@@ -670,7 +714,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			if r.transformExec != nil {
 				params := ORWSubmitParams{
 					SeaweedURL:       seaweed,
-					ExecID:           os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					ExecID:           os.Getenv("PLOY_MODS_EXECUTION_ID"),
 					BranchID:         branchID,
 					StepID:           curStepID,
 					RunID:            runID,
@@ -700,7 +744,7 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				},
 				r.reportLastJobAsync,
 				seaweed,
-				os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID,
+				os.Getenv("PLOY_MODS_EXECUTION_ID"), branchID, curStepID, runID,
 				submittedPath, diffPath, orwTimeout); err != nil {
 				r.emit(ctx, "apply", string(StepTypeORWApply), "error", err.Error())
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
@@ -849,11 +893,124 @@ build_step:
 	return result, nil
 }
 
+// modsSBOMEnabled returns whether controller-side SBOM generation is enabled for Mods
+func (r *ModRunner) sbomEnabled() bool {
+	if r.config != nil && r.config.SBOM != nil {
+		return r.config.SBOM.Enabled
+	}
+	v := strings.ToLower(os.Getenv("PLOY_MODS_SBOM_ENABLED"))
+	return v != "false" && v != "0" && v != "off"
+}
+
+func (r *ModRunner) sbomFailOnError() bool {
+	if r.config != nil && r.config.SBOM != nil {
+		return r.config.SBOM.FailOnError
+	}
+	v := strings.ToLower(os.Getenv("PLOY_MODS_SBOM_FAIL_ON_ERROR"))
+	return v == "true" || v == "1" || v == "on"
+}
+
+// Vulnerability gate config helpers
+func (r *ModRunner) vulnEnabled() bool {
+	if r.config != nil && r.config.Security != nil {
+		return r.config.Security.Enabled
+	}
+	v := strings.ToLower(os.Getenv("PLOY_MODS_VULN_ENABLED"))
+	return v == "true" || v == "1" || v == "on"
+}
+
+func (r *ModRunner) vulnMinSeverity() string {
+	if r.config != nil && r.config.Security != nil && r.config.Security.MinSeverity != "" {
+		return strings.ToLower(r.config.Security.MinSeverity)
+	}
+	v := strings.ToLower(os.Getenv("PLOY_MODS_VULN_MIN_SEVERITY"))
+	if v == "" {
+		return "high"
+	}
+	return v
+}
+
+func (r *ModRunner) vulnFailOnFindings() bool {
+	if r.config != nil && r.config.Security != nil {
+		return r.config.Security.FailOnFindings
+	}
+	v := strings.ToLower(os.Getenv("PLOY_MODS_VULN_FAIL_ON_FINDINGS"))
+	return v != "false" && v != "0" && v != "off"
+}
+
+// runVulnerabilityGate performs a lightweight NVD query using SBOM dependencies
+func (r *ModRunner) runVulnerabilityGate(ctx context.Context, repoPath string) error {
+	sbomPath := filepath.Join(repoPath, ".sbom.json")
+	if !utils.FileExists(sbomPath) {
+		r.emit(ctx, "vuln", "nvd", "warn", "SBOM not found; skipping vulnerability gate")
+		return nil
+	}
+
+	// Load SBOM and extract dependencies via analyzer
+	var sbomData map[string]interface{}
+	if b, err := os.ReadFile(sbomPath); err == nil {
+		_ = json.Unmarshal(b, &sbomData)
+	}
+	deps, _ := sbomanalysis.NewSyftSBOMAnalyzer().ExtractDependencies(sbomData)
+	if len(deps) == 0 {
+		r.emit(ctx, "vuln", "nvd", "info", "No dependencies found in SBOM; skipping")
+		return nil
+	}
+
+	// Configure NVD client from env (NVD_*), consistent with server wiring
+	nvd := nvdapi.NewNVDDatabase()
+	if apiKey := os.Getenv("NVD_API_KEY"); apiKey != "" {
+		nvd.SetAPIKey(apiKey)
+	}
+	if base := os.Getenv("NVD_BASE_URL"); base != "" {
+		nvd.SetBaseURL(base)
+	}
+	if to := os.Getenv("NVD_TIMEOUT_MS"); to != "" {
+		if ms, err := strconv.Atoi(to); err == nil && ms > 0 {
+			nvd.SetHTTPTimeout(time.Duration(ms) * time.Millisecond)
+		}
+	}
+
+	// Query NVD per dependency name (keyword search); coarse but effective
+	sevRank := map[string]int{"low": 1, "medium": 2, "high": 3, "critical": 4}
+	threshold := sevRank[r.vulnMinSeverity()]
+	total := 0
+	hitsAtOrAbove := 0
+
+	for _, d := range deps {
+		q := arfapi.VulnerabilityQuery{PackageName: d.Name}
+		vulns, err := nvd.QueryVulnerabilities(q)
+		if err != nil {
+			// Non-fatal; log and continue
+			r.emit(ctx, "vuln", "nvd", "warn", fmt.Sprintf("query failed for %s: %v", d.Name, err))
+			continue
+		}
+		for _, v := range vulns {
+			total++
+			if sevRank[strings.ToLower(v.Severity)] >= threshold {
+				hitsAtOrAbove++
+			}
+		}
+	}
+
+	msg := fmt.Sprintf("NVD scan complete: total=%d findings>=min=%d min_severity=%s", total, hitsAtOrAbove, r.vulnMinSeverity())
+	if hitsAtOrAbove > 0 {
+		if r.vulnFailOnFindings() {
+			r.emit(ctx, "vuln", "nvd", "error", msg)
+			return fmt.Errorf("vulnerability gate failed: %s", msg)
+		}
+		r.emit(ctx, "vuln", "nvd", "warn", msg)
+		return nil
+	}
+	r.emit(ctx, "vuln", "nvd", "info", msg)
+	return nil
+}
+
 // MR description rendering moved to mr_template.go
 
 // attemptHealing orchestrates the healing workflow: planner → fanout → reducer
-func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*TransflowHealingSummary, error) {
-	summary := &TransflowHealingSummary{
+func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
+	summary := &ModHealingSummary{
 		Enabled:       true,
 		AttemptsCount: 1,
 	}
@@ -938,7 +1095,7 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 }
 
 // CleanupWorkspace removes the temporary workspace directory
-func (r *TransflowRunner) CleanupWorkspace() error {
+func (r *ModRunner) CleanupWorkspace() error {
 	if r.workspaceDir != "" {
 		return os.RemoveAll(r.workspaceDir)
 	}

@@ -150,7 +150,7 @@ GET /v1/mods
 **Response:**
 ```json
 {
-  "transflows": [
+  "mods": [
     {
       "id": "tf-abc123def456",
       "status": "completed",
@@ -176,9 +176,9 @@ GET /v1/mods
 }
 ```
 
-### Cancel Mods
+### Cancel Mod
 
-Cancel a running transflow workflow.
+Cancel a running mod workflow.
 
 ```http
 DELETE /v1/mods/{id}
@@ -198,8 +198,8 @@ DELETE /v1/mods/{id}
 Retrieve workflow artifacts via the controller (keys are exposed in status `result.artifacts`).
 
 ```http
-GET /v1/mods/artifacts/{id}
-GET /v1/mods/artifacts/{id}/{name}
+GET /v1/mods/{id}/artifacts
+GET /v1/mods/{id}/artifacts/{name}
 ```
 
 Known names: `plan_json`, `next_json`, `diff_patch`, `error_log`.
@@ -396,7 +396,7 @@ GET /v1/llms/models/{model_id}
 
 ### Get Mods Configuration
 
-Get default transflow configuration template.
+Get default mod configuration template.
 
 ```http
 // Removed: config template endpoint (not implemented)
@@ -430,7 +430,7 @@ llm_model: gpt-4o-mini@2024-08-06
 
 ### Validate Configuration
 
-Validate a transflow configuration without executing it.
+Validate a mod configuration without executing it.
 
 ```http
 // Removed: config validate endpoint (not implemented)
@@ -481,7 +481,7 @@ GET /v1/health
   "status": "healthy",
   "timestamp": "2025-01-09T10:40:00Z",
   "components": {
-    "transflow_runner": {
+    "mod_runner": {
       "status": "healthy",
       "active_workflows": 3,
       "queue_length": 0
@@ -516,16 +516,16 @@ GET /v1/metrics
 
 **Response (Prometheus format):**
 ```
-# HELP transflow_workflows_total Total number of transflow workflows
-# TYPE transflow_workflows_total counter
-transflow_workflows_total{status="completed"} 1247
-transflow_workflows_total{status="failed"} 156
-transflow_workflows_total{status="running"} 3
+# HELP mods_workflows_total Total number of mod workflows
+# TYPE mods_workflows_total counter
+mods_workflows_total{status="completed"} 1247
+mods_workflows_total{status="failed"} 156
+mods_workflows_total{status="running"} 3
 
-# HELP transflow_healing_attempts_total Total number of healing attempts
-# TYPE transflow_healing_attempts_total counter
-transflow_healing_attempts_total{strategy="llm-exec",result="success"} 891
-transflow_healing_attempts_total{strategy="human-step",result="success"} 234
+# HELP mods_healing_attempts_total Total number of healing attempts
+# TYPE mods_healing_attempts_total counter
+mods_healing_attempts_total{strategy="llm-exec",result="success"} 891
+mods_healing_attempts_total{strategy="human-step",result="success"} 234
 
 # HELP kb_learning_cases_total Total KB learning cases
 # TYPE kb_learning_cases_total counter
@@ -579,22 +579,22 @@ X-RateLimit-Reset: 1641724800
 
 ## Webhooks
 
-Configure webhooks to receive real-time notifications about transflow events.
+Configure webhooks to receive real-time notifications about mod events.
 
 ### Webhook Events
 
-- `transflow.started`: Workflow execution started
-- `transflow.step.completed`: Workflow step completed
-- `transflow.healing.started`: Self-healing process started
-- `transflow.healing.completed`: Self-healing process completed
-- `transflow.completed`: Workflow execution completed
-- `transflow.failed`: Workflow execution failed
+- `mod.started`: Workflow execution started
+- `mod.step.completed`: Workflow step completed
+- `mod.healing.started`: Self-healing process started
+- `mod.healing.completed`: Self-healing process completed
+- `mod.completed`: Workflow execution completed
+- `mod.failed`: Workflow execution failed
 
 ### Webhook Payload
 
 ```json
 {
-  "event": "transflow.completed",
+  "event": "mod.completed",
   "timestamp": "2025-01-09T10:37:30Z",
   "data": {
     "workflow_id": "tf-abc123def456",
@@ -611,7 +611,7 @@ Configure webhooks to receive real-time notifications about transflow events.
 
 Jobs and the server-side runner can push fine-grained execution events to update live status.
 
-- POST `/v1/mods/event`
+- POST `/v1/mods/{id}/events`
 
 Request body:
 
@@ -630,7 +630,7 @@ Request body:
 
 Effect:
 
-- Updates `/v1/mods/status/{id}` with latest `phase`.
+- Updates `/v1/mods/{id}/status` with latest `phase`.
 - Appends to `steps[]` with timestamped records.
 - Populates `last_job` metadata when `job_name` is provided.
 
@@ -643,7 +643,7 @@ Notes:
 
 Stream live status and step events via Server-Sent Events.
 
-- GET `/v1/mods/logs/{id}?follow=true|false`
+- GET `/v1/mods/{id}/logs?follow=true|false`
 
 Headers:
 
@@ -664,11 +664,11 @@ Events:
 Examples:
 
 ```sh
-curl -sN "https://api.dev.ployman.app/v1/mods/logs/tf-abc123?follow=true"
+curl -sN "https://api.dev.ployman.app/v1/mods/tf-abc123/logs?follow=true"
 ```
 
 Notes:
 
 - `follow=false` streams a snapshot of current steps then ends with `end`.
-- Interval and timeout are tunable via env: `PLOY_TRANSFLOW_SSE_INTERVAL` (default `2s`), `PLOY_TRANSFLOW_SSE_TIMEOUT` (default `30m`).
+- Interval and timeout are tunable via env: `PLOY_MODS_SSE_INTERVAL` (default `2s`), `PLOY_MODS_SSE_TIMEOUT` (default `30m`).
 - When available, the server includes a `log` event containing a short log preview from the job’s last allocation.

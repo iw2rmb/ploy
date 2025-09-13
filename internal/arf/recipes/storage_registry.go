@@ -29,7 +29,7 @@ func (r *StorageBackedRegistry) List(ctx context.Context, f Filters) ([]Recipe, 
 		// If missing or error, return empty list (non-fatal for listing)
 		return []Recipe{}, nil
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	var metas []CatalogEntry
 	if err := json.NewDecoder(rc).Decode(&metas); err != nil {
 		return []Recipe{}, nil
@@ -96,7 +96,7 @@ func (r *StorageBackedRegistry) Get(ctx context.Context, id string) (*Recipe, er
 	if err != nil {
 		return nil, nil
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	var metas []CatalogEntry
 	if err := json.NewDecoder(rc).Decode(&metas); err != nil {
 		return nil, nil

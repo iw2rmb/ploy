@@ -7,7 +7,7 @@ import (
 
 // reconstructBranchState replays previous step diffs in a branch from root to HEAD.
 // Best-effort: skips failures silently to match previous behavior.
-func (r *TransflowRunner) reconstructBranchState(ctx context.Context, seaweed, execID, branchID, baseDir, repoPath string) error {
+func (r *ModRunner) reconstructBranchState(ctx context.Context, seaweed, execID, branchID, baseDir, repoPath string) error {
 	rep := BranchChainReplayer{
 		GetJSON:             getJSONFn,
 		DownloadToFile:      downloadToFileFn,

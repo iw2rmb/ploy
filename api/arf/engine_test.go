@@ -42,11 +42,11 @@ func TestTransformationResultWithHealingFields(t *testing.T) {
 
 func testHealingFieldsSerialization(t *testing.T) {
 	result := &TransformationResult{
-		TransformationID: "test-transform-123",
-		RecipeID:         "upgrade-java-17",
-		Success:          true,
-		ChangesApplied:   5,
-		ExecutionTime:    15 * time.Minute,
+		ModID:          "test-transform-123",
+		RecipeID:       "upgrade-java-17",
+		Success:        true,
+		ChangesApplied: 5,
+		ExecutionTime:  15 * time.Minute,
 
 		// New healing workflow fields
 		WorkflowStage:   "heal",
@@ -54,11 +54,11 @@ func testHealingFieldsSerialization(t *testing.T) {
 		ParentTransform: "parent-456",
 		Children: []HealingAttempt{
 			{
-				TransformationID: "child-1",
-				AttemptPath:      "1",
-				TriggerReason:    "build_failure",
-				Status:           "completed",
-				Result:           "success",
+				ModID:         "child-1",
+				AttemptPath:   "1",
+				TriggerReason: "build_failure",
+				Status:        "completed",
+				Result:        "success",
 			},
 		},
 		SandboxID: "sandbox-789",
@@ -190,32 +190,32 @@ func testBackwardCompatibility(t *testing.T) {
 
 func testNestedHealingAttempts(t *testing.T) {
 	result := &TransformationResult{
-		TransformationID: "root-transform",
-		RecipeID:         "complex-upgrade",
-		WorkflowStage:    "heal",
+		ModID:         "root-transform",
+		RecipeID:      "complex-upgrade",
+		WorkflowStage: "heal",
 		Children: []HealingAttempt{
 			{
-				TransformationID: "heal-1",
-				AttemptPath:      "1",
-				TriggerReason:    "build_failure",
-				Status:           "completed",
-				Result:           "partial_success",
+				ModID:         "heal-1",
+				AttemptPath:   "1",
+				TriggerReason: "build_failure",
+				Status:        "completed",
+				Result:        "partial_success",
 				Children: []HealingAttempt{
 					{
-						TransformationID: "heal-1-1",
-						AttemptPath:      "1.1",
-						TriggerReason:    "test_failure",
-						Status:           "in_progress",
-						ParentAttempt:    "1",
+						ModID:         "heal-1-1",
+						AttemptPath:   "1.1",
+						TriggerReason: "test_failure",
+						Status:        "in_progress",
+						ParentAttempt: "1",
 					},
 				},
 			},
 			{
-				TransformationID: "heal-2",
-				AttemptPath:      "2",
-				TriggerReason:    "test_failure",
-				Status:           "completed",
-				Result:           "success",
+				ModID:         "heal-2",
+				AttemptPath:   "2",
+				TriggerReason: "test_failure",
+				Status:        "completed",
+				Result:        "success",
 			},
 		},
 	}
@@ -242,8 +242,8 @@ func testNestedHealingAttempts(t *testing.T) {
 
 func testDeploymentStatus(t *testing.T) {
 	result := &TransformationResult{
-		TransformationID: "deploy-test",
-		RecipeID:         "deploy-recipe",
+		ModID:    "deploy-test",
+		RecipeID: "deploy-recipe",
 		DeploymentStatus: &DeploymentMetrics{
 			DeploymentID:     "deploy-123",
 			DeploymentURL:    "https://test.ployd.app",
@@ -282,18 +282,18 @@ func testDeploymentStatus(t *testing.T) {
 func testParentChildRelationships(t *testing.T) {
 	// Create parent transformation
 	parent := &TransformationResult{
-		TransformationID: "parent-123",
-		RecipeID:         "parent-recipe",
-		ChildTransforms:  []string{"child-456", "child-789"},
-		WorkflowStage:    "heal",
+		ModID:           "parent-123",
+		RecipeID:        "parent-recipe",
+		ChildTransforms: []string{"child-456", "child-789"},
+		WorkflowStage:   "heal",
 	}
 
 	// Create child transformation
 	child := &TransformationResult{
-		TransformationID: "child-456",
-		RecipeID:         "healing-recipe",
-		ParentTransform:  "parent-123",
-		WorkflowStage:    "openrewrite",
+		ModID:           "child-456",
+		RecipeID:        "healing-recipe",
+		ParentTransform: "parent-123",
+		WorkflowStage:   "openrewrite",
 	}
 
 	// Verify relationships
@@ -331,7 +331,7 @@ func testParentChildRelationships(t *testing.T) {
 		t.Fatalf("Failed to unmarshal child: %v", err)
 	}
 
-	if decodedParent.TransformationID != parent.TransformationID {
+	if decodedParent.ModID != parent.ModID {
 		t.Error("Parent transformation ID not preserved")
 	}
 
