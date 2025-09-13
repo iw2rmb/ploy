@@ -54,16 +54,28 @@ EXTRA_FLAGS=()
 [[ -n "${LANE:-}" ]] && EXTRA_FLAGS+=("-lane" "$LANE")
 [[ -n "${MAIN:-}" ]] && EXTRA_FLAGS+=("-main" "$MAIN")
 START_TS=$(date +%s)
-PUSH_OUT=$("$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]:-}" 2>&1)
-PUSH_RC=$?
-echo "$PUSH_OUT"
-if [[ $PUSH_RC -ne 0 ]]; then
-  err "ploy push failed (exit $PUSH_RC)"
-  exit 1
-fi
-if echo "$PUSH_OUT" | rg -q '"error"\s*:'; then
-  err "ploy push returned server error"
-  exit 1
+attempt_push() {
+  local out rc
+  out=$("$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]:-}" 2>&1)
+  rc=$?
+  echo "$out"
+  if [[ $rc -ne 0 ]] || echo "$out" | rg -qi '("error"\s*:|failed|^❌)'; then
+    return 1
+  fi
+  return 0
+}
+
+if ! attempt_push; then
+  warn "First push attempt failed; retrying once in 5s..."
+  sleep 5
+  if ! attempt_push; then
+    err "ploy push reported failure"
+    # Show logs for diagnostics
+    if command -v jq >/dev/null 2>&1; then
+      APP_NAME="$APP_NAME" PLOY_CONTROLLER="$PLOY_CONTROLLER" "${REPO_ROOT}/tests/lanes/check-app-logs.sh" || true
+    fi
+    exit 1
+  fi
 fi
 ok "ploy push triggered"
 
