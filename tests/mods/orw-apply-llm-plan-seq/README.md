@@ -110,6 +110,31 @@ Quick start (Go E2E) — prepared repo/branches
   - go test -count=1 ./tests/e2e -tags e2e -v -run HealingFlow_ORWFail_LLMSucceeds -timeout 20m
   - Expected: build gate fails after orw-apply, planner/llm-exec/reducer run, build passes, MR URL logged.
 
+Run Log & Key Takeaways
+
+- Cycle 1 (before profile tweak):
+  - Branches used: e2e/fail-missing-symbol, e2e/fail-java17-specific.
+  - Outcome: orw-apply completed; build gate passed; MR created (no healing triggered):
+    - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/22
+    - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/23
+  - Takeaway: the “fail” branches no longer produced a deterministic build failure in the current env.
+
+- Cycle 2 (deterministic fail reintroduced via Maven profile + build-gate property):
+  - Repo updated: added a Maven profile `healing-gate` activated by property `ploy.build.gate=1` that adds `src/healing/java` as a compile source (containing intentional compile errors). Failing classes were moved out of `src/main/java` and into `src/healing/java`.
+  - API updated: build gate now passes `-Dploy.build.gate=1` so the failure only occurs during the gate, not during orw-apply.
+  - Deploy: main branch redeployed to Dev VPS.
+  - Outcomes observed:
+    - On `e2e/success`: orw-apply completed; build gate attempted twice, then one path reported 502 (push/deploy layer) causing overall failure. Exec: tf-b51ed979.
+    - On `e2e/fail-*` branches: in some runs orw-apply allocation failed early (exit 1) before build gate, likely transient infra/plugin fetch issue (no artifacts recorded). Execs: tf-a6a5596b, tf-48583b92.
+  - Takeaways:
+    - The profile approach is wired end-to-end (API passes the property); success branch exercised build gate but hit a 502 error path.
+    - Intermittent `orw-apply` allocation failures require resilience/telemetry improvements (capture transform.log/error.log; transient retry/backoff).
+    - Next: re-run once caches warm and verify that on `e2e/success` the build-gate triggers a deterministic compile fail → healing → success → MR.
+
+Notes
+- Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
+- For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
+
 Go E2E tests — CI/VPS flow
 
 - Primary method for automated validation. Tests live under tests/e2e with build tag `e2e`.
