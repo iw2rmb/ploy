@@ -17,60 +17,60 @@ import (
 
 // TransflowCmd provides the CLI entrypoint to run transflows
 func TransflowCmd(args []string, controllerURL string) {
-    if len(args) == 0 {
-        printTransflowHelp()
-        return
-    }
+	if len(args) == 0 {
+		printTransflowHelp()
+		return
+	}
 
-    switch args[0] {
-    case "help":
-        printTransflowHelp()
-        return
-    case "run":
-        if err := runTransflow(args[1:], controllerURL); err != nil {
-            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-            os.Exit(1)
-        }
-    case "watch":
-        if err := watchTransflow(args[1:], controllerURL); err != nil {
-            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-            os.Exit(1)
-        }
-    case "render":
-        if err := transflowRenderCmd(args[1:], controllerURL); err != nil {
-            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-            os.Exit(1)
-        }
-    case "plan":
-        if err := transflowPlanCmd(args[1:], controllerURL); err != nil {
-            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-            os.Exit(1)
-        }
-    case "reduce":
-        if err := transflowReduceCmd(args[1:], controllerURL); err != nil {
-            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-            os.Exit(1)
-        }
-    case "apply":
-        if err := transflowApplyCmd(args[1:], controllerURL); err != nil {
-            fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-            os.Exit(1)
-        }
-    default:
-        printTransflowHelp()
-    }
+	switch args[0] {
+	case "help":
+		printTransflowHelp()
+		return
+	case "run":
+		if err := runTransflow(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	case "watch":
+		if err := watchTransflow(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	case "render":
+		if err := transflowRenderCmd(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	case "plan":
+		if err := transflowPlanCmd(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	case "reduce":
+		if err := transflowReduceCmd(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	case "apply":
+		if err := transflowApplyCmd(args[1:], controllerURL); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		printTransflowHelp()
+	}
 }
 
 func printTransflowHelp() {
-    fmt.Println("Usage: ploy transflow <subcommand> [options]")
-    fmt.Println("Subcommands:")
-    fmt.Println("  run      - Execute full workflow remotely (default mode)")
-    fmt.Println("  watch    - Attach to a running execution by ID")
-    fmt.Println("  render   - Render planner inputs and HCL locally (no submission)")
-    fmt.Println("  plan     - Render planner and optionally submit (use --submit)")
-    fmt.Println("  reduce   - Render reducer and optionally submit (use --submit)")
-    fmt.Println("  apply    - Apply a diff locally and run build gate (use --diff-path/--diff-url)")
-    fmt.Println("  help     - Show this help message")
+	fmt.Println("Usage: ploy transflow <subcommand> [options]")
+	fmt.Println("Subcommands:")
+	fmt.Println("  run      - Execute full workflow remotely (default mode)")
+	fmt.Println("  watch    - Attach to a running execution by ID")
+	fmt.Println("  render   - Render planner inputs and HCL locally (no submission)")
+	fmt.Println("  plan     - Render planner and optionally submit (use --submit)")
+	fmt.Println("  reduce   - Render reducer and optionally submit (use --submit)")
+	fmt.Println("  apply    - Apply a diff locally and run build gate (use --diff-path/--diff-url)")
+	fmt.Println("  help     - Show this help message")
 }
 
 // runTransflow handles the actual transflow execution
@@ -233,93 +233,167 @@ func runTransflow(args []string, controllerURL string) error {
 
 // transflowRenderCmd: planner render (no submission)
 func transflowRenderCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("transflow render", flag.ContinueOnError)
-    file := fs.String("f", "", "transflow YAML file")
-    workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
-    preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
-    verbose := fs.Bool("v", false, "verbose output")
-    if err := fs.Parse(args); err != nil { return err }
-    if *file == "" { return fmt.Errorf("missing -f <transflow.yaml>") }
-    cfg, err := LoadConfig(*file)
-    if err != nil { return fmt.Errorf("failed to load config: %w", err) }
-    wd := *workDir
-    if wd == "" { if wd, err = os.MkdirTemp("", "transflow-*"); err != nil { return err } }
-    if !*preserve { defer os.RemoveAll(wd) }
-    integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, true)
-    runner, err := integrations.CreateConfiguredRunner(cfg)
-    if err != nil { return err }
-    _ = verbose // reserved; executePlannerMode emits events/logs already
-    return executePlannerMode(runner, *preserve, *verbose)
+	fs := flag.NewFlagSet("transflow render", flag.ContinueOnError)
+	file := fs.String("f", "", "transflow YAML file")
+	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
+	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
+	verbose := fs.Bool("v", false, "verbose output")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *file == "" {
+		return fmt.Errorf("missing -f <transflow.yaml>")
+	}
+	cfg, err := LoadConfig(*file)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	wd := *workDir
+	if wd == "" {
+		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+			return err
+		}
+	}
+	if !*preserve {
+		defer os.RemoveAll(wd)
+	}
+	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, true)
+	runner, err := integrations.CreateConfiguredRunner(cfg)
+	if err != nil {
+		return err
+	}
+	_ = verbose // reserved; executePlannerMode emits events/logs already
+	return executePlannerMode(runner, *preserve, *verbose)
 }
 
 // transflowPlanCmd: render planner and optionally submit when --submit provided
 func transflowPlanCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("transflow plan", flag.ContinueOnError)
-    file := fs.String("f", "", "transflow YAML file")
-    workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
-    preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
-    submit := fs.Bool("submit", false, "submit planner job after rendering")
-    verbose := fs.Bool("v", false, "verbose output")
-    if err := fs.Parse(args); err != nil { return err }
-    if *file == "" { return fmt.Errorf("missing -f <transflow.yaml>") }
-    cfg, err := LoadConfig(*file)
-    if err != nil { return fmt.Errorf("failed to load config: %w", err) }
-    wd := *workDir
-    if wd == "" { if wd, err = os.MkdirTemp("", "transflow-*"); err != nil { return err } }
-    if !*preserve { defer os.RemoveAll(wd) }
-    integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
-    runner, err := integrations.CreateConfiguredRunner(cfg)
-    if err != nil { return err }
-    if *submit { os.Setenv("TRANSFLOW_SUBMIT", "1") } else { os.Unsetenv("TRANSFLOW_SUBMIT") }
-    return executePlannerMode(runner, *preserve, *verbose)
+	fs := flag.NewFlagSet("transflow plan", flag.ContinueOnError)
+	file := fs.String("f", "", "transflow YAML file")
+	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
+	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
+	submit := fs.Bool("submit", false, "submit planner job after rendering")
+	verbose := fs.Bool("v", false, "verbose output")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *file == "" {
+		return fmt.Errorf("missing -f <transflow.yaml>")
+	}
+	cfg, err := LoadConfig(*file)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	wd := *workDir
+	if wd == "" {
+		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+			return err
+		}
+	}
+	if !*preserve {
+		defer os.RemoveAll(wd)
+	}
+	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
+	runner, err := integrations.CreateConfiguredRunner(cfg)
+	if err != nil {
+		return err
+	}
+	if *submit {
+		os.Setenv("TRANSFLOW_SUBMIT", "1")
+	} else {
+		os.Unsetenv("TRANSFLOW_SUBMIT")
+	}
+	return executePlannerMode(runner, *preserve, *verbose)
 }
 
 // transflowReduceCmd: render reducer and optionally submit when --submit
 func transflowReduceCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("transflow reduce", flag.ContinueOnError)
-    file := fs.String("f", "", "transflow YAML file")
-    workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
-    preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
-    submit := fs.Bool("submit", false, "submit reducer job after rendering")
-    verbose := fs.Bool("v", false, "verbose output")
-    if err := fs.Parse(args); err != nil { return err }
-    if *file == "" { return fmt.Errorf("missing -f <transflow.yaml>") }
-    cfg, err := LoadConfig(*file)
-    if err != nil { return fmt.Errorf("failed to load config: %w", err) }
-    wd := *workDir
-    if wd == "" { if wd, err = os.MkdirTemp("", "transflow-*"); err != nil { return err } }
-    if !*preserve { defer os.RemoveAll(wd) }
-    integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
-    runner, err := integrations.CreateConfiguredRunner(cfg)
-    if err != nil { return err }
-    if *submit { os.Setenv("TRANSFLOW_SUBMIT", "1") } else { os.Unsetenv("TRANSFLOW_SUBMIT") }
-    _ = verbose
-    return executeReducerMode(runner, *preserve)
+	fs := flag.NewFlagSet("transflow reduce", flag.ContinueOnError)
+	file := fs.String("f", "", "transflow YAML file")
+	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
+	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
+	submit := fs.Bool("submit", false, "submit reducer job after rendering")
+	verbose := fs.Bool("v", false, "verbose output")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *file == "" {
+		return fmt.Errorf("missing -f <transflow.yaml>")
+	}
+	cfg, err := LoadConfig(*file)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	wd := *workDir
+	if wd == "" {
+		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+			return err
+		}
+	}
+	if !*preserve {
+		defer os.RemoveAll(wd)
+	}
+	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
+	runner, err := integrations.CreateConfiguredRunner(cfg)
+	if err != nil {
+		return err
+	}
+	if *submit {
+		os.Setenv("TRANSFLOW_SUBMIT", "1")
+	} else {
+		os.Unsetenv("TRANSFLOW_SUBMIT")
+	}
+	_ = verbose
+	return executeReducerMode(runner, *preserve)
 }
 
 // transflowApplyCmd: apply a diff to repo and run build gate
 func transflowApplyCmd(args []string, controllerURL string) error {
-    fs := flag.NewFlagSet("transflow apply", flag.ContinueOnError)
-    file := fs.String("f", "", "transflow YAML file")
-    diffPath := fs.String("diff-path", "", "local unified diff file path")
-    diffURL := fs.String("diff-url", "", "URL to download unified diff")
-    workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
-    preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
-    if err := fs.Parse(args); err != nil { return err }
-    if *file == "" { return fmt.Errorf("missing -f <transflow.yaml>") }
-    if *diffPath == "" && *diffURL == "" { return fmt.Errorf("provide --diff-path or --diff-url") }
-    cfg, err := LoadConfig(*file)
-    if err != nil { return fmt.Errorf("failed to load config: %w", err) }
-    wd := *workDir
-    if wd == "" { if wd, err = os.MkdirTemp("", "transflow-*"); err != nil { return err } }
-    if !*preserve { defer os.RemoveAll(wd) }
-    integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
-    runner, err := integrations.CreateConfiguredRunner(cfg)
-    if err != nil { return err }
-    // Wire env for executeApplyFirst (compat)
-    if *diffURL != "" { os.Setenv("TRANSFLOW_DIFF_URL", *diffURL) } else { os.Unsetenv("TRANSFLOW_DIFF_URL") }
-    if *diffPath != "" { os.Setenv("TRANSFLOW_DIFF_PATH", *diffPath) } else { os.Unsetenv("TRANSFLOW_DIFF_PATH") }
-    return executeApplyFirst(runner)
+	fs := flag.NewFlagSet("transflow apply", flag.ContinueOnError)
+	file := fs.String("f", "", "transflow YAML file")
+	diffPath := fs.String("diff-path", "", "local unified diff file path")
+	diffURL := fs.String("diff-url", "", "URL to download unified diff")
+	workDir := fs.String("work-dir", "", "working directory (default: temp dir)")
+	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *file == "" {
+		return fmt.Errorf("missing -f <transflow.yaml>")
+	}
+	if *diffPath == "" && *diffURL == "" {
+		return fmt.Errorf("provide --diff-path or --diff-url")
+	}
+	cfg, err := LoadConfig(*file)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	wd := *workDir
+	if wd == "" {
+		if wd, err = os.MkdirTemp("", "transflow-*"); err != nil {
+			return err
+		}
+	}
+	if !*preserve {
+		defer os.RemoveAll(wd)
+	}
+	integrations := NewTransflowIntegrationsWithTestMode(controllerURL, wd, false)
+	runner, err := integrations.CreateConfiguredRunner(cfg)
+	if err != nil {
+		return err
+	}
+	// Wire env for executeApplyFirst (compat)
+	if *diffURL != "" {
+		os.Setenv("TRANSFLOW_DIFF_URL", *diffURL)
+	} else {
+		os.Unsetenv("TRANSFLOW_DIFF_URL")
+	}
+	if *diffPath != "" {
+		os.Setenv("TRANSFLOW_DIFF_PATH", *diffPath)
+	} else {
+		os.Unsetenv("TRANSFLOW_DIFF_PATH")
+	}
+	return executeApplyFirst(runner)
 }
 
 // watchTransflow polls the controller for status updates and streams step events

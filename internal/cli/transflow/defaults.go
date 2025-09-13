@@ -20,8 +20,8 @@ type Defaults struct {
 	ReducerTimeout    time.Duration
 	LLMExecTimeout    time.Duration
 	ORWApplyTimeout   time.Duration
-    BuildApplyTimeout time.Duration
-    AllowPartialORW   bool
+	BuildApplyTimeout time.Duration
+	AllowPartialORW   bool
 }
 
 // ResolveDefaults resolves defaults using the provided getter (env-like).
@@ -73,30 +73,30 @@ func ResolveDefaults(get func(string) string) Defaults {
 	} else {
 		allow = []string{"src/**", "pom.xml"}
 	}
-    seaweed := get("PLOY_SEAWEEDFS_URL")
-    if seaweed == "" {
-        seaweed = "http://seaweedfs-filer.service.consul:8888"
-    }
-    allowPartial := func() bool {
-        v := strings.ToLower(strings.TrimSpace(get("TRANSFLOW_ALLOW_PARTIAL_ORW")))
-        return v == "1" || v == "true" || v == "yes"
-    }()
-    return Defaults{
-        Registry:          reg,
-        PlannerImage:      planner,
-        ReducerImage:      reducer,
-        LLMExecImage:      llm,
-        ORWApplyImage:     orw,
-        DC:                dc,
-        Allowlist:         allow,
-        SeaweedURL:        seaweed,
-        PlannerTimeout:    parseDur("TRANSFLOW_PLANNER_TIMEOUT", "15m"),
-        ReducerTimeout:    parseDur("TRANSFLOW_REDUCER_TIMEOUT", "10m"),
-        LLMExecTimeout:    parseDur("TRANSFLOW_LLM_EXEC_TIMEOUT", "30m"),
-        ORWApplyTimeout:   parseDur("TRANSFLOW_ORW_APPLY_TIMEOUT", "30m"),
-        BuildApplyTimeout: parseDur("TRANSFLOW_BUILD_APPLY_TIMEOUT", "10m"),
-        AllowPartialORW:   allowPartial,
-    }
+	seaweed := get("PLOY_SEAWEEDFS_URL")
+	if seaweed == "" {
+		seaweed = "http://seaweedfs-filer.service.consul:8888"
+	}
+	allowPartial := func() bool {
+		v := strings.ToLower(strings.TrimSpace(get("TRANSFLOW_ALLOW_PARTIAL_ORW")))
+		return v == "1" || v == "true" || v == "yes"
+	}()
+	return Defaults{
+		Registry:          reg,
+		PlannerImage:      planner,
+		ReducerImage:      reducer,
+		LLMExecImage:      llm,
+		ORWApplyImage:     orw,
+		DC:                dc,
+		Allowlist:         allow,
+		SeaweedURL:        seaweed,
+		PlannerTimeout:    parseDur("TRANSFLOW_PLANNER_TIMEOUT", "15m"),
+		ReducerTimeout:    parseDur("TRANSFLOW_REDUCER_TIMEOUT", "10m"),
+		LLMExecTimeout:    parseDur("TRANSFLOW_LLM_EXEC_TIMEOUT", "30m"),
+		ORWApplyTimeout:   parseDur("TRANSFLOW_ORW_APPLY_TIMEOUT", "30m"),
+		BuildApplyTimeout: parseDur("TRANSFLOW_BUILD_APPLY_TIMEOUT", "10m"),
+		AllowPartialORW:   allowPartial,
+	}
 }
 
 // ResolveDefaultsFromEnv resolves using os.Getenv.

@@ -908,6 +908,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
   - **human-step**: Git-based manual intervention with MR creation
   - **llm-exec**: HCL template rendering and Nomad job execution
   - **orw-gen**: Recipe configuration extraction and OpenRewrite execution
+  - Canonical step types enforced via StepType constants with alias normalization (planner-emitted `human` maps to `human-step`). Event streams report normalized step names.
 - ✅ Production job submission via `orchestration.SubmitAndWaitTerminal()`
 - ✅ Comprehensive error handling and timeout management
 - ✅ Full integration with transflow runner
@@ -935,6 +936,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ Performance benchmarks and load testing
 - ✅ Mock replacement with real service calls for production fidelity
 - ✅ Secure diff path validation now supports doublestar globs (`**`) in allowlists to correctly match nested paths like `src/**/*.java` and repo-root files like `pom.xml`.
+ - Deterministic Transflow tests using injected seams for HCL submission and planner/reducer helpers; removed reliance on global test stubs. Added unit tests for step-type normalization and event emission.
 
 **Production Readiness**
 - ✅ VPS deployment and testing validation

@@ -11,7 +11,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
-	"github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // ProductionBranchRunner defines the interface for production branch job execution
@@ -29,18 +28,19 @@ type ProductionBranchRunner interface {
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
 type fanoutOrchestrator struct {
-    submitter JobSubmitter           // Mock in tests, real in production (Noop enables healing)
-    runner    ProductionBranchRunner // For accessing asset rendering methods in production
+	submitter JobSubmitter           // Mock in tests, real in production (Noop enables healing)
+	runner    ProductionBranchRunner // For accessing asset rendering methods in production
+	hcl       HCLSubmitter           // For HCL validate/submit in production
 }
 
 // NewFanoutOrchestrator creates a new fanout orchestrator
 func NewFanoutOrchestrator(submitter JobSubmitter) FanoutOrchestrator {
-    return &fanoutOrchestrator{submitter: submitter, runner: nil}
+	return &fanoutOrchestrator{submitter: submitter, runner: nil, hcl: DefaultHCLSubmitter{}}
 }
 
 // NewFanoutOrchestratorWithRunner creates a new fanout orchestrator with runner access for production
 func NewFanoutOrchestratorWithRunner(submitter JobSubmitter, runner ProductionBranchRunner) FanoutOrchestrator {
-    return &fanoutOrchestrator{submitter: submitter, runner: runner}
+	return &fanoutOrchestrator{submitter: submitter, runner: runner, hcl: DefaultHCLSubmitter{}}
 }
 
 // RunHealingFanout executes parallel healing branches with first-success-wins semantics
@@ -121,18 +121,18 @@ func (o *fanoutOrchestrator) RunHealingFanout(ctx context.Context, runCtx interf
 
 // executeBranch executes a single branch and returns the result
 func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpec) BranchResult {
-    startTime := time.Now()
+	startTime := time.Now()
 
-    result := BranchResult{
-        ID:        branch.ID,
-        Status:    "failed", // Default to failed
-        StartedAt: startTime,
-    }
+	result := BranchResult{
+		ID:        branch.ID,
+		Status:    "failed", // Default to failed
+		StartedAt: startTime,
+	}
 
-    // Emit branch start event if reporter available
-    if o.runner != nil && o.runner.GetEventReporter() != nil {
-        _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: "info", Message: "branch started: " + branch.ID, Time: time.Now()})
-    }
+	// Emit branch start event if reporter available
+	if o.runner != nil && o.runner.GetEventReporter() != nil {
+		_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "info", Message: "branch started: " + branch.ID, Time: time.Now()})
+	}
 
 	// Check if context is already cancelled
 	select {
@@ -150,9 +150,9 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 		// Choose sensible default timeouts based on branch type
 		var tmo time.Duration
 		switch branch.Type {
-		case "llm-exec":
+		case string(StepTypeLLMExec):
 			tmo = ResolveDefaultsFromEnv().LLMExecTimeout
-		case "orw-gen":
+		case string(StepTypeORWGen):
 			tmo = ResolveDefaultsFromEnv().ORWApplyTimeout
 		default:
 			tmo = ResolveDefaultsFromEnv().BuildApplyTimeout
@@ -167,31 +167,31 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(startTime)
 		if err != nil {
-            result.Status = "failed"
-            result.Notes = fmt.Sprintf("job execution failed: %v", err)
-        } else {
-            result.JobID = jobResult.JobID
-            result.Status = jobResult.Status
-            result.Notes = jobResult.Output
-        }
-        if o.runner != nil && o.runner.GetEventReporter() != nil {
-            lvl := "info"
-            if result.Status != "completed" {
-                lvl = "error"
-            }
-            _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: lvl, Message: fmt.Sprintf("branch %s finished: %s", branch.ID, result.Status), Time: time.Now()})
-        }
-        return result
-    }
+			result.Status = "failed"
+			result.Notes = fmt.Sprintf("job execution failed: %v", err)
+		} else {
+			result.JobID = jobResult.JobID
+			result.Status = jobResult.Status
+			result.Notes = jobResult.Output
+		}
+		if o.runner != nil && o.runner.GetEventReporter() != nil {
+			lvl := "info"
+			if result.Status != "completed" {
+				lvl = "error"
+			}
+			_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: lvl, Message: fmt.Sprintf("branch %s finished: %s", branch.ID, result.Status), Time: time.Now()})
+		}
+		return result
+	}
 
 	// Production implementation using real Nomad job submission
 	if o.runner != nil {
 		switch branch.Type {
-		case "llm-exec":
+		case string(StepTypeLLMExec):
 			return o.executeLLMExecBranch(ctx, branch, result)
-		case "orw-gen":
+		case string(StepTypeORWGen):
 			return o.executeORWGenBranch(ctx, branch, result)
-		case "human-step":
+		case string(StepTypeHumanStep):
 			return o.executeHumanStepBranch(ctx, branch, result)
 		default:
 			result.Status = "failed"
@@ -229,21 +229,21 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
 	imgs := ResolveImagesFromEnv()
 	infra := ResolveInfraFromEnv()
-    llm := ResolveLLMDefaultsFromEnv()
-    vars := map[string]string{
-        "TRANSFLOW_CONTEXT_DIR":       baseDir,
-        "TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
-        "TRANSFLOW_REGISTRY":          imgs.Registry,
-        "TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
-        "TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
-        "TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
-        "PLOY_CONTROLLER":             infra.Controller,
-        "PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-        "NOMAD_DC":                    infra.DC,
-        "TRANSFLOW_MODEL":             llm.Model,
-        "TRANSFLOW_TOOLS":             llm.ToolsJSON,
-        "TRANSFLOW_LIMITS":            llm.LimitsJSON,
-    }
+	llm := ResolveLLMDefaultsFromEnv()
+	vars := map[string]string{
+		"TRANSFLOW_CONTEXT_DIR":       baseDir,
+		"TRANSFLOW_OUT_DIR":           filepath.Join(baseDir, "out"),
+		"TRANSFLOW_REGISTRY":          imgs.Registry,
+		"TRANSFLOW_PLANNER_IMAGE":     imgs.Planner,
+		"TRANSFLOW_REDUCER_IMAGE":     imgs.Reducer,
+		"TRANSFLOW_LLM_EXEC_IMAGE":    imgs.LLMExec,
+		"PLOY_CONTROLLER":             infra.Controller,
+		"PLOY_TRANSFLOW_EXECUTION_ID": os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+		"NOMAD_DC":                    infra.DC,
+		"TRANSFLOW_MODEL":             llm.Model,
+		"TRANSFLOW_TOOLS":             llm.ToolsJSON,
+		"TRANSFLOW_LIMITS":            llm.LimitsJSON,
+	}
 
 	// Step 2: Generate unique run ID for this branch
 	runID := LLMRunID(branch.ID)
@@ -270,10 +270,10 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	}
 
 	// Step 4: Report job metadata asynchronously (job name == runID)
-	reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "llm-exec", "llm-exec")
+	reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, string(StepTypeLLMExec), string(StepTypeLLMExec))
 
 	// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
-	if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
+	if err := o.hcl.Validate(renderedHCLPath); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec HCL validation failed: %v", err)
 		result.FinishedAt = time.Now()
@@ -281,7 +281,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 	timeout := ResolveDefaultsFromEnv().LLMExecTimeout
-	if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
+	if err := o.hcl.Submit(renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec job failed: %v", err)
 		result.FinishedAt = time.Now()
@@ -464,40 +464,40 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 
 	// Step 3: Report job metadata asynchronously (job name == runID)
-	reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "apply", "orw-apply")
+	reportJobSubmittedAsync(ctx, o.runner.GetEventReporter(), runID, "apply", string(StepTypeORWApply))
 
 	// Step 4: Preflight validate HCL, then submit job to Nomad and wait for completion
-	if err := orchestration.ValidateJob(renderedHCLPath); err != nil {
+	if err := o.hcl.Validate(renderedHCLPath); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("ORW apply HCL validation failed: %v", err)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result
 	}
-    timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-    if err := orchestration.SubmitAndWaitTerminalCtx(ctx, renderedHCLPath, timeout); err != nil {
-        diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
-        if ResolveDefaultsFromEnv().AllowPartialORW {
-            if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
-                // proceed (partial allowed)
-            } else {
-                result.Status = "failed"
-                result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
-                result.FinishedAt = time.Now()
-                result.Duration = time.Since(result.StartedAt)
-                return result
-            }
-        } else {
-            result.Status = "failed"
-            result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
-            result.FinishedAt = time.Now()
-            result.Duration = time.Since(result.StartedAt)
-            if o.runner != nil && o.runner.GetEventReporter() != nil {
-                _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: "error", Message: fmt.Sprintf("branch %s failed: %s", branch.ID, result.Notes), Time: time.Now()})
-            }
-            return result
-        }
-    }
+	timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+	if err := o.hcl.Submit(renderedHCLPath, timeout); err != nil {
+		diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
+		if ResolveDefaultsFromEnv().AllowPartialORW {
+			if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
+				// proceed (partial allowed)
+			} else {
+				result.Status = "failed"
+				result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
+				result.FinishedAt = time.Now()
+				result.Duration = time.Since(result.StartedAt)
+				return result
+			}
+		} else {
+			result.Status = "failed"
+			result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
+			result.FinishedAt = time.Now()
+			result.Duration = time.Since(result.StartedAt)
+			if o.runner != nil && o.runner.GetEventReporter() != nil {
+				_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "error", Message: fmt.Sprintf("branch %s failed: %s", branch.ID, result.Notes), Time: time.Now()})
+			}
+			return result
+		}
+	}
 
 	// Step 5: Check for generated diff.patch artifact
 	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
@@ -506,11 +506,11 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		result.Notes = fmt.Sprintf("ORW apply job completed but no diff.patch found: %v", err)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
-    if o.runner != nil && o.runner.GetEventReporter() != nil {
-        _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: branch.Type, Level: "info", Message: fmt.Sprintf("branch %s completed", branch.ID), Time: time.Now()})
-    }
-    return result
-}
+		if o.runner != nil && o.runner.GetEventReporter() != nil {
+			_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "info", Message: fmt.Sprintf("branch %s completed", branch.ID), Time: time.Now()})
+		}
+		return result
+	}
 
 	result.Status = "completed"
 	result.Notes = fmt.Sprintf("ORW apply job completed successfully, diff.patch at: %s", diffPath)

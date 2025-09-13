@@ -189,10 +189,10 @@ func (kb *KBIntegration) ConvertKBFixesToBranchSpecs(fixes []PromotedFix) []Bran
 
 		switch fix.Kind {
 		case "orw_recipe":
-			branchType = "orw-apply"
+			branchType = string(StepTypeORWApply)
 			inputs = map[string]interface{}{
 				"id":     branchID,
-				"type":   "orw-apply",
+				"type":   string(StepTypeORWApply),
 				"recipe": fix.Ref,
 				"source": "kb",
 				"score":  fix.Score,
@@ -328,11 +328,11 @@ func NewKBTransflowRunner(config *TransflowConfig, workspaceDir string, kb KBInt
 
 // SetJobSubmitter extends the base implementation with KB-aware job submission
 func (kr *KBTransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
-    // Set the original submitter
-    kr.TransflowRunner.SetJobSubmitter(submitter)
+	// Set the original submitter
+	kr.TransflowRunner.SetJobSubmitter(submitter)
 
-    // The attemptHealing method will need to be overridden or extended
-    // to use the KB-enhanced job submission helper
+	// The attemptHealing method will need to be overridden or extended
+	// to use the KB-enhanced job submission helper
 }
 
 // attemptHealing overrides the base implementation to use KB-enhanced healing
@@ -377,9 +377,10 @@ func (kr *KBTransflowRunner) attemptHealingWithKB(ctx context.Context, repoPath 
 			branchID = id
 		}
 
-		branchType := "llm-exec" // default
+		// Default and normalize planner types to canonical values (e.g., human -> human-step)
+		branchType := string(StepTypeLLMExec)
 		if t, ok := option["type"].(string); ok {
-			branchType = t
+			branchType = string(NormalizeStepType(t))
 		}
 
 		branches = append(branches, BranchSpec{

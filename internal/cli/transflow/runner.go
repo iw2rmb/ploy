@@ -145,19 +145,21 @@ func (r *TransflowResult) Summary() string {
 
 // TransflowRunner orchestrates the execution of transflow steps
 type TransflowRunner struct {
-    config         *TransflowConfig
-    workspaceDir   string
-    gitOps         GitOperationsInterface
-    repoManager    RepoManager
-    recipeExecutor RecipeExecutorInterface
-    transformExec  TransformationExecutor
-    buildChecker   BuildCheckerInterface
-    buildGate      BuildGate
-    jobSubmitter   JobSubmitter         // For healing workflows
-    gitProvider    provider.GitProvider // For MR creation
-    mrManager      MRManager
-    eventReporter  EventReporter        // Optional real-time event reporter
-    healer         HealingOrchestrator
+	config         *TransflowConfig
+	workspaceDir   string
+	gitOps         GitOperationsInterface
+	repoManager    RepoManager
+	recipeExecutor RecipeExecutorInterface
+	transformExec  TransformationExecutor
+	buildChecker   BuildCheckerInterface
+	buildGate      BuildGate
+	jobSubmitter   JobSubmitter         // For healing workflows
+	gitProvider    provider.GitProvider // For MR creation
+	mrManager      MRManager
+	eventReporter  EventReporter // Optional real-time event reporter
+	healer         HealingOrchestrator
+	hcl            HCLSubmitter
+	jobHelper      JobSubmissionHelper
 }
 
 // NewTransflowRunner creates a new transflow runner with the given configuration
@@ -169,18 +171,23 @@ func NewTransflowRunner(config *TransflowConfig, workspaceDir string) (*Transflo
 	return &TransflowRunner{
 		config:       config,
 		workspaceDir: workspaceDir,
+		hcl:          DefaultHCLSubmitter{},
 	}, nil
 }
 
 // SetGitOperations sets the Git operations implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetGitOperations(gitOps GitOperationsInterface) {
-    r.gitOps = gitOps
-    if gitOps != nil { r.repoManager = NewRepoManagerAdapter(gitOps) } else { r.repoManager = nil }
+	r.gitOps = gitOps
+	if gitOps != nil {
+		r.repoManager = NewRepoManagerAdapter(gitOps)
+	} else {
+		r.repoManager = nil
+	}
 }
 
 // SetRecipeExecutor sets the recipe executor implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
-    r.recipeExecutor = executor
+	r.recipeExecutor = executor
 }
 
 // SetTransformationExecutor sets the modular TransformationExecutor
@@ -188,13 +195,13 @@ func (r *TransflowRunner) SetTransformationExecutor(x TransformationExecutor) { 
 
 // SetBuildChecker sets the build checker implementation (for dependency injection/testing)
 func (r *TransflowRunner) SetBuildChecker(checker BuildCheckerInterface) {
-    r.buildChecker = checker
-    // Also expose through BuildGate adapter for modularization
-    if checker != nil {
-        r.buildGate = NewBuildGateAdapter(checker)
-    } else {
-        r.buildGate = nil
-    }
+	r.buildChecker = checker
+	// Also expose through BuildGate adapter for modularization
+	if checker != nil {
+		r.buildGate = NewBuildGateAdapter(checker)
+	} else {
+		r.buildGate = nil
+	}
 }
 
 // SetBuildGate sets the modular BuildGate; takes precedence over buildChecker when set.
@@ -202,22 +209,32 @@ func (r *TransflowRunner) SetBuildGate(g BuildGate) { r.buildGate = g }
 
 // SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
 func (r *TransflowRunner) SetJobSubmitter(submitter JobSubmitter) {
-    r.jobSubmitter = submitter
+	r.jobSubmitter = submitter
 }
 
 // SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
 func (r *TransflowRunner) SetGitProvider(provider provider.GitProvider) {
-    r.gitProvider = provider
-    if provider != nil { r.mrManager = NewMRManagerAdapter(provider) } else { r.mrManager = nil }
+	r.gitProvider = provider
+	if provider != nil {
+		r.mrManager = NewMRManagerAdapter(provider)
+	} else {
+		r.mrManager = nil
+	}
 }
 
 // SetEventReporter sets the reporter used for real-time observability
 func (r *TransflowRunner) SetEventReporter(reporter EventReporter) {
-    r.eventReporter = reporter
+	r.eventReporter = reporter
 }
 
 // SetHealingOrchestrator sets the modular healing orchestrator
 func (r *TransflowRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h }
+
+// SetHCLSubmitter sets the indirection used for HCL validate/submit flows.
+func (r *TransflowRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
+
+// SetJobHelper allows injecting a planner/reducer submission helper for testing.
+func (r *TransflowRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
 
 func (r *TransflowRunner) emit(ctx context.Context, phase, step, level, message string) {
 	if r.eventReporter != nil {
@@ -340,7 +357,7 @@ func (r *TransflowRunner) RenderPlannerAssets() (*PlannerAssets, error) {
 
 // RenderLLMExecAssets writes a rendered llm_exec.hcl for the given option ID.
 func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
-	dir := filepath.Join(r.workspaceDir, "llm-exec", optionID)
+	dir := filepath.Join(r.workspaceDir, string(StepTypeLLMExec), optionID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
@@ -354,7 +371,7 @@ func (r *TransflowRunner) RenderLLMExecAssets(optionID string) (string, error) {
 
 // RenderORWApplyAssets writes a rendered orw_apply.hcl for the given option ID.
 func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) {
-	dir := filepath.Join(r.workspaceDir, "orw-apply", optionID)
+	dir := filepath.Join(r.workspaceDir, string(StepTypeORWApply), optionID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", err
 	}
@@ -367,23 +384,23 @@ func (r *TransflowRunner) RenderORWApplyAssets(optionID string) (string, error) 
 
 // PrepareRepo clones the target repository and creates a workflow branch; returns the repo path and branch name.
 func (r *TransflowRunner) PrepareRepo(ctx context.Context) (string, string, error) {
-    repoPath := filepath.Join(r.workspaceDir, "repo-apply")
-    if r.repoManager != nil {
-        if err := r.repoManager.Clone(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
-            return "", "", fmt.Errorf("clone failed: %w", err)
-        }
-    } else if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
-        return "", "", fmt.Errorf("clone failed: %w", err)
-    }
-    branchName := GenerateBranchName(r.config.ID)
-    if r.repoManager != nil {
-        if err := r.repoManager.CreateBranch(ctx, repoPath, branchName); err != nil {
-            return "", "", fmt.Errorf("branch failed: %w", err)
-        }
-    } else if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
-        return "", "", fmt.Errorf("branch failed: %w", err)
-    }
-    return repoPath, branchName, nil
+	repoPath := filepath.Join(r.workspaceDir, "repo-apply")
+	if r.repoManager != nil {
+		if err := r.repoManager.Clone(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+			return "", "", fmt.Errorf("clone failed: %w", err)
+		}
+	} else if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
+		return "", "", fmt.Errorf("clone failed: %w", err)
+	}
+	branchName := GenerateBranchName(r.config.ID)
+	if r.repoManager != nil {
+		if err := r.repoManager.CreateBranch(ctx, repoPath, branchName); err != nil {
+			return "", "", fmt.Errorf("branch failed: %w", err)
+		}
+	} else if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
+		return "", "", fmt.Errorf("branch failed: %w", err)
+	}
+	return repoPath, branchName, nil
 }
 
 // ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
@@ -399,13 +416,13 @@ func (r *TransflowRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffP
 	if err := applyUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
 		return err
 	}
-    if r.repoManager != nil {
-        if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
-            return fmt.Errorf("commit failed: %w", err)
-        }
-    } else if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
-        return fmt.Errorf("commit failed: %w", err)
-    }
+	if r.repoManager != nil {
+		if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+			return fmt.Errorf("commit failed: %w", err)
+		}
+	} else if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): transflow branch patch"); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
 	// Build gate
 	res, err := r.runBuildGate(ctx, repoPath)
 	if err != nil {
@@ -472,8 +489,8 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 		for i := 0; i < max; i++ {
 			names = append(names, entries[i].Name())
 		}
-        // Emit as event for remote visibility
-        r.emit(ctx, "clone", "clone-diagnostics", "info", fmt.Sprintf("repo=%s entries=%s", repoPath, strings.Join(names, ",")))
+		// Emit as event for remote visibility
+		r.emit(ctx, "clone", "clone-diagnostics", "info", fmt.Sprintf("repo=%s entries=%s", repoPath, strings.Join(names, ",")))
 	}
 
 	// If repository has no working tree files (besides .git), fail early
@@ -523,29 +540,29 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 	// Step 3: Execute transformation steps
 	for _, step := range r.config.Steps {
 		switch step.Type {
-		case "orw-apply":
+		case string(StepTypeORWApply):
 			stepStart := time.Now()
-            // Render ORW apply HCL assets (prefer transformation executor)
-            var renderedPath string
-            var err error
-            if r.transformExec != nil {
-                renderedPath, err = r.transformExec.RenderORWAssets(step.ID)
-            } else {
-                renderedPath, err = r.RenderORWApplyAssets(step.ID)
-            }
-            if err != nil {
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to render ORW assets: %v", err)})
-                result.ErrorMessage = fmt.Sprintf("failed to render orw-apply assets: %v", err)
-                result.Duration = time.Since(startTime)
-                return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
-            }
+			// Render ORW apply HCL assets (prefer transformation executor)
+			var renderedPath string
+			var err error
+			if r.transformExec != nil {
+				renderedPath, err = r.transformExec.RenderORWAssets(step.ID)
+			} else {
+				renderedPath, err = r.RenderORWApplyAssets(step.ID)
+			}
+			if err != nil {
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to render ORW assets: %v", err)})
+				result.ErrorMessage = fmt.Sprintf("failed to render orw-apply assets: %v", err)
+				result.Duration = time.Since(startTime)
+				return nil, fmt.Errorf("failed to render orw-apply assets: %w", err)
+			}
 
 			// Guard: ensure repository contains a supported build file before creating input tar
 			{
 				hasPom, hasGradle, hasKts := checkBuildFiles(repoPath)
-                r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
+				r.emit(ctx, "apply", "guard-build-file", "info", fmt.Sprintf("repo=%s pom=%v gradle=%v kts=%v", repoPath, hasPom, hasGradle, hasKts))
 				if err := ensureBuildFile(repoPath); err != nil {
-					r.emit(ctx, "apply", "orw-apply", "error", "no build file in repo (pom.xml/build.gradle)")
+					r.emit(ctx, "apply", string(StepTypeORWApply), "error", "no build file in repo (pom.xml/build.gradle)")
 					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: ErrNoBuildFile.Error()})
 					result.ErrorMessage = ErrNoBuildFile.Error()
 					result.Duration = time.Since(startTime)
@@ -559,12 +576,12 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to create input tar: %v", err)})
 				return nil, fmt.Errorf("failed to create input tar: %w", err)
 			}
-            // Preview tar contents for diagnostics via reporter
-            if r.eventReporter != nil {
-                logPreviewTarWithReporter(r.eventReporter, "apply", "input-preview", inputTar, 20)
-            } else {
-                logPreviewTar(inputTar, 20)
-            }
+			// Preview tar contents for diagnostics via reporter
+			if r.eventReporter != nil {
+				logPreviewTarWithReporter(r.eventReporter, "apply", "input-preview", inputTar, 20)
+			} else {
+				logPreviewTar(inputTar, 20)
+			}
 
 			// Pre-substitute recipe class and input tar host path into template
 			rclass := ""
@@ -606,9 +623,9 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			execID = os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID")
 			seaweed := ResolveInfraFromEnv().SeaweedURL
 			// Upload best-effort to artifacts/transflow/<id>/input.tar using HTTP client
-            if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
-                r.emit(ctx, "apply", "input-upload", "warn", fmt.Sprintf("input.tar upload failed: %v", err))
-            }
+			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
+				r.emit(ctx, "apply", "input-upload", "warn", fmt.Sprintf("input.tar upload failed: %v", err))
+			}
 			// Substitute HCL with explicit variables to avoid global env writes
 			vars := makeORWVars(baseDir, execID, diffKey, seaweed)
 			submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
@@ -622,78 +639,94 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 				persistDir := filepath.Join("/tmp/transflow-submitted", execID, step.ID)
 				_ = os.MkdirAll(persistDir, 0755)
 				dest := filepath.Join(persistDir, "orw_apply.submitted.hcl")
-                if b, e := os.ReadFile(submittedPath); e == nil {
-                    _ = os.WriteFile(dest, b, 0644)
-                    r.emit(ctx, "apply", "orw-apply", "info", fmt.Sprintf("Saved submitted HCL to %s", dest))
-                }
+				if b, e := os.ReadFile(submittedPath); e == nil {
+					_ = os.WriteFile(dest, b, 0644)
+					r.emit(ctx, "apply", string(StepTypeORWApply), "info", fmt.Sprintf("Saved submitted HCL to %s", dest))
+				}
 			}
 
 			// Debug: log env block from submitted HCL for verification (INPUT_URL, SEAWEEDFS_URL, etc.)
-                if b, e := os.ReadFile(submittedPath); e == nil {
-                    s := string(b)
-                    start := strings.Index(s, "env = {")
-                    if start >= 0 {
-                        end := strings.Index(s[start:], "}")
-                        if end > 0 {
-                            block := s[start : start+end+1]
-                            // Avoid spamming controller with large blocks; only log locally
-                            _ = block
-                        }
-                    }
-                }
+			if b, e := os.ReadFile(submittedPath); e == nil {
+				s := string(b)
+				start := strings.Index(s, "env = {")
+				if start >= 0 {
+					end := strings.Index(s[start:], "}")
+					if end > 0 {
+						block := s[start : start+end+1]
+						// Avoid spamming controller with large blocks; only log locally
+						_ = block
+					}
+				}
+			}
 			// Prepare diff path for later fetch and processing
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			_ = os.MkdirAll(filepath.Dir(diffPath), 0755)
-			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
-            // Submit job and fetch diff via executor/helper
-            orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-            if r.transformExec != nil {
-                params := ORWSubmitParams{
-                    SeaweedURL:       seaweed,
-                    ExecID:           os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
-                    BranchID:         branchID,
-                    StepID:           curStepID,
-                    RunID:            runID,
-                    SubmittedHCLPath: submittedPath,
-                    DiffPath:         diffPath,
-                    Timeout:          orwTimeout,
-                }
-                if _, err := r.transformExec.SubmitORWAndFetchDiff(ctx, params); err != nil {
-                    r.emit(ctx, "apply", "orw-apply", "error", err.Error())
-                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
-                    result.ErrorMessage = err.Error()
-                    result.Duration = time.Since(startTime)
-                    return nil, err
-                }
-            } else if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID, submittedPath, diffPath, orwTimeout); err != nil {
-                r.emit(ctx, "apply", "orw-apply", "error", err.Error())
-                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
-                result.ErrorMessage = err.Error()
-                result.Duration = time.Since(startTime)
-                return nil, err
-            }
+			r.emit(ctx, "apply", string(StepTypeORWApply), "info", "Submitting orw-apply job")
+			// Submit job and fetch diff via executor/helper
+			orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+			if r.transformExec != nil {
+				params := ORWSubmitParams{
+					SeaweedURL:       seaweed,
+					ExecID:           os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+					BranchID:         branchID,
+					StepID:           curStepID,
+					RunID:            runID,
+					SubmittedHCLPath: submittedPath,
+					DiffPath:         diffPath,
+					Timeout:          orwTimeout,
+				}
+				if _, err := r.transformExec.SubmitORWAndFetchDiff(ctx, params); err != nil {
+					r.emit(ctx, "apply", string(StepTypeORWApply), "error", err.Error())
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+					result.ErrorMessage = err.Error()
+					result.Duration = time.Since(startTime)
+					return nil, err
+				}
+			} else if err := submitORWJobAndFetchDiff(ctx,
+				func(p string) error {
+					if r.hcl != nil {
+						return r.hcl.Validate(p)
+					}
+					return validateJob(p)
+				},
+				func(p string, t time.Duration) error {
+					if r.hcl != nil {
+						return r.hcl.Submit(p, t)
+					}
+					return submitAndWaitTerminal(p, t)
+				},
+				r.reportLastJobAsync,
+				seaweed,
+				os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID,
+				submittedPath, diffPath, orwTimeout); err != nil {
+				r.emit(ctx, "apply", string(StepTypeORWApply), "error", err.Error())
+				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+				result.ErrorMessage = err.Error()
+				result.Duration = time.Since(startTime)
+				return nil, err
+			}
 			// Successful wait and fetch implies job completed
-			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
+			r.emit(ctx, "apply", string(StepTypeORWApply), "info", "orw-apply job completed")
 
 			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
 			_ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
 
-            if fi, err := os.Stat(diffPath); err == nil {
-                r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
-                if fi.Size() == 0 {
-                    // Treat empty diff as no-op: skip apply/build and continue pipeline
-                    msg := "No changes produced by orw-apply; skipping apply/build"
-                    r.emit(ctx, "apply", "diff-empty", "info", msg)
-                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: true, Message: msg, Duration: time.Since(stepStart)})
-                    // Continue with next steps
-                    continue
-                }
-            } else {
-                r.emit(ctx, "apply", "diff-stat", "warn", fmt.Sprintf("diff stat failed: %v", err))
-            }
+			if fi, err := os.Stat(diffPath); err == nil {
+				r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
+				if fi.Size() == 0 {
+					// Treat empty diff as no-op: skip apply/build and continue pipeline
+					msg := "No changes produced by orw-apply; skipping apply/build"
+					r.emit(ctx, "apply", "diff-empty", "info", msg)
+					result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: true, Message: msg, Duration: time.Since(stepStart)})
+					// Continue with next steps
+					continue
+				}
+			} else {
+				r.emit(ctx, "apply", "diff-stat", "warn", fmt.Sprintf("diff stat failed: %v", err))
+			}
 
-            // Apply + build via helper with events and timeout
-            r.emit(ctx, "build", "build-gate-start", "info", fmt.Sprintf("Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath))
+			// Apply + build via helper with events and timeout
+			r.emit(ctx, "build", "build-gate-start", "info", fmt.Sprintf("Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath))
 			sr, err := runApplyAndBuildWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffAndBuild)
 			result.StepResults = append(result.StepResults, sr)
 			if err != nil {
@@ -792,15 +825,15 @@ build_step:
 		Duration: time.Since(buildStart),
 	})
 
-    // Step 6: Push branch (via helper)
-    if sr, err := runPushWithEvents(r, ctx, repoPath, branchName); err != nil {
-        result.StepResults = append(result.StepResults, sr)
-        result.ErrorMessage = sr.Message
-        result.Duration = time.Since(startTime)
-        return nil, fmt.Errorf("failed to push branch: %w", err)
-    } else {
-        result.StepResults = append(result.StepResults, sr)
-    }
+	// Step 6: Push branch (via helper)
+	if sr, err := runPushWithEvents(r, ctx, repoPath, branchName); err != nil {
+		result.StepResults = append(result.StepResults, sr)
+		result.ErrorMessage = sr.Message
+		result.Duration = time.Since(startTime)
+		return nil, fmt.Errorf("failed to push branch: %w", err)
+	} else {
+		result.StepResults = append(result.StepResults, sr)
+	}
 
 	// Step 7: Create or update merge request (if provider is configured)
 	if r.gitProvider != nil {
@@ -823,7 +856,12 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 	}
 
 	// Step 1: Submit planner job to analyze the build error
-	jobHelper := NewJobSubmissionHelperWithRunner(r.jobSubmitter, r)
+	var jobHelper JobSubmissionHelper
+	if r.jobHelper != nil {
+		jobHelper = r.jobHelper
+	} else {
+		jobHelper = NewJobSubmissionHelperWithRunner(r.jobSubmitter, r)
+	}
 	planResult, err := jobHelper.SubmitPlannerJob(ctx, r.config, buildError, r.workspaceDir)
 	if err != nil {
 		return summary, fmt.Errorf("planner job failed: %w", err)
@@ -839,9 +877,10 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 			branchID = id
 		}
 
-		branchType := "llm-exec" // default
+		// Default and normalize planner types to canonical values
+		branchType := string(StepTypeLLMExec)
 		if t, ok := option["type"].(string); ok {
-			branchType = t
+			branchType = string(NormalizeStepType(t))
 		}
 
 		branches = append(branches, BranchSpec{
@@ -852,21 +891,27 @@ func (r *TransflowRunner) attemptHealing(ctx context.Context, repoPath string, b
 	}
 
 	// Step 3: Execute fanout orchestration
-    var orchestrator FanoutOrchestrator
-    if r.healer != nil {
-        orchestrator = HealerFanoutAdapter{H: r.healer}
-    } else {
-        orchestrator = NewFanoutOrchestratorWithRunner(r.jobSubmitter, r)
-    }
 	maxParallel := 3 // Default parallelism
 	if r.config.SelfHeal.MaxRetries > 0 {
 		maxParallel = r.config.SelfHeal.MaxRetries
 	}
 
-	winner, allResults, err := orchestrator.RunHealingFanout(ctx, nil, branches, maxParallel)
+	var (
+		winner     BranchResult
+		allResults []BranchResult
+		fanoutErr  error
+	)
+	if r.healer != nil {
+		// Prefer modular HealingOrchestrator directly
+		winner, allResults, fanoutErr = r.healer.RunFanout(ctx, nil, branches, maxParallel)
+	} else {
+		// Fallback to existing fanout orchestrator
+		orchestrator := NewFanoutOrchestratorWithRunner(r.jobSubmitter, r)
+		winner, allResults, fanoutErr = orchestrator.RunHealingFanout(ctx, nil, branches, maxParallel)
+	}
 	summary.AllResults = allResults
 
-	if err != nil {
+	if fanoutErr != nil {
 		// Fanout failed, but continue to reducer anyway
 		summary.Winner = nil
 	} else {

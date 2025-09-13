@@ -1,8 +1,8 @@
 package transflow
 
 import (
-    "strings"
-    "testing"
+	"strings"
+	"testing"
 )
 
 func TestRenderMRDescription_IncludesHealingAndSteps(t *testing.T) {
@@ -54,37 +54,37 @@ func mustContain(t *testing.T, s, sub string) {
 }
 
 func TestRenderMRDescription_NoSteps(t *testing.T) {
-    r := &TransflowRunner{config: &TransflowConfig{ID: "wf-x"}}
-    res := &TransflowResult{BranchName: "workflow/wf-x/1", StepResults: nil}
-    s := renderMRDescription(r, res)
-    mustContain(t, s, "Transflow Workflow")
-    mustContain(t, s, "(no transformation steps recorded)")
+	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-x"}}
+	res := &TransflowResult{BranchName: "workflow/wf-x/1", StepResults: nil}
+	s := renderMRDescription(r, res)
+	mustContain(t, s, "Transflow Workflow")
+	mustContain(t, s, "(no transformation steps recorded)")
 }
 
 func TestRenderMRDescription_FiltersFailedAndMR(t *testing.T) {
-    r := &TransflowRunner{config: &TransflowConfig{ID: "wf-y"}}
-    res := &TransflowResult{
-        BranchName: "workflow/wf-y/1",
-        StepResults: []StepResult{
-            {StepID: "apply", Success: true, Message: "Applied"},
-            {StepID: "mr", Success: true, Message: "Created MR"},
-            {StepID: "build", Success: false, Message: "Failed"},
-        },
-    }
-    s := renderMRDescription(r, res)
-    mustContain(t, s, "Applied")
-    // should not include mr step or failed step message
-    if strings.Contains(s, "Created MR") || strings.Contains(s, "Failed") {
-        t.Fatalf("description contains filtered content: %s", s)
-    }
+	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-y"}}
+	res := &TransflowResult{
+		BranchName: "workflow/wf-y/1",
+		StepResults: []StepResult{
+			{StepID: "apply", Success: true, Message: "Applied"},
+			{StepID: "mr", Success: true, Message: "Created MR"},
+			{StepID: "build", Success: false, Message: "Failed"},
+		},
+	}
+	s := renderMRDescription(r, res)
+	mustContain(t, s, "Applied")
+	// should not include mr step or failed step message
+	if strings.Contains(s, "Created MR") || strings.Contains(s, "Failed") {
+		t.Fatalf("description contains filtered content: %s", s)
+	}
 }
 
 func TestRenderMRDescription_HealingDisabled(t *testing.T) {
-    r := &TransflowRunner{config: &TransflowConfig{ID: "wf-z"}}
-    res := &TransflowResult{BranchName: "workflow/wf-z/1", HealingSummary: &TransflowHealingSummary{Enabled: false}}
-    s := renderMRDescription(r, res)
-    // No Self-Healing section
-    if strings.Contains(s, "Self-Healing Applied") {
-        t.Fatalf("unexpected healing section: %s", s)
-    }
+	r := &TransflowRunner{config: &TransflowConfig{ID: "wf-z"}}
+	res := &TransflowResult{BranchName: "workflow/wf-z/1", HealingSummary: &TransflowHealingSummary{Enabled: false}}
+	s := renderMRDescription(r, res)
+	// No Self-Healing section
+	if strings.Contains(s, "Self-Healing Applied") {
+		t.Fatalf("unexpected healing section: %s", s)
+	}
 }
