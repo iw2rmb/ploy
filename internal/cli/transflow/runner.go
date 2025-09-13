@@ -741,28 +741,15 @@ build_step:
 		Duration: time.Since(buildStart),
 	})
 
-	// Step 6: Push branch
-	r.emit(ctx, "push", "push", "info", "Pushing branch")
-	if err := r.runPushStep(ctx, repoPath, branchName); err != nil {
-		msg := fmt.Sprintf("push failed: %v", err)
-		if strings.Contains(msg, "rc=128") || strings.Contains(msg, "exit status 128") {
-			r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
-		}
-		r.emit(ctx, "push", "push", "error", msg)
-		result.StepResults = append(result.StepResults, StepResult{
-			StepID:  "push",
-			Success: false,
-			Message: fmt.Sprintf("Push failed: %v", err),
-		})
-		result.ErrorMessage = fmt.Sprintf("failed to push branch: %v", err)
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("failed to push branch: %w", err)
-	}
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:  "push",
-		Success: true,
-		Message: fmt.Sprintf("Pushed branch %s", branchName),
-	})
+    // Step 6: Push branch (via helper)
+    if sr, err := runPushWithEvents(r, ctx, repoPath, branchName); err != nil {
+        result.StepResults = append(result.StepResults, sr)
+        result.ErrorMessage = sr.Message
+        result.Duration = time.Since(startTime)
+        return nil, fmt.Errorf("failed to push branch: %w", err)
+    } else {
+        result.StepResults = append(result.StepResults, sr)
+    }
 
 	// Step 7: Create or update merge request (if provider is configured)
 	if r.gitProvider != nil {

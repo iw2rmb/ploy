@@ -1,16 +1,18 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"strings"
-	"time"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+    "strings"
+    "time"
+
+    "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 func runApiStatus(args []string) {
-	controllerURL := getControllerURL()
+    controllerURL := utils.ResolveControllerURLFromEnv()
 
 	fmt.Println("Checking API deployment status...")
 	fmt.Println("")
