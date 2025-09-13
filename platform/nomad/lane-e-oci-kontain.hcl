@@ -306,13 +306,6 @@ EOF
           }
         }
         
-        check {
-          type     = "http"
-          path     = "/ready"
-          interval = "30s"
-          timeout  = "5s"
-        }
-        
         {{#if CONNECT_ENABLED}}
         connect {
           sidecar_service {}
@@ -378,7 +371,7 @@ EOF
       
       logs { 
         max_files = 10
-        max_file_size = 50
+        max_file_size = 10
       }
       
       # Container lifecycle
