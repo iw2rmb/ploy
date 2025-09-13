@@ -1,16 +1,14 @@
 package transflow
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
-	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "context"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+    "time"
 )
 
 // executeReducerMode renders and optionally submits reducer job
@@ -59,11 +57,11 @@ func executeReducerMode(runner *TransflowRunner, preserve bool) error {
 		return nil
 	}
 
-	timeout := ResolveDefaultsFromEnv().ReducerTimeout
-	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-		runner.emit(ctx, "reducer", "submit", "error", fmt.Sprintf("reducer job failed: %v", err))
-		return fmt.Errorf("reducer job failed: %w", err)
-	}
+    timeout := ResolveDefaultsFromEnv().ReducerTimeout
+    if err := runner.hcl.Submit(renderedPath, timeout); err != nil {
+        runner.emit(ctx, "reducer", "submit", "error", fmt.Sprintf("reducer job failed: %v", err))
+        return fmt.Errorf("reducer job failed: %w", err)
+    }
 
 	// Fetch next.json via URL or local path
 	if url := os.Getenv("TRANSFLOW_NEXT_URL"); url != "" {

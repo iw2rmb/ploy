@@ -280,8 +280,8 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		result.Duration = time.Since(result.StartedAt)
 		return result
 	}
-	timeout := ResolveDefaultsFromEnv().LLMExecTimeout
-	if err := o.hcl.Submit(renderedHCLPath, timeout); err != nil {
+    timeout := ResolveDefaultsFromEnv().LLMExecTimeout
+    if err := o.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec job failed: %v", err)
 		result.FinishedAt = time.Now()
@@ -474,8 +474,8 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		result.Duration = time.Since(result.StartedAt)
 		return result
 	}
-	timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-	if err := o.hcl.Submit(renderedHCLPath, timeout); err != nil {
+    timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+    if err := o.hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 		diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 		if ResolveDefaultsFromEnv().AllowPartialORW {
 			if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {

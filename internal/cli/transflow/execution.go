@@ -95,11 +95,11 @@ func executeFirstLLMExec(runner *TransflowRunner, options []map[string]any) erro
 					return nil
 				}
 				fmt.Printf("Rendered llm_exec HCL (substituted): %s\n", renderedPath)
-				if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
-					timeout := ResolveDefaultsFromEnv().LLMExecTimeout
-					if err := orchestration.SubmitAndWaitTerminalCtx(context.Background(), renderedPath, timeout); err != nil {
-						fmt.Printf("llm-exec job failed: %v\n", err)
-					} else {
+                if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+                    timeout := ResolveDefaultsFromEnv().LLMExecTimeout
+                    if err := runner.hcl.SubmitCtx(context.Background(), renderedPath, timeout); err != nil {
+                        fmt.Printf("llm-exec job failed: %v\n", err)
+                    } else {
 						// Show where diff.patch would be
 						diffPath := filepath.Join(filepath.Dir(renderedPath), "out", "diff.patch")
 						fmt.Printf("llm-exec completed. diff.patch expected at: %s (or via TRANSFLOW_DIFF_URL/TRANSFLOW_DIFF_PATH).\n", diffPath)
@@ -173,11 +173,11 @@ func executeFirstORWGen(runner *TransflowRunner, options []map[string]any) error
 					fmt.Printf("failed to write submitted HCL: %v\n", serr)
 				} else {
 					fmt.Printf("Rendered orw_apply HCL (substituted): %s\n", submittedPath)
-					if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
-						timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-						if err := orchestration.SubmitAndWaitTerminalCtx(context.Background(), submittedPath, timeout); err != nil {
-							fmt.Printf("orw-apply job failed: %v\n", err)
-						} else {
+                    if os.Getenv("TRANSFLOW_SUBMIT") == "1" {
+                        timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+                        if err := runner.hcl.SubmitCtx(context.Background(), submittedPath, timeout); err != nil {
+                            fmt.Printf("orw-apply job failed: %v\n", err)
+                        } else {
 							diffPath := filepath.Join(filepath.Dir(submittedPath), "out", "diff.patch")
 							fmt.Printf("orw-apply completed. diff.patch expected at: %s\n", diffPath)
 						}
