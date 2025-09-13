@@ -25,9 +25,11 @@ ARTS_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/artifacts" || true)
 echo "$ARTS_JSON" > "$LOG_DIR/artifacts_index.json"
 
 download() {
-  local name="$1"; shift
-  local out="$LOG_DIR/$2"; shift
+  local name="$1"
+  local out="$LOG_DIR/$2"
   echo "Fetching $name → $out"
+  if [[ -z "$2" ]]; then
+    echo "  (skip: no output filename provided)"; return 0; fi
   curl -fsS "$API_BASE/mods/$EXEC_ID/artifacts/$name" -o "$out" || {
     echo "  (missing $name)"; return 0; }
 }
