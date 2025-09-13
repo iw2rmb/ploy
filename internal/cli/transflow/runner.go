@@ -645,15 +645,33 @@ func (r *TransflowRunner) Run(ctx context.Context) (*TransflowResult, error) {
 			diffPath := filepath.Join(baseDir, "out", "diff.patch")
 			_ = os.MkdirAll(filepath.Dir(diffPath), 0755)
 			r.emit(ctx, "apply", "orw-apply", "info", "Submitting orw-apply job")
-			// Submit job and fetch diff via helper
-			orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
-			if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID, submittedPath, diffPath, orwTimeout); err != nil {
-				r.emit(ctx, "apply", "orw-apply", "error", err.Error())
-				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
-				result.ErrorMessage = err.Error()
-				result.Duration = time.Since(startTime)
-				return nil, err
-			}
+            // Submit job and fetch diff via executor/helper
+            orwTimeout := ResolveDefaultsFromEnv().ORWApplyTimeout
+            if r.transformExec != nil {
+                params := ORWSubmitParams{
+                    SeaweedURL:       seaweed,
+                    ExecID:           os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"),
+                    BranchID:         branchID,
+                    StepID:           curStepID,
+                    RunID:            runID,
+                    SubmittedHCLPath: submittedPath,
+                    DiffPath:         diffPath,
+                    Timeout:          orwTimeout,
+                }
+                if _, err := r.transformExec.SubmitORWAndFetchDiff(ctx, params); err != nil {
+                    r.emit(ctx, "apply", "orw-apply", "error", err.Error())
+                    result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+                    result.ErrorMessage = err.Error()
+                    result.Duration = time.Since(startTime)
+                    return nil, err
+                }
+            } else if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, r.reportLastJobAsync, seaweed, os.Getenv("PLOY_TRANSFLOW_EXECUTION_ID"), branchID, curStepID, runID, submittedPath, diffPath, orwTimeout); err != nil {
+                r.emit(ctx, "apply", "orw-apply", "error", err.Error())
+                result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
+                result.ErrorMessage = err.Error()
+                result.Duration = time.Since(startTime)
+                return nil, err
+            }
 			// Successful wait and fetch implies job completed
 			r.emit(ctx, "apply", "orw-apply", "info", "orw-apply job completed")
 
