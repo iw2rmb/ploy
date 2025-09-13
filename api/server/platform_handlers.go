@@ -123,7 +123,15 @@ func (s *Server) handlePlatformLogs(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
 	defer cancel()
 	// Build command arguments safely
-	args := []string{"logs", "--alloc-id", runningID}
+    args := []string{"logs", "--alloc-id", runningID}
+    // Best-effort task name inference: task "api" for ploy-api job; otherwise use service name
+    taskName := serviceName
+    if serviceName == "api" {
+        taskName = "api"
+    }
+    if taskName != "" {
+        args = append(args, "--task", taskName)
+    }
 	if lines > 0 {
 		args = append(args, "--lines", fmt.Sprintf("%d", lines))
 	}
