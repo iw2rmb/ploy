@@ -423,7 +423,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
         _ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
         base := filepath.Base(src)
         dst := filepath.Join("/opt/ploy/debug/jobs", base)
-        _, _ = copyFile(src, dst)
+        _ = copyFile(src, dst)
         fmt.Printf("[Build] Job HCL written to %s\n", dst)
     }
     funcCopy(jobFile)
