@@ -91,9 +91,9 @@ validate_documentation_on_vps() {
                     exit 1
                 fi
                 
-                # Test dry-run validation if ploy transflow is available
+                # Test dry-run validation if ploy mod is available
                 if [ -f \"./bin/ploy\" ]; then
-                    if ./bin/ploy transflow run -f \"\$yaml_file\" --dry-run --validate-only 2>/dev/null; then
+                    if ./bin/ploy mod run -f \"\$yaml_file\" --dry-run --validate-only 2>/dev/null; then
                         echo \"✅ Configuration validation passed: \$(basename \"\$yaml_file\")\"
                     else
                         echo \"⚠️  Configuration validation not available or failed: \$(basename \"\$yaml_file\")\"
@@ -122,19 +122,19 @@ validate_documentation_on_vps() {
             echo \"⚠️  ployman binary not found\"
         fi
         
-        # Test transflow CLI examples
+        # Test mod CLI examples
         if [ -f \"./bin/ploy\" ]; then
-            echo \"🔍 Testing ploy transflow CLI commands\"
-            if ./bin/ploy transflow --help >/dev/null 2>&1; then
-                echo \"✅ ploy transflow command available\"
+            echo \"🔍 Testing ploy mod CLI commands\"
+            if ./bin/ploy mod --help >/dev/null 2>&1; then
+                echo \"✅ ploy mod command available\"
             else
-                echo \"⚠️  ploy transflow command not available\"
+                echo \"⚠️  ploy mod command not available\"
             fi
             
-            if ./bin/ploy transflow run --help >/dev/null 2>&1; then
-                echo \"✅ ploy transflow run command available\"
+            if ./bin/ploy mod run --help >/dev/null 2>&1; then
+                echo \"✅ ploy mod run command available\"
             else
-                echo \"⚠️  ploy transflow run command not available\"
+                echo \"⚠️  ploy mod run command not available\"
             fi
         else
             echo \"⚠️  ploy binary not found\"

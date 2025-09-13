@@ -148,7 +148,7 @@ func TestRecordErrorAndStatusFlow(t *testing.T) {
 	// Retrieve
 	app := fiber.New()
 	h.RegisterRoutes(app)
-	req := httptest.NewRequest("GET", "/v1/transflow/status/"+id, nil)
+    req := httptest.NewRequest("GET", "/v1/mods/"+id+"/status", nil)
 	resp, _ := app.Test(req)
 	defer resp.Body.Close()
 	var got TransflowStatus
@@ -181,7 +181,7 @@ func TestArtifactsEndpoints(t *testing.T) {
 	h.RegisterRoutes(app)
 
 	// List artifacts
-	req := httptest.NewRequest("GET", "/v1/transflow/artifacts/"+id, nil)
+    req := httptest.NewRequest("GET", "/v1/mods/"+id+"/artifacts", nil)
 	resp, _ := app.Test(req)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -189,7 +189,7 @@ func TestArtifactsEndpoints(t *testing.T) {
 	assert.Equal(t, 200, resp.StatusCode)
 
 	// Download artifact
-	req2 := httptest.NewRequest("GET", "/v1/transflow/artifacts/"+id+"/error_log", nil)
+    req2 := httptest.NewRequest("GET", "/v1/mods/"+id+"/artifacts/error_log", nil)
 	resp2, _ := app.Test(req2)
 	if resp2 != nil {
 		defer resp2.Body.Close()
@@ -217,7 +217,7 @@ func TestDownloadArtifact_InvalidKeyRejected(t *testing.T) {
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
-	req := httptest.NewRequest("GET", "/v1/transflow/artifacts/"+id+"/error_log", nil)
+    req := httptest.NewRequest("GET", "/v1/mods/"+id+"/artifacts/error_log", nil)
 	resp, _ := app.Test(req)
 	if resp != nil {
 		defer resp.Body.Close()
@@ -237,7 +237,7 @@ func TestSSELogsStub(t *testing.T) {
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
-	req := httptest.NewRequest("GET", "/v1/transflow/logs/tf-abc?follow=false", nil)
+    req := httptest.NewRequest("GET", "/v1/mods/tf-abc/logs?follow=false", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -268,7 +268,7 @@ func TestSSELogsSnapshotFollowFalse(t *testing.T) {
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
-	req := httptest.NewRequest("GET", "/v1/transflow/logs/tf-sse1?follow=false", nil)
+    req := httptest.NewRequest("GET", "/v1/mods/tf-sse1/logs?follow=false", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -303,7 +303,7 @@ func TestReportEvent_UpdatesStatusWithStepsAndLastJob(t *testing.T) {
 	// Send a phase event
 	ev1 := TransflowEvent{ExecutionID: id, Phase: "clone", Step: "clone", Level: "info", Message: "Cloning repo"}
 	b1, _ := json.Marshal(ev1)
-	req1 := httptest.NewRequest("POST", "/v1/transflow/event", bytes.NewReader(b1))
+    req1 := httptest.NewRequest("POST", "/v1/mods/tf-abc/events", bytes.NewReader(b1))
 	req1.Header.Set("Content-Type", "application/json")
 	resp1, _ := app.Test(req1)
 	if resp1 != nil {
@@ -314,7 +314,7 @@ func TestReportEvent_UpdatesStatusWithStepsAndLastJob(t *testing.T) {
 	// Send a job metadata event
 	ev2 := TransflowEvent{ExecutionID: id, Phase: "apply", Step: "orw-apply", Level: "info", Message: "Submitted orw-apply", JobName: "orw-apply-123"}
 	b2, _ := json.Marshal(ev2)
-	req2 := httptest.NewRequest("POST", "/v1/transflow/event", bytes.NewReader(b2))
+    req2 := httptest.NewRequest("POST", "/v1/mods/tf-abc/events", bytes.NewReader(b2))
 	req2.Header.Set("Content-Type", "application/json")
 	resp2, _ := app.Test(req2)
 	if resp2 != nil {
@@ -323,7 +323,7 @@ func TestReportEvent_UpdatesStatusWithStepsAndLastJob(t *testing.T) {
 	assert.Equal(t, 200, resp2.StatusCode)
 
 	// Read back status
-	req := httptest.NewRequest("GET", "/v1/transflow/status/"+id, nil)
+    req := httptest.NewRequest("GET", "/v1/mods/"+id+"/status", nil)
 	resp, _ := app.Test(req)
 	defer resp.Body.Close()
 	var got TransflowStatus

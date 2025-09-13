@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"ploy/internal/cli/transflow"
+    mods "ploy/internal/mods"
 )
 
 // TestDocumentationExamples validates all documentation examples
 func TestDocumentationExamples(t *testing.T) {
 	t.Run("TransflowConfigExamples", func(t *testing.T) {
-		// Test YAML examples from documentation
+        // Test YAML examples from documentation
 		exampleConfigs := []string{
 			"docs/examples/java-migration.yaml",
 			"docs/examples/self-healing.yaml",
@@ -36,7 +36,7 @@ func TestDocumentationExamples(t *testing.T) {
 				require.NoError(t, err, "Should be able to read example config")
 				require.NotEmpty(t, yamlData, "Example config should not be empty")
 
-				var config transflow.Config
+                var config mods.Config
 				err = yaml.Unmarshal(yamlData, &config)
 				assert.NoError(t, err, "Example YAML should be valid for file: %s", configPath)
 
@@ -61,17 +61,17 @@ func TestDocumentationExamples(t *testing.T) {
 			Body   string
 		}
 
-		apiExamples := map[string]APIExample{
-			"create_transflow": {
-				Method: "POST",
-				Path:   "/v1/transflow",
-				Body:   `{"config": {"version": "v1alpha1", "id": "test", "target_repo": "https://github.com/example/repo.git", "steps": []}}`,
-			},
-			"get_transflow": {
-				Method: "GET",
-				Path:   "/v1/transflow/status/tf-abc123",
-				Body:   "",
-			},
+        apiExamples := map[string]APIExample{
+            "create_mod": {
+                Method: "POST",
+                Path:   "/v1/mods",
+                Body:   `{"config": {"version": "v1alpha1", "id": "test", "target_repo": "https://github.com/example/repo.git", "steps": []}}`,
+            },
+            "get_mod": {
+                Method: "GET",
+                Path:   "/v1/mods/tf-abc123/status",
+                Body:   "",
+            },
 			"kb_query": {
 				Method: "GET",
 				Path:   "/v1/llms/kb/errors/java-compilation-error",
@@ -106,13 +106,13 @@ func TestDocumentationExamples(t *testing.T) {
 
 	t.Run("CLIExamples", func(t *testing.T) {
 		// Test CLI examples from documentation
-		cliExamples := []string{
-			"ploy transflow run -f examples/java-migration.yaml",
-			"ploy transflow run -f examples/self-healing.yaml --verbose",
-			"ploy transflow run -f examples/multi-step.yaml --dry-run",
-			"ployman models list",
-			"ployman models get gpt-4o-mini@2024-08-06",
-		}
+        cliExamples := []string{
+            "ploy mod run -f examples/java-migration.yaml",
+            "ploy mod run -f examples/self-healing.yaml --verbose",
+            "ploy mod run -f examples/multi-step.yaml --dry-run",
+            "ployman models list",
+            "ployman models get gpt-4o-mini@2024-08-06",
+        }
 
 		for _, example := range cliExamples {
 			t.Run(example, func(t *testing.T) {
