@@ -416,9 +416,13 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		return utils.ErrJSON(c, 500, err)
 	}
 
-	if err := orchestration.Submit(jobFile); err != nil {
-		return utils.ErrJSON(c, 500, err)
-	}
+    // Validate job before submission to return clearer errors from HCL conversion
+    if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
+        return utils.ErrJSON(c, 500, fmt.Errorf("job validation failed: %w", vErr))
+    }
+    if err := orchestration.Submit(jobFile); err != nil {
+        return utils.ErrJSON(c, 500, err)
+    }
 
 	jobName := appName + "-lane-" + strings.ToLower(lane)
 	_ = orchestration.WaitHealthy(jobName, 90*time.Second)
