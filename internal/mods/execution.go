@@ -280,7 +280,7 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 	}
 	inputKey := "transflow/" + execID + "/input.tar"
 	inputURL := seaweedURL + "/artifacts/" + inputKey
-	log.Printf("[Transflow] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
+    log.Printf("[Mods] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
 
 	dc := vars["NOMAD_DC"]
 	if dc == "" {

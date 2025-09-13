@@ -312,7 +312,7 @@ test-benchmark: ## Run benchmark tests
 	go test -bench=. -benchmem ./...
 
 # -----------------------------------------------------------------------------
-# Transflow package focused tasks
+# Mods package focused tasks
 # -----------------------------------------------------------------------------
 .PHONY: fmt-transflow
 fmt-transflow: ## Format transflow package (goimports + gofmt)

@@ -22,11 +22,11 @@ ARF provides automated code transformations with OpenRewrite, optional LLM‑ass
 - Sandboxes: `GET/POST /v1/arf/sandboxes`, `DELETE /v1/arf/sandboxes/:id`.
  
 
-Removed/unsupported: legacy benchmark endpoints; ARF healing coordinator and healing metrics; direct Nomad/Consul CLI instructions in this README. Healing is unified under Transflow.
+Removed/unsupported: legacy benchmark endpoints; ARF healing coordinator and healing metrics; direct Nomad/Consul CLI instructions in this README. Healing is unified under Mods.
 
 ## Transform Workflows
 
-Transformation execution is unified under the Transflow API and CLI. See `docs/api/transflow.md` and `docs/mods/README.md` for details on `/v1/transflow/*` endpoints and `ploy transflow run`.
+Transformation execution is unified under the Mods API and CLI. See `docs/api/mods.md` and `docs/mods/README.md` for details on `/v1/mods/*` endpoints and `ploy mod run`.
 
 ## Operational Rules
 
@@ -40,7 +40,7 @@ Transformation execution is unified under the Transflow API and CLI. See `docs/a
 # List recipes
 ploy arf recipes list
 
-# Execute code transformations via Transflow
+# Execute code transformations via Mods
 ploy transflow run -f ./transflow.yaml
 ```
 

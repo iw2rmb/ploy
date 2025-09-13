@@ -20,7 +20,7 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
 			RepoURL:      r.config.TargetRepo,
 			SourceBranch: branchName,
 			TargetBranch: r.config.TargetBranch,
-			Title:        fmt.Sprintf("Transflow: %s", r.config.ID),
+            Title:        fmt.Sprintf("Mods: %s", r.config.ID),
 			Description:  renderMRDescription(r, result),
 			Labels:       []string{"ploy", "tfl"},
 		}
@@ -52,7 +52,7 @@ func (r *TransflowRunner) createOrUpdateMR(ctx context.Context, result *Transflo
 		RepoURL:      r.config.TargetRepo,
 		SourceBranch: branchName,
 		TargetBranch: r.config.TargetBranch,
-		Title:        fmt.Sprintf("Transflow: %s", r.config.ID),
+    Title:        fmt.Sprintf("Mods: %s", r.config.ID),
 		Description:  renderMRDescription(r, result),
 		Labels:       []string{"ploy", "tfl"},
 	}
