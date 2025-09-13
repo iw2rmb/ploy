@@ -51,19 +51,19 @@ func NewHandler(
 
 // RegisterRoutes registers Transflow routes with the Fiber app
 func (h *Handler) RegisterRoutes(app *fiber.App) {
-	tf := app.Group("/v1/transflow")
+    tf := app.Group("/v1/mods")
 
 	// Transflow execution
-	tf.Post("/run", h.RunTransflow)
-	tf.Get("/status/:id", h.GetTransflowStatus)
-	tf.Get("/list", h.ListTransflows)
-	tf.Delete("/:id", h.CancelTransflow)
-	tf.Get("/artifacts/:id", h.GetArtifacts)
-	tf.Get("/artifacts/:id/:name", h.DownloadArtifact)
-	// Real-time events push endpoint
-	tf.Post("/event", h.ReportEvent)
-	// Logs streaming (SSE stub)
-	tf.Get("/logs/:id", h.StreamLogs)
+    tf.Post("", h.RunTransflow)
+    tf.Get("/:id/status", h.GetTransflowStatus)
+    tf.Get("", h.ListTransflows)
+    tf.Delete("/:id", h.CancelTransflow)
+    tf.Get("/:id/artifacts", h.GetArtifacts)
+    tf.Get("/:id/artifacts/:name", h.DownloadArtifact)
+    // Real-time events push endpoint
+    tf.Post("/:id/events", h.ReportEvent)
+    // Logs streaming (SSE stub)
+    tf.Get("/:id/logs", h.StreamLogs)
 	// Debug: Nomad recent job diagnostics (dev only)
 	tf.Get("/debug/nomad", h.DebugNomad)
 }
@@ -196,7 +196,7 @@ func (h *Handler) RunTransflow(c *fiber.Ctx) error {
 		"execution_id": executionID,
 		"status":       "initializing",
 		"message":      "Transflow execution started",
-		"status_url":   fmt.Sprintf("/v1/transflow/status/%s", executionID),
+        "status_url":   fmt.Sprintf("/v1/mods/%s/status", executionID),
 	})
 }
 
@@ -440,7 +440,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	// Planner plan.json
 	planPath := filepath.Join(tempDir, "planner", "out", "plan.json")
 	if fi, err := os.Stat(planPath); err == nil && !fi.IsDir() {
-		key := fmt.Sprintf("artifacts/transflow/%s/plan.json", executionID)
+    key := fmt.Sprintf("artifacts/mods/%s/plan.json", executionID)
 		f, _ := os.Open(planPath)
 		defer f.Close()
 		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -450,7 +450,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	// Reducer next.json
 	nextPath := filepath.Join(tempDir, "reducer", "out", "next.json")
 	if fi, err := os.Stat(nextPath); err == nil && !fi.IsDir() {
-		key := fmt.Sprintf("artifacts/transflow/%s/next.json", executionID)
+    key := fmt.Sprintf("artifacts/mods/%s/next.json", executionID)
 		f, _ := os.Open(nextPath)
 		defer f.Close()
 		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -466,8 +466,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 		}
 		if filepath.Base(path) == "diff.patch" {
 			// Prefer task-side upload key if present; support both legacy and new prefixes
-			keyPrimary := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
-			keyAlt := fmt.Sprintf("transflow/%s/diff.patch", executionID)
+                keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
+                keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
 			// If already present (task-side upload), record and skip
 			if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
 				artifacts["diff_patch"] = keyPrimary
@@ -487,7 +487,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			return nil
 		}
 		if filepath.Base(path) == "error.log" {
-			key := fmt.Sprintf("artifacts/transflow/%s/error.log", executionID)
+            key := fmt.Sprintf("artifacts/mods/%s/error.log", executionID)
 			if ok, _ := h.storage.Exists(ctx, key); ok {
 				artifacts["error_log"] = key
 			} else {
@@ -503,8 +503,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	})
 	// If no local diff found or persisted above, check storage proactively for known keys (SeaweedFS-only IO path)
 	if _, ok := artifacts["diff_patch"]; !ok {
-		keyPrimary := fmt.Sprintf("artifacts/transflow/%s/diff.patch", executionID)
-		keyAlt := fmt.Sprintf("transflow/%s/diff.patch", executionID)
+        keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
+        keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
 		if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
 			artifacts["diff_patch"] = keyPrimary
 		} else if ok2, _ := h.storage.Exists(ctx, keyAlt); ok2 {
@@ -652,7 +652,7 @@ func (h *Handler) storeStatus(status TransflowStatus) error {
 		return nil // Silently skip if no store configured
 	}
 
-	key := fmt.Sprintf("transflow/status/%s", status.ID)
+    key := fmt.Sprintf("mods/status/%s", status.ID)
 	data, err := json.Marshal(status)
 	if err != nil {
 		return err
@@ -667,7 +667,7 @@ func (h *Handler) getStatus(executionID string) (*TransflowStatus, error) {
 		return nil, fmt.Errorf("status store not configured")
 	}
 
-	key := fmt.Sprintf("transflow/status/%s", executionID)
+    key := fmt.Sprintf("mods/status/%s", executionID)
 	data, err := h.statusStore.Get(key)
 	if err != nil {
 		return nil, err
@@ -693,7 +693,7 @@ type TransflowEvent struct {
 	AllocID     string    `json:"alloc_id,omitempty"`
 }
 
-// ReportEvent handles POST /v1/transflow/event to update live status metadata
+// ReportEvent handles POST /v1/mods/:id/events to update live status metadata
 func (h *Handler) ReportEvent(c *fiber.Ctx) error {
 	if h.statusStore == nil {
 		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
@@ -706,11 +706,15 @@ func (h *Handler) ReportEvent(c *fiber.Ctx) error {
 			"error": fiber.Map{"code": "invalid_event", "message": "failed to parse event", "details": err.Error()},
 		})
 	}
-	if ev.ExecutionID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": fiber.Map{"code": "missing_execution_id", "message": "execution_id is required"},
-		})
-	}
+    if ev.ExecutionID == "" {
+        // Allow path param to carry execution id when payload omits it
+        ev.ExecutionID = c.Params("id")
+    }
+    if ev.ExecutionID == "" {
+        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+            "error": fiber.Map{"code": "missing_execution_id", "message": "execution_id is required"},
+        })
+    }
 	// Load or initialize status
 	st, err := h.getStatus(ev.ExecutionID)
 	if err != nil || st == nil || st.ID == "" {
