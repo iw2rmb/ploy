@@ -1,6 +1,6 @@
 //go:build docker
 
-package transflow
+package mods
 
 import (
 	"bytes"
@@ -24,7 +24,7 @@ import (
 //     REPO_URL=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 //     PLOY_SEAWEEDFS_URL=http://localhost:8888
 //     RECIPE_CLASS, RECIPE_GROUP, RECIPE_ARTIFACT, RECIPE_VERSION, MAVEN_PLUGIN_VERSION
-//   - Run: go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/cli/transflow -v
+//   - Run: go test -tags=docker -run TestORWApplyDocker_Smoke ./internal/mods -v
 func TestORWApplyDocker_Smoke(t *testing.T) {
 	if os.Getenv("TRANSFLOW_DOCKER_SMOKE") != "1" {
 		t.Skip("set TRANSFLOW_DOCKER_SMOKE=1 to enable this smoke test")

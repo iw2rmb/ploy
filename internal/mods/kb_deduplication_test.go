@@ -1,4 +1,4 @@
-package transflow
+package mods
 
 import (
 	"testing"

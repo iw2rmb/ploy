@@ -92,13 +92,13 @@ type Result struct {
 	TransformationApplied  bool
 	ModelRegistryAvailable bool
 
-	// Transflow-specific results
-	TransflowResult *transflow.TransflowResult
+    // Mods-specific results
+    TransflowResult *mods.TransflowResult
 	WorkflowID      string
 	CommitSHA       string
 	BranchName      string
-	StepResults     []transflow.StepResult
-	HealingSummary  *transflow.TransflowHealingSummary
+    StepResults     []mods.StepResult
+    HealingSummary  *mods.TransflowHealingSummary
 	MRURL           string
 }
 
@@ -120,7 +120,7 @@ type LearningMetrics struct {
 
 // MVPEnvironment provides the complete testing environment for MVP acceptance tests
 type MVPEnvironment struct {
-	TransflowRunner     *transflow.TransflowRunner
+    TransflowRunner     *mods.TransflowRunner
 	BuildClient         *BuildClient
 	GitLabClient        *GitLabClient
 	KBClient            *KBClient
@@ -211,13 +211,13 @@ func (env *MVPEnvironment) ExecuteScenario(ctx context.Context, scenario *Scenar
 	configFile.Close()
 
 	// Parse transflow configuration
-	config, err := transflow.LoadConfig(configFile.Name())
+    config, err := mods.LoadConfig(configFile.Name())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transflow config: %w", err)
 	}
 
 	// Create transflow runner
-	runner, err := transflow.NewTransflowRunner(config, env.WorkspaceDir)
+    runner, err := mods.NewTransflowRunner(config, env.WorkspaceDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transflow runner: %w", err)
 	}
@@ -264,7 +264,7 @@ func (env *MVPEnvironment) ExecuteScenario(ctx context.Context, scenario *Scenar
 }
 
 // mapTransflowResults maps TransflowResult fields to acceptance test Result fields
-func (env *MVPEnvironment) mapTransflowResults(result *Result, transflowResult *transflow.TransflowResult) {
+func (env *MVPEnvironment) mapTransflowResults(result *Result, transflowResult *mods.TransflowResult) {
 	if transflowResult == nil {
 		return
 	}
@@ -295,8 +295,8 @@ func (env *MVPEnvironment) mapTransflowResults(result *Result, transflowResult *
 	result.MRURL = transflowResult.MRURL
 	result.MRCreated = result.MRURL != ""
 	if result.MRURL != "" {
-		result.MRTitle = "Transflow automated changes"
-		result.MRDescription = "Automated code transformation via transflow"
+        result.MRTitle = "Mods automated changes"
+        result.MRDescription = "Automated code transformation via Mods"
 		result.MRLabels = []string{"ploy", "tfl"}
 	}
 

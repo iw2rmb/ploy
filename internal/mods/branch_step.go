@@ -1,4 +1,4 @@
-package transflow
+package mods
 
 // BranchStep describes a new branch step identity and its diff key path.
 type BranchStep struct {
