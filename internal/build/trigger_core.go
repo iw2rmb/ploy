@@ -80,21 +80,29 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	tmpDir, _ := os.MkdirTemp("", "ploy-build-")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	tarPath := filepath.Join(tmpDir, "src.tar")
-	f, _ := os.Create(tarPath)
-	defer func() { _ = f.Close() }()
-	// Prefer streaming read to avoid buffering limits and reduce proxy timeouts
-	if reader := c.Context().RequestBodyStream(); reader != nil {
-		if _, err := io.Copy(f, reader); err != nil {
-			log.Printf("[Build] Failed to stream request body: %v", err)
-			return c.Status(400).SendString("Failed to read request body: " + err.Error())
-		}
-	} else {
-		if _, err := f.Write(c.Body()); err != nil {
-			log.Printf("[Build] Failed to write request body: %v", err)
-			return c.Status(400).SendString("Failed to read request body: " + err.Error())
-		}
-	}
+    tarPath := filepath.Join(tmpDir, "src.tar")
+    f, _ := os.Create(tarPath)
+    defer func() { _ = f.Close() }()
+    // Log incoming content length (if provided)
+    log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
+    // Prefer streaming read to avoid buffering limits and reduce proxy timeouts
+    var written int64
+    if reader := c.Context().RequestBodyStream(); reader != nil {
+        n, err := io.Copy(f, reader)
+        written = n
+        if err != nil {
+            log.Printf("[Build] Failed to stream request body: %v", err)
+            return c.Status(400).SendString("Failed to read request body: " + err.Error())
+        }
+    } else {
+        n, err := f.Write(c.Body())
+        written = int64(n)
+        if err != nil {
+            log.Printf("[Build] Failed to write request body: %v", err)
+            return c.Status(400).SendString("Failed to read request body: " + err.Error())
+        }
+    }
+    log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
 
 	srcDir := filepath.Join(tmpDir, "src")
 	if err := os.MkdirAll(srcDir, 0755); err != nil {
