@@ -69,16 +69,16 @@ func executePlannerMode(runner *TransflowRunner, preserve, verbose bool) error {
 	}
 
 	// Optionally submit if TRANSFLOW_SUBMIT=1
-	if os.Getenv("TRANSFLOW_SUBMIT") != "1" {
-		runner.emit(ctx, "planner", "submit", "info", "Skipping submission (unset TRANSFLOW_SUBMIT)")
-		return nil
-	}
+    if os.Getenv("TRANSFLOW_SUBMIT") != "1" {
+        runner.emit(ctx, "planner", "submit", "info", "Skipping submission (unset TRANSFLOW_SUBMIT)")
+        return nil
+    }
 
-	timeout := ResolveDefaultsFromEnv().PlannerTimeout
-	if err := orchestration.SubmitAndWaitTerminal(renderedPath, timeout); err != nil {
-		runner.emit(ctx, "planner", "submit", "error", fmt.Sprintf("planner job failed: %v", err))
-		return fmt.Errorf("planner job failed: %w", err)
-	}
+    timeout := ResolveDefaultsFromEnv().PlannerTimeout
+    if err := runner.hcl.Submit(renderedPath, timeout); err != nil {
+        runner.emit(ctx, "planner", "submit", "error", fmt.Sprintf("planner job failed: %v", err))
+        return fmt.Errorf("planner job failed: %w", err)
+    }
 
 	// Attempt to read plan.json from URL or locally (also support SeaweedFS filer via bucket/key)
 	if url := os.Getenv("TRANSFLOW_PLAN_URL"); url != "" {
