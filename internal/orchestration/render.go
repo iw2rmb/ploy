@@ -369,16 +369,26 @@ func (r *RenderData) SetDefaults() {
 
 func processConditionalBlocks(template string, data RenderData) string {
 	conditionalRegex := regexp.MustCompile(`(?s)\{\{#if\s+(\w+)\}\}(.*?)\{\{/if\}\}`)
-	result := conditionalRegex.ReplaceAllStringFunc(template, func(match string) string {
-		sub := conditionalRegex.FindStringSubmatch(match)
-		if len(sub) < 3 {
-			return match
+	// Iteratively process conditionals to handle nested blocks
+	prev := ""
+	result := template
+	// Cap iterations to avoid pathological cases
+	for i := 0; i < 10; i++ {
+		if result == prev {
+			break
 		}
-		if evaluateCondition(sub[1], data) {
-			return sub[2]
-		}
-		return ""
-	})
+		prev = result
+		result = conditionalRegex.ReplaceAllStringFunc(result, func(match string) string {
+			sub := conditionalRegex.FindStringSubmatch(match)
+			if len(sub) < 3 {
+				return match
+			}
+			if evaluateCondition(sub[1], data) {
+				return sub[2]
+			}
+			return ""
+		})
+	}
 	// Strip any remaining conditional markers to avoid leaving stray tags
 	// that can break HCL parsing if earlier passes missed nested structures.
 	openTag := regexp.MustCompile(`(?m)^[\t ]*\{\{#if\s+\w+\}\}[\t ]*$`)
