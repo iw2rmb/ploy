@@ -1,11 +1,12 @@
 package deploy
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"time"
+    "fmt"
+    "io"
+    "mime/multipart"
+    "net/http"
+    "os"
+    "time"
 
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
@@ -80,13 +81,35 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		url += "&blue_green=true"
 	}
 
-	// Create HTTP request with known Content-Length
-	req, _ := http.NewRequest("POST", url, rf)
-	req.Header.Set("Content-Type", "application/x-tar")
-	req.Header.Set("X-Target-Domain", "ployd.app")
-	if stat != nil {
-		req.ContentLength = stat.Size()
-	}
+    var (
+        req *http.Request
+        clientBody io.Reader
+        contentType string
+    )
+    if os.Getenv("PLOY_PUSH_MULTIPART") == "1" {
+        // Multipart upload: stream tar as a file part to avoid proxy buffering issues
+        pr, pw := io.Pipe()
+        mw := multipart.NewWriter(pw)
+        go func() {
+            defer pw.Close()
+            defer mw.Close()
+            part, err := mw.CreateFormFile("file", "src.tar")
+            if err != nil { _ = pw.CloseWithError(err); return }
+            if _, err := io.Copy(part, rf); err != nil { _ = pw.CloseWithError(err); return }
+        }()
+        clientBody = pr
+        contentType = mw.FormDataContentType()
+    } else {
+        clientBody = rf
+        contentType = "application/x-tar"
+    }
+    // Create HTTP request (multipart or raw tar)
+    req, _ = http.NewRequest("POST", url, clientBody)
+    req.Header.Set("Content-Type", contentType)
+    req.Header.Set("X-Target-Domain", "ployd.app")
+    if stat != nil && os.Getenv("PLOY_PUSH_MULTIPART") != "1" {
+        req.ContentLength = stat.Size()
+    }
 
 	// Execute request with a generous timeout
 	client := &http.Client{Timeout: 3 * time.Minute}

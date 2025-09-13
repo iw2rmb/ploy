@@ -56,8 +56,17 @@ EXTRA_FLAGS=()
 START_TS=$(date +%s)
 attempt_push() {
   local out rc
-  out=$("$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]:-}" 2>&1)
-  rc=$?
+  if [[ "${USE_MULTIPART:-}" == "1" ]]; then
+    # Build tar from repo and upload via multipart
+    TAR_PATH="$WORKDIR/app.tar"
+    tar -cf "$TAR_PATH" -C "$WORKDIR/app" .
+    local url="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds?sha=${GIT_SHA:-dev}&lane=${LANE:-}"
+    out=$(curl -sS --http1.1 -D - -o - -X POST -F "file=@${TAR_PATH};type=application/x-tar" "$url" 2>&1)
+    rc=$?
+  else
+    out=$("$PLOY_CMD" push -a "$APP_NAME" "${EXTRA_FLAGS[@]:-}" 2>&1)
+    rc=$?
+  fi
   echo "$out"
   if [[ $rc -ne 0 ]] || echo "$out" | rg -qi '("error"\s*:|failed|^❌)'; then
     return 1
