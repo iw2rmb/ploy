@@ -35,7 +35,7 @@ func TestLoadConfigFromEnv(t *testing.T) {
 
 // TestDefaultTTLConfigUsesEnvDefault confirms DefaultTTLConfig respects default when env unset
 func TestDefaultTTLConfigUsesEnvDefault(t *testing.T) {
-	os.Unsetenv("NOMAD_ADDR")
+	_ = os.Unsetenv("NOMAD_ADDR")
 	cfg := DefaultTTLConfig()
 	if cfg.NomadAddr == "" {
 		t.Fatalf("expected NomadAddr to have a default value, got empty")

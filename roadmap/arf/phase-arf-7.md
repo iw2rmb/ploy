@@ -56,7 +56,7 @@ workflowEngine: NewHumanWorkflowEngine(nil, nil, nil, nil, nil)
 - ReviewService: Code review platform integration
 - NotificationService: Slack, email, webhook notifications
 - AuditService: Comprehensive audit logging
-- WorkflowStore: PostgreSQL/Redis persistence
+- WorkflowStore: Redis persistence (SQL-backed store deferred)
 
 ### From Core ARF: Sandbox Management
 
@@ -309,11 +309,13 @@ func (s *SlackNotifier) SendNotification(
 
 ```go
 // api/arf/workflow_store_impl.go
+// Note: SQL-backed stores are deferred; example retained for reference only
 type PostgreSQLWorkflowStore struct {
     db          *pgxpool.Pool
     cache       *redis.Client
 }
 
+// Deferred: not used in current system (no SQL)
 func (p *PostgreSQLWorkflowStore) CreateWorkflow(
     ctx context.Context,
     workflow *Workflow,
@@ -532,7 +534,8 @@ workflow:
       
   storage:
     postgres:
-      connection: "postgres://arf:password@localhost/arf_workflows"
+      # Example (deferred): persistence connection string (SQL disabled)
+      connection: "redis://localhost:6379/0"
       max_connections: 50
       
     redis:
@@ -632,7 +635,7 @@ sandbox:
 - GitHub API token
 - Slack workspace access
 - SMTP server for email
-- PostgreSQL database
+- SQL database (deferred/disabled)
 - Redis cache server
 
 ### Infrastructure

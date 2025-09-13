@@ -65,7 +65,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize WASM runtime: %v", err)
 	}
-	defer wasmRuntime.Close(ctx)
+	defer func() { _ = wasmRuntime.Close(ctx) }()
 
 	// Load WASM module
 	wasmBytes, err := os.ReadFile(*modulePath)
@@ -100,7 +100,7 @@ func main() {
 		// In production, WASM modules would handle HTTP requests directly
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{
+		_, _ = fmt.Fprintf(w, `{
   "status": "success",
   "message": "WASM module executed successfully",
   "runtime": "wazero",
@@ -112,7 +112,7 @@ func main() {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{
+		_, _ = fmt.Fprintf(w, `{
   "status": "healthy",
   "service": "ploy-wasm-runner",
   "runtime": "wazero",
@@ -133,11 +133,11 @@ func main() {
 			http.Error(w, fmt.Sprintf("WASM runtime unhealthy: %v", err), http.StatusServiceUnavailable)
 			return
 		}
-		module.Close(testCtx)
+		_ = module.Close(testCtx)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{
+		_, _ = fmt.Fprintf(w, `{
   "status": "healthy",
   "wasm_runtime": "wazero",
   "module_loaded": true,
@@ -150,18 +150,18 @@ func main() {
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		// Basic Prometheus-style metrics
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "# HELP wasm_executions_total Total number of WASM executions\n")
-		fmt.Fprintf(w, "# TYPE wasm_executions_total counter\n")
-		fmt.Fprintf(w, "wasm_executions_total %d\n", executionCount)
+		_, _ = fmt.Fprintf(w, "# HELP wasm_executions_total Total number of WASM executions\n")
+		_, _ = fmt.Fprintf(w, "# TYPE wasm_executions_total counter\n")
+		_, _ = fmt.Fprintf(w, "wasm_executions_total %d\n", executionCount)
 
-		fmt.Fprintf(w, "# HELP wasm_execution_duration_seconds Duration of WASM executions\n")
-		fmt.Fprintf(w, "# TYPE wasm_execution_duration_seconds histogram\n")
-		fmt.Fprintf(w, "wasm_execution_duration_seconds_sum %.3f\n", totalExecutionTime.Seconds())
-		fmt.Fprintf(w, "wasm_execution_duration_seconds_count %d\n", executionCount)
+		_, _ = fmt.Fprintf(w, "# HELP wasm_execution_duration_seconds Duration of WASM executions\n")
+		_, _ = fmt.Fprintf(w, "# TYPE wasm_execution_duration_seconds histogram\n")
+		_, _ = fmt.Fprintf(w, "wasm_execution_duration_seconds_sum %.3f\n", totalExecutionTime.Seconds())
+		_, _ = fmt.Fprintf(w, "wasm_execution_duration_seconds_count %d\n", executionCount)
 
-		fmt.Fprintf(w, "# HELP wasm_memory_pages_max Maximum memory pages configured\n")
-		fmt.Fprintf(w, "# TYPE wasm_memory_pages_max gauge\n")
-		fmt.Fprintf(w, "wasm_memory_pages_max %d\n", config.MaxMemoryPages)
+		_, _ = fmt.Fprintf(w, "# HELP wasm_memory_pages_max Maximum memory pages configured\n")
+		_, _ = fmt.Fprintf(w, "# TYPE wasm_memory_pages_max gauge\n")
+		_, _ = fmt.Fprintf(w, "wasm_memory_pages_max %d\n", config.MaxMemoryPages)
 	})
 
 	// Create HTTP server
@@ -183,7 +183,7 @@ func main() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		server.Shutdown(shutdownCtx)
+		_ = server.Shutdown(shutdownCtx)
 	}()
 
 	// Start server

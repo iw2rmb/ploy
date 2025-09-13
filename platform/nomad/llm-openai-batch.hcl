@@ -53,6 +53,16 @@ cd /workspace
 tar -xzf input.tar.gz
 rm input.tar.gz
 
+# Optionally download additional context (if provided)
+if [ -n "${CONTEXT_URL}" ]; then
+  echo "Downloading context from: ${CONTEXT_URL}"
+  mkdir -p /workspace/context || true
+  if wget -q -O /workspace/context.tar.gz "${CONTEXT_URL}"; then
+    tar -C /workspace -xzf /workspace/context.tar.gz 2>/dev/null || tar -C /workspace/context -xzf /workspace/context.tar.gz 2>/dev/null || true
+    rm -f /workspace/context.tar.gz || true
+  fi
+fi
+
 # Create Python script for OpenAI transformation
 cat > transform.py <<'PYTHON'
 import os
@@ -86,6 +96,16 @@ def main():
     except Exception as e:
         print(f"Error decoding prompt: {e}")
         sys.exit(1)
+
+    # Optionally enrich prompt with SBOM summary if present in context
+    try:
+        sbom_hint_path = '/workspace/context/prompt_sbom.txt'
+        if os.path.exists(sbom_hint_path):
+            with open(sbom_hint_path, 'r', encoding='utf-8', errors='ignore') as f:
+                hint = f.read(4000)
+                prompt = f"{prompt}\n\n[Context — SBOM Summary]\n{hint}"
+    except Exception as e:
+        print(f"Warning: could not append SBOM hint: {e}")
     
     # Map language to file extensions
     ext_map = {

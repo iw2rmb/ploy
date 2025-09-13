@@ -118,20 +118,20 @@ func TestGitLabProvider_CreateOrUpdateMR(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up environment variables
 			if tt.envURL != "" {
-				os.Setenv("GITLAB_URL", tt.envURL)
+				_ = os.Setenv("GITLAB_URL", tt.envURL)
 			} else {
-				os.Unsetenv("GITLAB_URL")
+				_ = os.Unsetenv("GITLAB_URL")
 			}
 
 			if tt.envToken != "" {
-				os.Setenv("GITLAB_TOKEN", tt.envToken)
+				_ = os.Setenv("GITLAB_TOKEN", tt.envToken)
 			} else {
-				os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Unsetenv("GITLAB_TOKEN")
 			}
 
 			defer func() {
-				os.Unsetenv("GITLAB_URL")
-				os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Unsetenv("GITLAB_URL")
+				_ = os.Unsetenv("GITLAB_TOKEN")
 			}()
 
 			// Create mock GitLab server
@@ -150,14 +150,14 @@ func TestGitLabProvider_CreateOrUpdateMR(t *testing.T) {
 					// List existing MRs
 					response, _ := json.Marshal(tt.existingMRs)
 					w.Header().Set("Content-Type", "application/json")
-					w.Write(response)
+					_, _ = w.Write(response)
 					return
 				}
 
 				if strings.Contains(r.URL.Path, "/merge_requests") {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(tt.mockStatus)
-					w.Write([]byte(tt.mockResponse))
+					_, _ = w.Write([]byte(tt.mockResponse))
 					return
 				}
 
@@ -167,7 +167,7 @@ func TestGitLabProvider_CreateOrUpdateMR(t *testing.T) {
 
 			// Override GitLab URL to use mock server
 			if tt.envURL != "" {
-				os.Setenv("GITLAB_URL", server.URL)
+				_ = os.Setenv("GITLAB_URL", server.URL)
 			}
 
 			// Create GitLab provider
@@ -240,20 +240,20 @@ func TestGitLabProvider_ValidateConfiguration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up environment variables
 			if tt.envURL != "" {
-				os.Setenv("GITLAB_URL", tt.envURL)
+				_ = os.Setenv("GITLAB_URL", tt.envURL)
 			} else {
-				os.Unsetenv("GITLAB_URL")
+				_ = os.Unsetenv("GITLAB_URL")
 			}
 
 			if tt.envToken != "" {
-				os.Setenv("GITLAB_TOKEN", tt.envToken)
+				_ = os.Setenv("GITLAB_TOKEN", tt.envToken)
 			} else {
-				os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Unsetenv("GITLAB_TOKEN")
 			}
 
 			defer func() {
-				os.Unsetenv("GITLAB_URL")
-				os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Unsetenv("GITLAB_URL")
+				_ = os.Unsetenv("GITLAB_TOKEN")
 			}()
 
 			provider := NewGitLabProvider()

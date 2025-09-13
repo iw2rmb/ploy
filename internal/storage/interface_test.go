@@ -700,7 +700,7 @@ func TestStorage_Get(t *testing.T) {
 	reader, err := storage.Get(ctx, key)
 	assert.NoError(t, err)
 	assert.NotNil(t, reader)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	content, err := io.ReadAll(reader)
 	assert.NoError(t, err)

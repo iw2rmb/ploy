@@ -227,7 +227,7 @@ func GetLaneSizeLimit(lane string) (LaneSizeLimit, error) {
 	limits := GetLaneSizeLimits()
 
 	for _, limit := range limits {
-		if strings.ToUpper(limit.Lane) == strings.ToUpper(lane) {
+		if strings.EqualFold(limit.Lane, lane) {
 			return limit, nil
 		}
 	}

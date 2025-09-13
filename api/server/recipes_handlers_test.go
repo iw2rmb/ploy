@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"strings"
@@ -54,7 +55,7 @@ func TestARFRecipesList_StorageBacked_OK(t *testing.T) {
       {"id":"org.openrewrite.java.format.AutoFormat","display_name":"Auto Format","description":"Formatting","tags":["format","java"],"pack":"rewrite-java","version":"1.0.0"}
     ]`
 	// write to the expected catalog key
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 
 	// Build a server and inject storage-backed registry
 	srv, err := NewServer(&ControllerConfig{})
@@ -83,7 +84,7 @@ func TestARFRecipesList_StorageBacked_LanguageFilter(t *testing.T) {
       {"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","tags":["cleanup","java"]},
       {"id":"org.openrewrite.kotlin.cleanup.Cleanup","display_name":"Kotlin Cleanup","tags":["cleanup","kotlin"]}
     ]`
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 
 	srv, err := NewServer(&ControllerConfig{})
 	if err != nil {
@@ -118,7 +119,7 @@ func TestARFRecipesGet_StorageBacked_OK(t *testing.T) {
       {"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","description":"Cleanup rules","tags":["cleanup","java"],"pack":"rewrite-java","version":"1.2.3"},
       {"id":"org.openrewrite.java.format.AutoFormat","display_name":"Auto Format","description":"Formatting","tags":["format","java"],"pack":"rewrite-java","version":"1.0.0"}
     ]`
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 
 	srv, err := NewServer(&ControllerConfig{})
 	if err != nil {
@@ -146,7 +147,7 @@ func TestARFRecipesList_StorageBacked_PayloadFields(t *testing.T) {
 	catalog := `[
       {"id":"org.openrewrite.java.format.AutoFormat","display_name":"Auto Format","description":"Formatting rules","tags":["format","java"],"pack":"rewrite-java","version":"1.0.0"}
     ]`
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 
 	srv, err := NewServer(&ControllerConfig{})
 	if err != nil {
@@ -184,7 +185,7 @@ func TestARFRecipesGet_StorageBacked_PayloadFields(t *testing.T) {
 	catalog := `[
       {"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","description":"Cleanup rules","tags":["cleanup","java"],"pack":"rewrite-java","version":"1.2.3"}
     ]`
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 
 	srv, err := NewServer(&ControllerConfig{})
 	if err != nil {

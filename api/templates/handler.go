@@ -3,11 +3,11 @@ package templates
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+	platformnomad "github.com/iw2rmb/ploy/platform/nomad"
 )
 
 // Handler manages template operations
@@ -58,60 +58,21 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 		})
 	}
 
-	// Try multiple possible locations for platform templates
-	possibleDirs := []string{
-		"platform/nomad", // Relative path (development)
-	}
-
-	// Add path from environment variable if set
-	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
-		possibleDirs = append(possibleDirs, filepath.Join(templateDir, "platform/nomad"))
-	}
-
-	// Add fallback paths
-	possibleDirs = append(possibleDirs,
-		"/home/ploy/ploy/platform/nomad", // Absolute path on VPS
-		"/opt/ploy/platform/nomad",       // Alternative deployment location
-	)
-
-	var templates []os.DirEntry
-	var platformTemplateDir string
-	for _, dir := range possibleDirs {
-		if t, err := os.ReadDir(dir); err == nil {
-			templates = t
-			platformTemplateDir = dir
-			break
-		}
-	}
-
-	if templates == nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read platform templates from any location",
-		})
-	}
+	// Use embedded templates as the sole source of truth
+	embeddedPaths := platformnomad.ListEmbeddedTemplatePaths()
 
 	var response SyncTemplatesResponse
-	response.Templates = make([]TemplateStatus, 0, len(templates))
+	response.Templates = make([]TemplateStatus, 0, len(embeddedPaths))
 
-	for _, template := range templates {
-		if template.IsDir() {
-			continue
-		}
+	for _, fullPath := range embeddedPaths {
+		templateName := filepath.Base(fullPath)
+		status := TemplateStatus{Name: templateName}
 
-		templateName := template.Name()
-		if filepath.Ext(templateName) != ".hcl" {
-			continue
-		}
-
-		status := TemplateStatus{
-			Name: templateName,
-		}
-
-		// Read template content from platform files
-		content, err := os.ReadFile(filepath.Join(platformTemplateDir, templateName))
-		if err != nil {
+		// Read template content from embedded bytes
+		content := platformnomad.GetEmbeddedTemplate(fullPath)
+		if len(content) == 0 {
 			status.Status = "error"
-			status.Message = fmt.Sprintf("Failed to read platform template: %v", err)
+			status.Message = "Embedded template missing"
 			response.Templates = append(response.Templates, status)
 			continue
 		}
@@ -131,7 +92,7 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 		}
 
 		// Store template in Consul KV
-		err = h.consulClient.PutTemplate(templateName, content)
+		err := h.consulClient.PutTemplate(templateName, content)
 		if err != nil {
 			status.Status = "error"
 			status.Message = fmt.Sprintf("Failed to store in Consul KV: %v", err)
@@ -153,79 +114,35 @@ func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
 
 // GetTemplateStatus returns the status of templates in both platform files and Consul KV
 func (h *Handler) GetTemplateStatus(c *fiber.Ctx) error {
-	// Try multiple possible locations for platform templates
-	possibleDirs := []string{
-		"platform/nomad", // Relative path (development)
-	}
-
-	// Add path from environment variable if set
-	if templateDir := os.Getenv("PLOY_TEMPLATE_DIR"); templateDir != "" {
-		possibleDirs = append(possibleDirs, filepath.Join(templateDir, "platform/nomad"))
-	}
-
-	// Add fallback paths
-	possibleDirs = append(possibleDirs,
-		"/home/ploy/ploy/platform/nomad", // Absolute path on VPS
-		"/opt/ploy/platform/nomad",       // Alternative deployment location
-	)
-
-	var templates []os.DirEntry
-	var platformTemplateDir string
-	for _, dir := range possibleDirs {
-		if t, err := os.ReadDir(dir); err == nil {
-			templates = t
-			platformTemplateDir = dir
-			break
-		}
-	}
-
-	if templates == nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to read platform templates from any location",
-		})
-	}
-
+	// Use embedded templates only and compare with Consul KV
 	var statuses []TemplateStatus
-	for _, template := range templates {
-		if template.IsDir() || filepath.Ext(template.Name()) != ".hcl" {
-			continue
-		}
+	for _, fullPath := range platformnomad.ListEmbeddedTemplatePaths() {
+		templateName := filepath.Base(fullPath)
+		status := TemplateStatus{Name: templateName}
 
-		templateName := template.Name()
-		status := TemplateStatus{
-			Name: templateName,
-		}
-
-		// Check platform template
-		platformContent, err := os.ReadFile(filepath.Join(platformTemplateDir, templateName))
-		if err != nil {
-			status.Status = "error"
-			status.Message = fmt.Sprintf("Platform template error: %v", err)
-		} else {
-			status.SizeBytes = len(platformContent)
-		}
+		// Embedded content
+		platformContent := platformnomad.GetEmbeddedTemplate(fullPath)
+		status.SizeBytes = len(platformContent)
 
 		// Check Consul KV
 		consulContent, err := h.consulClient.GetTemplate(templateName)
 		if err == nil && len(consulContent) > 0 {
 			if len(platformContent) == len(consulContent) {
 				status.Status = "synced"
-				status.Message = "Available in both platform files and Consul KV"
+				status.Message = "Available in embedded set and Consul KV"
 			} else {
 				status.Status = "different"
-				status.Message = fmt.Sprintf("Size mismatch - Platform: %d bytes, Consul: %d bytes", len(platformContent), len(consulContent))
+				status.Message = fmt.Sprintf("Size mismatch - Embedded: %d bytes, Consul: %d bytes", len(platformContent), len(consulContent))
 			}
 		} else {
-			status.Status = "platform_only"
-			status.Message = "Available in platform files only"
+			status.Status = "embedded_only"
+			status.Message = "Available in embedded set only"
 		}
 
 		statuses = append(statuses, status)
 	}
 
-	return c.JSON(fiber.Map{
-		"templates": statuses,
-	})
+	return c.JSON(fiber.Map{"templates": statuses})
 }
 
 // SetupRoutes registers template management routes

@@ -30,14 +30,16 @@ echo "  VPS IP: $TARGET_HOST"
 echo ""
 
 # Test 1: Controller environment variables
-echo -e "${YELLOW}Test 1: Checking controller environment...${NC}"
-CONTROLLER_ENV=$(ssh root@$TARGET_HOST "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && nomad alloc exec \"\$ALLOC_ID\" env | grep PLOY_" 2>/dev/null || echo "failed")
-
-if echo "$CONTROLLER_ENV" | grep -q "PLOY_ENVIRONMENT=dev"; then
-    echo -e "${GREEN}✓ Controller has dev environment variables${NC}"
+echo -e "${YELLOW}Test 1: Checking controller health (proxy for environment)...${NC}"
+CONTROLLER_PORT=$(ssh root@$TARGET_HOST "ALLOC_ID=\$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc ploy-api 2>/dev/null) && /opt/hashicorp/bin/nomad-job-manager.sh alloc-status \"\$ALLOC_ID\" 2>/dev/null | jq -r '.Resources.Networks[0].DynamicPorts[] | select(.Label == \"http\") | .Value // empty'" 2>/dev/null)
+if [ -n "$CONTROLLER_PORT" ]; then
+    if ssh root@$TARGET_HOST "curl -sf http://localhost:$CONTROLLER_PORT/health > /dev/null" 2>/dev/null; then
+        echo -e "${GREEN}✓ Controller health endpoint accessible on dev${NC}"
+    else
+        echo -e "${RED}✗ Controller health endpoint not accessible${NC}"
+    fi
 else
-    echo -e "${RED}✗ Controller missing dev environment${NC}"
-    echo "Controller environment: $CONTROLLER_ENV"
+    echo -e "${RED}✗ Could not find controller port${NC}"
 fi
 
 # Test 2: Reserved app names

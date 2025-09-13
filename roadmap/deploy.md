@@ -145,7 +145,7 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
     if err != nil {
         return nil, fmt.Errorf("deployment request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     // Parse response
     result, err := parseDeployResponse(resp, config)

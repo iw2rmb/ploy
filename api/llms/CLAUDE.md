@@ -1,7 +1,7 @@
 # API LLMs Module CLAUDE.md
 
 ## Purpose
-REST API endpoints for LLM model registry management providing complete CRUD operations, filtering, and statistics for transflow healing workflows.
+REST API endpoints for LLM model registry management providing complete CRUD operations, filtering, and statistics for mods healing workflows.
 
 ## Architecture Overview
 The LLMs API module provides HTTP endpoints for managing LLM models in the registry. Built on Fiber framework with comprehensive validation, error handling, and storage integration. Supports filtering by provider and capability, with plans for usage statistics tracking.
@@ -84,7 +84,7 @@ The LLMs API module provides HTTP endpoints for managing LLM models in the regis
 - Context-based request handling
 
 ## Related Documentation
-- `../../cmd/ployman/CLAUDE.md` - CLI client for these endpoints
+- `../../cmd/ployman/README.md` - CLI client for these endpoints
 - `../../internal/storage/CLAUDE.md` - Storage layer implementation
 - `../../internal/arf/models/` - Core model data structures
 - `../../internal/validation/` - Model validation logic

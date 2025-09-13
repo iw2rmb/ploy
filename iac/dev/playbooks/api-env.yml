@@ -1,0 +1,113 @@
+---
+# Configure per-service environment file for Ploy API
+# Safely writes /home/ploy/api.env and ensures it is sourced by ~/.bashrc
+
+- name: Configure API environment file for Mods
+  hosts: linux_hosts
+  become: true
+  vars:
+    api_env_path: "/home/ploy/api.env"
+  tasks:
+    - name: Capture controller-side GitLab envs (workstation)
+      no_log: true
+      set_fact:
+        controller_gitlab_url: "{{ lookup('env', 'GITLAB_URL') | default('', true) }}"
+        controller_gitlab_token: "{{ lookup('env', 'GITLAB_TOKEN') | default('', true) }}"
+    - name: Ensure ploy home exists
+      file:
+        path: "/home/ploy"
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Discover existing GitLab envs on VPS (do not log)
+      no_log: true
+      become_user: ploy
+      shell: |
+        set -a
+        [ -r "$HOME/api.env" ] && . "$HOME/api.env" || true
+        [ -r "$HOME/.bashrc" ] && . "$HOME/.bashrc" || true
+        [ -r "$HOME/ploy/.bashrc" ] && . "$HOME/ploy/.bashrc" || true
+        set +a
+        if [ -z "${GITLAB_URL}" ] && [ -r /etc/environment ]; then
+          eval $(grep -E '^GITLAB_URL=' /etc/environment | sed 's/^/export /') || true
+        fi
+        if [ -z "${GITLAB_TOKEN}" ] && [ -r /etc/environment ]; then
+          eval $(grep -E '^GITLAB_TOKEN=' /etc/environment | sed 's/^/export /') || true
+        fi
+        if [ -z "${GITLAB_TOKEN}" ] && [ -r "$HOME/.gitlab_token" ]; then
+          GITLAB_TOKEN=$(tr -d '\n' <"$HOME/.gitlab_token" 2>/dev/null)
+        fi
+        printf 'GITLAB_URL=%s\n' "${GITLAB_URL}"
+        printf 'GITLAB_TOKEN=%s\n' "${GITLAB_TOKEN}"
+      register: vps_env
+
+    - name: Extract fallback URL/token (do not log)
+      no_log: true
+      set_fact:
+        fallback_url: "{{ (vps_env.stdout | regex_search('^GITLAB_URL=(.*)$', '\\1', multiline=True)) | default(omit, true) }}"
+        fallback_token: "{{ (vps_env.stdout | regex_search('^GITLAB_TOKEN=(.*)$', '\\1', multiline=True)) | default(omit, true) }}"
+
+    - name: Build api.env content from controller env (do not log)
+      no_log: true
+      set_fact:
+        api_env_content: |
+          # Managed by Ansible - API service environment
+          # Prefer controller (workstation) env; fallback to discovered VPS env; finally default URL
+          GITLAB_URL="{{ (controller_gitlab_url | length > 0) | ternary(controller_gitlab_url, (fallback_url | default('https://gitlab.com', true))) }}"
+          # Always favor controller token if provided to ensure write access for pushes/MRs
+          GITLAB_TOKEN="{{ (controller_gitlab_token | length > 0) | ternary(controller_gitlab_token, (fallback_token | default('', true))) }}"
+          PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') | default('https://api.dev.ployman.app/v1', true) }}"
+          # Nomad/Mods runtime defaults
+          NOMAD_DC="{{ lookup('env', 'NOMAD_DC') | default('dc1', true) }}"
+          PLOY_SEAWEEDFS_URL="{{ lookup('env', 'PLOY_SEAWEEDFS_URL') | default('http://seaweedfs-filer.service.consul:8888', true) }}"
+          # OpenRewrite apply runner image (must exist in internal registry)
+          # Preferred: set MODS_ORW_APPLY_IMAGE; runner substitutes ${ORW_IMAGE}
+          MODS_ORW_APPLY_IMAGE="{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') | default('registry.dev.ployman.app/openrewrite-jvm:latest', true) }}"
+          # LangGraph runner images for planner/reducer/llm-exec
+          MODS_PLANNER_IMAGE="{{ lookup('env', 'MODS_PLANNER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          MODS_REDUCER_IMAGE="{{ lookup('env', 'MODS_REDUCER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          MODS_LLM_EXEC_IMAGE="{{ lookup('env', 'MODS_LLM_EXEC_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          # Optional defaults
+          MODS_REGISTRY="{{ lookup('env', 'MODS_REGISTRY') | default('registry.dev.ployman.app', true) }}"
+          GIT_AUTHOR_NAME="{{ lookup('env', 'GIT_AUTHOR_NAME') | default('Ploy Bot', true) }}"
+          GIT_AUTHOR_EMAIL="{{ lookup('env', 'GIT_AUTHOR_EMAIL') | default('ploy-bot@local', true) }}"
+
+    - name: Fail fast if controller token was expected but missing
+      when: controller_gitlab_token | length == 0
+      debug:
+        msg: "Controller-side GITLAB_TOKEN is empty; playbook will preserve any VPS fallback or leave token blank. To populate from workstation, export GITLAB_TOKEN before running."
+
+    - name: Write /home/ploy/api.env with restricted permissions (do not log)
+      no_log: true
+      copy:
+        content: "{{ api_env_content }}\n"
+        dest: "{{ api_env_path }}"
+        owner: ploy
+        group: ploy
+        mode: '0600'
+
+    - name: Ensure ~/.bashrc sources api.env if present (idempotent)
+      lineinfile:
+        path: "/home/ploy/.bashrc"
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        create: true
+        line: "[ -r \"$HOME/api.env\" ] && set -a && . \"$HOME/api.env\" && set +a"
+        insertafter: EOF
+
+    - name: Verify token presence without printing value (best-effort)
+      become_user: ploy
+      shell: |
+        set -a
+        [ -r "$HOME/api.env" ] && . "$HOME/api.env"
+        set +a
+        if [ -n "$GITLAB_TOKEN" ]; then echo PRESENT; else echo MISSING; fi
+      register: token_check
+      changed_when: false
+
+    - name: Report token presence
+      debug:
+        msg: "GITLAB_TOKEN in api.env: {{ token_check.stdout }}"

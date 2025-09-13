@@ -81,15 +81,19 @@ func DebugApp(c *fiber.Ctx, envStore envstore.EnvStoreInterface) error {
 			DockerImage: debugResult.DockerImage,
 			EnvVars:     envVars,
 			IsDebug:     true,
+			Lane:        lane,
 		}
 		templatePath, err := orchestration.RenderTemplate(lane, renderData)
 		if err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("failed to render debug template: %v", err))
 		}
+		if vErr := orchestration.ValidateJob(templatePath); vErr != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("job validation failed: %v", vErr))
+		}
 		if err := orchestration.Submit(templatePath); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("failed to deploy debug instance: %v", err))
 		}
-		os.Remove(templatePath)
+		_ = os.Remove(templatePath)
 	}
 
 	response := fiber.Map{

@@ -34,6 +34,8 @@ job "ploy-api" {
       progress_deadline = "15m"   # Increased from 10m to allow more time
       auto_revert = true
       canary = 1
+      auto_promote = true         # Enable automatic promotion of canaries for unattended rollouts
+      health_check = "checks"     # Gate on service/Consul health checks
     }
 
     # Network configuration (moved from task level to group level)
@@ -54,7 +56,7 @@ job "ploy-api" {
 
       # Binary distribution via artifact download from SeaweedFS
       artifact {
-        source = "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
+        source = "http://{{ 'seaweedfs-filer.service.consul:8888' if seaweedfs.use_consul_discovery else 'localhost:8888' }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
         destination = "local/api"
         mode = "file"
       }
@@ -83,14 +85,26 @@ job "ploy-api" {
         CONSUL_ADDR = "http://consul.service.consul:8500"
         NOMAD_ADDR = "http://nomad.service.consul:4646"
         VAULT_ADDR = "http://vault.service.consul:8200"
+        # Nomad SDK resilience (used by API when talking to Nomad directly)
+        NOMAD_HTTP_MAX_RETRIES = "{{ ploy.nomad_http_max_retries | default('5') }}"
+        NOMAD_HTTP_BASE_DELAY = "{{ ploy.nomad_http_base_delay | default('500ms') }}"
+        NOMAD_HTTP_MAX_DELAY = "{{ ploy.nomad_http_max_delay | default('30s') }}"
+        NOMAD_SUBMIT_MAX_CONCURRENCY = "{{ ploy.nomad_submit_max_concurrency | default('4') }}"
+        NOMAD_BLOCKING_WAIT = "{{ ploy.nomad_blocking_wait | default('30s') }}"
 
-        # SeaweedFS configuration
-        SEAWEEDFS_MASTER = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
-        SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
+        # SeaweedFS configuration (master via localhost, filer via consul DNS)
+        SEAWEEDFS_MASTER = "http://localhost:9333"
+        SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:8888"
+
+        # Prefer direct filer IP for mods tasks to avoid DNS issues inside job containers
+        # Use the host's primary IPv4 for Filer port 8888
+        # Use Consul DNS for SeaweedFS Filer to avoid hardcoding host IPs
+        PLOY_SEAWEEDFS_URL = "http://seaweedfs-filer.service.consul:8888"
 
         # ARF (Automated Remediation Framework) configuration
-        ARF_SEAWEEDFS_MASTER_URL = "http://seaweedfs-master.service.consul:{{ seaweedfs.master_port }}"
-        ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}"
+        ARF_STORAGE_BACKEND = "seaweedfs"
+        ARF_SEAWEEDFS_MASTER_URL = "http://localhost:9333"
+        ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:8888"
         ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"
         ARF_FREEBSD_USER = "root"
         ARF_FREEBSD_PORT = "22"
@@ -102,13 +116,13 @@ job "ploy-api" {
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
         ARF_OPENREWRITE_JAR = "/usr/local/bin/rewrite-maven.jar"
         ARF_WORKING_DIR = "/tmp/arf"
+
+        # Mods job image overrides (server-side) — use single env only
+        MODS_ORW_APPLY_IMAGE = "{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') }}"
         
-        # ARF Phase 3 - LLM Integration & Learning System
-        ARF_LEARNING_DB_URL = "postgres://ploy:{{ arf_db_password | default('arf_dev_password') }}@localhost/arf_learning?sslmode=disable"
-        ARF_TREE_SITTER_PATH = "/usr/local/bin/tree-sitter"
+        # ARF Phase 3 - LLM Integration & Learning System (DB disabled)
         ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
         ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
-        TREE_SITTER_PARSER_DIR = "/usr/local/lib/node_modules"
         
         # Internal ARF Recipes Indexer
         PLOY_ARF_REGISTRY = "{{ ploy.arf_registry | default('https://repo1.maven.org/maven2') }}"
@@ -155,6 +169,10 @@ job "ploy-api" {
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"
+
+        # GitLab integration (populated from local env via Ansible)
+        GITLAB_TOKEN = "{{ lookup('env', 'GITLAB_TOKEN') }}"
+        GITLAB_URL   = "{{ lookup('env', 'GITLAB_URL') }}"
       }
 
       # Make binary executable and start
@@ -168,29 +186,67 @@ echo "[SETUP] Verifying system dependencies..."
 
 # Verify git (pre-installed by Ansible)
 if command -v git &> /dev/null; then
-  echo "[SETUP] ✓ git: $(git --version)"
+echo "[SETUP] OK git: $(git --version)"
 else
-  echo "[SETUP] ⚠️  git: NOT AVAILABLE - ARF transformations may fail"
+  echo "[SETUP] WARN git: NOT AVAILABLE - ARF transformations may fail"
 fi
 
 # Verify Java (pre-installed by Ansible)
 if command -v java &> /dev/null; then
-  echo "[SETUP] ✓ java: $(java -version 2>&1 | head -n1)"
+  echo "[SETUP] OK java: $(java -version 2>&1 | head -n1)"
 else
-  echo "[SETUP] ⚠️  java: NOT AVAILABLE - OpenRewrite operations may fail"  
+  echo "[SETUP] WARN java: NOT AVAILABLE - OpenRewrite operations may fail"  
 fi
 
 # Verify curl (pre-installed)
 if command -v curl &> /dev/null; then
-  echo "[SETUP] ✓ curl: $(curl --version | head -n1)"
+  echo "[SETUP] OK curl: $(curl --version | head -n1)"
 else
-  echo "[SETUP] ⚠️  curl: NOT AVAILABLE - HTTP operations may fail"
+  echo "[SETUP] WARN curl: NOT AVAILABLE - HTTP operations may fail"
 fi
 
 echo "[SETUP] Dependency verification completed"
 
-# Make binary executable and start API
+# Make binary executable
 chmod +x local/api
+
+# Network diagnostics: best-effort GitLab reachability (escape HCL template markers)
+GITLAB_URL=$${GITLAB_URL:-https://gitlab.com}
+echo "[SETUP] Probing GitLab connectivity: $${GITLAB_URL}/api/v4/version"
+set +e
+GL_PROBE=$(curl -sS -o /dev/null -w "HTTP:%%{http_code} TIME:%%{time_total}" --connect-timeout 5 --max-time 10 "$${GITLAB_URL}/api/v4/version")
+echo "[SETUP] GitLab probe result: ${GL_PROBE}"
+set -e
+
+# Attempt to load credentials if not provided via Nomad env
+if [ -z "$GITLAB_TOKEN" ]; then
+  # Source ploy user's bashrc if available (may contain exported token)
+  if [ -r /home/ploy/.bashrc ]; then
+    set +o allexport
+    . /home/ploy/.bashrc || true
+  fi
+  # Also source repo-local bashrc if used as stash for env
+  if [ -r /home/ploy/ploy/.bashrc ]; then
+    set +o allexport
+    . /home/ploy/ploy/.bashrc || true
+  fi
+  # Source explicit per-service env file (auto-export)
+  if [ -r /home/ploy/api.env ]; then
+    set -a
+    . /home/ploy/api.env || true
+    set +a
+  fi
+fi
+
+if [ -z "$GITLAB_TOKEN" ] && [ -r /etc/environment ]; then
+  # Extract from /etc/environment if present
+  eval $(grep -E '^GITLAB_TOKEN=' /etc/environment | sed 's/^/export /') || true
+fi
+
+if [ -z "$GITLAB_TOKEN" ] && [ -r /home/ploy/.gitlab_token ]; then
+  export GITLAB_TOKEN="$(tr -d '\n' </home/ploy/.gitlab_token 2>/dev/null)"
+fi
+
 echo "[SETUP] Starting Ploy API..."
 exec local/api
 EOF

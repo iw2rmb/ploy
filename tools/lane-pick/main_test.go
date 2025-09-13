@@ -256,7 +256,7 @@ func main() {
 			// Create temporary directory
 			tmpDir, err := os.MkdirTemp("", "lane-test-")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			// Create test files
 			for relativePath, content := range tt.files {
@@ -287,7 +287,7 @@ func main() {
 func TestHelperFunctions(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "helper-test-")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	t.Run("exists function", func(t *testing.T) {
 		// Create a test file
@@ -388,7 +388,7 @@ web-sys = "0.3"`,
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir, err := os.MkdirTemp("", "wasm-test-")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			// Create test files
 			for relativePath, content := range tt.files {
@@ -464,7 +464,7 @@ func TestJibDetection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir, err := os.MkdirTemp("", "jib-test-")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			// Create test files
 			for relativePath, content := range tt.files {
@@ -530,7 +530,7 @@ func TestPythonCExtensionsDetection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir, err := os.MkdirTemp("", "python-test-")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			// Create test files
 			for relativePath, content := range tt.files {

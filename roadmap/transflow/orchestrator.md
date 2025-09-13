@@ -18,7 +18,7 @@ This doc describes how the transflow orchestrator maps branch outputs into `hist
   "notes": "optional details"
 }
 ```
-Schema: see `jobs/schemas/branch_record.schema.json`.
+Schema: see `platform/nomad/transflow/schemas/branch_record.schema.json`.
 
 ### First-Success-Wins
 
@@ -41,7 +41,7 @@ Schema: see `jobs/schemas/branch_record.schema.json`.
   "winner": "<branch_id>"
 }
 ```
-- Validate against `jobs/schemas/history.schema.json` before passing to reducer.
+- Validate against `platform/nomad/transflow/schemas/history.schema.json` before passing to reducer.
 
 ### Cancellation Semantics
 
@@ -57,7 +57,7 @@ See `jobs/cancellation.md` for signals and idempotency rules.
 
 ### Run Manifest
 
-- Orchestrator writes a manifest per run with (validate against `jobs/schemas/run_manifest.schema.json`):
+- Orchestrator writes a manifest per run with (validate against `platform/nomad/transflow/schemas/run_manifest.schema.json`):
   - repo metadata, lane, timestamps
   - build gate outcomes
   - planner stdout + plan path

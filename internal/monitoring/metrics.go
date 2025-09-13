@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -87,9 +88,9 @@ type MetricsCollector struct {
 // NewMetricsCollector creates a new metrics collector
 func NewMetricsCollector() *MetricsCollector {
 	registry := prometheus.NewRegistry()
-	// Register default collectors
-	registry.MustRegister(prometheus.NewGoCollector())
-	registry.MustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	// Register default collectors (collectors package; replaces deprecated constructors)
+	registry.MustRegister(collectors.NewGoCollector())
+	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	// Initialize default values
 	CurrentInstances.Set(1) // Default to 1 instance
@@ -146,7 +147,7 @@ func (m *MetricsCollector) GetWorkerUtilization() float64 {
 	// Use a simple approach to get the current value
 	// In production, this would typically be tracked separately
 	metric := &dto.Metric{}
-	WorkerPoolUtilization.Write(metric)
+	_ = WorkerPoolUtilization.Write(metric)
 	if metric.Gauge != nil && metric.Gauge.Value != nil {
 		return *metric.Gauge.Value
 	}

@@ -185,7 +185,7 @@ func TestSetEnvVars(t *testing.T) {
 			// Execute request
 			resp, err := app.Test(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Verify status code
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
@@ -278,7 +278,7 @@ func TestGetEnvVars(t *testing.T) {
 			// Execute request
 			resp, err := app.Test(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Verify status code
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
@@ -446,7 +446,7 @@ func TestSetEnvVar(t *testing.T) {
 			// Execute request
 			resp, err := app.Test(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Verify status code
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
@@ -543,7 +543,7 @@ func TestDeleteEnvVar(t *testing.T) {
 			// Execute request
 			resp, err := app.Test(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			// Verify status code
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)

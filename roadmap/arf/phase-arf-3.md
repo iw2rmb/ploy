@@ -9,6 +9,8 @@
 
 Phase ARF-3 represents the revolutionary integration of Large Language Models with OpenRewrite's static analysis capabilities, creating a hybrid intelligence system that combines deterministic transformations with AI-driven adaptability. This phase enables dynamic recipe generation, context-aware transformations, and continuous learning from transformation outcomes.
 
+Note: References to tree-sitter, a universal AST, and a MultiLanguageEngine in this document describe earlier plans. These components have been removed from the codebase in favor of consolidating transformation execution under Mods and ARF recipes.
+
 ## Technical Architecture
 
 ### Core Components
@@ -35,11 +37,11 @@ Phase ARF-3 represents the revolutionary integration of Large Language Models wi
 - Create prompt template management system with versioning and A/B testing
 - Add context-aware prompt engineering for multi-language recipe creation
 - Implement prompt effectiveness tracking and optimization
-- Add LLM response parsing into valid recipe formats (OpenRewrite YAML, tree-sitter queries)
+- Add LLM response parsing into valid recipe formats (OpenRewrite YAML)
 - Create LLM-generated recipe validation and testing system
 - Implement fallback handling with model switching when primary fails
 - Extend support beyond Java to Node.js, Python, Go, and Rust
-- Integrate tree-sitter for universal AST parsing across languages
+ 
 - Add WASM-specific transformation capabilities for Lane G
 
 **Deliverables**:
@@ -154,69 +156,12 @@ type PromptMetrics struct {
 **Objective**: Extend ARF capabilities beyond Java to support transformations across Ploy's supported languages.
 
 **Tasks**:
-- Integrate tree-sitter for universal AST parsing
 - Create language-specific transformation recipes for Node.js, Python, Go
 - Implement WASM-specific optimizations for Lane G
 - Add cross-language dependency analysis
 - Create polyglot transformation capabilities
 
-**Deliverables**:
-```go
-// api/arf/multi_language.go
-type MultiLanguageEngine interface {
-    ParseAST(ctx context.Context, code string, language string) (*UniversalAST, error)
-    GenerateTransformation(ctx context.Context, ast *UniversalAST, recipe Recipe) (*Transformation, error)
-    ValidateLanguageSupport(language string) (bool, error)
-    GetLanguageCapabilities(language string) (*LanguageCapabilities, error)
-}
-
-type UniversalAST struct {
-    Language    string              `json:"language"`
-    Parser      string              `json:"parser"`
-    RootNode    *ASTNode            `json:"root_node"`
-    Symbols     []Symbol            `json:"symbols"`
-    Imports     []Import            `json:"imports"`
-    Metadata    map[string]interface{} `json:"metadata"`
-}
-
-type LanguageCapabilities struct {
-    Language        string              `json:"language"`
-    Parsers         []string            `json:"parsers"`
-    Transformations []TransformationType `json:"transformations"`
-    Frameworks      []string            `json:"frameworks"`
-    LaneSupport     []string            `json:"lane_support"`
-}
-
-// Language-specific recipe types
-type NodeJSRecipe struct {
-    Recipe
-    PackageUpdates  map[string]string   `json:"package_updates"`
-    ESLintRules     map[string]interface{} `json:"eslint_rules"`
-    TypeScript      bool                `json:"typescript"`
-}
-
-type PythonRecipe struct {
-    Recipe
-    PipUpdates      map[string]string   `json:"pip_updates"`
-    PyUpgrade       string              `json:"pyupgrade_target"`
-    BlackConfig     map[string]interface{} `json:"black_config"`
-}
-
-type GoRecipe struct {
-    Recipe
-    GoModUpdates    map[string]string   `json:"go_mod_updates"`
-    GofmtOptions    []string            `json:"gofmt_options"`
-    StaticCheck     []string            `json:"staticcheck_rules"`
-}
-
-type WASMRecipe struct {
-    Recipe
-    OptimizationLevel   int             `json:"optimization_level"`
-    TargetFeatures      []string        `json:"target_features"`
-    PolyfillsRequired   []string        `json:"polyfills_required"`
-    MemoryConfiguration MemoryConfig    `json:"memory_config"`
-}
-```
+**Deliverables**: Consolidated under Mods and ARF recipe orchestration (no universal AST engine)
 
 **Acceptance Criteria**:
 - Support for 5+ languages (Java, JavaScript, Python, Go, Rust)
@@ -290,7 +235,7 @@ type ConfidenceThresholds struct {
 
 **Tasks**:
 - Implement vector embedding generation for code patterns using transformer models
-- Add pgvector extension for PostgreSQL vector similarity search
+- Vector similarity search (SQL/pgvector) deferred; no SQL database in use
 - Create embedding-based pattern clustering and classification
 - Implement semantic similarity search for finding related transformations
 - Add success pattern extraction from completed transformations with embeddings
@@ -349,7 +294,7 @@ type VectorSearchEngine interface {
 }
 
 type TransformationOutcome struct {
-    TransformationID  string                    `json:"transformation_id"`
+    ModID  string                    `json:"mod_id"`
     Repository        RepositoryMetadata        `json:"repository"`
     Strategy          TransformationStrategy    `json:"strategy"`
     Result            TransformationResult      `json:"result"`
@@ -376,15 +321,14 @@ type SuccessPattern struct {
 }
 ```
 
-**Learning Database Schema with Vector Storage**:
+**Learning Schema with Vector Storage (deferred)**:
 ```sql
--- Enable pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Deferred: vector extension for SQL backends (not enabled)
 
 -- Transformation outcomes table with embeddings
 CREATE TABLE transformation_outcomes (
     id UUID PRIMARY KEY,
-    transformation_id UUID NOT NULL,
+    mod_id UUID NOT NULL,
     repository_id UUID NOT NULL,
     language VARCHAR(50),
     framework VARCHAR(100),
@@ -440,7 +384,7 @@ CREATE TABLE ab_experiments (
 
 -- Feature extraction for ML
 CREATE TABLE transformation_features (
-    transformation_id UUID PRIMARY KEY,
+    mod_id UUID PRIMARY KEY,
     repo_size_kb INT,
     file_count INT,
     complexity_score FLOAT,
@@ -582,7 +526,7 @@ type ComplexityAnalysis struct {
 type DeveloperTools interface {
     PreviewTransformation(ctx context.Context, code string, recipe Recipe) (*PreviewResult, error)
     DryRun(ctx context.Context, repository Repository, recipe Recipe) (*DryRunResult, error)
-    DebugTransformation(ctx context.Context, transformationID string) (*DebugSession, error)
+    DebugTransformation(ctx context.Context, modID string) (*DebugSession, error)
     ValidateRecipeLocally(ctx context.Context, recipe Recipe) (*ValidationResult, error)
     GenerateRecipeFromExample(ctx context.Context, before, after string) (*Recipe, error)
 }
@@ -608,7 +552,7 @@ type DebugSession struct {
     Breakpoints     []Breakpoint        `json:"breakpoints"`
     StepHistory     []TransformStep     `json:"step_history"`
     Variables       map[string]interface{} `json:"variables"`
-    ASTSnapshot     *UniversalAST       `json:"ast_snapshot"`
+    // ASTSnapshot removed in current architecture
 }
 ```
 
@@ -751,8 +695,10 @@ learning_system:
 
 ### LLM-Enhanced Transformation Job
 ```hcl
-# platform/nomad/templates/arf-llm-transformation.hcl.j2
-job "arf-llm-transform-{{ transformation_id }}" {
+# platform/nomad/templates/arf-llm-transformation.hcl.j2 (removed)
+
+Note: This template has been removed as part of the Mods migration. The Mods Nomad jobs now live under `platform/nomad/mods/` (planner, llm_exec, reducer, orw_apply) and are embedded for submission via the controller.
+job "arf-llm-transform-{{ mod_id }}" {
   datacenters = ["{{ datacenter }}"]
   type = "batch"
   
@@ -766,7 +712,7 @@ job "arf-llm-transform-{{ transformation_id }}" {
       driver = "jail"
       
       config {
-        path = "/zroot/jails/arf-primary-{{ transformation_id }}"
+        path = "/zroot/jails/arf-primary-{{ mod_id }}"
         command = "/usr/local/bin/arf-openrewrite-executor"
         args = [
           "--recipe", "/local/recipe.yaml",
@@ -811,7 +757,7 @@ job "arf-llm-transform-{{ transformation_id }}" {
       driver = "jail"
       
       config {
-        path = "/zroot/jails/arf-validator-{{ transformation_id }}"
+        path = "/zroot/jails/arf-validator-{{ mod_id }}"
         command = "/usr/local/bin/arf-validator"
         args = [
           "--result", "/shared/enhanced-result.tar.gz",

@@ -61,6 +61,16 @@ client {
     path      = "/opt/ploy/logs"
     read_only = false
   }
+
+  # Host volumes for Mods planner/LLM/ORW jobs (optional if using docker bind mounts)
+  host_volume "mods-context" {
+    path      = "/opt/ploy/mods/context"
+    read_only = false
+  }
+  host_volume "mods-out" {
+    path      = "/opt/ploy/mods/out"
+    read_only = false
+  }
 }
 
 consul {

@@ -168,7 +168,7 @@ func (a *ErrorProneAnalyzer) ValidateConfiguration(config interface{}) error {
 	// Check if Error Prone JAR exists
 	if epConfig.ErrorPronePath != "" {
 		if _, err := os.Stat(epConfig.ErrorPronePath); os.IsNotExist(err) {
-			return fmt.Errorf("Error Prone JAR not found at %s", epConfig.ErrorPronePath)
+			return fmt.Errorf("error prone JAR not found at %s", epConfig.ErrorPronePath)
 		}
 	}
 
@@ -298,7 +298,7 @@ func (a *ErrorProneAnalyzer) findJavaFiles(codebase analysis.Codebase) []string 
 
 	// If no files provided, walk the directory
 	if len(javaFiles) == 0 && codebase.RootPath != "" {
-		filepath.Walk(codebase.RootPath, func(path string, info os.FileInfo, err error) error {
+		if err := filepath.Walk(codebase.RootPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -306,7 +306,9 @@ func (a *ErrorProneAnalyzer) findJavaFiles(codebase analysis.Codebase) []string 
 				javaFiles = append(javaFiles, path)
 			}
 			return nil
-		})
+		}); err != nil {
+			a.logger.WithError(err).Warn("java file walk encountered error")
+		}
 	}
 
 	return javaFiles
@@ -415,7 +417,7 @@ func (a *ErrorProneAnalyzer) parseErrorProneOutput(output string) []analysis.Iss
 		if len(matches) == 6 {
 			file := matches[1]
 			lineNum := 0
-			fmt.Sscanf(matches[2], "%d", &lineNum)
+			_, _ = fmt.Sscanf(matches[2], "%d", &lineNum)
 			severity := matches[3]
 			checkName := matches[4]
 			message := matches[5]

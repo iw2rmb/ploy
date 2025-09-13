@@ -19,7 +19,7 @@ The MCP integration consists of several key components:
 ### Basic MCP Configuration in Transflow YAML
 
 ```yaml
-# transflow.yaml
+# mod.yaml
 version: v1alpha1
 id: my-workflow
 target_repo: org/project
@@ -182,7 +182,7 @@ A comprehensive manifest file is created at `/workspace/context/mcp_context_mani
 The LLM-exec HCL template has been extended with MCP environment variables:
 
 ```hcl
-# roadmap/transflow/jobs/llm_exec.hcl
+# platform/nomad/transflow/llm_exec.hcl
 env = {
   # Core LLM configuration
   MODEL       = "${MODEL}"
@@ -329,7 +329,7 @@ steps:
 ```
 Error: MCP tool 'file-system' endpoint must start with mcp://, http://, or https://
 ```
-**Solution**: Verify endpoint URL format in transflow.yaml
+**Solution**: Verify endpoint URL format in mod.yaml
 
 #### Context Prefetching Failed
 ```
@@ -346,7 +346,7 @@ Error: MCP timeout must be positive
 ### Debug Mode
 Enable verbose logging by setting environment variable:
 ```bash
-export TRANSFLOW_DEBUG=1
+export MODS_DEBUG=1
 ```
 
 This provides detailed logs for:

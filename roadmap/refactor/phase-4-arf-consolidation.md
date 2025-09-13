@@ -16,7 +16,7 @@ Consolidate all duplicate ARF (Automated Refactoring Framework) implementations,
 2. **Duplicate Core Components**:
    ```
    Duplicated in both api/arf/ and controller/arf/:
-   - complexity_analyzer.go (identical 505 lines)
+   
    - pattern_learning.go (identical 400+ lines)
    - ab_testing.go (identical structures)
    - multi_language.go (identical CodeChange struct)
@@ -263,12 +263,10 @@ import (
 
 // ComplexityAnalyzer analyzes code complexity
 type ComplexityAnalyzer struct {
-    multiLangEngine MultiLanguageEngine
+    // multiLangEngine removed (tree-sitter deprecation)
 }
 
 // Merge implementations from:
-// - api/arf/complexity_analyzer.go
-// - controller/arf/complexity_analyzer.go
 
 func (ca *ComplexityAnalyzer) Analyze(ctx context.Context, code string, language string) (*core.ComplexityMetrics, error) {
     // Consolidated implementation
@@ -416,7 +414,7 @@ After consolidation:
 1. **Remove duplicate files**:
 ```bash
 # Remove old ARF implementations
-rm -rf api/arf/complexity_analyzer.go
+
 rm -rf api/arf/pattern_learning.go
 rm -rf controller/arf/  # If entire directory is duplicate
 ```

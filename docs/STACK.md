@@ -47,6 +47,11 @@
 
 ## Automated Remediation Framework (ARF)
 - **OpenRewrite** — Semantic-aware Java transformation engine with 2,800+ recipes
+- **LangGraph Runner** — Lightweight containerized planner/reducer/LLM-exec runtime used by Mods jobs
+  - Planner: produces `plan.json` with healing options
+  - Reducer: produces `next.json` with next action (e.g., `stop`)
+  - LLM-exec: produces `diff.patch` artifact for code changes
+  - Deployed as a Nomad batch job with host bind mounts for context and artifacts
 - **Error Prone** — Google's compile-time bug detection and prevention system
 - **LLM Integration** — Hybrid intelligence for complex transformation patterns
 - **Tree-sitter** — Universal parsing infrastructure for multi-language AST support
@@ -70,6 +75,8 @@
   - **Memory Efficiency** — 90% less memory usage vs Harbor (~256MB vs ~2GB)
   - **Nomad Deployment** — Cloud-native deployment with service discovery
   - **Benefits** — Standards-compliant Docker Registry v2 API, simplified RBAC-free access
+  - **Image Publications** — Default destination for platform images (e.g., `openrewrite-jvm`, `langgraph-runner`)
+  - **Mods Integration** — Planner/Reducer/ORW jobs pull images from the internal registry by default
 
 ## Storage & Networking
 - **SeaweedFS** — Distributed object storage optimized for small files (artifacts, SBOMs, signatures)

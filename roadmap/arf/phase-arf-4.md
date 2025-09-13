@@ -13,7 +13,7 @@ Phase ARF-4 transforms ARF into a production-ready, security-focused transformat
 
 **✅ Complete:**
 - All REST API endpoints (`/v1/arf/security/*`, `/v1/arf/workflow/*`)
-- Test suite (`test-arf-phase4-security.sh`) with comprehensive coverage
+- Comprehensive Go test coverage (policy enforcer unit tests, integration/behavioral suites)
 - Core engine structures and interfaces
 - Handler implementations with proper routing
 
@@ -277,7 +277,7 @@ type WorkflowStateMachine struct {
 }
 
 type ApprovalRequest struct {
-    TransformationID  string                 `json:"transformation_id"`
+    ModID  string                 `json:"mod_id"`
     Repository        RepositoryInfo         `json:"repository"`
     Changes          []FileChange           `json:"changes"`
     RiskAssessment   RiskAssessment         `json:"risk_assessment"`
@@ -982,7 +982,7 @@ response:
 ```yaml
 # API: POST /v1/arf/approvals/request
 request:
-  transformation_id: "trans-xyz789"
+  mod_id: "trans-xyz789"
   risk_assessment:
     level: "high"
     factors: ["security_impact", "business_critical"]

@@ -110,11 +110,8 @@ func (cm *ComponentManager) InstantiateComponent(ctx context.Context, spec Compo
 		moduleConfig = moduleConfig.WithEnv(key, value)
 	}
 
-	// Configure memory limits if specified
-	if spec.Resources.MaxMemoryMB > 0 {
-		// Note: wazero memory limits are handled at runtime level
-		// This would require custom runtime configuration
-	}
+	// Note: wazero memory limits are handled at runtime level and
+	// would require custom runtime configuration if enforced.
 
 	// Instantiate main module first
 	mainModuleKey := spec.Name + "_main"

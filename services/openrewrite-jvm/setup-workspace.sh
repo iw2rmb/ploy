@@ -1,120 +1,65 @@
 #!/bin/bash
 
-# OpenRewrite Workspace Setup Script
-# This script handles the workspace setup for Nomad-deployed OpenRewrite transformations
+# OpenRewrite Workspace Setup Script (SeaweedFS-only IO)
+# - Always download input.tar from SeaweedFS via INPUT_URL
+# - Extract into /workspace/project
+# - Delegate transformation and diff upload to /usr/local/bin/openrewrite
 
 set -euo pipefail
 
-echo "[SETUP] Starting OpenRewrite workspace setup..."
+echo "[SETUP] Starting OpenRewrite workspace setup (SeaweedFS mode)..."
 echo "[SETUP] Current directory: $(pwd)"
 echo "[SETUP] User: $(whoami)"
 
-# Debug: Show what Nomad provided
-echo "[SETUP] Directory contents:"
-ls -la
+WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
+SKIP_EXEC_OPENREWRITE="${SKIP_EXEC_OPENREWRITE:-}"
+CONTEXT_DIR="${CONTEXT_DIR:-/workspace/context}"
 
-echo "[SETUP] Checking for Nomad artifact locations..."
+mkdir -p "${WORKSPACE_DIR}" "${WORKSPACE_DIR}/project"
 
-# First, let's search for input.tar anywhere in the filesystem
-echo "[SETUP] Searching for input.tar file..."
-INPUT_TAR_FOUND=$(find / -name "input.tar" -type f 2>/dev/null | head -1)
-
-if [ -n "$INPUT_TAR_FOUND" ]; then
-    echo "[SETUP] Found input.tar at: $INPUT_TAR_FOUND"
-    # Copy the tar file to workspace where runner script expects it
-    cp "$INPUT_TAR_FOUND" "/workspace/input.tar"
-    echo "[SETUP] Copied input.tar to /workspace/input.tar"
-    ls -la /workspace/input.tar
-    
-    # We're done - runner script will extract it
-    echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
-    echo "[SETUP] Starting OpenRewrite transformation..."
-    exec /usr/local/bin/openrewrite
-fi
-
-# If not found by search, check common locations
-if [ -f "/local/input.tar" ]; then
-    echo "[SETUP] Found input.tar at /local/input.tar (Nomad artifact location)"
-    cp "/local/input.tar" "/workspace/input.tar"
-    echo "[SETUP] Copied input.tar to /workspace/input.tar"
-    ls -la /workspace/input.tar
-    echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
-    echo "[SETUP] Starting OpenRewrite transformation..."
-    exec /usr/local/bin/openrewrite
-elif [ -f "local/input.tar" ]; then
-    echo "[SETUP] Found input.tar at local/input.tar"
-    cp "local/input.tar" "/workspace/input.tar"
-    echo "[SETUP] Copied input.tar to /workspace/input.tar"
-    ls -la /workspace/input.tar
-    echo "[SETUP] Workspace setup complete - input.tar ready for runner script!"
-    echo "[SETUP] Starting OpenRewrite transformation..."
-    exec /usr/local/bin/openrewrite
-elif [ -d "local" ]; then
-    echo "[SETUP] Found 'local' directory but no input.tar"
-    ls -la local/
-    ARTIFACT_DIR="local"
-elif [ -d "artifacts" ]; then
-    echo "[SETUP] Found 'artifacts' directory"
-    ls -la artifacts/
-    ARTIFACT_DIR="artifacts"
-else
-    echo "[SETUP] No standard artifact directory found, using current directory"
-    ARTIFACT_DIR="."
-fi
-
-# Create OpenRewrite expected workspace structure
-echo "[SETUP] Creating workspace structure..."
-mkdir -p /workspace/project
-
-# Copy extracted files to workspace and create input.tar that runner script expects
-echo "[SETUP] Copying files from $ARTIFACT_DIR to /workspace/project..."
-if [ "$ARTIFACT_DIR" = "." ]; then
-    # Copy all files except known Nomad directories
-    find . -maxdepth 1 -type f -exec cp {} /workspace/project/ \; 2>/dev/null || true
-    find . -maxdepth 1 -type d ! -name . ! -name tmp ! -name secrets -exec cp -r {} /workspace/project/ \; 2>/dev/null || true
-else
-    cp -r "$ARTIFACT_DIR"/* /workspace/project/ 2>/dev/null || true
-fi
-
-# Create input.tar that the OpenRewrite runner script expects
-echo "[SETUP] Creating input.tar for OpenRewrite runner..."
-cd /workspace/project
-if [ $(find . -type f | wc -l) -gt 0 ]; then
-    tar -cf /workspace/input.tar . 2>/dev/null || {
-        echo "[SETUP] Failed to create input.tar"
-        exit 1
+if [ -z "${INPUT_URL:-}" ]; then
+  if [ "${SKIP_EXEC_OPENREWRITE}" = "1" ]; then
+    echo "[SETUP] No INPUT_URL provided; packaging context from CONTEXT_DIR=${CONTEXT_DIR}"
+    # create input.tar from CONTEXT_DIR, preserving project root at archive root
+    if [ ! -d "${CONTEXT_DIR}" ]; then
+      echo "[SETUP] ERROR: CONTEXT_DIR does not exist: ${CONTEXT_DIR}"
+      exit 1
+    fi
+    tar -C "${CONTEXT_DIR}" -cf "${WORKSPACE_DIR}/input.tar" . || {
+      echo "[SETUP] ERROR: Failed to create input.tar from CONTEXT_DIR"
+      exit 1
     }
-    echo "[SETUP] Created input.tar successfully"
-    ls -la /workspace/input.tar
-else
-    echo "[SETUP] ERROR: No files found to tar in /workspace/project"
+  else
+    echo "[SETUP] ERROR: INPUT_URL not provided; cannot download input.tar"
     exit 1
+  fi
+else
+  echo "[SETUP] Downloading input.tar from INPUT_URL=${INPUT_URL}..."
+  set +e
+  RESP=$(curl -sSL --connect-timeout 30 --max-time 300 -w "HTTP_CODE:%{http_code}" -o "${WORKSPACE_DIR}/input.tar" "${INPUT_URL}")
+  RC=$?
+  set -e
+  echo "[SETUP] INPUT_URL download result: rc=${RC} ${RESP}"
+  if [ $RC -ne 0 ] || ! echo "$RESP" | grep -q "HTTP_CODE:200"; then
+    echo "[SETUP] ERROR: Failed to download input.tar from INPUT_URL"
+    exit 1
+  fi
 fi
+ls -lh "${WORKSPACE_DIR}/input.tar" || true
 
-# Verify workspace contents
-echo "[SETUP] Workspace contents:"
-ls -la /workspace/project/ | head -20
+echo "[SETUP] Extracting input.tar into ${WORKSPACE_DIR}/project..."
+rm -rf "${WORKSPACE_DIR}/project" && mkdir -p "${WORKSPACE_DIR}/project"
+tar -xf "${WORKSPACE_DIR}/input.tar" -C "${WORKSPACE_DIR}/project" || {
+  echo "[SETUP] ERROR: Failed to extract input.tar"
+  exit 1
+}
 
-# Check if we have any files
-FILE_COUNT=$(find /workspace/project -type f | wc -l)
-echo "[SETUP] Total files in workspace: $FILE_COUNT"
+echo "[SETUP] Project directory contents (top-level):"
+ls -la "${WORKSPACE_DIR}/project" | head -50 || true
 
-if [ "$FILE_COUNT" -eq 0 ]; then
-    echo "[SETUP] WARNING: No files found in input.tar!"
-    echo "[SETUP] This might indicate an issue with artifact extraction"
-    
-    # Additional debugging
-    echo "[SETUP] Full filesystem exploration:"
-    find /alloc -name "*.tar" 2>/dev/null | head -5 || true
-    find . -name "*.tar" 2>/dev/null | head -5 || true
-fi
+chown -R $(whoami):$(whoami) "${WORKSPACE_DIR}/" 2>/dev/null || true
+chmod -R 755 "${WORKSPACE_DIR}/" 2>/dev/null || true
 
-# Set proper permissions on workspace
-chown -R $(whoami):$(whoami) /workspace/ 2>/dev/null || true
-chmod -R 755 /workspace/ 2>/dev/null || true
-
-echo "[SETUP] Workspace setup complete!"
-echo "[SETUP] Starting OpenRewrite transformation..."
-
-# Execute the original OpenRewrite entrypoint
+echo "[SETUP] Workspace setup complete! Starting OpenRewrite transformation..."
+if [ "$SKIP_EXEC_OPENREWRITE" = "1" ]; then exit 0; fi
 exec /usr/local/bin/openrewrite

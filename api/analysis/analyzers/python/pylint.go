@@ -331,7 +331,7 @@ func (a *PylintAnalyzer) findPythonFiles(codebase analysis.Codebase) []string {
 
 	// If no files provided, walk the directory
 	if len(pythonFiles) == 0 && codebase.RootPath != "" {
-		filepath.Walk(codebase.RootPath, func(path string, info os.FileInfo, err error) error {
+		if err := filepath.Walk(codebase.RootPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -344,7 +344,9 @@ func (a *PylintAnalyzer) findPythonFiles(codebase analysis.Codebase) []string {
 				pythonFiles = append(pythonFiles, path)
 			}
 			return nil
-		})
+		}); err != nil {
+			a.logger.WithError(err).Warn("python file walk encountered error")
+		}
 	}
 
 	return pythonFiles

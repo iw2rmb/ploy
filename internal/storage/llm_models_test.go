@@ -626,16 +626,16 @@ func BenchmarkLLMModelStorage_Operations(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			model := *testModel
 			model.ID = fmt.Sprintf("bench-create-%d@v1", i)
-			llmStorage.CreateModel(ctx, &model)
+			_ = llmStorage.CreateModel(ctx, &model)
 		}
 	})
 
 	// Create a model for other benchmarks
-	llmStorage.CreateModel(ctx, testModel)
+	_ = llmStorage.CreateModel(ctx, testModel)
 
 	b.Run("GetModel", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			llmStorage.GetModel(ctx, "benchmark-model@v1")
+			_, _ = llmStorage.GetModel(ctx, "benchmark-model@v1")
 		}
 	})
 
@@ -643,19 +643,19 @@ func BenchmarkLLMModelStorage_Operations(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			updatedModel := *testModel
 			updatedModel.Name = fmt.Sprintf("Updated Model %d", i)
-			llmStorage.UpdateModel(ctx, &updatedModel)
+			_ = llmStorage.UpdateModel(ctx, &updatedModel)
 		}
 	})
 
 	b.Run("ListModels", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			llmStorage.ListModels(ctx, ListModelFilter{Limit: 50})
+			_, _, _ = llmStorage.ListModels(ctx, ListModelFilter{Limit: 50})
 		}
 	})
 
 	b.Run("SearchModels", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			llmStorage.SearchModels(ctx, "benchmark")
+			_, _ = llmStorage.SearchModels(ctx, "benchmark")
 		}
 	})
 }

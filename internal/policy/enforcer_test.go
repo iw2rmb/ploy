@@ -6,7 +6,7 @@ import (
 )
 
 func TestEnforcer_StrictRequiresSignatureAndSBOM(t *testing.T) {
-	os.Setenv("PLOY_POLICY_STRICT_ENVS", "prod")
+	_ = os.Setenv("PLOY_POLICY_STRICT_ENVS", "prod")
 	e := NewDefaultEnforcer()
 	err := e.Enforce(ArtifactInput{Env: "prod", Signed: false, SBOMPresent: true, Lane: "C", ImageSizeMB: 100})
 	if err == nil {
@@ -24,8 +24,8 @@ func TestEnforcer_StrictRequiresSignatureAndSBOM(t *testing.T) {
 }
 
 func TestEnforcer_SizeCapsPerLane(t *testing.T) {
-	os.Setenv("PLOY_POLICY_STRICT_ENVS", "prod,staging")
-	os.Setenv("PLOY_POLICY_MAX_SIZE_MB_C", "500")
+	_ = os.Setenv("PLOY_POLICY_STRICT_ENVS", "prod,staging")
+	_ = os.Setenv("PLOY_POLICY_MAX_SIZE_MB_C", "500")
 	e := NewDefaultEnforcer()
 	// Over cap
 	if err := e.Enforce(ArtifactInput{Env: "dev", Lane: "C", ImageSizeMB: 600}); err == nil {
@@ -38,7 +38,7 @@ func TestEnforcer_SizeCapsPerLane(t *testing.T) {
 }
 
 func TestEnforcer_VulnScanRequiredForImagesInStrict(t *testing.T) {
-	os.Setenv("PLOY_POLICY_STRICT_ENVS", "prod")
+	_ = os.Setenv("PLOY_POLICY_STRICT_ENVS", "prod")
 	e := NewDefaultEnforcer()
 	// Missing vuln pass in strict env with docker image
 	if err := e.Enforce(ArtifactInput{Env: "prod", DockerImage: "repo/image:tag", Signed: true, SBOMPresent: true}); err == nil {

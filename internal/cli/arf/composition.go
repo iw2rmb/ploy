@@ -282,9 +282,10 @@ func displayCompositionResults(execution CompositionExecution, verbose bool) err
 		fmt.Printf("\nRecipe Results:\n")
 		for i, result := range execution.Results {
 			status := "✅"
-			if result.Status == "failed" {
+			switch result.Status {
+			case "failed":
 				status = "❌"
-			} else if result.Status == "skipped" {
+			case "skipped":
 				status = "⏭️"
 			}
 
@@ -301,13 +302,14 @@ func displayCompositionResults(execution CompositionExecution, verbose bool) err
 	}
 
 	// Show success or failure message
-	if execution.Status == "completed" {
+	switch execution.Status {
+	case "completed":
 		if summary.FailedRuns == 0 {
 			PrintSuccess("All recipes executed successfully!")
 		} else {
 			PrintWarning(fmt.Sprintf("Composition completed with %d failed recipes", summary.FailedRuns))
 		}
-	} else if execution.Status == "failed" {
+	case "failed":
 		PrintError(NewCLIError("Composition execution failed", 1))
 	}
 

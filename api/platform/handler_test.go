@@ -186,7 +186,7 @@ func TestPlatformHandlerUsesUnifiedStorage(t *testing.T) {
 	// Execute request (this will fail until we implement unified storage support)
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// This assertion will fail in RED phase
 	// assert.Equal(t, 200, resp.StatusCode)

@@ -17,7 +17,7 @@ func TestListApps(t *testing.T) {
 	req := httptest.NewRequest("GET", "/apps", nil)
 	resp, err := app.Test(req)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, 200, resp.StatusCode)
 

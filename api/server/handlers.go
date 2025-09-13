@@ -1,6 +1,8 @@
 package server
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/internal/build"
 	"github.com/iw2rmb/ploy/internal/debug"
@@ -10,32 +12,59 @@ import (
 
 // handleTriggerBuild handles build trigger requests with request-scoped storage
 func (s *Server) handleTriggerBuild(c *fiber.Ctx) error {
+	log.Printf("[Handler] triggerBuild ENTER method=%s url=%s app=%s sha=%s lane=%s env=%s body_len=%d",
+		c.Method(), c.OriginalURL(), c.Params("app"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
 	// Use factory pattern to get unified storage interface
 	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
+		log.Printf("[Handler] triggerBuild resolveUnifiedStorage ERROR: %v", err)
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return build.TriggerBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	err = build.TriggerBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	if err != nil {
+		log.Printf("[Handler] triggerBuild EXIT with error: %v", err)
+	} else {
+		log.Printf("[Handler] triggerBuild EXIT success")
+	}
+	return err
 }
 
 // handleTriggerPlatformBuild handles platform service builds with platform namespace
 func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
+	log.Printf("[Handler] triggerPlatformBuild ENTER method=%s url=%s service=%s sha=%s lane=%s env=%s body_len=%d",
+		c.Method(), c.OriginalURL(), c.Params("service"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
 	// Use factory pattern to get unified storage interface
 	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
+		log.Printf("[Handler] triggerPlatformBuild resolveUnifiedStorage ERROR: %v", err)
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return build.TriggerPlatformBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	err = build.TriggerPlatformBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	if err != nil {
+		log.Printf("[Handler] triggerPlatformBuild EXIT with error: %v", err)
+	} else {
+		log.Printf("[Handler] triggerPlatformBuild EXIT success")
+	}
+	return err
 }
 
 // handleTriggerAppBuild handles user application builds with apps namespace
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
+	log.Printf("[Handler] triggerAppBuild ENTER method=%s url=%s app=%s sha=%s lane=%s env=%s body_len=%d",
+		c.Method(), c.OriginalURL(), c.Params("app"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
 	// Use factory pattern to get unified storage interface
 	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
+		log.Printf("[Handler] triggerAppBuild resolveUnifiedStorage ERROR: %v", err)
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-	return build.TriggerAppBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	err = build.TriggerAppBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	if err != nil {
+		log.Printf("[Handler] triggerAppBuild EXIT with error: %v", err)
+	} else {
+		log.Printf("[Handler] triggerAppBuild EXIT success")
+	}
+	return err
 }
 
 // handleDestroyApp handles app destruction with request-scoped storage

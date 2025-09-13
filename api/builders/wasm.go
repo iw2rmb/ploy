@@ -148,9 +148,7 @@ func (w *WASMBuilder) buildRustWasm32(ctx context.Context, sourcePath, outputDir
 	// Add wasm32 target if not present
 	cmd := exec.CommandContext(ctx, "rustup", "target", "add", "wasm32-unknown-unknown")
 	cmd.Dir = sourcePath
-	if err := cmd.Run(); err != nil {
-		// Continue even if rustup fails (might already be installed)
-	}
+	_ = cmd.Run() // Continue even if rustup fails (might already be installed)
 
 	// Build with cargo
 	cmd = exec.CommandContext(ctx, "cargo", "build", "--target", "wasm32-unknown-unknown", "--release")
@@ -203,7 +201,7 @@ func (w *WASMBuilder) buildGoJSWasm(ctx context.Context, sourcePath, outputDir, 
 	if goRoot != "" {
 		wasmExecSrc := filepath.Join(goRoot, "misc", "wasm", "wasm_exec.js")
 		wasmExecDst := filepath.Join(outputDir, "wasm_exec.js")
-		copyFile(wasmExecSrc, wasmExecDst) // Ignore error, not critical
+		_ = copyFile(wasmExecSrc, wasmExecDst) // Best-effort helper copy
 	}
 
 	return wasmPath, nil
@@ -378,13 +376,13 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }()
 
 	_, err = destFile.ReadFrom(sourceFile)
 	return err

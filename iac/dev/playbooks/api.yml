@@ -311,6 +311,36 @@
               - Size: {{ api_binary_stat.stat.size }} bytes
               - Location: artifacts/api-binaries/{{ binary_version.stdout }}/linux/amd64/api
 
+        - name: Clean up old API binary versions (keep only current and previous)
+          shell: |
+            echo "Cleaning up old API binary versions..."
+            
+            # Get list of all versions, sorted by date (newest first)
+            VERSIONS=$(curl -s "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/" | \
+              grep -o "20[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*-[a-f0-9]*" | \
+              sort -u -r | head -10)
+            
+            echo "Current versions found:"
+            echo "$VERSIONS"
+            
+            # Skip first 2 versions (current and previous), delete the rest
+            OLD_VERSIONS=$(echo "$VERSIONS" | tail -n +3)
+            
+            if [ -n "$OLD_VERSIONS" ]; then
+              echo "Deleting old versions:"
+              echo "$OLD_VERSIONS" | while read version; do
+                if [ -n "$version" ]; then
+                  echo "  Deleting version: $version"
+                  curl -X DELETE "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/$version/?recursive=true"
+                fi
+              done
+              echo "✓ Old versions cleaned up"
+            else
+              echo "✓ No old versions to clean up"
+            fi
+          register: cleanup_result
+          failed_when: false
+
         - name: Save uploaded version for reference
           copy:
             content: "{{ binary_version.stdout }}"
@@ -391,16 +421,7 @@
             msg: "Service cleanup completed: {{ cleanup_result.stdout_lines[-1] if cleanup_result.stdout_lines else 'No output' }}"
           when: cleanup_result.stdout_lines is defined
 
-        - name: Stop existing API job if running
-          shell: /opt/hashicorp/bin/nomad-job-manager.sh stop --job ploy-api
-          environment:
-            NOMAD_ADDR: "http://localhost:4646"
-          register: stop_result
-          failed_when: false
-
-        - name: Wait between stop and deploy operations
-          pause:
-            seconds: 5
+        # NOTE: Do not stop the existing job. Rely on Nomad update stanza for zero-downtime rollout.
 
         - name: Deploy API job using HTTP API
           shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job ploy-api --file /opt/hashicorp/nomad/jobs/ploy-api.hcl

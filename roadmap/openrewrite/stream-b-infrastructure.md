@@ -150,7 +150,7 @@ func (s *SeaweedFSStorage) StoreDiff(jobID string, diff []byte) (string, error) 
     if err != nil {
         return "", err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var assign AssignResponse
     if err := json.NewDecoder(resp.Body).Decode(&assign); err != nil {
@@ -185,7 +185,7 @@ func (s *SeaweedFSStorage) StoreDiff(jobID string, diff []byte) (string, error) 
     if err != nil {
         return "", err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     if resp.StatusCode != http.StatusCreated {
         return "", fmt.Errorf("upload failed: %d", resp.StatusCode)
@@ -202,7 +202,7 @@ func (s *SeaweedFSStorage) RetrieveDiff(fileID string) ([]byte, error) {
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     var lookup LookupResponse
     if err := json.NewDecoder(resp.Body).Decode(&lookup); err != nil {
@@ -219,7 +219,7 @@ func (s *SeaweedFSStorage) RetrieveDiff(fileID string) ([]byte, error) {
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     return io.ReadAll(resp.Body)
 }

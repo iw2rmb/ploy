@@ -82,7 +82,7 @@ func (r *RegistryConfig) MustAuthenticate() error {
 		"-p", r.Password)
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Docker Registry authentication failed: %w", err)
+		return fmt.Errorf("docker registry authentication failed: %w", err)
 	}
 
 	return nil
@@ -96,7 +96,7 @@ func (r *RegistryConfig) Authenticate() error {
 // Validate checks if the registry configuration is valid
 func (r *RegistryConfig) Validate() error {
 	if r.Endpoint == "" {
-		return fmt.Errorf("Registry endpoint is required")
+		return fmt.Errorf("registry endpoint is required")
 	}
 
 	return nil

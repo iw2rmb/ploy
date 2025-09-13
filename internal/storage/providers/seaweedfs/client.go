@@ -114,7 +114,7 @@ func (p *Provider) Delete(ctx context.Context, key string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		return fmt.Errorf("delete failed: %s", resp.Status)
@@ -184,7 +184,7 @@ func (p *Provider) Head(ctx context.Context, key string) (*storage.Object, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, storage.NewStorageError("head", fmt.Errorf("object not found"), storage.ErrorContext{Key: key})
@@ -227,7 +227,7 @@ func (p *Provider) Copy(ctx context.Context, src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read source: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	return p.Put(ctx, dst, reader)
 }
@@ -290,7 +290,9 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 	if size, err := body.Seek(0, 2); err == nil { // Seek to end to get size
 		fileSize = size
 	}
-	body.Seek(0, 0) // Reset to start for actual upload
+	if _, err := body.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to reset body: %w", err)
+	} // Reset to start for actual upload
 	log.Printf("[SeaweedFS PutObject] File size: %d bytes", fileSize)
 
 	// Create multipart form data
@@ -311,7 +313,9 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 	}
 	log.Printf("[SeaweedFS PutObject] Copied %d bytes to multipart form", bytesWritten)
 
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close multipart writer: %w", err)
+	}
 	log.Printf("[SeaweedFS PutObject] Multipart form size: %d bytes", buf.Len())
 
 	// Make the request
@@ -329,7 +333,7 @@ func (p *Provider) PutObject(bucket, key string, body io.ReadSeeker, contentType
 		log.Printf("[SeaweedFS PutObject] ERROR: HTTP request failed: %v", err)
 		return nil, fmt.Errorf("failed to upload: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	log.Printf("[SeaweedFS PutObject] HTTP Response Status: %s (%d)", resp.Status, resp.StatusCode)
 
@@ -381,7 +385,7 @@ func (p *Provider) GetObject(bucket, key string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("failed to get object: %s", resp.Status)
 	}
 	return resp.Body, nil
@@ -408,7 +412,7 @@ func (p *Provider) ListObjects(bucket, prefix string) ([]storage.ObjectInfo, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Directory doesn't exist yet, return empty list
@@ -513,7 +517,7 @@ func (p *Provider) VerifyUpload(key string) error {
 		log.Printf("[SeaweedFS VerifyUpload] ERROR: HEAD request failed: %v", err)
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	log.Printf("[SeaweedFS VerifyUpload] HEAD response status: %s (%d)", resp.Status, resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
@@ -564,7 +568,7 @@ func (p *Provider) assignVolume() (*VolumeAssignment, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to assign volume: %s", resp.Status)
@@ -598,7 +602,7 @@ func (p *Provider) createDirectory(bucket, dir string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
@@ -626,7 +630,7 @@ func (p *Provider) createDirectoryFullPath(fullPath string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body for debugging
 	body, _ := io.ReadAll(resp.Body)
@@ -645,7 +649,7 @@ func (p *Provider) uploadFile(keyPrefix, filePath, contentType string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	key := keyPrefix + filepath.Base(filePath)
 

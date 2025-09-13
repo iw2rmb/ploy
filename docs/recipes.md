@@ -251,7 +251,7 @@ Rebuilds the catalog by re-indexing recipe packs.
 
 #### Execute Transformation
 ```http
-POST /v1/arf/transforms
+// Removed: ARF transforms endpoint. Use Mods instead.
 ```
 
 Request body:
@@ -270,16 +270,16 @@ Request body:
 Response includes transformation ID and status URL for monitoring:
 ```json
 {
-  "transformation_id": "abc-123-def",
+  "mod_id": "abc-123-def",
   "status": "initiated",
-  "status_url": "/v1/arf/transforms/abc-123-def/status",
+  "status_url": "/v1/mods/tf-abc123/status",
   "message": "Transformation started, use status_url to monitor progress"
 }
 ```
 
 #### Check Transformation Status
 ```http
-GET /v1/arf/transforms/:id/status
+GET /v1/mods/:id/status
 ```
 
 Returns current status, progress, and any healing attempts.
@@ -325,7 +325,7 @@ ploy arf recipes compose \
 
 The API validates `recipe_id` when a catalog is available:
 
-1. On `POST /v1/arf/transforms`, the recipe ID is checked against the catalog
+1. On mod run, the plan can include OpenRewrite recipes which are checked against the catalog
 2. If not found, returns 400 with suggestions based on fuzzy matching
 3. The CLI surfaces these suggestions to help users correct typos
 
@@ -356,7 +356,7 @@ ploy arf transform --recipe <recipe-id> --auto-heal --iterations 3
 For long-running transformations, monitor progress:
 ```bash
 # Start transformation
-TRANSFORM_ID=$(ploy arf transform --recipe <recipe-id> --repo <repo-url> | jq -r '.transformation_id')
+EXEC_ID=$(ploy mod run -f config.yaml | jq -r '.execution_id')
 
 # Check status
 ploy arf transforms status $TRANSFORM_ID --watch

@@ -34,7 +34,7 @@ func TestMonitoringMiddleware_Get_RecordsMetrics(t *testing.T) {
 	reader, err := monitoringMiddleware.Get(ctx, "test-key")
 	require.NoError(t, err)
 	require.NotNil(t, reader)
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Verify metrics were recorded
 	snapshot := metrics.GetSnapshot()
@@ -185,7 +185,7 @@ func TestMonitoringMiddleware_ConcurrentOperations(t *testing.T) {
 	go func() {
 		reader, err := monitoringMiddleware.Get(ctx, "key1")
 		if err == nil && reader != nil {
-			reader.Close()
+			_ = reader.Close()
 		}
 		done <- true
 	}()
@@ -224,7 +224,7 @@ func TestMonitoringMiddleware_TracksOperationDuration(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		reader, err := monitoringMiddleware.Get(ctx, "test-key")
 		if err == nil && reader != nil {
-			reader.Close()
+			_ = reader.Close()
 		}
 		time.Sleep(10 * time.Millisecond) // Small delay between operations
 	}

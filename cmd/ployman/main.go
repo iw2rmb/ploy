@@ -5,30 +5,15 @@ import (
 	"os"
 
 	"github.com/iw2rmb/ploy/internal/cli/platform"
+	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
 )
 
-var controllerURL = getControllerURL()
-
-func getControllerURL() string {
-	// First check if PLOY_CONTROLLER is explicitly set
-	if url := os.Getenv("PLOY_CONTROLLER"); url != "" {
-		return url
-	}
-
-	// Check if PLOY_PLATFORM_DOMAIN is set for SSL endpoint
-	if domain := os.Getenv("PLOY_PLATFORM_DOMAIN"); domain != "" {
-		// Platform services use ployman.app domain
-		return fmt.Sprintf("https://api.%s/v1", domain)
-	}
-
-	// Default to platform domain
-	return "https://api.dev.ployman.app/v1"
-}
+var controllerURL = utils.ResolveControllerURLFromEnv()
 
 func main() {
 	// Set platform mode environment variable
-	os.Setenv("PLOY_PLATFORM_MODE", "true")
+	_ = os.Setenv("PLOY_PLATFORM_MODE", "true")
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {

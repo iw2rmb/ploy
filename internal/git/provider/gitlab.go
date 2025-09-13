@@ -98,7 +98,7 @@ func (g *GitLabProvider) findExistingMR(ctx context.Context, project, sourceBran
 	if err != nil {
 		return nil, fmt.Errorf("failed to make API request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitLab API error: status %d", resp.StatusCode)
@@ -149,7 +149,7 @@ func (g *GitLabProvider) createMR(ctx context.Context, project string, config MR
 	if err != nil {
 		return nil, fmt.Errorf("failed to make API request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("GitLab API error: status %d", resp.StatusCode)
@@ -198,7 +198,7 @@ func (g *GitLabProvider) updateMR(ctx context.Context, project string, mrIID int
 	if err != nil {
 		return nil, fmt.Errorf("failed to make API request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitLab API error: status %d", resp.StatusCode)

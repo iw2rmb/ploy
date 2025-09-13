@@ -41,5 +41,5 @@ Each job type is executed as an isolated Nomad job with explicit allowlists and 
 ## Conventions
 - Branch names: `workflow/<id>/<timestamp>` (workflow) and `exec/<id>/<seq>` (future parallel).
 - Build app name: `tfw-<id>-<timestamp>`.
-- Global controls: `lane` (override), `build_timeout` (default 10m) in transflow.yaml.
+- Global controls: `lane` (override), `build_timeout` (default 10m) in mod.yaml.
 - MR defaults: add labels/scope `ploy`, `tfl` when supported; always include them in description.

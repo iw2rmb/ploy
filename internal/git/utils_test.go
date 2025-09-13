@@ -133,7 +133,7 @@ func TestGitUtils_tryParseGitConfig(t *testing.T) {
 			// Create temporary directory with git config
 			tmpDir, err := os.MkdirTemp("", "git_utils_test_*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			gitDir := filepath.Join(tmpDir, ".git")
 			err = os.MkdirAll(gitDir, 0755)
@@ -227,7 +227,7 @@ func TestGitUtils_tryExtractFromPackageJSON(t *testing.T) {
 			// Create temporary directory with package.json
 			tmpDir, err := os.MkdirTemp("", "package_json_test_*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			packagePath := filepath.Join(tmpDir, "package.json")
 			err = os.WriteFile(packagePath, []byte(tt.packageContent), 0644)
@@ -300,7 +300,7 @@ repository = "not-a-repo-url"`,
 			// Create temporary directory with Cargo.toml
 			tmpDir, err := os.MkdirTemp("", "cargo_toml_test_*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			cargoPath := filepath.Join(tmpDir, "Cargo.toml")
 			err = os.WriteFile(cargoPath, []byte(tt.cargoContent), 0644)
@@ -374,7 +374,7 @@ go 1.21`,
 			// Create temporary directory with go.mod
 			tmpDir, err := os.MkdirTemp("", "go_mod_test_*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			modPath := filepath.Join(tmpDir, "go.mod")
 			err = os.WriteFile(modPath, []byte(tt.modContent), 0644)
@@ -464,7 +464,7 @@ func TestGitUtils_tryExtractFromPomXML(t *testing.T) {
 			// Create temporary directory with pom.xml
 			tmpDir, err := os.MkdirTemp("", "pom_xml_test_*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			defer func() { _ = os.RemoveAll(tmpDir) }()
 
 			pomPath := filepath.Join(tmpDir, "pom.xml")
 			err = os.WriteFile(pomPath, []byte(tt.pomContent), 0644)
@@ -490,7 +490,7 @@ func TestGitUtils_GetRepositoryURL(t *testing.T) {
 	t.Run("package.json repository extraction", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "repo_url_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Create package.json with repository URL
 		packageContent := `{
@@ -510,7 +510,7 @@ func TestGitUtils_GetRepositoryURL(t *testing.T) {
 	t.Run("go.mod module extraction", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "repo_url_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Create go.mod with module path
 		modContent := `module github.com/user/go-project
@@ -529,7 +529,7 @@ go 1.21`
 	t.Run("Cargo.toml repository extraction", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "repo_url_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Create Cargo.toml with repository
 		cargoContent := `[package]
@@ -549,7 +549,7 @@ repository = "https://github.com/user/rust-project.git"`
 	t.Run("no repository URL found", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "repo_url_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Create some files but no repository information
 		err = os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Test"), 0644)
@@ -726,7 +726,7 @@ func TestGitUtils_Integration(t *testing.T) {
 	t.Run("comprehensive URL extraction priority", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "integration_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Create multiple source files with different URLs
 		files := map[string]string{
@@ -758,7 +758,7 @@ repository = "https://github.com/user/from-cargo.git"`,
 	t.Run("URL normalization in extraction process", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "integration_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		// Create package.json with SSH URL that needs normalization
 		packageContent := `{
@@ -795,7 +795,7 @@ func BenchmarkGitUtils_tryExtractFromPackageJSON(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	packageContent := `{
   "name": "benchmark-project",
@@ -823,7 +823,7 @@ func BenchmarkGitUtils_GetRepositoryURL(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create go.mod for testing
 	modContent := `module github.com/user/benchmark-project

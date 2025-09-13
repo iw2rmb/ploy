@@ -24,7 +24,7 @@ func showVersion(controllerURL string) {
 	// Try to get controller version
 	resp, err := http.Get(fmt.Sprintf("%s/version", controllerURL))
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var result map[string]string
 		if json.NewDecoder(resp.Body).Decode(&result) == nil {
 			fmt.Printf("Controller version: %s\n", result["version"])
@@ -46,7 +46,7 @@ func showDetailedVersion(controllerURL string) {
 	// Try to get controller version
 	resp, err := http.Get(fmt.Sprintf("%s/version/detailed", controllerURL))
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		var result version.Info
 		if json.NewDecoder(resp.Body).Decode(&result) == nil {
 			fmt.Println("\nPloy Controller:")

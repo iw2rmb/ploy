@@ -92,13 +92,7 @@
         group: root
         mode: '0644'
 
-    - name: Create SeaweedFS filer service
-      template:
-        src: ../../common/templates/seaweedfs-filer.service.j2
-        dest: /etc/systemd/system/seaweedfs-filer.service
-        owner: root
-        group: root
-        mode: '0644'
+    # SeaweedFS filer will be deployed via Nomad (see seaweedfs-filer.yml playbook)
 
     # SeaweedFS will run with command-line arguments, no config files needed
 
@@ -142,25 +136,7 @@
         delay: 2
         timeout: 30
 
-    - name: Check SeaweedFS filer service status
-      command: systemctl is-active seaweedfs-filer
-      register: seaweedfs_filer_status
-      ignore_errors: true
-      changed_when: false
-
-    - name: Start and enable SeaweedFS filer (if not running)
-      systemd:
-        name: seaweedfs-filer
-        state: started
-        enabled: true
-        daemon_reload: true
-      when: seaweedfs_filer_status.stdout != "active"
-
-    - name: Wait for filer to be ready
-      wait_for:
-        port: "{{ seaweedfs.filer_port }}"
-        delay: 2
-        timeout: 30
+    # SeaweedFS filer service is managed by Nomad - see seaweedfs-filer.yml playbook
 
     - name: Create artifact collections
       uri:
@@ -273,25 +249,7 @@
             group: root
             mode: '0644'
 
-        - name: Create Consul service definition for SeaweedFS filer
-          copy:
-            content: |
-              {
-                "service": {
-                  "name": "seaweedfs-filer",
-                  "port": {{ seaweedfs.filer_port }},
-                  "tags": ["seaweedfs", "filer", "storage"],
-                  "check": {
-                    "http": "http://localhost:{{ seaweedfs.filer_port }}/",
-                    "interval": "10s",
-                    "timeout": "5s"
-                  }
-                }
-              }
-            dest: /etc/consul.d/seaweedfs-filer.json
-            owner: root
-            group: root
-            mode: '0644'
+        # SeaweedFS filer service registration handled by Nomad
 
         - name: Reload Consul to register SeaweedFS services
           systemd:
@@ -311,11 +269,98 @@
           loop:
             - seaweedfs-master
             - seaweedfs-volume
-            - seaweedfs-filer
+            # seaweedfs-filer will be registered by Nomad
 
         - name: Display SeaweedFS Consul registration status
           debug:
             msg: "✅ SeaweedFS services successfully registered with Consul"
+
+    - name: Create Knowledge Base (KB) namespace structure
+      block:
+        - name: Wait for SeaweedFS filer to be available
+          wait_for:
+            host: "{{ 'seaweedfs-filer.service.consul' if seaweedfs.use_consul_discovery else 'localhost' }}"
+            port: "{{ seaweedfs.filer_port }}"
+            delay: 10
+            timeout: 60
+          ignore_errors: true
+
+        - name: Create temporary KB setup directory
+          file:
+            path: /tmp/kb-setup
+            state: directory
+            mode: '0755'
+
+        - name: Create KB namespace placeholder files
+          copy:
+            content: "KB {{ item }} directory - created by Ansible"
+            dest: "/tmp/kb-setup/{{ item }}_placeholder.txt"
+            mode: '0644'
+          loop:
+            - errors
+            - cases
+            - summaries
+            - patches
+
+        - name: Create root KB namespace
+          copy:
+            content: "Knowledge Base root namespace"
+            dest: /tmp/kb-setup/kb_placeholder.txt
+            mode: '0644'
+
+        - name: Upload KB namespace structure to SeaweedFS
+          uri:
+            url: "http://{{ 'seaweedfs-filer.service.consul' if seaweedfs.use_consul_discovery else 'localhost' }}:{{ seaweedfs.filer_port }}/kb/{{ item }}/"
+            method: POST
+            body_format: form-multipart
+            body:
+              file:
+                filename: "{{ item }}_placeholder.txt"
+                content: "KB {{ item }} directory - created by Ansible"
+            status_code: [200, 201, 409]  # 409 = already exists
+          loop:
+            - errors
+            - cases
+            - summaries
+            - patches
+          register: kb_namespace_creation
+          failed_when: false
+          ignore_errors: true
+
+        - name: Display KB namespace creation results
+          debug:
+            msg: "KB namespace {{ item.item }}: {{ 'Created' if item.status in [200, 201] else 'Already exists' if item.status == 409 else 'Skipped (filer not ready)' if item.skipped is defined else 'Failed' }}"
+          loop: "{{ kb_namespace_creation.results | default([]) }}"
+          when: kb_namespace_creation.results is defined
+
+        - name: Create KB root placeholder
+          uri:
+            url: "http://{{ 'seaweedfs-filer.service.consul' if seaweedfs.use_consul_discovery else 'localhost' }}:{{ seaweedfs.filer_port }}/kb/kb_placeholder.txt"
+            method: POST
+            body_format: form-multipart
+            body:
+              file:
+                filename: kb_placeholder.txt
+                content: "Knowledge Base root namespace"
+            status_code: [200, 201, 409]  # 409 = already exists
+          register: kb_root_creation
+          failed_when: false
+          ignore_errors: true
+
+        - name: Clean up temporary KB setup files
+          file:
+            path: /tmp/kb-setup
+            state: absent
+
+        - name: Display KB namespace setup status
+          debug:
+            msg: "✅ Knowledge Base namespace structure created in SeaweedFS"
+          when: kb_namespace_creation.results is defined and kb_namespace_creation.results | length > 0
+
+      rescue:
+        - name: Display KB namespace setup failure
+          debug:
+            msg: "⚠️ KB namespace creation failed or skipped - filer may not be ready yet. KB will be created when filer becomes available."
 
     - name: Cleanup installation files
       file:

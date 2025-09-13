@@ -95,6 +95,13 @@ seaweedfs:
   volume_port: 8080
   filer_port: 8888
   
+  # Use Consul service discovery for multi-node deployments
+  use_consul_discovery: true
+  
+  # Service endpoints - master/volume via localhost (systemd), filer via consul DNS (nomad)
+  master_endpoint: "localhost:9333"
+  filer_endpoint: "seaweedfs-filer.service.consul:8888"
+  
   # Collection configuration for different artifact types (dev environment)
   collections:
     artifacts:
@@ -111,7 +118,7 @@ seaweedfs:
 storage_config:
   seaweedfs:
     master: "localhost:9333"
-    filer: "localhost:8888"
+    filer: "seaweedfs-filer.service.consul:8888"
     collection: "artifacts"
     replication: "000"
     timeout: 30

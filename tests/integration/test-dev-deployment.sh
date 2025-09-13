@@ -44,8 +44,8 @@ test_prerequisites() {
     log_info "Checking test prerequisites..."
     
     # Check if we're on VPS with ploy infrastructure
-    if ! command -v nomad &> /dev/null; then
-        log_error "Nomad not found - this test must run on VPS with Ploy infrastructure"
+    if ! [ -x "/opt/hashicorp/bin/nomad-job-manager.sh" ]; then
+        log_error "Nomad wrapper not found - this test must run on VPS with Ploy infrastructure"
         exit 1
     fi
     
@@ -228,12 +228,12 @@ test_platform_service_deployment() {
 cleanup_test_resources() {
     log_info "Cleaning up test resources..."
     
-    # Remove test user app if it exists
-    if nomad job status "$TEST_APP_NAME" &> /dev/null; then
-        log_info "Stopping test user app: $TEST_APP_NAME"
-        nomad job stop "$TEST_APP_NAME" || true
+    # Remove test user app if it exists (best-effort via wrapper)
+    if [ -x "/opt/hashicorp/bin/nomad-job-manager.sh" ]; then
+        log_info "Stopping test user app (best-effort): $TEST_APP_NAME"
+        /opt/hashicorp/bin/nomad-job-manager.sh stop --job "$TEST_APP_NAME" || true
         sleep 5
-        nomad job stop -purge "$TEST_APP_NAME" || true
+        /opt/hashicorp/bin/nomad-job-manager.sh stop --job "$TEST_APP_NAME" || true
     fi
     
     # Clean up temporary directories

@@ -194,7 +194,7 @@ func (rb *RequestBuilder) Execute() *APIResponse {
 	}
 
 	if resp != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 
 	var bodyBytes []byte

@@ -146,7 +146,9 @@ func (cm *CertificateManager) ProvisionCertificate(ctx context.Context, appName,
 	if err != nil {
 		domainCert.Status = "failed"
 		domainCert.LastError = err.Error()
-		cm.storeDomainCertificate(domainCert)
+		if storeErr := cm.storeDomainCertificate(domainCert); storeErr != nil {
+			log.Printf("warning: failed to persist failed cert status: %v", storeErr)
+		}
 		return nil, fmt.Errorf("failed to issue certificate: %w", err)
 	}
 
@@ -155,7 +157,9 @@ func (cm *CertificateManager) ProvisionCertificate(ctx context.Context, appName,
 		if err := cm.certificateStorage.StoreCertificate(ctx, cert); err != nil {
 			domainCert.Status = "failed"
 			domainCert.LastError = fmt.Sprintf("failed to store certificate: %v", err)
-			cm.storeDomainCertificate(domainCert)
+			if storeErr := cm.storeDomainCertificate(domainCert); storeErr != nil {
+				log.Printf("warning: failed to persist failed cert status: %v", storeErr)
+			}
 			return nil, fmt.Errorf("failed to store certificate: %w", err)
 		}
 	}

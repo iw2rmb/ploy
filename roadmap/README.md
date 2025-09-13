@@ -119,7 +119,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ **Template Processing**: Resolved Lane C HCL conditional processing enabling seamless deployments
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination
 - ✅ **High Availability**: Distributed processing with Consul leader election
-- ✅ **Pattern Learning**: PostgreSQL vector similarity for cross-repository intelligence
+- ⏸️ Pattern Learning: vector similarity (SQL-backed) planned; disabled currently
 - ✅ **Comprehensive API**: Complete `/v1/arf/*` endpoints and `ploy arf` CLI integration
 - ✅ **Production Testing**: 28/28 test suite passing (100% success rate)
 

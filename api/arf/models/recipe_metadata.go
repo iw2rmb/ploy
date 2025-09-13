@@ -45,10 +45,9 @@ func (m *RecipeMetadata) Validate() error {
 		return fmt.Errorf("author is required")
 	}
 
-	// Validate license if provided
+	// Validate license if provided; normalize invalid to empty (non-fatal)
 	if m.License != "" && !isValidLicense(m.License) {
-		// Just a warning, not an error
-		// Could log a warning here
+		m.License = ""
 	}
 
 	// Validate URLs if provided

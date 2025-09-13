@@ -38,6 +38,8 @@ type RenderData struct {
 
 	// Language-specific options
 	Language string
+	// Lane letter (A-G)
+	Lane string
 
 	// JVM-specific options
 	JvmOpts     string
@@ -145,6 +147,10 @@ func debugTemplateForLane(lane string) string {
 
 // loadTemplateContent tries Consul KV first, then standard platform file locations
 func loadTemplateContent(templatePath string) ([]byte, error) {
+	// Prefer embedded templates when available
+	if b := getEmbeddedTemplate(templatePath); b != nil {
+		return b, nil
+	}
 	if consulClient, err := NewConsulTemplateClient(); err == nil {
 		if content, err := consulClient.GetTemplate(templatePath); err == nil {
 			return content, nil
@@ -171,10 +177,23 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 func applyTemplateSubstitutions(template string, data RenderData) string {
 	s := template
 	s = processConditionalBlocks(s, data)
+	// Safety: strip mesh/secrets blocks if disabled and conditionals didn't remove them
+	if !data.ConnectEnabled {
+		s = strings.ReplaceAll(s, "connect { sidecar_service {} }", "")
+		// Best-effort removal of standalone connect service blocks
+		s = regexp.MustCompile(`(?s)service\s*\{\s*name\s*=\s*\".*-connect\".*?\}`).ReplaceAllString(s, "")
+	}
+	if !data.VaultEnabled {
+		s = regexp.MustCompile(`(?s)vault\s*\{.*?\}`).ReplaceAllString(s, "")
+	}
 	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
 	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
 	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
-	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Version))
+	if data.Lane == "" {
+		// Fallback to C if not provided
+		data.Lane = "C"
+	}
+	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Lane))
 	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
@@ -204,10 +223,10 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	}
 	s = strings.ReplaceAll(s, "{{DOMAIN_SUFFIX}}", domainSuffix)
 
-	taskName := getTaskNameForLane(strings.ToUpper(data.Version))
+	taskName := getTaskNameForLane(strings.ToUpper(data.Lane))
 	s = strings.ReplaceAll(s, "{{TASK_NAME}}", taskName)
 
-	driverConfig := getDriverConfigForLane(strings.ToUpper(data.Version), data)
+	driverConfig := getDriverConfigForLane(strings.ToUpper(data.Lane), data)
 	s = strings.ReplaceAll(s, "{{DRIVER}}", driverConfig.Driver)
 	s = strings.ReplaceAll(s, "{{DRIVER_CONFIG}}", driverConfig.Config)
 
@@ -337,10 +356,14 @@ func (r *RenderData) SetDefaults() {
 			r.MemoryLimit = 512
 		}
 	}
-	r.ConnectEnabled = true
-	r.VaultEnabled = true
-	r.VolumeEnabled = true
-	r.ConsulConfigEnabled = true
+	// Default feature flags based on whether this is a platform service
+	isPlat := isPlatformService(*r)
+	// Consul services enabled by default for platform services, disabled for regular apps
+	r.ConsulConfigEnabled = isPlat
+	// Volumes default off for regular apps; may be enabled for platform services
+	r.VolumeEnabled = isPlat
+	// Vault and Connect default off unless explicitly enabled by caller
+	// r.VaultEnabled and r.ConnectEnabled remain false unless set by caller
 	r.DebugEnabled = false
 }
 

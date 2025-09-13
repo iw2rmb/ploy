@@ -51,3 +51,4 @@ test-template/
 
 .gocache_go/
 .gocache/
+.gopath/.gocache/

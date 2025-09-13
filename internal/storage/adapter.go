@@ -151,7 +151,7 @@ func (a *StorageAdapter) Copy(ctx context.Context, src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read source: %w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Write to destination
 	return a.Put(ctx, dst, reader)

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Nomad Job Manager - HTTP API wrapper to prevent 429 rate limiting
 # Usage: nomad-job-manager.sh <command> --param value
-# Commands: stop, run, status, wait, allocs, alloc-status, running-alloc, logs, cleanup
+# Commands: stop, run, status, wait, allocs, alloc-status, running-alloc, logs, cleanup, validate
 
 set -e
 
@@ -93,6 +93,7 @@ Commands:
       --stderr                             Show stderr instead of stdout
       --both                               Show both stdout and stderr
   cleanup --job <name>                      Clean up stale service registrations
+  validate --file <file>                   Validate a Nomad job file (HCL or JSON)
 
 Examples:
   $0 stop --job ploy-api
@@ -101,6 +102,7 @@ Examples:
   $0 logs --alloc-id abc123 --stderr --lines 100
   $0 logs --alloc-id abc123 --both --follow
   $0 allocs --job ploy-api --format json
+  $0 validate --file job.hcl
 EOF
 }
 
@@ -453,6 +455,46 @@ get_single_log_stream() {
     fi
 }
 
+validate_job() {
+    if [ -z "$JOB_FILE" ]; then
+        echo "Error: --file parameter is required" >&2
+        show_help
+        exit 1
+    fi
+
+    log "Validating job file: $JOB_FILE"
+    if ! [ -f "$JOB_FILE" ]; then
+        log "Job file not found: $JOB_FILE"
+        return 1
+    fi
+
+    # Prefer Nomad CLI validation when available
+    if command -v nomad >/dev/null 2>&1; then
+        if nomad job validate "$JOB_FILE"; then
+            log "Validation passed"
+            return 0
+        else
+            log "Validation failed"
+            return 1
+        fi
+    fi
+
+    # Fallback: attempt HCL→JSON conversion as a syntax check
+    if [ "${JOB_FILE##*.}" = "hcl" ]; then
+        if nomad job run -output "$JOB_FILE" >/dev/null 2>&1; then
+            log "HCL to JSON conversion succeeded (basic syntax OK)"
+            return 0
+        else
+            log "HCL to JSON conversion failed"
+            return 1
+        fi
+    fi
+
+    # JSON file: try parsing via API dry-run endpoint (not available), accept file presence
+    log "No Nomad CLI; basic file presence check only"
+    return 0
+}
+
 # Main command routing
 COMMAND=$1
 shift
@@ -495,6 +537,10 @@ case "$COMMAND" in
     
     "cleanup")
         cleanup_stale_services
+        ;;
+    
+    "validate")
+        validate_job
         ;;
     
     "help"|"--help"|"-h"|"")

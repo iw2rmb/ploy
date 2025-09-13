@@ -99,7 +99,7 @@ func (w *WASMRuntime) ExecuteModule(ctx context.Context, compiledModule wazero.C
 	if err != nil {
 		return fmt.Errorf("failed to instantiate WASM module: %w", err)
 	}
-	defer module.Close(ctx)
+	defer func() { _ = module.Close(ctx) }()
 
 	// Execute the main function or _start
 	if startFn := module.ExportedFunction("_start"); startFn != nil {

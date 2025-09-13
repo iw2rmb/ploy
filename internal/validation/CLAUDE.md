@@ -6,6 +6,8 @@ Comprehensive validation logic for application names, environment variables, res
 ## Architecture Overview
 The validation module provides specialized validators for different types of platform entities. Each validator implements domain-specific rules and constraints, with the LLM model validator providing comprehensive provider-specific validation for the model registry system.
 
+**E2E Validation Infrastructure** - Complete end-to-end validation framework with VPS testing capabilities supporting comprehensive workflow validation. Provides validation infrastructure for mods workflows including Java migration testing, self-healing validation, KB learning verification, and GitLab integration testing. Framework enables production environment testing with real repository operations and distributed job orchestration.
+
 ## Module Structure
 - `app_name.go` - Application name validation with platform constraints
 - `env_vars.go` - Environment variable validation and sanitization
@@ -62,6 +64,8 @@ The validation module provides specialized validators for different types of pla
 - Error Messages: Detailed validation failure descriptions
 - Format Validation: Standalone ID format validation functions
 - Update Validation: Specialized validation for model updates
+- E2E Validation Framework: Comprehensive workflow testing infrastructure with VPS support
+- Production Testing: Real environment validation for mods and healing workflows
 
 ## Testing
 - Comprehensive test coverage for all validation scenarios
@@ -79,5 +83,5 @@ The validation module provides specialized validators for different types of pla
 ## Related Documentation
 - `../../api/llms/CLAUDE.md` - API handlers using validation services
 - `../arf/models/` - Model structures being validated
-- `../../cmd/ployman/CLAUDE.md` - CLI operations with validation
+- `../../cmd/ployman/README.md` - CLI operations with validation
 - `../storage/CLAUDE.md` - Storage operations requiring valid models

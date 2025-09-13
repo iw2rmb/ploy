@@ -1,6 +1,6 @@
 ---
 # Complete Ploy development environment setup
-# Proper service ordering: Basic tools -> SeaweedFS -> HashiCorp -> Traefik -> Docker Registry -> API -> CHTTP -> FreeBSD -> Testing
+# Proper service ordering: Basic tools -> SeaweedFS (master/volume) -> HashiCorp -> SeaweedFS (filer via Nomad) -> ARF -> Traefik -> Docker Registry -> API -> CHTTP -> FreeBSD -> Testing
 
 # Global connection resilience settings
 - hosts: all
@@ -21,10 +21,13 @@
 - import_playbook: playbooks/main.yml
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
-- import_playbook: playbooks/arf-openrewrite-recipes.yml
+- import_playbook: playbooks/seaweedfs-filer.yml
+- import_playbook: playbooks/arf-openrewrite-recipes-registry.yml
 - import_playbook: playbooks/traefik.yml
 - import_playbook: playbooks/docker-registry.yml
+- import_playbook: playbooks/langgraph-runner.yml
 - import_playbook: playbooks/openrewrite-jvm.yml
+- import_playbook: playbooks/mods-env.yml
 - import_playbook: playbooks/api.yml
 - import_playbook: playbooks/gitlab-token.yml
 - import_playbook: playbooks/freebsd.yml

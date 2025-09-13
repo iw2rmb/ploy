@@ -24,8 +24,6 @@ func handleARFCommand(args []string) error {
 	switch subcommand {
 	case "recipes":
 		return handleARFRecipesCommand(args[1:])
-	case "transform":
-		return handleARFTransformCommand(args[1:])
 	case "models":
 		return handleARFModelsCommand(args[1:])
 	case "health":
@@ -48,7 +46,6 @@ func printARFUsage() {
 	fmt.Println()
 	fmt.Println("Available subcommands:")
 	fmt.Println("  recipes    Manage transformation recipes")
-	fmt.Println("  transform  Execute code transformations with self-healing")
 	fmt.Println("  models     Manage LLM model configurations")
 	fmt.Println("  health     Check ARF system health")
 	fmt.Println("  cache      Manage AST cache")

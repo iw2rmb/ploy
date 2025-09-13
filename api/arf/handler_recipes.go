@@ -8,14 +8,15 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/api/arf/models"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 )
 
 // Helper methods to bridge catalog and storage interfaces
 
-func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilters) ([]*models.Recipe, error) {
+func (h *Handler) listRecipesWithStorage(ctx context.Context, filters recipes.RecipeFilters) ([]*models.Recipe, error) {
 	if h.recipeStorage != nil {
 		// Convert RecipeFilters to RecipeFilter
-		storageFilter := RecipeFilter{
+		storageFilter := recipes.RecipeFilter{
 			Tags:     filters.Tags,
 			Language: filters.Language,
 			Author:   filters.Author,
@@ -25,9 +26,9 @@ func (h *Handler) listRecipesWithStorage(ctx context.Context, filters RecipeFilt
 		return h.recipeStorage.ListRecipes(ctx, storageFilter)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.ListRecipes(ctx, filters)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.ListRecipes(ctx, filters)
 	}
 
 	return nil, fmt.Errorf("no storage backend available")
@@ -38,9 +39,9 @@ func (h *Handler) getRecipeWithStorage(ctx context.Context, recipeID string) (*m
 		return h.recipeStorage.GetRecipe(ctx, recipeID)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.GetRecipe(ctx, recipeID)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.GetRecipeAsModelsRecipe(ctx, recipeID)
 	}
 
 	return nil, fmt.Errorf("no storage backend available")
@@ -58,9 +59,9 @@ func (h *Handler) createRecipeWithStorage(ctx context.Context, recipe *models.Re
 		return h.recipeStorage.CreateRecipe(ctx, recipe)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.StoreRecipe(ctx, recipe)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.StoreRecipe(ctx, recipe)
 	}
 
 	return fmt.Errorf("no storage backend available")
@@ -78,9 +79,9 @@ func (h *Handler) updateRecipeWithStorage(ctx context.Context, recipeID string, 
 		return h.recipeStorage.UpdateRecipe(ctx, recipeID, recipe)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.UpdateRecipe(ctx, recipe)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.UpdateRecipe(ctx, recipe)
 	}
 
 	return fmt.Errorf("no storage backend available")
@@ -91,9 +92,9 @@ func (h *Handler) deleteRecipeWithStorage(ctx context.Context, recipeID string) 
 		return h.recipeStorage.DeleteRecipe(ctx, recipeID)
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.DeleteRecipe(ctx, recipeID)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.DeleteRecipe(ctx, recipeID)
 	}
 
 	return fmt.Errorf("no storage backend available")
@@ -114,18 +115,18 @@ func (h *Handler) searchRecipesWithStorage(ctx context.Context, query string) ([
 		return recipes, nil
 	}
 
-	// Fallback to catalog
-	if h.catalog != nil {
-		return h.catalog.SearchRecipes(ctx, query)
+	// Use RecipeRegistry
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.SearchRecipes(ctx, query)
 	}
 
 	return nil, fmt.Errorf("no storage backend available")
 }
 
 func (h *Handler) getRecipeStatsWithStorage(ctx context.Context, recipeID string) (interface{}, error) {
-	// Try catalog first if available (it has stats functionality)
-	if h.catalog != nil {
-		return h.catalog.GetRecipeStats(ctx, recipeID)
+	// Use RecipeRegistry for stats functionality
+	if h.recipeRegistry != nil {
+		return h.recipeRegistry.GetRecipeStats(ctx, recipeID)
 	}
 
 	// If no catalog available, return mock stats
@@ -143,141 +144,8 @@ func (h *Handler) getRecipeStatsWithStorage(ctx context.Context, recipeID string
 	}, nil
 }
 
-// ListRecipesLegacy returns a list of available recipes (old implementation)
-func (h *Handler) ListRecipesLegacy(c *fiber.Ctx) error {
-	// Parse query parameters
-	page, _ := strconv.Atoi(c.Query("page", "1"))
-	limit, _ := strconv.Atoi(c.Query("limit", "10"))
-	category := c.Query("category")
-	language := c.Query("language")
-
-	// Get recipes using storage backend
-	filters := RecipeFilters{
-		Category: category,
-		Language: language,
-	}
-	recipes, err := h.listRecipesWithStorage(c.Context(), filters)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to list recipes",
-			"details": err.Error(),
-		})
-	}
-
-	// Mock total count for pagination
-	totalCount := len(recipes)
-
-	return c.JSON(fiber.Map{
-		"recipes": recipes,
-		"pagination": fiber.Map{
-			"page":        page,
-			"limit":       limit,
-			"total_count": totalCount,
-			"total_pages": (totalCount + limit - 1) / limit,
-		},
-	})
-}
-
-// GetRecipeLegacy returns a specific recipe by ID (old implementation)
-func (h *Handler) GetRecipeLegacy(c *fiber.Ctx) error {
-	recipeID := c.Params("id")
-
-	recipe, err := h.getRecipeWithStorage(c.Context(), recipeID)
-	if err != nil {
-		return c.Status(404).JSON(fiber.Map{
-			"error":   "Recipe not found",
-			"details": err.Error(),
-		})
-	}
-
-	return c.JSON(recipe)
-}
-
-// CreateRecipeLegacy creates a new recipe (old implementation)
-func (h *Handler) CreateRecipeLegacy(c *fiber.Ctx) error {
-	var recipe models.Recipe
-	if err := c.BodyParser(&recipe); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error":   "Invalid recipe data",
-			"details": err.Error(),
-		})
-	}
-
-	// Set system fields
-	recipe.SetSystemFields("api-user")
-
-	// Store recipe using storage backend
-	if err := h.createRecipeWithStorage(c.Context(), &recipe); err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to save recipe",
-			"details": err.Error(),
-		})
-	}
-
-	return c.Status(201).JSON(recipe)
-}
-
-// UpdateRecipeLegacy updates an existing recipe (old implementation)
-func (h *Handler) UpdateRecipeLegacy(c *fiber.Ctx) error {
-	recipeID := c.Params("id")
-
-	var recipe models.Recipe
-	if err := c.BodyParser(&recipe); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"error":   "Invalid recipe data",
-			"details": err.Error(),
-		})
-	}
-
-	// Ensure recipe ID matches
-	recipe.ID = recipeID
-	recipe.UpdatedAt = time.Now()
-
-	// Update recipe using storage backend
-	if err := h.updateRecipeWithStorage(c.Context(), recipeID, &recipe); err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to update recipe",
-			"details": err.Error(),
-		})
-	}
-
-	return c.JSON(recipe)
-}
-
-// DeleteRecipeLegacy deletes a recipe (old implementation)
-func (h *Handler) DeleteRecipeLegacy(c *fiber.Ctx) error {
-	recipeID := c.Params("id")
-
-	if err := h.deleteRecipeWithStorage(c.Context(), recipeID); err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to delete recipe",
-			"details": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Recipe deleted successfully",
-	})
-}
-
-// SearchRecipesLegacy searches for recipes based on criteria (old implementation)
-func (h *Handler) SearchRecipesLegacy(c *fiber.Ctx) error {
-	query := c.Query("q")
-
-	recipes, err := h.searchRecipesWithStorage(c.Context(), query)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Search failed",
-			"details": err.Error(),
-		})
-	}
-
-	return c.JSON(fiber.Map{
-		"query":   query,
-		"count":   len(recipes),
-		"recipes": recipes,
-	})
-}
+// Legacy recipe handlers removed: ListRecipesLegacy, GetRecipeLegacy, CreateRecipeLegacy,
+// UpdateRecipeLegacy, DeleteRecipeLegacy, SearchRecipesLegacy.
 
 // GetRecipeMetadata returns recipe metadata
 func (h *Handler) GetRecipeMetadata(c *fiber.Ctx) error {

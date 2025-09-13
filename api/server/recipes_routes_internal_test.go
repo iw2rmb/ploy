@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -21,7 +22,7 @@ func TestRecipesRoute_GetByID_Internal(t *testing.T) {
 	// Inject storage-backed registry with a minimal catalog
 	mem := providers_memory.NewMemoryStorage(0)
 	catalog := `[{"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","tags":["cleanup"]}]`
-	_ = mem.Put(nil, "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
+	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 	srv.dependencies.ARFRecipes = recipes.NewStorageBacked(mem)
 
 	req := httptest.NewRequest("GET", "/v1/arf/recipes/org.openrewrite.java.cleanup.Cleanup", nil)

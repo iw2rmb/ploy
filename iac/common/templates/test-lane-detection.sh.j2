@@ -31,10 +31,19 @@ cd python-apisvc
 /home/ploy/ploy/lane-pick --path .
 cd ..
 
-# Test Scala app detection
-echo "Testing Scala app (should be Lane C or E):"
-cd scala-catalogsvc
-/home/ploy/ploy/lane-pick --path .
-cd ..
+if [[ -n "$SCALA_HELLO_REPO" ]]; then
+  echo "Testing Scala app (should be Lane C or E) from external repo"
+  TMP_SCALA="/tmp/scala-hello"
+  rm -rf "$TMP_SCALA" && git clone --depth 1 "$SCALA_HELLO_REPO" "$TMP_SCALA" >/dev/null 2>&1 || true
+  if [[ -d "$TMP_SCALA" ]]; then
+    cd "$TMP_SCALA"
+    /home/ploy/ploy/lane-pick --path .
+    cd - >/dev/null
+  else
+    echo "Skipping Scala test: clone failed"
+  fi
+else
+  echo "Skipping Scala test: SCALA_HELLO_REPO not set"
+fi
 
 echo "Lane detection tests completed!"
