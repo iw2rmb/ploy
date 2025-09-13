@@ -220,6 +220,13 @@ System monitoring components including health checks, metrics collection, and di
 ### orchestration
 Orchestration layer providing abstractions for container orchestration with Nomad, including allocation management and client interfaces.
 
+### lifecycle
+Lifecycle management endpoints and helpers that perform cleanup of applications and associated resources (Nomad jobs, environment variables, domains, certificates, storage artifacts, containers, and temporary files).
+
+Nomad Wrapper Preference (VPS):
+- When stopping Nomad jobs with exact names, lifecycle uses the job manager wrapper `/opt/hashicorp/bin/nomad-job-manager.sh` to align with wrapper-first policy (retries, logging, cleanup).
+- For glob patterns (e.g., `app-*`), raw Nomad CLI may be used as a fallback due to wrapper limitations with pattern matching.
+
 ### policy
 Policy enforcement framework for security and compliance requirements.
 
