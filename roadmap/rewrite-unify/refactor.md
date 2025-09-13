@@ -150,6 +150,7 @@ Scope
     - ✅ Extracted input.tar preview helper (`logPreviewTar`/`previewTarEntries`) to replace inline tar listing.
     - ✅ Centralized run ID generation (`PlannerRunID`, `ReducerRunID`, `LLMRunID`, `ORWRunID`) and replaced ad-hoc formatting.
     - ✅ Added `NewBranchStep(execID, branchID)` to generate step IDs and DIFF keys consistently.
+    - ✅ Extracted push step emission into `runPushWithEvents` helper.
     - ✅ Centralized MR creation event emissions (`mrEmitStart`, `mrAppendFailure`, `mrAppendSuccess`) and updated MR flow.
     - ✅ Centralized image resolution (`ResolveImages*`) and applied across planner preview, LLM/ORW previews, fanout branches, and job submission.
     - ✅ Centralized infra resolution (`ResolveInfra*`) for controller/DC/Seaweed; applied across execution and fanout; runner seaweed usage updated.

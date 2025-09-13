@@ -63,8 +63,18 @@ func (e *errPushGitOps) PushBranch(ctx context.Context, repoPath, remoteURL, bra
 func TestRunPushStep_Error(t *testing.T) {
     cfg := &TransflowConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []TransflowStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
     r, _ := NewTransflowRunner(cfg, t.TempDir())
-	r.SetGitOperations(&errPushGitOps{})
-	if err := r.runPushStep(context.Background(), "/repo", "branch"); err == nil {
-		t.Fatalf("expected push error")
-	}
+    r.SetGitOperations(&errPushGitOps{})
+    if err := r.runPushStep(context.Background(), "/repo", "branch"); err == nil {
+        t.Fatalf("expected push error")
+    }
+}
+
+func TestRunPushWithEvents_Error(t *testing.T) {
+    cfg := &TransflowConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []TransflowStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+    r, _ := NewTransflowRunner(cfg, t.TempDir())
+    r.SetGitOperations(&errPushGitOps{})
+    sr, err := runPushWithEvents(r, context.Background(), "/repo", "branch")
+    if err == nil || sr.Success {
+        t.Fatalf("expected push error with failed step, got err=%v sr=%+v", err, sr)
+    }
 }
