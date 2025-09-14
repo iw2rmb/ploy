@@ -27,6 +27,8 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
 
       config {
         image = "{{KANIKO_IMAGE}}"
+        # Use host networking so the builder can reach local service endpoints (e.g., SeaweedFS filer)
+        network_mode = "host"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
           "set -euo pipefail; wget -qO /tmp/src.tar $CONTEXT_URL; mkdir -p /workspace; tar -xf /tmp/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
