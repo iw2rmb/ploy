@@ -143,3 +143,9 @@ Temporary Dev workaround (no in-API Docker):
 - Lane expansion:
   - With Lane E green, begin bringing up A, B, C, D, F, G per plan using lane-appropriate hello repos.
   - For each lane change, update docs/LANES.md accordingly and capture notes here.
+
+### Cycle: Lane C (OSv JVM) — Initial Bring-up
+- Attempted LANE=C with minimal Java repo; async accepted but failed at job validation.
+- Error: job validation failed (HCL parse) in `lane-c-java.hcl` around the QEMU args block.
+- Likely fix: simplify/quote the `args` array (avoid `${...}` interpolations in HCL strings) and re-validate with wrapper. Also consider disabling `kvm=true` on Dev if KVM is unavailable.
+- Next: patch `platform/nomad/lane-c-java.hcl` args formatting, set `accelerator`/`kvm` to Dev-friendly defaults, and retry. If runtime still unavailable, temporarily force container fallback (LANE_OVERRIDE=E) for green while OSv support is finalized on Dev.
