@@ -805,14 +805,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	// Measure image size for policy enforcement
 	var imageSizeMB float64
-	sizeInfo, err := utils.GetImageSize(imagePath, dockerImage, lane)
-	if err != nil {
-		fmt.Printf("Warning: Failed to measure image size: %v\n", err)
-		imageSizeMB = 0 // Continue without size info
-	} else {
-		imageSizeMB = sizeInfo.SizeMB
-		fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
-	}
+    sizeInfo, err := utils.GetImageSize(imagePath, dockerImage, lane)
+    if err != nil || sizeInfo == nil {
+        if err != nil {
+            fmt.Printf("Warning: Failed to measure image size: %v\n", err)
+        }
+        imageSizeMB = 0 // Continue without size info
+    } else {
+        imageSizeMB = sizeInfo.SizeMB
+        fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
+    }
 
 	// Vulnerability scanning (stub implementation - Harbor removed)
 	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
