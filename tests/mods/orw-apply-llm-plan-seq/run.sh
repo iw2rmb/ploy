@@ -44,22 +44,22 @@ if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]
   exit 1
 fi
 
-EXEC_ID=$(echo "$JSON" | jq -r '.execution_id // .id')
-if [[ -z "$EXEC_ID" || "$EXEC_ID" == "null" ]]; then
+MOD_ID=$(echo "$JSON" | jq -r '.execution_id // .id')
+if [[ -z "$MOD_ID" || "$MOD_ID" == "null" ]]; then
   echo "No execution_id in response:" >&2
   echo "$JSON" | jq . >&2 || echo "$JSON" >&2
   exit 1
 fi
 
-LOG_DIR="$ROOT_DIR/logs/$EXEC_ID"
+LOG_DIR="$ROOT_DIR/logs/$MOD_ID"
 mkdir -p "$LOG_DIR"
 echo "$JSON" > "$LOG_DIR/run_response.json"
-echo "EXEC_ID: $EXEC_ID"
+echo "MOD_ID: $MOD_ID"
 
 echo "Streaming events to $LOG_DIR/events.sse …"
 (
   set +e
-  curl -sN "$API_BASE/mods/$EXEC_ID/logs?follow=1" \
+  curl -sN "$API_BASE/mods/$MOD_ID/logs?follow=1" \
     | tee "$LOG_DIR/events.sse"
 ) &
 SSE_PID=$!
@@ -71,7 +71,7 @@ MR_URL=""
 START_TS=$(date +%s)
 TIMEOUT_SEC=${TIMEOUT_SEC:-3600}
 while :; do
-  ST_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/status" || true)
+  ST_JSON=$(curl -sS "$API_BASE/mods/$MOD_ID/status" || true)
   if [[ -n "$ST_JSON" ]]; then
     echo "$ST_JSON" > "$LOG_DIR/status_last.json"
     TERM_STATUS=$(echo "$ST_JSON" | jq -r '.status // empty')
@@ -94,17 +94,28 @@ echo "Stopping SSE (pid=$SSE_PID)…"
 kill "$SSE_PID" >/dev/null 2>&1 || true
 
 echo "Fetching artifacts…"
-"$ROOT_DIR/fetch-artifacts.sh" "$EXEC_ID" || true
+"$ROOT_DIR/fetch-artifacts.sh" "$MOD_ID" || true
 
 echo "Summary:"
-echo "  EXEC_ID: $EXEC_ID"
+echo "  MOD_ID: $MOD_ID"
 echo "  STATUS:  $TERM_STATUS"
 echo "  MR_URL:  ${MR_URL:-<none>}"
 echo "Logs and artifacts under: $LOG_DIR"
 
 if [[ "$TERM_STATUS" != "completed" ]]; then
   echo "Run did not complete successfully (status=$TERM_STATUS). Check $LOG_DIR for details." >&2
+  # Always collect logs (controller/platform) and referenced SeaweedFS artifacts for diagnosis
+  if [[ -x "$ROOT_DIR/collect-logs.sh" ]]; then
+    echo "Collecting logs and artifacts via collect-logs.sh …"
+    PLOY_CONTROLLER="$API_BASE" PLOY_SEAWEEDFS_URL="${PLOY_SEAWEEDFS_URL:-}" "$ROOT_DIR/collect-logs.sh" "$MOD_ID" || true
+  fi
   exit 2
+fi
+
+# On success also collect logs for traceability (optional, non-fatal)
+if [[ -x "$ROOT_DIR/collect-logs.sh" ]]; then
+  echo "Collecting logs and artifacts via collect-logs.sh …"
+  PLOY_CONTROLLER="$API_BASE" PLOY_SEAWEEDFS_URL="${PLOY_SEAWEEDFS_URL:-}" "$ROOT_DIR/collect-logs.sh" "$MOD_ID" || true
 fi
 
 exit 0

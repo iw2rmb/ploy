@@ -28,16 +28,16 @@ type EventReporter interface {
 // ControllerEventReporter posts events to the controller's /v1/mods/:id/events endpoint
 type ControllerEventReporter struct {
 	endpoint string
-	execID   string
+	modID    string
 	client   *http.Client
 }
 
 // NewControllerEventReporter creates a reporter targeting the given controller URL (with /v1 suffix) and execution ID
-func NewControllerEventReporter(controllerURL, executionID string) EventReporter {
-	endpoint := strings.TrimRight(controllerURL, "/") + "/mods/" + strings.TrimLeft(executionID, "/") + "/events"
+func NewControllerEventReporter(controllerURL, modID string) EventReporter {
+	endpoint := strings.TrimRight(controllerURL, "/") + "/mods/" + strings.TrimLeft(modID, "/") + "/events"
 	return &ControllerEventReporter{
 		endpoint: endpoint,
-		execID:   executionID,
+		modID:    modID,
 		client:   &http.Client{Timeout: 5 * time.Second},
 	}
 }

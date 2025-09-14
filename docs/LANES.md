@@ -56,9 +56,15 @@ Lane selection can be explicit via `lane` query param or environment override. O
 
 #### Dockerfile Autogeneration
 - Default: If `Dockerfile` is missing, API returns 400 instructing to add one.
-- Opt-in: `autogen_dockerfile=true` query param (or `PLOY_AUTOGEN_DOCKERFILE=true`) generates a minimal Dockerfile when markers found:
+- Opt-in: `autogen_dockerfile=true` query param (or `PLOY_AUTOGEN_DOCKERFILE=true`) generates a minimal Dockerfile using centralized detection:
   - Go: multi-stage build → distroless
   - Node: Node 20 alpine → run `index.js`
+  - JVM (Gradle/Maven):
+    - Build: Gradle `gradle:8-jdk<major>` or Maven `maven:3-eclipse-temurin-<major>`
+    - Runtime: `eclipse-temurin:<major>-jre`
+    - Entrypoint: main class if detected, else `java -jar /app/app.jar`
+  - .NET: `mcr.microsoft.com/dotnet/sdk:<ver>` → `mcr.microsoft.com/dotnet/aspnet:<ver>`, entrypoint `dotnet <Project>.dll`
+  - Python: `python:<ver>-slim`; if app server present in deps, prefer `gunicorn` or `uvicorn`; otherwise `python app.py`
 - Best Practice: Keep an explicit Dockerfile in the repo for clarity and control. Autogen is for bootstrap/demos only.
 
 ### Lane F — Full VMs
@@ -126,4 +132,3 @@ If detection fails, the system defaults to Lane E in Dev to maximize success, bu
 - API runs as a Nomad job without Docker — container builds use Kaniko.
 - Traefik runs as a Nomad job; logs available via the Dev API.
 - Some advanced lane features (e.g., mesh, Vault) are disabled in Dev templates.
-

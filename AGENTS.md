@@ -70,7 +70,7 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 - These tests exercise VPS services remotely and are considered VPS-side execution (REFACTOR phase), even if invoked from the workstation.
 - Do not spin up or depend on local Nomad/Consul/Gateway for these tests.
 - Example:
-  - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestModsE2E_JavaMigrationComplete -timeout 20m`
+  - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestModsE2E_JavaMigrationComplete -timeout 10m`
 
 ### Platform Logs (Debugging)
 
@@ -83,6 +83,8 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 - Notes:
   - These endpoints route through the VPS job-manager wrapper to retrieve Nomad allocation logs.
   - Task inference is automatic for known services (api → task "api", traefik → task "traefik").
+
+- Helper script: `tests/e2e/deploy/fetch-logs.sh` aggregates app logs, platform logs, and (optionally) builder job logs via SSH. Export `APP_NAME`, and optionally `LANE`, `SHA`, `LINES`, and `TARGET_HOST`.
 
 ## Commands
 
@@ -104,8 +106,8 @@ Notes:
   - Configure image refs in environment (e.g., `MODS_ORW_APPLY_IMAGE`, `MODS_PLANNER_IMAGE`, `MODS_REDUCER_IMAGE`, `MODS_LLM_EXEC_IMAGE`) to point at the internal registry.
 
 **VPS**:
-- Use for runtime inspection and logs only (e.g., `ssh root@$TARGET_HOST`, then `su - ploy`).
-- Do not run `ployman` deploys directly on the VPS.
+- You may SSH to the VPS to fetch logs and perform required diagnostics/operations (e.g., `ssh root@$TARGET_HOST`, then `su - ploy`).
+- Avoid running `ployman` deploys directly on the VPS unless explicitly requested.
 
 **NEVER**: Integration tests against local infrastructure, direct Nomad commands
   - Exception: Running E2E tests from your workstation that target the VPS Dev API is allowed (see above).

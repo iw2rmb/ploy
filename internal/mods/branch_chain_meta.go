@@ -8,8 +8,8 @@ import (
 
 // writeBranchChainStepMeta records chain metadata for a branch step and updates HEAD.
 // It reads previous HEAD (if exists), writes steps/<stepID>/meta.json, and updates HEAD.json.
-func writeBranchChainStepMeta(seaweed, execID, branchID, stepID, diffKey string) error {
-	headKey := fmt.Sprintf("mods/%s/branches/%s/HEAD.json", execID, branchID)
+func writeBranchChainStepMeta(seaweed, modID, branchID, stepID, diffKey string) error {
+	headKey := fmt.Sprintf("mods/%s/branches/%s/HEAD.json", modID, branchID)
 	prevID := ""
 	if b, code, _ := getJSONFn(seaweed, headKey); code == 200 {
 		var head map[string]string
@@ -25,7 +25,7 @@ func writeBranchChainStepMeta(seaweed, execID, branchID, stepID, diffKey string)
 		"ts":           time.Now().UTC().Format(time.RFC3339),
 	}
 	if mb, e := json.Marshal(meta); e == nil {
-		if err := putJSONFn(seaweed, fmt.Sprintf("mods/%s/branches/%s/steps/%s/meta.json", execID, branchID, stepID), mb); err != nil {
+		if err := putJSONFn(seaweed, fmt.Sprintf("mods/%s/branches/%s/steps/%s/meta.json", modID, branchID, stepID), mb); err != nil {
 			return err
 		}
 		if err := putJSONFn(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", stepID))); err != nil {

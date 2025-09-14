@@ -14,7 +14,7 @@ func TestMakeORWVarsContainsExpected(t *testing.T) {
 	if vars["MODS_CONTEXT_DIR"] != "/tmp/x" {
 		t.Fatal("context dir mismatch")
 	}
-	if vars["PLOY_MODS_EXECUTION_ID"] != "e-9" {
+	if vars["MOD_ID"] != "e-9" {
 		t.Fatal("exec id mismatch")
 	}
 	if vars["MODS_DIFF_KEY"] == "" {

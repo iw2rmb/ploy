@@ -9,18 +9,18 @@ import (
 func TestSubstituteHCLTemplateWithMCPVars_UsesProvidedVars(t *testing.T) {
 	tmp := t.TempDir()
 	hcl := filepath.Join(tmp, "planner.hcl")
-	body := "env { MODEL=\"${MODEL}\" CONTROLLER=\"${CONTROLLER_URL}\" EXEC=\"${EXECUTION_ID}\" CTX=${CONTEXT_HOST_DIR} OUT=${OUT_HOST_DIR} IMG=${PLANNER_IMAGE} DC=${NOMAD_DC} }\n"
+	body := "env { MODEL=\"${MODEL}\" CONTROLLER=\"${CONTROLLER_URL}\" MOD=\"${MOD_ID}\" CTX=${CONTEXT_HOST_DIR} OUT=${OUT_HOST_DIR} IMG=${PLANNER_IMAGE} DC=${NOMAD_DC} }\n"
 	if err := os.WriteFile(hcl, []byte(body), 0644); err != nil {
 		t.Fatalf("write hcl: %v", err)
 	}
 	vars := map[string]string{
-		"MODS_MODEL":             "gpt-x",
-		"PLOY_CONTROLLER":        "https://api.dev.ployman.app/v1",
-		"PLOY_MODS_EXECUTION_ID": "e-22",
-		"MODS_CONTEXT_DIR":       tmp,
-		"MODS_OUT_DIR":           filepath.Join(tmp, "out"),
-        "MODS_PLANNER_IMAGE":     "registry.dev.ployman.app/langgraph-runner:latest",
-		"NOMAD_DC":               "dc77",
+		"MODS_MODEL":         "gpt-x",
+		"PLOY_CONTROLLER":    "https://api.dev.ployman.app/v1",
+		"MOD_ID":             "mod-e-22",
+		"MODS_CONTEXT_DIR":   tmp,
+		"MODS_OUT_DIR":       filepath.Join(tmp, "out"),
+		"MODS_PLANNER_IMAGE": "registry.dev.ployman.app/langgraph-runner:latest",
+		"NOMAD_DC":           "dc77",
 	}
 	out, err := substituteHCLTemplateWithMCPVars(hcl, "run-1", vars, nil)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestSubstituteHCLTemplateWithMCPVars_UsesProvidedVars(t *testing.T) {
 	if want := "CONTROLLER=\"https://api.dev.ployman.app/v1\""; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "EXEC=\"e-22\""; !contains(s, want) {
+	if want := "MOD=\"mod-e-22\""; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
 	if want := "CTX=" + vars["MODS_CONTEXT_DIR"]; !contains(s, want) {

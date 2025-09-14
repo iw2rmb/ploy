@@ -21,7 +21,8 @@ func Status(c *fiber.Ctx) error {
 	}
 
 	// Get status from Nomad for all lanes that might be running
-	lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	// Prefer container lane E first on Dev to avoid misreporting older A/B jobs
+	lanes := []string{"e", "c", "d", "b", "a", "f", "g"}
 	var activeJob *orchestration.JobStatus
 	var lastError error
 

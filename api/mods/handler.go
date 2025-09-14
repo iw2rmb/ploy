@@ -177,11 +177,11 @@ func (h *Handler) RunMod(c *fiber.Ctx) error {
 	}
 
 	// Generate execution ID
-	executionID := fmt.Sprintf("tf-%s", uuid.New().String()[:8])
+	modID := fmt.Sprintf("tf-%s", uuid.New().String()[:8])
 
 	// Store initial status
 	status := ModStatus{
-		ID:        executionID,
+		ID:        modID,
 		Status:    "initializing",
 		StartTime: time.Now(),
 		Phase:     "init",
@@ -191,23 +191,23 @@ func (h *Handler) RunMod(c *fiber.Ctx) error {
 	}
 
 	// Execute mod asynchronously
-	go h.executeMod(executionID, config, req.TestMode)
+	go h.executeMod(modID, config, req.TestMode)
 
 	// Return immediate response
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
-		"execution_id": executionID,
-		"status":       "initializing",
-		"message":      "Mod execution started",
-		"status_url":   fmt.Sprintf("/v1/mods/%s/status", executionID),
+		"mod_id":     modID,
+		"status":     "initializing",
+		"message":    "Mod execution started",
+		"status_url": fmt.Sprintf("/v1/mods/%s/status", modID),
 	})
 }
 
 // executeMod runs the workflow asynchronously
-func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMode bool) {
+func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool) {
 	// Top-level guard: always convert panics to a terminal failure status
 	defer func() {
 		if r := recover(); r != nil {
-			h.recordError(executionID, fmt.Errorf("mod execution panic: %v", r))
+			h.recordError(modID, fmt.Errorf("mod execution panic: %v", r))
 		}
 	}()
 
@@ -224,7 +224,7 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 
 	// Update status to running
 	status := ModStatus{
-		ID:        executionID,
+		ID:        modID,
 		Status:    "running",
 		StartTime: time.Now(),
 		Phase:     "running",
@@ -234,9 +234,9 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 	}
 
 	// Create temp directory for workflow
-	tempDir, err := os.MkdirTemp("", fmt.Sprintf("mods-%s-*", executionID))
+	tempDir, err := os.MkdirTemp("", fmt.Sprintf("mods-%s-*", modID))
 	if err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to create temp directory: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to create temp directory: %w", err))
 		return
 	}
 	defer func() { _ = os.RemoveAll(tempDir) }()
@@ -244,24 +244,24 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 	// Prepare workspace structure and write templates for mod runner
 	jobsDir := filepath.Join(tempDir, "roadmap", "mods", "jobs")
 	if err := os.MkdirAll(jobsDir, 0755); err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to create jobs dir: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to create jobs dir: %w", err))
 		return
 	}
 	// Write embedded HCL templates
 	if err := os.WriteFile(filepath.Join(jobsDir, "planner.hcl"), nomadtpl.GetPlannerTemplate(), 0644); err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to write planner.hcl: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to write planner.hcl: %w", err))
 		return
 	}
 	if err := os.WriteFile(filepath.Join(jobsDir, "llm_exec.hcl"), nomadtpl.GetLLMExecTemplate(), 0644); err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to write llm_exec.hcl: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to write llm_exec.hcl: %w", err))
 		return
 	}
 	if err := os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), nomadtpl.GetORWApplyTemplate(), 0644); err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to write orw_apply.hcl: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to write orw_apply.hcl: %w", err))
 		return
 	}
 	if err := os.WriteFile(filepath.Join(jobsDir, "reducer.hcl"), nomadtpl.GetReducerTemplate(), 0644); err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to write reducer.hcl: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to write reducer.hcl: %w", err))
 		return
 	}
 
@@ -269,7 +269,7 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 	configPath := filepath.Join(tempDir, "mods.yaml")
 	configBytes, _ := yaml.Marshal(config)
 	if err := os.WriteFile(configPath, configBytes, 0644); err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to write config file: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to write config file: %w", err))
 		return
 	}
 
@@ -290,17 +290,17 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 	// Create configured runner
 	runner, err := integrations.CreateConfiguredRunner(config)
 	if err != nil {
-		h.recordError(executionID, fmt.Errorf("failed to create runner: %w", err))
+		h.recordError(modID, fmt.Errorf("failed to create runner: %w", err))
 		return
 	}
 
 	// Wire event reporter for real-time observability
-	reporter := mods.NewControllerEventReporter(controllerURL, executionID)
+	reporter := mods.NewControllerEventReporter(controllerURL, modID)
 	runner.SetEventReporter(reporter)
 
 	// Expose controller and execution ID to job templates for in-job event pushes
 	_ = os.Setenv("PLOY_CONTROLLER", controllerURL)
-	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", executionID)
+	_ = os.Setenv("MOD_ID", modID)
 	// Expose SeaweedFS URL default for task-side uploads
 	if os.Getenv("PLOY_SEAWEEDFS_URL") == "" {
 		_ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
@@ -324,14 +324,14 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 		if runErr != nil {
 			// Best-effort: persist any artifacts (e.g., error logs) and enrich error message
 			if h.storage != nil {
-				if persisted, err := h.persistArtifacts(executionID, tempDir); err != nil {
+				if persisted, err := h.persistArtifacts(modID, tempDir); err != nil {
 					log.Printf("[Mod] Warning: artifact persistence on failure failed: %v", err)
 				} else if repo := config.TargetRepo; repo != "" {
 					if key, ok := persisted["source_sbom"]; ok {
-						h.recordLatestSBOM(repo, key, "", executionID)
+						h.recordLatestSBOM(repo, key, "", modID)
 					}
 					if key, ok := persisted["sbom"]; ok {
-						h.recordLatestSBOM(repo, key, "", executionID)
+						h.recordLatestSBOM(repo, key, "", modID)
 					}
 				}
 			}
@@ -360,13 +360,13 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 			if errDetail != "" {
 				runErr = fmt.Errorf("%v; details: %s", runErr, errDetail)
 			}
-			h.recordError(executionID, runErr)
+			h.recordError(modID, runErr)
 			return
 		}
 		// continue to success handling below
 	case <-ctx.Done():
 		// Timeout/cancellation — record a terminal error
-		h.recordError(executionID, fmt.Errorf("mod execution exceeded max duration (%s)", execTimeout))
+		h.recordError(modID, fmt.Errorf("mod execution exceeded max duration (%s)", execTimeout))
 		return
 	}
 
@@ -376,15 +376,15 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 	// Persist known artifacts (best-effort)
 	artifacts := map[string]string{}
 	if h.storage != nil {
-		if persisted, err := h.persistArtifacts(executionID, tempDir); err == nil {
+		if persisted, err := h.persistArtifacts(modID, tempDir); err == nil {
 			artifacts = persisted
 			// Record latest SBOM pointer if available
 			if repo := config.TargetRepo; repo != "" {
 				if key, ok := artifacts["source_sbom"]; ok {
-					h.recordLatestSBOM(repo, key, result.CommitSHA, executionID)
+					h.recordLatestSBOM(repo, key, result.CommitSHA, modID)
 				}
 				if key, ok := artifacts["sbom"]; ok {
-					h.recordLatestSBOM(repo, key, result.CommitSHA, executionID)
+					h.recordLatestSBOM(repo, key, result.CommitSHA, modID)
 				}
 			}
 		} else {
@@ -392,7 +392,7 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 		}
 	}
 	// Load current status to preserve steps and phase
-	prevStatus, _ := h.getStatus(executionID)
+	prevStatus, _ := h.getStatus(modID)
 	var prevSteps []ModStepStatus
 	var prevPhase string
 	var prevLastJob *ModLastJob
@@ -402,7 +402,7 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 		prevLastJob = prevStatus.LastJob
 	}
 	status = ModStatus{
-		ID:        executionID,
+		ID:        modID,
 		Status:    "completed",
 		StartTime: status.StartTime,
 		EndTime:   &endTime,
@@ -430,14 +430,14 @@ func (h *Handler) executeMod(executionID string, config *mods.ModConfig, testMod
 // (See bottom of file for the handler that returns status and includes runtime enrichment.)
 
 // recordError records an error status for the execution
-func (h *Handler) recordError(executionID string, err error) {
+func (h *Handler) recordError(modID string, err error) {
 	endTime := time.Now()
 	// Preserve existing status (steps, phase, start time) if available
 	var status *ModStatus
-	if st, getErr := h.getStatus(executionID); getErr == nil && st != nil {
+	if st, getErr := h.getStatus(modID); getErr == nil && st != nil {
 		status = st
 	} else {
-		status = &ModStatus{ID: executionID, StartTime: endTime}
+		status = &ModStatus{ID: modID, StartTime: endTime}
 	}
 	status.Status = "failed"
 	status.EndTime = &endTime
@@ -449,7 +449,7 @@ func (h *Handler) recordError(executionID string, err error) {
 
 // persistArtifacts scans the temp workspace for known Mods artifacts and uploads them to storage.
 // Returns a map of artifact logical names to storage keys.
-func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]string, error) {
+func (h *Handler) persistArtifacts(modID, tempDir string) (map[string]string, error) {
 	artifacts := map[string]string{}
 	if h.storage == nil {
 		return artifacts, nil
@@ -461,7 +461,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			return nil
 		}
 		if strings.HasSuffix(strings.ToLower(info.Name()), ".sbom.json") {
-			key := fmt.Sprintf("artifacts/mods/%s/%s", executionID, info.Name())
+			key := fmt.Sprintf("artifacts/mods/%s/%s", modID, info.Name())
 			f, _ := os.Open(path)
 			defer func() { _ = f.Close() }()
 			if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -484,7 +484,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	// Planner plan.json
 	planPath := filepath.Join(tempDir, "planner", "out", "plan.json")
 	if fi, err := os.Stat(planPath); err == nil && !fi.IsDir() {
-		key := fmt.Sprintf("artifacts/mods/%s/plan.json", executionID)
+		key := fmt.Sprintf("artifacts/mods/%s/plan.json", modID)
 		f, _ := os.Open(planPath)
 		defer func() { _ = f.Close() }()
 		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -494,7 +494,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	// Reducer next.json
 	nextPath := filepath.Join(tempDir, "reducer", "out", "next.json")
 	if fi, err := os.Stat(nextPath); err == nil && !fi.IsDir() {
-		key := fmt.Sprintf("artifacts/mods/%s/next.json", executionID)
+		key := fmt.Sprintf("artifacts/mods/%s/next.json", modID)
 		f, _ := os.Open(nextPath)
 		defer func() { _ = f.Close() }()
 		if err := h.storage.Put(ctx, key, f, internalStorage.WithContentType("application/json")); err == nil {
@@ -510,8 +510,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 		}
 		if filepath.Base(path) == "diff.patch" {
 			// Prefer task-side upload key if present; support both legacy and new prefixes
-			keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
-			keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
+			keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", modID)
+			keyAlt := fmt.Sprintf("mods/%s/diff.patch", modID)
 			// If already present (task-side upload), record and skip
 			if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
 				artifacts["diff_patch"] = keyPrimary
@@ -531,7 +531,7 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 			return nil
 		}
 		if filepath.Base(path) == "error.log" {
-			key := fmt.Sprintf("artifacts/mods/%s/error.log", executionID)
+			key := fmt.Sprintf("artifacts/mods/%s/error.log", modID)
 			if ok, _ := h.storage.Exists(ctx, key); ok {
 				artifacts["error_log"] = key
 			} else {
@@ -547,8 +547,8 @@ func (h *Handler) persistArtifacts(executionID, tempDir string) (map[string]stri
 	})
 	// If no local diff found or persisted above, check storage proactively for known keys (SeaweedFS-only IO path)
 	if _, ok := artifacts["diff_patch"]; !ok {
-		keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", executionID)
-		keyAlt := fmt.Sprintf("mods/%s/diff.patch", executionID)
+		keyPrimary := fmt.Sprintf("artifacts/mods/%s/diff.patch", modID)
+		keyAlt := fmt.Sprintf("mods/%s/diff.patch", modID)
 		if ok, _ := h.storage.Exists(ctx, keyPrimary); ok {
 			artifacts["diff_patch"] = keyPrimary
 		} else if ok2, _ := h.storage.Exists(ctx, keyAlt); ok2 {
@@ -566,11 +566,11 @@ func (h *Handler) recordLatestSBOM(repo, storageKey, sha, execID string) {
 	sum := crsha1.Sum([]byte(repo))
 	slug := hex.EncodeToString(sum[:])
 	data := map[string]interface{}{
-		"repo":         repo,
-		"sha":          sha,
-		"storage_key":  storageKey,
-		"execution_id": execID,
-		"updated_at":   time.Now().UTC().Format(time.RFC3339),
+		"repo":        repo,
+		"sha":         sha,
+		"storage_key": storageKey,
+		"mod_id":      execID,
+		"updated_at":  time.Now().UTC().Format(time.RFC3339),
 	}
 	b, _ := json.Marshal(data)
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -583,8 +583,8 @@ func (h *Handler) recordLatestSBOM(repo, storageKey, sha, execID string) {
 
 // GetModStatus handles GET /v1/mods/:id/status
 func (h *Handler) GetModStatus(c *fiber.Ctx) error {
-	executionID := c.Params("id")
-	if executionID == "" {
+	modID := c.Params("id")
+	if modID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "missing_id",
@@ -594,12 +594,12 @@ func (h *Handler) GetModStatus(c *fiber.Ctx) error {
 	}
 
 	// Retrieve status from store
-	status, err := h.getStatus(executionID)
+	status, err := h.getStatus(modID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "not_found",
-				"message": fmt.Sprintf("Mod execution %s not found", executionID),
+				"message": fmt.Sprintf("Mod execution %s not found", modID),
 			},
 		})
 	}
@@ -662,8 +662,8 @@ func (h *Handler) ListMods(c *fiber.Ctx) error {
 
 // CancelMod handles DELETE /v1/mods/:id
 func (h *Handler) CancelMod(c *fiber.Ctx) error {
-	executionID := c.Params("id")
-	if executionID == "" {
+	modID := c.Params("id")
+	if modID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "missing_id",
@@ -673,12 +673,12 @@ func (h *Handler) CancelMod(c *fiber.Ctx) error {
 	}
 
 	// Check if execution exists
-	status, err := h.getStatus(executionID)
+	status, err := h.getStatus(modID)
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "not_found",
-				"message": fmt.Sprintf("Mod execution %s not found", executionID),
+				"message": fmt.Sprintf("Mod execution %s not found", modID),
 			},
 		})
 	}
@@ -708,7 +708,7 @@ func (h *Handler) CancelMod(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"message": fmt.Sprintf("Mod execution %s cancelled", executionID),
+		"message": fmt.Sprintf("Mod execution %s cancelled", modID),
 		"status":  status,
 	})
 }
@@ -729,12 +729,12 @@ func (h *Handler) storeStatus(status ModStatus) error {
 }
 
 // getStatus retrieves the status from the KV store
-func (h *Handler) getStatus(executionID string) (*ModStatus, error) {
+func (h *Handler) getStatus(modID string) (*ModStatus, error) {
 	if h.statusStore == nil {
 		return nil, fmt.Errorf("status store not configured")
 	}
 
-	key := fmt.Sprintf("mods/status/%s", executionID)
+	key := fmt.Sprintf("mods/status/%s", modID)
 	data, err := h.statusStore.Get(key)
 	if err != nil {
 		return nil, err
@@ -750,7 +750,7 @@ func (h *Handler) getStatus(executionID string) (*ModStatus, error) {
 
 // ModEvent represents a real-time event emitted by runner/jobs
 type ModEvent struct {
-	ExecutionID string    `json:"execution_id"`
+	ExecutionID string    `json:"mod_id"`
 	Phase       string    `json:"phase,omitempty"`
 	Step        string    `json:"step,omitempty"`
 	Level       string    `json:"level,omitempty"`
@@ -779,7 +779,7 @@ func (h *Handler) ReportEvent(c *fiber.Ctx) error {
 	}
 	if ev.ExecutionID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": fiber.Map{"code": "missing_execution_id", "message": "execution_id is required"},
+			"error": fiber.Map{"code": "missing_mod_id", "message": "mod_id is required"},
 		})
 	}
 	// Load or initialize status

@@ -313,9 +313,9 @@ func randomStepID() string {
 
 // IO helpers moved to job_io.go; keep indirection vars there
 
-// uploadInputTar uploads input.tar to artifacts/mods/<execID>/input.tar (best-effort)
-func uploadInputTar(seaweedBase, execID, inputTarPath string) error {
-	key := fmt.Sprintf("mods/%s/input.tar", execID)
+// uploadInputTar uploads input.tar to artifacts/mods/<modID>/input.tar (best-effort)
+func uploadInputTar(seaweedBase, modID, inputTarPath string) error {
+	key := fmt.Sprintf("mods/%s/input.tar", modID)
 	return putFileFn(seaweedBase, key, inputTarPath, "application/octet-stream")
 }
 
@@ -663,22 +663,22 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			// Prepare env and substitute final template
 			baseDir := filepath.Dir(renderedPath)
 
-			// Prepare branch-scoped step id and DIFF_KEY so job uploads directly under branches/<branch>/steps/<step_id>
-			execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+			// Prepare branch-scoped step id and DIFF_KEY using MOD_ID only
+			modID := os.Getenv("MOD_ID")
 			branchID := step.ID
-			bs := NewBranchStep(execID, branchID)
+			bs := NewBranchStep(modID, branchID)
 			curStepID := bs.ID
 			diffKey := bs.DiffKey
 
 			// Prepare input tar from the cloned repository and upload to SeaweedFS for task-side download
-			execID = os.Getenv("PLOY_MODS_EXECUTION_ID")
+			modID = os.Getenv("MOD_ID")
 			seaweed := ResolveInfraFromEnv().SeaweedURL
 			// Upload best-effort to artifacts/mods/<id>/input.tar using HTTP client
-			if err := uploadInputTar(seaweed, execID, inputTar); err != nil {
+			if err := uploadInputTar(seaweed, modID, inputTar); err != nil {
 				r.emit(ctx, "apply", "input-upload", "warn", fmt.Sprintf("input.tar upload failed: %v", err))
 			}
 			// Substitute HCL with explicit variables to avoid global env writes
-			vars := makeORWVars(baseDir, execID, diffKey, seaweed)
+			vars := makeORWVars(baseDir, modID, diffKey, seaweed)
 			submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
 			if err != nil {
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)})
@@ -686,8 +686,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			}
 
 			// Persist a copy of the submitted HCL for post-mortem inspection
-			if execID := os.Getenv("PLOY_MODS_EXECUTION_ID"); execID != "" {
-				persistDir := filepath.Join("/tmp/mods-submitted", execID, step.ID)
+			if modID := os.Getenv("MOD_ID"); modID != "" {
+				persistDir := filepath.Join("/tmp/mods-submitted", modID, step.ID)
 				_ = os.MkdirAll(persistDir, 0755)
 				dest := filepath.Join(persistDir, "orw_apply.submitted.hcl")
 				if b, e := os.ReadFile(submittedPath); e == nil {
@@ -718,7 +718,7 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			if r.transformExec != nil {
 				params := ORWSubmitParams{
 					SeaweedURL:       seaweed,
-					ExecID:           os.Getenv("PLOY_MODS_EXECUTION_ID"),
+					ModID:            os.Getenv("MOD_ID"),
 					BranchID:         branchID,
 					StepID:           curStepID,
 					RunID:            runID,
@@ -748,7 +748,7 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 				},
 				r.reportLastJobAsync,
 				seaweed,
-				os.Getenv("PLOY_MODS_EXECUTION_ID"), branchID, curStepID, runID,
+				os.Getenv("MOD_ID"), branchID, curStepID, runID,
 				submittedPath, diffPath, orwTimeout); err != nil {
 				r.emit(ctx, "apply", string(StepTypeORWApply), "error", err.Error())
 				result.StepResults = append(result.StepResults, StepResult{StepID: step.ID, Success: false, Message: err.Error()})
@@ -760,7 +760,7 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			r.emit(ctx, "apply", string(StepTypeORWApply), "info", "orw-apply job completed")
 
 			// Reconstruct branch state: apply all prior diffs from chain HEAD → root
-			_ = r.reconstructBranchState(ctx, seaweed, execID, step.ID, baseDir, repoPath)
+			_ = r.reconstructBranchState(ctx, seaweed, modID, step.ID, baseDir, repoPath)
 
 			if fi, err := os.Stat(diffPath); err == nil {
 				r.emit(ctx, "apply", "diff-found", "info", fmt.Sprintf("diff ready (%d bytes)", fi.Size()))
@@ -789,8 +789,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			// Record chain metadata for this branch (option_id = step.ID)
 			{
 				branchID := step.ID
-				branchDiffKey := computeBranchDiffKey(execID, branchID, curStepID)
-				_ = writeBranchChainStepMeta(seaweed, execID, branchID, curStepID, branchDiffKey)
+				branchDiffKey := computeBranchDiffKey(modID, branchID, curStepID)
+				_ = writeBranchChainStepMeta(seaweed, modID, branchID, curStepID, branchDiffKey)
 			}
 
 		case "recipe":
@@ -1124,8 +1124,8 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 // Strategy: remove src/healing/java (profile-only failing sources) and
 // add a stub UnknownClass if the error contains that symbol.
 func (r *ModRunner) localRemediation(repoPath, buildError string) error {
-    // Disabled to ensure healing proceeds via planner/llm and produces an explicit diff
-    return fmt.Errorf("local remediation disabled; require planner/llm healing")
+	// Disabled to ensure healing proceeds via planner/llm and produces an explicit diff
+	return fmt.Errorf("local remediation disabled; require planner/llm healing")
 }
 
 // CleanupWorkspace removes the temporary workspace directory

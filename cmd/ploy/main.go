@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/iw2rmb/ploy/internal/cli/analysis"
 	"github.com/iw2rmb/ploy/internal/cli/apps"
 	"github.com/iw2rmb/ploy/internal/cli/arf"
 	"github.com/iw2rmb/ploy/internal/cli/bluegreen"
@@ -19,7 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/ui"
 	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
-	mods "github.com/iw2rmb/ploy/internal/mods"
+	"github.com/iw2rmb/ploy/internal/mods"
 )
 
 var controllerURL = utils.ResolveControllerURLFromEnv()
@@ -29,8 +28,6 @@ func main() {
 		switch os.Args[1] {
 		case "mod":
 			mods.ModCmd(os.Args[2:], controllerURL)
-		case "analyze":
-			analysis.AnalyzeCmd(os.Args[2:], controllerURL)
 		case "apps":
 			apps.AppsCmd(os.Args[2:], controllerURL)
 		case "push":

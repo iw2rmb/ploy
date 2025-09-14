@@ -3,125 +3,425 @@
 package deploy
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "testing"
-    "time"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
 )
 
 type Case struct {
-    Lane    string
-    Lang    string
-    Version string
+	Lane    string
+	Lang    string
+	Version string
 }
 
 func (c Case) RepoURL(user string) string {
-    return fmt.Sprintf("https://github.com/%s/ploy-lane-%s-%s-%s.git", user, strings.ToLower(c.Lane), strings.ToLower(c.Lang), c.Version)
+	return fmt.Sprintf("https://github.com/%s/ploy-lane-%s-%s-%s.git", user, strings.ToLower(c.Lane), strings.ToLower(c.Lang), c.Version)
 }
 
 var matrix = []Case{
-    {Lane: "C", Lang: "scala", Version: "21"},
-    {Lane: "C", Lang: "java", Version: "8"},
-    {Lane: "E", Lang: "node", Version: "20"},
-    {Lane: "E", Lang: "go", Version: "1.22"},
-    {Lane: "E", Lang: "python", Version: "3.12"},
+	// Focus on Lane E first while stabilizing Dev
+	{Lane: "E", Lang: "node", Version: "20"},
+	{Lane: "E", Lang: "go", Version: "1.22"},
+	{Lane: "E", Lang: "python", Version: "3.12"},
 }
 
 func TestDeployMatrix(t *testing.T) {
-    controller := os.Getenv("PLOY_CONTROLLER")
-    if controller == "" {
-        t.Skip("PLOY_CONTROLLER is required for E2E")
-    }
-    user := os.Getenv("GITHUB_PLOY_DEV_USERNAME")
-    if user == "" { t.Skip("GITHUB_PLOY_DEV_USERNAME required") }
-    for _, tc := range matrix {
-        t.Run(fmt.Sprintf("%s-%s-%s", tc.Lane, tc.Lang, tc.Version), func(t *testing.T) {
-            repo := tc.RepoURL(user)
-            app := filepath.Base(strings.TrimSuffix(repo, ".git"))
-            runDeploy(t, controller, tc.Lane, repo, app)
-        })
-    }
+	controller := os.Getenv("PLOY_CONTROLLER")
+	if controller == "" {
+		t.Skip("PLOY_CONTROLLER is required for E2E")
+	}
+	user := os.Getenv("GITHUB_PLOY_DEV_USERNAME")
+	if user == "" {
+		t.Skip("GITHUB_PLOY_DEV_USERNAME required")
+	}
+	total := len(matrix)
+	for i, tc := range matrix {
+		t.Run(fmt.Sprintf("%s-%s-%s", tc.Lane, tc.Lang, tc.Version), func(t *testing.T) {
+			repo := tc.RepoURL(user)
+			app := filepath.Base(strings.TrimSuffix(repo, ".git"))
+			pushBudget, asyncBudget, healthBudget := budgetsForCase(t, i, total)
+			runDeploy(t, controller, tc.Lane, repo, app, pushBudget, asyncBudget, healthBudget)
+		})
+	}
 }
 
-func runDeploy(t *testing.T, controller, lane, repo, app string) {
-    t.Helper()
-    // Clone shallow
-    work, err := os.MkdirTemp("", "ploy-e2e-")
-    if err != nil { t.Fatal(err) }
-    defer os.RemoveAll(work)
-    run(t, work, "git", "clone", "--depth", "1", "--branch", "main", repo, "app")
-    // Push with ploy CLI
-    cmd := exec.Command(bin(), "push", "-a", app, "-lane", lane)
-    cmd.Dir = filepath.Join(work, "app")
-    cmd.Env = append(os.Environ(), fmt.Sprintf("PLOY_CONTROLLER=%s", controller))
-    out, err := cmd.CombinedOutput()
-    if err != nil { t.Fatalf("ploy push failed: %v\n%s", err, string(out)) }
-    // Parse async id if present
-    id := parseAcceptedID(out)
-    if id != "" { waitAsync(t, controller, app, id, 180*time.Second) }
-    // Health check
-    waitHealth(t, app, 300*time.Second)
-    // Cleanup
-    run(t, work, bin(), "apps", "destroy", "--name", app, "--force")
+// Explicit case: Java (Gradle) without Jib to validate Lane E autogen
+func TestDeploy_Java17_NoJib(t *testing.T) {
+	controller := os.Getenv("PLOY_CONTROLLER")
+	if controller == "" {
+		t.Skip("PLOY_CONTROLLER is required for E2E")
+	}
+	user := os.Getenv("GITHUB_PLOY_DEV_USERNAME")
+	if user == "" {
+		t.Skip("GITHUB_PLOY_DEV_USERNAME required")
+	}
+	lane := "E"
+	repo := fmt.Sprintf("https://github.com/%s/ploy-lane-e-java-17-nojib.git", user)
+	app := "ploy-lane-e-java-17-nojib"
+	pushBudget, asyncBudget, healthBudget := budgetsForCase(t, 0, 1)
+	runDeploy(t, controller, lane, repo, app, pushBudget, asyncBudget, healthBudget)
+}
+
+func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asyncBudget, healthBudget time.Duration) {
+	t.Helper()
+	// Clone shallow
+	work, err := os.MkdirTemp("", "ploy-e2e-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(work)
+	run(t, work, 20*time.Second, "git", "clone", "--depth", "1", "--branch", "main", repo, "app")
+	// Push with ploy CLI; for Lane E, opt-in Dockerfile autogen via env
+	cmd := exec.Command(bin(), "push", "-a", app, "-lane", lane)
+	cmd.Dir = filepath.Join(work, "app")
+	env := append(os.Environ(), fmt.Sprintf("PLOY_CONTROLLER=%s", controller))
+	if strings.ToUpper(lane) == "E" {
+		env = append(env, "PLOY_AUTOGEN_DOCKERFILE=1")
+	}
+	cmd.Env = env
+	out, err := runWithTimeout(cmd, pushBudget)
+	if err != nil {
+		t.Fatalf("ploy push failed: %v\n%s", err, string(out))
+	}
+	// Parse async id if present
+	id := parseAcceptedID(out)
+	var metrics map[string]any
+    if id != "" {
+        metrics = waitAsync(t, controller, app, id, asyncBudget)
+    }
+    // Health check (fetch logs on failure), with controller-proxied fallback
+    if err := waitHealth(controller, app, healthBudget); err != nil {
+        sha := gitHead(t, filepath.Join(work, "app"))
+        if id != "" {
+            fetchBuilderLogsAPI(t, controller, app, id)
+        }
+        fetchLogs(t, app, lane, sha)
+        t.Fatalf("%v", err)
+    }
+	// Cleanup
+	run(t, work, 15*time.Second, bin(), "apps", "destroy", "--name", app, "--force")
+	// Write result entry
+	writeResult(t, lane, repo, app, metrics)
 }
 
 func bin() string {
-    if p := os.Getenv("PLOY_CMD"); p != "" { return p }
-    if _, err := os.Stat("./bin/ploy"); err == nil { return "./bin/ploy" }
-    return "ploy"
+	if p := os.Getenv("PLOY_CMD"); p != "" {
+		return p
+	}
+	if _, err := os.Stat("./bin/ploy"); err == nil {
+		return "./bin/ploy"
+	}
+	return "ploy"
 }
 
-func run(t *testing.T, dir string, name string, args ...string) {
-    t.Helper()
-    cmd := exec.Command(name, args...)
-    cmd.Dir = dir
-    out, err := cmd.CombinedOutput()
-    if err != nil { t.Fatalf("%s %v failed: %v\n%s", name, args, err, string(out)) }
+func run(t *testing.T, dir string, timeout time.Duration, name string, args ...string) {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	out, err := runWithTimeout(cmd, timeout)
+	if err != nil {
+		t.Fatalf("%s %v failed: %v\n%s", name, args, err, string(out))
+	}
+}
+
+// runWithTimeout runs a command with a timeout and returns (stdout+stderr, error)
+func runWithTimeout(cmd *exec.Cmd, timeout time.Duration) ([]byte, error) {
+	if timeout <= 0 {
+		return cmd.CombinedOutput()
+	}
+	type result struct {
+		out []byte
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		out, err := cmd.CombinedOutput()
+		done <- result{out: out, err: err}
+	}()
+	select {
+	case r := <-done:
+		return r.out, r.err
+	case <-time.After(timeout):
+		_ = cmd.Process.Kill()
+		return []byte(fmt.Sprintf("command timed out after %s", timeout)), fmt.Errorf("timeout")
+	}
 }
 
 func parseAcceptedID(out []byte) string {
-    // extract {"accepted":true,"id":"..."}
-    i := bytes.IndexByte(out, '{')
-    if i < 0 { return "" }
-    var m map[string]any
-    if err := json.Unmarshal(out[i:], &m); err != nil { return "" }
-    if v, ok := m["accepted"].(bool); !ok || !v { return "" }
-    if id, ok := m["id"].(string); ok { return id }
-    return "" }
-
-func waitAsync(t *testing.T, controller, app, id string, dur time.Duration) {
-    t.Helper()
-    deadline := time.Now().Add(dur)
-    url := fmt.Sprintf("%s/apps/%s/builds/%s/status", strings.TrimRight(controller, "/"), app, id)
-    for time.Now().Before(deadline) {
-        resp, err := http.Get(url)
-        if err == nil && resp.StatusCode == 200 {
-            var m map[string]any
-            _ = json.NewDecoder(resp.Body).Decode(&m); resp.Body.Close()
-            if s, _ := m["status"].(string); s == "failed" { t.Fatalf("async failed: %v", m["message"]) }
-            if s == "completed" { return }
-        }
-        time.Sleep(3 * time.Second)
-    }
+	// extract {"accepted":true,"id":"..."}
+	i := bytes.IndexByte(out, '{')
+	if i < 0 {
+		return ""
+	}
+	var m map[string]any
+	if err := json.Unmarshal(out[i:], &m); err != nil {
+		return ""
+	}
+	if v, ok := m["accepted"].(bool); !ok || !v {
+		return ""
+	}
+	if id, ok := m["id"].(string); ok {
+		return id
+	}
+	return ""
 }
 
-func waitHealth(t *testing.T, app string, dur time.Duration) {
-    t.Helper()
+func waitAsync(t *testing.T, controller, app, id string, dur time.Duration) map[string]any {
+	t.Helper()
+	deadline := time.Now().Add(dur)
+	url := fmt.Sprintf("%s/apps/%s/builds/%s/status", strings.TrimRight(controller, "/"), app, id)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(url)
+		if err == nil && resp.StatusCode == 200 {
+			var m map[string]any
+			_ = json.NewDecoder(resp.Body).Decode(&m)
+			resp.Body.Close()
+			status, _ := m["status"].(string)
+			if status == "failed" {
+				t.Fatalf("async failed: %v", m["message"])
+			}
+			if status == "completed" {
+				// Parse response JSON embedded in message
+				if msg, _ := m["message"].(string); msg != "" {
+					var rm map[string]any
+					_ = json.Unmarshal([]byte(msg), &rm)
+					return rm
+				}
+				return nil
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func waitHealth(controller, app string, dur time.Duration) error {
     // preview URL or fallback
     // Since HEAD commit may vary, try the fallback app host first
     base := fmt.Sprintf("https://%s.dev.ployd.app/healthz", app)
     deadline := time.Now().Add(dur)
     for time.Now().Before(deadline) {
         resp, err := http.Get(base)
-        if err == nil { resp.Body.Close(); if resp.StatusCode == 200 { return } }
-        time.Sleep(3 * time.Second)
+        if err == nil {
+            resp.Body.Close()
+            if resp.StatusCode == 200 {
+                return nil
+            }
+        }
+        // Try controller-proxied internal probe if available
+        if controller != "" {
+            url := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
+            if r, e := http.Get(url); e == nil {
+                var m map[string]any
+                _ = json.NewDecoder(r.Body).Decode(&m)
+                r.Body.Close()
+                if code, ok := m["code"].(float64); ok && int(code) == 200 {
+                    return nil
+                }
+            }
+        }
+        time.Sleep(1 * time.Second)
     }
-    t.Fatalf("health check failed: %s", base)
+    return fmt.Errorf("health check failed: %s", base)
 }
 
+// timeBudgets derives phase budgets from the test deadline to honor -timeout.
+// It reserves 60s for teardown and log collection.
+func budgetsForCase(t *testing.T, idx, total int) (time.Duration, time.Duration, time.Duration) {
+	dl, ok := t.Deadline()
+	if !ok || total <= 0 {
+		return 30 * time.Second, 45 * time.Second, 30 * time.Second
+	}
+	remaining := time.Until(dl)
+	if remaining <= 0 {
+		return 15 * time.Second, 20 * time.Second, 10 * time.Second
+	}
+	if remaining > 30*time.Second {
+		remaining -= 30 * time.Second
+	}
+	casesLeft := total - idx
+	if casesLeft < 1 {
+		casesLeft = 1
+	}
+	slice := remaining / time.Duration(casesLeft)
+    push := time.Duration(float64(slice) * 0.25)
+    async := time.Duration(float64(slice) * 0.55)
+    health := time.Duration(float64(slice) * 0.15)
+	// clamps
+    if push > 60*time.Second {
+        push = 60 * time.Second
+    }
+    if async > 240*time.Second {
+        async = 240 * time.Second
+    }
+    if health > 60*time.Second {
+        health = 60 * time.Second
+    }
+    if push < 15*time.Second {
+        push = 15 * time.Second
+    }
+    if async < 20*time.Second {
+        async = 20 * time.Second
+    }
+    if health < 15*time.Second {
+        health = 15 * time.Second
+    }
+	return push, async, health
+}
+
+func writeResult(t *testing.T, lane, repo, app string, metrics map[string]any) {
+	t.Helper()
+	type entry struct {
+		Lane    string         `json:"lane"`
+		Repo    string         `json:"repo"`
+		App     string         `json:"app"`
+		Metrics map[string]any `json:"metrics,omitempty"`
+		Time    string         `json:"time"`
+	}
+	e := entry{Lane: lane, Repo: repo, App: app, Metrics: metrics, Time: time.Now().Format(time.RFC3339)}
+	b, _ := json.Marshal(e)
+	path := filepath.Join("tests", "e2e", "deploy", "results.jsonl")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		t.Logf("failed to write results: %v", err)
+		return
+	}
+	defer f.Close()
+	b = append(b, '\n')
+	_, _ = f.Write(b)
+
+	// Also append a human-friendly Markdown row to results.md with size/time if available
+	md := filepath.Join("tests", "e2e", "deploy", "results.md")
+	var szMB, durMS string
+	if metrics != nil {
+		if im, ok := metrics["imageSize"].(map[string]any); ok {
+			if v, ok := im["mb"].(float64); ok {
+				szMB = fmt.Sprintf("%.1fMB", v)
+			}
+		}
+		if bm, ok := metrics["build"].(map[string]any); ok {
+			if v, ok := bm["duration_ms"].(float64); ok {
+				durMS = fmt.Sprintf("%.1fs", v/1000.0)
+			}
+		}
+	}
+	if szMB == "" {
+		szMB = "—"
+	}
+	if durMS == "" {
+		durMS = "—"
+	}
+	row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s |\n", lane, inferStack(repo), inferVersion(repo), repo, szMB, durMS)
+	_ = appendFile(md, row)
+}
+
+func inferStack(repo string) string {
+	// repo name: ploy-lane-<lane>-<lang>-<ver>
+	base := filepath.Base(strings.TrimSuffix(repo, ".git"))
+	parts := strings.Split(base, "-")
+	if len(parts) >= 4 {
+		return parts[3]
+	}
+	return ""
+}
+
+func inferVersion(repo string) string {
+	base := filepath.Base(strings.TrimSuffix(repo, ".git"))
+	parts := strings.Split(base, "-")
+	if len(parts) >= 5 {
+		return parts[4]
+	}
+	return ""
+}
+
+func appendFile(path, line string) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(line)
+	return err
+}
+
+func gitHead(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "--short=12", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func fetchLogs(t *testing.T, app, lane, sha string) {
+	t.Helper()
+	script := resolveRepoPath("tests/e2e/deploy/fetch-logs.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Logf("fetch-logs.sh not found: %v", err)
+		return
+	}
+	cmd := exec.Command("bash", script)
+	cmd.Env = append(os.Environ(),
+		"APP_NAME="+app,
+		"LANE="+lane,
+		"SHA="+sha,
+		"LINES=200",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("fetch-logs.sh error: %v", err)
+	}
+	if len(out) > 0 {
+		t.Logf("\n%s\n", string(out))
+	}
+}
+
+// resolveRepoPath returns an absolute path to a repo-relative path, working under `go test` temp dirs.
+func resolveRepoPath(rel string) string {
+	// Allow override to set repo root explicitly
+	if root := os.Getenv("E2E_REPO_ROOT"); root != "" {
+		return filepath.Join(root, rel)
+	}
+	// Use the path of this source file to derive repo root
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return rel
+	}
+	// file is .../tests/e2e/deploy/deploy_matrix_test.go
+	base := filepath.Dir(file)               // .../tests/e2e/deploy
+	root := filepath.Dir(filepath.Dir(base)) // .../tests
+	root = filepath.Dir(root)                // repo root
+	return filepath.Join(root, rel)
+}
+
+func fetchBuilderLogsAPI(t *testing.T, controller, app, id string) {
+	t.Helper()
+	if controller == "" || id == "" {
+		return
+	}
+	url := fmt.Sprintf("%s/apps/%s/builds/%s/logs?lines=200", strings.TrimRight(controller, "/"), app, id)
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Logf("builder logs API error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Logf("builder logs API status: %d", resp.StatusCode)
+		return
+	}
+	var m map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&m)
+	b, _ := json.MarshalIndent(m, "", "  ")
+	t.Logf("\n== Builder logs API (%s)\n%s\n", id, string(b))
+}

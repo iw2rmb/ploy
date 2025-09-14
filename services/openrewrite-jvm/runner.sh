@@ -11,9 +11,9 @@ post_event() {
   local phase="$1"; shift
   local step="$1"; shift
   local msg="$1"
-  if [ -n "${CONTROLLER_URL}" ] && [ -n "${MODS_EXECUTION_ID}" ]; then
+  if [ -n "${CONTROLLER_URL}" ] && [ -n "${MOD_ID}" ]; then
     # Avoid failing the run due to telemetry issues
-    curl -sS -X POST "${CONTROLLER_URL%/}/mods/${MODS_EXECUTION_ID}/events" \
+    curl -sS -X POST "${CONTROLLER_URL%/}/mods/${MOD_ID}/events" \
       -H "Content-Type: application/json" \
       -d "{\"phase\":\"${phase}\",\"step\":\"${step}\",\"level\":\"${level}\",\"message\":\"${msg}\"}" \
       -o /dev/null || true

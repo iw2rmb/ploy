@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./check-steps.sh <EXEC_ID>
+# Usage: ./check-steps.sh <MOD_ID>
 # Validates that critical steps occurred in the expected order for the scenario.
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 <EXEC_ID>" >&2
+  echo "Usage: $0 <MOD_ID>" >&2
   exit 1
 fi
 
-EXEC_ID="$1"
+MOD_ID="$1"
 API_BASE="${PLOY_CONTROLLER:-}"
 if [[ -z "$API_BASE" ]]; then
   echo "PLOY_CONTROLLER must be set (e.g., https://api.dev.ployman.app/v1)" >&2
   exit 1
 fi
 
-ST_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/status")
+ST_JSON=$(curl -sS "$API_BASE/mods/$MOD_ID/status")
 
 req() {
   local field="$1"; shift
@@ -30,7 +30,7 @@ req() {
 # Ensure step records exist
 COUNT=$(echo "$ST_JSON" | jq '.steps | length')
 if [[ "$COUNT" -eq 0 ]]; then
-  echo "No steps recorded for $EXEC_ID" >&2
+  echo "No steps recorded for $MOD_ID" >&2
   exit 3
 fi
 

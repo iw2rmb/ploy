@@ -43,7 +43,7 @@ func (hs *HelpSystem) showGeneralHelp() error {
 
 	fmt.Printf("\nExamples:\n")
 	fmt.Printf("  ploy arf recipe list --language java\n")
-	fmt.Printf("  ploy arf recipe run spring-migration --repo https://github.com/user/app.git\n")
+	// run command removed; execution handled by Mods
 	fmt.Printf("  ploy arf recipe create --template openrewrite\n")
 	fmt.Printf("  ploy arf recipe compose prep migration cleanup --repo .\n")
 

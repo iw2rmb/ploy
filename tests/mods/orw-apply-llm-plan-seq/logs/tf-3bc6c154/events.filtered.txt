@@ -1,0 +1,9 @@
+# Errors
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/tf-3bc6c154/events.sample.sse:data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: maven build failed: exit status 1\n","time":"2025-09-14T12:16:13.630077342Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/tf-3bc6c154/events.sample.sse:data: {"step":"healing","phase":"healing","level":"error","message":"build check failed and healing failed","time":"2025-09-14T12:16:16.528572545Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/tf-3bc6c154/events.sse:data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: maven build failed: exit status 1\n","time":"2025-09-14T12:16:13.630077342Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/tf-3bc6c154/events.sse:data: {"step":"healing","phase":"healing","level":"error","message":"build check failed and healing failed","time":"2025-09-14T12:16:16.528572545Z"}
+
+# Planner/LLM/Reducer/Apply steps
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/tf-3bc6c154/events.sample.sse:data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-14T12:16:16.282735248Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/tf-3bc6c154/events.sse:data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-14T12:16:16.282735248Z"}
