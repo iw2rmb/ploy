@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"time"
@@ -104,21 +105,48 @@ func (s *Server) handlePlatformLogs(c *fiber.Ctx) error {
         }
     }
 
-	monitor := orchestration.NewHealthMonitor()
-	allocs, err := monitor.GetJobAllocations(jobName)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"error":   "Failed to retrieve allocations",
-			"details": err.Error(),
-		})
-	}
-	runningID := ""
-	for _, a := range allocs {
-		if a.ClientStatus == "running" {
-			runningID = a.ID
-			break
-		}
-	}
+    monitor := orchestration.NewHealthMonitor()
+    allocs, err := monitor.GetJobAllocations(jobName)
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{
+            "error":   "Failed to retrieve allocations",
+            "details": err.Error(),
+        })
+    }
+    runningID := ""
+    for _, a := range allocs {
+        if a.ClientStatus == "running" {
+            runningID = a.ID
+            break
+        }
+    }
+    // Fallback: use job manager to list allocations if SDK path found none
+    if runningID == "" {
+        type allocInfo struct {
+            ID           string `json:"ID"`
+            ClientStatus string `json:"ClientStatus"`
+        }
+        ctxList, cancelList := context.WithTimeout(c.Context(), 15*time.Second)
+        defer cancelList()
+        cmdList := exec.CommandContext(ctxList, "/opt/hashicorp/bin/nomad-job-manager.sh", "allocs", "--job", jobName, "--format", "json")
+        var outList bytes.Buffer
+        cmdList.Stdout = &outList
+        cmdList.Stderr = &outList
+        if err := cmdList.Run(); err == nil {
+            var arr []allocInfo
+            if json.Unmarshal(outList.Bytes(), &arr) == nil {
+                for _, ai := range arr {
+                    if ai.ClientStatus == "running" {
+                        runningID = ai.ID
+                        break
+                    }
+                }
+                if runningID == "" && len(arr) > 0 {
+                    runningID = arr[0].ID
+                }
+            }
+        }
+    }
 	if runningID == "" {
 		return c.JSON(fiber.Map{
 			"service":         serviceName,

@@ -122,22 +122,20 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Parse response
-	result := &DeployResult{
-		Success:      resp.StatusCode == http.StatusOK,
-		Version:      sha,
-		DeploymentID: resp.Header.Get("X-Deployment-ID"),
-		URL:          fmt.Sprintf("https://%s.ployd.app", appName),
-		Message:      "App deployment completed",
-	}
+    // Read response body for messaging
+    body, _ := io.ReadAll(resp.Body)
 
-	// Add error message if not successful
-	if !result.Success {
-		result.Message = fmt.Sprintf("App deployment failed with status %d", resp.StatusCode)
-	}
+    // Parse response
+    result := &DeployResult{
+        Success:      resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted,
+        Version:      sha,
+        DeploymentID: resp.Header.Get("X-Deployment-ID"),
+        URL:          fmt.Sprintf("https://%s.ployd.app", appName),
+        Message:      string(body),
+    }
 
-	// Output response to console and clean up temp
-	_, _ = io.Copy(os.Stdout, resp.Body)
+    // Output response body to console and clean up temp
+    _, _ = os.Stdout.Write(body)
 	_ = rf.Close()
 	_ = os.Remove(tmpPath)
 
