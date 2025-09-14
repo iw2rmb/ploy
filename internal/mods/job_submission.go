@@ -118,11 +118,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 
 	// Perform substitution
 	controllerURL := get("PLOY_CONTROLLER")
-	// Use MOD_ID only; do not support legacy or tf- prefixes
 	modID := get("MOD_ID")
-	if strings.HasPrefix(modID, "tf-") {
-		return "", fmt.Errorf("unsupported MOD_ID prefix 'tf-'; use 'mod-' only")
-	}
 	if modID != "" && !strings.HasPrefix(modID, "mod-") {
 		modID = "mod-" + modID
 	}
@@ -235,13 +231,9 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		outDir := filepath.Join(workspace, "planner", "out")
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
-		// MOD_ID must be provided explicitly; no legacy fallback or tf- support
 		modID := os.Getenv("MOD_ID")
 		if modID == "" {
 			return nil, fmt.Errorf("MOD_ID is required for planner job submission")
-		}
-		if strings.HasPrefix(modID, "tf-") {
-			return nil, fmt.Errorf("unsupported MOD_ID prefix 'tf-'; use 'mod-' only")
 		}
 		if !strings.HasPrefix(modID, "mod-") {
 			modID = "mod-" + modID

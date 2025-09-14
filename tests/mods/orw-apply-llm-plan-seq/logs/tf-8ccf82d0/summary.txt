@@ -1,0 +1,9 @@
+MOD_ID: tf-8ccf82d0
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+running, phase=apply
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log

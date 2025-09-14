@@ -28,10 +28,10 @@ func executeRemoteMod(controllerURL, file string, testMode, verbose, watch bool,
 	if output == "json" {
 		// Print a single JSON line. If --watch is set, attach watch afterwards.
 		resp := map[string]any{
-			"execution_id": id,
-			"status":       "initializing",
-			"status_url":   "/v1/mods/" + id + "/status",
-			"watch_hint":   "ploy mod watch -id " + id,
+			"mod_id":     id,
+			"status":     "initializing",
+			"status_url": "/v1/mods/" + id + "/status",
+			"watch_hint": "ploy mod watch -id " + id,
 		}
 		b, _ := json.Marshal(resp)
 		fmt.Println(string(b))
@@ -135,11 +135,11 @@ func remoteStart(controllerURL string, configBytes []byte, testMode bool, client
 	}
 
 	var ack struct {
-		ExecutionID string `json:"execution_id"`
+		ModID string `json:"mod_id"`
 	}
 	_ = json.NewDecoder(resp.Body).Decode(&ack)
-	if ack.ExecutionID == "" {
-		return "", fmt.Errorf("controller did not return execution_id")
+	if ack.ModID == "" {
+		return "", fmt.Errorf("controller did not return mod_id")
 	}
-	return ack.ExecutionID, nil
+	return ack.ModID, nil
 }
