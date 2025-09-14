@@ -13,8 +13,9 @@ job "mods-llm-exec-${RUN_ID}" {
         TOOLS_JSON  = "${TOOLS_JSON}"
         LIMITS_JSON = "${LIMITS_JSON}"
         RUN_ID      = "${RUN_ID}"
-        PLOY_OPENAI_API_KEY = "${PLOY_OPENAI_API_KEY}"
         SBOM_LATEST_URL = "${SBOM_LATEST_URL}"
+        CONTROLLER_URL    = "${CONTROLLER_URL}"
+        MODS_EXECUTION_ID = "${EXECUTION_ID}"
       }
       template {
         data        = "${SBOM_LATEST_URL}"

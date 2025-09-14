@@ -238,23 +238,23 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	baseDir := filepath.Dir(hclPath)
 	// Ensure out directory exists for bind mount target
 	_ = os.MkdirAll(filepath.Join(baseDir, "out"), 0755)
-	imgs := ResolveImagesFromEnv()
-	infra := ResolveInfraFromEnv()
-	llm := ResolveLLMDefaultsFromEnv()
-	vars := map[string]string{
-		"MODS_CONTEXT_DIR":       baseDir,
-		"MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"MODS_REGISTRY":          imgs.Registry,
-		"MODS_PLANNER_IMAGE":     imgs.Planner,
-		"MODS_REDUCER_IMAGE":     imgs.Reducer,
-		"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
-		"PLOY_CONTROLLER":        infra.Controller,
-		"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-		"NOMAD_DC":               infra.DC,
-		"MODS_MODEL":             llm.Model,
-		"MODS_TOOLS":             llm.ToolsJSON,
-		"MODS_LIMITS":            llm.LimitsJSON,
-	}
+    imgs := ResolveImagesFromEnv()
+    infra := ResolveInfraFromEnv()
+    llm := ResolveLLMDefaultsFromEnv()
+    vars := map[string]string{
+        "MODS_CONTEXT_DIR":       baseDir,
+        "MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
+        "MODS_REGISTRY":          imgs.Registry,
+        "MODS_PLANNER_IMAGE":     imgs.Planner,
+        "MODS_REDUCER_IMAGE":     imgs.Reducer,
+        "MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+        "PLOY_CONTROLLER":        infra.Controller,
+        "PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+        "NOMAD_DC":               infra.DC,
+        "MODS_MODEL":             llm.Model,
+        "MODS_TOOLS":             llm.ToolsJSON,
+        "MODS_LIMITS":            llm.LimitsJSON,
+    }
 
 	// Step 2: Generate unique run ID for this branch
 	runID := LLMRunID(branch.ID)
@@ -271,7 +271,11 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	}
 
 	// Step 4: Substitute environment variables in HCL template with MCP support
-	renderedHCLPath, err := substituteHCLTemplateWithMCPVars(hclPath, runID, vars, mcpConfig)
+    // If branch MCP config specifies a model, prefer it
+    if mcpConfig != nil && strings.TrimSpace(mcpConfig.Model) != "" {
+        vars["MODS_MODEL"] = strings.TrimSpace(mcpConfig.Model)
+    }
+    renderedHCLPath, err := substituteHCLTemplateWithMCPVars(hclPath, runID, vars, mcpConfig)
 	if err != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("failed to substitute HCL template: %v", err)

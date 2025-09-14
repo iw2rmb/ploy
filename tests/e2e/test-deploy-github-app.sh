@@ -54,6 +54,10 @@ EXTRA_FLAGS=()
 [[ -n "${LANE:-}" ]] && EXTRA_FLAGS+=("-lane" "$LANE")
 [[ -n "${MAIN:-}" ]] && EXTRA_FLAGS+=("-main" "$MAIN")
 START_TS=$(date +%s)
+# Global health check params
+HEALTH_PATH=${HEALTH_PATH:-/healthz}
+TIMEOUT=${TIMEOUT:-300}
+SLEEP=${SLEEP:-5}
 attempt_push() {
   local out rc
   if [[ "${USE_MULTIPART:-}" == "1" ]]; then
@@ -68,6 +72,7 @@ attempt_push() {
     rc=$?
   fi
   echo "$out"
+  PUSH_OUT="$out"
   if [[ $rc -ne 0 ]] || echo "$out" | rg -qi '("error"\s*:|failed|^❌)'; then
     return 1
   fi
@@ -88,6 +93,34 @@ if ! attempt_push; then
 fi
 ok "ploy push triggered"
 
+# If async accepted, poll build status before HTTPS check
+if command -v jq >/dev/null 2>&1; then
+  RAW_JSON=$(echo "$PUSH_OUT" | sed -n 's/.*\({.*}\).*/\1/p')
+  ACCEPTED=$(echo "$RAW_JSON" | jq -r 'try .accepted // false')
+  if [[ "$ACCEPTED" == "true" ]]; then
+    STATUS_PATH=$(echo "$RAW_JSON" | jq -r 'try .status // empty')
+    BUILD_ID=$(echo "$RAW_JSON" | jq -r 'try .id // empty')
+    if [[ -n "$STATUS_PATH" ]]; then
+      info "Async build accepted (id=$BUILD_ID). Polling status..."
+      # budget: up to half of TIMEOUT for build
+      BUILD_WAIT=$(( TIMEOUT / 2 ))
+      B_ELAPSED=0
+      while (( B_ELAPSED < BUILD_WAIT )); do
+        R=$(curl -sf "${PLOY_CONTROLLER%/}${STATUS_PATH}") || true
+        ST=$(echo "$R" | jq -r 'try .status // empty')
+        if [[ "$ST" == "completed" ]]; then
+          ok "Build completed"
+          break
+        elif [[ "$ST" == "failed" ]]; then
+          err "Build failed: $(echo "$R" | jq -r '.message')"
+          exit 1
+        fi
+        sleep "$SLEEP"; B_ELAPSED=$((B_ELAPSED + SLEEP))
+      done
+    fi
+  fi
+fi
+
 # Determine expected URL
 # Prefer preview router using commit SHA to trigger run, else allow override
 GIT_SHA=$(git rev-parse --short=12 HEAD 2>/dev/null || echo "")
@@ -104,9 +137,6 @@ else
   URL="https://${APP_NAME}.ployd.app"
 fi
 
-HEALTH_PATH=${HEALTH_PATH:-/healthz}
-TIMEOUT=${TIMEOUT:-300}
-SLEEP=${SLEEP:-5}
 # Adjust remaining time budget after push
 NOW_TS=$(date +%s)
 SPENT=$((NOW_TS - START_TS))
