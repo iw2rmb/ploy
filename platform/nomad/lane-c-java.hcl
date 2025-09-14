@@ -104,13 +104,13 @@ job "{{APP_NAME}}-lane-c" {
           "-nographic",
           "-smp", "{{JVM_CPUS}}",
           "-m", "{{JVM_MEMORY}}M",
-          "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}},hostfwd=tcp::${NOMAD_PORT_jmx}-:9999",
+          "-netdev", "user,id=net0",
           "-device", "virtio-net-pci,netdev=net0"
         ]
-        accelerator = "kvm"
-        kvm = true
+        # Dev VPS: disable KVM/accelerator to avoid host dependency
+        kvm = false
         machine = "q35"
-        cpu = "host"
+        cpu = "max"
       }
       
       # Volume mounting for JVM data
