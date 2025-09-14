@@ -1,0 +1,16 @@
+[2025-09-14 12:41:01] Getting stdout logs for allocation: 2cef917e-611b-5f0a-1988-888781d7ebcd (task: api, lines: 800, follow: false)
+[2025-09-14 12:41:01] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/2cef917e-611b-5f0a-1988-888781d7ebcd?type=stdout&plain=true&task=api&offset=-800
+[2025-09-14 12:41:01] Response code: 200
+40:28] 200 - GET /live -      41.611µs
+[12:40:36] 200 - GET /v1/mods/tf-5d19e6c0/status -      956.76µs
+[12:40:47] 200 - GET /v1/mods/tf-5d19e6c0/status -    1.136071ms
+[12:40:48] 200 - POST /v1/mods/tf-5d19e6c0/events -    2.437033ms
+[12:40:48] 200 - POST /v1/mods/tf-5d19e6c0/events -     1.94621ms
+[12:40:46] 200 - GET /ready -  3.453229407s
+[12:40:51] 200 - POST /v1/mods/tf-5d19e6c0/events -    3.161452ms
+[12:40:53] 200 - POST /v1/mods/tf-5d19e6c0/events -    3.742857ms
+[12:40:53] 200 - POST /v1/mods/tf-5d19e6c0/events -    2.382783ms
+[12:40:58] 200 - GET /v1/mods/tf-5d19e6c0/artifacts -    1.376834ms
+[12:40:58] 200 - GET /live -      46.641µs
+[12:40:59] 404 - GET /v1/mods/tf-5d19e6c0/artifacts/next_json -    1.168191ms
+[12:41:00] 200 - GET /v1/mods/tf-5d19e6c0/status -    1.380853ms

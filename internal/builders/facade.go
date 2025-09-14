@@ -1,9 +1,9 @@
 package builders
 
 import (
-    "fmt"
-    "os"
-    "path/filepath"
+	"fmt"
+	"os"
+	"path/filepath"
 )
 
 // JavaOSVRequest mirrors the request subset used by internal build flow
@@ -54,13 +54,13 @@ func BuildJail(app, srcDir, sha, outDir string, envVars map[string]string) (stri
 }
 
 func BuildOCI(app, srcDir, tag string, envVars map[string]string) (string, error) {
-    // On Dev, API runs as a Nomad job without Docker. Building must be handled by a
-    // separate builder job. For now, return the tag for downstream orchestration.
-    // Push verification will detect missing tags and surface readable errors.
-    if tag == "" {
-        return "", fmt.Errorf("empty image tag")
-    }
-    return tag, nil
+	// On Dev, API runs as a Nomad job without Docker. Building must be handled by a
+	// separate builder job. For now, return the tag for downstream orchestration.
+	// Push verification will detect missing tags and surface readable errors.
+	if tag == "" {
+		return "", fmt.Errorf("empty image tag")
+	}
+	return tag, nil
 }
 
 func BuildVM(app, sha, outDir string, envVars map[string]string) (string, error) {

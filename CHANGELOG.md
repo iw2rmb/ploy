@@ -607,7 +607,7 @@
 
 - Enabled feature-flagged recipes catalog routes (`PLOY_ENABLE_RECIPES_CATALOG=true`) and optional CLI catalog mode (`PLOY_RECIPES_CATALOG=true`) for `ploy arf recipe list/search`. Added minimal tests for server wiring and CLI parsing.
  - Added transform-time validation: `/v1/arf/transforms` returns 400 with recipe suggestions when `recipe_id` is unknown (uses catalog when available).
- - CLI now surfaces suggestions for unknown `recipe_id` before executing (`ploy arf recipe run` and legacy `arf transform`), when catalog mode is enabled.
+ - CLI now surfaces suggestions for unknown `recipe_id` before executing (legacy ARF execution removed; use Mods), when catalog mode is enabled.
 
 ## [2025-09-03] - Config Service Validation & Caching (Phase 3)
 

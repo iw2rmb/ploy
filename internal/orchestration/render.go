@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -140,20 +141,56 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath s
 }
 
 // RenderOSVBuilder renders a simple OSv pack builder job that prepares a bootable image
-func RenderOSVBuilder(app, version, outputPath, contextURL, mainClass, baseImage string) (string, error) {
-    b, err := loadTemplateContent("platform/nomad/lane-c-osv-builder.hcl")
-    if err != nil { return "", err }
-    s := string(b)
-    s = strings.ReplaceAll(s, "{{APP_NAME}}", app)
-    s = strings.ReplaceAll(s, "{{VERSION}}", version)
-    s = strings.ReplaceAll(s, "{{OUTPUT_PATH}}", outputPath)
-    s = strings.ReplaceAll(s, "{{CONTEXT_URL}}", contextURL)
-    s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", mainClass)
-    if baseImage == "" { baseImage = "/host/opt/ploy/osv/base/java8.qemu" }
-    s = strings.ReplaceAll(s, "{{BASE_IMAGE}}", baseImage)
-    out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-c-build-%s.hcl", app, version))
-    if err := os.WriteFile(out, []byte(s), 0644); err != nil { return "", err }
-    return out, nil
+func RenderOSVBuilder(app, version, outputPath, contextURL, mainClass, javaVersion string) (string, error) {
+	b, err := loadTemplateContent("platform/nomad/lane-c-osv-builder.hcl")
+	if err != nil {
+		return "", err
+	}
+	s := string(b)
+	s = strings.ReplaceAll(s, "{{APP_NAME}}", app)
+	s = strings.ReplaceAll(s, "{{VERSION}}", version)
+	// Builder runs in docker with /opt/ploy bind-mounted to /host/opt/ploy
+	outContainer := outputPath
+	if strings.HasPrefix(outContainer, "/opt/ploy/") {
+		outContainer = "/host" + outContainer
+	}
+	s = strings.ReplaceAll(s, "{{OUTPUT_PATH}}", outContainer)
+	s = strings.ReplaceAll(s, "{{CONTEXT_URL}}", contextURL)
+	s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", mainClass)
+	baseHost := selectOSVBase(javaVersion)
+	baseContainer := baseHost
+	if strings.HasPrefix(baseContainer, "/opt/ploy/") {
+		baseContainer = "/host" + baseContainer
+	}
+	s = strings.ReplaceAll(s, "{{BASE_IMAGE}}", baseContainer)
+	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-c-build-%s.hcl", app, version))
+	if err := os.WriteFile(out, []byte(s), 0644); err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+// selectOSVBase maps Java version to a host path for the OSv base image.
+// Mapping is configured via PLOY_OSV_BASES as JSON (e.g., {"8":"/opt/ploy/osv/base/java8.qemu","21":"/opt/ploy/osv/base/java21.qemu"}).
+// Fallback: /opt/ploy/osv/base/java<major>.qemu
+func selectOSVBase(javaVersion string) string {
+	v := javaVersion
+	if v == "" {
+		v = "8"
+	}
+	if i := strings.Index(v, "."); i > 0 {
+		v = v[:i]
+	}
+	raw := os.Getenv("PLOY_OSV_BASES")
+	if raw != "" {
+		var m map[string]string
+		if json.Unmarshal([]byte(raw), &m) == nil {
+			if p, ok := m[v]; ok && p != "" {
+				return p
+			}
+		}
+	}
+	return "/opt/ploy/osv/base/java" + v + ".qemu"
 }
 
 func templateForLaneAndLanguage(lane, language string) string {

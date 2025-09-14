@@ -74,19 +74,19 @@ func executeFirstLLMExec(runner *ModRunner, options []map[string]any) error {
 				infra := ResolveInfraFromEnv()
 				llm := ResolveLLMDefaultsFromEnv()
 				vars := map[string]string{
-					"MODS_CONTEXT_DIR":       filepath.Dir(hcl),
-					"MODS_OUT_DIR":           filepath.Join(filepath.Dir(hcl), "out"),
-					"MODS_REGISTRY":          imgs.Registry,
-					"MODS_PLANNER_IMAGE":     imgs.Planner,
-					"MODS_REDUCER_IMAGE":     imgs.Reducer,
-					"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
-					"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
-					"MODS_MODEL":             llm.Model,
-					"MODS_TOOLS":             llm.ToolsJSON,
-					"MODS_LIMITS":            llm.LimitsJSON,
-					"PLOY_CONTROLLER":        infra.Controller,
-					"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-					"NOMAD_DC":               infra.DC,
+					"MODS_CONTEXT_DIR":     filepath.Dir(hcl),
+					"MODS_OUT_DIR":         filepath.Join(filepath.Dir(hcl), "out"),
+					"MODS_REGISTRY":        imgs.Registry,
+					"MODS_PLANNER_IMAGE":   imgs.Planner,
+					"MODS_REDUCER_IMAGE":   imgs.Reducer,
+					"MODS_LLM_EXEC_IMAGE":  imgs.LLMExec,
+					"MODS_ORW_APPLY_IMAGE": imgs.ORWApply,
+					"MODS_MODEL":           llm.Model,
+					"MODS_TOOLS":           llm.ToolsJSON,
+					"MODS_LIMITS":          llm.LimitsJSON,
+					"PLOY_CONTROLLER":      infra.Controller,
+					"MOD_ID":               os.Getenv("MOD_ID"),
+					"NOMAD_DC":             infra.DC,
 				}
 				if infra.Controller != "" && runner.config != nil && runner.config.TargetRepo != "" {
 					vars["SBOM_LATEST_URL"] = fmt.Sprintf("%s/sbom/latest?repo=%s", strings.TrimRight(infra.Controller, "/"), url.QueryEscape(runner.config.TargetRepo))
@@ -160,15 +160,15 @@ func executeFirstORWGen(runner *ModRunner, options []map[string]any) error {
 				imgs := ResolveImagesFromEnv()
 				infra := ResolveInfraFromEnv()
 				vars := map[string]string{
-					"MODS_CONTEXT_DIR":       contextDir,
-					"MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
-					"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
-					"MODS_REGISTRY":          imgs.Registry,
-					"PLOY_CONTROLLER":        infra.Controller,
-					"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-					"PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
-					"MODS_DIFF_KEY":          os.Getenv("MODS_DIFF_KEY"),
-					"NOMAD_DC":               infra.DC,
+					"MODS_CONTEXT_DIR":     contextDir,
+					"MODS_OUT_DIR":         filepath.Join(baseDir, "out"),
+					"MODS_ORW_APPLY_IMAGE": imgs.ORWApply,
+					"MODS_REGISTRY":        imgs.Registry,
+					"PLOY_CONTROLLER":      infra.Controller,
+					"MOD_ID":               os.Getenv("MOD_ID"),
+					"PLOY_SEAWEEDFS_URL":   infra.SeaweedURL,
+					"MODS_DIFF_KEY":        os.Getenv("MODS_DIFF_KEY"),
+					"NOMAD_DC":             infra.DC,
 				}
 				submittedPath, serr := substituteORWTemplateVars(prePath, runID2, vars)
 				if serr != nil {
@@ -235,15 +235,15 @@ func executeApplyFirst(runner *ModRunner) error {
 func substituteORWTemplate(prePath, runID string) (string, error) {
 	// Backward-compatible wrapper that reads from process env
 	vars := map[string]string{
-		"MODS_CONTEXT_DIR":       os.Getenv("MODS_CONTEXT_DIR"),
-		"MODS_OUT_DIR":           os.Getenv("MODS_OUT_DIR"),
-		"MODS_ORW_APPLY_IMAGE":   os.Getenv("MODS_ORW_APPLY_IMAGE"),
-		"MODS_REGISTRY":          os.Getenv("MODS_REGISTRY"),
-		"PLOY_CONTROLLER":        os.Getenv("PLOY_CONTROLLER"),
-		"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-		"PLOY_SEAWEEDFS_URL":     os.Getenv("PLOY_SEAWEEDFS_URL"),
-		"MODS_DIFF_KEY":          os.Getenv("MODS_DIFF_KEY"),
-		"NOMAD_DC":               os.Getenv("NOMAD_DC"),
+		"MODS_CONTEXT_DIR":     os.Getenv("MODS_CONTEXT_DIR"),
+		"MODS_OUT_DIR":         os.Getenv("MODS_OUT_DIR"),
+		"MODS_ORW_APPLY_IMAGE": os.Getenv("MODS_ORW_APPLY_IMAGE"),
+		"MODS_REGISTRY":        os.Getenv("MODS_REGISTRY"),
+		"PLOY_CONTROLLER":      os.Getenv("PLOY_CONTROLLER"),
+		"MOD_ID":               os.Getenv("MOD_ID"),
+		"PLOY_SEAWEEDFS_URL":   os.Getenv("PLOY_SEAWEEDFS_URL"),
+		"MODS_DIFF_KEY":        os.Getenv("MODS_DIFF_KEY"),
+		"NOMAD_DC":             os.Getenv("NOMAD_DC"),
 	}
 	return substituteORWTemplateVars(prePath, runID, vars)
 }
@@ -269,9 +269,9 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 		orwImage = d.ORWApplyImage
 	}
 
-	// Controller and execution ID for in-job event push
+	// Controller and MOD_ID for in-job event push
 	controllerURL := vars["PLOY_CONTROLLER"]
-	execID := vars["PLOY_MODS_EXECUTION_ID"]
+	modID := vars["MOD_ID"]
 	seaweedURL := vars["PLOY_SEAWEEDFS_URL"]
 	if seaweedURL == "" {
 		seaweedURL = d.SeaweedURL
@@ -280,9 +280,9 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 	// Allow override via MODS_DIFF_KEY for branch-scoped step uploads
 	diffKey := vars["MODS_DIFF_KEY"]
 	if diffKey == "" {
-		diffKey = "mods/" + execID + "/diff.patch"
+		diffKey = "mods/" + modID + "/diff.patch"
 	}
-	inputKey := "mods/" + execID + "/input.tar"
+	inputKey := "mods/" + modID + "/input.tar"
 	inputURL := seaweedURL + "/artifacts/" + inputKey
 	log.Printf("[Mods] Computed INPUT_URL=%s (SEAWEEDFS_URL=%s)", inputURL, seaweedURL)
 
@@ -301,7 +301,7 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 		"${ORW_IMAGE}", orwImage,
 		"${CONTROLLER_URL}", controllerURL,
 		"${PLOY_API_URL}", apiBase,
-		"${EXECUTION_ID}", execID,
+		"${MOD_ID}", modID,
 		"${SEAWEEDFS_URL}", seaweedURL,
 		"${DIFF_KEY}", diffKey,
 		"${INPUT_KEY}", inputKey,

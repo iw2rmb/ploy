@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ import (
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
 	clutils "github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/config"
-    "github.com/iw2rmb/ploy/internal/detect/project"
+	"github.com/iw2rmb/ploy/internal/detect/project"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
@@ -140,11 +141,84 @@ func verifyOCIPush(tag string) verifyResult {
 	return vr
 }
 
+// getJobLogsSnippet fetches recent logs for a job via the nomad-job-manager wrapper.
+func getJobLogsSnippet(job string, lines int) string {
+	if job == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "logs", "--job", job, "--lines", fmt.Sprintf("%d", lines))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out)
+	}
+	// limit size
+	b := out
+	if len(b) > 4000 {
+		b = b[len(b)-4000:]
+	}
+	return string(b)
+}
+
 // generateDockerfile writes a simple Dockerfile into srcDir based on detected project markers.
 // Supports Go (go.mod) and Node.js (package.json). For other stacks, returns an error.
-func generateDockerfile(srcDir string) error {
+func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error {
+	// Java/Scala (JVM) via Gradle/Maven multi-stage, selecting eclipse-temurin:<ver>-jre
+	if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
+		v := facts.Versions.Java
+		if v == "" {
+			v = "17"
+		}
+		// Normalize: only major
+		if i := strings.Index(v, "."); i > 0 {
+			v = v[:i]
+		}
+		var dockerfile string
+		if facts.BuildTool == "gradle" {
+			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
+			if facts.MainClass != "" {
+				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
+			}
+			dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
+WORKDIR /src
+COPY . .
+RUN chmod +x ./gradlew || true \
+ && ( ./gradlew -x test clean build || gradle -x test clean build )
+
+FROM eclipse-temurin:%[1]s-jre
+WORKDIR /app
+COPY --from=build /src/build/libs/*.jar /app/app.jar
+ENV PORT=8080
+EXPOSE 8080
+%s
+`, v, entry)
+		} else if facts.BuildTool == "maven" {
+			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
+			if facts.MainClass != "" {
+				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
+			}
+			dockerfile = fmt.Sprintf(`FROM maven:3-eclipse-temurin-%[1]s AS build
+WORKDIR /src
+COPY . .
+RUN chmod +x ./mvnw || true \
+ && ( ./mvnw -B -DskipTests package || mvn -B -DskipTests package )
+
+FROM eclipse-temurin:%[1]s-jre
+WORKDIR /app
+COPY --from=build /src/target/*.jar /app/app.jar
+ENV PORT=8080
+EXPOSE 8080
+%s
+`, v, entry)
+		} else {
+			return fmt.Errorf("no supported Java build tool detected for Dockerfile autogen")
+		}
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
+	}
+
+	// Go
 	goMod := filepath.Join(srcDir, "go.mod")
-	pkgJSON := filepath.Join(srcDir, "package.json")
 	if _, err := os.Stat(goMod); err == nil {
 		content := `FROM golang:1.22-alpine AS build
 WORKDIR /src
@@ -161,6 +235,8 @@ ENTRYPOINT ["/app"]
 `
 		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
 	}
+	// Node
+	pkgJSON := filepath.Join(srcDir, "package.json")
 	if _, err := os.Stat(pkgJSON); err == nil {
 		content := `FROM node:20-alpine
 WORKDIR /app
@@ -173,11 +249,116 @@ CMD ["node", "index.js"]
 `
 		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
 	}
+	// Python
+	// Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
+	if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) {
+		v := facts.Versions.Python
+		if v == "" {
+			v = "3.12"
+		}
+		// Normalize to major.minor
+		if parts := strings.Split(v, "."); len(parts) >= 2 {
+			v = parts[0] + "." + parts[1]
+		}
+		base := fmt.Sprintf("python:%s-slim", v)
+		// Detect app servers
+		hasGunicorn := pythonDepPresent(srcDir, "gunicorn")
+		hasUvicorn := pythonDepPresent(srcDir, "uvicorn")
+		cmd := "CMD [\"python\", \"app.py\"]"
+		if hasGunicorn {
+			cmd = "CMD [\"sh\", \"-lc\", \"exec gunicorn -b 0.0.0.0:$PORT app:app\"]"
+		} else if hasUvicorn {
+			cmd = "CMD [\"sh\", \"-lc\", \"exec uvicorn app:app --host 0.0.0.0 --port $PORT\"]"
+		}
+		content := fmt.Sprintf(`FROM %s
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \\
+    PYTHONUNBUFFERED=1 \\
+    PORT=8080
+COPY requirements.txt requirements.txt
+RUN if [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
+COPY . .
+EXPOSE 8080
+%s
+`, base, cmd)
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+	}
+	// .NET
+	// Detect .NET projects by presence of *.csproj
+	if csproj := findFirstCsproj(srcDir); csproj != "" {
+		// Derive version tag
+		v := facts.Versions.Dotnet
+		if v == "" {
+			v = "8.0"
+		}
+		// Normalize to major.minor (e.g., 8.0)
+		if parts := strings.Split(v, "."); len(parts) >= 2 {
+			v = parts[0] + "." + parts[1]
+		} else if len(v) == 1 {
+			v = v + ".0"
+		}
+		projName := strings.TrimSuffix(filepath.Base(csproj), filepath.Ext(csproj))
+		content := fmt.Sprintf(`FROM mcr.microsoft.com/dotnet/sdk:%[1]s AS build
+WORKDIR /src
+COPY . .
+RUN dotnet restore
+RUN dotnet publish -c Release -o /app/out
+
+FROM mcr.microsoft.com/dotnet/aspnet:%[1]s
+WORKDIR /app
+COPY --from=build /app/out .
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "%[2]s.dll"]
+`, v, projName)
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+	}
 	return fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
+}
+
+// fileExists wraps os.Stat for brevity
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// pythonDepPresent looks for a dependency name in common Python manifests
+func pythonDepPresent(srcDir, name string) bool {
+	// requirements.txt
+	if b, err := os.ReadFile(filepath.Join(srcDir, "requirements.txt")); err == nil {
+		if strings.Contains(strings.ToLower(string(b)), strings.ToLower(name)) {
+			return true
+		}
+	}
+	// Pipfile
+	if b, err := os.ReadFile(filepath.Join(srcDir, "Pipfile")); err == nil {
+		if strings.Contains(strings.ToLower(string(b)), strings.ToLower(name)) {
+			return true
+		}
+	}
+	// pyproject.toml
+	if b, err := os.ReadFile(filepath.Join(srcDir, "pyproject.toml")); err == nil {
+		s := strings.ToLower(string(b))
+		if strings.Contains(s, "[project]") || strings.Contains(s, "[tool.poetry]") {
+			if strings.Contains(s, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// findFirstCsproj returns the first *.csproj path in srcDir
+func findFirstCsproj(srcDir string) string {
+	entries, _ := os.ReadDir(srcDir)
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(strings.ToLower(e.Name()), ".csproj") {
+			return filepath.Join(srcDir, e.Name())
+		}
+	}
+	return ""
 }
 
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
 func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext) error {
+	buildStart := time.Now()
 	appName := c.Params("app")
 
 	// Validate app name
@@ -188,7 +369,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		})
 	}
 	sha := c.Query("sha", "dev")
-    mainClass := c.Query("main", "")
+	mainClass := c.Query("main", "")
 	lane := c.Query("lane", "")
 	// Diagnostic: request overview
 	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
@@ -270,34 +451,38 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		appEnvVars = make(map[string]string)
 	}
 
-    detectedLanguage := ""
-    detectedJavaVersion := ""
-    detectedMainClass := ""
-    if lane == "" {
-        if res, err := utils.RunLanePick(srcDir); err == nil {
-            lane = res.Lane
-            detectedLanguage = res.Language
-        } else {
-            // Default to container lane for broad compatibility when detection is unavailable
-            lane = "E"
-        }
-    } else {
-        // Attempt language detection even when lane is forced
-        if res, err := utils.RunLanePick(srcDir); err == nil {
-            detectedLanguage = res.Language
-        }
-    }
-    // Compute cross-language build facts (versions/main) for consistent behavior
-    facts := project.ComputeFacts(srcDir, strings.ToLower(detectedLanguage))
-    if facts.Versions.Java != "" { detectedJavaVersion = facts.Versions.Java }
-    if facts.MainClass != "" { detectedMainClass = facts.MainClass }
-    if mainClass == "" && detectedMainClass != "" {
-        mainClass = detectedMainClass
-    }
-    if mainClass == "" {
-        mainClass = "com.ploy.ordersvc.Main"
-    }
-    log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
+	detectedLanguage := ""
+	detectedJavaVersion := ""
+	detectedMainClass := ""
+	if lane == "" {
+		if res, err := utils.RunLanePick(srcDir); err == nil {
+			lane = res.Lane
+			detectedLanguage = res.Language
+		} else {
+			// Default to container lane for broad compatibility when detection is unavailable
+			lane = "E"
+		}
+	} else {
+		// Attempt language detection even when lane is forced
+		if res, err := utils.RunLanePick(srcDir); err == nil {
+			detectedLanguage = res.Language
+		}
+	}
+	// Compute cross-language build facts (versions/main) for consistent behavior
+	facts := project.ComputeFacts(srcDir, strings.ToLower(detectedLanguage))
+	if facts.Versions.Java != "" {
+		detectedJavaVersion = facts.Versions.Java
+	}
+	if facts.MainClass != "" {
+		detectedMainClass = facts.MainClass
+	}
+	if mainClass == "" && detectedMainClass != "" {
+		mainClass = detectedMainClass
+	}
+	if mainClass == "" {
+		mainClass = "com.ploy.ordersvc.Main"
+	}
+	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
 
 	var imagePath, dockerImage string
 	switch strings.ToUpper(lane) {
@@ -341,7 +526,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
 		}
 		outPath := fmt.Sprintf("/opt/ploy/artifacts/%s-%s-osv.qemu", appName, sha)
-		jobFile, err := orchestration.RenderOSVBuilder(appName, sha, outPath, ctxURL, mainClass, "")
+		jobFile, err := orchestration.RenderOSVBuilder(appName, sha, outPath, ctxURL, mainClass, detectedJavaVersion)
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
@@ -349,7 +534,12 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return utils.ErrJSON(c, 500, fmt.Errorf("OSv builder job validation failed: %w", vErr))
 		}
 		if err := orchestration.SubmitAndWaitTerminal(jobFile, 10*time.Minute); err != nil {
-			return utils.ErrJSON(c, 500, fmt.Errorf("OSv builder failed: %w", err))
+			jobName := fmt.Sprintf("%s-c-build-%s", appName, sha)
+			snippet := getJobLogsSnippet(jobName, 80)
+			return c.Status(500).JSON(fiber.Map{
+				"error":   fmt.Sprintf("OSv builder failed: %v", err),
+				"builder": fiber.Map{"job": jobName, "logs": snippet},
+			})
 		}
 		imagePath = outPath
 	case "D":
@@ -360,11 +550,8 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 		imagePath = img
 	case "E":
-		// Lane E: prefer Jib (Gradle/Maven) if present; otherwise use Kaniko builder job
-		// Jib path avoids Docker on controller and produces proper entrypoints
-		hasGradle := utils.FileExists(filepath.Join(srcDir, "gradlew")) || utils.FileExists(filepath.Join(srcDir, "build.gradle")) || utils.FileExists(filepath.Join(srcDir, "build.gradle.kts"))
-		hasMaven := utils.FileExists(filepath.Join(srcDir, "pom.xml"))
-		if hasGradle || hasMaven {
+		// Lane E: prefer Jib when plugin detected; otherwise use Kaniko builder job (with autogen when allowed)
+		if facts.HasJib {
 			registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 			tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 			log.Printf("[Build:E] Jib path selected (gradle/maven detected). app=%s sha=%s tag=%s", appName, sha, tag)
@@ -390,7 +577,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		if _, err := os.Stat(dockerfilePath); err != nil {
 			autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
 			if autogen == "true" || autogen == "1" || autogen == "on" {
-				if err := generateDockerfile(srcDir); err != nil {
+				if err := generateDockerfileWithFacts(srcDir, facts); err != nil {
 					return utils.ErrJSON(c, 400, fmt.Errorf("no Dockerfile and failed to autogenerate: %w", err))
 				}
 				log.Printf("[Build:E] Autogenerated Dockerfile at %s", dockerfilePath)
@@ -458,7 +645,11 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		builderJobName := fmt.Sprintf("%s-e-build-%s", appName, sha)
 		log.Printf("[Build:E] Submitting Kaniko job: %s", builderJobName)
 		if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
-			return utils.ErrJSON(c, 500, fmt.Errorf("kaniko builder failed for job %s: %w", builderJobName, err))
+			snippet := getJobLogsSnippet(builderJobName, 80)
+			return c.Status(500).JSON(fiber.Map{
+				"error":   fmt.Sprintf("kaniko builder failed for job %s: %v", builderJobName, err),
+				"builder": fiber.Map{"job": builderJobName, "logs": snippet},
+			})
 		}
 		// Verify image exists in registry before continuing
 		vr := verifyOCIPush(tag)
@@ -741,16 +932,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		domainSuffix = "dev.ployd.app"
 	}
 
-    jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
-        App:         appName,
-        ImagePath:   imagePath,
-        DockerImage: dockerImage,
-        EnvVars:     appEnvVars,
-        Version:     sha,
-        Lane:        lane,
-        MainClass:   mainClass,
-        IsDebug:     debug,
-        Language:    detectedLanguage,
+	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
+		App:         appName,
+		ImagePath:   imagePath,
+		DockerImage: dockerImage,
+		EnvVars:     appEnvVars,
+		Version:     sha,
+		Lane:        lane,
+		MainClass:   mainClass,
+		IsDebug:     debug,
+		Language:    detectedLanguage,
 
 		// Feature flags (dev-friendly defaults)
 		VaultEnabled:        false, // Vault not enabled on dev cluster
@@ -765,10 +956,15 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		MemoryLimit:   getMemoryLimitForLane(lane),
 		HttpPort:      8080,
 
-        // JVM-specific configuration for Lane C
-        JvmMemory:   getJvmMemoryForLane(lane),
-        JvmCpus:     2,
-        JavaVersion: func() string { if detectedJavaVersion != "" { return detectedJavaVersion }; return "17" }(),
+		// JVM-specific configuration for Lane C
+		JvmMemory: getJvmMemoryForLane(lane),
+		JvmCpus:   2,
+		JavaVersion: func() string {
+			if detectedJavaVersion != "" {
+				return detectedJavaVersion
+			}
+			return "17"
+		}(),
 
 		// Domain configuration
 		DomainSuffix: domainSuffix,
@@ -914,10 +1110,27 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		"appType":     string(buildCtx.AppType),
 	}
 
+	// Include build metrics (duration and image size) for async status consumers
+	response["build"] = fiber.Map{
+		"start":       buildStart.Format(time.RFC3339),
+		"end":         time.Now().Format(time.RFC3339),
+		"duration_ms": time.Since(buildStart).Milliseconds(),
+	}
+	// sizeInfo and imageSizeMB computed earlier
+	response["imageSize"] = fiber.Map{
+		"mb":    imageSizeMB,
+		"bytes": sizeInfo.SizeBytes,
+	}
+
 	// Include builder job info for lane E
 	if strings.ToUpper(lane) == "E" {
 		response["builder"] = fiber.Map{
 			"job": fmt.Sprintf("%s-e-build-%s", appName, sha),
+		}
+	}
+	if strings.ToUpper(lane) == "C" {
+		response["builder"] = fiber.Map{
+			"job": fmt.Sprintf("%s-c-build-%s", appName, sha),
 		}
 	}
 

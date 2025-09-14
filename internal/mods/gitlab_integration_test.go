@@ -54,7 +54,7 @@ func TestModRunner_GitLabIntegration(t *testing.T) {
 	validateDiffPathsFn = func(string, []string) error { return nil }
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
-	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "gitlab-test")
+	_ = os.Setenv("MOD_ID", "mod-gitlab-test")
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDL
@@ -63,7 +63,7 @@ func TestModRunner_GitLabIntegration(t *testing.T) {
 		validateUnifiedDiffFn = oldVUD
 		applyUnifiedDiffFn = oldAD
 		validateJob = oldValidate
-		_ = os.Unsetenv("PLOY_MODS_EXECUTION_ID")
+		_ = os.Unsetenv("MOD_ID")
 	}()
 	// Create a temporary workspace
 	workspaceDir := t.TempDir()
@@ -211,7 +211,7 @@ func TestModRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 	validateDiffPathsFn = func(string, []string) error { return nil }
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
-	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "gitlab-test")
+	_ = os.Setenv("MOD_ID", "mod-gitlab-test")
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDL
@@ -220,7 +220,7 @@ func TestModRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 		validateUnifiedDiffFn = oldVUD
 		applyUnifiedDiffFn = oldAD
 		validateJob = oldValidate
-		_ = os.Unsetenv("PLOY_MODS_EXECUTION_ID")
+		_ = os.Unsetenv("MOD_ID")
 	}()
 	// Test that MR creation fails gracefully when GitLab configuration is invalid
 	workspaceDir := t.TempDir()

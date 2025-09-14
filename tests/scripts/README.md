@@ -1092,7 +1092,7 @@ Each test should:
   1. Check ARF health endpoint: `GET /v1/arf/health`
   2. Test recipe listing: `GET /v1/arf/recipes`
   3. Test sandbox management: `POST /v1/arf/sandboxes`
-  4. Verify benchmark endpoints: `GET /v1/arf/benchmark/status`
+  4. Benchmark endpoints removed from ARF; use Mods status APIs.
   5. Test transformation endpoints with deployment integration
 - **Expected Results**: All API endpoints respond correctly with new naming conventions
 
@@ -1102,7 +1102,7 @@ Each test should:
 - **Prerequisites**: ARF benchmark system configured with DeploymentSandboxManager
 - **Steps**:
   1. Create benchmark configuration with Java test repository
-  2. Execute benchmark via API: `POST /v1/arf/benchmark/run`
+  2. ARF benchmark run removed; use Mods execution APIs.
   3. Monitor all pipeline stages: transformation, deployment, application_testing, error_detection, cleanup
   4. Verify deployment stage creates actual applications using api APIs
   5. Verify application_testing stage validates HTTP endpoints

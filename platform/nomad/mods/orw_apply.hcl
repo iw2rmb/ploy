@@ -15,7 +15,7 @@ job "${RUN_ID}" {
       env = {
         OUTPUT_DIR            = "/workspace/out"
         JOB_ID                = ""
-        MOD_ID     = ""
+        MOD_ID                = "${MOD_ID}"
         RECIPE                = "${RECIPE_CLASS}"
         RECIPE_GROUP          = "${RECIPE_GROUP}"
         RECIPE_ARTIFACT       = "${RECIPE_ARTIFACT}"
@@ -23,7 +23,6 @@ job "${RUN_ID}" {
         MAVEN_PLUGIN_VERSION  = "${MAVEN_PLUGIN_VERSION}"
         CONTROLLER_URL        = "${CONTROLLER_URL}"
         PLOY_API_URL          = "${PLOY_API_URL}"
-        MODS_EXECUTION_ID= "${EXECUTION_ID}"
         DIFF_KEY              = "${DIFF_KEY}"
         SEAWEEDFS_URL         = "${SEAWEEDFS_URL}"
         INPUT_URL             = "${INPUT_URL}"
@@ -43,4 +42,3 @@ job "${RUN_ID}" {
     }
   }
 }
-

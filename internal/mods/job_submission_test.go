@@ -440,9 +440,11 @@ func TestModRunnerWithHealing(t *testing.T) {
 			applyUnifiedDiffFn = oldAD
 			hasRepoChangesFn = oldHasChanges
 		}()
-		// Execution id used in branch metadata paths
-		_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "test-exec")
-		defer func() { _ = os.Unsetenv("PLOY_MODS_EXECUTION_ID") }()
+		// MOD_ID used in artifact paths and events
+		_ = os.Setenv("MOD_ID", "mod-test-exec")
+		defer func() {
+			_ = os.Unsetenv("MOD_ID")
+		}()
 		// Setup
 		config := &ModConfig{
 			ID:         "healing-test",
