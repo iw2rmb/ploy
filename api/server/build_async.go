@@ -54,7 +54,7 @@ func (s *Server) handleBuildStatus(c *fiber.Ctx) error {
 
 // startAsyncBuild saves the tar body and triggers a background self-call to complete the build.
 func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (string, error) {
-	id := fmt.Sprintf("b-%d", time.Now().UnixNano())
+    id := fmt.Sprintf("b-%d", time.Now().UnixNano())
 	// Persist body
 	upDir := "/opt/ploy/uploads"
 	if err := os.MkdirAll(upDir, 0755); err != nil {
@@ -64,8 +64,11 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 	if err := os.WriteFile(tarPath, c.Body(), 0644); err != nil {
 		return "", err
 	}
-	// Initial status
-	writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
+    // Capture request-scoped flags BEFORE we return/exit handler (Fiber Ctx is not safe in goroutines)
+    autogenVal := c.Query("autogen_dockerfile", "")
+
+    // Initial status
+    writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
 	// Persist meta for later log retrieval
 	_ = os.WriteFile(metaPath(id), []byte(fmt.Sprintf(`{"app":"%s","sha":"%s","lane":"%s"}`, app, sha, lane)), 0644)
 
@@ -85,9 +88,9 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 		if main != "" {
 			q = append(q, "main="+main)
 		}
-		if v := c.Query("autogen_dockerfile", ""); v != "" {
-			q = append(q, "autogen_dockerfile="+v)
-		}
+        if autogenVal != "" {
+            q = append(q, "autogen_dockerfile="+autogenVal)
+        }
     // Resolve controller port robustly in case server config is partially initialized
     port := ""
     if s != nil && s.config != nil {
