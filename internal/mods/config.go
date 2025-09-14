@@ -201,10 +201,10 @@ func GenerateBranchName(id string) string {
 // PreferredModel returns the first non-empty model declared in steps, if any.
 // This allows mods.yaml to specify the LLM model used by planner/llm-exec flows.
 func (c *ModConfig) PreferredModel() string {
-    for _, s := range c.Steps {
-        if strings.TrimSpace(s.Model) != "" {
-            return strings.TrimSpace(s.Model)
-        }
-    }
-    return ""
+	for _, s := range c.Steps {
+		if strings.TrimSpace(s.Model) != "" {
+			return strings.TrimSpace(s.Model)
+		}
+	}
+	return ""
 }

@@ -82,3 +82,47 @@ The script creates the 7 repos if missing and sets descriptions.
 ## Cleanup & Idempotency
 - Scripts destroy the app post validation and tolerate 404 on status checks.
 - Avoid reusing app names across concurrent runs; env `APP_NAME` can include a suffix.
+
+## Cycle Key Takeaways
+- Async deploy path implemented for reliability:
+  - `POST /v1/apps/:app/builds?async=true` returns 202 with `{accepted,id,status}`.
+  - Background worker posts tar to local API and updates `/v1/apps/:app/builds/:id/status` (running/completed/failed) with raw build message for triage.
+- Lane E (OCI) dev template fixes:
+  - Removed Docker `healthcheck` (unsupported on this Nomad/Docker driver); added service-level health checks.
+  - Corrected Traefik rule to `Host(<app>.<domain>)`; HTTPS fallback tries both preview and app host.
+- E2E harness hardening:
+  - TIMEOUT covers push + health wait; early failure detection + single retry; logs on failure.
+  - Async-aware: polls status ID (up to half of TIMEOUT) before HTTPS checks.
+- Current blocker for Lane E sample:
+  - Nomad fails to pull image: `manifest unknown` for `registry.dev.ployman.app/ploy-lane-a-go:<sha>`.
+  - Likely missing push and/or pull credentials for internal registry; image not present for Nomad to pull.
+- Next steps:
+  - Ensure API build host pushes to `registry.dev.ployman.app` and Nomad node can pull (credentials/whitelist).
+  - Add push verification to build script and surface results in async status for faster triage.
+  - Re-run Lane E to green, then proceed to lane-specific tests (A–G) per plan.
+
+### Cycle: Push Verification + Async Status Enhancements
+- Build pipeline:
+  - Added push verification to `scripts/build/oci/build_oci.sh` using `docker manifest inspect` (non-fatal).
+    - Emits a readable line: `Push verification: OK (digest sha256:...)` or a clear FAILED/SKIPPED note.
+  - Server adds a registry check after builds for container lanes and includes it in response JSON:
+    - New field `pushVerification`: `{ok,status,digest,message}`.
+    - Async status now carries this JSON message, making missing-tag/auth issues obvious during polling.
+- Credentials guidance (Dev VPS):
+  - API build host (push): `docker login registry.dev.ployman.app` under the `ploy` user; ensure `~/.docker/config.json` persisted.
+  - Nomad nodes (pull): configure `~/.docker/config.json` for the Nomad client service user (often `root`), then `systemctl restart nomad`.
+  - Optional: use per-app env vars to store registry coordinates; pull auth can also be injected via host-level Docker config. Template auth block intentionally omitted for dev; prefer host config.
+- Test harness:
+  - Lane E E2E will now surface `pushVerification` in the status poll results before HTTPS checks, reducing time-to-diagnose `manifest unknown`.
+  - Continue using async deploy mode to avoid ingress timeouts during tar upload.
+
+### Cycle: Traefik as Nomad Job
+- Ingress topology:
+  - Traefik now runs as a Nomad job; discovery uses Consul Catalog tags.
+  - Lane E template already sets Consul service tags for Traefik: `traefik.enable=true`, router rule `Host(<app>.<domain>)`, TLS certresolver `dev-wildcard`, and service healthcheck path `/healthz`.
+- Diagnostics:
+  - Fetch Traefik logs via Dev API: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`.
+  - Our `tests/lanes/check-app-logs.sh` now also prints Traefik logs after app logs when `PLOY_CONTROLLER` is set.
+  - Verify router creation and 404s in Traefik logs if HTTPS fails while allocations are healthy.
+- Next validation pass:
+  - Ensure image exists in internal registry (push OK) so Nomad allocates the task; once healthy, Traefik should route per tags above.

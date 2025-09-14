@@ -174,6 +174,23 @@ Run Log & Key Takeaways
     - Deterministic Java 17–specific failure path also heals to MR completion.
     - LLMS model registry + step-level model selection continues to work seamlessly across branches.
 
+- Cycle 7 (LLM diff persisted step-scoped to SeaweedFS; clean commit scope):
+  - Change:
+    - Runner now stages only files referenced by the unified diff during the healing commit (avoids target/* and SBOM.json noise).
+    - LLM exec branch uploads its diff to SeaweedFS under `mods/<EXEC_ID>/branches/<branchID>/steps/<stepID>/diff.patch` and writes `HEAD.json` like ORW.
+  - Result (EXEC_ID tf-9c72790b):
+    - Status: completed, phase=mr
+    - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/30
+  - Diff links:
+    - Final healing diff (controller): `${PLOY_CONTROLLER}/mods/tf-9c72790b/artifacts/diff_patch`
+    - ORW step diff (SeaweedFS): `${PLOY_SEAWEEDFS_URL}/artifacts/mods/tf-9c72790b/branches/orw-1/steps/<STEP_ID>/diff.patch` (discover `<STEP_ID>` via `HEAD.json`)
+    - LLM step diff (SeaweedFS): `${PLOY_SEAWEEDFS_URL}/artifacts/mods/tf-9c72790b/branches/llm-1/steps/<STEP_ID>/diff.patch` (discover `<STEP_ID>` via `HEAD.json`)
+  - Manual build verification (workstation):
+    - Cloned MR 27 branch and ran `mvn -B -DskipTests package` locally → build OK with Java 17.
+  - Takeaways:
+    - Healing diff is now stored with the same branch/step lineage as ORW, enabling per-step diff retrieval.
+    - MRs are cleanly scoped to patch contents (no target/ artifacts).
+
 Notes
 - Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.

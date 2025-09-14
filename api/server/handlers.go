@@ -1,11 +1,11 @@
 package server
 
 import (
-    "fmt"
-    "log"
-    "strings"
+	"fmt"
+	"log"
+	"strings"
 
-    "github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/internal/build"
 	"github.com/iw2rmb/ploy/internal/debug"
 	"github.com/iw2rmb/ploy/internal/env"
@@ -52,29 +52,29 @@ func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
 
 // handleTriggerAppBuild handles user application builds with apps namespace
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
-    log.Printf("[Handler] triggerAppBuild ENTER method=%s url=%s app=%s sha=%s lane=%s env=%s body_len=%d",
-        c.Method(), c.OriginalURL(), c.Params("app"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
+	log.Printf("[Handler] triggerAppBuild ENTER method=%s url=%s app=%s sha=%s lane=%s env=%s body_len=%d",
+		c.Method(), c.OriginalURL(), c.Params("app"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
 	// Use factory pattern to get unified storage interface
 	unifiedStorage, err := s.resolveUnifiedStorage()
 	if err != nil {
 		log.Printf("[Handler] triggerAppBuild resolveUnifiedStorage ERROR: %v", err)
 		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
-    // Async mode: accept upload and run build in background via local loopback call
-    if strings.ToLower(c.Query("async", "false")) == "true" {
-        app := c.Params("app")
-        id, aerr := s.startAsyncBuild(c, app, c.Query("sha", "dev"), c.Query("lane", ""), c.Query("main", ""))
-        if aerr != nil {
-            return c.Status(500).JSON(fiber.Map{"error": aerr.Error()})
-        }
-        return c.Status(202).JSON(fiber.Map{
-            "accepted": true,
-            "id":       id,
-            "status":   fmt.Sprintf("/v1/apps/%s/builds/%s/status", app, id),
-        })
-    }
+	// Async mode: accept upload and run build in background via local loopback call
+	if strings.ToLower(c.Query("async", "false")) == "true" {
+		app := c.Params("app")
+		id, aerr := s.startAsyncBuild(c, app, c.Query("sha", "dev"), c.Query("lane", ""), c.Query("main", ""))
+		if aerr != nil {
+			return c.Status(500).JSON(fiber.Map{"error": aerr.Error()})
+		}
+		return c.Status(202).JSON(fiber.Map{
+			"accepted": true,
+			"id":       id,
+			"status":   fmt.Sprintf("/v1/apps/%s/builds/%s/status", app, id),
+		})
+	}
 
-    err = build.TriggerAppBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
+	err = build.TriggerAppBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 	if err != nil {
 		log.Printf("[Handler] triggerAppBuild EXIT with error: %v", err)
 	} else {
@@ -85,11 +85,11 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 
 // handleBuildsOptions responds to OPTIONS on /v1/apps/:app/builds for quick reachability checks
 func (s *Server) handleBuildsOptions(c *fiber.Ctx) error {
-    c.Set("Allow", "POST, OPTIONS")
-    c.Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-    c.Set("Access-Control-Allow-Headers", "Content-Type, X-Target-Domain")
-    c.Set("Access-Control-Max-Age", "300")
-    return c.SendStatus(204)
+	c.Set("Allow", "POST, OPTIONS")
+	c.Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	c.Set("Access-Control-Allow-Headers", "Content-Type, X-Target-Domain")
+	c.Set("Access-Control-Max-Age", "300")
+	return c.SendStatus(204)
 }
 
 // handleDestroyApp handles app destruction with request-scoped storage
@@ -105,16 +105,16 @@ func (s *Server) handleDestroyApp(c *fiber.Ctx) error {
 
 // handleBuildsProbe provides a dev-only JSON POST endpoint to test ingress POST handling without binary bodies
 func (s *Server) handleBuildsProbe(c *fiber.Ctx) error {
-    app := c.Params("app")
-    // Read small JSON body
-    var payload map[string]interface{}
-    _ = c.BodyParser(&payload)
-    return c.JSON(fiber.Map{
-        "status":  "ok",
-        "app":     app,
-        "len":     len(c.Body()),
-        "headers": c.GetReqHeaders(),
-    })
+	app := c.Params("app")
+	// Read small JSON body
+	var payload map[string]interface{}
+	_ = c.BodyParser(&payload)
+	return c.JSON(fiber.Map{
+		"status":  "ok",
+		"app":     app,
+		"len":     len(c.Body()),
+		"headers": c.GetReqHeaders(),
+	})
 }
 
 // handleStorageHealth handles storage health checks with request-scoped client

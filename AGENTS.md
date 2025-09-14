@@ -90,6 +90,12 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 - `make test-unit`, `make test-coverage-threshold`, build verification
 - Deploy API: `./bin/ployman api deploy --monitor` (run on workstation)
 
+Git hygiene (MANDATORY) before any deploy:
+- Always commit and push your changes to the remote branch before invoking any deploy commands.
+  - Run `pre-commit run --all-files` locally and ensure it passes.
+  - `git add -A && git commit -m "<message>" && git push`.
+  - Only then run `./bin/ployman api deploy --monitor` or other deployment commands.
+
 Notes:
 - Run `./bin/ployman api deploy --monitor` on your workstation. Do not run it on the VPS.
 - Never use direct Nomad commands; if needed remotely, only via `/opt/hashicorp/bin/nomad-job-manager.sh` as invoked by platform tooling.
@@ -136,7 +142,8 @@ For EVERY code change:
 
 1. **Write failing tests** (RED phase)
 2. **Write minimal code** to pass tests (GREEN phase)  
-3. **Deploy to VPS** for integration testing (REFACTOR phase)
+3. Ensure all changes are committed and pushed to the remote repository
+4. **Deploy to VPS** for integration testing (REFACTOR phase)
 4. **Update documentation** (`CHANGELOG.md`, `FEATURES.md` as needed)
 5. **Merge to main** and return to worktree branch
 
