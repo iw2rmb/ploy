@@ -8,6 +8,21 @@
   vars:
     api_env_path: "/home/ploy/api.env"
   tasks:
+    - name: Ensure Nomad job manager directory exists
+      file:
+        path: /opt/hashicorp/bin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install Nomad job manager wrapper
+      copy:
+        src: "{{ playbook_dir }}/../../common/scripts/nomad-job-manager.sh"
+        dest: "/opt/hashicorp/bin/nomad-job-manager.sh"
+        owner: root
+        group: root
+        mode: '0755'
     - name: Capture controller-side GitLab envs (workstation)
       no_log: true
       set_fact:
