@@ -335,6 +335,10 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
     }
     key := computeBranchDiffKey(execID, branchID, stepID)
     url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+    // Emit download attempt event for diagnostics
+    if o.runner != nil && o.runner.GetEventReporter() != nil {
+        _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download diff from %s", key), Time: time.Now()})
+    }
     if err := downloadToFileFn(url, diffPath); err != nil {
         result.Status = "failed"
         result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", err)
