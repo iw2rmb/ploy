@@ -25,7 +25,7 @@ job "mods-planner" {
         destination = "local/sbom_latest_url"
       }
       template {
-        data        = ""
+        data        = "# keep planner out dir"
         destination = "local/out/.keep"
       }
       artifact {
