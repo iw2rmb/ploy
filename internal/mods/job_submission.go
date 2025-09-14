@@ -259,6 +259,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
             "MODS_LIMITS":            llm.LimitsJSON,
             "PLOY_CONTROLLER":        infra.Controller,
             "PLOY_MODS_EXECUTION_ID": execIDVal,
+            "PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
             "NOMAD_DC":               infra.DC,
         }
 
