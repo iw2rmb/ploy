@@ -125,14 +125,11 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		dc = d.DC
 	}
 
-	// Resolve OpenAI key solely from PLOY_OPENAI_API_KEY per platform policy
-	openaiKey := get("PLOY_OPENAI_API_KEY")
-
-	replacer := strings.NewReplacer(
-		"${MODEL}", hclEscape(model),
-		"${TOOLS_JSON}", hclEscape(toolsJSON),
-		"${LIMITS_JSON}", hclEscape(limitsJSON),
-		"${RUN_ID}", runID,
+    replacer := strings.NewReplacer(
+        "${MODEL}", hclEscape(model),
+        "${TOOLS_JSON}", hclEscape(toolsJSON),
+        "${LIMITS_JSON}", hclEscape(limitsJSON),
+        "${RUN_ID}", runID,
 		"${CONTEXT_HOST_DIR}", hclEscape(contextHostDir),
 		"${OUT_HOST_DIR}", hclEscape(outHostDir),
 		"${PLANNER_IMAGE}", hclEscape(plannerImage),
@@ -146,12 +143,11 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${MCP_PROMPTS_JSON}", hclEscape(mcpEnvConfig.MCPPromptsJSON),
 		"${MCP_TIMEOUT}", hclEscape(mcpEnvConfig.MCPTimeout),
 		"${MCP_SECURITY_MODE}", hclEscape(mcpEnvConfig.MCPSecurityMode),
-		"${CONTROLLER_URL}", hclEscape(controllerURL),
-		"${EXECUTION_ID}", hclEscape(execID),
-		"${NOMAD_DC}", hclEscape(dc),
-		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
-		"${PLOY_OPENAI_API_KEY}", hclEscape(openaiKey),
-	)
+        "${CONTROLLER_URL}", hclEscape(controllerURL),
+        "${EXECUTION_ID}", hclEscape(execID),
+        "${NOMAD_DC}", hclEscape(dc),
+        "${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
+    )
 	rendered := replacer.Replace(string(hclBytes))
 
 	// Write substituted HCL to a new file
@@ -225,17 +221,22 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		// Step 2: Generate unique run ID for this planner job
 		runID := PlannerRunID(config.ID)
 
-		// Step 3: Substitute environment variables in HCL template without global env writes
-		contextDir := filepath.Dir(assets.InputsPath)
-		outDir := filepath.Join(workspace, "planner", "out")
-		imgs := ResolveImagesFromEnv()
-		infra := ResolveInfraFromEnv()
-		llm := ResolveLLMDefaultsFromEnv()
-		vars := map[string]string{
-			"MODS_CONTEXT_DIR":       contextDir,
-			"MODS_OUT_DIR":           outDir,
-			"MODS_REGISTRY":          imgs.Registry,
-			"MODS_PLANNER_IMAGE":     imgs.Planner,
+        // Step 3: Determine model from mods.yaml (if provided), provision in registry, then substitute env placeholders
+        contextDir := filepath.Dir(assets.InputsPath)
+        outDir := filepath.Join(workspace, "planner", "out")
+        imgs := ResolveImagesFromEnv()
+        infra := ResolveInfraFromEnv()
+        llm := ResolveLLMDefaultsFromEnv()
+        if config != nil {
+            if pref := config.PreferredModel(); pref != "" {
+                llm.Model = pref
+            }
+        }
+        vars := map[string]string{
+            "MODS_CONTEXT_DIR":       contextDir,
+            "MODS_OUT_DIR":           outDir,
+            "MODS_REGISTRY":          imgs.Registry,
+            "MODS_PLANNER_IMAGE":     imgs.Planner,
 			"MODS_REDUCER_IMAGE":     imgs.Reducer,
 			"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
 			"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
@@ -370,12 +371,12 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		outDir := filepath.Join(workspace, "reducer", "out")
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
-		llm := ResolveLLMDefaultsFromEnv()
-		vars := map[string]string{
-			"MODS_CONTEXT_DIR":       contextDir,
-			"MODS_OUT_DIR":           outDir,
-			"MODS_REGISTRY":          imgs.Registry,
-			"MODS_PLANNER_IMAGE":     imgs.Planner,
+        llm := ResolveLLMDefaultsFromEnv()
+        vars := map[string]string{
+            "MODS_CONTEXT_DIR":       contextDir,
+            "MODS_OUT_DIR":           outDir,
+            "MODS_REGISTRY":          imgs.Registry,
+            "MODS_PLANNER_IMAGE":     imgs.Planner,
 			"MODS_REDUCER_IMAGE":     imgs.Reducer,
 			"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
 			"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
