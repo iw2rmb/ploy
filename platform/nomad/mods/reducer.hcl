@@ -7,6 +7,7 @@ job "mods-reducer" {
       driver = "docker"
       config {
         image = "${REDUCER_IMAGE}"
+        force_pull = true
       }
       env = {
         RUN_ID = "${RUN_ID}"

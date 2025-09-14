@@ -7,6 +7,7 @@ job "mods-planner" {
       driver = "docker"
       config {
         image = "${PLANNER_IMAGE}"
+        force_pull = true
       }
       env = {
         MODEL       = "${MODEL}"
