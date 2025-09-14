@@ -249,6 +249,25 @@ Next Steps (ops):
   - Commit and push these template changes; redeploy API so updated templates ship to the job manager.
   - Ensure API env on VPS sets `MODS_*_IMAGE` to the latest `langgraph-runner:py-0.1.7+` and `PLOY_SEAWEEDFS_URL` is reachable from jobs.
   - Re-run `./run.sh`; expect healing to progress into llm-exec, upload the deletion diff, and complete with an MR.
+
+Cycle 13 (Planner submits but allocation fails):
+  - Change/Result (EXEC_ID tf-bdcf34b2):
+    - Planner now validates and submits: events show "planner job started" → "job submitted".
+    - Allocation failed later: "job mods-planner allocation failed (...)"; no plan_json artifact produced.
+  - Likely causes:
+    - Planner image tag not present or not accessible in internal registry.
+    - Runtime network/DNS pull issue for `registry.dev.ployman.app/langgraph-runner:py-0.1.7`.
+  - Actions:
+    - Ensure langgraph-runner:py-0.1.7 is built and pushed to the internal registry.
+    - Persist image overrides on VPS using `iac/dev/playbooks/mods-env.yml` (or re-deploy API with MODS_*_IMAGE env exported) to avoid reverting to defaults.
+    - Re-run scenario; expect planner to complete and llm-exec to run next.
+
+Cycle 14 (Expected next: llm-exec emits step-scoped diff):
+  - On success, llm-exec logs should include:
+    - `env CTX_DIR=… OUT_DIR=…` and `env PLOY_SEAWEEDFS_URL=…` events.
+    - `uploaded diff to mods/<EXEC_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch` event.
+  - Controller fallback downloads the step-scoped diff when local `out/diff.patch` is missing and proceeds to MR.
+  - Manual build validation (workstation): checkout MR branch and `mvn -B -DskipTests package` should succeed.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
 
 Go E2E tests — CI/VPS flow
