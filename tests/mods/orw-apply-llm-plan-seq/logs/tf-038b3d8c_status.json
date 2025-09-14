@@ -1,0 +1,127 @@
+{
+  "id": "tf-038b3d8c",
+  "status": "failed",
+  "start_time": "2025-09-14T08:28:33.339269884Z",
+  "end_time": "2025-09-14T08:29:33.127727213Z",
+  "error": "build check failed: maven build failed: exit status 1\n (healing also failed: planner job failed: planner HCL validation failed: wrapper validate failed: exit status 1: [2025-09-14 08:29:33] Validating job file: /tmp/mods-tf-038b3d8c-486957177/planner/planner.rendered.submitted.hcl\nError getting job struct: Error parsing job file from /tmp/mods-tf-038b3d8c-486957177/planner/planner.rendered.submitted.hcl:\nplanner.rendered.submitted.hcl:27,23-28: Error in function call; Call to function \"file\" failed: no file exists at ${NOMAD_TASK_DIR}/context/inputs.json.\nplanner.rendered.submitted.hcl:27,23-28: Unsuitable value type; Unsuitable value: value must be known\n[2025-09-14 08:29:33] Validation failed\n)",
+  "phase": "healing",
+  "duration": "59.788457329s",
+  "steps": [
+    {
+      "step": "clone",
+      "phase": "clone",
+      "level": "info",
+      "message": "Cloning repository: repo=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git ref=e2e/fail-java17-specific",
+      "time": "2025-09-14T08:28:33.341516635Z"
+    },
+    {
+      "step": "clone-diagnostics",
+      "phase": "clone",
+      "level": "info",
+      "message": "repo=/tmp/mods-tf-038b3d8c-486957177/repo entries=.claude,.git,README.md,pom.xml,src",
+      "time": "2025-09-14T08:28:34.544663987Z"
+    },
+    {
+      "step": "source",
+      "phase": "sbom",
+      "level": "info",
+      "message": "Generated source SBOM",
+      "time": "2025-09-14T08:28:34.548606794Z"
+    },
+    {
+      "step": "create-branch",
+      "phase": "branch",
+      "level": "info",
+      "message": "Creating workflow branch",
+      "time": "2025-09-14T08:28:34.551325139Z"
+    },
+    {
+      "step": "guard-build-file",
+      "phase": "apply",
+      "level": "info",
+      "message": "repo=/tmp/mods-tf-038b3d8c-486957177/repo pom=true gradle=false kts=false",
+      "time": "2025-09-14T08:28:34.55923356Z"
+    },
+    {
+      "step": "input-preview",
+      "phase": "apply",
+      "level": "info",
+      "message": "input.tar preview:\n./.claude/state/context-warning-75.flag\n./.claude/state/context-warning-90.flag\n./.claude/state/daic-mode.json\n./.git/HEAD\n./.git/ORIG_HEAD\n./.git/config\n./.git/config.worktree\n./.git/description\n./.git/hooks/applypatch-msg.sample\n./.git/hooks/commit-msg.sample\n./.git/hooks/fsmonitor-watchman.sample\n./.git/hooks/post-update.sample\n./.git/hooks/pre-applypatch.sample\n./.git/hooks/pre-commit.sample\n./.git/hooks/pre-merge-commit.sample\n./.git/hooks/pre-push.sample\n./.git/hooks/pre-rebase.sample\n./.git/hooks/pre-receive.sample\n./.git/hooks/prepare-commit-msg.sample\n./.git/hooks/push-to-checkout.sample",
+      "time": "2025-09-14T08:28:34.566506626Z"
+    },
+    {
+      "step": "orw-apply",
+      "phase": "apply",
+      "level": "info",
+      "message": "Saved submitted HCL to /tmp/mods-submitted/tf-038b3d8c/java11to17-migration/orw_apply.submitted.hcl",
+      "time": "2025-09-14T08:28:34.577945952Z"
+    },
+    {
+      "step": "orw-apply",
+      "phase": "apply",
+      "level": "info",
+      "message": "Submitting orw-apply job",
+      "time": "2025-09-14T08:28:34.581312223Z"
+    },
+    {
+      "step": "orw-apply",
+      "phase": "apply",
+      "level": "info",
+      "message": "orw-apply job completed",
+      "time": "2025-09-14T08:29:27.999490479Z"
+    },
+    {
+      "step": "diff-found",
+      "phase": "apply",
+      "level": "info",
+      "message": "diff ready (1106 bytes)",
+      "time": "2025-09-14T08:29:28.003581097Z"
+    },
+    {
+      "step": "build-gate-start",
+      "phase": "build",
+      "level": "info",
+      "message": "Applying diff and running build gate: repo=/tmp/mods-tf-038b3d8c-486957177/repo diff=/tmp/mods-tf-038b3d8c-486957177/orw-apply/java11to17-migration/out/diff.patch",
+      "time": "2025-09-14T08:29:28.006490013Z"
+    },
+    {
+      "step": "diff-apply-started",
+      "phase": "apply",
+      "level": "info",
+      "message": "Applying diff to repository",
+      "time": "2025-09-14T08:29:28.008805895Z"
+    },
+    {
+      "step": "build-gate-start",
+      "phase": "build",
+      "level": "info",
+      "message": "Running build gate",
+      "time": "2025-09-14T08:29:28.01147041Z"
+    },
+    {
+      "step": "build-gate-failed",
+      "phase": "build",
+      "level": "error",
+      "message": "apply/build failed: build gate failed: maven build failed: exit status 1\n",
+      "time": "2025-09-14T08:29:30.608183248Z"
+    },
+    {
+      "step": "planner",
+      "phase": "planner",
+      "level": "info",
+      "message": "job started",
+      "time": "2025-09-14T08:29:33.03857567Z"
+    },
+    {
+      "step": "healing",
+      "phase": "healing",
+      "level": "error",
+      "message": "build check failed and healing failed",
+      "time": "2025-09-14T08:29:33.110066061Z"
+    }
+  ],
+  "last_job": {
+    "job_name": "java11to17-orw-llm-planner-1757838573",
+    "submitted_at": "2025-09-14T08:29:33.03857567Z"
+  }
+}
