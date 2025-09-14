@@ -1,0 +1,14 @@
+[2025-09-14 15:58:44] Getting stdout logs for allocation: 32088dda-3ac4-2999-e67a-ba62a2d1052f (task: api, lines: 800, follow: false)
+[2025-09-14 15:58:44] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/32088dda-3ac4-2999-e67a-ba62a2d1052f?type=stdout&plain=true&task=api&offset=-800
+[2025-09-14 15:58:44] Response code: 200
+/v1/apps/ploy-lane-e-go-1.22/probe -   16.883478ms
+[15:58:39] 200 - POST /v1/mods/mod-333d2b59/events -    2.722166ms
+[coordination] 2025/09/14 15:58:39 leader.go:312: New leader elected: swpjullapd
+[15:58:39] 200 - POST /v1/mods/mod-333d2b59/events -    3.507223ms
+[15:58:40] 404 - GET /v1/apps/ploy-lane-e-go-1.22/probe -    8.099746ms
+[coordination] 2025/09/14 15:58:41 leader.go:312: New leader elected: swpjullapd
+[15:58:42] 200 - GET /v1/mods/mod-333d2b59/artifacts -    1.589375ms
+[15:58:42] 404 - GET /v1/mods/mod-333d2b59/artifacts/plan_json -    1.148541ms
+[coordination] 2025/09/14 15:58:43 leader.go:312: New leader elected: swpjullapd
+[15:58:43] 404 - GET /v1/mods/mod-333d2b59/artifacts/diff_patch -    1.224591ms
+[15:58:43] 404 - GET /v1/apps/ploy-lane-e-go-1.22/probe -    9.650349ms
