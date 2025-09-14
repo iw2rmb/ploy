@@ -248,6 +248,21 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
 			"NOMAD_DC":               infra.DC,
 		}
+
+		// Upload planner context as a tar to SeaweedFS and provide URL for artifact fetch
+		if infra.SeaweedURL != "" {
+			// Ensure non-empty by adding .keep
+			_ = os.WriteFile(filepath.Join(contextDir, ".keep"), []byte("planner-context"), 0644)
+			tarPath := filepath.Join(workspace, "planner", "context.tar")
+			if err := createTarFromDir(contextDir, tarPath); err == nil {
+				execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+				if execID != "" {
+					key := fmt.Sprintf("mods/%s/contexts/%s.tar", execID, runID)
+					_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+				}
+			}
+		}
 		// Inject SBOM_LATEST_URL for job reuse of last SBOM
 		if infra.Controller != "" && config != nil && config.TargetRepo != "" {
 			vars["SBOM_LATEST_URL"] = fmt.Sprintf("%s/sbom/latest?repo=%s", strings.TrimRight(infra.Controller, "/"), url.QueryEscape(config.TargetRepo))
@@ -387,6 +402,20 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			"PLOY_CONTROLLER":        infra.Controller,
 			"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
 			"NOMAD_DC":               infra.DC,
+		}
+
+		// Upload reducer history/context as tar to SeaweedFS and provide URL
+		if infra.SeaweedURL != "" {
+			_ = os.WriteFile(filepath.Join(contextDir, ".keep"), []byte("reducer-context"), 0644)
+			tarPath := filepath.Join(workspace, "reducer", "context.tar")
+			if err := createTarFromDir(contextDir, tarPath); err == nil {
+				execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+				if execID != "" {
+					key := fmt.Sprintf("mods/%s/contexts/%s.tar", execID, runID)
+					_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+				}
+			}
 		}
 		// vars already carries PLOY_CONTROLLER; nothing else to do here.
 		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)

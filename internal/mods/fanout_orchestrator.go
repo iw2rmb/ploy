@@ -256,6 +256,22 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		"MODS_LIMITS":            llm.LimitsJSON,
 	}
 
+	// Prepare and upload a minimal context tar for artifact download (mirror planner/reducer behavior)
+	if infra.SeaweedURL != "" {
+		ctxDir := filepath.Join(baseDir, "context")
+		_ = os.MkdirAll(ctxDir, 0755)
+		_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
+		tarPath := filepath.Join(baseDir, "llm-context.tar")
+		if err := createTarFromDir(ctxDir, tarPath); err == nil {
+			execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+			if execID != "" {
+				key := fmt.Sprintf("mods/%s/contexts/%s.tar", execID, runID)
+				_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+				vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+			}
+		}
+	}
+
 	// Step 2: Generate unique run ID for this branch
 	runID := LLMRunID(branch.ID)
 
