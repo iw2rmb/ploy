@@ -15,12 +15,17 @@ fi
 if [[ -n "${PLOY_CONTROLLER:-}" ]]; then
   APP_URL="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/logs?lines=${LINES}&follow=${FOLLOW}"
   echo "Fetching app logs via API: $APP_URL" >&2
-  curl -sf "$APP_URL" | jq -r '.logs // .message // .error'
+  APP_LOGS=$(curl -sf "$APP_URL" || true)
+  if command -v jq >/dev/null 2>&1; then
+    echo "$APP_LOGS" | jq -r '.logs // .message // .error' || echo "$APP_LOGS"
+  else
+    echo "$APP_LOGS"
+  fi
   # Also attempt to fetch Traefik platform logs when available (Traefik runs as Nomad job)
   TRAEFIK_URL="${PLOY_CONTROLLER%/}/platform/traefik/logs?lines=${LINES}&follow=false"
   echo "---" >&2
   echo "Fetching Traefik logs via API (if supported): $TRAEFIK_URL" >&2
-  curl -sf "$TRAEFIK_URL" | jq -r '.logs // .message // .error' || true
+  curl -sf "$TRAEFIK_URL" || true
   exit 0
 fi
 
