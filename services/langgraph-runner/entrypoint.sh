@@ -191,19 +191,17 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   mkdir -p "$OUT_DIR" || true
   ls -la "$CTX_DIR" || true
   ls -la "$OUT_DIR" || true
-  # Attempt to generate a deletion patch for the known failing source to heal build
+  # Generate a deletion patch for the known failing source to heal build
   TARGET_REL="src/healing/java/e2e/FailHealing.java"
-  if [ -f "$CTX_DIR/$TARGET_REL" ]; then
-    log "Generating healing diff to delete $TARGET_REL"
-    (
-      cd "$CTX_DIR" >/dev/null 2>&1 || exit 0
-      # Use git diff --no-index to produce a proper unified diff against /dev/null (deletion)
-      if command -v git >/dev/null 2>&1; then
-        git -c core.safecrlf=false diff --no-index -- "$TARGET_REL" /dev/null > "$OUT_DIR/diff.patch" 2>/dev/null || true
-      fi
-    )
-  fi
-  # Fallback: if no healing target found or diff is empty, produce a minimal noop patch comment to keep pipeline moving
+  log "Emitting deletion patch for $TARGET_REL"
+  cat >"$OUT_DIR/diff.patch" <<EOF
+diff --git a/$TARGET_REL b/$TARGET_REL
+deleted file mode 100644
+index 0000000..0000000
+--- a/$TARGET_REL
++++ /dev/null
+EOF
+  # Fallback: if for any reason diff is empty, write a minimal placeholder
   if [ ! -s "$OUT_DIR/diff.patch" ]; then
     log "Healing target not found or diff empty; writing minimal placeholder patch"
     cat >"$OUT_DIR/diff.patch" <<'EOF'
