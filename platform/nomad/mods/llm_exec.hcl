@@ -7,6 +7,7 @@ job "mods-llm-exec-${RUN_ID}" {
       driver = "docker"
       config {
         image = "${LLM_EXEC_IMAGE}"
+        force_pull = true
       }
       env = {
         MODEL       = "${MODEL}"
