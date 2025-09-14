@@ -104,7 +104,7 @@ job "{{APP_NAME}}-lane-c" {
           "-nographic",
           "-smp", "{{JVM_CPUS}}",
           "-m", "{{JVM_MEMORY}}M",
-          "-netdev", "user,id=net0",
+          "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}}",
           "-device", "virtio-net-pci,netdev=net0"
         ]
         # Dev VPS: disable KVM/accelerator to avoid host dependency
