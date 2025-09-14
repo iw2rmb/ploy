@@ -188,6 +188,8 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   log "Detected llm-exec run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "llm-exec" "llm-exec" "job started"
   log "CTX_DIR=$CTX_DIR OUT_DIR=$OUT_DIR"
+  post_event "info" "llm-exec" "llm-exec" "env CTX_DIR=$CTX_DIR OUT_DIR=$OUT_DIR"
+  post_event "info" "llm-exec" "llm-exec" "env PLOY_SEAWEEDFS_URL=${SEAWEEDFS_URL:-<empty>}"
   mkdir -p "$OUT_DIR" || true
   ls -la "$CTX_DIR" || true
   ls -la "$OUT_DIR" || true
