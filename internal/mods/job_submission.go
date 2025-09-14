@@ -125,7 +125,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		dc = d.DC
 	}
 
-    replacer := strings.NewReplacer(
+	replacer := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
 		"${LIMITS_JSON}", hclEscape(limitsJSON),
@@ -147,9 +147,9 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${CONTROLLER_URL}", hclEscape(controllerURL),
 		"${EXECUTION_ID}", hclEscape(execID),
 		"${NOMAD_DC}", hclEscape(dc),
-        "${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
-        "${PLOY_SEAWEEDFS_URL}", hclEscape(get("PLOY_SEAWEEDFS_URL")),
-    )
+		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
+		"${PLOY_SEAWEEDFS_URL}", hclEscape(get("PLOY_SEAWEEDFS_URL")),
+	)
 	rendered := replacer.Replace(string(hclBytes))
 
 	// Write substituted HCL to a new file
@@ -226,29 +226,41 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		// Step 3: Determine model from mods.yaml (if provided), provision in registry, then substitute env placeholders
 		contextDir := filepath.Dir(assets.InputsPath)
 		outDir := filepath.Join(workspace, "planner", "out")
-		imgs := ResolveImagesFromEnv()
-		infra := ResolveInfraFromEnv()
+        imgs := ResolveImagesFromEnv()
+        infra := ResolveInfraFromEnv()
+        // Derive execution ID from env or workspace folder name (mods-<exec>-<rand>)
+        execIDVal := os.Getenv("PLOY_MODS_EXECUTION_ID")
+        if execIDVal == "" {
+            base := filepath.Base(workspace)
+            // Expecting mods-<exec>-<rand>
+            if strings.HasPrefix(base, "mods-") {
+                parts := strings.SplitN(base, "-", 3)
+                if len(parts) >= 2 {
+                    execIDVal = parts[1]
+                }
+            }
+        }
 		llm := ResolveLLMDefaultsFromEnv()
 		if config != nil {
 			if pref := config.PreferredModel(); pref != "" {
 				llm.Model = pref
 			}
 		}
-		vars := map[string]string{
-			"MODS_CONTEXT_DIR":       contextDir,
-			"MODS_OUT_DIR":           outDir,
-			"MODS_REGISTRY":          imgs.Registry,
-			"MODS_PLANNER_IMAGE":     imgs.Planner,
-			"MODS_REDUCER_IMAGE":     imgs.Reducer,
-			"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
-			"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
-			"MODS_MODEL":             llm.Model,
-			"MODS_TOOLS":             llm.ToolsJSON,
-			"MODS_LIMITS":            llm.LimitsJSON,
-			"PLOY_CONTROLLER":        infra.Controller,
-			"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-			"NOMAD_DC":               infra.DC,
-		}
+        vars := map[string]string{
+            "MODS_CONTEXT_DIR":       contextDir,
+            "MODS_OUT_DIR":           outDir,
+            "MODS_REGISTRY":          imgs.Registry,
+            "MODS_PLANNER_IMAGE":     imgs.Planner,
+            "MODS_REDUCER_IMAGE":     imgs.Reducer,
+            "MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+            "MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
+            "MODS_MODEL":             llm.Model,
+            "MODS_TOOLS":             llm.ToolsJSON,
+            "MODS_LIMITS":            llm.LimitsJSON,
+            "PLOY_CONTROLLER":        infra.Controller,
+            "PLOY_MODS_EXECUTION_ID": execIDVal,
+            "NOMAD_DC":               infra.DC,
+        }
 
 		// Upload planner context as a tar to SeaweedFS and provide URL for artifact fetch
 		if infra.SeaweedURL != "" {
@@ -293,13 +305,12 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-        // Step 6: Read and validate job output artifact (plan.json)
-        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
-        if _, err := os.Stat(artifactPath); err != nil {
+		// Step 6: Read and validate job output artifact (plan.json)
+		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+		if _, err := os.Stat(artifactPath); err != nil {
             // Fallback: fetch from SeaweedFS if runner uploaded it
-            execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
-            if infra.SeaweedURL != "" && execID != "" {
-                key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execID, runID)
+            if infra.SeaweedURL != "" && execIDVal != "" {
+                key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execIDVal, runID)
                 url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
                 _ = downloadToFileFn(url, artifactPath)
             }
