@@ -73,14 +73,13 @@ ploy:
     ttl: 300
     enable_ipv6: false
   
-  # User apps domain configuration
-  # If env var is set but empty, still fall back to defaults (second arg true)
-  apps_domain: "{{ lookup('env', 'PLOY_APPS_DOMAIN') | default('ployd.app', true) }}"
-  apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | default('namecheap', true) }}"
+  # User apps domain configuration (iac/dev enforces dev subdomain)
+  apps_domain: "dev.ployd.app"
+  apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') }}"
   
   # Platform services domain configuration
-  platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('ployman.app', true) }}"
-  platform_domain_provider: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN_PROVIDER') | default('namecheap') }}"
+  platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') }}"
+  platform_domain_provider: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN_PROVIDER') }}"
   
   # API accessible at api.{platform_domain}
   api_subdomain: "api"

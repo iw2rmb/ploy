@@ -5,17 +5,13 @@
 # Development subdomain configuration
 ploy_dev_subdomain: "dev"
 
-# Full domains for development environment
-ploy_dev_apps_domain: "{{ ploy_dev_subdomain }}.{{ ploy.apps_domain }}"
-ploy_dev_platform_domain: "{{ ploy_dev_subdomain }}.{{ ploy.platform_domain }}"
-
 # Certificate configuration for user apps domain
 ploy_dev_apps_certificate:
   # Wildcard domain to provision
-  wildcard_domain: "*.{{ ploy_dev_apps_domain }}"
+  wildcard_domain: "*.{{ ploy.apps_domain }}"
   
   # Base domain (needed for DNS challenge)
-  base_domain: "{{ ploy_dev_apps_domain }}"
+  base_domain: "{{ ploy.apps_domain }}"
   
   # Certificate storage paths
   cert_path: "/etc/ploy/certs/dev-apps-wildcard.crt"
@@ -32,10 +28,10 @@ ploy_dev_apps_certificate:
 # Certificate configuration for platform services domain
 ploy_dev_platform_certificate:
   # Wildcard domain to provision
-  wildcard_domain: "*.{{ ploy_dev_platform_domain }}"
+  wildcard_domain: "*.{{ ploy.platform_domain }}"
   
   # Base domain (needed for DNS challenge)
-  base_domain: "{{ ploy_dev_platform_domain }}"
+  base_domain: "{{ ploy.platform_domain }}"
   
   # Platform services will be accessible at:
   # - api.dev.ployman.app (API service)
@@ -57,13 +53,13 @@ ploy_dev_platform_certificate:
 # Environment-specific routing
 ploy_dev_routing:
   # API endpoint on platform domain
-  api_domain: "api.{{ ploy_dev_platform_domain }}"
+  api_domain: "api.{{ ploy.platform_domain }}"
   
   # User app pattern for dev environment
-  app_pattern: "{app}.{{ ploy_dev_apps_domain }}"
+  app_pattern: "{app}.{{ ploy.apps_domain }}"
   
   # Platform service pattern for dev environment
-  platform_pattern: "{service}.{{ ploy_dev_platform_domain }}"
+  platform_pattern: "{service}.{{ ploy.platform_domain }}"
   
   # Examples:
   # User apps: node-hello.dev.ployd.app, java-app.dev.ployd.app
@@ -73,29 +69,29 @@ ploy_dev_routing:
 traefik_dev_config:
   # Router for API on platform domain
   api_router:
-    rule: "Host(`api.{{ ploy_dev_platform_domain }}`)"
+    rule: "Host(`api.{{ ploy.platform_domain }}`)"
     service: "ploy-api"
     tls:
       certResolver: "platform-wildcard"
       domains:
-        - main: "{{ ploy_dev_platform_domain }}"
+        - main: "{{ ploy.platform_domain }}"
           sans:
-            - "*.{{ ploy_dev_platform_domain }}"
+            - "*.{{ ploy.platform_domain }}"
   
   # Dynamic router for user apps
   apps_router:
-    rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy_dev_apps_domain }}`)"
+    rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy.apps_domain }}`)"
     service: "dynamic-apps"
     tls:
       certResolver: "apps-wildcard"
       domains:
-        - main: "{{ ploy_dev_apps_domain }}"
+        - main: "{{ ploy.apps_domain }}"
           sans:
-            - "*.{{ ploy_dev_apps_domain }}"
+            - "*.{{ ploy.apps_domain }}"
   
   # Dynamic router for platform services
   platform_router:
-    rule: "HostRegexp(`{service:[a-z0-9-]+}.{{ ploy_dev_platform_domain }}`)"
+    rule: "HostRegexp(`{service:[a-z0-9-]+}.{{ ploy.platform_domain }}`)"
     service: "dynamic-platform"
     tls:
       certResolver: "platform-wildcard"

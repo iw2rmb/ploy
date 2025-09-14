@@ -30,7 +30,7 @@ ploy_prod_certificate:
 # Environment-specific routing for production
 ploy_prod_routing:
   # Controller endpoint for production environment
-  controller_domain: "api.{{ ploy.apps_domain }}"
+  controller_domain: "api.{{ ploy.platform_domain }}"
   
   # App pattern for production environment
   app_pattern: "{app}.{{ ploy.apps_domain }}"
@@ -44,14 +44,14 @@ ploy_prod_routing:
 traefik_prod_config:
   # Router for production controller
   controller_router:
-    rule: "Host(`api.{{ ploy.apps_domain }}`)"
+    rule: "Host(`api.{{ ploy.platform_domain }}`)"
     service: "ploy-api"
     tls:
       certResolver: "prod-wildcard"
       domains:
-        - main: "{{ ploy.apps_domain }}"
+        - main: "{{ ploy.platform_domain }}"
           sans:
-            - "*.{{ ploy.apps_domain }}"
+            - "*.{{ ploy.platform_domain }}"
   
   # Dynamic router for production apps
   apps_router:
