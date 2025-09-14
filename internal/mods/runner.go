@@ -426,6 +426,10 @@ func (r *ModRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath st
 	if err := applyUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
 		return err
 	}
+	// Stage only files referenced by the unified diff to avoid committing build artifacts
+	if err := stagePathsFromDiff(ctx, repoPath, diffPath); err != nil {
+		return err
+	}
 	if r.repoManager != nil {
 		if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): mods branch patch"); err != nil {
 			return fmt.Errorf("commit failed: %w", err)

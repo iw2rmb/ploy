@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	doublestar "github.com/bmatcuk/doublestar/v4"
 )
@@ -70,6 +71,76 @@ func ValidateDiffPaths(diffPath string, allowedGlobs []string) error {
 	}
 	if err := scanner.Err(); err != nil {
 		return err
+	}
+	return nil
+}
+
+// stagePathsFromDiff stages only the files referenced by diffPath.
+// - Added/Modified files: git add -- path
+// - Deleted files: git rm -- path (if present), otherwise ensure removal is staged
+// It also avoids staging common build artifacts by limiting to explicit diff paths.
+func stagePathsFromDiff(ctx context.Context, repoPath, diffPath string) error {
+	addedOrModified := make(map[string]struct{})
+	deleted := make(map[string]struct{})
+
+	f, err := os.Open(diffPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	var lastMinus, lastPlus string
+	for s.Scan() {
+		line := s.Text()
+		if strings.HasPrefix(line, "--- ") {
+			lastMinus = strings.TrimPrefix(line, "--- ")
+		} else if strings.HasPrefix(line, "+++ ") {
+			lastPlus = strings.TrimPrefix(line, "+++ ")
+			// Determine added/modified/deleted based on pairing
+			// Normalize prefixes a/ or b/
+			norm := func(p string) string {
+				if p == "/dev/null" {
+					return p
+				}
+				if strings.HasPrefix(p, "a/") || strings.HasPrefix(p, "b/") {
+					return p[2:]
+				}
+				return p
+			}
+			minus := norm(lastMinus)
+			plus := norm(lastPlus)
+			if plus == "/dev/null" && minus != "/dev/null" {
+				deleted[minus] = struct{}{}
+			} else if plus != "/dev/null" { // added or modified
+				addedOrModified[plus] = struct{}{}
+			}
+		}
+	}
+	if err := s.Err(); err != nil {
+		return err
+	}
+
+	// Stage deletions first
+	for p := range deleted {
+		cmd := exec.CommandContext(ctx, "git", "rm", "--", p)
+		cmd.Dir = repoPath
+		if out, err := cmd.CombinedOutput(); err != nil {
+			// Fallback: try to remove cached if file already absent
+			_ = exec.CommandContext(ctx, "git", "rm", "--cached", "--", p).Run()
+			_ = out
+		}
+	}
+	// Stage added/modified
+	for p := range addedOrModified {
+		// Skip common build artifact locations defensively (target/, build/, .sbom.json handled by diff itself)
+		if strings.HasPrefix(p, "target/") || strings.HasPrefix(p, "build/") {
+			continue
+		}
+		cmd := exec.CommandContext(ctx, "git", "add", "--", p)
+		cmd.Dir = repoPath
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git add failed for %s: %v: %s", p, err, string(out))
+		}
 	}
 	return nil
 }

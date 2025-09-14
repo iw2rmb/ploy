@@ -113,3 +113,36 @@ Notes
   - Key takeaways:
     - Behavior is consistent across `/builds` and `/upload`: POST bodies aren’t reaching the controller; likely an ingress/policy filter on POSTs to the API service, independent of path and size, and specific to body-bearing requests under HTTP/2.
     - Next: collect Traefik/system logs from the node (systemd journal or /var/log/traefik/traefik.log) to confirm proxy handling; or temporarily add a dev-only controller endpoint that accepts a small JSON POST on `/v1/apps/:app/builds` to test POST-without-binary (to isolate content-type handling).
+
+- Cycle 8 (JSON probe succeeds; add Traefik log fetch script):
+  - Added dev-only JSON probe `POST /v1/apps/:app/builds/probe` → HTTP/2 200 with echoed headers; proves POST + body reaches controller when Content-Type is JSON.
+  - Probed `/upload` with `application/octet-stream` → still times out with 0 bytes received; confirms binary uploads are blocked upstream.
+  - Added `tests/lanes/fetch-traefik-logs.sh` to fetch Traefik logs via SSH (`journalctl` and `/var/log/traefik/*.log`).
+  - Key takeaways:
+    - Ingress is likely filtering/closing binary-bodied POSTs to the controller under HTTP/2.
+    - Next: run `TARGET_HOST=<ip> ./tests/lanes/fetch-traefik-logs.sh` and inspect access/error logs for POST `/v1/apps/<app>/(builds|upload)` to confirm.
+
+- Cycle 9 (Deeper diagnosis via VPS; pinpoint ingress behavior):
+  - From VPS, JSON probe POST `/v1/apps/:app/builds/probe` → HTTP/2 200 (controller sees body). From VPS, tiny binary body (4 bytes) with `Content-Length` and without `Expect` reaches controller (500 untar failed, expected); but a small tar (~4 KB) still fails (connection timeout/close).
+  - Traefik access.log does not record the failing external POST attempts (neither /builds nor /upload), even with log level DEBUG; successful internal controller POSTs (mods) and GETs appear normally. This indicates the failing requests are terminated before reaching Traefik’s router/service.
+  - Key takeaways:
+    - Route and HTTP/2 are fine (OPTIONS 204, JSON POST 200). The problem is specific to binary-bodied POSTs (application/x-tar, application/octet-stream, multipart/form-data) over HTTP/2 being terminated upstream of the controller and before Traefik logging.
+    - Disabling `Expect: 100-continue` and using a trivial body can reach the controller; realistic tar payloads (even ~4 KB) still fail—so it’s not just `Expect`, nor purely size.
+    - Logging to add next: (1) temporary iptables/ufw LOG rule for 443 to detect drops; (2) tcpdump capture during a failing POST to inspect TLS record/flow; (3) in Traefik, add a dev-only buffering middleware for `api.dev.ployman.app` to eagerly read request bodies, which can mitigate HTTP/2 framing/flow-control issues.
+  - Next: add dev-only Traefik buffering middleware to the API router/service and retest small tar POSTs; keep capture tools ready if needed.
+
+- Cycle 4 (Dev-only buffering at ingress → binary POSTs reach controller):
+  - Implemented a reversible Traefik dynamic-config patch to add a buffering middleware for `api.dev.ployman.app` and attached it via a high‑priority file‑provider router targeting `ploy-api@consulcatalog`.
+    - Script: `scripts/dev/add-traefik-buffering-mw.sh` (add|remove). Appends a marked block to `/opt/ploy/traefik-data/dynamic-config.yml`, restarts Traefik if systemd, or relies on file watch when Nomad‑managed.
+    - Probe: `scripts/dev/probe-api-binary-post.sh` sends tiny tar via `application/x-tar` and `multipart/form-data`, plus JSON probe.
+  - Result after enabling buffering:
+    - Binary POSTs over HTTP/2 now return API responses (no upstream drop). Example:
+      - `POST /v1/apps/probe-hello/upload?...` (binary tar) → `HTTP 500` with body: `{"error":"job validation failed: ... nonexistent namespace \"debug\""}`
+      - JSON probe `POST /v1/apps/probe-hello/builds/probe` → `HTTP 200`.
+    - Prior behavior (pre-buffering): binary POSTs were terminated before reaching controller and absent from Traefik access logs.
+  - Takeaways:
+    - Traefik’s buffering middleware mitigates the HTTP/2 binary body termination; requests now land at the controller reliably.
+    - Remaining 500s are controller‑side validation issues (e.g., debug namespace), unrelated to the original ingress/body transport problem.
+  - Next:
+    - Clean up the controller’s debug lane/namespace path for probe routes so small tar uploads validate in dev.
+    - Decide whether to keep buffering permanently for `api.dev.ployman.app` (dev‑only) or gate by feature flag.
