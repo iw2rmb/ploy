@@ -16,6 +16,8 @@ job "mods-planner" {
         SBOM_LATEST_URL = "${SBOM_LATEST_URL}"
         CONTROLLER_URL    = "${CONTROLLER_URL}"
         MODS_EXECUTION_ID = "${EXECUTION_ID}"
+        CONTEXT_DIR  = "${NOMAD_TASK_DIR}/context"
+        OUTPUT_DIR   = "${NOMAD_TASK_DIR}/out"
       }
       template {
         data        = "${SBOM_LATEST_URL}"
@@ -24,6 +26,10 @@ job "mods-planner" {
       template {
         data        = file("${NOMAD_TASK_DIR}/context/inputs.json")
         destination = "local/inputs.json"
+      }
+      template {
+        data        = ""
+        destination = "local/out/.keep"
       }
       artifact {
         source      = "${MODS_CONTEXT_URL}"
