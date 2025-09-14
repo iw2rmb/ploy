@@ -490,35 +490,42 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 	}
 	t.Logf("steps:\n%s", flat)
 
-	// Only assert when healing actually triggered (repo must be prepared to fail build)
-	if strings.Contains(flat, "build:build-gate-failed:error") {
-		// Artifacts are best-effort: pass if planner outputs are absent but MR exists.
-		req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, artsURL, nil)
-		resp2, err := httpc.Do(req2)
-		if err == nil && resp2 != nil && resp2.StatusCode == 200 {
-			defer resp2.Body.Close()
-			var arts map[string]any
-			if json.NewDecoder(resp2.Body).Decode(&arts) == nil {
-				if amap, ok := arts["artifacts"].(map[string]any); ok {
-					if amap["plan_json"] == nil || amap["next_json"] == nil {
-						t.Logf("planner artifacts missing; MR present? %t", st["result"] != nil && asStr(st["result"].(map[string]any)["mr_url"]) != "")
-					}
-				}
-			}
-		} else {
-			t.Logf("artifacts unavailable (http %v); MR present? %t", func() any {
-				if resp2 != nil {
-					return resp2.StatusCode
-				}
-				return "n/a"
-			}(), func() bool {
-				if r, ok := st["result"].(map[string]any); ok {
-					return asStr(r["mr_url"]) != ""
-				}
-				return false
-			}())
-		}
-	} else {
+    // Only assert when healing actually triggered (repo must be prepared to fail build)
+    if strings.Contains(flat, "build:build-gate-failed:error") {
+        // Tightened assertion: planner/reducer artifacts must be available when MR created
+        // 1) Fetch artifacts index
+        req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, artsURL, nil)
+        resp2, err := httpc.Do(req2)
+        if err != nil {
+            t.Fatalf("artifacts fetch failed: %v", err)
+        }
+        defer resp2.Body.Close()
+        if resp2.StatusCode != 200 {
+            t.Fatalf("artifacts HTTP %d", resp2.StatusCode)
+        }
+        var arts map[string]any
+        if err := json.NewDecoder(resp2.Body).Decode(&arts); err != nil {
+            t.Fatalf("decode artifacts: %v", err)
+        }
+        if _, ok := arts["artifacts"].(map[string]any); !ok {
+            t.Fatalf("artifacts map missing in response")
+        }
+        // 2) Download each expected artifact via controller streaming endpoint
+        for _, name := range []string{"plan_json", "next_json", "diff_patch"} {
+            dl := strings.TrimRight(controller, "/") + "/mods/" + result.ExecutionID + "/artifacts/" + name
+            req3, _ := http.NewRequestWithContext(ctx, http.MethodGet, dl, nil)
+            resp3, err := httpc.Do(req3)
+            if err != nil {
+                t.Fatalf("download %s failed: %v", name, err)
+            }
+            b := make([]byte, 64)
+            n, _ := resp3.Body.Read(b)
+            _ = resp3.Body.Close()
+            if resp3.StatusCode != 200 || n == 0 {
+                t.Fatalf("artifact %s not available (http %d, bytes %d)", name, resp3.StatusCode, n)
+            }
+        }
+    } else {
 		t.Skip("build gate did not fail; provide E2E_HEALING_REPO with deterministic failure to fully validate healing path")
 	}
 }
