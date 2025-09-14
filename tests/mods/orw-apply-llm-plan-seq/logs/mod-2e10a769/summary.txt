@@ -1,0 +1,11 @@
+MOD_ID: mod-2e10a769
+Controller: https://api.ployman.app/v1
+SeaweedFS: http://seaweedfs-filer.service.consul:8888
+
+Status:
+failed, phase=running
+build check failed: maven build failed: exit status 1
+ (healing also failed: planner job failed: failed to download planner output from SeaweedFS: http 404)
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log

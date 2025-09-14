@@ -1,0 +1,1 @@
+{"id":"mod-a5fb6f33","status":"failed","start_time":"2025-09-14T15:48:26.320122204Z","end_time":"2025-09-14T15:49:24.449604944Z","error":"build check failed: maven build failed: exit status 1\n (healing also failed: planner job failed: failed to download planner output from SeaweedFS: http 404)","phase":"running","duration":"58.12948274s"}

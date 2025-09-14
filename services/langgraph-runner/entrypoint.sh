@@ -11,6 +11,9 @@ SEAWEEDFS_URL="${SEAWEEDFS_URL:-${PLOY_SEAWEEDFS_URL:-}}"
 
 mkdir -p "$OUT_DIR"
 
+# Early startup diagnostics to confirm entrypoint is running and env is wired
+echo "[LG-STUB] ENTRYPOINT starting: RUN_ID=${RUN_ID_STR:-<empty>} MOD_ID=${MOD_ID_ENV:-<empty>} SEAWEEDFS_URL=${SEAWEEDFS_URL:-<empty>} CONTROLLER_URL=${CONTROLLER_URL:-<empty>}"
+
 log() { echo "[LG-STUB] $*"; }
 
 post_event() {
@@ -161,6 +164,23 @@ if [[ "$RUN_ID_STR" == *"planner"* ]]; then
   post_event "info" "planner" "planner" "job started"
   post_event "info" "planner" "planner" "env PLOY_SEAWEEDFS_URL=${SEAWEEDFS_URL:-<empty>}"
   post_event "info" "planner" "planner" "env MOD_ID=${MOD_ID_ENV:-<empty>} RUN_ID=${RUN_ID_STR}"
+
+  # Connectivity check to SeaweedFS (HEAD, fallback GET) for visibility
+  if [ -n "${SEAWEEDFS_URL:-}" ]; then
+    CHECK_URL="${SEAWEEDFS_URL%/}/"
+    HEAD_CODE=$(curl -sS -o /dev/null -w '%{http_code}' -I "$CHECK_URL" || echo "000")
+    if [ "$HEAD_CODE" = "200" ] || [ "$HEAD_CODE" = "204" ]; then
+      post_event "info" "planner" "planner" "seaweedfs connectivity (HEAD) status=${HEAD_CODE} url=${CHECK_URL}"
+    else
+      # Fallback to GET with short timeout and capture a snippet
+      GET_CODE=$(curl -sS -m 5 -o /tmp/seaweed_check.out -w '%{http_code}' "$CHECK_URL" || echo "000")
+      SNIP=$(tr -d '\r' </tmp/seaweed_check.out | head -c 200)
+      post_event "warn" "planner" "planner" "seaweedfs connectivity (HEAD=${HEAD_CODE}, GET=${GET_CODE}) url=${CHECK_URL} body=${SNIP}"
+      rm -f /tmp/seaweed_check.out || true
+    fi
+  else
+    post_event "warn" "planner" "planner" "seaweedfs connectivity skipped: SEAWEEDFS_URL empty"
+  fi
   PLAN_ID="plan-$(date +%s)"
   # Flag whether we included an SBOM prompt hint
   PROMPT_HINT="false"

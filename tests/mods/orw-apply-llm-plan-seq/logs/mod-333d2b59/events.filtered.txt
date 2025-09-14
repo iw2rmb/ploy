@@ -1,0 +1,13 @@
+# Errors
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sample.sse:data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: maven build failed: exit status 1\n","time":"2025-09-14T15:58:36.890225692Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sample.sse:data: {"step":"healing","phase":"healing","level":"error","message":"build check failed and healing failed","time":"2025-09-14T15:58:39.686043355Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sse:data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: maven build failed: exit status 1\n","time":"2025-09-14T15:58:36.890225692Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sse:data: {"step":"healing","phase":"healing","level":"error","message":"build check failed and healing failed","time":"2025-09-14T15:58:39.686043355Z"}
+
+# Planner/LLM/Reducer/Apply steps
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sample.sse:data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-333d2b59/planner/planner.submitted.hcl","time":"2025-09-14T15:58:39.366851638Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sample.sse:data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-14T15:58:39.373174407Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sample.sse:data: {"step":"planner","phase":"planner","level":"info","message":"download plan from mods/mod-333d2b59/planner/java11to17-orw-llm-planner-1757865519/plan.json","time":"2025-09-14T15:58:39.677898849Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sse:data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-333d2b59/planner/planner.submitted.hcl","time":"2025-09-14T15:58:39.366851638Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sse:data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-14T15:58:39.373174407Z"}
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-333d2b59/events.sse:data: {"step":"planner","phase":"planner","level":"info","message":"download plan from mods/mod-333d2b59/planner/java11to17-orw-llm-planner-1757865519/plan.json","time":"2025-09-14T15:58:39.677898849Z"}
