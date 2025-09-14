@@ -29,7 +29,7 @@ job "mods-llm-exec-${RUN_ID}" {
         destination = "local/context"
       }
       template {
-        data        = ""
+        data        = "# keep llm out dir"
         destination = "local/out/.keep"
       }
     }
