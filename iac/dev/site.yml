@@ -23,7 +23,6 @@
 - import_playbook: playbooks/hashicorp.yml
 - import_playbook: playbooks/seaweedfs-filer.yml
 - import_playbook: playbooks/arf-openrewrite-recipes-registry.yml
-- import_playbook: playbooks/traefik.yml
 - import_playbook: playbooks/docker-registry.yml
 - import_playbook: playbooks/langgraph-runner.yml
 - import_playbook: playbooks/openrewrite-jvm.yml

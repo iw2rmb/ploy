@@ -19,6 +19,24 @@ vault_version: "1.18.3"  # Compatible Vault version
 # Traefik version
 traefik_version: "3.5.0"
 
+# Node class for gateway/edge nodes where Traefik should run
+ploy_gateway_node_class: "gateway"
+
+# Nomad client meta key/value used to place Traefik (constraint uses ${meta.<key>})
+ploy_gateway_node_meta_key: "role"
+
+# Traefik admin/dashboard port (entrypoint "admin")
+traefik_admin_port: 8090
+
+# DNS provider credentials (prefer Vault-injected in production)
+# For Namecheap provider used in dev by default; leave blank or populate via env overrides for local testing.
+vault_namecheap_api_user: ""
+vault_namecheap_api_key: ""
+vault_namecheap_username: ""
+# If your Namecheap account requires API IP whitelist, set to VPS public IP
+vault_namecheap_client_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
+vault_namecheap_sandbox: false
+
 # Node Exporter version
 node_exporter_version: "1.7.0"
 

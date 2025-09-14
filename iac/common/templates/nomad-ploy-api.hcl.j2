@@ -264,7 +264,11 @@ EOF
           "traefik.enable=true",
           "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployman.app`)",
           "traefik.http.routers.ploy-api.tls=true",
-          "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard"
+          "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard",
+          # Alias on apps domain (dev) so both domains work
+          "traefik.http.routers.ploy-api-apps.rule=Host(`api.dev.{{ ploy.apps_domain }}`)",
+          "traefik.http.routers.ploy-api-apps.tls=true",
+          "traefik.http.routers.ploy-api-apps.tls.certresolver=apps-wildcard"
         ]
 
         # Health check endpoint - simplified configuration

@@ -8,6 +8,13 @@ job "traefik-system" {
     value = "linux"
   }
   
+  # Run only on edge/gateway nodes
+  # Ensure Nomad clients that should run Traefik set client.meta.role accordingly
+  constraint {
+    attribute = "${meta.{{ ploy_gateway_node_meta_key | default('role') }}}"
+    value     = "{{ ploy_gateway_node_class | default('gateway') }}"
+  }
+  
   group "traefik" {
     count = 1
     
@@ -38,8 +45,8 @@ job "traefik-system" {
         to = 443
       }
       port "admin" {
-        static = 8090
-        to = 8090
+        static = {{ traefik_admin_port | default(8090) }}
+        to = {{ traefik_admin_port | default(8090) }}
       }
       port "metrics" {
         static = 8091
@@ -104,9 +111,10 @@ job "traefik-system" {
           "--api.dashboard=true",
           "--api.insecure=true",
           "--ping=true",
+          "--ping.entryPoint=admin",
           "--entrypoints.web.address=:80",
           "--entrypoints.websecure.address=:443", 
-          "--entrypoints.admin.address=:8090",
+          "--entrypoints.admin.address=:{{ traefik_admin_port | default(8090) }}",
           "--entrypoints.metrics.address=:8091",
           "--entrypoints.traefik.address=:8095",
           "--providers.consulcatalog=true",
@@ -114,7 +122,7 @@ job "traefik-system" {
           "--providers.consulcatalog.exposedByDefault=false",
           "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
-          "--providers.consulcatalog.endpoint.token=${CONSUL_HTTP_TOKEN}",
+          # Token is provided via CONSUL_HTTP_TOKEN environment variable when Consul ACLs are enabled
           "--providers.file.filename=/etc/traefik/dynamic-configs/dynamic-config.yml",
           "--providers.file.watch=true",
           "--metrics.prometheus=true",
@@ -128,18 +136,18 @@ job "traefik-system" {
           "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Dev environment wildcard certificate resolver for ployman.app
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge=true",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.dev-wildcard.acme.email=admin@ployd.app",
-          "--certificatesresolvers.dev-wildcard.acme.storage=/data/dev-wildcard-acme.json",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Apps wildcard certificate resolver for ployd.app
+          # Platform wildcard certificate resolver for dev.ployman.app (reuse existing storage)
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge=true",
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.provider=namecheap",
+          "--certificatesresolvers.platform-wildcard.acme.email={{ ploy_dev_platform_certificate.email | default('admin@ployman.app') }}",
+          "--certificatesresolvers.platform-wildcard.acme.storage=/data/platform-acme.json",
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.delayBeforeCheck=30",
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          # Apps wildcard certificate resolver for dev.ployd.app (reuse existing storage)
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge=true",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.apps-wildcard.acme.email=admin@ployd.app",
-          "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-wildcard-acme.json",
+          "--certificatesresolvers.apps-wildcard.acme.email={{ ploy_dev_apps_certificate.email | default('admin@ployd.app') }}",
+          "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
           # HTTP to HTTPS redirect
@@ -173,14 +181,14 @@ job "traefik-system" {
         CONSUL_HTTP_TOKEN = "{{ vault_consul_http_token | default(lookup('env', 'CONSUL_HTTP_TOKEN') | default('')) }}"
         
         # Namecheap DNS provider for Let's Encrypt ACME challenges
-        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default('') }}"
-        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default('') }}"
-        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default('false') }}"
+        NAMECHEAP_API_USER = "{{ vault_namecheap_api_user | default(lookup('env', 'NAMECHEAP_API_USER') | default('')) }}"
+        NAMECHEAP_API_KEY = "{{ vault_namecheap_api_key | default(lookup('env', 'NAMECHEAP_API_KEY') | default('')) }}"
+        NAMECHEAP_SANDBOX = "{{ vault_namecheap_sandbox | default(lookup('env', 'NAMECHEAP_SANDBOX') | default('false')) }}"
         
         # DNS challenge configuration
         ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
-        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address']) }}"
-        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default('') }}"
+        NAMECHEAP_CLIENT_IP = "{{ vault_namecheap_client_ip | default(lookup('env', 'NAMECHEAP_CLIENT_IP') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address'])) }}"
+        NAMECHEAP_USERNAME = "{{ vault_namecheap_username | default(lookup('env', 'NAMECHEAP_USERNAME') | default('')) }}"
       }
       
       resources {
