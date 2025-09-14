@@ -198,3 +198,24 @@ Notes
   - Next:
     - Patch Lane E template and/or renderer to eliminate the malformed block and any invalid labels, then deploy the API to VPS (`./bin/ployman api deploy --monitor`).
     - Re-run E2E end-to-end with no lane override and verify HTTPS health and destroy/status flow.
+
+- Cycle 9 (Lane E builder path + logging; policy-aligned ingress):
+  - Aligned Lane E and renderer with current constraints:
+    - Default Docker runtime (Kontain only when `PLOY_KONTAIN_ENABLED=true`).
+    - Use `apps-wildcard` TLS resolver for app routers (`*.dev.ployd.app`).
+    - Renderer loads filesystem templates first (e.g., `/home/ploy/ploy/platform/nomad`) to avoid stale embedded content on the VPS.
+  - Stabilized Lane E build strategy:
+    - Prefer Jib (Gradle/Maven) automatically for OCI builds when `gradlew` or `build.gradle(.kts)`/`pom.xml` is present; fallback to Kaniko otherwise.
+    - Kaniko builder template fixed (unquoted `$CONTEXT_URL`/`$DOCKERFILE_PATH`/`$DOCKER_IMAGE` in args) and synced to VPS.
+  - Added detailed logging on the controller for Lane E builds:
+    - Selected path (Jib/Kaniko), context tar size, uploaded context URL, Kaniko HCL dump path, submission, and registry verification digest.
+  - Results:
+    - Controller accepts builds; with Kaniko path, the builder job now validates but the task exits with code 1 (allocation failed). Logs are needed to pinpoint (likely context fetch, base image pull, or Dockerfile error).
+    - When using plain Dockerfile previously, the app container started then exited quickly (no health); Jib should provide a correct entrypoint once image is built via Jib path.
+  - Key takeaways:
+    - Keep Traefik dynamic config clean; routing must come from Consul tags. Auto lane detection only—do not set lanes in tests.
+    - Lane E should prefer Jib for JVM stacks; Kaniko remains fallback for Dockerfile-only repos.
+    - Filesystem-first template loading on VPS is essential to pick up HCL fixes promptly.
+  - Next:
+    - Fetch Kaniko task logs for `ploy-scala-hello-e-build-dev` on the VPS to determine the exit-1 cause and address (context URL, base image, or Dockerfile step).
+    - Re-run E2E for `ploy-scala-hello` with auto lane and verify HTTPS health → destroy → 404 status.
