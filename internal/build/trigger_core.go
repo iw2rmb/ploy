@@ -143,22 +143,41 @@ func verifyOCIPush(tag string) verifyResult {
 
 // getJobLogsSnippet fetches recent logs for a job via the nomad-job-manager wrapper.
 func getJobLogsSnippet(job string, lines int) string {
-	if job == "" {
-		return ""
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "logs", "--job", job, "--lines", fmt.Sprintf("%d", lines))
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(out)
-	}
-	// limit size
-	b := out
-	if len(b) > 4000 {
-		b = b[len(b)-4000:]
-	}
-	return string(b)
+    if job == "" {
+        return ""
+    }
+    // Resolve running allocation ID first
+    allocID := func() string {
+        ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+        defer cancel()
+        cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "running-alloc", "--job", job)
+        out, err := cmd.CombinedOutput()
+        if err == nil {
+            id := strings.TrimSpace(string(out))
+            if id != "" {
+                return id
+            }
+        }
+        return ""
+    }()
+    if allocID == "" {
+        // Fallback: show allocs (human) for visibility
+        ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+        defer cancel()
+        cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "allocs", "--job", job, "--format", "human")
+        out, _ := cmd.CombinedOutput()
+        return string(out)
+    }
+    // Fetch logs for resolved alloc
+    ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+    defer cancel()
+    cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "logs", "--alloc-id", allocID, "--lines", fmt.Sprintf("%d", lines))
+    out, _ := cmd.CombinedOutput()
+    b := out
+    if len(b) > 4000 {
+        b = b[len(b)-4000:]
+    }
+    return string(b)
 }
 
 // generateDockerfile writes a simple Dockerfile into srcDir based on detected project markers.
