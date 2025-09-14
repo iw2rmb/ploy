@@ -14,6 +14,7 @@ import (
     "path/filepath"
     "strings"
     "time"
+    "regexp"
 
 	"github.com/gofiber/fiber/v2"
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
@@ -153,9 +154,18 @@ func getJobLogsSnippet(job string, lines int) string {
         cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "running-alloc", "--job", job)
         out, err := cmd.CombinedOutput()
         if err == nil {
-            id := strings.TrimSpace(string(out))
-            if id != "" {
-                return id
+            s := strings.TrimSpace(string(out))
+            // Extract UUID-like alloc ID from noisy output
+            re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+            if m := re.FindString(s); m != "" {
+                return m
+            }
+            // Fallback: last line
+            if i := strings.LastIndex(s, "\n"); i >= 0 {
+                s = strings.TrimSpace(s[i+1:])
+            }
+            if s != "" {
+                return s
             }
         }
         return ""
