@@ -100,14 +100,7 @@ job "{{APP_NAME}}-lane-e" {
           "ploy.runtime" = "kontain"
         }
         
-        # Health check at container level
-        healthcheck {
-          test = ["CMD", "curl", "-f", "http://localhost:{{HTTP_PORT}}/healthz"]
-          interval = "10s"
-          timeout = "5s"
-          retries = 3
-          start_period = "30s"
-        }
+        # Container-level healthcheck not supported on this cluster's Docker driver; use service-level checks instead.
         
         # Logging configuration
         logging {
@@ -294,7 +287,18 @@ EOF
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.sticky.cookie=true"
         ]
         
-        # Service-level checks disabled in dev to avoid conflicts; rely on container healthcheck above
+        # Service-level health checks
+        check {
+          type     = "http"
+          path     = "/healthz"
+          interval = "15s"
+          timeout  = "5s"
+          check_restart {
+            limit = 3
+            grace = "20s"
+            ignore_warnings = false
+          }
+        }
         
         {{#if CONNECT_ENABLED}}
         connect {
