@@ -305,15 +305,18 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-		// Step 6: Read and validate job output artifact (plan.json)
-		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
-		if _, err := os.Stat(artifactPath); err != nil {
-            // Fallback: fetch from SeaweedFS if runner uploaded it
-            if infra.SeaweedURL != "" && execIDVal != "" {
-                key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execIDVal, runID)
-                url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-                _ = downloadToFileFn(url, artifactPath)
-            }
+        // Step 6: Always fetch planner plan.json from SeaweedFS
+        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+        if infra.SeaweedURL == "" || execIDVal == "" {
+            return nil, fmt.Errorf("planner artifact fetch requires SeaweedFS URL and execution ID")
+        }
+        if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
+            return nil, fmt.Errorf("planner artifact path prep: %w", err)
+        }
+        key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execIDVal, runID)
+        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        if err := downloadToFileFn(url, artifactPath); err != nil {
+            return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", err)
         }
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
