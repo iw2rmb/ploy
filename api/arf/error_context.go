@@ -7,6 +7,19 @@ import (
 	"time"
 )
 
+// ErrorContext represents error context for analysis and prompt helpers
+// Minimal definition retained after removing legacy LLM types.
+type ErrorContext struct {
+	ErrorMessage   string                 `json:"error_message"`
+	ErrorType      string                 `json:"error_type"`
+	ErrorDetails   map[string]string      `json:"error_details"`
+	StackTrace     []string               `json:"stack_trace,omitempty"`
+	SourceFile     string                 `json:"source_file,omitempty"`
+	CompilerOutput string                 `json:"compiler_output,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp      time.Time              `json:"timestamp"`
+}
+
 // EnhancedErrorPattern represents a pattern for error detection in LLM analysis
 type EnhancedErrorPattern struct {
 	Pattern    *regexp.Regexp
