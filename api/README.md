@@ -121,7 +121,7 @@ api/
     ├── multi_language_python.go # Python-specific transformations
     ├── multi_language_go.go  # Go-specific transformations
     ├── multi_language_rust.go # Rust-specific transformations
-    ├── multi_language_wasm.go # WebAssembly transformations
+    # WebAssembly transformations now live under builders/wasm; ARF-specific WASM types removed
     ├── multi_language_javascript.go # JavaScript transformations
     ├── pattern_matcher.go    # Code pattern matching engine
     # Note: recipe_* sources (registry, executor, evolution, types) moved to api/recipes
@@ -141,7 +141,7 @@ api/
     ├── shared_types.go       # Additional shared types
     ├── recipe_types.go       # Recipe-specific type definitions
     ├── transformation_types.go # Transformation type definitions
-    ├── llm_types.go          # LLM integration types
+    # LLM integration is handled by Mods and LLMS; ARF LLM types removed
     ├── debug_types.go        # Debug system types
     ├── security_engine_types.go # Security engine types
     ├──

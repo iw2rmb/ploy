@@ -94,18 +94,18 @@ func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asy
 	// Parse async id if present
 	id := parseAcceptedID(out)
 	var metrics map[string]any
-    if id != "" {
-        metrics = waitAsync(t, controller, app, id, asyncBudget)
-    }
-    // Health check (fetch logs on failure), with controller-proxied fallback
-    if err := waitHealth(controller, app, healthBudget); err != nil {
-        sha := gitHead(t, filepath.Join(work, "app"))
-        if id != "" {
-            fetchBuilderLogsAPI(t, controller, app, id)
-        }
-        fetchLogs(t, app, lane, sha)
-        t.Fatalf("%v", err)
-    }
+	if id != "" {
+		metrics = waitAsync(t, controller, app, id, asyncBudget)
+	}
+	// Health check (fetch logs on failure), with controller-proxied fallback
+	if err := waitHealth(controller, app, healthBudget); err != nil {
+		sha := gitHead(t, filepath.Join(work, "app"))
+		if id != "" {
+			fetchBuilderLogsAPI(t, controller, app, id)
+		}
+		fetchLogs(t, app, lane, sha)
+		t.Fatalf("%v", err)
+	}
 	// Cleanup
 	run(t, work, 15*time.Second, bin(), "apps", "destroy", "--name", app, "--force")
 	// Write result entry
@@ -204,33 +204,33 @@ func waitAsync(t *testing.T, controller, app, id string, dur time.Duration) map[
 }
 
 func waitHealth(controller, app string, dur time.Duration) error {
-    // preview URL or fallback
-    // Since HEAD commit may vary, try the fallback app host first
-    base := fmt.Sprintf("https://%s.dev.ployd.app/healthz", app)
-    deadline := time.Now().Add(dur)
-    for time.Now().Before(deadline) {
-        resp, err := http.Get(base)
-        if err == nil {
-            resp.Body.Close()
-            if resp.StatusCode == 200 {
-                return nil
-            }
-        }
-        // Try controller-proxied internal probe if available
-        if controller != "" {
-            url := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
-            if r, e := http.Get(url); e == nil {
-                var m map[string]any
-                _ = json.NewDecoder(r.Body).Decode(&m)
-                r.Body.Close()
-                if code, ok := m["code"].(float64); ok && int(code) == 200 {
-                    return nil
-                }
-            }
-        }
-        time.Sleep(1 * time.Second)
-    }
-    return fmt.Errorf("health check failed: %s", base)
+	// preview URL or fallback
+	// Since HEAD commit may vary, try the fallback app host first
+	base := fmt.Sprintf("https://%s.dev.ployd.app/healthz", app)
+	deadline := time.Now().Add(dur)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(base)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				return nil
+			}
+		}
+		// Try controller-proxied internal probe if available
+		if controller != "" {
+			url := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
+			if r, e := http.Get(url); e == nil {
+				var m map[string]any
+				_ = json.NewDecoder(r.Body).Decode(&m)
+				r.Body.Close()
+				if code, ok := m["code"].(float64); ok && int(code) == 200 {
+					return nil
+				}
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return fmt.Errorf("health check failed: %s", base)
 }
 
 // timeBudgets derives phase budgets from the test deadline to honor -timeout.
@@ -252,28 +252,28 @@ func budgetsForCase(t *testing.T, idx, total int) (time.Duration, time.Duration,
 		casesLeft = 1
 	}
 	slice := remaining / time.Duration(casesLeft)
-    push := time.Duration(float64(slice) * 0.25)
-    async := time.Duration(float64(slice) * 0.55)
-    health := time.Duration(float64(slice) * 0.15)
+	push := time.Duration(float64(slice) * 0.25)
+	async := time.Duration(float64(slice) * 0.55)
+	health := time.Duration(float64(slice) * 0.15)
 	// clamps
-    if push > 60*time.Second {
-        push = 60 * time.Second
-    }
-    if async > 240*time.Second {
-        async = 240 * time.Second
-    }
-    if health > 60*time.Second {
-        health = 60 * time.Second
-    }
-    if push < 15*time.Second {
-        push = 15 * time.Second
-    }
-    if async < 20*time.Second {
-        async = 20 * time.Second
-    }
-    if health < 15*time.Second {
-        health = 15 * time.Second
-    }
+	if push > 60*time.Second {
+		push = 60 * time.Second
+	}
+	if async > 240*time.Second {
+		async = 240 * time.Second
+	}
+	if health > 60*time.Second {
+		health = 60 * time.Second
+	}
+	if push < 15*time.Second {
+		push = 15 * time.Second
+	}
+	if async < 20*time.Second {
+		async = 20 * time.Second
+	}
+	if health < 15*time.Second {
+		health = 15 * time.Second
+	}
 	return push, async, health
 }
 

@@ -77,18 +77,18 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 			}
 		}()
 		writeStatus(id, buildStatus{ID: id, App: app, Status: "running", StartedAt: time.Now().Format(time.RFC3339)})
-    // Build internal URL (bypass ingress). Preserve relevant flags from original query.
-    q := []string{fmt.Sprintf("sha=%s", sha), "async=false"}
-    if lane != "" {
-        q = append(q, "lane="+lane)
-    }
-    if main != "" {
-        q = append(q, "main="+main)
-    }
-    if v := c.Query("autogen_dockerfile", ""); v != "" {
-        q = append(q, "autogen_dockerfile="+v)
-    }
-    url := fmt.Sprintf("http://127.0.0.1:%s/v1/apps/%s/builds?%s", s.config.Port, app, strings.Join(q, "&"))
+		// Build internal URL (bypass ingress). Preserve relevant flags from original query.
+		q := []string{fmt.Sprintf("sha=%s", sha), "async=false"}
+		if lane != "" {
+			q = append(q, "lane="+lane)
+		}
+		if main != "" {
+			q = append(q, "main="+main)
+		}
+		if v := c.Query("autogen_dockerfile", ""); v != "" {
+			q = append(q, "autogen_dockerfile="+v)
+		}
+		url := fmt.Sprintf("http://127.0.0.1:%s/v1/apps/%s/builds?%s", s.config.Port, app, strings.Join(q, "&"))
 		f, err := os.Open(tarPath)
 		if err != nil {
 			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Message: err.Error(), EndedAt: time.Now().Format(time.RFC3339)})
