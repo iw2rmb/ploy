@@ -1,0 +1,14 @@
+[2025-09-14 17:55:40] Getting stdout logs for allocation: 5fbcea84-a41a-108e-b00d-ce3d0d76948a (task: api, lines: 800, follow: false)
+[2025-09-14 17:55:40] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/5fbcea84-a41a-108e-b00d-ce3d0d76948a?type=stdout&plain=true&task=api&offset=-800
+[2025-09-14 17:55:40] Response code: 200
+/apps/ploy-lane-e-node-20/builds/b-1757872521307718077/logs -  8.055810624s
+[17:55:30] 202 - POST /v1/apps/ploy-lane-e-go-1.22/builds -     503.565µs
+[17:55:30] 200 - POST /v1/mods/mod-3ed7ed1c/events -    2.701245ms
+[17:55:30] 200 - POST /v1/mods/mod-3ed7ed1c/events -    2.131441ms
+[17:55:33] 200 - POST /v1/mods/mod-3ed7ed1c/events -    3.287932ms
+[17:55:35] 200 - POST /v1/mods/mod-3ed7ed1c/events -    2.394074ms
+[17:55:36] 200 - POST /v1/mods/mod-3ed7ed1c/events -    2.412734ms
+[17:55:37] 200 - GET /v1/mods/mod-3ed7ed1c/artifacts -    1.561175ms
+[17:55:38] 404 - GET /v1/mods/mod-3ed7ed1c/artifacts/next_json -    1.704597ms
+[17:55:31] 200 - GET /v1/apps/ploy-lane-e-go-1.22/builds/b-1757872531096132086/logs -  8.066357206s
+[17:55:39] 200 - GET /v1/mods/mod-3ed7ed1c/status -    1.678955ms
