@@ -179,7 +179,7 @@ fi
 popd >/dev/null
 
 info "Destroying app via ploy apps destroy --name $APP_NAME --force"
-ploy apps destroy --name "$APP_NAME" --force
+"$PLOY_CMD" apps destroy --name "$APP_NAME" --force
 ok "Destroy request sent"
 
 info "Verifying app status returns 404"
