@@ -214,6 +214,16 @@ index 0000000..e69de29
 EOF
   fi
   log "Wrote diff.patch to $OUT_DIR"
+  # Upload to SeaweedFS step-scoped key to mirror ORW behavior
+  if [ -s "$OUT_DIR/diff.patch" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$EXECUTION_ID" ]; then
+    # Derive branch ID from RUN_ID: strip llm-exec- prefix and trailing -<ts>
+    BRANCH_ID=$(echo "$RUN_ID_STR" | sed -E 's/^llm-exec-//' | sed -E 's/-[0-9]+$//')
+    STEP_ID="$RUN_ID_STR"
+    KEY="mods/${EXECUTION_ID}/branches/${BRANCH_ID}/steps/${STEP_ID}/diff.patch"
+    URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
+    log "Uploading diff to $URL"
+    curl -sS -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /dev/null || true
+  fi
 else
   log "Unknown mode (RUN_ID=$RUN_ID_STR). Defaulting to planner output."
   PLAN_ID="plan-$(date +%s)"
