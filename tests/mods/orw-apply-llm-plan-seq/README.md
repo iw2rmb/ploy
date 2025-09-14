@@ -156,12 +156,23 @@ Run Log & Key Takeaways
     - ployman models add -f my-openai-model.json  (contains provider=openai, id=model-id, config.api_key and endpoint; see api/llms/handler.go format)
     - ployman models get <model-id> to verify; optionally set default via /v1/llms/models/default.
     - Set `model: <model-id>` on a relevant step in scenario.yaml and rerun ./run.sh.
-  - Result:
-    - Planner/llm-exec jobs run without relying on OPENAI_API_KEY env; model id flows via MODEL env only.
-    - Healing still depends on real planner image producing plan_json/next_json; if stubs are used, artifacts remain empty.
+  - Result (EXEC_ID tf-8fd02f15):
+    - Status: completed, phase=mr
+    - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/26
+    - Artifacts: plan_json/next_json/diff_patch availability depends on planner image; this run completed with MR created successfully.
   - Takeaways:
     - Credentials live in the registry (api/llms/handler.go, internal/arf/models); jobs should query controller when needed.
     - Model selection via mods.yaml is effective; no more hardcoded defaults in job templates.
+
+- Cycle 6 (Alt failing branch: e2e/fail-java17-specific):
+  - Change:
+    - Switched scenario base_ref to e2e/fail-java17-specific while keeping the same model in llm-plan step.
+  - Result (EXEC_ID tf-2b604c85):
+    - Status: completed, phase=mr
+    - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/27
+  - Takeaways:
+    - Deterministic Java 17–specific failure path also heals to MR completion.
+    - LLMS model registry + step-level model selection continues to work seamlessly across branches.
 
 Notes
 - Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
