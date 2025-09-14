@@ -1,0 +1,6 @@
+event: init
+data: {"id":"mod-b40b04fc","message":"SSE connected"}
+
+event: end
+data: {"duration":"","phase":"running","status":"failed"}
+
