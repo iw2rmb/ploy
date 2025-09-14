@@ -6,7 +6,7 @@ set -euo pipefail
 REGISTRY=${REGISTRY:-"ghcr.io"}
 OWNER_LOWER=${OWNER_LOWER:-"$(echo "${GITHUB_REPOSITORY_OWNER:-$(git config --get user.name || echo unknown)}" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')"}
 IMAGE_NAME=${IMAGE_NAME:-"langgraph-runner"}
-IMAGE_TAG=${IMAGE_TAG:-"py-0.1.0"}
+IMAGE_TAG=${IMAGE_TAG:-"latest"}
 PUSH=${PUSH:-"false"}
 
 while getopts ":p" opt; do
@@ -32,4 +32,3 @@ else
 fi
 
 echo "[LG] Done."
-

@@ -19,7 +19,7 @@ func TestSubstituteHCLTemplateWithMCPVars_UsesProvidedVars(t *testing.T) {
 		"PLOY_MODS_EXECUTION_ID": "e-22",
 		"MODS_CONTEXT_DIR":       tmp,
 		"MODS_OUT_DIR":           filepath.Join(tmp, "out"),
-		"MODS_PLANNER_IMAGE":     "registry.dev.ployman.app/langgraph-runner:py-0.1.0",
+        "MODS_PLANNER_IMAGE":     "registry.dev.ployman.app/langgraph-runner:latest",
 		"NOMAD_DC":               "dc77",
 	}
 	out, err := substituteHCLTemplateWithMCPVars(hcl, "run-1", vars, nil)

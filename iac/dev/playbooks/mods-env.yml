@@ -7,9 +7,9 @@
     - ../vars/main.yml
   vars:
     mods_registry: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
-    planner_image: "{{ mods_registry }}/langgraph-runner:py-0.1.0"
-    reducer_image: "{{ mods_registry }}/langgraph-runner:py-0.1.0"
-    llm_exec_image: "{{ mods_registry }}/langgraph-runner:py-0.1.0"
+    planner_image: "{{ mods_registry }}/langgraph-runner:latest"
+    reducer_image: "{{ mods_registry }}/langgraph-runner:latest"
+    llm_exec_image: "{{ mods_registry }}/langgraph-runner:latest"
     orw_apply_image: "{{ mods_registry }}/openrewrite-jvm:latest"
 
   tasks:

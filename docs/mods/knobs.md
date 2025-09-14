@@ -37,7 +37,7 @@ Storage endpoints
 -
 Images
     - MODS_ORW_APPLY_IMAGE: registry.dev.ployman.app/openrewrite-jvm:latest
-    - MODS_PLANNER_IMAGE / MODS_REDUCER_IMAGE / MODS_LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:py-0.1.0
+    - MODS_PLANNER_IMAGE / MODS_REDUCER_IMAGE / MODS_LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
     - MODS_REGISTRY: registry.dev.ployman.app (fallback registry prefix)
 -
 Nomad/DC
@@ -63,7 +63,7 @@ Recommended Defaults (dev)
 
 - orw-apply: memory=1024 MB, cpu=300; MAVEN_OPTS unset unless needed (then -Xmx768m).
 - MODS_ORW_APPLY_IMAGE: registry.dev.ployman.app/openrewrite-jvm:latest
-- MODS_PLANNER/REDUCER/LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:py-0.1.0
+- MODS_PLANNER/REDUCER/LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
 - NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
 - PLOY_CONTROLLER=https://api.dev.ployman.app/v1 (CLI), PLOY_API_URL auto-derived to https://api.dev.ployman.app
 - GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope)
@@ -114,7 +114,7 @@ The following environment variables control Mods defaults. All are optional; sen
 
 Registry and Images
 - MODS_REGISTRY: Default registry (default: registry.dev.ployman.app)
-- MODS_PLANNER_IMAGE: Planner job image (default: <REGISTRY>/langgraph-runner:py-0.1.0)
+- MODS_PLANNER_IMAGE: Planner job image (default: <REGISTRY>/langgraph-runner:latest)
 - MODS_REDUCER_IMAGE: Reducer job image (default: same as planner)
 - MODS_LLM_EXEC_IMAGE: LLM exec job image (default: same as planner)
 - MODS_ORW_APPLY_IMAGE: OpenRewrite apply image (default: <REGISTRY>/openrewrite-jvm:latest)
