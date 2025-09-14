@@ -1,8 +1,8 @@
 version: v1alpha1
 id: java11to17-orw-llm
-target_repo: https://gitlab.com/CHANGE-ME/your-fork-orw-java11-maven.git
+target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 target_branch: main
-base_ref: main
+base_ref: e2e/fail-java17-specific
 lane: C
 build_timeout: 12m
 
@@ -18,7 +18,7 @@ budgets:
 
 artifacts:
   type: mr
-  target_repo: https://gitlab.com/CHANGE-ME/your-fork-orw-java11-maven.git
+  target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
   storage:
     diffs: seaweedfs
     process_state: consul_kv
@@ -71,6 +71,7 @@ steps:
   # This step provides MCP context for the planner inputs and is ignored by executor if not used
   - type: llm-plan
     id: plan-build-fixes
+    model: gpt-4o-mini@2024-08-06
     parallel: true
     max_parallel_execs: 3
     mcp_tools:

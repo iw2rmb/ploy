@@ -59,6 +59,9 @@ Notes
   - Result: Nomad job validation failed due to volume/consul blocks present for a user app (dev cluster). Root cause: API renderer defaulted `VolumeEnabled`/`ConsulConfigEnabled` to true for non‑platform apps.
   - Action: Updated API renderer defaults to match orchestration — disable Volumes and Consul Config by default for non‑platform apps (Vault/Connect already off). Added unit tests and CHANGELOG note.
   - Next: Deploy API (`./bin/ployman api deploy --monitor`) and rerun E2E with `LANE=E` and `URL_OVERRIDE=https://ploy-scala-hello.dev.ployd.app/healthz` (Lane E host rule includes `dev.`).
+  - Key takeaways:
+    - API defaults needed alignment with orchestration to avoid invalid HCL for user apps.
+    - Add unit tests alongside behavior changes; document in CHANGELOG.
 
 - Cycle 2 (Deploy + E2E, cap timeouts to 5 min):
   - Deployed API to Dev, but Dev pulls from its own git remote. Local fixes are not yet present on the VPS because they haven’t been pushed upstream.
@@ -67,6 +70,9 @@ Notes
     - Lane C deploys, but HTTPS health does not come up publicly. Logs via API show: "No running allocations found" (likely OSv path not suited for this Scala app, or not exposed publicly on Dev).
   - Script improvements: capped health wait TIMEOUT to 5 minutes by default and fixed a bash array edge case for extra flags.
   - Next: land the renderer/template fixes on the VPS (push main, then deploy) so Lane E (Jib container) validates and exposes `https://<app>.dev.ployd.app/healthz`. Until then, Lane C will not be a reliable public HTTPS path for this app.
+  - Key takeaways:
+    - Cap test timeouts and surface failures quickly; fetch logs when health fails.
+    - Ensure fixes are pushed and deployed to VPS; Dev cluster pulls from its own repo.
 
 - Cycle 3 (Template simplification + validation fixes):
   - Deployed API with nested-conditional handling, but Lane E still produced invalid HCL due to nested `{{#if}}` inside the Connect service block.
@@ -74,13 +80,36 @@ Notes
   - Result: Lane E job validation advances; subsequent failure was an HTTP client EOF during `ploy push` to the controller.
   - E2E script: now detects non‑JSON CLI failures (❌) and aborts quickly; applies a single global TIMEOUT budget across push+health to keep cycles under 5 minutes.
   - Next: stabilize controller POST `/apps/:app/builds` for larger payloads (EOF); then retry Lane E. If needed, set `TIMEOUT=180` for faster cycles during iteration.
+  - Key takeaways:
+    - Simplify templates for dev where enterprise features aren’t enabled.
+    - After HCL fixes, focus moved to upload path stability.
 
 - Cycle 4 (Retry with 3min cap; inspect):
   - E2E retried with `TIMEOUT=180`, Lane E. CLI reports `unexpected EOF` from POST `/v1/apps/ploy-scala-hello/builds` consistently (twice, with backoff). App logs show no running allocations, as deploy aborts pre-Nomad.
   - Platform logs endpoint exists (`/v1/platform/:service/logs`) but is a stub; cannot fetch controller alloc logs via API. Next step is VPS-side alloc logs via job manager wrapper or implement the platform logs handler.
   - Hypothesis: reverse proxy (Traefik) or upstream idle timeout during streaming upload; consider increasing `forwardingTimeouts`/`readTimeout` for POSTs to `/v1/apps/*/builds`, or switching to chunked/multipart with smaller chunks.
+  - Key takeaways:
+    - Controller route might be fine, but ingress could be closing connections.
+    - Add server-side logs and endpoints to improve visibility.
 
 - Cycle 5 (Platform logs + streaming uploads):
   - Implemented `/v1/platform/:service/logs` (dev helper) — for `service=api` it fetches Nomad alloc logs via the job manager wrapper with `--task api`. Verified logs return HTTP 200 with controller entries.
   - Hardened build upload path to stream the request body to disk (`io.Copy` from request body stream) instead of `c.Body()` to reduce buffering and avoid proxy-induced EOFs.
   - Deployed API; `ploy push` still reports `unexpected EOF` to `/v1/apps/:app/builds`. Controller logs show no explicit errors (only leader elections). Next likely step: adjust Traefik/ingress timeouts for large POSTs or switch the client to multipart/chunked uploads with retries.
+  - Key takeaways:
+    - Streaming read/multipart support on server alone doesn’t resolve ingress drops.
+    - Need to collect proxy logs or isolate path-based behavior.
+
+- Cycle 6 (Alias route + OPTIONS probe):
+  - Added OPTIONS handler for `/v1/apps/:app/builds` → returns `204` via HTTP/2 (route reachable through Traefik).
+  - Implemented alias route `/v1/apps/:app/upload` mapped to the same build handler; updated E2E script to allow `USE_UPLOAD=1` for multipart.
+  - Traefik logs via Nomad are unavailable (Traefik runs as systemd in this environment). Controller logs still healthy.
+  - Key takeaways:
+    - Builds work internally (mods build gate) — controller/Nomad OK.
+    - External POST with body likely blocked by ingress path rules; probing `/upload` next.
+
+- Cycle 7 (Probe alias /upload under HTTP/2):
+  - Sent a tiny tar (4KB) over HTTP/2 to `/v1/apps/:app/upload` with a 20s cap → timed out with 0 bytes received (no controller logs). OPTIONS still 204 on `/builds`.
+  - Key takeaways:
+    - Behavior is consistent across `/builds` and `/upload`: POST bodies aren’t reaching the controller; likely an ingress/policy filter on POSTs to the API service, independent of path and size, and specific to body-bearing requests under HTTP/2.
+    - Next: collect Traefik/system logs from the node (systemd journal or /var/log/traefik/traefik.log) to confirm proxy handling; or temporarily add a dev-only controller endpoint that accepts a small JSON POST on `/v1/apps/:app/builds` to test POST-without-binary (to isolate content-type handling).

@@ -103,6 +103,20 @@ func (s *Server) handleDestroyApp(c *fiber.Ctx) error {
 	return lifecycle.DestroyAppWithStorage(c, unifiedStorage, s.dependencies.EnvStore)
 }
 
+// handleBuildsProbe provides a dev-only JSON POST endpoint to test ingress POST handling without binary bodies
+func (s *Server) handleBuildsProbe(c *fiber.Ctx) error {
+    app := c.Params("app")
+    // Read small JSON body
+    var payload map[string]interface{}
+    _ = c.BodyParser(&payload)
+    return c.JSON(fiber.Map{
+        "status":  "ok",
+        "app":     app,
+        "len":     len(c.Body()),
+        "headers": c.GetReqHeaders(),
+    })
+}
+
 // handleStorageHealth handles storage health checks with request-scoped client
 func (s *Server) handleStorageHealth(c *fiber.Ctx) error {
 	storeClient, err := s.getStorageClient()
