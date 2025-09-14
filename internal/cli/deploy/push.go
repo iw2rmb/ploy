@@ -81,8 +81,14 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		url += "&blue_green=true"
 	}
 
-	// Prefer async mode to avoid long-lived client connections through ingress
-	url += "&async=true"
+    // Prefer async mode to avoid long-lived client connections through ingress, unless disabled via env
+    if v := os.Getenv("PLOY_ASYNC"); !(v == "0" || v == "false" || v == "off" || v == "FALSE") {
+        url += "&async=true"
+    }
+    // Propagate autogen flag to server so the async inner call can honor it
+    if v := os.Getenv("PLOY_AUTOGEN_DOCKERFILE"); v == "1" || v == "true" || v == "on" || v == "TRUE" {
+        url += "&autogen_dockerfile=true"
+    }
 
 	var (
 		req         *http.Request

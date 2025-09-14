@@ -223,11 +223,11 @@ func (h *Handler) GetHistory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "list error"})
 	}
 	type Entry struct {
-		Repo        string `json:"repo"`
-		SHA         string `json:"sha"`
-		StorageKey  string `json:"storage_key"`
-		ExecutionID string `json:"execution_id"`
-		UpdatedAt   string `json:"updated_at"`
+		Repo       string `json:"repo"`
+		SHA        string `json:"sha"`
+		StorageKey string `json:"storage_key"`
+		ModID      string `json:"mod_id"`
+		UpdatedAt  string `json:"updated_at"`
 	}
 	entries := make([]Entry, 0, len(objs))
 	for _, o := range objs {
@@ -238,11 +238,11 @@ func (h *Handler) GetHistory(c *fiber.Ctx) error {
 		var m map[string]interface{}
 		if err := json.NewDecoder(r).Decode(&m); err == nil {
 			e := Entry{
-				Repo:        fmt.Sprintf("%v", m["repo"]),
-				SHA:         fmt.Sprintf("%v", m["sha"]),
-				StorageKey:  fmt.Sprintf("%v", m["storage_key"]),
-				ExecutionID: fmt.Sprintf("%v", m["execution_id"]),
-				UpdatedAt:   fmt.Sprintf("%v", m["updated_at"]),
+				Repo:       fmt.Sprintf("%v", m["repo"]),
+				SHA:        fmt.Sprintf("%v", m["sha"]),
+				StorageKey: fmt.Sprintf("%v", m["storage_key"]),
+				ModID:      fmt.Sprintf("%v", m["mod_id"]),
+				UpdatedAt:  fmt.Sprintf("%v", m["updated_at"]),
 			}
 			entries = append(entries, e)
 		}

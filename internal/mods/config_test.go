@@ -432,7 +432,7 @@ steps:
     maven_plugin_version: 6.18.0
     discover_recipe: false
 `
-	tmp := filepath.Join(t.TempDir(), "tf.yaml")
+	tmp := filepath.Join(t.TempDir(), "mod.yaml")
 	require.NoError(t, os.WriteFile(tmp, []byte(yamlContent), 0644))
 
 	cfg, err := LoadConfig(tmp)

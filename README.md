@@ -260,7 +260,7 @@ Subcommands for code transformation workflows and self-healing:
 
 ```
 ploy mod run -f mods.yaml [--watch] [--output json|text]
-ploy mod watch -id <execution_id>
+ploy mod watch -id <mod_id>
 ploy mod render -f mods.yaml [--work-dir DIR] [--preserve-workspace] [-v]
 ploy mod plan -f mods.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]
 ploy mod reduce -f mods.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]

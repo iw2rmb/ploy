@@ -52,7 +52,7 @@ type WorkflowResult struct {
 	Success             bool
 	Output              string
 	Error               string
-	ExecutionID         string
+	ModID               string
 	ConfigPath          string
 	ConfigYAML          string
 	WorkflowBranch      string
@@ -138,17 +138,17 @@ self_heal:
 }
 
 func (r *WorkflowResult) parseFromOutput(output string) {
-	// Parse execution_id from controller output variants
-	// 1) JSON-like: execution_id: "<id>"
-	execJSON := regexp.MustCompile(`(?i)execution_id\s*[:=]\s*\"([a-zA-Z0-9\-]+)\"`)
+	// Parse mod_id from controller output variants
+	// 1) JSON-like: mod_id: "<id>"
+	execJSON := regexp.MustCompile(`(?i)mod_id\s*[:=]\s*\"([a-zA-Z0-9\-]+)\"`)
 	if m := execJSON.FindStringSubmatch(output); len(m) > 1 {
-		r.ExecutionID = m[1]
+		r.ModID = m[1]
 	}
 	// 2) Human line: Execution ID: <id>
-	if r.ExecutionID == "" {
+	if r.ModID == "" {
 		execLine := regexp.MustCompile(`(?i)execution\s+id\s*[:=]\s*([a-zA-Z0-9\-]+)`)
 		if m := execLine.FindStringSubmatch(output); len(m) > 1 {
-			r.ExecutionID = m[1]
+			r.ModID = m[1]
 		}
 	}
 	// Parse workflow branch

@@ -114,7 +114,7 @@ func TestMods_ListAndReportEvent(t *testing.T) {
 	}
 
 	// Report event initializes status if missing
-	ev := map[string]any{"execution_id": "id3", "phase": "build", "step": "start", "message": "ok"}
+	ev := map[string]any{"mod_id": "id3", "phase": "build", "step": "start", "message": "ok"}
 	eb, _ := json.Marshal(ev)
 	req := httptest.NewRequest("POST", "/v1/mods/id3/events", bytes.NewReader(eb))
 	req.Header.Set("Content-Type", "application/json")

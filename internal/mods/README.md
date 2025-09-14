@@ -83,7 +83,7 @@ Mods offers explicit subcommands for common workflows:
 
 - `ploy mod run -f mods.yaml [--watch] [--output json|text]`
   - Remote execution via controller. Prints execution ID and optionally attaches a watch.
-- `ploy mod watch -id <execution_id>`
+- `ploy mod watch -id <mod_id>`
   - Attaches to a running run and streams status/events.
 - `ploy mod render -f mods.yaml [--work-dir DIR] [--preserve-workspace] [-v]`
   - Renders planner inputs and HCL locally (no submission).

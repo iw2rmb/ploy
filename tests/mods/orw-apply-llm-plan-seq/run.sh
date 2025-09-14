@@ -44,9 +44,9 @@ if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]
   exit 1
 fi
 
-MOD_ID=$(echo "$JSON" | jq -r '.execution_id // .id')
+MOD_ID=$(echo "$JSON" | jq -r '.mod_idxecution_id // .id')
 if [[ -z "$MOD_ID" || "$MOD_ID" == "null" ]]; then
-  echo "No execution_id in response:" >&2
+  echo "No mod_id in response:" >&2
   echo "$JSON" | jq . >&2 || echo "$JSON" >&2
   exit 1
 fi

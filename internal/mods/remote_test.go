@@ -13,12 +13,12 @@ import (
 	"time"
 )
 
-// TestRemoteStartReturnsExecutionID verifies that the helper returns the execution id from the controller
-func TestRemoteStartReturnsExecutionID(t *testing.T) {
+// TestRemoteStartReturnsModID verifies that the helper returns the execution id from the controller
+func TestRemoteStartReturnsModID(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"execution_id":"tf-test1234"}`)
+		_, _ = io.WriteString(w, `{"mod_id":"mod-test1234"}`)
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -28,23 +28,23 @@ func TestRemoteStartReturnsExecutionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remoteStart error: %v", err)
 	}
-	if id != "tf-test1234" {
+	if id != "mod-test1234" {
 		t.Fatalf("unexpected id: %s", id)
 	}
 }
 
-// TestExecuteRemoteTransflowPrintsExecutionID ensures the CLI prints the id and completes when status becomes completed
-func TestExecuteRemoteModsPrintsExecutionID(t *testing.T) {
+// TestExecuteRemoteTransflowPrintsModID ensures the CLI prints the id and completes when status becomes completed
+func TestExecuteRemoteModsPrintsModID(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"execution_id":"tf-abc123"}`)
+		_, _ = io.WriteString(w, `{"mod_id":"mod-abc123"}`)
 	})
-	mux.HandleFunc("/v1/mods/tf-abc123/status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/mods/mod-abc123/status", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Minimal successful status payload
 		resp := map[string]any{
-			"id":     "tf-abc123",
+			"id":     "mod-abc123",
 			"status": "completed",
 			"result": map[string]any{"artifacts": map[string]any{}},
 		}
@@ -55,7 +55,7 @@ func TestExecuteRemoteModsPrintsExecutionID(t *testing.T) {
 
 	// Create a temporary config file
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "tf.yaml")
+	cfgPath := filepath.Join(dir, "mod.yaml")
 	if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
 		t.Fatalf("write cfg: %v", err)
 	}
@@ -84,10 +84,10 @@ func TestExecuteRemoteModsPrintsExecutionID(t *testing.T) {
 		t.Fatalf("executeRemoteMod error: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "Execution ID: tf-abc123") {
-		t.Fatalf("expected Execution ID in output, got: %s", out)
+	if !strings.Contains(out, "Mod ID: mod-abc123") {
+		t.Fatalf("expected Mod ID in output, got: %s", out)
 	}
-	if !strings.Contains(out, "ploy mod watch -id tf-abc123") {
+	if !strings.Contains(out, "ploy mod watch -id mod-abc123") {
 		t.Fatalf("expected watch hint in output, got: %s", out)
 	}
 }
@@ -97,14 +97,14 @@ func TestExecuteRemoteModsWatch(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"execution_id":"tf-watch1"}`)
+		_, _ = io.WriteString(w, `{"mod_id":"mod-watch1"}`)
 	})
 	// SSE endpoint returns immediate end
-	mux.HandleFunc("/v1/mods/tf-watch1/logs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/v1/mods/mod-watch1/logs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "event: init\n")
-		_, _ = io.WriteString(w, "data: {\"id\":\"tf-watch1\",\"message\":\"SSE connected\"}\n\n")
+		_, _ = io.WriteString(w, "data: {\"id\":\"mod-watch1\",\"message\":\"SSE connected\"}\n\n")
 		_, _ = io.WriteString(w, "event: end\n")
 		_, _ = io.WriteString(w, "data: {\"status\":\"completed\"}\n\n")
 	})
@@ -112,7 +112,7 @@ func TestExecuteRemoteModsWatch(t *testing.T) {
 	defer srv.Close()
 
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "tf.yaml")
+	cfgPath := filepath.Join(dir, "mod.yaml")
 	if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
 		t.Fatalf("write cfg: %v", err)
 	}
@@ -127,14 +127,14 @@ func TestExecuteRemoteModsWatchAcceptsCharset(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"execution_id":"tf-watch2"}`)
+		_, _ = io.WriteString(w, `{"mod_id":"mod-watch2"}`)
 	})
 	// SSE endpoint returns with charset on content type
-	mux.HandleFunc("/v1/mods/tf-watch2/logs", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	mux.HandleFunc("/v1/mods/mod-watch2/logs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream; charset=umod-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "event: init\n")
-		_, _ = io.WriteString(w, "data: {\"id\":\"tf-watch2\",\"message\":\"SSE connected\"}\n\n")
+		_, _ = io.WriteString(w, "data: {\"id\":\"mod-watch2\",\"message\":\"SSE connected\"}\n\n")
 		_, _ = io.WriteString(w, "event: end\n")
 		_, _ = io.WriteString(w, "data: {\"status\":\"completed\"}\n\n")
 	})
@@ -142,7 +142,7 @@ func TestExecuteRemoteModsWatchAcceptsCharset(t *testing.T) {
 	defer srv.Close()
 
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "tf.yaml")
+	cfgPath := filepath.Join(dir, "mod.yaml")
 	if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
 		t.Fatalf("write cfg: %v", err)
 	}
@@ -152,18 +152,18 @@ func TestExecuteRemoteModsWatchAcceptsCharset(t *testing.T) {
 	}
 }
 
-// TestExecuteRemoteTransflowJSONOutputsExecutionID ensures --output=json prints a single JSON with execution_id
-func TestExecuteRemoteModsJSONOutputsExecutionID(t *testing.T) {
+// TestExecuteRemoteTransflowJSONOutputsModID ensures --output=json prints a single JSON with mod_id
+func TestExecuteRemoteModsJSONOutputsModID(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = io.WriteString(w, `{"execution_id":"tf-json1"}`)
+		_, _ = io.WriteString(w, `{"mod_id":"mod-json1"}`)
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "tf.yaml")
+	cfgPath := filepath.Join(dir, "mod.yaml")
 	if err := os.WriteFile(cfgPath, []byte("id: test\n"), 0644); err != nil {
 		t.Fatalf("write cfg: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestExecuteRemoteModsJSONOutputsExecutionID(t *testing.T) {
 		t.Fatalf("executeRemoteMod json error: %v", err)
 	}
 	out := strings.TrimSpace(buf.String())
-	if !strings.Contains(out, `"execution_id":"tf-json1"`) {
-		t.Fatalf("expected json with execution_id, got: %s", out)
+	if !strings.Contains(out, `"mod_id":"mod-json1"`) {
+		t.Fatalf("expected json with mod_id, got: %s", out)
 	}
 }

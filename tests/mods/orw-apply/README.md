@@ -95,7 +95,7 @@ Verify MR & diff (GitLab):
 - Emit granular apply/build events: `diff-found`, `diff-apply-started`, `build-gate-start`, `build-gate-failed/succeeded`.
 
 ### Near-Term (1–2 days)
-- Event push API: `POST /v1/mods/{id}/events {execution_id, step, phase, level, message, ts}`. Jobs/runner POST start/ok/fail.
+- Event push API: `POST /v1/mods/{id}/events {mod_id, step, phase, level, message, ts}`. Jobs/runner POST start/ok/fail.
 - Controller log tailer: tail last alloc logs; update status on success/error markers; record last_log_preview.
 - Nomad event stream: subscribe to alloc events; update status on Start/Terminated.
 - Standard job status.json: each job writes `/workspace/out/status.json` (step/state/message/ts/metrics) for the controller to persist.

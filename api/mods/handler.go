@@ -177,7 +177,7 @@ func (h *Handler) RunMod(c *fiber.Ctx) error {
 	}
 
 	// Generate execution ID
-	modID := fmt.Sprintf("tf-%s", uuid.New().String()[:8])
+	modID := fmt.Sprintf("mod-%s", uuid.New().String()[:8])
 
 	// Store initial status
 	status := ModStatus{
@@ -559,7 +559,7 @@ func (h *Handler) persistArtifacts(modID, tempDir string) (map[string]string, er
 }
 
 // recordLatestSBOM writes a pointer file under mods/sbom/latest/<repo-hash>.json
-func (h *Handler) recordLatestSBOM(repo, storageKey, sha, execID string) {
+func (h *Handler) recordLatestSBOM(repo, storageKey, sha, modID string) {
 	if h.storage == nil || repo == "" || storageKey == "" {
 		return
 	}
@@ -569,7 +569,7 @@ func (h *Handler) recordLatestSBOM(repo, storageKey, sha, execID string) {
 		"repo":        repo,
 		"sha":         sha,
 		"storage_key": storageKey,
-		"mod_id":      execID,
+		"mod_id":      modID,
 		"updated_at":  time.Now().UTC().Format(time.RFC3339),
 	}
 	b, _ := json.Marshal(data)
@@ -750,14 +750,14 @@ func (h *Handler) getStatus(modID string) (*ModStatus, error) {
 
 // ModEvent represents a real-time event emitted by runner/jobs
 type ModEvent struct {
-	ExecutionID string    `json:"mod_id"`
-	Phase       string    `json:"phase,omitempty"`
-	Step        string    `json:"step,omitempty"`
-	Level       string    `json:"level,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	Time        time.Time `json:"ts,omitempty"`
-	JobName     string    `json:"job_name,omitempty"`
-	AllocID     string    `json:"alloc_id,omitempty"`
+	ModID   string    `json:"mod_id"`
+	Phase   string    `json:"phase,omitempty"`
+	Step    string    `json:"step,omitempty"`
+	Level   string    `json:"level,omitempty"`
+	Message string    `json:"message,omitempty"`
+	Time    time.Time `json:"ts,omitempty"`
+	JobName string    `json:"job_name,omitempty"`
+	AllocID string    `json:"alloc_id,omitempty"`
 }
 
 // ReportEvent handles POST /v1/mods/:id/events to update live status metadata
@@ -773,20 +773,20 @@ func (h *Handler) ReportEvent(c *fiber.Ctx) error {
 			"error": fiber.Map{"code": "invalid_event", "message": "failed to parse event", "details": err.Error()},
 		})
 	}
-	if ev.ExecutionID == "" {
+	if ev.ModID == "" {
 		// Allow path param to carry execution id when payload omits it
-		ev.ExecutionID = c.Params("id")
+		ev.ModID = c.Params("id")
 	}
-	if ev.ExecutionID == "" {
+	if ev.ModID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fiber.Map{"code": "missing_mod_id", "message": "mod_id is required"},
 		})
 	}
 	// Load or initialize status
-	st, err := h.getStatus(ev.ExecutionID)
+	st, err := h.getStatus(ev.ModID)
 	if err != nil || st == nil || st.ID == "" {
 		now := time.Now()
-		st = &ModStatus{ID: ev.ExecutionID, Status: "running", StartTime: now}
+		st = &ModStatus{ID: ev.ModID, Status: "running", StartTime: now}
 	}
 	// Event timestamp
 	ts := ev.Time

@@ -241,15 +241,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	imgs := ResolveImagesFromEnv()
 	infra := ResolveInfraFromEnv()
 	llm := ResolveLLMDefaultsFromEnv()
-	// Use MOD_ID only; do not support legacy or tf- prefixes
 	modID := os.Getenv("MOD_ID")
-	if strings.HasPrefix(modID, "tf-") {
-		result.Status = "failed"
-		result.Notes = "unsupported MOD_ID prefix 'tf-'; use 'mod-' only"
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
 	if modID != "" && !strings.HasPrefix(modID, "mod-") {
 		modID = "mod-" + modID
 	}
