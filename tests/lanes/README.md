@@ -133,3 +133,13 @@ Temporary Dev workaround (no in-API Docker):
   - Controller uploads source tar to SeaweedFS and submits a short-lived Kaniko builder job.
   - Builder downloads context, builds, and pushes to `registry.dev.ployman.app/<app>:<sha>`.
   - Controller verifies push and proceeds to deploy the app; E2E waits for HTTPS /healthz.
+
+### Cycle: Kaniko Builder + CLI Cleanup + Next Lanes
+- Mirror Kaniko executor:
+  - Mirrored `gcr.io/kaniko-project/executor:debug` into internal registry and set default `PLOY_KANIKO_IMAGE=registry.dev.ployman.app/kaniko-executor:debug` via Ansible (`iac/dev/playbooks/main.yml`, `api-env.yml`).
+  - Builder template now uses `{{KANIKO_IMAGE}}` with env override.
+- E2E destroy robustness:
+  - Fixed destroy step to use `$PLOY_CMD` automatically (prefers `./bin/ploy` when available).
+- Lane expansion:
+  - With Lane E green, begin bringing up A, B, C, D, F, G per plan using lane-appropriate hello repos.
+  - For each lane change, update docs/LANES.md accordingly and capture notes here.

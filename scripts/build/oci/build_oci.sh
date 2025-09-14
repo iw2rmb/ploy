@@ -11,13 +11,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -z "$APP" || -z "$SRC" || -z "$TAG" ]] && usage
-if [ -f "$SRC/Dockerfile" ]; then
-  docker build -t "$TAG" "$SRC"
-  docker push "$TAG"
-elif [ -f "$SRC/gradlew" ]; then
+# Prefer Jib (Gradle/Maven) when present, as it sets a correct entrypoint
+if [ -f "$SRC/gradlew" ]; then
   (cd "$SRC" && ./gradlew jib -Djib.to.image="$TAG")
 elif [ -f "$SRC/pom.xml" ]; then
   (cd "$SRC" && ./mvnw -B com.google.cloud.tools:jib-maven-plugin:3.4.0:build -Dimage="$TAG")
+elif [ -f "$SRC/Dockerfile" ]; then
+  docker build -t "$TAG" "$SRC"
+  docker push "$TAG"
 else
   echo "No Dockerfile or Jib; cannot build OCI for $APP" >&2; exit 2
 fi
