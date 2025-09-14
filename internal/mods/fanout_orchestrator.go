@@ -304,15 +304,26 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
-	// Step 6: Check for generated diff.patch artifact
-	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
-	if _, err := os.Stat(diffPath); err != nil {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("LLM exec job completed but no diff.patch found: %v", err)
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
+    // Step 6: Check for generated diff.patch artifact (fallback to SeaweedFS download if missing)
+    diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
+    if _, err := os.Stat(diffPath); err != nil {
+        // Fallback: attempt to download from SeaweedFS step-scoped key
+        execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+        branchID := branch.ID
+        stepID := runID
+        if infra.SeaweedURL != "" && execID != "" {
+            key := computeBranchDiffKey(execID, branchID, stepID)
+            url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+            _ = downloadToFileFn(url, diffPath)
+        }
+    }
+    if _, err := os.Stat(diffPath); err != nil {
+        result.Status = "failed"
+        result.Notes = fmt.Sprintf("LLM exec job completed but no diff.patch found: %v", err)
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(result.StartedAt)
+        return result
+    }
 
 	// Step 6b: Upload LLM diff to SeaweedFS with step-scoped key (align with ORW convention)
 	// mods/<execID>/branches/<branchID>/steps/<stepID>/diff.patch
