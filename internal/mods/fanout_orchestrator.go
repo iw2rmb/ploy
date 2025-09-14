@@ -344,17 +344,13 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
     }
 
 	// Step 6b: Upload LLM diff to SeaweedFS with step-scoped key (align with ORW convention)
-	// mods/<execID>/branches/<branchID>/steps/<stepID>/diff.patch
-	// reuse infra from earlier
-	execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
-	branchID := branch.ID
-	stepID := runID
-	if execID != "" && infra.SeaweedURL != "" {
-		diffKey := computeBranchDiffKey(execID, branchID, stepID)
-		// Best-effort upload and write chain metadata
-		_ = putFileFn(infra.SeaweedURL, diffKey, diffPath, "text/plain")
-		_ = writeBranchChainStepMeta(infra.SeaweedURL, execID, branchID, stepID, diffKey)
-	}
+    // mods/<execID>/branches/<branchID>/steps/<stepID>/diff.patch (reuse computed IDs)
+    if execID != "" && infra.SeaweedURL != "" {
+        diffKey := computeBranchDiffKey(execID, branchID, stepID)
+        // Best-effort upload and write chain metadata
+        _ = putFileFn(infra.SeaweedURL, diffKey, diffPath, "text/plain")
+        _ = writeBranchChainStepMeta(infra.SeaweedURL, execID, branchID, stepID, diffKey)
+    }
 
 	result.Status = "completed"
 	result.Notes = fmt.Sprintf("LLM exec job completed successfully, diff.patch at: %s", diffPath)
