@@ -29,12 +29,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         image = "{{KANIKO_IMAGE}}"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
-          "set -euo pipefail; echo Fetching context: $CONTEXT_URL; \
-           wget -qO /tmp/src.tar \"$CONTEXT_URL\"; \
-           mkdir -p /workspace; tar -xf /tmp/src.tar -C /workspace; \
-           echo Running Kaniko build to $DOCKER_IMAGE with dockerfile=$DOCKERFILE_PATH; \
-           /kaniko/executor --context=/workspace --dockerfile=/$${DOCKERFILE_PATH:-Dockerfile} --destination=\"$DOCKER_IMAGE\" --reproducible \
-           --snapshotMode=redo --single-snapshot --use-new-run;"
+          "set -euo pipefail; wget -qO /tmp/src.tar "$CONTEXT_URL"; mkdir -p /workspace; tar -xf /tmp/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile="$DOCKERFILE_PATH" --destination="$DOCKER_IMAGE" --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
         ]
 
         ports = ["http"]
