@@ -66,9 +66,9 @@
           # Preferred: set MODS_ORW_APPLY_IMAGE; runner substitutes ${ORW_IMAGE}
           MODS_ORW_APPLY_IMAGE="{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') | default('registry.dev.ployman.app/openrewrite-jvm:latest', true) }}"
           # LangGraph runner images for planner/reducer/llm-exec
-          MODS_PLANNER_IMAGE="{{ lookup('env', 'MODS_PLANNER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
-          MODS_REDUCER_IMAGE="{{ lookup('env', 'MODS_REDUCER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
-          MODS_LLM_EXEC_IMAGE="{{ lookup('env', 'MODS_LLM_EXEC_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:py-0.1.0', true) }}"
+          MODS_PLANNER_IMAGE="{{ lookup('env', 'MODS_PLANNER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:latest', true) }}"
+          MODS_REDUCER_IMAGE="{{ lookup('env', 'MODS_REDUCER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:latest', true) }}"
+          MODS_LLM_EXEC_IMAGE="{{ lookup('env', 'MODS_LLM_EXEC_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:latest', true) }}"
           # Optional defaults
           MODS_REGISTRY="{{ lookup('env', 'MODS_REGISTRY') | default('registry.dev.ployman.app', true) }}"
           # Lane E builder image (Kaniko). Mirrored into internal registry in Dev.

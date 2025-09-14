@@ -42,9 +42,9 @@ func ResolveDefaults(get func(string) string) Defaults {
 		reg = "registry.dev.ployman.app"
 	}
 	planner := get("MODS_PLANNER_IMAGE")
-	if planner == "" {
-		planner = reg + "/langgraph-runner:py-0.1.0"
-	}
+    if planner == "" {
+        planner = reg + "/langgraph-runner:latest"
+    }
 	reducer := get("MODS_REDUCER_IMAGE")
 	if reducer == "" {
 		reducer = planner

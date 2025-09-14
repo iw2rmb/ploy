@@ -9,7 +9,7 @@
   vars:
     mods_registry: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
     langgraph_image_name: "langgraph-runner"
-    langgraph_image_tag: "py-0.1.0"
+    langgraph_image_tag: "latest"
 
   tasks:
     - name: Ensure remote build directory exists
@@ -50,15 +50,7 @@
       register: pull_local
       ignore_errors: true
 
-    - name: Build LangGraph runner image locally if not pulled
-      shell: |
-        set -euo pipefail
-        docker build -t {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} /home/ploy/ploy/services/langgraph-runner
-      args:
-        executable: /bin/bash
-      when: pull_local is failed or (pull_local.stdout is defined and 'Not present' in pull_local.stdout)
-
-    - name: Rebuild LangGraph runner image with no cache (ensure latest stub)
+    - name: Build LangGraph runner image with no cache (ensure latest)
       shell: |
         set -euo pipefail
         docker build --no-cache -t {{ mods_registry }}/{{ langgraph_image_name }}:{{ langgraph_image_tag }} /home/ploy/ploy/services/langgraph-runner
