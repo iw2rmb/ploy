@@ -242,6 +242,27 @@
           delay: 5
           until: registry_health_check.status == 200
 
+    - name: Prepare OSv base image directory
+      file:
+        path: /opt/ploy/osv/base
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Download OSv base image if URL provided
+      when: lookup('env', 'PLOY_OSV_BASE_URL') | length > 0
+      get_url:
+        url: "{{ lookup('env', 'PLOY_OSV_BASE_URL') }}"
+        dest: /opt/ploy/osv/base/java8.qemu
+        mode: '0644'
+        owner: ploy
+        group: ploy
+      register: osv_base_dl
+      retries: 3
+      delay: 5
+      until: osv_base_dl is succeeded
+
     - name: Mirror Kaniko executor image into internal registry (Dev)
       block:
         - name: Pull Kaniko executor image

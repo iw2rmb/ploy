@@ -16,6 +16,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
+	clutils "github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/config"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
@@ -25,7 +26,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/storage"
 	supply "github.com/iw2rmb/ploy/internal/supply"
 	"github.com/iw2rmb/ploy/internal/utils"
-	clutils "github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/validation"
 )
 
@@ -142,10 +142,10 @@ func verifyOCIPush(tag string) verifyResult {
 // generateDockerfile writes a simple Dockerfile into srcDir based on detected project markers.
 // Supports Go (go.mod) and Node.js (package.json). For other stacks, returns an error.
 func generateDockerfile(srcDir string) error {
-    goMod := filepath.Join(srcDir, "go.mod")
-    pkgJSON := filepath.Join(srcDir, "package.json")
-    if _, err := os.Stat(goMod); err == nil {
-        content := `FROM golang:1.22-alpine AS build
+	goMod := filepath.Join(srcDir, "go.mod")
+	pkgJSON := filepath.Join(srcDir, "package.json")
+	if _, err := os.Stat(goMod); err == nil {
+		content := `FROM golang:1.22-alpine AS build
 WORKDIR /src
 COPY go.mod .
 RUN go mod download
@@ -158,10 +158,10 @@ EXPOSE 8080
 COPY --from=build /out/app /app
 ENTRYPOINT ["/app"]
 `
-        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
-    }
-    if _, err := os.Stat(pkgJSON); err == nil {
-        content := `FROM node:20-alpine
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+	}
+	if _, err := os.Stat(pkgJSON); err == nil {
+		content := `FROM node:20-alpine
 WORKDIR /app
 COPY package.json .
 RUN npm install --omit=dev || true
@@ -170,9 +170,9 @@ ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "index.js"]
 `
-        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
-    }
-    return fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+	}
+	return fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
 }
 
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
@@ -300,7 +300,9 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		builderTar := filepath.Join(tmpDir, "context.tar")
 		if err := func() error {
 			f, err := os.Create(builderTar)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			defer f.Close()
 			ign, _ := clutils.ReadGitignore(srcDir)
 			return clutils.TarDir(srcDir, f, ign)
@@ -315,15 +317,21 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
 			}
 			base := os.Getenv("PLOY_SEAWEEDFS_URL")
-			if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
-			if !strings.HasPrefix(base, "http") { base = "http://" + base }
+			if base == "" {
+				base = "http://seaweedfs-filer.service.consul:8888"
+			}
+			if !strings.HasPrefix(base, "http") {
+				base = "http://" + base
+			}
 			ctxURL = strings.TrimRight(base, "/") + "/" + ctxKey
 		} else {
 			return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
 		}
 		outPath := fmt.Sprintf("/opt/ploy/artifacts/%s-%s-osv.qemu", appName, sha)
 		jobFile, err := orchestration.RenderOSVBuilder(appName, sha, outPath, ctxURL, mainClass, "")
-		if err != nil { return utils.ErrJSON(c, 500, err) }
+		if err != nil {
+			return utils.ErrJSON(c, 500, err)
+		}
 		if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("OSv builder job validation failed: %w", vErr))
 		}
@@ -338,69 +346,114 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return utils.ErrJSON(c, 500, err)
 		}
 		imagePath = img
-    case "E":
-        // Lane E: build OCI image via Kaniko builder job (API runs without Docker)
-        registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
-        tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
+	case "E":
+		// Lane E: prefer Jib (Gradle/Maven) if present; otherwise use Kaniko builder job
+		// Jib path avoids Docker on controller and produces proper entrypoints
+		hasGradle := utils.FileExists(filepath.Join(srcDir, "gradlew")) || utils.FileExists(filepath.Join(srcDir, "build.gradle")) || utils.FileExists(filepath.Join(srcDir, "build.gradle.kts"))
+		hasMaven := utils.FileExists(filepath.Join(srcDir, "pom.xml"))
+		if hasGradle || hasMaven {
+			registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+			tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
+			log.Printf("[Build:E] Jib path selected (gradle/maven detected). app=%s sha=%s tag=%s", appName, sha, tag)
+			img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
+			if err != nil {
+				log.Printf("[Build] OCI build error (Jib): %v", err)
+				es := strings.ToLower(err.Error())
+				if strings.Contains(es, "no dockerfile or jib") || strings.Contains(es, "oci build failed") {
+					return utils.ErrJSON(c, 400, fmt.Errorf("OCI build prerequisites not found: add a Dockerfile or Jib configuration in your repo: %w", err))
+				}
+				return utils.ErrJSON(c, 500, err)
+			}
+			dockerImage = img
+			break
+		}
+		// Fallback to Kaniko builder
+		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
+		log.Printf("[Build:E] Kaniko flow selected: app=%s sha=%s tag=%s", appName, sha, tag)
 
-        // Ensure Dockerfile exists or optionally autogenerate a minimal one
-        dockerfilePath := filepath.Join(srcDir, "Dockerfile")
-        if _, err := os.Stat(dockerfilePath); err != nil {
-            autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
-            if autogen == "true" || autogen == "1" || autogen == "on" {
-                if err := generateDockerfile(srcDir); err != nil {
-                    return utils.ErrJSON(c, 400, fmt.Errorf("no Dockerfile and failed to autogenerate: %w", err))
-                }
-                log.Printf("[Build] Autogenerated Dockerfile at %s", dockerfilePath)
-            } else {
-                return utils.ErrJSON(c, 400, fmt.Errorf("Dockerfile missing; pass autogen_dockerfile=true to generate a basic one"))
-            }
-        }
+		// Ensure Dockerfile exists or optionally autogenerate a minimal one
+		dockerfilePath := filepath.Join(srcDir, "Dockerfile")
+		if _, err := os.Stat(dockerfilePath); err != nil {
+			autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
+			if autogen == "true" || autogen == "1" || autogen == "on" {
+				if err := generateDockerfile(srcDir); err != nil {
+					return utils.ErrJSON(c, 400, fmt.Errorf("no Dockerfile and failed to autogenerate: %w", err))
+				}
+				log.Printf("[Build:E] Autogenerated Dockerfile at %s", dockerfilePath)
+			} else {
+				return utils.ErrJSON(c, 400, fmt.Errorf("Dockerfile missing; pass autogen_dockerfile=true to generate a basic one"))
+			}
+		}
 
-        // Create a tar context from srcDir
-        builderTar := filepath.Join(tmpDir, "context.tar")
-        if err := func() error {
-            f, err := os.Create(builderTar)
-            if err != nil { return err }
-            defer f.Close()
-            ign, _ := clutils.ReadGitignore(srcDir)
-            return clutils.TarDir(srcDir, f, ign)
-        }(); err != nil {
-            return utils.ErrJSON(c, 500, fmt.Errorf("create build context: %w", err))
-        }
+		// Create a tar context from srcDir
+		builderTar := filepath.Join(tmpDir, "context.tar")
+		if err := func() error {
+			f, err := os.Create(builderTar)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			ign, _ := clutils.ReadGitignore(srcDir)
+			return clutils.TarDir(srcDir, f, ign)
+		}(); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("create build context: %w", err))
+		}
+		log.Printf("[Build:E] Context tar created: %s (size=%d bytes)", builderTar, func() int64 {
+			fi, _ := os.Stat(builderTar)
+			if fi != nil {
+				return fi.Size()
+			}
+			return 0
+		}())
 
-        // Upload context tar to storage for Kaniko to fetch
-        contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
-        var contextURL string
-        if deps.Storage != nil {
-            ctxUp := context.Context(c.Context())
-            if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
-                return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
-            }
-            base := os.Getenv("PLOY_SEAWEEDFS_URL")
-            if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
-            if !strings.HasPrefix(base, "http") { base = "http://" + base }
-            contextURL = strings.TrimRight(base, "/") + "/" + contextKey
-        } else {
-            return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
-        }
+		// Upload context tar to storage for Kaniko to fetch
+		contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
+		var contextURL string
+		if deps.Storage != nil {
+			ctxUp := context.Context(c.Context())
+			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+				return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
+			}
+			base := os.Getenv("PLOY_SEAWEEDFS_URL")
+			if base == "" {
+				base = "http://seaweedfs-filer.service.consul:8888"
+			}
+			if !strings.HasPrefix(base, "http") {
+				base = "http://" + base
+			}
+			contextURL = strings.TrimRight(base, "/") + "/" + contextKey
+		} else {
+			return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
+		}
+		log.Printf("[Build:E] Context uploaded: url=%s", contextURL)
 
-        // Render and execute Kaniko builder job, waiting for terminal completion
-        builderHCL, err := orchestration.RenderKanikoBuilder(appName, sha, tag, contextURL, "Dockerfile")
-        if err != nil { return utils.ErrJSON(c, 500, err) }
-        if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
-            return utils.ErrJSON(c, 500, fmt.Errorf("builder job validation failed: %w", vErr))
-        }
-        builderJobName := fmt.Sprintf("%s-e-build-%s", appName, sha)
-        if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
-            return utils.ErrJSON(c, 500, fmt.Errorf("kaniko builder failed for job %s: %w", builderJobName, err))
-        }
-        // Verify image exists in registry before continuing
-        vr := verifyOCIPush(tag)
-        if !vr.OK {
-            return utils.ErrJSON(c, 500, fmt.Errorf("image push verification failed for %s: %s (status %d)", tag, vr.Message, vr.Status))
-        }
-        dockerImage = tag
+		// Render and execute Kaniko builder job, waiting for terminal completion
+		builderHCL, err := orchestration.RenderKanikoBuilder(appName, sha, tag, contextURL, "Dockerfile")
+		if err != nil {
+			return utils.ErrJSON(c, 500, err)
+		}
+		// Save a debug copy for inspection
+		func() {
+			_ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
+			_ = copyFile(builderHCL, filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL)))
+			log.Printf("[Build:E] Kaniko job HCL written to %s", filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL)))
+		}()
+		if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("builder job validation failed: %w", vErr))
+		}
+		builderJobName := fmt.Sprintf("%s-e-build-%s", appName, sha)
+		log.Printf("[Build:E] Submitting Kaniko job: %s", builderJobName)
+		if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("kaniko builder failed for job %s: %w", builderJobName, err))
+		}
+		// Verify image exists in registry before continuing
+		vr := verifyOCIPush(tag)
+		if !vr.OK {
+			return utils.ErrJSON(c, 500, fmt.Errorf("image push verification failed for %s: %s (status %d)", tag, vr.Message, vr.Status))
+		}
+		log.Printf("[Build:E] Image present in registry: %s (status=%d, digest=%s)", tag, vr.Status, vr.Digest)
+		dockerImage = tag
 	case "F":
 		img, err := ibuilders.BuildVM(appName, sha, tmpDir, appEnvVars)
 		if err != nil {
@@ -839,21 +892,21 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Include container registry information in response
-    response := fiber.Map{
-        "status":      "deployed",
-        "lane":        lane,
-        "image":       imagePath,
-        "dockerImage": dockerImage,
-        "namespace":   buildCtx.APIContext,
-        "appType":     string(buildCtx.AppType),
-    }
+	response := fiber.Map{
+		"status":      "deployed",
+		"lane":        lane,
+		"image":       imagePath,
+		"dockerImage": dockerImage,
+		"namespace":   buildCtx.APIContext,
+		"appType":     string(buildCtx.AppType),
+	}
 
-    // Include builder job info for lane E
-    if strings.ToUpper(lane) == "E" {
-        response["builder"] = fiber.Map{
-            "job": fmt.Sprintf("%s-e-build-%s", appName, sha),
-        }
-    }
+	// Include builder job info for lane E
+	if strings.ToUpper(lane) == "E" {
+		response["builder"] = fiber.Map{
+			"job": fmt.Sprintf("%s-e-build-%s", appName, sha),
+		}
+	}
 
 	// Verify container push for container lanes and include a readable message
 	if dockerImage != "" {
