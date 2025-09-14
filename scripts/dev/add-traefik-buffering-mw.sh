@@ -55,7 +55,7 @@ http:
 
   routers:
     dev-ploy-api-buffered:
-      rule: \"Host(`api.dev.ployman.app`)\"
+      rule: \"Host(\"api.dev.ployman.app\") && PathPrefix(`/v1`)\"
       entryPoints:
         - websecure
       service: ploy-api@consulcatalog
@@ -82,19 +82,18 @@ remove_block() {
 }
 
 reload_traefik() {
-  # If running as systemd service
+  # Prefer Nomad-managed detection first
+  if ssh -o StrictHostKeyChecking=no root@"$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh status --job traefik-system' >/dev/null 2>&1"; then
+    echo "Traefik is Nomad-managed (job: traefik-system); providers.file watch should reload automatically."
+    return 0
+  fi
+  # Fallback: systemd-managed traefik
   if ssh -o StrictHostKeyChecking=no root@"$TARGET_HOST" "systemctl is-active --quiet traefik"; then
     echo "Restarting Traefik via systemd..."
     ssh -o StrictHostKeyChecking=no root@"$TARGET_HOST" "systemctl restart traefik && sleep 1 && systemctl status --no-pager traefik | sed -n '1,10p'" || true
     return 0
   fi
-
-  # Otherwise, rely on file provider watch; additionally, ping the Nomad-managed job status if present
-  if ssh -o StrictHostKeyChecking=no root@"$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh status --job traefik-system' >/dev/null 2>&1"; then
-    echo "Traefik appears to be Nomad-managed; file provider watch should pick changes automatically."
-  else
-    echo "Traefik service not detected; assuming file watch will reload configuration."
-  fi
+  echo "Traefik management not detected; relying on file provider watch."
 }
 
 case "$MODE" in
@@ -112,4 +111,3 @@ esac
 
 reload_traefik
 echo "Done."
-

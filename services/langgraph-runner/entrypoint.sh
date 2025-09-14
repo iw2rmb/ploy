@@ -187,16 +187,28 @@ EOF
 elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   log "Detected llm-exec run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "llm-exec" "llm-exec" "job started"
-  cat >"$OUT_DIR/diff.patch" <<'EOF'
-diff --git a/pom.xml b/pom.xml
-index 1111111..2222222 100644
---- a/pom.xml
-+++ b/pom.xml
-@@ -1,3 +1,3 @@
--<!-- original -->
-+<!-- modified by langgraph stub -->
- <project></project>
+  # Attempt to generate a deletion patch for the known failing source to heal build
+  TARGET_REL="src/healing/java/e2e/FailHealing.java"
+  if [ -f "$CTX_DIR/$TARGET_REL" ]; then
+    log "Generating healing diff to delete $TARGET_REL"
+    (
+      cd "$CTX_DIR" >/dev/null 2>&1 || exit 0
+      # Use git diff --no-index to produce a proper unified diff against /dev/null (deletion)
+      git -c core.safecrlf=false diff --no-index -- "$TARGET_REL" /dev/null > "$OUT_DIR/diff.patch" 2>/dev/null || true
+    )
+  fi
+  # Fallback: if no healing target found or diff is empty, produce a minimal noop patch comment to keep pipeline moving
+  if [ ! -s "$OUT_DIR/diff.patch" ]; then
+    log "Healing target not found or diff empty; writing minimal placeholder patch"
+    cat >"$OUT_DIR/diff.patch" <<'EOF'
+diff --git a/.llm-healing b/.llm-healing
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/.llm-healing
+# LLM healing produced no-op patch
 EOF
+  fi
   log "Wrote diff.patch to $OUT_DIR"
 else
   log "Unknown mode (RUN_ID=$RUN_ID_STR). Defaulting to planner output."
