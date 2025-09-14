@@ -80,7 +80,9 @@
           IMAGE="${2}"
           KEEP=3
           echo "Pruning tags for ${IMAGE} at ${REGISTRY} (keeping ${KEEP})"
-          tags=$(curl -fsSL https://${REGISTRY}/v2/${IMAGE}/tags/list | jq -r '.tags[]' | sort -V || true)
+          # Try HTTPS then HTTP for tag listing
+          tags_json=$(curl -fsSL https://${REGISTRY}/v2/${IMAGE}/tags/list || curl -fsSL http://${REGISTRY}/v2/${IMAGE}/tags/list || echo '{}')
+          tags=$(echo "$tags_json" | jq -r '.tags[]' | sort -V || true)
           # Always keep 'latest'
           keep_tags=(latest)
           mapfile -t other_tags < <(echo "${tags}" | grep -v '^latest$' || true)
@@ -103,9 +105,14 @@
             # Fetch manifest digest for tag
             digest=$(curl -fsSI -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \\
                      https://${REGISTRY}/v2/${IMAGE}/manifests/${tag} | awk -F': ' '/Docker-Content-Digest/{print $2}' | tr -d '\\r')
+            if [ -z "$digest" ]; then
+              digest=$(curl -fsSI -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \\
+                       http://${REGISTRY}/v2/${IMAGE}/manifests/${tag} | awk -F': ' '/Docker-Content-Digest/{print $2}' | tr -d '\\r' || true)
+            fi
             if [ -n "$digest" ]; then
               echo "Deleting ${IMAGE}:${tag} (digest ${digest})"
-              curl -fsS -X DELETE https://${REGISTRY}/v2/${IMAGE}/manifests/${digest} || true
+              curl -fsS -X DELETE https://${REGISTRY}/v2/${IMAGE}/manifests/${digest} || \
+              curl -fsS -X DELETE http://${REGISTRY}/v2/${IMAGE}/manifests/${digest} || true
             fi
           done
           echo "Prune complete"
