@@ -127,6 +127,9 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath s
     s = strings.ReplaceAll(s, "{{CONTEXT_URL}}", contextURL)
     if dockerfilePath == "" { dockerfilePath = "Dockerfile" }
     s = strings.ReplaceAll(s, "{{DOCKERFILE_PATH}}", dockerfilePath)
+    // Kaniko executor image (allow override via env)
+    kaniko := utils.Getenv("PLOY_KANIKO_IMAGE", "gcr.io/kaniko-project/executor:debug")
+    s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
     out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
     if err := os.WriteFile(out, []byte(s), 0644); err != nil {
         return "", err

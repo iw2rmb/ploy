@@ -369,13 +369,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
         if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
             return utils.ErrJSON(c, 500, fmt.Errorf("builder job validation failed: %w", vErr))
         }
+        builderJobName := fmt.Sprintf("%s-e-build-%s", appName, sha)
         if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
-            return utils.ErrJSON(c, 500, fmt.Errorf("kaniko builder failed: %w", err))
+            return utils.ErrJSON(c, 500, fmt.Errorf("kaniko builder failed for job %s: %w", builderJobName, err))
         }
         // Verify image exists in registry before continuing
         vr := verifyOCIPush(tag)
         if !vr.OK {
-            return utils.ErrJSON(c, 500, fmt.Errorf("image push verification failed: %s (status %d)", vr.Message, vr.Status))
+            return utils.ErrJSON(c, 500, fmt.Errorf("image push verification failed for %s: %s (status %d)", tag, vr.Message, vr.Status))
         }
         dockerImage = tag
 	case "F":
@@ -816,14 +817,21 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	// Include container registry information in response
-	response := fiber.Map{
-		"status":      "deployed",
-		"lane":        lane,
-		"image":       imagePath,
-		"dockerImage": dockerImage,
-		"namespace":   buildCtx.APIContext,
-		"appType":     string(buildCtx.AppType),
-	}
+    response := fiber.Map{
+        "status":      "deployed",
+        "lane":        lane,
+        "image":       imagePath,
+        "dockerImage": dockerImage,
+        "namespace":   buildCtx.APIContext,
+        "appType":     string(buildCtx.AppType),
+    }
+
+    // Include builder job info for lane E
+    if strings.ToUpper(lane) == "E" {
+        response["builder"] = fiber.Map{
+            "job": fmt.Sprintf("%s-e-build-%s", appName, sha),
+        }
+    }
 
 	// Verify container push for container lanes and include a readable message
 	if dockerImage != "" {
