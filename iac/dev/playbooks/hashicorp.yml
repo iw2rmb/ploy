@@ -605,6 +605,27 @@
 
     - name: Deploy Traefik system job to Nomad
       block:
+        - name: Capture legacy Traefik systemd unit (for DNS env import)
+          stat:
+            path: /etc/systemd/system/traefik.service
+          register: traefik_unit_stat
+
+        - name: Read legacy Traefik systemd unit
+          slurp:
+            path: /etc/systemd/system/traefik.service
+          register: traefik_unit_content
+          when: traefik_unit_stat.stat.exists
+
+        - name: Extract Namecheap envs from legacy unit into vars (do not overwrite if already set)
+          set_fact:
+            vault_namecheap_api_user: "{{ (vault_namecheap_api_user | default('')) | ternary(vault_namecheap_api_user, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_API_USER=([^\"]*)\"', '\\1') | default(''))) }}"
+            vault_namecheap_api_key: "{{ (vault_namecheap_api_key | default('')) | ternary(vault_namecheap_api_key, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_API_KEY=([^\"]*)\"', '\\1') | default(''))) }}"
+            vault_namecheap_username: "{{ (vault_namecheap_username | default('')) | ternary(vault_namecheap_username, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_USERNAME=([^\"]*)\"', '\\1') | default(''))) }}"
+            vault_namecheap_client_ip: "{{ (vault_namecheap_client_ip | default('')) | ternary(vault_namecheap_client_ip, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_CLIENT_IP=([^\"]*)\"', '\\1') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address']))) }}"
+            vault_namecheap_sandbox: "{{ (vault_namecheap_sandbox | default('')) | ternary(vault_namecheap_sandbox, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_SANDBOX=([^\"]*)\"', '\\1') | default('false'))) }}"
+          when: traefik_unit_stat.stat.exists
+          no_log: true
+
         - name: Check if Traefik is already installed
           stat:
             path: /usr/local/bin/traefik
@@ -632,6 +653,28 @@
             status_code: [200, 404]
           register: traefik_job_check
           ignore_errors: true
+
+        - name: Assert Nomad client meta is set for Traefik placement
+          block:
+            - name: Read client meta role from Nomad client config
+              shell: |
+                awk '
+                  /client[[:space:]]*\{/ {in=1}
+                  in && /meta[[:space:]]*\{/ {inmeta=1}
+                  inmeta && /{{ ploy_gateway_node_meta_key | default("role") }}[[:space:]]*=/{ gsub(/\"/, "", $3); print $3; exit }
+                  /\}/ && inmeta { inmeta=0 }
+                  /\}/ && in { in=0 }
+                ' /etc/nomad.d/nomad.hcl
+              register: nomad_client_meta_value
+              changed_when: false
+              failed_when: false
+
+            - name: Ensure meta key/value matches expected
+              assert:
+                that:
+                  - nomad_client_meta_value.stdout is search(ploy_gateway_node_class)
+                fail_msg: "Nomad client meta '{{ ploy_gateway_node_meta_key | default('role') }}' must be '{{ ploy_gateway_node_class }}' for Traefik placement. Set in /etc/nomad.d/nomad.hcl under client.meta and restart nomad."
+                success_msg: "Nomad client meta '{{ ploy_gateway_node_meta_key | default('role') }}' matches '{{ ploy_gateway_node_class }}'"
 
         - name: Download and install Traefik binary (if needed)
           block:
@@ -691,7 +734,7 @@
 
         - name: Verify Traefik is accessible
           uri:
-            url: "http://localhost:8080/ping"
+            url: "http://localhost:{{ traefik_admin_port }}/ping"
             method: GET
             status_code: 200
           register: traefik_health_check
@@ -730,7 +773,7 @@
           loop:
             - "80"   # HTTP
             - "443"  # HTTPS
-            - "8080" # Traefik dashboard
+            - "{{ traefik_admin_port }}" # Traefik dashboard/admin
 
       rescue:
         - name: Handle Traefik deployment failure

@@ -76,8 +76,7 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 | **site.yml** | Complete infrastructure orchestration with service ordering | N/A |
 | **main.yml** | Base VPS setup, Docker, Go, build tools | ✅ Optimized |
 | **seaweedfs.yml** | Distributed storage with collections | ✅ Optimized |
-| **hashicorp.yml** | Nomad, Consul, Vault, Traefik deployment | ✅ Optimized |
-| **traefik.yml** | Reverse proxy with SSL termination | ✅ Optimized |
+| **hashicorp.yml** | Nomad, Consul, Vault, Traefik deployment (Nomad system job; node.class=gateway) | ✅ Optimized |
 | **docker-registry.yml** | Docker Registry v2 container storage | 🚀 New (Aug 2025) |
 | **api.yml** | Ploy API deployment via Nomad | ✅ Optimized |
 | **testing.yml** | Test environment and Ploy binaries | 🚀 Newly optimized (60-80% faster) |
@@ -86,6 +85,21 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 ## Configuration
 
 **Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Vault 1.20.2, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
+
+### Traefik placement
+
+Traefik runs as a Nomad system job only on gateway/edge nodes. Set `node_class = "gateway"` in the Nomad client config on the nodes that should run Traefik. Consul ACLs: Traefik's Consul Catalog provider reads the ACL token from the `CONSUL_HTTP_TOKEN` environment variable; no inline token is set in the job args.
+
+Example (`/etc/nomad.d/client.hcl`):
+
+```
+client {
+  enabled    = true
+  node_class = "gateway"
+}
+```
+
+Restart the Nomad client after changing node_class.
 
 ### Storage Configuration (Centralized Config Service)
 

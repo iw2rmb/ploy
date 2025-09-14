@@ -18,6 +18,8 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Dev IaC: Switch Traefik deployment to Nomad-only. Removed systemd-based playbook (`iac/dev/playbooks/traefik.yml`) and its import from `iac/dev/site.yml`. Traefik now deploys exclusively as a Nomad system job via `iac/dev/playbooks/hashicorp.yml` using `/opt/hashicorp/bin/nomad-job-manager.sh`. Placement is restricted to edge/gateway nodes via `node.class = "gateway"`. Consul ACL token is supplied via `CONSUL_HTTP_TOKEN` environment variable, not inline in job args.
+ - Traefik DNS env import: `hashicorp.yml` auto-imports legacy Namecheap envs from `/etc/systemd/system/traefik.service` (if present) into Nomad job env, without persisting secrets in the repo. This preserves renewals for existing `*.dev.ployd.app` and `*.dev.ployman.app` certificates after migrating from systemd to Nomad.
 - API Nomad templates: align default feature flags with orchestration. For non‑platform apps, disable Volumes and Consul config by default (Vault/Connect remain off). Fixes Lane E job validation for user apps and prevents invalid volume blocks on dev/test clusters.
 - Housekeeping: removed redundant `internal/cli/arf/recipes.go.backup` and the legacy `internal/testutils/` package in favor of `internal/testing/**`.
 - API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
@@ -381,7 +383,7 @@
 - Traefik Consul Catalog provider now supports Consul ACL tokens in all deployment paths:
   - platform/nomad/traefik.hcl: `--providers.consulcatalog.endpoint.token=${CONSUL_HTTP_TOKEN}`
   - iac/common/templates/nomad-traefik-system.hcl.j2: token flag + `CONSUL_HTTP_TOKEN` env passthrough
-  - iac/dev/playbooks/traefik.yml: `providers.consulCatalog.endpoint.token` for Ansible static config
+  - iac/dev/playbooks/traefik.yml: `providers.consulCatalog.endpoint.token` for Ansible static config (file removed in Nomad-only switch; superseded by `iac/common/templates/nomad-traefik-system.hcl.j2`)
 - Tests: `tests/unit/traefik_consul_token_test.go` enforces token wiring across Nomad + Ansible configs.
 
 ### Changed
