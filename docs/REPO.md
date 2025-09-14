@@ -67,9 +67,7 @@ Application configuration templates and defaults.
 ```
 configs/
 ├── storage-config.yaml           # Default storage configuration
-├── arf-hybrid-pipeline.yaml      # ARF hybrid pipeline configuration ✅ Aug 2025
-├── arf-learning-config.yaml      # ARF learning system configuration
-├── arf-llm-config.yaml           # ARF LLM integration configuration
+# ARF healing/LLM configs removed; execution and LLMs are managed by Mods/LLMS
 ├── java-errorprone-config.yaml   # Java ErrorProne analyzer configuration
 ├── python-pylint-config.yaml     # Python Pylint configuration
 ├── static-analysis-config.yaml   # Static analysis framework configuration

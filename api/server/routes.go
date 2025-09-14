@@ -46,8 +46,8 @@ func (s *Server) setupRoutes() {
 	api.Post("/apps/:app/builds/probe", s.handleBuildsProbe)
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
-    api.Get("/apps/:app/logs", build.GetLogs)
-    api.Get("/apps/:app/probe", s.handleAppProbe)
+	api.Get("/apps/:app/logs", build.GetLogs)
+	api.Get("/apps/:app/probe", s.handleAppProbe)
 
 	// Diagnostics (ingress/body debugging)
 	api.Post("/_diag/echo", s.handleDiagEcho)

@@ -30,7 +30,7 @@ Phase 3 transforms the static analysis framework into an enterprise-grade system
 
 **Tasks**:
 - ✅ Implement advanced issue-to-recipe mapping with confidence scoring (completed in Phase 1)
-- ✅ Create multi-language ARF recipe support and validation (ARF healing workflow supports all languages)
+- ✅ Create multi-language recipe support and validation. Healing workflows are unified under Mods and support all languages; ARF continues to provide recipe catalog/validation.
 - ✅ Build sophisticated remediation workflow orchestration (async transformation system operational)
 - ✅ Add human-in-the-loop integration for complex transformations (approval workflows in place)
 - ✅ Implement transformation impact analysis and risk assessment (transflow runtime metrics)

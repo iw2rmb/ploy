@@ -131,7 +131,7 @@ graph TD
 - [x] Job cancellation & advanced queue management (B2.3) ✅ 2025-08-26
 - [x] Nomad deployment specification (B3.1) ✅ 2025-08-26
 - [x] ARF Integration with async transformations ✅ 2025-09-02
-- [x] Monitoring and metrics via ARF healing metrics ✅ 2025-09-02
+- [x] Monitoring and metrics via Mods healing metrics ✅ 2025-09-02
 - [ ] Auto-scaling controller implementation (B3.2)
 - [ ] Production auto-scaling (C2)
 
