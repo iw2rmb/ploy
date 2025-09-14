@@ -5,7 +5,7 @@ OUT_DIR="${OUTPUT_DIR:-/workspace/out}"
 CTX_DIR="${CONTEXT_DIR:-/workspace/context}"
 RUN_ID_STR="${RUN_ID:-}"
 CONTROLLER_URL="${CONTROLLER_URL:-}"
-EXECUTION_ID="${MODS_EXECUTION_ID:-}"
+EXECUTION_ID="${MOD_ID:-${MODS_EXECUTION_ID:-}}"
 SBOM_LATEST_URL="${SBOM_LATEST_URL:-}"
 SEAWEEDFS_URL="${SEAWEEDFS_URL:-${PLOY_SEAWEEDFS_URL:-}}"
 
@@ -159,6 +159,8 @@ enrich_planner_prompt || true
 if [[ "$RUN_ID_STR" == *"planner"* ]]; then
   log "Detected planner run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "planner" "planner" "job started"
+  post_event "info" "planner" "planner" "env PLOY_SEAWEEDFS_URL=${SEAWEEDFS_URL:-<empty>}"
+  post_event "info" "planner" "planner" "env EXECUTION_ID=${EXECUTION_ID:-<empty>} RUN_ID=${RUN_ID_STR}"
   PLAN_ID="plan-$(date +%s)"
   # Flag whether we included an SBOM prompt hint
   PROMPT_HINT="false"

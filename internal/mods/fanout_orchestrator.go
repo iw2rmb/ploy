@@ -241,6 +241,19 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	imgs := ResolveImagesFromEnv()
 	infra := ResolveInfraFromEnv()
 	llm := ResolveLLMDefaultsFromEnv()
+    // Normalize MOD_ID (prefer MOD_ID env, fallback to legacy PLOY_MODS_EXECUTION_ID) with mod- prefix
+    modID := os.Getenv("MOD_ID")
+    if modID == "" {
+        modID = os.Getenv("PLOY_MODS_EXECUTION_ID")
+    }
+    if modID != "" {
+        if strings.HasPrefix(modID, "tf-") {
+            modID = "mod-" + strings.TrimPrefix(modID, "tf-")
+        } else if !strings.HasPrefix(modID, "mod-") {
+            modID = "mod-" + modID
+        }
+    }
+
     vars := map[string]string{
         "MODS_CONTEXT_DIR":       baseDir,
         "MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
@@ -249,6 +262,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
         "MODS_REDUCER_IMAGE":     imgs.Reducer,
         "MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
         "PLOY_CONTROLLER":        infra.Controller,
+        "MOD_ID":                 modID,
         "PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
         "PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
         "NOMAD_DC":               infra.DC,
