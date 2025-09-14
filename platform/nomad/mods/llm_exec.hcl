@@ -16,6 +16,8 @@ job "mods-llm-exec-${RUN_ID}" {
         SBOM_LATEST_URL = "${SBOM_LATEST_URL}"
         CONTROLLER_URL    = "${CONTROLLER_URL}"
         MODS_EXECUTION_ID = "${EXECUTION_ID}"
+        CONTEXT_DIR  = "${NOMAD_TASK_DIR}/context"
+        OUTPUT_DIR   = "${NOMAD_TASK_DIR}/out"
       }
       template {
         data        = "${SBOM_LATEST_URL}"
@@ -24,6 +26,10 @@ job "mods-llm-exec-${RUN_ID}" {
       artifact {
         source      = "${MODS_CONTEXT_URL}"
         destination = "local/context"
+      }
+      template {
+        data        = ""
+        destination = "local/out/.keep"
       }
     }
   }
