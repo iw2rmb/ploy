@@ -88,11 +88,21 @@ func (s *Server) handlePlatformLogs(c *fiber.Ctx) error {
 	lines := c.QueryInt("lines", 200)
 	follow := c.QueryBool("follow", false)
 
-	// Derive Nomad job name for platform services
-	jobName := serviceName
-	if !strings.HasPrefix(jobName, "ploy-") {
-		jobName = "ploy-" + jobName
-	}
+    // Derive Nomad job and task names for platform services
+    jobName := serviceName
+    taskName := serviceName
+    switch serviceName {
+    case "api":
+        jobName = "ploy-api"
+        taskName = "api"
+    case "traefik":
+        jobName = "traefik-system"
+        taskName = "traefik"
+    default:
+        if !strings.HasPrefix(jobName, "ploy-") {
+            jobName = "ploy-" + jobName
+        }
+    }
 
 	monitor := orchestration.NewHealthMonitor()
 	allocs, err := monitor.GetJobAllocations(jobName)
@@ -124,14 +134,9 @@ func (s *Server) handlePlatformLogs(c *fiber.Ctx) error {
 	defer cancel()
 	// Build command arguments safely
 	args := []string{"logs", "--alloc-id", runningID}
-	// Best-effort task name inference: task "api" for ploy-api job; otherwise use service name
-	taskName := serviceName
-	if serviceName == "api" {
-		taskName = "api"
-	}
-	if taskName != "" {
-		args = append(args, "--task", taskName)
-	}
+    if taskName != "" {
+        args = append(args, "--task", taskName)
+    }
 	if lines > 0 {
 		args = append(args, "--lines", fmt.Sprintf("%d", lines))
 	}

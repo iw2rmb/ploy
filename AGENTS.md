@@ -72,6 +72,18 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 - Example:
   - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestModsE2E_JavaMigrationComplete -timeout 20m`
 
+### Platform Logs (Debugging)
+
+- Fetch controller or proxy logs via Dev API for quick diagnosis:
+  - Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
+  - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
+- Query params:
+  - `lines` — number of log lines to return (default 200)
+  - `follow` — set to `true` to follow (SSE-style support may be added later; currently returns snapshot)
+- Notes:
+  - These endpoints route through the VPS job-manager wrapper to retrieve Nomad allocation logs.
+  - Task inference is automatic for known services (api → task "api", traefik → task "traefik").
+
 ## Commands
 
 **LOCAL**: 
