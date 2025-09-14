@@ -16,7 +16,7 @@ job "mods-planner" {
         RUN_ID      = "${RUN_ID}"
         SBOM_LATEST_URL = "${SBOM_LATEST_URL}"
         CONTROLLER_URL    = "${CONTROLLER_URL}"
-        MODS_EXECUTION_ID = "${EXECUTION_ID}"
+        MOD_ID = "${MOD_ID}"
         PLOY_SEAWEEDFS_URL = "${PLOY_SEAWEEDFS_URL}"
         CONTEXT_DIR  = "${NOMAD_TASK_DIR}/context"
         OUTPUT_DIR   = "${NOMAD_TASK_DIR}/out"
