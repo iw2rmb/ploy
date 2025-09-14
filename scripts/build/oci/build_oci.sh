@@ -14,6 +14,18 @@ done
 # Prefer Jib (Gradle/Maven) when present, as it sets a correct entrypoint
 if [ -f "$SRC/gradlew" ]; then
   (cd "$SRC" && ./gradlew jib -Djib.to.image="$TAG")
+elif [ -f "$SRC/build.gradle" ] || [ -f "$SRC/build.gradle.kts" ]; then
+  if command -v gradle >/dev/null 2>&1; then
+    (cd "$SRC" && gradle jib -Djib.to.image="$TAG")
+  else
+    echo "Gradle wrapper not found and gradle not installed; falling back to Dockerfile if present" >&2
+    if [ -f "$SRC/Dockerfile" ]; then
+      docker build -t "$TAG" "$SRC"
+      docker push "$TAG"
+      exit 0
+    fi
+    echo "No gradle available and no Dockerfile; cannot build OCI for $APP" >&2; exit 2
+  fi
 elif [ -f "$SRC/pom.xml" ]; then
   (cd "$SRC" && ./mvnw -B com.google.cloud.tools:jib-maven-plugin:3.4.0:build -Dimage="$TAG")
 elif [ -f "$SRC/Dockerfile" ]; then

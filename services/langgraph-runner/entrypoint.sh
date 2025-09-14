@@ -223,6 +223,7 @@ EOF
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading diff to $URL"
     curl -sS -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /dev/null || true
+    post_event "info" "llm-exec" "llm-exec" "uploaded diff to ${KEY}"
   fi
 else
   log "Unknown mode (RUN_ID=$RUN_ID_STR). Defaulting to planner output."
