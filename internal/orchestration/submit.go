@@ -114,43 +114,53 @@ func waitTerminalWithJobManager(jobName string, timeout time.Duration) error {
 		if idx := bytes.IndexByte(raw, '['); idx >= 0 {
 			raw = raw[idx:]
 		}
-		var allocs []AllocationStatusLite
+    var allocs []AllocationStatusLite
 		if err := json.Unmarshal(raw, &allocs); err == nil {
-			// Terminal if any alloc failed or any alloc completed
-			sawRunningOrPending := false
-			if len(allocs) > 0 {
-				sawAnyAllocs = true
-			}
-			for _, a := range allocs {
-				// Prefer explicit terminated event exit codes when available
-				for _, ts := range a.TaskStates {
-					// Scan events from latest to earliest
-					for i := len(ts.Events) - 1; i >= 0; i-- {
-						ev := ts.Events[i]
-						if strings.EqualFold(ev.Type, "Terminated") {
-							if code, ok := ev.Details["exit_code"]; ok {
-								if code == "0" {
-									return nil
-								}
-								return fmt.Errorf("job %s allocation failed (exit %s)", jobName, code)
-							}
-						}
-					}
-				}
-				switch strings.ToLower(a.ClientStatus) {
-				case "failed":
-					return fmt.Errorf("job %s allocation failed (%s)", jobName, a.ID)
-				case "complete", "completed":
-					return nil
-				case "running", "pending", "starting":
-					sawRunningOrPending = true
-				}
-			}
-			if !sawRunningOrPending && len(allocs) > 0 {
-				// Not clearly terminal; wait
-				_ = allocs // no-op to satisfy staticcheck
-			}
-		}
+            // Evaluate across all allocs: prefer success; only fail if everything is failed
+            sawRunningOrPending := false
+            sawComplete := false
+            var failedID string
+            if len(allocs) > 0 {
+                sawAnyAllocs = true
+            }
+            for _, a := range allocs {
+                // Prefer explicit terminated event exit codes when available
+                for _, ts := range a.TaskStates {
+                    // Scan events from latest to earliest
+                    for i := len(ts.Events) - 1; i >= 0; i-- {
+                        ev := ts.Events[i]
+                        if strings.EqualFold(ev.Type, "Terminated") {
+                            if code, ok := ev.Details["exit_code"]; ok {
+                                if code == "0" {
+                                    sawComplete = true
+                                    continue
+                                }
+                                failedID = a.ID
+                            }
+                        }
+                    }
+                }
+                switch strings.ToLower(a.ClientStatus) {
+                case "failed":
+                    if failedID == "" { failedID = a.ID }
+                case "complete", "completed":
+                    sawComplete = true
+                case "running", "pending", "starting":
+                    sawRunningOrPending = true
+                }
+            }
+            if sawComplete {
+                return nil
+            }
+            // If nothing is running/pending and at least one failed, consider terminal failure
+            if !sawRunningOrPending && failedID != "" {
+                return fmt.Errorf("job %s allocation failed (%s)", jobName, failedID)
+            }
+            if !sawRunningOrPending && len(allocs) > 0 {
+                // Not clearly terminal; wait
+                _ = allocs // no-op to satisfy staticcheck
+            }
+        }
 		// Fast-fail guard: no allocations appeared within guard window
 		if !sawAnyAllocs && time.Since(deadline.Add(-timeout)) > allocAppearGuard {
 			return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", jobName, allocAppearGuard)
@@ -350,21 +360,28 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 		if meta != nil && meta.LastIndex > 0 {
 			lastIndex = meta.LastIndex
 		}
-		// Evaluate terminal states
-		sawRunning := false
-		for _, a := range allocs {
-			sawAnyAllocs = true
-			cs := a.ClientStatus
-			if cs == "complete" {
-				return nil
-			}
-			if cs == "failed" {
-				return fmt.Errorf("job %s allocation failed (%s)", name, a.ID)
-			}
-			if cs == "running" || cs == "pending" || cs == "starting" {
-				sawRunning = true
-			}
-		}
+        // Evaluate terminal states across all allocs
+        sawRunning := false
+        sawComplete := false
+        var failedID string
+        for _, a := range allocs {
+            sawAnyAllocs = true
+            cs := a.ClientStatus
+            switch cs {
+            case "complete":
+                sawComplete = true
+            case "failed":
+                if failedID == "" { failedID = a.ID }
+            case "running", "pending", "starting":
+                sawRunning = true
+            }
+        }
+        if sawComplete {
+            return nil
+        }
+        if !sawRunning && failedID != "" {
+            return fmt.Errorf("job %s allocation failed (%s)", name, failedID)
+        }
 		if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
 			return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
 		}
