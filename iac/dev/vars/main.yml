@@ -74,8 +74,9 @@ ploy:
     enable_ipv6: false
   
   # User apps domain configuration
-  apps_domain: "{{ lookup('env', 'PLOY_APPS_DOMAIN') | default('ployd.app') }}"
-  apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | default('namecheap') }}"
+  # If env var is set but empty, still fall back to defaults (second arg true)
+  apps_domain: "{{ lookup('env', 'PLOY_APPS_DOMAIN') | default('ployd.app', true) }}"
+  apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | default('namecheap', true) }}"
   
   # Platform services domain configuration
   platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('ployman.app', true) }}"
