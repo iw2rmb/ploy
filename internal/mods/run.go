@@ -90,7 +90,7 @@ func runMod(args []string, controllerURL string) error {
 	applyFirst := fs.Bool("apply-first", false, "after fetching diff (MODS_DIFF_URL/MODS_DIFF_PATH), clone repo, validate/apply diff, commit, and run build gate")
 	verbose := fs.Bool("v", false, "verbose output")
 	preserve := fs.Bool("preserve-workspace", false, "do not delete the temporary workspace (for debugging)")
-	outputFmt := fs.String("output", "text", "output format: text|json (json prints execution_id and exits in remote mode)")
+	outputFmt := fs.String("output", "text", "output format: text|json (json prints mod_id and exits in remote mode)")
 	// SBOM flags to override config
 	sbomEnabled := fs.String("sbom", "", "override SBOM enabled (true|false)")
 	sbomFail := fs.String("sbom-fail-on-error", "", "override SBOM fail_on_error (true|false)")
@@ -437,7 +437,7 @@ func watchMod(args []string, controllerURL string) error {
 		return fmt.Errorf("flag parsing failed: %w", err)
 	}
 	if *id == "" {
-		return fmt.Errorf("missing -id <execution_id>")
+		return fmt.Errorf("missing -id <mod_id>")
 	}
 	base := controllerURL
 	if base == "" {
