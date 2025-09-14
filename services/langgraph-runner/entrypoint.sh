@@ -174,6 +174,14 @@ if [[ "$RUN_ID_STR" == *"planner"* ]]; then
 }
 EOF
   log "Wrote plan.json to $OUT_DIR"
+  # Upload planner plan.json to SeaweedFS for controller collection
+  if [ -s "$OUT_DIR/plan.json" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$EXECUTION_ID" ] && [ -n "$RUN_ID_STR" ]; then
+    KEY="mods/${EXECUTION_ID}/planner/${RUN_ID_STR}/plan.json"
+    URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
+    log "Uploading plan.json to $URL"
+    curl -sS -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$URL" -o /dev/null || true
+    post_event "info" "planner" "planner" "uploaded plan to ${KEY}"
+  fi
 elif [[ "$RUN_ID_STR" == *"reducer"* ]]; then
   log "Detected reducer run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "reducer" "reducer" "job started"
