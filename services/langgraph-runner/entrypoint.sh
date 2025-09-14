@@ -176,13 +176,19 @@ if [[ "$RUN_ID_STR" == *"planner"* ]]; then
 }
 EOF
   log "Wrote plan.json to $OUT_DIR"
-  # Upload planner plan.json to SeaweedFS for controller collection
+  # Upload planner plan.json to SeaweedFS for controller collection (log HTTP status)
   if [ -s "$OUT_DIR/plan.json" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$MOD_ID_ENV" ] && [ -n "$RUN_ID_STR" ]; then
     KEY="mods/${MOD_ID_ENV}/planner/${RUN_ID_STR}/plan.json"
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading plan.json to $URL"
-    curl -sS -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$URL" -o /dev/null || true
-    post_event "info" "planner" "planner" "uploaded plan to ${KEY}"
+    HTTP_CODE=$(curl -sS -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$URL" -o /tmp/plan_upload.out || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "204" ]; then
+      post_event "info" "planner" "planner" "uploaded plan to ${KEY} (status ${HTTP_CODE})"
+    else
+      ERR_MSG=$(tr -d '\r' </tmp/plan_upload.out | head -c 300)
+      post_event "error" "planner" "planner" "plan upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+    fi
+    rm -f /tmp/plan_upload.out || true
   fi
 elif [[ "$RUN_ID_STR" == *"reducer"* ]]; then
   log "Detected reducer run (RUN_ID=$RUN_ID_STR)"
@@ -226,7 +232,7 @@ index 0000000..e69de29
 EOF
   fi
   log "Wrote diff.patch to $OUT_DIR"
-  # Upload to SeaweedFS step-scoped key to mirror ORW behavior
+  # Upload to SeaweedFS step-scoped key to mirror ORW behavior (log HTTP status)
   if [ -s "$OUT_DIR/diff.patch" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$MOD_ID_ENV" ]; then
     # Derive branch ID from RUN_ID: strip llm-exec- prefix and trailing -<ts>
     BRANCH_ID=$(echo "$RUN_ID_STR" | sed -E 's/^llm-exec-//' | sed -E 's/-[0-9]+$//')
@@ -234,8 +240,14 @@ EOF
     KEY="mods/${MOD_ID_ENV}/branches/${BRANCH_ID}/steps/${STEP_ID}/diff.patch"
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading diff to $URL"
-    curl -sS -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /dev/null || true
-    post_event "info" "llm-exec" "llm-exec" "uploaded diff to ${KEY}"
+    HTTP_CODE=$(curl -sS -w '%{http_code}' -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /tmp/diff_upload.out || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "204" ]; then
+      post_event "info" "llm-exec" "llm-exec" "uploaded diff to ${KEY} (status ${HTTP_CODE})"
+    else
+      ERR_MSG=$(tr -d '\r' </tmp/diff_upload.out | head -c 300)
+      post_event "error" "llm-exec" "llm-exec" "diff upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+    fi
+    rm -f /tmp/diff_upload.out || true
   fi
 else
   log "Unknown mode (RUN_ID=$RUN_ID_STR). Defaulting to planner output."
