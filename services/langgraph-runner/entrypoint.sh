@@ -9,6 +9,9 @@ MOD_ID_ENV="${MOD_ID:-}"
 SBOM_LATEST_URL="${SBOM_LATEST_URL:-}"
 SEAWEEDFS_URL="${SEAWEEDFS_URL:-${PLOY_SEAWEEDFS_URL:-}}"
 
+# Curl defaults: fail fast in tests (Conn timeout 3s, total 12s, 2 retries)
+CURL_OPTS=(--connect-timeout 3 -m 12 --retry 2 --retry-delay 1 --retry-all-errors -sS)
+
 mkdir -p "$OUT_DIR"
 
 # Early startup diagnostics to confirm entrypoint is running and env is wired
@@ -22,7 +25,7 @@ post_event() {
   local step="$1"; shift
   local msg="$1"
   if [[ -n "$CONTROLLER_URL" && -n "$MOD_ID_ENV" ]]; then
-    curl -sS -X POST "${CONTROLLER_URL%/}/mods/${MOD_ID_ENV}/events" \
+    curl "${CURL_OPTS[@]}" -X POST "${CONTROLLER_URL%/}/mods/${MOD_ID_ENV}/events" \
       -H "Content-Type: application/json" \
       -d "{\"phase\":\"${phase}\",\"step\":\"${step}\",\"level\":\"${level}\",\"message\":\"${msg}\",\"job_name\":\"${RUN_ID_STR}\"}" \
       -o /dev/null || true
@@ -53,7 +56,7 @@ fetch_sbom_if_available() {
   local sbom_json="$ctx/sbom.json"
   local summary_json="$ctx/sbom_summary.json"
   # Fetch pointer
-  if curl -sS -m 8 "$pointer_url" -o "$pointer_json"; then
+  if curl "${CURL_OPTS[@]}" "$pointer_url" -o "$pointer_json"; then
     # Extract storage_key (very small JSON; avoid jq dependency)
     local storage_key
     storage_key=$(sed -n 's/.*"storage_key"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$pointer_json" | head -n1)
@@ -61,7 +64,7 @@ fetch_sbom_if_available() {
       local ok=0
       if [ -n "$SEAWEEDFS_URL" ]; then
         local sbom_url="${SEAWEEDFS_URL%/}/$storage_key"
-        curl -sS -m 15 "$sbom_url" -o "$sbom_json" && ok=1 || ok=0
+        curl "${CURL_OPTS[@]}" "$sbom_url" -o "$sbom_json" && ok=1 || ok=0
       fi
       if [ "$ok" -ne 1 ] && [ -n "$CONTROLLER_URL" ]; then
         # Controller proxy fallback; best-effort URL encode
@@ -72,7 +75,7 @@ print(urllib.parse.quote(sys.argv[1]))
 PY
 "$storage_key" 2>/dev/null || echo "$storage_key")
         local proxy_url="${CONTROLLER_URL%/}/sbom/download?key=${enc_key}"
-        curl -sS -m 15 "$proxy_url" -o "$sbom_json" && ok=1 || ok=0
+        curl "${CURL_OPTS[@]}" "$proxy_url" -o "$sbom_json" && ok=1 || ok=0
       fi
       if [ "$ok" -eq 1 ]; then
         post_event "info" "$(phase_from_runid)" "sbom" "downloaded latest SBOM"
@@ -168,12 +171,12 @@ if [[ "$RUN_ID_STR" == *"planner"* ]]; then
   # Connectivity check to SeaweedFS (HEAD, fallback GET) for visibility
   if [ -n "${SEAWEEDFS_URL:-}" ]; then
     CHECK_URL="${SEAWEEDFS_URL%/}/"
-    HEAD_CODE=$(curl -sS -o /dev/null -w '%{http_code}' -I "$CHECK_URL" || echo "000")
+    HEAD_CODE=$(curl "${CURL_OPTS[@]}" -o /dev/null -w '%{http_code}' -I "$CHECK_URL" || echo "000")
     if [ "$HEAD_CODE" = "200" ] || [ "$HEAD_CODE" = "204" ]; then
       post_event "info" "planner" "planner" "seaweedfs connectivity (HEAD) status=${HEAD_CODE} url=${CHECK_URL}"
     else
       # Fallback to GET with short timeout and capture a snippet
-      GET_CODE=$(curl -sS -m 5 -o /tmp/seaweed_check.out -w '%{http_code}' "$CHECK_URL" || echo "000")
+      GET_CODE=$(curl "${CURL_OPTS[@]}" -o /tmp/seaweed_check.out -w '%{http_code}' "$CHECK_URL" || echo "000")
       SNIP=$(tr -d '\r' </tmp/seaweed_check.out | head -c 200)
       post_event "warn" "planner" "planner" "seaweedfs connectivity (HEAD=${HEAD_CODE}, GET=${GET_CODE}) url=${CHECK_URL} body=${SNIP}"
       rm -f /tmp/seaweed_check.out || true
@@ -201,7 +204,7 @@ EOF
     KEY="mods/${MOD_ID_ENV}/planner/${RUN_ID_STR}/plan.json"
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading plan.json to $URL"
-    HTTP_CODE=$(curl -sS -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$URL" -o /tmp/plan_upload.out || echo "000")
+    HTTP_CODE=$(curl "${CURL_OPTS[@]}" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$URL" -o /tmp/plan_upload.out || echo "000")
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "204" ]; then
       post_event "info" "planner" "planner" "uploaded plan to ${KEY} (status ${HTTP_CODE})"
     else
@@ -260,7 +263,7 @@ EOF
     KEY="mods/${MOD_ID_ENV}/branches/${BRANCH_ID}/steps/${STEP_ID}/diff.patch"
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading diff to $URL"
-    HTTP_CODE=$(curl -sS -w '%{http_code}' -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /tmp/diff_upload.out || echo "000")
+    HTTP_CODE=$(curl "${CURL_OPTS[@]}" -w '%{http_code}' -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /tmp/diff_upload.out || echo "000")
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "204" ]; then
       post_event "info" "llm-exec" "llm-exec" "uploaded diff to ${KEY} (status ${HTTP_CODE})"
     else
