@@ -652,18 +652,33 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
                 base = "http://" + base
             }
             contextURL = strings.TrimRight(base, "/") + "/" + contextKey
-            // Best-effort: also PUT context directly to Filer HTTP path for Dev fetch compatibility
-            go func(path string) {
-                f, err := os.Open(builderTar)
-                if err != nil { return }
-                defer f.Close()
-                req, err := http.NewRequest("PUT", path, f)
-                if err != nil { return }
-                req.Header.Set("Content-Type", "application/x-tar")
-                client := &http.Client{Timeout: 20 * time.Second}
-                resp, err := client.Do(req)
-                if err == nil {
+            // Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
+            func(path string) {
+                fi, err := os.Stat(builderTar)
+                if err != nil { fmt.Printf("Warn: stat tar failed: %v\n", err); return }
+                for attempt := 1; attempt <= 3; attempt++ {
+                    f, err := os.Open(builderTar)
+                    if err != nil { fmt.Printf("Warn: open tar failed: %v\n", err); return }
+                    req, err := http.NewRequest("PUT", path, f)
+                    if err != nil { _ = f.Close(); fmt.Printf("Warn: build PUT request failed: %v\n", err); return }
+                    req.Header.Set("Content-Type", "application/x-tar")
+                    req.ContentLength = fi.Size()
+                    client := &http.Client{Timeout: 60 * time.Second}
+                    resp, err := client.Do(req)
+                    if err != nil {
+                        _ = f.Close()
+                        fmt.Printf("Warn: context PUT attempt %d failed: %v\n", attempt, err)
+                        time.Sleep(2 * time.Second)
+                        continue
+                    }
+                    _ = f.Close()
                     _ = resp.Body.Close()
+                    if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+                        fmt.Printf("Context PUT ok (%d bytes) to %s\n", fi.Size(), path)
+                        break
+                    }
+                    fmt.Printf("Warn: context PUT attempt %d got HTTP %d for %s\n", attempt, resp.StatusCode, path)
+                    time.Sleep(2 * time.Second)
                 }
             }(contextURL)
         } else {
