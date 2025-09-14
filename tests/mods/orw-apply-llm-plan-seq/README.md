@@ -191,6 +191,31 @@ Run Log & Key Takeaways
     - Healing diff is now stored with the same branch/step lineage as ORW, enabling per-step diff retrieval.
     - MRs are cleanly scoped to patch contents (no target/ artifacts).
 
+- Cycle 8 (Post-deploy, clean MR content):
+  - Change: Deployed commit-scoping and LLM/ORW step-scoped uploads.
+  - Result (EXEC_ID tf-2bb5a0cb): Status=completed; MR https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/32
+  - MR: single commit with only intended changes (no target/*), still showing ORW-only diff.
+  - Takeaways:
+    - Commit-scoping fix works. LLM diff not yet present in MR due to runner image not emitting an explicit diff.
+
+- Cycle 9 (Disable fast-path remediation; force planner/llm):
+  - Change: Disabled controller local remediation; llm-exec runner enhanced to emit deletion patch.
+  - Result (EXEC_ID tf-334abd49): Healing failed (phase=healing) — llm-exec image on cluster didn’t yet produce diff.patch.
+  - Takeaways:
+    - Controller path ready; cluster runner image must be updated to new entrypoint that writes out/diff.patch.
+
+- Cycle 10 (Re-run after wiring CONTEXT_DIR/OUTPUT_DIR):
+  - Change: Pass CONTEXT_DIR/OUTPUT_DIR to planner and llm-exec jobs; ensure out dir exists in tasks.
+  - Result (EXEC_ID tf-805adb3a): Healing failed (phase=healing) — consistent with runner image not updated.
+  - Takeaways:
+    - LLM job environment is in place; image update remains the blocker for producing explicit healing diff.
+
+Next steps (ops):
+- Update langgraph-runner image in internal registry to a build that includes the new entrypoint logic:
+  - MODS_LLM_EXEC_IMAGE, MODS_PLANNER_IMAGE, MODS_REDUCER_IMAGE should point to the updated tag (see iac/dev/playbooks/api-env.yml defaults).
+  - Re-deploy API (ployman api deploy --monitor) so env propagates to jobs.
+- Re-run this scenario; expect MR to include deletion of src/healing/java/e2e/FailHealing.java (LLM diff) alongside ORW changes.
+
 Notes
 - Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.

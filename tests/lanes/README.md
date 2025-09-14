@@ -1,11 +1,11 @@
 # Lanes E2E Test Plan (A–G)
 
-Purpose: Validate end-to-end deployment for all lanes (A–G) using minimal, reproducible GitHub hello apps and the `ploy` CLI against the Dev API.
+Purpose: Validate end-to-end deployment for all lanes (A–G) using minimal, reproducible GitHub hello apps and the `ploy` CLI against the Dev API. For comprehensive lane descriptions and build flows, see docs/LANES.md.
 
 This plan mirrors roadmap/hello-apps and extends it per lane with concrete repos, envs, and steps. Follow AGENTS.md (TDD cycle + VPS rules) at all times.
 
 ## Scope
-- Lanes: A (Unikraft Minimal), B (Unikraft POSIX), C (OSv Java/Scala), D (FreeBSD Jails), E (OCI+Kontain), F (Full VMs), G (WASM Runtime)
+- Lanes: A–G; see docs/LANES.md for detailed descriptions, detection, and build flows.
 - Environments: Workstation invoking Dev API (PLOY_CONTROLLER). No local Nomad/Consul.
 - Artifacts: HTTPS health, destroy cleanup, and basic log retrieval per app.
 
@@ -21,7 +21,7 @@ Created under the ploy dev GitHub account using `scripts/lanes/create-lane-repos
 
 Notes
 - Initial creation is empty/minimal. Each repo must expose an HTTP 200 health endpoint at `/healthz` and be lane-appropriate.
-- For existing examples, migrate from `tests/apps/*` to these repos, similar to `ploy-scala-hello` in roadmap/hello-apps.
+- For lane details and expectations, consult docs/LANES.md.
 
 ## Environment Variables
 - Required (Dev API): `PLOY_CONTROLLER=https://api.dev.ployman.app/v1`
@@ -72,6 +72,7 @@ The script creates the 7 repos if missing and sets descriptions.
 - RED: enable at least one lane’s env var (e.g., `LANE_C_REPO`) and run E2E → expect failures until hello app content exists.
 - GREEN: add minimal hello app to the corresponding repo, re-run until health succeeds and cleanup verified.
 - REFACTOR (VPS): harden with log checks, lane detection assertions, and timing budgets.
+- When patching lane functionality, also update docs/LANES.md to reflect behavior, limits, and best practices.
 
 ## Operational Tips
 - Prefer `APP_NAME` equal to repo name (`basename -s .git` logic in scripts).
@@ -128,12 +129,7 @@ The script creates the 7 repos if missing and sets descriptions.
 
 Temporary Dev workaround (no in-API Docker):
 - The API runs as a Nomad job without Docker, so Lane E image builds must occur via a builder job (future) or manual push.
-- Manual push via SSH (Dev only):
-  - ssh root@$TARGET_HOST
-  - su - ploy
-  - mkdir -p ~/tmp/ploy-lane-e-go && cd ~/tmp/ploy-lane-e-go
-  - Create Dockerfile and app (or git clone your lane repo), then:
-    docker build -t registry.dev.ployman.app/<app>:<sha> .
-    docker push registry.dev.ployman.app/<app>:<sha>
-  - Verify: curl -I https://registry.dev.ployman.app/v2/<app>/manifests/<sha>
-  - Re-run the Lane E test to confirm /healthz is green.
+- Automated path now added (Kaniko builder job):
+  - Controller uploads source tar to SeaweedFS and submits a short-lived Kaniko builder job.
+  - Builder downloads context, builds, and pushes to `registry.dev.ployman.app/<app>:<sha>`.
+  - Controller verifies push and proceeds to deploy the app; E2E waits for HTTPS /healthz.
