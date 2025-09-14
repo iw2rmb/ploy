@@ -293,8 +293,17 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-		// Step 6: Read and validate job output artifact (plan.json)
-		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+        // Step 6: Read and validate job output artifact (plan.json)
+        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+        if _, err := os.Stat(artifactPath); err != nil {
+            // Fallback: fetch from SeaweedFS if runner uploaded it
+            execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+            if infra.SeaweedURL != "" && execID != "" {
+                key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execID, runID)
+                url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+                _ = downloadToFileFn(url, artifactPath)
+            }
+        }
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
 				return nil, fmt.Errorf("planner output schema invalid: %w", err)
