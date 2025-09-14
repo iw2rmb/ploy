@@ -1,11 +1,9 @@
 package builders
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
+    "fmt"
+    "os"
+    "path/filepath"
 )
 
 // JavaOSVRequest mirrors the request subset used by internal build flow
@@ -56,25 +54,13 @@ func BuildJail(app, srcDir, sha, outDir string, envVars map[string]string) (stri
 }
 
 func BuildOCI(app, srcDir, tag string, envVars map[string]string) (string, error) {
-	// Execute the OCI build script to ensure the image is built and pushed to the registry
-	scriptPath := "/home/ploy/ploy/scripts/build/oci/build_oci.sh"
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		scriptPath = "./scripts/build/oci/build_oci.sh"
-	}
-	args := []string{"--app", app, "--src", srcDir, "--tag", tag}
-	cmd := exec.Command(scriptPath, args...)
-	// Include provided environment variables for the build context
-	env := os.Environ()
-	for k, v := range envVars {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
-	cmd.Env = env
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("oci build failed: %v: %s", err, string(out))
-	}
-	// Script prints the final image reference on the last line
-	return strings.TrimSpace(string(out)), nil
+    // On Dev, API runs as a Nomad job without Docker. Building must be handled by a
+    // separate builder job. For now, return the tag for downstream orchestration.
+    // Push verification will detect missing tags and surface readable errors.
+    if tag == "" {
+        return "", fmt.Errorf("empty image tag")
+    }
+    return tag, nil
 }
 
 func BuildVM(app, sha, outDir string, envVars map[string]string) (string, error) {

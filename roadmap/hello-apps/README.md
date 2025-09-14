@@ -146,3 +146,28 @@ Notes
   - Next:
     - Clean up the controller’s debug lane/namespace path for probe routes so small tar uploads validate in dev.
     - Decide whether to keep buffering permanently for `api.dev.ployman.app` (dev‑only) or gate by feature flag.
+
+- Cycle 5 (Traefik as Nomad job; refine router rule):
+  - Traefik now runs as a Nomad system job (`traefik-system`). File-provider `watch=true` reloads dynamic config; no systemd restart needed.
+  - Updated helper to prefer Nomad detection and rely on file watch; refined the router rule to `Host("api.dev.ployman.app") && PathPrefix(`/v1`)` to ensure the buffering middleware applies to all versioned API routes.
+  - Probes after refinement:
+    - Binary POSTs to both `/v1/apps/:app/builds` and `/v1/apps/:app/upload` return fast controller responses (HTTP 500 expected for dummy tar: missing Dockerfile/Jib), and JSON probe returns 200.
+    - Confirms ingress/body transport issues are addressed for HTTP/2 with Nomad-managed Traefik.
+  - Key takeaways:
+    - With Traefik under Nomad, dynamic config changes propagate automatically via file watch; target `/opt/ploy/traefik-data/dynamic-config.yml` which mounts to `/etc/traefik/dynamic-configs/dynamic-config.yml` in the job.
+    - Router specificity matters: adding `PathPrefix(`/v1`)` ensured the dev-only router/middleware consistently handled API requests including the `/upload` alias.
+  - Next:
+    - Re-run Lane E E2E for `ploy-scala-hello` with multipart enabled (`PLOY_PUSH_MULTIPART=1`) to confirm end-to-end build, deploy, HTTPS health, destroy, status.
+    - Keep the dev buffering middleware in place during validation; consider a toggle to enable/disable via a small CLI or API if needed.
+
+- Cycle 6 (E2E attempt for Lane E with multipart → blocked by repo build config):
+  - Ran E2E: `HELLO_APP_REPO=...ploy-scala-hello.git APP_NAME=ploy-scala-hello LANE=E USE_MULTIPART=1 HEALTH_PATH=/healthz ./tests/e2e/test-deploy-github-app.sh`.
+  - Result: `HTTP 500` with `{"error":"oci build failed: ... No Dockerfile or Jib; cannot build OCI ..."}` on both attempts; no allocations/logs for the app as the build never completed.
+  - Improvements (controller): mapped common builder error to a clearer client error (400) for missing Dockerfile/Jib prerequisites. Requires promoting API to VPS (ployman api deploy) to take effect.
+  - Key takeaways:
+    - The external repo currently lacks a Dockerfile or Jib configuration; OCI build cannot proceed. This is independent of the earlier ingress/body issue.
+    - The dev-only buffering middleware remains necessary for reliable HTTP/2 binary requests but is now functioning as intended.
+  - Next:
+    - Update the `ploy-scala-hello` repo to include a minimal Dockerfile or migrate to Gradle with Jib plugin, then rerun the E2E.
+    - Alternatively, enhance the controller’s OCI builder with a dev fallback (generate a simple Dockerfile for JVM apps) for demos, gated to dev only.
+    - Deploy the updated API to VPS: `./bin/ployman api deploy --monitor` so the improved 400 error mapping is visible in Dev.

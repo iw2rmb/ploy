@@ -1124,19 +1124,8 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 // Strategy: remove src/healing/java (profile-only failing sources) and
 // add a stub UnknownClass if the error contains that symbol.
 func (r *ModRunner) localRemediation(repoPath, buildError string) error {
-	healDir := filepath.Join(repoPath, "src", "healing", "java")
-	if info, err := os.Stat(healDir); err == nil && info.IsDir() {
-		if err := os.RemoveAll(healDir); err != nil {
-			return err
-		}
-	}
-	if strings.Contains(strings.ToLower(buildError), "unknownclass") {
-		stubPath := filepath.Join(repoPath, "src", "main", "java", "e2e", "UnknownClass.java")
-		_ = os.MkdirAll(filepath.Dir(stubPath), 0o755)
-		_ = os.WriteFile(stubPath, []byte("package e2e; public class UnknownClass {}"), 0o644)
-	}
-	// Let the normal commit step capture these changes
-	return nil
+    // Disabled to ensure healing proceeds via planner/llm and produces an explicit diff
+    return fmt.Errorf("local remediation disabled; require planner/llm healing")
 }
 
 // CleanupWorkspace removes the temporary workspace directory

@@ -286,6 +286,11 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			log.Printf("[Build] OCI build error: %v", err)
+			// Provide clearer client feedback for common missing-build-config cases
+			es := strings.ToLower(err.Error())
+			if strings.Contains(es, "no dockerfile or jib") || strings.Contains(es, "oci build failed") {
+				return utils.ErrJSON(c, 400, fmt.Errorf("OCI build prerequisites not found: add a Dockerfile or Jib configuration in your repo: %w", err))
+			}
 			return utils.ErrJSON(c, 500, err)
 		}
 		dockerImage = img
@@ -305,6 +310,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			log.Printf("[Build] WASM fallback (OCI) build error: %v", err)
+			es := strings.ToLower(err.Error())
+			if strings.Contains(es, "no dockerfile or jib") || strings.Contains(es, "oci build failed") {
+				return utils.ErrJSON(c, 400, fmt.Errorf("OCI build prerequisites not found: add a Dockerfile or Jib configuration in your repo: %w", err))
+			}
 			return utils.ErrJSON(c, 500, err)
 		}
 		dockerImage = img
@@ -316,6 +325,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
 		if err != nil {
 			log.Printf("[Build] Default OCI build error: %v", err)
+			es := strings.ToLower(err.Error())
+			if strings.Contains(es, "no dockerfile or jib") || strings.Contains(es, "oci build failed") {
+				return utils.ErrJSON(c, 400, fmt.Errorf("OCI build prerequisites not found: add a Dockerfile or Jib configuration in your repo: %w", err))
+			}
 			return utils.ErrJSON(c, 500, err)
 		}
 		dockerImage = img

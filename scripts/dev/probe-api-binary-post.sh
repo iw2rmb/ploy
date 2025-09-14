@@ -17,6 +17,7 @@ BASE_URL="${BASE_URL:-https://api.dev.ployman.app}"
 APP_NAME="${APP_NAME:-probe-hello}"
 LANE="${LANE:-E}"
 ENV_NAME="${ENV_NAME:-dev}"
+PROBE_DEBUG="${PROBE_DEBUG:-false}"
 
 WORKDIR="$(mktemp -d)"
 trap 'rm -rf "${WORKDIR}"' EXIT
@@ -55,9 +56,10 @@ post_json_probe() {
     "$url" || true
 }
 
-UPLOAD_URL="${BASE_URL}/v1/apps/${APP_NAME}/upload?lane=${LANE}&env=${ENV_NAME}&debug=true"
-BUILDS_URL="${BASE_URL}/v1/apps/${APP_NAME}/builds?lane=${LANE}&env=${ENV_NAME}&debug=true"
-PROBE_URL="${BASE_URL}/v1/apps/${APP_NAME}/builds/probe?lane=${LANE}&env=${ENV_NAME}"
+DEBUG_QS=""; if [[ "${PROBE_DEBUG}" == "true" ]]; then DEBUG_QS="&debug=true"; fi
+UPLOAD_URL="${BASE_URL}/v1/apps/${APP_NAME}/upload?lane=${LANE}&env=${ENV_NAME}${DEBUG_QS}"
+BUILDS_URL="${BASE_URL}/v1/apps/${APP_NAME}/builds?lane=${LANE}&env=${ENV_NAME}${DEBUG_QS}"
+PROBE_URL="${BASE_URL}/v1/apps/${APP_NAME}/builds/probe?lane=${LANE}&env=${ENV_NAME}${DEBUG_QS}"
 
 post_binary  "$UPLOAD_URL"
 post_multipart "$UPLOAD_URL"
@@ -68,4 +70,3 @@ post_multipart "$BUILDS_URL"
 post_json_probe "$PROBE_URL"
 
 echo "\nDone."
-

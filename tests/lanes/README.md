@@ -108,10 +108,9 @@ The script creates the 7 repos if missing and sets descriptions.
   - Server adds a registry check after builds for container lanes and includes it in response JSON:
     - New field `pushVerification`: `{ok,status,digest,message}`.
     - Async status now carries this JSON message, making missing-tag/auth issues obvious during polling.
-- Credentials guidance (Dev VPS):
-  - API build host (push): `docker login registry.dev.ployman.app` under the `ploy` user; ensure `~/.docker/config.json` persisted.
-  - Nomad nodes (pull): configure `~/.docker/config.json` for the Nomad client service user (often `root`), then `systemctl restart nomad`.
-  - Optional: use per-app env vars to store registry coordinates; pull auth can also be injected via host-level Docker config. Template auth block intentionally omitted for dev; prefer host config.
+- Registry access (Dev VPS):
+  - Docker Registry v2 at `registry.dev.ployman.app` is deployed without auth in Dev (see `iac/dev/playbooks/docker-registry.yml`). Push/pull do not require username/password.
+  - Ensure TLS trust and DNS resolution to `registry.dev.ployman.app` from the VPS. No docker login needed in Dev.
 - Test harness:
   - Lane E E2E will now surface `pushVerification` in the status poll results before HTTPS checks, reducing time-to-diagnose `manifest unknown`.
   - Continue using async deploy mode to avoid ingress timeouts during tar upload.
@@ -125,4 +124,16 @@ The script creates the 7 repos if missing and sets descriptions.
   - Our `tests/lanes/check-app-logs.sh` now also prints Traefik logs after app logs when `PLOY_CONTROLLER` is set.
   - Verify router creation and 404s in Traefik logs if HTTPS fails while allocations are healthy.
 - Next validation pass:
-  - Ensure image exists in internal registry (push OK) so Nomad allocates the task; once healthy, Traefik should route per tags above.
+  - Ensure image exists in internal registry so Nomad allocates the task; once healthy, Traefik should route per tags above.
+
+Temporary Dev workaround (no in-API Docker):
+- The API runs as a Nomad job without Docker, so Lane E image builds must occur via a builder job (future) or manual push.
+- Manual push via SSH (Dev only):
+  - ssh root@$TARGET_HOST
+  - su - ploy
+  - mkdir -p ~/tmp/ploy-lane-e-go && cd ~/tmp/ploy-lane-e-go
+  - Create Dockerfile and app (or git clone your lane repo), then:
+    docker build -t registry.dev.ployman.app/<app>:<sha> .
+    docker push registry.dev.ployman.app/<app>:<sha>
+  - Verify: curl -I https://registry.dev.ployman.app/v2/<app>/manifests/<sha>
+  - Re-run the Lane E test to confirm /healthz is green.
