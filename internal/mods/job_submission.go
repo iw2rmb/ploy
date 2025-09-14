@@ -281,10 +281,24 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		if infra.Controller != "" && config != nil && config.TargetRepo != "" {
 			vars["SBOM_LATEST_URL"] = fmt.Sprintf("%s/sbom/latest?repo=%s", strings.TrimRight(infra.Controller, "/"), url.QueryEscape(config.TargetRepo))
 		}
-		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
-		}
+        renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
+        if err != nil {
+            return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
+        }
+
+        // Persist submitted planner HCL for diagnostics
+        if execIDVal != "" {
+            persistDir := filepath.Join("/tmp/mods-submitted", execIDVal, "planner")
+            _ = os.MkdirAll(persistDir, 0755)
+            dest := filepath.Join(persistDir, "planner.submitted.hcl")
+            if b, e := os.ReadFile(renderedHCLPath); e == nil {
+                _ = os.WriteFile(dest, b, 0644)
+                if controller := ResolveInfraFromEnv().Controller; controller != "" {
+                    rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
+                    _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("Saved submitted HCL to %s", dest), JobName: runID, Time: time.Now()})
+                }
+            }
+        }
 
 		// Step 4: Push start event and report job metadata
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
