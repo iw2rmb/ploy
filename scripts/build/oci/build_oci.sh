@@ -22,6 +22,38 @@ else
   echo "No Dockerfile or Jib; cannot build OCI for $APP" >&2; exit 2
 fi
 
+# ---- Push verification (non-fatal) -----------------------------------------
+verify_push() {
+  local ref="$1"
+  # Try to verify using docker manifest inspect; do not fail the build on errors
+  if command -v docker >/dev/null 2>&1; then
+    local output
+    if output=$(docker manifest inspect "$ref" 2>&1); then
+      # Try to extract a digest (works for both OCI and Docker schema2)
+      local digest
+      if command -v jq >/dev/null 2>&1; then
+        digest=$(echo "$output" | jq -r '..|.digest? | select(.!=null) | strings | select(startswith("sha256:"))' | head -n1)
+      else
+        digest=$(echo "$output" | sed -n 's/.*\(sha256:[0-9a-f]\{64\}\).*/\1/p' | head -n1)
+      fi
+      if [ -n "$digest" ]; then
+        echo "Push verification: OK (digest $digest)"
+      else
+        echo "Push verification: OK (manifest available; digest unknown)"
+      fi
+      return 0
+    else
+      echo "Push verification: FAILED (docker manifest inspect error)"
+      echo "$output" | sed -e 's/^/  > /'
+      return 0
+    fi
+  else
+    echo "Push verification: SKIPPED (docker CLI not available)"
+  fi
+}
+
+verify_push "$TAG"
+
 # Generate comprehensive SBOM and signature for container image
 if command -v syft >/dev/null 2>&1; then 
   echo "Generating comprehensive container SBOM for $TAG..."

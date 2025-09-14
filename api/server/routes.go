@@ -37,20 +37,20 @@ func (s *Server) setupRoutes() {
 	api := s.app.Group("/v1")
 
 	// Application build endpoints with request-scoped storage
-    api.Post("/apps/:app/builds", s.handleTriggerAppBuild) // apps namespace
-    // Temporary alias for build uploads to isolate ingress path issues
-    api.Post("/apps/:app/upload", s.handleTriggerAppBuild)
-    // OPTIONS handler for build route to aid debugging (preflight/route reachability)
-    api.Options("/apps/:app/builds", s.handleBuildsOptions)
-    // Dev-only probe endpoint for POST testing (JSON without binary body)
-    api.Post("/apps/:app/builds/probe", s.handleBuildsProbe)
+	api.Post("/apps/:app/builds", s.handleTriggerAppBuild) // apps namespace
+	// Temporary alias for build uploads to isolate ingress path issues
+	api.Post("/apps/:app/upload", s.handleTriggerAppBuild)
+	// OPTIONS handler for build route to aid debugging (preflight/route reachability)
+	api.Options("/apps/:app/builds", s.handleBuildsOptions)
+	// Dev-only probe endpoint for POST testing (JSON without binary body)
+	api.Post("/apps/:app/builds/probe", s.handleBuildsProbe)
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)
 
-    // Diagnostics (ingress/body debugging)
-    api.Post("/_diag/echo", s.handleDiagEcho)
-    api.Get("/apps/:app/builds/:id/status", s.handleBuildStatus)
+	// Diagnostics (ingress/body debugging)
+	api.Post("/_diag/echo", s.handleDiagEcho)
+	api.Get("/apps/:app/builds/:id/status", s.handleBuildStatus)
 
 	// Platform service endpoints with platform namespace
 	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)

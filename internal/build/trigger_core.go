@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"mime/multipart"
 	"io"
 	"log"
+	"mime/multipart"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,6 +63,81 @@ type BuildContext struct {
 	AppType    config.AppType
 }
 
+// verifyResult represents the outcome of an OCI manifest existence check
+type verifyResult struct {
+	OK      bool
+	Status  int
+	Digest  string
+	Message string
+}
+
+// verifyOCIPush performs a lightweight registry check to verify that the
+// pushed reference exists. It issues a HEAD request to the registry v2 API
+// and reads Docker-Content-Digest when available. Best-effort only.
+func verifyOCIPush(tag string) verifyResult {
+	// Expect tags like: host/repo[:tag]|[@digest]
+	slash := strings.Index(tag, "/")
+	if slash <= 0 || slash >= len(tag)-1 {
+		return verifyResult{OK: false, Status: 0, Message: "unverifiable tag format"}
+	}
+	host := tag[:slash]
+	remainder := tag[slash+1:]
+	ref := "latest"
+	name := remainder
+	if at := strings.Index(remainder, "@"); at != -1 {
+		name = remainder[:at]
+		ref = remainder[at+1:]
+	} else if colon := strings.LastIndex(remainder, ":"); colon != -1 {
+		name = remainder[:colon]
+		ref = remainder[colon+1:]
+	}
+
+	// Build v2 manifest URL
+	u := url.URL{Scheme: "https", Host: host, Path: "/v2/" + name + "/manifests/" + ref}
+	req, _ := http.NewRequest("HEAD", u.String(), nil)
+	req.Header.Set("Accept", strings.Join([]string{
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v2+json",
+	}, ", "))
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return verifyResult{OK: false, Status: 0, Message: "registry check failed: " + err.Error()}
+	}
+	defer resp.Body.Close()
+	// Some registries may not support HEAD. Fall back to GET on 405.
+	if resp.StatusCode == http.StatusMethodNotAllowed {
+		req.Method = "GET"
+		resp.Body.Close()
+		resp, err = client.Do(req)
+		if err != nil {
+			return verifyResult{OK: false, Status: 0, Message: "registry GET failed: " + err.Error()}
+		}
+		defer resp.Body.Close()
+	}
+	vr := verifyResult{Status: resp.StatusCode}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		vr.OK = true
+		vr.Digest = resp.Header.Get("Docker-Content-Digest")
+		if vr.Digest == "" {
+			vr.Message = "manifest present (digest unavailable)"
+		} else {
+			vr.Message = "manifest present"
+		}
+		return vr
+	}
+	// Common outcomes
+	switch resp.StatusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		vr.Message = "unauthorized: ensure docker login on build host and pull credentials on Nomad nodes"
+	case http.StatusNotFound:
+		vr.Message = "manifest unknown: image tag not found in registry"
+	default:
+		vr.Message = "registry responded with status"
+	}
+	return vr
+}
+
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
 func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext) error {
 	appName := c.Params("app")
@@ -75,63 +152,71 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	sha := c.Query("sha", "dev")
 	mainClass := c.Query("main", "com.ploy.ordersvc.Main")
 	lane := c.Query("lane", "")
-    // Diagnostic: request overview
-    log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
+	// Diagnostic: request overview
+	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
 
 	tmpDir, _ := os.MkdirTemp("", "ploy-build-")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-    tarPath := filepath.Join(tmpDir, "src.tar")
-    f, _ := os.Create(tarPath)
-    defer func() { _ = f.Close() }()
-    ct := strings.ToLower(c.Get("Content-Type"))
-    // Multipart support (field names: file|tar|archive; falls back to first)
-    if strings.HasPrefix(ct, "multipart/form-data") {
-        var fh *multipart.FileHeader
-        for _, key := range []string{"file", "tar", "archive"} {
-            if h, err := c.FormFile(key); err == nil && h != nil {
-                fh = h; break
-            }
-        }
-        if fh == nil {
-            if form, err := c.MultipartForm(); err == nil && form != nil {
-                for _, files := range form.File {
-                    if len(files) > 0 { fh = files[0]; break }
-                }
-            }
-        }
-        if fh == nil {
-            log.Printf("[Build] Multipart request did not include a file part")
-            return c.Status(400).JSON(fiber.Map{"error": "missing file part in multipart"})
-        }
-        src, err := fh.Open()
-        if err != nil { return utils.ErrJSON(c, 400, fmt.Errorf("open multipart: %w", err)) }
-        defer src.Close()
-        n, err := io.Copy(f, src)
-        if err != nil { return utils.ErrJSON(c, 400, fmt.Errorf("copy multipart: %w", err)) }
-        log.Printf("[Build] Received multipart tar %q (%d bytes)", fh.Filename, n)
-    } else {
-        // Log incoming content length (if provided)
-        log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
-        // Prefer streaming read to avoid buffering limits and reduce proxy timeouts
-        var written int64
-        if reader := c.Context().RequestBodyStream(); reader != nil {
-            n, err := io.Copy(f, reader)
-            written = n
-            if err != nil {
-                log.Printf("[Build] Failed to stream request body: %v", err)
-                return c.Status(400).SendString("Failed to read request body: " + err.Error())
-            }
-        } else {
-            n, err := f.Write(c.Body())
-            written = int64(n)
-            if err != nil {
-                log.Printf("[Build] Failed to write request body: %v", err)
-                return c.Status(400).SendString("Failed to read request body: " + err.Error())
-            }
-        }
-        log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
-    }
+	tarPath := filepath.Join(tmpDir, "src.tar")
+	f, _ := os.Create(tarPath)
+	defer func() { _ = f.Close() }()
+	ct := strings.ToLower(c.Get("Content-Type"))
+	// Multipart support (field names: file|tar|archive; falls back to first)
+	if strings.HasPrefix(ct, "multipart/form-data") {
+		var fh *multipart.FileHeader
+		for _, key := range []string{"file", "tar", "archive"} {
+			if h, err := c.FormFile(key); err == nil && h != nil {
+				fh = h
+				break
+			}
+		}
+		if fh == nil {
+			if form, err := c.MultipartForm(); err == nil && form != nil {
+				for _, files := range form.File {
+					if len(files) > 0 {
+						fh = files[0]
+						break
+					}
+				}
+			}
+		}
+		if fh == nil {
+			log.Printf("[Build] Multipart request did not include a file part")
+			return c.Status(400).JSON(fiber.Map{"error": "missing file part in multipart"})
+		}
+		src, err := fh.Open()
+		if err != nil {
+			return utils.ErrJSON(c, 400, fmt.Errorf("open multipart: %w", err))
+		}
+		defer src.Close()
+		n, err := io.Copy(f, src)
+		if err != nil {
+			return utils.ErrJSON(c, 400, fmt.Errorf("copy multipart: %w", err))
+		}
+		log.Printf("[Build] Received multipart tar %q (%d bytes)", fh.Filename, n)
+	} else {
+		// Log incoming content length (if provided)
+		log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
+		// Prefer streaming read to avoid buffering limits and reduce proxy timeouts
+		var written int64
+		if reader := c.Context().RequestBodyStream(); reader != nil {
+			n, err := io.Copy(f, reader)
+			written = n
+			if err != nil {
+				log.Printf("[Build] Failed to stream request body: %v", err)
+				return c.Status(400).SendString("Failed to read request body: " + err.Error())
+			}
+		} else {
+			n, err := f.Write(c.Body())
+			written = int64(n)
+			if err != nil {
+				log.Printf("[Build] Failed to write request body: %v", err)
+				return c.Status(400).SendString("Failed to read request body: " + err.Error())
+			}
+		}
+		log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
+	}
 
 	srcDir := filepath.Join(tmpDir, "src")
 	if err := os.MkdirAll(srcDir, 0755); err != nil {
@@ -641,6 +726,17 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		"dockerImage": dockerImage,
 		"namespace":   buildCtx.APIContext,
 		"appType":     string(buildCtx.AppType),
+	}
+
+	// Verify container push for container lanes and include a readable message
+	if dockerImage != "" {
+		vr := verifyOCIPush(dockerImage)
+		response["pushVerification"] = fiber.Map{
+			"ok":      vr.OK,
+			"status":  vr.Status,
+			"digest":  vr.Digest,
+			"message": vr.Message,
+		}
 	}
 
 	// Add container registry information for container images

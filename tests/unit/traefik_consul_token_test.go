@@ -23,32 +23,29 @@ func TestTraefikConsulCatalogTokenWiring(t *testing.T) {
 	{
 		p := filepath.FromSlash(filepath.Join("..", "..", "iac", "common", "templates", "nomad-traefik-system.hcl.j2"))
 		content := mustReadFile(t, p)
-		if !strings.Contains(content, "--providers.consulcatalog.endpoint.token=") {
-			t.Fatalf("missing consulcatalog endpoint token flag in %s", p)
+		if strings.Contains(content, "--providers.consulcatalog.endpoint.token=") {
+			t.Fatalf("unexpected consulcatalog endpoint token flag in %s (should rely on env)", p)
 		}
 		if !strings.Contains(content, "CONSUL_HTTP_TOKEN") {
 			t.Fatalf("missing CONSUL_HTTP_TOKEN environment wiring in %s", p)
 		}
 	}
 
-	// Platform Nomad job example (kept in repo for reference) should include token flag too
+	// Platform Nomad job example should not include token flag in args
 	{
 		p := filepath.FromSlash(filepath.Join("..", "..", "platform", "nomad", "traefik.hcl"))
 		content := mustReadFile(t, p)
-		if !strings.Contains(content, "--providers.consulcatalog.endpoint.token=") {
-			t.Fatalf("missing consulcatalog endpoint token flag in %s", p)
+		if strings.Contains(content, "--providers.consulcatalog.endpoint.token=") {
+			t.Fatalf("unexpected consulcatalog endpoint token flag in %s (should rely on env)", p)
 		}
 	}
 
-	// Ansible Traefik static config should include token key under consulCatalog.endpoint
+	// Dev site playbook should NOT import systemd-based Traefik playbook anymore
 	{
-		p := filepath.FromSlash(filepath.Join("..", "..", "iac", "dev", "playbooks", "traefik.yml"))
+		p := filepath.FromSlash(filepath.Join("..", "..", "iac", "dev", "site.yml"))
 		content := mustReadFile(t, p)
-		if !strings.Contains(content, "consulCatalog:") || !strings.Contains(content, "endpoint:") {
-			t.Fatalf("consulCatalog endpoint block not found in %s", p)
-		}
-		if !strings.Contains(content, "token:") {
-			t.Fatalf("missing token field under consulCatalog.endpoint in %s", p)
+		if strings.Contains(content, "playbooks/traefik.yml") {
+			t.Fatalf("site.yml still imports systemd-based playbook: %s", p)
 		}
 	}
 }

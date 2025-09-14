@@ -1,12 +1,12 @@
 package deploy
 
 import (
-    "fmt"
-    "io"
-    "mime/multipart"
-    "net/http"
-    "os"
-    "time"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"time"
 
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
@@ -66,8 +66,8 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	stat, _ := rf.Stat()
 
 	// Build app-specific URL
-    url := fmt.Sprintf("%s/apps/%s/builds?sha=%s",
-        controllerURL, appName, sha)
+	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s",
+		controllerURL, appName, sha)
 
 	if mainClass != "" {
 		url += "&main=" + utils.URLQueryEsc(mainClass)
@@ -77,42 +77,48 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		url += "&lane=" + lane
 	}
 
-    if blueGreen {
-        url += "&blue_green=true"
-    }
+	if blueGreen {
+		url += "&blue_green=true"
+	}
 
-    // Prefer async mode to avoid long-lived client connections through ingress
-    url += "&async=true"
+	// Prefer async mode to avoid long-lived client connections through ingress
+	url += "&async=true"
 
-    var (
-        req *http.Request
-        clientBody io.Reader
-        contentType string
-    )
-    if os.Getenv("PLOY_PUSH_MULTIPART") == "1" {
-        // Multipart upload: stream tar as a file part to avoid proxy buffering issues
-        pr, pw := io.Pipe()
-        mw := multipart.NewWriter(pw)
-        go func() {
-            defer pw.Close()
-            defer mw.Close()
-            part, err := mw.CreateFormFile("file", "src.tar")
-            if err != nil { _ = pw.CloseWithError(err); return }
-            if _, err := io.Copy(part, rf); err != nil { _ = pw.CloseWithError(err); return }
-        }()
-        clientBody = pr
-        contentType = mw.FormDataContentType()
-    } else {
-        clientBody = rf
-        contentType = "application/x-tar"
-    }
-    // Create HTTP request (multipart or raw tar)
-    req, _ = http.NewRequest("POST", url, clientBody)
-    req.Header.Set("Content-Type", contentType)
-    req.Header.Set("X-Target-Domain", "ployd.app")
-    if stat != nil && os.Getenv("PLOY_PUSH_MULTIPART") != "1" {
-        req.ContentLength = stat.Size()
-    }
+	var (
+		req         *http.Request
+		clientBody  io.Reader
+		contentType string
+	)
+	if os.Getenv("PLOY_PUSH_MULTIPART") == "1" {
+		// Multipart upload: stream tar as a file part to avoid proxy buffering issues
+		pr, pw := io.Pipe()
+		mw := multipart.NewWriter(pw)
+		go func() {
+			defer pw.Close()
+			defer mw.Close()
+			part, err := mw.CreateFormFile("file", "src.tar")
+			if err != nil {
+				_ = pw.CloseWithError(err)
+				return
+			}
+			if _, err := io.Copy(part, rf); err != nil {
+				_ = pw.CloseWithError(err)
+				return
+			}
+		}()
+		clientBody = pr
+		contentType = mw.FormDataContentType()
+	} else {
+		clientBody = rf
+		contentType = "application/x-tar"
+	}
+	// Create HTTP request (multipart or raw tar)
+	req, _ = http.NewRequest("POST", url, clientBody)
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("X-Target-Domain", "ployd.app")
+	if stat != nil && os.Getenv("PLOY_PUSH_MULTIPART") != "1" {
+		req.ContentLength = stat.Size()
+	}
 
 	// Execute request with a generous timeout
 	client := &http.Client{Timeout: 3 * time.Minute}
@@ -122,20 +128,20 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-    // Read response body for messaging
-    body, _ := io.ReadAll(resp.Body)
+	// Read response body for messaging
+	body, _ := io.ReadAll(resp.Body)
 
-    // Parse response
-    result := &DeployResult{
-        Success:      resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted,
-        Version:      sha,
-        DeploymentID: resp.Header.Get("X-Deployment-ID"),
-        URL:          fmt.Sprintf("https://%s.ployd.app", appName),
-        Message:      string(body),
-    }
+	// Parse response
+	result := &DeployResult{
+		Success:      resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted,
+		Version:      sha,
+		DeploymentID: resp.Header.Get("X-Deployment-ID"),
+		URL:          fmt.Sprintf("https://%s.ployd.app", appName),
+		Message:      string(body),
+	}
 
-    // Output response body to console and clean up temp
-    _, _ = os.Stdout.Write(body)
+	// Output response body to console and clean up temp
+	_, _ = os.Stdout.Write(body)
 	_ = rf.Close()
 	_ = os.Remove(tmpPath)
 
