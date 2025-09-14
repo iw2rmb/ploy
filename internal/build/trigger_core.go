@@ -25,6 +25,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/storage"
 	supply "github.com/iw2rmb/ploy/internal/supply"
 	"github.com/iw2rmb/ploy/internal/utils"
+	clutils "github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/validation"
 )
 
@@ -136,6 +137,42 @@ func verifyOCIPush(tag string) verifyResult {
 		vr.Message = "registry responded with status"
 	}
 	return vr
+}
+
+// generateDockerfile writes a simple Dockerfile into srcDir based on detected project markers.
+// Supports Go (go.mod) and Node.js (package.json). For other stacks, returns an error.
+func generateDockerfile(srcDir string) error {
+    goMod := filepath.Join(srcDir, "go.mod")
+    pkgJSON := filepath.Join(srcDir, "package.json")
+    if _, err := os.Stat(goMod); err == nil {
+        content := `FROM golang:1.22-alpine AS build
+WORKDIR /src
+COPY go.mod .
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/app ./...
+
+FROM gcr.io/distroless/static
+ENV PORT=8080
+EXPOSE 8080
+COPY --from=build /out/app /app
+ENTRYPOINT ["/app"]
+`
+        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+    }
+    if _, err := os.Stat(pkgJSON); err == nil {
+        content := `FROM node:20-alpine
+WORKDIR /app
+COPY package.json .
+RUN npm install --omit=dev || true
+COPY . .
+ENV PORT=8080
+EXPOSE 8080
+CMD ["node", "index.js"]
+`
+        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+    }
+    return fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
 }
 
 // triggerBuildWithDependencies is the testable implementation of TriggerBuild
@@ -304,8 +341,8 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
             f, err := os.Create(builderTar)
             if err != nil { return err }
             defer f.Close()
-            ign, _ := utils.ReadGitignore(srcDir)
-            return utils.TarDir(srcDir, f, ign)
+            ign, _ := clutils.ReadGitignore(srcDir)
+            return clutils.TarDir(srcDir, f, ign)
         }(); err != nil {
             return utils.ErrJSON(c, 500, fmt.Errorf("create build context: %w", err))
         }

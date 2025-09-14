@@ -144,7 +144,7 @@ For EVERY code change:
 2. **Write minimal code** to pass tests (GREEN phase)  
 3. Ensure all changes are committed and pushed to the remote repository
 4. **Deploy to VPS** for integration testing (REFACTOR phase)
-4. **Update documentation** (`CHANGELOG.md`, `FEATURES.md` as needed)
+4. **Update documentation** (`CHANGELOG.md`, `FEATURES.md`, and `docs/LANES.md` for lane behavior)
 5. **Merge to main** and return to worktree branch
 
 **NO EXCEPTIONS**.
