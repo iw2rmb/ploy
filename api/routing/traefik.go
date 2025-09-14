@@ -15,6 +15,7 @@ import (
 type TraefikRouter struct {
 	consul             *consulapi.Client
 	platformAppsDomain string
+	platformDomain     string
 }
 
 // NewTraefikRouter creates a new Traefik router instance
@@ -29,16 +30,24 @@ func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
 		return nil, fmt.Errorf("failed to create Consul client: %w", err)
 	}
 
-	// Get platform apps domain from environment
+	// Get platform apps domain from environment (e.g., dev.ployd.app)
 	platformAppsDomain := utils.Getenv("PLOY_APPS_DOMAIN", "")
 	if platformAppsDomain == "" {
 		platformAppsDomain = "ployd.app" // Default fallback
 		log.Printf("PLOY_APPS_DOMAIN not set, using default: %s", platformAppsDomain)
 	}
 
+	// Get platform domain from environment (e.g., dev.ployman.app)
+	platformDomain := utils.Getenv("PLOY_PLATFORM_DOMAIN", "")
+	if platformDomain == "" {
+		platformDomain = "ployman.app"
+		log.Printf("PLOY_PLATFORM_DOMAIN not set, using default: %s", platformDomain)
+	}
+
 	return &TraefikRouter{
 		consul:             client,
 		platformAppsDomain: platformAppsDomain,
+		platformDomain:     platformDomain,
 	}, nil
 }
 
@@ -59,7 +68,7 @@ func (tr *TraefikRouter) GenerateAppDomain(appName string) string {
 
 // GenerateControllerDomain generates the controller domain
 func (tr *TraefikRouter) GenerateControllerDomain() string {
-	return fmt.Sprintf("api.%s", tr.platformAppsDomain)
+	return fmt.Sprintf("api.%s", tr.platformDomain)
 }
 
 // IsPlatformSubdomain checks if a domain is a platform subdomain
@@ -102,7 +111,7 @@ type RouteConfig struct {
 func DefaultRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "letsencrypt", // Traefik will automatically use wildcard cert for platform subdomains
+		CertResolver:        "apps-wildcard", // Use apps wildcard resolver by default for app subdomains
 		HealthPath:          "/healthz",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
@@ -121,7 +130,7 @@ func DefaultRouteConfig() *RouteConfig {
 func PlatformAppRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "letsencrypt", // Uses platform wildcard certificate automatically
+		CertResolver:        "platform-wildcard", // Uses platform wildcard certificate automatically
 		HealthPath:          "/healthz",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
@@ -203,7 +212,7 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 func ControllerRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "letsencrypt",
+		CertResolver:        "platform-wildcard",
 		HealthPath:          "/health",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
