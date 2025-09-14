@@ -3,55 +3,17 @@
 
 http:
   routers:
-    # API service router with wildcard SSL certificate
-    api-service:
-      rule: "Host(`api.dev.ployman.app`)"
-      service: api-service
-      tls:
-        certResolver: "dev-wildcard"
-        domains:
-          - main: "*.dev.ployman.app"
-      middlewares:
-        - secure-headers
-    
-    # API service insecure router (HTTP - will redirect to HTTPS)
-    api-service-insecure:
-      rule: "Host(`api.dev.ployman.app`)"
-      service: api-service
-      entryPoints:
-        - web
-      middlewares:
-        - https-redirect
-    
-    # Health check endpoint router (allow insecure for monitoring)
-    api-health:
-      rule: "Host(`api.dev.ployman.app`) && Path(`/health`)"
-      service: api-service
-      priority: 100
-      tls:
-        certResolver: "dev-wildcard"
-    
-    # Wildcard certificate request for apps domain (*.dev.ployd.app)
+    # Wildcard certificate request for apps domain (e.g., *.dev.ployd.app)
     apps-wildcard-cert:
-      rule: "Host(`dev.ployd.app`)"
+      rule: "Host(`{{ ploy.apps_domain }}`)"
       service: noop-service
       tls:
         certResolver: "apps-wildcard"
         domains:
-          - main: "*.dev.ployd.app"
+          - main: "*.{{ ploy.apps_domain }}"
       priority: 1
 
   services:
-    api-service:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:8081"
-        healthCheck:
-          path: "/health"
-          interval: "30s"
-          timeout: "5s"
-          scheme: "http"
-    
     # Noop service for certificate provisioning only
     noop-service:
       loadBalancer:
@@ -100,7 +62,7 @@ tls:
         - "TLS_RSA_WITH_AES_128_GCM_SHA256"
 
   certificates:
-    # Wildcard certificate for *.dev.ployman.app  
+    # Wildcard certificate for platform domain (e.g., *.dev.ployman.app)
     - certFile: "/data/certificates/dev-ployman-app.crt"
       keyFile: "/data/certificates/dev-ployman-app.key"
       stores:

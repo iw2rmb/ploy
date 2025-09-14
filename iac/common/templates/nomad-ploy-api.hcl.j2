@@ -78,7 +78,8 @@ job "ploy-api" {
       env {
         # API configuration - using dynamic port
         PORT = "${NOMAD_PORT_http}"
-        PLOY_CONTROLLER = "https://api.dev.{{ ploy.platform_domain }}/v1"
+        # Controller URL uses full platform domain; do not prepend environment here
+        PLOY_CONTROLLER = "https://api.{{ ploy.platform_domain }}/v1"
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         
         # HashiCorp service addresses
@@ -137,20 +138,19 @@ job "ploy-api" {
         LLM_TEMPERATURE = "{{ llm_temperature | default('0.1') }}"
 
         # Platform wildcard certificate configuration
-        {% if ploy_environment is defined and ploy_environment == 'dev' %}
-        PLOY_APPS_DOMAIN = "dev.{{ ploy.apps_domain }}"
-        {% else %}
+        # Use fully qualified apps domain from vars/env (e.g., dev.ployd.app)
         PLOY_APPS_DOMAIN = "{{ ploy.apps_domain }}"
-        {% endif %}
+        # Use fully qualified platform domain from vars/env (e.g., dev.ployman.app)
+        PLOY_PLATFORM_DOMAIN = "{{ ploy.platform_domain }}"
         PLOY_APPS_DOMAIN_PROVIDER = "{{ ploy.apps_domain_provider }}"
         
-        # Development environment wildcard certificate (*.dev.ployd.app)
-        # This is for DEV environment ONLY
+        # Development environment specifics (values derived from full domains)
         {% if ploy_environment is defined and ploy_environment == 'dev' %}
         PLOY_DEV_SUBDOMAIN = "dev"
-        PLOY_DEV_APPS_DOMAIN = "dev.{{ ploy.apps_domain }}"
-        PLOY_WILDCARD_DOMAIN = "*.dev.{{ ploy.apps_domain }}"
-        PLOY_API_DOMAIN = "api.dev.{{ ploy.apps_domain }}"
+        PLOY_DEV_APPS_DOMAIN = "{{ ploy.apps_domain }}"
+        PLOY_WILDCARD_DOMAIN = "*.{{ ploy.apps_domain }}"
+        # API/domain under platform domain (e.g., api.dev.ployman.app)
+        PLOY_API_DOMAIN = "api.{{ ploy.platform_domain }}"
         PLOY_ENVIRONMENT = "dev"
         {% endif %}
         
@@ -262,11 +262,11 @@ EOF
           "api",
           "ploy-api",
           "traefik.enable=true",
-          "traefik.http.routers.ploy-api.rule=Host(`api.dev.ployman.app`)",
+          "traefik.http.routers.ploy-api.rule=Host(`api.{{ ploy.platform_domain }}`)",
           "traefik.http.routers.ploy-api.tls=true",
-          "traefik.http.routers.ploy-api.tls.certresolver=dev-wildcard",
+          "traefik.http.routers.ploy-api.tls.certresolver=platform-wildcard",
           # Alias on apps domain (dev) so both domains work
-          "traefik.http.routers.ploy-api-apps.rule=Host(`api.dev.{{ ploy.apps_domain }}`)",
+          "traefik.http.routers.ploy-api-apps.rule=Host(`api.{{ ploy.apps_domain }}`)",
           "traefik.http.routers.ploy-api-apps.tls=true",
           "traefik.http.routers.ploy-api-apps.tls.certresolver=apps-wildcard"
         ]
