@@ -139,6 +139,23 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath s
 	return out, nil
 }
 
+// RenderOSVBuilder renders a simple OSv pack builder job that prepares a bootable image
+func RenderOSVBuilder(app, version, outputPath, contextURL, mainClass, baseImage string) (string, error) {
+    b, err := loadTemplateContent("platform/nomad/lane-c-osv-builder.hcl")
+    if err != nil { return "", err }
+    s := string(b)
+    s = strings.ReplaceAll(s, "{{APP_NAME}}", app)
+    s = strings.ReplaceAll(s, "{{VERSION}}", version)
+    s = strings.ReplaceAll(s, "{{OUTPUT_PATH}}", outputPath)
+    s = strings.ReplaceAll(s, "{{CONTEXT_URL}}", contextURL)
+    s = strings.ReplaceAll(s, "{{MAIN_CLASS}}", mainClass)
+    if baseImage == "" { baseImage = "/host/opt/ploy/osv/base/java8.qemu" }
+    s = strings.ReplaceAll(s, "{{BASE_IMAGE}}", baseImage)
+    out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-c-build-%s.hcl", app, version))
+    if err := os.WriteFile(out, []byte(s), 0644); err != nil { return "", err }
+    return out, nil
+}
+
 func templateForLaneAndLanguage(lane, language string) string {
 	laneUpper := strings.ToUpper(lane)
 	languageLower := strings.ToLower(language)
