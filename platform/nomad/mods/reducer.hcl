@@ -16,10 +16,6 @@ job "mods-reducer" {
         data        = "${SBOM_LATEST_URL}"
         destination = "local/sbom_latest_url"
       }
-      template {
-        data        = file("${NOMAD_TASK_DIR}/context/history.json")
-        destination = "local/history.json"
-      }
       artifact {
         source      = "${MODS_CONTEXT_URL}"
         destination = "local/context"

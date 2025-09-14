@@ -218,6 +218,37 @@ Next steps (ops):
 
 Notes
 - Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
+
+Cycle 11 (Fix planner HCL validation: remove file() on inputs.json):
+  - Change:
+    - Adjusted planner Nomad template to avoid `file("${NOMAD_TASK_DIR}/context/inputs.json")` during validation, which caused wrapper validation to fail before llm-exec could run. The context still arrives via the artifact block to `local/context` for runtime use.
+    - Also removed a similar `file()` call in reducer template (not strictly hit yet but same failure mode).
+  - Result (EXEC_ID tf-6f53640f):
+    - Previously failed at planner validation: `Error in function call; file() failed: no file exists at ${NOMAD_TASK_DIR}/context/inputs.json`.
+    - With the change, planner should validate and submit successfully, unblocking llm-exec stage.
+  - Takeaways:
+    - Do not dereference runtime files with `file()` at validation time; rely on `artifact` to stage context, and let containers read from `${CONTEXT_DIR}`.
+
+Cycle 12 (Verify llm-exec image/env and SeaweedFS upload path):
+  - Change/Checks:
+    - Confirmed llm-exec template passes `PLOY_SEAWEEDFS_URL` and runner entrypoint resolves `SEAWEEDFS_URL=${PLOY_SEAWEEDFS_URL}`.
+    - Confirmed orw-apply uses `${SEAWEEDFS_URL}` inside job and controller substitutes it from `PLOY_SEAWEEDFS_URL`; this explains why ORW artifacts reliably land in SeaweedFS.
+    - Ensure API env points MODS_LLM_EXEC_IMAGE/MODS_PLANNER_IMAGE/MODS_REDUCER_IMAGE to `langgraph-runner:py-0.1.7` (or newer) and redeploy API so jobs use the new image.
+  - Expected:
+    - llm-exec job logs show: `env CTX_DIR=… OUT_DIR=…`, `env PLOY_SEAWEEDFS_URL=…`, and `uploaded diff to mods/<EXEC_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch`.
+    - Controller fallback picks up the step-scoped diff if not present locally and proceeds to MR.
+  - Takeaways:
+    - If healing still fails after planner validation fix, likely causes: old llm-exec image in allocs, logs snapshot too early, or SeaweedFS unreachable from task. Inspect /v1/mods/{id}/logs for the posted env/upload events.
+
+Propagation of SeaweedFS URL (confirmed working in ORW):
+  - Controller resolves `PLOY_SEAWEEDFS_URL` (defaults to `http://seaweedfs-filer.service.consul:8888`).
+  - ORW HCL receives `SEAWEEDFS_URL` and `DIFF_KEY`; `openrewrite-jvm/runner.sh` uploads `diff.patch` and artifacts under `${SEAWEEDFS_URL}/artifacts/<KEY>` and logs the URL.
+  - Planner/llm-exec HCL receive `PLOY_SEAWEEDFS_URL`; `langgraph-runner/entrypoint.sh` uses `SEAWEEDFS_URL=${SEAWEEDFS_URL:-${PLOY_SEAWEEDFS_URL:-}}` and uploads the LLM diff step-scoped to match ORW layout.
+
+Next Steps (ops):
+  - Commit and push these template changes; redeploy API so updated templates ship to the job manager.
+  - Ensure API env on VPS sets `MODS_*_IMAGE` to the latest `langgraph-runner:py-0.1.7+` and `PLOY_SEAWEEDFS_URL` is reachable from jobs.
+  - Re-run `./run.sh`; expect healing to progress into llm-exec, upload the deletion diff, and complete with an MR.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
 
 Go E2E tests — CI/VPS flow

@@ -25,10 +25,6 @@ job "mods-planner" {
         destination = "local/sbom_latest_url"
       }
       template {
-        data        = file("${NOMAD_TASK_DIR}/context/inputs.json")
-        destination = "local/inputs.json"
-      }
-      template {
         data        = ""
         destination = "local/out/.keep"
       }
