@@ -89,13 +89,7 @@ func handleARFRecipesCommand(args []string) error {
 	case "create", "init":
 		flags := parseCommonFlags(args[1:])
 		return createRecipeInteractive(flags)
-	case "run":
-		if len(args) < 2 {
-			fmt.Println("Usage: ploy arf recipe run <recipe-id> [--repo <url>] [--branch <branch>] [--output-dir <dir>] [--report]")
-			return nil
-		}
-		flags := parseCommonFlags(args[2:])
-		return runRecipe(args[1], flags)
+		// "run" removed; use Mods for execution
 	case "compose":
 		if len(args) < 3 {
 			fmt.Println("Usage: ploy arf recipe compose <recipe-id1> <recipe-id2> [...] [--name <composition-name>] [--repo <url>] [options]")
@@ -164,7 +158,7 @@ func printRecipesUsage() {
 	fmt.Println("  validate <recipe-file>           Validate recipe without uploading")
 	fmt.Println("  stats <recipe-id>                Get recipe usage statistics")
 	fmt.Println("  create, init                     Create new recipe interactively")
-	fmt.Println("  run <recipe-id>                  Execute recipe against repository")
+	// run removed: execution handled by Mods
 	fmt.Println("  compose <recipe-ids...>          Chain multiple recipes in sequence")
 	fmt.Println("  import <archive-file>            Import recipes from archive")
 	fmt.Println("  export --output <file>           Export recipes to archive")
@@ -193,7 +187,7 @@ func printRecipesUsage() {
 	fmt.Println("  ploy arf recipe list --pack rewrite-spring --version 5.0.0")
 	fmt.Println("  ploy arf recipe upload my-recipe.yaml --dry-run")
 	fmt.Println("  ploy arf recipe search 'spring migration' --limit 5")
-	fmt.Println("  ploy arf recipe run java11to17 --repo https://github.com/user/repo")
+	// Example removed: use Mods for execution
 	fmt.Println("  ploy arf recipe compose recipe1 recipe2 --name 'full-migration'")
 	fmt.Println("  ploy arf recipe export --output recipes-backup.tar.gz --tag migration")
 }

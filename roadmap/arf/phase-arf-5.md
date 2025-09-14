@@ -582,7 +582,7 @@ GET    /v1/arf/recipes/stats              // Get recipe statistics
 
 // Recipe Execution API
 POST   /v1/arf/recipes/validate           // Validate recipe without storing
-POST   /v1/arf/benchmark/run              // Run benchmark with custom recipes
+// ARF benchmark run endpoint removed; use Mods
 ```
 
 ### Benchmark Integration

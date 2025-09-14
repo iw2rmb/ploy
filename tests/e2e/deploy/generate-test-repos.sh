@@ -79,8 +79,33 @@ EOF
 perl -0777 -pe "s/REPL\./${main%.*}\./g; s/REPL/${main%.*}/g" -i "$d/src/main/java/${main//.//}/Main.java"
 }
 
+# Java (Gradle) without Jib plugin — for Lane E autogen
+scaffold_java_gradle_nojib() { local d=$1 v=$2 main=$3; write "$d/settings.gradle.kts" <<EOF
+rootProject.name = "${d##*/}"
+EOF
+write "$d/build.gradle.kts" <<EOF
+plugins { application }
+repositories { mavenCentral() }
+dependencies { implementation("io.undertow:undertow-core:2.3.12.Final") }
+application { mainClass.set("$main") }
+tasks.withType(JavaCompile).configureEach { options.release = ${v} }
+EOF
+write "$d/src/main/java/${main//.//}/Main.java" <<'EOF'
+package REPL;
+import io.undertow.Undertow;import io.undertow.util.Headers;
+public class Main { public static void main(String[] args){
+  Undertow server = Undertow.builder().addHttpListener(Integer.parseInt(System.getenv().getOrDefault("PORT","8080")), "0.0.0.0")
+    .setHandler(exchange -> { if ("/healthz".equals(exchange.getRequestPath())) { exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain"); exchange.getResponseSender().send("ok"); } else { exchange.getResponseSender().send("hello"); } }).build(); server.start(); }
+}
+EOF
+perl -0777 -pe "s/REPL\./${main%.*}\./g; s/REPL/${main%.*}/g" -i "$d/src/main/java/${main//.//}/Main.java"
+}
+
 scaffold_repo() {
-  local lane=$1 lang=$2 ver=$3; local name="ploy-lane-${lane,,}-${lang,,}-${ver}"
+  local lane=$1 lang=$2 ver=$3
+  local lname=$(echo "$lane" | tr '[:upper:]' '[:lower:]')
+  local llang=$(echo "$lang" | tr '[:upper:]' '[:lower:]')
+  local name="ploy-lane-${lname}-${llang}-${ver}"
   create_repo "$name" "E2E ${lane}/${lang} ${ver}"
   local dir=$(mktemp -d)/$name; mk "$dir"
   case "$lang" in
@@ -102,5 +127,13 @@ scaffold_repo E python 3.12
 scaffold_repo E dotnet 8 || true
 scaffold_repo G rust 1.79 || true
 
-echo "Done."
+# JVM autogen sample (no Jib)
+name=ploy-lane-e-java-17-nojib
+create_repo "$name" "E2E E/java 17 without Jib (autogen Dockerfile)"
+tmp=$(mktemp -d)
+dir="$tmp/$name"
+mk "$dir"
+scaffold_java_gradle_nojib "$dir" 17 "com.ploy.app.Main"
+commit_push "$dir"
 
+echo "Done."

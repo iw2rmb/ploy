@@ -29,7 +29,7 @@ type TransformationExecutor interface {
 // ORWSubmitParams captures execution-time parameters needed to submit ORW job and fetch diff
 type ORWSubmitParams struct {
 	SeaweedURL       string
-	ExecID           string
+	ModID            string
 	BranchID         string
 	StepID           string
 	RunID            string
@@ -94,7 +94,7 @@ func (a *TransformationExecutorAdapter) PrepareInputTar(repoPath string) (string
 }
 func (a *TransformationExecutorAdapter) SubmitORWAndFetchDiff(ctx context.Context, p ORWSubmitParams) (string, error) {
 	// Use existing helper to validate, submit, wait and fetch diff
-	if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, a.r.reportLastJobAsync, p.SeaweedURL, p.ExecID, p.BranchID, p.StepID, p.RunID, p.SubmittedHCLPath, p.DiffPath, p.Timeout); err != nil {
+	if err := submitORWJobAndFetchDiff(ctx, validateJob, submitAndWaitTerminal, a.r.reportLastJobAsync, p.SeaweedURL, p.ModID, p.BranchID, p.StepID, p.RunID, p.SubmittedHCLPath, p.DiffPath, p.Timeout); err != nil {
 		return "", err
 	}
 	return p.DiffPath, nil

@@ -130,48 +130,7 @@ before upload to ensure recipe integrity.`,
 		SeeAlso: []string{"validate", "create", "update"},
 	}
 
-	// Recipe run command
-	hs.commands["run"] = CommandHelp{
-		Name:     "run",
-		Synopsis: "Execute a recipe against a repository",
-		Description: `
-Executes a transformation recipe against a specified repository. Can work with
-local directories or remote Git repositories, providing comprehensive execution
-tracking and reporting.`,
-		Usage: "ploy arf recipe run <recipe-id> [flags]",
-		Flags: []FlagHelp{
-			{Long: "--repo", Short: "-r", Description: "Repository URL or local path", Default: ".", Required: true},
-			{Long: "--branch", Description: "Git branch to use for remote repositories", Default: "main"},
-			{Long: "--output-dir", Description: "Directory for output files and reports", Default: ""},
-			{Long: "--timeout", Description: "Execution timeout (e.g., 15m, 1h)", Default: "15m"},
-			{Long: "--dry-run", Short: "-n", Description: "Show what would be executed without running", Default: "false"},
-			{Long: "--report", Description: "Generate detailed execution report", Default: "false"},
-			{Long: "--verbose", Short: "-v", Description: "Show detailed execution output", Default: "false"},
-		},
-		Examples: []ExampleHelp{
-			{
-				Title:       "Run recipe on current directory",
-				Command:     "ploy arf recipe run java11to17-1.0.0",
-				Description: "Execute recipe against current directory",
-			},
-			{
-				Title:       "Run recipe on remote repository",
-				Command:     "ploy arf recipe run spring-boot-migration --repo https://github.com/user/app.git",
-				Description: "Clone and execute recipe against remote repository",
-			},
-			{
-				Title:       "Run with specific branch and reporting",
-				Command:     "ploy arf recipe run java11to17-1.0.0 --repo . --branch develop --report",
-				Description: "Execute on develop branch with detailed execution report",
-			},
-			{
-				Title:       "Dry run to preview changes",
-				Command:     "ploy arf recipe run migration-recipe --dry-run --verbose",
-				Description: "Show what the recipe would do without making changes",
-			},
-		},
-		SeeAlso: []string{"compose", "status"},
-	}
+	// run command removed; execution handled by Mods
 
 	// Recipe compose command
 	hs.commands["compose"] = CommandHelp{
@@ -213,6 +172,6 @@ with configurable error handling and rollback strategies.`,
 				Description: "Execute long composition with extended timeout and detailed reporting",
 			},
 		},
-		SeeAlso: []string{"run", "list", "show"},
+		SeeAlso: []string{"list", "show"},
 	}
 }

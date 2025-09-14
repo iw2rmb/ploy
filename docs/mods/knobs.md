@@ -86,7 +86,7 @@ Example var maps used for HCL substitution
   - MODS_CONTEXT_DIR, MODS_OUT_DIR
   - MODS_REGISTRY, MODS_PLANNER_IMAGE, MODS_REDUCER_IMAGE, MODS_LLM_EXEC_IMAGE
   - MODS_MODEL, MODS_TOOLS, MODS_LIMITS (resolved via ResolveLLMDefaultsFromEnv; env overrides honored)
-  - PLOY_CONTROLLER (from ResolveInfra), PLOY_MODS_EXECUTION_ID, NOMAD_DC (from ResolveInfra)
+  - PLOY_CONTROLLER (from ResolveInfra), MOD_ID, NOMAD_DC (from ResolveInfra)
 
 - ORW Apply (substituteORWTemplateVars):
   - MODS_CONTEXT_DIR, MODS_OUT_DIR
@@ -138,7 +138,7 @@ Behavior
 
 Notes
 - CLI may still respect explicit configuration options in YAML; env vars only provide defaults.
-- The controller event reporter is used when PLOY_MODS_EXECUTION_ID is set.
+- The controller event reporter is used when <MOD_ID> is set.
 
 How to add new HCL template variables
 

@@ -356,7 +356,7 @@ ploy arf transform --recipe <recipe-id> --auto-heal --iterations 3
 For long-running transformations, monitor progress:
 ```bash
 # Start transformation
-EXEC_ID=$(ploy mod run -f config.yaml | jq -r '.execution_id')
+MOD_ID=$(ploy mod run -f config.yaml | jq -r '.mod_id')
 
 # Check status
 ploy arf transforms status $TRANSFORM_ID --watch

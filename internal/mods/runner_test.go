@@ -36,8 +36,8 @@ func TestModRunner_Run(t *testing.T) {
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 	// Provide exec ID so diff fetch proceeds
-	_ = os.Setenv("PLOY_MODS_EXECUTION_ID", "t-runner")
-	defer func() { _ = os.Unsetenv("PLOY_MODS_EXECUTION_ID") }()
+	_ = os.Setenv("MOD_ID", "mod-t-runner")
+	defer func() { _ = os.Unsetenv("MOD_ID") }()
 
 	defer func() {
 		validateJob = baseValidate

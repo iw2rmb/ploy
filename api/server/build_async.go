@@ -29,6 +29,13 @@ func statusPath(id string) string {
 	return filepath.Join(dir, id+".json")
 }
 
+// metaPath stores ancillary info about a build (app, sha, lane) for diagnostics/logs.
+func metaPath(id string) string {
+	dir := "/opt/ploy/uploads"
+	_ = os.MkdirAll(dir, 0755)
+	return filepath.Join(dir, id+".meta.json")
+}
+
 func writeStatus(id string, st buildStatus) {
 	b, _ := json.Marshal(st)
 	_ = os.WriteFile(statusPath(id), b, 0644)
@@ -59,6 +66,8 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 	}
 	// Initial status
 	writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
+	// Persist meta for later log retrieval
+	_ = os.WriteFile(metaPath(id), []byte(fmt.Sprintf(`{"app":"%s","sha":"%s","lane":"%s"}`, app, sha, lane)), 0644)
 
 	// Fire background requester against local fiber listener
 	go func() {

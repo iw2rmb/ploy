@@ -32,25 +32,7 @@ func (hs *HelpSystem) ShowExamples() error {
 				"ploy arf recipe upload my-recipe.yaml",
 			},
 		},
-		{
-			Title:       "Recipe Execution Workflows",
-			Description: "Execute recipes against repositories",
-			Commands: []string{
-				"# Run recipe on current directory",
-				"ploy arf recipe run java11to17-migration",
-				"",
-				"# Run recipe on remote repository",
-				"ploy arf recipe run spring-migration \\",
-				"  --repo https://github.com/user/app.git \\",
-				"  --branch develop",
-				"",
-				"# Chain multiple recipes",
-				"ploy arf recipe compose prep-migration java11to17 cleanup \\",
-				"  --name complete-migration \\",
-				"  --repo . \\",
-				"  --report",
-			},
-		},
+		// Execution workflows via ARF have been removed; use Mods.
 		{
 			Title:       "Advanced Filtering and Search",
 			Description: "Find specific recipes using filters",
@@ -107,15 +89,6 @@ func (hs *HelpSystem) ShowExamples() error {
 			Title:       "Integration with Development Workflow",
 			Description: "Use recipes in CI/CD and development processes",
 			Commands: []string{
-				"# Automated testing of recipe",
-				"ploy arf recipe run test-recipe --repo . --dry-run",
-				"",
-				"# Generate execution report for compliance",
-				"ploy arf recipe run security-fix \\",
-				"  --repo . \\",
-				"  --report \\",
-				"  --output-dir ./reports",
-				"",
 				"# Parallel execution for independent changes",
 				"ploy arf recipe compose style-fix license-update \\",
 				"  --parallel \\",
@@ -174,16 +147,7 @@ func (hs *HelpSystem) ShowQuickStart() error {
 			Description: "Review what a recipe does before running it",
 			Command:     "ploy arf recipe show java11to17-migration",
 		},
-		{
-			Step:        "4. Test Recipe (Safe Mode)",
-			Description: "Preview changes without modifying files",
-			Command:     "ploy arf recipe run java11to17-migration --dry-run",
-		},
-		{
-			Step:        "5. Execute Recipe",
-			Description: "Apply the transformation to your codebase",
-			Command:     "ploy arf recipe run java11to17-migration --repo .",
-		},
+		// Execution via ARF removed; use Mods for running transformations.
 		{
 			Step:        "6. Create Custom Recipe",
 			Description: "Build your own transformation recipe",

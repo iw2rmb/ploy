@@ -37,7 +37,7 @@ ploy arf recipe filter --language <lang>     # Filter by programming language
 ploy arf recipe filter --category <cat>      # Filter by category
 
 # Recipe Execution Commands
-ploy arf recipe run <recipe-id> [--repo]     # Execute single recipe
+// ARF recipe execution removed; use Mods
 ploy arf recipe compose <recipe-ids...>      # Chain multiple recipes
 ploy arf recipe validate <recipe-file>       # Validate recipe without execution
 

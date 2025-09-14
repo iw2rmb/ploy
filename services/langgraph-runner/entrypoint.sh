@@ -5,7 +5,7 @@ OUT_DIR="${OUTPUT_DIR:-/workspace/out}"
 CTX_DIR="${CONTEXT_DIR:-/workspace/context}"
 RUN_ID_STR="${RUN_ID:-}"
 CONTROLLER_URL="${CONTROLLER_URL:-}"
-EXECUTION_ID="${MOD_ID:-${MODS_EXECUTION_ID:-}}"
+MOD_ID_ENV="${MOD_ID:-}"
 SBOM_LATEST_URL="${SBOM_LATEST_URL:-}"
 SEAWEEDFS_URL="${SEAWEEDFS_URL:-${PLOY_SEAWEEDFS_URL:-}}"
 
@@ -18,8 +18,8 @@ post_event() {
   local phase="$1"; shift
   local step="$1"; shift
   local msg="$1"
-  if [[ -n "$CONTROLLER_URL" && -n "$EXECUTION_ID" ]]; then
-    curl -sS -X POST "${CONTROLLER_URL%/}/mods/${EXECUTION_ID}/events" \
+  if [[ -n "$CONTROLLER_URL" && -n "$MOD_ID_ENV" ]]; then
+    curl -sS -X POST "${CONTROLLER_URL%/}/mods/${MOD_ID_ENV}/events" \
       -H "Content-Type: application/json" \
       -d "{\"phase\":\"${phase}\",\"step\":\"${step}\",\"level\":\"${level}\",\"message\":\"${msg}\",\"job_name\":\"${RUN_ID_STR}\"}" \
       -o /dev/null || true
@@ -160,7 +160,7 @@ if [[ "$RUN_ID_STR" == *"planner"* ]]; then
   log "Detected planner run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "planner" "planner" "job started"
   post_event "info" "planner" "planner" "env PLOY_SEAWEEDFS_URL=${SEAWEEDFS_URL:-<empty>}"
-  post_event "info" "planner" "planner" "env EXECUTION_ID=${EXECUTION_ID:-<empty>} RUN_ID=${RUN_ID_STR}"
+  post_event "info" "planner" "planner" "env MOD_ID=${MOD_ID_ENV:-<empty>} RUN_ID=${RUN_ID_STR}"
   PLAN_ID="plan-$(date +%s)"
   # Flag whether we included an SBOM prompt hint
   PROMPT_HINT="false"
@@ -177,8 +177,8 @@ if [[ "$RUN_ID_STR" == *"planner"* ]]; then
 EOF
   log "Wrote plan.json to $OUT_DIR"
   # Upload planner plan.json to SeaweedFS for controller collection
-  if [ -s "$OUT_DIR/plan.json" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$EXECUTION_ID" ] && [ -n "$RUN_ID_STR" ]; then
-    KEY="mods/${EXECUTION_ID}/planner/${RUN_ID_STR}/plan.json"
+  if [ -s "$OUT_DIR/plan.json" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$MOD_ID_ENV" ] && [ -n "$RUN_ID_STR" ]; then
+    KEY="mods/${MOD_ID_ENV}/planner/${RUN_ID_STR}/plan.json"
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading plan.json to $URL"
     curl -sS -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$URL" -o /dev/null || true
@@ -227,11 +227,11 @@ EOF
   fi
   log "Wrote diff.patch to $OUT_DIR"
   # Upload to SeaweedFS step-scoped key to mirror ORW behavior
-  if [ -s "$OUT_DIR/diff.patch" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$EXECUTION_ID" ]; then
+  if [ -s "$OUT_DIR/diff.patch" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$MOD_ID_ENV" ]; then
     # Derive branch ID from RUN_ID: strip llm-exec- prefix and trailing -<ts>
     BRANCH_ID=$(echo "$RUN_ID_STR" | sed -E 's/^llm-exec-//' | sed -E 's/-[0-9]+$//')
     STEP_ID="$RUN_ID_STR"
-    KEY="mods/${EXECUTION_ID}/branches/${BRANCH_ID}/steps/${STEP_ID}/diff.patch"
+    KEY="mods/${MOD_ID_ENV}/branches/${BRANCH_ID}/steps/${STEP_ID}/diff.patch"
     URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
     log "Uploading diff to $URL"
     curl -sS -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$URL" -o /dev/null || true

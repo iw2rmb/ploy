@@ -60,8 +60,8 @@ Files here
 
 - scenario.yaml — Mods config with orw-apply then llm healing context (planner configured implicitly on failure)
 - run.sh — Runs scenario end-to-end, streams /v1/mods/logs SSE, polls status, downloads artifacts
-- watch-events.sh — Attach to the live SSE stream for a given EXEC_ID (optional standalone)
-- fetch-artifacts.sh — Download plan_json, next_json, diff_patch for a finished EXEC_ID
+- watch-events.sh — Attach to the live SSE stream for a given MOD_ID (optional standalone)
+- fetch-artifacts.sh — Download plan_json, next_json, diff_patch for a finished MOD_ID
 - check-steps.sh — Validates presence of key steps (diff-found, build-gate-failed, planner/llm-exec/reducer lifecycle)
 - prepare-branches.sh — Creates e2e/success, e2e/fail-missing-symbol, e2e/fail-java17-specific in your repo
 
@@ -76,8 +76,9 @@ Quick start (scripts) — operator flow
      - export E2E_HEALING_BRANCH=e2e/fail-missing-symbol    # or e2e/fail-java17-specific
    - Run via scripts (SSE stream, artifacts, step checks):
      - ./run.sh
-     - or: ./watch-events.sh <EXEC_ID> (after run prints EXEC_ID)
-     - After completion: ./fetch-artifacts.sh <EXEC_ID> and ./check-steps.sh <EXEC_ID>
+     - or: ./watch-events.sh <MOD_ID> (after run prints MOD_ID)
+     - After completion: ./fetch-artifacts.sh <MOD_ID> and ./check-steps.sh <MOD_ID>
+     - Logs and platform diagnostics: ./collect-logs.sh <MOD_ID> (run.sh calls this automatically)
 
    Option B — Prepare/fork your own repo with an intentional compile failure (see “How we force a predictable build failure”).
 2) Set env:
@@ -99,7 +100,7 @@ Quick start (scripts) — operator flow
      - Expects e2e/success to compile, and the two fail branches to fail compile.
 5) Run (workstation):
    - ./run.sh
-   - Script prints EXEC_ID, follows SSE, and waits until terminal. Artifacts are saved under ./logs/<EXEC_ID>/
+   - Script prints MOD_ID, follows SSE, and waits until terminal. Artifacts are saved under ./logs/<MOD_ID>/
 
 Quick start (Go E2E) — prepared repo/branches
 
@@ -156,7 +157,7 @@ Run Log & Key Takeaways
     - ployman models add -f my-openai-model.json  (contains provider=openai, id=model-id, config.api_key and endpoint; see api/llms/handler.go format)
     - ployman models get <model-id> to verify; optionally set default via /v1/llms/models/default.
     - Set `model: <model-id>` on a relevant step in scenario.yaml and rerun ./run.sh.
-  - Result (EXEC_ID tf-8fd02f15):
+  - Result (MOD_ID tf-8fd02f15):
     - Status: completed, phase=mr
     - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/26
     - Artifacts: plan_json/next_json/diff_patch availability depends on planner image; this run completed with MR created successfully.
@@ -167,7 +168,7 @@ Run Log & Key Takeaways
 - Cycle 6 (Alt failing branch: e2e/fail-java17-specific):
   - Change:
     - Switched scenario base_ref to e2e/fail-java17-specific while keeping the same model in llm-plan step.
-  - Result (EXEC_ID tf-2b604c85):
+  - Result (MOD_ID tf-2b604c85):
     - Status: completed, phase=mr
     - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/27
   - Takeaways:
@@ -177,8 +178,8 @@ Run Log & Key Takeaways
 - Cycle 7 (LLM diff persisted step-scoped to SeaweedFS; clean commit scope):
   - Change:
     - Runner now stages only files referenced by the unified diff during the healing commit (avoids target/* and SBOM.json noise).
-    - LLM exec branch uploads its diff to SeaweedFS under `mods/<EXEC_ID>/branches/<branchID>/steps/<stepID>/diff.patch` and writes `HEAD.json` like ORW.
-  - Result (EXEC_ID tf-9c72790b):
+    - LLM exec branch uploads its diff to SeaweedFS under `mods/<MOD_ID>/branches/<branchID>/steps/<stepID>/diff.patch` and writes `HEAD.json` like ORW.
+  - Result (MOD_ID tf-9c72790b):
     - Status: completed, phase=mr
     - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/30
   - Diff links:
@@ -193,20 +194,20 @@ Run Log & Key Takeaways
 
 - Cycle 8 (Post-deploy, clean MR content):
   - Change: Deployed commit-scoping and LLM/ORW step-scoped uploads.
-  - Result (EXEC_ID tf-2bb5a0cb): Status=completed; MR https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/32
+  - Result (MOD_ID tf-2bb5a0cb): Status=completed; MR https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/32
   - MR: single commit with only intended changes (no target/*), still showing ORW-only diff.
   - Takeaways:
     - Commit-scoping fix works. LLM diff not yet present in MR due to runner image not emitting an explicit diff.
 
 - Cycle 9 (Disable fast-path remediation; force planner/llm):
   - Change: Disabled controller local remediation; llm-exec runner enhanced to emit deletion patch.
-  - Result (EXEC_ID tf-334abd49): Healing failed (phase=healing) — llm-exec image on cluster didn’t yet produce diff.patch.
+  - Result (MOD_ID tf-334abd49): Healing failed (phase=healing) — llm-exec image on cluster didn’t yet produce diff.patch.
   - Takeaways:
     - Controller path ready; cluster runner image must be updated to new entrypoint that writes out/diff.patch.
 
 - Cycle 10 (Re-run after wiring CONTEXT_DIR/OUTPUT_DIR):
   - Change: Pass CONTEXT_DIR/OUTPUT_DIR to planner and llm-exec jobs; ensure out dir exists in tasks.
-  - Result (EXEC_ID tf-805adb3a): Healing failed (phase=healing) — consistent with runner image not updated.
+  - Result (MOD_ID tf-805adb3a): Healing failed (phase=healing) — consistent with runner image not updated.
   - Takeaways:
     - LLM job environment is in place; image update remains the blocker for producing explicit healing diff.
 
@@ -217,13 +218,13 @@ Next steps (ops):
 - Re-run this scenario; expect MR to include deletion of src/healing/java/e2e/FailHealing.java (LLM diff) alongside ORW changes.
 
 Notes
-- Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
+- Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<MOD_ID>/`.
 
 Cycle 11 (Fix planner HCL validation: remove file() on inputs.json):
   - Change:
     - Adjusted planner Nomad template to avoid `file("${NOMAD_TASK_DIR}/context/inputs.json")` during validation, which caused wrapper validation to fail before llm-exec could run. The context still arrives via the artifact block to `local/context` for runtime use.
     - Also removed a similar `file()` call in reducer template (not strictly hit yet but same failure mode).
-  - Result (EXEC_ID tf-6f53640f):
+  - Result (MOD_ID tf-6f53640f):
     - Previously failed at planner validation: `Error in function call; file() failed: no file exists at ${NOMAD_TASK_DIR}/context/inputs.json`.
     - With the change, planner should validate and submit successfully, unblocking llm-exec stage.
   - Takeaways:
@@ -235,7 +236,7 @@ Cycle 12 (Verify llm-exec image/env and SeaweedFS upload path):
     - Confirmed orw-apply uses `${SEAWEEDFS_URL}` inside job and controller substitutes it from `PLOY_SEAWEEDFS_URL`; this explains why ORW artifacts reliably land in SeaweedFS.
     - Ensure API env points MODS_LLM_EXEC_IMAGE/MODS_PLANNER_IMAGE/MODS_REDUCER_IMAGE to `langgraph-runner:py-0.1.7` (or newer) and redeploy API so jobs use the new image.
   - Expected:
-    - llm-exec job logs show: `env CTX_DIR=… OUT_DIR=…`, `env PLOY_SEAWEEDFS_URL=…`, and `uploaded diff to mods/<EXEC_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch`.
+    - llm-exec job logs show: `env CTX_DIR=… OUT_DIR=…`, `env PLOY_SEAWEEDFS_URL=…`, and `uploaded diff to mods/<MOD_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch`.
     - Controller fallback picks up the step-scoped diff if not present locally and proceeds to MR.
   - Takeaways:
     - If healing still fails after planner validation fix, likely causes: old llm-exec image in allocs, logs snapshot too early, or SeaweedFS unreachable from task. Inspect /v1/mods/{id}/logs for the posted env/upload events.
@@ -251,7 +252,7 @@ Next Steps (ops):
   - Re-run `./run.sh`; expect healing to progress into llm-exec, upload the deletion diff, and complete with an MR.
 
 Cycle 13 (Planner submits but allocation fails):
-  - Change/Result (EXEC_ID tf-bdcf34b2):
+  - Change/Result (MOD_ID tf-bdcf34b2):
     - Planner now validates and submits: events show "planner job started" → "job submitted".
     - Allocation failed later: "job mods-planner allocation failed (...)"; no plan_json artifact produced.
   - Likely causes:
@@ -265,7 +266,7 @@ Cycle 13 (Planner submits but allocation fails):
 Cycle 14 (Expected next: llm-exec emits step-scoped diff):
   - On success, llm-exec logs should include:
     - `env CTX_DIR=… OUT_DIR=…` and `env PLOY_SEAWEEDFS_URL=…` events.
-    - `uploaded diff to mods/<EXEC_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch` event.
+    - `uploaded diff to mods/<MOD_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch` event.
   - Controller fallback downloads the step-scoped diff when local `out/diff.patch` is missing and proceeds to MR.
   - Manual build validation (workstation): checkout MR branch and `mvn -B -DskipTests package` should succeed.
 
@@ -286,6 +287,28 @@ Cycle 16 (Planner context via MODS_CONTEXT_URL):
     - Planner allocation no longer fails on `Failed Artifact Download` for `${MODS_CONTEXT_URL}`; proceeds to produce `plan.json`.
   - If still failing:
     - Inspect `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job mods-planner --format json` and fetch latest alloc logs; verify the substituted HCL includes a concrete `MODS_CONTEXT_URL`.
+
+Cycle 17 (SeaweedFS-only artifacts; planner env diagnostics):
+  - Change:
+    - Removed all local artifact fallbacks: controller now always fetches planner plan.json and llm-exec diff.patch from SeaweedFS only.
+    - Planner runner posts env events and uploads `plan.json` to `mods/<MOD_ID>/planner/<RUN_ID>/plan.json`.
+    - Added force_pull=true to planner/llm-exec/reducer jobs to ensure :latest is pulled each run.
+    - Added `collect-logs.sh` to gather status, events, platform logs, and download SeaweedFS artifacts referenced in events.
+  - Result (MOD_ID tf-3bc6c154):
+    - Status: failed, phase=healing.
+    - Error: `failed to download planner output from SeaweedFS: http 404` (summary shows last_job=java11to17-orw-llm-planner-1757852176).
+    - Events: show `planner job started`, but no `uploaded plan to ...` event, confirming missing upload (or missing MOD_ID/SEAWEEDFS_URL in planner env).
+    - Latest planner alloc logs (via nomad-job-manager):
+      - Showed `[LG-STUB] Wrote plan.json to /local/out` (so the container ran) but did not log the "upload plan" event, indicating env for upload was absent.
+  - Takeaways:
+    - SeaweedFS-only policy is enforced; missing uploads now surface as explicit 404 download errors.
+    - Next step is to ensure planner task env includes both `PLOY_SEAWEEDFS_URL` and a non-empty execution ID. We already derive MOD_ID from workspace; we’ll also log planner env in SSE (now enabled) and ensure upload occurs so controller fetch can proceed.
+  - Logs:
+    - Use `collect-logs.sh tf-3bc6c154` to pull:
+      - status_latest.json (shows 404 on plan download)
+      - events.filtered.txt (errors and steps)
+      - platform logs
+      - any SeaweedFS artifacts referenced by events.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
 
 Go E2E tests — CI/VPS flow
@@ -323,8 +346,8 @@ What success looks like
 LLM runner event expectations (/v1/mods/{id}/events)
 
 - Planner and reducer jobs should post events like the orw-apply task does. Reference services/langgraph-runner/entrypoint.sh for examples:
-  - POST ${PLOY_CONTROLLER}/mods/${EXECUTION_ID}/events with JSON body:
-    {"execution_id":"…","phase":"planner","step":"planner","level":"info","message":"job started","job_name":"…"}
+  - POST ${PLOY_CONTROLLER}/mods/${<MOD_ID>}/events with JSON body:
+    {"mod_id":"…","phase":"planner","step":"planner","level":"info","message":"job started","job_name":"…"}
   - On exit, post either level=info message=job completed or level=error message=job failed.
 - orw-apply events are already emitted by services/openrewrite-jvm/runner.sh. Use the same endpoint and schema.
 
@@ -337,16 +360,16 @@ Tips and knobs
 
 Manual verification commands
 
-- After run.sh prints EXEC_ID, in another terminal:
-  - curl -s "$PLOY_CONTROLLER/mods/$EXEC_ID/status" | jq .
-  - curl -s "$PLOY_CONTROLLER/mods/$EXEC_ID/artifacts" | jq .
-  - curl -sN "$PLOY_CONTROLLER/mods/$EXEC_ID/logs?follow=1"
+- After run.sh prints MOD_ID, in another terminal:
+  - curl -s "$PLOY_CONTROLLER/mods/$MOD_ID/status" | jq .
+  - curl -s "$PLOY_CONTROLLER/mods/$MOD_ID/artifacts" | jq .
+  - curl -sN "$PLOY_CONTROLLER/mods/$MOD_ID/logs?follow=1"
 
 Cleanup
 
 - Merge or close the test MR in your fork
 - Remove test branches as needed
-- Local: delete ./logs/<EXEC_ID>/ directories
+- Local: delete ./logs/<MOD_ID>/ directories
 
 Troubleshooting
 

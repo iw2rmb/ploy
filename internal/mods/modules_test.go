@@ -123,7 +123,7 @@ func TestTransformationExecutorAdapter_Submit(t *testing.T) {
 	r := &ModRunner{workspaceDir: t.TempDir()}
 	x := NewTransformationExecutorAdapter(r)
 	diff := r.workspaceDir + "/out/diff.patch"
-	params := ORWSubmitParams{SeaweedURL: "http://filer", ExecID: "e", BranchID: "b", StepID: "s", RunID: "job-1", SubmittedHCLPath: r.workspaceDir + "/hcl.hcl", DiffPath: diff, Timeout: time.Second}
+	params := ORWSubmitParams{SeaweedURL: "http://filer", ModID: "e", BranchID: "b", StepID: "s", RunID: "job-1", SubmittedHCLPath: r.workspaceDir + "/hcl.hcl", DiffPath: diff, Timeout: time.Second}
 	// touch hcl file
 	if err := os.WriteFile(params.SubmittedHCLPath, []byte("job { }"), 0644); err != nil {
 		t.Fatal(err)

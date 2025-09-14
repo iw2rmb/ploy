@@ -628,7 +628,7 @@ api/arf/
 - Store execution results and artifacts
 
 ### With Phase 5.2 (CLI)
-- Execute recipes through `ploy arf recipe run` command
+// ARF recipe run command removed; use Mods for execution
 - Provide real-time execution progress updates
 - Generate comprehensive execution reports
 

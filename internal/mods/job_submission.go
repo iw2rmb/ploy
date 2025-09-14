@@ -116,27 +116,23 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		orwApplyImage = d.ORWApplyImage
 	}
 
-    // Perform substitution
-    controllerURL := get("PLOY_CONTROLLER")
-    // Compute MOD_ID (preferred), fallback to legacy and normalize to mod- prefix
-    execID := get("MOD_ID")
-    if execID == "" {
-        execID = get("PLOY_MODS_EXECUTION_ID")
-    }
-    if execID != "" {
-        if strings.HasPrefix(execID, "tf-") {
-            execID = "mod-" + strings.TrimPrefix(execID, "tf-")
-        } else if !strings.HasPrefix(execID, "mod-") {
-            execID = "mod-" + execID
-        }
-    }
+	// Perform substitution
+	controllerURL := get("PLOY_CONTROLLER")
+	// Use MOD_ID only; do not support legacy or tf- prefixes
+	modID := get("MOD_ID")
+	if strings.HasPrefix(modID, "tf-") {
+		return "", fmt.Errorf("unsupported MOD_ID prefix 'tf-'; use 'mod-' only")
+	}
+	if modID != "" && !strings.HasPrefix(modID, "mod-") {
+		modID = "mod-" + modID
+	}
 
 	dc := get("NOMAD_DC")
 	if dc == "" {
 		dc = d.DC
 	}
 
-    replacer := strings.NewReplacer(
+	replacer := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
 		"${LIMITS_JSON}", hclEscape(limitsJSON),
@@ -156,8 +152,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${MCP_TIMEOUT}", hclEscape(mcpEnvConfig.MCPTimeout),
 		"${MCP_SECURITY_MODE}", hclEscape(mcpEnvConfig.MCPSecurityMode),
 		"${CONTROLLER_URL}", hclEscape(controllerURL),
-        "${EXECUTION_ID}", hclEscape(execID),
-        "${MOD_ID}", hclEscape(execID),
+		"${MOD_ID}", hclEscape(modID),
 		"${NOMAD_DC}", hclEscape(dc),
 		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
 		"${PLOY_SEAWEEDFS_URL}", hclEscape(get("PLOY_SEAWEEDFS_URL")),
@@ -238,43 +233,41 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		// Step 3: Determine model from mods.yaml (if provided), provision in registry, then substitute env placeholders
 		contextDir := filepath.Dir(assets.InputsPath)
 		outDir := filepath.Join(workspace, "planner", "out")
-        imgs := ResolveImagesFromEnv()
-        infra := ResolveInfraFromEnv()
-        // Derive execution ID from env or workspace folder name (mods-<exec>-<rand>)
-        execIDVal := os.Getenv("PLOY_MODS_EXECUTION_ID")
-        if execIDVal == "" {
-            base := filepath.Base(workspace)
-            // Expecting mods-<exec>-<rand>
-            if strings.HasPrefix(base, "mods-") {
-                parts := strings.SplitN(base, "-", 3)
-                if len(parts) >= 2 {
-                    execIDVal = parts[1]
-                }
-            }
-        }
+		imgs := ResolveImagesFromEnv()
+		infra := ResolveInfraFromEnv()
+		// MOD_ID must be provided explicitly; no legacy fallback or tf- support
+		modID := os.Getenv("MOD_ID")
+		if modID == "" {
+			return nil, fmt.Errorf("MOD_ID is required for planner job submission")
+		}
+		if strings.HasPrefix(modID, "tf-") {
+			return nil, fmt.Errorf("unsupported MOD_ID prefix 'tf-'; use 'mod-' only")
+		}
+		if !strings.HasPrefix(modID, "mod-") {
+			modID = "mod-" + modID
+		}
 		llm := ResolveLLMDefaultsFromEnv()
 		if config != nil {
 			if pref := config.PreferredModel(); pref != "" {
 				llm.Model = pref
 			}
 		}
-        vars := map[string]string{
-            "MODS_CONTEXT_DIR":       contextDir,
-            "MODS_OUT_DIR":           outDir,
-            "MODS_REGISTRY":          imgs.Registry,
-            "MODS_PLANNER_IMAGE":     imgs.Planner,
-            "MODS_REDUCER_IMAGE":     imgs.Reducer,
-            "MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
-            "MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
-            "MODS_MODEL":             llm.Model,
-            "MODS_TOOLS":             llm.ToolsJSON,
-            "MODS_LIMITS":            llm.LimitsJSON,
-            "PLOY_CONTROLLER":        infra.Controller,
-            "PLOY_MODS_EXECUTION_ID": execIDVal,
-            "MOD_ID":                 execIDVal,
-            "PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
-            "NOMAD_DC":               infra.DC,
-        }
+		vars := map[string]string{
+			"MODS_CONTEXT_DIR":     contextDir,
+			"MODS_OUT_DIR":         outDir,
+			"MODS_REGISTRY":        imgs.Registry,
+			"MODS_PLANNER_IMAGE":   imgs.Planner,
+			"MODS_REDUCER_IMAGE":   imgs.Reducer,
+			"MODS_LLM_EXEC_IMAGE":  imgs.LLMExec,
+			"MODS_ORW_APPLY_IMAGE": imgs.ORWApply,
+			"MODS_MODEL":           llm.Model,
+			"MODS_TOOLS":           llm.ToolsJSON,
+			"MODS_LIMITS":          llm.LimitsJSON,
+			"PLOY_CONTROLLER":      infra.Controller,
+			"MOD_ID":               modID,
+			"PLOY_SEAWEEDFS_URL":   infra.SeaweedURL,
+			"NOMAD_DC":             infra.DC,
+		}
 
 		// Upload planner context as a tar to SeaweedFS and provide URL for artifact fetch
 		if infra.SeaweedURL != "" {
@@ -282,42 +275,42 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			_ = os.WriteFile(filepath.Join(contextDir, ".keep"), []byte("planner-context"), 0644)
 			tarPath := filepath.Join(workspace, "planner", "context.tar")
 			if err := createTarFromDir(contextDir, tarPath); err == nil {
-                if execIDVal != "" {
-                    key := fmt.Sprintf("mods/%s/contexts/%s.tar", execIDVal, runID)
-                    _ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
-                    vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-                }
-            }
-        }
+				if modID != "" {
+					key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
+					_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+				}
+			}
+		}
 		// Inject SBOM_LATEST_URL for job reuse of last SBOM
 		if infra.Controller != "" && config != nil && config.TargetRepo != "" {
 			vars["SBOM_LATEST_URL"] = fmt.Sprintf("%s/sbom/latest?repo=%s", strings.TrimRight(infra.Controller, "/"), url.QueryEscape(config.TargetRepo))
 		}
-        renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
-        if err != nil {
-            return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
-        }
+		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to substitute HCL template: %w", err)
+		}
 
-        // Persist submitted planner HCL for diagnostics
-        if execIDVal != "" {
-            persistDir := filepath.Join("/tmp/mods-submitted", execIDVal, "planner")
-            _ = os.MkdirAll(persistDir, 0755)
-            dest := filepath.Join(persistDir, "planner.submitted.hcl")
-            if b, e := os.ReadFile(renderedHCLPath); e == nil {
-                _ = os.WriteFile(dest, b, 0644)
-                if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                    rep := NewControllerEventReporter(controller, execIDVal)
-                    _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("Saved submitted HCL to %s", dest), JobName: runID, Time: time.Now()})
-                }
-            }
-        }
+		// Persist submitted planner HCL for diagnostics
+		if modID != "" {
+			persistDir := filepath.Join("/tmp/mods-submitted", modID, "planner")
+			_ = os.MkdirAll(persistDir, 0755)
+			dest := filepath.Join(persistDir, "planner.submitted.hcl")
+			if b, e := os.ReadFile(renderedHCLPath); e == nil {
+				_ = os.WriteFile(dest, b, 0644)
+				if controller := ResolveInfraFromEnv().Controller; controller != "" {
+					rep := NewControllerEventReporter(controller, modID)
+					_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("Saved submitted HCL to %s", dest), JobName: runID, Time: time.Now()})
+				}
+			}
+		}
 
 		// Step 4: Push start event and report job metadata
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, execIDVal)
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
-            reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
-        }
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, modID)
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
+			reportJobSubmittedAsync(ctx, rep, runID, "planner", "planner")
+		}
 
 		// Step 5: Preflight validate HCL, then submit job to Nomad and wait for completion
 		if err := h.runner.GetHCLSubmitter().Validate(renderedHCLPath); err != nil {
@@ -325,31 +318,31 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		}
 		timeout := ResolveDefaultsFromEnv().PlannerTimeout
 		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, execIDVal)
-                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
-            }
-            return nil, fmt.Errorf("planner job failed: %w", err)
-        }
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, modID)
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
+			return nil, fmt.Errorf("planner job failed: %w", err)
+		}
 
-        // Step 6: Always fetch planner plan.json from SeaweedFS
-        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
-        if infra.SeaweedURL == "" || execIDVal == "" {
-            return nil, fmt.Errorf("planner artifact fetch requires SeaweedFS URL and execution ID")
-        }
-        if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
-            return nil, fmt.Errorf("planner artifact path prep: %w", err)
-        }
-        key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execIDVal, runID)
-        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-        // Emit download attempt event for diagnostics
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download plan from %s", key), JobName: runID, Time: time.Now()})
-        }
-        if err := downloadToFileFn(url, artifactPath); err != nil {
-            return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", err)
-        }
+		// Step 6: Always fetch planner plan.json from SeaweedFS
+		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+		if infra.SeaweedURL == "" || modID == "" {
+			return nil, fmt.Errorf("planner artifact fetch requires SeaweedFS URL and execution ID")
+		}
+		if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
+			return nil, fmt.Errorf("planner artifact path prep: %w", err)
+		}
+		key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
+		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+		// Emit download attempt event for diagnostics
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, modID)
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download plan from %s", key), JobName: runID, Time: time.Now()})
+		}
+		if err := downloadToFileFn(url, artifactPath); err != nil {
+			return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", err)
+		}
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
 				return nil, fmt.Errorf("planner output schema invalid: %w", err)
@@ -361,7 +354,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		}
 
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, modID)
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
@@ -445,19 +438,19 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		infra := ResolveInfraFromEnv()
 		llm := ResolveLLMDefaultsFromEnv()
 		vars := map[string]string{
-			"MODS_CONTEXT_DIR":       contextDir,
-			"MODS_OUT_DIR":           outDir,
-			"MODS_REGISTRY":          imgs.Registry,
-			"MODS_PLANNER_IMAGE":     imgs.Planner,
-			"MODS_REDUCER_IMAGE":     imgs.Reducer,
-			"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
-			"MODS_ORW_APPLY_IMAGE":   imgs.ORWApply,
-			"MODS_MODEL":             llm.Model,
-			"MODS_TOOLS":             llm.ToolsJSON,
-			"MODS_LIMITS":            llm.LimitsJSON,
-			"PLOY_CONTROLLER":        infra.Controller,
-			"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-			"NOMAD_DC":               infra.DC,
+			"MODS_CONTEXT_DIR":     contextDir,
+			"MODS_OUT_DIR":         outDir,
+			"MODS_REGISTRY":        imgs.Registry,
+			"MODS_PLANNER_IMAGE":   imgs.Planner,
+			"MODS_REDUCER_IMAGE":   imgs.Reducer,
+			"MODS_LLM_EXEC_IMAGE":  imgs.LLMExec,
+			"MODS_ORW_APPLY_IMAGE": imgs.ORWApply,
+			"MODS_MODEL":           llm.Model,
+			"MODS_TOOLS":           llm.ToolsJSON,
+			"MODS_LIMITS":          llm.LimitsJSON,
+			"PLOY_CONTROLLER":      infra.Controller,
+			"MOD_ID":               os.Getenv("MOD_ID"),
+			"NOMAD_DC":             infra.DC,
 		}
 
 		// Upload reducer history/context as tar to SeaweedFS and provide URL
@@ -465,9 +458,9 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			_ = os.WriteFile(filepath.Join(contextDir, ".keep"), []byte("reducer-context"), 0644)
 			tarPath := filepath.Join(workspace, "reducer", "context.tar")
 			if err := createTarFromDir(contextDir, tarPath); err == nil {
-				execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
-				if execID != "" {
-					key := fmt.Sprintf("mods/%s/contexts/%s.tar", execID, runID)
+				modID := os.Getenv("MOD_ID")
+				if modID != "" {
+					key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
 					_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
 					vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
 				}
@@ -481,7 +474,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 
 		// Step 4: Push start event and report job metadata
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job started", JobName: runID, Time: time.Now()})
 			reportJobSubmittedAsync(ctx, rep, runID, "reducer", "reducer")
 		}
@@ -493,7 +486,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		timeout := ResolveDefaultsFromEnv().ReducerTimeout
 		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
 			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-				rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
+				rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
 				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
 			}
 			return nil, fmt.Errorf("reducer job failed: %w", err)
@@ -512,7 +505,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		}
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-			rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
+			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 

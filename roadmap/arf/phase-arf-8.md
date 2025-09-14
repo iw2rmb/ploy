@@ -676,20 +676,14 @@ benchmark:
 
 ```yaml
 # Benchmark Management
-POST   /v1/arf/benchmark/run              # Run single benchmark
-POST   /v1/arf/benchmark/suite            # Run benchmark suite
-GET    /v1/arf/benchmark/status/{id}      # Get benchmark status
-GET    /v1/arf/benchmark/results/{id}     # Get benchmark results
-DELETE /v1/arf/benchmark/cancel/{id}      # Cancel running benchmark
+// Benchmark endpoints removed; use Mods workflows for transformation metrics
 
 # Provider Comparison
-POST   /v1/arf/benchmark/compare          # Compare providers
-GET    /v1/arf/benchmark/comparison/{id}  # Get comparison results
+// Compare endpoint removed with ARF benchmark deprecation
+// Comparison endpoints removed with ARF benchmark deprecation
 
 # Report Generation
-GET    /v1/arf/benchmark/report/{id}      # Get benchmark report
-POST   /v1/arf/benchmark/report/generate  # Generate custom report
-GET    /v1/arf/benchmark/reports          # List all reports
+// Benchmark report endpoints removed
 
 # LLM Provider Management
 GET    /v1/arf/providers                  # List available providers

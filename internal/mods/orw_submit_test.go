@@ -22,7 +22,7 @@ func TestSubmitORWJobAndFetchDiff_Errors(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected submit error")
 	}
-	// fetch error (execID empty)
+	// fetch error (modID empty)
 	err = submitORWJobAndFetchDiff(context.Background(), func(string) error { return nil }, func(string, time.Duration) error { return nil }, nil, "http://filer", "", "b", "s", "job-1", hcl, diff, time.Second)
 	if err == nil {
 		t.Fatalf("expected fetch error due to missing exec id")

@@ -46,19 +46,19 @@ func TestUploadInputTar_InvokesPutFileWithExpectedKey(t *testing.T) {
 func TestSubstituteORWTemplateVars_ReplacesValuesWithoutEnv(t *testing.T) {
 	tmp := t.TempDir()
 	pre := filepath.Join(tmp, "orw.pre.hcl")
-	content := "env { EXEC=${EXECUTION_ID} DIFF=${DIFF_KEY} OUT=${OUT_HOST_DIR} API=${PLOY_API_URL} INPUT=${INPUT_URL} IMG=${ORW_IMAGE} DC=${NOMAD_DC} }\n"
+	content := "env { MOD=${MOD_ID} DIFF=${DIFF_KEY} OUT=${OUT_HOST_DIR} API=${PLOY_API_URL} INPUT=${INPUT_URL} IMG=${ORW_IMAGE} DC=${NOMAD_DC} }\n"
 	if err := os.WriteFile(pre, []byte(content), 0644); err != nil {
 		t.Fatalf("write pre: %v", err)
 	}
 	vars := map[string]string{
-		"MODS_CONTEXT_DIR":       tmp,
-		"MODS_OUT_DIR":           filepath.Join(tmp, "out"),
-		"PLOY_CONTROLLER":        "https://api.dev.ployman.app/v1",
-		"PLOY_MODS_EXECUTION_ID": "e-1",
-		"PLOY_SEAWEEDFS_URL":     "http://filer:8888",
-		"MODS_DIFF_KEY":          "mods/e-1/branches/b-1/steps/s-1/diff.patch",
-		"MODS_ORW_APPLY_IMAGE":   "registry.dev.ployman.app/openrewrite-jvm:latest",
-		"NOMAD_DC":               "dc9",
+		"MODS_CONTEXT_DIR":     tmp,
+		"MODS_OUT_DIR":         filepath.Join(tmp, "out"),
+		"PLOY_CONTROLLER":      "https://api.dev.ployman.app/v1",
+		"MOD_ID":               "mod-e-1",
+		"PLOY_SEAWEEDFS_URL":   "http://filer:8888",
+		"MODS_DIFF_KEY":        "mods/mod-e-1/branches/b-1/steps/s-1/diff.patch",
+		"MODS_ORW_APPLY_IMAGE": "registry.dev.ployman.app/openrewrite-jvm:latest",
+		"NOMAD_DC":             "dc9",
 	}
 	out, err := substituteORWTemplateVars(pre, "run-1", vars)
 	if err != nil {
@@ -67,10 +67,10 @@ func TestSubstituteORWTemplateVars_ReplacesValuesWithoutEnv(t *testing.T) {
 	b, _ := os.ReadFile(out)
 	s := string(b)
 	// Verify key replacements occurred and /v1 suffix was trimmed in API base
-	if want := "EXEC=e-1"; !contains(s, want) {
+	if want := "MOD=mod-e-1"; !contains(s, want) {
 		t.Fatalf("missing %s in %s", want, s)
 	}
-	if want := "DIFF=mods/e-1/branches/b-1/steps/s-1/diff.patch"; !contains(s, want) {
+	if want := "DIFF=mods/mod-e-1/branches/b-1/steps/s-1/diff.patch"; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
 	if want := "OUT=" + vars["MODS_OUT_DIR"]; !contains(s, want) {
@@ -79,7 +79,7 @@ func TestSubstituteORWTemplateVars_ReplacesValuesWithoutEnv(t *testing.T) {
 	if want := "API=https://api.dev.ployman.app"; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
-	if want := "INPUT=http://filer:8888/artifacts/mods/e-1/input.tar"; !contains(s, want) {
+	if want := "INPUT=http://filer:8888/artifacts/mods/mod-e-1/input.tar"; !contains(s, want) {
 		t.Fatalf("missing %s", want)
 	}
 	if want := "IMG=" + vars["MODS_ORW_APPLY_IMAGE"]; !contains(s, want) {

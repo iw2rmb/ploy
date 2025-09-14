@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./fetch-artifacts.sh <EXEC_ID>
-# Downloads known artifacts (plan_json, next_json, diff_patch) into logs/<EXEC_ID>/
+# Usage: ./fetch-artifacts.sh <MOD_ID>
+# Downloads known artifacts (plan_json, next_json, diff_patch) into logs/<MOD_ID>/
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 <EXEC_ID>" >&2
+  echo "Usage: $0 <MOD_ID>" >&2
   exit 1
 fi
 
-EXEC_ID="$1"
+MOD_ID="$1"
 API_BASE="${PLOY_CONTROLLER:-}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="$ROOT_DIR/logs/$EXEC_ID"
+LOG_DIR="$ROOT_DIR/logs/$MOD_ID"
 
 mkdir -p "$LOG_DIR"
 
@@ -21,7 +21,7 @@ if [[ -z "$API_BASE" ]]; then
   exit 1
 fi
 
-ARTS_JSON=$(curl -sS "$API_BASE/mods/$EXEC_ID/artifacts" || true)
+ARTS_JSON=$(curl -sS "$API_BASE/mods/$MOD_ID/artifacts" || true)
 echo "$ARTS_JSON" > "$LOG_DIR/artifacts_index.json"
 
 download() {
@@ -30,7 +30,7 @@ download() {
   echo "Fetching $name → $out"
   if [[ -z "$2" ]]; then
     echo "  (skip: no output filename provided)"; return 0; fi
-  curl -fsS "$API_BASE/mods/$EXEC_ID/artifacts/$name" -o "$out" || {
+  curl -fsS "$API_BASE/mods/$MOD_ID/artifacts/$name" -o "$out" || {
     echo "  (missing $name)"; return 0; }
 }
 

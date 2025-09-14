@@ -81,9 +81,9 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 		t.Logf("Continuing despite CLI error: %v", err)
 	}
 
-	// Fallback: if execution_id not parsed from CLI output, start run via controller directly
-	if result.ExecutionID == "" {
-		t.Logf("execution_id not found in CLI output; starting run via controller fallback")
+	// Fallback: if mod_id not parsed from CLI output, start run via controller directly
+	if result.ModID == "" {
+		t.Logf("mod_id not found in CLI output; starting run via controller fallback")
 		runURL := strings.TrimRight(controller, "/") + "/mods"
 		payload := fmt.Sprintf("{\"config\": %q, \"test_mode\": false}", result.ConfigYAML)
 		req0, _ := http.NewRequestWithContext(ctx, http.MethodPost, runURL, strings.NewReader(payload))
@@ -98,17 +98,17 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 			t.Fatalf("fallback run HTTP %d", resp0.StatusCode)
 		}
 		var ack struct {
-			ExecutionID string `json:"execution_id"`
+			ModID string `json:"mod_id"`
 		}
-		if json.NewDecoder(resp0.Body).Decode(&ack) != nil || ack.ExecutionID == "" {
-			t.Fatalf("fallback run: missing execution_id")
+		if json.NewDecoder(resp0.Body).Decode(&ack) != nil || ack.ModID == "" {
+			t.Fatalf("fallback run: missing mod_id")
 		}
-		result.ExecutionID = ack.ExecutionID
-		t.Logf("Fallback Execution ID: %s", result.ExecutionID)
+		result.ModID = ack.ModID
+		t.Logf("Fallback Execution ID: %s", result.ModID)
 	}
 
 	// Query controller for final status to assert MR and build metadata
-	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ExecutionID)
+	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ModID)
 	httpc := &http.Client{Timeout: 30 * time.Second}
 	// Poll until terminal
 	var st struct {
@@ -164,7 +164,7 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 			t.Logf("Artifacts (from status): %v", artsMap)
 		}
 	} else {
-		artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ExecutionID)
+		artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ModID)
 		req2, _ := http.NewRequestWithContext(ctx, http.MethodGet, artsURL, nil)
 		resp2, err := httpc.Do(req2)
 		if err == nil && resp2.StatusCode == 200 {
@@ -430,9 +430,9 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 		}
 	}
 
-	// Fallback: if execution_id not parsed from CLI output, start run via controller directly
-	if result.ExecutionID == "" {
-		t.Logf("execution_id not found in CLI output; starting run via controller fallback")
+	// Fallback: if mod_id not parsed from CLI output, start run via controller directly
+	if result.ModID == "" {
+		t.Logf("mod_id not found in CLI output; starting run via controller fallback")
 		runURL := strings.TrimRight(controller, "/") + "/mods"
 		payload := fmt.Sprintf("{\"config\": %q, \"test_mode\": false}", result.ConfigYAML)
 		req0, _ := http.NewRequestWithContext(ctx, http.MethodPost, runURL, strings.NewReader(payload))
@@ -447,18 +447,18 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 			t.Fatalf("fallback run HTTP %d", resp0.StatusCode)
 		}
 		var ack struct {
-			ExecutionID string `json:"execution_id"`
+			ModID string `json:"mod_id"`
 		}
-		if json.NewDecoder(resp0.Body).Decode(&ack) != nil || ack.ExecutionID == "" {
-			t.Fatalf("fallback run: missing execution_id")
+		if json.NewDecoder(resp0.Body).Decode(&ack) != nil || ack.ModID == "" {
+			t.Fatalf("fallback run: missing mod_id")
 		}
-		result.ExecutionID = ack.ExecutionID
-		t.Logf("Fallback Execution ID: %s", result.ExecutionID)
+		result.ModID = ack.ModID
+		t.Logf("Fallback Execution ID: %s", result.ModID)
 	}
 
 	// Query controller for steps and artifacts to verify healing path
-	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ExecutionID)
-	artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ExecutionID)
+	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ModID)
+	artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ModID)
 
 	httpc := &http.Client{Timeout: 30 * time.Second}
 	// Status
@@ -512,7 +512,7 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 		}
 		// 2) Download each expected artifact via controller streaming endpoint
 		for _, name := range []string{"plan_json", "next_json", "diff_patch"} {
-			dl := strings.TrimRight(controller, "/") + "/mods/" + result.ExecutionID + "/artifacts/" + name
+			dl := strings.TrimRight(controller, "/") + "/mods/" + result.ModID + "/artifacts/" + name
 			req3, _ := http.NewRequestWithContext(ctx, http.MethodGet, dl, nil)
 			resp3, err := httpc.Do(req3)
 			if err != nil {
