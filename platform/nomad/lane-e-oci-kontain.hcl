@@ -281,7 +281,7 @@ EOF
           "container",
           "traefik.enable=true",
           "traefik.http.routers.{{APP_NAME}}-e.rule=Host(`{{APP_NAME}}.{{DOMAIN_SUFFIX}}`)",
-          "traefik.http.routers.{{APP_NAME}}-e.tls.certresolver=dev-wildcard",
+          "traefik.http.routers.{{APP_NAME}}-e.tls.certresolver=apps-wildcard",
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.healthcheck.path=/healthz",
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.healthcheck.interval=10s",
           "traefik.http.services.{{APP_NAME}}-e.loadbalancer.sticky.cookie=true"
