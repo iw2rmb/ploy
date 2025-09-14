@@ -6,7 +6,7 @@
   vars_files:
     - ../vars/main.yml
   vars:
-    mods_registry: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
+    mods_registry: "registry.{{ ploy.platform_domain }}"
     planner_image: "{{ mods_registry }}/langgraph-runner:latest"
     reducer_image: "{{ mods_registry }}/langgraph-runner:latest"
     llm_exec_image: "{{ mods_registry }}/langgraph-runner:latest"

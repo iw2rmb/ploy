@@ -73,26 +73,26 @@
           GITLAB_URL="{{ (controller_gitlab_url | length > 0) | ternary(controller_gitlab_url, (fallback_url | default('https://gitlab.com', true))) }}"
           # Always favor controller token if provided to ensure write access for pushes/MRs
           GITLAB_TOKEN="{{ (controller_gitlab_token | length > 0) | ternary(controller_gitlab_token, (fallback_token | default('', true))) }}"
-          PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') | default('https://api.dev.ployman.app/v1', true) }}"
+          PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') }}"
           # Nomad/Mods runtime defaults
-          NOMAD_DC="{{ lookup('env', 'NOMAD_DC') | default('dc1', true) }}"
-          PLOY_SEAWEEDFS_URL="{{ lookup('env', 'PLOY_SEAWEEDFS_URL') | default('http://seaweedfs-filer.service.consul:8888', true) }}"
+          NOMAD_DC="{{ lookup('env', 'NOMAD_DC') }}"
+          PLOY_SEAWEEDFS_URL="{{ lookup('env', 'PLOY_SEAWEEDFS_URL') }}"
           # OpenRewrite apply runner image (must exist in internal registry)
           # Preferred: set MODS_ORW_APPLY_IMAGE; runner substitutes ${ORW_IMAGE}
-          MODS_ORW_APPLY_IMAGE="{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') | default('registry.dev.ployman.app/openrewrite-jvm:latest', true) }}"
+          MODS_ORW_APPLY_IMAGE="{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') }}"
           # LangGraph runner images for planner/reducer/llm-exec
-          MODS_PLANNER_IMAGE="{{ lookup('env', 'MODS_PLANNER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:latest', true) }}"
-          MODS_REDUCER_IMAGE="{{ lookup('env', 'MODS_REDUCER_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:latest', true) }}"
-          MODS_LLM_EXEC_IMAGE="{{ lookup('env', 'MODS_LLM_EXEC_IMAGE') | default(lookup('env','MODS_REGISTRY') | default('registry.dev.ployman.app', true) ~ '/langgraph-runner:latest', true) }}"
+          MODS_PLANNER_IMAGE="{{ lookup('env', 'MODS_PLANNER_IMAGE') }}"
+          MODS_REDUCER_IMAGE="{{ lookup('env', 'MODS_REDUCER_IMAGE') }}"
+          MODS_LLM_EXEC_IMAGE="{{ lookup('env', 'MODS_LLM_EXEC_IMAGE') }}"
           # Optional defaults
-          MODS_REGISTRY="{{ lookup('env', 'MODS_REGISTRY') | default('registry.dev.ployman.app', true) }}"
+          MODS_REGISTRY="{{ lookup('env', 'MODS_REGISTRY') }}"
           # Lane E builder image (Kaniko). Mirrored into internal registry in Dev.
-          PLOY_KANIKO_IMAGE="{{ lookup('env', 'PLOY_KANIKO_IMAGE') | default('registry.dev.ployman.app/kaniko-executor:debug', true) }}"
+          PLOY_KANIKO_IMAGE="{{ lookup('env', 'PLOY_KANIKO_IMAGE') }}"
           # Optional OSv base image URL for Lane C builder (Dev only)
           # Example: https://example.com/osv/java8.qemu
-          PLOY_OSV_BASE_URL="{{ lookup('env', 'PLOY_OSV_BASE_URL') | default('', true) }}"
-          GIT_AUTHOR_NAME="{{ lookup('env', 'GIT_AUTHOR_NAME') | default('Ploy Bot', true) }}"
-          GIT_AUTHOR_EMAIL="{{ lookup('env', 'GIT_AUTHOR_EMAIL') | default('ploy-bot@local', true) }}"
+          PLOY_OSV_BASE_URL="{{ lookup('env', 'PLOY_OSV_BASE_URL') }}"
+          GIT_AUTHOR_NAME="{{ lookup('env', 'GIT_AUTHOR_NAME') }}"
+          GIT_AUTHOR_EMAIL="{{ lookup('env', 'GIT_AUTHOR_EMAIL') }}"
 
     - name: Fail fast if controller token was expected but missing
       when: controller_gitlab_token | length == 0
