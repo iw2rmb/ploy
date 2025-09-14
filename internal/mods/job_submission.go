@@ -136,6 +136,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${REDUCER_IMAGE}", hclEscape(reducerImage),
 		"${LLM_EXEC_IMAGE}", hclEscape(llmExecImage),
 		"${ORW_APPLY_IMAGE}", hclEscape(orwApplyImage),
+		"${MODS_CONTEXT_URL}", hclEscape(get("MODS_CONTEXT_URL")),
 		"${MCP_TOOLS_JSON}", hclEscape(mcpEnvConfig.MCPToolsJSON),
 		"${MCP_CONTEXT_JSON}", hclEscape(mcpEnvConfig.MCPContextJSON),
 		"${MCP_ENDPOINTS_JSON}", hclEscape(mcpEnvConfig.MCPEndpointsJSON),
