@@ -173,25 +173,23 @@ func debugTemplateForLane(lane string) string {
 
 // loadTemplateContent tries Consul KV first, then standard platform file locations
 func loadTemplateContent(templatePath string) ([]byte, error) {
-	// Prefer embedded templates when available
-	if b := getEmbeddedTemplate(templatePath); b != nil {
-		return b, nil
-	}
-	// For dev builds, prefer filesystem templates to avoid stale KV content
-	possiblePaths := []string{
-		templatePath,
-	}
+	// Prefer filesystem templates first in dev to avoid stale embedded content
+	paths := []string{templatePath}
 	if templateDir := utils.Getenv("PLOY_TEMPLATE_DIR", ""); templateDir != "" {
-		possiblePaths = append(possiblePaths, filepath.Join(templateDir, templatePath))
+		paths = append(paths, filepath.Join(templateDir, templatePath))
 	}
-	possiblePaths = append(possiblePaths,
+	paths = append(paths,
 		filepath.Join("/home/ploy/ploy", templatePath),
 		filepath.Join("/opt/ploy", templatePath),
 	)
-	for _, p := range possiblePaths {
+	for _, p := range paths {
 		if b, err := os.ReadFile(p); err == nil {
 			return b, nil
 		}
+	}
+	// Fallback to embedded templates if filesystem not found
+	if b := getEmbeddedTemplate(templatePath); b != nil {
+		return b, nil
 	}
 	return nil, fmt.Errorf("template not found in any platform locations: %s", templatePath)
 }
