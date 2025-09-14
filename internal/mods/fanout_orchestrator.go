@@ -241,20 +241,21 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	imgs := ResolveImagesFromEnv()
 	infra := ResolveInfraFromEnv()
 	llm := ResolveLLMDefaultsFromEnv()
-	vars := map[string]string{
-		"MODS_CONTEXT_DIR":       baseDir,
-		"MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
-		"MODS_REGISTRY":          imgs.Registry,
-		"MODS_PLANNER_IMAGE":     imgs.Planner,
-		"MODS_REDUCER_IMAGE":     imgs.Reducer,
-		"MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
-		"PLOY_CONTROLLER":        infra.Controller,
-		"PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
-		"NOMAD_DC":               infra.DC,
-		"MODS_MODEL":             llm.Model,
-		"MODS_TOOLS":             llm.ToolsJSON,
-		"MODS_LIMITS":            llm.LimitsJSON,
-	}
+    vars := map[string]string{
+        "MODS_CONTEXT_DIR":       baseDir,
+        "MODS_OUT_DIR":           filepath.Join(baseDir, "out"),
+        "MODS_REGISTRY":          imgs.Registry,
+        "MODS_PLANNER_IMAGE":     imgs.Planner,
+        "MODS_REDUCER_IMAGE":     imgs.Reducer,
+        "MODS_LLM_EXEC_IMAGE":    imgs.LLMExec,
+        "PLOY_CONTROLLER":        infra.Controller,
+        "PLOY_MODS_EXECUTION_ID": os.Getenv("PLOY_MODS_EXECUTION_ID"),
+        "PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
+        "NOMAD_DC":               infra.DC,
+        "MODS_MODEL":             llm.Model,
+        "MODS_TOOLS":             llm.ToolsJSON,
+        "MODS_LIMITS":            llm.LimitsJSON,
+    }
 
 	// Step 2: Generate unique run ID for this branch
 	runID := LLMRunID(branch.ID)
