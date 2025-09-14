@@ -66,8 +66,8 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	stat, _ := rf.Stat()
 
 	// Build app-specific URL
-	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s",
-		controllerURL, appName, sha)
+    url := fmt.Sprintf("%s/apps/%s/builds?sha=%s",
+        controllerURL, appName, sha)
 
 	if mainClass != "" {
 		url += "&main=" + utils.URLQueryEsc(mainClass)
@@ -77,9 +77,12 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		url += "&lane=" + lane
 	}
 
-	if blueGreen {
-		url += "&blue_green=true"
-	}
+    if blueGreen {
+        url += "&blue_green=true"
+    }
+
+    // Prefer async mode to avoid long-lived client connections through ingress
+    url += "&async=true"
 
     var (
         req *http.Request
