@@ -197,3 +197,14 @@ func GenerateBranchName(id string) string {
 	timestamp := time.Now().Unix()
 	return fmt.Sprintf("workflow/%s/%s", id, strconv.FormatInt(timestamp, 10))
 }
+
+// PreferredModel returns the first non-empty model declared in steps, if any.
+// This allows mods.yaml to specify the LLM model used by planner/llm-exec flows.
+func (c *ModConfig) PreferredModel() string {
+    for _, s := range c.Steps {
+        if strings.TrimSpace(s.Model) != "" {
+            return strings.TrimSpace(s.Model)
+        }
+    }
+    return ""
+}

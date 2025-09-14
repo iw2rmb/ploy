@@ -91,15 +91,18 @@ func (v *LLMModelValidator) validateProviderSpecificConfig(provider string, conf
 
 // validateOpenAIConfig validates OpenAI-specific configuration
 func (v *LLMModelValidator) validateOpenAIConfig(config map[string]string) error {
-	// Common OpenAI configurations
-	validKeys := map[string]bool{
-		"api_base":     true,
-		"api_version":  true,
-		"organization": true,
-		"temperature":  true,
-		"top_p":        true,
-		"max_retries":  true,
-	}
+    // Common OpenAI configurations
+    validKeys := map[string]bool{
+        // Endpoint and api_key are allowed to support controller-side credential storage
+        "endpoint":    true,
+        "api_key":    true,
+        "api_base":     true,
+        "api_version":  true,
+        "organization": true,
+        "temperature":  true,
+        "top_p":        true,
+        "max_retries":  true,
+    }
 
 	for key := range config {
 		if !validKeys[key] {
@@ -112,13 +115,15 @@ func (v *LLMModelValidator) validateOpenAIConfig(config map[string]string) error
 
 // validateAnthropicConfig validates Anthropic-specific configuration
 func (v *LLMModelValidator) validateAnthropicConfig(config map[string]string) error {
-	validKeys := map[string]bool{
-		"api_base":    true,
-		"max_retries": true,
-		"temperature": true,
-		"top_k":       true,
-		"top_p":       true,
-	}
+    validKeys := map[string]bool{
+        // Allow endpoint to be specified
+        "endpoint":    true,
+        "api_base":    true,
+        "max_retries": true,
+        "temperature": true,
+        "top_k":       true,
+        "top_p":       true,
+    }
 
 	for key := range config {
 		if !validKeys[key] {
@@ -131,19 +136,21 @@ func (v *LLMModelValidator) validateAnthropicConfig(config map[string]string) er
 
 // validateAzureConfig validates Azure OpenAI-specific configuration
 func (v *LLMModelValidator) validateAzureConfig(config map[string]string) error {
-	// Azure requires deployment name
-	if _, exists := config["deployment_name"]; !exists {
-		return fmt.Errorf("azure models require 'deployment_name' in config")
-	}
+    // Azure requires deployment name
+    if _, exists := config["deployment_name"]; !exists {
+        return fmt.Errorf("azure models require 'deployment_name' in config")
+    }
 
-	validKeys := map[string]bool{
-		"api_base":        true,
-		"api_version":     true,
-		"deployment_name": true,
-		"temperature":     true,
-		"top_p":           true,
-		"max_retries":     true,
-	}
+    validKeys := map[string]bool{
+        // Allow endpoint for compatibility
+        "endpoint":        true,
+        "api_base":        true,
+        "api_version":     true,
+        "deployment_name": true,
+        "temperature":     true,
+        "top_p":           true,
+        "max_retries":     true,
+    }
 
 	for key := range config {
 		if !validKeys[key] {

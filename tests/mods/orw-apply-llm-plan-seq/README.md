@@ -147,6 +147,22 @@ Run Log & Key Takeaways
     - Healing orchestration reached planner submission. Failure likely due to planner image/config (no `plan_json/next_json` artifacts). Requires follow-up on planner/reducer image availability and permissions in Dev (MODS_PLANNER_IMAGE/MODS_LLM_EXEC_IMAGE/MODS_REDUCER_IMAGE).
     - Deterministic failure path and compile gate are functioning; next milestone is making planner/llm-exec produce a patch to flip the failure and complete with an MR.
 
+- Cycle 5 (Model registry, model selection in mods.yaml):
+  - Change:
+    - Stop injecting OPENAI credentials into job env; remove PLOY_OPENAI_API_KEY from Nomad job templates for planner/llm-exec.
+    - Use LLM Model Registry endpoints to provision credentials once: POST /v1/llms/models, verify via GET /v1/llms/models/{id}.
+    - Allow specifying a model in mods.yaml steps (`model:`); runner prefers the first non-empty step model for planner/llm-exec.
+  - Operator steps:
+    - ployman models add -f my-openai-model.json  (contains provider=openai, id=model-id, config.api_key and endpoint; see api/llms/handler.go format)
+    - ployman models get <model-id> to verify; optionally set default via /v1/llms/models/default.
+    - Set `model: <model-id>` on a relevant step in scenario.yaml and rerun ./run.sh.
+  - Result:
+    - Planner/llm-exec jobs run without relying on OPENAI_API_KEY env; model id flows via MODEL env only.
+    - Healing still depends on real planner image producing plan_json/next_json; if stubs are used, artifacts remain empty.
+  - Takeaways:
+    - Credentials live in the registry (api/llms/handler.go, internal/arf/models); jobs should query controller when needed.
+    - Model selection via mods.yaml is effective; no more hardcoded defaults in job templates.
+
 Notes
 - Scripts (`run.sh`, `watch-events.sh`, `fetch-artifacts.sh`, `check-steps.sh`) now have executable bits. `fetch-artifacts.sh` persists artifacts indices/logs under `logs/<EXEC_ID>/`.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
