@@ -26,7 +26,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
       }
 
       config {
-        image = "gcr.io/kaniko-project/executor:debug"
+        image = "{{KANIKO_IMAGE}}"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
           "set -euo pipefail; echo Fetching context: $CONTEXT_URL; \
@@ -83,4 +83,3 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
     }
   }
 }
-
