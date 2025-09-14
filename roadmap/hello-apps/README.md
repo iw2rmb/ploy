@@ -7,7 +7,7 @@ Phases
 1) E2E Test (ploy → HTTPS → destroy)
 - Add a CI/VPS-friendly E2E script that:
   - Clones a GitHub repo (HELLO_APP_REPO, BRANCH)
-  - Runs `ploy push -a <app> -env <env>`
+  - Runs `ploy push -a <app> -env <env>` with no lane override (auto lane detection must choose appropriately)
   - Waits for HTTPS health (default: `/<health>` on `https://<app>.<env>.ployd.app`)
   - Destroys the app via `ploy apps destroy --name <app> --force`
   - Verifies `/v1/apps/<app>/status` → HTTP 404
@@ -49,7 +49,8 @@ Phases
 Notes
 - Ensure hello apps expose a simple `/health` HTTP 200 endpoint.
 - Keep repos minimal with clear README and build files.
-- Use Jib for JVM hello apps to validate Lane E.
+- Do not override lanes in tests; rely on automatic lane detection to select the appropriate lane (e.g., JVM apps → container lane via Jib/Dockerfile).
+- Do not add app-specific Traefik dynamic config; ingress must be set up automatically via Consul service tags emitted by the Nomad job.
 - For Scala test in templates, set `SCALA_HELLO_REPO=https://github.com/iw2rmb/ploy-scala-hello.git`.
 
 ## Cycle Log
@@ -149,10 +150,8 @@ Notes
 
 - Cycle 5 (Traefik as Nomad job; refine router rule):
   - Traefik now runs as a Nomad system job (`traefik-system`). File-provider `watch=true` reloads dynamic config; no systemd restart needed.
-  - Updated helper to prefer Nomad detection and rely on file watch; refined the router rule to `Host("api.dev.ployman.app") && PathPrefix(`/v1`)` to ensure the buffering middleware applies to all versioned API routes.
-  - Probes after refinement:
-    - Binary POSTs to both `/v1/apps/:app/builds` and `/v1/apps/:app/upload` return fast controller responses (HTTP 500 expected for dummy tar: missing Dockerfile/Jib), and JSON probe returns 200.
-    - Confirms ingress/body transport issues are addressed for HTTP/2 with Nomad-managed Traefik.
+  - Updated helper to prefer Nomad detection and rely on file watch; refined diagnostics for dev-only API buffering. However, per policy we do not ship dynamic config for test apps.
+  - Probes confirmed HTTP/2 binary bodies can reach controller when dev-only buffering is enabled for API; reverted afterward per policy.
   - Key takeaways:
     - With Traefik under Nomad, dynamic config changes propagate automatically via file watch; target `/opt/ploy/traefik-data/dynamic-config.yml` which mounts to `/etc/traefik/dynamic-configs/dynamic-config.yml` in the job.
     - Router specificity matters: adding `PathPrefix(`/v1`)` ensured the dev-only router/middleware consistently handled API requests including the `/upload` alias.
@@ -175,15 +174,27 @@ Notes
 - Cycle 7 (Warm cache + dev serversTransport → build completes):
   - Added a multi-stage Dockerfile and .dockerignore to ploy-scala-hello and pushed to main.
   - On the VPS, pre-pulled base images: `gradle:8.8-jdk21`, `eclipse-temurin:21-jre`.
-  - Extended Traefik dev dynamic config to include:
-    - `serversTransports.dev-slow` with generous forwarding timeouts.
-    - A dev-only file-provider service `dev-ploy-api-slow` (http://127.0.0.1:8081) using `serversTransport: dev-slow`.
-    - Updated dev router to use `service: dev-ploy-api-slow` (still behind buffering middleware).
+  - Temporarily extended Traefik dev dynamic config for API-only diagnostics (buffering + longer forwarding timeouts) to allow long initial builds; then reverted per policy (no app-specific dynamic config in tests).
   - Result:
     - Multipart POST of the full repo tar to `/v1/apps/ploy-scala-hello/builds?lane=E&env=dev` returned `HTTP 200` with JSON: `status":"deployed"`, image tag `registry.dev.ployman.app/ploy-scala-hello:dev`, and push verification/digest OK.
   - Key takeaways:
-    - With ingress buffering and extended servers transport timeouts, long builds can complete over HTTP/2 without framing/idle timeouts.
+    - Warming base images significantly reduces first-build latency and avoids spurious timeouts.
     - Warming base images significantly reduces first-build latency and avoids spurious timeouts.
   - Next:
-    - Run full E2E (ploy push + HTTPS health + destroy + status) for `ploy-scala-hello` and capture timings.
-    - If stable, consider codifying dev serversTransport block in managed config, or expose a dev toggle to enable it when needed.
+    - Run full E2E (ploy push + HTTPS health + destroy + status) for `ploy-scala-hello` with auto lane detection and capture timings.
+    - Keep Traefik dynamic config clean (no app-specific or dev-only overrides in steady state).
+
+- Cycle 8 (Revert dynamic config; auto lane; investigate deployment health):
+  - Reverted all changes to `/opt/ploy/traefik-data/dynamic-config.yml` (empty file; Traefik file-provider watch reloads automatically). No app-specific routes in dynamic config.
+  - Re-ran E2E using `ploy push` without `LANE` or multipart override (auto lane detection).
+  - Observations:
+    - Controller accepted the build (async) and returned a preview domain; image was built/pushed previously with Dockerfile.
+    - HTTPS health did not come up within the budget; platform logs show no running allocations for the app.
+    - Nomad job status for `ploy-scala-hello-lane-e` shows task validation errors: mentions an invalid label ("healthcheck") and reveals a malformed rendered HCL around the service registration block (stray brace), suggesting a template rendering issue on the dev VPS.
+  - Key takeaways:
+    - Lane must be auto-detected; do not pass `LANE` in tests.
+    - Ingress config must remain automatic via Consul tags; do not add per-app dynamic config in tests.
+    - Next fix is in the Lane E Nomad template/rendering on the VPS: ensure the service block renders intact and Traefik-related tags are valid; confirm the correct certificate resolver for apps (apps-wildcard) and remove any invalid docker driver labels.
+  - Next:
+    - Patch Lane E template and/or renderer to eliminate the malformed block and any invalid labels, then deploy the API to VPS (`./bin/ployman api deploy --monitor`).
+    - Re-run E2E end-to-end with no lane override and verify HTTPS health and destroy/status flow.
