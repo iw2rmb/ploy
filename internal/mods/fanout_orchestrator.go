@@ -256,11 +256,11 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		"MODS_LIMITS":            llm.LimitsJSON,
 	}
 
-    // Step 2: Generate unique run ID for this branch
-    runID := LLMRunID(branch.ID)
+	// Step 2: Generate unique run ID for this branch
+	runID := LLMRunID(branch.ID)
 
-    // Prepare and upload a minimal context tar for artifact download (mirror planner/reducer behavior)
-    if infra.SeaweedURL != "" {
+	// Prepare and upload a minimal context tar for artifact download (mirror planner/reducer behavior)
+	if infra.SeaweedURL != "" {
 		ctxDir := filepath.Join(baseDir, "context")
 		_ = os.MkdirAll(ctxDir, 0755)
 		_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
@@ -275,7 +275,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		}
 	}
 
-    // Step 3: Extract MCP configuration from branch inputs
+	// Step 3: Extract MCP configuration from branch inputs
 	var mcpConfig *MCPConfig = nil
 	if mcpData, ok := branch.Inputs["mcp_config"]; ok {
 		if mcpConfigMap, ok := mcpData.(map[string]interface{}); ok {
@@ -320,22 +320,24 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
-    // Step 6: Check for generated diff.patch artifact (fallback to SeaweedFS download if missing)
+    // Step 6: Always fetch diff.patch from SeaweedFS step-scoped key
     diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
-    if _, err := os.Stat(diffPath); err != nil {
-        // Fallback: attempt to download from SeaweedFS step-scoped key
-        execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
-        branchID := branch.ID
-        stepID := runID
-        if infra.SeaweedURL != "" && execID != "" {
-            key := computeBranchDiffKey(execID, branchID, stepID)
-            url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-            _ = downloadToFileFn(url, diffPath)
-        }
-    }
-    if _, err := os.Stat(diffPath); err != nil {
+    _ = os.MkdirAll(filepath.Dir(diffPath), 0755)
+    execID := os.Getenv("PLOY_MODS_EXECUTION_ID")
+    branchID := branch.ID
+    stepID := runID
+    if infra.SeaweedURL == "" || execID == "" {
         result.Status = "failed"
-        result.Notes = fmt.Sprintf("LLM exec job completed but no diff.patch found: %v", err)
+        result.Notes = "LLM exec missing SeaweedFS URL or execution ID for artifact fetch"
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(result.StartedAt)
+        return result
+    }
+    key := computeBranchDiffKey(execID, branchID, stepID)
+    url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+    if err := downloadToFileFn(url, diffPath); err != nil {
+        result.Status = "failed"
+        result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", err)
         result.FinishedAt = time.Now()
         result.Duration = time.Since(result.StartedAt)
         return result
