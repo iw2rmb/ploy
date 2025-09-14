@@ -125,7 +125,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		dc = d.DC
 	}
 
-	replacer := strings.NewReplacer(
+    replacer := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
 		"${LIMITS_JSON}", hclEscape(limitsJSON),
@@ -146,8 +146,9 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${CONTROLLER_URL}", hclEscape(controllerURL),
 		"${EXECUTION_ID}", hclEscape(execID),
 		"${NOMAD_DC}", hclEscape(dc),
-		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
-	)
+        "${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
+        "${PLOY_SEAWEEDFS_URL}", hclEscape(get("PLOY_SEAWEEDFS_URL")),
+    )
 	rendered := replacer.Replace(string(hclBytes))
 
 	// Write substituted HCL to a new file
