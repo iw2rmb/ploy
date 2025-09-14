@@ -7,13 +7,13 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
+    "net/http"
+    "net/url"
+    "os"
+    "os/exec"
+    "path/filepath"
+    "strings"
+    "time"
 
 	"github.com/gofiber/fiber/v2"
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
@@ -626,25 +626,39 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return 0
 		}())
 
-		// Upload context tar to storage for Kaniko to fetch
-		contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
-		var contextURL string
-		if deps.Storage != nil {
-			ctxUp := context.Context(c.Context())
-			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
-				return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
-			}
-			base := os.Getenv("PLOY_SEAWEEDFS_URL")
-			if base == "" {
-				base = "http://seaweedfs-filer.service.consul:8888"
-			}
-			if !strings.HasPrefix(base, "http") {
-				base = "http://" + base
-			}
-			contextURL = strings.TrimRight(base, "/") + "/" + contextKey
-		} else {
-			return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
-		}
+        // Upload context tar to storage for Kaniko to fetch
+        contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
+        var contextURL string
+        if deps.Storage != nil {
+            ctxUp := context.Context(c.Context())
+            if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+                return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
+            }
+            base := os.Getenv("PLOY_SEAWEEDFS_URL")
+            if base == "" {
+                base = "http://seaweedfs-filer.service.consul:8888"
+            }
+            if !strings.HasPrefix(base, "http") {
+                base = "http://" + base
+            }
+            contextURL = strings.TrimRight(base, "/") + "/" + contextKey
+            // Best-effort: also PUT context directly to Filer HTTP path for Dev fetch compatibility
+            go func(path string) {
+                f, err := os.Open(builderTar)
+                if err != nil { return }
+                defer f.Close()
+                req, err := http.NewRequest("PUT", path, f)
+                if err != nil { return }
+                req.Header.Set("Content-Type", "application/x-tar")
+                client := &http.Client{Timeout: 20 * time.Second}
+                resp, err := client.Do(req)
+                if err == nil {
+                    _ = resp.Body.Close()
+                }
+            }(contextURL)
+        } else {
+            return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
+        }
 		log.Printf("[Build:E] Context uploaded: url=%s", contextURL)
 
 		// Render and execute Kaniko builder job, waiting for terminal completion
