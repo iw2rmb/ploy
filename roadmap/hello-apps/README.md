@@ -171,3 +171,19 @@ Notes
     - Update the `ploy-scala-hello` repo to include a minimal Dockerfile or migrate to Gradle with Jib plugin, then rerun the E2E.
     - Alternatively, enhance the controller’s OCI builder with a dev fallback (generate a simple Dockerfile for JVM apps) for demos, gated to dev only.
     - Deploy the updated API to VPS: `./bin/ployman api deploy --monitor` so the improved 400 error mapping is visible in Dev.
+
+- Cycle 7 (Warm cache + dev serversTransport → build completes):
+  - Added a multi-stage Dockerfile and .dockerignore to ploy-scala-hello and pushed to main.
+  - On the VPS, pre-pulled base images: `gradle:8.8-jdk21`, `eclipse-temurin:21-jre`.
+  - Extended Traefik dev dynamic config to include:
+    - `serversTransports.dev-slow` with generous forwarding timeouts.
+    - A dev-only file-provider service `dev-ploy-api-slow` (http://127.0.0.1:8081) using `serversTransport: dev-slow`.
+    - Updated dev router to use `service: dev-ploy-api-slow` (still behind buffering middleware).
+  - Result:
+    - Multipart POST of the full repo tar to `/v1/apps/ploy-scala-hello/builds?lane=E&env=dev` returned `HTTP 200` with JSON: `status":"deployed"`, image tag `registry.dev.ployman.app/ploy-scala-hello:dev`, and push verification/digest OK.
+  - Key takeaways:
+    - With ingress buffering and extended servers transport timeouts, long builds can complete over HTTP/2 without framing/idle timeouts.
+    - Warming base images significantly reduces first-build latency and avoids spurious timeouts.
+  - Next:
+    - Run full E2E (ploy push + HTTPS health + destroy + status) for `ploy-scala-hello` and capture timings.
+    - If stable, consider codifying dev serversTransport block in managed config, or expose a dev toggle to enable it when needed.

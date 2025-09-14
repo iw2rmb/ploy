@@ -115,13 +115,6 @@ func templateForLane(lane string) string {
 
 // RenderKanikoBuilder renders a Kaniko builder job for Lane E container builds
 func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath string) (string, error) {
-    data := RenderData{
-        App:           app,
-        Version:       version,
-        DockerImage:   dockerImage,
-        DomainSuffix:  utils.Getenv("PLOY_APPS_DOMAIN", "dev.ployman.app"),
-        BuildTime:     time.Now().Format(time.RFC3339),
-    }
     // Load builder template
     b, err := loadTemplateContent("platform/nomad/lane-e-kaniko-builder.hcl")
     if err != nil {

@@ -32,69 +32,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 
 ## 🛠 Build Lanes (A–G)
 
-Auto-classified lanes:
-- ✅ **Lane A** – Unikraft Minimal (Go, C)
-  - KraftKit unikernel images
-  - `<app>-<sha>.img` deterministic naming
-  - SBOM + signature generation
-- ✅ **Lane B** – Unikraft POSIX (Node, Python)
-  - ✅ **Intelligent Node.js Configuration System** (Aug 2025):
-    - Specialized B-unikraft-nodejs template for Node.js applications
-    - Enhanced V8 runtime support with optimized kernel configuration
-    - Threading and memory management for event loop and worker threads
-    - Advanced networking with IPv4/IPv6 and HTTP server optimizations
-    - Automatic application metadata extraction from package.json
-  - ✅ **Node.js Version Detection and Management** (Aug 2025):
-    - Automatic Node.js version detection from package.json engines field
-    - Support for version ranges (^18.0.0, >=16.0.0, 18.x, ~19.5.0)
-    - Download and caching of specific Node.js versions for Unikraft builds
-    - Fallback to system Node.js when download fails or network unavailable
-    - Version-specific npm and dependency management during build process
-    - Integration with Kraft YAML generation and dependency manifests
-  - Enhanced Node.js runtime support with libelf, musl, lwip libraries
-  - Comprehensive V8/Node.js kconfig for POSIX environment, networking, I/O
-  - Musl libc with crypto, locale, networking, and complex math support
-  - Optimized lwip networking stack with TCP/UDP, DHCP, threading
-  - Dropbear SSH for debug (planned)
-- ✅ **Lane C** – OSv Java/Scala **[FULLY OPERATIONAL]**
-  - ✅ **Java Version Detection** (Aug 2025): Automatic Java version detection from build files
-    - Gradle support: `JavaLanguageVersion.of(21)`, `sourceCompatibility = "17"`, `gradle.properties`
-    - Maven support: `<maven.compiler.source>21</maven.compiler.source>`, `<java.version>11</java.version>`
-    - `.java-version` file support for explicit version specification
-    - Intelligent fallback to Java 21 default when detection fails
-    - Version validation ensuring reasonable range (8-25) for production builds
-    - Enhanced build logging with detected version information and source
-  - ✅ **Complete OSv Pipeline** (Aug 2025): End-to-end Java→OSv unikernel deployment
-    - **Capstan Integration**: Package-based OSv image creation with S3 repository support
-    - **Template Processing**: HCL conditional block processing for Nomad deployment templates
-    - **Image Optimization**: 60-80MB unikernel images within Lane C 50-200MB specification
-    - **Boot Performance**: 200-800ms boot times for production-ready Java unikernels
-  - Jib → Capstan → `<app>-<sha>.qcow2`
-  - Custom MainClass support
-- ✅ **Lane D** – FreeBSD Jails
-  - `<app>-<sha>-jail.tar` rootfs
-  - Lightweight isolation for legacy apps
-  - Preview router health/endpoint discovery via unified `internal/orchestration` facade
-- ✅ **Lane E** – OCI + Kontain
-  - `harbor.local/ploy/<app>:<sha>` images
-  - `io.kontain` runtime for VM isolation
-- ✅ **Lane F** – Full VMs
-- ✅ **Lane G** – WebAssembly Runtime (Fully Implemented Aug 2025)
-  - ✅ **Complete WASM Implementation** (Aug 2025): Production-ready WebAssembly support with comprehensive feature set
-    - **Multi-Language Compilation Support**: Rust (wasm32-wasi), Go (js/wasm), C/C++ (Emscripten), AssemblyScript
-    - **wazero Runtime Integration**: Pure Go WebAssembly runtime v1.5.0 with security constraints
-    - **WASI Preview 1 Support**: Filesystem access, environment variables, and system interface
-    - **Automatic Detection**: Lane picker intelligently detects WASM targets with 95%+ accuracy
-    - **Component Model**: Multi-module WASM applications with dependency management and interface validation
-    - **Production Templates**: Nomad job templates with health checks, resource limits, and Traefik routing
-    - **Security Policies**: OPA policies for production/staging/development environments with WASM-specific constraints
-    - **Build Pipeline**: Complete build strategies for different WASM compilation targets
-    - **Runtime Features**: HTTP server integration, metrics endpoint, graceful shutdown, health monitoring
-    - **Sample Applications**: Working examples for Rust, Go, AssemblyScript, and C++ WASM modules
-  - `<app>-<sha>.wasm` module artifacts with wazero runtime
-  - Hardware-enforced sandboxing with process isolation  
-  - 5–30 MB footprint, 10–50ms boot times
-  - Supports Rust, Go, C++, AssemblyScript with extensible compilation detection
+For complete lane descriptions, detection rules, build flows, and best practices, see docs/LANES.md. This document is the single source of truth for lane-specific capabilities and limitations.
 
 ⸻
 
