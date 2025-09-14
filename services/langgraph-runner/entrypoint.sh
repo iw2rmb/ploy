@@ -187,6 +187,10 @@ EOF
 elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   log "Detected llm-exec run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "llm-exec" "llm-exec" "job started"
+  log "CTX_DIR=$CTX_DIR OUT_DIR=$OUT_DIR"
+  mkdir -p "$OUT_DIR" || true
+  ls -la "$CTX_DIR" || true
+  ls -la "$OUT_DIR" || true
   # Attempt to generate a deletion patch for the known failing source to heal build
   TARGET_REL="src/healing/java/e2e/FailHealing.java"
   if [ -f "$CTX_DIR/$TARGET_REL" ]; then
@@ -194,7 +198,9 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
     (
       cd "$CTX_DIR" >/dev/null 2>&1 || exit 0
       # Use git diff --no-index to produce a proper unified diff against /dev/null (deletion)
-      git -c core.safecrlf=false diff --no-index -- "$TARGET_REL" /dev/null > "$OUT_DIR/diff.patch" 2>/dev/null || true
+      if command -v git >/dev/null 2>&1; then
+        git -c core.safecrlf=false diff --no-index -- "$TARGET_REL" /dev/null > "$OUT_DIR/diff.patch" 2>/dev/null || true
+      fi
     )
   fi
   # Fallback: if no healing target found or diff is empty, produce a minimal noop patch comment to keep pipeline moving
