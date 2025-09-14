@@ -8,6 +8,12 @@ job "traefik-system" {
     value = "linux"
   }
   
+  # Run only on edge/gateway nodes (Nomad client config: client.meta.role = "gateway")
+  constraint {
+    attribute = "${meta.role}"
+    value     = "gateway"
+  }
+  
   group "traefik" {
     count = 1
     
@@ -104,6 +110,7 @@ job "traefik-system" {
           "--api.dashboard=true",
           "--api.insecure=true",
           "--ping=true",
+          "--ping.entryPoint=admin",
           "--entrypoints.web.address=:80",
           "--entrypoints.websecure.address=:443", 
           "--entrypoints.admin.address=:8090",
@@ -114,7 +121,7 @@ job "traefik-system" {
           "--providers.consulcatalog.exposedByDefault=false",
           "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
-          "--providers.consulcatalog.endpoint.token=${CONSUL_HTTP_TOKEN}",
+          # Token is provided via CONSUL_HTTP_TOKEN environment variable when Consul ACLs are enabled
           "--providers.file.filename=/etc/traefik/dynamic-configs/dynamic-config.yml",
           "--providers.file.watch=true",
           "--metrics.prometheus=true",
@@ -128,18 +135,18 @@ job "traefik-system" {
           "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Dev environment wildcard certificate resolver for ployman.app
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge=true",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.dev-wildcard.acme.email=admin@ployd.app",
-          "--certificatesresolvers.dev-wildcard.acme.storage=/data/dev-wildcard-acme.json",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Apps wildcard certificate resolver for ployd.app
+          # Platform wildcard certificate resolver for dev.ployman.app (reuse existing storage)
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge=true",
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.provider=namecheap",
+          "--certificatesresolvers.platform-wildcard.acme.email=admin@ployman.app",
+          "--certificatesresolvers.platform-wildcard.acme.storage=/data/platform-acme.json",
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.delayBeforeCheck=30",
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          # Apps wildcard certificate resolver for dev.ployd.app (reuse existing storage)
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge=true",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.provider=namecheap",
           "--certificatesresolvers.apps-wildcard.acme.email=admin@ployd.app",
-          "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-wildcard-acme.json",
+          "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
           # HTTP to HTTPS redirect
