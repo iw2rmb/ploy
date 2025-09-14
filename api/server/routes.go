@@ -40,8 +40,10 @@ func (s *Server) setupRoutes() {
     api.Post("/apps/:app/builds", s.handleTriggerAppBuild) // apps namespace
     // Temporary alias for build uploads to isolate ingress path issues
     api.Post("/apps/:app/upload", s.handleTriggerAppBuild)
-	// OPTIONS handler for build route to aid debugging (preflight/route reachability)
-	api.Options("/apps/:app/builds", s.handleBuildsOptions)
+    // OPTIONS handler for build route to aid debugging (preflight/route reachability)
+    api.Options("/apps/:app/builds", s.handleBuildsOptions)
+    // Dev-only probe endpoint for POST testing (JSON without binary body)
+    api.Post("/apps/:app/builds/probe", s.handleBuildsProbe)
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
 	api.Get("/apps/:app/logs", build.GetLogs)

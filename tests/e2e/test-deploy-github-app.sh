@@ -64,7 +64,9 @@ attempt_push() {
     # Build tar from repo and upload via multipart
     TAR_PATH="$WORKDIR/app.tar"
     tar -cf "$TAR_PATH" -C "$WORKDIR/app" .
-    local url="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds?sha=${GIT_SHA:-dev}&lane=${LANE:-}"
+    local endpoint="builds"
+    if [[ "${USE_UPLOAD:-}" == "1" ]]; then endpoint="upload"; fi
+    local url="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/${endpoint}?sha=${GIT_SHA:-dev}&lane=${LANE:-}"
     out=$(curl -sS --http1.1 -D - -o - -X POST -F "file=@${TAR_PATH};type=application/x-tar" "$url" 2>&1)
     rc=$?
   else
@@ -121,20 +123,22 @@ if command -v jq >/dev/null 2>&1; then
   fi
 fi
 
-# Determine expected URL
-# Prefer preview router using commit SHA to trigger run, else allow override
+# Determine expected URL(s)
+# Prefer preview router using commit SHA; also prepare fallback to app host
 GIT_SHA=$(git rev-parse --short=12 HEAD 2>/dev/null || echo "")
 URL_OVERRIDE=${URL_OVERRIDE:-}
+DOMAIN_SUFFIX="ployd.app"
+if [[ "${ENV_NAME}" == "dev" ]]; then
+  DOMAIN_SUFFIX="dev.ployd.app"
+fi
 if [[ -n "$URL_OVERRIDE" ]]; then
-  URL="$URL_OVERRIDE"
+  URL="$URL_OVERRIDE"; URL_FALLBACK=""
 elif [[ -n "$GIT_SHA" ]]; then
-  DOMAIN_SUFFIX="ployd.app"
-  if [[ "${ENV_NAME}" == "dev" ]]; then
-    DOMAIN_SUFFIX="dev.ployd.app"
-  fi
   URL="https://${GIT_SHA}.${APP_NAME}.${DOMAIN_SUFFIX}"
+  URL_FALLBACK="https://${APP_NAME}.${DOMAIN_SUFFIX}"
 else
-  URL="https://${APP_NAME}.ployd.app"
+  URL="https://${APP_NAME}.${DOMAIN_SUFFIX}"
+  URL_FALLBACK=""
 fi
 
 # Adjust remaining time budget after push
@@ -151,6 +155,10 @@ set +e
 while (( ELAPSED < REMAIN )); do
   if curl -sf "${URL}${HEALTH_PATH}" >/dev/null; then
     ok "App is responding over HTTPS: ${URL}${HEALTH_PATH}"
+    READY=1; break
+  elif [[ -n "$URL_FALLBACK" ]] && curl -sf "${URL_FALLBACK}${HEALTH_PATH}" >/dev/null; then
+    ok "App is responding over HTTPS (fallback): ${URL_FALLBACK}${HEALTH_PATH}"
+    URL="$URL_FALLBACK"
     READY=1; break
   fi
   sleep "$SLEEP"; ELAPSED=$((ELAPSED + SLEEP))
