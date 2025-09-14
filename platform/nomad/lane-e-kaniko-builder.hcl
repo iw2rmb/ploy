@@ -27,11 +27,11 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
 
       config {
         image = "{{KANIKO_IMAGE}}"
-        # Use host networking so the builder can reach local service endpoints (e.g., SeaweedFS filer)
+        # Builder needs resolver access for .service.consul and filer; host networking is scoped to this short-lived task
         network_mode = "host"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
-          "set -euo pipefail; wget -qO /tmp/src.tar $CONTEXT_URL; mkdir -p /workspace; tar -xf /tmp/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
+          "set -euo pipefail; for i in 1 2 3; do wget -qO /tmp/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...'; sleep 2; done; test -s /tmp/src.tar; mkdir -p /workspace; tar -xf /tmp/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
         ]
 
         ports = ["http"]
