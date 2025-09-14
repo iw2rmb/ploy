@@ -1,6 +1,7 @@
 FROM alpine:3.19
 
-RUN apk add --no-cache bash coreutils jq
+# Tools needed: bash/jq for glue; coreutils; git for --no-index diffs
+RUN apk add --no-cache bash coreutils jq git
 
 WORKDIR /workspace
 
@@ -12,4 +13,3 @@ ENV OUTPUT_DIR=/workspace/out \
     RUN_ID=""
 
 ENTRYPOINT ["/usr/local/bin/langgraph-runner"]
-
