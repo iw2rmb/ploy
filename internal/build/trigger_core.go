@@ -18,6 +18,7 @@ import (
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
 	clutils "github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/config"
+	detectjava "github.com/iw2rmb/ploy/internal/detect/java"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
@@ -187,7 +188,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		})
 	}
 	sha := c.Query("sha", "dev")
-	mainClass := c.Query("main", "com.ploy.ordersvc.Main")
+    mainClass := c.Query("main", "")
 	lane := c.Query("lane", "")
 	// Diagnostic: request overview
 	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
@@ -269,22 +270,35 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		appEnvVars = make(map[string]string)
 	}
 
-	detectedLanguage := ""
-	if lane == "" {
-		if res, err := utils.RunLanePick(srcDir); err == nil {
-			lane = res.Lane
-			detectedLanguage = res.Language
-		} else {
-			// Default to container lane for broad compatibility when detection is unavailable
-			lane = "E"
-		}
-	} else {
-		// Attempt language detection even when lane is forced
-		if res, err := utils.RunLanePick(srcDir); err == nil {
-			detectedLanguage = res.Language
-		}
-	}
-	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
+    detectedLanguage := ""
+    detectedJavaVersion := ""
+    detectedMainClass := ""
+    if lane == "" {
+        if res, err := utils.RunLanePick(srcDir); err == nil {
+            lane = res.Lane
+            detectedLanguage = res.Language
+        } else {
+            // Default to container lane for broad compatibility when detection is unavailable
+            lane = "E"
+        }
+    } else {
+        // Attempt language detection even when lane is forced
+        if res, err := utils.RunLanePick(srcDir); err == nil {
+            detectedLanguage = res.Language
+        }
+    }
+    // JVM detection: capture Java version and main class for JVM languages (java/scala/kotlin)
+    if strings.Contains(strings.ToLower(detectedLanguage), "java") || strings.Contains(strings.ToLower(detectedLanguage), "scala") || strings.Contains(strings.ToLower(detectedLanguage), "kotlin") {
+        if v := detectjava.DetectVersion(srcDir); v != "" { detectedJavaVersion = v }
+        if m := detectjava.DetectMainClass(srcDir); m != "" { detectedMainClass = m }
+    }
+    if mainClass == "" && detectedMainClass != "" {
+        mainClass = detectedMainClass
+    }
+    if mainClass == "" {
+        mainClass = "com.ploy.ordersvc.Main"
+    }
+    log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
 
 	var imagePath, dockerImage string
 	switch strings.ToUpper(lane) {
@@ -728,16 +742,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		domainSuffix = "dev.ployd.app"
 	}
 
-	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
-		App:         appName,
-		ImagePath:   imagePath,
-		DockerImage: dockerImage,
-		EnvVars:     appEnvVars,
-		Version:     sha,
-		Lane:        lane,
-		MainClass:   mainClass,
-		IsDebug:     debug,
-		Language:    detectedLanguage,
+    jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
+        App:         appName,
+        ImagePath:   imagePath,
+        DockerImage: dockerImage,
+        EnvVars:     appEnvVars,
+        Version:     sha,
+        Lane:        lane,
+        MainClass:   mainClass,
+        IsDebug:     debug,
+        Language:    detectedLanguage,
 
 		// Feature flags (dev-friendly defaults)
 		VaultEnabled:        false, // Vault not enabled on dev cluster
@@ -752,10 +766,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		MemoryLimit:   getMemoryLimitForLane(lane),
 		HttpPort:      8080,
 
-		// JVM-specific configuration for Lane C
-		JvmMemory:   getJvmMemoryForLane(lane),
-		JvmCpus:     2,
-		JavaVersion: "17", // Default Java version
+        // JVM-specific configuration for Lane C
+        JvmMemory:   getJvmMemoryForLane(lane),
+        JvmCpus:     2,
+        JavaVersion: func() string { if detectedJavaVersion != "" { return detectedJavaVersion }; return "17" }(),
 
 		// Domain configuration
 		DomainSuffix: domainSuffix,
