@@ -1,7 +1,7 @@
 FROM alpine:3.19
 
-# Tools needed: bash/jq for glue; coreutils; git for --no-index diffs
-RUN apk add --no-cache bash coreutils jq git
+# Tools needed: bash/jq for glue; coreutils; git for --no-index diffs; curl for uploads/events
+RUN apk add --no-cache bash coreutils jq git curl
 
 WORKDIR /workspace
 

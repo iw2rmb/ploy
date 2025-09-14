@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Test configuration
-CONTROLLER_URL="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
+CONTROLLER_URL="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
 TEST_APP="test-java-analysis"
 TEST_REPO_URL="https://github.com/winterbe/java8-tutorial.git"
 
