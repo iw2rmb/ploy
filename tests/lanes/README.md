@@ -149,3 +149,11 @@ Temporary Dev workaround (no in-API Docker):
 - Error: job validation failed (HCL parse) in `lane-c-java.hcl` around the QEMU args block.
 - Likely fix: simplify/quote the `args` array (avoid `${...}` interpolations in HCL strings) and re-validate with wrapper. Also consider disabling `kvm=true` on Dev if KVM is unavailable.
 - Next: patch `platform/nomad/lane-c-java.hcl` args formatting, set `accelerator`/`kvm` to Dev-friendly defaults, and retry. If runtime still unavailable, temporarily force container fallback (LANE_OVERRIDE=E) for green while OSv support is finalized on Dev.
+
+### Cycle: Lane C (OSv JVM) — After HCL Fix
+- Patched `lane-c-java.hcl`: simplified QEMU args; disabled KVM; redeployed API.
+- Retried with HELLO_APP_REPO=https://github.com/<org>/ploy-lane-c-java.git.
+- Result: Still no running allocations (Dev lacks a real OSv image builder; current stub image is not bootable).
+- Next:
+  - Integrate a minimal OSv image build path for Dev or add a Dev-only fallback to Lane E when OSv artifacts aren’t bootable.
+  - Keep tests green by forcing LANE_OVERRIDE=E for Lane C apps until OSv pipeline is ready on Dev.
