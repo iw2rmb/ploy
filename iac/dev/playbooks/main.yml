@@ -22,6 +22,21 @@
     - ../vars/dev-wildcard.yml
   
   tasks:
+    - name: Assert required dev domain variables are set
+      assert:
+        that:
+          - ploy is defined
+          - ploy.apps_domain is defined
+          - ploy.apps_domain | length > 0
+          - ploy.platform_domain is defined
+          - ploy.platform_domain | length > 0
+          - ploy.apps_domain_provider is defined
+          - ploy.apps_domain_provider | length > 0
+          - ploy.platform_domain_provider is defined
+          - ploy.platform_domain_provider | length > 0
+        fail_msg: "Required variables missing: set PLOY_APPS_DOMAIN, PLOY_PLATFORM_DOMAIN, PLOY_APPS_DOMAIN_PROVIDER, PLOY_PLATFORM_DOMAIN_PROVIDER in environment or inventory."
+        success_msg: "Required dev domain variables are set."
+
     - name: Create ploy user first
       user:
         name: ploy
@@ -1055,12 +1070,12 @@
         mode: '0644'
         block: |
           # Ploy Controller API endpoint configuration
-          export PLOY_APPS_DOMAIN={{ ploy.apps_domain | default('ployd.app') }}
+          export PLOY_APPS_DOMAIN={{ ploy.apps_domain }}
           export PLOY_ENVIRONMENT={{ ploy_environment | default('dev') }}
           {% if ploy_environment == 'dev' %}
-          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain | default('ployman.app') }}/v1
+          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain }}/v1
           {% else %}
-          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain | default('ployman.app') }}/v1
+          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain }}/v1
           {% endif %}
           
           # ARF (Automated Remediation Framework) environment variables
@@ -1687,8 +1702,8 @@
           export PLOY_DNS_PROVIDER="{{ lookup('env', 'PLOY_DNS_PROVIDER') | default('namecheap') }}"
           
           # Platform domain configuration
-          export PLOY_PLATFORM_DOMAIN="{{ ploy.platform_domain | default('ployman.app') }}"
-          export PLOY_DNS_DOMAIN="{{ lookup('env', 'PLOY_DNS_DOMAIN') | default('ployd.app') }}"
+          export PLOY_PLATFORM_DOMAIN="{{ ploy.platform_domain }}"
+          export PLOY_DNS_DOMAIN="{{ lookup('env', 'PLOY_DNS_DOMAIN') }}"
           export PLOY_DNS_TARGET_IP="{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
           
           # Global deployment target host
@@ -2042,19 +2057,19 @@
             group: ploy
             mode: '0644'
             block: |
-              # SSL Certificate Automation Environment
-              export CERT_EMAIL="{{ ploy_dev_certificate.email | default('admin@ployd.app') }}"
-              export ACME_STAGING="{{ ploy_dev_certificate.staging | default('false') }}"
+              # SSL Certificate Automation Environment (dev apps wildcard)
+              export CERT_EMAIL="{{ ploy_dev_apps_certificate.email }}"
+              export ACME_STAGING="{{ ploy_dev_apps_certificate.staging }}"
               
               # Certificate storage paths
               export CERT_DIR="/etc/ploy/certs"
-              export DEV_CERT_PATH="{{ ploy_dev_certificate.cert_path | default('/etc/ploy/certs/dev-wildcard.crt') }}"
-              export DEV_KEY_PATH="{{ ploy_dev_certificate.key_path | default('/etc/ploy/certs/dev-wildcard.key') }}"
+              export DEV_CERT_PATH="{{ ploy_dev_apps_certificate.cert_path }}"
+              export DEV_KEY_PATH="{{ ploy_dev_apps_certificate.key_path }}"
               
               # Dev environment certificate domains
-              export DEV_WILDCARD_DOMAIN="{{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}"
-              export DEV_BASE_DOMAIN="{{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }}"
-              export DEV_API_DOMAIN="{{ ploy_dev_routing.api_domain | default('api.' ~ (ploy.platform_domain | default('ployman.app'))) }}"
+              export DEV_WILDCARD_DOMAIN="{{ ploy_dev_apps_certificate.wildcard_domain }}"
+              export DEV_BASE_DOMAIN="{{ ploy_dev_apps_certificate.base_domain }}"
+              export DEV_API_DOMAIN="api.{{ ploy.platform_domain }}"
             marker: "# {mark} ANSIBLE MANAGED BLOCK - SSL Certificate vars"
 
     - name: Initialize SSL certificate provisioning for dev environment
@@ -2062,7 +2077,7 @@
         - name: Check if DNS records are properly configured
           shell: |
             DEV_IP=$(dig +short {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} | tail -n1)
-            API_IP=$(dig +short {{ ploy_dev_routing.api_domain | default('api.' ~ (ploy.platform_domain | default('ployman.app'))) }} | tail -n1)
+            API_IP=$(dig +short api.{{ ploy.platform_domain }} | tail -n1)
             TARGET_HOST="{{ ansible_default_ipv4.address }}"
             
             if [ "$DEV_IP" = "$TARGET_HOST" ] && [ "$API_IP" = "$TARGET_HOST" ]; then
@@ -2070,7 +2085,7 @@
             else
               echo "DNS_NOT_READY"
               echo "Current: {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} -> $DEV_IP"
-              echo "Current: {{ ploy_dev_routing.api_domain | default('api.' ~ (ploy.platform_domain | default('ployman.app'))) }} -> $API_IP"
+              echo "Current: api.{{ ploy.platform_domain }} -> $API_IP"
               echo "Required: $TARGET_HOST"
             fi
           register: dns_status
@@ -2096,7 +2111,7 @@
               - Wildcard certificate for {{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}
               - Automatic certificate renewal
               
-              Certificate will be available at: https://api.{{ ploy.platform_domain | default('ployman.app') }}
+              Certificate will be available at: https://api.{{ ploy.platform_domain }}
           when: ploy_environment is defined and ploy_environment == 'dev'
 
         - name: Display certificate provisioning approach
@@ -2111,12 +2126,12 @@
     # Platform wildcard certificate health check (after api deployment)
     - name: Wait for api health endpoint to be available
       uri:
-        url: "https://api.{{ ploy.platform_domain | default('ployman.app') }}/health"
+        url: "https://api.{{ ploy.platform_domain }}/health"
         validate_certs: no
         method: GET
         status_code: 200
       environment:
-        PLOY_PLATFORM_DOMAIN: "ployman.app"
+        PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
       register: health_check
       retries: 30
       delay: 5
@@ -2125,12 +2140,12 @@
 
     - name: Check platform wildcard certificate health
       uri:
-        url: "https://api.{{ ploy.platform_domain | default('ployman.app') }}/health/platform-certificates"
+        url: "https://api.{{ ploy.platform_domain }}/health/platform-certificates"
         validate_certs: no
         method: GET
         status_code: [200, 503]  # 503 is acceptable during initial provisioning
       environment:
-        PLOY_PLATFORM_DOMAIN: "ployman.app"
+        PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
       register: cert_health_check
       retries: 60  # More retries for certificate provisioning
       delay: 15

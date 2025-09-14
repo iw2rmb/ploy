@@ -488,7 +488,7 @@
     - name: Check A-records for root domains
       block:
         - name: Verify platform domain A-record
-          command: nslookup api.{{ ploy.platform_domain | default('ployman.app') }} 8.8.8.8
+          command: nslookup api.{{ ploy.platform_domain }} 8.8.8.8
           register: platform_dns_check
           ignore_errors: true
           changed_when: false
@@ -498,7 +498,7 @@
             msg: "Platform domain DNS check: {{ platform_dns_check.stdout_lines | select('match', '.*Address:.*') | list }}"
 
         - name: Verify apps domain A-record  
-          command: nslookup {{ ploy.apps_domain | default('ployd.app') }} 8.8.8.8
+          command: nslookup {{ ploy.apps_domain }} 8.8.8.8
           register: apps_dns_check
           ignore_errors: true
           changed_when: false
@@ -509,7 +509,7 @@
 
         - name: Check if DNS points to current VPS
           debug:
-            msg: "DNS Resolution Status - VPS IP: {{ ansible_default_ipv4.address }}, Platform DNS: {{ platform_dns_check.stdout | regex_search('Address: ([0-9.]+)', '\\1') | first | default('Not resolved') }}"
+            msg: "DNS Resolution Status - VPS IP: {{ ansible_default_ipv4.address }}, Platform DNS: {{ platform_dns_check.stdout | regex_search('Address: ([0-9.]+)', '\\1') | first }}"
 
     - name: Validate required environment variables for SSL certificates
       block:
@@ -811,12 +811,12 @@
 
         - name: Validate API service accessibility via domain
           uri:
-            url: "https://api.{{ ploy.platform_domain | default('ployman.app') }}/health"
+            url: "https://api.{{ ploy.platform_domain }}/health"
             method: GET
             status_code: 200
             validate_certs: no
           environment:
-            PLOY_PLATFORM_DOMAIN: "ployman.app"
+            PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
           register: api_health
           retries: 3
           delay: 10
@@ -830,14 +830,14 @@
               - Traefik: ✅ {{ 'Healthy' if service_health.results[0].status == 200 else 'Failed' }} (Port 8095)
               - Nomad: ✅ {{ 'Healthy' if service_health.results[1].status == 200 else 'Failed' }} (Port 4646)  
               - Consul: ✅ {{ 'Healthy' if service_health.results[2].status == 200 else 'Failed' }} (Port 8500)
-              - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (via https://api.{{ ploy.platform_domain | default('ployman.app') }})
+              - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (via https://api.{{ ploy.platform_domain }})
               
               SSL Certificates:
               - Platform (*.dev.ployman.app): ✅ Configured
               - Apps (*.dev.ployd.app): ✅ Ready for auto-provisioning
               
               Access Points:
-              - API: https://api.{{ ploy.platform_domain | default('ployman.app') }}/health
+              - API: https://api.{{ ploy.platform_domain }}/health
               - Traefik Dashboard: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8095
               - Nomad UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:4646
               - Consul UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8500

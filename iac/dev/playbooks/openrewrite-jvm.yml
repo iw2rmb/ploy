@@ -21,7 +21,7 @@
   vars:
     openrewrite_image_name: "openrewrite-jvm"
     openrewrite_image_tag: "latest"
-    registry_endpoint: "registry.{{ ploy_domain | default('dev.ployman.app') }}"
+    registry_endpoint: "registry.{{ ploy.platform_domain }}"
     build_directory: "/tmp/openrewrite-build"
     
   tasks:
