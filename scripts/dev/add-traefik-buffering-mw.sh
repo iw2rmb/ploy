@@ -47,18 +47,34 @@ append_block() {
   ssh -o StrictHostKeyChecking=no root@"$TARGET_HOST" bash -lc "cat >> '${REMOTE_FILE}' <<'YAML'
 ${MARK_START}
 http:
+  serversTransports:
+    dev-slow:
+      # Relaxed timeouts for long-running upstream builds (dev only)
+      forwardingTimeouts:
+        dialTimeout: 30s
+        responseHeaderTimeout: 900s
+        idleConnTimeout: 900s
+        readIdleTimeout: 900s
+
   middlewares:
     dev-api-buffering:
       buffering:
         maxRequestBodyBytes: 33554432   # 32 MB
         memRequestBodyBytes: 1048576    # 1 MB
 
+  services:
+    dev-ploy-api-slow:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8081"
+      serversTransport: dev-slow
+
   routers:
     dev-ploy-api-buffered:
       rule: \"Host(\"api.dev.ployman.app\") && PathPrefix(`/v1`)\"
       entryPoints:
         - websecure
-      service: ploy-api@consulcatalog
+      service: dev-ploy-api-slow
       middlewares:
         - dev-api-buffering
       tls:

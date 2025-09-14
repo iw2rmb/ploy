@@ -95,7 +95,7 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 }
 
 func templateForLane(lane string) string {
-	switch strings.ToUpper(lane) {
+    switch strings.ToUpper(lane) {
 	case "A":
 		return "platform/nomad/lane-a-unikraft.hcl"
 	case "B":
@@ -104,13 +104,41 @@ func templateForLane(lane string) string {
 		return "platform/nomad/lane-c-osv.hcl"
 	case "D":
 		return "platform/nomad/lane-d-jail.hcl"
-	case "E":
-		return "platform/nomad/lane-e-oci-kontain.hcl"
-	case "F":
-		return "platform/nomad/lane-f-vm.hcl"
-	default:
-		return "platform/nomad/lane-c-osv.hcl"
-	}
+    case "E":
+        return "platform/nomad/lane-e-oci-kontain.hcl"
+    case "F":
+        return "platform/nomad/lane-f-vm.hcl"
+    default:
+        return "platform/nomad/lane-c-osv.hcl"
+    }
+}
+
+// RenderKanikoBuilder renders a Kaniko builder job for Lane E container builds
+func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath string) (string, error) {
+    data := RenderData{
+        App:           app,
+        Version:       version,
+        DockerImage:   dockerImage,
+        DomainSuffix:  utils.Getenv("PLOY_APPS_DOMAIN", "dev.ployman.app"),
+        BuildTime:     time.Now().Format(time.RFC3339),
+    }
+    // Load builder template
+    b, err := loadTemplateContent("platform/nomad/lane-e-kaniko-builder.hcl")
+    if err != nil {
+        return "", err
+    }
+    s := string(b)
+    s = strings.ReplaceAll(s, "{{APP_NAME}}", app)
+    s = strings.ReplaceAll(s, "{{VERSION}}", version)
+    s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", dockerImage)
+    s = strings.ReplaceAll(s, "{{CONTEXT_URL}}", contextURL)
+    if dockerfilePath == "" { dockerfilePath = "Dockerfile" }
+    s = strings.ReplaceAll(s, "{{DOCKERFILE_PATH}}", dockerfilePath)
+    out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
+    if err := os.WriteFile(out, []byte(s), 0644); err != nil {
+        return "", err
+    }
+    return out, nil
 }
 
 func templateForLaneAndLanguage(lane, language string) string {
