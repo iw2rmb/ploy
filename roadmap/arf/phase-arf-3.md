@@ -9,6 +9,8 @@
 
 Phase ARF-3 represents the revolutionary integration of Large Language Models with OpenRewrite's static analysis capabilities, creating a hybrid intelligence system that combines deterministic transformations with AI-driven adaptability. This phase enables dynamic recipe generation, context-aware transformations, and continuous learning from transformation outcomes.
 
+Note: LLM execution/integration for transformations has since been consolidated under Mods and the LLMS module. ARF retains recipe catalog/CRUD, sandbox, and security routes.
+
 Note: References to tree-sitter, a universal AST, and a MultiLanguageEngine in this document describe earlier plans. These components have been removed from the codebase in favor of consolidating transformation execution under Mods and ARF recipes.
 
 ## Technical Architecture
@@ -623,9 +625,9 @@ type RecipeSDK struct {
 
 ## Configuration Examples
 
-### LLM Integration Configuration
+### LLM Integration Configuration (historical)
 ```yaml
-# configs/arf-llm-config.yaml
+# deprecated: ARF LLM config; use LLMS model registry and Mods configuration
 llm_integration:
   provider: "openai"  # openai, anthropic, azure
   model: "gpt-4"
@@ -649,9 +651,9 @@ llm_integration:
     confidence_threshold: 0.7
 ```
 
-### Hybrid Pipeline Configuration
+### Hybrid Pipeline Configuration (historical)
 ```yaml
-# configs/arf-hybrid-pipeline.yaml
+# deprecated: ARF hybrid pipeline; execution consolidated under Mods
 hybrid_pipeline:
   strategy_selection:
     complexity_threshold: 0.8

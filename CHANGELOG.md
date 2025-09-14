@@ -909,7 +909,7 @@
 ### Changed
 - **LLM Integration Update**: Modified ARF robust transform to use Nomad dispatcher instead of direct HTTP calls
   - Updated `api/arf/robust_transform.go` to use LLM dispatcher pattern
-  - Created comprehensive type system in `api/arf/llm_types.go` for LLM operations
+  - Created comprehensive type system in `api/arf/llm_types.go` for LLM operations (removed in favor of Mods + LLMS in Sep 2025)
   - Enhanced `api/arf/factory.go` with LLM generator initialization using Nomad jobs
   - Fixed hybrid pipeline to use new LLM metadata format (map[string]interface{})
 

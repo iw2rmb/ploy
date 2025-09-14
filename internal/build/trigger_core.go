@@ -1117,9 +1117,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		"duration_ms": time.Since(buildStart).Milliseconds(),
 	}
 	// sizeInfo and imageSizeMB computed earlier
+	// Safely include image size metrics
+	var sizeBytes int64
+	if sizeInfo != nil {
+		sizeBytes = sizeInfo.SizeBytes
+	}
 	response["imageSize"] = fiber.Map{
 		"mb":    imageSizeMB,
-		"bytes": sizeInfo.SizeBytes,
+		"bytes": sizeBytes,
 	}
 
 	// Include builder job info for lane E
