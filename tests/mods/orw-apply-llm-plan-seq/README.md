@@ -268,6 +268,24 @@ Cycle 14 (Expected next: llm-exec emits step-scoped diff):
     - `uploaded diff to mods/<EXEC_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch` event.
   - Controller fallback downloads the step-scoped diff when local `out/diff.patch` is missing and proceeds to MR.
   - Manual build validation (workstation): checkout MR branch and `mvn -B -DskipTests package` should succeed.
+
+Cycle 15 (Use :latest for LangGraph images; one-time env; registry prune):
+  - Change:
+    - Switched defaults and Ansible env to use `langgraph-runner:latest` for planner/reducer/llm-exec; no need to set tags per run.
+    - Ansible `langgraph-runner.yml` builds with `--no-cache` and pushes `:latest`, and prunes registry to keep `latest` + two previous non-latest tags.
+    - Made prune script resilient to HTTPS/HTTP endpoints.
+  - Result:
+    - API env now persists `MODS_*_IMAGE` pointing to `:latest`. Future runs use the current image automatically.
+  - Takeaways:
+    - Consistent runner selection without manual tag management; registry disk use bounded.
+
+Cycle 16 (Planner context via MODS_CONTEXT_URL):
+  - Change:
+    - Planner/Reducer/LLM HCL substitution now includes `${MODS_CONTEXT_URL}`; controller uploads a minimal context tar to SeaweedFS and injects the URL so the Nomad `artifact` block resolves.
+  - Expected:
+    - Planner allocation no longer fails on `Failed Artifact Download` for `${MODS_CONTEXT_URL}`; proceeds to produce `plan.json`.
+  - If still failing:
+    - Inspect `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job mods-planner --format json` and fetch latest alloc logs; verify the substituted HCL includes a concrete `MODS_CONTEXT_URL`.
 - For deep debugging of `orw-apply`, enhance the runner to always upload `/workspace/out/transform.log` and `error.log` to artifacts, even on failures.
 
 Go E2E tests — CI/VPS flow

@@ -18,7 +18,7 @@ import (
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
 	clutils "github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/config"
-	detectjava "github.com/iw2rmb/ploy/internal/detect/java"
+    "github.com/iw2rmb/ploy/internal/detect/project"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
@@ -287,11 +287,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
             detectedLanguage = res.Language
         }
     }
-    // JVM detection: capture Java version and main class for JVM languages (java/scala/kotlin)
-    if strings.Contains(strings.ToLower(detectedLanguage), "java") || strings.Contains(strings.ToLower(detectedLanguage), "scala") || strings.Contains(strings.ToLower(detectedLanguage), "kotlin") {
-        if v := detectjava.DetectVersion(srcDir); v != "" { detectedJavaVersion = v }
-        if m := detectjava.DetectMainClass(srcDir); m != "" { detectedMainClass = m }
-    }
+    // Compute cross-language build facts (versions/main) for consistent behavior
+    facts := project.ComputeFacts(srcDir, strings.ToLower(detectedLanguage))
+    if facts.Versions.Java != "" { detectedJavaVersion = facts.Versions.Java }
+    if facts.MainClass != "" { detectedMainClass = facts.MainClass }
     if mainClass == "" && detectedMainClass != "" {
         mainClass = detectedMainClass
     }
