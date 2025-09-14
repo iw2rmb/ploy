@@ -315,6 +315,11 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
         }
         key := fmt.Sprintf("mods/%s/planner/%s/plan.json", execIDVal, runID)
         url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        // Emit download attempt event for diagnostics
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("PLOY_MODS_EXECUTION_ID"))
+            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download plan from %s", key), JobName: runID, Time: time.Now()})
+        }
         if err := downloadToFileFn(url, artifactPath); err != nil {
             return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", err)
         }
