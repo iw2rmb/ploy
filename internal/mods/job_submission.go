@@ -270,7 +270,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
             "MODS_TOOLS":             llm.ToolsJSON,
             "MODS_LIMITS":            llm.LimitsJSON,
             "PLOY_CONTROLLER":        infra.Controller,
-            "PLOY_MODS_EXECUTION_ID": execIDVal,   # legacy (controller event paths)
+            "PLOY_MODS_EXECUTION_ID": execIDVal,
             "MOD_ID":                 execIDVal,
             "PLOY_SEAWEEDFS_URL":     infra.SeaweedURL,
             "NOMAD_DC":               infra.DC,
