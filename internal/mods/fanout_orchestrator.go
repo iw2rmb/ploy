@@ -256,8 +256,11 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		"MODS_LIMITS":            llm.LimitsJSON,
 	}
 
-	// Prepare and upload a minimal context tar for artifact download (mirror planner/reducer behavior)
-	if infra.SeaweedURL != "" {
+    // Step 2: Generate unique run ID for this branch
+    runID := LLMRunID(branch.ID)
+
+    // Prepare and upload a minimal context tar for artifact download (mirror planner/reducer behavior)
+    if infra.SeaweedURL != "" {
 		ctxDir := filepath.Join(baseDir, "context")
 		_ = os.MkdirAll(ctxDir, 0755)
 		_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
@@ -272,10 +275,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		}
 	}
 
-	// Step 2: Generate unique run ID for this branch
-	runID := LLMRunID(branch.ID)
-
-	// Step 3: Extract MCP configuration from branch inputs
+    // Step 3: Extract MCP configuration from branch inputs
 	var mcpConfig *MCPConfig = nil
 	if mcpData, ok := branch.Inputs["mcp_config"]; ok {
 		if mcpConfigMap, ok := mcpData.(map[string]interface{}); ok {
