@@ -296,19 +296,41 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		}
 		imagePath = img
 	case "C":
-		img, err := ibuilders.BuildOSVJava(ibuilders.JavaOSVRequest{
-			App:       appName,
-			MainClass: mainClass,
-			SrcDir:    srcDir,
-			GitSHA:    sha,
-			OutDir:    tmpDir,
-			EnvVars:   appEnvVars,
-		})
-		if err != nil {
-			log.Printf("[Build] OSv Java build error: %v", err)
-			return utils.ErrJSON(c, 500, err)
+		// OSv builder job: prepare a bootable image from a known-good base
+		builderTar := filepath.Join(tmpDir, "context.tar")
+		if err := func() error {
+			f, err := os.Create(builderTar)
+			if err != nil { return err }
+			defer f.Close()
+			ign, _ := clutils.ReadGitignore(srcDir)
+			return clutils.TarDir(srcDir, f, ign)
+		}(); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("create build context: %w", err))
 		}
-		imagePath = img
+		ctxKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
+		var ctxURL string
+		if deps.Storage != nil {
+			ctxUp := context.Context(c.Context())
+			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, ctxKey, "application/x-tar"); err != nil {
+				return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
+			}
+			base := os.Getenv("PLOY_SEAWEEDFS_URL")
+			if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
+			if !strings.HasPrefix(base, "http") { base = "http://" + base }
+			ctxURL = strings.TrimRight(base, "/") + "/" + ctxKey
+		} else {
+			return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
+		}
+		outPath := fmt.Sprintf("/opt/ploy/artifacts/%s-%s-osv.qemu", appName, sha)
+		jobFile, err := orchestration.RenderOSVBuilder(appName, sha, outPath, ctxURL, mainClass, "")
+		if err != nil { return utils.ErrJSON(c, 500, err) }
+		if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("OSv builder job validation failed: %w", vErr))
+		}
+		if err := orchestration.SubmitAndWaitTerminal(jobFile, 10*time.Minute); err != nil {
+			return utils.ErrJSON(c, 500, fmt.Errorf("OSv builder failed: %w", err))
+		}
+		imagePath = outPath
 	case "D":
 		img, err := ibuilders.BuildJail(appName, srcDir, sha, tmpDir, appEnvVars)
 		if err != nil {
