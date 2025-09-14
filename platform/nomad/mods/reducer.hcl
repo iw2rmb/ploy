@@ -6,7 +6,7 @@ job "mods-reducer" {
     task "reduce" {
       driver = "docker"
       config {
-        image = "${MODS_REDUCER_IMAGE}"
+        image = "${REDUCER_IMAGE}"
       }
       env = {
         RUN_ID = "${RUN_ID}"

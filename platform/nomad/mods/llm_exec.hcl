@@ -6,7 +6,7 @@ job "mods-llm-exec-${RUN_ID}" {
     task "llm" {
       driver = "docker"
       config {
-        image = "${MODS_LLM_EXEC_IMAGE}"
+        image = "${LLM_EXEC_IMAGE}"
       }
       env = {
         MODEL       = "${MODEL}"

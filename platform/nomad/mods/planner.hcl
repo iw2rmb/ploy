@@ -6,7 +6,7 @@ job "mods-planner" {
     task "planner" {
       driver = "docker"
       config {
-        image = "${MODS_PLANNER_IMAGE}"
+        image = "${PLANNER_IMAGE}"
       }
       env = {
         MODEL       = "${MODEL}"
