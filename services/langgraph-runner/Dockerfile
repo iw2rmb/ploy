@@ -1,7 +1,10 @@
-FROM alpine:3.19
+FROM debian:bookworm-slim
 
 # Tools needed: bash/jq for glue; coreutils; git for --no-index diffs; curl for uploads/events
-RUN apk add --no-cache bash coreutils jq git curl
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+         bash coreutils jq git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 

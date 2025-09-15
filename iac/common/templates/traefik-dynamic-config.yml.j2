@@ -1,16 +1,30 @@
 # Dynamic Traefik configuration for Ploy API with wildcard SSL certificates
-# This template generates routing rules for the Ploy API service
+# ACME DNS-01 is used via configured resolvers (apps-wildcard, platform-wildcard).
 
 http:
   routers:
     # Wildcard certificate request for apps domain (e.g., *.dev.ployd.app)
     apps-wildcard-cert:
-      rule: "Host(`{{ ploy.apps_domain }}`)"
+      rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy.apps_domain }}`)"
       service: noop-service
       tls:
         certResolver: "apps-wildcard"
         domains:
-          - main: "*.{{ ploy.apps_domain }}"
+          - main: "{{ ploy.apps_domain }}"
+            sans:
+              - "*.{{ ploy.apps_domain }}"
+      priority: 1
+
+    # Wildcard certificate request for platform services (e.g., *.dev.ployman.app)
+    platform-wildcard-cert:
+      rule: "HostRegexp(`{service:[a-z0-9-]+}.{{ ploy.platform_domain }}`)"
+      service: noop-service
+      tls:
+        certResolver: "platform-wildcard"
+        domains:
+          - main: "{{ ploy.platform_domain }}"
+            sans:
+              - "*.{{ ploy.platform_domain }}"
       priority: 1
 
   services:
@@ -49,7 +63,7 @@ http:
         browserXssFilter: true
         customFrameOptionsValue: "SAMEORIGIN"
 
-# TLS configuration for wildcard certificates
+# TLS configuration (no static certificates; rely on ACME resolvers)
 tls:
   options:
     default:
@@ -60,10 +74,3 @@ tls:
         - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
         - "TLS_RSA_WITH_AES_256_GCM_SHA384"
         - "TLS_RSA_WITH_AES_128_GCM_SHA256"
-
-  certificates:
-    # Wildcard certificate for platform domain (e.g., *.dev.ployman.app)
-    - certFile: "/data/certificates/dev-ployman-app.crt"
-      keyFile: "/data/certificates/dev-ployman-app.key"
-      stores:
-        - default

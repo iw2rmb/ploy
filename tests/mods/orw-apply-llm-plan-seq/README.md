@@ -238,6 +238,21 @@ Cycle 12 (Verify llm-exec image/env and SeaweedFS upload path):
   - Expected:
     - llm-exec job logs show: `env CTX_DIR=… OUT_DIR=…`, `env PLOY_SEAWEEDFS_URL=…`, and `uploaded diff to mods/<MOD_ID>/branches/<branchID>/steps/<RUN_ID>/diff.patch`.
     - Controller fallback picks up the step-scoped diff if not present locally and proceeds to MR.
+
+Cycle 13 (Dev TLS: api.dev.ployman.app validation failure → fixed config path):
+  - Symptom:
+    - Harness and scripts hitting `${PLOY_CONTROLLER}` failed TLS verification against `https://api.dev.ployman.app/v1` with `SSL certificate problem: unable to get local issuer certificate`.
+    - `openssl s_client` showed the server presenting `TRAEFIK DEFAULT CERT` (self-signed).
+  - Root cause:
+    - Traefik dynamic config referenced static cert paths under `/data/certificates/...` that were empty, and ACME wildcard issuance wasn’t reliably triggered for platform/apps domains; logs also showed `Router uses a nonexistent certificate resolver` in some runs.
+  - Change:
+    - Updated Traefik dynamic config (`iac/common/templates/traefik-dynamic-config.yml.j2`) to remove static cert references and rely solely on ACME DNS-01 resolvers configured in the Traefik system job (apps-wildcard, platform-wildcard).
+    - Added `apps-wildcard-cert` and `platform-wildcard-cert` routers using HostRegexp to proactively request wildcard certs for `*.dev.ployd.app` and `*.dev.ployman.app`.
+  - Deploy steps (ops):
+    - Apply IaC on Dev so Traefik picks up `/opt/ploy/traefik-data/dynamic-config.yml` and has NAMECHEAP_* env vars.
+    - Verify with `openssl s_client -connect api.dev.ployman.app:443 -servername api.dev.ployman.app` that no longer shows the Traefik default cert; `curl -I https://api.dev.ployman.app/healthz` succeeds without `-k`.
+  - Temporary workaround for this scenario:
+    - Until the IaC change is applied on Dev, export `PLOY_TLS_INSECURE=1` or modify curl invocations with `-k` in local runs so SSE polling and artifact fetches proceed.
   - Takeaways:
     - If healing still fails after planner validation fix, likely causes: old llm-exec image in allocs, logs snapshot too early, or SeaweedFS unreachable from task. Inspect /v1/mods/{id}/logs for the posted env/upload events.
 

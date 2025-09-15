@@ -2,22 +2,18 @@
 # This image runs OpenRewrite transformations using Maven with dynamic recipe loading
 # Recipes are cached in SeaweedFS to avoid repeated downloads from Maven Central
 
-FROM --platform=linux/amd64 eclipse-temurin:17-jdk-alpine
+FROM --platform=linux/amd64 eclipse-temurin:17-jdk
 
 # Build metadata to force fresh image digests on rebuilds
 ARG ORW_BUILD_TS="dev"
 LABEL org.ploy.orw_build_ts="${ORW_BUILD_TS}"
 
 # Install required tools
-RUN apk add --no-cache \
-    bash \
-    curl \
-    git \
-    maven \
-    tar \
-    gzip \
-    jq \
-    unzip
+# Install required tools (Debian base)
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+       bash curl git maven tar gzip jq unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Ensure JAVA_HOME points to the JDK and add to PATH
 ENV JAVA_HOME=/opt/java/openjdk

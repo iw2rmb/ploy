@@ -4,6 +4,7 @@ import (
     "encoding/json"
     "fmt"
     "regexp"
+    "sort"
     "os"
     "os/exec"
     "strconv"
@@ -60,7 +61,7 @@ func (s *Server) handleBuildLogs(c *fiber.Ctx) error {
     alloc := runJobMgr("running-alloc", job)
     if alloc == "" {
         if st.Message != "" {
-            if u := extractUUID(st.Message); u != "" {
+            if u := extractLastUUID(st.Message); u != "" {
                 alloc = u
             }
         }
@@ -136,9 +137,8 @@ func runJobMgr(cmd string, job string) string {
     }
     out, _ := runCmdTimeout(c, 8*time.Second)
     if cmd == "running-alloc" {
-        // Extract first UUID from noisy wrapper output
-        // Wrapper logs to stderr; CombinedOutput mixes both; pick the allocation ID via regex.
-        uuid := extractUUID(out)
+        // Wrapper logs + payload; extract the last UUID which should be the alloc ID
+        uuid := extractLastUUID(out)
         return uuid
     }
     return out
@@ -161,10 +161,13 @@ func runJobMgrAllocStatus(alloc string) string {
     return out
 }
 
-func extractUUID(s string) string {
-    // match RFC4122-like UUIDs
+func extractLastUUID(s string) string {
     re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-    return re.FindString(s)
+    all := re.FindAllString(s, -1)
+    if len(all) == 0 {
+        return ""
+    }
+    return all[len(all)-1]
 }
 
 func getAllocIDs(job string) []string {
@@ -172,12 +175,19 @@ func getAllocIDs(job string) []string {
     if out == "" {
         return nil
     }
-    type alloc struct{ ID string `json:"ID"` }
+    type alloc struct{
+        ID         string `json:"ID"`
+        ModifyTime int64  `json:"ModifyTime"`
+    }
     var a []alloc
     if err := json.Unmarshal([]byte(out), &a); err != nil {
-        // Fallback to regex: return all UUIDs found (first-most recent not guaranteed)
+        // Fallback: return all UUIDs found (order unknown)
         re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
         return re.FindAllString(out, -1)
+    }
+    // Sort by ModifyTime desc (newest first)
+    if len(a) > 1 {
+        sort.Slice(a, func(i, j int) bool { return a[i].ModifyTime > a[j].ModifyTime })
     }
     ids := make([]string, 0, len(a))
     for _, e := range a {

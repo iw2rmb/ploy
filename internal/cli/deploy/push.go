@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"crypto/tls"
 	"os"
 	"time"
 
@@ -127,7 +128,16 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 	}
 
 	// Execute request with a generous timeout
-	client := &http.Client{Timeout: 3 * time.Minute}
+    // HTTP client with optional TLS skip-verify for Dev (controlled via PLOY_TLS_INSECURE)
+    insecure := func() bool {
+        v := os.Getenv("PLOY_TLS_INSECURE")
+        return v == "1" || v == "true" || v == "TRUE" || v == "on" || v == "ON"
+    }()
+    tr := &http.Transport{}
+    if insecure {
+        tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // Dev only; do not use in prod
+    }
+    client := &http.Client{Timeout: 3 * time.Minute, Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("app deployment request failed: %w", err)
