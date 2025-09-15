@@ -383,18 +383,19 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		// In unit tests, HCL submitter may be nil; skip validation
 		vErr = nil
 	}
-	if vErr != nil {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("LLM exec HCL validation failed: %v", vErr)
-		if o.runner != nil {
-			if rep := o.runner.GetEventReporter(); rep != nil {
-				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("validation failed: %v", vErr), JobName: runID, Time: time.Now()})
-			}
-		}
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
+    if vErr != nil {
+        result.Status = "failed"
+        result.Notes = fmt.Sprintf("LLM exec HCL validation failed: %v", vErr)
+        if o.runner != nil {
+            if rep := o.runner.GetEventReporter(); rep != nil {
+                _ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("validation failed: %v", vErr), JobName: runID, Time: time.Now()})
+            }
+        }
+        _ = orchestration.DeregisterJob(runID, true)
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(result.StartedAt)
+        return result
+    }
 	timeout := ResolveDefaultsFromEnv().LLMExecTimeout
 	var sErr error
 	if o.hcl != nil {
@@ -403,18 +404,19 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		// In unit tests, HCL submitter may be nil; signal failure to match expectations
 		sErr = fmt.Errorf("no HCL submitter in test mode")
 	}
-	if sErr != nil {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("LLM exec job failed: %v", sErr)
-		if o.runner != nil {
-			if rep := o.runner.GetEventReporter(); rep != nil {
-				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("submission failed: %v", sErr), JobName: runID, Time: time.Now()})
-			}
-		}
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
+    if sErr != nil {
+        result.Status = "failed"
+        result.Notes = fmt.Sprintf("LLM exec job failed: %v", sErr)
+        if o.runner != nil {
+            if rep := o.runner.GetEventReporter(); rep != nil {
+                _ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("submission failed: %v", sErr), JobName: runID, Time: time.Now()})
+            }
+        }
+        _ = orchestration.DeregisterJob(runID, true)
+        result.FinishedAt = time.Now()
+        result.Duration = time.Since(result.StartedAt)
+        return result
+    }
 
 	// Step 6: Fetch diff.patch from SeaweedFS in prod; in tests (no HCL submitter), rely on local artifact existence
 	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
@@ -449,16 +451,17 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 			}
 		}
 		dlEnd := time.Now()
-		if dlErr != nil {
-			if o.runner != nil && o.runner.GetEventReporter() != nil {
-				_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
-			}
-			result.Status = "failed"
-			result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", dlErr)
-			result.FinishedAt = time.Now()
-			result.Duration = time.Since(result.StartedAt)
-			return result
-		}
+        if dlErr != nil {
+            if o.runner != nil && o.runner.GetEventReporter() != nil {
+                _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+            }
+            result.Status = "failed"
+            result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", dlErr)
+            _ = orchestration.DeregisterJob(runID, true)
+            result.FinishedAt = time.Now()
+            result.Duration = time.Since(result.StartedAt)
+            return result
+        }
 		if o.runner != nil && o.runner.GetEventReporter() != nil {
 			// Best-effort size
 			var sz int64
@@ -483,7 +486,9 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		}
 	}
 
-	result.Status = "completed"
+    // Cleanup job registration after successful artifact retrieval
+    _ = orchestration.DeregisterJob(runID, true)
+    result.Status = "completed"
 	result.Notes = fmt.Sprintf("LLM exec job completed successfully, diff.patch at: %s", diffPath)
 	result.FinishedAt = time.Now()
 	result.Duration = time.Since(result.StartedAt)
