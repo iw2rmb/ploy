@@ -76,6 +76,8 @@
           # Always favor controller token if provided to ensure write access for pushes/MRs
           GITLAB_TOKEN="{{ (controller_gitlab_token | length > 0) | ternary(controller_gitlab_token, (fallback_token | default('', true))) }}"
           PLOY_CONTROLLER="{{ lookup('env', 'PLOY_CONTROLLER') }}"
+          # Platform domain used by API and platform ingress
+          PLOY_PLATFORM_DOMAIN="{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('dev.ployman.app', true) }}"
           # Nomad/Mods runtime defaults
           NOMAD_DC="{{ lookup('env', 'NOMAD_DC') }}"
           PLOY_SEAWEEDFS_URL="{{ lookup('env', 'PLOY_SEAWEEDFS_URL') }}"
