@@ -66,6 +66,15 @@
           stat:
             path: /home/ploy/ploy/.git
           register: git_repo_exists
+        
+        - name: Clone repository if missing
+          git:
+            repo: https://github.com/iw2rmb/ploy.git
+            dest: /home/ploy/ploy
+            version: "{{ deploy_branch | default('main') }}"
+            force: true
+          become_user: ploy
+          when: not git_repo_exists.stat.exists
           
         - name: Stash any local changes if repository exists
           shell: cd /home/ploy/ploy && git stash push -m "Ansible deployment stash $(date +%Y%m%d-%H%M%S)"
@@ -99,11 +108,20 @@
             msg: "Git authentication verified successfully for repository access"
           when: git_auth_check.rc == 0
           
+        - name: Ensure correct Git remote URL
+          shell: |
+            cd /home/ploy/ploy
+            git remote set-url origin https://github.com/iw2rmb/ploy.git
+          become_user: ploy
+          register: set_remote_url
+          changed_when: false
+          when: git_repo_exists.stat.exists
+          
         - name: Pull latest code from git repository
           shell: |
             cd /home/ploy/ploy
             # Reset any local changes and pull latest
-            git fetch origin
+            git fetch --all --prune
             git reset --hard origin/{{ deploy_branch | default('main') }}
             git clean -fd
             echo "Updated to commit: $(git rev-parse HEAD)"
