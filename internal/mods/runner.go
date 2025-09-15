@@ -1170,6 +1170,23 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
         summary.NextAction = *nextAction
     }
 
+    // Fallback policy: if reducer returned stop but at least one LLM branch produced a diff (completed),
+    // prefer applying that branch to ensure healing impact is reflected. This keeps flow progressing
+    // until reducer logic is refined to emit apply explicitly.
+    if nextAction != nil && strings.ToLower(nextAction.Action) == "stop" {
+        // Pick winner if present, else first completed llm-* branch
+        if summary.Winner != nil && strings.HasPrefix(strings.ToLower(summary.Winner.ID), "llm") && strings.ToLower(summary.Winner.Status) == "completed" {
+            summary.NextAction = NextAction{Action: "apply", StepID: summary.Winner.ID, Notes: "fallback-apply: winner llm branch"}
+        } else {
+            for _, br := range allResults {
+                if strings.HasPrefix(strings.ToLower(br.ID), "llm") && strings.ToLower(br.Status) == "completed" {
+                    summary.NextAction = NextAction{Action: "apply", StepID: br.ID, Notes: "fallback-apply: completed llm branch"}
+                    break
+                }
+            }
+        }
+    }
+
     // If reducer requests applying a branch chain, replay it into the repo now
     if nextAction != nil && strings.ToLower(nextAction.Action) == "apply" {
         seaweed := ResolveInfraFromEnv().SeaweedURL
