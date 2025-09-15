@@ -13,8 +13,8 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-BASE_DOMAIN="{{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }}"
-CONTROLLER_DOMAIN="{{ ploy_dev_routing.controller_domain | default('api.dev.ployman.app') }}"
+BASE_DOMAIN="{{ ploy.apps_domain }}"
+CONTROLLER_DOMAIN="api.{{ ploy.platform_domain }}"
 TARGET_HOST="{{ ansible_default_ipv4.address }}"
 
 echo -e "${BLUE}🌐 DNS Records Validation${NC}"

@@ -19,7 +19,6 @@
   become: true
   vars_files:
     - ../vars/main.yml
-    - ../vars/dev-wildcard.yml
   
   tasks:
     - name: Assert required dev domain variables are set
@@ -2047,81 +2046,7 @@
             name: "Platform Wildcard Certificate Renewal"
             state: absent
 
-    - name: Configure Namecheap DNS API environment
-      block:
-        - name: Set Namecheap API environment variables for certificate automation
-          blockinfile:
-            path: /home/ploy/.bashrc
-            create: true
-            owner: ploy
-            group: ploy
-            mode: '0644'
-            block: |
-              # SSL Certificate Automation Environment (dev apps wildcard)
-              export CERT_EMAIL="{{ ploy_dev_apps_certificate.email }}"
-              export ACME_STAGING="{{ ploy_dev_apps_certificate.staging }}"
-              
-              # Certificate storage paths
-              export CERT_DIR="/etc/ploy/certs"
-              export DEV_CERT_PATH="{{ ploy_dev_apps_certificate.cert_path }}"
-              export DEV_KEY_PATH="{{ ploy_dev_apps_certificate.key_path }}"
-              
-              # Dev environment certificate domains
-              export DEV_WILDCARD_DOMAIN="{{ ploy_dev_apps_certificate.wildcard_domain }}"
-              export DEV_BASE_DOMAIN="{{ ploy_dev_apps_certificate.base_domain }}"
-              export DEV_API_DOMAIN="api.{{ ploy.platform_domain }}"
-            marker: "# {mark} ANSIBLE MANAGED BLOCK - SSL Certificate vars"
-
-    - name: Initialize SSL certificate provisioning for dev environment
-      block:
-        - name: Check if DNS records are properly configured
-          shell: |
-            DEV_IP=$(dig +short {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} | tail -n1)
-            API_IP=$(dig +short api.{{ ploy.platform_domain }} | tail -n1)
-            TARGET_HOST="{{ ansible_default_ipv4.address }}"
-            
-            if [ "$DEV_IP" = "$TARGET_HOST" ] && [ "$API_IP" = "$TARGET_HOST" ]; then
-              echo "DNS_READY"
-            else
-              echo "DNS_NOT_READY"
-              echo "Current: {{ ploy_dev_certificate.base_domain | default('dev.ployd.app') }} -> $DEV_IP"
-              echo "Current: api.{{ ploy.platform_domain }} -> $API_IP"
-              echo "Required: $TARGET_HOST"
-            fi
-          register: dns_status
-          changed_when: false
-
-        - name: Display DNS configuration status
-          debug:
-            msg: |
-              DNS Configuration Status: {{ dns_status.stdout_lines[0] }}
-              {% if dns_status.stdout_lines|length > 1 %}
-              Details:
-              {% for line in dns_status.stdout_lines[1:] %}
-                {{ line }}
-              {% endfor %}
-              {% endif %}
-
-        - name: Skip manual certificate provisioning (now handled by Traefik ACME)
-          debug:
-            msg: |
-              Manual certificate provisioning disabled - Traefik will automatically obtain certificates via ACME.
-              Traefik configuration includes:
-              - DNS challenge with Namecheap provider
-              - Wildcard certificate for {{ ploy_dev_certificate.wildcard_domain | default('*.dev.ployd.app') }}
-              - Automatic certificate renewal
-              
-              Certificate will be available at: https://api.{{ ploy.platform_domain }}
-          when: ploy_environment is defined and ploy_environment == 'dev'
-
-        - name: Display certificate provisioning approach
-          debug:
-            msg: |
-              Certificate provisioning approach: Traefik ACME automation
-              - Certificates will be automatically obtained when Traefik starts
-              - DNS challenge will use Namecheap API
-              - Wildcard certificate will cover *.dev.ployd.app
-              - No manual intervention required
+    # Manual certificate env and provisioning steps removed; Traefik handles ACME
 
     # Platform wildcard certificate health check (after api deployment)
     - name: Wait for api health endpoint to be available

@@ -27,6 +27,7 @@
 - API Nomad templates: align default feature flags with orchestration. For non‑platform apps, disable Volumes and Consul config by default (Vault/Connect remain off). Fixes Lane E job validation for user apps and prevents invalid volume blocks on dev/test clusters.
 - Housekeeping: removed redundant `internal/cli/arf/recipes.go.backup` and the legacy `internal/testutils/` package in favor of `internal/testing/**`.
 - API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
+ - Orchestration: embedded builder templates `lane-e-kaniko-builder.hcl` and `lane-c-osv-builder.hcl` in `internal/orchestration` to remove filesystem dependency during API builds. The blanket Ansible copy of `platform/nomad/*.hcl` is no longer required for API-driven deployments; keep IaC-managed jobs (e.g., Traefik, Docker Registry) in playbooks.
 - Ansible API deploy: switch to Nomad rolling updates (no stop/start). The dev playbook removes explicit stop and relies on the job's `update` stanza. Nomad job template now enables `auto_promote = true` and `health_check = "checks"` for zero‑downtime rollouts.
 - AGENTS.md: added mandatory Go analysis tooling section and pre-commit hooks guidance.
 - Transflow: diff path allowlist now uses doublestar globbing with `**` support; added unit tests covering `src/**/*.java`, `src/**`, and `pom.xml` to prevent false negatives in path validation.

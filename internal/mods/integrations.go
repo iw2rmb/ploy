@@ -221,9 +221,9 @@ func (i *ModIntegrations) CreateConfiguredRunner(config *ModConfig) (*ModRunner,
 	runner.SetTransformationExecutor(NewTransformationExecutorAdapter(runner))
 	// BuildGate is already provided via SetBuildChecker; Repo/MR modules via SetGitOperations/SetGitProvider
 
-    // Prefer production healing via Nomad; do not set a test submitter by default.
-    // Tests can inject a mock submitter explicitly when needed.
-    runner.SetJobSubmitter(nil)
+	// Prefer production healing via Nomad; do not set a test submitter by default.
+	// Tests can inject a mock submitter explicitly when needed.
+	runner.SetJobSubmitter(nil)
 	// Wire default production healing orchestrator (wraps existing fanout)
 	runner.SetHealingOrchestrator(NewProdHealingOrchestrator(runner.jobSubmitter, runner))
 
