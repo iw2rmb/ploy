@@ -4,14 +4,14 @@ Documentation=https://www.nomadproject.io/
 Requires=network-online.target
 After=network-online.target
 Wants=consul.service
-ConditionFileNotEmpty=/etc/nomad.d/nomad.hcl
+ConditionPathExists=/etc/nomad.d
 
 [Service]
 Type=notify
 User=ploy
 Group=ploy
 EnvironmentFile=-/etc/nomad.d/nomad.env
-ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d/nomad.hcl
+ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
