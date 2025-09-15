@@ -12,11 +12,10 @@ job "mods-reducer" {
       }
       env = {
         RUN_ID = "${RUN_ID}"
-        SBOM_LATEST_URL = "${SBOM_LATEST_URL}"
       }
       template {
-        data        = "${SBOM_LATEST_URL}"
-        destination = "local/sbom_latest_url"
+        data        = "# keep reducer out dir"
+        destination = "local/out/.keep"
       }
       artifact {
         source      = "${MODS_CONTEXT_URL}"
