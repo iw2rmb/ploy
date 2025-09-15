@@ -10,6 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -107,6 +110,11 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 		t.Logf("Fallback Execution ID: %s", result.ModID)
 	}
 
+	// Optional: collect logs early if requested or initial CLI errored
+	if (os.Getenv("E2E_LOG_CONFIG") == "1" || err != nil) && result.ModID != "" {
+		runModsCollector(t, result.ModID)
+	}
+
 	// Query controller for final status to assert MR and build metadata
 	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ModID)
 	httpc := &http.Client{Timeout: 30 * time.Second}
@@ -138,6 +146,10 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 	if st.Status != "completed" {
+		// Collect logs on unexpected terminal state for post-mortem
+		if result.ModID != "" {
+			runModsCollector(t, result.ModID)
+		}
 		t.Fatalf("expected completed status, got %s (error=%s)", st.Status, st.Error)
 	}
 	// Extract result fields
@@ -293,6 +305,13 @@ func TestModsE2E_SelfHealingScenario(t *testing.T) {
 	if len(result.HealingAttempts) > 0 {
 		for i, attempt := range result.HealingAttempts {
 			t.Logf("Attempt %d: Success=%t, Error=%s", i+1, attempt.Success, attempt.ErrorSignature)
+		}
+	}
+
+	// Collect logs when requested or on error conditions
+	if os.Getenv("E2E_LOG_CONFIG") == "1" || !result.Success {
+		if result.ModID != "" {
+			runModsCollector(t, result.ModID)
 		}
 	}
 }
@@ -456,6 +475,11 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 		t.Logf("Fallback Execution ID: %s", result.ModID)
 	}
 
+	// Optional: collect logs early if requested or initial CLI errored
+	if (os.Getenv("E2E_LOG_CONFIG") == "1" || err != nil) && result.ModID != "" {
+		runModsCollector(t, result.ModID)
+	}
+
 	// Query controller for steps and artifacts to verify healing path
 	statusURL := fmt.Sprintf("%s/mods/%s/status", strings.TrimRight(controller, "/"), result.ModID)
 	artsURL := fmt.Sprintf("%s/mods/%s/artifacts", strings.TrimRight(controller, "/"), result.ModID)
@@ -526,6 +550,10 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 			}
 		}
 	} else {
+		// If healing path wasn’t exercised, still collect logs on request for analysis
+		if os.Getenv("E2E_LOG_CONFIG") == "1" && result.ModID != "" {
+			runModsCollector(t, result.ModID)
+		}
 		t.Skip("build gate did not fail; provide E2E_HEALING_REPO with deterministic failure to fully validate healing path")
 	}
 }
@@ -547,4 +575,59 @@ func asStr(v any) string {
 		return s
 	}
 	return fmt.Sprintf("%v", v)
+}
+
+// runModsCollector invokes the mods collect-logs.sh with a short follow window when enabled.
+func runModsCollector(t *testing.T, modID string) {
+	t.Helper()
+	if modID == "" {
+		return
+	}
+	script := resolveModsCollectorPath()
+	if _, err := os.Stat(script); err != nil {
+		t.Logf("collect-logs.sh not found: %v", err)
+		return
+	}
+	follow := os.Getenv("E2E_LOG_FOLLOW_SECONDS")
+	if follow == "" {
+		follow = "30"
+	}
+	cmd := exec.Command("bash", script, modID)
+	// Prepare environment
+	env := os.Environ()
+	// Propagate controller and optional SeaweedFS URL
+	if v := os.Getenv("PLOY_CONTROLLER"); v != "" {
+		env = append(env, "PLOY_CONTROLLER="+v)
+	}
+	if v := os.Getenv("PLOY_SEAWEEDFS_URL"); v != "" {
+		env = append(env, "PLOY_SEAWEEDFS_URL="+v)
+	}
+	if v := os.Getenv("TARGET_HOST"); v != "" {
+		env = append(env, "TARGET_HOST="+v)
+	}
+	env = append(env, "FOLLOW_SECONDS="+follow)
+	if os.Getenv("E2E_LOG_COMPRESS") == "1" {
+		env = append(env, "COMPRESS=1")
+	}
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("collect-logs.sh error: %v", err)
+	}
+	if len(out) > 0 {
+		t.Logf("\n%s\n", string(out))
+	}
+}
+
+// resolveModsCollectorPath returns an absolute path to the mods collect-logs.sh script.
+func resolveModsCollectorPath() string {
+	// Use caller path to derive repo root
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return "tests/mods/orw-apply-llm-plan-seq/collect-logs.sh"
+	}
+	base := filepath.Dir(file) // .../tests/e2e
+	root := filepath.Dir(base) // .../tests
+	root = filepath.Dir(root)  // repo root
+	return filepath.Join(root, "tests/mods/orw-apply-llm-plan-seq/collect-logs.sh")
 }
