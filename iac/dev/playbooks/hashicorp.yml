@@ -835,14 +835,13 @@
             group: ploy
             mode: '0644'
 
-        - name: Ensure proper ownership of certificate data directory
+        - name: Ensure certificate data directory exists (no recursive perms)
           file:
             path: /opt/ploy/traefik-data
             state: directory
-            owner: ploy
-            group: ploy
+            owner: root
+            group: root
             mode: '0755'
-            recurse: true
 
     - name: Final validation and health checks
       block:
