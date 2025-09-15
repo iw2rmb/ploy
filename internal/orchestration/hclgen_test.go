@@ -6,7 +6,7 @@ import (
 )
 
 func TestRenderServiceDockerJobHCL_Basic(t *testing.T) {
-	hcl := RenderServiceDockerJobHCL("platform-api", "api", "api", "ghcr.io/x/y:1", map[string]string{"FOO": "bar"}, "api.dev.ployman.app", "dev-wildcard", "dev")
+	hcl := RenderServiceDockerJobHCL("platform-api", "api", "api", "ghcr.io/x/y:1", map[string]string{"FOO": "bar"}, "api.dev.ployman.app", "platform-wildcard", "dev")
 	if !strings.Contains(hcl, "job \"platform-api\"") {
 		t.Fatalf("missing job header: %s", hcl)
 	}

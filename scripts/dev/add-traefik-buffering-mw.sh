@@ -78,7 +78,7 @@ http:
       middlewares:
         - dev-api-buffering
       tls:
-        certResolver: dev-wildcard
+        certResolver: platform-wildcard
       priority: 1000
 ${MARK_END}
 YAML"

@@ -631,6 +631,18 @@
 
     - name: Deploy Traefik system job to Nomad (Nomad-only; systemd Traefik disabled)
       block:
+        - name: Ensure Traefik ACME storage files exist with strict permissions
+          file:
+            path: "{{ item }}"
+            state: touch
+            owner: root
+            group: root
+            mode: '0600'
+          loop:
+            - /opt/ploy/traefik-data/acme.json
+            - /opt/ploy/traefik-data/platform-acme.json
+            - /opt/ploy/traefik-data/apps-acme.json
+
         - name: Ensure systemd Traefik service is stopped and disabled (Nomad-only)
           systemd:
             name: traefik
@@ -688,21 +700,31 @@
                 method: GET
                 status_code: 200
               register: nomad_agent_self
-              retries: 3
-              delay: 3
+              retries: 5
+              delay: 2
               until: nomad_agent_self.status == 200
               failed_when: false
               changed_when: false
 
-            - name: Extract Nomad client meta role
+            - name: Extract Nomad client meta role (case-robust)
               set_fact:
-                nomad_client_meta_role: "{{ nomad_agent_self.json.config.Client.meta[ploy_gateway_node_meta_key | default('role')] | default('') }}"
+                nomad_client_meta_role: >-
+                  {{
+                    (nomad_agent_self.json.config.Client.meta[ploy_gateway_node_meta_key | default('role')] 
+                      if (nomad_agent_self.json is defined and nomad_agent_self.json.config is defined and nomad_agent_self.json.config.Client is defined and nomad_agent_self.json.config.Client.meta is defined)
+                      else '')
+                  }}
+              when: nomad_agent_self.json is defined
+
+            - name: Display Nomad client meta
+              debug:
+                msg: "Nomad client meta map: {{ nomad_agent_self.json.config.Client.meta | default({}) }} (role resolved='{{ nomad_client_meta_role | default('') }}')"
               when: nomad_agent_self.json is defined
 
             - name: Warn if Nomad client meta is not set for Traefik placement
               debug:
                 msg: "Nomad client meta '{{ ploy_gateway_node_meta_key | default('role') }}' is '{{ nomad_client_meta_role | default('') }}' but expected '{{ ploy_gateway_node_class }}'. Traefik scheduling may be constrained. Set in /etc/nomad.d/nomad.hcl under client.meta and restart nomad."
-              when: nomad_client_meta_role | default('') != (ploy_gateway_node_class)
+              when: (nomad_client_meta_role | default('')) != (ploy_gateway_node_class)
 
         - name: Download and install Traefik binary (if needed)
           block:

@@ -2021,7 +2021,8 @@
             mode: '0600'
           loop:
             - /opt/ploy/traefik-data/acme.json
-            - /opt/ploy/traefik-data/dev-wildcard-acme.json
+            - /opt/ploy/traefik-data/platform-acme.json
+            - /opt/ploy/traefik-data/apps-acme.json
 
         - name: Create SSL certificate scripts directory
           file:
