@@ -490,7 +490,7 @@
         msg: "Vault unsealing result: {{ vault_unseal.json.sealed | default('Already unsealed or error occurred') }}"
       when: vault_init_file.stat.exists
 
-    - name: Check A-records for root domains
+    - name: Check A-records for root domains (resilient)
       block:
         - name: Verify platform domain A-record
           command: nslookup api.{{ ploy.platform_domain }} 8.8.8.8
@@ -498,23 +498,32 @@
           ignore_errors: true
           changed_when: false
 
+        - name: Parse platform DNS IP (exclude resolver IP)
+          set_fact:
+            platform_dns_ips: "{{ (platform_dns_check.stdout | default('') | regex_findall('Address: ([0-9.]+)')) | list }}"
+            platform_dns_ip: "{{ (platform_dns_ips | difference(['8.8.8.8']) | first | default('')) }}"
+
         - name: Display platform domain DNS resolution
           debug:
-            msg: "Platform domain DNS check: {{ platform_dns_check.stdout_lines | select('match', '.*Address:.*') | list }}"
+            msg: "Platform domain DNS: {{ platform_dns_ips | default([]) }} (selected: {{ platform_dns_ip | default('') }})"
 
-        - name: Verify apps domain A-record  
+        - name: Verify apps domain A-record
           command: nslookup {{ ploy.apps_domain }} 8.8.8.8
           register: apps_dns_check
           ignore_errors: true
           changed_when: false
 
+        - name: Parse apps domain DNS IP
+          set_fact:
+            apps_dns_ips: "{{ (apps_dns_check.stdout | default('') | regex_findall('Address: ([0-9.]+)')) | list }}"
+
         - name: Display apps domain DNS resolution
           debug:
-            msg: "Apps domain DNS check: {{ apps_dns_check.stdout_lines | select('match', '.*Address:.*') | list }}"
+            msg: "Apps domain DNS: {{ apps_dns_ips | default([]) }}"
 
         - name: Check if DNS points to current VPS
           debug:
-            msg: "DNS Resolution Status - VPS IP: {{ ansible_default_ipv4.address }}, Platform DNS: {{ platform_dns_check.stdout | regex_search('Address: ([0-9.]+)', '\\1') | first }}"
+            msg: "DNS Resolution Status - VPS IP: {{ ansible_default_ipv4.address }}, Platform DNS: {{ platform_dns_ip | default('') }}"
 
     - name: Validate required environment variables for SSL certificates
       block:
