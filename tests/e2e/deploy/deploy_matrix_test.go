@@ -3,11 +3,11 @@
 package deploy
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "os"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -45,12 +45,12 @@ func TestDeployMatrix(t *testing.T) {
 	total := len(matrix)
 	for i, tc := range matrix {
 		t.Run(fmt.Sprintf("%s-%s-%s", tc.Lane, tc.Lang, tc.Version), func(t *testing.T) {
-        repo := tc.RepoURL(user)
-        app := sanitizeAppName(filepath.Base(strings.TrimSuffix(repo, ".git")))
-        pushBudget, asyncBudget, healthBudget := budgetsForCase(t, i, total)
-        runDeploy(t, controller, tc.Lane, repo, app, pushBudget, asyncBudget, healthBudget)
-    })
-    }
+			repo := tc.RepoURL(user)
+			app := sanitizeAppName(filepath.Base(strings.TrimSuffix(repo, ".git")))
+			pushBudget, asyncBudget, healthBudget := budgetsForCase(t, i, total)
+			runDeploy(t, controller, tc.Lane, repo, app, pushBudget, asyncBudget, healthBudget)
+		})
+	}
 }
 
 // Explicit case: Java (Gradle) without Jib to validate Lane E autogen
@@ -65,9 +65,9 @@ func TestDeploy_Java17_NoJib(t *testing.T) {
 	}
 	lane := "E"
 	repo := fmt.Sprintf("https://github.com/%s/ploy-lane-e-java-17-nojib.git", user)
-    app := sanitizeAppName("ploy-lane-e-java-17-nojib")
-    pushBudget, asyncBudget, healthBudget := budgetsForCase(t, 0, 1)
-    runDeploy(t, controller, lane, repo, app, pushBudget, asyncBudget, healthBudget)
+	app := sanitizeAppName("ploy-lane-e-java-17-nojib")
+	pushBudget, asyncBudget, healthBudget := budgetsForCase(t, 0, 1)
+	runDeploy(t, controller, lane, repo, app, pushBudget, asyncBudget, healthBudget)
 }
 
 func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asyncBudget, healthBudget time.Duration) {
@@ -346,25 +346,25 @@ func inferVersion(repo string) string {
 // sanitizeAppName makes a best-effort to comply with app name policy:
 // start with letter, end with letter/number, only [a-z0-9-].
 func sanitizeAppName(s string) string {
-    s = strings.ToLower(s)
-    s = strings.ReplaceAll(s, ".", "-")
-    var b strings.Builder
-    for _, r := range s {
-        if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-            b.WriteRune(r)
-        } else {
-            b.WriteRune('-')
-        }
-    }
-    out := b.String()
-    out = strings.Trim(out, "-")
-    for len(out) > 0 && out[len(out)-1] == '-' {
-        out = strings.TrimRight(out, "-")
-    }
-    if out == "" || !(out[0] >= 'a' && out[0] <= 'z') {
-        out = "a-" + out
-    }
-    return out
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, ".", "-")
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('-')
+		}
+	}
+	out := b.String()
+	out = strings.Trim(out, "-")
+	for len(out) > 0 && out[len(out)-1] == '-' {
+		out = strings.TrimRight(out, "-")
+	}
+	if out == "" || !(out[0] >= 'a' && out[0] <= 'z') {
+		out = "a-" + out
+	}
+	return out
 }
 
 func appendFile(path, line string) error {

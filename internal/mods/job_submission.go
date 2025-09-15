@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
 // Implementation of job submission helpers for the mods healing workflow.
@@ -314,15 +316,15 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("planner HCL validation failed: %w", err)
 		}
 		timeout := ResolveDefaultsFromEnv().PlannerTimeout
-        if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, modID)
-                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
-            }
-            // Best-effort cleanup: job reached terminal with error; deregister to avoid lingering registrations
-            _ = orchestration.DeregisterJob(runID, true)
-            return nil, fmt.Errorf("planner job failed: %w", err)
-        }
+		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, modID)
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
+			// Best-effort cleanup: job reached terminal with error; deregister to avoid lingering registrations
+			_ = orchestration.DeregisterJob(runID, true)
+			return nil, fmt.Errorf("planner job failed: %w", err)
+		}
 
 		// Step 6: Always fetch planner plan.json from SeaweedFS
 		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
@@ -352,15 +354,15 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			}
 		}
 		dlEnd := time.Now()
-        if dlErr != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, modID)
-                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-            }
-            // Planner finished without producing artifact; cleanup job registration
-            _ = orchestration.DeregisterJob(runID, true)
-            return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
-        }
+		if dlErr != nil {
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, modID)
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+			}
+			// Planner finished without producing artifact; cleanup job registration
+			_ = orchestration.DeregisterJob(runID, true)
+			return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
+		}
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
 			rep := NewControllerEventReporter(controller, modID)
 			// Best-effort size
@@ -380,12 +382,12 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("failed to read planner output: %w", err)
 		}
 
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, modID)
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
-        }
-        // Planner artifact obtained; job can be deregistered now
-        _ = orchestration.DeregisterJob(runID, true)
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, modID)
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
+		}
+		// Planner artifact obtained; job can be deregistered now
+		_ = orchestration.DeregisterJob(runID, true)
 
 		return &planResult, nil
 	}
@@ -486,14 +488,14 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("reducer HCL validation failed: %w", err)
 		}
 		timeout := ResolveDefaultsFromEnv().ReducerTimeout
-        if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
-            if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-                rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
-            }
-            _ = orchestration.DeregisterJob(runID, true)
-            return nil, fmt.Errorf("reducer job failed: %w", err)
-        }
+		if err := h.runner.GetHCLSubmitter().SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+			if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("job failed: %v", err), JobName: runID, Time: time.Now()})
+			}
+			_ = orchestration.DeregisterJob(runID, true)
+			return nil, fmt.Errorf("reducer job failed: %w", err)
+		}
 
 		// Step 6: Fetch reducer next.json from SeaweedFS (align with planner fetch)
 		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
@@ -521,14 +523,14 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			}
 		}
 		dlEnd := time.Now()
-        if dlErr != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-            }
-            _ = orchestration.DeregisterJob(runID, true)
-            return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
-        }
+		if dlErr != nil {
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+			}
+			_ = orchestration.DeregisterJob(runID, true)
+			return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
+		}
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
 			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
 			var sz int64
@@ -568,11 +570,11 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("next parsed: %s", string(b)), JobName: runID, Time: time.Now()})
 		}
 
-        if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
-        }
-        _ = orchestration.DeregisterJob(runID, true)
+		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
+		}
+		_ = orchestration.DeregisterJob(runID, true)
 
 		return &nextAction, nil
 	}
