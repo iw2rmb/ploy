@@ -128,7 +128,12 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		dc = d.DC
 	}
 
-	replacer := strings.NewReplacer(
+    // Ensure SBOM_LATEST_URL has a non-empty value to satisfy Nomad template validation
+    sbomURL := get("SBOM_LATEST_URL")
+    if strings.TrimSpace(sbomURL) == "" {
+        sbomURL = "#"
+    }
+    replacer := strings.NewReplacer(
 		"${MODEL}", hclEscape(model),
 		"${TOOLS_JSON}", hclEscape(toolsJSON),
 		"${LIMITS_JSON}", hclEscape(limitsJSON),
@@ -150,7 +155,7 @@ func substituteHCLTemplateWithMCPVars(hclPath string, runID string, vars map[str
 		"${CONTROLLER_URL}", hclEscape(controllerURL),
 		"${MOD_ID}", hclEscape(modID),
 		"${NOMAD_DC}", hclEscape(dc),
-		"${SBOM_LATEST_URL}", hclEscape(get("SBOM_LATEST_URL")),
+        "${SBOM_LATEST_URL}", hclEscape(sbomURL),
 		"${PLOY_SEAWEEDFS_URL}", hclEscape(get("PLOY_SEAWEEDFS_URL")),
 	)
 	rendered := replacer.Replace(string(hclBytes))
@@ -325,40 +330,42 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
 			return nil, fmt.Errorf("planner artifact path prep: %w", err)
 		}
-        key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
-        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-        // Emit download attempt event with timing start
-        dlStart := time.Now()
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, modID)
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-        }
-        // Download with small retry/backoff to avoid race with artifact upload
-        var dlErr error
-        for i := 0; i < 10; i++ {
-            if err := downloadToFileFn(url, artifactPath); err == nil {
-                dlErr = nil
-                break
-            } else {
-                dlErr = err
-                time.Sleep(500 * time.Millisecond)
-            }
-        }
-        dlEnd := time.Now()
-        if dlErr != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, modID)
-                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-            }
-            return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
-        }
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, modID)
-            // Best-effort size
-            var sz int64
-            if fi, err := os.Stat(artifactPath); err == nil { sz = fi.Size() }
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-        }
+		key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
+		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+		// Emit download attempt event with timing start
+		dlStart := time.Now()
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, modID)
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+		}
+		// Download with small retry/backoff to avoid race with artifact upload
+		var dlErr error
+		for i := 0; i < 10; i++ {
+			if err := downloadToFileFn(url, artifactPath); err == nil {
+				dlErr = nil
+				break
+			} else {
+				dlErr = err
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+		dlEnd := time.Now()
+		if dlErr != nil {
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, modID)
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+			}
+			return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
+		}
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, modID)
+			// Best-effort size
+			var sz int64
+			if fi, err := os.Stat(artifactPath); err == nil {
+				sz = fi.Size()
+			}
+			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+		}
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
 				return nil, fmt.Errorf("planner output schema invalid: %w", err)
@@ -409,13 +416,13 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 
 // SubmitReducerJob submits a reducer job to determine the next action
 func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error) {
-    // Prefer production implementation using real Nomad job submission when runner is provided
-    if h.runner != nil {
-        // Step 1: Render reducer assets
-        assets, err := h.runner.RenderReducerAssets()
-        if err != nil {
-            return nil, fmt.Errorf("failed to render reducer assets: %w", err)
-        }
+	// Prefer production implementation using real Nomad job submission when runner is provided
+	if h.runner != nil {
+		// Step 1: Render reducer assets
+		assets, err := h.runner.RenderReducerAssets()
+		if err != nil {
+			return nil, fmt.Errorf("failed to render reducer assets: %w", err)
+		}
 
 		// Step 2: Generate unique run ID for this reducer job
 		runID := ReducerRunID(planID)
@@ -481,106 +488,112 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("reducer job failed: %w", err)
 		}
 
-        // Step 6: Fetch reducer next.json from SeaweedFS (align with planner fetch)
-        artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
-        if infra.SeaweedURL == "" {
-            return nil, fmt.Errorf("reducer artifact fetch requires SeaweedFS URL")
-        }
-        if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
-            return nil, fmt.Errorf("reducer artifact path prep: %w", err)
-        }
-        key := fmt.Sprintf("mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
-        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-        dlStart := time.Now()
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-        }
-        var dlErr error
-        for i := 0; i < 10; i++ {
-            if err := downloadToFileFn(url, artifactPath); err == nil {
-                dlErr = nil
-                break
-            } else {
-                dlErr = err
-                time.Sleep(500 * time.Millisecond)
-            }
-        }
-        dlEnd := time.Now()
-        if dlErr != nil {
-            if controller := ResolveInfraFromEnv().Controller; controller != "" {
-                rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-            }
-            return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
-        }
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-            var sz int64
-            if fi, err := os.Stat(artifactPath); err == nil { sz = fi.Size() }
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
-        }
-        if b, err := os.ReadFile(artifactPath); err == nil {
-            if err := validateNextJSON(b); err != nil {
-                return nil, fmt.Errorf("reducer output schema invalid: %w", err)
-            }
-        }
-        var nextAction NextAction
-        if err := readJobArtifact(artifactPath, &nextAction); err != nil {
-            return nil, fmt.Errorf("failed to read reducer output: %w", err)
-        }
-        // Emit a controller log step including parsed reducer next.json (minus PII)
-        if controller := ResolveInfraFromEnv().Controller; controller != "" {
-            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-            // Build a concise summary of fields used
-            used := map[string]string{"action": nextAction.Action}
-            if nextAction.StepID != "" { used["step_id"] = nextAction.StepID }
-            if nextAction.Notes != "" {
-                // Truncate and strip newlines to avoid leaking verbose content
-                notes := nextAction.Notes
-                if len(notes) > 180 { notes = notes[:180] + "…" }
-                notes = strings.ReplaceAll(notes, "\n", " ")
-                used["notes"] = notes
-            }
-            // Marshal compact JSON message
-            b, _ := json.Marshal(used)
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("next parsed: %s", string(b)), JobName: runID, Time: time.Now()})
-        }
+		// Step 6: Fetch reducer next.json from SeaweedFS (align with planner fetch)
+		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
+		if infra.SeaweedURL == "" {
+			return nil, fmt.Errorf("reducer artifact fetch requires SeaweedFS URL")
+		}
+		if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
+			return nil, fmt.Errorf("reducer artifact path prep: %w", err)
+		}
+		key := fmt.Sprintf("mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
+		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+		dlStart := time.Now()
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+		}
+		var dlErr error
+		for i := 0; i < 10; i++ {
+			if err := downloadToFileFn(url, artifactPath); err == nil {
+				dlErr = nil
+				break
+			} else {
+				dlErr = err
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+		dlEnd := time.Now()
+		if dlErr != nil {
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+				_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+			}
+			return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
+		}
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+			var sz int64
+			if fi, err := os.Stat(artifactPath); err == nil {
+				sz = fi.Size()
+			}
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+		}
+		if b, err := os.ReadFile(artifactPath); err == nil {
+			if err := validateNextJSON(b); err != nil {
+				return nil, fmt.Errorf("reducer output schema invalid: %w", err)
+			}
+		}
+		var nextAction NextAction
+		if err := readJobArtifact(artifactPath, &nextAction); err != nil {
+			return nil, fmt.Errorf("failed to read reducer output: %w", err)
+		}
+		// Emit a controller log step including parsed reducer next.json (minus PII)
+		if controller := ResolveInfraFromEnv().Controller; controller != "" {
+			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+			// Build a concise summary of fields used
+			used := map[string]string{"action": nextAction.Action}
+			if nextAction.StepID != "" {
+				used["step_id"] = nextAction.StepID
+			}
+			if nextAction.Notes != "" {
+				// Truncate and strip newlines to avoid leaking verbose content
+				notes := nextAction.Notes
+				if len(notes) > 180 {
+					notes = notes[:180] + "…"
+				}
+				notes = strings.ReplaceAll(notes, "\n", " ")
+				used["notes"] = notes
+			}
+			// Marshal compact JSON message
+			b, _ := json.Marshal(used)
+			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("next parsed: %s", string(b)), JobName: runID, Time: time.Now()})
+		}
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
 			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
-        return &nextAction, nil
-    }
+		return &nextAction, nil
+	}
 
-    // Fallback to test submitter path via JobSubmitter
-    if h.submitter != nil {
-        spec := JobSpec{
-            Name:    "reducer",
-            Type:    "reducer",
-            HCLPath: "",
-            EnvVars: map[string]string{
-                "PLAN_ID": planID,
-            },
-            Timeout: ResolveDefaultsFromEnv().ReducerTimeout,
-            Inputs: map[string]interface{}{
-                "workspace": workspace,
-                "results":   results,
-                "winner":    winner,
-            },
-        }
-        result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
-        if err != nil {
-            return nil, fmt.Errorf("reducer job failed: %w", err)
-        }
-        var nextAction NextAction
-        if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
-            return nil, fmt.Errorf("failed to parse reducer output: %w", err)
-        }
-        return &nextAction, nil
-    }
+	// Fallback to test submitter path via JobSubmitter
+	if h.submitter != nil {
+		spec := JobSpec{
+			Name:    "reducer",
+			Type:    "reducer",
+			HCLPath: "",
+			EnvVars: map[string]string{
+				"PLAN_ID": planID,
+			},
+			Timeout: ResolveDefaultsFromEnv().ReducerTimeout,
+			Inputs: map[string]interface{}{
+				"workspace": workspace,
+				"results":   results,
+				"winner":    winner,
+			},
+		}
+		result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
+		if err != nil {
+			return nil, fmt.Errorf("reducer job failed: %w", err)
+		}
+		var nextAction NextAction
+		if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
+			return nil, fmt.Errorf("failed to parse reducer output: %w", err)
+		}
+		return &nextAction, nil
+	}
 
 	// Fallback to test submitter path if runner is not provided
 	if h.submitter != nil {

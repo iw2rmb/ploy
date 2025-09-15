@@ -323,15 +323,19 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 	case <-doneCh:
 		if runErr != nil {
 			// Best-effort: persist any artifacts (e.g., error logs) and enrich error message
+			var failedArtifacts map[string]string
 			if h.storage != nil {
 				if persisted, err := h.persistArtifacts(modID, tempDir); err != nil {
 					log.Printf("[Mod] Warning: artifact persistence on failure failed: %v", err)
-				} else if repo := config.TargetRepo; repo != "" {
-					if key, ok := persisted["source_sbom"]; ok {
-						h.recordLatestSBOM(repo, key, "", modID)
-					}
-					if key, ok := persisted["sbom"]; ok {
-						h.recordLatestSBOM(repo, key, "", modID)
+				} else {
+					failedArtifacts = persisted
+					if repo := config.TargetRepo; repo != "" {
+						if key, ok := persisted["source_sbom"]; ok {
+							h.recordLatestSBOM(repo, key, "", modID)
+						}
+						if key, ok := persisted["sbom"]; ok {
+							h.recordLatestSBOM(repo, key, "", modID)
+						}
 					}
 				}
 			}
@@ -360,7 +364,26 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 			if errDetail != "" {
 				runErr = fmt.Errorf("%v; details: %s", runErr, errDetail)
 			}
-			h.recordError(modID, runErr)
+			// Build and store a failed status that includes any discovered artifacts for diagnostics
+			endTime := time.Now()
+			prevStatus, _ := h.getStatus(modID)
+			status := ModStatus{ID: modID, StartTime: endTime}
+			if prevStatus != nil {
+				status = *prevStatus
+			}
+			status.Status = "failed"
+			status.EndTime = &endTime
+			status.Error = runErr.Error()
+			// Attach artifacts if we found any during failure path
+			if len(failedArtifacts) > 0 {
+				if status.Result == nil {
+					status.Result = map[string]interface{}{}
+				}
+				status.Result["artifacts"] = failedArtifacts
+			}
+			if err := h.storeStatus(status); err != nil {
+				log.Printf("Failed to store error status: %v", err)
+			}
 			return
 		}
 		// continue to success handling below

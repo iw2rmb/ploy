@@ -91,7 +91,11 @@ while :; do
 done
 
 echo "Stopping SSE (pid=$SSE_PID)…"
-kill "$SSE_PID" >/dev/null 2>&1 || true
+# Gracefully terminate children of the SSE subshell to avoid noisy 'Terminated: 15' messages
+if ps -p "$SSE_PID" >/dev/null 2>&1; then
+  pkill -TERM -P "$SSE_PID" >/dev/null 2>&1 || true
+  wait "$SSE_PID" >/dev/null 2>&1 || true
+fi
 
 echo "Fetching artifacts…"
 "$ROOT_DIR/fetch-artifacts.sh" "$MOD_ID" || true
