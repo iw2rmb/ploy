@@ -13,7 +13,6 @@
   become: true
   vars_files:
     - ../vars/main.yml
-    - ../vars/dev-wildcard.yml
   pre_tasks:
     - name: Assert required dev domain variables are set (api)
       assert:

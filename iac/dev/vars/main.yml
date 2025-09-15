@@ -28,6 +28,10 @@ ploy_gateway_node_meta_key: "role"
 # Traefik admin/dashboard port (entrypoint "admin")
 traefik_admin_port: 8090
 
+# Certificate contact emails (used by Traefik ACME); override via env if needed
+ploy_platform_cert_email: "{{ lookup('env', 'PLOY_PLATFORM_CERT_EMAIL') | default('admin@ployman.app') }}"
+ploy_apps_cert_email: "{{ lookup('env', 'PLOY_APPS_CERT_EMAIL') | default('admin@ployd.app') }}"
+
 # DNS provider credentials (prefer Vault-injected in production)
 # For Namecheap provider used in dev by default; leave blank or populate via env overrides for local testing.
 vault_namecheap_api_user: ""
