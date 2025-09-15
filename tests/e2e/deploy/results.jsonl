@@ -8,3 +8,8 @@
 {"lane":"T","repo":"test://dummy-repo","app":"dummy-app","metrics":{"build":{"duration_ms":1234}},"time":"2025-09-15T21:34:00+03:00"}
 {"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","metrics":{"imageSize":{"bytes":54803207,"mb":52.264410972595215}},"time":"2025-09-15T22:10:27+03:00"}
 {"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-go-1.22.git","app":"ploy-lane-e-go-1-22","metrics":{"imageSize":{"bytes":5112021,"mb":4.8752031326293945}},"time":"2025-09-15T22:10:30+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","metrics":{"imageSize":{"bytes":54803247,"mb":52.26444911956787}},"time":"2025-09-15T22:28:18+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-go-1.22.git","app":"ploy-lane-e-go-1-22","metrics":{"imageSize":{"bytes":5112021,"mb":4.8752031326293945}},"time":"2025-09-15T22:32:15+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","metrics":{"imageSize":{"bytes":54803219,"mb":52.26442241668701,"uncompressed_bytes":134408182,"uncompressed_mb":128.18163108825684}},"time":"2025-09-15T22:34:29+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","metrics":{"imageSize":{"bytes":54803226,"mb":52.26442909240723,"uncompressed_bytes":134408182,"uncompressed_mb":128.18163108825684}},"time":"2025-09-15T22:41:22+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-go-1.22.git","app":"ploy-lane-e-go-1-22","metrics":{"imageSize":{"bytes":5112021,"mb":4.8752031326293945,"uncompressed_bytes":9084664,"uncompressed_mb":8.663810729980469}},"time":"2025-09-15T22:41:28+03:00"}

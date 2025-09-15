@@ -39,20 +39,20 @@ After each run: Inspect logs first
   - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
 
 Test matrix (seed)
-| Lane | Stack   | Version | Repo                                         | Image Size | Build Time | Current State |
-| ---- | ------- | ------- | -------------------------------------------- | ---------- | ---------- | ------------- |
-| A    | Go      | 1.22    | https://github.com/<u>/ploy-lane-a-go-1.22   | —          | —          | pending       |
-| B    | Node    | 20      | https://github.com/<u>/ploy-lane-b-node-20   | —          | —          | pending       |
-| B    | Python  | 3.12    | https://github.com/<u>/ploy-lane-b-python-3.12 | —        | —          | pending       |
-| C    | Scala   | 21      | https://github.com/<u>/ploy-lane-c-scala-21  | —          | —          | pending       |
-| C    | Java    | 8       | https://github.com/<u>/ploy-lane-c-java-8    | —          | —          | pending       |
-| D    | Python  | 3.12    | https://github.com/<u>/ploy-lane-d-python-3.12 | —        | —          | pending       |
-| D    | Node    | 20      | https://github.com/<u>/ploy-lane-d-node-20   | —          | —          | pending       |
-| E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | 52.3MB     | 23.5s      | passed        |
-| E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | —          | —          | pending       |
-| E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | —        | —          | pending       |
-| E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | —          | —          | pending       |
-| G    | Rust    | 1.79    | https://github.com/<u>/ploy-lane-g-rust-1.79 | —          | —          | pending       |
+| Lane | Stack   | Version | Repo                                         | Image Size (compressed) | Uncompressed Size | Build Time | Current State |
+| ---- | ------- | ------- | -------------------------------------------- | ------------------------ | ----------------- | ---------- | ------------- |
+| A    | Go      | 1.22    | https://github.com/<u>/ploy-lane-a-go-1.22   | —                        | —                 | —          | pending       |
+| B    | Node    | 20      | https://github.com/<u>/ploy-lane-b-node-20   | —                        | —                 | —          | pending       |
+| B    | Python  | 3.12    | https://github.com/<u>/ploy-lane-b-python-3.12 | —                      | —                 | —          | pending       |
+| C    | Scala   | 21      | https://github.com/<u>/ploy-lane-c-scala-21  | —                        | —                 | —          | pending       |
+| C    | Java    | 8       | https://github.com/<u>/ploy-lane-c-java-8    | —                        | —                 | —          | pending       |
+| D    | Python  | 3.12    | https://github.com/<u>/ploy-lane-d-python-3.12 | —                      | —                 | —          | pending       |
+| D    | Node    | 20      | https://github.com/<u>/ploy-lane-d-node-20   | —                        | —                 | —          | pending       |
+| E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | 52.3MB                   | 128.2MB           | 23.5s      | passed        |
+| E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | 4.9MB                    | 8.7MB             | —          | passed        |
+| E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | —                      | —                 | —          | pending       |
+| E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | —                        | —                 | —          | pending       |
+| G    | Rust    | 1.79    | https://github.com/<u>/ploy-lane-g-rust-1.79 | —                        | —                 | —          | pending       |
 
 Notes
 - Start with major current versions; expand matrix incrementally.
