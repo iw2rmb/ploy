@@ -9,6 +9,7 @@ import (
     "os/exec"
     "strconv"
     "time"
+    "strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -104,22 +105,59 @@ func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane str
 			}
 		}
 	}
-	if meta.App == "" || meta.Sha == "" {
-		return ""
-	}
-	lane := meta.Lane
-	if lane == "" {
-		lane = "E"
-	}
-	lane = string([]byte{byte(([]rune(lane))[0])})
-	switch lane {
-	case "E", "e":
-		return fmt.Sprintf("%s-e-build-%s", meta.App, meta.Sha)
-	case "C", "c":
-		return fmt.Sprintf("%s-c-build-%s", meta.App, meta.Sha)
-	default:
-		return ""
-	}
+    if meta.App == "" || meta.Sha == "" {
+        return ""
+    }
+    lane := meta.Lane
+    if lane == "" {
+        lane = "E"
+    }
+    lane = string([]byte{byte(([]rune(lane))[0])})
+    // For Lane E, try to find the most recent nonce-suffixed builder job from debug copies
+    if lane == "E" || lane == "e" {
+        if j := findLatestBuilderJobFromDebug(meta.App, meta.Sha); j != "" {
+            return j
+        }
+    }
+    switch lane {
+    case "E", "e":
+        return fmt.Sprintf("%s-e-build-%s", meta.App, meta.Sha)
+    case "C", "c":
+        return fmt.Sprintf("%s-c-build-%s", meta.App, meta.Sha)
+    default:
+        return ""
+    }
+}
+
+// findLatestBuilderJobFromDebug scans /opt/ploy/debug/jobs for the newest HCL
+// matching the Lane E builder pattern for a given app and sha, and returns the job name.
+func findLatestBuilderJobFromDebug(app, sha string) string {
+    dir := "/opt/ploy/debug/jobs"
+    entries, err := os.ReadDir(dir)
+    if err != nil {
+        return ""
+    }
+    prefix := fmt.Sprintf("%s-e-build-%s-", app, sha)
+    newestName := ""
+    var newestTime time.Time
+    for _, e := range entries {
+        name := e.Name()
+        if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, ".hcl") {
+            continue
+        }
+        info, err := e.Info()
+        if err != nil { continue }
+        mod := info.ModTime()
+        if newestName == "" || mod.After(newestTime) {
+            newestName = name
+            newestTime = mod
+        }
+    }
+    if newestName == "" {
+        return ""
+    }
+    // Strip .hcl to get the job name
+    return strings.TrimSuffix(newestName, ".hcl")
 }
 
 func runJobMgr(cmd string, job string) string {
@@ -146,7 +184,8 @@ func runJobMgr(cmd string, job string) string {
 
 func runJobMgrLogs(alloc string, lines int) string {
     wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-    c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines))
+    // Prefer explicit task name for known builders to avoid Nomad 400 errors
+    c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--task", "kaniko", "--lines", fmt.Sprintf("%d", lines))
     out, _ := runCmdTimeout(c, 8*time.Second)
     return out
 }

@@ -147,12 +147,17 @@ http_request() {
         
         # Other errors
         log "Request failed with code $http_code: $body"
-        
+
+        # Do not retry on client errors (4xx) except 429
+        if [ "${http_code:0:1}" = "4" ] && [ "$http_code" != "429" ]; then
+            return 1
+        fi
+
         if [ $attempt -eq $MAX_RETRIES ]; then
             log "Max retries exceeded"
             return 1
         fi
-        
+
         # Wait before retry
         delay=$((RETRY_DELAY * attempt))
         log "Retrying in ${delay}s..."
@@ -430,6 +435,16 @@ get_single_log_stream() {
     local follow=$4
     local stream_type=$5
     
+    # Auto-detect task name if not provided and allocation has a single task
+    if [ -z "$task_name" ]; then
+        if alloc_json=$(http_request "GET" "$NOMAD_ADDR/v1/allocation/$alloc_id" "" "200"); then
+            task_count=$(echo "$alloc_json" | jq -r '(.TaskStates|keys|length) // 0' 2>/dev/null)
+            if [ "$task_count" = "1" ]; then
+                task_name=$(echo "$alloc_json" | jq -r '.TaskStates|keys[0]' 2>/dev/null)
+            fi
+        fi
+    fi
+
     # Build URL with query parameters
     local url="$NOMAD_ADDR/v1/client/fs/logs/$alloc_id"
     local query_params="type=$stream_type&plain=true"

@@ -31,7 +31,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         network_mode = "host"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
-          "set -euo pipefail; for i in 1 2 3; do wget -qO /tmp/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...'; sleep 2; done; test -s /tmp/src.tar; mkdir -p /workspace; tar -xf /tmp/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
+          "set -euo pipefail; mkdir -p /workspace; for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...'; sleep 2; done; test -s /workspace/src.tar; tar -xf /workspace/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
         ]
 
         ports = ["http"]

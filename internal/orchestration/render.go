@@ -142,6 +142,8 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath s
         }
     }
     s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
+    // Ensure a writable temp dir is present for BusyBox wget target in Kaniko entrypoint
+    // The builder template already includes a mkdir -p /tmp; keep it enforced here if template changes.
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
 	if err := os.WriteFile(out, []byte(s), 0644); err != nil {
 		return "", err
