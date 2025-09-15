@@ -6,6 +6,8 @@ http:
     # Wildcard certificate request for apps domain (e.g., *.dev.ployd.app)
     apps-wildcard-cert:
       rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy.apps_domain }}`)"
+      entryPoints:
+        - acme
       service: noop-service
       tls:
         certResolver: "apps-wildcard"
@@ -13,11 +15,13 @@ http:
           - main: "{{ ploy.apps_domain }}"
             sans:
               - "*.{{ ploy.apps_domain }}"
-      priority: 1
+      priority: -100
 
     # Wildcard certificate request for platform services (e.g., *.dev.ployman.app)
     platform-wildcard-cert:
       rule: "HostRegexp(`{service:[a-z0-9-]+}.{{ ploy.platform_domain }}`)"
+      entryPoints:
+        - acme
       service: noop-service
       tls:
         certResolver: "platform-wildcard"
@@ -25,7 +29,7 @@ http:
           - main: "{{ ploy.platform_domain }}"
             sans:
               - "*.{{ ploy.platform_domain }}"
-      priority: 1
+      priority: -100
 
   services:
     # Noop service for certificate provisioning only
