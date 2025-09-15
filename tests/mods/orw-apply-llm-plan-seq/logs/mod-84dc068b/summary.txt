@@ -1,0 +1,30 @@
+MOD_ID: mod-84dc068b
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: http://seaweedfs-filer.service.consul:8888
+
+Status:
+failed, phase=healing
+build check failed: maven build failed: exit status 1
+ (healing also failed: reducer job failed: reducer HCL validation failed: wrapper validate failed: exit status 1: [2025-09-15 03:47:59] Validating job file: /tmp/mods-mod-84dc068b-2410936505/reducer/reducer.rendered.submitted.hcl
+Job validation errors:
+1 error occurred:
+	* Task group reducer validation failed: 1 error occurred:
+	* Task reduce validation failed: 1 error occurred:
+	* Template 1 validation failed: 1 error occurred:
+	* Must specify a source path or have an embedded template
+
+
+
+
+
+
+
+
+[2025-09-15 03:47:59] Validation failed
+)
+last_job=plan-1757908078-reducer-1757908079
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-84dc068b/planner/java11to17-orw-llm-planner-1757908077/plan.json

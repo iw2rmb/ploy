@@ -7,6 +7,8 @@
   become: true
   vars:
     api_env_path: "/home/ploy/api.env"
+    # Compute default Kaniko image; prefer internal mirror on Dev
+    computed_kaniko_image: "{{ (lookup('env','PLOY_KANIKO_IMAGE') | default('', true)) | ternary(lookup('env','PLOY_KANIKO_IMAGE'), 'registry.dev.ployman.app/kaniko-executor:debug') }}"
   tasks:
     - name: Ensure Nomad job manager directory exists
       file:
@@ -87,12 +89,22 @@
           # Optional defaults
           MODS_REGISTRY="{{ lookup('env', 'MODS_REGISTRY') }}"
           # Lane E builder image (Kaniko). Mirrored into internal registry in Dev.
-          PLOY_KANIKO_IMAGE="{{ lookup('env', 'PLOY_KANIKO_IMAGE') }}"
+          PLOY_KANIKO_IMAGE="{{ computed_kaniko_image }}"
           # Optional OSv base image URL for Lane C builder (Dev only)
           # Example: https://example.com/osv/java8.qemu
           PLOY_OSV_BASE_URL="{{ lookup('env', 'PLOY_OSV_BASE_URL') }}"
           GIT_AUTHOR_NAME="{{ lookup('env', 'GIT_AUTHOR_NAME') }}"
           GIT_AUTHOR_EMAIL="{{ lookup('env', 'GIT_AUTHOR_EMAIL') }}"
+
+    - name: Ensure PLOY_KANIKO_IMAGE present in /home/ploy/api.env (idempotent)
+      lineinfile:
+        path: "/home/ploy/api.env"
+        create: true
+        mode: '0600'
+        regexp: '^PLOY_KANIKO_IMAGE='
+        line: "PLOY_KANIKO_IMAGE={{ computed_kaniko_image }}"
+        owner: ploy
+        group: ploy
 
     - name: Fail fast if controller token was expected but missing
       when: controller_gitlab_token | length == 0

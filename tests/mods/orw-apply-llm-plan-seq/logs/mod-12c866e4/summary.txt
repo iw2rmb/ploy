@@ -1,0 +1,14 @@
+MOD_ID: mod-12c866e4
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: http://seaweedfs-filer.service.consul:8888
+
+Status:
+failed, phase=healing
+build check failed: maven build failed: exit status 1
+ (healing also failed: healing failed: )
+last_job=plan-1757912016-reducer-1757912016
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-12c866e4/planner/java11to17-orw-llm-planner-1757912014/plan.json

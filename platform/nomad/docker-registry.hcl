@@ -48,7 +48,8 @@ job "docker-registry" {
         "traefik.http.routers.docker-registry.rule=Host(`registry.dev.ployman.app`)",
         "traefik.http.routers.docker-registry.tls=true",
         "traefik.http.routers.docker-registry.tls.certresolver=platform-wildcard",
-        "traefik.http.routers.docker-registry.tls.domains[0].main=*.dev.ployman.app",
+        "traefik.http.routers.docker-registry.tls.domains[0].main=dev.ployman.app",
+        "traefik.http.routers.docker-registry.tls.domains[0].sans=*.dev.ployman.app",
         "traefik.http.services.docker-registry.loadbalancer.server.scheme=http",
         "traefik.http.services.docker-registry.loadbalancer.healthcheck.path=/",
         "traefik.http.services.docker-registry.loadbalancer.healthcheck.interval=10s",
@@ -165,9 +166,10 @@ job "docker-registry" {
       config {
         image = "registry:2.8.3"
         ports = ["http"]
-        
+
         volumes = [
-          "local/config.yml:/etc/docker/registry/config.yml:ro"
+          "local/config.yml:/etc/docker/registry/config.yml:ro",
+          "/opt/ploy/registry:/var/lib/registry"
         ]
         
         logging {

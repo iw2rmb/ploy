@@ -325,13 +325,14 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
 			return nil, fmt.Errorf("planner artifact path prep: %w", err)
 		}
-		key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
-		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-		// Emit download attempt event for diagnostics
-		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, modID)
-			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download plan from %s", key), JobName: runID, Time: time.Now()})
-		}
+        key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
+        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        // Emit download attempt event with timing start
+        dlStart := time.Now()
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, modID)
+            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+        }
         // Download with small retry/backoff to avoid race with artifact upload
         var dlErr error
         for i := 0; i < 10; i++ {
@@ -343,16 +344,20 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
                 time.Sleep(500 * time.Millisecond)
             }
         }
+        dlEnd := time.Now()
         if dlErr != nil {
             if controller := ResolveInfraFromEnv().Controller; controller != "" {
                 rep := NewControllerEventReporter(controller, modID)
-                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("plan download failed: %v", dlErr), JobName: runID, Time: time.Now()})
+                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
             }
             return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
         }
         if controller := ResolveInfraFromEnv().Controller; controller != "" {
             rep := NewControllerEventReporter(controller, modID)
-            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "plan downloaded", JobName: runID, Time: time.Now()})
+            // Best-effort size
+            var sz int64
+            if fi, err := os.Stat(artifactPath); err == nil { sz = fi.Size() }
+            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
         }
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
@@ -486,9 +491,10 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
         }
         key := fmt.Sprintf("mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
         url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        dlStart := time.Now()
         if controller := ResolveInfraFromEnv().Controller; controller != "" {
             rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download next from %s", key), JobName: runID, Time: time.Now()})
+            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
         }
         var dlErr error
         for i := 0; i < 10; i++ {
@@ -500,16 +506,19 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
                 time.Sleep(500 * time.Millisecond)
             }
         }
+        dlEnd := time.Now()
         if dlErr != nil {
             if controller := ResolveInfraFromEnv().Controller; controller != "" {
                 rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("next download failed: %v", dlErr), JobName: runID, Time: time.Now()})
+                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
             }
             return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
         }
         if controller := ResolveInfraFromEnv().Controller; controller != "" {
             rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "next downloaded", JobName: runID, Time: time.Now()})
+            var sz int64
+            if fi, err := os.Stat(artifactPath); err == nil { sz = fi.Size() }
+            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
         }
         if b, err := os.ReadFile(artifactPath); err == nil {
             if err := validateNextJSON(b); err != nil {
@@ -519,6 +528,23 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
         var nextAction NextAction
         if err := readJobArtifact(artifactPath, &nextAction); err != nil {
             return nil, fmt.Errorf("failed to read reducer output: %w", err)
+        }
+        // Emit a controller log step including parsed reducer next.json (minus PII)
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+            // Build a concise summary of fields used
+            used := map[string]string{"action": nextAction.Action}
+            if nextAction.StepID != "" { used["step_id"] = nextAction.StepID }
+            if nextAction.Notes != "" {
+                // Truncate and strip newlines to avoid leaking verbose content
+                notes := nextAction.Notes
+                if len(notes) > 180 { notes = notes[:180] + "…" }
+                notes = strings.ReplaceAll(notes, "\n", " ")
+                used["notes"] = notes
+            }
+            // Marshal compact JSON message
+            b, _ := json.Marshal(used)
+            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("next parsed: %s", string(b)), JobName: runID, Time: time.Now()})
         }
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {

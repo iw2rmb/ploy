@@ -1,0 +1,14 @@
+MOD_ID: mod-d7d8370b
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: http://seaweedfs-filer.service.consul:8888
+
+Status:
+failed, phase=healing
+build check failed: maven build failed: exit status 1
+ (healing also failed: reducer job failed: reducer output schema invalid: schema validation failed: jsonschema: '' does not validate with https://example.com/mods/next.schema.json#/additionalProperties: additionalProperties 'notes' not allowed)
+last_job=plan-1757909227-reducer-1757909227
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-d7d8370b/planner/java11to17-orw-llm-planner-1757909226/plan.json

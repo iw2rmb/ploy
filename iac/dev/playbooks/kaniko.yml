@@ -1,0 +1,29 @@
+---
+# Ensure Kaniko builder image is mirrored into internal registry (no API rollout)
+
+- name: Ensure Kaniko image is available in internal registry
+  hosts: linux_hosts
+  become: true
+  vars:
+    kaniko_image: "{{ lookup('env','PLOY_KANIKO_IMAGE') | default('registry.dev.ployman.app/kaniko-executor:debug', true) }}"
+  tasks:
+    - name: Check if Kaniko image is mirrored
+      command: bash -lc "docker manifest inspect {{ kaniko_image }} >/dev/null 2>&1 && echo ok || echo missing"
+      register: kaniko_mirror
+      changed_when: false
+
+    - name: Pull upstream Kaniko image (if missing)
+      when: kaniko_mirror.stdout != 'ok'
+      docker_image:
+        name: gcr.io/kaniko-project/executor:debug
+        source: pull
+
+    - name: Tag Kaniko image for internal registry (if missing)
+      when: kaniko_mirror.stdout != 'ok'
+      command: >-
+        docker tag gcr.io/kaniko-project/executor:debug {{ kaniko_image }}
+      changed_when: true
+
+    - name: Push Kaniko image to internal registry (if missing)
+      when: kaniko_mirror.stdout != 'ok'
+      command: docker push {{ kaniko_image }}

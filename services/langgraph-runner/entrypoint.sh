@@ -218,8 +218,7 @@ elif [[ "$RUN_ID_STR" == *"reducer"* ]]; then
   post_event "info" "reducer" "reducer" "job started"
   cat >"$OUT_DIR/next.json" <<EOF
 {
-  "action": "stop",
-  "notes": "stub reducer"
+  "action": "stop"
 }
 EOF
   log "Wrote next.json to $OUT_DIR"
@@ -246,20 +245,69 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   mkdir -p "$OUT_DIR" || true
   ls -la "$CTX_DIR" || true
   ls -la "$OUT_DIR" || true
-  # Generate a deletion patch for the known failing source to heal build
-  TARGET_REL="src/healing/java/e2e/FailHealing.java"
-  log "Emitting deletion patch for $TARGET_REL"
-  cat >"$OUT_DIR/diff.patch" <<EOF
-diff --git a/$TARGET_REL b/$TARGET_REL
-deleted file mode 100644
-index 0000000..0000000
---- a/$TARGET_REL
-+++ /dev/null
-EOF
-  # Fallback: if for any reason diff is empty, write a minimal placeholder
-  if [ ! -s "$OUT_DIR/diff.patch" ]; then
-    log "Healing target not found or diff empty; writing minimal placeholder patch"
-    cat >"$OUT_DIR/diff.patch" <<'EOF'
+  # 1) If a diff is provided via context, use it.
+  # 2) Else, try to parse inputs.json.last_error to compute a minimal fix
+  #    by editing the first offending Java file line (comment it out).
+  # 3) Else, emit a harmless no-op patch.
+  if [ -s "$CTX_DIR/diff.patch" ]; then
+    log "Using provided diff from context (diff.patch)"
+    cp "$CTX_DIR/diff.patch" "$OUT_DIR/diff.patch"
+    post_event "info" "llm-exec" "llm-exec" "using context diff.patch"
+  else
+    # Attempt to parse build error and derive target file + line
+    TARGET_FILE=""
+    TARGET_LINE=""
+    if [ -s "$CTX_DIR/inputs.json" ]; then
+      # Extract stderr block
+      ERR=$(awk 'BEGIN{RS=""} /"last_error"/ {print}' "$CTX_DIR/inputs.json" 2>/dev/null)
+      # Find first Java file path
+      CAND=$(printf "%s" "$ERR" | sed -n 's/.*\([A-Za-z0-9_\.\/-]\+\.java\).*/\1/p' | head -n1)
+      # Try to capture line like ":123:" or ":[123,"
+      LINE=$(printf "%s" "$ERR" | sed -n 's/.*\.java:\([0-9]\+\).*/\1/p' | head -n1)
+      if [ -n "$CAND" ]; then
+        # If a source snapshot was provided, prefer it to ensure exact diff
+        if [ -f "$CTX_DIR/sources/$CAND" ]; then
+          TARGET_FILE="$CTX_DIR/sources/$CAND"
+          TARGET_REL="$CAND"
+        fi
+      fi
+      if [ -z "$TARGET_FILE" ]; then
+        post_event "warn" "llm-exec" "llm-exec" "could not resolve offending file from inputs.json"
+      fi
+      if [ -n "$LINE" ]; then
+        TARGET_LINE="$LINE"
+      fi
+    fi
+    if [ -n "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ] && [ -n "$TARGET_LINE" ]; then
+      # Build edited file content: comment out the offending line (prefix with // )
+      TMP_NEW="$(mktemp)"
+      awk -v ln="$TARGET_LINE" '{ if (NR==ln) { print "// " $0 } else { print $0 } }' "$TARGET_FILE" > "$TMP_NEW"
+      # Try diff -u; fallback to manual minimal hunk if diff not available
+      if command -v diff >/dev/null 2>&1; then
+        diff -u --label "a/$TARGET_REL" --label "b/$TARGET_REL" "$TARGET_FILE" "$TMP_NEW" > "$OUT_DIR/diff.patch" || true
+      fi
+      if [ ! -s "$OUT_DIR/diff.patch" ]; then
+        # Manual single-line hunk (3 lines of context when possible)
+        TOTAL=$(wc -l < "$TARGET_FILE" | tr -d ' ')
+        S=$(( TARGET_LINE>1 ? TARGET_LINE-1 : TARGET_LINE ))
+        E=$(( TARGET_LINE+1<=TOTAL ? TARGET_LINE+1 : TARGET_LINE ))
+        # Read original and new line
+        ORIG_LINE=$(sed -n "${TARGET_LINE}p" "$TARGET_FILE")
+        NEW_LINE="// $ORIG_LINE"
+        printf "--- a/%s\n+++ b/%s\n" "$TARGET_REL" "$TARGET_REL" > "$OUT_DIR/diff.patch"
+        printf "@@ -%d,%d +%d,%d @@\n" "$S" "$((E-S+1))" "$S" "$((E-S+1))" >> "$OUT_DIR/diff.patch"
+        # Emit context before
+        if [ "$S" -lt "$TARGET_LINE" ]; then sed -n "${S},$((TARGET_LINE-1))p" "$TARGET_FILE" | sed 's/^/ /' >> "$OUT_DIR/diff.patch"; fi
+        # Emit changed line
+        printf "-%s\n+%s\n" "$ORIG_LINE" "$NEW_LINE" >> "$OUT_DIR/diff.patch"
+        # Emit context after
+        if [ "$E" -gt "$TARGET_LINE" ]; then sed -n "$((TARGET_LINE+1)),${E}p" "$TARGET_FILE" | sed 's/^/ /' >> "$OUT_DIR/diff.patch"; fi
+      fi
+      rm -f "$TMP_NEW" || true
+      post_event "info" "llm-exec" "llm-exec" "generated minimal edit patch (comment offending line)"
+    else
+      log "No actionable inputs; writing minimal placeholder patch"
+      cat >"$OUT_DIR/diff.patch" <<'EOF'
 diff --git a/.llm-healing b/.llm-healing
 new file mode 100644
 index 0000000..e69de29
@@ -267,6 +315,8 @@ index 0000000..e69de29
 +++ b/.llm-healing
 # LLM healing produced no-op patch
 EOF
+      post_event "warn" "llm-exec" "llm-exec" "no actionable inputs; wrote placeholder"
+    fi
   fi
   log "Wrote diff.patch to $OUT_DIR"
   # Upload to SeaweedFS step-scoped key to mirror ORW behavior (log HTTP status)

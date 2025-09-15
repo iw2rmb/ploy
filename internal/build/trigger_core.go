@@ -514,6 +514,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
 
 	var imagePath, dockerImage string
+	var builderJobName string
 	switch strings.ToUpper(lane) {
 	case "A", "B":
 		img, err := ibuilders.BuildUnikraft(appName, lane, srcDir, sha, tmpDir, appEnvVars)
@@ -687,7 +688,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		log.Printf("[Build:E] Context uploaded: url=%s", contextURL)
 
 		// Render and execute Kaniko builder job, waiting for terminal completion
-		builderHCL, err := orchestration.RenderKanikoBuilder(appName, sha, tag, contextURL, "Dockerfile")
+		// Include a nonce in the builder job version to avoid stale alloc collisions
+		nonce := time.Now().Unix()
+		versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
+		builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile")
 		if err != nil {
 			return utils.ErrJSON(c, 500, err)
 		}
@@ -700,7 +704,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("builder job validation failed: %w", vErr))
 		}
-		builderJobName := fmt.Sprintf("%s-e-build-%s", appName, sha)
+		builderJobName := fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
 		log.Printf("[Build:E] Submitting Kaniko job: %s", builderJobName)
 		if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
 			snippet := getJobLogsSnippet(builderJobName, 80)
@@ -1190,7 +1194,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	// Include builder job info for lane E
 	if strings.ToUpper(lane) == "E" {
 		response["builder"] = fiber.Map{
-			"job": fmt.Sprintf("%s-e-build-%s", appName, sha),
+			"job": builderJobName,
 		}
 	}
 	if strings.ToUpper(lane) == "C" {
