@@ -357,9 +357,9 @@ func (kr *KBModRunner) attemptHealingWithKB(ctx context.Context, repoPath string
 		kbCtx = &KBContext{HasData: false}
 	}
 
-    // Create KB-enhanced job helper (use production runner to enable Nomad submit)
-    originalHelper := NewJobSubmissionHelperWithRunner(kr.jobSubmitter, kr.ModRunner)
-    jobHelper := NewExtendedJobSubmissionHelper(originalHelper, kr.kb)
+	// Create KB-enhanced job helper (use production runner to enable Nomad submit)
+	originalHelper := NewJobSubmissionHelperWithRunner(kr.jobSubmitter, kr.ModRunner)
+	jobHelper := NewExtendedJobSubmissionHelper(originalHelper, kr.kb)
 
 	// Submit planner job (may use KB suggestions directly)
 	planResult, err := jobHelper.SubmitPlannerJob(ctx, kr.config, buildError, kr.workspaceDir)
@@ -390,8 +390,8 @@ func (kr *KBModRunner) attemptHealingWithKB(ctx context.Context, repoPath string
 		})
 	}
 
-    // Execute fanout orchestration using production runner (Nomad HCL submit)
-    orchestrator := NewFanoutOrchestratorWithRunner(kr.jobSubmitter, kr.ModRunner)
+	// Execute fanout orchestration using production runner (Nomad HCL submit)
+	orchestrator := NewFanoutOrchestratorWithRunner(kr.jobSubmitter, kr.ModRunner)
 	maxParallel := 3
 	if kr.config.SelfHeal.MaxRetries > 0 {
 		maxParallel = kr.config.SelfHeal.MaxRetries

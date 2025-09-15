@@ -54,7 +54,7 @@ func (s *Server) handleBuildStatus(c *fiber.Ctx) error {
 
 // startAsyncBuild saves the tar body and triggers a background self-call to complete the build.
 func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (string, error) {
-    id := fmt.Sprintf("b-%d", time.Now().UnixNano())
+	id := fmt.Sprintf("b-%d", time.Now().UnixNano())
 	// Persist body
 	upDir := "/opt/ploy/uploads"
 	if err := os.MkdirAll(upDir, 0755); err != nil {
@@ -64,11 +64,11 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 	if err := os.WriteFile(tarPath, c.Body(), 0644); err != nil {
 		return "", err
 	}
-    // Capture request-scoped flags BEFORE we return/exit handler (Fiber Ctx is not safe in goroutines)
-    autogenVal := c.Query("autogen_dockerfile", "")
+	// Capture request-scoped flags BEFORE we return/exit handler (Fiber Ctx is not safe in goroutines)
+	autogenVal := c.Query("autogen_dockerfile", "")
 
-    // Initial status
-    writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
+	// Initial status
+	writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
 	// Persist meta for later log retrieval
 	_ = os.WriteFile(metaPath(id), []byte(fmt.Sprintf(`{"app":"%s","sha":"%s","lane":"%s"}`, app, sha, lane)), 0644)
 
@@ -80,31 +80,37 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 			}
 		}()
 		writeStatus(id, buildStatus{ID: id, App: app, Status: "running", StartedAt: time.Now().Format(time.RFC3339)})
-    // Build internal URL (bypass ingress). Preserve relevant flags from original query.
-    q := []string{fmt.Sprintf("sha=%s", sha), "async=false"}
+		// Build internal URL (bypass ingress). Preserve relevant flags from original query.
+		q := []string{fmt.Sprintf("sha=%s", sha), "async=false"}
 		if lane != "" {
 			q = append(q, "lane="+lane)
 		}
 		if main != "" {
 			q = append(q, "main="+main)
 		}
-        if autogenVal != "" {
-            q = append(q, "autogen_dockerfile="+autogenVal)
-        }
-    // Resolve controller port robustly in case server config is partially initialized
-    port := ""
-    if s != nil && s.config != nil {
-        port = s.config.Port
-    }
-    if port == "" {
-        // Prefer dynamic port from Nomad, then PORT, then default 8081
-        if v := os.Getenv("NOMAD_PORT_http"); v != "" { port = v }
-    }
-    if port == "" {
-        if v := os.Getenv("PORT"); v != "" { port = v }
-    }
-    if port == "" { port = "8081" }
-    url := fmt.Sprintf("http://127.0.0.1:%s/v1/apps/%s/builds?%s", port, app, strings.Join(q, "&"))
+		if autogenVal != "" {
+			q = append(q, "autogen_dockerfile="+autogenVal)
+		}
+		// Resolve controller port robustly in case server config is partially initialized
+		port := ""
+		if s != nil && s.config != nil {
+			port = s.config.Port
+		}
+		if port == "" {
+			// Prefer dynamic port from Nomad, then PORT, then default 8081
+			if v := os.Getenv("NOMAD_PORT_http"); v != "" {
+				port = v
+			}
+		}
+		if port == "" {
+			if v := os.Getenv("PORT"); v != "" {
+				port = v
+			}
+		}
+		if port == "" {
+			port = "8081"
+		}
+		url := fmt.Sprintf("http://127.0.0.1:%s/v1/apps/%s/builds?%s", port, app, strings.Join(q, "&"))
 		f, err := os.Open(tarPath)
 		if err != nil {
 			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Message: err.Error(), EndedAt: time.Now().Format(time.RFC3339)})
