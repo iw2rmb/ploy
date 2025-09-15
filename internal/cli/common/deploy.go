@@ -1,16 +1,17 @@
 package common
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"time"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "time"
 
-	"bytes"
-	"log"
+    "bytes"
+    "log"
+    "path/filepath"
 
-	utils "github.com/iw2rmb/ploy/internal/cli/utils"
+    utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
 // DeployConfig contains all deployment parameters
@@ -54,17 +55,20 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 		}
 	}
 
-	// Create tar archive
-	wd := config.WorkingDir
-	if wd == "" {
-		wd = "."
-	}
-	ign, _ := utils.ReadGitignore(wd)
-	pr, pw := io.Pipe()
-	go func() {
-		defer func() { _ = pw.Close() }()
-		_ = utils.TarDir(wd, pw, ign)
-	}()
+    // Create tar archive (optionally autogenerating a minimal Dockerfile for known stacks)
+    wd := config.WorkingDir
+    if wd == "" {
+        wd = "."
+    }
+    if v := os.Getenv("PLOY_AUTOGEN_DOCKERFILE"); v == "1" || v == "true" || v == "TRUE" || v == "on" || v == "ON" {
+        _ = tryAutogenDockerfile(wd)
+    }
+    ign, _ := utils.ReadGitignore(wd)
+    pr, pw := io.Pipe()
+    go func() {
+        defer func() { _ = pw.Close() }()
+        _ = utils.TarDir(wd, pw, ign)
+    }()
 
 	// Build deployment URL
 	url := buildDeployURL(config)
@@ -181,6 +185,31 @@ func parseDeployResponse(resp *http.Response, config DeployConfig) (*DeployResul
 	}
 
 	return result, nil
+}
+
+// tryAutogenDockerfile writes a minimal Dockerfile for known stacks when missing.
+// Currently supports Python minimal apps with app.py.
+func tryAutogenDockerfile(dir string) error {
+    df := filepath.Join(dir, "Dockerfile")
+    if _, err := os.Stat(df); err == nil {
+        return nil
+    }
+    // Python minimal app: app.py at repo root
+    if _, err := os.Stat(filepath.Join(dir, "app.py")); err == nil {
+        content := `FROM python:3.12-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \\
+    PYTHONUNBUFFERED=1 \\
+    PYTHONPATH=/app \\
+    PORT=8080
+COPY . .
+RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
+EXPOSE 8080
+CMD ["python","app.py"]
+`
+        return os.WriteFile(df, []byte(content), 0644)
+    }
+    return nil
 }
 
 // getTargetDomain returns the appropriate domain based on platform and environment
