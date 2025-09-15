@@ -13,6 +13,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Mock Infrastructure**: Complete mock implementations for Nomad, Consul, Storage with realistic behavior
 - **Test Utilities**: Builder patterns, fixtures for Go/Node.js/Java/WASM apps, database testing framework
 - **CI/CD Pipeline**: GitHub Actions for testing; deployment via `ployman api deploy` with local Ansible execution
+  - Improved reliability (Sep 2025): `ployman api deploy` ensures the VPS repo is up to date by cloning if missing (`/home/ploy/ploy`), enforcing the canonical `origin` remote, and using `git fetch --all --prune` before a hard reset to the target branch. Prevents stale code deployments due to missing clones, misconfigured remotes, or non-pruned refs.
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
@@ -95,7 +96,8 @@ For complete lane descriptions, detection rules, build flows, and best practices
  - **Config Path Decoupling (Sep 2025)**: API server resolves storage config path internally (env → external → embedded) without `api/config` dependency; unit tests cover behavior
 - ✅ **Platform CLI Separation** (Aug 2025):
   - **ploy CLI**: Deploys user apps to `<app-name>.ployd.app`
-  - **ployman CLI**: Deploys platform services to `<service-name>.ployman.app`
+- **ployman CLI**: Deploys platform services to `<service-name>.ployman.app`
+    - Deploy behavior (Sep 2025): API deploys pull latest repo state on VPS with guarded clone, remote enforcement, and pruned fetch prior to reset, then rebuild and roll via Nomad.
   - **Automatic Routing**: API detects platform services and routes to appropriate domain
 
 ⸻
