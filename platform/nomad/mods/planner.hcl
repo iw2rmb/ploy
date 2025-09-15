@@ -8,6 +8,7 @@ job "mods-planner" {
       config {
         image = "${PLANNER_IMAGE}"
         force_pull = true
+        network_mode = "host"
       }
       env = {
         MODEL       = "${MODEL}"
