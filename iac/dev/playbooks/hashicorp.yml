@@ -498,10 +498,13 @@
           ignore_errors: true
           changed_when: false
 
-        - name: Parse platform DNS IP (exclude resolver IP)
+        - name: Parse platform DNS IPs
           set_fact:
             platform_dns_ips: "{{ (platform_dns_check.stdout | default('') | regex_findall('Address: ([0-9.]+)')) | list }}"
-            platform_dns_ip: "{{ (platform_dns_ips | difference(['8.8.8.8']) | first | default('')) }}"
+
+        - name: Select platform DNS IP (exclude resolver IP)
+          set_fact:
+            platform_dns_ip: "{{ (platform_dns_ips | default([]) | difference(['8.8.8.8']) | first | default('')) }}"
 
         - name: Display platform domain DNS resolution
           debug:
