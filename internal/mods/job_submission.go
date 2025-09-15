@@ -468,17 +468,42 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("reducer job failed: %w", err)
 		}
 
-		// Step 6: Read and validate job output artifact (next.json)
-		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
-		if b, err := os.ReadFile(artifactPath); err == nil {
-			if err := validateNextJSON(b); err != nil {
-				return nil, fmt.Errorf("reducer output schema invalid: %w", err)
-			}
-		}
-		var nextAction NextAction
-		if err := readJobArtifact(artifactPath, &nextAction); err != nil {
-			return nil, fmt.Errorf("failed to read reducer output: %w", err)
-		}
+        // Step 6: Fetch reducer next.json from SeaweedFS (align with planner fetch)
+        artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
+        if infra.SeaweedURL == "" {
+            return nil, fmt.Errorf("reducer artifact fetch requires SeaweedFS URL")
+        }
+        if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
+            return nil, fmt.Errorf("reducer artifact path prep: %w", err)
+        }
+        key := fmt.Sprintf("mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
+        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download next from %s", key), JobName: runID, Time: time.Now()})
+        }
+        var dlErr error
+        for i := 0; i < 6; i++ {
+            if err := downloadToFileFn(url, artifactPath); err == nil {
+                dlErr = nil
+                break
+            } else {
+                dlErr = err
+                time.Sleep(500 * time.Millisecond)
+            }
+        }
+        if dlErr != nil {
+            return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
+        }
+        if b, err := os.ReadFile(artifactPath); err == nil {
+            if err := validateNextJSON(b); err != nil {
+                return nil, fmt.Errorf("reducer output schema invalid: %w", err)
+            }
+        }
+        var nextAction NextAction
+        if err := readJobArtifact(artifactPath, &nextAction); err != nil {
+            return nil, fmt.Errorf("failed to read reducer output: %w", err)
+        }
 
 		if controller := os.Getenv("PLOY_CONTROLLER"); controller != "" {
 			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
