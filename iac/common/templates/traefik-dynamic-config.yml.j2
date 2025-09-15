@@ -9,7 +9,7 @@ http:
     
     # Apps domain wildcard certificate provisioning (*.dev.ployd.app)
     apps-wildcard-provisioner:
-      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.apps_domain | replace('.', '\.') }}`)"
+      rule: 'HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.apps_domain | replace('.', '\.') }}`)'
       entryPoints:
         - websecure
       service: noop-service
@@ -23,7 +23,7 @@ http:
 
     # Platform domain wildcard certificate provisioning (*.dev.ployman.app)
     platform-wildcard-provisioner:
-      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.platform_domain | replace('.', '\.') }}`)"
+      rule: 'HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.platform_domain | replace('.', '\.') }}`)'
       entryPoints:
         - websecure
       service: noop-service

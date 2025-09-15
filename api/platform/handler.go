@@ -213,7 +213,7 @@ func (h *Handler) deployToNomad(serviceName, dockerImage, environment string, en
 	// Render HCL for platform service and submit via orchestration (uses wrapper on VPS)
 	jobName := fmt.Sprintf("platform-%s", serviceName)
 	traefikHost := fmt.Sprintf("%s.%s.ployman.app", serviceName, environment)
-	hcl := orchestration.RenderServiceDockerJobHCL(jobName, serviceName, serviceName, dockerImage, envVars, traefikHost, "dev-wildcard", environment)
+	hcl := orchestration.RenderServiceDockerJobHCL(jobName, serviceName, serviceName, dockerImage, envVars, traefikHost, "platform-wildcard", environment)
 
 	tmp, err := os.CreateTemp("", "platform-*.hcl")
 	if err != nil {
