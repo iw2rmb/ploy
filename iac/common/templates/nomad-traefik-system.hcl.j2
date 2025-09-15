@@ -52,6 +52,10 @@ job "traefik-system" {
         static = 8091
         to = 8091
       }
+      port "acme" {
+        static = 9443
+        to = 9443
+      }
       port "traefik" {
         static = 8095
         to = 8095
@@ -116,6 +120,7 @@ job "traefik-system" {
           "--entrypoints.websecure.address=:443", 
           "--entrypoints.admin.address=:{{ traefik_admin_port | default(8090) }}",
           "--entrypoints.metrics.address=:8091",
+          "--entrypoints.acme.address=:9443",
           "--entrypoints.traefik.address=:8095",
           "--providers.consulcatalog=true",
           "--providers.consulcatalog.prefix=traefik",
