@@ -1,0 +1,14 @@
+MOD_ID: mod-fb12da4a
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: http://seaweedfs-filer.service.consul:8888
+
+Status:
+failed, phase=healing
+build check failed: maven build failed: exit status 1
+ (healing also failed: reducer job failed: failed to read reducer output: failed to read artifact /tmp/mods-mod-fb12da4a-981830625/reducer/out/next.json: open /tmp/mods-mod-fb12da4a-981830625/reducer/out/next.json: no such file or directory)
+last_job=plan-1757908821-reducer-1757908821
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-fb12da4a/planner/java11to17-orw-llm-planner-1757908819/plan.json

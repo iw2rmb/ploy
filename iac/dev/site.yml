@@ -21,9 +21,11 @@
 - import_playbook: playbooks/main.yml
 - import_playbook: playbooks/seaweedfs.yml
 - import_playbook: playbooks/hashicorp.yml
+- import_playbook: playbooks/dns-consul.yml
 - import_playbook: playbooks/seaweedfs-filer.yml
 - import_playbook: playbooks/arf-openrewrite-recipes-registry.yml
 - import_playbook: playbooks/docker-registry.yml
+- import_playbook: playbooks/kaniko.yml
 - import_playbook: playbooks/langgraph-runner.yml
 - import_playbook: playbooks/openrewrite-jvm.yml
 - import_playbook: playbooks/mods-env.yml
