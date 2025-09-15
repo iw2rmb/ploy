@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -277,22 +278,37 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
 			inputsJSON := fmt.Sprintf("{\n  \"language\": \"java\",\n  \"lane\": \"%s\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": %q\n  },\n  \"deps\": {}\n}\n", "", be)
 			_ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
-			// Best-effort: extract first .java path from error and include its current source for diffing
+			// Best-effort: extract up to 5 .java paths from error and include current sources for diffing
 			repoRoot := filepath.Join(o.runner.GetWorkspaceDir(), "repo")
-			cand := firstJavaPathFromError(be)
-			if cand != "" {
-				// Normalize candidate to relative form
+			seen := make(map[string]struct{})
+			paths := extractJavaPathsFromError(be, 5)
+			// Augment with guesses from class names in error if needed
+			if len(paths) == 0 {
+				classNames := parseClassNamesFromError(be, 5)
+				guessed := findJavaFilesByBasename(repoRoot, classNames, 5)
+				paths = append(paths, guessed...)
+			}
+			var manifest []string
+			for _, cand := range paths {
+				// Normalize to relative form
 				rel := cand
 				if strings.HasPrefix(rel, repoRoot+string(os.PathSeparator)) {
 					rel = strings.TrimPrefix(rel, repoRoot+string(os.PathSeparator))
 				}
+				if _, ok := seen[rel]; ok || strings.TrimSpace(rel) == "" {
+					continue
+				}
+				seen[rel] = struct{}{}
 				srcAbs := filepath.Join(repoRoot, rel)
 				if b, err := ioutil.ReadFile(srcAbs); err == nil {
 					dst := filepath.Join(ctxDir, "sources", rel)
 					_ = os.MkdirAll(filepath.Dir(dst), 0755)
 					_ = ioutil.WriteFile(dst, b, 0644)
-					_ = ioutil.WriteFile(filepath.Join(ctxDir, "source_manifest.txt"), []byte(rel+"\n"), 0644)
+					manifest = append(manifest, rel)
 				}
+			}
+			if len(manifest) > 0 {
+				_ = ioutil.WriteFile(filepath.Join(ctxDir, "source_manifest.txt"), []byte(strings.Join(manifest, "\n")+"\n"), 0644)
 			}
 		}
 		// Optional: pass through precomputed diff or delete paths from branch inputs (keeps runner generic)
@@ -506,6 +522,94 @@ func firstJavaPathFromError(s string) string {
 		return p
 	}
 	return ""
+}
+
+// extractJavaPathsFromError returns up to max unique .java paths found in the error text.
+func extractJavaPathsFromError(s string, max int) []string {
+	re := regexp.MustCompile(`([A-Za-z0-9_./\\-]+\.java)`) // includes Windows separators
+	matches := re.FindAllStringSubmatch(s, -1)
+	seen := make(map[string]struct{})
+	var out []string
+	for _, m := range matches {
+		if len(m) < 2 {
+			continue
+		}
+		p := strings.ReplaceAll(m[1], "\\", "/")
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+		if max > 0 && len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+// parseClassNamesFromError extracts up to max class names mentioned in common compiler messages
+func parseClassNamesFromError(s string, max int) []string {
+	var out []string
+	seen := make(map[string]struct{})
+	// Patterns: "symbol: class Foo", "class Foo", "cannot find symbol Foo"
+	pats := []*regexp.Regexp{
+		regexp.MustCompile(`symbol:\s*class\s+([A-Za-z0-9_]+)`),
+		regexp.MustCompile(`class\s+([A-Za-z0-9_]+)\b`),
+		regexp.MustCompile(`cannot\s+find\s+symbol\s+([A-Za-z0-9_]+)\b`),
+	}
+	for _, re := range pats {
+		ms := re.FindAllStringSubmatch(s, -1)
+		for _, m := range ms {
+			if len(m) < 2 {
+				continue
+			}
+			name := m[1]
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			out = append(out, name)
+			if max > 0 && len(out) >= max {
+				return out
+			}
+		}
+	}
+	return out
+}
+
+// findJavaFilesByBasename walks repoRoot/src and returns relative paths for files matching basenames.
+func findJavaFilesByBasename(repoRoot string, names []string, max int) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	want := make(map[string]struct{})
+	for _, n := range names {
+		if strings.TrimSpace(n) == "" {
+			continue
+		}
+		want[n+".java"] = struct{}{}
+	}
+	var out []string
+	root := filepath.Join(repoRoot, "src")
+	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		base := filepath.Base(path)
+		if _, ok := want[base]; ok {
+			rel, _ := filepath.Rel(repoRoot, path)
+			rel = filepath.ToSlash(rel)
+			out = append(out, rel)
+			if max > 0 && len(out) >= max {
+				return io.EOF
+			}
+		}
+		return nil
+	})
+	return out
 }
 
 // parseMCPFromInputs converts map[string]interface{} to MCPConfig struct

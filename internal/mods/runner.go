@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -834,34 +835,83 @@ build_step:
 			Duration: time.Since(buildStart),
 		})
 
-		// Check if self-healing is enabled (allow local remediation even without job submitter)
-		if r.config.SelfHeal != nil && r.config.SelfHeal.Enabled {
-			// Attempt healing workflow
-			healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
-			result.HealingSummary = healingSummary
-
-			if healingErr == nil && (healingSummary.Winner != nil || healingSummary.FinalSuccess) {
-				// Healing succeeded! Continue with the healed version
-				result.StepResults = append(result.StepResults, StepResult{
-					StepID:   "healing",
-					Success:  true,
-					Message:  fmt.Sprintf("Healing succeeded with plan %s", healingSummary.PlanID),
-					Duration: time.Since(buildStart),
-				})
-				// Continue with normal workflow (push, etc.)
-			} else {
-				r.emit(ctx, "healing", "healing", "error", "build check failed and healing failed")
-				// Healing also failed
-				result.ErrorMessage = "build check failed and healing failed"
-				result.Duration = time.Since(startTime)
-				return nil, fmt.Errorf("build check failed: %s (healing also failed: %v)", message, healingErr)
-			}
-		} else {
-			// No healing enabled, fail immediately
+		// Check if self-healing is enabled
+		if r.config.SelfHeal == nil || !r.config.SelfHeal.Enabled {
 			r.emit(ctx, "build", "build", "error", message)
 			result.ErrorMessage = "build check failed"
 			result.Duration = time.Since(startTime)
 			return nil, fmt.Errorf("build check failed: %s", message)
+		}
+
+		// Healing retry loop: planner → fanout → reducer; optionally apply winner and re-build
+		maxRetries := r.config.SelfHeal.MaxRetries
+		if maxRetries <= 0 {
+			maxRetries = 1
+		}
+		var healingSuccess bool
+		var lastErr error
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			r.emit(ctx, "healing", "healing", "info", fmt.Sprintf("attempt %d/%d", attempt, maxRetries))
+			healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
+			result.HealingSummary = healingSummary
+			if healingErr != nil {
+				lastErr = healingErr
+				if attempt == maxRetries {
+					break
+				}
+				continue
+			}
+			// If reducer requested apply, a branch chain has been replayed in working tree.
+			if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
+				// Build check before committing healing changes
+				buildStart2 := time.Now()
+				if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
+					// Revert working tree and retry if attempts remain
+					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+					cmd.Dir = repoPath
+					_ = cmd.Run()
+					msg2 := "post-healing build failed"
+					if br2 != nil && br2.Message != "" {
+						msg2 = br2.Message
+					}
+					if err2 != nil {
+						msg2 = fmt.Sprintf("%s: %v", msg2, err2)
+					}
+					result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg2 + " (reverted healing patch)", Duration: time.Since(buildStart2)})
+					lastErr = fmt.Errorf("%s", msg2)
+					if attempt == maxRetries {
+						break
+					}
+					continue
+				}
+				// Commit healing changes and proceed
+				if r.repoManager != nil {
+					_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
+				} else {
+					_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
+				}
+				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
+				r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
+				healingSuccess = true
+				break
+			}
+			// If reducer chose stop, accept healing as succeeded (no additional apply)
+			if strings.ToLower(healingSummary.NextAction.Action) == "stop" && healingSummary.Winner != nil {
+				healingSuccess = true
+				break
+			}
+			// Unknown or no action; prepare to retry or fail
+			lastErr = fmt.Errorf("reducer returned no actionable next step")
+			if attempt == maxRetries {
+				break
+			}
+		}
+
+		if !healingSuccess {
+			r.emit(ctx, "healing", "healing", "error", "healing failed after retries")
+			result.ErrorMessage = fmt.Sprintf("build check failed and healing failed: %v", lastErr)
+			result.Duration = time.Since(startTime)
+			return nil, fmt.Errorf("build check failed: %s (healing failed: %v)", message, lastErr)
 		}
 	}
 
@@ -876,35 +926,44 @@ build_step:
 		Duration: time.Since(buildStart),
 	})
 
-    // Step 6: If healing requested applying additional diffs, commit them and re-run build gate
-    if result.HealingSummary != nil && result.HealingSummary.FinalSuccess {
-        if strings.ToLower(result.HealingSummary.NextAction.Action) == "apply" {
-            // Commit post-healing changes
-            if r.repoManager != nil {
-                _ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
-            } else {
-                _ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
-            }
-            // Build check again after applying healing patch
-            buildStart2 := time.Now()
-            if br2, err := r.runBuildGate(ctx, repoPath); err != nil || (br2 != nil && !br2.Success) {
-                msg := "Build check failed after healing apply"
-                if br2 != nil && br2.Message != "" { msg = br2.Message }
-                if err != nil { msg = fmt.Sprintf("%s: %v", msg, err) }
-                result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg, Duration: time.Since(buildStart2)})
-                result.ErrorMessage = msg
-                result.Duration = time.Since(startTime)
-                return nil, fmt.Errorf("build check failed after healing: %s", msg)
-            } else {
-                result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
-                r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
-            }
-        }
-    }
+	// Step 6: If healing requested applying additional diffs, commit them and re-run build gate
+	if result.HealingSummary != nil && result.HealingSummary.FinalSuccess {
+		if strings.ToLower(result.HealingSummary.NextAction.Action) == "apply" {
+			// Build check before committing healing changes
+			buildStart2 := time.Now()
+			if br2, err := r.runBuildGate(ctx, repoPath); err != nil || (br2 != nil && !br2.Success) {
+				msg := "Build check failed after healing apply"
+				if br2 != nil && br2.Message != "" {
+					msg = br2.Message
+				}
+				if err != nil {
+					msg = fmt.Sprintf("%s: %v", msg, err)
+				}
+				// Revert working tree to pre-healing HEAD (discard uncommitted changes)
+				// Discard uncommitted changes to return to pre-healing state
+				{
+					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+					cmd.Dir = repoPath
+					_ = cmd.Run()
+				}
+				// Record failed post-healing build but continue with normal flow (ORW-only)
+				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg + " (reverted healing patch)", Duration: time.Since(buildStart2)})
+			} else {
+				// Commit post-healing changes after successful build
+				if r.repoManager != nil {
+					_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
+				} else {
+					_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
+				}
+				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
+				r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
+			}
+		}
+	}
 
-    // Step 7: Push branch (via helper)
-    // Apply MR auth/env selection from config before any Git operations that require credentials
-    r.applyMRAuthFromConfig(ctx)
+	// Step 7: Push branch (via helper)
+	// Apply MR auth/env selection from config before any Git operations that require credentials
+	r.applyMRAuthFromConfig(ctx)
 	if sr, err := runPushWithEvents(r, ctx, repoPath, branchName); err != nil {
 		result.StepResults = append(result.StepResults, sr)
 		result.ErrorMessage = sr.Message
@@ -1155,8 +1214,8 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 	}
 
 	// Step 4: Submit reducer job to determine next action
-    nextAction, reducerErr := jobHelper.SubmitReducerJob(ctx, planResult.PlanID, allResults, summary.Winner, r.workspaceDir)
-    if reducerErr != nil {
+	nextAction, reducerErr := jobHelper.SubmitReducerJob(ctx, planResult.PlanID, allResults, summary.Winner, r.workspaceDir)
+	if reducerErr != nil {
 		// Fallback: local remediation when reducer fails
 		if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
 			summary.SetFinalResult(true)
@@ -1165,46 +1224,29 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		return summary, fmt.Errorf("reducer job failed: %w", reducerErr)
 	}
 
-    // Record reducer decision
-    if nextAction != nil {
-        summary.NextAction = *nextAction
-    }
+	// Record reducer decision
+	if nextAction != nil {
+		summary.NextAction = *nextAction
+	}
 
-    // Fallback policy: if reducer returned stop but at least one LLM branch produced a diff (completed),
-    // prefer applying that branch to ensure healing impact is reflected. This keeps flow progressing
-    // until reducer logic is refined to emit apply explicitly.
-    if nextAction != nil && strings.ToLower(nextAction.Action) == "stop" {
-        // Pick winner if present, else first completed llm-* branch
-        if summary.Winner != nil && strings.HasPrefix(strings.ToLower(summary.Winner.ID), "llm") && strings.ToLower(summary.Winner.Status) == "completed" {
-            summary.NextAction = NextAction{Action: "apply", StepID: summary.Winner.ID, Notes: "fallback-apply: winner llm branch"}
-        } else {
-            for _, br := range allResults {
-                if strings.HasPrefix(strings.ToLower(br.ID), "llm") && strings.ToLower(br.Status) == "completed" {
-                    summary.NextAction = NextAction{Action: "apply", StepID: br.ID, Notes: "fallback-apply: completed llm branch"}
-                    break
-                }
-            }
-        }
-    }
+	// If reducer requests applying a branch chain, replay it into the repo now
+	if nextAction != nil && strings.ToLower(nextAction.Action) == "apply" {
+		seaweed := ResolveInfraFromEnv().SeaweedURL
+		if seaweed != "" && nextAction.StepID != "" {
+			// Use a workspace-scoped out dir for temporary chain patches
+			baseDir := filepath.Join(r.workspaceDir, "branch-apply")
+			_ = os.MkdirAll(baseDir, 0755)
+			_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), nextAction.StepID, baseDir, repoPath)
+		}
+		summary.SetFinalResult(true)
+		return summary, nil
+	}
 
-    // If reducer requests applying a branch chain, replay it into the repo now
-    if nextAction != nil && strings.ToLower(nextAction.Action) == "apply" {
-        seaweed := ResolveInfraFromEnv().SeaweedURL
-        if seaweed != "" && nextAction.StepID != "" {
-            // Use a workspace-scoped out dir for temporary chain patches
-            baseDir := filepath.Join(r.workspaceDir, "branch-apply")
-            _ = os.MkdirAll(baseDir, 0755)
-            _ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), nextAction.StepID, baseDir, repoPath)
-        }
-        summary.SetFinalResult(true)
-        return summary, nil
-    }
-
-    // If reducer says to stop and we have a winner, healing succeeded
-    if nextAction != nil && strings.ToLower(nextAction.Action) == "stop" && summary.Winner != nil {
-        summary.SetFinalResult(true)
-        return summary, nil
-    }
+	// If reducer says to stop and we have a winner, healing succeeded
+	if nextAction != nil && strings.ToLower(nextAction.Action) == "stop" && summary.Winner != nil {
+		summary.SetFinalResult(true)
+		return summary, nil
+	}
 
 	// Otherwise, healing failed
 	// Fallback: if reducer did not select a winner, attempt local remediation
@@ -1212,11 +1254,11 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		summary.SetFinalResult(true)
 		return summary, nil
 	}
-    // No actionable next step; mark failure with reducer notes if present
-    if nextAction != nil {
-        return summary, fmt.Errorf("healing failed: %s", nextAction.Notes)
-    }
-    return summary, fmt.Errorf("healing failed: reducer returned no next action")
+	// No actionable next step; mark failure with reducer notes if present
+	if nextAction != nil {
+		return summary, fmt.Errorf("healing failed: %s", nextAction.Notes)
+	}
+	return summary, fmt.Errorf("healing failed: reducer returned no next action")
 }
 
 // localRemediation performs best-effort local fixes for common compile failures

@@ -1,0 +1,13 @@
+[2025-09-15 21:32:11] Getting stdout logs for allocation: 6eb40f1e-d604-0dbe-1382-e4f20c0ccf75 (task: api, lines: 800, follow: false)
+[2025-09-15 21:32:11] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/6eb40f1e-d604-0dbe-1382-e4f20c0ccf75?type=stdout&plain=true&task=api&offset=-800
+[2025-09-15 21:32:11] Response code: 200
+ leader.go:312: New leader elected: swpjullapd
+[coordination] 2025/09/15 21:32:06 leader.go:312: New leader elected: swpjullapd
+[coordination] 2025/09/15 21:32:08 leader.go:312: New leader elected: swpjullapd
+[21:32:08] 200 - GET /v1/mods/mod-1da8d15d/artifacts -    2.180883ms
+[21:32:09] 200 - GET /v1/mods/mod-1da8d15d/artifacts/next_json -    4.144133ms
+[coordination] 2025/09/15 21:32:10 leader.go:312: New leader elected: swpjullapd
+[21:32:10] 202 - POST /v1/apps/ploy-lane-e-python-3-12/builds -     530.586µs
+File context.tar uploaded successfully: builds/ploy-lane-e-python-3-12/05fe0f5772e4/src.tar
+Context PUT ok (4096 bytes) to http://seaweedfs-filer.service.consul:8888/builds/ploy-lane-e-python-3-12/05fe0f5772e4/src.tar
+[21:32:11] 200 - GET /v1/mods/mod-1da8d15d/logs -     201.802µs

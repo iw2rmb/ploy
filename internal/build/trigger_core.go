@@ -278,10 +278,10 @@ CMD ["node", "index.js"]
 `
 		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
 	}
-    // Python
-    // Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
-    // Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
-    if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
+	// Python
+	// Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
+	// Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
+	if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
 		v := facts.Versions.Python
 		if v == "" {
 			v = "3.12"
@@ -302,10 +302,10 @@ CMD ["node", "index.js"]
 		}
 		content := fmt.Sprintf(`FROM %s
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 \\
-    PYTHONUNBUFFERED=1 \\
-    PYTHONPATH=/app \\
-    PORT=8080
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV PORT=8080
 COPY . .
 RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
 EXPOSE 8080
@@ -617,150 +617,150 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			}
 		}
 
-        // Create a tar context from srcDir
-        builderTar := filepath.Join(tmpDir, "context.tar")
-        if err := func() error {
-            f, err := os.Create(builderTar)
-            if err != nil {
-                return err
-            }
-            defer f.Close()
-            ign, _ := clutils.ReadGitignore(srcDir)
-            return clutils.TarDir(srcDir, f, ign)
-        }(); err != nil {
-            return c.Status(500).JSON(fiber.Map{
-                "error": "create build context failed",
-                "stage": "build_context",
-                "details": err.Error(),
-            })
-        }
-        tarSize := func() int64 {
-            fi, _ := os.Stat(builderTar)
-            if fi != nil {
-                return fi.Size()
-            }
-            return 0
-        }()
-        log.Printf("[Build:E] Context tar created: %s (size=%d bytes)", builderTar, tarSize)
+		// Create a tar context from srcDir
+		builderTar := filepath.Join(tmpDir, "context.tar")
+		if err := func() error {
+			f, err := os.Create(builderTar)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			ign, _ := clutils.ReadGitignore(srcDir)
+			return clutils.TarDir(srcDir, f, ign)
+		}(); err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "create build context failed",
+				"stage":   "build_context",
+				"details": err.Error(),
+			})
+		}
+		tarSize := func() int64 {
+			fi, _ := os.Stat(builderTar)
+			if fi != nil {
+				return fi.Size()
+			}
+			return 0
+		}()
+		log.Printf("[Build:E] Context tar created: %s (size=%d bytes)", builderTar, tarSize)
 
 		// Upload context tar to storage for Kaniko to fetch
 		contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
 		var contextURL string
-        if deps.Storage != nil {
-            ctxUp := context.Context(c.Context())
-            if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
-                return c.Status(500).JSON(fiber.Map{
-                    "error": "failed to upload build context",
-                    "stage": "upload_context",
-                    "context_key": contextKey,
-                    "tar_size": tarSize,
-                    "details": err.Error(),
-                })
-            }
-            base := os.Getenv("PLOY_SEAWEEDFS_URL")
-            if base == "" {
-                base = "http://seaweedfs-filer.service.consul:8888"
-            }
+		if deps.Storage != nil {
+			ctxUp := context.Context(c.Context())
+			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+				return c.Status(500).JSON(fiber.Map{
+					"error":       "failed to upload build context",
+					"stage":       "upload_context",
+					"context_key": contextKey,
+					"tar_size":    tarSize,
+					"details":     err.Error(),
+				})
+			}
+			base := os.Getenv("PLOY_SEAWEEDFS_URL")
+			if base == "" {
+				base = "http://seaweedfs-filer.service.consul:8888"
+			}
 			if !strings.HasPrefix(base, "http") {
 				base = "http://" + base
 			}
 			contextURL = strings.TrimRight(base, "/") + "/" + contextKey
-            // Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
-            func(path string) {
-                fi, err := os.Stat(builderTar)
-                if err != nil {
-                    fmt.Printf("Warn: stat tar failed: %v\n", err)
-                    return
-                }
-                for attempt := 1; attempt <= 3; attempt++ {
-                    f, err := os.Open(builderTar)
-                    if err != nil {
-                        fmt.Printf("Warn: open tar failed: %v\n", err)
-                        return
-                    }
-                    req, err := http.NewRequest("PUT", path, f)
-                    if err != nil {
-                        _ = f.Close()
-                        fmt.Printf("Warn: build PUT request failed: %v\n", err)
-                        return
-                    }
-                    req.Header.Set("Content-Type", "application/x-tar")
-                    req.ContentLength = fi.Size()
-                    client := &http.Client{Timeout: 60 * time.Second}
-                    resp, err := client.Do(req)
-                    if err != nil {
-                        _ = f.Close()
-                        fmt.Printf("Warn: context PUT attempt %d failed: %v\n", attempt, err)
-                        time.Sleep(2 * time.Second)
-                        continue
-                    }
-                    _ = f.Close()
-                    _ = resp.Body.Close()
-                    if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-                        fmt.Printf("Context PUT ok (%d bytes) to %s\n", fi.Size(), path)
-                        break
-                    }
-                    fmt.Printf("Warn: context PUT attempt %d got HTTP %d for %s\n", attempt, resp.StatusCode, path)
-                    time.Sleep(2 * time.Second)
-                }
-            }(contextURL)
-        } else {
-            return c.Status(500).JSON(fiber.Map{
-                "error": "storage not available for build context upload",
-                "stage": "upload_context",
-                "context_key": contextKey,
-            })
-        }
-        log.Printf("[Build:E] Context uploaded: url=%s", contextURL)
+			// Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
+			func(path string) {
+				fi, err := os.Stat(builderTar)
+				if err != nil {
+					fmt.Printf("Warn: stat tar failed: %v\n", err)
+					return
+				}
+				for attempt := 1; attempt <= 3; attempt++ {
+					f, err := os.Open(builderTar)
+					if err != nil {
+						fmt.Printf("Warn: open tar failed: %v\n", err)
+						return
+					}
+					req, err := http.NewRequest("PUT", path, f)
+					if err != nil {
+						_ = f.Close()
+						fmt.Printf("Warn: build PUT request failed: %v\n", err)
+						return
+					}
+					req.Header.Set("Content-Type", "application/x-tar")
+					req.ContentLength = fi.Size()
+					client := &http.Client{Timeout: 60 * time.Second}
+					resp, err := client.Do(req)
+					if err != nil {
+						_ = f.Close()
+						fmt.Printf("Warn: context PUT attempt %d failed: %v\n", attempt, err)
+						time.Sleep(2 * time.Second)
+						continue
+					}
+					_ = f.Close()
+					_ = resp.Body.Close()
+					if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+						fmt.Printf("Context PUT ok (%d bytes) to %s\n", fi.Size(), path)
+						break
+					}
+					fmt.Printf("Warn: context PUT attempt %d got HTTP %d for %s\n", attempt, resp.StatusCode, path)
+					time.Sleep(2 * time.Second)
+				}
+			}(contextURL)
+		} else {
+			return c.Status(500).JSON(fiber.Map{
+				"error":       "storage not available for build context upload",
+				"stage":       "upload_context",
+				"context_key": contextKey,
+			})
+		}
+		log.Printf("[Build:E] Context uploaded: url=%s", contextURL)
 
 		// Render and execute Kaniko builder job, waiting for terminal completion
 		// Include a nonce in the builder job version to avoid stale alloc collisions
 		nonce := time.Now().Unix()
 		versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
 		builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile")
-        if err != nil {
-            return c.Status(500).JSON(fiber.Map{
-                "error": "render builder failed",
-                "stage": "render_builder",
-                "details": err.Error(),
-            })
-        }
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "render builder failed",
+				"stage":   "render_builder",
+				"details": err.Error(),
+			})
+		}
 		// Save a debug copy for inspection
 		func() {
 			_ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
 			_ = copyFile(builderHCL, filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL)))
 			log.Printf("[Build:E] Kaniko job HCL written to %s", filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL)))
 		}()
-        if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
-            return c.Status(500).JSON(fiber.Map{
-                "error": "builder job validation failed",
-                "stage": "validate_builder",
-                "builder_hcl": builderHCL,
-                "details": vErr.Error(),
-            })
-        }
+		if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
+			return c.Status(500).JSON(fiber.Map{
+				"error":       "builder job validation failed",
+				"stage":       "validate_builder",
+				"builder_hcl": builderHCL,
+				"details":     vErr.Error(),
+			})
+		}
 		builderJobName := fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
 		log.Printf("[Build:E] Submitting Kaniko job: %s", builderJobName)
-        if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
-            snippet := getJobLogsSnippet(builderJobName, 80)
-            return c.Status(500).JSON(fiber.Map{
-                "error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
-                "stage":   "kaniko_submit",
-                "details": err.Error(),
-                "builder": fiber.Map{"job": builderJobName, "logs": snippet},
-            })
-        }
-        // Verify image exists in registry before continuing
-        vr := verifyOCIPush(tag)
-        if !vr.OK {
-            return c.Status(500).JSON(fiber.Map{
-                "error": "image push verification failed",
-                "stage": "verify_push",
-                "image": tag,
-                "status": vr.Status,
-                "message": vr.Message,
-            })
-        }
+		if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
+			snippet := getJobLogsSnippet(builderJobName, 80)
+			return c.Status(500).JSON(fiber.Map{
+				"error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
+				"stage":   "kaniko_submit",
+				"details": err.Error(),
+				"builder": fiber.Map{"job": builderJobName, "logs": snippet},
+			})
+		}
+		// Verify image exists in registry before continuing
+		vr := verifyOCIPush(tag)
+		if !vr.OK {
+			return c.Status(500).JSON(fiber.Map{
+				"error":   "image push verification failed",
+				"stage":   "verify_push",
+				"image":   tag,
+				"status":  vr.Status,
+				"message": vr.Message,
+			})
+		}
 		log.Printf("[Build:E] Image present in registry: %s (status=%d, digest=%s)", tag, vr.Status, vr.Digest)
 		dockerImage = tag
 	case "F":
@@ -1096,42 +1096,51 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
 		return utils.ErrJSON(c, 500, fmt.Errorf("job validation failed: %w", vErr))
 	}
-    if err := orchestration.Submit(jobFile); err != nil {
-        return utils.ErrJSON(c, 500, err)
-    }
+	if err := orchestration.Submit(jobFile); err != nil {
+		return utils.ErrJSON(c, 500, err)
+	}
 
-    jobName := appName + "-lane-" + strings.ToLower(lane)
-    if err := orchestration.WaitHealthy(jobName, 90*time.Second); err != nil {
-        // Collect allocation summaries to aid diagnostics
-        allocs, _ := orchestration.NewHealthMonitor().GetJobAllocations(jobName)
-        type ev struct{ Type, Message, DisplayMessage string }
-        type ts struct{ Name, State string; Failed bool; Events []ev }
-        type sum struct{ ID, ClientStatus, DesiredStatus string; Tasks []ts }
-        var out []sum
-        for _, a := range allocs {
-            s := sum{ID: a.ID, ClientStatus: a.ClientStatus, DesiredStatus: a.DesiredStatus}
-            if len(a.TaskStates) > 0 {
-                for name, st := range a.TaskStates {
-                    t := ts{Name: name, State: st.State, Failed: st.Failed}
-                    if len(st.Events) > 0 {
-                        start := 0
-                        if len(st.Events) > 4 { start = len(st.Events) - 4 }
-                        for _, e := range st.Events[start:] {
-                            t.Events = append(t.Events, ev{Type: e.Type, Message: e.Message, DisplayMessage: e.DisplayMessage})
-                        }
-                    }
-                    s.Tasks = append(s.Tasks, t)
-                }
-            }
-            out = append(out, s)
-        }
-        return c.Status(500).JSON(fiber.Map{
-            "error":       "deployment did not become healthy",
-            "job_name":    jobName,
-            "allocations": out,
-            "details":     err.Error(),
-        })
-    }
+	jobName := appName + "-lane-" + strings.ToLower(lane)
+	if err := orchestration.WaitHealthy(jobName, 90*time.Second); err != nil {
+		// Collect allocation summaries to aid diagnostics
+		allocs, _ := orchestration.NewHealthMonitor().GetJobAllocations(jobName)
+		type ev struct{ Type, Message, DisplayMessage string }
+		type ts struct {
+			Name, State string
+			Failed      bool
+			Events      []ev
+		}
+		type sum struct {
+			ID, ClientStatus, DesiredStatus string
+			Tasks                           []ts
+		}
+		var out []sum
+		for _, a := range allocs {
+			s := sum{ID: a.ID, ClientStatus: a.ClientStatus, DesiredStatus: a.DesiredStatus}
+			if len(a.TaskStates) > 0 {
+				for name, st := range a.TaskStates {
+					t := ts{Name: name, State: st.State, Failed: st.Failed}
+					if len(st.Events) > 0 {
+						start := 0
+						if len(st.Events) > 4 {
+							start = len(st.Events) - 4
+						}
+						for _, e := range st.Events[start:] {
+							t.Events = append(t.Events, ev{Type: e.Type, Message: e.Message, DisplayMessage: e.DisplayMessage})
+						}
+					}
+					s.Tasks = append(s.Tasks, t)
+				}
+			}
+			out = append(out, s)
+		}
+		return c.Status(500).JSON(fiber.Map{
+			"error":       "deployment did not become healthy",
+			"job_name":    jobName,
+			"allocations": out,
+			"details":     err.Error(),
+		})
+	}
 
 	// Prefer unified storage interface if available, fallback to legacy StorageClient
 	if deps.Storage != nil {
