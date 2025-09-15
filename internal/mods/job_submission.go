@@ -338,15 +338,15 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			rep := NewControllerEventReporter(controller, modID)
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
 		}
-		// Download with small retry/backoff to avoid race with artifact upload
+		// Download with extended retry/backoff to avoid race with artifact upload
 		var dlErr error
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 20; i++ {
 			if err := downloadToFileFn(url, artifactPath); err == nil {
 				dlErr = nil
 				break
 			} else {
 				dlErr = err
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(1 * time.Second)
 			}
 		}
 		dlEnd := time.Now()
