@@ -1,27 +1,29 @@
 package server
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"os/exec"
-	"strconv"
-	"time"
+    "encoding/json"
+    "fmt"
+    "regexp"
+    "os"
+    "os/exec"
+    "strconv"
+    "time"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type buildLogsResponse struct {
-	ID      string `json:"id"`
-	App     string `json:"app"`
-	Job     string `json:"job,omitempty"`
-	AllocID string `json:"alloc_id,omitempty"`
-	Lines   int    `json:"lines"`
-	Logs    string `json:"logs"`
-	Message string `json:"message,omitempty"`
-	Status  string `json:"status,omitempty"`
-	Started string `json:"started_at,omitempty"`
-	Ended   string `json:"ended_at,omitempty"`
+    ID      string `json:"id"`
+    App     string `json:"app"`
+    Job     string `json:"job,omitempty"`
+    AllocID string `json:"alloc_id,omitempty"`
+    AllocStatus string `json:"alloc_status,omitempty"`
+    Lines   int    `json:"lines"`
+    Logs    string `json:"logs"`
+    Message string `json:"message,omitempty"`
+    Status  string `json:"status,omitempty"`
+    Started string `json:"started_at,omitempty"`
+    Ended   string `json:"ended_at,omitempty"`
 }
 
 // handleBuildLogs returns recent builder logs for a given async build id.
@@ -54,16 +56,24 @@ func (s *Server) handleBuildLogs(c *fiber.Ctx) error {
 		return c.JSON(resp)
 	}
 	// Resolve running allocation for the builder job via the wrapper
-	alloc := runJobMgr("running-alloc", job)
-	if alloc == "" {
-		// Best-effort: return allocs short list for visibility
-		allocs := runJobMgr("allocs-human", job)
-		resp.Logs = allocs
-		return c.JSON(resp)
-	}
-	resp.AllocID = alloc
-	resp.Logs = runJobMgrLogs(alloc, lines)
-	return c.JSON(resp)
+    alloc := runJobMgr("running-alloc", job)
+    if alloc == "" {
+        // Best-effort: return allocs short list for visibility
+        allocs := runJobMgr("allocs-human", job)
+        resp.Logs = allocs
+        return c.JSON(resp)
+    }
+    resp.AllocID = alloc
+    resp.Logs = runJobMgrLogs(alloc, lines)
+    // Include allocation status snapshot for quick diagnosis
+    if st := runJobMgrAllocStatus(alloc); st != "" {
+        // limit size to avoid huge payloads
+        if len(st) > 4000 {
+            st = st[:4000]
+        }
+        resp.AllocStatus = st
+    }
+    return c.JSON(resp)
 }
 
 func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane string }) string {
@@ -97,25 +107,47 @@ func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane str
 }
 
 func runJobMgr(cmd string, job string) string {
-	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-	var c *exec.Cmd
-	switch cmd {
-	case "running-alloc":
-		c = exec.Command(wrapper, "running-alloc", "--job", job)
-	case "allocs-human":
-		c = exec.Command(wrapper, "allocs", "--job", job, "--format", "human")
-	default:
-		return ""
-	}
-	out, _ := runCmdTimeout(c, 8*time.Second)
-	return out
+    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+    var c *exec.Cmd
+    switch cmd {
+    case "running-alloc":
+        c = exec.Command(wrapper, "running-alloc", "--job", job)
+    case "allocs-human":
+        c = exec.Command(wrapper, "allocs", "--job", job, "--format", "human")
+    default:
+        return ""
+    }
+    out, _ := runCmdTimeout(c, 8*time.Second)
+    if cmd == "running-alloc" {
+        // Extract first UUID from noisy wrapper output
+        // Wrapper logs to stderr; CombinedOutput mixes both; pick the allocation ID via regex.
+        uuid := extractUUID(out)
+        return uuid
+    }
+    return out
 }
 
 func runJobMgrLogs(alloc string, lines int) string {
-	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-	c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines))
-	out, _ := runCmdTimeout(c, 8*time.Second)
-	return out
+    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+    c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines))
+    out, _ := runCmdTimeout(c, 8*time.Second)
+    return out
+}
+
+func runJobMgrAllocStatus(alloc string) string {
+    if alloc == "" {
+        return ""
+    }
+    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+    c := exec.Command(wrapper, "alloc-status", "--alloc-id", alloc)
+    out, _ := runCmdTimeout(c, 8*time.Second)
+    return out
+}
+
+func extractUUID(s string) string {
+    // match RFC4122-like UUIDs
+    re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+    return re.FindString(s)
 }
 
 func runCmdTimeout(cmd *exec.Cmd, timeout time.Duration) (string, error) {
