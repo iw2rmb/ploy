@@ -163,7 +163,7 @@ The test repositories contain various Java code issues that OpenRewrite recipes 
 **Test Environment**: api.dev.ployman.app
 **Go Test Suites**: Prefer Go-based integration/E2E tests over shell scripts
   - Integration: `go test ./tests/integration -tags=integration -v`
-  - E2E (Dev API): `PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags=e2e -v`
+  - E2E (Dev API): ensure `PLOY_CONTROLLER=https://api.dev.ployman.app/v1`, then run `go test ./tests/e2e -tags=e2e -v`
 **Results Directory**: `tests/results/openrewrite-20250904-075658/`
 
 **Summary**:

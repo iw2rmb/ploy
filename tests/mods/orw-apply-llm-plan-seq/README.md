@@ -6,6 +6,25 @@ Overview
 - This mirrors the validated Java 11→17 pipeline while forcing a compile failure post-ORW apply, so the planner has work to do.
 - Uses SeaweedFS for artifacts and the controller’s /v1/mods/{id}/events endpoint for live status.
 
+Cycle State (Single Source)
+
+- Current issues to solve (keep this list current after each run):
+  - Git push/MR: push failed due to GitLab authentication (rc=128). Ensure `GITLAB_TOKEN` is set with write_repository scope and picked up by the controller for branch pushes and MR creation.
+  - Capacity: keep Nomad client memory free enough to schedule the 1GiB ORW task; stop non‑essential jobs when validating (ORW alloc failures observed previously).
+  - Event‑driven flow: Confirmed working — controller gates artifact downloads on explicit “uploaded …” events and deregisters after artifacts; keep monitoring for races.
+  - Confirmed: Planner emits `plan.json` and LLM‑exec uploads `diff.patch` (artifact keys present in events); Reducer produced `next.json` with `{ "action": "stop" }` in latest run.
+
+- Update rule: After each ./run.sh execution, update this Cycle State with:
+  - MOD_ID and a 1–2 line summary of outcome;
+  - Any new blocking issues or confirmations solved;
+  - The logs directory path (see Inspecting Logs) for reference.
+
+- Latest run:
+  - MOD_ID: mod-83cdaaf7 — healing completed through reducer; build gate succeeded; push failed with GitLab auth (rc=128). Ensure the controller job env has `GITLAB_TOKEN` with write_repository/api scopes.
+  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-83cdaaf7
+
+Note: Historical cycle-by-cycle notes have been condensed into this single Cycle State to avoid drift. Refer to git history if you need past detail.
+
 Prepared Repo (ready-to-use)
 
 - A public GitLab repository is prepared with deterministic failure branches so you don’t need to fork or craft failures yourself:
@@ -68,23 +87,39 @@ Files here
 Quick start (scripts) — operator flow
 
 1) Option A — Use prepared repo/branches (recommended):
-   - export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
-   - export GITLAB_URL=https://gitlab.com
-   - (Optional) export GITLAB_TOKEN=glpat-…  # only used by cleanup scripts/tests to delete MR source branches
+   - Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`
+   - Ensure GITLAB_URL=https://gitlab.com
+   - (Optional) ensure GITLAB_TOKEN=glpat-…  # only used by cleanup scripts/tests to delete MR source branches
    - Choose one branch to trigger healing:
-     - export E2E_HEALING_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
-     - export E2E_HEALING_BRANCH=e2e/fail-missing-symbol    # or e2e/fail-java17-specific
+     - Ensure E2E_HEALING_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
+     - Ensure E2E_HEALING_BRANCH=e2e/fail-missing-symbol    # or e2e/fail-java17-specific
    - Run via scripts (SSE stream, artifacts, step checks):
      - ./run.sh
      - or: ./watch-events.sh <MOD_ID> (after run prints MOD_ID)
+   - After completion (always do this):
+     - ./collect-logs.sh <MOD_ID>
+     - ./fetch-artifacts.sh <MOD_ID>
+     - ./check-steps.sh <MOD_ID>
+   - Then update the Cycle State section above with the current outcome and any issues.
+
+Inspecting Logs (after each run)
+
+- Run: ./collect-logs.sh <MOD_ID>
+- Inspect directory: logs/<MOD_ID>/
+  - summary.txt — quick overview (status, last_job, controller URL references)
+  - events.sse and events.filtered.txt — raw and filtered event streams (errors and key steps)
+  - platform_api.log, traefik.log — recent platform logs to correlate failures
+  - artifacts_index.json — current controller-reported artifacts
+  - seaweedfs/… — if PLOY_SEAWEEDFS_URL set, downloaded artifacts by key
+  - Use these to diagnose missing artifacts (404), Nomad placement/validation, or runner issues.
      - After completion: ./fetch-artifacts.sh <MOD_ID> and ./check-steps.sh <MOD_ID>
      - Logs and platform diagnostics: ./collect-logs.sh <MOD_ID> (run.sh calls this automatically)
 
    Option B — Prepare/fork your own repo with an intentional compile failure (see “How we force a predictable build failure”).
 2) Set env:
-   - export GITLAB_URL=https://gitlab.com
-   - export GITLAB_TOKEN=glpat-…
-   - export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+   - Ensure GITLAB_URL=https://gitlab.com
+   - Ensure GITLAB_TOKEN=glpat-…
+   - Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`
 3) Edit scenario.yaml:
    - id: choose a unique id (e.g., java11to17-orw-llm)
    - target_repo: set to your fork URL
@@ -105,7 +140,7 @@ Quick start (scripts) — operator flow
 Quick start (Go E2E) — prepared repo/branches
 
 - Healing flow validation (uses prepared failing branch). Ensure controller is reachable:
-  - export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+  - Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`
   - export E2E_HEALING_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
   - export E2E_HEALING_BRANCH=e2e/fail-missing-symbol   # or e2e/fail-java17-specific
   - go test -count=1 ./tests/e2e -tags e2e -v -run HealingFlow_ORWFail_LLMSucceeds -timeout 20m
@@ -336,8 +371,10 @@ Go E2E tests — CI/VPS flow
 - Existing migration and learning tests were updated to use `type: orw-apply` with explicit recipe coordinates (no discovery).
 - Run examples:
   - go test ./tests/e2e -tags e2e -v -run HealingFlow -timeout 20m
-  - env PLOY_CONTROLLER=… E2E_HEALING_REPO=https://gitlab.com/… E2E_HEALING_BRANCH=e2e/fail-missing-symbol go test ./tests/e2e -tags e2e -v -run HealingFlow -timeout 20m
-  - env PLOY_CONTROLLER=… E2E_BRANCH=e2e/success go test ./tests/e2e -tags e2e -v -run JavaMigrationComplete -timeout 15m
+  - Ensure PLOY_CONTROLLER and E2E_HEALING_REPO are set, then:
+    go test ./tests/e2e -tags e2e -v -run HealingFlow -timeout 20m
+  - Ensure PLOY_CONTROLLER is set; to use a specific branch:
+    E2E_BRANCH=e2e/success go test ./tests/e2e -tags e2e -v -run JavaMigrationComplete -timeout 15m
 
 Branch strategy (single repo)
 

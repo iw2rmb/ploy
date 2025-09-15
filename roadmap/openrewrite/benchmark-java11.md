@@ -40,7 +40,7 @@ Design a comprehensive test scenario that progressively evaluates ARF's enhanced
 ### ARF Configuration
 ```bash
 # Only the controller endpoint is required
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`.
 
 # Verify configuration
 echo "Controller: $PLOY_CONTROLLER"
@@ -142,7 +142,7 @@ The standalone OpenRewrite service at `openrewrite.dev.ployman.app` is no longer
 **Phase 1: Sequential Simple Projects (Recipe-based)**
 ```bash
 # Configure controller endpoint
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`.
 
 # Single project baseline (Java 8 Tutorial - actual migration test)
 ploy arf transform \
@@ -179,7 +179,7 @@ done
 **Phase 2: LLM-Enhanced Self-Healing**
 ```bash
 # Configure controller endpoint and LLM provider
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`.
 
 # Test with self-healing capabilities
 ploy arf transform \
@@ -385,7 +385,7 @@ COMPLEX_REPOS=(
 set -e
 
 # Configure controller endpoint
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`.
 
 # Verify controller is accessible
 echo "Checking controller health..."
@@ -438,7 +438,7 @@ echo "Phase 1 sequential testing completed"
 set -e
 
 # Configure controller endpoint
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`.
 
 # Verify controller is accessible
 echo "Checking controller health..."
@@ -495,7 +495,7 @@ echo "Phase 2 LLM-enhanced testing completed"
 set -e
 
 # Configure controller endpoint
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+Ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`.
 
 echo "Starting Phase 3 parallel execution test"
 
@@ -604,8 +604,8 @@ ploy arf transform \
 
 **Transform Command Issues**:
 ```bash
-# Ensure controller endpoint is set
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+# Ensure controller endpoint is set (once per shell)
+# PLOY_CONTROLLER should point to https://api.dev.ployman.app/v1
 
 # Check transform command help for latest options
 ploy arf transform --help

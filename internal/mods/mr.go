@@ -16,13 +16,17 @@ func (r *ModRunner) createOrUpdateMR(ctx context.Context, result *ModResult, bra
 	}
 	// When MRManager is present, prefer it
 	if r.mrManager != nil {
+		labels := []string{"ploy", "tfl"}
+		if r.config != nil && r.config.MR != nil && len(r.config.MR.Labels) > 0 {
+			labels = r.config.MR.Labels
+		}
 		mrConfig := provider.MRConfig{
 			RepoURL:      r.config.TargetRepo,
 			SourceBranch: branchName,
 			TargetBranch: r.config.TargetBranch,
 			Title:        fmt.Sprintf("Mods: %s", r.config.ID),
 			Description:  renderMRDescription(r, result),
-			Labels:       []string{"ploy", "tfl"},
+			Labels:       labels,
 		}
 		mrTimeout := 2 * time.Minute
 		mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
@@ -61,6 +65,8 @@ func (r *ModRunner) createOrUpdateMR(ctx context.Context, result *ModResult, bra
 	mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
 	defer cancelMR()
 	mrEmitStart(r, ctx, mrConfig.SourceBranch, mrConfig.TargetBranch)
+	// Apply MR auth/env selection before provider invocation as well
+	r.applyMRAuthFromConfig(ctx)
 	mrResult, err := r.gitProvider.CreateOrUpdateMR(mrCtx, mrConfig)
 	if err != nil {
 		mrAppendFailure(result, err)

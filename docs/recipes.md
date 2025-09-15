@@ -93,13 +93,13 @@ ploy arf recipes stats org.openrewrite.java.RemoveUnusedImports
 
 Enable lightweight catalog mode for faster searches:
 ```bash
-export PLOY_RECIPES_CATALOG=true
+# Ensure PLOY_RECIPES_CATALOG=true
 ploy arf recipes list
 ```
 
 Server routes can be enabled with:
 ```bash
-export PLOY_ENABLE_RECIPES_CATALOG=true
+# Ensure PLOY_ENABLE_RECIPES_CATALOG=true
 ```
 
 ## Running Transformations

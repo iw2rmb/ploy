@@ -6,7 +6,7 @@ set -e
 echo "=== Testing New CLI Commands ==="
 
 # Set up environment
-export PLOY_CONTROLLER="http://localhost:8081/v1"
+export PLOY_CONTROLLER="${PLOY_CONTROLLER:-http://localhost:8081/v1}"
 cd /home/ploy/ploy
 
 # Build CLI if not exists

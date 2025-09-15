@@ -1072,9 +1072,9 @@
           export PLOY_APPS_DOMAIN={{ ploy.apps_domain }}
           export PLOY_ENVIRONMENT={{ ploy_environment | default('dev') }}
           {% if ploy_environment == 'dev' %}
-          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain }}/v1
+          export PLOY_CONTROLLER=${PLOY_CONTROLLER:-https://api.{{ ploy.platform_domain }}/v1}
           {% else %}
-          export PLOY_CONTROLLER=https://api.{{ ploy.platform_domain }}/v1
+          export PLOY_CONTROLLER=${PLOY_CONTROLLER:-https://api.{{ ploy.platform_domain }}/v1}
           {% endif %}
           
           # ARF (Automated Remediation Framework) environment variables

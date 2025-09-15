@@ -455,25 +455,44 @@
           debug:
             msg: "Bootstrap API deployed successfully. Status: {{ wait_result.rc == 0 | ternary('Running', 'Failed') }}"
 
-        - name: Wait for bootstrap API to be available via domain
+        - name: Wait for API to be available via domain (versioned)
           uri:
-            url: "https://api.{{ ploy.platform_domain }}/health"
+            url: "https://api.{{ ploy.platform_domain }}/v1/health"
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
           environment:
             PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
-          register: bootstrap_health
+          register: versioned_health
           retries: 10
           delay: 15
-          until: bootstrap_health.status == 200
+          until: versioned_health.status == 200
+
+        - name: Verify Consul service tags include Traefik router labels
+          uri:
+            url: "http://localhost:8500/v1/catalog/service/ploy-api"
+            method: GET
+            status_code: 200
+          register: consul_api_service
+          retries: 5
+          delay: 5
+          until: consul_api_service.status == 200
+
+        - name: Assert required Traefik labels on Consul service
+          assert:
+            that:
+              - consul_api_service.json | length > 0
+              - (consul_api_service.json[0].ServiceTags | join(',')) is search('traefik.enable=true')
+              - (consul_api_service.json[0].ServiceTags | join(',')) is search('traefik.http.routers.ploy-api.rule=Host\(`api\.' + ploy.platform_domain + '`\)')
+          fail_msg: "Consul service tags for ploy-api missing required Traefik router labels"
+          success_msg: "Consul service tags contain required Traefik router labels"
 
         - name: Mark bootstrap as ready for unified deployment transition
           copy:
             content: |
               # Bootstrap deployment completed at {{ ansible_date_time.iso8601 }}
               # Ready for transition to unified deployment system
-              # Use: PLOY_CONTROLLER=https://api.dev.ployman.app/v1 ./bin/ployman push -a ploy-api
+              # Use: ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1, then run: ./bin/ployman push -a ploy-api
               BOOTSTRAP_VERSION={{ current_deployment_version }}
               UNIFIED_TRANSITION_READY=true
             dest: /opt/ploy/bootstrap-status
@@ -483,32 +502,32 @@
 
     - name: Validate bootstrap deployment
       block:
-        - name: Verify bootstrap API health endpoint via domain
+        - name: Verify API health endpoint via domain
           uri:
-            url: "https://api.{{ ploy.platform_domain }}/health"
+            url: "https://api.{{ ploy.platform_domain }}/v1/health"
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
           environment:
             PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
-          register: bootstrap_health_check
+          register: versioned_health_check
           retries: 3
           delay: 5
-          until: bootstrap_health_check.status == 200
+          until: versioned_health_check.status == 200
           ignore_errors: true
 
-        - name: Verify bootstrap API readiness via domain
+        - name: Verify API readiness via domain
           uri:
-            url: "https://api.{{ ploy.platform_domain }}/ready"
+            url: "https://api.{{ ploy.platform_domain }}/v1/ready"
             method: GET
             status_code: 200
             validate_certs: no  # May need time for cert provisioning
           environment:
             PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
-          register: bootstrap_ready
+          register: versioned_ready
           retries: 3
           delay: 5
-          until: bootstrap_ready.status == 200
+          until: versioned_ready.status == 200
           ignore_errors: true
 
         - name: Test bootstrap API endpoints via domain
@@ -615,5 +634,5 @@
               
               NEXT STEPS:
               1. Verify external API access: curl https://api.{{ ploy.platform_domain }}/health
-              2. Transition to unified deployment: PLOY_CONTROLLER=https://api.{{ ploy.platform_domain }}/v1 ./bin/ployman push -a ploy-api
+              2. Transition to unified deployment: ensure PLOY_CONTROLLER=https://api.{{ ploy.platform_domain }}/v1, then run: ./bin/ployman push -a ploy-api
               3. Future deployments will use the unified system automatically

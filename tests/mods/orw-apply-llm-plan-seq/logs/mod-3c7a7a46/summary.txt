@@ -1,0 +1,10 @@
+MOD_ID: mod-3c7a7a46
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+failed, phase=apply
+orw-apply job failed: no allocations created for job orw-apply-java11to17-migration-1757960183 within 1m30s (check job evaluations/constraints)
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log

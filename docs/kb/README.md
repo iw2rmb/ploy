@@ -101,16 +101,16 @@ for _, suggestion := range suggestions.OrderByConfidence() {
 ### Environment Variables
 ```bash
 # Enable KB learning
-export KB_ENABLED=true
+# Ensure KB_ENABLED=true
 
 # Storage configuration
-export KB_STORAGE_URL=http://localhost:8888
-export KB_STORAGE_TIMEOUT=10s
+# Ensure KB_STORAGE_URL=http://localhost:8888
+# Ensure KB_STORAGE_TIMEOUT=10s
 
 # Learning parameters
-export KB_MIN_CONFIDENCE=0.7
-export KB_MAX_CASES_PER_ERROR=100
-export KB_SUMMARY_UPDATE_INTERVAL=1h
+# Ensure KB_MIN_CONFIDENCE=0.7
+# Ensure KB_MAX_CASES_PER_ERROR=100
+# Ensure KB_SUMMARY_UPDATE_INTERVAL=1h
 ```
 
 ### Mods Integration
@@ -297,7 +297,7 @@ curl http://localhost:8888/v1/llms/kb/trends?period=7d&metric=case_count
 ### Debug Commands
 ```bash
 # Enable detailed KB logging
-export KB_LOG_LEVEL=debug
+# Ensure KB_LOG_LEVEL=debug
 
 # Test error canonicalization
 curl -X POST http://localhost:8888/v1/llms/kb/errors/canonicalize \

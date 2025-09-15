@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # E2E: Deploy a GitHub app with ploy CLI, verify HTTPS, then destroy
-# Requirements (VPS Dev API): set PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+# Requirements (VPS Dev API): ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
 set -euo pipefail
 

@@ -72,6 +72,12 @@ func TestDeploy_Java17_NoJib(t *testing.T) {
 
 func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asyncBudget, healthBudget time.Duration) {
 	t.Helper()
+	// Always attempt cleanup at the end to free resources
+	defer func() {
+		cmd := exec.Command(bin(), "apps", "destroy", "--name", app, "--force")
+		cmd.Env = append(os.Environ(), fmt.Sprintf("PLOY_CONTROLLER=%s", controller))
+		_, _ = runWithTimeout(cmd, 20*time.Second)
+	}()
 	// Clone shallow
 	work, err := os.MkdirTemp("", "ploy-e2e-")
 	if err != nil {
@@ -83,27 +89,45 @@ func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asy
 	cmd := exec.Command(bin(), "push", "-a", app, "-lane", lane)
 	cmd.Dir = filepath.Join(work, "app")
 	env := append(os.Environ(), fmt.Sprintf("PLOY_CONTROLLER=%s", controller))
+	// Prefer async to retrieve build metrics via status endpoint
+	env = append(env, "PLOY_ASYNC=1")
 	if strings.ToUpper(lane) == "E" {
 		env = append(env, "PLOY_AUTOGEN_DOCKERFILE=1")
 	}
 	cmd.Env = env
 	out, err := runWithTimeout(cmd, pushBudget)
 	if err != nil {
+		// Best-effort logs on push failure
+		sha := gitHead(t, filepath.Join(work, "app"))
+		collectDeployLogs(t, controller, app, lane, sha, "")
 		t.Fatalf("ploy push failed: %v\n%s", err, string(out))
 	}
 	// Parse async id if present
 	id := parseAcceptedID(out)
 	var metrics map[string]any
 	if id != "" {
-		metrics = waitAsync(t, controller, app, id, asyncBudget)
+		metrics = waitAsync(t, controller, app, lane, id, asyncBudget)
 	}
+	// Compute image size from registry if metrics missing or imageSize zero
+	sha := gitHead(t, filepath.Join(work, "app"))
+	if (metrics == nil || !hasPositiveImageSize(metrics)) && sha != "" {
+		if tag := deriveImageTagFromMetricsOrGuess(metrics, app, sha); tag != "" {
+			if bytes, mb, ok := fetchImageSizeFromRegistry(tag); ok {
+				if metrics == nil {
+					metrics = map[string]any{}
+				}
+				metrics["imageSize"] = map[string]any{"bytes": float64(bytes), "mb": mb}
+			}
+		}
+	}
+	// Optional: collect logs proactively when requested
+	if os.Getenv("E2E_LOG_CONFIG") == "1" {
+		collectDeployLogs(t, controller, app, lane, sha, id)
+	}
+
 	// Health check (fetch logs on failure), with controller-proxied fallback
 	if err := waitHealth(controller, app, healthBudget); err != nil {
-		sha := gitHead(t, filepath.Join(work, "app"))
-		if id != "" {
-			fetchBuilderLogsAPI(t, controller, app, id)
-		}
-		fetchLogs(t, app, lane, sha)
+		collectDeployLogs(t, controller, app, lane, sha, id)
 		t.Fatalf("%v", err)
 	}
 	// Cleanup
@@ -174,7 +198,91 @@ func parseAcceptedID(out []byte) string {
 	return ""
 }
 
-func waitAsync(t *testing.T, controller, app, id string, dur time.Duration) map[string]any {
+func hasPositiveImageSize(m map[string]any) bool {
+	if m == nil {
+		return false
+	}
+	if im, ok := m["imageSize"].(map[string]any); ok {
+		if b, ok := im["bytes"].(float64); ok && b > 0 {
+			return true
+		}
+		if mb, ok := im["mb"].(float64); ok && mb > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func deriveImageTagFromMetricsOrGuess(metrics map[string]any, app, sha string) string {
+	// Prefer server-supplied imageTag when available
+	if metrics != nil {
+		if reg, ok := metrics["registry"].(map[string]any); ok {
+			if it, ok := reg["imageTag"].(string); ok && it != "" {
+				return it
+			}
+			if ep, ok := reg["endpoint"].(string); ok && ep != "" {
+				return ep + "/" + app + ":" + sha
+			}
+		}
+	}
+	// Default Dev registry guess
+	return "registry.dev.ployman.app/" + app + ":" + sha
+}
+
+func fetchImageSizeFromRegistry(tag string) (bytes int64, mb float64, ok bool) {
+	// tag format: host/repo:ref
+	slash := strings.Index(tag, "/")
+	if slash <= 0 || slash >= len(tag)-1 {
+		return 0, 0, false
+	}
+	host := tag[:slash]
+	remainder := tag[slash+1:]
+	name := remainder
+	ref := "latest"
+	if at := strings.Index(remainder, "@"); at != -1 {
+		name = remainder[:at]
+		ref = remainder[at+1:]
+	} else if colon := strings.LastIndex(remainder, ":"); colon != -1 {
+		name = remainder[:colon]
+		ref = remainder[colon+1:]
+	}
+	// HTTPS then HTTP fallback
+	for _, scheme := range []string{"https", "http"} {
+		url := scheme + "://" + host + "/v2/" + name + "/manifests/" + ref
+		req, _ := http.NewRequest("GET", url, nil)
+		req.Header.Set("Accept", strings.Join([]string{
+			"application/vnd.oci.image.manifest.v1+json",
+			"application/vnd.docker.distribution.manifest.v2+json",
+		}, ", "))
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			continue
+		}
+		if layers, ok := body["layers"].([]any); ok {
+			var total int64
+			for _, l := range layers {
+				if m, ok := l.(map[string]any); ok {
+					if sz, ok := m["size"].(float64); ok {
+						total += int64(sz)
+					}
+				}
+			}
+			if total > 0 {
+				return total, float64(total) / (1024 * 1024), true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+func waitAsync(t *testing.T, controller, app, lane, id string, dur time.Duration) map[string]any {
 	t.Helper()
 	deadline := time.Now().Add(dur)
 	url := fmt.Sprintf("%s/apps/%s/builds/%s/status", strings.TrimRight(controller, "/"), app, id)
@@ -186,6 +294,8 @@ func waitAsync(t *testing.T, controller, app, id string, dur time.Duration) map[
 			resp.Body.Close()
 			status, _ := m["status"].(string)
 			if status == "failed" {
+				// Collect logs on async failure before failing the test
+				collectDeployLogs(t, controller, app, lane, "", id)
 				t.Fatalf("async failed: %v", m["message"])
 			}
 			if status == "completed" {
@@ -453,4 +563,14 @@ func fetchBuilderLogsAPI(t *testing.T, controller, app, id string) {
 	_ = json.NewDecoder(resp.Body).Decode(&m)
 	b, _ := json.MarshalIndent(m, "", "  ")
 	t.Logf("\n== Builder logs API (%s)\n%s\n", id, string(b))
+}
+
+// collectDeployLogs aggregates builder logs (via API) and app/platform logs via fetch-logs.sh.
+// Pass sha when available (for SSH builder logs); id may be empty if push failed before acceptance.
+func collectDeployLogs(t *testing.T, controller, app, lane, sha, id string) {
+	t.Helper()
+	if id != "" {
+		fetchBuilderLogsAPI(t, controller, app, id)
+	}
+	fetchLogs(t, app, lane, sha)
 }

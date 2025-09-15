@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -368,6 +372,40 @@ func TestFormatSize(t *testing.T) {
 			result := FormatSize(tt.bytes)
 			assert.Equal(t, tt.expected, result)
 		})
+	}
+}
+
+func TestGetDockerImageSizeFromRegistry(t *testing.T) {
+	// Start a fake registry endpoint serving a simple manifest
+	manifest := `{
+      "schemaVersion": 2,
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "layers": [
+        {"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size": 1024},
+        {"mediaType":"application/vnd.docker.image.rootfs.diff.tar.gzip","size": 2048}
+      ]
+    }`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/v2/") && strings.Contains(r.URL.Path, "/manifests/") {
+			w.Header().Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
+			_, _ = w.Write([]byte(manifest))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	u, _ := url.Parse(srv.URL)
+	dockerImage := u.Host + "/repo:tag"
+	info, err := getDockerImageSizeFromRegistry(dockerImage)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.SizeBytes != 3072 {
+		t.Fatalf("want 3072 bytes, got %d", info.SizeBytes)
+	}
+	if info.SizeMB <= 0 {
+		t.Fatalf("want positive sizeMB, got %f", info.SizeMB)
 	}
 }
 
