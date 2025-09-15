@@ -332,9 +332,20 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			rep := NewControllerEventReporter(controller, modID)
 			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download plan from %s", key), JobName: runID, Time: time.Now()})
 		}
-		if err := downloadToFileFn(url, artifactPath); err != nil {
-			return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", err)
-		}
+        // Download with small retry/backoff to avoid race with artifact upload
+        var dlErr error
+        for i := 0; i < 6; i++ {
+            if err := downloadToFileFn(url, artifactPath); err == nil {
+                dlErr = nil
+                break
+            } else {
+                dlErr = err
+                time.Sleep(500 * time.Millisecond)
+            }
+        }
+        if dlErr != nil {
+            return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
+        }
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
 				return nil, fmt.Errorf("planner output schema invalid: %w", err)

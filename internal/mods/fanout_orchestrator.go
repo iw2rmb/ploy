@@ -363,13 +363,24 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		if o.runner != nil && o.runner.GetEventReporter() != nil {
 			_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download diff from %s", key), Time: time.Now()})
 		}
-		if err := downloadToFileFn(url, diffPath); err != nil {
-			result.Status = "failed"
-			result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", err)
-			result.FinishedAt = time.Now()
-			result.Duration = time.Since(result.StartedAt)
-			return result
-		}
+        // Download with small retry/backoff to avoid race with artifact upload
+        var dlErr error
+        for i := 0; i < 6; i++ {
+            if err := downloadToFileFn(url, diffPath); err == nil {
+                dlErr = nil
+                break
+            } else {
+                dlErr = err
+                time.Sleep(500 * time.Millisecond)
+            }
+        }
+        if dlErr != nil {
+            result.Status = "failed"
+            result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", dlErr)
+            result.FinishedAt = time.Now()
+            result.Duration = time.Since(result.StartedAt)
+            return result
+        }
 	}
 
 	// Step 6b: Upload LLM diff to SeaweedFS with step-scoped key (align with ORW convention)
