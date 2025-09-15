@@ -3,11 +3,15 @@
 
 http:
   routers:
-    # Wildcard certificate request for apps domain (e.g., *.dev.ployd.app)
-    apps-wildcard-cert:
-      rule: "HostRegexp(`{app:[a-z0-9-]+}.{{ ploy.apps_domain }}`)"
+    # Wildcard certificate provisioning routers
+    # These routers ensure wildcard certificates are acquired and available in the certificate store
+    # They use very low priority so Consul Catalog services take precedence, but ensure certs exist
+    
+    # Apps domain wildcard certificate provisioning (*.dev.ployd.app)
+    apps-wildcard-provisioner:
+      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.apps_domain | replace('.', '\.') }}`)"
       entryPoints:
-        - acme
+        - websecure
       service: noop-service
       tls:
         certResolver: "apps-wildcard"
@@ -15,13 +19,13 @@ http:
           - main: "{{ ploy.apps_domain }}"
             sans:
               - "*.{{ ploy.apps_domain }}"
-      priority: -100
+      priority: -100  # Low priority - Consul Catalog services will override this
 
-    # Wildcard certificate request for platform services (e.g., *.dev.ployman.app)
-    platform-wildcard-cert:
-      rule: "HostRegexp(`{service:[a-z0-9-]+}.{{ ploy.platform_domain }}`)"
+    # Platform domain wildcard certificate provisioning (*.dev.ployman.app)
+    platform-wildcard-provisioner:
+      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.platform_domain | replace('.', '\.') }}`)"
       entryPoints:
-        - acme
+        - websecure
       service: noop-service
       tls:
         certResolver: "platform-wildcard"
@@ -29,7 +33,7 @@ http:
           - main: "{{ ploy.platform_domain }}"
             sans:
               - "*.{{ ploy.platform_domain }}"
-      priority: -100
+      priority: -100  # Low priority - Consul Catalog services will override this
 
   services:
     # Noop service for certificate provisioning only
@@ -67,8 +71,9 @@ http:
         browserXssFilter: true
         customFrameOptionsValue: "SAMEORIGIN"
 
-# TLS configuration (no static certificates; rely on ACME resolvers)
+# TLS configuration with proper certificate resolution
 tls:
+  # TLS options
   options:
     default:
       minVersion: "VersionTLS12"

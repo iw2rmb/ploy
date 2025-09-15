@@ -150,6 +150,8 @@ job "traefik-system" {
           "--certificatesresolvers.platform-wildcard.acme.storage=/data/platform-acme.json",
           "--certificatesresolvers.platform-wildcard.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.platform-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          "--certificatesresolvers.platform-wildcard.acme.domains[0].main={{ ploy.platform_domain }}",
+          "--certificatesresolvers.platform-wildcard.acme.domains[0].sans=*.{{ ploy.platform_domain }}",
           # Apps wildcard certificate resolver for dev.ployd.app (reuse existing storage)
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge=true",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.provider=namecheap",
@@ -157,6 +159,8 @@ job "traefik-system" {
           "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
+          "--certificatesresolvers.apps-wildcard.acme.domains[0].main={{ ploy.apps_domain }}",
+          "--certificatesresolvers.apps-wildcard.acme.domains[0].sans=*.{{ ploy.apps_domain }}",
           # HTTP to HTTPS redirect
           "--entrypoints.web.http.redirections.entrypoint.to=websecure",
           "--entrypoints.web.http.redirections.entrypoint.scheme=https"
