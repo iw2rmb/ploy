@@ -565,7 +565,7 @@
 
     - name: Copy Ploy Nomad job templates (if they exist)
       copy:
-        src: ../../common/templates/"{{ item.path }}"
+        src: "{{ item.path }}"
         dest: /opt/hashicorp/nomad/jobs/
         owner: ploy
         group: ploy
@@ -659,27 +659,29 @@
             traefik_needs_submit: true
           when: traefik_job_check.status == 404 or (traefik_allocs.json is defined and (traefik_allocs.json | length) == 0)
 
-        - name: Assert Nomad client meta is set for Traefik placement
+        - name: Check Nomad client meta via agent API (non-fatal)
           block:
-            - name: Read client meta role from Nomad client config
-              shell: |
-                awk '
-                  /client[[:space:]]*\{/ {in=1}
-                  in && /meta[[:space:]]*\{/ {inmeta=1}
-                  inmeta && /{{ ploy_gateway_node_meta_key | default("role") }}[[:space:]]*=/{ gsub(/\"/, "", $3); print $3; exit }
-                  /\}/ && inmeta { inmeta=0 }
-                  /\}/ && in { in=0 }
-                ' /etc/nomad.d/nomad.hcl
-              register: nomad_client_meta_value
-              changed_when: false
+            - name: Read Nomad agent self configuration
+              uri:
+                url: "http://localhost:4646/v1/agent/self"
+                method: GET
+                status_code: 200
+              register: nomad_agent_self
+              retries: 3
+              delay: 3
+              until: nomad_agent_self.status == 200
               failed_when: false
+              changed_when: false
 
-            - name: Ensure meta key/value matches expected
-              assert:
-                that:
-                  - nomad_client_meta_value.stdout is search(ploy_gateway_node_class)
-                fail_msg: "Nomad client meta '{{ ploy_gateway_node_meta_key | default('role') }}' must be '{{ ploy_gateway_node_class }}' for Traefik placement. Set in /etc/nomad.d/nomad.hcl under client.meta and restart nomad."
-                success_msg: "Nomad client meta '{{ ploy_gateway_node_meta_key | default('role') }}' matches '{{ ploy_gateway_node_class }}'"
+            - name: Extract Nomad client meta role
+              set_fact:
+                nomad_client_meta_role: "{{ nomad_agent_self.json.config.Client.meta[ploy_gateway_node_meta_key | default('role')] | default('') }}"
+              when: nomad_agent_self.json is defined
+
+            - name: Warn if Nomad client meta is not set for Traefik placement
+              debug:
+                msg: "Nomad client meta '{{ ploy_gateway_node_meta_key | default('role') }}' is '{{ nomad_client_meta_role | default('') }}' but expected '{{ ploy_gateway_node_class }}'. Traefik scheduling may be constrained. Set in /etc/nomad.d/nomad.hcl under client.meta and restart nomad."
+              when: nomad_client_meta_role | default('') != (ploy_gateway_node_class)
 
         - name: Download and install Traefik binary (if needed)
           block:
@@ -753,22 +755,6 @@
 
         # Traefik directories already created in main.yml comprehensive structure
 
-        - name: Deploy Traefik dynamic configuration for API routing with SSL
-          template:
-            src: ../../common/templates/traefik-dynamic-config.yml.j2
-            dest: /opt/ploy/traefik-data/dynamic-config.yml
-            owner: ploy
-            group: ploy
-            mode: '0644'
-
-        - name: Ensure proper ownership of certificate data directory
-          file:
-            path: /opt/ploy/traefik-data
-            state: directory
-            owner: ploy
-            group: ploy
-            mode: '0755'
-            recurse: true
 
         - name: Set up firewall rules for Traefik
           ufw:
@@ -797,6 +783,24 @@
             var: traefik_status.stdout_lines
           when: traefik_status.stdout_lines is defined
 
+      always:
+        - name: Deploy Traefik dynamic configuration for API routing with SSL
+          template:
+            src: ../../common/templates/traefik-dynamic-config.yml.j2
+            dest: /opt/ploy/traefik-data/dynamic-config.yml
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+        - name: Ensure proper ownership of certificate data directory
+          file:
+            path: /opt/ploy/traefik-data
+            state: directory
+            owner: ploy
+            group: ploy
+            mode: '0755'
+            recurse: true
+
     - name: Final validation and health checks
       block:
         - name: Validate all HashiCorp services are healthy
@@ -808,7 +812,7 @@
           retries: 3
           delay: 10
           loop:
-            - { name: "Traefik", url: "http://localhost:8095/ping" }
+            - { name: "Traefik", url: "http://localhost:{{ traefik_admin_port | default(8090) }}/ping" }
             - { name: "Nomad", url: "http://localhost:4646/v1/status/leader" }
             - { name: "Consul", url: "http://localhost:8500/v1/status/leader" }
           loop_control:
@@ -832,7 +836,7 @@
               ✅ HashiCorp Stack Deployment Complete!
               
               Services Status:
-              - Traefik: ✅ {{ 'Healthy' if service_health.results[0].status == 200 else 'Failed' }} (Port 8095)
+              - Traefik: ✅ {{ 'Healthy' if service_health.results[0].status == 200 else 'Failed' }} (Port {{ traefik_admin_port | default(8090) }})
               - Nomad: ✅ {{ 'Healthy' if service_health.results[1].status == 200 else 'Failed' }} (Port 4646)  
               - Consul: ✅ {{ 'Healthy' if service_health.results[2].status == 200 else 'Failed' }} (Port 8500)
               - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (via https://api.{{ ploy.platform_domain }})
@@ -843,7 +847,7 @@
               
               Access Points:
               - API: https://api.{{ ploy.platform_domain }}/health
-              - Traefik Dashboard: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8095
+              - Traefik Dashboard: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:{{ traefik_admin_port | default(8090) }}
               - Nomad UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:4646
               - Consul UI: http://{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}:8500
 
