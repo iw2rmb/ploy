@@ -1,0 +1,13 @@
+MOD_ID: mod-8fb56015
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+completed, phase=mr
+last_job=plan-1757968747-reducer-1757968752
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-8fb56015/branches/llm-1/steps/llm-exec-llm-1-1757968748/diff.patch
+mods/mod-8fb56015/planner/java11to17-orw-llm-planner-1757968743/plan.json
