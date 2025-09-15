@@ -18,6 +18,8 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Workstation docs and examples: replaced inline `export` assignments with “Ensure … is set” guidance to avoid double-exporting env vars that are already populated.
+- Scripts: default to Dev API and other values only when unset (e.g., `PLOY_CONTROLLER`, `ARF_LLM_PROVIDER`, `ARF_LLM_MODEL`).
 - E2E log helpers:
   - tests/e2e/deploy/fetch-logs.sh now supports `BUILD_ID`, `FOLLOW`, and `OUT_DIR`, writes logs to files when `OUT_DIR` is set, includes builder logs via API, and optionally tails app task logs via SSH job-manager. Platform logs accept `follow`.
   - tests/mods/orw-apply-llm-plan-seq/collect-logs.sh adds `FOLLOW_SECONDS` to capture longer SSE streams, optional `TARGET_HOST` to fetch `last_job` allocation logs via SSH job-manager, and optional gzip compression for large files.

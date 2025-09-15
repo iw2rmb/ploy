@@ -303,10 +303,10 @@ CMD ["node", "index.js"]
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \\
     PYTHONUNBUFFERED=1 \\
+    PYTHONPATH=/app \\
     PORT=8080
-COPY requirements.txt requirements.txt
-RUN if [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
 COPY . .
+RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
 EXPOSE 8080
 %s
 `, base, cmd)

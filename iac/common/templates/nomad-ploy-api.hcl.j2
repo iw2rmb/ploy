@@ -289,6 +289,16 @@ EOF
           timeout = "20s"
           port = "http"
         }
+
+        # Versioned health check to align with external routing
+        check {
+          name = "versioned-health"
+          type = "http"
+          path = "/v1/health"
+          interval = "30s"
+          timeout = "20s"
+          port = "http"
+        }
         
         # Configure Consul to automatically deregister failed services
         meta {

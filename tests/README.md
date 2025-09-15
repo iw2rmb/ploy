@@ -25,7 +25,7 @@ tests/
 - **Unit**: `go test ./tests/unit/...`
 - **Integration**: `go test ./tests/integration/...`
 - **E2E**: `go test -tags=e2e ./tests/e2e/...`
-- **VPS**: `TARGET_HOST=45.12.75.241 go test -tags=vps ./tests/vps/...`
+- **VPS**: `go test -tags=vps ./tests/vps/...` (assumes `TARGET_HOST` is set)
 - **Scripts**: `./tests/scripts/test-*.sh`
 
 ## Test Levels

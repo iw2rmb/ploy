@@ -299,10 +299,10 @@ The dev environment uses `*.dev.ployd.app` subdomain pattern:
 
 3. **Deploy with SSL**
    ```bash
-   # Set DNS API credentials
-   export NAMECHEAP_API_USER="your-api-user"
-   export NAMECHEAP_API_KEY="your-api-key" 
-   export NAMECHEAP_USERNAME="your-username"
+   # Set DNS API credentials (once per shell)
+   # Ensure NAMECHEAP_API_USER=your-api-user
+   # Ensure NAMECHEAP_API_KEY=your-api-key
+   # Ensure NAMECHEAP_USERNAME=your-username
    
    # Deploy api with wildcard certificate support
    ployman push -a ploy-api

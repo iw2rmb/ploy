@@ -66,19 +66,19 @@ ploy mod run -f java-migration.yaml
 
 ### Environment Variables
 ```bash
-# GitLab Integration
-export GITLAB_URL=https://gitlab.com
-export GITLAB_TOKEN=your-gitlab-token
+# GitLab Integration (ensure set once per shell)
+# GITLAB_URL=https://gitlab.com
+# GITLAB_TOKEN=your-gitlab-token
 
 # Service Endpoints (defaults shown)
-export CONSUL_HTTP_ADDR=localhost:8500
-export NOMAD_ADDR=http://localhost:4646
-export SEAWEEDFS_FILER=http://localhost:8888
+# CONSUL_HTTP_ADDR=localhost:8500
+# NOMAD_ADDR=http://localhost:4646
+# SEAWEEDFS_FILER=http://localhost:8888
 
 # KB Configuration
-export KB_ENABLED=true
-export KB_STORAGE_URL=http://localhost:8888
-export KB_TIMEOUT=10s
+# KB_ENABLED=true
+# KB_STORAGE_URL=http://localhost:8888
+# KB_TIMEOUT=10s
 ```
 
 ### Mods Configuration
@@ -216,7 +216,7 @@ build_timeout: 20m  # Increase for complex projects
 #### GitLab Authentication
 ```bash
 # Verify GitLab token has correct permissions
-export GITLAB_TOKEN=glpat-your-token
+# Ensure GITLAB_TOKEN is set (glpat-...)
 curl -H "Authorization: Bearer $GITLAB_TOKEN" https://gitlab.com/api/v4/user
 ```
 
@@ -231,7 +231,7 @@ curl http://localhost:8888/                  # SeaweedFS
 ### Debug Mode
 ```bash
 # Enable debug logging
-export MODS_LOG_LEVEL=debug
+# Ensure MODS_LOG_LEVEL=debug, then run:
 ploy mod run -f config.yaml --verbose
 ```
 

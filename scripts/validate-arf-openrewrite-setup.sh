@@ -191,8 +191,8 @@ if [ "$VALIDATION_FAILED" = true ]; then
   echo "  ollama serve &"
   echo "  ollama pull codellama:7b"
   echo
-  echo "  # Set environment variables:"
-  echo "  export PLOY_CONTROLLER=https://api.dev.ployman.app/v1"
+  echo "  # Set environment variables (once per shell):"
+  echo "  # Ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1"
   exit 1
 else
   echo -e "${GREEN}✅ VALIDATION PASSED${NC}"

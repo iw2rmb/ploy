@@ -209,11 +209,12 @@ These areas should continue using mocks as they serve legitimate testing purpose
 
 2. **Environment Variables**
    ```bash
-   export CONSUL_HTTP_ADDR=localhost:8500
-   export NOMAD_ADDR=http://localhost:4646  
-   export SEAWEEDFS_FILER=http://localhost:8888
-   export GITLAB_URL=https://gitlab.com
-   export GITLAB_TOKEN=your-integration-test-token
+   # Ensure the following env vars are set (once per shell):
+   # CONSUL_HTTP_ADDR=localhost:8500
+   # NOMAD_ADDR=http://localhost:4646
+   # SEAWEEDFS_FILER=http://localhost:8888
+   # GITLAB_URL=https://gitlab.com
+   # GITLAB_TOKEN=your-integration-test-token
    ```
 
 3. **Test Project Setup**

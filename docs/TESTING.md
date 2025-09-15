@@ -226,15 +226,15 @@ Key environment variables for testing:
 
 ```bash
 # Service endpoints
-export CONSUL_HTTP_ADDR=localhost:8500
-export NOMAD_ADDR=http://localhost:4646
-export SEAWEEDFS_MASTER=http://localhost:9333
-export SEAWEEDFS_FILER=http://localhost:8888
+# Ensure CONSUL_HTTP_ADDR=localhost:8500
+# Ensure NOMAD_ADDR=http://localhost:4646
+# Ensure SEAWEEDFS_MASTER=http://localhost:9333
+# Ensure SEAWEEDFS_FILER=http://localhost:8888
 
 
 # Testing flags
-export PLOY_TEST_MODE=true
-export PLOY_TEST_TIMEOUT=30s
+# Ensure PLOY_TEST_MODE=true
+# Ensure PLOY_TEST_TIMEOUT=30s
 ```
 
 ## Writing Tests
@@ -439,13 +439,13 @@ Set environment variables for test behavior:
 
 ```bash
 # Skip integration tests if services unavailable
-export PLOY_SKIP_INTEGRATION=true
+# Ensure PLOY_SKIP_INTEGRATION=true
 
 # Increase test timeout for slow tests
-export PLOY_TEST_TIMEOUT=60s
+# Ensure PLOY_TEST_TIMEOUT=60s
 
 # Enable debug logging in tests
-export PLOY_TEST_DEBUG=true
+# Ensure PLOY_TEST_DEBUG=true
 
 ```
 

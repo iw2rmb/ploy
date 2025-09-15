@@ -8,7 +8,8 @@ echo "⚡ Starting ARF OpenRewrite Phase 3 Parallel Execution Testing"
 echo "=============================================================="
 
 # Configure environment (batch jobs are the only mode)
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+# Respect existing PLOY_CONTROLLER; default to Dev API if unset
+export PLOY_CONTROLLER="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 
 echo "📋 Configuration:"
 echo "  Controller: $PLOY_CONTROLLER"

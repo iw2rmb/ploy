@@ -147,7 +147,7 @@ SEAWEEDFS_FILER=http://localhost:8888
 REDIS_ADDR=localhost:6379
 
 # Controller configuration
-PLOY_CONTROLLER=http://localhost:8081/v1
+# Ensure PLOY_CONTROLLER is set to http://localhost:8081/v1
 PLOY_APPS_DOMAIN=local.dev
 PLOY_ENVIRONMENT=test
 ```

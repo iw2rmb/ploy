@@ -231,13 +231,54 @@
         port: 8500
         delay: 10
 
-    - name: Configure DNS to use Consul for .consul domain resolution
+    - name: Ensure libnss-resolve is installed (NSS plugin)
+      apt:
+        name: libnss-resolve
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install and configure dnsmasq for Consul DNS forwarding
+      block:
+        - name: Ensure dnsmasq is installed
+          apt:
+            name: dnsmasq
+            state: present
+          when: ansible_os_family == "Debian"
+
+        - name: Configure dnsmasq to forward .consul to Consul DNS
+          copy:
+            dest: /etc/dnsmasq.d/consul.conf
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              # Forward .consul to local Consul DNS on port 8600
+              server=/consul/127.0.0.1#8600
+              # Upstream resolvers for non-consul domains
+              server=1.1.1.1
+              server=8.8.8.8
+              # Bind only to loopback
+              listen-address=127.0.0.1
+              bind-interfaces
+              # Cache and host mapping
+              cache-size=1000
+              addn-hosts=/etc/hosts
+          register: dnsmasq_cfg
+
+        - name: Enable and restart dnsmasq
+          systemd:
+            name: dnsmasq
+            state: restarted
+            enabled: true
+          when: dnsmasq_cfg.changed
+
+    - name: Configure systemd-resolved for Consul domain routing
       blockinfile:
         path: /etc/systemd/resolved.conf
         create: yes
         block: |
           [Resolve]
-          DNS=127.0.0.1:8600 1.1.1.1 8.8.8.8
+          DNS=127.0.0.1
           Domains=~consul
         marker: "# {mark} CONSUL DNS CONFIGURATION"
         backup: yes
@@ -302,10 +343,18 @@
     - name: Test Consul service discovery from Go programs
       shell: |
         export GODEBUG=netdns=go+2
-        nslookup consul.service.consul 127.0.0.1
+        getent hosts consul.service.consul || nslookup consul.service.consul 127.0.0.1
       register: go_dns_test
       failed_when: false
       changed_when: false
+
+    - name: Ensure nsswitch uses systemd-resolved first for hosts
+      lineinfile:
+        path: /etc/nsswitch.conf
+        regexp: '^hosts:'
+        line: 'hosts:          files resolve dns mymachines'
+        backrefs: no
+      notify: restart systemd-resolved
 
     - name: Display Go DNS compatibility test
       debug:

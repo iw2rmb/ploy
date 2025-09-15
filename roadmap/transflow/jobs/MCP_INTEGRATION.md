@@ -346,7 +346,7 @@ Error: MCP timeout must be positive
 ### Debug Mode
 Enable verbose logging by setting environment variable:
 ```bash
-export MODS_DEBUG=1
+Ensure MODS_DEBUG=1
 ```
 
 This provides detailed logs for:

@@ -65,12 +65,33 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 **Setup**: `ssh root@$TARGET_HOST` → `su - ploy`  
 **Nomad**: ONLY use `/opt/hashicorp/bin/nomad-job-manager.sh` (never direct `nomad` commands)
 
+### Environment & Context (MANDATORY)
+
+- Always check for required environment variables before asking the user to provide them. Prefer existing values from the session.
+  - Common vars: `TARGET_HOST`, `PLOY_CONTROLLER`, `PLOY_SEAWEEDFS_URL`, `GITHUB_PLOY_DEV_USERNAME`, `GITHUB_PLOY_DEV_PAT`, `GITLAB_TOKEN`.
+  - In Go/tests: use `os.Getenv` to probe; in shell: use `printenv`/`echo ${VAR:-}`. In the Codex CLI harness, also consider provided `environment_context`.
+- If a variable is missing, suggest how to set it concisely; do not ask for values already present.
+- Do not echo secrets verbatim in logs. Mask sensitive values when printing (e.g., show `abcd****wxyz`).
+- When invoking helper scripts or subprocesses, propagate relevant env vars automatically (controller, target host, follow/lines settings, etc.).
+
+### SSH On VPS (Latency-Safe Ops)
+
+- Keep SSH operations short to avoid timeouts and blocking:
+  - Prefer single, bounded commands per SSH call; avoid long-running tails.
+  - Use explicit timeouts: `ssh -o ConnectTimeout=10` and tool-level `--timeout` flags.
+  - Break multi-step flows into separate SSH calls with brief waits between steps.
+  - Run commands as separate steps so progress is visible (emit concise preambles before each).
+  - For logs, fetch snapshots (fixed `--lines`) rather than `--follow` by default.
+  - For Nomad actions, use the wrapper’s bounded commands: `wait --timeout`, `logs --lines`, `allocs --format human`.
+  - If a command may be slow (playbooks, large uploads), report progress and prefer controller/API paths when available.
+  - On repeated failures/timeouts, fall back to Ansible playbooks to reconcile state instead of tight SSH loops.
+
 **E2E via Dev API (Allowed from Workstation)**
-- You may run E2E tests locally when they call the VPS Dev API endpoint (e.g., set `PLOY_CONTROLLER=https://api.dev.ployman.app/v1`).
+- You may run E2E tests locally when they call the VPS Dev API endpoint (ensure `PLOY_CONTROLLER` points to `https://api.dev.ployman.app/v1`).
 - These tests exercise VPS services remotely and are considered VPS-side execution (REFACTOR phase), even if invoked from the workstation.
 - Do not spin up or depend on local Nomad/Consul/Gateway for these tests.
 - Example:
-  - `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 go test ./tests/e2e -tags e2e -v -run TestModsE2E_JavaMigrationComplete -timeout 10m`
+  - `E2E_LOG_CONFIG=1 go test ./tests/e2e -tags e2e -v -run TestModsE2E_JavaMigrationComplete -timeout 10m`  (assumes `PLOY_CONTROLLER` is already set)
 
 ### Platform Logs (Debugging)
 

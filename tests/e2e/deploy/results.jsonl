@@ -2,3 +2,9 @@
 {"lane":"T","repo":"test://dummy-repo","app":"dummy-app","metrics":{"build":{"duration_ms":1234}},"time":"2025-09-15T20:52:01+03:00"}
 {"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","time":"2025-09-15T20:54:28+03:00"}
 {"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","time":"2025-09-15T20:58:06+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","time":"2025-09-15T21:08:54+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","time":"2025-09-15T21:09:23+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","metrics":{"imageSize":{"bytes":54803236,"mb":52.26443862915039}},"time":"2025-09-15T21:16:07+03:00"}
+{"lane":"T","repo":"test://dummy-repo","app":"dummy-app","metrics":{"build":{"duration_ms":1234}},"time":"2025-09-15T21:34:00+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","metrics":{"imageSize":{"bytes":54803207,"mb":52.264410972595215}},"time":"2025-09-15T22:10:27+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-go-1.22.git","app":"ploy-lane-e-go-1-22","metrics":{"imageSize":{"bytes":5112021,"mb":4.8752031326293945}},"time":"2025-09-15T22:10:30+03:00"}
