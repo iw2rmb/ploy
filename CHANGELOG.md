@@ -18,6 +18,8 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- E2E deploy docs: expanded tests/e2e/deploy/README.md with quick subtest filters and log collection tips (controller/Traefik endpoints and fetch-logs.sh usage). Updated ongoing TLS investigation notes and matrix guidance.
+- E2E harness: results writer now uses repo-root-relative paths to ensure results.jsonl/results.md are appended regardless of package working directory. Added a targeted test (TestWriteResultPaths) under the e2e tag to validate this behavior.
 - Dev IaC: remove Traefik `dev-wildcard` ACME resolver and stop managing `/opt/ploy/traefik-data/dev-wildcard-acme.json`; `apps-wildcard` is now the sole wildcard resolver for dev.
 - API platform deploys: switch TLS certresolver from `dev-wildcard` to `platform-wildcard` for `*.dev.ployman.app` routes.
 - Traefik (Nomad-only): Update system job template to load dynamic config from `/data/dynamic-config.yml` and remove the read-only `/etc/traefik/*` bind mount that caused container start failures. This aligns the file provider path with the mounted host volume `/opt/ploy/traefik-data`.

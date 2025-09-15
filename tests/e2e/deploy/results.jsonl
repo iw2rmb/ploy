@@ -1,1 +1,3 @@
 {"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20","app":"ploy-lane-e-node-20","metrics":{"build":{"duration_ms":23546},"pushVerification":{"ok":true,"status":200,"digest":"sha256:b3b400242dad34f8334611b4894d307acb3c96922040065bd6a03c0667bb78e7"},"imageSize":{"mb":0,"bytes":0}},"time":"2025-09-15T06:22:13Z"}
+{"lane":"T","repo":"test://dummy-repo","app":"dummy-app","metrics":{"build":{"duration_ms":1234}},"time":"2025-09-15T20:52:01+03:00"}
+{"lane":"E","repo":"https://github.com/iw2rmb/ploy-lane-e-node-20.git","app":"ploy-lane-e-node-20","time":"2025-09-15T20:54:28+03:00"}

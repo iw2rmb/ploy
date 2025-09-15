@@ -437,17 +437,17 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		if o.runner != nil && o.runner.GetEventReporter() != nil {
 			_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
 		}
-        // Download with extended retry/backoff to avoid race with artifact upload
-        var dlErr error
-        for i := 0; i < 20; i++ {
-            if err := downloadToFileFn(url, diffPath); err == nil {
-                dlErr = nil
-                break
-            } else {
-                dlErr = err
-                time.Sleep(1 * time.Second)
-            }
-        }
+		// Download with extended retry/backoff to avoid race with artifact upload
+		var dlErr error
+		for i := 0; i < 20; i++ {
+			if err := downloadToFileFn(url, diffPath); err == nil {
+				dlErr = nil
+				break
+			} else {
+				dlErr = err
+				time.Sleep(1 * time.Second)
+			}
+		}
 		dlEnd := time.Now()
 		if dlErr != nil {
 			if o.runner != nil && o.runner.GetEventReporter() != nil {
