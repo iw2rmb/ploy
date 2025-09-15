@@ -6,6 +6,11 @@
     - ../vars/main.yml
   
   tasks:
+    - name: Ensure hashicorp group exists (for compatibility)
+      group:
+        name: hashicorp
+        state: present
+
     - name: Create hashicorp user (alias to ploy for compatibility)
       user:
         name: ploy
@@ -654,6 +659,20 @@
           register: traefik_job_check
           ignore_errors: true
 
+        - name: Check Traefik allocations count (when job exists)
+          uri:
+            url: "http://localhost:4646/v1/job/traefik-system/allocations"
+            method: GET
+            status_code: 200
+          register: traefik_allocs
+          when: traefik_job_check.status == 200
+          ignore_errors: true
+
+        - name: Set flag to (re)submit Traefik when no allocations
+          set_fact:
+            traefik_needs_submit: true
+          when: traefik_job_check.status == 404 or (traefik_allocs.json is defined and (traefik_allocs.json | length) == 0)
+
         - name: Assert Nomad client meta is set for Traefik placement
           block:
             - name: Read client meta role from Nomad client config
@@ -717,12 +736,12 @@
           environment:
             NOMAD_ADDR: "http://localhost:4646"
 
-        - name: Submit Traefik system job to Nomad (if not running)
+        - name: Submit Traefik system job to Nomad (initial or recover)
           shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job traefik-system --file /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_job_submit
           environment:
             NOMAD_ADDR: "http://localhost:4646"
-          when: traefik_job_check.status == 404
+          when: traefik_needs_submit | default(false)
 
         - name: Wait for Traefik service to be healthy
           shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job traefik-system --timeout 180
@@ -730,7 +749,7 @@
             NOMAD_ADDR: "http://localhost:4646"
           register: traefik_wait_result
           failed_when: traefik_wait_result.rc != 0
-          when: traefik_job_check.status == 404
+          when: traefik_needs_submit | default(false)
 
         - name: Verify Traefik is accessible
           uri:

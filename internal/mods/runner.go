@@ -1046,11 +1046,11 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 
 	// Step 2: Convert planner options to branch specs
 	var branches []BranchSpec
-    for i, option := range planResult.Options {
-        branchID := fmt.Sprintf("option-%d", i)
-        if id, ok := option["id"].(string); ok {
-            branchID = id
-        }
+	for i, option := range planResult.Options {
+		branchID := fmt.Sprintf("option-%d", i)
+		if id, ok := option["id"].(string); ok {
+			branchID = id
+		}
 
 		// Default and normalize planner types to canonical values
 		branchType := string(StepTypeLLMExec)
@@ -1058,12 +1058,16 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 			branchType = string(NormalizeStepType(t))
 		}
 
-        // Attach build error context to each branch inputs for llm-exec to parse
-        inputs := map[string]interface{}{}
-        for k, v := range option { inputs[k] = v }
-        if buildError != "" { inputs["build_error"] = buildError }
-        branches = append(branches, BranchSpec{ID: branchID, Type: branchType, Inputs: inputs})
-    }
+		// Attach build error context to each branch inputs for llm-exec to parse
+		inputs := map[string]interface{}{}
+		for k, v := range option {
+			inputs[k] = v
+		}
+		if buildError != "" {
+			inputs["build_error"] = buildError
+		}
+		branches = append(branches, BranchSpec{ID: branchID, Type: branchType, Inputs: inputs})
+	}
 
 	// Step 3: Execute fanout orchestration
 	maxParallel := 3 // Default parallelism
