@@ -123,7 +123,7 @@ job "traefik-system" {
           "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
           # Token is provided via CONSUL_HTTP_TOKEN environment variable when Consul ACLs are enabled
-          "--providers.file.filename=/etc/traefik/dynamic-configs/dynamic-config.yml",
+          "--providers.file.filename=/data/dynamic-config.yml",
           "--providers.file.watch=true",
           "--metrics.prometheus=true",
           "--metrics.prometheus.addEntryPointsLabels=true",
@@ -162,13 +162,7 @@ job "traefik-system" {
           target = "/data"
         }
         
-        # Host mount for dynamic configuration directory
-        mount {
-          type = "bind"
-          source = "/opt/ploy/traefik-data"
-          target = "/etc/traefik/dynamic-configs"
-          readonly = true
-        }
+        # Dynamic configuration is provided via /data/dynamic-config.yml
       }
       
       # Configuration now loaded from external file provider at /etc/traefik/dynamic-configs/dynamic-config.yml
