@@ -130,20 +130,20 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath s
 		dockerfilePath = "Dockerfile"
 	}
 	s = strings.ReplaceAll(s, "{{DOCKERFILE_PATH}}", dockerfilePath)
-    // Kaniko executor image (allow override via env). Prefer internal mirror on Dev.
-    kaniko := utils.Getenv("PLOY_KANIKO_IMAGE", "")
-    if kaniko == "" {
-        plat := utils.Getenv("PLOY_PLATFORM_DOMAIN", "")
-        ctrl := os.Getenv("PLOY_CONTROLLER")
-        if strings.Contains(ctrl, "api.dev.ployman.app") || plat == "dev.ployman.app" || strings.HasSuffix(plat, ".dev.ployman.app") {
-            kaniko = "registry.dev.ployman.app/kaniko-executor:debug"
-        } else {
-            kaniko = "gcr.io/kaniko-project/executor:debug"
-        }
-    }
-    s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
-    // Ensure a writable temp dir is present for BusyBox wget target in Kaniko entrypoint
-    // The builder template already includes a mkdir -p /tmp; keep it enforced here if template changes.
+	// Kaniko executor image (allow override via env). Prefer internal mirror on Dev.
+	kaniko := utils.Getenv("PLOY_KANIKO_IMAGE", "")
+	if kaniko == "" {
+		plat := utils.Getenv("PLOY_PLATFORM_DOMAIN", "")
+		ctrl := os.Getenv("PLOY_CONTROLLER")
+		if strings.Contains(ctrl, "api.dev.ployman.app") || plat == "dev.ployman.app" || strings.HasSuffix(plat, ".dev.ployman.app") {
+			kaniko = "registry.dev.ployman.app/kaniko-executor:debug"
+		} else {
+			kaniko = "gcr.io/kaniko-project/executor:debug"
+		}
+	}
+	s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
+	// Ensure a writable temp dir is present for BusyBox wget target in Kaniko entrypoint
+	// The builder template already includes a mkdir -p /tmp; keep it enforced here if template changes.
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
 	if err := os.WriteFile(out, []byte(s), 0644); err != nil {
 		return "", err

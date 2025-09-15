@@ -1,32 +1,32 @@
 package server
 
 import (
-    "encoding/json"
-    "fmt"
-    "regexp"
-    "sort"
-    "os"
-    "os/exec"
-    "strconv"
-    "time"
-    "strings"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type buildLogsResponse struct {
-    ID      string `json:"id"`
-    App     string `json:"app"`
-    Job     string `json:"job,omitempty"`
-    AllocID string `json:"alloc_id,omitempty"`
-    AllocStatus string `json:"alloc_status,omitempty"`
-    Allocs  string `json:"allocs,omitempty"`
-    Lines   int    `json:"lines"`
-    Logs    string `json:"logs"`
-    Message string `json:"message,omitempty"`
-    Status  string `json:"status,omitempty"`
-    Started string `json:"started_at,omitempty"`
-    Ended   string `json:"ended_at,omitempty"`
+	ID          string `json:"id"`
+	App         string `json:"app"`
+	Job         string `json:"job,omitempty"`
+	AllocID     string `json:"alloc_id,omitempty"`
+	AllocStatus string `json:"alloc_status,omitempty"`
+	Allocs      string `json:"allocs,omitempty"`
+	Lines       int    `json:"lines"`
+	Logs        string `json:"logs"`
+	Message     string `json:"message,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Started     string `json:"started_at,omitempty"`
+	Ended       string `json:"ended_at,omitempty"`
 }
 
 // handleBuildLogs returns recent builder logs for a given async build id.
@@ -59,38 +59,38 @@ func (s *Server) handleBuildLogs(c *fiber.Ctx) error {
 		return c.JSON(resp)
 	}
 	// Resolve running allocation for the builder job via the wrapper
-    alloc := runJobMgr("running-alloc", job)
-    if alloc == "" {
-        if st.Message != "" {
-            if u := extractLastUUID(st.Message); u != "" {
-                alloc = u
-            }
-        }
-        // Try to get the most recent alloc ID from JSON list (even if not running)
-        if ids := getAllocIDs(job); len(ids) > 0 {
-            alloc = ids[0]
-        }
-        if alloc == "" {
-            // Best-effort: return allocs short list for visibility
-            allocs := runJobMgr("allocs-human", job)
-            resp.Logs = allocs
-            return c.JSON(resp)
-        }
-    }
-    resp.AllocID = alloc
-    if aj := runJobMgr("allocs-json", job); aj != "" {
-        resp.Allocs = aj
-    }
-    resp.Logs = runJobMgrLogs(alloc, lines)
-    // Include allocation status snapshot for quick diagnosis
-    if st := runJobMgrAllocStatus(alloc); st != "" {
-        // limit size to avoid huge payloads
-        if len(st) > 4000 {
-            st = st[:4000]
-        }
-        resp.AllocStatus = st
-    }
-    return c.JSON(resp)
+	alloc := runJobMgr("running-alloc", job)
+	if alloc == "" {
+		if st.Message != "" {
+			if u := extractLastUUID(st.Message); u != "" {
+				alloc = u
+			}
+		}
+		// Try to get the most recent alloc ID from JSON list (even if not running)
+		if ids := getAllocIDs(job); len(ids) > 0 {
+			alloc = ids[0]
+		}
+		if alloc == "" {
+			// Best-effort: return allocs short list for visibility
+			allocs := runJobMgr("allocs-human", job)
+			resp.Logs = allocs
+			return c.JSON(resp)
+		}
+	}
+	resp.AllocID = alloc
+	if aj := runJobMgr("allocs-json", job); aj != "" {
+		resp.Allocs = aj
+	}
+	resp.Logs = runJobMgrLogs(alloc, lines)
+	// Include allocation status snapshot for quick diagnosis
+	if st := runJobMgrAllocStatus(alloc); st != "" {
+		// limit size to avoid huge payloads
+		if len(st) > 4000 {
+			st = st[:4000]
+		}
+		resp.AllocStatus = st
+	}
+	return c.JSON(resp)
 }
 
 func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane string }) string {
@@ -105,136 +105,138 @@ func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane str
 			}
 		}
 	}
-    if meta.App == "" || meta.Sha == "" {
-        return ""
-    }
-    lane := meta.Lane
-    if lane == "" {
-        lane = "E"
-    }
-    lane = string([]byte{byte(([]rune(lane))[0])})
-    // For Lane E, try to find the most recent nonce-suffixed builder job from debug copies
-    if lane == "E" || lane == "e" {
-        if j := findLatestBuilderJobFromDebug(meta.App, meta.Sha); j != "" {
-            return j
-        }
-    }
-    switch lane {
-    case "E", "e":
-        return fmt.Sprintf("%s-e-build-%s", meta.App, meta.Sha)
-    case "C", "c":
-        return fmt.Sprintf("%s-c-build-%s", meta.App, meta.Sha)
-    default:
-        return ""
-    }
+	if meta.App == "" || meta.Sha == "" {
+		return ""
+	}
+	lane := meta.Lane
+	if lane == "" {
+		lane = "E"
+	}
+	lane = string([]byte{byte(([]rune(lane))[0])})
+	// For Lane E, try to find the most recent nonce-suffixed builder job from debug copies
+	if lane == "E" || lane == "e" {
+		if j := findLatestBuilderJobFromDebug(meta.App, meta.Sha); j != "" {
+			return j
+		}
+	}
+	switch lane {
+	case "E", "e":
+		return fmt.Sprintf("%s-e-build-%s", meta.App, meta.Sha)
+	case "C", "c":
+		return fmt.Sprintf("%s-c-build-%s", meta.App, meta.Sha)
+	default:
+		return ""
+	}
 }
 
 // findLatestBuilderJobFromDebug scans /opt/ploy/debug/jobs for the newest HCL
 // matching the Lane E builder pattern for a given app and sha, and returns the job name.
 func findLatestBuilderJobFromDebug(app, sha string) string {
-    dir := "/opt/ploy/debug/jobs"
-    entries, err := os.ReadDir(dir)
-    if err != nil {
-        return ""
-    }
-    prefix := fmt.Sprintf("%s-e-build-%s-", app, sha)
-    newestName := ""
-    var newestTime time.Time
-    for _, e := range entries {
-        name := e.Name()
-        if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, ".hcl") {
-            continue
-        }
-        info, err := e.Info()
-        if err != nil { continue }
-        mod := info.ModTime()
-        if newestName == "" || mod.After(newestTime) {
-            newestName = name
-            newestTime = mod
-        }
-    }
-    if newestName == "" {
-        return ""
-    }
-    // Strip .hcl to get the job name
-    return strings.TrimSuffix(newestName, ".hcl")
+	dir := "/opt/ploy/debug/jobs"
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	prefix := fmt.Sprintf("%s-e-build-%s-", app, sha)
+	newestName := ""
+	var newestTime time.Time
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, ".hcl") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		mod := info.ModTime()
+		if newestName == "" || mod.After(newestTime) {
+			newestName = name
+			newestTime = mod
+		}
+	}
+	if newestName == "" {
+		return ""
+	}
+	// Strip .hcl to get the job name
+	return strings.TrimSuffix(newestName, ".hcl")
 }
 
 func runJobMgr(cmd string, job string) string {
-    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-    var c *exec.Cmd
-    switch cmd {
-    case "running-alloc":
-        c = exec.Command(wrapper, "running-alloc", "--job", job)
-    case "allocs-human":
-        c = exec.Command(wrapper, "allocs", "--job", job, "--format", "human")
-    case "allocs-json":
-        c = exec.Command(wrapper, "allocs", "--job", job, "--format", "json")
-    default:
-        return ""
-    }
-    out, _ := runCmdTimeout(c, 8*time.Second)
-    if cmd == "running-alloc" {
-        // Wrapper logs + payload; extract the last UUID which should be the alloc ID
-        uuid := extractLastUUID(out)
-        return uuid
-    }
-    return out
+	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+	var c *exec.Cmd
+	switch cmd {
+	case "running-alloc":
+		c = exec.Command(wrapper, "running-alloc", "--job", job)
+	case "allocs-human":
+		c = exec.Command(wrapper, "allocs", "--job", job, "--format", "human")
+	case "allocs-json":
+		c = exec.Command(wrapper, "allocs", "--job", job, "--format", "json")
+	default:
+		return ""
+	}
+	out, _ := runCmdTimeout(c, 8*time.Second)
+	if cmd == "running-alloc" {
+		// Wrapper logs + payload; extract the last UUID which should be the alloc ID
+		uuid := extractLastUUID(out)
+		return uuid
+	}
+	return out
 }
 
 func runJobMgrLogs(alloc string, lines int) string {
-    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-    // Prefer explicit task name for known builders to avoid Nomad 400 errors
-    c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--task", "kaniko", "--lines", fmt.Sprintf("%d", lines))
-    out, _ := runCmdTimeout(c, 8*time.Second)
-    return out
+	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+	// Prefer explicit task name for known builders to avoid Nomad 400 errors
+	c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--task", "kaniko", "--lines", fmt.Sprintf("%d", lines))
+	out, _ := runCmdTimeout(c, 8*time.Second)
+	return out
 }
 
 func runJobMgrAllocStatus(alloc string) string {
-    if alloc == "" {
-        return ""
-    }
-    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-    c := exec.Command(wrapper, "alloc-status", "--alloc-id", alloc)
-    out, _ := runCmdTimeout(c, 8*time.Second)
-    return out
+	if alloc == "" {
+		return ""
+	}
+	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+	c := exec.Command(wrapper, "alloc-status", "--alloc-id", alloc)
+	out, _ := runCmdTimeout(c, 8*time.Second)
+	return out
 }
 
 func extractLastUUID(s string) string {
-    re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-    all := re.FindAllString(s, -1)
-    if len(all) == 0 {
-        return ""
-    }
-    return all[len(all)-1]
+	re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	all := re.FindAllString(s, -1)
+	if len(all) == 0 {
+		return ""
+	}
+	return all[len(all)-1]
 }
 
 func getAllocIDs(job string) []string {
-    out := runJobMgr("allocs-json", job)
-    if out == "" {
-        return nil
-    }
-    type alloc struct{
-        ID         string `json:"ID"`
-        ModifyTime int64  `json:"ModifyTime"`
-    }
-    var a []alloc
-    if err := json.Unmarshal([]byte(out), &a); err != nil {
-        // Fallback: return all UUIDs found (order unknown)
-        re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-        return re.FindAllString(out, -1)
-    }
-    // Sort by ModifyTime desc (newest first)
-    if len(a) > 1 {
-        sort.Slice(a, func(i, j int) bool { return a[i].ModifyTime > a[j].ModifyTime })
-    }
-    ids := make([]string, 0, len(a))
-    for _, e := range a {
-        if e.ID != "" {
-            ids = append(ids, e.ID)
-        }
-    }
-    return ids
+	out := runJobMgr("allocs-json", job)
+	if out == "" {
+		return nil
+	}
+	type alloc struct {
+		ID         string `json:"ID"`
+		ModifyTime int64  `json:"ModifyTime"`
+	}
+	var a []alloc
+	if err := json.Unmarshal([]byte(out), &a); err != nil {
+		// Fallback: return all UUIDs found (order unknown)
+		re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+		return re.FindAllString(out, -1)
+	}
+	// Sort by ModifyTime desc (newest first)
+	if len(a) > 1 {
+		sort.Slice(a, func(i, j int) bool { return a[i].ModifyTime > a[j].ModifyTime })
+	}
+	ids := make([]string, 0, len(a))
+	for _, e := range a {
+		if e.ID != "" {
+			ids = append(ids, e.ID)
+		}
+	}
+	return ids
 }
 
 func runCmdTimeout(cmd *exec.Cmd, timeout time.Duration) (string, error) {

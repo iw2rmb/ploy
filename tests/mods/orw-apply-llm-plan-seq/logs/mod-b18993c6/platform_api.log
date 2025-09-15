@@ -1,0 +1,14 @@
+[2025-09-15 05:39:16] Getting stdout logs for allocation: 9d1d813a-4ffb-13b4-979f-f1ddf88d2d4a (task: api, lines: 800, follow: false)
+[2025-09-15 05:39:16] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/9d1d813a-4ffb-13b4-979f-f1ddf88d2d4a?type=stdout&plain=true&task=api&offset=-800
+[2025-09-15 05:39:16] Response code: 200
+ST /v1/mods/mod-b18993c6/events -    4.488475ms
+[05:39:09] 200 - POST /v1/mods/mod-b18993c6/events -     7.31339ms
+[05:39:10] 200 - POST /v1/mods/mod-b18993c6/events -    3.949572ms
+[05:39:10] 200 - POST /v1/mods/mod-b18993c6/events -    6.765807ms
+[05:39:10] 200 - POST /v1/mods/mod-b18993c6/events -    3.182444ms
+[05:39:10] 200 - POST /v1/mods/mod-b18993c6/events -    3.072031ms
+[05:38:54] 200 - GET /v1/apps/ploy-lane-e-node-20/builds/b-1757914671323379912/logs - 16.122880172s
+[05:39:13] 200 - GET /v1/mods/mod-b18993c6/artifacts -    1.543136ms
+[05:39:14] 404 - GET /v1/mods/mod-b18993c6/artifacts/next_json -    1.858943ms
+[05:39:15] 200 - GET /v1/mods/mod-b18993c6/status -    2.254193ms
+[05:39:15] 200 - GET /v1/apps/ploy-lane-e-node-20/builds/b-1757914671323379912/status -     114.643µs

@@ -298,33 +298,35 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		if v, ok := branch.Inputs["precomputed_diff"].(string); ok && strings.TrimSpace(v) != "" {
 			_ = os.WriteFile(filepath.Join(ctxDir, "diff.patch"), []byte(v), 0644)
 		}
-        if arr, ok := branch.Inputs["delete_paths"].([]string); ok && len(arr) > 0 {
-            var b strings.Builder
-            for _, p := range arr {
-                if strings.TrimSpace(p) == "" { continue }
-                b.WriteString(p)
-                b.WriteString("\n")
-            }
-            _ = os.WriteFile(filepath.Join(ctxDir, "delete_paths.txt"), []byte(b.String()), 0644)
-        } else if arrI, ok := branch.Inputs["delete_paths"].([]interface{}); ok && len(arrI) > 0 {
-            var b strings.Builder
-            for _, it := range arrI {
-                if s, ok := it.(string); ok && strings.TrimSpace(s) != "" {
-                    b.WriteString(s)
-                    b.WriteString("\n")
-                }
-            }
-            _ = os.WriteFile(filepath.Join(ctxDir, "delete_paths.txt"), []byte(b.String()), 0644)
-        }
-        tarPath := filepath.Join(baseDir, "llm-context.tar")
-        if err := createTarFromDir(ctxDir, tarPath); err == nil {
-            if modID != "" {
-                key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
-                _ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
-                vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-            }
-        }
-    }
+		if arr, ok := branch.Inputs["delete_paths"].([]string); ok && len(arr) > 0 {
+			var b strings.Builder
+			for _, p := range arr {
+				if strings.TrimSpace(p) == "" {
+					continue
+				}
+				b.WriteString(p)
+				b.WriteString("\n")
+			}
+			_ = os.WriteFile(filepath.Join(ctxDir, "delete_paths.txt"), []byte(b.String()), 0644)
+		} else if arrI, ok := branch.Inputs["delete_paths"].([]interface{}); ok && len(arrI) > 0 {
+			var b strings.Builder
+			for _, it := range arrI {
+				if s, ok := it.(string); ok && strings.TrimSpace(s) != "" {
+					b.WriteString(s)
+					b.WriteString("\n")
+				}
+			}
+			_ = os.WriteFile(filepath.Join(ctxDir, "delete_paths.txt"), []byte(b.String()), 0644)
+		}
+		tarPath := filepath.Join(baseDir, "llm-context.tar")
+		if err := createTarFromDir(ctxDir, tarPath); err == nil {
+			if modID != "" {
+				key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
+				_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+				vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+			}
+		}
+	}
 
 	// Step 3: Extract MCP configuration from branch inputs
 	var mcpConfig *MCPConfig = nil
@@ -351,6 +353,21 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		return result
 	}
 
+	// Persist submitted HCL for diagnostics and emit controller event with path
+	if o.runner != nil {
+		if modID := os.Getenv("MOD_ID"); modID != "" {
+			persistDir := filepath.Join("/tmp/mods-submitted", modID, "llm-exec", branch.ID)
+			_ = os.MkdirAll(persistDir, 0755)
+			dest := filepath.Join(persistDir, "llm_exec.submitted.hcl")
+			if b, e := os.ReadFile(renderedHCLPath); e == nil {
+				_ = os.WriteFile(dest, b, 0644)
+				if rep := o.runner.GetEventReporter(); rep != nil {
+					_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("Saved submitted HCL to %s", dest), JobName: runID, Time: time.Now()})
+				}
+			}
+		}
+	}
+
 	// Step 4: Report job metadata asynchronously (job name == runID)
 	var rep EventReporter
 	if o.runner != nil {
@@ -369,6 +386,11 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	if vErr != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec HCL validation failed: %v", vErr)
+		if o.runner != nil {
+			if rep := o.runner.GetEventReporter(); rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("validation failed: %v", vErr), JobName: runID, Time: time.Now()})
+			}
+		}
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result
@@ -384,6 +406,11 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	if sErr != nil {
 		result.Status = "failed"
 		result.Notes = fmt.Sprintf("LLM exec job failed: %v", sErr)
+		if o.runner != nil {
+			if rep := o.runner.GetEventReporter(); rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("submission failed: %v", sErr), JobName: runID, Time: time.Now()})
+			}
+		}
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result
@@ -403,41 +430,43 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 			result.Duration = time.Since(result.StartedAt)
 			return result
 		}
-    key := computeBranchDiffKey(id, branchID, stepID)
-    url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-    // Emit download attempt event with timing start
-    dlStart := time.Now()
-    if o.runner != nil && o.runner.GetEventReporter() != nil {
-        _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
-    }
-        // Download with small retry/backoff to avoid race with artifact upload
-        var dlErr error
-        for i := 0; i < 6; i++ {
-            if err := downloadToFileFn(url, diffPath); err == nil {
-                dlErr = nil
-                break
-            } else {
-                dlErr = err
-                time.Sleep(500 * time.Millisecond)
-            }
-        }
-        dlEnd := time.Now()
-        if dlErr != nil {
-            if o.runner != nil && o.runner.GetEventReporter() != nil {
-                _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
-            }
-            result.Status = "failed"
-            result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", dlErr)
-            result.FinishedAt = time.Now()
-            result.Duration = time.Since(result.StartedAt)
-            return result
-        }
-        if o.runner != nil && o.runner.GetEventReporter() != nil {
-            // Best-effort size
-            var sz int64
-            if fi, err := os.Stat(diffPath); err == nil { sz = fi.Size() }
-            _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
-        }
+		key := computeBranchDiffKey(id, branchID, stepID)
+		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+		// Emit download attempt event with timing start
+		dlStart := time.Now()
+		if o.runner != nil && o.runner.GetEventReporter() != nil {
+			_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+		}
+		// Download with small retry/backoff to avoid race with artifact upload
+		var dlErr error
+		for i := 0; i < 6; i++ {
+			if err := downloadToFileFn(url, diffPath); err == nil {
+				dlErr = nil
+				break
+			} else {
+				dlErr = err
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+		dlEnd := time.Now()
+		if dlErr != nil {
+			if o.runner != nil && o.runner.GetEventReporter() != nil {
+				_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+			}
+			result.Status = "failed"
+			result.Notes = fmt.Sprintf("LLM exec diff download failed: %v", dlErr)
+			result.FinishedAt = time.Now()
+			result.Duration = time.Since(result.StartedAt)
+			return result
+		}
+		if o.runner != nil && o.runner.GetEventReporter() != nil {
+			// Best-effort size
+			var sz int64
+			if fi, err := os.Stat(diffPath); err == nil {
+				sz = fi.Size()
+			}
+			_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download succeeded: key=%s bytes=%d start_ts=%s end_ts=%s", key, sz, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+		}
 	}
 
 	// Step 6b: Upload LLM diff to SeaweedFS with step-scoped key (align with ORW convention)
@@ -464,13 +493,13 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 // firstJavaPathFromError extracts the first token that looks like a Java source path from an error string.
 func firstJavaPathFromError(s string) string {
 	re := regexp.MustCompile(`([A-Za-z0-9_./\\-]+\.java)`) // greedy enough to catch paths; includes Windows separators
-    m := re.FindStringSubmatch(s)
-    if len(m) > 1 {
-        // Normalize backslashes to slashes
-        p := strings.ReplaceAll(m[1], "\\", "/")
-        return p
-    }
-    return ""
+	m := re.FindStringSubmatch(s)
+	if len(m) > 1 {
+		// Normalize backslashes to slashes
+		p := strings.ReplaceAll(m[1], "\\", "/")
+		return p
+	}
+	return ""
 }
 
 // parseMCPFromInputs converts map[string]interface{} to MCPConfig struct

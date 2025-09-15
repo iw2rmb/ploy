@@ -7,14 +7,14 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
-    "net/http"
-    "net/url"
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "time"
-    "regexp"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
@@ -144,50 +144,50 @@ func verifyOCIPush(tag string) verifyResult {
 
 // getJobLogsSnippet fetches recent logs for a job via the nomad-job-manager wrapper.
 func getJobLogsSnippet(job string, lines int) string {
-    if job == "" {
-        return ""
-    }
-    // Resolve running allocation ID first
-    allocID := func() string {
-        ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
-        defer cancel()
-        cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "running-alloc", "--job", job)
-        out, err := cmd.CombinedOutput()
-        if err == nil {
-            s := strings.TrimSpace(string(out))
-            // Extract UUID-like alloc ID from noisy output
-            re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-            if m := re.FindString(s); m != "" {
-                return m
-            }
-            // Fallback: last line
-            if i := strings.LastIndex(s, "\n"); i >= 0 {
-                s = strings.TrimSpace(s[i+1:])
-            }
-            if s != "" {
-                return s
-            }
-        }
-        return ""
-    }()
-    if allocID == "" {
-        // Fallback: show allocs (human) for visibility
-        ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
-        defer cancel()
-        cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "allocs", "--job", job, "--format", "human")
-        out, _ := cmd.CombinedOutput()
-        return string(out)
-    }
-    // Fetch logs for resolved alloc
-    ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-    defer cancel()
-    cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "logs", "--alloc-id", allocID, "--lines", fmt.Sprintf("%d", lines))
-    out, _ := cmd.CombinedOutput()
-    b := out
-    if len(b) > 4000 {
-        b = b[len(b)-4000:]
-    }
-    return string(b)
+	if job == "" {
+		return ""
+	}
+	// Resolve running allocation ID first
+	allocID := func() string {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "running-alloc", "--job", job)
+		out, err := cmd.CombinedOutput()
+		if err == nil {
+			s := strings.TrimSpace(string(out))
+			// Extract UUID-like alloc ID from noisy output
+			re := regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+			if m := re.FindString(s); m != "" {
+				return m
+			}
+			// Fallback: last line
+			if i := strings.LastIndex(s, "\n"); i >= 0 {
+				s = strings.TrimSpace(s[i+1:])
+			}
+			if s != "" {
+				return s
+			}
+		}
+		return ""
+	}()
+	if allocID == "" {
+		// Fallback: show allocs (human) for visibility
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "allocs", "--job", job, "--format", "human")
+		out, _ := cmd.CombinedOutput()
+		return string(out)
+	}
+	// Fetch logs for resolved alloc
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "/opt/hashicorp/bin/nomad-job-manager.sh", "logs", "--alloc-id", allocID, "--lines", fmt.Sprintf("%d", lines))
+	out, _ := cmd.CombinedOutput()
+	b := out
+	if len(b) > 4000 {
+		b = b[len(b)-4000:]
+	}
+	return string(b)
 }
 
 // generateDockerfile writes a simple Dockerfile into srcDir based on detected project markers.
@@ -637,54 +637,64 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return 0
 		}())
 
-        // Upload context tar to storage for Kaniko to fetch
-        contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
-        var contextURL string
-        if deps.Storage != nil {
-            ctxUp := context.Context(c.Context())
-            if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
-                return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
-            }
-            base := os.Getenv("PLOY_SEAWEEDFS_URL")
-            if base == "" {
-                base = "http://seaweedfs-filer.service.consul:8888"
-            }
-            if !strings.HasPrefix(base, "http") {
-                base = "http://" + base
-            }
-            contextURL = strings.TrimRight(base, "/") + "/" + contextKey
-            // Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
-            func(path string) {
-                fi, err := os.Stat(builderTar)
-                if err != nil { fmt.Printf("Warn: stat tar failed: %v\n", err); return }
-                for attempt := 1; attempt <= 3; attempt++ {
-                    f, err := os.Open(builderTar)
-                    if err != nil { fmt.Printf("Warn: open tar failed: %v\n", err); return }
-                    req, err := http.NewRequest("PUT", path, f)
-                    if err != nil { _ = f.Close(); fmt.Printf("Warn: build PUT request failed: %v\n", err); return }
-                    req.Header.Set("Content-Type", "application/x-tar")
-                    req.ContentLength = fi.Size()
-                    client := &http.Client{Timeout: 60 * time.Second}
-                    resp, err := client.Do(req)
-                    if err != nil {
-                        _ = f.Close()
-                        fmt.Printf("Warn: context PUT attempt %d failed: %v\n", attempt, err)
-                        time.Sleep(2 * time.Second)
-                        continue
-                    }
-                    _ = f.Close()
-                    _ = resp.Body.Close()
-                    if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-                        fmt.Printf("Context PUT ok (%d bytes) to %s\n", fi.Size(), path)
-                        break
-                    }
-                    fmt.Printf("Warn: context PUT attempt %d got HTTP %d for %s\n", attempt, resp.StatusCode, path)
-                    time.Sleep(2 * time.Second)
-                }
-            }(contextURL)
-        } else {
-            return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
-        }
+		// Upload context tar to storage for Kaniko to fetch
+		contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
+		var contextURL string
+		if deps.Storage != nil {
+			ctxUp := context.Context(c.Context())
+			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+				return utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
+			}
+			base := os.Getenv("PLOY_SEAWEEDFS_URL")
+			if base == "" {
+				base = "http://seaweedfs-filer.service.consul:8888"
+			}
+			if !strings.HasPrefix(base, "http") {
+				base = "http://" + base
+			}
+			contextURL = strings.TrimRight(base, "/") + "/" + contextKey
+			// Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
+			func(path string) {
+				fi, err := os.Stat(builderTar)
+				if err != nil {
+					fmt.Printf("Warn: stat tar failed: %v\n", err)
+					return
+				}
+				for attempt := 1; attempt <= 3; attempt++ {
+					f, err := os.Open(builderTar)
+					if err != nil {
+						fmt.Printf("Warn: open tar failed: %v\n", err)
+						return
+					}
+					req, err := http.NewRequest("PUT", path, f)
+					if err != nil {
+						_ = f.Close()
+						fmt.Printf("Warn: build PUT request failed: %v\n", err)
+						return
+					}
+					req.Header.Set("Content-Type", "application/x-tar")
+					req.ContentLength = fi.Size()
+					client := &http.Client{Timeout: 60 * time.Second}
+					resp, err := client.Do(req)
+					if err != nil {
+						_ = f.Close()
+						fmt.Printf("Warn: context PUT attempt %d failed: %v\n", attempt, err)
+						time.Sleep(2 * time.Second)
+						continue
+					}
+					_ = f.Close()
+					_ = resp.Body.Close()
+					if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+						fmt.Printf("Context PUT ok (%d bytes) to %s\n", fi.Size(), path)
+						break
+					}
+					fmt.Printf("Warn: context PUT attempt %d got HTTP %d for %s\n", attempt, resp.StatusCode, path)
+					time.Sleep(2 * time.Second)
+				}
+			}(contextURL)
+		} else {
+			return utils.ErrJSON(c, 500, fmt.Errorf("storage not available for build context upload"))
+		}
 		log.Printf("[Build:E] Context uploaded: url=%s", contextURL)
 
 		// Render and execute Kaniko builder job, waiting for terminal completion
@@ -867,16 +877,16 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	// Measure image size for policy enforcement
 	var imageSizeMB float64
-    sizeInfo, err := utils.GetImageSize(imagePath, dockerImage, lane)
-    if err != nil || sizeInfo == nil {
-        if err != nil {
-            fmt.Printf("Warning: Failed to measure image size: %v\n", err)
-        }
-        imageSizeMB = 0 // Continue without size info
-    } else {
-        imageSizeMB = sizeInfo.SizeMB
-        fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
-    }
+	sizeInfo, err := utils.GetImageSize(imagePath, dockerImage, lane)
+	if err != nil || sizeInfo == nil {
+		if err != nil {
+			fmt.Printf("Warning: Failed to measure image size: %v\n", err)
+		}
+		imageSizeMB = 0 // Continue without size info
+	} else {
+		imageSizeMB = sizeInfo.SizeMB
+		fmt.Printf("Image size measurement: %s (%.1fMB)\n", utils.FormatSize(sizeInfo.SizeBytes), imageSizeMB)
+	}
 
 	// Vulnerability scanning (stub implementation - Harbor removed)
 	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
