@@ -15,9 +15,8 @@
     "max-size": "10m",
     "max-file": "3"
   },
-  "insecure-registries": [
-    "registry.{{ ploy_domain | default('dev.ployman.app') }}"
-  ],
+  "dns": ["127.0.0.1"],
+  "dns-search": ["service.consul"],
   "experimental": false,
   "live-restore": true,
   "userland-proxy": false,
