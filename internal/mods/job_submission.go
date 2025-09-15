@@ -471,6 +471,50 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("failed to render reducer assets: %w", err)
 		}
 
+		// Step 1b: Populate reducer history.json with plan/results/winner to guide reducer decision
+		// Schema: platform/nomad/mods/schemas/history.schema.json
+		{
+			ctxDir := filepath.Dir(assets.HistoryPath)
+			type histBranch struct {
+				ID       string `json:"id"`
+				Status   string `json:"status"`
+				Artifact string `json:"artifact,omitempty"`
+				Notes    string `json:"notes,omitempty"`
+			}
+			history := struct {
+				PlanID   string       `json:"plan_id"`
+				Branches []histBranch `json:"branches"`
+				Winner   string       `json:"winner"`
+			}{PlanID: planID, Branches: []histBranch{}, Winner: ""}
+			for _, br := range results {
+				// Map status to schema values
+				s := strings.ToLower(br.Status)
+				switch s {
+				case "completed", "success":
+					s = "success"
+				case "failed", "error":
+					s = "failed"
+				case "cancelled", "canceled":
+					s = "canceled"
+				case "timeout":
+					s = "timeout"
+				default:
+					s = "failed"
+				}
+				artifact := ""
+				if idx := strings.Index(br.Notes, "diff.patch"); idx >= 0 {
+					artifact = br.Notes
+				}
+				history.Branches = append(history.Branches, histBranch{ID: br.ID, Status: s, Artifact: artifact, Notes: br.Notes})
+			}
+			if winner != nil {
+				history.Winner = winner.ID
+			}
+			b, _ := json.MarshalIndent(history, "", "  ")
+			_ = os.MkdirAll(ctxDir, 0755)
+			_ = os.WriteFile(assets.HistoryPath, b, 0644)
+		}
+
 		// Step 2: Generate unique run ID for this reducer job
 		runID := ReducerRunID(planID)
 
