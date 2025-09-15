@@ -103,9 +103,11 @@ type ModHealingSummary struct {
 	TotalDuration time.Duration        `json:"total_duration"`
 
 	// Job-based healing workflow fields
-	PlanID     string         `json:"plan_id,omitempty"`
-	Winner     *BranchResult  `json:"winner,omitempty"`
-	AllResults []BranchResult `json:"all_results,omitempty"`
+    PlanID     string         `json:"plan_id,omitempty"`
+    Winner     *BranchResult  `json:"winner,omitempty"`
+    AllResults []BranchResult `json:"all_results,omitempty"`
+    // NextAction is the reducer's decision for next steps (e.g., apply/stop)
+    NextAction NextAction `json:"next_action,omitempty"`
 }
 
 // NewModHealingSummary creates a new healing summary
