@@ -49,6 +49,13 @@
  - ARF: removed legacy complexity analyzer module (`api/arf/complexity_*.go`) and doc references; Mods + LangGraph strategy selection is canonical. No runtime paths referenced these functions.
  - ARF: removed SQL learning layer assets (no SQL in use) — deleted `api/arf/sql/**`, generated `api/arf/db/**`, and `configs/arf-learning-config.yaml`. Docs adjusted to not claim PostgreSQL-backed learning.
 
+### Fixed
+- Dev IaC / `ployman api deploy`: Ensure VPS repo updates pull the latest from GitHub reliably. The API deploy playbook now:
+  - Clones the repo if `/home/ploy/ploy` is missing (uses `deploy_branch` when provided).
+  - Enforces the correct `origin` remote URL.
+  - Uses `git fetch --all --prune` before hard reset to `origin/<deploy_branch>`.
+  This fixes cases where deployments used stale code due to a missing clone, stale remote configuration, or non‑pruned refs.
+
 ### Breaking Changes
 - Remove ARF transform HTTP endpoints (`/v1/arf/transforms/*`) in favor of unified Transflow API (`/v1/transflow/*`).
 - Remove `ploy arf transform` CLI command; use `ploy transflow run` instead.
