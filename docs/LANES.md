@@ -112,7 +112,7 @@ If detection fails, the system defaults to Lane E in Dev to maximize success, bu
 
 ## Environment & Config
 
-- Controller: `PLOY_CONTROLLER=https://api.dev.ployman.app/v1`
+- Controller: ensure `PLOY_CONTROLLER` is set to `https://api.dev.ployman.app/v1`
 - Registry (Dev): `registry.dev.ployman.app` (no auth)
 - Storage: SeaweedFS Filer (Dev): `http://seaweedfs-filer.service.consul:8888`
 - Common query params:

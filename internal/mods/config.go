@@ -44,6 +44,23 @@ type ModConfig struct {
 	SelfHeal     *SelfHealConfig `yaml:"self_heal"`
 	SBOM         *SBOMConfig     `yaml:"sbom,omitempty"`
 	Security     *SecurityConfig `yaml:"security,omitempty"`
+	MR           *MRConfigYAML   `yaml:"mr,omitempty"`
+}
+
+// MRConfigYAML allows selecting which environment variables to use for
+// Git provider configuration without embedding secrets in YAML.
+// Example:
+// mr:
+//
+//	forge: gitlab
+//	repo_url_env: GITLAB_URL
+//	token_env: GITLAB_TOKEN
+//	labels: ["ploy", "tfl", "healing-llm"]
+type MRConfigYAML struct {
+	Forge      string   `yaml:"forge,omitempty"`
+	RepoURLEnv string   `yaml:"repo_url_env,omitempty"`
+	TokenEnv   string   `yaml:"token_env,omitempty"`
+	Labels     []string `yaml:"labels,omitempty"`
 }
 
 // SBOMConfig controls SBOM behavior for this Mods run

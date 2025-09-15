@@ -1,0 +1,4 @@
+# Errors
+/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-3c7a7a46/events.sample.sse:data: {"step":"orw-apply","phase":"apply","level":"error","message":"orw-apply job failed: no allocations created for job orw-apply-java11to17-migration-1757960183 within 1m30s (check job evaluations/constraints)","time":"2025-09-15T18:17:55.634795189Z"}
+
+# Planner/LLM/Reducer/Apply steps

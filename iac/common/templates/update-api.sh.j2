@@ -48,7 +48,7 @@ fi
 
 # Use unified deployment system via ployman
 echo "Deploying via unified deployment system..."
-export PLOY_CONTROLLER="https://api.dev.ployman.app/v1"
+export PLOY_CONTROLLER="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
 
 # Deploy using ployman push
 if ./bin/ployman push -a ploy-api; then

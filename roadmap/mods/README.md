@@ -122,9 +122,9 @@ Work Items (Trackable)
 Operator Runbook (Smoke/E2E)
 
 1. Deploy Dev API on feature branch
-2. Run E2E against `/v1/mods` controller base:
+2. Run E2E against `/v1/mods` controller base (assumes `PLOY_CONTROLLER` is set):
    ```bash
-   E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 \
+   E2E_LOG_CONFIG=1 \
    E2E_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
    E2E_BRANCH=e2e/success \
    go test ./tests/e2e -tags e2e -v -run JavaMigrationComplete -timeout 20m

@@ -386,7 +386,7 @@ ploy_apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') | defa
         mode: '0644'
         block: |
           # Wildcard certificate environment variables
-          export PLOY_APPS_DOMAIN="{{ ploy_apps_domain }}"
+          # Ensure PLOY_APPS_DOMAIN={{ ploy_apps_domain }}
           
           # Certificate provisioning settings (already configured above)
           # CERT_EMAIL, CERT_STAGING, DNS provider settings are already set

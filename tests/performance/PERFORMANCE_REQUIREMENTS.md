@@ -262,8 +262,8 @@ go test -tags=performance -bench=. -cpuprofile=cpu.prof ./tests/performance/
 # Load testing with detailed logging
 go test -tags=performance -run=TestLoadTesting -v ./tests/performance/
 
-# VPS validation with real services
-TARGET_HOST=45.12.75.241 go test -tags=performance -run=TestVPSValidation ./tests/performance/
+# VPS validation with real services (assumes TARGET_HOST is set)
+go test -tags=performance -run=TestVPSValidation ./tests/performance/
 ```
 
 ### Performance Analysis Tools

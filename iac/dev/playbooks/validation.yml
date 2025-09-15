@@ -57,6 +57,18 @@
         status_code: 200
       register: seaweedfs_status
 
+    - name: Validate Consul DNS resolves filer (resolvectl)
+      shell: resolvectl query seaweedfs-filer.service.consul
+      register: consul_dns_filer
+      failed_when: consul_dns_filer.rc != 0
+      changed_when: false
+
+    - name: Validate Consul DNS resolves filer (getent)
+      shell: getent hosts seaweedfs-filer.service.consul
+      register: getent_filer
+      failed_when: getent_filer.rc != 0
+      changed_when: false
+
     - name: Display validation results
       debug:
         msg: |

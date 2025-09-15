@@ -184,7 +184,7 @@
             content: |
               # Bootstrap deployment completed at {{ ansible_date_time.iso8601 }}
               # Ready for transition to unified deployment system
-              # Use: PLOY_CONTROLLER=https://api.dev.ployman.app/v1 ./bin/ployman push -a ploy-api
+              # Use: ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1, then run: ./bin/ployman push -a ploy-api
               BOOTSTRAP_VERSION={{ current_deployment_version }}
               UNIFIED_TRANSITION_READY=true
             dest: /opt/ploy/bootstrap-status
@@ -199,7 +199,7 @@
               
               To transition to unified deployment system:
               1. Verify API is accessible: curl https://api.dev.ployman.app/health
-              2. Deploy via unified system: PLOY_CONTROLLER=https://api.dev.ployman.app/v1 ./bin/ployman push -a ploy-api
+              2. Deploy via unified system: ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1, then run: ./bin/ployman push -a ploy-api
               3. Verify deployment: curl https://api.dev.ployman.app/v1/version
               
               Bootstrap version: {{ current_deployment_version }}
@@ -314,5 +314,5 @@
           
           NEXT STEPS:
           1. Verify external API access: curl https://api.dev.ployman.app/health
-          2. Transition to unified deployment: PLOY_CONTROLLER=https://api.dev.ployman.app/v1 ./bin/ployman push -a ploy-api
+          2. Transition to unified deployment: ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1, then run: ./bin/ployman push -a ploy-api
           3. Future deployments will use the unified system automatically

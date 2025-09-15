@@ -8,7 +8,7 @@ Follow instructions:
 - After pushing changes, deploy API using:
     `DEPLOY_BRANCH=feature/mods-mvp-completion ./bin/ployman api deploy --monitor`
 - After API deploy make sure this test passes succesfuly:
-    `E2E_LOG_CONFIG=1 PLOY_CONTROLLER=https://api.dev.ployman.app/v1 E2E_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git E2E_BRANCH=e2e/success go test ./tests/e2e -tags e2e -v -run JavaMigrationComplete -timeout 20m`
+    `E2E_LOG_CONFIG=1 E2E_REPO=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git E2E_BRANCH=e2e/success go test ./tests/e2e -tags e2e -v -run JavaMigrationComplete -timeout 20m` (assumes `PLOY_CONTROLLER` is set)
 - After test passes delete branch created by mods
 - After completion, mark task with checkmark.
 

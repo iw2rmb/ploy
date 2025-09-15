@@ -90,16 +90,25 @@ if [[ -n "${TARGET_HOST:-}" ]]; then
     fi
   fi
 
-  # Optional: fetch app task logs by scanning lanes for running alloc
-  echo "== SSH: app task logs ($APP_NAME, lanes a-g)" >&2
-  for L in a b c d e f g; do
-    JOB="$APP_NAME-lane-$L"
-    ALLOC_ID=$(ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh running-alloc --job $JOB'" 2>/dev/null || true)
+  # App job allocs + alloc status + task logs (prefer provided LANE; else scan)
+  if [[ -n "$LANE" ]]; then
+    L_LOWER=$(printf '%s' "$LANE" | tr '[:upper:]' '[:lower:]')
+    CANDIDATES=("$APP_NAME-lane-$L_LOWER")
+  else
+    CANDIDATES=("$APP_NAME-lane-e" "$APP_NAME-lane-c" "$APP_NAME-lane-a" "$APP_NAME-lane-b" "$APP_NAME-lane-d" "$APP_NAME-lane-f" "$APP_NAME-lane-g")
+  fi
+  for JOB in "${CANDIDATES[@]}"; do
+    echo "== SSH: app job allocs ($JOB)" >&2
+    ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh allocs --job $JOB --format human'" || true
+    ALLOC_ID=$(ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh running-alloc --job $JOB'" 2>/dev/null | tail -n1 || true)
     if [[ -n "$ALLOC_ID" ]]; then
+      echo "== SSH: app alloc status ($ALLOC_ID)" >&2
+      ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh alloc-status --alloc-id $ALLOC_ID'" || true
+      echo "== SSH: app task logs (oci-kontain stdout+stderr)" >&2
       if [[ -n "$OUT_DIR" ]]; then
-        ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $ALLOC_ID --both --lines $LINES'" | tee "$OUT_DIR/app-$JOB.log" || true
+        ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $ALLOC_ID --task oci-kontain --both --lines $LINES'" | tee "$OUT_DIR/app-$JOB.oci-kontain.log" || true
       else
-        ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $ALLOC_ID --both --lines $LINES'" || true
+        ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $ALLOC_ID --task oci-kontain --both --lines $LINES'" || true
       fi
       break
     fi

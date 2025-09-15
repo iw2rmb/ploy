@@ -8,9 +8,10 @@ echo "🧠 Starting ARF OpenRewrite Phase 2 LLM-Enhanced Testing"
 echo "======================================================="
 
 # Configure LLM provider (batch jobs are the only OpenRewrite mode)
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
-export ARF_LLM_PROVIDER="ollama"
-export ARF_LLM_MODEL="codellama:7b"
+# Respect existing PLOY_CONTROLLER; default to Dev API if unset
+export PLOY_CONTROLLER="${PLOY_CONTROLLER:-https://api.dev.ployman.app/v1}"
+export ARF_LLM_PROVIDER="${ARF_LLM_PROVIDER:-ollama}"
+export ARF_LLM_MODEL="${ARF_LLM_MODEL:-codellama:7b}"
 
 echo "📋 Configuration:"
 echo "  Controller: $PLOY_CONTROLLER"

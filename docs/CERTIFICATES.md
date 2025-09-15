@@ -52,11 +52,12 @@ Ploy has two distinct certificate management systems that serve different purpos
 
 ```bash
 # Platform wildcard certificate (infrastructure)
-export PLOY_ENVIRONMENT="dev"
-export PLOY_DEV_SUBDOMAIN="dev"
-export PLOY_APPS_DOMAIN="ployd.app"
-export NAMECHEAP_API_KEY="your-api-key"
-export CERT_EMAIL="admin@ployd.app"
+# Ensure the following are set in your environment (once per shell):
+# PLOY_ENVIRONMENT=dev
+# PLOY_DEV_SUBDOMAIN=dev
+# PLOY_APPS_DOMAIN=ployd.app
+# NAMECHEAP_API_KEY=your-api-key
+# CERT_EMAIL=admin@ployd.app
 ```
 
 **Result**: Platform provides `*.dev.ployd.app` wildcard certificate
@@ -65,9 +66,10 @@ export CERT_EMAIL="admin@ployd.app"
 
 ```bash
 # Platform wildcard certificate (infrastructure)
-export PLOY_APPS_DOMAIN="ployd.app"
-export CLOUDFLARE_API_TOKEN="your-token"  # Production uses Cloudflare
-export CERT_EMAIL="admin@ployd.app"
+# Ensure the following are set in your environment (once per shell):
+# PLOY_APPS_DOMAIN=ployd.app
+# CLOUDFLARE_API_TOKEN=your-token  # Production uses Cloudflare
+# CERT_EMAIL=admin@ployd.app
 ```
 
 **Result**: Platform provides `*.ployd.app` wildcard certificate

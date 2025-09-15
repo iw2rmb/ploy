@@ -19,11 +19,12 @@ Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu V
 
 ```bash
 # 1. Set required environment variables (CRITICAL)
-export NAMECHEAP_API_KEY="your-api-key"
-export NAMECHEAP_API_USER="your-username"
-export NAMECHEAP_USERNAME="your-username"  
-export NAMECHEAP_CLIENT_IP="your-vps-ip"
-export TARGET_HOST=your-vps-ip
+# Ensure the following are set in your shell (values shown as examples):
+# NAMECHEAP_API_KEY=your-api-key
+# NAMECHEAP_API_USER=your-username
+# NAMECHEAP_USERNAME=your-username
+# NAMECHEAP_CLIENT_IP=your-vps-ip
+# TARGET_HOST=your-vps-ip
 
 # 2. Validate prerequisites (RECOMMENDED)
 cd iac/dev
@@ -44,8 +45,7 @@ The Ploy API can be deployed in two ways:
 
 ### Option 1: Using ployman (Recommended)
 ```bash
-export TARGET_HOST=your-vps-ip
-export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
+# Ensure TARGET_HOST and PLOY_CONTROLLER are set
 ployman api deploy
 ```
 
@@ -177,23 +177,23 @@ iac/
 
 ```bash
 # Platform domain configuration
-export PLOY_APPS_DOMAIN="ployd.app"              # Your platform domain
-export PLOY_APPS_DOMAIN_PROVIDER="namecheap"     # DNS provider (namecheap or cloudflare)
+# Ensure PLOY_APPS_DOMAIN=ployd.app              # Your platform domain
+# Ensure PLOY_APPS_DOMAIN_PROVIDER=namecheap     # DNS provider (namecheap or cloudflare)
 
 # REQUIRED: Namecheap configuration for SSL certificate automation
-export NAMECHEAP_API_KEY="your-api-key"          # Production API key (REQUIRED)
-export NAMECHEAP_API_USER="your-username"        # Namecheap username (REQUIRED)
-export NAMECHEAP_USERNAME="your-username"        # Same as API user (REQUIRED)
-export NAMECHEAP_CLIENT_IP="vps-ip-address"      # Your VPS IP address (REQUIRED)
-export NAMECHEAP_SANDBOX="false"                 # Use sandbox for testing (set to "true" for testing)
+# Ensure NAMECHEAP_API_KEY=your-api-key          # Production API key (REQUIRED)
+# Ensure NAMECHEAP_API_USER=your-username        # Namecheap username (REQUIRED)
+# Ensure NAMECHEAP_USERNAME=your-username        # Same as API user (REQUIRED)
+# Ensure NAMECHEAP_CLIENT_IP=vps-ip-address      # Your VPS IP address (REQUIRED)
+# Ensure NAMECHEAP_SANDBOX=false                 # Use sandbox for testing (set to "true" for testing)
 
 # Optional: GitHub credentials for private repository access
-export GITHUB_PLOY_DEV_USERNAME="your-github-username"
-export GITHUB_PLOY_DEV_PAT="your-github-token"
+# Ensure GITHUB_PLOY_DEV_USERNAME=your-github-username
+# Ensure GITHUB_PLOY_DEV_PAT=your-github-token
 
 # CloudFlare configuration (alternative to Namecheap)
-export CLOUDFLARE_API_TOKEN="your-token"
-export CLOUDFLARE_ZONE_ID="your-zone-id"
+# Ensure CLOUDFLARE_API_TOKEN=your-token
+# Ensure CLOUDFLARE_ZONE_ID=your-zone-id
 ```
 
 ⚠️ **CRITICAL**: The Namecheap environment variables are REQUIRED for SSL certificate automation. The playbook will fail if they are not set.

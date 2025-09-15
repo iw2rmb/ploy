@@ -1,15 +1,15 @@
 package utils
 
 import (
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "net/url"
-    "os"
-    "os/exec"
-    "strconv"
-    "strings"
-    "time"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // ImageSizeInfo contains detailed size information for an artifact
@@ -62,105 +62,111 @@ func getFileSize(filePath, lane string) (*ImageSizeInfo, error) {
 
 // getDockerImageSize measures the size of a Docker container image
 func getDockerImageSize(dockerImage, lane string) (*ImageSizeInfo, error) {
-    // First try registry manifest (works in VPS without local Docker)
-    if info, err := getDockerImageSizeFromRegistry(dockerImage); err == nil && info != nil {
-        info.Lane = lane
-        info.MeasurementType = "docker"
-        info.DockerImage = dockerImage
-        return info, nil
-    }
-    // Fallback to local docker CLI if available
-    cmd := exec.Command("docker", "images", "--format", "{{.Size}}", dockerImage)
-    output, err := cmd.Output()
-    if err != nil {
-        return nil, fmt.Errorf("failed to get docker image size: %w", err)
-    }
+	// First try registry manifest (works in VPS without local Docker)
+	if info, err := getDockerImageSizeFromRegistry(dockerImage); err == nil && info != nil {
+		info.Lane = lane
+		info.MeasurementType = "docker"
+		info.DockerImage = dockerImage
+		return info, nil
+	}
+	// Fallback to local docker CLI if available
+	cmd := exec.Command("docker", "images", "--format", "{{.Size}}", dockerImage)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker image size: %w", err)
+	}
 
-    sizeStr := strings.TrimSpace(string(output))
-    if sizeStr == "" {
-        return nil, fmt.Errorf("docker image not found: %s", dockerImage)
-    }
+	sizeStr := strings.TrimSpace(string(output))
+	if sizeStr == "" {
+		return nil, fmt.Errorf("docker image not found: %s", dockerImage)
+	}
 
-    // Parse size (format could be "123MB", "1.5GB", etc.)
-    sizeBytes, err := parseDockerSize(sizeStr)
-    if err != nil {
-        return nil, fmt.Errorf("failed to parse docker image size: %w", err)
-    }
+	// Parse size (format could be "123MB", "1.5GB", etc.)
+	sizeBytes, err := parseDockerSize(sizeStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse docker image size: %w", err)
+	}
 
-    sizeMB := float64(sizeBytes) / (1024 * 1024)
+	sizeMB := float64(sizeBytes) / (1024 * 1024)
 
-    // For Docker images, try to get more detailed size information
-    compressedSize, uncompressedSize := getDetailedDockerSize(dockerImage)
+	// For Docker images, try to get more detailed size information
+	compressedSize, uncompressedSize := getDetailedDockerSize(dockerImage)
 
-    return &ImageSizeInfo{
-        DockerImage:      dockerImage,
-        SizeBytes:        sizeBytes,
-        SizeMB:           sizeMB,
-        CompressedSize:   compressedSize,
-        UncompressedSize: uncompressedSize,
-        Lane:             lane,
-        MeasurementType:  "docker",
-    }, nil
+	return &ImageSizeInfo{
+		DockerImage:      dockerImage,
+		SizeBytes:        sizeBytes,
+		SizeMB:           sizeMB,
+		CompressedSize:   compressedSize,
+		UncompressedSize: uncompressedSize,
+		Lane:             lane,
+		MeasurementType:  "docker",
+	}, nil
 }
 
 // Minimal schema for Docker/OCI manifest v2
 type manifestV2 struct {
-    MediaType string `json:"mediaType"`
-    Layers    []struct {
-        Size int64  `json:"size"`
-        MediaType string `json:"mediaType"`
-    } `json:"layers"`
+	MediaType string `json:"mediaType"`
+	Layers    []struct {
+		Size      int64  `json:"size"`
+		MediaType string `json:"mediaType"`
+	} `json:"layers"`
 }
 
 // Parses dockerImage host/repo:tag and sums layer sizes from registry manifest
 func getDockerImageSizeFromRegistry(dockerImage string) (*ImageSizeInfo, error) {
-    slash := strings.Index(dockerImage, "/")
-    if slash <= 0 || slash >= len(dockerImage)-1 {
-        return nil, fmt.Errorf("unverifiable image tag: %s", dockerImage)
-    }
-    host := dockerImage[:slash]
-    remainder := dockerImage[slash+1:]
-    name := remainder
-    ref := "latest"
-    if at := strings.Index(remainder, "@"); at != -1 {
-        name = remainder[:at]
-        ref = remainder[at+1:]
-    } else if colon := strings.LastIndex(remainder, ":"); colon != -1 {
-        name = remainder[:colon]
-        ref = remainder[colon+1:]
-    }
-    u := url.URL{Scheme: "https", Host: host, Path: "/v2/" + name + "/manifests/" + ref}
-    req, _ := http.NewRequest("GET", u.String(), nil)
-    req.Header.Set("Accept", strings.Join([]string{
-        "application/vnd.oci.image.manifest.v1+json",
-        "application/vnd.docker.distribution.manifest.v2+json",
-    }, ", "))
-    client := &http.Client{Timeout: 10 * time.Second}
-    resp, err := client.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
-    if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-        return nil, fmt.Errorf("registry responded %d", resp.StatusCode)
-    }
-    var m manifestV2
-    if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
-        return nil, err
-    }
-    var total int64
-    for _, l := range m.Layers {
-        if l.Size > 0 {
-            total += l.Size
-        }
-    }
-    if total <= 0 {
-        return nil, fmt.Errorf("no layer sizes found")
-    }
-    return &ImageSizeInfo{
-        SizeBytes: total,
-        SizeMB:    float64(total) / (1024 * 1024),
-    }, nil
+	slash := strings.Index(dockerImage, "/")
+	if slash <= 0 || slash >= len(dockerImage)-1 {
+		return nil, fmt.Errorf("unverifiable image tag: %s", dockerImage)
+	}
+	host := dockerImage[:slash]
+	remainder := dockerImage[slash+1:]
+	name := remainder
+	ref := "latest"
+	if at := strings.Index(remainder, "@"); at != -1 {
+		name = remainder[:at]
+		ref = remainder[at+1:]
+	} else if colon := strings.LastIndex(remainder, ":"); colon != -1 {
+		name = remainder[:colon]
+		ref = remainder[colon+1:]
+	}
+	u := url.URL{Scheme: "https", Host: host, Path: "/v2/" + name + "/manifests/" + ref}
+	req, _ := http.NewRequest("GET", u.String(), nil)
+	req.Header.Set("Accept", strings.Join([]string{
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v2+json",
+	}, ", "))
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		// Fallback to http (useful for tests or non-TLS registries)
+		u.Scheme = "http"
+		req.URL = &u
+		resp, err = client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("registry responded %d", resp.StatusCode)
+	}
+	var m manifestV2
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		return nil, err
+	}
+	var total int64
+	for _, l := range m.Layers {
+		if l.Size > 0 {
+			total += l.Size
+		}
+	}
+	if total <= 0 {
+		return nil, fmt.Errorf("no layer sizes found")
+	}
+	return &ImageSizeInfo{
+		SizeBytes: total,
+		SizeMB:    float64(total) / (1024 * 1024),
+	}, nil
 }
 
 // parseDockerSize converts Docker size format (e.g., "123MB", "1.5GB") to bytes

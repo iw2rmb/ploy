@@ -150,12 +150,12 @@ Track these metrics weekly to measure progress:
 
 ### Environment Setup Requirements
 ```bash
-# Required for integration testing
-export CONSUL_HTTP_ADDR=localhost:8500
-export NOMAD_ADDR=http://localhost:4646
-export SEAWEEDFS_FILER=http://localhost:8888
-export GITLAB_URL=https://gitlab.com
-export GITLAB_TOKEN=your-integration-test-token
+# Required for integration testing (ensure these are set once per shell)
+# CONSUL_HTTP_ADDR=localhost:8500
+# NOMAD_ADDR=http://localhost:4646
+# SEAWEEDFS_FILER=http://localhost:8888
+# GITLAB_URL=https://gitlab.com
+# GITLAB_TOKEN=your-integration-test-token
 
 # Docker services
 docker-compose -f docker-compose.integration.yml up -d

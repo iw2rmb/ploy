@@ -215,8 +215,8 @@ self_heal:
 **With GitLab MR Creation:**
 ```bash
 # Set GitLab environment variables
-export GITLAB_URL=https://gitlab.com
-export GITLAB_TOKEN=your-gitlab-token
+Ensure GITLAB_URL=https://gitlab.com
+Ensure GITLAB_TOKEN=your-gitlab-token
 
 # Run workflow with MR creation
 ploy mod run -f mod.yaml

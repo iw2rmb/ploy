@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Collects controller/platform logs and referenced SeaweedFS artifacts for a given MOD_ID.
 # Usage:
-#   PLOY_CONTROLLER=https://api.dev.ployman.app/v1 ./collect-logs.sh <MOD_ID>
+#   Ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1, then run: ./collect-logs.sh <MOD_ID>
 # Optional:
 #   PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
 #   LINES=800            # number of platform log lines to fetch

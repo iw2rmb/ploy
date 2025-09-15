@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Capture planner allocation logs shortly after planner starts.
 # Usage:
-#   PLOY_CONTROLLER=https://api.dev.ployman.app/v1 \
+#   Ensure PLOY_CONTROLLER=https://api.dev.ployman.app/v1, then run:
 #   ANSIBLE_INVENTORY=iac/dev/inventory/hosts.yml \
 #   TARGET_HOST=45.12.75.241 \
 #   ./capture-planner-logs.sh <MOD_ID>
@@ -64,4 +64,3 @@ done
 
 echo "[capture] Unable to resolve planner allocation logs after retries." >&2
 exit 1
-

@@ -65,8 +65,27 @@ Recommended Defaults (dev)
 - MODS_ORW_APPLY_IMAGE: registry.dev.ployman.app/openrewrite-jvm:latest
 - MODS_PLANNER/REDUCER/LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
 - NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
-- PLOY_CONTROLLER=https://api.dev.ployman.app/v1 (CLI), PLOY_API_URL auto-derived to https://api.dev.ployman.app
+- PLOY_CONTROLLER: ensure it is set to `https://api.dev.ployman.app/v1` for Dev; `PLOY_API_URL` auto-derived to https://api.dev.ployman.app
 - GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope)
+
+Per-run MR auth selection (mods.yaml)
+
+- To choose which environment variables power Git push/MR for a specific mods run without placing secrets in YAML, use the `mr` block with env var names:
+
+  mr:
+    forge: gitlab
+    repo_url_env: GITLAB_URL
+    token_env: GITLAB_TOKEN
+    labels: ["ploy", "tfl", "healing-llm"]
+
+- Behavior:
+  - `repo_url_env`: name of the env var that holds the GitLab base URL (e.g., https://gitlab.com). The runner maps it to `GITLAB_URL` internally.
+  - `token_env`: name of the env var that holds the token. The runner maps it to `GITLAB_TOKEN` internally. Token must have write_repository (and usually api) scopes.
+  - `labels`: optional MR labels override; defaults to ["ploy", "tfl"].
+
+- Notes:
+  - Only env var NAMES are specified in YAML; values remain in the environment on the controller/VPS.
+  - The runner emits info/warn events noting which env names were used, never the secret values.
 
 Notes
 
