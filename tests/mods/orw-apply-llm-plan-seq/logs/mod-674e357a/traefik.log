@@ -1,0 +1,7 @@
+[2025-09-15 08:58:25] Getting stdout logs for allocation: 9cf0b6fa-efe4-0588-c5d3-e587cb9dc963 (task: traefik, lines: 800, follow: false)
+[2025-09-15 08:58:25] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/9cf0b6fa-efe4-0588-c5d3-e587cb9dc963?type=stdout&plain=true&task=traefik&offset=-800
+[2025-09-15 08:58:25] Response code: 200
+ik/traefik/v3/pkg/server/service/loadbalancer/wrr/wrr.go:125[0m[36m >[0m Still UP, no need to propagate [36mserviceName=[0mploy-lane-e-node-20-e@consulcatalog
+[90m2025-09-15T08:58:25Z[0m DBG [1mgithub.com/traefik/traefik/v3/pkg/server/service/loadbalancer/wrr/wrr.go:108[0m[36m >[0m Setting status of http://45.12.75.241:29871 to UP [36mserviceName=[0mploy-lane-e-node-20-e@consulcatalog
+[90m2025-09-15T08:58:25Z[0m DBG [1mgithub.com/traefik/traefik/v3/pkg/server/service/loadbalancer/wrr/wrr.go:125[0m[36m >[0m Still UP, no need to propagate [36mserviceName=[0mploy-lane-e-node-20-e@consulcatalog
+[90m2025-09-15T08:58:25Z[0m DBG [1mgithub.com/traefik/traefik/v3/pkg/server/service/loadbalancer/wrr/wrr.go:175[0m[36m >[0m Service selected by WRR: http://45.12.75.241:24220
