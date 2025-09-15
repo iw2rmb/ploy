@@ -296,25 +296,25 @@ func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
 func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.Duration) error {
 	start := time.Now()
 	allocAppearGuard := envDur("NOMAD_ALLOC_APPEARANCE_TIMEOUT", 90*time.Second)
-    if useJobManager() {
-        name, err := submitWithJobManager(jobPath)
-        if err != nil {
-            return err
-        }
-        // Wait with guard and cancellation support
-        done := make(chan error, 1)
-        go func() { done <- waitTerminalWithJobManager(name, timeout) }()
-        select {
-        case err := <-done:
-            // Best-effort: deregister job after terminal state to avoid lingering registrations
-            _ = stopWithJobManager(name)
-            return err
-        case <-ctx.Done():
-            // Best-effort stop via wrapper
-            _ = stopWithJobManager(name)
-            return ctx.Err()
-        }
-    }
+	if useJobManager() {
+		name, err := submitWithJobManager(jobPath)
+		if err != nil {
+			return err
+		}
+		// Wait with guard and cancellation support
+		done := make(chan error, 1)
+		go func() { done <- waitTerminalWithJobManager(name, timeout) }()
+		select {
+		case err := <-done:
+			// Best-effort: deregister job after terminal state to avoid lingering registrations
+			_ = stopWithJobManager(name)
+			return err
+		case <-ctx.Done():
+			// Best-effort stop via wrapper
+			_ = stopWithJobManager(name)
+			return ctx.Err()
+		}
+	}
 	acquireSubmit()
 	defer releaseSubmit()
 	hcl, err := os.ReadFile(jobPath)
@@ -330,9 +330,9 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 	if err != nil {
 		return fmt.Errorf("parse HCL: %w", err)
 	}
-    if _, _, err := jobs.Register(job, nil); err != nil {
-        return fmt.Errorf("register job: %w", err)
-    }
+	if _, _, err := jobs.Register(job, nil); err != nil {
+		return fmt.Errorf("register job: %w", err)
+	}
 	name := ""
 	if job != nil && job.Name != nil {
 		name = *job.Name
@@ -345,14 +345,14 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 	var lastIndex uint64
 	waitTime := envDur("NOMAD_BLOCKING_WAIT", 30*time.Second)
 	sawAnyAllocs := false
-    for time.Now().Before(deadline) {
-        select {
-        case <-ctx.Done():
-            // Best-effort deregister
-            _, _, _ = client.Jobs().Deregister(name, true, nil)
-            return ctx.Err()
-        default:
-        }
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			// Best-effort deregister
+			_, _, _ = client.Jobs().Deregister(name, true, nil)
+			return ctx.Err()
+		default:
+		}
 		// Use blocking query to reduce control-plane load
 		q := &nomadapi.QueryOptions{WaitIndex: lastIndex, WaitTime: waitTime, AllowStale: true}
 		allocs, meta, err := client.Jobs().Allocations(name, false, q)
@@ -382,30 +382,30 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 				sawRunning = true
 			}
 		}
-        if sawComplete {
-            // Cleanup job registration on success
-            _, _, _ = client.Jobs().Deregister(name, true, nil)
-            return nil
-        }
-        if !sawRunning && failedID != "" {
-            // Cleanup job registration on failure
-            _, _, _ = client.Jobs().Deregister(name, true, nil)
-            return fmt.Errorf("job %s allocation failed (%s)", name, failedID)
-        }
-        if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
-            // Cleanup job registration when placement fails
-            _, _, _ = client.Jobs().Deregister(name, true, nil)
-            return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
-        }
+		if sawComplete {
+			// Cleanup job registration on success
+			_, _, _ = client.Jobs().Deregister(name, true, nil)
+			return nil
+		}
+		if !sawRunning && failedID != "" {
+			// Cleanup job registration on failure
+			_, _, _ = client.Jobs().Deregister(name, true, nil)
+			return fmt.Errorf("job %s allocation failed (%s)", name, failedID)
+		}
+		if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
+			// Cleanup job registration when placement fails
+			_, _, _ = client.Jobs().Deregister(name, true, nil)
+			return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
+		}
 		if !sawRunning && len(allocs) > 0 {
 			// Allocations exist but none running and none complete/failed; give them time
 			_ = allocs // no-op to satisfy staticcheck
 		}
 		// Do not sleep here; blocking query already waited. Loop continues.
 	}
-    // Cleanup on timeout as well
-    _, _, _ = client.Jobs().Deregister(name, true, nil)
-    return fmt.Errorf("timeout waiting for job %s to complete", name)
+	// Cleanup on timeout as well
+	_, _, _ = client.Jobs().Deregister(name, true, nil)
+	return fmt.Errorf("timeout waiting for job %s to complete", name)
 }
 
 // stopWithJobManager attempts to stop/deregister a job via the wrapper

@@ -8,11 +8,10 @@ job "traefik-system" {
     value = "linux"
   }
   
-  # Run only on edge/gateway nodes
-  # Ensure Nomad clients that should run Traefik set client.meta.role accordingly
+  # Run only on edge/gateway nodes (Nomad client config: client.meta.role = "gateway")
   constraint {
-    attribute = "${meta.{{ ploy_gateway_node_meta_key | default('role') }}}"
-    value     = "{{ ploy_gateway_node_class | default('gateway') }}"
+    attribute = "${meta.role}"
+    value     = "gateway"
   }
   
   group "traefik" {
@@ -45,8 +44,8 @@ job "traefik-system" {
         to = 443
       }
       port "admin" {
-        static = {{ traefik_admin_port | default(8090) }}
-        to = {{ traefik_admin_port | default(8090) }}
+        static = 8090
+        to = 8090
       }
       port "metrics" {
         static = 8091
@@ -103,36 +102,30 @@ job "traefik-system" {
       driver = "docker"
       
       config {
-        image = "traefik:v{{ traefik_version }}"
+        image = "traefik:v3.5.0"
         network_mode = "host"
         
-        ports = ["http", "https", "admin", "metrics", "traefik", "acme"]
+        ports = ["http", "https", "admin", "metrics", "traefik"]
         
         args = [
           "--global.checkNewVersion=false",
           "--global.sendAnonymousUsage=false",
           "--log.level=INFO",
-          "--log.format=json",
-          "--accesslog=true",
           "--api.dashboard=true",
           "--api.insecure=true",
           "--ping=true",
           "--ping.entryPoint=admin",
           "--entrypoints.web.address=:80",
           "--entrypoints.websecure.address=:443", 
-          # Enable TLS by default on websecure so HTTPS routers don't need per-service flags
-          "--entrypoints.websecure.http.tls=true",
-          "--entrypoints.admin.address=:{{ traefik_admin_port | default(8090) }}",
+          "--entrypoints.admin.address=:8090",
           "--entrypoints.metrics.address=:8091",
           "--entrypoints.acme.address=:9443",
           "--entrypoints.traefik.address=:8095",
           "--providers.consulcatalog=true",
           "--providers.consulcatalog.prefix=traefik",
           "--providers.consulcatalog.exposedByDefault=false",
-          "--providers.consulcatalog.endpoint.address=localhost:8500",
+          "--providers.consulcatalog.endpoint.address=*********:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
-          # Enable default TLS for Consul Catalog services on websecure entrypoint
-          "--providers.consulcatalog.defaultRule=HostRegexp(`{service:[a-z0-9-]+}.{domain:.+}`)",
           # Token is provided via CONSUL_HTTP_TOKEN environment variable when Consul ACLs are enabled
           "--providers.file.filename=/data/dynamic-config.yml",
           "--providers.file.watch=true",
@@ -146,23 +139,28 @@ job "traefik-system" {
           "--certificatesresolvers.letsencrypt.acme.email=admin@ployd.app",
           "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
           "--certificatesresolvers.letsencrypt.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=*******:53,*******:53",
           # Platform wildcard certificate resolver for dev.ployman.app (reuse existing storage)
           "--certificatesresolvers.platform-wildcard.acme.dnschallenge=true",
           "--certificatesresolvers.platform-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.platform-wildcard.acme.email={{ ploy_platform_cert_email }}",
+          "--certificatesresolvers.platform-wildcard.acme.email=admin@ployman.app",
           "--certificatesresolvers.platform-wildcard.acme.storage=/data/platform-acme.json",
           "--certificatesresolvers.platform-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Domains are specified via dynamic file provider routers (tls.domains)
+          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
           # Apps wildcard certificate resolver for dev.ployd.app (reuse existing storage)
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge=true",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.apps-wildcard.acme.email={{ ploy_apps_cert_email }}",
+          "--certificatesresolvers.apps-wildcard.acme.email=admin@ployd.app",
           "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Domains are specified via dynamic file provider routers (tls.domains)
+          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
+          # Dev wildcard certificate resolver (alias to apps-wildcard) - ADDED FOR COMPATIBILITY
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge=true",
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.provider=namecheap",
+          "--certificatesresolvers.dev-wildcard.acme.email=admin@ployd.app",
+          "--certificatesresolvers.dev-wildcard.acme.storage=/data/apps-acme.json",
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.delayBeforeCheck=30",
+          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
           # HTTP to HTTPS redirect
           "--entrypoints.web.http.redirections.entrypoint.to=websecure",
           "--entrypoints.web.http.redirections.entrypoint.scheme=https"
@@ -174,28 +172,22 @@ job "traefik-system" {
           source = "/opt/ploy/traefik-data"
           target = "/data"
         }
-        
-        # Dynamic configuration is provided via /data/dynamic-config.yml
       }
-      
-      # Configuration now loaded from external file provider at /etc/traefik/dynamic-configs/dynamic-config.yml
       
       # Environment variables for Traefik
       env {
         # Consul configuration
-        CONSUL_HTTP_ADDR = "127.0.0.1:8500"
-        # Optional: Consul ACL token for Consul Catalog provider (production)
-        CONSUL_HTTP_TOKEN = "{{ vault_consul_http_token | default(lookup('env', 'CONSUL_HTTP_TOKEN') | default('')) }}"
+        CONSUL_HTTP_ADDR = "*********:8500"
         
         # Namecheap DNS provider for Let's Encrypt ACME challenges
-        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default(vault_namecheap_api_user | default('')) }}"
-        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default(vault_namecheap_api_key | default('')) }}"
-        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default(vault_namecheap_sandbox | default('false')) }}"
+        NAMECHEAP_API_USER = "iw2rmb"
+        NAMECHEAP_API_KEY = "c8615d72b5794eb0a52cbf1cf22fc42f"
+        NAMECHEAP_SANDBOX = "false"
         
         # DNS challenge configuration
         ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
-        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(vault_namecheap_client_ip | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address'])) }}"
-        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default(vault_namecheap_username | default('')) }}"
+        NAMECHEAP_CLIENT_IP = "************"
+        NAMECHEAP_USERNAME = "iw2rmb"
       }
       
       resources {

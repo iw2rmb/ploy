@@ -181,6 +181,20 @@
         mode: '0644'
       register: nomad_config
 
+    - name: Ensure Nomad client meta for Traefik placement
+      copy:
+        dest: /etc/nomad.d/20-client-meta.hcl
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        content: |
+          client {
+            meta {
+              {{ ploy_gateway_node_meta_key | default('role') }} = "{{ ploy_gateway_node_class | default('gateway') }}"
+            }
+          }
+      register: nomad_meta_config
+
     - name: Create Vault configuration
       template:
         src: ../../common/templates/vault.hcl.j2
@@ -350,7 +364,7 @@
         name: nomad
         state: restarted
         daemon_reload: true
-      when: nomad_config.changed
+      when: nomad_config.changed or (nomad_meta_config is defined and nomad_meta_config.changed)
       register: nomad_restart_result
       retries: 3
       delay: 5
@@ -567,23 +581,10 @@
         group: ploy
         mode: '0644'
 
-    - name: Find Nomad job templates
-      find:
-        paths: "{{ playbook_dir }}/../../../platform/nomad"
-        patterns: "*.hcl"
-      register: nomad_templates
-      delegate_to: localhost
-      become: no
-
-    - name: Copy Ploy Nomad job templates (if they exist)
-      copy:
-        src: "{{ item.path }}"
-        dest: /opt/hashicorp/nomad/jobs/
-        owner: ploy
-        group: ploy
-        mode: '0644'
-      with_items: "{{ nomad_templates.files }}"
-      when: nomad_templates.files | length > 0
+    # Note: API embeds platform Nomad templates; avoid blanket copies to VPS
+    # The following find/copy tasks were pruned to prevent stale or unused HCLs
+    # from being synced. Targeted IaC-managed jobs (e.g., Traefik) are handled
+    # explicitly below.
 
     - name: Create Nomad environment file for systemd
       copy:
@@ -620,6 +621,14 @@
           export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience (dev)"
 
+    - name: Set PLOY_TEMPLATE_DIR for ploy user (dev)
+      lineinfile:
+        path: /home/ploy/.bashrc
+        line: "export PLOY_TEMPLATE_DIR=/home/ploy/ploy"
+        create: true
+        owner: ploy
+        group: ploy
+
     - name: Deploy Traefik system job to Nomad (Nomad-only; systemd Traefik disabled)
       block:
         - name: Ensure systemd Traefik service is stopped and disabled (Nomad-only)
@@ -643,7 +652,7 @@
 
         - name: Copy job manager script
           copy:
-            src: /Users/vk/@iw2rmb/ploy/iac/common/scripts/nomad-job-manager.sh
+            src: "{{ playbook_dir }}/../../common/scripts/nomad-job-manager.sh"
             dest: /opt/hashicorp/bin/nomad-job-manager.sh
             mode: '0755'
             owner: root

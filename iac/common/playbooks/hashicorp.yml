@@ -336,23 +336,9 @@
         group: hashicorp
         mode: '0644'
 
-    - name: Find Nomad job templates
-      find:
-        paths: "{{ playbook_dir }}/../../../platform/nomad"
-        patterns: "*.hcl"
-      register: nomad_templates
-      delegate_to: localhost
-      become: no
-
-    - name: Copy Ploy Nomad job templates (if they exist)
-      copy:
-        src: "{{ item.path }}"
-        dest: /opt/hashicorp/nomad/jobs/
-        owner: hashicorp
-        group: hashicorp
-        mode: '0644'
-      with_items: "{{ nomad_templates.files }}"
-      when: nomad_templates.files | length > 0
+    # Note: API embeds platform Nomad templates; avoid blanket copies to VPS.
+    # Removed broad find/copy of platform/nomad/*.hcl. Explicit IaC-managed
+    # jobs (e.g., Traefik) continue below.
 
     - name: Create Nomad environment file for systemd
       copy:
@@ -401,6 +387,14 @@
           export NOMAD_SUBMIT_MAX_CONCURRENCY="${NOMAD_SUBMIT_MAX_CONCURRENCY:-4}"
           export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience"
+
+    - name: Set PLOY_TEMPLATE_DIR for ploy user
+      lineinfile:
+        path: /home/ploy/.bashrc
+        line: "export PLOY_TEMPLATE_DIR=/home/ploy/ploy"
+        create: true
+        owner: ploy
+        group: ploy
 
     - name: Deploy Traefik system job to Nomad
       block:
@@ -473,39 +467,43 @@
               debug:
                 msg: "hcl2json installed successfully: {{ hcl2json_version.stdout }}"
 
-        - name: Copy Traefik Nomad job template to VPS
+        - name: Copy job manager script
           copy:
-            src: "{{ playbook_dir }}/../../../platform/nomad/traefik-system.hcl"
+            src: "../scripts/nomad-job-manager.sh"
+            dest: "/opt/hashicorp/bin/nomad-job-manager.sh"
+            mode: '0755'
+            owner: root
+            group: root
+
+        - name: Render Traefik Nomad job template (Jinja)
+          template:
+            src: "../templates/nomad-traefik-system.hcl.j2"
             dest: "/opt/hashicorp/nomad/jobs/traefik-system.hcl"
             owner: hashicorp
             group: hashicorp
             mode: '0644'
 
         - name: Validate Traefik job syntax
-          command: nomad job validate /opt/hashicorp/nomad/jobs/traefik-system.hcl
+          command: /opt/hashicorp/bin/nomad-job-manager.sh validate --file /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_validate
           changed_when: false
           environment:
             NOMAD_ADDR: "http://localhost:4646"
 
-        - name: Submit Traefik system job to Nomad (if not running)
-          command: nomad job run /opt/hashicorp/nomad/jobs/traefik-system.hcl
+        - name: Submit Traefik system job to Nomad (initial or recover)
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job traefik-system --file /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_job_submit
           environment:
             NOMAD_ADDR: "http://localhost:4646"
           when: traefik_job_check.status == 404
 
         - name: Wait for Traefik service to be healthy
-          uri:
-            url: "http://localhost:4646/v1/job/traefik-system/allocations"
-            method: GET
-            status_code: 200
-          register: traefik_allocs
-          until: >
-            traefik_allocs.json | length > 0 and
-            (traefik_allocs.json | map(attribute='ClientStatus') | list | unique) == ['running']
-          retries: 12
-          delay: 10
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job traefik-system --timeout 180
+          environment:
+            NOMAD_ADDR: "http://localhost:4646"
+          register: traefik_wait_result
+          failed_when: traefik_wait_result.rc != 0
+          when: traefik_job_check.status == 404
 
         - name: Verify Traefik is accessible
           uri:

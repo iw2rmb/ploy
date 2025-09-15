@@ -13,12 +13,26 @@ var embeddedLaneCOsv []byte
 //go:embed templates/lane-c-java.hcl
 var embeddedLaneCJava []byte
 
+// Embed builder job templates used by internal/orchestration renderers
+//
+//go:embed templates/lane-e-kaniko-builder.hcl
+var embeddedLaneEKanikoBuilder []byte
+
+//go:embed templates/lane-c-osv-builder.hcl
+var embeddedLaneCOsvBuilder []byte
+
 func getEmbeddedTemplate(path string) []byte {
 	if strings.HasSuffix(path, "lane-c-osv.hcl") {
 		return embeddedLaneCOsv
 	}
 	if strings.HasSuffix(path, "lane-c-java.hcl") {
 		return embeddedLaneCJava
+	}
+	if strings.HasSuffix(path, "lane-e-kaniko-builder.hcl") {
+		return embeddedLaneEKanikoBuilder
+	}
+	if strings.HasSuffix(path, "lane-c-osv-builder.hcl") {
+		return embeddedLaneCOsvBuilder
 	}
 	return nil
 }
