@@ -30,8 +30,15 @@ download() {
   echo "Fetching $name → $out"
   if [[ -z "$2" ]]; then
     echo "  (skip: no output filename provided)"; return 0; fi
-  curl -fsS "$API_BASE/mods/$MOD_ID/artifacts/$name" -o "$out" || {
-    echo "  (missing $name)"; return 0; }
+  # Quietly handle 404 without printing curl errors
+  local code
+  code=$(curl -s -o "$out.tmp" -w "%{http_code}" "$API_BASE/mods/$MOD_ID/artifacts/$name" || true)
+  if [[ "$code" == "200" ]]; then
+    mv "$out.tmp" "$out"
+  else
+    rm -f "$out.tmp"
+    echo "  (missing $name)"
+  fi
 }
 
 download plan_json plan.json
