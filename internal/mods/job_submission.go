@@ -334,7 +334,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		}
         // Download with small retry/backoff to avoid race with artifact upload
         var dlErr error
-        for i := 0; i < 6; i++ {
+        for i := 0; i < 10; i++ {
             if err := downloadToFileFn(url, artifactPath); err == nil {
                 dlErr = nil
                 break
@@ -344,7 +344,15 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
             }
         }
         if dlErr != nil {
+            if controller := ResolveInfraFromEnv().Controller; controller != "" {
+                rep := NewControllerEventReporter(controller, modID)
+                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "error", Message: fmt.Sprintf("plan download failed: %v", dlErr), JobName: runID, Time: time.Now()})
+            }
             return nil, fmt.Errorf("failed to download planner output from SeaweedFS: %w", dlErr)
+        }
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, modID)
+            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: "plan downloaded", JobName: runID, Time: time.Now()})
         }
 		if b, err := os.ReadFile(artifactPath); err == nil {
 			if err := validatePlanJSON(b); err != nil {
@@ -483,7 +491,7 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
             _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: fmt.Sprintf("download next from %s", key), JobName: runID, Time: time.Now()})
         }
         var dlErr error
-        for i := 0; i < 6; i++ {
+        for i := 0; i < 10; i++ {
             if err := downloadToFileFn(url, artifactPath); err == nil {
                 dlErr = nil
                 break
@@ -493,7 +501,15 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
             }
         }
         if dlErr != nil {
+            if controller := ResolveInfraFromEnv().Controller; controller != "" {
+                rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+                _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "error", Message: fmt.Sprintf("next download failed: %v", dlErr), JobName: runID, Time: time.Now()})
+            }
             return nil, fmt.Errorf("failed to download reducer output from SeaweedFS: %w", dlErr)
+        }
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+            _ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "next downloaded", JobName: runID, Time: time.Now()})
         }
         if b, err := os.ReadFile(artifactPath); err == nil {
             if err := validateNextJSON(b); err != nil {
