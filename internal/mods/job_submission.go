@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
+	"net/http"
 	"strings"
 	"time"
 
@@ -36,7 +38,38 @@ func NewJobSubmissionHelper(submitter JobSubmitter) JobSubmissionHelper {
 
 // NewJobSubmissionHelperWithRunner creates a new job submission helper with runner access for production
 func NewJobSubmissionHelperWithRunner(submitter JobSubmitter, runner ProductionJobSubmitter) JobSubmissionHelper {
-	return &jobSubmissionHelper{submitter: submitter, runner: runner}
+    return &jobSubmissionHelper{submitter: submitter, runner: runner}
+}
+
+// waitForStepContaining polls the controller status for the given MOD_ID until a step
+// message contains the given substring (case-sensitive) or an error condition occurs.
+// Returns nil when the substring is observed, or an error if an error step is detected or timeout elapses.
+func waitForStepContaining(controller, modID, phase, contains string, timeout time.Duration) error {
+    if controller == "" || modID == "" || contains == "" {
+        return fmt.Errorf("invalid wait parameters")
+    }
+    deadline := time.Now().Add(timeout)
+    client := &http.Client{Timeout: 5 * time.Second}
+    url := strings.TrimRight(controller, "/") + "/mods/" + modID + "/status"
+    for time.Now().Before(deadline) {
+        req, _ := http.NewRequest(http.MethodGet, url, nil)
+        resp, err := client.Do(req)
+        if err == nil && resp != nil && resp.Body != nil {
+            body, _ := io.ReadAll(resp.Body)
+            _ = resp.Body.Close()
+            // Minimal JSON scan to avoid full struct; look for our contains string and phase/level hints
+            s := string(body)
+            if strings.Contains(s, contains) {
+                return nil
+            }
+            // Detect explicit job failed message in this phase
+            if strings.Contains(s, "\"phase\":\""+phase+"\"") && strings.Contains(strings.ToLower(s), "job failed") {
+                return fmt.Errorf("job in phase %s reported failure", phase)
+            }
+        }
+        time.Sleep(1 * time.Second)
+    }
+    return fmt.Errorf("timeout waiting for event: %s", contains)
 }
 
 // substituteHCLTemplate performs environment variable substitution in HCL templates
@@ -326,21 +359,27 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("planner job failed: %w", err)
 		}
 
-		// Step 6: Always fetch planner plan.json from SeaweedFS
-		artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
-		if infra.SeaweedURL == "" || modID == "" {
-			return nil, fmt.Errorf("planner artifact fetch requires SeaweedFS URL and execution ID")
-		}
-		if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
-			return nil, fmt.Errorf("planner artifact path prep: %w", err)
-		}
-		key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
-		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-		// Emit download attempt event with timing start
-		dlStart := time.Now()
-		if controller := ResolveInfraFromEnv().Controller; controller != "" {
-			rep := NewControllerEventReporter(controller, modID)
-			_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
+        // Step 6: Wait for explicit upload event, then fetch planner plan.json from SeaweedFS
+        artifactPath := filepath.Join(workspace, "planner", "out", "plan.json")
+        if infra.SeaweedURL == "" || modID == "" {
+            return nil, fmt.Errorf("planner artifact fetch requires SeaweedFS URL and execution ID")
+        }
+        if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
+            return nil, fmt.Errorf("planner artifact path prep: %w", err)
+        }
+        key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
+        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        // Event-driven gating: wait until runner reports upload
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            // Be robust to message formatting: just require substrings
+            want := fmt.Sprintf("uploaded plan to mods/%s/planner/%s/plan.json", modID, runID)
+            _ = waitForStepContaining(controller, modID, "planner", want, ResolveDefaultsFromEnv().PlannerTimeout)
+        }
+        // Emit download attempt event with timing start
+        dlStart := time.Now()
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            rep := NewControllerEventReporter(controller, modID)
+            _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), JobName: runID, Time: time.Now()})
 		}
 		// Download with extended retry/backoff to avoid race with artifact upload
 		var dlErr error
@@ -497,16 +536,20 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			return nil, fmt.Errorf("reducer job failed: %w", err)
 		}
 
-		// Step 6: Fetch reducer next.json from SeaweedFS (align with planner fetch)
-		artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
-		if infra.SeaweedURL == "" {
-			return nil, fmt.Errorf("reducer artifact fetch requires SeaweedFS URL")
-		}
-		if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
-			return nil, fmt.Errorf("reducer artifact path prep: %w", err)
-		}
-		key := fmt.Sprintf("mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
-		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        // Step 6: Wait for explicit upload event, then fetch reducer next.json from SeaweedFS
+        artifactPath := filepath.Join(workspace, "reducer", "out", "next.json")
+        if infra.SeaweedURL == "" {
+            return nil, fmt.Errorf("reducer artifact fetch requires SeaweedFS URL")
+        }
+        if err := os.MkdirAll(filepath.Dir(artifactPath), 0755); err != nil {
+            return nil, fmt.Errorf("reducer artifact path prep: %w", err)
+        }
+        key := fmt.Sprintf("mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
+        url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+        if controller := ResolveInfraFromEnv().Controller; controller != "" {
+            want := fmt.Sprintf("uploaded next to mods/%s/reducer/%s/next.json", os.Getenv("MOD_ID"), runID)
+            _ = waitForStepContaining(controller, os.Getenv("MOD_ID"), "reducer", want, ResolveDefaultsFromEnv().ReducerTimeout)
+        }
 		dlStart := time.Now()
 		if controller := ResolveInfraFromEnv().Controller; controller != "" {
 			rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))

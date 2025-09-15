@@ -32,7 +32,10 @@ Quick filters
 Log collection tips
 - Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
 - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
-- Aggregated app/platform/builder logs: `APP_NAME=<name> [LANE=<A|C|E>] [SHA=<sha12>] [LINES=200] [TARGET_HOST=<ip>] ./tests/e2e/deploy/fetch-logs.sh`
+- Aggregated app/platform/builder logs:
+  - Basic: `APP_NAME=<name> [LANE=<A|C|E>] [SHA=<sha12>] [LINES=200] ./tests/e2e/deploy/fetch-logs.sh`
+  - With API builder logs + follow + files: `APP_NAME=<name> BUILD_ID=<id> LINES=2000 FOLLOW=false OUT_DIR=./e2e-logs ./tests/e2e/deploy/fetch-logs.sh`
+  - With SSH job-manager (fetch builder and app task logs from VPS): `APP_NAME=<name> TARGET_HOST=<ip> [LANE=<A|C|E>] [SHA=<sha12>] [LINES=2000] OUT_DIR=./e2e-logs ./tests/e2e/deploy/fetch-logs.sh`
 
 Test matrix (seed)
 | Lane | Stack   | Version | Repo                                         | Image Size | Build Time | Current State |
@@ -44,7 +47,7 @@ Test matrix (seed)
 | C    | Java    | 8       | https://github.com/<u>/ploy-lane-c-java-8    | —          | —          | pending       |
 | D    | Python  | 3.12    | https://github.com/<u>/ploy-lane-d-python-3.12 | —        | —          | pending       |
 | D    | Node    | 20      | https://github.com/<u>/ploy-lane-d-node-20   | —          | —          | pending       |
-| E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | —          | —          | pending       |
+| E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | —          | 23.5s      | passed        |
 | E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | —          | —          | pending       |
 | E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | —        | —          | pending       |
 | E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | —          | —          | pending       |
@@ -103,6 +106,24 @@ Cycle Key Takeaways
     - Lane E Kaniko image selection prefers the internal mirror by default when targeting Dev (`registry.dev.ployman.app/kaniko-executor:debug`), unless `PLOY_KANIKO_IMAGE` is explicitly set.
   - Next actions:
     - Verify `PLOY_KANIKO_IMAGE` on Dev and re-roll API env if needed; rerun Node 20 case and capture alloc events/logs; if DNS is the culprit, confirm dnsmasq and resolv.conf on the node and container.
+    
+ - Cycle: App name normalization and current Lane E status.
+   - Normalization: E2E harness now sanitizes app names to comply with API policy (only `[a-z0-9-]`); version dots (`1.22`, `3.12`) are replaced with hyphens. Example: `ploy-lane-e-go-1.22` → `ploy-lane-e-go-1-22`.
+   - Results:
+     - Node 20 (Lane E): passed; build ~23.5s; results recorded.
+     - Go 1.22 (Lane E): failing external health; Nomad shows two running allocations for job `ploy-lane-e-go-1-22-lane-e`, but controller probe reports `no running allocation endpoint`. Traefik tags present for host `ploy-lane-e-go-1-22.dev.ployd.app` and healthcheck path `/healthz`.
+     - Python 3.12 (Lane E): similar behavior; job status `running` with no successful health.
+   - Builder jobs: No running allocations found for `*-e-build-<sha12>` jobs via wrapper; likely build-to-deploy handoff uses registry image (`registry.dev.ployman.app/<app>:<sha>`) but Kaniko builder jobs are short-lived or not being submitted/retained.
+   - Next actions (Dev/VPS):
+     - Confirm Kaniko image mirror and env: `grep PLOY_KANIKO_IMAGE /home/ploy/api.env` should point to `registry.dev.ployman.app/kaniko-executor:debug`; re-roll API if changed.
+     - Inspect app allocs and checks:
+       - `ssh root@$TARGET_HOST; su - ploy`
+       - `/opt/hashicorp/bin/nomad-job-manager.sh allocs --job <app>-lane-e --format human`
+       - `ALLOC=$(/opt/hashicorp/bin/nomad-job-manager.sh running-alloc --job <app>-lane-e)`
+       - `/opt/hashicorp/bin/nomad-job-manager.sh alloc-status --alloc-id $ALLOC | jq .TaskStates["oci-kontain"].Events`
+       - `/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $ALLOC --task oci-kontain --both --lines 200`
+     - Verify container image exists in registry and entrypoint runs the app server for Go/Python autogen.
+     - Review Lane E autogen for Go/Python to ensure correct CMD/PORT and health path `/healthz`.
 
 Maintenance Rules
 - When a significant change to lane behavior, detection, or builders happens, update docs/LANES.md accordingly.
