@@ -396,40 +396,13 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 
 // SubmitReducerJob submits a reducer job to determine the next action
 func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error) {
-	// Test submitter path via JobSubmitter
-	if h.submitter != nil {
-		spec := JobSpec{
-			Name:    "reducer",
-			Type:    "reducer",
-			HCLPath: "",
-			EnvVars: map[string]string{
-				"PLAN_ID": planID,
-			},
-			Timeout: ResolveDefaultsFromEnv().ReducerTimeout,
-			Inputs: map[string]interface{}{
-				"workspace": workspace,
-				"results":   results,
-				"winner":    winner,
-			},
-		}
-		result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
-		if err != nil {
-			return nil, fmt.Errorf("reducer job failed: %w", err)
-		}
-		var nextAction NextAction
-		if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
-			return nil, fmt.Errorf("failed to parse reducer output: %w", err)
-		}
-		return &nextAction, nil
-	}
-
-	// Production implementation using real Nomad job submission
-	if h.runner != nil {
-		// Step 1: Render reducer assets
-		assets, err := h.runner.RenderReducerAssets()
-		if err != nil {
-			return nil, fmt.Errorf("failed to render reducer assets: %w", err)
-		}
+    // Prefer production implementation using real Nomad job submission when runner is provided
+    if h.runner != nil {
+        // Step 1: Render reducer assets
+        assets, err := h.runner.RenderReducerAssets()
+        if err != nil {
+            return nil, fmt.Errorf("failed to render reducer assets: %w", err)
+        }
 
 		// Step 2: Generate unique run ID for this reducer job
 		runID := ReducerRunID(planID)
@@ -512,8 +485,35 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 			_ = rep.Report(ctx, Event{Phase: "reducer", Step: "reducer", Level: "info", Message: "job completed", JobName: runID, Time: time.Now()})
 		}
 
-		return &nextAction, nil
-	}
+        return &nextAction, nil
+    }
+
+    // Fallback to test submitter path via JobSubmitter
+    if h.submitter != nil {
+        spec := JobSpec{
+            Name:    "reducer",
+            Type:    "reducer",
+            HCLPath: "",
+            EnvVars: map[string]string{
+                "PLAN_ID": planID,
+            },
+            Timeout: ResolveDefaultsFromEnv().ReducerTimeout,
+            Inputs: map[string]interface{}{
+                "workspace": workspace,
+                "results":   results,
+                "winner":    winner,
+            },
+        }
+        result, err := h.submitter.SubmitAndWaitTerminal(ctx, spec)
+        if err != nil {
+            return nil, fmt.Errorf("reducer job failed: %w", err)
+        }
+        var nextAction NextAction
+        if err := json.Unmarshal([]byte(result.Output), &nextAction); err != nil {
+            return nil, fmt.Errorf("failed to parse reducer output: %w", err)
+        }
+        return &nextAction, nil
+    }
 
 	// Fallback to test submitter path if runner is not provided
 	if h.submitter != nil {
