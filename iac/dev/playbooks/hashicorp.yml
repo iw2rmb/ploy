@@ -6,6 +6,11 @@
     - ../vars/main.yml
   
   tasks:
+    - name: Ensure hashicorp group exists (for compatibility)
+      group:
+        name: hashicorp
+        state: present
+
     - name: Create hashicorp user (alias to ploy for compatibility)
       user:
         name: ploy
@@ -603,28 +608,14 @@
           export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience (dev)"
 
-    - name: Deploy Traefik system job to Nomad
+    - name: Deploy Traefik system job to Nomad (Nomad-only; systemd Traefik disabled)
       block:
-        - name: Capture legacy Traefik systemd unit (for DNS env import)
-          stat:
-            path: /etc/systemd/system/traefik.service
-          register: traefik_unit_stat
-
-        - name: Read legacy Traefik systemd unit
-          slurp:
-            path: /etc/systemd/system/traefik.service
-          register: traefik_unit_content
-          when: traefik_unit_stat.stat.exists
-
-        - name: Extract Namecheap envs from legacy unit into vars (do not overwrite if already set)
-          set_fact:
-            vault_namecheap_api_user: "{{ (vault_namecheap_api_user | default('')) | ternary(vault_namecheap_api_user, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_API_USER=([^\"]*)\"', '\\1') | default(''))) }}"
-            vault_namecheap_api_key: "{{ (vault_namecheap_api_key | default('')) | ternary(vault_namecheap_api_key, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_API_KEY=([^\"]*)\"', '\\1') | default(''))) }}"
-            vault_namecheap_username: "{{ (vault_namecheap_username | default('')) | ternary(vault_namecheap_username, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_USERNAME=([^\"]*)\"', '\\1') | default(''))) }}"
-            vault_namecheap_client_ip: "{{ (vault_namecheap_client_ip | default('')) | ternary(vault_namecheap_client_ip, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_CLIENT_IP=([^\"]*)\"', '\\1') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address']))) }}"
-            vault_namecheap_sandbox: "{{ (vault_namecheap_sandbox | default('')) | ternary(vault_namecheap_sandbox, (traefik_unit_content.content | b64decode | regex_search('Environment=\"NAMECHEAP_SANDBOX=([^\"]*)\"', '\\1') | default('false'))) }}"
-          when: traefik_unit_stat.stat.exists
-          no_log: true
+        - name: Ensure systemd Traefik service is stopped and disabled (Nomad-only)
+          systemd:
+            name: traefik
+            state: stopped
+            enabled: false
+          ignore_errors: true
 
         - name: Check if Traefik is already installed
           stat:
@@ -653,6 +644,20 @@
             status_code: [200, 404]
           register: traefik_job_check
           ignore_errors: true
+
+        - name: Check Traefik allocations count (when job exists)
+          uri:
+            url: "http://localhost:4646/v1/job/traefik-system/allocations"
+            method: GET
+            status_code: 200
+          register: traefik_allocs
+          when: traefik_job_check.status == 200
+          ignore_errors: true
+
+        - name: Set flag to (re)submit Traefik when no allocations
+          set_fact:
+            traefik_needs_submit: true
+          when: traefik_job_check.status == 404 or (traefik_allocs.json is defined and (traefik_allocs.json | length) == 0)
 
         - name: Assert Nomad client meta is set for Traefik placement
           block:
@@ -717,12 +722,12 @@
           environment:
             NOMAD_ADDR: "http://localhost:4646"
 
-        - name: Submit Traefik system job to Nomad (if not running)
+        - name: Submit Traefik system job to Nomad (initial or recover)
           shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job traefik-system --file /opt/hashicorp/nomad/jobs/traefik-system.hcl
           register: traefik_job_submit
           environment:
             NOMAD_ADDR: "http://localhost:4646"
-          when: traefik_job_check.status == 404
+          when: traefik_needs_submit | default(false)
 
         - name: Wait for Traefik service to be healthy
           shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job traefik-system --timeout 180
@@ -730,7 +735,7 @@
             NOMAD_ADDR: "http://localhost:4646"
           register: traefik_wait_result
           failed_when: traefik_wait_result.rc != 0
-          when: traefik_job_check.status == 404
+          when: traefik_needs_submit | default(false)
 
         - name: Verify Traefik is accessible
           uri:
