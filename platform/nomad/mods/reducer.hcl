@@ -12,6 +12,11 @@ job "mods-reducer" {
       }
       env = {
         RUN_ID = "${RUN_ID}"
+        CONTROLLER_URL = "${CONTROLLER_URL}"
+        MOD_ID = "${MOD_ID}"
+        PLOY_SEAWEEDFS_URL = "${PLOY_SEAWEEDFS_URL}"
+        CONTEXT_DIR  = "${NOMAD_TASK_DIR}/context"
+        OUTPUT_DIR   = "${NOMAD_TASK_DIR}/out"
       }
       template {
         data        = "# keep reducer out dir"

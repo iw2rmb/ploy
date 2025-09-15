@@ -223,6 +223,20 @@ elif [[ "$RUN_ID_STR" == *"reducer"* ]]; then
 }
 EOF
   log "Wrote next.json to $OUT_DIR"
+  # Upload reducer next.json to SeaweedFS for controller collection (log HTTP status)
+  if [ -s "$OUT_DIR/next.json" ] && [ -n "$SEAWEEDFS_URL" ] && [ -n "$MOD_ID_ENV" ] && [ -n "$RUN_ID_STR" ]; then
+    KEY="mods/${MOD_ID_ENV}/reducer/${RUN_ID_STR}/next.json"
+    URL="${SEAWEEDFS_URL%/}/artifacts/${KEY}"
+    log "Uploading next.json to $URL"
+    HTTP_CODE=$(curl "${CURL_OPTS[@]}" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/next.json" "$URL" -o /tmp/next_upload.out || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ] || [ "$HTTP_CODE" = "204" ]; then
+      post_event "info" "reducer" "reducer" "uploaded next to ${KEY} (status ${HTTP_CODE})"
+    else
+      ERR_MSG=$(tr -d '\r' </tmp/next_upload.out | head -c 300)
+      post_event "error" "reducer" "reducer" "next upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+    fi
+    rm -f /tmp/next_upload.out || true
+  fi
 elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   log "Detected llm-exec run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "llm-exec" "llm-exec" "job started"
