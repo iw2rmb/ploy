@@ -305,10 +305,8 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 		done := make(chan error, 1)
 		go func() { done <- waitTerminalWithJobManager(name, timeout) }()
 		select {
-		case err := <-done:
-			// Best-effort: deregister job after terminal state to avoid lingering registrations
-			_ = stopWithJobManager(name)
-			return err
+        case err := <-done:
+            return err
 		case <-ctx.Done():
 			// Best-effort stop via wrapper
 			_ = stopWithJobManager(name)
@@ -382,30 +380,22 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 				sawRunning = true
 			}
 		}
-		if sawComplete {
-			// Cleanup job registration on success
-			_, _, _ = client.Jobs().Deregister(name, true, nil)
-			return nil
-		}
-		if !sawRunning && failedID != "" {
-			// Cleanup job registration on failure
-			_, _, _ = client.Jobs().Deregister(name, true, nil)
-			return fmt.Errorf("job %s allocation failed (%s)", name, failedID)
-		}
-		if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
-			// Cleanup job registration when placement fails
-			_, _, _ = client.Jobs().Deregister(name, true, nil)
-			return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
-		}
+        if sawComplete {
+            return nil
+        }
+        if !sawRunning && failedID != "" {
+            return fmt.Errorf("job %s allocation failed (%s)", name, failedID)
+        }
+        if !sawAnyAllocs && time.Since(start) > allocAppearGuard {
+            return fmt.Errorf("no allocations created for job %s within %s (check job evaluations/constraints)", name, allocAppearGuard)
+        }
 		if !sawRunning && len(allocs) > 0 {
 			// Allocations exist but none running and none complete/failed; give them time
 			_ = allocs // no-op to satisfy staticcheck
 		}
 		// Do not sleep here; blocking query already waited. Loop continues.
 	}
-	// Cleanup on timeout as well
-	_, _, _ = client.Jobs().Deregister(name, true, nil)
-	return fmt.Errorf("timeout waiting for job %s to complete", name)
+    return fmt.Errorf("timeout waiting for job %s to complete", name)
 }
 
 // stopWithJobManager attempts to stop/deregister a job via the wrapper
