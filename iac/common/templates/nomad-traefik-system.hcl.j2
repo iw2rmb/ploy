@@ -106,7 +106,7 @@ job "traefik-system" {
         image = "traefik:v{{ traefik_version }}"
         network_mode = "host"
         
-        ports = ["http", "https", "admin", "metrics", "traefik"]
+        ports = ["http", "https", "admin", "metrics", "traefik", "acme"]
         
         args = [
           "--global.checkNewVersion=false",
@@ -125,8 +125,10 @@ job "traefik-system" {
           "--providers.consulcatalog=true",
           "--providers.consulcatalog.prefix=traefik",
           "--providers.consulcatalog.exposedByDefault=false",
-          "--providers.consulcatalog.endpoint.address=127.0.0.1:8500",
+          "--providers.consulcatalog.endpoint.address=*********:8500",
           "--providers.consulcatalog.endpoint.scheme=http",
+          # Enable default TLS for Consul Catalog services on websecure entrypoint
+          "--providers.consulcatalog.defaultRule=HostRegexp(`{service:[a-z0-9-]+}.{domain:.+}`)",
           # Token is provided via CONSUL_HTTP_TOKEN environment variable when Consul ACLs are enabled
           "--providers.file.filename=/data/dynamic-config.yml",
           "--providers.file.watch=true",
@@ -154,7 +156,7 @@ job "traefik-system" {
           "--certificatesresolvers.apps-wildcard.acme.email={{ ploy_dev_apps_certificate.email | default('admin@ployd.app') }}",
           "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
           # HTTP to HTTPS redirect
           "--entrypoints.web.http.redirections.entrypoint.to=websecure",
           "--entrypoints.web.http.redirections.entrypoint.scheme=https"
@@ -180,14 +182,14 @@ job "traefik-system" {
         CONSUL_HTTP_TOKEN = "{{ vault_consul_http_token | default(lookup('env', 'CONSUL_HTTP_TOKEN') | default('')) }}"
         
         # Namecheap DNS provider for Let's Encrypt ACME challenges
-        NAMECHEAP_API_USER = "{{ vault_namecheap_api_user | default(lookup('env', 'NAMECHEAP_API_USER') | default('')) }}"
-        NAMECHEAP_API_KEY = "{{ vault_namecheap_api_key | default(lookup('env', 'NAMECHEAP_API_KEY') | default('')) }}"
-        NAMECHEAP_SANDBOX = "{{ vault_namecheap_sandbox | default(lookup('env', 'NAMECHEAP_SANDBOX') | default('false')) }}"
+        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default(vault_namecheap_api_user | default('')) }}"
+        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default(vault_namecheap_api_key | default('')) }}"
+        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default(vault_namecheap_sandbox | default('false')) }}"
         
         # DNS challenge configuration
         ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
-        NAMECHEAP_CLIENT_IP = "{{ vault_namecheap_client_ip | default(lookup('env', 'NAMECHEAP_CLIENT_IP') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address'])) }}"
-        NAMECHEAP_USERNAME = "{{ vault_namecheap_username | default(lookup('env', 'NAMECHEAP_USERNAME') | default('')) }}"
+        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(vault_namecheap_client_ip | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address'])) }}"
+        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default(vault_namecheap_username | default('')) }}"
       }
       
       resources {
