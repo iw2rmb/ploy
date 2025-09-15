@@ -18,6 +18,7 @@ type buildLogsResponse struct {
     Job     string `json:"job,omitempty"`
     AllocID string `json:"alloc_id,omitempty"`
     AllocStatus string `json:"alloc_status,omitempty"`
+    Allocs  string `json:"allocs,omitempty"`
     Lines   int    `json:"lines"`
     Logs    string `json:"logs"`
     Message string `json:"message,omitempty"`
@@ -58,12 +59,26 @@ func (s *Server) handleBuildLogs(c *fiber.Ctx) error {
 	// Resolve running allocation for the builder job via the wrapper
     alloc := runJobMgr("running-alloc", job)
     if alloc == "" {
-        // Best-effort: return allocs short list for visibility
-        allocs := runJobMgr("allocs-human", job)
-        resp.Logs = allocs
-        return c.JSON(resp)
+        if st.Message != "" {
+            if u := extractUUID(st.Message); u != "" {
+                alloc = u
+            }
+        }
+        // Try to get the most recent alloc ID from JSON list (even if not running)
+        if ids := getAllocIDs(job); len(ids) > 0 {
+            alloc = ids[0]
+        }
+        if alloc == "" {
+            // Best-effort: return allocs short list for visibility
+            allocs := runJobMgr("allocs-human", job)
+            resp.Logs = allocs
+            return c.JSON(resp)
+        }
     }
     resp.AllocID = alloc
+    if aj := runJobMgr("allocs-json", job); aj != "" {
+        resp.Allocs = aj
+    }
     resp.Logs = runJobMgrLogs(alloc, lines)
     // Include allocation status snapshot for quick diagnosis
     if st := runJobMgrAllocStatus(alloc); st != "" {
@@ -114,6 +129,8 @@ func runJobMgr(cmd string, job string) string {
         c = exec.Command(wrapper, "running-alloc", "--job", job)
     case "allocs-human":
         c = exec.Command(wrapper, "allocs", "--job", job, "--format", "human")
+    case "allocs-json":
+        c = exec.Command(wrapper, "allocs", "--job", job, "--format", "json")
     default:
         return ""
     }
@@ -148,6 +165,27 @@ func extractUUID(s string) string {
     // match RFC4122-like UUIDs
     re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
     return re.FindString(s)
+}
+
+func getAllocIDs(job string) []string {
+    out := runJobMgr("allocs-json", job)
+    if out == "" {
+        return nil
+    }
+    type alloc struct{ ID string `json:"ID"` }
+    var a []alloc
+    if err := json.Unmarshal([]byte(out), &a); err != nil {
+        // Fallback to regex: return all UUIDs found (first-most recent not guaranteed)
+        re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+        return re.FindAllString(out, -1)
+    }
+    ids := make([]string, 0, len(a))
+    for _, e := range a {
+        if e.ID != "" {
+            ids = append(ids, e.ID)
+        }
+    }
+    return ids
 }
 
 func runCmdTimeout(cmd *exec.Cmd, timeout time.Duration) (string, error) {
