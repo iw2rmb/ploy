@@ -8,6 +8,7 @@ job "mods-reducer" {
       config {
         image = "${REDUCER_IMAGE}"
         force_pull = true
+        network_mode = "host"
       }
       env = {
         RUN_ID = "${RUN_ID}"
