@@ -154,13 +154,6 @@ job "traefik-system" {
           "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
           "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
-          # Dev wildcard certificate resolver (alias to apps-wildcard) - ADDED FOR COMPATIBILITY
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge=true",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.dev-wildcard.acme.email=admin@ployd.app",
-          "--certificatesresolvers.dev-wildcard.acme.storage=/data/apps-acme.json",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.dev-wildcard.acme.dnschallenge.resolvers=*******:53,*******:53",
           # HTTP to HTTPS redirect
           "--entrypoints.web.http.redirections.entrypoint.to=websecure",
           "--entrypoints.web.http.redirections.entrypoint.scheme=https"

@@ -18,6 +18,8 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Dev IaC: remove Traefik `dev-wildcard` ACME resolver and stop managing `/opt/ploy/traefik-data/dev-wildcard-acme.json`; `apps-wildcard` is now the sole wildcard resolver for dev.
+- API platform deploys: switch TLS certresolver from `dev-wildcard` to `platform-wildcard` for `*.dev.ployman.app` routes.
 - Traefik (Nomad-only): Update system job template to load dynamic config from `/data/dynamic-config.yml` and remove the read-only `/etc/traefik/*` bind mount that caused container start failures. This aligns the file provider path with the mounted host volume `/opt/ploy/traefik-data`.
 - Traefik: Ensure ACME resolvers remain in static configuration (CLI args) and clean up dynamic config to not duplicate `certificatesResolvers` (avoids early “nonexistent resolver” warnings).
 - API env: Include `PLOY_PLATFORM_DOMAIN` in `/home/ploy/api.env` with a sensible default (`dev.ployman.app`) so platform domain is persisted on the VPS and available to API processes.
