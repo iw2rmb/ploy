@@ -18,8 +18,11 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
-- E2E deploy docs: expanded tests/e2e/deploy/README.md with quick subtest filters and log collection tips (controller/Traefik endpoints and fetch-logs.sh usage). Updated ongoing TLS investigation notes and matrix guidance.
-- E2E harness: results writer now uses repo-root-relative paths to ensure results.jsonl/results.md are appended regardless of package working directory. Added a targeted test (TestWriteResultPaths) under the e2e tag to validate this behavior.
+- E2E log helpers:
+  - tests/e2e/deploy/fetch-logs.sh now supports `BUILD_ID`, `FOLLOW`, and `OUT_DIR`, writes logs to files when `OUT_DIR` is set, includes builder logs via API, and optionally tails app task logs via SSH job-manager. Platform logs accept `follow`.
+  - tests/mods/orw-apply-llm-plan-seq/collect-logs.sh adds `FOLLOW_SECONDS` to capture longer SSE streams, optional `TARGET_HOST` to fetch `last_job` allocation logs via SSH job-manager, and optional gzip compression for large files.
+- E2E deploy docs: expanded tests/e2e/deploy/README.md with quick subtest filters and log collection tips (controller/Traefik endpoints and fetch-logs.sh usage). Updated ongoing TLS investigation notes and matrix guidance. Documented app-name normalization and current Lane E Go/Python findings.
+- E2E harness: results writer now uses repo-root-relative paths to ensure results.jsonl/results.md are appended regardless of package working directory. Added a targeted test (TestWriteResultPaths) under the e2e tag to validate this behavior. Also sanitize app names in E2E to comply with API name policy (replace dots with hyphens, restrict to [a-z0-9-]).
 - Dev IaC: remove Traefik `dev-wildcard` ACME resolver and stop managing `/opt/ploy/traefik-data/dev-wildcard-acme.json`; `apps-wildcard` is now the sole wildcard resolver for dev.
 - API platform deploys: switch TLS certresolver from `dev-wildcard` to `platform-wildcard` for `*.dev.ployman.app` routes.
 - Traefik (Nomad-only): Update system job template to load dynamic config from `/data/dynamic-config.yml` and remove the read-only `/etc/traefik/*` bind mount that caused container start failures. This aligns the file provider path with the mounted host volume `/opt/ploy/traefik-data`.
