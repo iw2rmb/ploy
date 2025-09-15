@@ -3,8 +3,12 @@ package mods
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
@@ -57,6 +61,16 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 
 	if result != nil && !result.Success {
+		// Attempt to fetch build logs to enrich error for downstream healing
+		logs := fetchBuildLogs(b.controllerURL, config.App, result.DeploymentID)
+		if logs != "" {
+			tail := logs
+			if len(tail) > 2000 {
+				tail = tail[len(tail)-2000:]
+			}
+			// Append logs tail to result.Message
+			result.Message = strings.TrimSpace(result.Message + "\n" + tail)
+		}
 		if modID := os.Getenv("MOD_ID"); modID != "" {
 			rep := NewControllerEventReporter(b.controllerURL, modID)
 			_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "error", Message: fmt.Sprintf("unsuccessful: %s", result.Message)})
@@ -70,6 +84,33 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 	log.Printf("[Mods Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
+}
+
+// fetchBuildLogs best-effort fetches recent build logs from the controller for a given deployment ID
+func fetchBuildLogs(controller, app, id string) string {
+	if controller == "" || app == "" || id == "" {
+		return ""
+	}
+	// Normalize base and construct URL: /v1/apps/:app/builds/:id/logs?lines=400
+	base := strings.TrimRight(controller, "/")
+	url := fmt.Sprintf("%s/apps/%s/builds/%s/logs?lines=1200", base, app, id)
+	client := &http.Client{Timeout: 20 * time.Second}
+	req, _ := http.NewRequest(http.MethodGet, url, nil)
+	resp, err := client.Do(req)
+	if err != nil || resp == nil || resp.Body == nil {
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	b, _ := io.ReadAll(resp.Body)
+	// Cap to a generous tail to keep payloads bounded
+	s := string(b)
+	if len(s) > 8000 {
+		return s[len(s)-8000:]
+	}
+	return s
 }
 
 // TestModeBuildChecker implements build checking for testing without external dependencies

@@ -1,0 +1,15 @@
+MOD_ID: mod-620dacaf
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+failed, phase=build
+build check failed after healing: maven build failed: exit status 1
+
+last_job=plan-1757969532-reducer-1757969537
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-620dacaf/branches/llm-1/steps/llm-exec-llm-1-1757969532/diff.patch
+mods/mod-620dacaf/planner/java11to17-orw-llm-planner-1757969528/plan.json

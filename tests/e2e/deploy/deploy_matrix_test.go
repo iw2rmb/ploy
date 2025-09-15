@@ -85,19 +85,19 @@ func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asy
 	}
 	defer os.RemoveAll(work)
 	run(t, work, 20*time.Second, "git", "clone", "--depth", "1", "--branch", "main", repo, "app")
-    // Push with ploy CLI; for Lane E, opt-in Dockerfile autogen via env
-    cmd := exec.Command(bin(), "push", "-a", app, "-lane", lane)
-    cmd.Dir = filepath.Join(work, "app")
-    // E2E helper: for Python minimal apps without Dockerfile, write a basic Dockerfile client-side
-    if strings.ToUpper(lane) == "E" {
-        // quick heuristic: app.py at repo root
-        if _, err := os.Stat(filepath.Join(cmd.Dir, "app.py")); err == nil {
-            df := filepath.Join(cmd.Dir, "Dockerfile")
-            if _, err := os.Stat(df); os.IsNotExist(err) {
-                _ = os.WriteFile(df, []byte("FROM python:3.12-slim\nWORKDIR /app\nENV PYTHONDONTWRITEBYTECODE=1 \\\n+    PYTHONUNBUFFERED=1 \\\n+    PYTHONPATH=/app \\\n+    PORT=8080\nCOPY . .\nRUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true\nEXPOSE 8080\nCMD [\"python\",\"app.py\"]\n"), 0644)
-            }
-        }
-    }
+	// Push with ploy CLI; for Lane E, opt-in Dockerfile autogen via env
+	cmd := exec.Command(bin(), "push", "-a", app, "-lane", lane)
+	cmd.Dir = filepath.Join(work, "app")
+	// E2E helper: for Python minimal apps without Dockerfile, write a basic Dockerfile client-side
+	if strings.ToUpper(lane) == "E" {
+		// quick heuristic: app.py at repo root
+		if _, err := os.Stat(filepath.Join(cmd.Dir, "app.py")); err == nil {
+			df := filepath.Join(cmd.Dir, "Dockerfile")
+			if _, err := os.Stat(df); os.IsNotExist(err) {
+				_ = os.WriteFile(df, []byte("FROM python:3.12-slim\nWORKDIR /app\nENV PYTHONDONTWRITEBYTECODE=1 \\\n+    PYTHONUNBUFFERED=1 \\\n+    PYTHONPATH=/app \\\n+    PORT=8080\nCOPY . .\nRUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true\nEXPOSE 8080\nCMD [\"python\",\"app.py\"]\n"), 0644)
+			}
+		}
+	}
 	env := append(os.Environ(), fmt.Sprintf("PLOY_CONTROLLER=%s", controller))
 	// Prefer async to retrieve build metrics via status endpoint
 	env = append(env, "PLOY_ASYNC=1")
@@ -120,27 +120,35 @@ func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asy
 	}
 	// Compute image size from registry if metrics missing or imageSize zero
 	sha := gitHead(t, filepath.Join(work, "app"))
-    if (metrics == nil || !hasPositiveImageSize(metrics)) && sha != "" {
-        if tag := deriveImageTagFromMetricsOrGuess(metrics, app, sha); tag != "" {
-            if bytes, mb, ok := fetchImageSizeFromRegistry(tag); ok {
-                if metrics == nil {
-                    metrics = map[string]any{}
-                }
-                metrics["imageSize"] = map[string]any{"bytes": float64(bytes), "mb": mb}
-            }
-            // Try to fetch uncompressed size via local Docker, then remote Docker via SSH (TARGET_HOST)
-            if ub, umb, ok := fetchUncompressedSizeDocker(tag); ok || func() bool { if ok { return true }; ub, umb, ok = fetchUncompressedSizeRemoteDocker(tag); return ok }() {
-                if metrics == nil {
-                    metrics = map[string]any{}
-                }
-                im, _ := metrics["imageSize"].(map[string]any)
-                if im == nil { im = map[string]any{} }
-                im["uncompressed_bytes"] = float64(ub)
-                im["uncompressed_mb"] = umb
-                metrics["imageSize"] = im
-            }
-        }
-    }
+	if (metrics == nil || !hasPositiveImageSize(metrics)) && sha != "" {
+		if tag := deriveImageTagFromMetricsOrGuess(metrics, app, sha); tag != "" {
+			if bytes, mb, ok := fetchImageSizeFromRegistry(tag); ok {
+				if metrics == nil {
+					metrics = map[string]any{}
+				}
+				metrics["imageSize"] = map[string]any{"bytes": float64(bytes), "mb": mb}
+			}
+			// Try to fetch uncompressed size via local Docker, then remote Docker via SSH (TARGET_HOST)
+			if ub, umb, ok := fetchUncompressedSizeDocker(tag); ok || func() bool {
+				if ok {
+					return true
+				}
+				ub, umb, ok = fetchUncompressedSizeRemoteDocker(tag)
+				return ok
+			}() {
+				if metrics == nil {
+					metrics = map[string]any{}
+				}
+				im, _ := metrics["imageSize"].(map[string]any)
+				if im == nil {
+					im = map[string]any{}
+				}
+				im["uncompressed_bytes"] = float64(ub)
+				im["uncompressed_mb"] = umb
+				metrics["imageSize"] = im
+			}
+		}
+	}
 	// Optional: collect logs proactively when requested
 	if os.Getenv("E2E_LOG_CONFIG") == "1" {
 		collectDeployLogs(t, controller, app, lane, sha, id)
@@ -304,54 +312,54 @@ func fetchImageSizeFromRegistry(tag string) (bytes int64, mb float64, ok bool) {
 }
 
 func fetchUncompressedSizeDocker(tag string) (bytes int64, mb float64, ok bool) {
-    // Check docker binary presence quickly
-    if _, err := exec.LookPath("docker"); err != nil {
-        return 0, 0, false
-    }
-    // docker inspect requires daemon reachable; best-effort
-    cmd := exec.Command("docker", "inspect", "--format", "{{.Size}}", tag)
-    out, err := runWithTimeout(cmd, 10*time.Second)
-    if err != nil {
-        return 0, 0, false
-    }
-    s := strings.TrimSpace(string(out))
-    if s == "" {
-        return 0, 0, false
-    }
-    // Parse integer bytes
-    var n int64
-    if _, e := fmt.Sscanf(s, "%d", &n); e != nil {
-        return 0, 0, false
-    }
-    if n <= 0 {
-        return 0, 0, false
-    }
-    return n, float64(n) / (1024 * 1024), true
+	// Check docker binary presence quickly
+	if _, err := exec.LookPath("docker"); err != nil {
+		return 0, 0, false
+	}
+	// docker inspect requires daemon reachable; best-effort
+	cmd := exec.Command("docker", "inspect", "--format", "{{.Size}}", tag)
+	out, err := runWithTimeout(cmd, 10*time.Second)
+	if err != nil {
+		return 0, 0, false
+	}
+	s := strings.TrimSpace(string(out))
+	if s == "" {
+		return 0, 0, false
+	}
+	// Parse integer bytes
+	var n int64
+	if _, e := fmt.Sscanf(s, "%d", &n); e != nil {
+		return 0, 0, false
+	}
+	if n <= 0 {
+		return 0, 0, false
+	}
+	return n, float64(n) / (1024 * 1024), true
 }
 
 func fetchUncompressedSizeRemoteDocker(tag string) (bytes int64, mb float64, ok bool) {
-    host := os.Getenv("TARGET_HOST")
-    if host == "" {
-        return 0, 0, false
-    }
-    // ssh to VPS and run docker inspect
-    cmd := exec.Command("ssh", "-o", "ConnectTimeout=10", "root@"+host, "docker", "inspect", "--format", "{{.Size}}", tag)
-    out, err := runWithTimeout(cmd, 10*time.Second)
-    if err != nil {
-        return 0, 0, false
-    }
-    s := strings.TrimSpace(string(out))
-    if s == "" {
-        return 0, 0, false
-    }
-    var n int64
-    if _, e := fmt.Sscanf(s, "%d", &n); e != nil {
-        return 0, 0, false
-    }
-    if n <= 0 {
-        return 0, 0, false
-    }
-    return n, float64(n) / (1024 * 1024), true
+	host := os.Getenv("TARGET_HOST")
+	if host == "" {
+		return 0, 0, false
+	}
+	// ssh to VPS and run docker inspect
+	cmd := exec.Command("ssh", "-o", "ConnectTimeout=10", "root@"+host, "docker", "inspect", "--format", "{{.Size}}", tag)
+	out, err := runWithTimeout(cmd, 10*time.Second)
+	if err != nil {
+		return 0, 0, false
+	}
+	s := strings.TrimSpace(string(out))
+	if s == "" {
+		return 0, 0, false
+	}
+	var n int64
+	if _, e := fmt.Sscanf(s, "%d", &n); e != nil {
+		return 0, 0, false
+	}
+	if n <= 0 {
+		return 0, 0, false
+	}
+	return n, float64(n) / (1024 * 1024), true
 }
 
 func waitAsync(t *testing.T, controller, app, lane, id string, dur time.Duration) map[string]any {
@@ -386,77 +394,77 @@ func waitAsync(t *testing.T, controller, app, lane, id string, dur time.Duration
 }
 
 func waitHealth(controller, app string, dur time.Duration) error {
-    base := fmt.Sprintf("https://%s.dev.ployd.app/healthz", app)
-    deadline := time.Now().Add(dur)
-    statusURL := ""
-    if controller != "" {
-        statusURL = fmt.Sprintf("%s/apps/%s/status", strings.TrimRight(controller, "/"), app)
-    }
-    for time.Now().Before(deadline) {
-        // Prefer event-driven status when available
-        if statusURL != "" {
-            if r, e := http.Get(statusURL); e == nil && r.StatusCode == 200 {
-                var s map[string]any
-                _ = json.NewDecoder(r.Body).Decode(&s)
-                r.Body.Close()
-                if allocs, ok := s["allocations"].([]any); ok && len(allocs) > 0 {
-                    // Look for healthy or failing signals
-                    healthy := false
-                    failing := false
-                    for _, a := range allocs {
-                        if m, ok := a.(map[string]any); ok {
-                            if cs, _ := m["client_status"].(string); cs == "running" {
-                                healthy = true
-                            }
-                            if tasks, ok := m["tasks"].([]any); ok {
-                                for _, t := range tasks {
-                                    if tm, ok := t.(map[string]any); ok {
-                                        if fv, _ := tm["failed"].(bool); fv {
-                                            failing = true
-                                        }
-                                        if evs, ok := tm["events"].([]any); ok {
-                                            for _, ev := range evs {
-                                                if evm, ok := ev.(map[string]any); ok {
-                                                    // Heuristic: "Alloc Unhealthy", "Killing", "Failed" → failing
-                                                    if typ, _ := evm["type"].(string); typ == "Alloc Unhealthy" || typ == "Killing" || typ == "Failed" {
-                                                        failing = true
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if failing {
-                        return fmt.Errorf("health failed by alloc events")
-                    }
-                    if healthy {
-                        // Optionally confirm via controller-proxied probe once
-                        probe := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
-                        if pr, pe := http.Get(probe); pe == nil {
-                            var pm map[string]any
-                            _ = json.NewDecoder(pr.Body).Decode(&pm)
-                            pr.Body.Close()
-                            if code, ok := pm["code"].(float64); ok && int(code) == 200 {
-                                return nil
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // External healthz as a fallback
-        if resp, err := http.Get(base); err == nil {
-            resp.Body.Close()
-            if resp.StatusCode == 200 {
-                return nil
-            }
-        }
-        time.Sleep(1 * time.Second)
-    }
-    return fmt.Errorf("health check failed: %s", base)
+	base := fmt.Sprintf("https://%s.dev.ployd.app/healthz", app)
+	deadline := time.Now().Add(dur)
+	statusURL := ""
+	if controller != "" {
+		statusURL = fmt.Sprintf("%s/apps/%s/status", strings.TrimRight(controller, "/"), app)
+	}
+	for time.Now().Before(deadline) {
+		// Prefer event-driven status when available
+		if statusURL != "" {
+			if r, e := http.Get(statusURL); e == nil && r.StatusCode == 200 {
+				var s map[string]any
+				_ = json.NewDecoder(r.Body).Decode(&s)
+				r.Body.Close()
+				if allocs, ok := s["allocations"].([]any); ok && len(allocs) > 0 {
+					// Look for healthy or failing signals
+					healthy := false
+					failing := false
+					for _, a := range allocs {
+						if m, ok := a.(map[string]any); ok {
+							if cs, _ := m["client_status"].(string); cs == "running" {
+								healthy = true
+							}
+							if tasks, ok := m["tasks"].([]any); ok {
+								for _, t := range tasks {
+									if tm, ok := t.(map[string]any); ok {
+										if fv, _ := tm["failed"].(bool); fv {
+											failing = true
+										}
+										if evs, ok := tm["events"].([]any); ok {
+											for _, ev := range evs {
+												if evm, ok := ev.(map[string]any); ok {
+													// Heuristic: "Alloc Unhealthy", "Killing", "Failed" → failing
+													if typ, _ := evm["type"].(string); typ == "Alloc Unhealthy" || typ == "Killing" || typ == "Failed" {
+														failing = true
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					if failing {
+						return fmt.Errorf("health failed by alloc events")
+					}
+					if healthy {
+						// Optionally confirm via controller-proxied probe once
+						probe := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
+						if pr, pe := http.Get(probe); pe == nil {
+							var pm map[string]any
+							_ = json.NewDecoder(pr.Body).Decode(&pm)
+							pr.Body.Close()
+							if code, ok := pm["code"].(float64); ok && int(code) == 200 {
+								return nil
+							}
+						}
+					}
+				}
+			}
+		}
+		// External healthz as a fallback
+		if resp, err := http.Get(base); err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				return nil
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return fmt.Errorf("health check failed: %s", base)
 }
 
 // timeBudgets derives phase budgets from the test deadline to honor -timeout.
@@ -525,35 +533,35 @@ func writeResult(t *testing.T, lane, repo, app string, metrics map[string]any) {
 	b = append(b, '\n')
 	_, _ = f.Write(b)
 
-    // Also append a human-friendly Markdown row to results.md with size/time if available
-    md := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.md"))
-    var szMB, uncompressedMB, durMS string
-    if metrics != nil {
-        if im, ok := metrics["imageSize"].(map[string]any); ok {
-            if v, ok := im["mb"].(float64); ok {
-                szMB = fmt.Sprintf("%.1fMB", v)
-            }
-            if v, ok := im["uncompressed_mb"].(float64); ok {
-                uncompressedMB = fmt.Sprintf("%.1fMB", v)
-            }
-        }
-        if bm, ok := metrics["build"].(map[string]any); ok {
-            if v, ok := bm["duration_ms"].(float64); ok {
-                durMS = fmt.Sprintf("%.1fs", v/1000.0)
-            }
-        }
-    }
-    if szMB == "" {
-        szMB = "—"
-    }
-    if uncompressedMB == "" {
-        uncompressedMB = "—"
-    }
-    if durMS == "" {
-        durMS = "—"
-    }
-    row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n", lane, inferStack(repo), inferVersion(repo), repo, szMB, uncompressedMB, durMS)
-    _ = appendFile(md, row)
+	// Also append a human-friendly Markdown row to results.md with size/time if available
+	md := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.md"))
+	var szMB, uncompressedMB, durMS string
+	if metrics != nil {
+		if im, ok := metrics["imageSize"].(map[string]any); ok {
+			if v, ok := im["mb"].(float64); ok {
+				szMB = fmt.Sprintf("%.1fMB", v)
+			}
+			if v, ok := im["uncompressed_mb"].(float64); ok {
+				uncompressedMB = fmt.Sprintf("%.1fMB", v)
+			}
+		}
+		if bm, ok := metrics["build"].(map[string]any); ok {
+			if v, ok := bm["duration_ms"].(float64); ok {
+				durMS = fmt.Sprintf("%.1fs", v/1000.0)
+			}
+		}
+	}
+	if szMB == "" {
+		szMB = "—"
+	}
+	if uncompressedMB == "" {
+		uncompressedMB = "—"
+	}
+	if durMS == "" {
+		durMS = "—"
+	}
+	row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n", lane, inferStack(repo), inferVersion(repo), repo, szMB, uncompressedMB, durMS)
+	_ = appendFile(md, row)
 }
 
 func inferStack(repo string) string {
@@ -631,13 +639,13 @@ func fetchLogs(t *testing.T, app, lane, sha string) {
 		t.Logf("fetch-logs.sh not found: %v", err)
 		return
 	}
-    cmd := exec.Command("bash", script)
-    cmd.Env = append(os.Environ(),
-        "APP_NAME="+app,
-        "LANE="+lane,
-        "SHA="+sha,
-        "LINES=200",
-    )
+	cmd := exec.Command("bash", script)
+	cmd.Env = append(os.Environ(),
+		"APP_NAME="+app,
+		"LANE="+lane,
+		"SHA="+sha,
+		"LINES=200",
+	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Logf("fetch-logs.sh error: %v", err)
@@ -691,16 +699,16 @@ func fetchBuilderLogsAPI(t *testing.T, controller, app, id string) {
 // Pass sha when available (for SSH builder logs); id may be empty if push failed before acceptance.
 func collectDeployLogs(t *testing.T, controller, app, lane, sha, id string) {
 	t.Helper()
-    if id != "" {
-        fetchBuilderLogsAPI(t, controller, app, id)
-    }
-    // Pass BUILD_ID to fetch-logs.sh so it can pull builder logs via API
-    old := os.Getenv("BUILD_ID")
-    if id != "" {
-        _ = os.Setenv("BUILD_ID", id)
-    }
-    fetchLogs(t, app, lane, sha)
-    if id != "" {
-        _ = os.Setenv("BUILD_ID", old)
-    }
+	if id != "" {
+		fetchBuilderLogsAPI(t, controller, app, id)
+	}
+	// Pass BUILD_ID to fetch-logs.sh so it can pull builder logs via API
+	old := os.Getenv("BUILD_ID")
+	if id != "" {
+		_ = os.Setenv("BUILD_ID", id)
+	}
+	fetchLogs(t, app, lane, sha)
+	if id != "" {
+		_ = os.Setenv("BUILD_ID", old)
+	}
 }
