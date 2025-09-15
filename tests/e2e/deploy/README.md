@@ -25,6 +25,15 @@ How to run E2E
   - JSONL: tests/e2e/deploy/results.jsonl (one JSON per run)
   - Markdown rows: tests/e2e/deploy/results.md (includes image size and build time)
 
+Quick filters
+- Single subtest: `go test ./tests/e2e/deploy -tags e2e -v -run 'TestDeployMatrix/E-node-20' -timeout 6m`
+- Explicit case (Java 17, no Jib): `go test ./tests/e2e/deploy -tags e2e -v -run TestDeploy_Java17_NoJib -timeout 10m`
+
+Log collection tips
+- Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
+- Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
+- Aggregated app/platform/builder logs: `APP_NAME=<name> [LANE=<A|C|E>] [SHA=<sha12>] [LINES=200] [TARGET_HOST=<ip>] ./tests/e2e/deploy/fetch-logs.sh`
+
 Test matrix (seed)
 | Lane | Stack   | Version | Repo                                         | Image Size | Build Time | Current State |
 | ---- | ------- | ------- | -------------------------------------------- | ---------- | ---------- | ------------- |

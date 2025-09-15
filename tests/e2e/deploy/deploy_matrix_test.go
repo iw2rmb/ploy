@@ -288,7 +288,8 @@ func writeResult(t *testing.T, lane, repo, app string, metrics map[string]any) {
 	}
 	e := entry{Lane: lane, Repo: repo, App: app, Metrics: metrics, Time: time.Now().Format(time.RFC3339)}
 	b, _ := json.Marshal(e)
-	path := filepath.Join("tests", "e2e", "deploy", "results.jsonl")
+	// Write to repo-root-relative path to work regardless of package CWD
+	path := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.jsonl"))
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		t.Logf("failed to write results: %v", err)
@@ -299,7 +300,7 @@ func writeResult(t *testing.T, lane, repo, app string, metrics map[string]any) {
 	_, _ = f.Write(b)
 
 	// Also append a human-friendly Markdown row to results.md with size/time if available
-	md := filepath.Join("tests", "e2e", "deploy", "results.md")
+	md := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.md"))
 	var szMB, durMS string
 	if metrics != nil {
 		if im, ok := metrics["imageSize"].(map[string]any); ok {
@@ -343,6 +344,10 @@ func inferVersion(repo string) string {
 }
 
 func appendFile(path, line string) error {
+	// Ensure parent directory exists when path points into repo root
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
