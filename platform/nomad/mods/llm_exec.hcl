@@ -8,6 +8,7 @@ job "mods-llm-exec-${RUN_ID}" {
       config {
         image = "${LLM_EXEC_IMAGE}"
         force_pull = true
+        network_mode = "host"
       }
       env = {
         MODEL       = "${MODEL}"
