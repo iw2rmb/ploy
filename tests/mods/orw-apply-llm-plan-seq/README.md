@@ -20,8 +20,8 @@ Cycle State (Single Source)
   - The logs directory path (see Inspecting Logs) for reference.
 
 - Latest run:
-  - MOD_ID: mod-83cdaaf7 — healing completed through reducer; build gate succeeded; push failed with GitLab auth (rc=128). Ensure the controller job env has `GITLAB_TOKEN` with write_repository/api scopes.
-  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-83cdaaf7
+  - MOD_ID: mod-589af7e8 — healing succeeded to reducer next={action:"stop"}; build gate passed; push failed (rc=128). The runner emitted `mr-config` events confirming it used `token_env=GITLAB_TOKEN` and `repo_url_env=GITLAB_URL`, indicating per-run MR auth selection is active. The API runtime likely lacks a valid GITLAB_TOKEN or scope.
+  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-589af7e8
 
 Note: Historical cycle-by-cycle notes have been condensed into this single Cycle State to avoid drift. Refer to git history if you need past detail.
 

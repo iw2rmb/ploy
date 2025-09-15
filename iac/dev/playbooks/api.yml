@@ -484,8 +484,8 @@
               - consul_api_service.json | length > 0
               - (consul_api_service.json[0].ServiceTags | join(',')) is search('traefik.enable=true')
               - (consul_api_service.json[0].ServiceTags | join(',')) is search('traefik.http.routers.ploy-api.rule=Host\(`api\.' + ploy.platform_domain + '`\)')
-          fail_msg: "Consul service tags for ploy-api missing required Traefik router labels"
-          success_msg: "Consul service tags contain required Traefik router labels"
+            fail_msg: "Consul service tags for ploy-api missing required Traefik router labels"
+            success_msg: "Consul service tags contain required Traefik router labels"
 
         - name: Mark bootstrap as ready for unified deployment transition
           copy:
