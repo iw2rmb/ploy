@@ -263,20 +263,44 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("failed to render planner assets: %w", err)
 		}
 
-		// Inject build error into planner inputs.json so downstream jobs have full compiler context
-		{
-			lane := ""
-			if config != nil {
-				lane = config.Lane
-			}
-			inputs := fmt.Sprintf("{\n  \"language\": \"java\",\n  \"lane\": %q,\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": %q\n  },\n  \"deps\": {}\n}\n", lane, buildError)
-			_ = os.WriteFile(assets.InputsPath, []byte(inputs), 0644)
-			if controller := ResolveInfraFromEnv().Controller; controller != "" {
-				rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
-				// Log only size to avoid noisy events
-				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputs)), JobName: "", Time: time.Now()})
-			}
-		}
+        // Inject build error into planner inputs.json so downstream jobs have full compiler context
+        {
+            lane := ""
+            if config != nil {
+                lane = config.Lane
+            }
+            // Try to parse structured errors (generic parser; currently Java/Maven aware)
+            // Language heuristics: Lane C is Java in our scenario, tool is Maven for Java builds
+            parsed := ParseBuildErrors("java", "maven", buildError)
+            // Build a compact JSON with both raw last_error and structured errors for clients that support it
+            var b strings.Builder
+            b.WriteString("{\n  \"language\": \"java\",\n  \"lane\": \"")
+            b.WriteString(lane)
+            b.WriteString("\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": ")
+            b.WriteString(strconv.Quote(buildError))
+            b.WriteString("\n  },\n  \"errors\": [")
+            for i, e := range parsed {
+                if i > 0 { b.WriteString(",") }
+                // Emit minimal fields needed by LLM: file, line, column, message
+                b.WriteString("{\"file\":")
+                b.WriteString(strconv.Quote(e.File))
+                b.WriteString(",\"line\":")
+                b.WriteString(strconv.Itoa(e.Line))
+                b.WriteString(",\"column\":")
+                b.WriteString(strconv.Itoa(e.Column))
+                b.WriteString(",\"message\":")
+                b.WriteString(strconv.Quote(e.Message))
+                b.WriteString("}")
+            }
+            b.WriteString("\n  ]\n}\n")
+            inputs := b.String()
+            _ = os.WriteFile(assets.InputsPath, []byte(inputs), 0644)
+            if controller := ResolveInfraFromEnv().Controller; controller != "" {
+                rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+                // Log only size to avoid noisy events
+                _ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputs)), JobName: "", Time: time.Now()})
+            }
+        }
 
 		// Step 2: Generate unique run ID for this planner job
 		runID := PlannerRunID(config.ID)

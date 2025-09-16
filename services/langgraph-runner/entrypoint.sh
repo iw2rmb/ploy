@@ -258,12 +258,21 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
     TARGET_FILE=""
     TARGET_LINE=""
     if [ -s "$CTX_DIR/inputs.json" ]; then
-      # Extract stderr block
-      ERR=$(awk 'BEGIN{RS=""} /"last_error"/ {print}' "$CTX_DIR/inputs.json" 2>/dev/null)
-      # Find first Java file path
-      CAND=$(printf "%s" "$ERR" | sed -n 's/.*\([A-Za-z0-9_\.\/-]\+\.java\).*/\1/p' | head -n1)
-      # Try to capture line like ":123:" or ":[123,"
-      LINE=$(printf "%s" "$ERR" | sed -n 's/.*\.java:\([0-9]\+\).*/\1/p' | head -n1)
+      # Prefer structured errors array if present
+      FIRST_ERR_JSON=$(awk 'BEGIN{RS="}"} /"errors"[[:space:]]*:/ {print $0"}"; exit}' "$CTX_DIR/inputs.json" 2>/dev/null || true)
+      if [ -n "$FIRST_ERR_JSON" ]; then
+        # Extract "file": "..." and "line": N (very lightweight parsing)
+        CAND=$(printf "%s" "$FIRST_ERR_JSON" | sed -n 's/.*"file"[[:space:]]*:[[:space:]]*"\([^"]\+\)".*/\1/p' | head -n1)
+        LINE=$(printf "%s" "$FIRST_ERR_JSON" | sed -n 's/.*"line"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+      fi
+      # Fallback: extract from raw last_error stderr
+      if [ -z "$CAND" ] || [ -z "$LINE" ]; then
+        ERR=$(awk 'BEGIN{RS=""} /"last_error"/ {print}' "$CTX_DIR/inputs.json" 2>/dev/null)
+        # Find first Java file path
+        CAND=$(printf "%s" "$ERR" | sed -n 's/.*\([A-Za-z0-9_\.\/-]\+\.java\).*/\1/p' | head -n1)
+        # Accept either :123 or :[123,456]
+        LINE=$(printf "%s" "$ERR" | sed -n 's/.*\.java:\[\([0-9]\+\),.*/\1/p; t; s/.*\.java:\([0-9]\+\).*/\1/p' | head -n1)
+      fi
       if [ -n "$CAND" ]; then
         # If a source snapshot was provided, prefer it to ensure exact diff
         if [ -f "$CTX_DIR/sources/$CAND" ]; then
