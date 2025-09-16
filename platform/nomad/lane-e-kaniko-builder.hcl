@@ -47,7 +47,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
 
       resources {
         cpu    = 500
-        memory = {{KANIKO_MEMORY}}
+        memory = 2048
       }
 
       service {
