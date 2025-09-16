@@ -263,6 +263,21 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			return nil, fmt.Errorf("failed to render planner assets: %w", err)
 		}
 
+		// Inject build error into planner inputs.json so downstream jobs have full compiler context
+		{
+			lane := ""
+			if config != nil {
+				lane = config.Lane
+			}
+			inputs := fmt.Sprintf("{\n  \"language\": \"java\",\n  \"lane\": %q,\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": %q\n  },\n  \"deps\": {}\n}\n", lane, buildError)
+			_ = os.WriteFile(assets.InputsPath, []byte(inputs), 0644)
+			if controller := ResolveInfraFromEnv().Controller; controller != "" {
+				rep := NewControllerEventReporter(controller, os.Getenv("MOD_ID"))
+				// Log only size to avoid noisy events
+				_ = rep.Report(ctx, Event{Phase: "planner", Step: "planner", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputs)), JobName: "", Time: time.Now()})
+			}
+		}
+
 		// Step 2: Generate unique run ID for this planner job
 		runID := PlannerRunID(config.ID)
 
