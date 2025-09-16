@@ -123,31 +123,61 @@ func TestRetryWithBackoff(t *testing.T) {
 	}
 }
 
+type countProvider struct{ MockStorageProvider; listCalls, verifyCalls int }
+func (cp *countProvider) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
+    cp.listCalls++
+    if cp.listCalls == 1 { return nil, errors.New("connection reset by peer") }
+    return []ObjectInfo{{Key: prefix + "/a", Size: 1}}, nil
+}
+func (cp *countProvider) VerifyUpload(key string) error {
+    cp.verifyCalls++
+    if cp.verifyCalls == 1 { return errors.New("service unavailable") }
+    return nil
+}
+
+func TestRetryableStorageClient_ListObjects_RetriesThenSucceeds(t *testing.T) {
+    prov := &countProvider{}
+    cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 1 * time.Millisecond, MaxDelay: 10 * time.Millisecond, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeNetwork, ErrorTypeInternal, ErrorTypeServiceUnavailable}}
+    c := NewRetryableStorageClient(prov, cfg)
+    objs, err := c.ListObjects("bucket", "prefix")
+    if err != nil { t.Fatalf("unexpected error: %v", err) }
+    if prov.listCalls != 2 { t.Fatalf("expected 2 list calls, got %d", prov.listCalls) }
+    if len(objs) != 1 { t.Fatalf("expected 1 object, got %d", len(objs)) }
+}
+
+func TestRetryableStorageClient_VerifyUpload_RetriesThenSucceeds(t *testing.T) {
+    prov := &countProvider{}
+    cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 1 * time.Millisecond, MaxDelay: 10 * time.Millisecond, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeServiceUnavailable, ErrorTypeInternal}}
+    c := NewRetryableStorageClient(prov, cfg)
+    if err := c.VerifyUpload("k"); err != nil { t.Fatalf("unexpected error: %v", err) }
+    if prov.verifyCalls != 2 { t.Fatalf("expected 2 verify calls, got %d", prov.verifyCalls) }
+}
+
 func TestRetryWithBackoff_RespectsRetryAfter(t *testing.T) {
-    // Configure a large initial delay so we can detect Retry-After override
-    cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 200 * time.Millisecond, MaxDelay: 1 * time.Second, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeInternal}}
-    attempts := 0
-    op := func() error {
-        attempts++
-        if attempts == 1 {
-            // Return a retryable StorageError with RetryAfter 5ms
-            return &StorageError{ErrorType: ErrorTypeInternal, Retryable: true, RetryAfter: 5 * time.Millisecond}
-        }
-        return nil
-    }
-    start := time.Now()
-    err := RetryWithBackoff(context.Background(), op, cfg, "test_retry_after")
-    elapsed := time.Since(start)
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-    if attempts != 2 {
-        t.Fatalf("expected 2 attempts, got %d", attempts)
-    }
-    // Should be significantly less than InitialDelay due to Retry-After override
-    if elapsed >= 200*time.Millisecond {
-        t.Fatalf("expected elapsed < 200ms due to Retry-After override, got %v", elapsed)
-    }
+	// Configure a large initial delay so we can detect Retry-After override
+	cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 200 * time.Millisecond, MaxDelay: 1 * time.Second, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeInternal}}
+	attempts := 0
+	op := func() error {
+		attempts++
+		if attempts == 1 {
+			// Return a retryable StorageError with RetryAfter 5ms
+			return &StorageError{ErrorType: ErrorTypeInternal, Retryable: true, RetryAfter: 5 * time.Millisecond}
+		}
+		return nil
+	}
+	start := time.Now()
+	err := RetryWithBackoff(context.Background(), op, cfg, "test_retry_after")
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	// Should be significantly less than InitialDelay due to Retry-After override
+	if elapsed >= 200*time.Millisecond {
+		t.Fatalf("expected elapsed < 200ms due to Retry-After override, got %v", elapsed)
+	}
 }
 
 func TestNewRetryableStorageClient(t *testing.T) {
