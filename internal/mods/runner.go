@@ -2,8 +2,6 @@ package mods
 
 import (
 	"context"
-	crand "crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -12,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	supply "github.com/iw2rmb/ploy/internal/supply"
@@ -32,24 +29,6 @@ var hasRepoChangesFn = hasRepoChanges
 
 // ErrNoBuildFile indicates missing supported build files in repository.
 var ErrNoBuildFile = errors.New("no build file found in repository")
-
-// GitOperationsInterface defines the Git operations needed by the runner
-type GitOperationsInterface interface {
-	CloneRepository(ctx context.Context, repoURL, branch, targetPath string) error
-	CreateBranchAndCheckout(ctx context.Context, repoPath, branchName string) error
-	CommitChanges(ctx context.Context, repoPath, message string) error
-	PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error
-}
-
-// RecipeExecutorInterface defines the recipe execution interface
-type RecipeExecutorInterface interface {
-	ExecuteRecipes(ctx context.Context, workspacePath string, recipeIDs []string) error
-}
-
-// BuildCheckerInterface defines the build check interface
-type BuildCheckerInterface interface {
-	CheckBuild(ctx context.Context, config common.DeployConfig) (*common.DeployResult, error)
-}
 
 // StepResult represents the result of executing a single step
 // StepResult, ModResult and Summary moved to runner_results.go
@@ -87,109 +66,13 @@ func NewModRunner(config *ModConfig, workspaceDir string) (*ModRunner, error) {
 }
 
 // SetGitOperations sets the Git operations implementation (for dependency injection/testing)
-func (r *ModRunner) SetGitOperations(gitOps GitOperationsInterface) {
-	r.gitOps = gitOps
-	if gitOps != nil {
-		r.repoManager = NewRepoManagerAdapter(gitOps)
-	} else {
-		r.repoManager = nil
-	}
-}
-
-// SetRecipeExecutor sets the recipe executor implementation (for dependency injection/testing)
-func (r *ModRunner) SetRecipeExecutor(executor RecipeExecutorInterface) {
-	r.recipeExecutor = executor
-}
-
-// SetTransformationExecutor sets the modular TransformationExecutor
-func (r *ModRunner) SetTransformationExecutor(x TransformationExecutor) { r.transformExec = x }
-
-// SetBuildChecker sets the build checker implementation (for dependency injection/testing)
-func (r *ModRunner) SetBuildChecker(checker BuildCheckerInterface) {
-	r.buildChecker = checker
-	// Also expose through BuildGate adapter for modularization
-	if checker != nil {
-		r.buildGate = NewBuildGateAdapter(checker)
-	} else {
-		r.buildGate = nil
-	}
-}
-
-// SetBuildGate sets the modular BuildGate; takes precedence over buildChecker when set.
-func (r *ModRunner) SetBuildGate(g BuildGate) { r.buildGate = g }
-
-// SetJobSubmitter sets the job submitter for healing workflows (for dependency injection/testing)
-func (r *ModRunner) SetJobSubmitter(submitter JobSubmitter) {
-	r.jobSubmitter = submitter
-}
-
-// SetGitProvider sets the Git provider implementation for MR creation (for dependency injection/testing)
-func (r *ModRunner) SetGitProvider(provider provider.GitProvider) {
-	r.gitProvider = provider
-	if provider != nil {
-		r.mrManager = NewMRManagerAdapter(provider)
-	} else {
-		r.mrManager = nil
-	}
-}
-
-// SetEventReporter sets the reporter used for real-time observability
-func (r *ModRunner) SetEventReporter(reporter EventReporter) {
-	r.eventReporter = reporter
-}
-
-// SetHealingOrchestrator sets the modular healing orchestrator
-func (r *ModRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h }
-
-// SetHCLSubmitter sets the indirection used for HCL validate/submit flows.
-func (r *ModRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
-
-// SetJobHelper allows injecting a planner/reducer submission helper for testing.
-func (r *ModRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
-
-// GetHCLSubmitter exposes the HCLSubmitter for helpers that need it.
-func (r *ModRunner) GetHCLSubmitter() HCLSubmitter { return r.hcl }
-
 // Event emission helpers moved to events_emit.go
-
-// GetGitProvider returns the Git provider for human-step branch operations
-func (r *ModRunner) GetGitProvider() provider.GitProvider {
-	return r.gitProvider
-}
-
-// GetBuildChecker returns the build checker for human-step branch operations
-func (r *ModRunner) GetBuildChecker() BuildCheckerInterface {
-	return r.buildChecker
-}
-
-// GetWorkspaceDir returns the workspace directory for human-step branch operations
-func (r *ModRunner) GetWorkspaceDir() string {
-	return r.workspaceDir
-}
 
 // test indirections moved to job_io.go
 
-// randomStepID returns s-<12 hex chars>
-func randomStepID() string {
-	var buf [6]byte
-	_, _ = crand.Read(buf[:])
-	return "s-" + hex.EncodeToString(buf[:])
-}
-
 // IO helpers moved to job_io.go; keep indirection vars there
 
-// uploadInputTar uploads input.tar to artifacts/mods/<modID>/input.tar (best-effort)
-func uploadInputTar(seaweedBase, modID, inputTarPath string) error {
-	key := fmt.Sprintf("mods/%s/input.tar", modID)
-	return putFileFn(seaweedBase, key, inputTarPath, "application/octet-stream")
-}
-
 // JSON helpers moved to job_io.go; keep indirection vars there
-
-// GetTargetRepo returns the target repository URL for human-step branch operations
-func (r *ModRunner) GetTargetRepo() string {
-	return r.config.TargetRepo
-}
 
 // Planner/assets, repo ops, and apply/build helpers moved to dedicated files
 
