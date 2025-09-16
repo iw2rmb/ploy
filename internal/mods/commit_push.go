@@ -3,7 +3,8 @@ package mods
 import (
 	"context"
 	"fmt"
-	"time"
+
+	gitapi "github.com/iw2rmb/ploy/api/git"
 )
 
 // runCommitStep performs commit logic considering whether changes exist and whether HEAD moved already.
@@ -26,8 +27,27 @@ func (r *ModRunner) runCommitStep(ctx context.Context, repoPath, initialHead str
 
 // runPushStep pushes the branch with a timeout.
 func (r *ModRunner) runPushStep(ctx context.Context, repoPath, branchName string) error {
-	pushTimeout := 3 * time.Minute
-	pushCtx, cancel := context.WithTimeout(ctx, pushTimeout)
-	defer cancel()
-	return r.gitOps.PushBranch(pushCtx, repoPath, r.config.TargetRepo, branchName)
+	op := r.gitOps.PushBranchAsync(ctx, repoPath, r.config.TargetRepo, branchName)
+	for event := range op.Events() {
+		level := "info"
+		switch event.Type {
+		case gitapi.EventFailed:
+			level = "error"
+		case gitapi.EventProgress:
+			level = "debug"
+		case gitapi.EventStarted:
+			level = "info"
+		case gitapi.EventCompleted:
+			level = "info"
+		}
+		message := event.Message
+		if message == "" {
+			message = fmt.Sprintf("git push %s", event.Type)
+		}
+		r.emit(ctx, "git", "push", level, message)
+	}
+	if err := op.Err(); err != nil {
+		return err
+	}
+	return nil
 }

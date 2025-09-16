@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf"
+	gitapi "github.com/iw2rmb/ploy/api/git"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
@@ -168,11 +168,15 @@ func NewModIntegrationsWithTestMode(controllerURL, workDir string, testMode bool
 	}
 }
 
-// ARFGitOperations wraps the ARF Git operations to satisfy the interface
-type ARFGitOperations struct{ *arf.GitOperations }
+// APIGitOperations wraps the API git service to satisfy the Mods interface
+type APIGitOperations struct{ *gitapi.Service }
 
-func NewARFGitOperations(workDir string) *ARFGitOperations {
-	return &ARFGitOperations{GitOperations: arf.NewGitOperations(workDir)}
+func NewAPIGitOperations(workDir string) *APIGitOperations {
+	return &APIGitOperations{Service: gitapi.NewGitOperations(workDir)}
+}
+
+func (g *APIGitOperations) PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) *gitapi.Operation {
+	return g.Service.PushBranchAsync(ctx, gitapi.PushRequest{RepoPath: repoPath, RemoteURL: remoteURL, Branch: branchName})
 }
 
 // CreateGitOperations creates a Git operations implementation
@@ -180,7 +184,7 @@ func (i *ModIntegrations) CreateGitOperations() GitOperationsInterface {
 	if i.TestMode {
 		return NewMockGitOperations() // Use mock implementation for testing
 	}
-	return NewARFGitOperations(i.WorkDir)
+	return NewAPIGitOperations(i.WorkDir)
 }
 
 // CreateRecipeExecutor creates a recipe executor implementation

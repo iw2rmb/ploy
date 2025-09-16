@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	gitapi "github.com/iw2rmb/ploy/api/git"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 )
@@ -97,6 +98,24 @@ func (m *MockGitOperations) PushBranch(ctx context.Context, repoPath, remoteURL,
 	m.PushRemoteURL = remoteURL
 	m.PushBranchName = branchName
 	return m.PushError
+}
+
+func (m *MockGitOperations) PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) *gitapi.Operation {
+	m.PushCalled = true
+	m.PushRemoteURL = remoteURL
+	m.PushBranchName = branchName
+	runner := mockRunner{mock: m}
+	svc := gitapi.NewService(gitapi.ServiceConfig{Runner: runner})
+	return svc.PushBranchAsync(ctx, gitapi.PushRequest{RepoPath: repoPath, RemoteURL: remoteURL, Branch: branchName})
+}
+
+type mockRunner struct{ mock *MockGitOperations }
+
+func (r mockRunner) Run(ctx context.Context, dir string, name string, args ...string) error {
+	if r.mock.PushError != nil && len(args) > 0 && name == "git" && args[0] == "push" {
+		return r.mock.PushError
+	}
+	return nil
 }
 
 // MockRecipeExecutor implements RecipeExecutorInterface for testing
