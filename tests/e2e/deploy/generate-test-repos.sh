@@ -58,6 +58,43 @@ HTTPServer(('',port), H).serve_forever()
 EOF
 }
 
+# .NET minimal ASP.NET Core app
+scaffold_dotnet() { local d=$1 v=$2;
+  mk "$d"
+  write "$d/Program.cs" <<'EOF'
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+app.MapGet("/healthz", () => Results.Text("ok", "text/plain"));
+app.MapGet("/", () => Results.Text("hello", "text/plain"));
+app.Run();
+EOF
+  write "$d/App.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net${v}</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>
+EOF
+  # Provide a minimal multi-stage Dockerfile for Kaniko builds in Lane E
+  write "$d/Dockerfile" << 'EOF'
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet publish -c Release -o /out
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+COPY --from=build /out /app
+WORKDIR /app
+ENTRYPOINT ["dotnet", "App.dll"]
+EOF
+}
+
 scaffold_java_gradle() { local d=$1 v=$2 main=$3; write "$d/settings.gradle.kts" <<EOF
 rootProject.name = "${d##*/}"
 EOF
@@ -114,6 +151,7 @@ scaffold_repo() {
     python) scaffold_python "$dir" "$ver" ;;
     java) scaffold_java_gradle "$dir" "$ver" "com.ploy.app.Main" ;;
     scala) scaffold_java_gradle "$dir" "$ver" "com.ploy.app.Main" ;;
+    dotnet) scaffold_dotnet "$dir" "$ver" ;;
   esac
   commit_push "$dir"
 }
