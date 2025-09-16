@@ -87,7 +87,7 @@ func stagePathsFromDiff(ctx context.Context, repoPath, diffPath string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	s := bufio.NewScanner(f)
 	var lastMinus, lastPlus string
 	for s.Scan() {

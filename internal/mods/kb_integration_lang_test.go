@@ -11,7 +11,7 @@ func TestDetectLanguageFromBuildError(t *testing.T) {
 		{"go build ./...\npackage main", "go"},
 		{"tsc --noEmit\nnode_modules warning", "typescript"},
 		{"Traceback (most recent call last):\nImportError: foo\npytest", "python"},
-        {"error[E0425]: cannot find value `x` in this scope\nrustc 1.79", "rust"},
+		{"error[E0425]: cannot find value `x` in this scope\nrustc 1.79", "rust"},
 		{"some unknown tool output", "unknown"},
 	}
 
