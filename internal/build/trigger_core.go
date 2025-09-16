@@ -717,7 +717,11 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		// Include a nonce in the builder job version to avoid stale alloc collisions
 		nonce := time.Now().Unix()
 		versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
-		builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile", detectedLanguage)
+		langForBuilder := detectedLanguage
+		if langForBuilder == "" && strings.ToLower(facts.BuildTool) == "dotnet" {
+			langForBuilder = "dotnet"
+		}
+		builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{
 				"error":   "render builder failed",
