@@ -56,7 +56,10 @@ type RenderData struct {
 	DomainSuffix string
 
 	// Build metadata
-	BuildTime string
+    BuildTime string
+
+    // WASM-specific options
+    WasmModuleURL string
 }
 
 // RenderTemplate renders a Nomad job HCL based on lane and data, returning a temp file path
@@ -110,8 +113,8 @@ func templateForLane(lane string) string {
     case "F":
         return "platform/nomad/lane-f-vm.hcl"
     case "G":
-        // For now, Lane G (WASM) apps use OCI containers as fallback
-        return "platform/nomad/lane-e-oci-kontain.hcl"
+        // Lane G uses WASM runtime template
+        return "platform/nomad/lane-g-wasm.hcl"
     default:
         return "platform/nomad/lane-c-osv.hcl"
     }
@@ -302,7 +305,10 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 		data.Lane = "C"
 	}
 	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Lane))
-	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
+    s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
+    if data.WasmModuleURL != "" {
+        s = strings.ReplaceAll(s, "{{WASM_URL}}", data.WasmModuleURL)
+    }
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
 	if data.GrpcPort > 0 {
