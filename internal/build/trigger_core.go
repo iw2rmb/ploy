@@ -776,22 +776,100 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return utils.ErrJSON(c, 500, err)
 		}
 		imagePath = img
-	case "G":
-		// For now, Lane G WASM applications should use OCI containers as fallback
-		// TODO: Implement proper WASM runtime integration
-		// Use container registry with namespace-aware routing and RBAC credentials
-		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
-		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
-		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
-		if err != nil {
-			log.Printf("[Build] WASM fallback (OCI) build error: %v", err)
-			es := strings.ToLower(err.Error())
-			if strings.Contains(es, "no dockerfile or jib") || strings.Contains(es, "oci build failed") {
-				return utils.ErrJSON(c, 400, fmt.Errorf("OCI build prerequisites not found: add a Dockerfile or Jib configuration in your repo: %w", err))
-			}
-			return utils.ErrJSON(c, 500, err)
-		}
-		dockerImage = img
+    case "G":
+        // Lane G fallback: use the same Kaniko builder flow as Lane E to produce an OCI image
+        registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
+        tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
+        log.Printf("[Build:G] Kaniko flow selected (OCI fallback): app=%s sha=%s tag=%s", appName, sha, tag)
+
+        // Ensure a Dockerfile exists (Rust scaffold should provide one)
+        dockerfilePath := filepath.Join(srcDir, "Dockerfile")
+        if _, err := os.Stat(dockerfilePath); err != nil {
+            return utils.ErrJSON(c, 400, fmt.Errorf("Dockerfile missing for Lane G OCI fallback"))
+        }
+
+        // Create a tar context from srcDir
+        builderTar := filepath.Join(tmpDir, "context.tar")
+        if err := func() error {
+            f, err := os.Create(builderTar)
+            if err != nil { return err }
+            defer f.Close()
+            ign, _ := clutils.ReadGitignore(srcDir)
+            return clutils.TarDir(srcDir, f, ign)
+        }(); err != nil {
+            return c.Status(500).JSON(fiber.Map{
+                "error":   "create build context failed",
+                "stage":   "build_context",
+                "details": err.Error(),
+            })
+        }
+        tarSize := func() int64 { fi, _ := os.Stat(builderTar); if fi != nil { return fi.Size() }; return 0 }()
+        log.Printf("[Build:G] Context tar created: %s (size=%d bytes)", builderTar, tarSize)
+
+        // Upload context tar
+        contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
+        var contextURL string
+        if deps.Storage != nil {
+            ctxUp := context.Context(c.Context())
+            if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+                return c.Status(500).JSON(fiber.Map{
+                    "error":       "failed to upload build context",
+                    "stage":       "upload_context",
+                    "context_key": contextKey,
+                    "tar_size":    tarSize,
+                    "details":     err.Error(),
+                })
+            }
+            base := os.Getenv("PLOY_SEAWEEDFS_URL")
+            if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
+            if !strings.HasPrefix(base, "http") { base = "http://" + base }
+            contextURL = strings.TrimRight(base, "/") + "/" + contextKey
+            // Also PUT directly
+            func(path string) {
+                fi, err := os.Stat(builderTar); if err != nil { fmt.Printf("Warn: stat tar failed: %v\n", err); return }
+                for attempt := 1; attempt <= 3; attempt++ {
+                    f, err := os.Open(builderTar); if err != nil { fmt.Printf("Warn: open tar failed: %v\n", err); return }
+                    req, err := http.NewRequest("PUT", path, f); if err != nil { _ = f.Close(); fmt.Printf("Warn: build PUT request failed: %v\n", err); return }
+                    req.Header.Set("Content-Type", "application/x-tar"); req.ContentLength = fi.Size()
+                    client := &http.Client{Timeout: 60 * time.Second}
+                    resp, err := client.Do(req); if err != nil { _ = f.Close(); fmt.Printf("Warn: context PUT attempt %d failed: %v\n", attempt, err); time.Sleep(2*time.Second); continue }
+                    _ = f.Close(); _ = resp.Body.Close()
+                    if resp.StatusCode >= 200 && resp.StatusCode < 300 { fmt.Printf("Context PUT ok (%d bytes) to %s\n", fi.Size(), path); break }
+                    fmt.Printf("Warn: context PUT attempt %d got HTTP %d for %s\n", attempt, resp.StatusCode, path); time.Sleep(2*time.Second)
+                }
+            }(contextURL)
+        } else {
+            return c.Status(500).JSON(fiber.Map{
+                "error":       "storage not available for build context upload",
+                "stage":       "upload_context",
+                "context_key": contextKey,
+            })
+        }
+        log.Printf("[Build:G] Context uploaded: url=%s", contextURL)
+
+        // Render and execute Kaniko builder job
+        nonce := time.Now().Unix()
+        versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
+        builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile", detectedLanguage)
+        if err != nil {
+            return c.Status(500).JSON(fiber.Map{"error":"render builder failed","stage":"render_builder","details": err.Error()})
+        }
+        func() { _ = os.MkdirAll("/opt/ploy/debug/jobs", 0755); _ = copyFile(builderHCL, filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL))) }()
+        if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
+            return c.Status(500).JSON(fiber.Map{"error":"builder job validation failed","stage":"validate_builder","builder_hcl": builderHCL, "details": vErr.Error()})
+        }
+        builderJobName := fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
+        log.Printf("[Build:G] Submitting Kaniko job: %s", builderJobName)
+        if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
+            snippet := getJobLogsSnippet(builderJobName, 80)
+            return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("kaniko builder failed for job %s", builderJobName), "stage":"kaniko_submit", "details": err.Error(), "builder": fiber.Map{"job": builderJobName, "logs": snippet}})
+        }
+        vr := verifyOCIPush(tag)
+        if !vr.OK {
+            return c.Status(500).JSON(fiber.Map{"error":"image push verification failed","stage":"verify_push","image": tag, "status": vr.Status, "message": vr.Message})
+        }
+        log.Printf("[Build:G] Image present in registry: %s (status=%d, digest=%s)", tag, vr.Status, vr.Digest)
+        dockerImage = tag
 	default:
 		// Fallback to container lane if unspecified/unsupported
 		lane = "E"
