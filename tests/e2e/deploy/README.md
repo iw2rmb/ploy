@@ -50,7 +50,7 @@ Test matrix (seed)
 | D    | Node    | 20      | https://github.com/<u>/ploy-lane-d-node-20   | —                        | —                 | —          | pending       |
 | E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | 52.3MB                   | 128.2MB           | 23.5s      | passed        |
 | E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | 4.9MB                    | 8.7MB             | —          | passed        |
-| E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | —                      | —                 | —          | pending       |
+| E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | 47.3MB                  | 113.7MB           | 22.2s      | passed        |
 | E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | —                        | —                 | —          | pending       |
 | G    | Rust    | 1.79    | https://github.com/<u>/ploy-lane-g-rust-1.79 | —                        | —                 | —          | pending       |
 
@@ -67,8 +67,9 @@ Cycle State
 - Current key takeaways only; update each cycle and keep concise. For historical notes, use CHANGELOG.md.
 
  - App-name normalization: tests sanitize names to `[a-z0-9-]`, replacing dots in versions (e.g., `1.22` → `1-22`).
- - Lane E status: Node 20 passed; Go/Python running allocs but failing external health — investigate autogen CMD/PORT and readiness wiring.
- - Image size: captured from registry manifest when async metrics omit it; recorded in results files.
+ - Lane E status: Node 20, Go 1.22, and Python 3.12 pass with event-driven health; .NET 8 pending due to Kaniko OOM during snapshot (exit code 137).
+ - Targeted fix: bump Kaniko builder memory only for .NET builds (default 2048MB; others remain at 512MB). Env override: `PLOY_KANIKO_MEMORY_DOTNET_MB`.
+ - Image size: captured from registry manifest (compressed) and Docker inspect (uncompressed) and recorded in results files.
  - Logs: use `fetch-logs.sh` with `BUILD_ID` and `TARGET_HOST` to retrieve builder and app alloc status/logs before deeper triage.
  - Cleanup: apps are destroyed after each cycle; if automated destroy fails, destroy manually: `ploy apps destroy --name <app> --force`.
 
