@@ -20,7 +20,7 @@ job "{{APP_NAME}}-lane-g" {
       config {
         image = "{{WASM_RUNTIME_IMAGE}}"
         entrypoint = ["/runner"]
-        args = ["-ignore-errors", "-url", "${WASM_URL}", "-port", "${PORT}"]
+        args = ["-ignore-errors", "-url", "{{WASM_URL}}", "-port", "{{HTTP_PORT}}"]
         ports = ["http"]
       }
 
@@ -51,4 +51,3 @@ job "{{APP_NAME}}-lane-g" {
     }
   }
 }
-
