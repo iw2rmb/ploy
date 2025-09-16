@@ -67,6 +67,27 @@
             path: /home/ploy/ploy/.git
           register: git_repo_exists
         
+        - name: Assert GitHub credentials are provided in environment (private repo)
+          assert:
+            that:
+              - lookup('env', 'GITHUB_PLOY_DEV_USERNAME') | length > 0
+              - lookup('env', 'GITHUB_PLOY_DEV_PAT') | length > 0
+            fail_msg: "Missing GitHub credentials. Ensure GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT are set in your workstation environment before running deploy."
+            success_msg: "GitHub credentials detected in environment"
+
+        - name: Configure Git credential helper for GitHub (private repo)
+          shell: |
+            set -euo pipefail
+            git config --global credential.helper store
+            CREDS_FILE="$HOME/.git-credentials"
+            # Avoid rewriting if already configured
+            if ! grep -q "^https://github.com" "$CREDS_FILE" 2>/dev/null; then
+              echo "https://{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}:{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}@github.com" > "$CREDS_FILE"
+              chmod 600 "$CREDS_FILE"
+            fi
+          become_user: ploy
+          changed_when: false
+
         - name: Clone repository if missing
           git:
             repo: https://github.com/iw2rmb/ploy.git
@@ -88,24 +109,19 @@
             msg: "Local changes stashed: {{ git_stash.stdout }}"
           when: git_repo_exists.stat.exists and git_stash.rc == 0 and 'No local changes to save' not in git_stash.stdout
         
-        - name: Ensure GitHub environment variables are available for Git operations
+        - name: Verify GitHub access with configured credentials
           shell: |
-            # Source the bashrc to get environment variables
-            source /home/ploy/.bashrc
-            
-            # Verify Git authentication works
-            if ! git ls-remote https://github.com/iw2rmb/ploy.git HEAD > /dev/null 2>&1; then
-              echo "ERROR: Git authentication failed. Please ensure GitHub credentials are properly configured."
-              echo "Check that GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT are set in the local environment."
-              exit 1
-            fi
+            set -euo pipefail
+            # Minimal non-verbose connectivity check (does not print secrets)
+            git ls-remote https://github.com/iw2rmb/ploy.git HEAD >/dev/null 2>&1
           become_user: ploy
           register: git_auth_check
+          changed_when: false
           failed_when: git_auth_check.rc != 0
           
-        - name: Display Git authentication status
+        - name: GitHub access confirmed
           debug:
-            msg: "Git authentication verified successfully for repository access"
+            msg: "GitHub authentication verified for private repository access"
           when: git_auth_check.rc == 0
           
         - name: Ensure correct Git remote URL
@@ -135,6 +151,30 @@
           debug:
             msg: "Git repository updated: {{ git_update.stdout }}"
           when: git_update.rc == 0
+
+        - name: Verify working HEAD matches origin/{{ deploy_branch | default('main') }}
+          shell: |
+            set -e
+            cd /home/ploy/ploy
+            HEAD_COMMIT=$(git rev-parse HEAD)
+            ORIGIN_COMMIT=$(git rev-parse origin/{{ deploy_branch | default('main') }})
+            if [ "$HEAD_COMMIT" != "$ORIGIN_COMMIT" ]; then
+              echo "HEAD:   $HEAD_COMMIT"
+              echo "ORIGIN: $ORIGIN_COMMIT"
+              exit 2
+            fi
+            echo "Verified HEAD matches origin/{{ deploy_branch | default('main') }}: $HEAD_COMMIT"
+          become_user: ploy
+          register: git_verify
+          changed_when: false
+          failed_when: git_verify.rc != 0
+          environment:
+            HOME: /home/ploy
+
+        - name: Show verification details when mismatch detected
+          debug:
+            msg: "Repo verification failed: {{ git_verify.stdout_lines | default([]) }} {{ git_verify.stderr_lines | default([]) }}"
+          when: git_verify is defined and git_verify.rc != 0
         
         - name: Ensure /tmp has proper permissions for all users
           file:

@@ -1,0 +1,16 @@
+[2025-09-16 04:27:35] Getting stdout logs for allocation: c3e4a444-4ea3-6a6e-87a2-16282a545f18 (task: api, lines: 800, follow: false)
+[2025-09-16 04:27:35] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/c3e4a444-4ea3-6a6e-87a2-16282a545f18?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 04:27:35] Response code: 200
+
+Vulnerability scan: No vulnerabilities found
+[Build] Job HCL written to /opt/ploy/debug/jobs/ploy-lane-g-rust-1-79-lane-g.hcl
+[04:27:27] 500 - POST /v1/apps/ploy-lane-g-rust-1-79/builds -  125.156379ms
+[04:27:28] 200 - POST /v1/mods/mod-c4ecb075/events -    4.500355ms
+[04:27:28] 200 - POST /v1/mods/mod-c4ecb075/events -    6.357212ms
+[04:27:28] 200 - POST /v1/mods/mod-c4ecb075/events -    3.465464ms
+[04:27:28] 200 - POST /v1/mods/mod-c4ecb075/events -    3.277472ms
+[04:27:30] 200 - POST /v1/mods/mod-c4ecb075/events -    3.899008ms
+[04:27:32] 200 - GET /v1/mods/mod-c4ecb075/artifacts -    1.625956ms
+[04:27:33] 200 - GET /v1/mods/mod-c4ecb075/artifacts/next_json -    5.872626ms
+[04:27:34] 200 - GET /v1/mods/mod-c4ecb075/status -    2.316842ms
+[04:27:30] 200 - GET /v1/health -  4.079998374s

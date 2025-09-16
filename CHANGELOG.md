@@ -18,6 +18,12 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Mods: Split `internal/mods/fanout_orchestrator.go` into logical parts:
+  - `fanout_orchestrator_core.go` (interface, core runner, dispatch)
+  - `fanout_llm_exec.go` + `fanout_llm_helpers.go` (LLM exec branch + helpers)
+  - `fanout_orw_apply.go` (OpenRewrite apply branch)
+  - `fanout_human_step.go` (human-step branch)
+  No behavior changes; unit tests updated/split accordingly.
 - Mods API: Split `api/mods/handler.go` into logical files (`types.go`, `run.go`, `status.go`, `artifacts.go`, `logs.go`, `debug.go`) to reduce LOC and improve maintainability. No behavior changes.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
  - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-eddd8c37). Healing completed and MR created (MR 37). Prior runs captured auth troubleshooting and recovery.
