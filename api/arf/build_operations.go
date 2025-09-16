@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	buildutil "github.com/iw2rmb/ploy/internal/build"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -112,12 +113,12 @@ func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error
 	// First, try to run clean compile (stable property to activate deterministic profile)
 	cmd := exec.CommandContext(ctx, "mvn", "clean", "compile", "-B", "-DskipTests", "-Dploy.build.gate=1")
 	cmd.Dir = repoPath
-	eo, err := runCmd(ctx, cmd)
+	eo, err := buildutil.RunCmd(ctx, cmd)
 	if err != nil {
 		combined := strings.TrimSpace(strings.Join([]string{eo.Stderr, eo.Stdout}, "\n"))
 		errors := b.parseMavenErrors(combined)
 		if len(errors) > 0 {
-			return &BuildError{
+			return &buildutil.BuildError{
 				Type:    "compilation",
 				Message: fmt.Sprintf("Maven compilation failed: %d errors", len(errors)),
 				Details: strings.Join(errors, "\n"),
@@ -125,7 +126,7 @@ func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error
 				Stderr:  eo.Stderr,
 			}
 		}
-		return &BuildError{Type: "compilation", Message: fmt.Sprintf("maven build failed: %v", err), Details: combined, Stdout: eo.Stdout, Stderr: eo.Stderr}
+		return &buildutil.BuildError{Type: "compilation", Message: fmt.Sprintf("maven build failed: %v", err), Details: combined, Stdout: eo.Stdout, Stderr: eo.Stderr}
 	}
 
 	return nil
@@ -142,12 +143,12 @@ func (b *BuildOperations) buildGradle(ctx context.Context, repoPath string) erro
 	cmd := exec.CommandContext(ctx, gradleCmd, "clean", "compileJava", "-x", "test")
 	cmd.Dir = repoPath
 
-	eo, err := runCmd(ctx, cmd)
+	eo, err := buildutil.RunCmd(ctx, cmd)
 	if err != nil {
 		// Extract compilation errors from Gradle output
 		errors := b.parseGradleErrors(eo.Stderr)
 		if len(errors) > 0 {
-			return &BuildError{
+			return &buildutil.BuildError{
 				Type:    "compilation",
 				Message: fmt.Sprintf("Gradle compilation failed: %d errors", len(errors)),
 				Details: strings.Join(errors, "\n"),
@@ -155,7 +156,7 @@ func (b *BuildOperations) buildGradle(ctx context.Context, repoPath string) erro
 				Stderr:  eo.Stderr,
 			}
 		}
-		return &BuildError{Type: "compilation", Message: fmt.Sprintf("gradle build failed: %v", err), Details: eo.Stderr, Stdout: eo.Stdout, Stderr: eo.Stderr}
+		return &buildutil.BuildError{Type: "compilation", Message: fmt.Sprintf("gradle build failed: %v", err), Details: eo.Stderr, Stdout: eo.Stdout, Stderr: eo.Stderr}
 	}
 
 	return nil

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	arf "github.com/iw2rmb/ploy/api/arf"
+	buildutil "github.com/iw2rmb/ploy/internal/build"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 )
 
@@ -28,8 +29,8 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 	if bo := arf.NewBuildOperations(compileTimeout); bo != nil {
 		if err := bo.ValidateBuild(cctx, repoPath, ""); err != nil {
 			msg := err.Error()
-			if be, ok := err.(*arf.BuildError); ok {
-				msg = arf.FormatBuildError(be, true, 64*1024)
+			if be, ok := err.(*buildutil.BuildError); ok {
+				msg = buildutil.FormatBuildError(be, true, 64*1024)
 			}
 			return &common.DeployResult{Success: false, Message: msg}, nil
 		}
