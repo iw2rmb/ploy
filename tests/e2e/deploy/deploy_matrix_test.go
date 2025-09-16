@@ -149,16 +149,23 @@ func runDeploy(t *testing.T, controller, lane, repo, app string, pushBudget, asy
 			}
 		}
 	}
-	// Optional: collect logs proactively when requested
-	if os.Getenv("E2E_LOG_CONFIG") == "1" {
-		collectDeployLogs(t, controller, app, lane, sha, id)
-	}
+    // Optional: collect logs proactively when requested
+    if os.Getenv("E2E_LOG_CONFIG") == "1" {
+        collectDeployLogs(t, controller, app, lane, sha, id)
+    }
 
-	// Health check (fetch logs on failure), with controller-proxied fallback
-	if err := waitHealth(controller, app, healthBudget); err != nil {
-		collectDeployLogs(t, controller, app, lane, sha, id)
-		t.Fatalf("%v", err)
-	}
+    // Health check (fetch logs on failure), with controller-proxied fallback
+    if err := waitHealth(controller, app, healthBudget); err != nil {
+        collectDeployLogs(t, controller, app, lane, sha, id)
+        t.Fatalf("%v", err)
+    }
+    // Capture builder caps (CPU/memory) for recording if available
+    if strings.ToUpper(lane) == "E" && sha != "" {
+        if cpu, mem, ok := fetchBuilderCaps(app, sha); ok {
+            if metrics == nil { metrics = map[string]any{} }
+            metrics["builder"] = map[string]any{"cpu": float64(cpu), "memory_mb": float64(mem)}
+        }
+    }
 	// Cleanup
 	run(t, work, 15*time.Second, bin(), "apps", "destroy", "--name", app, "--force")
 	// Write result entry
@@ -533,35 +540,94 @@ func writeResult(t *testing.T, lane, repo, app string, metrics map[string]any) {
 	b = append(b, '\n')
 	_, _ = f.Write(b)
 
-	// Also append a human-friendly Markdown row to results.md with size/time if available
-	md := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.md"))
-	var szMB, uncompressedMB, durMS string
-	if metrics != nil {
-		if im, ok := metrics["imageSize"].(map[string]any); ok {
-			if v, ok := im["mb"].(float64); ok {
-				szMB = fmt.Sprintf("%.1fMB", v)
-			}
-			if v, ok := im["uncompressed_mb"].(float64); ok {
-				uncompressedMB = fmt.Sprintf("%.1fMB", v)
-			}
-		}
-		if bm, ok := metrics["build"].(map[string]any); ok {
-			if v, ok := bm["duration_ms"].(float64); ok {
-				durMS = fmt.Sprintf("%.1fs", v/1000.0)
-			}
-		}
-	}
-	if szMB == "" {
-		szMB = "—"
-	}
-	if uncompressedMB == "" {
-		uncompressedMB = "—"
-	}
-	if durMS == "" {
-		durMS = "—"
-	}
-	row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s |\n", lane, inferStack(repo), inferVersion(repo), repo, szMB, uncompressedMB, durMS)
-	_ = appendFile(md, row)
+    // Also append a human-friendly Markdown row to results.md with size/time if available
+    md := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.md"))
+    var szMB, uncompressedMB, durMS string
+    var builderCPU, builderMem string
+    if metrics != nil {
+        if im, ok := metrics["imageSize"].(map[string]any); ok {
+            if v, ok := im["mb"].(float64); ok {
+                szMB = fmt.Sprintf("%.1fMB", v)
+            }
+            if v, ok := im["uncompressed_mb"].(float64); ok {
+                uncompressedMB = fmt.Sprintf("%.1fMB", v)
+            }
+        }
+        if bm, ok := metrics["build"].(map[string]any); ok {
+            if v, ok := bm["duration_ms"].(float64); ok {
+                durMS = fmt.Sprintf("%.1fs", v/1000.0)
+            }
+        }
+        if b, ok := metrics["builder"].(map[string]any); ok {
+            if v, ok := b["cpu"].(float64); ok && v > 0 {
+                // Nomad CPU unit is MHz (shares); show as integer
+                builderCPU = fmt.Sprintf("%d", int(v))
+            }
+            if v, ok := b["memory_mb"].(float64); ok && v > 0 {
+                builderMem = fmt.Sprintf("%dMB", int(v))
+            }
+        }
+    }
+    if szMB == "" {
+        szMB = "—"
+    }
+    if uncompressedMB == "" {
+        uncompressedMB = "—"
+    }
+    if durMS == "" {
+        durMS = "—"
+    }
+    if builderCPU == "" { builderCPU = "—" }
+    if builderMem == "" { builderMem = "—" }
+    row := fmt.Sprintf("| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n", lane, inferStack(repo), inferVersion(repo), repo, szMB, uncompressedMB, durMS, builderCPU, builderMem)
+    _ = appendFile(md, row)
+}
+
+// fetchBuilderCaps attempts to retrieve the Kaniko builder CPU and memory caps for the given app build (by git sha)
+// Returns (cpu, memoryMB, ok).
+func fetchBuilderCaps(app, sha string) (int, int, bool) {
+    host := os.Getenv("TARGET_HOST")
+    if host == "" {
+        return 0, 0, false
+    }
+    // Find latest debug job file for this build
+    findCmd := exec.Command("ssh", "-o", "ConnectTimeout=10", "root@"+host,
+        "ls -1 /opt/ploy/debug/jobs | grep "+app+"-e-build-"+sha+" | sort | tail -n 1")
+    out, err := runWithTimeout(findCmd, 8*time.Second)
+    if err != nil {
+        return 0, 0, false
+    }
+    file := strings.TrimSpace(string(out))
+    if file == "" {
+        return 0, 0, false
+    }
+    cat := exec.Command("ssh", "-o", "ConnectTimeout=10", "root@"+host, "sed", "-n", "1,200p", "/opt/ploy/debug/jobs/"+file)
+    body, err := runWithTimeout(cat, 8*time.Second)
+    if err != nil {
+        return 0, 0, false
+    }
+    s := string(body)
+    // Parse lines for resources block
+    var cpu, mem int
+    for _, line := range strings.Split(s, "\n") {
+        line = strings.TrimSpace(line)
+        if strings.HasPrefix(line, "cpu") {
+            var v int
+            if _, e := fmt.Sscanf(line, "cpu = %d", &v); e == nil {
+                cpu = v
+            }
+        }
+        if strings.HasPrefix(line, "memory") {
+            var v int
+            if _, e := fmt.Sscanf(line, "memory = %d", &v); e == nil {
+                mem = v
+            }
+        }
+    }
+    if cpu > 0 || mem > 0 {
+        return cpu, mem, true
+    }
+    return 0, 0, false
 }
 
 func inferStack(repo string) string {
