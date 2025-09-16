@@ -828,6 +828,16 @@ build_step:
 			message = fmt.Sprintf("%s: %v", message, err)
 		}
 
+		// Emit a diagnostic event with a truncated build error message to aid planner/LLM debugging
+		{
+			const maxLen = 600
+			msg := message
+			if len(msg) > maxLen {
+				msg = msg[:maxLen] + "…"
+			}
+			r.emit(ctx, "build", "build-gate-error", "info", msg)
+		}
+
 		result.StepResults = append(result.StepResults, StepResult{
 			StepID:   "build",
 			Success:  false,
@@ -1133,6 +1143,16 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 	summary := &ModHealingSummary{
 		Enabled:       true,
 		AttemptsCount: 1,
+	}
+
+	// Log the captured build error (truncated) to help diagnose planner inputs
+	{
+		const maxLen = 800
+		msg := buildError
+		if len(msg) > maxLen {
+			msg = msg[:maxLen] + "…"
+		}
+		r.emit(ctx, "healing", "build-error", "info", msg)
 	}
 
 	// Fast-path local remediation to ensure E2E healing success when remote planner is unavailable

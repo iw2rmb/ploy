@@ -62,9 +62,12 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		_ = os.MkdirAll(ctxDir, 0755)
 		_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
 		// Inject inputs.json with last_error if provided
-		if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
-			inputsJSON := fmt.Sprintf("{\n  \"language\": \"java\",\n  \"lane\": \"%s\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": %q\n  },\n  \"deps\": {}\n}\n", "", be)
-			_ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
+        if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
+            inputsJSON := fmt.Sprintf("{\n  \"language\": \"java\",\n  \"lane\": \"%s\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": %q\n  },\n  \"deps\": {}\n}\n", "", be)
+            _ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
+            if o.runner != nil && o.runner.GetEventReporter() != nil {
+                _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputsJSON)), Time: time.Now()})
+            }
 			// Best-effort: extract up to 5 .java paths from error and include current sources for diffing
 			repoRoot := filepath.Join(o.runner.GetWorkspaceDir(), "repo")
 			seen := make(map[string]struct{})
