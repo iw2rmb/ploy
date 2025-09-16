@@ -96,22 +96,25 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 }
 
 func templateForLane(lane string) string {
-	switch strings.ToUpper(lane) {
-	case "A":
-		return "platform/nomad/lane-a-unikraft.hcl"
-	case "B":
-		return "platform/nomad/lane-b-unikraft-posix.hcl"
-	case "C":
-		return "platform/nomad/lane-c-osv.hcl"
-	case "D":
-		return "platform/nomad/lane-d-jail.hcl"
-	case "E":
-		return "platform/nomad/lane-e-oci-kontain.hcl"
-	case "F":
-		return "platform/nomad/lane-f-vm.hcl"
-	default:
-		return "platform/nomad/lane-c-osv.hcl"
-	}
+    switch strings.ToUpper(lane) {
+    case "A":
+        return "platform/nomad/lane-a-unikraft.hcl"
+    case "B":
+        return "platform/nomad/lane-b-unikraft-posix.hcl"
+    case "C":
+        return "platform/nomad/lane-c-osv.hcl"
+    case "D":
+        return "platform/nomad/lane-d-jail.hcl"
+    case "E":
+        return "platform/nomad/lane-e-oci-kontain.hcl"
+    case "F":
+        return "platform/nomad/lane-f-vm.hcl"
+    case "G":
+        // For now, Lane G (WASM) apps use OCI containers as fallback
+        return "platform/nomad/lane-e-oci-kontain.hcl"
+    default:
+        return "platform/nomad/lane-c-osv.hcl"
+    }
 }
 
 // RenderKanikoBuilder renders a Kaniko builder job for Lane E container builds
