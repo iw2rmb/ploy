@@ -100,11 +100,20 @@ api/
 ├── platform/                 # Platform service integration
 │   ├── handler.go            # Platform API endpoints
 │   └── handler_test.go       # Platform handler tests
-├── mods/                     # Mods API endpoints
-│   └── handler.go            # Mods transformation handlers
-├── llms/                     # Large Language Model integration
-│   ├── handler.go            # LLM API endpoints
-│   └── handler_test.go       # LLM handler tests
+├── mods/                     # Mods API endpoints (split by concern)
+│   ├── handler.go            # Wiring: Handler struct and RegisterRoutes; events handler
+│   ├── types.go              # Public API types (status, steps, events)
+│   ├── run.go                # RunMod orchestration (async execution)
+│   ├── status.go             # Status, list, cancel, KV helpers
+│   ├── artifacts.go          # Artifact persistence and download helpers
+│   ├── logs.go               # SSE log streaming helpers
+│   └── debug.go              # Debug utilities (Nomad diagnostics)
+├── llms/                     # Large Language Model integration (split by concern)
+│   ├── handler.go            # Wiring: Handler struct and RegisterRoutes
+│   ├── list.go               # ListModels
+│   ├── model_crud.go         # GetModel, CreateModel, UpdateModel, DeleteModel
+│   ├── default.go            # GetDefaultModel, SetDefaultModel
+│   └── stats.go              # GetModelStats
 ├── sbom/                     # SBOM API and analyzer
 │   ├── handler.go            # SBOM API endpoints (/v1/sbom/*)
 │   ├── analyzer.go           # Minimal Syft-style analyzer

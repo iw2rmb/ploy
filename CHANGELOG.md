@@ -18,6 +18,7 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Mods API: Split `api/mods/handler.go` into logical files (`types.go`, `run.go`, `status.go`, `artifacts.go`, `logs.go`, `debug.go`) to reduce LOC and improve maintainability. No behavior changes.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
  - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-eddd8c37). Healing completed and MR created (MR 37). Prior runs captured auth troubleshooting and recovery.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-a246d18f). Healing produced plan/diff/next artifacts; push/MR failed due to missing GitLab token.
