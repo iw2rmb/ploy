@@ -204,6 +204,14 @@
           register: ployman_build
           changed_when: ployman_build.rc == 0
 
+        - name: Build wazero-runner binary
+          shell: |
+            cd /home/ploy/ploy
+            /usr/local/go/bin/go build -o bin/wazero-runner ./cmd/wazero-runner
+          become_user: ploy
+          register: wazero_runner_build
+          changed_when: wazero_runner_build.rc == 0
+
         - name: Verify binaries were created successfully
           stat:
             path: "/home/ploy/ploy/bin/{{ item }}"
@@ -212,6 +220,7 @@
             - api
             - ploy
             - ployman
+            - wazero-runner
 
         - name: Display build results
           debug:
@@ -335,6 +344,18 @@
             fi
           register: binary_upload
           become_user: ploy
+
+        - name: Upload wazero-runner to SeaweedFS
+          shell: |
+            RUNNER_PATH="/home/ploy/ploy/bin/wazero-runner"
+            DEST="http://localhost:{{ seaweedfs.filer_port }}/artifacts/wazero-runner/linux/amd64/wazero-runner"
+            echo "Uploading wazero-runner to SeaweedFS..."
+            curl -X POST -F "file=@${RUNNER_PATH}" --max-time 60 --connect-timeout 10 -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" "$DEST"
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$DEST")
+            if [ "$HTTP_CODE" != "200" ]; then echo "runner not accessible (HTTP $HTTP_CODE)"; exit 1; fi
+          become_user: ploy
+          register: runner_upload
+          changed_when: runner_upload.rc == 0
 
         - name: Upload metadata to SeaweedFS
           shell: |
