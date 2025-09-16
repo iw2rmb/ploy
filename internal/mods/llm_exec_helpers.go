@@ -193,16 +193,17 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 	if ctrl := ResolveInfraFromEnv().Controller; ctrl != "" {
 		_ = waitForStepContaining(ctrl, modID, "llm-exec", "uploaded diff to", 120*time.Second)
 	}
-	var dlErr error
-	for i := 0; i < 60; i++ {
-		if err := downloadToFileFn(url, diffPath); err == nil {
-			dlErr = nil
+	// Event observed — wait for filer to index object using lightweight HEAD with backoff
+	// Try up to 30s with jitter
+	for i := 0; i < 30; i++ {
+		if headURLFn(url) {
 			break
-		} else {
-			dlErr = err
-			time.Sleep(1 * time.Second)
 		}
+		// jittered sleep between 300–700ms
+		time.Sleep(300*time.Millisecond + time.Duration(i%5)*80*time.Millisecond)
 	}
+	// Single download attempt after HEAD reports ready (or timeout)
+	dlErr := downloadToFileFn(url, diffPath)
 	dlEnd := time.Now()
 	if dlErr != nil {
 		if rep != nil {

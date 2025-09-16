@@ -40,6 +40,23 @@ func downloadToFile(url, dest string) error {
 // test indirections
 var downloadToFileFn = downloadToFile
 
+// headOK performs a HEAD request and returns true if the resource exists (2xx)
+func headOK(url string) bool {
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return false
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return resp.StatusCode >= 200 && resp.StatusCode < 300
+}
+
+var headURLFn = headOK
+
 // validateArtifactKey ensures keys are safe and within the allowed namespace.
 // Allowed form:
 //   - must start with "mods/"
