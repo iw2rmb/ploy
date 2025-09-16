@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 
+	gitapi "github.com/iw2rmb/ploy/api/git"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 )
@@ -13,6 +14,7 @@ type GitOperationsInterface interface {
 	CreateBranchAndCheckout(ctx context.Context, repoPath, branchName string) error
 	CommitChanges(ctx context.Context, repoPath, message string) error
 	PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error
+	PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) *gitapi.Operation
 }
 
 // RecipeExecutorInterface defines the recipe execution interface

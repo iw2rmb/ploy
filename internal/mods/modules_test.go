@@ -8,6 +8,7 @@ import (
 
 	"os"
 
+	gitapi "github.com/iw2rmb/ploy/api/git"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	provider "github.com/iw2rmb/ploy/internal/git/provider"
 )
@@ -51,6 +52,16 @@ func (f *fakeGitOps) PushBranch(ctx context.Context, repoPath, remoteURL, branch
 	f.calls = append(f.calls, "push:"+repoPath+":"+remoteURL+":"+branchName)
 	return nil
 }
+
+func (f *fakeGitOps) PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) *gitapi.Operation {
+	f.calls = append(f.calls, "push-async:"+repoPath+":"+remoteURL+":"+branchName)
+	svc := gitapi.NewService(gitapi.ServiceConfig{Runner: noopRunner{}})
+	return svc.PushBranchAsync(ctx, gitapi.PushRequest{RepoPath: repoPath, RemoteURL: remoteURL, Branch: branchName})
+}
+
+type noopRunner struct{}
+
+func (noopRunner) Run(ctx context.Context, dir string, name string, args ...string) error { return nil }
 
 func TestRepoManagerAdapter_Delegates(t *testing.T) {
 	f := &fakeGitOps{}
