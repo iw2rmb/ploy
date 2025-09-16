@@ -3,7 +3,7 @@ job "{{APP_NAME}}-lane-g" {
   type = "service"
 
   group "app" {
-    count = {{INSTANCE_COUNT}}
+    count = 1
 
     network {
       port "http" { to = {{HTTP_PORT}} }
