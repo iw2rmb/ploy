@@ -53,6 +53,10 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, modID, br
 		for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
 			chain[i], chain[j] = chain[j], chain[i]
 		}
+		// Optimization: apply only HEAD step to avoid context conflicts when multiple LLM steps exist
+		if len(chain) > 0 {
+			chain = []string{chain[len(chain)-1]}
+		}
 		allow := r.Allowlist
 		for _, sid := range chain {
 			url := strings.TrimRight(storageBase, "/") + "/artifacts/" + fmt.Sprintf("mods/%s/branches/%s/steps/%s/diff.patch", modID, branchID, sid)

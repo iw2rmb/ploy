@@ -131,8 +131,8 @@ func TestModRunner_Run(t *testing.T) {
 				// Force HCL validation failure
 				validateJob = func(string) error { return fmt.Errorf("job parse/validate failed: bad HCL") }
 			},
-            expectError:    true,
-            expectedErrMsg: "ORW HCL validation failed",
+			expectError:    true,
+			expectedErrMsg: "ORW HCL validation failed",
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
@@ -160,8 +160,8 @@ func TestModRunner_Run(t *testing.T) {
 					Message: "Build failed with compilation errors",
 				}
 			},
-            expectError:    true,
-            expectedErrMsg: "build check failed",
+			expectError:    true,
+			expectedErrMsg: "build check failed",
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
