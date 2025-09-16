@@ -258,12 +258,16 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
     TARGET_FILE=""
     TARGET_LINE=""
     if [ -s "$CTX_DIR/inputs.json" ]; then
-      # Prefer structured errors array if present
-      FIRST_ERR_JSON=$(awk 'BEGIN{RS="}"} /"errors"[[:space:]]*:/ {print $0"}"; exit}' "$CTX_DIR/inputs.json" 2>/dev/null || true)
-      if [ -n "$FIRST_ERR_JSON" ]; then
-        # Extract "file": "..." and "line": N (very lightweight parsing)
-        CAND=$(printf "%s" "$FIRST_ERR_JSON" | sed -n 's/.*"file"[[:space:]]*:[[:space:]]*"\([^"]\+\)".*/\1/p' | head -n1)
-        LINE=$(printf "%s" "$FIRST_ERR_JSON" | sed -n 's/.*"line"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+      # Prefer explicit top-level hints if present
+      CAND=$(sed -n 's/.*"first_error_file"[[:space:]]*:[[:space:]]*"\([^"]\+\)".*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
+      LINE=$(sed -n 's/.*"first_error_line"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
+      # Else try structured errors array
+      if [ -z "$CAND" ] || [ -z "$LINE" ]; then
+        FIRST_ERR_JSON=$(awk 'BEGIN{RS="}"} /"errors"[[:space:]]*:/ {print $0"}"; exit}' "$CTX_DIR/inputs.json" 2>/dev/null || true)
+        if [ -n "$FIRST_ERR_JSON" ]; then
+          CAND=$(printf "%s" "$FIRST_ERR_JSON" | sed -n 's/.*"file"[[:space:]]*:[[:space:]]*"\([^"]\+\)".*/\1/p' | head -n1)
+          LINE=$(printf "%s" "$FIRST_ERR_JSON" | sed -n 's/.*"line"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+        fi
       fi
       # Fallback: extract from raw last_error stderr
       if [ -z "$CAND" ] || [ -z "$LINE" ]; then
