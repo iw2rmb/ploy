@@ -718,8 +718,10 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		nonce := time.Now().Unix()
 		versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
 		langForBuilder := detectedLanguage
-		if langForBuilder == "" && strings.ToLower(facts.BuildTool) == "dotnet" {
-			langForBuilder = "dotnet"
+		if langForBuilder == "" {
+			if cs := findFirstCsproj(srcDir); cs != "" {
+				langForBuilder = "dotnet"
+			}
 		}
 		builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
 		if err != nil {
