@@ -80,7 +80,8 @@
           PLOY_PLATFORM_DOMAIN="{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('dev.ployman.app', true) }}"
           # Nomad/Mods runtime defaults
           NOMAD_DC="{{ lookup('env', 'NOMAD_DC') }}"
-          PLOY_SEAWEEDFS_URL="{{ lookup('env', 'PLOY_SEAWEEDFS_URL') }}"
+          # SeaweedFS Filer URL base. If not provided from controller, default to node IP:8888 (resolvable by Docker tasks)
+          PLOY_SEAWEEDFS_URL="{{ (lookup('env', 'PLOY_SEAWEEDFS_URL') | default('', true)) | ternary(lookup('env','PLOY_SEAWEEDFS_URL'), 'http://' + (hostvars[inventory_hostname]['ansible_host'] | default(inventory_hostname)) + ':8888') }}"
           # OpenRewrite apply runner image (must exist in internal registry)
           # Preferred: set MODS_ORW_APPLY_IMAGE; runner substitutes ${ORW_IMAGE}
           MODS_ORW_APPLY_IMAGE="{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') }}"

@@ -56,10 +56,11 @@ type RenderData struct {
 	DomainSuffix string
 
 	// Build metadata
-    BuildTime string
+	BuildTime string
 
-    // WASM-specific options
+	// WASM-specific options
     WasmModuleURL string
+    FilerBaseURL  string
 }
 
 // RenderTemplate renders a Nomad job HCL based on lane and data, returning a temp file path
@@ -99,25 +100,25 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 }
 
 func templateForLane(lane string) string {
-    switch strings.ToUpper(lane) {
-    case "A":
-        return "platform/nomad/lane-a-unikraft.hcl"
-    case "B":
-        return "platform/nomad/lane-b-unikraft-posix.hcl"
-    case "C":
-        return "platform/nomad/lane-c-osv.hcl"
-    case "D":
-        return "platform/nomad/lane-d-jail.hcl"
-    case "E":
-        return "platform/nomad/lane-e-oci-kontain.hcl"
-    case "F":
-        return "platform/nomad/lane-f-vm.hcl"
-    case "G":
-        // Lane G uses WASM runtime template
-        return "platform/nomad/lane-g-wasm.hcl"
-    default:
-        return "platform/nomad/lane-c-osv.hcl"
-    }
+	switch strings.ToUpper(lane) {
+	case "A":
+		return "platform/nomad/lane-a-unikraft.hcl"
+	case "B":
+		return "platform/nomad/lane-b-unikraft-posix.hcl"
+	case "C":
+		return "platform/nomad/lane-c-osv.hcl"
+	case "D":
+		return "platform/nomad/lane-d-jail.hcl"
+	case "E":
+		return "platform/nomad/lane-e-oci-kontain.hcl"
+	case "F":
+		return "platform/nomad/lane-f-vm.hcl"
+	case "G":
+		// Lane G uses WASM runtime template
+		return "platform/nomad/lane-g-wasm.hcl"
+	default:
+		return "platform/nomad/lane-c-osv.hcl"
+	}
 }
 
 // RenderKanikoBuilder renders a Kaniko builder job for Lane E container builds
@@ -171,6 +172,30 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, 
 	// Ensure a writable temp dir is present for BusyBox wget target in Kaniko entrypoint
 	// The builder template already includes a mkdir -p /tmp; keep it enforced here if template changes.
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
+	if err := os.WriteFile(out, []byte(s), 0644); err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
+// RenderWasmBuilder renders a builder job that compiles a Rust project to wasm32-wasi and uploads module.wasm
+func RenderWasmBuilder(app, version, contextURL, uploadURL string) (string, error) {
+	b, err := loadTemplateContent("platform/nomad/lane-g-wasm-builder.hcl")
+	if err != nil {
+		// Fall back to embedded path
+		b2, err2 := loadTemplateContent("internal/orchestration/templates/lane-g-wasm-builder.hcl")
+		if err2 == nil {
+			b = b2
+		} else {
+			return "", err
+		}
+	}
+	s := string(b)
+	s = strings.ReplaceAll(s, "{{APP_NAME}}", app)
+	s = strings.ReplaceAll(s, "{{VERSION}}", version)
+	s = strings.ReplaceAll(s, "{{CONTEXT_URL}}", contextURL)
+	s = strings.ReplaceAll(s, "{{WASM_UPLOAD_URL}}", uploadURL)
+	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-g-build-%s.hcl", app, version))
 	if err := os.WriteFile(out, []byte(s), 0644); err != nil {
 		return "", err
 	}
@@ -305,9 +330,12 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 		data.Lane = "C"
 	}
 	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Lane))
-    s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
+	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
     if data.WasmModuleURL != "" {
         s = strings.ReplaceAll(s, "{{WASM_URL}}", data.WasmModuleURL)
+    }
+    if data.FilerBaseURL != "" {
+        s = strings.ReplaceAll(s, "{{FILER_URL}}", strings.TrimRight(data.FilerBaseURL, "/"))
     }
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
