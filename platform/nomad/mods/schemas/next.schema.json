@@ -5,7 +5,8 @@
   "type": "object",
   "required": ["action"],
   "properties": {
-    "action": { "enum": ["stop", "new_plan"] },
+    "action": { "enum": ["stop", "new_plan", "apply"] },
+    "step_id": { "type": "string" },
     "plan": {
       "type": "object",
       "required": ["plan_id", "options"],
