@@ -98,32 +98,38 @@ func workingTreeDiffNames(ctx context.Context, repoPath string, max int) []strin
 
 // firstErrorFileHead returns the first n lines of the first error file for diagnostics.
 func firstErrorFileHead(repoPath, buildError string, n int) string {
-    if n <= 0 { n = 10 }
-    errs := ParseBuildErrors("java", "maven", buildError)
-    if len(errs) == 0 {
-        return ""
-    }
-    file := errs[0].File
-    // Normalize rel path
-    rel := file
-    if repoPath != "" {
-        prefix := strings.TrimRight(repoPath, string(os.PathSeparator)) + string(os.PathSeparator)
-        if strings.HasPrefix(file, prefix) {
-            rel = strings.TrimPrefix(file, prefix)
-        }
-    }
-    abs := file
-    if !filepath.IsAbs(abs) {
-        abs = filepath.Join(repoPath, rel)
-    }
-    b, err := os.ReadFile(abs)
-    if err != nil {
-        return ""
-    }
-    content := string(b)
-    lines := strings.Split(content, "\n")
-    if n > len(lines) { n = len(lines) }
-    head := strings.Join(lines[:n], "\n")
-    if len(head) > 800 { head = head[:800] + "…" }
-    return fmt.Sprintf("post-replay file head file=%s lines 1-%d:\n%s", rel, n, head)
+	if n <= 0 {
+		n = 10
+	}
+	errs := ParseBuildErrors("java", "maven", buildError)
+	if len(errs) == 0 {
+		return ""
+	}
+	file := errs[0].File
+	// Normalize rel path
+	rel := file
+	if repoPath != "" {
+		prefix := strings.TrimRight(repoPath, string(os.PathSeparator)) + string(os.PathSeparator)
+		if strings.HasPrefix(file, prefix) {
+			rel = strings.TrimPrefix(file, prefix)
+		}
+	}
+	abs := file
+	if !filepath.IsAbs(abs) {
+		abs = filepath.Join(repoPath, rel)
+	}
+	b, err := os.ReadFile(abs)
+	if err != nil {
+		return ""
+	}
+	content := string(b)
+	lines := strings.Split(content, "\n")
+	if n > len(lines) {
+		n = len(lines)
+	}
+	head := strings.Join(lines[:n], "\n")
+	if len(head) > 800 {
+		head = head[:800] + "…"
+	}
+	return fmt.Sprintf("post-replay file head file=%s lines 1-%d:\n%s", rel, n, head)
 }
