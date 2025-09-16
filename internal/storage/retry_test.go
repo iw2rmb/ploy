@@ -123,6 +123,33 @@ func TestRetryWithBackoff(t *testing.T) {
 	}
 }
 
+func TestRetryWithBackoff_RespectsRetryAfter(t *testing.T) {
+    // Configure a large initial delay so we can detect Retry-After override
+    cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 200 * time.Millisecond, MaxDelay: 1 * time.Second, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeInternal}}
+    attempts := 0
+    op := func() error {
+        attempts++
+        if attempts == 1 {
+            // Return a retryable StorageError with RetryAfter 5ms
+            return &StorageError{ErrorType: ErrorTypeInternal, Retryable: true, RetryAfter: 5 * time.Millisecond}
+        }
+        return nil
+    }
+    start := time.Now()
+    err := RetryWithBackoff(context.Background(), op, cfg, "test_retry_after")
+    elapsed := time.Since(start)
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if attempts != 2 {
+        t.Fatalf("expected 2 attempts, got %d", attempts)
+    }
+    // Should be significantly less than InitialDelay due to Retry-After override
+    if elapsed >= 200*time.Millisecond {
+        t.Fatalf("expected elapsed < 200ms due to Retry-After override, got %v", elapsed)
+    }
+}
+
 func TestNewRetryableStorageClient(t *testing.T) {
 	mockProvider := &MockStorageProvider{}
 
