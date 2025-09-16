@@ -300,38 +300,41 @@ build_step:
 						}
 					}
 				}
-				// Build check before committing healing changes
-				buildStart2 := time.Now()
-				if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
-					// Revert working tree and retry if attempts remain
-					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
-					cmd.Dir = repoPath
-					_ = cmd.Run()
-					msg2 := "post-healing build failed"
-					if br2 != nil && br2.Message != "" {
-						msg2 = br2.Message
-					}
-					if err2 != nil {
-						msg2 = fmt.Sprintf("%s: %v", msg2, err2)
-					}
-					result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg2 + " (reverted healing patch)", Duration: time.Since(buildStart2)})
-					lastErr = fmt.Errorf("%s", msg2)
-					if attempt == maxRetries {
-						break
-					}
-					continue
-				}
-				// Commit healing changes and proceed
-				if r.repoManager != nil {
-					_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
-				} else {
-					_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
-				}
-				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
-				r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
-				healingSuccess = true
-				break
-			}
+                // Build check before committing healing changes
+                r.emit(ctx, "build", "post-healing-build-start", "info", "Running post-healing build gate")
+                buildStart2 := time.Now()
+                if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
+                    // Revert working tree and retry if attempts remain
+                    cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+                    cmd.Dir = repoPath
+                    _ = cmd.Run()
+                    msg2 := "post-healing build failed"
+                    if br2 != nil && br2.Message != "" {
+                        msg2 = br2.Message
+                    }
+                    if err2 != nil {
+                        msg2 = fmt.Sprintf("%s: %v", msg2, err2)
+                    }
+                    r.emit(ctx, "build", "post-healing-build-failed", "error", msg2)
+                    result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg2 + " (reverted healing patch)", Duration: time.Since(buildStart2)})
+                    lastErr = fmt.Errorf("%s", msg2)
+                    if attempt == maxRetries {
+                        break
+                    }
+                    continue
+                }
+                // Commit healing changes and proceed
+                if r.repoManager != nil {
+                    _ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
+                } else {
+                    _ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
+                }
+                result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
+                r.emit(ctx, "build", "post-healing-build-succeeded", "info", "Build completed successfully (post-healing)")
+                r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
+                healingSuccess = true
+                break
+            }
 			// If reducer chose stop, accept healing as succeeded (no additional apply)
 			if strings.ToLower(healingSummary.NextAction.Action) == "stop" && healingSummary.Winner != nil {
 				healingSuccess = true
@@ -366,35 +369,38 @@ build_step:
 	// Step 6: If healing requested applying additional diffs, commit them and re-run build gate
 	if result.HealingSummary != nil && result.HealingSummary.FinalSuccess {
 		if strings.ToLower(result.HealingSummary.NextAction.Action) == "apply" {
-			// Build check before committing healing changes
-			buildStart2 := time.Now()
-			if br2, err := r.runBuildGate(ctx, repoPath); err != nil || (br2 != nil && !br2.Success) {
-				msg := "Build check failed after healing apply"
-				if br2 != nil && br2.Message != "" {
-					msg = br2.Message
-				}
-				if err != nil {
-					msg = fmt.Sprintf("%s: %v", msg, err)
-				}
-				// Revert working tree to pre-healing HEAD (discard uncommitted changes)
-				// Discard uncommitted changes to return to pre-healing state
-				{
-					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
-					cmd.Dir = repoPath
-					_ = cmd.Run()
-				}
-				// Record failed post-healing build but continue with normal flow (ORW-only)
-				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg + " (reverted healing patch)", Duration: time.Since(buildStart2)})
-			} else {
-				// Commit post-healing changes after successful build
-				if r.repoManager != nil {
-					_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
-				} else {
-					_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
-				}
-				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
-				r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
-			}
+            // Build check before committing healing changes
+            buildStart2 := time.Now()
+            r.emit(ctx, "build", "post-healing-build-start", "info", "Running post-healing build gate")
+            if br2, err := r.runBuildGate(ctx, repoPath); err != nil || (br2 != nil && !br2.Success) {
+                msg := "Build check failed after healing apply"
+                if br2 != nil && br2.Message != "" {
+                    msg = br2.Message
+                }
+                if err != nil {
+                    msg = fmt.Sprintf("%s: %v", msg, err)
+                }
+                // Revert working tree to pre-healing HEAD (discard uncommitted changes)
+                // Discard uncommitted changes to return to pre-healing state
+                {
+                    cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+                    cmd.Dir = repoPath
+                    _ = cmd.Run()
+                }
+                // Record failed post-healing build but continue with normal flow (ORW-only)
+                r.emit(ctx, "build", "post-healing-build-failed", "error", msg)
+                result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg + " (reverted healing patch)", Duration: time.Since(buildStart2)})
+            } else {
+                // Commit post-healing changes after successful build
+                if r.repoManager != nil {
+                    _ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
+                } else {
+                    _ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
+                }
+                result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
+                r.emit(ctx, "build", "post-healing-build-succeeded", "info", "Build completed successfully (post-healing)")
+                r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
+            }
 		}
 	}
 
