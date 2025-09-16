@@ -107,14 +107,23 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		summary.NextAction = *nextAction
 	}
 
-	// If reducer requests applying a branch chain, replay it into the repo now
-	if nextAction != nil && strings.ToLower(nextAction.Action) == "apply" {
-		seaweed := ResolveInfraFromEnv().SeaweedURL
-		if seaweed != "" && nextAction.StepID != "" {
-			baseDir := filepath.Join(r.workspaceDir, "branch-apply")
-			_ = os.MkdirAll(baseDir, 0755)
-			_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), nextAction.StepID, baseDir, repoPath)
-		}
+    // If reducer requests applying a branch chain, replay it into the repo now
+    if nextAction != nil && strings.ToLower(nextAction.Action) == "apply" {
+        // Visibility: emit a replay starting event
+        if ctrl := ResolveInfraFromEnv().Controller; ctrl != "" {
+            _ = NewControllerEventReporter(ctrl, os.Getenv("MOD_ID")).Report(ctx, Event{
+                Phase:   "healing",
+                Step:    "apply",
+                Level:   "info",
+                Message: fmt.Sprintf("replay starting: branch_id=%s plan_id=%s", nextAction.StepID, planResult.PlanID),
+            })
+        }
+        seaweed := ResolveInfraFromEnv().SeaweedURL
+        if seaweed != "" && nextAction.StepID != "" {
+            baseDir := filepath.Join(r.workspaceDir, "branch-apply")
+            _ = os.MkdirAll(baseDir, 0755)
+            _ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), nextAction.StepID, baseDir, repoPath)
+        }
 		summary.SetFinalResult(true)
 		return summary, nil
 	}
