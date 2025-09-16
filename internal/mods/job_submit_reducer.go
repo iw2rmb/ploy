@@ -113,20 +113,16 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		}
 		key := fmt.Sprintf("mods/%s/reducer/%s/next.json", modID, runID)
 		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-		// Wait for explicit upload confirmation from job logs before fetching
+		// Event-driven: wait for upload event, then HEAD+jitter readiness, then single download
 		_ = waitForStepContaining(infra.Controller, modID, "reducer", "uploaded next to", 120*time.Second)
-		var dlErr error
-		for i := 0; i < 60; i++ {
-			if err := downloadToFileFn(url, artifactPath); err == nil {
-				dlErr = nil
+		for i := 0; i < 30; i++ { // ~2s
+			if headURLFn(url) {
 				break
-			} else {
-				dlErr = err
-				time.Sleep(1 * time.Second)
 			}
+			time.Sleep(300*time.Millisecond + time.Duration(i%5)*80*time.Millisecond)
 		}
-		if dlErr != nil {
-			return nil, fmt.Errorf("failed to download reducer artifact: %w", dlErr)
+		if err := downloadToFileFn(url, artifactPath); err != nil {
+			return nil, fmt.Errorf("failed to download reducer artifact: %w", err)
 		}
 		var next NextAction
 		if err := readJobArtifact(artifactPath, &next); err != nil {

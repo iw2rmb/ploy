@@ -165,21 +165,16 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		}
 		key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
 		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
-		// Wait for upload event, then fetch with retry
-		// Wait for job to report artifact upload before downloading
+		// Event-driven: wait for upload event, then HEAD+jitter for filer readiness, single download
 		_ = waitForStepContaining(infra.Controller, modID, "planner", "uploaded plan to", 120*time.Second)
-		var dlErr error
-		for i := 0; i < 60; i++ {
-			if err := downloadToFileFn(url, artifactPath); err == nil {
-				dlErr = nil
+		for i := 0; i < 30; i++ { // up to ~2s
+			if headURLFn(url) {
 				break
-			} else {
-				dlErr = err
-				time.Sleep(1 * time.Second)
 			}
+			time.Sleep(300*time.Millisecond + time.Duration(i%5)*80*time.Millisecond)
 		}
-		if dlErr != nil {
-			return nil, fmt.Errorf("failed to download planner artifact: %w", dlErr)
+		if err := downloadToFileFn(url, artifactPath); err != nil {
+			return nil, fmt.Errorf("failed to download planner artifact: %w", err)
 		}
 
 		// Parse plan.json to PlanResult
