@@ -1,15 +1,16 @@
 package mods
 
 import (
-	"context"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
+    "context"
+    "fmt"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+    "strings"
+    "time"
 
-	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    orchestration "github.com/iw2rmb/ploy/internal/orchestration"
+    "strconv"
 )
 
 // executeLLMExecBranch executes an LLM-based code generation branch
@@ -63,12 +64,38 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 		_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
 		// Inject inputs.json with last_error if provided
         if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
-            inputsJSON := fmt.Sprintf("{\n  \"language\": \"java\",\n  \"lane\": \"%s\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": %q\n  },\n  \"deps\": {}\n}\n", "", be)
+            // Build inputs.json with raw and structured hints
+            parsed := ParseBuildErrors("java", "maven", be)
+            var b strings.Builder
+            b.WriteString("{\n  \"language\": \"java\",\n  \"lane\": \"\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": ")
+            b.WriteString(strconv.Quote(be))
+            b.WriteString("\n  }")
+            if len(parsed) > 0 {
+                b.WriteString(",\n  \"first_error_file\": ")
+                b.WriteString(strconv.Quote(parsed[0].File))
+                b.WriteString(",\n  \"first_error_line\": ")
+                b.WriteString(strconv.Itoa(parsed[0].Line))
+            }
+            b.WriteString(",\n  \"errors\": [")
+            for i, e := range parsed {
+                if i > 0 { b.WriteString(",") }
+                b.WriteString("{\"file\":")
+                b.WriteString(strconv.Quote(e.File))
+                b.WriteString(",\"line\":")
+                b.WriteString(strconv.Itoa(e.Line))
+                b.WriteString(",\"column\":")
+                b.WriteString(strconv.Itoa(e.Column))
+                b.WriteString(",\"message\":")
+                b.WriteString(strconv.Quote(e.Message))
+                b.WriteString("}")
+            }
+            b.WriteString("]\n}\n")
+            inputsJSON := b.String()
             _ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
             if o.runner != nil && o.runner.GetEventReporter() != nil {
                 _ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputsJSON)), Time: time.Now()})
             }
-			// Best-effort: extract up to 5 .java paths from error and include current sources for diffing
+            // Best-effort: extract up to 5 .java paths from error and include current sources for diffing
 			repoRoot := filepath.Join(o.runner.GetWorkspaceDir(), "repo")
 			seen := make(map[string]struct{})
 			paths := extractJavaPathsFromError(be, 5)
