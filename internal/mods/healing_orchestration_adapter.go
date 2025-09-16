@@ -127,14 +127,18 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 			if msg := buildFirstErrorSnippet(repoPath, buildError); strings.TrimSpace(msg) != "" {
 				r.emit(ctx, "healing", "apply", "info", msg)
 			}
-			// Emit a short diff file list after replay
-			if files := workingTreeDiffNames(ctx, repoPath, 8); len(files) > 0 {
-				joined := strings.Join(files, ", ")
-				if len(joined) > 400 {
-					joined = joined[:400] + "…"
-				}
-				r.emit(ctx, "healing", "apply", "info", "post-replay changed files: "+joined)
-			}
+            // Emit a short diff file list after replay
+            if files := workingTreeDiffNames(ctx, repoPath, 8); len(files) > 0 {
+                joined := strings.Join(files, ", ")
+                if len(joined) > 400 {
+                    joined = joined[:400] + "…"
+                }
+                r.emit(ctx, "healing", "apply", "info", "post-replay changed files: "+joined)
+            }
+            // Emit head of file for extra confirmation
+            if head := firstErrorFileHead(repoPath, buildError, 10); strings.TrimSpace(head) != "" {
+                r.emit(ctx, "healing", "apply", "info", head)
+            }
 		}
 		summary.SetFinalResult(true)
 		return summary, nil
