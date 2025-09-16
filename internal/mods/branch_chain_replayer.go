@@ -49,21 +49,30 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, modID, br
 		if r.Reporter != nil {
 			_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("replay branch %s: chain length=%d", branchID, len(chain)), Time: time.Now()})
 		}
-		// Reverse to root→head
-		for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
-			chain[i], chain[j] = chain[j], chain[i]
-		}
-		// Optimization: apply only HEAD step to avoid context conflicts when multiple LLM steps exist
-		if len(chain) > 0 {
-			chain = []string{chain[len(chain)-1]}
-		}
-		allow := r.Allowlist
-		for _, sid := range chain {
-			url := strings.TrimRight(storageBase, "/") + "/artifacts/" + fmt.Sprintf("mods/%s/branches/%s/steps/%s/diff.patch", modID, branchID, sid)
-			tmp := filepath.Join(outDir, "chain-"+sid+".patch")
-			if r.Reporter != nil {
-				_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("fetching step %s diff from %s", sid, url), Time: time.Now()})
-			}
+        // Reverse to root→head
+        for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
+            chain[i], chain[j] = chain[j], chain[i]
+        }
+        // Explicitly select and apply the HEAD step only to avoid context conflicts
+        if len(chain) == 0 {
+            if r.Reporter != nil {
+                _ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: "no steps discovered in chain after HEAD lookup", Time: time.Now()})
+            }
+            return nil
+        }
+
+        headSID := chain[len(chain)-1]
+        if r.Reporter != nil {
+            _ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("applying HEAD step %s", headSID), Time: time.Now()})
+        }
+
+        allow := r.Allowlist
+        for _, sid := range []string{headSID} {
+            url := strings.TrimRight(storageBase, "/") + "/artifacts/" + fmt.Sprintf("mods/%s/branches/%s/steps/%s/diff.patch", modID, branchID, sid)
+            tmp := filepath.Join(outDir, "chain-"+sid+".patch")
+            if r.Reporter != nil {
+                _ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("fetching step %s diff from %s", sid, url), Time: time.Now()})
+            }
 			if err := r.DownloadToFile(url, tmp); err != nil {
 				if r.Reporter != nil {
 					_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: fmt.Sprintf("failed to download step %s: %v", sid, err), Time: time.Now()})
