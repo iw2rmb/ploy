@@ -189,24 +189,24 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	initialHead, _ := getHeadHash(repoPath)
 
 	// Step 3: Execute transformation steps
-    for _, step := range r.config.Steps {
-        switch step.Type {
-        case string(StepTypeORWApply):
-            stepStart := time.Now()
-            sr, err := r.runORWApplyStep(ctx, repoPath, step, stepStart)
-            result.StepResults = append(result.StepResults, sr)
-            if err != nil {
-                result.ErrorMessage = sr.Message
-                result.Duration = time.Since(startTime)
-                return nil, err
-            }
-            // proceed to next step
-            continue
-        case "recipe":
-            // Deprecated: recipe step is no longer supported in main workflow
-            return nil, fmt.Errorf("recipe step is no longer supported; use orw-apply")
-        }
-    }
+	for _, step := range r.config.Steps {
+		switch step.Type {
+		case string(StepTypeORWApply):
+			stepStart := time.Now()
+			sr, err := r.runORWApplyStep(ctx, repoPath, step, stepStart)
+			result.StepResults = append(result.StepResults, sr)
+			if err != nil {
+				result.ErrorMessage = sr.Message
+				result.Duration = time.Since(startTime)
+				return nil, err
+			}
+			// proceed to next step
+			continue
+		case "recipe":
+			// Deprecated: recipe step is no longer supported in main workflow
+			return nil, fmt.Errorf("recipe step is no longer supported; use orw-apply")
+		}
+	}
 
 	// Step 4: Commit changes (only if not already committed by an apply step)
 	if committed, msg, err := r.runCommitStep(ctx, repoPath, initialHead); err != nil {
@@ -279,20 +279,20 @@ build_step:
 				}
 				continue
 			}
-            // If reducer requested apply, ensure branch chain is replayed into working tree before rebuild.
-            if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
-                if sid := healingSummary.NextAction.StepID; sid != "" {
-                    seaweed := ResolveInfraFromEnv().SeaweedURL
-                    if seaweed != "" {
-                        r.emit(ctx, "healing", "apply", "info", fmt.Sprintf("replay starting: branch_id=%s", sid))
-                        baseDir := filepath.Join(r.workspaceDir, "branch-apply")
-                        _ = os.MkdirAll(baseDir, 0755)
-                        _ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), sid, baseDir, repoPath)
-                    }
-                }
-                // Build check before committing healing changes
-                buildStart2 := time.Now()
-                if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
+			// If reducer requested apply, ensure branch chain is replayed into working tree before rebuild.
+			if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
+				if sid := healingSummary.NextAction.StepID; sid != "" {
+					seaweed := ResolveInfraFromEnv().SeaweedURL
+					if seaweed != "" {
+						r.emit(ctx, "healing", "apply", "info", fmt.Sprintf("replay starting: branch_id=%s", sid))
+						baseDir := filepath.Join(r.workspaceDir, "branch-apply")
+						_ = os.MkdirAll(baseDir, 0755)
+						_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), sid, baseDir, repoPath)
+					}
+				}
+				// Build check before committing healing changes
+				buildStart2 := time.Now()
+				if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
 					// Revert working tree and retry if attempts remain
 					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
 					cmd.Dir = repoPath
