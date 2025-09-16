@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	gitapi "github.com/iw2rmb/ploy/api/git"
 )
 
 func TestRunCommitStep_NoChangesHeadMoved(t *testing.T) {
@@ -58,6 +60,11 @@ type errPushGitOps struct{ MockGitOperations }
 
 func (e *errPushGitOps) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
 	return errors.New("push error")
+}
+
+func (e *errPushGitOps) PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) *gitapi.Operation {
+	e.PushError = errors.New("push error")
+	return e.MockGitOperations.PushBranchAsync(ctx, repoPath, remoteURL, branchName)
 }
 
 func TestRunPushStep_Error(t *testing.T) {

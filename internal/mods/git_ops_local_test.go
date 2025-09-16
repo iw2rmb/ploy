@@ -48,7 +48,7 @@ func TestGitOperations_LocalCloneAndBranch(t *testing.T) {
 	_, bare := setupLocalRepos(t, work)
 
 	// Use production Git ops (ARF-backed) against local repos
-	gitOps := NewARFGitOperations(work)
+	gitOps := NewAPIGitOperations(work)
 
 	// Clone from bare into repo path
 	clonePath := filepath.Join(work, "repo")
@@ -79,7 +79,7 @@ func TestGitOperations_PushToBare(t *testing.T) {
 	work := t.TempDir()
 	_, bare := setupLocalRepos(t, work)
 
-	gitOps := NewARFGitOperations(work)
+	gitOps := NewAPIGitOperations(work)
 	clonePath := filepath.Join(work, "repo2")
 	if err := gitOps.CloneRepository(context.Background(), bare, "main", clonePath); err != nil {
 		t.Fatalf("CloneRepository failed: %v", err)
