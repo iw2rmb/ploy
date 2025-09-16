@@ -68,16 +68,15 @@ func (esg *DefaultEnhancedSignatureGenerator) ComputeSignatureSimilarity(sig1, s
 }
 
 func (esg *DefaultEnhancedSignatureGenerator) computeHammingSimilarity(sig1, sig2 string) float64 {
-	if len(sig1) != len(sig2) {
-		return 0.0
-	}
+	// Compare up to a fixed length of 16 hex chars to be robust to minor length differences
+	const n = 16
 	matches := 0
-	for i := 0; i < len(sig1); i++ {
-		if sig1[i] == sig2[i] {
+	for i := 0; i < n; i++ {
+		if i < len(sig1) && i < len(sig2) && sig1[i] == sig2[i] {
 			matches++
 		}
 	}
-	return float64(matches) / float64(len(sig1))
+	return float64(matches) / float64(n)
 }
 
 // FindSimilarSignatures finds signatures similar to the target
@@ -139,36 +138,36 @@ func (esg *DefaultEnhancedSignatureGenerator) computeStructuralSimilarity(patch1
 }
 
 func (esg *DefaultEnhancedSignatureGenerator) computeSemanticSimilarity(patch1, patch2 []byte) float64 {
-    tokens1 := esg.extractChangeTokens(patch1)
-    tokens2 := esg.extractChangeTokens(patch2)
-    return esg.computeTokenOverlap(tokens1, tokens2)
+	tokens1 := esg.extractChangeTokens(patch1)
+	tokens2 := esg.extractChangeTokens(patch2)
+	return esg.computeTokenOverlap(tokens1, tokens2)
 }
 
 // FindSimilarPatches finds patches similar to the target fingerprint
 func (esg *DefaultEnhancedSignatureGenerator) FindSimilarPatches(targetFingerprint string, candidateFingerprints []string, patches map[string][]byte, threshold float64) []SimilarPatch {
-    targetPatch, exists := patches[targetFingerprint]
-    if !exists {
-        return nil
-    }
-    var results []SimilarPatch
-    for _, candidate := range candidateFingerprints {
-        if len(results) >= esg.config.MaxSimilarResults {
-            break
-        }
-        if candidate == targetFingerprint {
-            continue
-        }
-        candPatch, ok := patches[candidate]
-        if !ok {
-            continue
-        }
-        sim := esg.ComputePatchSimilarity(targetPatch, candPatch)
-        if sim >= threshold {
-            results = append(results, SimilarPatch{Fingerprint: candidate, Similarity: sim, PatchSize: len(candPatch)})
-        }
-    }
-    sort.Slice(results, func(i, j int) bool { return results[i].Similarity > results[j].Similarity })
-    return results
+	targetPatch, exists := patches[targetFingerprint]
+	if !exists {
+		return nil
+	}
+	var results []SimilarPatch
+	for _, candidate := range candidateFingerprints {
+		if len(results) >= esg.config.MaxSimilarResults {
+			break
+		}
+		if candidate == targetFingerprint {
+			continue
+		}
+		candPatch, ok := patches[candidate]
+		if !ok {
+			continue
+		}
+		sim := esg.ComputePatchSimilarity(targetPatch, candPatch)
+		if sim >= threshold {
+			results = append(results, SimilarPatch{Fingerprint: candidate, Similarity: sim, PatchSize: len(candPatch)})
+		}
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].Similarity > results[j].Similarity })
+	return results
 }
 
 type patchStructure struct{ additions, deletions, context int }
