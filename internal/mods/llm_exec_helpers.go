@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	build "github.com/iw2rmb/ploy/internal/build"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 )
 
@@ -24,7 +25,7 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 
 	// Inject inputs.json with last_error if provided
 	if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
-		parsed := ParseBuildErrors("java", "maven", be)
+		parsed := build.ParseBuildErrors("java", "maven", be)
 		var b strings.Builder
 		b.WriteString("{\n  \"language\": \"java\",\n  \"lane\": \"\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": ")
 		b.WriteString(strconv.Quote(be))
