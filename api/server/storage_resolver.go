@@ -9,7 +9,8 @@ import (
 
 // resolveStorageFromConfigService requires the centralized config service and
 // returns an error if it cannot resolve a storage client.
-func resolveStorageFromConfigService(svc *cfgsvc.Service) (istorage.Storage, error) {
+// resolveStorageFromConfigService is a var to allow test overrides.
+var resolveStorageFromConfigService = func(svc *cfgsvc.Service) (istorage.Storage, error) {
 	if svc == nil {
 		return nil, fmt.Errorf("config service is required for storage resolution")
 	}
