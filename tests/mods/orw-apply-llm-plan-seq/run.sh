@@ -24,6 +24,11 @@ fi
 mkdir -p "$ROOT_DIR/logs"
 
 echo "Submitting mods run…"
+# Quick debug: show the base_ref and target_branch being sent
+if command -v grep >/dev/null 2>&1; then
+  echo "Scenario base_ref: $(grep -E '^base_ref:' -m1 "$SCENARIO_YAML" || echo '<none>')"
+  echo "Scenario target_branch: $(grep -E '^target_branch:' -m1 "$SCENARIO_YAML" || echo '<none>')"
+fi
 CONFIG_ESCAPED=$(jq -Rs . < "$SCENARIO_YAML")
 BODY=$(cat <<EOF
 {
