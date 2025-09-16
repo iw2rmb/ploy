@@ -69,6 +69,20 @@ echo "Streaming events to $LOG_DIR/events.sse …"
 ) &
 SSE_PID=$!
 
+# Start an event-driven watcher to detect terminal status from SSE and signal early exit
+# Creates $LOG_DIR/terminated.flag when a meta event includes status completed/failed/cancelled
+(
+  set +e
+  for i in $(seq 1 720); do # up to ~12 minutes
+    if rg -n '"status":"(completed|failed|cancelled)"' -S "$LOG_DIR/events.sse" >/dev/null 2>&1; then
+      touch "$LOG_DIR/terminated.flag"
+      break
+    fi
+    sleep 1
+  done
+) &
+WATCH_PID=$!
+
 # Poll status
 echo "Polling status…"
 TERM_STATUS=""
@@ -83,6 +97,10 @@ while :; do
     MR_URL=$(echo "$ST_JSON" | jq -r '.result.mr_url // empty')
     PHASE=$(echo "$ST_JSON" | jq -r '.phase // empty')
     echo "status=$TERM_STATUS phase=$PHASE"
+  fi
+  # Event-driven short-circuit: if watcher detected terminal in SSE, break after one final status fetch
+  if [[ -f "$LOG_DIR/terminated.flag" && -n "$TERM_STATUS" ]]; then
+    break
   fi
   if [[ "$TERM_STATUS" == "completed" || "$TERM_STATUS" == "failed" || "$TERM_STATUS" == "cancelled" ]]; then
     break
@@ -100,6 +118,10 @@ echo "Stopping SSE (pid=$SSE_PID)…"
 if ps -p "$SSE_PID" >/dev/null 2>&1; then
   pkill -TERM -P "$SSE_PID" >/dev/null 2>&1 || true
   wait "$SSE_PID" >/dev/null 2>&1 || true
+fi
+if ps -p "$WATCH_PID" >/dev/null 2>&1; then
+  kill "$WATCH_PID" >/dev/null 2>&1 || true
+  wait "$WATCH_PID" >/dev/null 2>&1 || true
 fi
 
 echo "Fetching artifacts…"
