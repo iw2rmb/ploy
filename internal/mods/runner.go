@@ -279,11 +279,20 @@ build_step:
 				}
 				continue
 			}
-			// If reducer requested apply, a branch chain has been replayed in working tree.
-			if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
-				// Build check before committing healing changes
-				buildStart2 := time.Now()
-				if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
+            // If reducer requested apply, ensure branch chain is replayed into working tree before rebuild.
+            if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
+                if sid := healingSummary.NextAction.StepID; sid != "" {
+                    seaweed := ResolveInfraFromEnv().SeaweedURL
+                    if seaweed != "" {
+                        r.emit(ctx, "healing", "apply", "info", fmt.Sprintf("replay starting: branch_id=%s", sid))
+                        baseDir := filepath.Join(r.workspaceDir, "branch-apply")
+                        _ = os.MkdirAll(baseDir, 0755)
+                        _ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), sid, baseDir, repoPath)
+                    }
+                }
+                // Build check before committing healing changes
+                buildStart2 := time.Now()
+                if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
 					// Revert working tree and retry if attempts remain
 					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
 					cmd.Dir = repoPath
