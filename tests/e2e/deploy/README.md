@@ -51,7 +51,7 @@ Test matrix (seed)
 | E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | 52.3MB                   | 128.2MB           | 23.5s      | passed        |
 | E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | 4.9MB                    | 8.7MB             | —          | passed        |
 | E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | 47.3MB                  | 113.7MB           | 22.2s      | passed        |
-| E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | —                        | —                 | —          | pending       |
+| E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | 97.9MB                   | 207.6MB           | 125.0s     | passed        |
 | G    | Rust    | 1.79    | https://github.com/<u>/ploy-lane-g-rust-1.79 | —                        | —                 | —          | pending       |
 
 Notes
