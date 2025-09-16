@@ -1,0 +1,13 @@
+MOD_ID: mod-eddd8c37
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+completed, phase=mr
+last_job=plan-1757994439-reducer-1757994444
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-eddd8c37/branches/llm-1/steps/llm-exec-llm-1-1757994439/diff.patch
+mods/mod-eddd8c37/planner/java11to17-orw-llm-planner-1757994435/plan.json
