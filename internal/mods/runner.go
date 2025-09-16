@@ -291,6 +291,13 @@ build_step:
 						if msg := buildFirstErrorSnippet(repoPath, message); strings.TrimSpace(msg) != "" {
 							r.emit(ctx, "healing", "apply", "info", msg)
 						}
+						if files := workingTreeDiffNames(ctx, repoPath, 8); len(files) > 0 {
+							joined := strings.Join(files, ", ")
+							if len(joined) > 400 {
+								joined = joined[:400] + "…"
+							}
+							r.emit(ctx, "healing", "apply", "info", "post-replay changed files: "+joined)
+						}
 					}
 				}
 				// Build check before committing healing changes
