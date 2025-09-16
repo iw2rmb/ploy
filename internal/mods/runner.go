@@ -288,6 +288,9 @@ build_step:
 						baseDir := filepath.Join(r.workspaceDir, "branch-apply")
 						_ = os.MkdirAll(baseDir, 0755)
 						_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), sid, baseDir, repoPath)
+						if msg := buildFirstErrorSnippet(repoPath, message); strings.TrimSpace(msg) != "" {
+							r.emit(ctx, "healing", "apply", "info", msg)
+						}
 					}
 				}
 				// Build check before committing healing changes
