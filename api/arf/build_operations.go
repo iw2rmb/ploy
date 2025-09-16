@@ -106,8 +106,16 @@ func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Extract compilation errors from Maven output
-		errors := b.parseMavenErrors(stderr.String())
+		// Extract compilation errors from Maven output (consider both stderr and stdout)
+		combined := stderr.String()
+		if out := stdout.String(); out != "" {
+			if combined != "" {
+				combined = combined + "\n" + out
+			} else {
+				combined = out
+			}
+		}
+		errors := b.parseMavenErrors(combined)
 		if len(errors) > 0 {
 			return &BuildError{
 				Type:    "compilation",
@@ -115,7 +123,7 @@ func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error
 				Details: strings.Join(errors, "\n"),
 			}
 		}
-		return fmt.Errorf("maven build failed: %v\n%s", err, stderr.String())
+		return fmt.Errorf("maven build failed: %v\n%s", err, combined)
 	}
 
 	return nil
