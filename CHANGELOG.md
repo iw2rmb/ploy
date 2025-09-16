@@ -18,6 +18,8 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
+- internal/mods: Extracted DI/accessors and tiny helpers from `runner.go` into `runner_di.go` and `runner_helpers.go` to reduce LOC and improve maintainability. No behavior changes.
  - internal/mods: Refactor large runner and tests into cohesive modules without behavior change. Split runner into assets_*.go, repo_ops_adapter.go, apply_and_build_adapter.go, events_emit.go, mr_auth.go, vuln_gate.go, healing_orchestration_adapter.go, cleanup.go, and runner_results.go. Split monolithic job_submission_test.go into focused test files (planner, reducer, fanout, branches, integration, timeouts). This reduces file size and improves maintainability.
 - Build: Split `internal/build/trigger_core.go` into focused helpers:
   - `sbom.go` (SBOM feature toggles)
@@ -33,6 +35,8 @@
   - `fanout_human_step.go` (human-step branch)
   No behavior changes; unit tests updated/split accordingly.
 - Mods API: Split `api/mods/handler.go` into logical files (`types.go`, `run.go`, `status.go`, `artifacts.go`, `logs.go`, `debug.go`) to reduce LOC and improve maintainability. No behavior changes.
+ - Mods KB: Split `internal/mods/kb_signatures.go` into `signatures.go`, `patch_normalization.go`, `log_sanitizer.go`, and `enhanced_signatures.go`. No behavior changes; fixed minor test expectation by normalizing Hamming comparison length to 16.
+ - Mods Integration Tests: Split monolithic `internal/mods/integration_test.go` into focused files: `integration_smoke_test.go`, `integration_seaweedfs_test.go`, `integration_nomad_test.go`, `integration_consul_test.go`, `integration_gitlab_test.go`, `integration_all_services_test.go`, with shared helpers in `test_services.go`.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
  - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-eddd8c37). Healing completed and MR created (MR 37). Prior runs captured auth troubleshooting and recovery.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-a246d18f). Healing produced plan/diff/next artifacts; push/MR failed due to missing GitLab token.

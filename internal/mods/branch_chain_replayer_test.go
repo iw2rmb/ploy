@@ -52,8 +52,8 @@ func TestBranchChainReplayer_ReplaysInOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("replay err: %v", err)
 	}
-    // With head-only replay optimization, only the HEAD (s3) should be applied
-    want := []string{"chain-s3.patch"}
+	// With head-only replay optimization, only the HEAD (s3) should be applied
+	want := []string{"chain-s3.patch"}
 	if !reflect.DeepEqual(appliedOrder, want) {
 		t.Fatalf("order mismatch:\nwant=%v\n got=%v", want, appliedOrder)
 	}
@@ -97,9 +97,9 @@ func TestBranchChainReplayer_SkipsOnInvalidDiffPath(t *testing.T) {
 	if err := r.Replay(context.Background(), "http://filer", "exec-2", "B", tmp, "/repo"); err != nil {
 		t.Fatalf("replay err: %v", err)
 	}
-    // With head-only replay, only the HEAD (s2) is validated/applied
-    want := []string{"chain-s2.patch"}
-    if !reflect.DeepEqual(validated, want) {
-        t.Fatalf("validate order mismatch:\nwant=%v\n got=%v", want, validated)
-    }
+	// With head-only replay, only the HEAD (s2) is validated/applied
+	want := []string{"chain-s2.patch"}
+	if !reflect.DeepEqual(validated, want) {
+		t.Fatalf("validate order mismatch:\nwant=%v\n got=%v", want, validated)
+	}
 }
