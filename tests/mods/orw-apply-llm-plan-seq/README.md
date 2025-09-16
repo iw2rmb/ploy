@@ -20,8 +20,12 @@ Cycle State (Single Source)
   - The logs directory path (see Inspecting Logs) for reference.
 
 - Latest run:
-  - MOD_ID: mod-589af7e8 — healing succeeded to reducer next={action:"stop"}; build gate passed; push failed (rc=128). The runner emitted `mr-config` events confirming it used `token_env=GITLAB_TOKEN` and `repo_url_env=GITLAB_URL`, indicating per-run MR auth selection is active. The API runtime likely lacks a valid GITLAB_TOKEN or scope.
-  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-589af7e8
+  - MOD_ID: mod-fa2ce630 — deterministic fail → healing succeeded (planner/llm-exec/reducer completed; build-gate-succeeded). Push step failed (rc=128) due to GitLab 401 from VPS.
+  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-fa2ce630
+  - Notes:
+    - plan.json, diff.patch, next.json were downloaded via controller artifacts endpoint; step-scoped SeaweedFS uploads present in events.
+    - Verified on VPS: GITLAB_TOKEN in `/home/ploy/api.env` matches the working local token (sha256 digests equal), but `curl -H 'PRIVATE-TOKEN: $GITLAB_TOKEN' https://gitlab.com/api/v4/user` returns 401 from VPS while 200 locally. This points to an environment/network-side denial rather than token value.
+    - Action: Investigate GitLab access from VPS IP (allowlist/SSO/policy). After resolving, redeploy API so jobs inherit env, then re-run to confirm MR creation.
 
 Note: Historical cycle-by-cycle notes have been condensed into this single Cycle State to avoid drift. Refer to git history if you need past detail.
 

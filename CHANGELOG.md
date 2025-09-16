@@ -18,6 +18,9 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
+ - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-dbedbb3a). Healing completed with artifacts; push/MR failed due to GitLab auth (token scope/validity). Added remediation guidance.
+- Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-a246d18f). Healing produced plan/diff/next artifacts; push/MR failed due to missing GitLab token.
 - Workstation docs and examples: replaced inline `export` assignments with “Ensure … is set” guidance to avoid double-exporting env vars that are already populated.
 - Scripts: default to Dev API and other values only when unset (e.g., `PLOY_CONTROLLER`, `ARF_LLM_PROVIDER`, `ARF_LLM_MODEL`).
 - E2E log helpers:
