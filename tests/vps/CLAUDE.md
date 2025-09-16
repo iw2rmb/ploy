@@ -105,6 +105,5 @@ User Context:
 ## Related Documentation
 - `../e2e/CLAUDE.md` - E2E testing framework with VPS integration (✅ operational)
 - `../../internal/mods/README.md` - Mods CLI with VPS deployment support (MVP complete)
-- `../../internal/kb/CLAUDE.md` - KB system with SeaweedFS backend integration (✅ production operational)
 - Root `Makefile` - VPS integration test targets and TARGET_HOST configuration
 - Production deployment documentation for service stack configuration
