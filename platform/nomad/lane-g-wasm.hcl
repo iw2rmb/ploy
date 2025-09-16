@@ -21,7 +21,7 @@ job "{{APP_NAME}}-lane-g" {
         image = "debian:bookworm-slim"
         entrypoint = ["/bin/sh", "-lc"]
         args = [
-          "set -euo pipefail; apt-get update -y >/dev/null 2>&1 && apt-get install -y wget ca-certificates >/dev/null 2>&1; mkdir -p /app; wget -qO /app/wazero-runner http://seaweedfs-filer.service.consul:8888/artifacts/wazero-runner/linux/amd64/wazero-runner; chmod +x /app/wazero-runner; wget -qO /app/module.wasm $WASM_URL; echo 'Fetched WASM module'; /app/wazero-runner -module /app/module.wasm -port $PORT || true; echo 'Runner finished or detached; keeping task alive'; sleep 3600"
+          "set -eu; apt-get update -y >/dev/null 2>&1 && apt-get install -y wget ca-certificates >/dev/null 2>&1; mkdir -p /app; wget -qO /app/wazero-runner http://seaweedfs-filer.service.consul:8888/artifacts/wazero-runner/linux/amd64/wazero-runner; chmod +x /app/wazero-runner; wget -qO /app/module.wasm $WASM_URL; echo 'Fetched WASM module'; exec /app/wazero-runner -module /app/module.wasm -port $PORT"
         ]
         ports = ["http"]
       }
@@ -39,9 +39,9 @@ job "{{APP_NAME}}-lane-g" {
           "wasm",
         ]
         check {
-          type     = "script"
-          command  = "/bin/true"
-          interval = "15s"
+          type     = "http"
+          path     = "/healthz"
+          interval = "10s"
           timeout  = "3s"
         }
       }
