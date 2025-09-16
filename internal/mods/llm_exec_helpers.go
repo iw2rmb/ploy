@@ -189,8 +189,12 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 	if rep != nil {
 		_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
 	}
+	// Wait for job to report upload before starting download loop
+	if ctrl := ResolveInfraFromEnv().Controller; ctrl != "" {
+		_ = waitForStepContaining(ctrl, modID, "llm-exec", "uploaded diff to", 120*time.Second)
+	}
 	var dlErr error
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 60; i++ {
 		if err := downloadToFileFn(url, diffPath); err == nil {
 			dlErr = nil
 			break

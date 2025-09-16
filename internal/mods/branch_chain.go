@@ -2,6 +2,7 @@ package mods
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 )
 
@@ -15,6 +16,7 @@ func (r *ModRunner) reconstructBranchState(ctx context.Context, seaweed, modID, 
 		ValidateUnifiedDiff: validateUnifiedDiffFn,
 		ApplyUnifiedDiff:    applyUnifiedDiffFn,
 		Allowlist:           ResolveDefaultsFromEnv().Allowlist,
+		Reporter:            NewControllerEventReporter(ResolveInfraFromEnv().Controller, os.Getenv("MOD_ID")),
 	}
 	return rep.Replay(ctx, seaweed, modID, branchID, filepath.Join(baseDir, "out"), repoPath)
 }

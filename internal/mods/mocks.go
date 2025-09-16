@@ -1,11 +1,13 @@
 package mods
 
 import (
-	"context"
-	"os"
+    "context"
+    "os"
+    "os/exec"
+    "path/filepath"
 
-	"github.com/iw2rmb/ploy/internal/cli/common"
-	"github.com/iw2rmb/ploy/internal/git/provider"
+    "github.com/iw2rmb/ploy/internal/cli/common"
+    "github.com/iw2rmb/ploy/internal/git/provider"
 )
 
 // MockGitOperations implements GitOperationsInterface for testing
@@ -37,17 +39,43 @@ func (m *MockGitOperations) CloneRepository(ctx context.Context, repoURL, branch
 	m.CloneBranch = branch
 	m.ClonePath = targetPath
 
-	// Create the directory for testing
-	if err := os.MkdirAll(targetPath, 0755); err != nil {
-		return err
-	}
+    // Create the directory for testing
+    if err := os.MkdirAll(targetPath, 0755); err != nil {
+        return err
+    }
 
-	// Ensure the working tree is non-empty to satisfy runner guards.
-	// Create a harmless placeholder file so subsequent steps (branch/apply) run.
-	placeholder := targetPath + "/README.md"
-	_ = os.WriteFile(placeholder, []byte("# mock repo\n"), 0644)
-	// Provide a minimal build file to pass ORW build-file guard
-	_ = os.WriteFile(targetPath+"/pom.xml", []byte("<project></project>"), 0644)
+    // Initialize a minimal git repository so git-based operations (apply/add/commit) succeed
+    {
+        cmd := exec.CommandContext(ctx, "git", "init")
+        cmd.Dir = targetPath
+        _ = cmd.Run()
+        // Configure a default identity for commits
+        _ = exec.CommandContext(ctx, "git", "config", "user.email", "test@example.com").Run()
+        _ = exec.CommandContext(ctx, "git", "config", "user.name", "Test User").Run()
+    }
+
+    // Ensure the working tree is non-empty and buildable to satisfy runner guards and ARF compile gate.
+    // Create a minimal Maven project skeleton.
+    _ = os.WriteFile(filepath.Join(targetPath, "README.md"), []byte("# mock repo\n"), 0644)
+    pom := []byte(`<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example</groupId>
+  <artifactId>mock</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+</project>
+`)
+    _ = os.WriteFile(filepath.Join(targetPath, "pom.xml"), pom, 0644)
+    srcDir := filepath.Join(targetPath, "src", "main", "java")
+    _ = os.MkdirAll(srcDir, 0755)
+    _ = os.WriteFile(filepath.Join(srcDir, "App.java"), []byte("public class App { public static void main(String[] a){} }\n"), 0644)
+
+    // Create initial commit
+    _ = exec.CommandContext(ctx, "git", "add", ".").Run()
+    _ = exec.CommandContext(ctx, "git", "commit", "-m", "initial").Run()
 
 	return m.CloneError
 }
