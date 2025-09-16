@@ -58,9 +58,10 @@ type RenderData struct {
 	// Build metadata
 	BuildTime string
 
-	// WASM-specific options
-	WasmModuleURL string
-	FilerBaseURL  string
+    // WASM-specific options
+    WasmModuleURL   string
+    FilerBaseURL    string
+    WasmRuntimeImage string
 }
 
 // RenderTemplate renders a Nomad job HCL based on lane and data, returning a temp file path
@@ -100,7 +101,7 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 }
 
 func templateForLane(lane string) string {
-	switch strings.ToUpper(lane) {
+    switch strings.ToUpper(lane) {
 	case "A":
 		return "platform/nomad/lane-a-unikraft.hcl"
 	case "B":
@@ -113,9 +114,12 @@ func templateForLane(lane string) string {
 		return "platform/nomad/lane-e-oci-kontain.hcl"
 	case "F":
 		return "platform/nomad/lane-f-vm.hcl"
-	case "G":
-		// Lane G uses WASM runtime template
-		return "platform/nomad/lane-g-wasm.hcl"
+    case "G":
+        // Lane G: allow selecting a distroless runner image
+        if utils.Getenv("PLOY_WASM_DISTROLESS", "") == "1" {
+            return "platform/nomad/lane-g-wasm-runner.hcl"
+        }
+        return "platform/nomad/lane-g-wasm.hcl"
 	default:
 		return "platform/nomad/lane-c-osv.hcl"
 	}
@@ -334,9 +338,12 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	if data.WasmModuleURL != "" {
 		s = strings.ReplaceAll(s, "{{WASM_URL}}", data.WasmModuleURL)
 	}
-	if data.FilerBaseURL != "" {
-		s = strings.ReplaceAll(s, "{{FILER_URL}}", strings.TrimRight(data.FilerBaseURL, "/"))
-	}
+    if data.FilerBaseURL != "" {
+        s = strings.ReplaceAll(s, "{{FILER_URL}}", strings.TrimRight(data.FilerBaseURL, "/"))
+    }
+    if data.WasmRuntimeImage != "" {
+        s = strings.ReplaceAll(s, "{{WASM_RUNTIME_IMAGE}}", data.WasmRuntimeImage)
+    }
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
 	if data.GrpcPort > 0 {

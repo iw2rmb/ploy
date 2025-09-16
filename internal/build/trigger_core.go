@@ -495,6 +495,21 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return ""
 		}(),
 
+		WasmRuntimeImage: func() string {
+			if strings.ToUpper(lane) == "G" && os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
+				engine := strings.ToLower(os.Getenv("PLOY_WASM_ENGINE"))
+				switch engine {
+				case "wasmtime":
+					return "registry.dev.ployman.app/wasm/runner:wasmtime-distroless"
+				case "wasmedge":
+					return "registry.dev.ployman.app/wasm/runner:wasmedge-distroless"
+				default:
+					return "registry.dev.ployman.app/wasm/runner:wazero-distroless"
+				}
+			}
+			return ""
+		}(),
+
 		FilerBaseURL: func() string {
 			if strings.ToUpper(lane) == "G" {
 				base := os.Getenv("PLOY_SEAWEEDFS_URL")
