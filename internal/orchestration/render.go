@@ -152,7 +152,7 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, 
 	}
     s = strings.ReplaceAll(s, "{{KANIKO_MEMORY}}", memMB)
     // Also hard-rewrite any existing static memory assignment to ensure targeted bump applies
-    s = regexp.MustCompile(`(?m)(memory\s*=\s*)\d+`).ReplaceAllString(s, `${1}`+memMB)
+    s = regexp.MustCompile(`(?m)(memory\s*=\s*)\d+`).ReplaceAllString(s, "$1"+memMB)
 	// Ensure a writable temp dir is present for BusyBox wget target in Kaniko entrypoint
 	// The builder template already includes a mkdir -p /tmp; keep it enforced here if template changes.
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
