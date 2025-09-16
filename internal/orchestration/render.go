@@ -115,7 +115,7 @@ func templateForLane(lane string) string {
 }
 
 // RenderKanikoBuilder renders a Kaniko builder job for Lane E container builds
-func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath string) (string, error) {
+func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, language string) (string, error) {
 	// Load builder template
 	b, err := loadTemplateContent("platform/nomad/lane-e-kaniko-builder.hcl")
 	if err != nil {
@@ -142,6 +142,15 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath s
 		}
 	}
 	s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
+
+	// Targeted memory bump for .NET builds only
+	memMB := utils.Getenv("PLOY_KANIKO_MEMORY_MB", "512")
+	ll := strings.ToLower(strings.TrimSpace(language))
+	if ll == ".net" || ll == "dotnet" || ll == "csharp" || ll == "c#" {
+		// Allow override for .NET-specific memory via env, else default to 2048MB
+		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_DOTNET_MB", "2048")
+	}
+	s = strings.ReplaceAll(s, "{{KANIKO_MEMORY}}", memMB)
 	// Ensure a writable temp dir is present for BusyBox wget target in Kaniko entrypoint
 	// The builder template already includes a mkdir -p /tmp; keep it enforced here if template changes.
 	out := filepath.Join(os.TempDir(), fmt.Sprintf("%s-e-build-%s.hcl", app, version))
