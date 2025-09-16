@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // BranchChainReplayer replays a branch's diff chain from root to head by
@@ -17,6 +18,7 @@ type BranchChainReplayer struct {
 	ValidateUnifiedDiff func(ctx context.Context, repoPath, diffPath string) error
 	ApplyUnifiedDiff    func(ctx context.Context, repoPath, diffPath string) error
 	Allowlist           []string
+	Reporter            EventReporter
 }
 
 // Replay executes the reconstruction for a given modID/branchID
@@ -44,6 +46,9 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, modID, br
 				cur = ""
 			}
 		}
+		if r.Reporter != nil {
+			_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("replay branch %s: chain length=%d", branchID, len(chain)), Time: time.Now()})
+		}
 		// Reverse to root→head
 		for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
 			chain[i], chain[j] = chain[j], chain[i]
@@ -52,11 +57,40 @@ func (r *BranchChainReplayer) Replay(ctx context.Context, storageBase, modID, br
 		for _, sid := range chain {
 			url := strings.TrimRight(storageBase, "/") + "/artifacts/" + fmt.Sprintf("mods/%s/branches/%s/steps/%s/diff.patch", modID, branchID, sid)
 			tmp := filepath.Join(outDir, "chain-"+sid+".patch")
-			_ = r.DownloadToFile(url, tmp)
-			if err := r.ValidateDiffPaths(tmp, allow); err == nil {
-				_ = r.ValidateUnifiedDiff(ctx, repoPath, tmp)
-				_ = r.ApplyUnifiedDiff(ctx, repoPath, tmp)
+			if r.Reporter != nil {
+				_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("fetching step %s diff from %s", sid, url), Time: time.Now()})
 			}
+			if err := r.DownloadToFile(url, tmp); err != nil {
+				if r.Reporter != nil {
+					_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: fmt.Sprintf("failed to download step %s: %v", sid, err), Time: time.Now()})
+				}
+				continue
+			}
+			if err := r.ValidateDiffPaths(tmp, allow); err != nil {
+				if r.Reporter != nil {
+					_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: fmt.Sprintf("diff path validation failed for %s: %v", sid, err), Time: time.Now()})
+				}
+				continue
+			}
+			if err := r.ValidateUnifiedDiff(ctx, repoPath, tmp); err != nil {
+				if r.Reporter != nil {
+					_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: fmt.Sprintf("diff format invalid for %s: %v", sid, err), Time: time.Now()})
+				}
+				continue
+			}
+			if err := r.ApplyUnifiedDiff(ctx, repoPath, tmp); err != nil {
+				if r.Reporter != nil {
+					_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: fmt.Sprintf("apply failed for %s: %v", sid, err), Time: time.Now()})
+				}
+				continue
+			}
+			if r.Reporter != nil {
+				_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "info", Message: fmt.Sprintf("applied step %s", sid), Time: time.Now()})
+			}
+		}
+	} else {
+		if r.Reporter != nil {
+			_ = r.Reporter.Report(ctx, Event{Phase: "healing", Step: "apply", Level: "warn", Message: "HEAD.json not found for branch (no steps to replay)", Time: time.Now()})
 		}
 	}
 	return nil
