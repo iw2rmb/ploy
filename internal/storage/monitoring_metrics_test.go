@@ -25,22 +25,22 @@ func TestStorageMetrics_RecordAndSuccessRate(t *testing.T) {
 		t.Fatalf("expected success rate ~66.7, got %v", sr)
 	}
 
-    // Force degraded and unhealthy states and verify transitions
-    // Create several failures to cross degraded/unhealthy thresholds
-    for i := 0; i < 4; i++ { // 4 failures total to push degraded
-        m.RecordDownload(false, 0, 0, ErrorTypeInternal)
-    }
-    if m.HealthStatus != HealthStatusDegraded && m.HealthStatus != HealthStatusUnhealthy {
-        t.Fatalf("expected degraded or unhealthy after failures, got %s", m.HealthStatus)
-    }
-    for i := 0; i < 10; i++ { // increase consecutive failures
-        m.RecordVerification(false, ErrorTypeInternal)
-    }
-    if m.HealthStatus != HealthStatusUnhealthy {
-        t.Fatalf("expected unhealthy after many failures, got %s", m.HealthStatus)
-    }
+	// Force degraded and unhealthy states and verify transitions
+	// Create several failures to cross degraded/unhealthy thresholds
+	for i := 0; i < 4; i++ { // 4 failures total to push degraded
+		m.RecordDownload(false, 0, 0, ErrorTypeInternal)
+	}
+	if m.HealthStatus != HealthStatusDegraded && m.HealthStatus != HealthStatusUnhealthy {
+		t.Fatalf("expected degraded or unhealthy after failures, got %s", m.HealthStatus)
+	}
+	for i := 0; i < 10; i++ { // increase consecutive failures
+		m.RecordVerification(false, ErrorTypeInternal)
+	}
+	if m.HealthStatus != HealthStatusUnhealthy {
+		t.Fatalf("expected unhealthy after many failures, got %s", m.HealthStatus)
+	}
 
-    // Snapshot JSON contains expected keys
+	// Snapshot JSON contains expected keys
 	b, err := m.ToJSON()
 	if err != nil {
 		t.Fatalf("ToJSON error: %v", err)

@@ -1,0 +1,8 @@
+{
+  "plan_id": "plan-1757999508",
+  "prompt_hint_included": false,
+  "options": [
+    {"id": "llm-1", "type": "llm-exec"},
+    {"id": "orw-1", "type": "orw-gen", "inputs": {"recipe_config": {"class": "org.openrewrite.java.RemoveUnusedImports", "coords": "org.openrewrite.recipe:rewrite-java-latest:latest", "timeout": "5m"}}}
+  ]
+}

@@ -25,7 +25,9 @@ func TestParseClassNamesFromError(t *testing.T) {
 func TestFindJavaFilesByBasename(t *testing.T) {
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "repo")
-	os.MkdirAll(filepath.Join(repo, "src/main/java/app"), 0755)
+	if err := os.MkdirAll(filepath.Join(repo, "src/main/java/app"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 	f := filepath.Join(repo, "src/main/java/app/Hello.java")
 	if err := os.WriteFile(f, []byte("class Hello {}"), 0644); err != nil {
 		t.Fatalf("write: %v", err)
