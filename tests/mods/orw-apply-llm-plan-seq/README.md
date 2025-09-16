@@ -20,12 +20,14 @@ Cycle State (Single Source)
   - The logs directory path (see Inspecting Logs) for reference.
 
 - Latest run:
-  - MOD_ID: mod-eddd8c37 — healing path exercised and completed; MR created successfully.
-  - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/37
-  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-eddd8c37
+  - MOD_ID: mod-33d29ca8 — healing path exercised; LLM produced concrete fix and MR created.
+  - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/50
+  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-33d29ca8
   - Notes:
-    - Steps observed: orw-apply → build-gate-failed → planner (plan.json uploaded) → llm-exec (diff.patch uploaded) → reducer (next={action:"stop"}) → build-gate-succeeded → push → MR.
-    - GitLab API from VPS now returns 200 for /user; push/MR succeeded. Keep `GITLAB_TOKEN` and `GITLAB_URL` in `/home/ploy/api.env` and redeploy when changed so jobs inherit env.
+    - Steps observed: orw-apply → build-gate-failed → planner (plan.json uploaded) → llm-exec (diff.patch uploaded, 395 bytes) → reducer (next={action:"stop"}) → build-gate-succeeded → push → MR.
+    - LLM diff edits src/healing/java/e2e/FailHealing.java line 4 (comments out UnknownClass usage), resolving the compile error.
+    - Cluster runner image updated: registry.dev.ployman.app/langgraph-runner:latest rebuilt with no cache; Nomad templates use force_pull=true to pull :latest.
+    - Ensure controller env uses MODS_*_IMAGE=:latest (api redeployed). GitLab token present in /home/ploy/api.env.
 
 Note: Historical cycle-by-cycle notes have been condensed into this single Cycle State to avoid drift. Refer to git history if you need past detail.
 

@@ -216,9 +216,11 @@ EOF
 elif [[ "$RUN_ID_STR" == *"reducer"* ]]; then
   log "Detected reducer run (RUN_ID=$RUN_ID_STR)"
   post_event "info" "reducer" "reducer" "job started"
+  # Prefer applying the LLM branch (llm-1)
   cat >"$OUT_DIR/next.json" <<EOF
 {
-  "action": "stop"
+  "action": "apply",
+  "step_id": "llm-1"
 }
 EOF
   log "Wrote next.json to $OUT_DIR"
@@ -259,8 +261,8 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
     TARGET_LINE=""
     if [ -s "$CTX_DIR/inputs.json" ]; then
       # Prefer explicit top-level hints if present
-      CAND=$(sed -n 's/.*"first_error_file"[[:space:]]*:[[:space:]]*"\([^"]\+\)".*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
-      LINE=$(sed -n 's/.*"first_error_line"[[:space:]]*:[[:space:]]*\([0-9]\+\).*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
+      CAND=$(sed -n 's/.*"first_error_file"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
+      LINE=$(sed -n 's/.*"first_error_line"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
       # Else try structured errors array
       if [ -z "$CAND" ] || [ -z "$LINE" ]; then
         FIRST_ERR_JSON=$(awk 'BEGIN{RS="}"} /"errors"[[:space:]]*:/ {print $0"}"; exit}' "$CTX_DIR/inputs.json" 2>/dev/null || true)
@@ -274,12 +276,32 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
         ERR=$(awk 'BEGIN{RS=""} /"last_error"/ {print}' "$CTX_DIR/inputs.json" 2>/dev/null)
         # Find first Java file path
         CAND=$(printf "%s" "$ERR" | sed -n 's/.*\([A-Za-z0-9_\.\/-]\+\.java\).*/\1/p' | head -n1)
-        # Accept either :123 or :[123,456]
-        LINE=$(printf "%s" "$ERR" | sed -n 's/.*\.java:\[\([0-9]\+\),.*/\1/p; t; s/.*\.java:\([0-9]\+\).*/\1/p' | head -n1)
+        # Accept either :123 or :[123,456] (portable BSD/GNU sed)
+        LINE=$(printf "%s" "$ERR" | sed -n 's/.*\\.java:\\[\\([0-9][0-9]*\\),.*/\\1/p' | head -n1)
+        if [ -z "$LINE" ]; then
+          LINE=$(printf "%s" "$ERR" | sed -n 's/.*\\.java:\\([0-9][0-9]*\\).*/\\1/p' | head -n1)
+        fi
       fi
       if [ -n "$CAND" ]; then
+        # Normalize absolute paths to repo-relative when possible
+        CAND_REL="$CAND"
+        if [ "${CAND_REL#/}" != "$CAND_REL" ]; then
+          # Prefer stripping the common temp repo segment: */repo/<relpath>
+          case "$CAND_REL" in
+            */repo/*)
+              CAND_REL="${CAND_REL#*/repo/}"
+              ;;
+            */src/*)
+              # Ensure it begins with src/
+              CAND_REL="src/${CAND_REL#*/src/}"
+              ;;
+          esac
+        fi
         # If a source snapshot was provided, prefer it to ensure exact diff
-        if [ -f "$CTX_DIR/sources/$CAND" ]; then
+        if [ -f "$CTX_DIR/sources/$CAND_REL" ]; then
+          TARGET_FILE="$CTX_DIR/sources/$CAND_REL"
+          TARGET_REL="$CAND_REL"
+        elif [ -f "$CTX_DIR/sources/$CAND" ]; then
           TARGET_FILE="$CTX_DIR/sources/$CAND"
           TARGET_REL="$CAND"
         fi

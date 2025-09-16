@@ -9,17 +9,25 @@ IMAGE_NAME=${IMAGE_NAME:-"langgraph-runner"}
 IMAGE_TAG=${IMAGE_TAG:-"latest"}
 PUSH=${PUSH:-"false"}
 
-while getopts ":p" opt; do
+NO_CACHE=${NO_CACHE:-"false"}
+
+while getopts ":pn" opt; do
   case $opt in
     p) PUSH="true" ;;
+    n) NO_CACHE="true" ;;
   esac
 done
 
 IMAGE_REF="${REGISTRY}/${OWNER_LOWER}/${IMAGE_NAME}:${IMAGE_TAG}"
 IMAGE_REF_SHA="${REGISTRY}/${OWNER_LOWER}/${IMAGE_NAME}:sha-$(git rev-parse --short HEAD)"
 
-echo "[LG] Building image: ${IMAGE_REF}"
-docker build -t "${IMAGE_REF}" -t "${IMAGE_REF_SHA}" -f services/langgraph-runner/Dockerfile services/langgraph-runner
+echo "[LG] Building image: ${IMAGE_REF} (no-cache=${NO_CACHE})"
+BUILD_ARGS=( -t "${IMAGE_REF}" -t "${IMAGE_REF_SHA}" -f services/langgraph-runner/Dockerfile services/langgraph-runner )
+if [[ "${NO_CACHE}" == "true" ]]; then
+  docker build --no-cache "${BUILD_ARGS[@]}"
+else
+  docker build "${BUILD_ARGS[@]}"
+fi
 
 docker images "${IMAGE_REF}" --format 'size={{.Size}}' || true
 
