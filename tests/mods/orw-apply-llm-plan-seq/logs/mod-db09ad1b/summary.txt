@@ -1,0 +1,17 @@
+MOD_ID: mod-db09ad1b
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: http://seaweedfs-filer.service.consul:8888
+
+Status:
+completed, phase=mr
+last_job=plan-1758003190-reducer-1758003195
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-db09ad1b/branches/llm-1/steps/llm-exec-llm-1-1758003191/diff.patch
+mods/mod-db09ad1b/planner/java11to17-orw-llm-planner-1758003185/plan.json
+Planner RUN_ID: /Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-db09ad1b/events.sample.sse:java11to17-orw-llm-planner-1758003185
+LLM RUN_ID: /Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-db09ad1b/events.sample.sse:llm-exec-llm-1-1758003191
+warning: failed to download context tar for /Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-db09ad1b/events.sample.sse:java11to17-orw-llm-planner-1758003185 from http://seaweedfs-filer.service.consul:8888/artifacts/mods/mod-db09ad1b/contexts//Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-db09ad1b/events.sample.sse:java11to17-orw-llm-planner-1758003185.tar
+warning: failed to download context tar for /Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-db09ad1b/events.sample.sse:llm-exec-llm-1-1758003191 from http://seaweedfs-filer.service.consul:8888/artifacts/mods/mod-db09ad1b/contexts//Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-db09ad1b/events.sample.sse:llm-exec-llm-1-1758003191.tar
