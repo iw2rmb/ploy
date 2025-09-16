@@ -123,6 +123,10 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 			baseDir := filepath.Join(r.workspaceDir, "branch-apply")
 			_ = os.MkdirAll(baseDir, 0755)
 			_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), nextAction.StepID, baseDir, repoPath)
+			// Emit a brief snippet of the offending file after replay for verification
+			if msg := buildFirstErrorSnippet(repoPath, buildError); strings.TrimSpace(msg) != "" {
+				r.emit(ctx, "healing", "apply", "info", msg)
+			}
 		}
 		summary.SetFinalResult(true)
 		return summary, nil
