@@ -598,31 +598,25 @@
           register: deployed_head_short
           changed_when: false
 
-        - name: Post-deploy | Fetch API version info
+        - name: Post-deploy | Wait for API git_commit to match deployed HEAD
           uri:
             url: "https://api.{{ ploy.platform_domain }}/v1/version"
             method: GET
             status_code: 200
             validate_certs: no
-          register: api_version_info
-          retries: 3
-          delay: 5
-          until: api_version_info.status == 200
+          register: api_version_check
+          retries: 20
+          delay: 6
+          until: api_version_check.status == 200 and
+                 api_version_check.json is defined and
+                 api_version_check.json.git_commit is defined and
+                 (api_version_check.json.git_commit.startswith(deployed_head_short.stdout) or
+                  deployed_head_short.stdout.startswith(api_version_check.json.git_commit))
 
-        - name: Post-deploy | Assert API git_commit matches deployed HEAD
-          assert:
-            that:
-              - api_version_info.json is defined
-              - api_version_info.json.git_commit is defined
-              - api_version_info.json.git_commit | length > 0
-              - api_version_info.json.git_commit.startswith(deployed_head_short.stdout)
-                or deployed_head_short.stdout.startswith(api_version_info.json.git_commit)
-            fail_msg: >-
-              Deployed API git_commit ({{ api_version_info.json.git_commit | default('unknown') }})
-              does not match repo HEAD ({{ deployed_head_short.stdout | default('unknown') }})
-            success_msg: >-
-              Post-deploy check passed: API git_commit {{ api_version_info.json.git_commit }}
-              matches HEAD {{ deployed_head_short.stdout }}
+        - name: Post-deploy | Confirm API version match
+          debug:
+            msg: >-
+              API git_commit {{ api_version_check.json.git_commit }} matches deployed HEAD {{ deployed_head_short.stdout }}
 
         - name: Verify clean service registrations post-deployment
           shell: /opt/hashicorp/bin/consul-service-monitor.sh --job-name ploy-api
