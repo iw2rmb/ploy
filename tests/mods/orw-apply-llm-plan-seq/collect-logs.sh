@@ -136,6 +136,59 @@ SUMMARY="$OUT_DIR/summary.txt"
     echo "Artifact keys (from events):"
     cat "$ART_KEYS_FILE"
   fi
+  # Try to extract planner and llm-exec RUN_IDs from events to fetch context inputs.json (if SeaweedFS URL is set)
+  if [[ -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
+    # Planner RUN_ID: from uploaded plan key mods/<MOD_ID>/planner/<RUN_ID>/plan.json
+    PLANNER_RUN_ID=$(grep -Eo 'planner/[A-Za-z0-9_.:-]+/plan.json' "$OUT_DIR"/events*.sse 2>/dev/null | sed -E 's#planner/([^/]+)/plan\.json#\1#' | head -n1)
+    # LLM RUN_ID: from steps/<RUN_ID>/diff.patch in llm-exec events
+    LLM_RUN_ID=$(grep -Eo 'steps/[A-Za-z0-9_.:-]+/diff\.patch' "$OUT_DIR"/events*.sse 2>/dev/null | sed -E 's#steps/([^/]+)/diff\.patch#\1#' | head -n1)
+    if [[ -n "$PLANNER_RUN_ID" ]]; then
+      echo "Planner RUN_ID: $PLANNER_RUN_ID"
+    fi
+    if [[ -n "$LLM_RUN_ID" ]]; then
+      echo "LLM RUN_ID: $LLM_RUN_ID"
+    fi
+    # Download and extract contexts where possible
+    for RID in $PLANNER_RUN_ID $LLM_RUN_ID; do
+      [[ -z "$RID" ]] && continue
+      KEY_CTX="mods/${MOD_ID}/contexts/${RID}.tar"
+      URL_CTX="${PLOY_SEAWEEDFS_URL%/}/artifacts/${KEY_CTX}"
+      DEST_CTX_TAR="$OUT_DIR/${RID}.context.tar"
+      DEST_CTX_DIR="$OUT_DIR/${RID}.context"
+      if curl -fsS "$URL_CTX" -o "$DEST_CTX_TAR"; then
+        mkdir -p "$DEST_CTX_DIR"
+        tar -xf "$DEST_CTX_TAR" -C "$DEST_CTX_DIR" 2>/dev/null || true
+        if [[ -s "$DEST_CTX_DIR/inputs.json" ]]; then
+          echo "Context inputs.json for $RID:" >> "$SUMMARY"
+          # Save full inputs.json alongside for inspection
+          cp "$DEST_CTX_DIR/inputs.json" "$OUT_DIR/inputs.$RID.json" 2>/dev/null || true
+          # Compact summary: first_error_file/line and errors[] count
+          if command -v jq >/dev/null 2>&1; then
+            fe_file=$(jq -r 'try .first_error_file // empty' "$OUT_DIR/inputs.$RID.json")
+            fe_line=$(jq -r 'try .first_error_line // empty' "$OUT_DIR/inputs.$RID.json")
+            errs_cnt=$(jq -r 'try (.errors | length) // 0' "$OUT_DIR/inputs.$RID.json")
+          else
+            fe_file=$(sed -n 's/.*"first_error_file"[[:space:]]*:[[:space:]]*"\([^"\n]*\)".*/\1/p' "$OUT_DIR/inputs.$RID.json" | head -n1)
+            fe_line=$(sed -n 's/.*"first_error_line"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$OUT_DIR/inputs.$RID.json" | head -n1)
+            # rough count of errors entries
+            errs_cnt=$(grep -c '"file"[[:space:]]*:' "$OUT_DIR/inputs.$RID.json" 2>/dev/null || echo 0)
+          fi
+          echo "  first_error_file: ${fe_file:-<none>}" >> "$SUMMARY"
+          echo "  first_error_line: ${fe_line:-<none>}" >> "$SUMMARY"
+          echo "  errors_count: ${errs_cnt:-0}" >> "$SUMMARY"
+          # Also append a brief note into events.filtered.txt for quick scan
+          {
+            echo "# Context summary ($RID)"
+            echo "first_error_file=${fe_file:-<none>} first_error_line=${fe_line:-<none>} errors_count=${errs_cnt:-0}"
+          } >> "$OUT_DIR/events.filtered.txt"
+        else
+          echo "Context for $RID downloaded, but inputs.json not found" >> "$SUMMARY"
+        fi
+      else
+        echo "warning: failed to download context tar for $RID from $URL_CTX" >> "$SUMMARY"
+      fi
+    done
+  fi
 } > "$SUMMARY"
 
 log "Done. Collected logs in $OUT_DIR"

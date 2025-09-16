@@ -21,6 +21,9 @@ var embeddedLaneEKanikoBuilder []byte
 //go:embed templates/lane-c-osv-builder.hcl
 var embeddedLaneCOsvBuilder []byte
 
+//go:embed templates/lane-g-wasm-builder.hcl
+var embeddedLaneGWasmBuilder []byte
+
 func getEmbeddedTemplate(path string) []byte {
 	if strings.HasSuffix(path, "lane-c-osv.hcl") {
 		return embeddedLaneCOsv
@@ -33,6 +36,9 @@ func getEmbeddedTemplate(path string) []byte {
 	}
 	if strings.HasSuffix(path, "lane-c-osv-builder.hcl") {
 		return embeddedLaneCOsvBuilder
+	}
+	if strings.HasSuffix(path, "lane-g-wasm-builder.hcl") {
+		return embeddedLaneGWasmBuilder
 	}
 	return nil
 }

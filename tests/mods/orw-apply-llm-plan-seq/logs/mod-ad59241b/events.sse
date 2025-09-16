@@ -1,0 +1,294 @@
+event: init
+data: {"id":"mod-ad59241b","message":"SSE connected"}
+
+event: step
+data: {"step":"clone","phase":"clone","level":"info","message":"Cloning repository: repo=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git ref=e2e/fail-missing-symbol","time":"2025-09-16T04:57:57.256655223Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"clone-diagnostics","phase":"clone","level":"info","message":"repo=/tmp/mods-mod-ad59241b-3060577658/repo entries=.claude,.git,README.md,pom.xml,src","time":"2025-09-16T04:57:58.463762804Z"}
+
+event: step
+data: {"step":"source","phase":"sbom","level":"info","message":"Generated source SBOM","time":"2025-09-16T04:57:58.469299861Z"}
+
+event: step
+data: {"step":"create-branch","phase":"branch","level":"info","message":"Creating workflow branch","time":"2025-09-16T04:57:58.473164892Z"}
+
+event: step
+data: {"step":"guard-build-file","phase":"apply","level":"info","message":"repo=/tmp/mods-mod-ad59241b-3060577658/repo pom=true gradle=false kts=false","time":"2025-09-16T04:57:58.487988533Z"}
+
+event: step
+data: {"step":"input-preview","phase":"apply","level":"info","message":"input.tar preview:\n./.claude/state/context-warning-75.flag\n./.claude/state/context-warning-90.flag\n./.claude/state/daic-mode.json\n./.git/HEAD\n./.git/ORIG_HEAD\n./.git/config\n./.git/config.worktree\n./.git/description\n./.git/hooks/applypatch-msg.sample\n./.git/hooks/commit-msg.sample\n./.git/hooks/fsmonitor-watchman.sample\n./.git/hooks/post-update.sample\n./.git/hooks/pre-applypatch.sample\n./.git/hooks/pre-commit.sample\n./.git/hooks/pre-merge-commit.sample\n./.git/hooks/pre-push.sample\n./.git/hooks/pre-rebase.sample\n./.git/hooks/pre-receive.sample\n./.git/hooks/prepare-commit-msg.sample\n./.git/hooks/push-to-checkout.sample","time":"2025-09-16T04:57:58.500691503Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-ad59241b/java11to17-migration/orw_apply.submitted.hcl","time":"2025-09-16T04:57:58.515549156Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Submitting orw-apply job","time":"2025-09-16T04:57:58.522636398Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T04:57:59.259844086Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T04:58:47.347730415Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"orw-apply job completed","time":"2025-09-16T04:58:49.931669454Z"}
+
+event: step
+data: {"step":"diff-found","phase":"apply","level":"info","message":"diff ready (1106 bytes)","time":"2025-09-16T04:58:49.941012689Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Applying diff and running build gate: repo=/tmp/mods-mod-ad59241b-3060577658/repo diff=/tmp/mods-mod-ad59241b-3060577658/orw-apply/java11to17-migration/out/diff.patch","time":"2025-09-16T04:58:49.946552956Z"}
+
+event: step
+data: {"step":"diff-apply-started","phase":"apply","level":"info","message":"Applying diff to repository","time":"2025-09-16T04:58:49.951526437Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Running build gate","time":"2025-09-16T04:58:49.956111784Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: step
+data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: maven build failed: exit status 1\n","time":"2025-09-16T04:58:52.642571741Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 1/2","time":"2025-09-16T04:58:55.127045618Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-ad59241b/planner/planner.submitted.hcl","time":"2025-09-16T04:58:55.140158152Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T04:58:55.145729569Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job submitted","time":"2025-09-16T04:58:56.197443539Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T04:58:59.027591164Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T04:58:59.084907282Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T04:58:59.134256497Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-ad59241b RUN_ID=java11to17-orw-llm-planner-1757998735","time":"2025-09-16T04:58:59.193884449Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://seaweedfs-filer.service.consul:8888/","time":"2025-09-16T04:58:59.265069468Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-ad59241b/planner/java11to17-orw-llm-planner-1757998735/plan.json (status 201)","time":"2025-09-16T04:58:59.342409081Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T04:58:59.393785688Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"download start: key=mods/mod-ad59241b/planner/java11to17-orw-llm-planner-1757998735/plan.json start_ts=2025-09-16T04:58:59.446330366Z","time":"2025-09-16T04:58:59.446373296Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"download succeeded: key=mods/mod-ad59241b/planner/java11to17-orw-llm-planner-1757998735/plan.json bytes=332 start_ts=2025-09-16T04:58:59.446330366Z end_ts=2025-09-16T04:58:59.533924694Z","time":"2025-09-16T04:58:59.534015085Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T04:58:59.540522441Z"}
+
+event: step
+data: {"step":"orw-gen","phase":"fanout","level":"info","message":"branch started: orw-1","time":"2025-09-16T04:58:59.545965807Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-ad59241b/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T04:58:59.557171122Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T04:59:00.250163653Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T04:59:00.596470322Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T04:59:00.609143852Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T04:59:02.393022064Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T04:59:02.45410294Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T04:59:02.524023976Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T04:59:02.587137063Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"warn","message":"could not resolve offending file from inputs.json","time":"2025-09-16T04:59:02.677810572Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"warn","message":"no actionable inputs; wrote placeholder","time":"2025-09-16T04:59:02.750168924Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"uploaded diff to mods/mod-ad59241b/branches/llm-1/steps/llm-exec-llm-1-1757998739/diff.patch (status 201)","time":"2025-09-16T04:59:02.836386488Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job completed","time":"2025-09-16T04:59:02.897963909Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"push","status":"running"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download start: key=mods/mod-ad59241b/branches/llm-1/steps/llm-exec-llm-1-1757998739/diff.patch start_ts=2025-09-16T04:59:03.941615923Z","time":"2025-09-16T04:59:03.941639113Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download succeeded: key=mods/mod-ad59241b/branches/llm-1/steps/llm-exec-llm-1-1757998739/diff.patch bytes=153 start_ts=2025-09-16T04:59:03.941615923Z end_ts=2025-09-16T04:59:03.95200673Z","time":"2025-09-16T04:59:03.95202416Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T04:59:04.077365055Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T04:59:04.128563988Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T04:59:04.811014542Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-ad59241b/reducer/plan-1757998739-reducer-1757998744/next.json (status 201)","time":"2025-09-16T04:59:04.890293484Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T04:59:04.958560024Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T04:59:05.126222302Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"download start: key=mods/mod-ad59241b/reducer/plan-1757998739-reducer-1757998744/next.json start_ts=2025-09-16T04:59:05.407970669Z","time":"2025-09-16T04:59:05.40799152Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"download succeeded: key=mods/mod-ad59241b/reducer/plan-1757998739-reducer-1757998744/next.json bytes=23 start_ts=2025-09-16T04:59:05.407970669Z end_ts=2025-09-16T04:59:05.419370776Z","time":"2025-09-16T04:59:05.419418557Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"next parsed: {\"action\":\"stop\"}","time":"2025-09-16T04:59:05.425861783Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T04:59:05.431419739Z"}
+
+event: step
+data: {"step":"build-gate-succeeded","phase":"build","level":"info","message":"Build version ","time":"2025-09-16T04:59:05.438921896Z"}
+
+event: step
+data: {"step":"mr-config","phase":"mr","level":"info","message":"using token_env=GITLAB_TOKEN","time":"2025-09-16T04:59:05.443430143Z"}
+
+event: step
+data: {"step":"mr-config","phase":"mr","level":"info","message":"using repo_url_env=GITLAB_URL","time":"2025-09-16T04:59:05.448190231Z"}
+
+event: step
+data: {"step":"push","phase":"push","level":"info","message":"Pushing branch","time":"2025-09-16T04:59:05.452339754Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"mr","status":"running"}
+
+event: step
+data: {"step":"mr","phase":"mr","level":"info","message":"creating MR: source=workflow/java11to17-orw-llm/1757998678 target=main","time":"2025-09-16T04:59:07.016798115Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"mr","status":"completed"}
+
+event: end
+data: {"duration":"","overdue":false,"phase":"mr","status":"completed"}
+
