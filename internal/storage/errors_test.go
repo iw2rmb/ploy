@@ -655,19 +655,19 @@ func TestDefaultRetryConfig(t *testing.T) {
 }
 
 func TestClassifyError_HttpPrecedenceOverContent(t *testing.T) {
-    // Even if the message suggests quota, HTTP 500 should map to Internal with retryable true
-    err := errors.New("quota exceeded for user")
-    et, retryable, retryAfter := classifyError(err, ErrorContext{HTTPStatus: http.StatusInternalServerError})
-    if et != ErrorTypeInternal || !retryable || retryAfter != 5*time.Second {
-        t.Fatalf("expected internal retryable with 5s, got et=%v retryable=%v after=%v", et, retryable, retryAfter)
-    }
+	// Even if the message suggests quota, HTTP 500 should map to Internal with retryable true
+	err := errors.New("quota exceeded for user")
+	et, retryable, retryAfter := classifyError(err, ErrorContext{HTTPStatus: http.StatusInternalServerError})
+	if et != ErrorTypeInternal || !retryable || retryAfter != 5*time.Second {
+		t.Fatalf("expected internal retryable with 5s, got et=%v retryable=%v after=%v", et, retryable, retryAfter)
+	}
 
-    // Even if message suggests timeout, HTTP 429 should map to rate limit with Retry-After
-    err2 := errors.New("operation timeout")
-    et2, retryable2, retryAfter2 := classifyError(err2, ErrorContext{HTTPStatus: http.StatusTooManyRequests, Headers: map[string]string{"Retry-After": "3"}})
-    if et2 != ErrorTypeRateLimit || !retryable2 || retryAfter2 != 3*time.Second {
-        t.Fatalf("expected rate_limit retryable with 3s, got et=%v retryable=%v after=%v", et2, retryable2, retryAfter2)
-    }
+	// Even if message suggests timeout, HTTP 429 should map to rate limit with Retry-After
+	err2 := errors.New("operation timeout")
+	et2, retryable2, retryAfter2 := classifyError(err2, ErrorContext{HTTPStatus: http.StatusTooManyRequests, Headers: map[string]string{"Retry-After": "3"}})
+	if et2 != ErrorTypeRateLimit || !retryable2 || retryAfter2 != 3*time.Second {
+		t.Fatalf("expected rate_limit retryable with 3s, got et=%v retryable=%v after=%v", et2, retryable2, retryAfter2)
+	}
 }
 
 func TestRetryConfig_ShouldRetry(t *testing.T) {

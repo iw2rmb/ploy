@@ -1,0 +1,408 @@
+event: init
+data: {"id":"mod-db3aa3ec","message":"SSE connected"}
+
+event: step
+data: {"step":"clone","phase":"clone","level":"info","message":"Cloning repository: repo=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git ref=e2e/fail-missing-symbol","time":"2025-09-16T10:52:16.524863863Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"clone-diagnostics","phase":"clone","level":"info","message":"repo=/tmp/mods-mod-db3aa3ec-2403933387/repo entries=.claude,.git,README.md,pom.xml,src","time":"2025-09-16T10:52:17.714011063Z"}
+
+event: step
+data: {"step":"source","phase":"sbom","level":"info","message":"Generated source SBOM","time":"2025-09-16T10:52:17.72014392Z"}
+
+event: step
+data: {"step":"create-branch","phase":"branch","level":"info","message":"Creating workflow branch","time":"2025-09-16T10:52:17.724310554Z"}
+
+event: step
+data: {"step":"guard-build-file","phase":"apply","level":"info","message":"repo=/tmp/mods-mod-db3aa3ec-2403933387/repo pom=true gradle=false kts=false","time":"2025-09-16T10:52:17.736969934Z"}
+
+event: step
+data: {"step":"input-preview","phase":"apply","level":"info","message":"input.tar preview:\n./.claude/state/context-warning-75.flag\n./.claude/state/context-warning-90.flag\n./.claude/state/daic-mode.json\n./.git/HEAD\n./.git/ORIG_HEAD\n./.git/config\n./.git/config.worktree\n./.git/description\n./.git/hooks/applypatch-msg.sample\n./.git/hooks/commit-msg.sample\n./.git/hooks/fsmonitor-watchman.sample\n./.git/hooks/post-update.sample\n./.git/hooks/pre-applypatch.sample\n./.git/hooks/pre-commit.sample\n./.git/hooks/pre-merge-commit.sample\n./.git/hooks/pre-push.sample\n./.git/hooks/pre-rebase.sample\n./.git/hooks/pre-receive.sample\n./.git/hooks/prepare-commit-msg.sample\n./.git/hooks/push-to-checkout.sample","time":"2025-09-16T10:52:17.746202362Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-db3aa3ec/java11to17-migration/orw_apply.submitted.hcl","time":"2025-09-16T10:52:17.7626691Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Submitting orw-apply job","time":"2025-09-16T10:52:17.76731848Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T10:52:23.541313173Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T10:53:11.200022978Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"orw-apply job completed","time":"2025-09-16T10:53:13.222847491Z"}
+
+event: step
+data: {"step":"diff-found","phase":"apply","level":"info","message":"diff ready (1106 bytes)","time":"2025-09-16T10:53:13.228025836Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Applying diff and running build gate: repo=/tmp/mods-mod-db3aa3ec-2403933387/repo diff=/tmp/mods-mod-db3aa3ec-2403933387/orw-apply/java11to17-migration/out/diff.patch","time":"2025-09-16T10:53:13.232703844Z"}
+
+event: step
+data: {"step":"diff-apply-started","phase":"apply","level":"info","message":"Applying diff to repository","time":"2025-09-16T10:53:13.236394311Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Running build gate","time":"2025-09-16T10:53:13.240041976Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: step
+data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ ploy-orw-java11-maven ---\n[INFO] \n[INFO] --- build-helper-maven-plugin:3.5.0:add-source (add-healing-source) @ ploy-orw-java11-maven ---\n[INFO] Source directory: /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java added.\n[INFO] \n[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ ploy-orw-java11-maven ---\n[INFO] Using 'UTF-8' encoding to copy filtered resources.\n[INFO] skip non existing resourceDirectory /tmp/mods-mod-db3aa3ec-2403933387/repo/src/main/resources\n[INFO] \n[INFO] --- maven-compiler-plugin:3.14.0:compile (default-compile) @ ploy-orw-java11-maven ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 2 source files with javac [debug release 17] to target/classes\n[INFO] -------------------------------------------------------------\n[ERROR] COMPILATION ERROR : \n[INFO] -------------------------------------------------------------\n[ERROR] /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol\n  symbol:   class UnknownClass\n  location: class e2e.FailHealing\n[ERROR] /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol\n  symbol:   class UnknownClass\n  location: class e2e.FailHealing\n[INFO] 2 errors \n[INFO] -------------------------------------------------------------\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  1.485 s\n[INFO] Finished at: 2025-09-16T10:53:15Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.0:compile (default-compile) on project ploy-orw-java11-maven: Compilation failure: Compilation failure: \n[ERROR] /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol\n[ERROR]   symbol:   class UnknownClass\n[ERROR]   location: class e2e.FailHealing\n[ERROR] /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol\n[ERROR]   symbol:   class UnknownClass\n[ERROR]   location: class e2e.FailHealing\n[ERROR] -\u003e [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n","time":"2025-09-16T10:53:15.931592627Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: step
+data: {"step":"build-gate-error","phase":"build","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Buildi…","time":"2025-09-16T10:53:18.426115282Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 1/2","time":"2025-09-16T10:53:18.432774855Z"}
+
+event: step
+data: {"step":"build-error","phase":"healing","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ …","time":"2025-09-16T10:53:18.438151042Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"prepared inputs.json (bytes=4907)","time":"2025-09-16T10:53:18.444710145Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-db3aa3ec/planner/planner.submitted.hcl","time":"2025-09-16T10:53:18.456446261Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T10:53:18.462606169Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T10:53:19.281466907Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T10:53:19.335461371Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T10:53:19.39056823Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-db3aa3ec RUN_ID=java11to17-orw-llm-planner-1758019998","time":"2025-09-16T10:53:19.438330476Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://seaweedfs-filer.service.consul:8888/","time":"2025-09-16T10:53:19.508165028Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job submitted","time":"2025-09-16T10:53:19.511760743Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-db3aa3ec/planner/java11to17-orw-llm-planner-1758019998/plan.json (status 201)","time":"2025-09-16T10:53:19.584528702Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T10:53:19.634452716Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"download start: key=mods/mod-db3aa3ec/planner/java11to17-orw-llm-planner-1758019998/plan.json start_ts=2025-09-16T10:53:19.77171Z","time":"2025-09-16T10:53:19.77173868Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"download succeeded: key=mods/mod-db3aa3ec/planner/java11to17-orw-llm-planner-1758019998/plan.json bytes=332 start_ts=2025-09-16T10:53:19.77171Z end_ts=2025-09-16T10:53:19.782461274Z","time":"2025-09-16T10:53:19.782508325Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T10:53:19.788859884Z"}
+
+event: step
+data: {"step":"orw-gen","phase":"fanout","level":"info","message":"branch started: orw-1","time":"2025-09-16T10:53:19.793915777Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"prepared inputs.json (bytes=4903)","time":"2025-09-16T10:53:19.801385381Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-db3aa3ec/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T10:53:19.810326322Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T10:53:20.472319369Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T10:53:20.847479844Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T10:53:20.866238548Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T10:53:22.60001979Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T10:53:22.659542893Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T10:53:22.733207251Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T10:53:22.787425038Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"generated minimal edit patch (comment offending line)","time":"2025-09-16T10:53:22.861471582Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"uploaded diff to mods/mod-db3aa3ec/branches/llm-1/steps/llm-exec-llm-1-1758019999/diff.patch (status 201)","time":"2025-09-16T10:53:22.937913666Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job completed","time":"2025-09-16T10:53:22.994661814Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"reducer","status":"running"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download start: key=mods/mod-db3aa3ec/branches/llm-1/steps/llm-exec-llm-1-1758019999/diff.patch start_ts=2025-09-16T10:53:24.166379593Z","time":"2025-09-16T10:53:24.166396063Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download succeeded: key=mods/mod-db3aa3ec/branches/llm-1/steps/llm-exec-llm-1-1758019999/diff.patch bytes=395 start_ts=2025-09-16T10:53:24.166379593Z end_ts=2025-09-16T10:53:24.17731369Z","time":"2025-09-16T10:53:24.17732671Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T10:53:24.267493464Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T10:53:24.306147727Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T10:53:24.957667663Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-db3aa3ec/reducer/plan-1758019999-reducer-1758020004/next.json (status 201)","time":"2025-09-16T10:53:25.029391668Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T10:53:25.084242392Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T10:53:25.319698457Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"download start: key=mods/mod-db3aa3ec/reducer/plan-1758019999-reducer-1758020004/next.json start_ts=2025-09-16T10:53:25.561778996Z","time":"2025-09-16T10:53:25.561806497Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"download succeeded: key=mods/mod-db3aa3ec/reducer/plan-1758019999-reducer-1758020004/next.json bytes=46 start_ts=2025-09-16T10:53:25.561778996Z end_ts=2025-09-16T10:53:25.570961961Z","time":"2025-09-16T10:53:25.571012431Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 2/2","time":"2025-09-16T10:53:25.578423985Z"}
+
+event: step
+data: {"step":"build-error","phase":"healing","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-db3aa3ec-2403933387/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ …","time":"2025-09-16T10:53:25.58377152Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"prepared inputs.json (bytes=4907)","time":"2025-09-16T10:53:25.589933677Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-db3aa3ec/planner/planner.submitted.hcl","time":"2025-09-16T10:53:25.598999481Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T10:53:25.603876811Z"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T10:53:26.331700217Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T10:53:26.381368626Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T10:53:26.43221994Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-db3aa3ec RUN_ID=java11to17-orw-llm-planner-1758020005","time":"2025-09-16T10:53:26.484754545Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://seaweedfs-filer.service.consul:8888/","time":"2025-09-16T10:53:26.559585267Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-db3aa3ec/planner/java11to17-orw-llm-planner-1758020005/plan.json (status 201)","time":"2025-09-16T10:53:26.638198528Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job submitted","time":"2025-09-16T10:53:26.653193085Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T10:53:26.702248686Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"download start: key=mods/mod-db3aa3ec/planner/java11to17-orw-llm-planner-1758020005/plan.json start_ts=2025-09-16T10:53:26.904522888Z","time":"2025-09-16T10:53:26.904554719Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"download succeeded: key=mods/mod-db3aa3ec/planner/java11to17-orw-llm-planner-1758020005/plan.json bytes=332 start_ts=2025-09-16T10:53:26.904522888Z end_ts=2025-09-16T10:53:26.915415253Z","time":"2025-09-16T10:53:26.915458654Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T10:53:26.922317099Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"fanout","level":"info","message":"branch started: llm-1","time":"2025-09-16T10:53:26.929532839Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"prepared inputs.json (bytes=4903)","time":"2025-09-16T10:53:26.937222915Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-db3aa3ec/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T10:53:26.948420505Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T10:53:27.591080055Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T10:53:27.979090051Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T10:53:27.999231653Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T10:53:29.693173918Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T10:53:29.746577242Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T10:53:29.801235384Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T10:53:29.852783166Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"generated minimal edit patch (comment offending line)","time":"2025-09-16T10:53:29.941116447Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"uploaded diff to mods/mod-db3aa3ec/branches/llm-1/steps/llm-exec-llm-1-1758020006/diff.patch (status 201)","time":"2025-09-16T10:53:30.037436746Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job completed","time":"2025-09-16T10:53:30.098234453Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"healing","status":"failed"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download start: key=mods/mod-db3aa3ec/branches/llm-1/steps/llm-exec-llm-1-1758020006/diff.patch start_ts=2025-09-16T10:53:31.271954291Z","time":"2025-09-16T10:53:31.271967721Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download succeeded: key=mods/mod-db3aa3ec/branches/llm-1/steps/llm-exec-llm-1-1758020006/diff.patch bytes=395 start_ts=2025-09-16T10:53:31.271954291Z end_ts=2025-09-16T10:53:31.28392644Z","time":"2025-09-16T10:53:31.2839409Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T10:53:31.378537788Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T10:53:31.420014184Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T10:53:32.105039253Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-db3aa3ec/reducer/plan-1758020006-reducer-1758020011/next.json (status 201)","time":"2025-09-16T10:53:32.185466214Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T10:53:32.252723771Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T10:53:32.42053109Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"download start: key=mods/mod-db3aa3ec/reducer/plan-1758020006-reducer-1758020011/next.json start_ts=2025-09-16T10:53:32.684912801Z","time":"2025-09-16T10:53:32.684944802Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"download succeeded: key=mods/mod-db3aa3ec/reducer/plan-1758020006-reducer-1758020011/next.json bytes=46 start_ts=2025-09-16T10:53:32.684912801Z end_ts=2025-09-16T10:53:32.694265798Z","time":"2025-09-16T10:53:32.694305098Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"error","message":"healing failed after retries","time":"2025-09-16T10:53:32.703594294Z"}
+
+event: end
+data: {"duration":"","overdue":false,"phase":"healing","status":"failed"}
+

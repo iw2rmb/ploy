@@ -4,26 +4,19 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
-	arfapi "github.com/iw2rmb/ploy/api/arf"
-	nvdapi "github.com/iw2rmb/ploy/api/nvd"
-	sbomanalysis "github.com/iw2rmb/ploy/api/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	supply "github.com/iw2rmb/ploy/internal/supply"
 	"github.com/iw2rmb/ploy/internal/utils"
-	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/mods"
 )
 
 // submitAndWaitTerminal is a package-level indirection to allow test stubbing.
@@ -59,97 +52,7 @@ type BuildCheckerInterface interface {
 }
 
 // StepResult represents the result of executing a single step
-type StepResult struct {
-	StepID   string
-	Success  bool
-	Message  string
-	Duration time.Duration
-}
-
-// ModResult represents the overall result of a Mod execution
-type ModResult struct {
-	Success        bool
-	WorkflowID     string
-	BranchName     string
-	CommitSHA      string
-	BuildVersion   string
-	StepResults    []StepResult
-	ErrorMessage   string
-	Duration       time.Duration
-	HealingSummary *ModHealingSummary
-	MRURL          string // GitLab merge request URL if created
-}
-
-// Summary returns a human-readable summary of the Mods execution
-func (r *ModResult) Summary() string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("Workflow: %s\n", r.WorkflowID))
-
-	if r.Success {
-		sb.WriteString("Status: SUCCESS\n")
-	} else {
-		sb.WriteString("Status: FAILED\n")
-	}
-
-	if r.BranchName != "" {
-		sb.WriteString(fmt.Sprintf("Branch: %s\n", r.BranchName))
-	}
-
-	if r.CommitSHA != "" {
-		sb.WriteString(fmt.Sprintf("Commit: %s\n", r.CommitSHA))
-	}
-
-	if r.BuildVersion != "" {
-		sb.WriteString(fmt.Sprintf("Build: %s\n", r.BuildVersion))
-	}
-
-	if !r.Success && r.ErrorMessage != "" {
-		sb.WriteString(fmt.Sprintf("Error: %s\n", r.ErrorMessage))
-	}
-
-	sb.WriteString("Steps:\n")
-	for _, step := range r.StepResults {
-		status := "✓"
-		if !step.Success {
-			status = "✗"
-		}
-		sb.WriteString(fmt.Sprintf("  %s %s: %s\n", status, step.StepID, step.Message))
-	}
-
-	// Include healing summary if self-healing was enabled
-	if r.HealingSummary != nil && r.HealingSummary.Enabled {
-		sb.WriteString("\nSelf-Healing:\n")
-		if r.HealingSummary.AttemptsCount > 0 {
-			sb.WriteString(fmt.Sprintf("  Attempts: %d/%d\n", r.HealingSummary.AttemptsCount, r.HealingSummary.MaxRetries))
-			sb.WriteString(fmt.Sprintf("  Successful fixes: %d\n", r.HealingSummary.TotalHealed))
-			sb.WriteString(fmt.Sprintf("  Final result: %s\n", map[bool]string{true: "SUCCESS", false: "FAILED"}[r.HealingSummary.FinalSuccess]))
-
-			for _, attempt := range r.HealingSummary.Attempts {
-				status := "✗"
-				if attempt.Success {
-					status = "✓"
-				}
-				sb.WriteString(fmt.Sprintf("    %s Attempt %d: %s\n", status, attempt.AttemptNumber,
-					func() string {
-						if attempt.Success {
-							return fmt.Sprintf("Applied %d recipe(s)", len(attempt.AppliedRecipes))
-						}
-						return attempt.ErrorMessage
-					}()))
-			}
-		} else {
-			sb.WriteString("  No healing attempts made\n")
-		}
-	}
-
-	// Include MR URL if available
-	if r.MRURL != "" {
-		sb.WriteString(fmt.Sprintf("\nMerge Request: %s\n", r.MRURL))
-	}
-
-	return sb.String()
-}
+// StepResult, ModResult and Summary moved to runner_results.go
 
 // ModRunner orchestrates the execution of Mod steps
 type ModRunner struct {
@@ -247,46 +150,7 @@ func (r *ModRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
 // GetHCLSubmitter exposes the HCLSubmitter for helpers that need it.
 func (r *ModRunner) GetHCLSubmitter() HCLSubmitter { return r.hcl }
 
-func (r *ModRunner) emit(ctx context.Context, phase, step, level, message string) {
-	if r.eventReporter != nil {
-		_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: level, Message: message, Time: time.Now()})
-		return
-	}
-	// Fallback to local log output when no reporter is configured
-	log.Printf("[Mods][%s/%s][%s] %s", phase, step, level, message)
-}
-
-// GetEventReporter exposes the reporter for orchestrators
-func (r *ModRunner) GetEventReporter() EventReporter {
-	return r.eventReporter
-}
-
-// reportLastJobAsync looks up allocation ID and reports job metadata once available
-func (r *ModRunner) reportLastJobAsync(ctx context.Context, jobName, phase, step string) {
-	if r.eventReporter == nil || jobName == "" {
-		return
-	}
-	go func() {
-		// brief delay to allow registration
-		select {
-		case <-time.After(1 * time.Second):
-		case <-ctx.Done():
-			return
-		}
-		deadline := time.Now().Add(1 * time.Minute)
-		for time.Now().Before(deadline) {
-			if id := findFirstAllocID(jobName); id != "" {
-				_ = r.eventReporter.Report(ctx, Event{Phase: phase, Step: step, Level: "info", Message: "job submitted", JobName: jobName, AllocID: id, Time: time.Now()})
-				return
-			}
-			select {
-			case <-time.After(1 * time.Second):
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-}
+// Event emission helpers moved to events_emit.go
 
 // GetGitProvider returns the Git provider for human-step branch operations
 func (r *ModRunner) GetGitProvider() provider.GitProvider {
@@ -327,155 +191,7 @@ func (r *ModRunner) GetTargetRepo() string {
 	return r.config.TargetRepo
 }
 
-// PlannerAssets holds file paths for rendered planner inputs and HCL
-type PlannerAssets struct {
-	InputsPath string
-	HCLPath    string
-}
-
-// RenderPlannerAssets writes minimal inputs.json and a rendered planner.hcl (with placeholders) into the workspace.
-// This is a dry-run helper to prepare artifacts for planner submission later.
-func (r *ModRunner) RenderPlannerAssets() (*PlannerAssets, error) {
-	inputsDir := filepath.Join(r.workspaceDir, "planner", "context")
-	outDir := filepath.Join(r.workspaceDir, "planner", "out")
-	if err := os.MkdirAll(inputsDir, 0755); err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(outDir, 0755); err != nil {
-		return nil, err
-	}
-	// Minimal inputs.json
-	inputsPath := filepath.Join(inputsDir, "inputs.json")
-	inputs := fmt.Sprintf(`{
-  "language": "java",
-  "lane": %q,
-  "last_error": {"stdout": "", "stderr": ""},
-  "deps": {}
-}`, r.config.Lane)
-
-	if err := os.WriteFile(inputsPath, []byte(inputs), 0644); err != nil {
-		return nil, err
-	}
-
-	// Write embedded planner template into workspace
-	hclPath := filepath.Join(r.workspaceDir, "planner", "planner.hcl")
-	if err := os.WriteFile(hclPath, nomadtpl.GetPlannerTemplate(), 0644); err != nil {
-		return nil, err
-	}
-
-	return &PlannerAssets{InputsPath: inputsPath, HCLPath: hclPath}, nil
-}
-
-// RenderLLMExecAssets writes a rendered llm_exec.hcl for the given option ID.
-func (r *ModRunner) RenderLLMExecAssets(optionID string) (string, error) {
-	dir := filepath.Join(r.workspaceDir, string(StepTypeLLMExec), optionID)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err
-	}
-	renderedPath := filepath.Join(dir, "llm_exec.rendered.hcl")
-	// Defer env substitution to caller (same as planner/reducer), we just copy template here
-	if err := os.WriteFile(renderedPath, nomadtpl.GetLLMExecTemplate(), 0644); err != nil {
-		return "", err
-	}
-	return renderedPath, nil
-}
-
-// RenderORWApplyAssets writes a rendered orw_apply.hcl for the given option ID.
-func (r *ModRunner) RenderORWApplyAssets(optionID string) (string, error) {
-	dir := filepath.Join(r.workspaceDir, string(StepTypeORWApply), optionID)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err
-	}
-	renderedPath := filepath.Join(dir, "orw_apply.rendered.hcl")
-	if err := os.WriteFile(renderedPath, nomadtpl.GetORWApplyTemplate(), 0644); err != nil {
-		return "", err
-	}
-	return renderedPath, nil
-}
-
-// PrepareRepo clones the target repository and creates a workflow branch; returns the repo path and branch name.
-func (r *ModRunner) PrepareRepo(ctx context.Context) (string, string, error) {
-	repoPath := filepath.Join(r.workspaceDir, "repo-apply")
-	if r.repoManager != nil {
-		if err := r.repoManager.Clone(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
-			return "", "", fmt.Errorf("clone failed: %w", err)
-		}
-	} else if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
-		return "", "", fmt.Errorf("clone failed: %w", err)
-	}
-	branchName := GenerateBranchName(r.config.ID)
-	if r.repoManager != nil {
-		if err := r.repoManager.CreateBranch(ctx, repoPath, branchName); err != nil {
-			return "", "", fmt.Errorf("branch failed: %w", err)
-		}
-	} else if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
-		return "", "", fmt.Errorf("branch failed: %w", err)
-	}
-	return repoPath, branchName, nil
-}
-
-// ApplyDiffAndBuild validates and applies a diff, commits changes, and runs a build gate.
-func (r *ModRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath string) error {
-	// Validate paths first (allowlist)
-	allow := ResolveDefaultsFromEnv().Allowlist
-	if err := validateDiffPathsFn(diffPath, allow); err != nil {
-		return err
-	}
-	if err := validateUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
-		return err
-	}
-	if err := applyUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
-		return err
-	}
-	// Stage only files referenced by the unified diff to avoid committing build artifacts
-	if err := stagePathsFromDiff(ctx, repoPath, diffPath); err != nil {
-		return err
-	}
-	if r.repoManager != nil {
-		if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): mods branch patch"); err != nil {
-			return fmt.Errorf("commit failed: %w", err)
-		}
-	} else if err := r.gitOps.CommitChanges(ctx, repoPath, "apply(diff): mods branch patch"); err != nil {
-		return fmt.Errorf("commit failed: %w", err)
-	}
-	// Build gate
-	res, err := r.runBuildGate(ctx, repoPath)
-	if err != nil {
-		return fmt.Errorf("build gate failed: %w", err)
-	}
-	if res != nil && !res.Success {
-		return fmt.Errorf("build gate failed: %s", res.Message)
-	}
-	return nil
-}
-
-// ReducerAssets holds file paths for rendered reducer inputs and HCL
-type ReducerAssets struct {
-	HistoryPath string
-	HCLPath     string
-}
-
-// RenderReducerAssets writes a minimal history.json and a rendered reducer.hcl (with placeholders) into the workspace.
-func (r *ModRunner) RenderReducerAssets() (*ReducerAssets, error) {
-	ctxDir := filepath.Join(r.workspaceDir, "reducer", "context")
-	if err := os.MkdirAll(ctxDir, 0755); err != nil {
-		return nil, err
-	}
-
-	// Minimal history.json
-	historyPath := filepath.Join(ctxDir, "history.json")
-	history := "{\n  \"plan_id\": \"\",\n  \"branches\": [],\n  \"winner\": \"\"\n}"
-	if err := os.WriteFile(historyPath, []byte(history), 0644); err != nil {
-		return nil, err
-	}
-
-	hclPath := filepath.Join(r.workspaceDir, "reducer", "reducer.hcl")
-	if err := os.WriteFile(hclPath, nomadtpl.GetReducerTemplate(), 0644); err != nil {
-		return nil, err
-	}
-
-	return &ReducerAssets{HistoryPath: historyPath, HCLPath: hclPath}, nil
-}
+// Planner/assets, repo ops, and apply/build helpers moved to dedicated files
 
 // Run executes the complete Mods workflow
 func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
@@ -994,309 +710,23 @@ build_step:
 	return result, nil
 }
 
-// modsSBOMEnabled returns whether controller-side SBOM generation is enabled for Mods
-func (r *ModRunner) sbomEnabled() bool {
-	if r.config != nil && r.config.SBOM != nil {
-		return r.config.SBOM.Enabled
-	}
-	v := strings.ToLower(os.Getenv("PLOY_MODS_SBOM_ENABLED"))
-	return v != "false" && v != "0" && v != "off"
-}
+// SBOM helpers moved to vuln_gate.go
 
 // applyMRAuthFromConfig resolves per-run Git provider environment from mods.yaml (mr.*)
 // without embedding secrets in YAML. It reads the named env vars and maps them to
 // the standard GITLAB_URL/GITLAB_TOKEN variables expected by provider and git ops.
-func (r *ModRunner) applyMRAuthFromConfig(ctx context.Context) {
-	if r.config == nil || r.config.MR == nil {
-		return
-	}
-	// Token
-	if name := strings.TrimSpace(r.config.MR.TokenEnv); name != "" {
-		val := os.Getenv(name)
-		if val != "" {
-			_ = os.Setenv("GITLAB_TOKEN", val)
-			r.emit(ctx, "mr", "mr-config", "info", fmt.Sprintf("using token_env=%s", name))
-		} else {
-			r.emit(ctx, "mr", "mr-config", "warn", fmt.Sprintf("token_env=%s not set", name))
-		}
-	}
-	// Base URL
-	if name := strings.TrimSpace(r.config.MR.RepoURLEnv); name != "" {
-		val := os.Getenv(name)
-		if val != "" {
-			_ = os.Setenv("GITLAB_URL", val)
-			r.emit(ctx, "mr", "mr-config", "info", fmt.Sprintf("using repo_url_env=%s", name))
-		} else {
-			r.emit(ctx, "mr", "mr-config", "warn", fmt.Sprintf("repo_url_env=%s not set", name))
-		}
-	}
-}
+// MR auth helper moved to mr_auth.go
 
-func (r *ModRunner) sbomFailOnError() bool {
-	if r.config != nil && r.config.SBOM != nil {
-		return r.config.SBOM.FailOnError
-	}
-	v := strings.ToLower(os.Getenv("PLOY_MODS_SBOM_FAIL_ON_ERROR"))
-	return v == "true" || v == "1" || v == "on"
-}
+// SBOM helpers moved to vuln_gate.go
 
 // Vulnerability gate config helpers
-func (r *ModRunner) vulnEnabled() bool {
-	if r.config != nil && r.config.Security != nil {
-		return r.config.Security.Enabled
-	}
-	v := strings.ToLower(os.Getenv("PLOY_MODS_VULN_ENABLED"))
-	return v == "true" || v == "1" || v == "on"
-}
+// Vulnerability helpers moved to vuln_gate.go
 
-func (r *ModRunner) vulnMinSeverity() string {
-	if r.config != nil && r.config.Security != nil && r.config.Security.MinSeverity != "" {
-		return strings.ToLower(r.config.Security.MinSeverity)
-	}
-	v := strings.ToLower(os.Getenv("PLOY_MODS_VULN_MIN_SEVERITY"))
-	if v == "" {
-		return "high"
-	}
-	return v
-}
+// Vulnerability helpers moved to vuln_gate.go
 
-func (r *ModRunner) vulnFailOnFindings() bool {
-	if r.config != nil && r.config.Security != nil {
-		return r.config.Security.FailOnFindings
-	}
-	v := strings.ToLower(os.Getenv("PLOY_MODS_VULN_FAIL_ON_FINDINGS"))
-	return v != "false" && v != "0" && v != "off"
-}
-
-// runVulnerabilityGate performs a lightweight NVD query using SBOM dependencies
-func (r *ModRunner) runVulnerabilityGate(ctx context.Context, repoPath string) error {
-	sbomPath := filepath.Join(repoPath, ".sbom.json")
-	if !utils.FileExists(sbomPath) {
-		r.emit(ctx, "vuln", "nvd", "warn", "SBOM not found; skipping vulnerability gate")
-		return nil
-	}
-
-	// Load SBOM and extract dependencies via analyzer
-	var sbomData map[string]interface{}
-	if b, err := os.ReadFile(sbomPath); err == nil {
-		_ = json.Unmarshal(b, &sbomData)
-	}
-	deps, _ := sbomanalysis.NewSyftSBOMAnalyzer().ExtractDependencies(sbomData)
-	if len(deps) == 0 {
-		r.emit(ctx, "vuln", "nvd", "info", "No dependencies found in SBOM; skipping")
-		return nil
-	}
-
-	// Configure NVD client from env (NVD_*), consistent with server wiring
-	nvd := nvdapi.NewNVDDatabase()
-	if apiKey := os.Getenv("NVD_API_KEY"); apiKey != "" {
-		nvd.SetAPIKey(apiKey)
-	}
-	if base := os.Getenv("NVD_BASE_URL"); base != "" {
-		nvd.SetBaseURL(base)
-	}
-	if to := os.Getenv("NVD_TIMEOUT_MS"); to != "" {
-		if ms, err := strconv.Atoi(to); err == nil && ms > 0 {
-			nvd.SetHTTPTimeout(time.Duration(ms) * time.Millisecond)
-		}
-	}
-
-	// Query NVD per dependency name (keyword search); coarse but effective
-	sevRank := map[string]int{"low": 1, "medium": 2, "high": 3, "critical": 4}
-	threshold := sevRank[r.vulnMinSeverity()]
-	total := 0
-	hitsAtOrAbove := 0
-
-	for _, d := range deps {
-		q := arfapi.VulnerabilityQuery{PackageName: d.Name}
-		vulns, err := nvd.QueryVulnerabilities(q)
-		if err != nil {
-			// Non-fatal; log and continue
-			r.emit(ctx, "vuln", "nvd", "warn", fmt.Sprintf("query failed for %s: %v", d.Name, err))
-			continue
-		}
-		for _, v := range vulns {
-			total++
-			if sevRank[strings.ToLower(v.Severity)] >= threshold {
-				hitsAtOrAbove++
-			}
-		}
-	}
-
-	msg := fmt.Sprintf("NVD scan complete: total=%d findings>=min=%d min_severity=%s", total, hitsAtOrAbove, r.vulnMinSeverity())
-	if hitsAtOrAbove > 0 {
-		if r.vulnFailOnFindings() {
-			r.emit(ctx, "vuln", "nvd", "error", msg)
-			return fmt.Errorf("vulnerability gate failed: %s", msg)
-		}
-		r.emit(ctx, "vuln", "nvd", "warn", msg)
-		return nil
-	}
-	r.emit(ctx, "vuln", "nvd", "info", msg)
-	return nil
-}
+// Vulnerability helpers moved to vuln_gate.go
 
 // MR description rendering moved to mr_template.go
-
-// attemptHealing orchestrates the healing workflow: planner → fanout → reducer
-func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
-	summary := &ModHealingSummary{
-		Enabled:       true,
-		AttemptsCount: 1,
-	}
-
-	// Log the captured build error (truncated) to help diagnose planner inputs
-	{
-		const maxLen = 800
-		msg := buildError
-		if len(msg) > maxLen {
-			msg = msg[:maxLen] + "…"
-		}
-		r.emit(ctx, "healing", "build-error", "info", msg)
-	}
-
-	// Fast-path local remediation to ensure E2E healing success when remote planner is unavailable
-	if err := r.localRemediation(repoPath, buildError); err == nil {
-		summary.SetFinalResult(true)
-		return summary, nil
-	}
-
-	// Step 1: Submit planner job to analyze the build error
-	var jobHelper JobSubmissionHelper
-	if r.jobHelper != nil {
-		jobHelper = r.jobHelper
-	} else {
-		jobHelper = NewJobSubmissionHelperWithRunner(r.jobSubmitter, r)
-	}
-	planResult, err := jobHelper.SubmitPlannerJob(ctx, r.config, buildError, r.workspaceDir)
-	if err != nil {
-		// Fallback: local remediation when planner is unavailable
-		if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
-			summary.SetFinalResult(true)
-			return summary, nil
-		}
-		return summary, fmt.Errorf("planner job failed: %w", err)
-	}
-
-	summary.PlanID = planResult.PlanID
-
-	// Step 2: Convert planner options to branch specs
-	var branches []BranchSpec
-	for i, option := range planResult.Options {
-		branchID := fmt.Sprintf("option-%d", i)
-		if id, ok := option["id"].(string); ok {
-			branchID = id
-		}
-
-		// Default and normalize planner types to canonical values
-		branchType := string(StepTypeLLMExec)
-		if t, ok := option["type"].(string); ok {
-			branchType = string(NormalizeStepType(t))
-		}
-
-		// Attach build error context to each branch inputs for llm-exec to parse
-		inputs := map[string]interface{}{}
-		for k, v := range option {
-			inputs[k] = v
-		}
-		if buildError != "" {
-			inputs["build_error"] = buildError
-		}
-		branches = append(branches, BranchSpec{ID: branchID, Type: branchType, Inputs: inputs})
-	}
-
-	// Step 3: Execute fanout orchestration
-	maxParallel := 3 // Default parallelism
-	if r.config.SelfHeal.MaxRetries > 0 {
-		maxParallel = r.config.SelfHeal.MaxRetries
-	}
-
-	var (
-		winner     BranchResult
-		allResults []BranchResult
-		fanoutErr  error
-	)
-	if r.healer != nil {
-		// Prefer modular HealingOrchestrator directly
-		winner, allResults, fanoutErr = r.healer.RunFanout(ctx, nil, branches, maxParallel)
-	} else {
-		// Fallback to existing fanout orchestrator
-		orchestrator := NewFanoutOrchestratorWithRunner(r.jobSubmitter, r)
-		winner, allResults, fanoutErr = orchestrator.RunHealingFanout(ctx, nil, branches, maxParallel)
-	}
-	summary.AllResults = allResults
-
-	if fanoutErr != nil {
-		// Fanout failed, but continue to reducer anyway
-		summary.Winner = nil
-	} else {
-		summary.Winner = &winner
-	}
-
-	// Step 4: Submit reducer job to determine next action
-	nextAction, reducerErr := jobHelper.SubmitReducerJob(ctx, planResult.PlanID, allResults, summary.Winner, r.workspaceDir)
-	if reducerErr != nil {
-		// Fallback: local remediation when reducer fails
-		if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
-			summary.SetFinalResult(true)
-			return summary, nil
-		}
-		return summary, fmt.Errorf("reducer job failed: %w", reducerErr)
-	}
-
-	// Record reducer decision
-	if nextAction != nil {
-		summary.NextAction = *nextAction
-	}
-
-	// If reducer requests applying a branch chain, replay it into the repo now
-	if nextAction != nil && strings.ToLower(nextAction.Action) == "apply" {
-		seaweed := ResolveInfraFromEnv().SeaweedURL
-		if seaweed != "" && nextAction.StepID != "" {
-			// Use a workspace-scoped out dir for temporary chain patches
-			baseDir := filepath.Join(r.workspaceDir, "branch-apply")
-			_ = os.MkdirAll(baseDir, 0755)
-			_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), nextAction.StepID, baseDir, repoPath)
-		}
-		summary.SetFinalResult(true)
-		return summary, nil
-	}
-
-	// If reducer says to stop and we have a winner, healing succeeded
-	if nextAction != nil && strings.ToLower(nextAction.Action) == "stop" && summary.Winner != nil {
-		summary.SetFinalResult(true)
-		return summary, nil
-	}
-
-	// Otherwise, healing failed
-	// Fallback: if reducer did not select a winner, attempt local remediation
-	if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
-		summary.SetFinalResult(true)
-		return summary, nil
-	}
-	// No actionable next step; mark failure with reducer notes if present
-	if nextAction != nil {
-		return summary, fmt.Errorf("healing failed: %s", nextAction.Notes)
-	}
-	return summary, fmt.Errorf("healing failed: reducer returned no next action")
-}
-
-// localRemediation performs best-effort local fixes for common compile failures
-// to enable the E2E sequence to progress when planner/reducer are unavailable.
-// Strategy: remove src/healing/java (profile-only failing sources) and
-// add a stub UnknownClass if the error contains that symbol.
-func (r *ModRunner) localRemediation(repoPath, buildError string) error {
-	// Disabled to ensure healing proceeds via planner/llm and produces an explicit diff
-	return fmt.Errorf("local remediation disabled; require planner/llm healing")
-}
-
-// CleanupWorkspace removes the temporary workspace directory
-func (r *ModRunner) CleanupWorkspace() error {
-	if r.workspaceDir != "" {
-		return os.RemoveAll(r.workspaceDir)
-	}
-	return nil
-}
 
 // hasRepoChanges returns true if the working tree has any changes
 // repo ops moved to repo_ops.go

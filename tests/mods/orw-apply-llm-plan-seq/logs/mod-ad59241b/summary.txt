@@ -1,0 +1,13 @@
+MOD_ID: mod-ad59241b
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+completed, phase=mr
+last_job=plan-1757998739-reducer-1757998744
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log
+Artifact keys (from events):
+mods/mod-ad59241b/branches/llm-1/steps/llm-exec-llm-1-1757998739/diff.patch
+mods/mod-ad59241b/planner/java11to17-orw-llm-planner-1757998735/plan.json

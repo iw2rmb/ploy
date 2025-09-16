@@ -18,6 +18,14 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+ - internal/mods: Refactor large runner and tests into cohesive modules without behavior change. Split runner into assets_*.go, repo_ops_adapter.go, apply_and_build_adapter.go, events_emit.go, mr_auth.go, vuln_gate.go, healing_orchestration_adapter.go, cleanup.go, and runner_results.go. Split monolithic job_submission_test.go into focused test files (planner, reducer, fanout, branches, integration, timeouts). This reduces file size and improves maintainability.
+- Build: Split `internal/build/trigger_core.go` into focused helpers:
+  - `sbom.go` (SBOM feature toggles)
+  - `registry_verify.go` (OCI push verification)
+  - `dockerfile_gen.go` (Dockerfile autogeneration + helpers)
+  - `builder_job.go` (Nomad job-manager log helper)
+  - `lane_a.go`, `lane_c.go`, `lane_d.go`, `lane_e.go` (extracted lane logic; A–E routed through these helpers)
+  No behavior changes; added targeted unit tests for each module.
 - Mods: Split `internal/mods/fanout_orchestrator.go` into logical parts:
   - `fanout_orchestrator_core.go` (interface, core runner, dispatch)
   - `fanout_llm_exec.go` + `fanout_llm_helpers.go` (LLM exec branch + helpers)

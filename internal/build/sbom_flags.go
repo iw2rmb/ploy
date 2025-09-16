@@ -9,4 +9,3 @@ func sbomFeatureEnabled(_ *fiber.Ctx) bool { return false }
 // sbomFailOnError determines whether SBOM generation errors are fatal.
 // Default to false in Dev to keep deployments moving when optional features fail.
 func sbomFailOnError() bool { return false }
-
