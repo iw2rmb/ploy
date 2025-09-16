@@ -58,9 +58,8 @@ type RenderData struct {
 	// Build metadata
 	BuildTime string
 
-	// WASM-specific options
+    // WASM-specific options
     WasmModuleURL string
-    FilerBaseURL  string
 }
 
 // RenderTemplate renders a Nomad job HCL based on lane and data, returning a temp file path
@@ -333,9 +332,6 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
     if data.WasmModuleURL != "" {
         s = strings.ReplaceAll(s, "{{WASM_URL}}", data.WasmModuleURL)
-    }
-    if data.FilerBaseURL != "" {
-        s = strings.ReplaceAll(s, "{{FILER_URL}}", strings.TrimRight(data.FilerBaseURL, "/"))
     }
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))

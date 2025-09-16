@@ -493,15 +493,6 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return ""
 		}(),
 
-		FilerBaseURL: func() string {
-			if strings.ToUpper(lane) == "G" {
-				base := os.Getenv("PLOY_SEAWEEDFS_URL")
-				if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
-				if !strings.HasPrefix(base, "http") { base = "http://" + base }
-				return strings.TrimRight(base, "/")
-			}
-			return ""
-		}(),
 
 		// Feature flags (dev-friendly defaults)
 		VaultEnabled:        false, // Vault not enabled on dev cluster

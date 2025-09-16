@@ -15,14 +15,13 @@ job "{{APP_NAME}}-lane-g" {
       env {
         WASM_URL = "{{WASM_URL}}"
         PORT     = "{{HTTP_PORT}}"
-        FILER_URL = "{{FILER_URL}}"
       }
 
       config {
         image = "debian:bookworm-slim"
         entrypoint = ["/bin/sh", "-lc"]
         args = [
-          "set -ex; apt-get update -y && apt-get install -y wget ca-certificates; mkdir -p /app; echo '[lane-g] downloading wazero-runner'; wget -O /app/wazero-runner ${FILER_URL}/artifacts/wazero-runner/linux/amd64/wazero-runner; chmod +x /app/wazero-runner; echo '[lane-g] downloading module from' $WASM_URL; wget -O /app/module.wasm $WASM_URL; echo '[lane-g] module downloaded:'; ls -l /app/module.wasm; exec /app/wazero-runner -ignore-errors -module /app/module.wasm -port $PORT"
+          "set -ex; apt-get update -y && apt-get install -y wget ca-certificates; mkdir -p /app; base=\${WASM_URL%/builds/*}; echo '[lane-g] resolved filer base:' $base; echo '[lane-g] downloading wazero-runner'; wget -O /app/wazero-runner $base/artifacts/wazero-runner/linux/amd64/wazero-runner; chmod +x /app/wazero-runner; echo '[lane-g] downloading module from' $WASM_URL; wget -O /app/module.wasm $WASM_URL; echo '[lane-g] module downloaded:'; ls -l /app/module.wasm; exec /app/wazero-runner -ignore-errors -module /app/module.wasm -port $PORT"
         ]
         ports = ["http"]
       }
