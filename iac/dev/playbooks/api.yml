@@ -77,16 +77,19 @@
 
         - name: Configure Git credential helper for GitHub (private repo)
           shell: |
-            set -euo pipefail
+            set -eu
             git config --global credential.helper store
-            CREDS_FILE="$HOME/.git-credentials"
-            # Avoid rewriting if already configured
-            if ! grep -q "^https://github.com" "$CREDS_FILE" 2>/dev/null; then
-              echo "https://{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}:{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}@github.com" > "$CREDS_FILE"
-              chmod 600 "$CREDS_FILE"
-            fi
           become_user: ploy
           changed_when: false
+
+        - name: Write GitHub credentials file for Git (private repo)
+          copy:
+            content: "https://{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}:{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}@github.com\n"
+            dest: /home/ploy/.git-credentials
+            owner: ploy
+            group: ploy
+            mode: '0600'
+          no_log: true
 
         - name: Clone repository if missing
           git:
@@ -111,7 +114,7 @@
         
         - name: Verify GitHub access with configured credentials
           shell: |
-            set -euo pipefail
+            set -eu
             # Minimal non-verbose connectivity check (does not print secrets)
             git ls-remote https://github.com/iw2rmb/ploy.git HEAD >/dev/null 2>&1
           become_user: ploy
@@ -588,15 +591,38 @@
           until: versioned_ready.status == 200
           ignore_errors: true
 
-        - name: Test bootstrap API endpoints via domain
+        - name: Post-deploy | Get deployed repo HEAD (short)
+          shell: |
+            cd /home/ploy/ploy && git rev-parse --short HEAD
+          become_user: ploy
+          register: deployed_head_short
+          changed_when: false
+
+        - name: Post-deploy | Fetch API version info
           uri:
-            url: "https://api.{{ ploy.platform_domain }}/v1/health"
+            url: "https://api.{{ ploy.platform_domain }}/v1/version"
             method: GET
             status_code: 200
-            environment:
-            PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
-          register: bootstrap_api_test
-          ignore_errors: true
+            validate_certs: no
+          register: api_version_info
+          retries: 3
+          delay: 5
+          until: api_version_info.status == 200
+
+        - name: Post-deploy | Assert API git_commit matches deployed HEAD
+          assert:
+            that:
+              - api_version_info.json is defined
+              - api_version_info.json.git_commit is defined
+              - api_version_info.json.git_commit | length > 0
+              - api_version_info.json.git_commit.startswith(deployed_head_short.stdout)
+                or deployed_head_short.stdout.startswith(api_version_info.json.git_commit)
+            fail_msg: >-
+              Deployed API git_commit ({{ api_version_info.json.git_commit | default('unknown') }})
+              does not match repo HEAD ({{ deployed_head_short.stdout | default('unknown') }})
+            success_msg: >-
+              Post-deploy check passed: API git_commit {{ api_version_info.json.git_commit }}
+              matches HEAD {{ deployed_head_short.stdout }}
 
         - name: Verify clean service registrations post-deployment
           shell: /opt/hashicorp/bin/consul-service-monitor.sh --job-name ploy-api
