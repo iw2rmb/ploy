@@ -123,34 +123,52 @@ func TestRetryWithBackoff(t *testing.T) {
 	}
 }
 
-type countProvider struct{ MockStorageProvider; listCalls, verifyCalls int }
+type countProvider struct {
+	MockStorageProvider
+	listCalls, verifyCalls int
+}
+
 func (cp *countProvider) ListObjects(bucket, prefix string) ([]ObjectInfo, error) {
-    cp.listCalls++
-    if cp.listCalls == 1 { return nil, errors.New("connection reset by peer") }
-    return []ObjectInfo{{Key: prefix + "/a", Size: 1}}, nil
+	cp.listCalls++
+	if cp.listCalls == 1 {
+		return nil, errors.New("connection reset by peer")
+	}
+	return []ObjectInfo{{Key: prefix + "/a", Size: 1}}, nil
 }
 func (cp *countProvider) VerifyUpload(key string) error {
-    cp.verifyCalls++
-    if cp.verifyCalls == 1 { return errors.New("service unavailable") }
-    return nil
+	cp.verifyCalls++
+	if cp.verifyCalls == 1 {
+		return errors.New("service unavailable")
+	}
+	return nil
 }
 
 func TestRetryableStorageClient_ListObjects_RetriesThenSucceeds(t *testing.T) {
-    prov := &countProvider{}
-    cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 1 * time.Millisecond, MaxDelay: 10 * time.Millisecond, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeNetwork, ErrorTypeInternal, ErrorTypeServiceUnavailable}}
-    c := NewRetryableStorageClient(prov, cfg)
-    objs, err := c.ListObjects("bucket", "prefix")
-    if err != nil { t.Fatalf("unexpected error: %v", err) }
-    if prov.listCalls != 2 { t.Fatalf("expected 2 list calls, got %d", prov.listCalls) }
-    if len(objs) != 1 { t.Fatalf("expected 1 object, got %d", len(objs)) }
+	prov := &countProvider{}
+	cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 1 * time.Millisecond, MaxDelay: 10 * time.Millisecond, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeNetwork, ErrorTypeInternal, ErrorTypeServiceUnavailable}}
+	c := NewRetryableStorageClient(prov, cfg)
+	objs, err := c.ListObjects("bucket", "prefix")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prov.listCalls != 2 {
+		t.Fatalf("expected 2 list calls, got %d", prov.listCalls)
+	}
+	if len(objs) != 1 {
+		t.Fatalf("expected 1 object, got %d", len(objs))
+	}
 }
 
 func TestRetryableStorageClient_VerifyUpload_RetriesThenSucceeds(t *testing.T) {
-    prov := &countProvider{}
-    cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 1 * time.Millisecond, MaxDelay: 10 * time.Millisecond, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeServiceUnavailable, ErrorTypeInternal}}
-    c := NewRetryableStorageClient(prov, cfg)
-    if err := c.VerifyUpload("k"); err != nil { t.Fatalf("unexpected error: %v", err) }
-    if prov.verifyCalls != 2 { t.Fatalf("expected 2 verify calls, got %d", prov.verifyCalls) }
+	prov := &countProvider{}
+	cfg := &RetryConfig{MaxAttempts: 2, InitialDelay: 1 * time.Millisecond, MaxDelay: 10 * time.Millisecond, BackoffMultiplier: 2.0, RetryableErrors: []ErrorType{ErrorTypeServiceUnavailable, ErrorTypeInternal}}
+	c := NewRetryableStorageClient(prov, cfg)
+	if err := c.VerifyUpload("k"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prov.verifyCalls != 2 {
+		t.Fatalf("expected 2 verify calls, got %d", prov.verifyCalls)
+	}
 }
 
 func TestRetryWithBackoff_RespectsRetryAfter(t *testing.T) {

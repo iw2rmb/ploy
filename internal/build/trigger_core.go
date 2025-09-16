@@ -484,7 +484,9 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		WasmModuleURL: func() string {
 			if strings.ToUpper(lane) == "G" {
 				base := os.Getenv("PLOY_SEAWEEDFS_URL")
-				if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
+				if base == "" {
+					base = "http://seaweedfs-filer.service.consul:8888"
+				}
 				if !strings.HasPrefix(base, "http") {
 					base = "http://" + base
 				}
@@ -496,8 +498,12 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		FilerBaseURL: func() string {
 			if strings.ToUpper(lane) == "G" {
 				base := os.Getenv("PLOY_SEAWEEDFS_URL")
-				if base == "" { base = "http://seaweedfs-filer.service.consul:8888" }
-				if !strings.HasPrefix(base, "http") { base = "http://" + base }
+				if base == "" {
+					base = "http://seaweedfs-filer.service.consul:8888"
+				}
+				if !strings.HasPrefix(base, "http") {
+					base = "http://" + base
+				}
 				return strings.TrimRight(base, "/")
 			}
 			return ""
