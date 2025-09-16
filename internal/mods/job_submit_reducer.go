@@ -52,18 +52,33 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 		imgs := ResolveImagesFromEnv()
 		infra := ResolveInfraFromEnv()
 		runID := ReducerRunID(planID)
-		vars := map[string]string{
-			"MODS_REGISTRY":      imgs.Registry,
-			"MODS_PLANNER_IMAGE": imgs.Planner,
-			"MODS_REDUCER_IMAGE": imgs.Reducer,
-			"PLOY_CONTROLLER":    infra.Controller,
-			"MOD_ID":             os.Getenv("MOD_ID"),
-			"PLOY_SEAWEEDFS_URL": infra.SeaweedURL,
-			"NOMAD_DC":           infra.DC,
-			"MODS_CONTEXT_DIR":   filepath.Dir(assets.HistoryPath),
-			"MODS_OUT_DIR":       filepath.Join(workspace, "reducer", "out"),
-		}
-		renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
+        contextDir := filepath.Dir(assets.HistoryPath)
+        outDir := filepath.Join(workspace, "reducer", "out")
+        vars := map[string]string{
+            "MODS_REGISTRY":      imgs.Registry,
+            "MODS_PLANNER_IMAGE": imgs.Planner,
+            "MODS_REDUCER_IMAGE": imgs.Reducer,
+            "PLOY_CONTROLLER":    infra.Controller,
+            "MOD_ID":             os.Getenv("MOD_ID"),
+            "PLOY_SEAWEEDFS_URL": infra.SeaweedURL,
+            "NOMAD_DC":           infra.DC,
+            "MODS_CONTEXT_DIR":   contextDir,
+            "MODS_OUT_DIR":       outDir,
+        }
+        // If SeaweedFS is available, tar the reducer context and upload; set MODS_CONTEXT_URL for artifact source
+        if infra.SeaweedURL != "" {
+            _ = os.WriteFile(filepath.Join(contextDir, ".keep"), []byte("reducer-context"), 0644)
+            tarPath := filepath.Join(workspace, "reducer", "context.tar")
+            if err := createTarFromDir(contextDir, tarPath); err == nil {
+                if modID := os.Getenv("MOD_ID"); modID != "" {
+                    if !strings.HasPrefix(modID, "mod-") { modID = "mod-" + modID }
+                    key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
+                    _ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+                    vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
+                }
+            }
+        }
+        renderedHCLPath, err := substituteHCLTemplateWithMCPVars(assets.HCLPath, runID, vars, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to substitute reducer HCL: %w", err)
 		}
