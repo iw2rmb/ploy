@@ -17,6 +17,20 @@ type BuildOperations struct {
 	timeout time.Duration
 }
 
+// ExecOutput captures full stdout/stderr from a command execution.
+type ExecOutput struct {
+	Stdout string
+	Stderr string
+}
+
+func runCmd(ctx context.Context, cmd *exec.Cmd) (ExecOutput, error) {
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+	e := cmd.Run()
+	return ExecOutput{Stdout: out.String(), Stderr: errb.String()}, e
+}
+
 // NewBuildOperations creates a new build operations handler
 func NewBuildOperations(timeout time.Duration) *BuildOperations {
 	if timeout == 0 {
@@ -95,35 +109,23 @@ func (b *BuildOperations) ValidateBuild(ctx context.Context, repoPath string, bu
 
 // buildMaven runs Maven build
 func (b *BuildOperations) buildMaven(ctx context.Context, repoPath string) error {
-	// First, try to run clean compile
-	// Always pass a stable property to allow controlled profile activation in test repos
-	// This enables E2E scenarios to introduce compile-time failures only during the build gate
+	// First, try to run clean compile (stable property to activate deterministic profile)
 	cmd := exec.CommandContext(ctx, "mvn", "clean", "compile", "-B", "-DskipTests", "-Dploy.build.gate=1")
 	cmd.Dir = repoPath
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		// Extract compilation errors from Maven output (consider both stderr and stdout)
-		combined := stderr.String()
-		if out := stdout.String(); out != "" {
-			if combined != "" {
-				combined = combined + "\n" + out
-			} else {
-				combined = out
-			}
-		}
+	eo, err := runCmd(ctx, cmd)
+	if err != nil {
+		combined := strings.TrimSpace(strings.Join([]string{eo.Stderr, eo.Stdout}, "\n"))
 		errors := b.parseMavenErrors(combined)
 		if len(errors) > 0 {
 			return &BuildError{
 				Type:    "compilation",
 				Message: fmt.Sprintf("Maven compilation failed: %d errors", len(errors)),
 				Details: strings.Join(errors, "\n"),
+				Stdout:  eo.Stdout,
+				Stderr:  eo.Stderr,
 			}
 		}
-		return fmt.Errorf("maven build failed: %v\n%s", err, combined)
+		return &BuildError{Type: "compilation", Message: fmt.Sprintf("maven build failed: %v", err), Details: combined, Stdout: eo.Stdout, Stderr: eo.Stderr}
 	}
 
 	return nil
@@ -140,21 +142,20 @@ func (b *BuildOperations) buildGradle(ctx context.Context, repoPath string) erro
 	cmd := exec.CommandContext(ctx, gradleCmd, "clean", "compileJava", "-x", "test")
 	cmd.Dir = repoPath
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
+	eo, err := runCmd(ctx, cmd)
+	if err != nil {
 		// Extract compilation errors from Gradle output
-		errors := b.parseGradleErrors(stderr.String())
+		errors := b.parseGradleErrors(eo.Stderr)
 		if len(errors) > 0 {
 			return &BuildError{
 				Type:    "compilation",
 				Message: fmt.Sprintf("Gradle compilation failed: %d errors", len(errors)),
 				Details: strings.Join(errors, "\n"),
+				Stdout:  eo.Stdout,
+				Stderr:  eo.Stderr,
 			}
 		}
-		return fmt.Errorf("gradle build failed: %v\n%s", err, stderr.String())
+		return &BuildError{Type: "compilation", Message: fmt.Sprintf("gradle build failed: %v", err), Details: eo.Stderr, Stdout: eo.Stdout, Stderr: eo.Stderr}
 	}
 
 	return nil
@@ -574,10 +575,45 @@ type BuildError struct {
 	Type    string
 	Message string
 	Details string
+	Stdout  string
+	Stderr  string
 }
 
 func (e *BuildError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+}
+
+// FormatBuildError renders a human-readable error including details and optional raw output.
+// maxBytes caps the length of stdout/stderr sections to avoid oversized messages (0 = unlimited).
+func FormatBuildError(e *BuildError, includeRaw bool, maxBytes int) string {
+	if e == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(e.Error())
+	if e.Details != "" {
+		b.WriteString(": ")
+		b.WriteString(e.Details)
+	}
+	if includeRaw {
+		if e.Stderr != "" {
+			b.WriteString("\nstderr:\n")
+			s := e.Stderr
+			if maxBytes > 0 && len(s) > maxBytes {
+				s = s[:maxBytes] + "…"
+			}
+			b.WriteString(s)
+		}
+		if e.Stdout != "" {
+			b.WriteString("\nstdout:\n")
+			s := e.Stdout
+			if maxBytes > 0 && len(s) > maxBytes {
+				s = s[:maxBytes] + "…"
+			}
+			b.WriteString(s)
+		}
+	}
+	return b.String()
 }
 
 // TestResults represents test execution results

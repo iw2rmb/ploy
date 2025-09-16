@@ -27,8 +27,11 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 	defer cancel()
 	if bo := arf.NewBuildOperations(compileTimeout); bo != nil {
 		if err := bo.ValidateBuild(cctx, repoPath, ""); err != nil {
-			// Return a failed result to trigger healing flow with the compiler error message
-			return &common.DeployResult{Success: false, Message: err.Error()}, nil
+			msg := err.Error()
+			if be, ok := err.(*arf.BuildError); ok {
+				msg = arf.FormatBuildError(be, true, 64*1024)
+			}
+			return &common.DeployResult{Success: false, Message: msg}, nil
 		}
 	}
 	appName := GenerateAppName(r.config.ID)
