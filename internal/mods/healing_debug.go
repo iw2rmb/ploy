@@ -1,8 +1,10 @@
 package mods
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -68,4 +70,28 @@ func buildFirstErrorSnippet(repoPath, buildError string) string {
 		snippet = snippet[:500] + "…"
 	}
 	return fmt.Sprintf("post-replay snippet file=%s lines %d-%d:\n%s", rel, start, end, snippet)
+}
+
+// workingTreeDiffNames returns a list of changed files in the working tree
+// relative to HEAD (uncommitted changes) using `git diff --name-only`.
+func workingTreeDiffNames(ctx context.Context, repoPath string, max int) []string {
+	cmd := exec.CommandContext(ctx, "git", "diff", "--name-only")
+	cmd.Dir = repoPath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var res []string
+	for _, l := range lines {
+		s := strings.TrimSpace(l)
+		if s == "" {
+			continue
+		}
+		res = append(res, s)
+		if max > 0 && len(res) >= max {
+			break
+		}
+	}
+	return res
 }
