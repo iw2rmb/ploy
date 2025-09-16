@@ -138,6 +138,35 @@ EOF
 perl -0777 -pe "s/REPL\./${main%.*}\./g; s/REPL/${main%.*}/g" -i "$d/src/main/java/${main//.//}/Main.java"
 }
 
+# Rust minimal wasm32-wasi app (Lane G)
+scaffold_rust_wasm() {
+  local d=$1 v=$2
+  write "$d/Cargo.toml" << 'EOF'
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2021"
+
+[profile.release]
+opt-level = "z"
+strip = true
+lto = true
+codegen-units = 1
+EOF
+  write "$d/src/main.rs" << 'EOF'
+fn main() {
+    // Minimal entry for WASI; printing is optional
+    // Exit 0 ensures runner reports healthy
+    println!("ok");
+}
+EOF
+  # Optional: hint default target (builder adds target anyway)
+  write "$d/.cargo/config.toml" << 'EOF'
+[build]
+target = "wasm32-wasi"
+EOF
+}
+
 scaffold_repo() {
   local lane=$1 lang=$2 ver=$3
   local lname=$(echo "$lane" | tr '[:upper:]' '[:lower:]')
@@ -152,6 +181,13 @@ scaffold_repo() {
     java) scaffold_java_gradle "$dir" "$ver" "com.ploy.app.Main" ;;
     scala) scaffold_java_gradle "$dir" "$ver" "com.ploy.app.Main" ;;
     dotnet) scaffold_dotnet "$dir" "$ver" ;;
+    rust)
+      if [ "$lane" = "G" ] || [ "$lane" = "g" ]; then
+        scaffold_rust_wasm "$dir" "$ver"
+      else
+        echo "Rust scaffolding for non-G lanes not implemented" >&2
+      fi
+      ;;
   esac
   commit_push "$dir"
 }

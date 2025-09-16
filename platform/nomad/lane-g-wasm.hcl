@@ -21,7 +21,13 @@ job "{{APP_NAME}}-lane-g" {
         image = "debian:bookworm-slim"
         entrypoint = ["/bin/sh", "-lc"]
         args = [
-          "set -eu; apt-get update -y >/dev/null 2>&1 && apt-get install -y wget ca-certificates >/dev/null 2>&1; mkdir -p /app; wget -qO /app/wazero-runner http://seaweedfs-filer.service.consul:8888/artifacts/wazero-runner/linux/amd64/wazero-runner; chmod +x /app/wazero-runner; wget -qO /app/module.wasm $WASM_URL; echo 'Fetched WASM module'; exec /app/wazero-runner -module /app/module.wasm -port $PORT"
+          "set -ex; apt-get update -y && apt-get install -y wget ca-certificates; \
+           mkdir -p /app; \
+           echo '[lane-g] downloading wazero-runner' && wget -O /app/wazero-runner http://seaweedfs-filer.service.consul:8888/artifacts/wazero-runner/linux/amd64/wazero-runner; \
+           chmod +x /app/wazero-runner; \
+           echo '[lane-g] downloading module from ' $WASM_URL && wget -O /app/module.wasm $WASM_URL; \
+           echo '[lane-g] module downloaded:' && ls -l /app/module.wasm; \
+           exec /app/wazero-runner -ignore-errors -module /app/module.wasm -port $PORT"
         ]
         ports = ["http"]
       }
