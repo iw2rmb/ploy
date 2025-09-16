@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	build "github.com/iw2rmb/ploy/internal/build"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 )
 
@@ -29,7 +30,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			if config != nil {
 				lane = config.Lane
 			}
-			parsed := ParseBuildErrors("java", "maven", buildError)
+			parsed := build.ParseBuildErrors("java", "maven", buildError)
 			// Build JSON: last_error + optional first_error_* + full errors[]
 			var b strings.Builder
 			b.WriteString("{\n  \"language\": \"java\",\n  \"lane\": ")

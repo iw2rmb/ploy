@@ -7,12 +7,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	build "github.com/iw2rmb/ploy/internal/build"
 )
 
 // buildFirstErrorSnippet extracts a small 1-3 line snippet around the first compiler error
 // from buildError and returns a formatted message for event emission.
 func buildFirstErrorSnippet(repoPath, buildError string) string {
-	errs := ParseBuildErrors("java", "maven", buildError)
+	errs := build.ParseBuildErrors("java", "maven", buildError)
 	if len(errs) == 0 {
 		return ""
 	}
@@ -101,7 +103,7 @@ func firstErrorFileHead(repoPath, buildError string, n int) string {
 	if n <= 0 {
 		n = 10
 	}
-	errs := ParseBuildErrors("java", "maven", buildError)
+	errs := build.ParseBuildErrors("java", "maven", buildError)
 	if len(errs) == 0 {
 		return ""
 	}

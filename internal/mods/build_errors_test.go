@@ -1,14 +1,18 @@
 package mods
 
-import "testing"
+import (
+	"testing"
 
-func TestJavaMavenErrorParser_Parse_LineColBracket(t *testing.T) {
+	build "github.com/iw2rmb/ploy/internal/build"
+)
+
+func TestSandboxParser_ParseJavaMaven(t *testing.T) {
 	raw := `
-[ERROR] COMPILATION ERROR : 
+[ERROR] COMPILATION ERROR :
 [ERROR] /workspace/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol
 [ERROR] /workspace/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol
 `
-	got := JavaMavenErrorParser{}.Parse(raw)
+	got := build.ParseBuildErrors("java", "maven", raw)
 	if len(got) == 0 {
 		t.Fatalf("expected parsed errors, got none")
 	}
