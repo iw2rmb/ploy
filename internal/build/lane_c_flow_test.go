@@ -29,5 +29,10 @@ func TestLaneC_NoStorageReturns500(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-tar")
 	resp, err := app.Test(req, 30000)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	require.Equal(t, 500, resp.StatusCode)
 }

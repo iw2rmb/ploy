@@ -27,7 +27,15 @@ func TestRecipesRoute_GetByID_Internal(t *testing.T) {
 
 	srv.app.Get("/_test/recipes/:id", srv.handleRecipeCatalogGet)
 	req := httptest.NewRequest("GET", "/_test/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
-	resp := mustResponse(t)(srv.app.Test(req, -1))
+	resp, err := srv.app.Test(req, -1)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
