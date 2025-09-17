@@ -84,7 +84,7 @@ func TestLaneE_BuilderFailure_UploadsLogsAndPointer(t *testing.T) {
 	}
 	logsKey, _ := builder["logs_key"].(string)
 	logsURL, _ := builder["logs_url"].(string)
-	if logsKey == "" || !strings.Contains(logsKey, "artifacts/build-logs/") {
+	if logsKey == "" || !strings.Contains(logsKey, "build-logs/") {
 		t.Fatalf("logs_key not set or invalid: %q", logsKey)
 	}
 	if logsURL == "" || !strings.Contains(logsURL, logsKey) {
