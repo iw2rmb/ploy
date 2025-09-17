@@ -162,8 +162,8 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, 
 		// .NET builds often need more memory
 		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_DOTNET_MB", "2048")
 	case "java", "scala", "kotlin", "jvm":
-		// JVM builds (Gradle/Maven) typically need more than default
-		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_JAVA_MB", "1024")
+		// JVM builds (Gradle/Maven) need more memory; default to 4GB unless overridden
+		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_JAVA_MB", "4096")
 	}
 	s = strings.ReplaceAll(s, "{{KANIKO_MEMORY}}", memMB)
 	// Also hard-rewrite any existing static memory assignment to ensure targeted bump applies
