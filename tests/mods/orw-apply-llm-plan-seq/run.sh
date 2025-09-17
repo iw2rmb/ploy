@@ -93,10 +93,14 @@ while :; do
   ST_JSON=$(curl -sS "$API_BASE/mods/$MOD_ID/status" || true)
   if [[ -n "$ST_JSON" ]]; then
     echo "$ST_JSON" > "$LOG_DIR/status_last.json"
-    TERM_STATUS=$(echo "$ST_JSON" | jq -r '.status // empty')
-    MR_URL=$(echo "$ST_JSON" | jq -r '.result.mr_url // empty')
-    PHASE=$(echo "$ST_JSON" | jq -r '.phase // empty')
-    echo "status=$TERM_STATUS phase=$PHASE"
+    if [[ "${ST_JSON:0:1}" == "{" ]]; then
+      TERM_STATUS=$(echo "$ST_JSON" | jq -r '.status // empty' 2>/dev/null || echo "")
+      MR_URL=$(echo "$ST_JSON" | jq -r '.result.mr_url // empty' 2>/dev/null || echo "")
+      PHASE=$(echo "$ST_JSON" | jq -r '.phase // empty' 2>/dev/null || echo "")
+      echo "status=$TERM_STATUS phase=$PHASE"
+    else
+      echo "non-json status response (len=${#ST_JSON})" >&2
+    fi
   fi
   # Event-driven short-circuit: if watcher detected terminal in SSE, break after one final status fetch
   if [[ -f "$LOG_DIR/terminated.flag" && -n "$TERM_STATUS" ]]; then
