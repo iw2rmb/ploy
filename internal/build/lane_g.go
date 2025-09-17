@@ -115,17 +115,11 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 		}
 		formatted := FormatBuildError(be, true, 4000)
 		c.Set("X-Deployment-ID", builderJobName)
-		logsKey := fmt.Sprintf("artifacts/build-logs/%s.log", builderJobName)
+		logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
 		if deps.Storage != nil && fullLogs != "" {
 			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
 		}
-		logsURL := ""
-		if base := os.Getenv("PLOY_SEAWEEDFS_URL"); base != "" {
-			if !strings.HasPrefix(base, "http") {
-				base = "http://" + base
-			}
-			logsURL = strings.TrimRight(base, "/") + "/" + logsKey
-		}
+		logsURL := buildLogsURL(logsKey)
 		return "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   formatted,
 			"stage":   "wasm_submit",

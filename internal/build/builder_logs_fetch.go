@@ -48,13 +48,26 @@ func runningAlloc(job string) string {
 }
 
 func runJobMgrLogs(alloc string, lines int, both bool) string {
-	args := []string{"logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines)}
+	base := []string{"logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines)}
 	if both {
-		args = append(args, "--both")
+		base = append(base, "--both")
 	}
-	cmd := exec.Command(jobMgrPath(), args...)
+	for _, task := range candidateLogTasks() {
+		args := append(append([]string{}, base...), "--task", task)
+		cmd := exec.Command(jobMgrPath(), args...)
+		b, err := cmd.CombinedOutput()
+		out := string(b)
+		if err == nil && !strings.Contains(out, "must provide task name") && !strings.Contains(out, "task not found") {
+			return out
+		}
+	}
+	cmd := exec.Command(jobMgrPath(), base...)
 	b, _ := cmd.CombinedOutput()
 	return string(b)
+}
+
+func candidateLogTasks() []string {
+	return []string{"kaniko", "build-wasm", "osv-pack", "osv-jvm", "compile", "builder"}
 }
 
 func getAllocIDs(job string) []string {
