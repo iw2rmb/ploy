@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	models "github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/api/recipes/models"
 	"gopkg.in/yaml.v3"
 )
 

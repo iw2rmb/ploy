@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/internal/llms/models"
 )
 
 // setupTestServer creates a test HTTP server for CLI command testing

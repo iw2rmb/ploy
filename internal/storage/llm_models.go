@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/internal/llms/models"
 )
 
 // LLMModelStorage provides storage operations for LLM models

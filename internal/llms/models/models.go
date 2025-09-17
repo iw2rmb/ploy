@@ -7,6 +7,43 @@ import (
 	"time"
 )
 
+// Time wraps time.Time for JSON mapping compatibility
+type Time time.Time
+
+// Format proxies to time.Time formatting
+func (t Time) Format(layout string) string { return time.Time(t).Format(layout) }
+
+// Before compares underlying time values
+func (t Time) Before(other Time) bool { return time.Time(t).Before(time.Time(other)) }
+
+func (t *Time) UnmarshalJSON(data []byte) error {
+	// Expect RFC3339 string
+	var s string
+	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
+		s = string(data[1 : len(data)-1])
+	} else {
+		s = string(data)
+	}
+	if s == "" || s == "null" {
+		*t = Time{}
+		return nil
+	}
+	parsed, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return err
+	}
+	*t = Time(parsed)
+	return nil
+}
+
+// MarshalJSON converts Time to JSON string
+func (t Time) MarshalJSON() ([]byte, error) {
+	if time.Time(t).IsZero() {
+		return []byte("null"), nil
+	}
+	return []byte(`"` + time.Time(t).Format(time.RFC3339) + `"`), nil
+}
+
 // LLMModel represents a language model in the registry
 type LLMModel struct {
 	ID           string            `json:"id"`           // e.g., "gpt-4o-mini@2024-08-06"
