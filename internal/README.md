@@ -23,7 +23,7 @@ internal/
 ├── git/            # Git ops (repo, provider integrations, validation, security, stats)
 ├── lane/           # Lane detection rules and helpers
 ├── lifecycle/      # App lifecycle operations (create/destroy/rollback)
-├── mods/           # Mods orchestration (planner/reducer/LLM exec/ORW, KB, MR, events, images, gates)
+├── mods/           # Mods subsystem — see internal/mods/README.md
 ├── monitoring/     # Health, metrics, tracing instrumentation
 ├── orchestration/  # Nomad orchestration (render/submit/monitor, HCL templates, retry transport)
 ├── policy/         # Policy enforcement (enforcer + config)
@@ -50,4 +50,3 @@ internal/
 
 - ARF is being migrated into `internal/arf` from `api/arf` incrementally; see `internal/arf/README.md` for status.
 - When adding new internal modules, prefer small, focused packages and wire them through `internal/config` and `internal/orchestration` seams when applicable.
-
