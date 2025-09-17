@@ -105,9 +105,9 @@ func TestProcessConditionalBlocksAndEvaluate(t *testing.T) {
 		"{{#if DEBUG_ENABLED}}debug-on{{/if}}\n" +
 		"{{#if GRPC_PORT}}grpc={{GRPC_PORT}}{{/if}}\n" +
 		"{{#if DISK_SIZE}}disk={{DISK_SIZE}}{{/if}}\n" +
-		"{{#if VAULT_ENABLED}}vault{{/if}}\n"
+		"{{#if CONNECT_ENABLED}}connect{{/if}}\n"
 
-	data := RenderData{DebugEnabled: true, GrpcPort: 9090, DiskSize: 0, VaultEnabled: false}
+	data := RenderData{DebugEnabled: true, GrpcPort: 9090, DiskSize: 0, ConnectEnabled: false}
 	out := processConditionalBlocks(tpl, data)
 	if !strings.Contains(out, "debug-on") {
 		t.Fatalf("expected debug-on in output: %q", out)
@@ -118,8 +118,8 @@ func TestProcessConditionalBlocksAndEvaluate(t *testing.T) {
 	if strings.Contains(out, "disk=") {
 		t.Fatalf("did not expect disk line when DiskSize=0: %q", out)
 	}
-	if strings.Contains(out, "vault") {
-		t.Fatalf("did not expect vault line when disabled: %q", out)
+	if strings.Contains(out, "connect") {
+		t.Fatalf("did not expect connect line when disabled: %q", out)
 	}
 }
 

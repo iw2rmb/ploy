@@ -57,14 +57,6 @@ job "{{APP_NAME}}-lane-a" {
     task "unikernel" {
       driver = "qemu"
       
-      # Vault integration for configuration secrets
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
-      
       config {
         image_path = "{{IMAGE_PATH}}"
         args = [
@@ -111,22 +103,6 @@ EOF
         env         = true
         change_mode = "restart"
         perms       = "0644"
-      }
-      {{/if}}
-      
-      # Vault secrets for unikernels
-      {{#if VAULT_ENABLED}}
-      template {
-        data = <<EOF
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}"}}{{.Data.data.database_password}}{{end}}
-API_KEY={{with secret "secret/data/{{APP_NAME}}"}}{{.Data.data.api_key}}{{end}}
-TLS_CERT={{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul"}}{{.Data.certificate}}{{end}}
-TLS_KEY={{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul"}}{{.Data.private_key}}{{end}}
-EOF
-        destination = "secrets/unikernel.env"
-        env         = true
-        change_mode = "restart"
-        perms       = "0600"
       }
       {{/if}}
       

@@ -43,14 +43,6 @@ job "{{APP_NAME}}-lane-b" {
     task "unikernel-posix" {
       driver = "qemu"
       
-      # Vault integration for Node.js secrets
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
-      
       config {
         image_path = "{{IMAGE_PATH}}"
         args = [
@@ -115,35 +107,6 @@ EOF
         env         = true
         change_mode = "restart"
         perms       = "0644"
-      }
-      {{/if}}
-      
-      # Vault secrets for Node.js applications
-      {{#if VAULT_ENABLED}}
-      template {
-        data = <<EOF
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.password}}{{end}}
-API_SECRET={{with secret "secret/data/{{APP_NAME}}/api"}}{{.Data.data.secret}}{{end}}
-JWT_SECRET={{with secret "secret/data/{{APP_NAME}}/jwt"}}{{.Data.data.secret}}{{end}}
-SESSION_SECRET={{with secret "secret/data/{{APP_NAME}}/session"}}{{.Data.data.secret}}{{end}}
-
-# Third-party API keys
-STRIPE_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/stripe"}}{{.Data.data.secret_key}}{{end}}
-SENDGRID_API_KEY={{with secret "secret/data/{{APP_NAME}}/sendgrid"}}{{.Data.data.api_key}}{{end}}
-AWS_ACCESS_KEY_ID={{with secret "aws/creds/{{APP_NAME}}-role"}}{{.Data.access_key}}{{end}}
-AWS_SECRET_ACCESS_KEY={{with secret "aws/creds/{{APP_NAME}}-role"}}{{.Data.secret_key}}{{end}}
-
-# TLS certificates
-{{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=72h"}}
-TLS_CERT={{.Data.certificate}}
-TLS_KEY={{.Data.private_key}}
-TLS_CA={{.Data.ca_chain}}
-{{end}}
-EOF
-        destination = "secrets/node.env"
-        env         = true
-        change_mode = "restart"
-        perms       = "0600"
       }
       {{/if}}
       

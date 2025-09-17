@@ -60,7 +60,6 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 			return ""
 		}(),
 		FilerBaseURL:        filerBaseURL(lane),
-		VaultEnabled:        false,
 		ConsulConfigEnabled: true,
 		ConnectEnabled:      false,
 		VolumeEnabled:       false,

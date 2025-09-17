@@ -29,7 +29,6 @@ type RenderData struct {
 	DiskSize      int
 
 	// Feature flags
-	VaultEnabled        bool
 	ConsulConfigEnabled bool
 	ConnectEnabled      bool
 	VolumeEnabled       bool
@@ -424,7 +423,6 @@ func (r *RenderData) SetDefaults() {
 	// validation issues; enable selectively for platform services.
 	isPlat := isPlatformService(*r)
 	r.ConnectEnabled = false
-	r.VaultEnabled = false
 	r.VolumeEnabled = isPlat
 	r.ConsulConfigEnabled = isPlat
 
@@ -476,8 +474,6 @@ func processConditionalBlocks(template string, data RenderData) string {
 // evaluateCondition determines if a condition should be true based on RenderData
 func evaluateCondition(condition string, data RenderData) bool {
 	switch condition {
-	case "VAULT_ENABLED":
-		return data.VaultEnabled
 	case "CONSUL_CONFIG_ENABLED":
 		return data.ConsulConfigEnabled
 	case "CONNECT_ENABLED":
@@ -506,7 +502,7 @@ func isPlatformService(data RenderData) bool {
 	platformServices := []string{
 		"api", "controller", "openrewrite", "openrewrite-service",
 		"metrics", "monitoring", "logging", "traefik",
-		"nomad", "consul", "vault", "seaweedfs",
+		"nomad", "consul", "seaweedfs",
 	}
 
 	for _, service := range platformServices {

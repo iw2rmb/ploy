@@ -76,12 +76,6 @@ job "{{APP_NAME}}-{{LANE}}" {
               destination_name = "database"
               local_bind_port  = 5432
             }
-            {{#if VAULT_ENABLED}}
-            upstreams {
-              destination_name = "vault"
-              local_bind_port  = 8200
-            }
-            {{/if}}
           }
         }
       }
@@ -95,14 +89,6 @@ job "{{APP_NAME}}-{{LANE}}" {
     
     task "{{TASK_NAME}}" {
       driver = "{{DRIVER}}"
-      
-      # Vault integration for secrets
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
       
       # Enhanced configuration based on driver
       config {
@@ -148,19 +134,6 @@ job "{{APP_NAME}}-{{LANE}}" {
 {{end}}
 EOF
         destination = "local/app.env"
-        env         = true
-        change_mode = "restart"
-      }
-      {{/if}}
-      
-      # Vault secrets template
-      {{#if VAULT_ENABLED}}
-      template {
-        data = <<EOF
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}"}}{{.Data.data.database_password}}{{end}}
-API_KEY={{with secret "secret/data/{{APP_NAME}}"}}{{.Data.data.api_key}}{{end}}
-EOF
-        destination = "secrets/app.env"
         env         = true
         change_mode = "restart"
       }
