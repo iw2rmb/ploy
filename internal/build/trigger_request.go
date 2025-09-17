@@ -13,6 +13,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
+var persistentArtifactsDir = "/opt/ploy/artifacts"
+
 // readRequestBodyToTar reads the incoming request body (multipart or raw) into dst
 func readRequestBodyToTar(c *fiber.Ctx, dst *os.File) (int64, error) {
 	ct := strings.ToLower(c.Get("Content-Type"))
@@ -109,11 +111,10 @@ func ensurePersistentArtifactCopy(imagePath string) (string, error) {
 	if imagePath == "" {
 		return "", nil
 	}
-	persistentDir := "/opt/ploy/artifacts"
-	if err := os.MkdirAll(persistentDir, 0755); err != nil {
+	if err := os.MkdirAll(persistentArtifactsDir, 0755); err != nil {
 		return "", err
 	}
-	persistentImagePath := filepath.Join(persistentDir, filepath.Base(imagePath))
+	persistentImagePath := filepath.Join(persistentArtifactsDir, filepath.Base(imagePath))
 	if err := copyFile(imagePath, persistentImagePath); err != nil {
 		return "", err
 	}

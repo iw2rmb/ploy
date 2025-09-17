@@ -53,6 +53,7 @@ Lane selection can be explicit via `lane` query param or environment override. O
   - Registry: `registry.dev.ployman.app` (Dev) without auth. Tag: `<registry>/<app>:<sha>`
 - Health: HTTP `:8080/healthz`; Traefik routes `Host(<app>.<domain>)`
 - Notes: easiest onramp via Dockerfile. Supports autogeneration (opt-in) for trivial Go/Node apps.
+- Tests: Lane E now has unit coverage for Jib failures (400 responses), Kaniko registry verification (HEAD→GET fallback), and Dockerfile autogeneration scaffolding.
 
 #### Dockerfile Autogeneration
 - Default: If `Dockerfile` is missing, API returns 400 instructing to add one.
@@ -83,6 +84,7 @@ Lane selection can be explicit via `lane` query param or environment override. O
   - Module location: your repo’s first `*.wasm` is uploaded to SeaweedFS at `builds/<app>/<sha>/module.wasm` and passed to the template as `{{WASM_URL}}`.
 - Health: HTTP `:8080/healthz` served by the runner (200 OK when module started without errors; 503 with error details when `-ignore-errors` is enabled).
 - Failure semantics: strict-by-default — if the module fails to compile/instantiate, the runner exits non‑zero and the task fails.
+- Tests: Lane G unit coverage asserts storage upload success and surfaces 500 responses when unified storage is unavailable.
 - Dev diagnostics (optional): pass `-ignore-errors` to the runner to keep the process alive and have `/healthz` return 503 + error text, for inspection without restart storms.
 - Notes: Great for small services; multi-language; ultra-fast start. Full WASM HTTP hosting requires a host adapter — the current runner executes `_start` and exposes a health endpoint.
 

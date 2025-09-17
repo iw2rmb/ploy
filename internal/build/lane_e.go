@@ -17,13 +17,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/orchestration"
 )
 
+var (
+	ociBuilder               = ibuilders.BuildOCI
+	dockerfileGenerator      = generateDockerfileWithFacts
+	renderKanikoBuilderFn    = orchestration.RenderKanikoBuilder
+	validateJobFn            = orchestration.ValidateJob
+	submitAndWaitFn          = orchestration.SubmitAndWaitTerminal
+	uploadWithUnifiedStorage = uploadFileWithUnifiedStorage
+	verifyOCIPushFn          = verifyOCIPush
+)
+
 // buildLaneE handles the container workflow (Jib or Kaniko). Returns dockerImage (or empty), imagePath (empty for Kaniko), and builderJobName when Kaniko runs.
 func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha, tmpDir, detectedLanguage string, facts project.BuildFacts, appEnvVars map[string]string) (imagePath, dockerImage, builderJobName string, err error) {
 	// Prefer Jib when detected
 	if facts.HasJib {
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
-		img, jibErr := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
+		img, jibErr := ociBuilder(appName, srcDir, tag, appEnvVars)
 		if jibErr != nil {
 			// propagate as 400 when prerequisites missing; otherwise as 500 from caller
 			es := strings.ToLower(jibErr.Error())
@@ -47,7 +57,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
 		if autogen == "true" || autogen == "1" || autogen == "on" {
 			fmt.Printf("[Lane E] No Dockerfile; attempting autogen for app=%s lang=%s tool=%s\n", appName, facts.Language, facts.BuildTool)
-			if err := generateDockerfileWithFacts(srcDir, facts); err != nil {
+			if err := dockerfileGenerator(srcDir, facts); err != nil {
 				return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
 					"error":   "no Dockerfile and failed to autogenerate",
 					"details": err.Error(),
@@ -84,7 +94,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	var contextURL string
 	if deps.Storage != nil {
 		ctxUp := context.Context(c.Context())
-		if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+		if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
 			return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 				"error":       "failed to upload build context",
 				"stage":       "upload_context",
@@ -150,7 +160,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			langForBuilder = "dotnet"
 		}
 	}
-	builderHCL, err := orchestration.RenderKanikoBuilder(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
+	builderHCL, err := renderKanikoBuilderFn(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
 	if err != nil {
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   "render builder failed",
@@ -163,7 +173,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		_ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
 		_ = copyFile(builderHCL, filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL)))
 	}()
-	if vErr := orchestration.ValidateJob(builderHCL); vErr != nil {
+	if vErr := validateJobFn(builderHCL); vErr != nil {
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":       "builder job validation failed",
 			"stage":       "validate_builder",
@@ -173,7 +183,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	}
 	builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
 	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s)\n", builderJobName, tag)
-	if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
+	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
 		snippet := getJobLogsSnippet(builderJobName, 80)
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
@@ -183,7 +193,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		})
 	}
 	// Verify image exists in registry before returning and capture digest
-	vr := verifyOCIPush(tag)
+	vr := verifyOCIPushFn(tag)
 	fmt.Printf("[Lane E] Verify push: tag=%s ok=%t status=%d digest=%s message=%s\n", tag, vr.OK, vr.Status, vr.Digest, vr.Message)
 	if !vr.OK || vr.Digest == "" {
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
