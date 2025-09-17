@@ -105,10 +105,16 @@ if [[ -n "${TARGET_HOST:-}" ]]; then
   log "Attempting SSH fetch of last_job allocation logs"
   LAST_ALLOC_ID=$(jq -r 'try .last_job.alloc_id // .last_job.AllocID // empty' "$OUT_DIR/status_latest.json" 2>/dev/null || true)
   LAST_JOB_NAME=$(jq -r 'try .last_job.job_name // .last_job.JobName // empty' "$OUT_DIR/status_latest.json" 2>/dev/null || true)
+  # Derive a --since timestamp from first event time (format to YYYY-MM-DD HH:MM:SS)
+  SINCE_RAW=$(grep -Eo '"time":"[0-9TZ:.-]+' "$OUT_DIR"/events*.sse 2>/dev/null | head -n1 | sed -E 's/"time":"([0-9T:.\-]+).*/\1/' || true)
+  if [[ -n "$SINCE_RAW" ]]; then
+    SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"
+    log "Using log since timestamp: $SINCE_FMT"
+  fi
   if [[ -n "$LAST_ALLOC_ID" ]]; then
     log "Fetching logs for alloc=$LAST_ALLOC_ID job=$LAST_JOB_NAME"
     ssh -o ConnectTimeout=10 "root@$TARGET_HOST" \
-      "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $LAST_ALLOC_ID --both --lines $LINES'" \
+      "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id $LAST_ALLOC_ID --both --lines $LINES ${SINCE_FMT:+--since "$SINCE_FMT"}'" \
       | sed -e "1s/^/[alloc:$LAST_ALLOC_ID] /" \
       > "$OUT_DIR/last_job.logs" || true
   else
