@@ -25,11 +25,15 @@
         owner: root
         group: root
         mode: '0755'
-    - name: Capture controller-side GitLab envs (workstation)
+    - name: Capture controller-side Git envs (workstation)
       no_log: true
       set_fact:
         controller_gitlab_url: "{{ lookup('env', 'GITLAB_URL') | default('', true) }}"
         controller_gitlab_token: "{{ lookup('env', 'GITLAB_TOKEN') | default('', true) }}"
+        controller_git_author_name: "{{ lookup('env', 'GIT_AUTHOR_NAME') | default('', true) }}"
+        controller_git_author_email: "{{ lookup('env', 'GIT_AUTHOR_EMAIL') | default('', true) }}"
+        controller_git_committer_name: "{{ lookup('env', 'GIT_COMMITTER_NAME') | default('', true) }}"
+        controller_git_committer_email: "{{ lookup('env', 'GIT_COMMITTER_EMAIL') | default('', true) }}"
     - name: Ensure ploy home exists
       file:
         path: "/home/ploy"
@@ -38,7 +42,7 @@
         group: ploy
         mode: '0755'
 
-    - name: Discover existing GitLab envs on VPS (do not log)
+    - name: Discover existing Git envs on VPS (do not log)
       no_log: true
       become_user: ploy
       shell: |
@@ -58,9 +62,13 @@
         fi
         printf 'GITLAB_URL=%s\n' "${GITLAB_URL}"
         printf 'GITLAB_TOKEN=%s\n' "${GITLAB_TOKEN}"
+        printf 'GIT_AUTHOR_NAME=%s\n' "${GIT_AUTHOR_NAME}"
+        printf 'GIT_AUTHOR_EMAIL=%s\n' "${GIT_AUTHOR_EMAIL}"
+        printf 'GIT_COMMITTER_NAME=%s\n' "${GIT_COMMITTER_NAME}"
+        printf 'GIT_COMMITTER_EMAIL=%s\n' "${GIT_COMMITTER_EMAIL}"
       register: vps_env
 
-    - name: Extract fallback URL/token (do not log)
+    - name: Extract fallback envs (do not log)
       no_log: true
       set_fact:
         fallback_url: "{{ (vps_env.stdout | regex_search('^GITLAB_URL=(.*)$', '\\1', multiline=True)) | default(omit, true) }}"
@@ -99,8 +107,10 @@
           # Optional OSv base image URL for Lane C builder (Dev only)
           # Example: https://example.com/osv/java8.qemu
           PLOY_OSV_BASE_URL="{{ lookup('env', 'PLOY_OSV_BASE_URL') }}"
-          GIT_AUTHOR_NAME="{{ lookup('env', 'GIT_AUTHOR_NAME') }}"
-          GIT_AUTHOR_EMAIL="{{ lookup('env', 'GIT_AUTHOR_EMAIL') }}"
+          GIT_AUTHOR_NAME="{{ controller_git_author_name if controller_git_author_name | length > 0 else 'Ploy Bot' }}"
+          GIT_AUTHOR_EMAIL="{{ controller_git_author_email if controller_git_author_email | length > 0 else 'ploy-bot@dev.ployman.app' }}"
+          GIT_COMMITTER_NAME="{{ controller_git_committer_name if controller_git_committer_name | length > 0 else (controller_git_author_name if controller_git_author_name | length > 0 else 'Ploy Bot') }}"
+          GIT_COMMITTER_EMAIL="{{ controller_git_committer_email if controller_git_committer_email | length > 0 else (controller_git_author_email if controller_git_author_email | length > 0 else 'ploy-bot@dev.ployman.app') }}"
 
     - name: Ensure PLOY_KANIKO_IMAGE present in /home/ploy/api.env (idempotent)
       lineinfile:
