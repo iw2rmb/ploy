@@ -83,6 +83,16 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 
 - Helper script: `tests/e2e/deploy/fetch-logs.sh` aggregates app logs, platform logs, and (optionally) builder job logs via SSH. Export `APP_NAME`, and optionally `LANE`, `SHA`, `LINES`, and `TARGET_HOST`.
 
+### Time-based Log Slicing (Recommended)
+
+- Prefer slicing platform logs by timestamp instead of restarting services or fetching overly large windows.
+- Strategy:
+  1) Record a start timestamp right before triggering a build, e.g. `START_TS=$(date '+%Y-%m-%d %H:%M:%S')`.
+  2) After the run, fetch platform logs and filter to lines at or after `START_TS`.
+     - The Nomad job manager (`/opt/hashicorp/bin/nomad-job-manager.sh`) supports `--since "YYYY-MM-DD HH:MM:SS"` on `logs` to apply a time-based filter when log lines begin with `[YYYY-MM-DD HH:MM:SS]`.
+     - Alternatively, use `tests/e2e/deploy/fetch-logs.sh` with `FILTER_MARKERS` or pipe through `awk` to slice by timestamp.
+- This keeps log slices small and focused per run without bouncing the API allocations.
+
 ## Commands
 
 **LOCAL**: 
