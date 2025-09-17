@@ -33,6 +33,7 @@
 - Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.
 - Docs: Updated `internal/README.md` to reflect current internal package structure.
 - Docs: Updated `api/README.md` with accurate API module structure.
+ - Docs: Added `internal/mods/README.md` (features + per-file list) and linked it from `internal/README.md` and `docs/FEATURES.md`.
 - API: Fixed SeaweedFS health readiness regression by creating storage clients from the centralized config service without requiring a metrics shim, preventing Nomad canaries from failing `/v1/health` with nil-pointer panics.
 - API Recipes: Registry storage adapter now semver-sorts recipe versions so latest-version lookups favor the highest semantic release.
 - Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
