@@ -29,12 +29,17 @@ func uploadRecipe(recipePath string, flags CommandFlags) error {
 		recipe.Metadata.Name = flags.Name
 	}
 
-	// Validate recipe
+	// Populate system fields (ID, timestamps, content hash) for payload completeness
+	recipe.SetSystemFields("cli")
+
+	// Light validation for CLI: rely on server for strict checks.
+	// Only enforce that a name is present; warn on other issues.
+	if recipe.Metadata.Name == "" {
+		return fmt.Errorf("recipe validation failed: recipe name is required")
+	}
 	if err := recipe.Validate(); err != nil {
-		if !flags.Force {
-			return fmt.Errorf("recipe validation failed: %w", err)
-		}
-		fmt.Printf("Warning: %v (continuing due to --force)\n", err)
+		// Print a warning but proceed; server/API performs authoritative validation.
+		fmt.Printf("Warning: %v (uploading anyway; server will validate)\n", err)
 	}
 
 	// Dry run mode
@@ -79,9 +84,12 @@ func updateRecipe(recipeID, recipePath string, flags CommandFlags) error {
 		return fmt.Errorf("failed to parse recipe YAML: %w", err)
 	}
 
-	// Validate recipe
+	// Light validation for CLI: require name only; warn on other issues.
+	if recipe.Metadata.Name == "" {
+		return fmt.Errorf("recipe validation failed: recipe name is required")
+	}
 	if err := recipe.Validate(); err != nil {
-		return fmt.Errorf("recipe validation failed: %w", err)
+		fmt.Printf("Warning: %v (updating anyway; server will validate)\n", err)
 	}
 
 	// Send to API
