@@ -15,19 +15,23 @@ func (r *ModRunner) createOrUpdateMR(ctx context.Context, result *ModResult, bra
 		return
 	}
 	// When MRManager is present, prefer it
-	if r.mrManager != nil {
-		labels := []string{"ploy", "tfl"}
-		if r.config != nil && r.config.MR != nil && len(r.config.MR.Labels) > 0 {
-			labels = r.config.MR.Labels
-		}
-		mrConfig := provider.MRConfig{
-			RepoURL:      r.config.TargetRepo,
-			SourceBranch: branchName,
-			TargetBranch: r.config.TargetBranch,
-			Title:        fmt.Sprintf("Mods: %s", r.config.ID),
-			Description:  renderMRDescription(r, result),
-			Labels:       labels,
-		}
+    if r.mrManager != nil {
+        labels := []string{"ploy", "tfl"}
+        if r.config != nil && r.config.MR != nil && len(r.config.MR.Labels) > 0 {
+            labels = r.config.MR.Labels
+        }
+        target := r.config.TargetBranch
+        if target == "" {
+            target = r.config.BaseRef
+        }
+        mrConfig := provider.MRConfig{
+            RepoURL:      r.config.TargetRepo,
+            SourceBranch: branchName,
+            TargetBranch: target,
+            Title:        fmt.Sprintf("Mods: %s", r.config.ID),
+            Description:  renderMRDescription(r, result),
+            Labels:       labels,
+        }
 		mrTimeout := 2 * time.Minute
 		mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
 		defer cancelMR()
@@ -43,23 +47,27 @@ func (r *ModRunner) createOrUpdateMR(ctx context.Context, result *ModResult, bra
 		}
 		return
 	}
-	if err := r.gitProvider.ValidateConfiguration(); err != nil {
-		r.emit(ctx, "mr", "mr", "warn", "MR creation skipped - configuration invalid")
-		result.StepResults = append(result.StepResults, StepResult{
-			StepID:  "mr",
-			Success: true,
-			Message: fmt.Sprintf("MR creation skipped - configuration invalid: %v", err),
-		})
-		return
-	}
-	mrConfig := provider.MRConfig{
-		RepoURL:      r.config.TargetRepo,
-		SourceBranch: branchName,
-		TargetBranch: r.config.TargetBranch,
-		Title:        fmt.Sprintf("Mods: %s", r.config.ID),
-		Description:  renderMRDescription(r, result),
-		Labels:       []string{"ploy", "tfl"},
-	}
+    if err := r.gitProvider.ValidateConfiguration(); err != nil {
+        r.emit(ctx, "mr", "mr", "warn", "MR creation skipped - configuration invalid")
+        result.StepResults = append(result.StepResults, StepResult{
+            StepID:  "mr",
+            Success: false,
+            Message: fmt.Sprintf("MR creation skipped - configuration invalid: %v", err),
+        })
+        return
+    }
+    target := r.config.TargetBranch
+    if target == "" {
+        target = r.config.BaseRef
+    }
+    mrConfig := provider.MRConfig{
+        RepoURL:      r.config.TargetRepo,
+        SourceBranch: branchName,
+        TargetBranch: target,
+        Title:        fmt.Sprintf("Mods: %s", r.config.ID),
+        Description:  renderMRDescription(r, result),
+        Labels:       []string{"ploy", "tfl"},
+    }
 
 	mrTimeout := 2 * time.Minute
 	mrCtx, cancelMR := context.WithTimeout(ctx, mrTimeout)
